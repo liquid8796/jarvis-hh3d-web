@@ -1,18 +1,22 @@
 import { Sandbox } from "@vercel/sandbox";
-import type { UserConfig } from "@/lib/services/configs";
 import { SANDBOX_SLICE_MS } from "./policy";
 
 /**
- * Linh sứ sandbox — chạy MỘT LÁT nhiệm vụ trong một microVM của Vercel rồi tắt.
+ * Linh sứ SANDBOX — dựng một microVM rồi thả nó tự chạy.
  *
- * Vì sao lại là "lát" chứ không phải "lượt": sandbox có trần thời gian, còn nhiệm vụ thì
- * không hứa xong trong trần đó. Nên đơn vị làm việc ở đây là một lát có giới hạn — làm
- * được tới đâu, báo cáo tới đó, và nói rõ đã xong hẳn hay cần lát nữa. Cron gọi lại lát sau.
+ * Điểm mấu chốt của thiết kế này, và lý do nó khác bản đầu tiên: **function KHÔNG chờ
+ * sandbox làm xong.** Bản trước `await` cả lát tám phút, nhưng function của Vercel có trần
+ * thời gian riêng — trên gói Hobby chỉ 60 giây. Chờ trong function nghĩa là function chết
+ * trước, kéo theo cả lượt chạy, và không gói nào rẻ chữa được điều đó.
  *
- * Đánh đổi phải biết trước: mỗi lát là một VM MỚI, không kế thừa gì từ lát trước — không
- * cookie đã warm, không tab đang mở, không phòng đang đứng. Với Luyện Đan Đường điều đó vô
- * hại vì mỗi lượt ghé vốn đã độc lập (vào trang, làm, đi). Với Mê Cung thì chí mạng, và đó
- * chính là lý do `policy.ts` không bao giờ giao Mê Cung cho sandbox.
+ * Nên đảo vai: function chỉ (1) dựng VM, (2) nạp một script worker vào đó, (3) chạy script
+ * ở chế độ `detached`, (4) trả về ngay. Từ giây đó sandbox sống độc lập với microVM timeout
+ * của CHÍNH nó, và tự nói chuyện với `/api/worker` bằng đúng giao thức mà linh sứ máy nhà
+ * dùng — nhận việc, nhịp tim, kể chuyện, báo kết thúc.
+ *
+ * Cái hay của việc dùng lại giao thức: sandbox và worker máy nhà trở thành hai hiện thân
+ * của cùng một hợp đồng. Không có nhánh code thứ hai để lệch pha, và người dùng thấy nhật
+ * ký giống hệt nhau dù lượt chạy ở đâu.
  */
 
 /** Thư viện hệ thống Chromium cần trên VM (Amazon Linux / dnf). */
@@ -24,15 +28,6 @@ const CHROMIUM_SYSTEM_DEPS = [
   "gtk3", "dbus-libs",
 ];
 
-export type SliceResult = {
-  /** true = nhiệm vụ đã xong hẳn; false = còn dở, cần lát nữa. */
-  finished: boolean;
-  ok: boolean;
-  message: string;
-  /** Những dòng kể cho người dùng đọc, theo thứ tự thời gian. */
-  events: { level: "info" | "success" | "warning" | "error"; message: string }[];
-};
-
 function credentials() {
   const { VERCEL_TOKEN, VERCEL_TEAM_ID, VERCEL_PROJECT_ID } = process.env;
   return VERCEL_TOKEN && VERCEL_TEAM_ID && VERCEL_PROJECT_ID
@@ -40,22 +35,32 @@ function credentials() {
     : {};
 }
 
-/**
- * Chạy một lát. Luôn tắt VM ở `finally` — một sandbox bị bỏ quên vẫn tính tiền, và lỗi ở
- * giữa chừng là lúc dễ quên nhất.
- */
-export async function runSandboxSlice(input: {
-  config: UserConfig;
-  onEvent?: (level: SliceResult["events"][number]["level"], message: string) => void;
-}): Promise<SliceResult> {
-  const events: SliceResult["events"] = [];
-  const say = (level: SliceResult["events"][number]["level"], message: string) => {
-    events.push({ level, message });
-    input.onEvent?.(level, message);
-  };
+export type LaunchResult = { launched: boolean; reason: string };
 
+/**
+ * Dựng một sandbox và thả nó đi làm. Trả về trong vài giây, không đợi việc xong.
+ *
+ * Cố ý KHÔNG nhận job cụ thể: sandbox tự gọi `claim` như mọi linh sứ khác. Nhờ vậy cùng một
+ * câu UPDATE nguyên tử của Postgres phân xử việc giành job, và không bao giờ có chuyện một
+ * job bị hai runner ôm.
+ */
+export async function launchSandboxWorker(): Promise<LaunchResult> {
+  const webUrl = process.env.WEB_URL ?? process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  const token = process.env.WORKER_TOKEN;
+
+  if (!token || token === "change-me") {
+    return { launched: false, reason: "WORKER_TOKEN chưa đặt — sandbox không tự xác thực được." };
+  }
+
+  if (!webUrl) {
+    return {
+      launched: false,
+      reason: "Chưa biết địa chỉ web để sandbox gọi về — đặt WEB_URL (https://<app>.vercel.app).",
+    };
+  }
+
+  const base = webUrl.startsWith("http") ? webUrl : `https://${webUrl}`;
   const snapshotId = process.env.AGENT_BROWSER_SNAPSHOT_ID;
-  say("info", snapshotId ? "Đang dựng sandbox từ ảnh có sẵn…" : "Đang dựng sandbox (lần đầu, cài Chromium — hơi lâu)…");
 
   const sandbox = snapshotId
     ? await Sandbox.create({
@@ -67,45 +72,118 @@ export async function runSandboxSlice(input: {
 
   try {
     if (!snapshotId) {
-      // Không có ảnh dựng sẵn thì mỗi lát mất ~30s chỉ để cài — đủ để ăn hết ngân sách của
-      // một lát ngắn. README hướng dẫn tạo ảnh một lần; đây là đường chạy được nhưng chậm.
+      // Không có ảnh dựng sẵn thì phải cài tại chỗ. Việc này diễn ra TRONG sandbox chứ
+      // không trong function, nên nó không ăn vào trần 60 giây — chỉ tốn thời gian sống
+      // của VM. Vẫn nên tạo ảnh (xem README): mỗi lát tiết kiệm ~30 giây.
       await sandbox.runCommand("sh", [
         "-c",
-        `sudo dnf clean all 2>&1 && sudo dnf install -y --skip-broken ${CHROMIUM_SYSTEM_DEPS.join(" ")} 2>&1 && sudo ldconfig 2>&1`,
+        `sudo dnf install -y --skip-broken ${CHROMIUM_SYSTEM_DEPS.join(" ")} >/dev/null 2>&1 || true; sudo ldconfig || true`,
       ]);
-      await sandbox.runCommand("npm", ["install", "-g", "agent-browser"]);
-      await sandbox.runCommand("npx", ["agent-browser", "install"]);
-      say("warning", "Chưa có AGENT_BROWSER_SNAPSHOT_ID — mỗi lát phải cài lại Chromium. Xem README để tạo ảnh dựng sẵn.");
     }
 
-    const quests: string[] = [];
-    if (input.config.quests.luyenDan.enabled) quests.push("Luyện Đan Đường");
-    if (input.config.quests.meCung.enabled) quests.push("Mê Cung");
+    await sandbox.writeFiles([
+      { path: "worker.mjs", content: Buffer.from(SANDBOX_WORKER_SOURCE, "utf8") },
+    ]);
 
-    if (quests.length === 0) {
-      return { finished: true, ok: true, message: "Không có nhiệm vụ nào được bật.", events };
-    }
-
-    say("success", `Sandbox đã sẵn sàng. Sẽ hành sự: ${quests.join(" · ")}.`);
-
-    // ---- CHỖ CẮM ENGINE ---------------------------------------------------------------
-    // Ở đây sẽ là chuỗi lệnh agent-browser: nạp cookie của người dùng, mở trang lò, thu đan,
-    // phân giải, khai lô, giữ lửa. Cookie đã giải mã nằm ở input.config.gameCookie.
-    //
-    // Hiện tại chỉ chứng minh trọn đường đi: dựng được VM, chạy được lệnh, kể được chuyện.
-    const probe = await sandbox.runCommand("node", ["-e", "console.log('sandbox-ok')"]);
-    const stdout = (await probe.stdout()).trim();
-    say("info", `Kiểm tra VM: ${stdout || "(không có phản hồi)"}`);
-
-    return {
-      finished: true,
-      ok: true,
-      message: "Lát sandbox hoàn tất.",
-      events,
-    };
-  } finally {
-    await sandbox.stop().catch(() => {
-      /* VM tự hết hạn theo timeout; không để lỗi dọn dẹp che mất lỗi thật */
+    // detached: trả về ngay lập tức. VM tiếp tục chạy tới khi xong việc hoặc hết timeout.
+    await sandbox.runCommand({
+      cmd: "node",
+      args: ["worker.mjs"],
+      detached: true,
+      env: {
+        WEB_URL: base,
+        WORKER_TOKEN: token,
+        WORKER_ID: `sandbox-${Date.now().toString(36)}`,
+        // Tự thoát trước khi VM bị giết, để kịp báo cáo thay vì biến mất giữa chừng.
+        BUDGET_MS: String(SANDBOX_SLICE_MS - 45_000),
+      },
     });
+
+    return { launched: true, reason: "Đã thả linh sứ sandbox — nó sẽ tự nhận việc." };
+  } catch (err) {
+    // Chỉ dọn VM khi KHÔNG thả được. Thả rồi mà stop() là tự tay giết linh sứ vừa gửi đi.
+    await sandbox.stop().catch(() => {});
+    throw err;
   }
 }
+
+/**
+ * Mã nguồn của worker chạy BÊN TRONG sandbox — nhúng thành chuỗi vì VM không có repo này.
+ *
+ * Giữ nó ngắn và không phụ thuộc gì ngoài Node: mọi thứ nó cần là `fetch` và giao thức bốn
+ * thao tác. Chỗ cắm engine Playwright được đánh dấu y như trong scripts/worker.mjs.
+ */
+const SANDBOX_WORKER_SOURCE = String.raw`
+const WEB_URL = process.env.WEB_URL.replace(/\/$/, "");
+const TOKEN = process.env.WORKER_TOKEN;
+const WORKER_ID = process.env.WORKER_ID;
+const BUDGET_MS = Number(process.env.BUDGET_MS ?? 420000);
+const deadline = Date.now() + BUDGET_MS;
+
+const call = async (op, payload = {}) => {
+  const res = await fetch(WEB_URL + "/api/worker", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: "Bearer " + TOKEN },
+    body: JSON.stringify({ op, ...payload }),
+  });
+  if (!res.ok) throw new Error(op + " -> HTTP " + res.status + " " + (await res.text()));
+  return res.json();
+};
+
+const say = (jobId, message, level = "info") =>
+  call("event", { jobId, level, message }).catch(() => {});
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function runQuest(job, shouldStop) {
+  const config = job.config ?? {};
+  const quests = [];
+  if (config.quests?.luyenDan?.enabled) quests.push("Luyện Đan Đường");
+  if (config.quests?.meCung?.enabled) quests.push("Mê Cung");
+  if (quests.length === 0) {
+    return { outcome: "done", message: "Không có nhiệm vụ nào được bật." };
+  }
+
+  await say(job.id, "Linh sứ sandbox đã dựng xong, sẽ hành sự: " + quests.join(" · "), "success");
+
+  // ---- CHỖ CẮM ENGINE (Playwright/agent-browser) --------------------------------------
+  // config.gameCookie đã được giải mã ở /api/worker. Gọi shouldStop() ở các điểm an toàn.
+  for (let i = 1; i <= 200; i++) {
+    if (await shouldStop()) return { outcome: "stopped", message: "Đã thu đàn theo lệnh đạo hữu." };
+    if (Date.now() > deadline) {
+      return { outcome: "done", message: "Hết ngân sách thời gian của lát này — sẽ tiếp tục ở lượt sau." };
+    }
+    await sleep(3000);
+    if (i % 5 === 0) await say(job.id, "Đang vận hành… (nhịp " + i + ")");
+  }
+  return { outcome: "done", message: "Đã đi hết một vòng nhiệm vụ." };
+}
+
+(async () => {
+  // Nhận việc; hàng chờ rỗng thì tắt ngay cho đỡ tốn VM.
+  let job = null;
+  for (const runner of ["sandbox", "local"]) {
+    ({ job } = await call("claim", { workerId: WORKER_ID, runner }));
+    if (job) break;
+  }
+  if (!job) { console.log("hàng chờ rỗng"); return; }
+
+  let stopping = false;
+  const beat = setInterval(async () => {
+    try {
+      const { status } = await call("heartbeat", { jobId: job.id });
+      if (status === "stopping" || status === "stopped") stopping = true;
+    } catch {}
+  }, 20000);
+
+  try {
+    const result = await runQuest(job, async () => stopping);
+    await call("complete", { jobId: job.id, ...result });
+  } catch (err) {
+    await call("complete", {
+      jobId: job.id, outcome: "failed", message: "Đàn pháp gặp trắc trở: " + err.message,
+    }).catch(() => {});
+  } finally {
+    clearInterval(beat);
+  }
+})();
+`;

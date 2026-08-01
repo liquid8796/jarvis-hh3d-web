@@ -67,8 +67,18 @@ người dùng không phải làm gì, chỉ cần có một worker đang trực
 > `SANDBOX_ENABLED=1`. Thà giao cho thứ chắc chắn chạy còn hơn xếp job vào hàng chờ không
 > ai đến lấy.
 >
-> Bật sandbox khi nào? Khi bạn lên gói Pro (cron mỗi phút), hoặc có một cron NGOÀI tự gọi
-> vào `/api/cron` — xem mục "Cron miễn phí từ bên ngoài" bên dưới.
+> **Vẫn dùng được sandbox trên Hobby.** Hai giới hạn của gói free được né bằng thiết kế
+> chứ không bằng cách trả tiền:
+>
+> - *Function chỉ sống 60 giây* → function **không chờ** sandbox. Nó dựng VM, nạp một script
+>   worker vào, chạy ở chế độ `detached`, rồi trả về ngay. Sandbox sống tiếp bằng timeout
+>   của chính nó và tự nói chuyện với `/api/worker` bằng đúng giao thức mà linh sứ máy nhà
+>   dùng. Trần 60 giây trở nên vô hại.
+> - *Cron chỉ 1 lần/ngày* → **bấm Khai Đàn là thả sandbox ngay**, không đợi nhịp cron. Cron
+>   hằng ngày chỉ còn làm việc quét dọn.
+>
+> Muốn sandbox tự nhặt cả những job xếp hàng lúc bạn không ngồi trước máy (ví dụ lượt ghé lò
+> kế tiếp sau 26 phút) thì cần một cron dày hơn — xem "Cron miễn phí từ bên ngoài" bên dưới.
 >
 > `vercel.json` để cron ở `0 3 * * *` (mỗi ngày một lần) cho deploy được trên Hobby. Nhịp
 > đó vẫn hữu ích: nó dọn job chết và job không ai nhận, nên hệ thống tự lành kể cả khi

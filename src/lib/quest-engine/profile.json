@@ -1,0 +1,1648 @@
+{
+  "name": "Hoạt động hàng ngày (mặc định)",
+  "schemaVersion": 41,
+  "dailyQuestPath": "/nhiem-vu-hang-ngay",
+  "quests": [
+    {
+      "id": "hoang-vuc",
+      "name": "Hoang Vực",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "hoang vực",
+        "hoang vuc"
+      ],
+      "pagePath": "/hoang-vuc",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/hoang-vuc",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#boss-info",
+          "timeoutMs": 25000,
+          "note": "chờ khối thông tin boss render"
+        },
+        {
+          "action": "readCooldownSeconds",
+          "selector": "#countdown-timer",
+          "timeoutMs": 15000,
+          "note": "\"Chờ 7 phút 19 giây để tấn công lần tiếp theo.\" — không có thẻ này thì không đọc được gì, và đó chính là dấu hiệu đã hết lượt hôm nay"
+        },
+        {
+          "action": "stopIf",
+          "text": "chưa đánh được (đang chờ lượt hoặc đã hết 5 lượt hôm nay)",
+          "timeoutMs": 15000,
+          "note": "nút KHIÊU CHIẾN biến mất cả khi đang cooldown lẫn khi hết lượt; engine tự phân biệt — đọc được đồng hồ thì báo OnCooldown kèm thời gian, không đọc được thì AlreadyDone",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#battle-button"
+          }
+        },
+        {
+          "action": "repeat",
+          "timeoutMs": 15000,
+          "note": "kiểm tra TRƯỚC mỗi vòng, nên đang có +15% rồi thì không đổi lần nào. Trần 5 lần vì mỗi lần đổi tốn phí và phí tăng dần.",
+          "steps": [
+            {
+              "action": "click",
+              "selector": "#change-element-button",
+              "timeoutMs": 6000,
+              "optional": true
+            },
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 8000,
+              "note": "hộp xác nhận SweetAlert2 \"Đổi\"",
+              "optional": true,
+              "condition": {
+                "kind": "visible",
+                "selector": ".swal2-confirm"
+              }
+            },
+            {
+              "action": "click",
+              "selector": ".swal2-confirm",
+              "timeoutMs": 6000,
+              "optional": true
+            },
+            {
+              "action": "waitMilliseconds",
+              "timeoutMs": 1200,
+              "note": "chờ ngũ hành mới áp vào"
+            }
+          ],
+          "until": {
+            "kind": "visible",
+            "selector": "#boss-info .increase-damage"
+          },
+          "maxIterations": 5,
+          "maxSeconds": 90
+        },
+        {
+          "action": "click",
+          "selector": "#battle-button",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 15000,
+          "note": "màn đánh boss đã mở",
+          "condition": {
+            "kind": "visible",
+            "selector": "#boss-damage-screen .attack-button"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#boss-damage-screen .attack-button",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 25000,
+          "note": "bảng tổng kết sát thương hiện sau khi đòn đánh chạy xong",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#damage-summary-container .close-button"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#damage-summary-container .close-button",
+          "timeoutMs": 6000,
+          "note": "đóng bảng tổng kết",
+          "optional": true
+        },
+        {
+          "action": "click",
+          "selector": "#boss-damage-screen .back-button",
+          "timeoutMs": 6000,
+          "note": "trở lại trang boss để đọc đồng hồ",
+          "optional": true
+        },
+        {
+          "action": "readCooldownSeconds",
+          "selector": "#countdown-timer",
+          "timeoutMs": 15000,
+          "note": "đồng hồ tới lượt kế tiếp, xuất hiện ngay sau khi đánh xong"
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 420,
+      "order": 20,
+      "notes": "Đánh boss Hoang Vực, 5 lượt/ngày."
+    },
+    {
+      "id": "phuc-loi-duong",
+      "name": "Phúc Lợi Đường",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "phúc lợi đường",
+        "phuc loi duong"
+      ],
+      "pagePath": "/nhiem-vu-hang-ngay",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/nhiem-vu-hang-ngay",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".nv-quest",
+          "timeoutMs": 25000,
+          "note": "chờ hub render; .nv-quest tồn tại cả khi quest đã xong"
+        },
+        {
+          "action": "stopIf",
+          "text": "hết 4 lượt hôm nay",
+          "timeoutMs": 15000,
+          "note": "hết lượt hôm nay → nút bị xoá khỏi DOM; dừng hẳn thay vì chờ timeout",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#nv-phucloi-open-btn"
+          }
+        },
+        {
+          "action": "readCooldownSeconds",
+          "selector": "#nv-phucloi-open-btn",
+          "timeoutMs": 15000,
+          "note": "đọc trước: nếu đang đếm ngược thì đây chính là thời gian còn lại"
+        },
+        {
+          "action": "stopIf",
+          "text": "đang cooldown",
+          "timeoutMs": 15000,
+          "note": "nút còn đó nhưng bị khoá → dừng, không tốn timeout cho một cú click vô ích",
+          "condition": {
+            "kind": "disabled",
+            "selector": "#nv-phucloi-open-btn"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#nv-phucloi-open-btn",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 10000,
+          "note": "dấu ':' chỉ xuất hiện khi nút đã chuyển sang đồng hồ đếm ngược — đúng cho mọi quest bất kể chữ trung gian (\"Đang mở...\", \"Đang quét...\") khác nhau",
+          "optional": true,
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#nv-phucloi-open-btn",
+            "text": ":"
+          }
+        },
+        {
+          "action": "readCooldownSeconds",
+          "selector": "#nv-phucloi-open-btn",
+          "timeoutMs": 15000,
+          "note": "đọc lại sau khi bấm"
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 3600,
+      "order": 30,
+      "notes": "Mở rương Phúc Lợi Đường nhận thưởng, 4 lượt/ngày."
+    },
+    {
+      "id": "thi-luyen-tong-mon",
+      "name": "Thí Luyện Tông Môn",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "thí luyện",
+        "thi luyen"
+      ],
+      "pagePath": "/nhiem-vu-hang-ngay",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/nhiem-vu-hang-ngay",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".nv-quest",
+          "timeoutMs": 25000,
+          "note": "chờ hub render; .nv-quest tồn tại cả khi quest đã xong"
+        },
+        {
+          "action": "stopIf",
+          "text": "hết 3 lượt hôm nay",
+          "timeoutMs": 15000,
+          "note": "hết lượt hôm nay → nút bị xoá khỏi DOM; dừng hẳn thay vì chờ timeout",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#nv-tltm-open-btn"
+          }
+        },
+        {
+          "action": "readCooldownSeconds",
+          "selector": "#nv-tltm-open-btn",
+          "timeoutMs": 15000,
+          "note": "đọc trước: nếu đang đếm ngược thì đây chính là thời gian còn lại"
+        },
+        {
+          "action": "stopIf",
+          "text": "đang cooldown",
+          "timeoutMs": 15000,
+          "note": "nút còn đó nhưng bị khoá → dừng, không tốn timeout cho một cú click vô ích",
+          "condition": {
+            "kind": "disabled",
+            "selector": "#nv-tltm-open-btn"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#nv-tltm-open-btn",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 10000,
+          "note": "dấu ':' chỉ xuất hiện khi nút đã chuyển sang đồng hồ đếm ngược — đúng cho mọi quest bất kể chữ trung gian (\"Đang mở...\", \"Đang quét...\") khác nhau",
+          "optional": true,
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#nv-tltm-open-btn",
+            "text": ":"
+          }
+        },
+        {
+          "action": "readCooldownSeconds",
+          "selector": "#nv-tltm-open-btn",
+          "timeoutMs": 15000,
+          "note": "đọc lại sau khi bấm"
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 3600,
+      "order": 40,
+      "notes": "Thí luyện tông môn nhận thưởng, 3 lượt/ngày."
+    },
+    {
+      "id": "bi-canh-tong-mon",
+      "name": "Bí Cảnh Tông Môn",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "bí cảnh",
+        "bi canh"
+      ],
+      "pagePath": "/nhiem-vu-hang-ngay",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/nhiem-vu-hang-ngay",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".nv-quest",
+          "timeoutMs": 25000,
+          "note": "chờ hub render; .nv-quest tồn tại cả khi quest đã xong"
+        },
+        {
+          "action": "stopIf",
+          "text": "hết 5 lượt hôm nay",
+          "timeoutMs": 15000,
+          "note": "hết lượt hôm nay → nút bị xoá khỏi DOM; dừng hẳn thay vì chờ timeout",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#nv-btm-attack-btn"
+          }
+        },
+        {
+          "action": "readCooldownSeconds",
+          "selector": "#nv-btm-attack-btn",
+          "timeoutMs": 15000,
+          "note": "đọc trước: nếu đang đếm ngược thì đây chính là thời gian còn lại"
+        },
+        {
+          "action": "stopIf",
+          "text": "đang cooldown",
+          "timeoutMs": 15000,
+          "note": "nút còn đó nhưng bị khoá → dừng, không tốn timeout cho một cú click vô ích",
+          "condition": {
+            "kind": "disabled",
+            "selector": "#nv-btm-attack-btn"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#nv-btm-attack-btn",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 10000,
+          "note": "dấu ':' chỉ xuất hiện khi nút đã chuyển sang đồng hồ đếm ngược — đúng cho mọi quest bất kể chữ trung gian (\"Đang mở...\", \"Đang quét...\") khác nhau",
+          "optional": true,
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#nv-btm-attack-btn",
+            "text": ":"
+          }
+        },
+        {
+          "action": "readCooldownSeconds",
+          "selector": "#nv-btm-attack-btn",
+          "timeoutMs": 15000,
+          "note": "đọc lại sau khi bấm"
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 3600,
+      "order": 60,
+      "notes": "Đánh Bí Cảnh Tông Môn nhận thưởng, 5 lượt/ngày."
+    },
+    {
+      "id": "te-le-tong-mon",
+      "name": "Tế Lễ Tông Môn",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "tế lễ",
+        "te le"
+      ],
+      "pagePath": "/nhiem-vu-hang-ngay",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/nhiem-vu-hang-ngay",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".nv-quest",
+          "timeoutMs": 25000,
+          "note": "chờ hub render; .nv-quest tồn tại cả khi quest đã xong"
+        },
+        {
+          "action": "stopIf",
+          "text": "đã tế lễ hôm nay",
+          "timeoutMs": 15000,
+          "note": "đã làm hôm nay → nút bị xoá khỏi DOM; dừng hẳn thay vì chờ timeout",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#nv-tele-open-btn"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#nv-tele-open-btn",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 15000,
+          "note": "chờ nút thật sự biến mất = site đã ghi nhận. Không đạt thì báo lỗi rõ ràng chứ không nhận vơ là xong",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#nv-tele-open-btn"
+          }
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 14400,
+      "order": 70,
+      "notes": "Tế lễ 10 Tinh Thạch đổi Tông Khố + Cống Hiến, 1 lần/ngày."
+    },
+    {
+      "id": "phuc-loi-vip-khac-tran-van",
+      "name": "Phúc Lợi VIP — Khắc Trận Văn",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "khắc trận văn",
+        "khac tran van",
+        "phúc lợi vip",
+        "phuc loi vip"
+      ],
+      "pagePath": "/nhiem-vu-hang-ngay",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/nhiem-vu-hang-ngay",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".nv-quest",
+          "timeoutMs": 25000,
+          "note": "chờ hub render; .nv-quest tồn tại cả khi quest đã xong"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#nv-pt-vip-quest",
+          "timeoutMs": 10000,
+          "note": "chờ đúng thẻ quest này hiện — cổng .nv-quest chung có thể đã xanh từ thẻ khác",
+          "optional": true
+        },
+        {
+          "action": "stopIf",
+          "text": "không thấy mục Phúc Lợi VIP trên hub (tài khoản không phải VIP?)",
+          "timeoutMs": 15000,
+          "note": "không có thẻ = quest không áp dụng cho tài khoản này; báo khác hẳn với 'đã làm rồi'",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#nv-pt-vip-quest"
+          }
+        },
+        {
+          "action": "stopIf",
+          "text": "đã nhận hôm nay",
+          "timeoutMs": 15000,
+          "note": "đã làm hôm nay → nút bị xoá khỏi DOM; dừng hẳn thay vì chờ timeout",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#nv-pt-claim-btn"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#nv-pt-claim-btn",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 6000,
+          "note": "modal \"Nhận Thành Công!\"",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#nv-modal-btn"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#nv-modal-btn",
+          "timeoutMs": 4000,
+          "note": "modal chặn tương tác, phải đóng lại",
+          "optional": true
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 14400,
+      "order": 80,
+      "notes": "Nhận lượt Khắc Trận Văn mỗi ngày — chỉ dành cho tài khoản VIP."
+    },
+    {
+      "id": "vong-quay-phuc-van",
+      "name": "Vòng Quay Phúc Vận",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "vòng quay phúc vận",
+        "phúc vận",
+        "vòng quay",
+        "vong quay"
+      ],
+      "pagePath": "/nhiem-vu-hang-ngay",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/nhiem-vu-hang-ngay",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".nv-quest",
+          "timeoutMs": 25000,
+          "note": "chờ hub render; .nv-quest tồn tại cả khi quest đã xong"
+        },
+        {
+          "action": "stopIf",
+          "text": "hết lượt quay hôm nay",
+          "timeoutMs": 15000,
+          "note": "nút bị xoá khỏi DOM",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#nv-lottery-spin-btn"
+          }
+        },
+        {
+          "action": "stopIf",
+          "text": "đã quay đủ 4 lượt hôm nay",
+          "timeoutMs": 15000,
+          "note": "tiến độ đã đầy thì không bấm gì nữa",
+          "condition": {
+            "kind": "textMatches",
+            "selector": ".nv-quest:has(#nv-lottery-spin-btn) .nv-prog-txt",
+            "text": "4/4"
+          }
+        },
+        {
+          "action": "repeat",
+          "timeoutMs": 15000,
+          "note": "bấm quay cho tới khi UI đạt 4/4. Trần 4 lần vì một ngày nhiều nhất 4 lượt — lượt thứ 4 bị khoá cho tới khi các quest khác xong, nên cứ bấm thử; server từ chối thì tiến độ đứng yên, vòng lặp hết trần và lần ghé sau thử lại.",
+          "steps": [
+            {
+              "action": "click",
+              "selector": "#nv-lottery-spin-btn",
+              "timeoutMs": 5000,
+              "note": "optional + timeout ngắn: một cú bấm bị từ chối là chuyện bình thường ở đây, không phải lỗi của quest",
+              "optional": true
+            },
+            {
+              "action": "waitMilliseconds",
+              "timeoutMs": 4000,
+              "note": "chờ animation quay xong (API trả final_rotation vài nghìn độ) rồi mới quay tiếp"
+            }
+          ],
+          "until": {
+            "kind": "textMatches",
+            "selector": ".nv-quest:has(#nv-lottery-spin-btn) .nv-prog-txt",
+            "text": "4/4"
+          },
+          "maxIterations": 4,
+          "maxSeconds": 75
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 3600,
+      "order": 50,
+      "notes": "Quay Vòng Quay Phúc Vận nhận thưởng, tối đa 4 lượt/ngày."
+    },
+    {
+      "id": "van-dap",
+      "name": "Vấn Đáp",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "vấn đáp",
+        "van dap"
+      ],
+      "pagePath": "/van-dap-tong-mon",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/van-dap-tong-mon",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#quiz-wrapper, #start-quiz-button",
+          "timeoutMs": 25000,
+          "note": "chờ trang vấn đáp render — ngày mới có #start-quiz-button, ngày đã xong chỉ còn #quiz-wrapper với câu chúc mừng"
+        },
+        {
+          "action": "stopIf",
+          "text": "đã hoàn thành vấn đáp hôm nay",
+          "timeoutMs": 15000,
+          "note": "trang tự báo \"Đạo hữu đã hoàn thành Vấn Đáp hôm nay!\" ngay khi mở — không còn gì để làm",
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#quiz-wrapper",
+            "text": "hoàn thành Vấn Đáp"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#start-quiz-button",
+          "timeoutMs": 8000,
+          "note": "BẮT ĐẦU VẤN ĐÁP — một cú bấm tải cả 5 câu của ngày (API 7cfa6143)",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#start-quiz-button"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 12000,
+          "note": "câu hỏi đầu tiên đã hiện (~1s sau khi bấm bắt đầu)",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#quiz-container .option"
+          }
+        },
+        {
+          "action": "repeat",
+          "timeoutMs": 15000,
+          "note": "5 câu; thoát khi trang tự báo hoàn thành. Trần 6 vòng: 5 câu + 1 vòng đệm cho khoảnh khắc chữ hoàn thành chưa kịp render.",
+          "steps": [
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 10000,
+              "note": "chờ câu hỏi hiện và bấm được — khung quiz tàng hình ~1-1.5s giữa hai câu, KHÔNG ngủ theo giờ cố định",
+              "optional": true,
+              "condition": {
+                "kind": "enabled",
+                "selector": "#quiz-container .option"
+              }
+            },
+            {
+              "action": "answerQuiz",
+              "selector": "#question",
+              "timeoutMs": 15000,
+              "note": "đọc câu hỏi + 4 lựa chọn, tra đáp án rồi click theo TEXT — bỏ qua êm nếu lượt này không còn câu nào (vừa xong câu cuối)",
+              "when": {
+                "kind": "visible",
+                "selector": "#quiz-container .option"
+              },
+              "optionsSelector": "#quiz-container .option"
+            },
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 8000,
+              "note": "chờ đáp án đúng đổi xanh (~0.5-3.5s tuỳ tải server) = server đã ghi nhận câu trả lời",
+              "optional": true,
+              "condition": {
+                "kind": "visible",
+                "selector": "#quiz-container .option.correct"
+              },
+              "when": {
+                "kind": "visible",
+                "selector": "#quiz-container .option"
+              }
+            },
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 8000,
+              "note": "chờ dấu xanh biến mất = trang đã sang câu kế (hoặc màn hoàn thành)",
+              "optional": true,
+              "condition": {
+                "kind": "hidden",
+                "selector": "#quiz-container .option.correct"
+              },
+              "when": {
+                "kind": "visible",
+                "selector": "#quiz-container .option.correct"
+              }
+            }
+          ],
+          "until": {
+            "kind": "textMatches",
+            "selector": "#quiz-wrapper",
+            "text": "hoàn thành Vấn Đáp"
+          },
+          "maxIterations": 6,
+          "maxSeconds": 300
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 10000,
+          "note": "lưới an toàn: hết vòng mà trang KHÔNG tự báo hoàn thành thì báo lỗi rõ ràng — không nhận vơ là xong như modal hub đã lừa được flow cũ",
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#quiz-wrapper",
+            "text": "hoàn thành Vấn Đáp"
+          }
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 14400,
+      "order": 90,
+      "notes": "Trả lời 5 câu Vấn Đáp mỗi ngày lấy Tông Khố + Cống Hiến."
+    },
+    {
+      "id": "diem-danh",
+      "name": "Điểm Danh",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "điểm danh",
+        "diem danh"
+      ],
+      "pagePath": "/nhiem-vu-hang-ngay",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/nhiem-vu-hang-ngay",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".nv-quest",
+          "timeoutMs": 25000,
+          "note": "chờ hub render; .nv-quest tồn tại cả khi quest đã xong"
+        },
+        {
+          "action": "stopIf",
+          "text": "đã điểm danh hôm nay",
+          "timeoutMs": 15000,
+          "note": "đã làm hôm nay → nút bị xoá khỏi DOM; dừng hẳn thay vì chờ timeout",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#nv-checkin-btn"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#nv-checkin-btn",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 15000,
+          "note": "chờ nút thật sự biến mất = site đã ghi nhận. Không đạt thì báo lỗi rõ ràng chứ không nhận vơ là xong",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#nv-checkin-btn"
+          }
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 14400,
+      "order": 10,
+      "notes": "Điểm danh mỗi ngày nhận thưởng và giữ chuỗi ngày (streak)."
+    },
+    {
+      "id": "khoang-mach",
+      "name": "Khoáng Mạch",
+      "enabled": false,
+      "kind": "labelMatch",
+      "matchTexts": [
+        "thu hoạch",
+        "thu hoach",
+        "nhận thưởng",
+        "nhan thuong"
+      ],
+      "steps": [],
+      "options": [],
+      "fallbackCooldownSeconds": 420,
+      "order": 100,
+      "notes": "Thu hoạch tài nguyên Khoáng Mạch (nhãn chưa hiệu chỉnh nên tắt sẵn)."
+    },
+    {
+      "id": "me-cung",
+      "name": "Mê Cung",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "mê cung",
+        "me cung"
+      ],
+      "pagePath": "/me-cung",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/me-cung",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 8000,
+          "note": "còn phòng cũ từ lượt trước?",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#btn-disband-room"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#btn-disband-room",
+          "timeoutMs": 6000,
+          "note": "giải tán phòng cũ",
+          "optional": true
+        },
+        {
+          "action": "click",
+          "selector": "#confirm-overlay .confirm-btn-ok",
+          "timeoutMs": 6000,
+          "note": "xác nhận giải tán phòng cũ",
+          "optional": true
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#lobby-overview",
+          "timeoutMs": 25000,
+          "note": "chờ sảnh mê cung render — tới đây chắc chắn đang ở sảnh, không ở trong phòng"
+        },
+        {
+          "action": "stopIf",
+          "text": "đã đủ huyền tinh hôm nay",
+          "timeoutMs": 15000,
+          "note": "\"Hôm nay đã nhận 385/385\" — hôm nay không cần đánh nữa; tuỳ chọn \"Không kiểm tra\" thay chuỗi này bằng sentinel không bao giờ khớp",
+          "condition": {
+            "kind": "textMatches",
+            "selector": ".mc-ht-daily-text",
+            "text": "{{capCheck}}"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#lobby-overview .btn-create-room",
+          "timeoutMs": 15000,
+          "note": "\"Lập Đội\" mở form tạo phòng"
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 10000,
+          "note": "khối chọn độ khó đã hiện",
+          "condition": {
+            "kind": "visible",
+            "selector": "#cr-mode-block"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#cr-mode-block .cr-mode-btn.{{mode}}",
+          "timeoutMs": 5000,
+          "note": "chọn độ khó theo tuỳ chọn của người dùng",
+          "optional": true
+        },
+        {
+          "action": "click",
+          "selector": "#confirm-overlay .confirm-btn-ok",
+          "timeoutMs": 15000,
+          "note": "xác nhận \"Lập Đội\" — chỉ bấm nút ok theo selector, không quét nhãn"
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 20000,
+          "note": "đã vào phòng của mình",
+          "condition": {
+            "kind": "visible",
+            "selector": "#btn-start"
+          }
+        },
+        {
+          "action": "evaluateJavaScript",
+          "script": "() => { const thr = parseInt('{{kickHp}}', 10) || 0; window.__jvz = { roster: null, told: [] }; return '!Đã tạo phòng — chờ đủ 5 người sẵn sàng' + (thr > 0 ? ' (tự trục xuất HP dưới ' + thr.toLocaleString('vi-VN') + ')' : ''); }",
+          "timeoutMs": 4000,
+          "note": "kể chuyện: phòng đã mở, đang tuyển người",
+          "optional": true
+        },
+        {
+          "action": "click",
+          "selector": "#auto-next-stage-row .auto-ready-toggle",
+          "timeoutMs": 4000,
+          "note": "bật \"Tự động chuyển ải\" nếu đang tắt — track thiếu class .on nghĩa là tắt",
+          "optional": true,
+          "when": {
+            "kind": "hidden",
+            "selector": "#auto-next-stage-track.on"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#auto-open-chest-row .auto-ready-toggle",
+          "timeoutMs": 4000,
+          "note": "bật \"Tự động mở rương\" nếu đang tắt — thiếu toggle này rương cuối bị bỏ phí",
+          "optional": true,
+          "when": {
+            "kind": "hidden",
+            "selector": "#auto-open-chest-track.on"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#room-invite-panel .btn-invite-share.btn-invite-lc",
+          "timeoutMs": 6000,
+          "note": "mở \"Kêu gọi đồng đội\"",
+          "optional": true
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 5000,
+          "note": "hộp kêu gọi đã mở",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#mc-share-send"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#mc-share-send",
+          "timeoutMs": 5000,
+          "note": "gửi lời mời lên Phòng Chat Cộng Đồng + Sảnh Mê Cung",
+          "optional": true
+        },
+        {
+          "action": "repeat",
+          "timeoutMs": 15000,
+          "note": "mỗi vòng là một lượt chạy 5 ải; dừng khi \"385/385\" hoặc hết trần 6 vòng / 35 phút. Sau mỗi lượt (thắng hay bại) site tự reload về phòng, cả đội vẫn ở nguyên đó (bản ghi 20:10).",
+          "steps": [
+            {
+              "action": "repeat",
+              "timeoutMs": 15000,
+              "note": "chờ phòng đủ 5 sẵn sàng, mỗi nhịp ~20s có kèm lượt xét trục xuất",
+              "steps": [
+                {
+                  "action": "evaluateJavaScript",
+                  "script": "() => { const S = window.__jvz = window.__jvz || { roster: null, told: [] }; for (const b of document.querySelectorAll('.btn-kick.jarvis-kick')) b.classList.remove('jarvis-kick'); const thr = parseInt('{{kickHp}}', 10) || 0; const fmt = v => v.toLocaleString('vi-VN'); const out = []; const seen = []; const cur = []; let n = 0; for (const btn of document.querySelectorAll('.player-card .btn-kick')) { const row = btn.closest('.player-card'); const nmEl = row && row.querySelector('.player-name'); const nm = (nmEl ? nmEl.textContent : '?').trim().replace(/^\\d+\\s*/, ''); const hp = row && row.querySelector('.pp-hp'); const digits = hp ? (hp.textContent || '').replace(/[^0-9]/g, '') : ''; const v = digits ? parseInt(digits, 10) : -1; cur.push(nm + '\\t' + v); const kick = thr > 0 && v >= 0 && v < thr; if (kick) { btn.classList.add('jarvis-kick'); n++; if (!S.told.includes(nm)) { S.told.push(nm); out.push('!Trục xuất «' + nm + '» — HP ' + fmt(v) + ' dưới ngưỡng ' + fmt(thr)); } } seen.push(v + (kick ? '!' : '')); } const names = cur.map(x => x.split('\\t')[0]); if (S.roster) { const prev = S.roster.map(x => x.split('\\t')[0]); for (const c of cur) { const pr = c.split('\\t'); if (!prev.includes(pr[0])) out.push('!«' + pr[0] + '» vào phòng — HP ' + fmt(+pr[1])); } for (const nm of prev) if (!names.includes(nm)) out.push('!«' + nm + '» rời phòng'); } S.roster = cur; S.told = S.told.filter(nm => names.includes(nm)); const ready = document.querySelector('#lobby-ready'); const bs = document.querySelector('#btn-start'); const r = bs ? bs.getBoundingClientRect() : null; out.push('kick-scan thr=' + thr + ' hp=[' + seen.join(',') + '] marked=' + n + ' ready=' + (ready ? ready.textContent.trim() : '?') + ' btnStart=' + (bs ? (bs.className || '(bare)') : 'MISSING') + ' rect=' + (r ? Math.round(r.width) + 'x' + Math.round(r.height) : '?') + ' anim=' + (bs ? getComputedStyle(bs).animationName : '?')); return out.join('\\n'); }",
+                  "timeoutMs": 5000,
+                  "note": "đánh dấu nút Trục Xuất của thành viên có HP dưới ngưỡng {{kickHp}}",
+                  "optional": true
+                },
+                {
+                  "action": "click",
+                  "selector": ".btn-kick.jarvis-kick",
+                  "timeoutMs": 2500,
+                  "note": "trục xuất một thành viên dưới ngưỡng HP — mỗi nhịp một người",
+                  "optional": true,
+                  "when": {
+                    "kind": "visible",
+                    "selector": ".btn-kick.jarvis-kick"
+                  }
+                },
+                {
+                  "action": "click",
+                  "selector": "#confirm-overlay .confirm-btn-ok",
+                  "timeoutMs": 2500,
+                  "note": "xác nhận trục xuất, nếu site hỏi",
+                  "optional": true,
+                  "when": {
+                    "kind": "visible",
+                    "selector": "#confirm-overlay .confirm-btn-ok"
+                  }
+                },
+                {
+                  "action": "waitForCondition",
+                  "timeoutMs": 20000,
+                  "note": "nhịp chờ ~20s — thoát sớm ngay khi #lobby-ready đạt 5",
+                  "optional": true,
+                  "condition": {
+                    "kind": "textMatches",
+                    "selector": "#lobby-ready",
+                    "text": "5"
+                  }
+                }
+              ],
+              "until": {
+                "kind": "textMatches",
+                "selector": "#lobby-ready",
+                "text": "5"
+              },
+              "maxIterations": 15,
+              "maxSeconds": 300
+            },
+            {
+              "action": "evaluateJavaScript",
+              "script": "() => { const S = window.__jvz = window.__jvz || { roster: null, told: [] }; for (const b of document.querySelectorAll('.btn-kick.jarvis-kick')) b.classList.remove('jarvis-kick'); const thr = parseInt('{{kickHp}}', 10) || 0; const fmt = v => v.toLocaleString('vi-VN'); const out = []; const seen = []; const cur = []; let n = 0; for (const btn of document.querySelectorAll('.player-card .btn-kick')) { const row = btn.closest('.player-card'); const nmEl = row && row.querySelector('.player-name'); const nm = (nmEl ? nmEl.textContent : '?').trim().replace(/^\\d+\\s*/, ''); const hp = row && row.querySelector('.pp-hp'); const digits = hp ? (hp.textContent || '').replace(/[^0-9]/g, '') : ''; const v = digits ? parseInt(digits, 10) : -1; cur.push(nm + '\\t' + v); const kick = thr > 0 && v >= 0 && v < thr; if (kick) { btn.classList.add('jarvis-kick'); n++; if (!S.told.includes(nm)) { S.told.push(nm); out.push('!Trục xuất «' + nm + '» — HP ' + fmt(v) + ' dưới ngưỡng ' + fmt(thr)); } } seen.push(v + (kick ? '!' : '')); } const names = cur.map(x => x.split('\\t')[0]); if (S.roster) { const prev = S.roster.map(x => x.split('\\t')[0]); for (const c of cur) { const pr = c.split('\\t'); if (!prev.includes(pr[0])) out.push('!«' + pr[0] + '» vào phòng — HP ' + fmt(+pr[1])); } for (const nm of prev) if (!names.includes(nm)) out.push('!«' + nm + '» rời phòng'); } S.roster = cur; S.told = S.told.filter(nm => names.includes(nm)); const ready = document.querySelector('#lobby-ready'); const bs = document.querySelector('#btn-start'); const r = bs ? bs.getBoundingClientRect() : null; out.push('kick-scan thr=' + thr + ' hp=[' + seen.join(',') + '] marked=' + n + ' ready=' + (ready ? ready.textContent.trim() : '?') + ' btnStart=' + (bs ? (bs.className || '(bare)') : 'MISSING') + ' rect=' + (r ? Math.round(r.width) + 'x' + Math.round(r.height) : '?') + ' anim=' + (bs ? getComputedStyle(bs).animationName : '?')); return out.join('\\n'); }",
+              "timeoutMs": 5000,
+              "note": "lượt xét trục xuất chốt hạ — phòng vừa đủ 5 vẫn phải qua được vòng này",
+              "optional": true
+            },
+            {
+              "action": "click",
+              "selector": ".btn-kick.jarvis-kick",
+              "timeoutMs": 2500,
+              "note": "trục xuất nốt người dưới ngưỡng lọt vào phút chót",
+              "optional": true,
+              "when": {
+                "kind": "visible",
+                "selector": ".btn-kick.jarvis-kick"
+              }
+            },
+            {
+              "action": "click",
+              "selector": "#confirm-overlay .confirm-btn-ok",
+              "timeoutMs": 2500,
+              "note": "xác nhận trục xuất, nếu site hỏi",
+              "optional": true,
+              "when": {
+                "kind": "visible",
+                "selector": "#confirm-overlay .confirm-btn-ok"
+              }
+            },
+            {
+              "action": "repeat",
+              "timeoutMs": 15000,
+              "note": "bấm BẮT ĐẦU tối đa 4 nhịp — phòng hay nhấp nháy sẵn sàng, một nhịp xui không được phép tốn cả vòng chờ",
+              "steps": [
+                {
+                  "action": "waitForCondition",
+                  "timeoutMs": 15000,
+                  "note": "đợi số sẵn sàng về lại 5 trước mỗi nhịp bấm",
+                  "optional": true,
+                  "condition": {
+                    "kind": "textMatches",
+                    "selector": "#lobby-ready",
+                    "text": "5"
+                  }
+                },
+                {
+                  "action": "click",
+                  "selector": "#btn-start:not(.blocked-start)",
+                  "timeoutMs": 6000,
+                  "note": "BẮT ĐẦU — chỉ khi đủ 5 sẵn sàng VÀ nút không mang blocked-start; forceClick vì nút có animation, không bao giờ đứng yên đủ lâu cho Playwright",
+                  "optional": true,
+                  "when": {
+                    "kind": "textMatches",
+                    "selector": "#lobby-ready",
+                    "text": "5"
+                  },
+                  "forceClick": true
+                },
+                {
+                  "action": "click",
+                  "selector": "#confirm-overlay .confirm-btn-ok",
+                  "timeoutMs": 4000,
+                  "note": "xác nhận vào ải",
+                  "optional": true,
+                  "when": {
+                    "kind": "visible",
+                    "selector": "#confirm-overlay .confirm-btn-ok"
+                  }
+                },
+                {
+                  "action": "waitForCondition",
+                  "timeoutMs": 8000,
+                  "note": "đã rời phòng vào ải? — until của vòng retry đọc lại đúng điều kiện này giữa hai nhịp",
+                  "optional": true,
+                  "condition": {
+                    "kind": "hidden",
+                    "selector": "#btn-start"
+                  }
+                }
+              ],
+              "until": {
+                "kind": "hidden",
+                "selector": "#btn-start"
+              },
+              "maxIterations": 4,
+              "maxSeconds": 90
+            },
+            {
+              "action": "evaluateJavaScript",
+              "script": "() => { const S = window.__jvz = window.__jvz || {}; const bs = document.querySelector('#btn-start'); const vis = bs && bs.getBoundingClientRect().width > 0; if (!vis && !S.battle) { S.battle = true; return '!Đủ đội — BẮT ĐẦU! Cả đội đang đánh ải'; } return ''; }",
+              "timeoutMs": 4000,
+              "note": "kể chuyện: trận đã mở màn (và đặt cờ cho bản tin cuối lượt)",
+              "optional": true
+            },
+            {
+              "action": "click",
+              "selector": "#auto-attack-track",
+              "timeoutMs": 5000,
+              "note": "bật \"TỰ ĐỘNG\" đánh trong trận — reset mỗi trận nên trận nào cũng phải bật lại",
+              "optional": true,
+              "when": {
+                "kind": "hidden",
+                "selector": "#auto-attack-track.on"
+              }
+            },
+            {
+              "action": "repeat",
+              "timeoutMs": 15000,
+              "note": "lái một lượt đánh: bấm hộ \"Đến ải kế tiếp\" khi cần, chờ về phòng",
+              "steps": [
+                {
+                  "action": "click",
+                  "selector": "#btn-next-stage",
+                  "timeoutMs": 6000,
+                  "note": "qua ải kế tiếp — chỉ tồn tại khi hộp thưởng ải đang chờ (tức \"tự qua ải\" đang tắt)",
+                  "optional": true
+                },
+                {
+                  "action": "waitMilliseconds",
+                  "timeoutMs": 4000,
+                  "note": "nhịp thăm dò giữa hai lần nhìn"
+                }
+              ],
+              "until": {
+                "kind": "visible",
+                "selector": "#btn-start"
+              },
+              "maxIterations": 60,
+              "maxSeconds": 1080
+            },
+            {
+              "action": "evaluateJavaScript",
+              "script": "() => { const S = window.__jvz = window.__jvz || {}; if (!S.battle) return ''; S.battle = false; const t = document.querySelector('.mc-ht-daily-text'); const m = t ? (t.textContent || '').match(/(\\d+)\\s*\\/\\s*(\\d+)/) : null; if (!m) return '!Về phòng sau lượt đánh'; const now = +m[1]; const prev = S.ht; S.ht = now; const gain = prev != null ? now - prev : null; let tail = ''; if (gain != null) tail = gain > 0 ? ' (+' + gain + ')' : ' (không được cộng — đội thua ải?)'; return '!Xong lượt đánh — huyền tinh hôm nay: ' + now + '/' + m[2] + tail; }",
+              "timeoutMs": 4000,
+              "note": "bản tin cuối lượt: huyền tinh bao nhiêu, được cộng bao nhiêu",
+              "optional": true
+            }
+          ],
+          "until": {
+            "kind": "textMatches",
+            "selector": ".mc-ht-daily-text",
+            "text": "{{capCheck}}"
+          },
+          "maxIterations": 6,
+          "maxSeconds": 2100
+        },
+        {
+          "action": "click",
+          "selector": "#btn-disband-room",
+          "timeoutMs": 8000,
+          "note": "giải tán phòng dù đủ huyền tinh hay hết giờ chờ — không để phòng treo lại",
+          "optional": true
+        },
+        {
+          "action": "click",
+          "selector": "#confirm-overlay .confirm-btn-ok",
+          "timeoutMs": 8000,
+          "note": "xác nhận giải tán",
+          "optional": true
+        }
+      ],
+      "options": [
+        {
+          "key": "mode",
+          "label": "Độ khó phòng",
+          "choices": [
+            {
+              "value": "is-normal",
+              "label": "Thường"
+            },
+            {
+              "value": "is-hard",
+              "label": "Khó"
+            },
+            {
+              "value": "is-nightmare",
+              "label": "Ác Mộng"
+            }
+          ],
+          "allowCustom": false,
+          "selectedValue": "is-normal"
+        },
+        {
+          "key": "kickHp",
+          "label": "Trục xuất theo HP",
+          "choices": [
+            {
+              "value": "0",
+              "label": "Không trục xuất"
+            },
+            {
+              "value": "200000",
+              "label": "HP dưới 200.000"
+            },
+            {
+              "value": "300000",
+              "label": "HP dưới 300.000"
+            },
+            {
+              "value": "400000",
+              "label": "HP dưới 400.000"
+            },
+            {
+              "value": "500000",
+              "label": "HP dưới 500.000"
+            },
+            {
+              "value": "600000",
+              "label": "HP dưới 600.000"
+            }
+          ],
+          "allowCustom": false,
+          "selectedValue": "0"
+        },
+        {
+          "key": "capCheck",
+          "label": "Kiểm tra huyền tinh",
+          "choices": [
+            {
+              "value": "385/385",
+              "label": "Dừng khi đủ 385/385"
+            },
+            {
+              "value": "«không kiểm tra»",
+              "label": "Không kiểm tra — lượt nào cũng đánh hết trần"
+            }
+          ],
+          "allowCustom": false,
+          "selectedValue": "385/385"
+        }
+      ],
+      "fallbackCooldownSeconds": 3600,
+      "order": 110,
+      "notes": "Đánh Mê Cung theo đội 5 người thật lấy huyền tinh mỗi ngày."
+    },
+    {
+      "id": "luyen-dan-duong",
+      "name": "Luyện Đan Đường",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "luyện đan",
+        "luyen dan"
+      ],
+      "pagePath": "/luyen-dan-duong",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/luyen-dan-duong",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#ld-app",
+          "timeoutMs": 25000,
+          "note": "chờ trang lò render"
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 25000,
+          "note": "chờ panel lò VẼ XONG theo thước đo opacity — shell chứa sẵn 3 nút dạng xương opacity-0, nên phải chờ nút THẬT có pixel; không hiện nổi trong 25s là trang hỏng và phải báo lỗi rõ ràng",
+          "condition": {
+            "kind": "visible",
+            "selector": "#ldBtnCraft, #ldBtnTune, #ldBtnCollect"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 20000,
+          "note": "đệm chờ XHR trạng thái thật: lò đang luyện/đan thành sẽ hiện đồng hồ trong vài giây — lò rảnh không bao giờ hiện nên chờ trọn cửa sổ rồi mới được tin là rảnh; nét vẽ đầu tiên của trang là màn lò trống GIẢ",
+          "optional": true,
+          "condition": {
+            "kind": "textMatches",
+            "text": "00:"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 90000,
+          "note": "đồng hồ lò đã về phút chót — nán lại chờ Thu Đan hiện thay vì bỏ đi",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#ldBtnCollect"
+          },
+          "when": {
+            "kind": "textMatches",
+            "text": "00:00:"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#ldBtnCollect",
+          "timeoutMs": 5000,
+          "note": "Thu Đan — mẻ trước đã thành",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#ldBtnCollect"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 15000,
+          "note": "bảng thưởng đan mở ~5-7s sau khi thu — nút Thu Đan còn trên màn ~3s (splash) rồi trang vẽ lại màn lò trống, nên phải đứng đây chờ modal",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#ldModalCloseBtn"
+          },
+          "when": {
+            "kind": "visible",
+            "selector": "#ldBtnCollect"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 15000,
+          "note": "lưới thứ hai gác theo ĐAN TRONG TÚI (bền, hiện ngay khi /collect về): nút Thu Đan biến mất nhanh thì lượt chờ này vẫn bắt được modal",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#ldModalCloseBtn"
+          },
+          "when": {
+            "kind": "visible",
+            "selector": "#ldInventory .ld-cell--pill"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#ldModalCloseBtn",
+          "timeoutMs": 5000,
+          "note": "đóng bảng thưởng",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#ldModalCloseBtn"
+          }
+        },
+        {
+          "action": "evaluateJavaScript",
+          "script": "() => { const p = document.querySelector('#ldInventory .ld-cell--pill'); const vis = p && p.getBoundingClientRect().width > 0; return vis ? '!Đã thu đan — viên đan nằm trong túi' : ''; }",
+          "timeoutMs": 4000,
+          "note": "kể chuyện: thu đan thành công",
+          "optional": true
+        },
+        {
+          "action": "click",
+          "selector": "#ldInventory .ld-cell--pill",
+          "timeoutMs": 4000,
+          "note": "mở ô đan trong túi — chỉ khi túi thật sự có đan",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#ldInventory .ld-cell--pill"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 5000,
+          "note": "hộp thông tin viên đan mở ra",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#ldModalDecompose"
+          },
+          "when": {
+            "kind": "visible",
+            "selector": "#ldInventory .ld-cell--pill"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#ldModalCloseBtn",
+          "timeoutMs": 4000,
+          "note": "viên đan này được GIỮ theo tuỳ chọn sao — đóng hộp thông tin, không phân giải",
+          "optional": true,
+          "when": {
+            "kind": "textMatches",
+            "selector": "#ldModal",
+            "text": "{{decompose}}"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#ldModalDecompose",
+          "timeoutMs": 4000,
+          "note": "PHÂN GIẢI",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#ldModalDecompose"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 5000,
+          "note": "hộp xác nhận phân giải (hoàn ~90% linh dược)",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#ldConfirmOk"
+          },
+          "when": {
+            "kind": "visible",
+            "selector": "#ldModalDecompose"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#ldConfirmOk",
+          "timeoutMs": 4000,
+          "note": "xác nhận phân giải",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#ldConfirmOk"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 3000,
+          "note": "bảng linh dược nhận lại hiện ra",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#ldDecomposeRewardOk"
+          }
+        },
+        {
+          "action": "evaluateJavaScript",
+          "script": "() => { const ok = document.querySelector('#ldDecomposeRewardOk'); const vis = ok && ok.getBoundingClientRect().width > 0; return vis ? '!Phân giải viên đan — hoàn lại linh dược cho mẻ sau' : ''; }",
+          "timeoutMs": 4000,
+          "note": "kể chuyện: phân giải thành công",
+          "optional": true
+        },
+        {
+          "action": "click",
+          "selector": "#ldDecomposeRewardOk",
+          "timeoutMs": 8000,
+          "note": "ĐÓNG — nút mở đầu là \"ĐỢI…\" bị khoá ~1.5s, Playwright tự chờ nó mở",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#ldDecomposeRewardOk"
+          }
+        },
+        {
+          "action": "evaluateJavaScript",
+          "script": "() => { const t = document.querySelector('#ldBtnTune'); (window.__jvzLd = window.__jvzLd || {}).pre = !!(t && t.getBoundingClientRect().width > 0); return ''; }",
+          "timeoutMs": 4000,
+          "note": "ghi nhớ trạng thái lò trước pha khai lô (phục vụ tường thuật)",
+          "optional": true
+        },
+        {
+          "action": "click",
+          "selector": ".ld-recipe-tier:has-text(\"{{tier}}\")",
+          "timeoutMs": 4000,
+          "note": "chọn phẩm đan theo tuỳ chọn",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#ldBtnCraft"
+          }
+        },
+        {
+          "action": "waitMilliseconds",
+          "timeoutMs": 800,
+          "note": "cho trang cập nhật nguyên liệu theo phẩm vừa chọn"
+        },
+        {
+          "action": "click",
+          "selector": "#ldBtnCraft",
+          "timeoutMs": 5000,
+          "note": "Luyện Đan — mở hộp xác nhận khai lô",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#ldBtnCraft"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 6000,
+          "note": "hộp xác nhận dùng 20 Tiên Ngọc",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#ldConfirmOk"
+          },
+          "when": {
+            "kind": "visible",
+            "selector": "#ldBtnCraft"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#ldConfirmOk",
+          "timeoutMs": 5000,
+          "note": "xác nhận khai lô — TỐN 20 Tiên Ngọc + dược liệu",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#ldConfirmOk"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 12000,
+          "note": "chờ màn luyện thay màn lò trống — nút Điều Hòa xuất hiện ~3s sau xác nhận",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#ldBtnTune"
+          },
+          "when": {
+            "kind": "hidden",
+            "selector": "#ldBtnTune"
+          }
+        },
+        {
+          "action": "evaluateJavaScript",
+          "script": "() => { const S = window.__jvzLd = window.__jvzLd || {}; const t = document.querySelector('#ldBtnTune'); const vis = !!(t && t.getBoundingClientRect().width > 0); return (vis && !S.pre) ? '!Khai lô mẻ mới ({{tier}}) — đang luyện, sẽ giữ lửa 3 nhịp' : ''; }",
+          "timeoutMs": 4000,
+          "note": "kể chuyện: đã khai lô mẻ mới",
+          "optional": true
+        },
+        {
+          "action": "repeat",
+          "timeoutMs": 15000,
+          "note": "lặp tới khi trang tự báo \"Đã giữ lửa đủ 3 lần — Đan Lô an toàn\". Ghé giữa chừng mà lò đã an toàn từ trước thì vòng chạy rỗng vài nhịp rồi thôi — mọi bước trong thân đều có điều kiện.",
+          "steps": [
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 110000,
+              "note": "chờ lửa hạ về 68% — chỉ trước lần Điều Hòa đầu tiên",
+              "optional": true,
+              "condition": {
+                "kind": "textMatches",
+                "text": "68%"
+              },
+              "when": {
+                "kind": "textMatches",
+                "text": "cần 3 lần"
+              }
+            },
+            {
+              "action": "click",
+              "selector": "#ldBtnTune",
+              "timeoutMs": 4000,
+              "note": "Điều Hòa — nút tự khoá vài giây sau mỗi lần bấm",
+              "optional": true,
+              "when": {
+                "kind": "enabled",
+                "selector": "#ldBtnTune"
+              }
+            },
+            {
+              "action": "waitMilliseconds",
+              "timeoutMs": 6500,
+              "note": "nhịp giữa hai lần Điều Hòa, theo đúng bản ghi (~6s)",
+              "when": {
+                "kind": "visible",
+                "selector": "#ldBtnTune"
+              }
+            },
+            {
+              "action": "evaluateJavaScript",
+              "script": "() => { const S = window.__jvzLd = window.__jvzLd || {}; const m = (document.body.innerText || '').match(/Giữ lửa:?\\s*(\\d)\\s*\\/\\s*3/i); if (!m) return ''; const n = +m[1]; if (S.tune === n) return ''; S.tune = n; return '!Giữ lửa ' + n + '/3' + (n >= 3 ? ' — Đan Lô an toàn' : ''); }",
+              "timeoutMs": 4000,
+              "note": "kể chuyện: tiến độ giữ lửa, chỉ nói khi con số đổi",
+              "optional": true
+            }
+          ],
+          "until": {
+            "kind": "textMatches",
+            "text": "giữ lửa đủ 3 lần"
+          },
+          "maxIterations": 6,
+          "maxSeconds": 240
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 8000,
+          "note": "lưới an toàn: hết vòng giữ lửa mà vẫn chưa Điều Hòa được lần nào thì báo lỗi rõ ràng — mẻ này coi như hỏng, không nhận vơ là xong",
+          "condition": {
+            "kind": "textNotMatches",
+            "text": "cần 3 lần"
+          },
+          "when": {
+            "kind": "textMatches",
+            "text": "cần 3 lần"
+          }
+        },
+        {
+          "action": "readCooldownSeconds",
+          "script": "() => { const m = document.body.innerText.match(/thời gian còn lại\\s*([0-9]{1,2}):([0-9]{2}):([0-9]{2})/i); if (!m) return null; const left = (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]); return left > 0 ? left + 60 : null; }",
+          "timeoutMs": 15000,
+          "note": "đọc \"Thời gian còn lại\" của lò — lượt ghé sau quay lại đúng lúc thu đan; lò đứng yên ở 00:00:00 thì coi như không có đồng hồ, nghỉ trọn 45 phút"
+        }
+      ],
+      "options": [
+        {
+          "key": "tier",
+          "label": "Loại đan",
+          "choices": [
+            {
+              "value": "Hạ Phẩm",
+              "label": "Hạ Phẩm"
+            },
+            {
+              "value": "Trung Phẩm",
+              "label": "Trung Phẩm"
+            },
+            {
+              "value": "Thượng Phẩm",
+              "label": "Thượng Phẩm"
+            },
+            {
+              "value": "Cực Phẩm",
+              "label": "Cực Phẩm"
+            }
+          ],
+          "allowCustom": false,
+          "selectedValue": "Trung Phẩm"
+        },
+        {
+          "key": "decompose",
+          "label": "Phân giải đan",
+          "choices": [
+            {
+              "value": "«luôn phân giải»",
+              "label": "Phân giải tất cả"
+            },
+            {
+              "value": "dược khí 5 sao",
+              "label": "Giữ 5 sao, phân giải số còn lại"
+            },
+            {
+              "value": "dược khí 4 sao|dược khí 5 sao",
+              "label": "Giữ từ 4 sao, phân giải 3 sao trở xuống"
+            },
+            {
+              "value": "dược khí 3 sao|dược khí 4 sao|dược khí 5 sao",
+              "label": "Giữ từ 3 sao, phân giải 2 sao trở xuống"
+            },
+            {
+              "value": "dược khí 2 sao|dược khí 3 sao|dược khí 4 sao|dược khí 5 sao",
+              "label": "Giữ từ 2 sao, chỉ phân giải 1 sao"
+            },
+            {
+              "value": "dược khí",
+              "label": "Không phân giải (giữ tất cả)"
+            }
+          ],
+          "allowCustom": false,
+          "selectedValue": "«luôn phân giải»"
+        }
+      ],
+      "fallbackCooldownSeconds": 2700,
+      "order": 105,
+      "notes": "Tự luyện đan ở Luyện Đan Đường — mỗi mẻ TỐN dược liệu + 20 Tiên Ngọc."
+    }
+  ]
+}

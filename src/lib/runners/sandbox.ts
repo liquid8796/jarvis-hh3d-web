@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { Sandbox } from "@vercel/sandbox";
 import { SANDBOX_SLICE_MS } from "./policy";
 
@@ -18,6 +20,13 @@ import { SANDBOX_SLICE_MS } from "./policy";
  * của cùng một hợp đồng. Không có nhánh code thứ hai để lệch pha, và người dùng thấy nhật
  * ký giống hệt nhau dù lượt chạy ở đâu.
  */
+
+/**
+ * Phiên bản Playwright dùng khi phải dựng VM tại chỗ. Giữ khớp với `playwright-core` trong
+ * package.json và với ảnh do scripts/createSandboxSnapshot.mts chụp: revision Chromium gắn
+ * chặt với phiên bản, nên lệch một nấc là "Executable doesn't exist" lúc chạy.
+ */
+const PLAYWRIGHT_VERSION = "1.62.1";
 
 /** Thư viện hệ thống Chromium cần trên VM (Amazon Linux / dnf). */
 const CHROMIUM_SYSTEM_DEPS = [
@@ -72,17 +81,21 @@ export async function launchSandboxWorker(): Promise<LaunchResult> {
 
   try {
     if (!snapshotId) {
-      // Không có ảnh dựng sẵn thì phải cài tại chỗ. Việc này diễn ra TRONG sandbox chứ
-      // không trong function, nên nó không ăn vào trần 60 giây — chỉ tốn thời gian sống
-      // của VM. Vẫn nên tạo ảnh (xem README): mỗi lát tiết kiệm ~30 giây.
+      // Không có ảnh dựng sẵn thì phải dựng tại chỗ: thư viện hệ thống, playwright-core, và
+      // cả một bản Chromium. Việc này diễn ra TRONG sandbox chứ không trong function, nên
+      // nó không ăn vào trần 60 giây — nhưng nó ăn vào chính thời gian sống của VM, và một
+      // lát ngắn có thể tiêu gần hết ngân sách chỉ để dựng. Hãy tạo ảnh (xem README).
       await sandbox.runCommand("sh", [
         "-c",
-        `sudo dnf install -y --skip-broken ${CHROMIUM_SYSTEM_DEPS.join(" ")} >/dev/null 2>&1 || true; sudo ldconfig || true`,
+        `sudo dnf install -y --skip-broken ${CHROMIUM_SYSTEM_DEPS.join(" ")} >/dev/null 2>&1 || true; sudo ldconfig || true; ` +
+          `npm init -y >/dev/null 2>&1; npm install playwright-core@${PLAYWRIGHT_VERSION} >/dev/null 2>&1; ` +
+          `npx --yes playwright@${PLAYWRIGHT_VERSION} install chromium >/dev/null 2>&1`,
       ]);
     }
 
     await sandbox.writeFiles([
       { path: "worker.mjs", content: Buffer.from(SANDBOX_WORKER_SOURCE, "utf8") },
+      ...(await engineFiles()),
     ]);
 
     // detached: trả về ngay lập tức. VM tiếp tục chạy tới khi xong việc hoặc hết timeout.
@@ -108,10 +121,44 @@ export async function launchSandboxWorker(): Promise<LaunchResult> {
 }
 
 /**
+ * Bộ thông dịch nhiệm vụ, gửi sang VM nguyên vẹn thành tệp.
+ *
+ * Cố ý KHÔNG nhúng thành chuỗi như worker bên dưới. Worker là ~60 dòng chỉ nói giao thức và
+ * gần như không đổi; engine là hơn nghìn dòng chứa toàn bộ tri thức về site, và một bản sao
+ * dán trong chuỗi sẽ trôi khỏi bản gốc ngay lần sửa selector đầu tiên. Gửi thẳng tệp nghĩa
+ * là VM chạy đúng đoạn mã mà worker máy nhà chạy, không có bản thứ hai nào để lệch.
+ *
+ * `profile.json` đi cùng vì `profile.mjs` đọc nó lúc chạy — thiếu nó thì engine lên VM mà
+ * không mang theo nhiệm vụ nào.
+ */
+const ENGINE_FILES = [
+  "boardScripts.mjs",
+  "cooldown.mjs",
+  "engine.mjs",
+  "profile.mjs",
+  "profile.json",
+  "runCycle.mjs",
+  "session.mjs",
+];
+
+async function engineFiles() {
+  // `outputFileTracingIncludes` trong next.config.ts là thứ giữ cho thư mục này còn nằm
+  // trong bundle của function — Next không tự đoán ra được, vì không dòng import nào trỏ
+  // tới đây: chúng chỉ được ĐỌC rồi gửi đi nơi khác.
+  const dir = path.join(process.cwd(), "src", "lib", "quest-engine");
+  return Promise.all(
+    ENGINE_FILES.map(async (name) => ({
+      path: `quest-engine/${name}`,
+      content: await readFile(path.join(dir, name)),
+    })),
+  );
+}
+
+/**
  * Mã nguồn của worker chạy BÊN TRONG sandbox — nhúng thành chuỗi vì VM không có repo này.
  *
- * Giữ nó ngắn và không phụ thuộc gì ngoài Node: mọi thứ nó cần là `fetch` và giao thức bốn
- * thao tác. Chỗ cắm engine Playwright được đánh dấu y như trong scripts/worker.mjs.
+ * Giữ nó ngắn và không phụ thuộc gì ngoài Node cùng engine gửi kèm: mọi thứ nó cần là
+ * `fetch` và giao thức bốn thao tác.
  */
 const SANDBOX_WORKER_SOURCE = String.raw`
 const WEB_URL = process.env.WEB_URL.replace(/\/$/, "");
@@ -132,30 +179,22 @@ const call = async (op, payload = {}) => {
 
 const say = (jobId, message, level = "info") =>
   call("event", { jobId, level, message }).catch(() => {});
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function runQuest(job, shouldStop) {
-  const config = job.config ?? {};
-  const quests = [];
-  if (config.quests?.luyenDan?.enabled) quests.push("Luyện Đan Đường");
-  if (config.quests?.meCung?.enabled) quests.push("Mê Cung");
-  if (quests.length === 0) {
-    return { outcome: "done", message: "Không có nhiệm vụ nào được bật." };
-  }
+  const { chromium } = await import("playwright-core");
+  const { runCycle } = await import("./quest-engine/runCycle.mjs");
 
-  await say(job.id, "Linh sứ sandbox đã dựng xong, sẽ hành sự: " + quests.join(" · "), "success");
+  await say(job.id, "Linh sứ sandbox đã dựng xong lư đỉnh.", "success");
 
-  // ---- CHỖ CẮM ENGINE (Playwright/agent-browser) --------------------------------------
-  // config.gameCookie đã được giải mã ở /api/worker. Gọi shouldStop() ở các điểm an toàn.
-  for (let i = 1; i <= 200; i++) {
-    if (await shouldStop()) return { outcome: "stopped", message: "Đã thu đàn theo lệnh đạo hữu." };
-    if (Date.now() > deadline) {
-      return { outcome: "done", message: "Hết ngân sách thời gian của lát này — sẽ tiếp tục ở lượt sau." };
-    }
-    await sleep(3000);
-    if (i % 5 === 0) await say(job.id, "Đang vận hành… (nhịp " + i + ")");
-  }
-  return { outcome: "done", message: "Đã đi hết một vòng nhiệm vụ." };
+  // config.gameCookie đã được giải mã ở /api/worker. Ngân sách truyền vào để engine dừng
+  // TỬ TẾ giữa hai nhiệm vụ thay vì biến mất cùng VM giữa một trận.
+  return runCycle({
+    chromium,
+    config: job.config ?? {},
+    say: (message, level) => say(job.id, message, level),
+    shouldStop,
+    budgetMs: Math.max(0, deadline - Date.now()),
+  });
 }
 
 (async () => {
@@ -176,7 +215,9 @@ async function runQuest(job, shouldStop) {
   }, 20000);
 
   try {
-    const result = await runQuest(job, async () => stopping);
+    // shouldStop ĐỒNG BỘ: engine gọi nó trong vòng lặp chặt, nên nó phải là phép đọc biến
+    // chứ không phải một lời hứa — một Promise ở đây luôn truthy và sẽ dừng lượt ngay lập tức.
+    const result = await runQuest(job, () => stopping);
     await call("complete", { jobId: job.id, ...result });
   } catch (err) {
     await call("complete", {

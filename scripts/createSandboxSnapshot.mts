@@ -10,10 +10,22 @@
  *
  * Rồi đặt kết quả vào biến môi trường AGENT_BROWSER_SNAPSHOT_ID trên Vercel.
  */
+import { readFileSync } from "node:fs";
 import { Sandbox } from "@vercel/sandbox";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
+
+/**
+ * Phiên bản Playwright của ảnh, đọc từ package.json chứ không gõ tay ở đây.
+ *
+ * Ảnh VM và repo phải khớp phiên bản: worker trong VM `import "playwright-core"` từ ảnh,
+ * còn revision Chromium thì gắn chặt với phiên bản ấy. Ghim số ở hai nơi là hẹn ngày chúng
+ * lệch nhau, và triệu chứng lúc đó ("Executable doesn't exist") chẳng nói gì về nguyên nhân.
+ */
+const PLAYWRIGHT_VERSION = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+).dependencies["playwright-core"].replace(/^[^\d]*/, "");
 
 const CHROMIUM_SYSTEM_DEPS = [
   "nss", "nspr", "libxkbcommon", "atk", "at-spi2-atk", "at-spi2-core",
@@ -77,11 +89,20 @@ try {
     `sudo dnf clean all 2>&1 && sudo dnf install -y --skip-broken ${CHROMIUM_SYSTEM_DEPS.join(" ")} 2>&1 && sudo ldconfig 2>&1`,
   ]);
 
-  console.log("  • cài agent-browser…");
-  await sandbox.runCommand("npm", ["install", "-g", "agent-browser"]);
+  // playwright-core cài NGAY TẠI thư mục làm việc, không phải `-g`. Worker được thả vào
+  // đúng thư mục này, và Node giải `import "playwright-core"` bằng cách đi ngược cây thư
+  // mục từ chỗ tệp nằm — một gói cài global sẽ không nằm trên đường đi đó.
+  console.log(`  • cài playwright-core@${PLAYWRIGHT_VERSION}…`);
+  await sandbox.runCommand("sh", [
+    "-c",
+    `npm init -y >/dev/null 2>&1; npm install playwright-core@${PLAYWRIGHT_VERSION} 2>&1`,
+  ]);
 
+  // Trình duyệt do CLI của `playwright` tải, nhưng phải ĐÚNG cùng phiên bản: playwright-core
+  // tìm một revision Chromium cụ thể, và một CLI lệch phiên bản sẽ đặt sẵn một revision khác
+  // — lúc chạy báo "Executable doesn't exist", sau khi ảnh đã chụp xong.
   console.log("  • tải Chromium…");
-  await sandbox.runCommand("npx", ["agent-browser", "install"]);
+  await sandbox.runCommand("npx", ["--yes", `playwright@${PLAYWRIGHT_VERSION}`, "install", "chromium"]);
 
   const snapshot = await sandbox.snapshot();
   console.log(`\n✔ Xong. AGENT_BROWSER_SNAPSHOT_ID=${snapshot.snapshotId}`);

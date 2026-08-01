@@ -117,7 +117,38 @@ src/
     auth/         # Phiên đăng nhập, guard phân quyền, cửa vào của worker.
     db/           # Schema Drizzle + client. Nơi DUY NHẤT biết hình thù bảng.
     services/     # Quy tắc nghiệp vụ. Nơi DUY NHẤT viết truy vấn.
+    quest-engine/ # Bộ thông dịch nhiệm vụ — JS thuần, không biết gì về Next hay database.
 ```
+
+#### Bộ thông dịch nhiệm vụ, và vì sao nó dùng chung với bản desktop
+
+`quest-engine/` là bản JavaScript của `QuestEngine.cs` bên bản desktop, và nó đọc **cùng một
+tệp hồ sơ** (`profile.json`, schema 41) mà bản desktop dùng. Đó là điểm mấu chốt: hồ sơ ấy
+không phải cấu hình, nó là **tri thức về site** — mỗi selector trong đó là một buổi tối ngồi
+xem trang thật, và vài cái là cả một đêm hỏng việc mới rút ra. Nếu web chép lại tri thức đó
+thành mã riêng thì hai bản sẽ trôi khỏi nhau ngay lần site đổi marker đầu tiên, và người sửa
+sẽ chỉ sửa được một bên.
+
+Nên chia thế này:
+
+- **Hồ sơ là dữ liệu.** Thêm nhiệm vụ = thêm dữ liệu, không thêm code.
+- **Engine là bộ thông dịch.** 13 loại bước × 6 loại điều kiện, chấm hết.
+- **`profile.mjs` là lớp dịch.** Web giữ form nhỏ và phẳng (bật/tắt, độ khó phòng, ngưỡng
+  HP), lớp này đặt các lựa chọn ấy vào đúng `selectedValue` của hồ sơ.
+- **Trình duyệt được TIÊM VÀO.** `runCycle` nhận `chromium` từ người gọi, nên `quest-engine/`
+  không phụ thuộc Playwright và bundle của Next không kéo theo thư viện nó không dùng.
+
+Lưới hồi quy chạy trên Chromium thật, trước một trang thật:
+
+```bash
+npm run smoke
+```
+
+Mỗi ca trong đó là một chuyện đã xảy ra một lần rồi — nút BẮT ĐẦU không chịu đứng yên nên
+click thường chết, một selector vắng mặt rơi về quét cả trang rồi khớp nhầm chỉ số, một option
+đổi giữa lượt mà script vẫn chạy giá trị cũ. Ba lỗi port đầu tiên đều do lưới này bắt, trong
+đó có một lỗi làm **toàn bộ tường thuật câm lặng mà không có một dòng lỗi nào**: Playwright
+bản .NET tự gọi một chuỗi hình dạng `() => {…}`, bản JavaScript thì trả `undefined`.
 
 Quy tắc giữ cho nó sạch khi lớn lên:
 
@@ -130,8 +161,10 @@ Quy tắc giữ cho nó sạch khi lớn lên:
 3. **Server action nào cũng tự kiểm tra lại quyền.** Form có thể bị giả mạo; guard thì không
    bỏ qua được.
 
-Thêm một nhiệm vụ mới về sau = thêm một nhánh vào `configSchema`, một `<fieldset>` trong
-`ConfigForm`, và phần xử lý trong worker. Không đụng tới auth, admin hay job lifecycle.
+Thêm một nhiệm vụ mới về sau = ghi nó ra bằng dữ liệu trong hồ sơ (làm ở bản desktop, nơi có
+trình ghi flow), xuất lại `profile.json`, rồi thêm một nhánh vào `configSchema`, một
+`<fieldset>` trong `ConfigForm`, và vài dòng trong `profile.mjs`. Không đụng tới engine, auth,
+admin hay job lifecycle — và không viết một dòng selector nào lần thứ hai.
 
 ---
 
@@ -210,8 +243,8 @@ Nhịp thật đến từ hai nguồn khác:
 Mỗi nhịp nhận đúng một job sandbox (một VM đang tính tiền là đủ; nhiều job thì lần lượt các
 nhịp sau).
 
-**2. Ảnh dựng sẵn (rất nên có).** Không có nó, mỗi lát mất ~30 giây chỉ để cài Chromium —
-đủ ăn hết ngân sách của một lát ngắn. Tạo một lần:
+**2. Ảnh dựng sẵn (rất nên có).** Không có nó, mỗi lát mất hàng chục giây chỉ để cài
+`playwright-core` và tải Chromium — đủ ăn hết ngân sách của một lát ngắn. Tạo một lần:
 
 ```bash
 npx tsx scripts/createSandboxSnapshot.mts
@@ -219,6 +252,19 @@ npx tsx scripts/createSandboxSnapshot.mts
 
 Rồi thêm `AGENT_BROWSER_SNAPSHOT_ID` vào Environment Variables trên Vercel. Từ đó VM khởi
 động dưới một giây.
+
+**Chụp xong thì KIỂM ẢNH**, đừng tin cái ID:
+
+```bash
+npx tsx scripts/verifySandboxSnapshot.mts
+```
+
+Nó dựng một VM từ ảnh, gửi sang đúng những tệp mà lượt chạy thật gửi, rồi bắt nó mở Chromium
+và chạy một bước của bộ thông dịch. Có mặt vì một ảnh hỏng **không kêu lúc chụp**: mọi lệnh
+cài đều thành công, ảnh chụp xong, ID trả về đẹp đẽ — rồi mỗi lát sandbox sau đó chết vì
+`Cannot find package 'playwright-core'` (cài `-g` thì Node không tra tới) hoặc
+`Executable doesn't exist` (CLI lệch phiên bản). Cả hai chỉ lộ ra trên production, trong một
+VM đã tự huỷ, sau khi người dùng bấm Khai Đàn.
 
 Tuỳ chọn: đặt `CRON_SECRET` để gọi `/api/cron` bằng tay lúc thử
 (`curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron`). Cron của Vercel tự
@@ -321,10 +367,15 @@ một job.
 Cho nó sống dai qua reboot: `pm2 start scripts/worker.mjs --name jarvis-worker`, hoặc một
 systemd unit, hoặc Docker restart-policy.
 
-> **Trạng thái hiện tại của worker:** toàn bộ giao thức đã hoàn chỉnh và chạy được — xin
-> việc, nhịp tim, dừng an toàn, tường thuật, xử lý lỗi. Riêng phần điều khiển Chromium thật
-> là một chỗ cắm được đánh dấu rõ trong `runQuest()`, chờ ghép engine Playwright của bản
-> desktop vào. Chạy ngay bây giờ, bạn sẽ thấy trọn vòng đời một lượt trên giao diện.
+Linh sứ máy nhà cần một bản Chromium — cài một lần:
+
+```bash
+npx playwright@1.62.1 install chromium
+```
+
+> Phải ĐÚNG phiên bản ấy. `playwright-core` đi tìm một revision Chromium cụ thể, và một CLI
+> lệch phiên bản sẽ đặt sẵn revision khác — lúc chạy báo "Executable doesn't exist", một câu
+> chẳng nói gì về nguyên nhân.
 
 ---
 

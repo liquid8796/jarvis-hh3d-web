@@ -1,6 +1,6 @@
 {
   "name": "jarvis-hh3d-web",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Jarvis HH3D — control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn tự động chạy trên server.",
   "scripts": {
@@ -11,7 +11,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate.mjs",
     "db:seed": "node scripts/seed.mjs",
-    "worker": "node scripts/worker.mjs"
+    "worker": "node scripts/worker.mjs",
+    "smoke": "node scripts/smokeQuestEngine.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",
@@ -20,6 +21,7 @@
     "drizzle-orm": "^0.44.4",
     "jose": "^6.0.12",
     "next": "^16.0.0",
+    "playwright-core": "^1.62.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "zod": "^4.0.14"

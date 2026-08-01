@@ -11,12 +11,13 @@
  * Vòng đời: xin việc → nhận config snapshot → chạy → kể chuyện qua `event` → nhịp tim mỗi
  * 20 giây (và nghe xem người dùng có bấm Thu Đàn không) → báo kết thúc.
  *
- * Phần THỰC SỰ điều khiển trình duyệt cố ý để trống: nó là engine của bản desktop
- * (JarvisHH3D) và sẽ được cắm vào đây qua `runQuest()`. Mọi thứ quanh nó — giao thức, nhịp
- * tim, dừng an toàn, tường thuật — đã hoàn chỉnh và chạy được ngay.
+ * Phần điều khiển trình duyệt là engine dùng chung ở `src/lib/quest-engine` — cùng bộ thông
+ * dịch và cùng hồ sơ quest schema 41 với bản desktop, nên tri thức về site chỉ có một bản gốc.
  *
  *   WEB_URL=https://<app>.vercel.app WORKER_TOKEN=... node scripts/worker.mjs
  */
+
+import { runCycle } from "../src/lib/quest-engine/runCycle.mjs";
 
 const WEB_URL = (process.env.WEB_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const TOKEN = process.env.WORKER_TOKEN;
@@ -64,40 +65,30 @@ const say = (jobId, message, level = "info") =>
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * CHỖ CẮM ENGINE.
+ * Chạy một lượt bằng engine thật.
  *
- * `shouldStop()` trả về true ngay khi người dùng bấm Thu Đàn — hãy gọi nó ở các điểm an
- * toàn (giữa hai bước, giữa hai vòng lặp), đúng như engine desktop chỉ dừng giữa các step
- * chứ không bao giờ dừng giữa một cú click.
+ * `shouldStop()` ĐỒNG BỘ có chủ ý — engine gọi nó trong những vòng lặp chặt (mỗi 300ms khi
+ * chờ một điều kiện, mỗi bước trong một repeat), nên nó phải là một phép đọc biến chứ không
+ * phải một lời hứa. Nhịp tim nền là thứ cập nhật biến ấy.
  */
 async function runQuest({ config, say, shouldStop }) {
   await say("Linh sứ đã nhận ngọc giản, đang khởi lư…");
 
-  const quests = [];
-  if (config?.quests?.meCung?.enabled) quests.push("Mê Cung");
-  if (config?.quests?.luyenDan?.enabled) quests.push("Luyện Đan Đường");
-
-  if (quests.length === 0) {
-    return { outcome: "done", message: "Không có nhiệm vụ nào được bật — kết thúc lượt." };
+  // Nạp Playwright TẠI ĐÂY chứ không ở đầu tệp: một máy chỉ dùng worker để canh việc vẫn
+  // chạy được `node scripts/worker.mjs` mà không cần cài Chromium, và lỗi thiếu thư viện
+  // hiện ra như một lượt chạy thất bại có lời giải thích, không phải một tiến trình chết
+  // ngay khi khởi động.
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright-core"));
+  } catch {
+    return {
+      outcome: "failed",
+      message: "Thiếu playwright-core — chạy `npm install` rồi `npx playwright install chromium`.",
+    };
   }
 
-  await say(`Sẽ hành sự: ${quests.join(" · ")}.`, "success");
-
-  // ---- TODO: cắm engine Playwright của bản desktop vào đây ------------------
-  // Vòng chờ dưới đây là chỗ giữ nhịp: nó chứng minh trọn vẹn đường đi của giao thức
-  // (nhịp tim, lệnh dừng, tường thuật) mà chưa đụng tới game thật.
-  for (let i = 1; i <= 100; i++) {
-    if (await shouldStop()) {
-      return { outcome: "stopped", message: "Đã thu đàn theo lệnh đạo hữu." };
-    }
-
-    await sleep(3000);
-    if (i % 5 === 0) {
-      await say(`Đang vận hành… (nhịp ${i})`);
-    }
-  }
-
-  return { outcome: "done", message: "Đã đi hết một vòng nhiệm vụ." };
+  return runCycle({ chromium, config, say, shouldStop });
 }
 
 /** Một lượt trọn vẹn: nhịp tim chạy nền, engine chạy trước, kết thúc thì báo cáo. */
@@ -120,7 +111,7 @@ async function handle(job) {
     const result = await runQuest({
       config: job.config,
       say: (message, level) => say(job.id, message, level),
-      shouldStop: async () => stopping,
+      shouldStop: () => stopping,
     });
     await call("complete", { jobId: job.id, ...result });
     console.log(`✔ job ${job.id} — ${result.outcome}`);

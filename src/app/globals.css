@@ -1,0 +1,351 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   Jarvis HH3D — theme "phàm nhân tu tiên"
+   Trời mực đêm, linh khí vàng kim, ngọc bích và tím huyền — mọi màu đi qua
+   token để cả app đổi giọng được từ một chỗ.
+   ========================================================================== */
+
+@theme {
+  --color-ink-950: #07060f;
+  --color-ink-900: #0c0a1a;
+  --color-ink-800: #141127;
+  --color-ink-700: #1d1936;
+  --color-ink-600: #2a2450;
+
+  --color-gold-300: #f4d78d;
+  --color-gold-400: #e8c25c;
+  --color-gold-500: #d4a733;
+
+  --color-jade-300: #7ee0b8;
+  --color-jade-400: #4cc99a;
+  --color-jade-500: #2aa87a;
+
+  --color-spirit-300: #b9a5ff;
+  --color-spirit-400: #9678f0;
+  --color-spirit-500: #7451d6;
+
+  --color-parchment: #efe6d0;
+  --color-mist: #8f89b3;
+
+  --font-display: var(--font-display), "Noto Serif", serif;
+  --font-body: var(--font-body), system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-ink-950);
+  color: var(--color-parchment);
+  font-family: var(--font-body);
+  min-height: 100dvh;
+}
+
+/* ---------------------------------------------------------------------------
+   Bầu trời: gradient mực + tinh vân linh khí + sao. Ba lớp cố định sau nội
+   dung, không chặn tương tác.
+--------------------------------------------------------------------------- */
+.sky {
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(116, 81, 214, 0.28), transparent 60%),
+    radial-gradient(900px 500px at 10% 110%, rgba(42, 168, 122, 0.16), transparent 60%),
+    radial-gradient(700px 400px at 50% 40%, rgba(212, 167, 51, 0.07), transparent 65%),
+    linear-gradient(180deg, #0b0918 0%, #07060f 55%, #0a0714 100%);
+}
+
+.stars {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background-image:
+    radial-gradient(1.2px 1.2px at 12% 22%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 28% 64%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1.4px 1.4px at 41% 12%, rgba(244, 215, 141, 0.9), transparent),
+    radial-gradient(1px 1px at 57% 48%, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1.3px 1.3px at 66% 81%, rgba(185, 165, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 74% 27%, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1.5px 1.5px at 87% 60%, rgba(244, 215, 141, 0.75), transparent),
+    radial-gradient(1px 1px at 94% 14%, rgba(255, 255, 255, 0.5), transparent);
+  animation: twinkle 7s ease-in-out infinite alternate;
+}
+
+@keyframes twinkle {
+  from { opacity: 0.55; }
+  to { opacity: 1; }
+}
+
+/* Mây trôi: hai dải sương mù dịch chuyển ngược chiều, rất chậm. */
+.clouds::before,
+.clouds::after {
+  content: "";
+  position: fixed;
+  left: -50%;
+  width: 200%;
+  height: 42vh;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(60% 100% at 50% 100%, rgba(143, 137, 179, 0.10), transparent 70%);
+  filter: blur(30px);
+}
+
+.clouds::before {
+  top: 8vh;
+  animation: drift 90s linear infinite;
+}
+
+.clouds::after {
+  bottom: -8vh;
+  background: radial-gradient(60% 100% at 50% 0%, rgba(116, 81, 214, 0.10), transparent 70%);
+  animation: drift 120s linear infinite reverse;
+}
+
+@keyframes drift {
+  from { transform: translateX(-8%); }
+  to { transform: translateX(8%); }
+}
+
+/* ---------------------------------------------------------------------------
+   Thành phần dùng chung
+--------------------------------------------------------------------------- */
+.card {
+  background: linear-gradient(165deg, rgba(29, 25, 54, 0.86), rgba(12, 10, 26, 0.92));
+  border: 1px solid rgba(232, 194, 92, 0.14);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+}
+
+.card-hairline {
+  position: relative;
+}
+
+.card-hairline::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(232, 194, 92, 0.08);
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.h-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+.text-gilded {
+  background: linear-gradient(120deg, #f4d78d 0%, #d4a733 45%, #f8e7b5 70%, #caa032 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 10px;
+  padding: 0.6rem 1.15rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease, opacity 0.2s;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-gold {
+  background: linear-gradient(135deg, #e8c25c, #c99a2e);
+  color: #241c04;
+  box-shadow: 0 0 22px rgba(232, 194, 92, 0.22);
+}
+
+.btn-gold:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 32px rgba(232, 194, 92, 0.38);
+}
+
+.btn-ghost {
+  border-color: rgba(232, 194, 92, 0.3);
+  color: var(--color-gold-300);
+  background: rgba(232, 194, 92, 0.04);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(232, 194, 92, 0.1);
+}
+
+.btn-danger {
+  border-color: rgba(255, 107, 107, 0.35);
+  color: #ff9c9c;
+  background: rgba(255, 80, 80, 0.06);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(255, 80, 80, 0.14);
+}
+
+.btn-jade {
+  background: linear-gradient(135deg, #4cc99a, #248a63);
+  color: #04241a;
+  box-shadow: 0 0 22px rgba(76, 201, 154, 0.2);
+}
+
+.btn-jade:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 30px rgba(76, 201, 154, 0.35);
+}
+
+.input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(143, 137, 179, 0.28);
+  background: rgba(7, 6, 15, 0.6);
+  padding: 0.6rem 0.85rem;
+  color: var(--color-parchment);
+  font-size: 0.95rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input:focus {
+  outline: none;
+  border-color: rgba(232, 194, 92, 0.55);
+  box-shadow: 0 0 0 3px rgba(232, 194, 92, 0.12);
+}
+
+.label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--color-mist);
+  margin-bottom: 0.35rem;
+  letter-spacing: 0.04em;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.18rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  border: 1px solid;
+}
+
+.badge-pending {
+  color: #f4d78d;
+  border-color: rgba(244, 215, 141, 0.4);
+  background: rgba(244, 215, 141, 0.08);
+}
+
+.badge-active {
+  color: #7ee0b8;
+  border-color: rgba(126, 224, 184, 0.4);
+  background: rgba(126, 224, 184, 0.08);
+}
+
+.badge-disabled {
+  color: #ff9c9c;
+  border-color: rgba(255, 156, 156, 0.4);
+  background: rgba(255, 156, 156, 0.08);
+}
+
+.badge-admin {
+  color: #b9a5ff;
+  border-color: rgba(185, 165, 255, 0.45);
+  background: rgba(185, 165, 255, 0.08);
+}
+
+/* Ấn tông môn: vòng tròn linh trận xoay chậm quanh chữ triện. */
+.seal {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+}
+
+.seal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 1px dashed rgba(232, 194, 92, 0.55);
+  animation: seal-spin 24s linear infinite;
+}
+
+.seal::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 194, 92, 0.25);
+}
+
+@keyframes seal-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Nhịp linh khí cho nút Khai Đàn khi đang chạy. */
+.pulse-jade {
+  animation: pulse-jade 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse-jade {
+  0%, 100% { box-shadow: 0 0 18px rgba(76, 201, 154, 0.25); }
+  50% { box-shadow: 0 0 34px rgba(76, 201, 154, 0.55); }
+}
+
+/* Hiện dần khi vào trang. */
+.rise-in {
+  animation: rise-in 0.6s ease-out both;
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Log feed */
+.log-line {
+  display: grid;
+  grid-template-columns: 4.4rem 1fr;
+  gap: 0.75rem;
+  padding: 0.32rem 0;
+  font-size: 0.85rem;
+  border-bottom: 1px dashed rgba(143, 137, 179, 0.12);
+}
+
+.log-time { color: var(--color-mist); font-variant-numeric: tabular-nums; }
+.log-info { color: var(--color-parchment); }
+.log-success { color: var(--color-jade-300); }
+.log-warning { color: var(--color-gold-300); }
+.log-error { color: #ff9c9c; }
+
+/* Bảng admin */
+.table-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.6fr 0.9fr 0.9fr auto;
+  gap: 0.9rem;
+  align-items: center;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid rgba(143, 137, 179, 0.1);
+}
+
+.table-row:hover { background: rgba(232, 194, 92, 0.03); }
+
+@media (max-width: 720px) {
+  .table-row { grid-template-columns: 1fr auto; row-gap: 0.4rem; }
+  .table-hide-sm { display: none; }
+}

@@ -31,10 +31,36 @@ export type RunnerDecision = {
 /** Trần thời gian một lát sandbox. Dưới trần của Vercel Sandbox, chừa chỗ cho dựng VM. */
 export const SANDBOX_SLICE_MS = 8 * 60 * 1000;
 
+/**
+ * Sandbox chỉ THẬT SỰ dùng được khi có thứ gõ cửa nó thường xuyên.
+ *
+ * Nó không phải tiến trình đang sống — phải có cron gọi `/api/cron` mỗi phút. Mà gói Hobby
+ * của Vercel **chỉ cho cron một lần mỗi ngày** (`vercel --prod` từ chối thẳng biểu thức
+ * `* * * * *`). Một lần mỗi ngày thì vô dụng với automation cần ghé lò mỗi ~26 phút.
+ *
+ * Nên sandbox mặc định TẮT, và chỉ bật khi người vận hành khẳng định mình có cron đủ dày
+ * (gói Pro, hoặc một cron ngoài tự gọi vào). Thà giao hết cho linh sứ máy nhà — thứ chắc
+ * chắn chạy — còn hơn xếp job vào một hàng chờ không ai đến lấy.
+ */
+export function sandboxAvailable(): boolean {
+  return process.env.SANDBOX_ENABLED === "1";
+}
+
 export function decideRunner(config: UserConfig): RunnerDecision {
   const meCung = config.quests.meCung.enabled;
   const luyenDan = config.quests.luyenDan.enabled;
   const preferred = config.runner;
+
+  if (!sandboxAvailable()) {
+    return {
+      runner: "local",
+      reason:
+        preferred === "sandbox"
+          ? "Sandbox chưa bật (cron của gói Hobby chỉ chạy 1 lần/ngày, không đủ để lái đàn " +
+            "pháp) — lượt này giao cho linh sứ máy nhà."
+          : "Giao cho linh sứ máy nhà.",
+    };
+  }
 
   if (meCung) {
     return {

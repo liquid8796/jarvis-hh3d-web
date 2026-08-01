@@ -53,6 +53,27 @@ nhà, **kèm một dòng giải thích trong nhật ký** thay vì âm thầm l�
 được, Chromium không lên) thì job tự đổi `runner` sang `local` và nằm chờ worker máy nhà —
 người dùng không phải làm gì, chỉ cần có một worker đang trực.
 
+> ### ⚠️ Gói Hobby (free) của Vercel KHÔNG chạy được linh sứ sandbox
+>
+> Sandbox không tự đi tìm việc — phải có cron gọi `/api/cron` mỗi phút. Nhưng gói Hobby
+> **chỉ cho cron một lần mỗi ngày**; `vercel --prod` từ chối thẳng biểu thức `* * * * *`:
+>
+> ```
+> Error: Hobby accounts are limited to daily cron jobs.
+> ```
+>
+> Một lần mỗi ngày thì vô dụng với automation cần ghé lò mỗi ~26 phút. Nên **sandbox mặc
+> định TẮT**: `src/lib/runners/policy.ts` giao mọi job cho `local` trừ khi có
+> `SANDBOX_ENABLED=1`. Thà giao cho thứ chắc chắn chạy còn hơn xếp job vào hàng chờ không
+> ai đến lấy.
+>
+> Bật sandbox khi nào? Khi bạn lên gói Pro (cron mỗi phút), hoặc có một cron NGOÀI tự gọi
+> vào `/api/cron` — xem mục "Cron miễn phí từ bên ngoài" bên dưới.
+>
+> `vercel.json` để cron ở `0 3 * * *` (mỗi ngày một lần) cho deploy được trên Hobby. Nhịp
+> đó vẫn hữu ích: nó dọn job chết và job không ai nhận, nên hệ thống tự lành kể cả khi
+> không ai mở dashboard.
+
 ### Lưu config người dùng bằng gì?
 
 **JSONB trong chính Postgres đó** (bảng `user_configs`), không dùng store thứ hai. Lý do,
@@ -256,6 +277,70 @@ npm run dev              # http://localhost:3000
 # cửa sổ khác:
 WEB_URL=http://localhost:3000 WORKER_TOKEN=<...> npm run worker
 ```
+
+## 3b. Chạy linh sứ ở đâu cho miễn phí
+
+Linh sứ chỉ cần một chỗ chạy Node **liên tục** (và một Chromium). Xếp theo mức tôi thật sự
+khuyên dùng:
+
+### 1. Chính máy đang chạy bản desktop — khuyến nghị số một
+
+Máy đó vốn đã bật, đã có Node, đã có Chromium của Playwright. Không tốn đồng nào, không
+thêm tài khoản, không giới hạn giờ. Cho nó sống dai qua reboot:
+
+```bash
+npm i -g pm2
+pm2 start scripts/worker.mjs --name jarvis-worker
+pm2 save && pm2 startup
+```
+
+Nhược điểm duy nhất: máy tắt là automation dừng. Với một công cụ farm game cá nhân thì đó
+hiếm khi là vấn đề thật.
+
+### 2. Oracle Cloud Free Tier — máy chủ thật, miễn phí vĩnh viễn
+
+Rộng rãi nhất trong các gói free: máy ảo ARM Ampere tới **4 vCPU / 24 GB RAM**, always-free
+(không phải trial). Thừa sức nuôi Chromium. Đây là lựa chọn tốt nhất nếu bạn muốn linh sứ
+chạy 24/7 mà không phụ thuộc máy nhà.
+
+Lưu ý thực tế: đăng ký cần thẻ (không bị trừ tiền), và khu vực nào đông thì có lúc báo hết
+capacity ARM — thử lại vào giờ khác hoặc đổi region.
+
+### 3. Google Cloud Free Tier — `e2-micro` always-free
+
+Một instance `e2-micro` miễn phí vĩnh viễn ở vài region của Mỹ. Đủ chạy worker, nhưng RAM
+chỉ ~1 GB nên Chromium sẽ chật vật — hợp nếu chỉ chạy Luyện Đan Đường, hơi thiếu cho Mê Cung.
+
+### 4. GitHub Actions — miễn phí, nhưng chạy theo phiên
+
+Repo private có hạn mức phút miễn phí mỗi tháng; một workflow chạy tối đa **6 tiếng** một
+lần. Cách dùng: đặt workflow `schedule` gọi `npm run worker` với một biến giới hạn thời gian
+tự thoát, rồi nó tự khởi động lại ở nhịp sau. Được việc và thật sự miễn phí, đổi lại có
+khoảng trống giữa các phiên và cron của Actions hay bị trễ vài phút.
+
+### Những chỗ KHÔNG nên dùng
+
+- **Render free** — web service tự ngủ sau ~15 phút không có request, mà worker thì không
+  nhận request nào cả. Background worker của Render là gói trả phí.
+- **Railway / Fly.io** — giờ chủ yếu là credit dùng thử rồi chuyển sang trả phí; kiểm tra
+  hạn mức hiện hành trước khi tin là free.
+- **Cloudflare Workers** — không chạy được Chromium (Browser Rendering là dịch vụ trả phí
+  riêng).
+
+> Hạn mức của các nhà cung cấp thay đổi liên tục — hãy kiểm tra lại trang giá trước khi
+> chọn, đừng tin con số trong tài liệu này là vĩnh viễn.
+
+### Cron miễn phí từ bên ngoài (nếu vẫn muốn dùng sandbox)
+
+Nếu bạn thích đường sandbox nhưng không lên Pro: đặt `CRON_SECRET` trên Vercel, rồi dùng một
+dịch vụ cron-as-a-service miễn phí (cron-job.org, EasyCron…) gọi mỗi phút:
+
+```
+GET https://<app>.vercel.app/api/cron
+Authorization: Bearer <CRON_SECRET>
+```
+
+Rồi bật `SANDBOX_ENABLED=1`. Lúc đó chính sách runner mới giao job cho sandbox.
 
 ## 4. Vận hành
 

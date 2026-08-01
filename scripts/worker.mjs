@@ -22,6 +22,18 @@ const WEB_URL = (process.env.WEB_URL ?? "http://localhost:3000").replace(/\/$/, 
 const TOKEN = process.env.WORKER_TOKEN;
 const WORKER_ID = process.env.WORKER_ID ?? `linh-su-${process.pid}`;
 const POLL_MS = Number(process.env.WORKER_POLL_MS ?? 5000);
+/**
+ * Loại job worker này chịu nhận, ưu tiên theo thứ tự liệt kê.
+ *
+ * Mặc định nhận CẢ HAI: trên gói Hobby của Vercel, cron chỉ chạy được 1 lần/ngày nên
+ * chẳng có ai lái job `sandbox` cả — nếu worker chỉ nhận `local` thì mọi job sandbox sẽ
+ * nằm chờ tới lúc bị reaper kết liễu. Một máy đang trực thì cứ nhận hết, hơn là để job mục
+ * trong hàng. Muốn tách vai trò thì đặt WORKER_RUNNERS=local.
+ */
+const RUNNERS = (process.env.WORKER_RUNNERS ?? "local,sandbox")
+  .split(",")
+  .map((r) => r.trim())
+  .filter((r) => r === "local" || r === "sandbox");
 const HEARTBEAT_MS = 20_000;
 
 if (!TOKEN || TOKEN === "change-me") {
@@ -124,16 +136,19 @@ async function handle(job) {
   }
 }
 
-console.log(`Linh sứ「${WORKER_ID}」đang canh ${WEB_URL} …`);
+console.log(`Linh sứ「${WORKER_ID}」đang canh ${WEB_URL} — nhận job: ${RUNNERS.join(", ")}`);
 
 // Một job một lúc, tuần tự — một máy chỉ nuôi nổi một browser cho ra hồn. Muốn chạy song
 // song thì mở thêm tiến trình với WORKER_ID khác; việc giành job đã được Postgres phân xử.
 for (;;) {
   try {
-    // Chỉ nhận job dành cho linh sứ máy nhà. Job sandbox đi đường /api/cron; nếu sandbox
-    // thất bại nhiều lát liên tiếp, server tự đổi runner của job sang `local` và nó sẽ rơi
-    // vào đây — đó chính là đường dự phòng, worker không cần biết gì thêm.
-    const { job } = await call("claim", { workerId: WORKER_ID, runner: "local" });
+    // Hỏi lần lượt từng loại; loại đầu có việc là làm ngay.
+    let job = null;
+    for (const runner of RUNNERS) {
+      ({ job } = await call("claim", { workerId: WORKER_ID, runner }));
+      if (job) break;
+    }
+
     if (job) {
       await handle(job);
       continue;

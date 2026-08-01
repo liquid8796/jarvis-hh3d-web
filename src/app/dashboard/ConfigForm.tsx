@@ -1,8 +1,12 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { saveConfigAction, type ActionResult } from "@/app/actions/automation";
-import type { UserConfig } from "@/lib/services/configs";
+import { useActionState, useState, useTransition } from "react";
+import {
+  clearCookieAction,
+  saveConfigAction,
+  type ActionResult,
+} from "@/app/actions/automation";
+import type { EditableConfig } from "@/lib/services/configs";
 
 /**
  * Ngọc giản cấu hình. Uncontrolled inputs với defaultValue từ server — form chỉ là tấm
@@ -10,13 +14,16 @@ import type { UserConfig } from "@/lib/services/configs";
  * hai công tắc nhiệm vụ, và chúng chỉ để LÀM MỜ phần tuỳ chọn bên dưới: giá trị vẫn được
  * gửi đi đầy đủ, nên tắt rồi bật lại không mất những gì đã chọn.
  */
-export function ConfigForm({ config }: { config: UserConfig }) {
+export function ConfigForm({ config }: { config: EditableConfig }) {
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
     saveConfigAction,
     null,
   );
   const [meCung, setMeCung] = useState(config.quests.meCung.enabled);
   const [luyenDan, setLuyenDan] = useState(config.quests.luyenDan.enabled);
+  const [clearing, startClearing] = useTransition();
+  const [cleared, setCleared] = useState(false);
+  const hasCookie = config.hasCookie && !cleared;
 
   return (
     <form action={action} className="card card-hairline p-6">
@@ -26,16 +33,48 @@ export function ConfigForm({ config }: { config: UserConfig }) {
         <label className="label" htmlFor="gameCookie">
           Pháp Khí — cookie đăng nhập hoathinh3d
         </label>
+
+        {/* Cookie đi MỘT CHIỀU: nhập vào thì được, đọc ra thì không. Đã mã hoá trong
+            database rồi mà vẫn trả về trình duyệt mỗi lần mở trang thì coi như chưa mã hoá. */}
+        <div className="mb-2 flex flex-wrap items-center gap-3">
+          {hasCookie ? (
+            <>
+              <span className="badge badge-active">Đã cất pháp khí (đã mã hoá)</span>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={clearing}
+                onClick={() =>
+                  startClearing(async () => {
+                    await clearCookieAction();
+                    setCleared(true);
+                  })
+                }
+              >
+                Xoá pháp khí
+              </button>
+            </>
+          ) : (
+            <span className="badge badge-pending">Chưa có pháp khí</span>
+          )}
+        </div>
+
         <textarea
           id="gameCookie"
           name="gameCookie"
           className="input h-24 resize-y font-mono text-xs"
-          placeholder="Dán chuỗi cookie (wordpress_logged_in_…) tại đây"
-          defaultValue={config.gameCookie}
+          placeholder={
+            hasCookie
+              ? "Để trống nếu giữ nguyên cookie đang dùng — dán chuỗi mới để thay thế"
+              : "Dán chuỗi cookie (wordpress_logged_in_…) tại đây"
+          }
+          autoComplete="off"
+          spellCheck={false}
         />
         <p className="mt-1 text-xs text-[var(--color-mist)]">
-          Linh sứ dùng cookie này để hành sự thay đạo hữu. Cookie hết hạn thì đàn pháp sẽ báo
-          lỗi đăng nhập — dán lại là xong.
+          Cookie được mã hoá AES-256-GCM trước khi vào database và chỉ được giải mã đúng lúc
+          linh sứ nhận việc — nó không bao giờ quay lại trình duyệt, kể cả của chính đạo hữu.
+          {hasCookie && " Để trống ô này khi lưu thì cookie cũ vẫn nguyên."}
         </p>
       </div>
 

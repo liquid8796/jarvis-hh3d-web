@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireActiveUser } from "@/lib/auth/guards";
-import { configSchema } from "@/lib/services/configs";
-import { saveConfig } from "@/lib/services/configs";
+import { clearCookie, configSchema, saveConfig } from "@/lib/services/configs";
 import { requestStop, startJob } from "@/lib/services/jobs";
 
 /**
@@ -40,6 +39,14 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
   await saveConfig(user.id, parsed.data);
   revalidatePath("/dashboard");
   return { ok: true, message: "Đã khắc cấu hình vào ngọc giản. Lượt khai đàn kế tiếp sẽ dùng bản này." };
+}
+
+/** Rút cookie khỏi hệ thống — thứ duy nhất xoá được bí mật đã lưu. */
+export async function clearCookieAction(): Promise<ActionResult> {
+  const user = await requireActiveUser();
+  await clearCookie(user.id);
+  revalidatePath("/dashboard");
+  return { ok: true, message: "Đã xoá pháp khí khỏi ngọc giản." };
 }
 
 export async function startAction(): Promise<ActionResult> {

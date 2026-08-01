@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
-import { getConfig } from "./configs";
+import { getEditableConfig, getStoredConfigForSnapshot } from "./configs";
 import type { JobEventRow, JobRow } from "@/lib/db/schema";
 
 /**
@@ -47,19 +47,24 @@ export async function startJob(
     return { ok: false, error: "Đàn pháp đang vận hành — dừng lượt hiện tại trước đã." };
   }
 
-  const config = await getConfig(userId);
-  const anyQuest = config.quests.meCung.enabled || config.quests.luyenDan.enabled;
-  if (!config.gameCookie) {
+  // Kiểm tra bằng bản KHÔNG chứa bí mật: ở đây chỉ cần biết cookie có tồn tại hay không.
+  const view = await getEditableConfig(userId);
+  if (!view.hasCookie) {
     return { ok: false, error: "Chưa có cookie đăng nhập game — dán vào phần Pháp Khí trước." };
   }
 
-  if (!anyQuest) {
+  if (!view.quests.meCung.enabled && !view.quests.luyenDan.enabled) {
     return { ok: false, error: "Chưa bật nhiệm vụ nào — chọn ít nhất một nhiệm vụ để khai đàn." };
   }
 
+  // Snapshot giữ nguyên cookie ở dạng ĐÃ MÃ HOÁ. Bảng jobs sống lâu hơn bảng config rất
+  // nhiều (nó là lịch sử), nên để plaintext ở đây là tự tay dựng lại đúng cái lỗ vừa bịt.
+  // Giải mã diễn ra đúng một lần, ở /api/worker, khi linh sứ đã xác thực.
+  const snapshot = await getStoredConfigForSnapshot(userId);
+
   const rows = await db()
     .insert(schema.automationJobs)
-    .values({ userId, configSnapshot: config })
+    .values({ userId, configSnapshot: snapshot })
     .returning();
 
   await addEvent(rows[0].id, "info", "Đàn pháp đã lập — chờ linh sứ (worker) tiếp nhận…");

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authorizeWorker } from "@/lib/auth/worker";
 import { addEvent, claimNextJob, completeJob, heartbeat } from "@/lib/services/jobs";
+import { configSchema } from "@/lib/services/configs";
+import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 
 /**
  * Giao thức linh sứ — MỘT endpoint, phân nhánh theo `op`.
@@ -60,11 +62,23 @@ export async function POST(request: Request) {
   switch (body.op) {
     case "claim": {
       const job = await claimNextJob(body.workerId);
-      return NextResponse.json(
-        job
-          ? { job: { id: job.id, userId: job.userId, config: job.configSnapshot } }
-          : { job: null },
-      );
+      if (!job) {
+        return NextResponse.json({ job: null });
+      }
+
+      // ĐÂY là điểm duy nhất cookie rời khỏi phong bì. Nó xảy ra sau khi linh sứ đã chứng
+      // minh danh tính bằng WORKER_TOKEN, và đi tiếp trên HTTPS tới một máy sắp dùng chính
+      // cookie đó để đăng nhập — không sớm hơn một dòng nào.
+      const snapshot = configSchema.safeParse(job.configSnapshot);
+      const config = snapshot.success ? snapshot.data : configSchema.parse({});
+      const cookie =
+        config.gameCookie.length > 0 && isEncrypted(config.gameCookie)
+          ? decryptSecret(config.gameCookie)
+          : config.gameCookie;
+
+      return NextResponse.json({
+        job: { id: job.id, userId: job.userId, config: { ...config, gameCookie: cookie } },
+      });
     }
 
     case "heartbeat": {

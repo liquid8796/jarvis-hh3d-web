@@ -111,6 +111,7 @@ Vercel → Project → **Settings** → **Environment Variables**. Thêm hai bi�
 | Biến | Giá trị | Dùng để làm gì |
 |---|---|---|
 | `AUTH_SECRET` | 32 byte ngẫu nhiên | Ký JWT phiên đăng nhập |
+| `ENCRYPTION_KEY` | **đúng** 32 byte (64 hex) | Mã hoá cookie game trong database |
 | `WORKER_TOKEN` | 32 byte ngẫu nhiên | Bí mật chia sẻ để linh sứ gọi `/api/worker` |
 
 Sinh chuỗi ngẫu nhiên:
@@ -121,6 +122,30 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 > `WORKER_TOKEN` là thứ duy nhất đứng giữa Internet và quyền đọc cookie game của mọi thành
 > viên. Giữ như giữ mật khẩu; đổi nó là cắt ngay một linh sứ bị lộ.
+>
+> `ENCRYPTION_KEY` thì **mất là mất luôn**: cookie đã lưu sẽ không giải mã được nữa và mọi
+> người phải dán lại. Hãy coi nó như bí mật vĩnh viễn của deployment — sao lưu chỗ an toàn,
+> đừng đổi trừ khi thật sự cần.
+
+### Cookie game được bảo vệ thế nào
+
+Cookie đăng nhập game là chìa khoá vào tài khoản thật của một người, nên nó không nằm
+plaintext ở đâu cả:
+
+- **Trong database:** mã hoá **AES-256-GCM**, mỗi lần lưu một IV mới, khoá lấy từ
+  `ENCRYPTION_KEY`. Quyền đọc database do đó **không** đồng nghĩa với quyền dùng — chìa nằm
+  ở biến môi trường. GCM là AEAD nên một ciphertext bị sửa sẽ báo lỗi thay vì âm thầm giải
+  ra rác.
+- **Về phía trình duyệt:** không bao giờ. Trang cấu hình chỉ hiện "đã có / chưa có" và một ô
+  để *thay thế*; để trống ô đó khi lưu thì cookie cũ giữ nguyên. Một bí mật đã mã hoá mà vẫn
+  render vào HTML mỗi lần mở trang thì coi như chưa mã hoá.
+- **Trong lịch sử job:** snapshot cấu hình cũng giữ cookie ở dạng đã mã hoá — bảng jobs sống
+  lâu hơn bảng config rất nhiều.
+- **Giải mã đúng một lần:** tại `/api/worker` khi linh sứ đã xác thực bằng `WORKER_TOKEN`,
+  rồi đi tiếp trên HTTPS tới máy sắp dùng chính cookie đó.
+
+Giá trị ghi từ trước khi có mã hoá vẫn đọc được bình thường và sẽ tự vào phong bì ở lần lưu
+kế tiếp — không cần downtime, không cần script migration.
 
 ### Bước 3 — Deploy
 

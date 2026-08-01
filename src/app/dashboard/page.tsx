@@ -1,6 +1,6 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { requireActiveUser } from "@/lib/auth/guards";
-import { getConfig } from "@/lib/services/configs";
+import { getEditableConfig } from "@/lib/services/configs";
 import { getActiveJob } from "@/lib/services/jobs";
 import { ConfigForm } from "./ConfigForm";
 import { ControlPanel } from "./ControlPanel";
@@ -13,7 +13,10 @@ export const metadata = { title: "Linh Đài" };
  */
 export default async function DashboardPage() {
   const user = await requireActiveUser();
-  const [config, activeJob] = await Promise.all([getConfig(user.id), getActiveJob(user.id)]);
+  const [config, activeJob] = await Promise.all([
+    getEditableConfig(user.id),
+    getActiveJob(user.id),
+  ]);
 
   return (
     <>

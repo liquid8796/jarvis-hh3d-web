@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
+import { decryptSecret, encryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { z } from "zod";
 
 /**
@@ -42,7 +43,18 @@ export const configSchema = z.object({
 
 export type UserConfig = z.infer<typeof configSchema>;
 
-export async function getConfig(userId: string): Promise<UserConfig> {
+/**
+ * Cấu hình như UI được phép nhìn thấy: mọi thứ, TRỪ cookie.
+ *
+ * `gameCookie` luôn là chuỗi rỗng ở đây — thay vào đó là `hasCookie`. Đó là chủ ý: một bí
+ * mật đã mã hoá at-rest mà vẫn được render vào HTML mỗi lần mở trang thì coi như chưa mã
+ * hoá — nó sẽ nằm trong cache trình duyệt, trong lịch sử, trong ảnh chụp màn hình. Nên
+ * cookie chỉ đi MỘT CHIỀU: từ người dùng vào database, rồi từ database ra worker.
+ */
+export type EditableConfig = UserConfig & { hasCookie: boolean };
+
+/** Đọc thô: parse JSONB về đúng hình thù hôm nay, cookie vẫn ở dạng phong bì. */
+async function readStored(userId: string): Promise<UserConfig> {
   const rows = await db()
     .select({ config: schema.userConfigs.config })
     .from(schema.userConfigs)
@@ -55,13 +67,72 @@ export async function getConfig(userId: string): Promise<UserConfig> {
   return parsed.success ? parsed.data : configSchema.parse({});
 }
 
+/**
+ * Bản để đóng băng vào một job: y nguyên như trong database, cookie vẫn trong phong bì.
+ * Worker sẽ nhận bản đã giải mã từ /api/worker, không phải từ đây.
+ */
+export async function getStoredConfigForSnapshot(userId: string): Promise<UserConfig> {
+  return readStored(userId);
+}
+
+/** Dành cho trang cấu hình. Không bao giờ chứa cookie. */
+export async function getEditableConfig(userId: string): Promise<EditableConfig> {
+  const stored = await readStored(userId);
+  return { ...stored, gameCookie: "", hasCookie: stored.gameCookie.length > 0 };
+}
+
+/**
+ * Dành cho lúc khai đàn: cookie đã giải mã, sẵn sàng cho worker.
+ *
+ * Tên hàm cố tình dài và cụ thể — đây là đường duy nhất trong hệ thống trả về plaintext,
+ * nên nó phải nổi bật ở chỗ gọi. Giá trị chưa đóng phong bì (ghi từ trước khi có mã hoá)
+ * vẫn đọc được, và lần lưu kế tiếp sẽ tự mã hoá.
+ */
+export async function getConfigWithSecrets(userId: string): Promise<UserConfig> {
+  const stored = await readStored(userId);
+  if (stored.gameCookie.length === 0) {
+    return stored;
+  }
+
+  return {
+    ...stored,
+    gameCookie: isEncrypted(stored.gameCookie)
+      ? decryptSecret(stored.gameCookie)
+      : stored.gameCookie,
+  };
+}
+
+/**
+ * Ghi cấu hình. `gameCookie` rỗng nghĩa là "giữ nguyên cookie cũ" — bắt buộc phải thế, vì
+ * form không còn nhận lại cookie để mà gửi lên; nếu rỗng bị hiểu là "xoá" thì mỗi lần sửa
+ * độ khó phòng là mất cookie.
+ */
 export async function saveConfig(userId: string, config: UserConfig): Promise<void> {
   const clean = configSchema.parse(config);
+
+  const cookie = clean.gameCookie.trim();
+  const stored = cookie.length > 0 ? encryptSecret(cookie) : (await readStored(userId)).gameCookie;
+
+  const document = { ...clean, gameCookie: stored };
+
   await db()
     .insert(schema.userConfigs)
-    .values({ userId, config: clean, updatedAt: new Date() })
+    .values({ userId, config: document, updatedAt: new Date() })
     .onConflictDoUpdate({
       target: schema.userConfigs.userId,
-      set: { config: clean, updatedAt: sql`now()` },
+      set: { config: document, updatedAt: sql`now()` },
+    });
+}
+
+/** Xoá cookie hẳn — đường thoát khi người dùng muốn rút chìa khỏi hệ thống. */
+export async function clearCookie(userId: string): Promise<void> {
+  const stored = await readStored(userId);
+  const document = { ...stored, gameCookie: "" };
+  await db()
+    .insert(schema.userConfigs)
+    .values({ userId, config: document, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: schema.userConfigs.userId,
+      set: { config: document, updatedAt: sql`now()` },
     });
 }

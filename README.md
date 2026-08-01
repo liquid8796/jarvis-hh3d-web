@@ -196,8 +196,19 @@ kế tiếp — không cần downtime, không cần script migration.
 Sandbox chạy bằng OIDC tự động khi ở trên Vercel, nên **không cần token gì thêm** cho
 production. Chỉ cần hai thứ:
 
-**1. Cron đã cấu hình sẵn** trong `vercel.json` — chạy mỗi phút, gọi `/api/cron`, nhận đúng
-một job sandbox mỗi nhịp (một VM đang tính tiền là đủ; nhiều job thì lần lượt các nhịp sau).
+**1. Một người gõ cửa `/api/cron`.** Cron trong `vercel.json` để `0 3 * * *` — mỗi ngày một
+lần, vì gói Hobby không cho dày hơn (xem cảnh báo đầu README). Nhịp đó chỉ đủ để **quét dọn**
+job chết, không đủ để lái automation.
+
+Nhịp thật đến từ hai nguồn khác:
+
+- **Nút Khai Đàn** gọi thẳng `ensureSandboxWorker()` — bấm là VM dựng ngay, không phải đợi cron.
+- **Một dịch vụ cron ngoài** (cron-job.org…) gọi `/api/cron` mỗi phút kèm
+  `Authorization: Bearer $CRON_SECRET`. Không có nó thì sau khi lát sandbox đầu tiên kết
+  thúc, lượt ghé lò kế tiếp (~26 phút sau) sẽ không ai đến gõ cửa.
+
+Mỗi nhịp nhận đúng một job sandbox (một VM đang tính tiền là đủ; nhiều job thì lần lượt các
+nhịp sau).
 
 **2. Ảnh dựng sẵn (rất nên có).** Không có nó, mỗi lát mất ~30 giây chỉ để cài Chromium —
 đủ ăn hết ngân sách của một lát ngắn. Tạo một lần:
@@ -213,16 +224,58 @@ Tuỳ chọn: đặt `CRON_SECRET` để gọi `/api/cron` bằng tay lúc thử
 (`curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron`). Cron của Vercel tự
 được nhận diện qua user-agent nên không cần biến này để chạy thật.
 
-> Chạy sandbox từ **máy nhà** (lúc dev) thì cần `VERCEL_TOKEN`, `VERCEL_TEAM_ID`,
-> `VERCEL_PROJECT_ID` — trên Vercel thì không.
+> Chạy sandbox từ **máy nhà** (lúc dev) cũng không cần token cá nhân: một lần
+> `vercel env pull` là `.env` có `VERCEL_OIDC_TOKEN`, và cả SDK lẫn script chụp ảnh đều tự
+> xác thực bằng nó. Token ấy hết hạn sau ~12 giờ — lúc đó pull lại, hoặc đặt hẳn
+> `VERCEL_TOKEN` + `VERCEL_TEAM_ID` + `VERCEL_PROJECT_ID` cho khỏi phải nhớ.
 
 ### Bước 3 — Deploy
+
+Trước khi bấm deploy, soát lại biến môi trường **Production**. `vercel env ls production`
+phải có đủ:
+
+| Biến | Ghi chú |
+| --- | --- |
+| `DATABASE_URL` | ⚠️ đọc kỹ cảnh báo ngay dưới |
+| `AUTH_SECRET`, `ENCRYPTION_KEY`, `WORKER_TOKEN` | ba bí mật, mỗi cái 32 byte |
+| `WEB_URL` | `https://<app>.vercel.app`, kèm scheme |
+| `SANDBOX_ENABLED` | `1` nếu muốn dùng sandbox |
+| `AGENT_BROWSER_SNAPSHOT_ID` | từ Bước 2b |
+| `CRON_SECRET` | nếu dùng cron ngoài |
+
+> **Bẫy `DATABASE_URL`.** Integration Neon của Vercel tự tạo biến này trỏ vào database **mặc
+> định** của project (`neondb`) — không phải database `jarvis` mà Jarvis dùng. Nếu để nguyên:
+>
+> - `npm run db:migrate` ở Bước 4 sẽ tạo bảng trong **nhầm database**, và bạn có một bộ bảng
+>   rác không ai đọc tới;
+> - app chạy lên vẫn đăng nhập được — bằng dữ liệu của database sai — nên lỗi này **không tự
+>   lộ ra**, nó chỉ khiến bạn ngồi tự hỏi sao mật khẩu vừa đặt lại không đúng.
+>
+> Ghi đè bằng chính chuỗi trong `.env` (đã qua `scripts/switchDb.mjs`):
+>
+> ```bash
+> vercel env rm DATABASE_URL production --yes
+> printf '%s' "$DATABASE_URL" | vercel env add DATABASE_URL production
+> ```
+>
+> Muốn biết chắc mình đang nói chuyện với database nào, hỏi thẳng nó:
+>
+> ```bash
+> node --input-type=module --env-file=.env \
+>   -e "import{neon}from'@neondatabase/serverless';
+>       console.log((await neon(process.env.DATABASE_URL)\`select current_database() db\`)[0])"
+> ```
+
+Rồi deploy:
 
 ```bash
 npm i -g vercel
 vercel link          # gắn thư mục này với project trên Vercel
 vercel --prod
 ```
+
+Đổi biến môi trường **không** tự áp vào bản đang chạy — phải deploy lại thì function mới đọc
+được giá trị mới.
 
 Hoặc đơn giản hơn: push lên GitHub rồi Vercel → **Add New Project** → Import repo. Từ đó mỗi
 lần push lên `master` là tự deploy.

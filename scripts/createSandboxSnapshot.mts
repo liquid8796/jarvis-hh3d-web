@@ -23,22 +23,49 @@ const CHROMIUM_SYSTEM_DEPS = [
   "gtk3", "dbus-libs",
 ];
 
-const { VERCEL_TOKEN, VERCEL_TEAM_ID, VERCEL_PROJECT_ID } = process.env;
-if (!VERCEL_TOKEN || !VERCEL_TEAM_ID || !VERCEL_PROJECT_ID) {
+/**
+ * Hai đường xác thực, ưu tiên cái tường minh.
+ *
+ * Ba biến VERCEL_* là đường chắc chắn nhất nhưng không phải đường duy nhất: sau một lần
+ * `vercel env pull`, .env đã có VERCEL_OIDC_TOKEN và SDK tự dùng nó — y như credentials()
+ * trong src/lib/runners/sandbox.ts nhường cho OIDC khi chạy trên Vercel. Bắt người ta đi
+ * tạo personal token chỉ để chụp một tấm ảnh VM là ma sát không đáng có.
+ *
+ * Thứ tự này cũng có nghĩa ai đã cấu hình đủ ba biến thì hành vi không đổi dưới chân họ.
+ */
+function credentials() {
+  const { VERCEL_TOKEN, VERCEL_TEAM_ID, VERCEL_PROJECT_ID, VERCEL_OIDC_TOKEN } = process.env;
+
+  if (VERCEL_TOKEN && VERCEL_TEAM_ID && VERCEL_PROJECT_ID) {
+    return {
+      how: "token cá nhân",
+      creds: { token: VERCEL_TOKEN, teamId: VERCEL_TEAM_ID, projectId: VERCEL_PROJECT_ID },
+    };
+  }
+
+  if (VERCEL_OIDC_TOKEN) {
+    // SDK đọc thẳng VERCEL_OIDC_TOKEN từ môi trường; team và project nằm trong claims của
+    // chính token nên không cần khai lại.
+    return { how: "OIDC (từ `vercel env pull`)", creds: {} };
+  }
+
   console.error(
-    "Chạy từ máy nhà cần đủ ba biến: VERCEL_TOKEN, VERCEL_TEAM_ID, VERCEL_PROJECT_ID.\n" +
-      "  Token : Vercel → Account Settings → Tokens\n" +
-      "  Team/Project ID: Vercel → Project → Settings → General",
+    "Không có đường nào để xác thực với Vercel. Chọn một:\n" +
+      "  • Dễ nhất : chạy `vercel env pull` — .env sẽ có VERCEL_OIDC_TOKEN (hạn ~12 giờ).\n" +
+      "  • Bền hơn : đặt đủ VERCEL_TOKEN, VERCEL_TEAM_ID, VERCEL_PROJECT_ID trong .env.\n" +
+      "      Token          : Vercel → Account Settings → Tokens\n" +
+      "      Team/Project ID: Vercel → Project → Settings → General",
   );
   process.exit(1);
 }
 
+const { how, creds } = credentials();
+
+console.log(`Xác thực bằng ${how}.`);
 console.log("Đang dựng VM để cài Chromium (mất vài phút, chỉ lần này)…");
 
 const sandbox = await Sandbox.create({
-  token: VERCEL_TOKEN,
-  teamId: VERCEL_TEAM_ID,
-  projectId: VERCEL_PROJECT_ID,
+  ...creds,
   runtime: "node24",
   timeout: 300_000,
 });

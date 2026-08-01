@@ -4,22 +4,19 @@
  * nếu tài khoản đã tồn tại thì script KHÔNG đổi mật khẩu — một lệnh seed lỡ tay không được
  * phép reset chìa khoá của hệ thống đang chạy.
  */
-import { readFileSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
 import bcrypt from "bcryptjs";
+import { loadEnv } from "./loadEnv.mjs";
 
-try {
-  for (const line of readFileSync(".env", "utf8").split("\n")) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*"?([^"\n]*)"?\s*$/);
-    if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
-  }
-} catch {
-  /* không có .env là chuyện bình thường */
-}
+loadEnv();
 
 const url = process.env.DATABASE_URL;
 if (!url) {
-  console.error("DATABASE_URL chưa được đặt — xem .env.example.");
+  console.error(
+    "DATABASE_URL chưa được đặt.\n" +
+      "Database trên Vercel? Kéo biến của môi trường production về:\n" +
+      "  vercel env pull .env --environment=production",
+  );
   process.exit(1);
 }
 

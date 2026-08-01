@@ -16,6 +16,12 @@ import { z } from "zod";
 export const configSchema = z.object({
   /** The hoathinh3d login cookie bundle the worker automates with. */
   gameCookie: z.string().trim().max(8000).default(""),
+  /**
+   * Ưu tiên của người dùng về nơi chạy. Chỉ là ƯU TIÊN: runners/policy.ts có quyền phủ
+   * quyết khi hình dạng nhiệm vụ không cho phép (Mê Cung luôn phải chạy `local`), và luôn
+   * ghi rõ lý do vào nhật ký thay vì âm thầm làm khác ý.
+   */
+  runner: z.enum(["sandbox", "local"]).default("sandbox"),
   quests: z
     .object({
       meCung: z

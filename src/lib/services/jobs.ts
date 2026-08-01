@@ -1,6 +1,7 @@
 import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { getEditableConfig, getStoredConfigForSnapshot } from "./configs";
+import { decideRunner, type RunnerKind } from "@/lib/runners/policy";
 import type { JobEventRow, JobRow } from "@/lib/db/schema";
 
 /**
@@ -17,6 +18,13 @@ const ACTIVE: JobRow["status"][] = ["queued", "running", "stopping"];
 
 /** A worker that has not heartbeat within this window is presumed dead. */
 const STALE_AFTER_MS = 3 * 60 * 1000;
+
+/**
+ * Một job xếp hàng lâu hơn thế này mà chưa ai nhận thì coi như không có runner nào đang
+ * trực. Rộng rãi có chủ ý: cron của Vercel chạy theo phút, và một sandbox lần đầu (chưa có
+ * ảnh dựng sẵn) mất ~30 giây chỉ để cài Chromium.
+ */
+const UNCLAIMED_AFTER_MS = 6 * 60 * 1000;
 
 export async function getActiveJob(userId: string): Promise<JobRow | null> {
   const rows = await db()
@@ -62,12 +70,16 @@ export async function startJob(
   // Giải mã diễn ra đúng một lần, ở /api/worker, khi linh sứ đã xác thực.
   const snapshot = await getStoredConfigForSnapshot(userId);
 
+  // Runner do HÌNH DẠNG NHIỆM VỤ quyết định, không phải do ai rảnh — xem runners/policy.ts.
+  const decision = decideRunner(view);
+
   const rows = await db()
     .insert(schema.automationJobs)
-    .values({ userId, configSnapshot: snapshot })
+    .values({ userId, configSnapshot: snapshot, runner: decision.runner })
     .returning();
 
-  await addEvent(rows[0].id, "info", "Đàn pháp đã lập — chờ linh sứ (worker) tiếp nhận…");
+  await addEvent(rows[0].id, "info", "Đàn pháp đã lập.");
+  await addEvent(rows[0].id, "info", decision.reason);
   return { ok: true, job: rows[0] };
 }
 
@@ -107,16 +119,17 @@ export async function requestStop(userId: string): Promise<void> {
  * locking story: two workers racing get two different rows or one row and one null —
  * Postgres decides, nobody double-runs.
  */
-export async function claimNextJob(workerId: string): Promise<JobRow | null> {
+export async function claimNextJob(workerId: string, runner: RunnerKind): Promise<JobRow | null> {
   const claimed = await db().execute(sql`
     update automation_jobs set
       status = 'running',
       worker_id = ${workerId},
-      started_at = now(),
+      attempts = attempts + 1,
+      started_at = coalesce(started_at, now()),
       last_heartbeat = now()
     where id = (
       select id from automation_jobs
-      where status = 'queued'
+      where status = 'queued' and runner = ${runner}
       order by created_at
       limit 1
     )
@@ -134,6 +147,8 @@ export async function claimNextJob(workerId: string): Promise<JobRow | null> {
     userId: String(row.user_id),
     status: "running",
     configSnapshot: row.config_snapshot,
+    runner,
+    attempts: Number(row.attempts ?? 1),
     workerId,
     createdAt: new Date(String(row.created_at)),
     startedAt: new Date(),
@@ -183,12 +198,44 @@ export async function eventsAfter(jobId: string, afterId: number): Promise<JobEv
 }
 
 /**
- * Housekeeping for a worker that died mid-job: anything "running" whose heartbeat went
- * silent flips to failed, with an honest line in the feed. Called opportunistically from
- * the dashboard read path — no cron needed at this scale.
+ * Đưa một job đang dở về hàng chờ để lát sau chạy tiếp — cơ chế sống của runner sandbox,
+ * nơi một lượt có thể cần nhiều lát VM.
+ */
+export async function requeueJob(jobId: string, note: string): Promise<void> {
+  await db()
+    .update(schema.automationJobs)
+    .set({ status: "queued", workerId: null })
+    .where(eq(schema.automationJobs.id, jobId));
+  await addEvent(jobId, "info", note);
+}
+
+/**
+ * Chuyển một job sang linh sứ máy nhà. Đây là đường DỰ PHÒNG: sandbox thử vài lát không
+ * xong (hết giờ dựng VM, thiếu quota, Chromium không lên) thì thay vì chết hẳn, job đổi
+ * chủ và nằm chờ worker máy nhà — người dùng không phải làm gì cả.
+ */
+export async function failoverToLocal(jobId: string, why: string): Promise<void> {
+  await db()
+    .update(schema.automationJobs)
+    .set({ status: "queued", runner: "local", workerId: null, attempts: 0 })
+    .where(eq(schema.automationJobs.id, jobId));
+  await addEvent(jobId, "warning", `${why} — chuyển lượt này cho linh sứ máy nhà.`);
+}
+
+/**
+ * Dọn dẹp hai kiểu job mắc kẹt.
+ *
+ * 1) `running` mà nhịp tim im — linh sứ chết giữa chừng.
+ * 2) `queued` mà KHÔNG AI nhận suốt một thời gian dài. Trường hợp này từng bị bỏ sót hoàn
+ *    toàn: reaper cũ chỉ nhìn `running`/`stopping`, nên một job xếp hàng khi không có runner
+ *    nào đang trực sẽ nằm đó VĨNH VIỄN, còn người dùng chỉ thấy mãi dòng "Chờ linh sứ tiếp
+ *    nhận" mà không bao giờ biết là chẳng có linh sứ nào tồn tại. Thà nói thật.
+ *
+ * Gọi cơ hội từ đường đọc của dashboard — ở quy mô này chưa cần cron riêng.
  */
 export async function reapStaleJobs(): Promise<void> {
   const cutoff = new Date(Date.now() - STALE_AFTER_MS);
+
   const stale = await db()
     .select({ id: schema.automationJobs.id })
     .from(schema.automationJobs)
@@ -201,5 +248,25 @@ export async function reapStaleJobs(): Promise<void> {
 
   for (const row of stale) {
     await completeJob(row.id, "failed", "Linh sứ mất liên lạc (quá 3 phút không hồi đáp) — lượt bị kết thúc.");
+  }
+
+  const abandoned = await db()
+    .select({ id: schema.automationJobs.id, runner: schema.automationJobs.runner })
+    .from(schema.automationJobs)
+    .where(
+      and(
+        eq(schema.automationJobs.status, "queued"),
+        sql`${schema.automationJobs.createdAt} < ${new Date(Date.now() - UNCLAIMED_AFTER_MS)}`,
+      ),
+    );
+
+  for (const row of abandoned) {
+    await completeJob(
+      row.id,
+      "failed",
+      row.runner === "local"
+        ? "Không có linh sứ máy nhà nào đang trực. Hãy chạy `npm run worker` trên máy chạy liên tục rồi khai đàn lại."
+        : "Sandbox không nhận được lượt này (cron chưa chạy hoặc thiếu cấu hình Vercel Sandbox). Xem README mục Sandbox.",
+    );
   }
 }

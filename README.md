@@ -12,33 +12,46 @@ một mô hình nhiệm vụ — Mê Cung, Luyện Đan Đường, cùng những
 
 ### Nút Start bấm ở web, browser chạy ở đâu?
 
-Điểm ràng buộc quan trọng nhất, nói thẳng ngay từ đầu:
+Web **không bao giờ** tự mở browser trong một function — function của Vercel sống theo
+request và bị cắt sau vài phút. Bấm Khai Đàn chỉ ghi một dòng `automation_jobs` trạng thái
+`queued`; một *linh sứ* nhận việc rồi kể lại qua HTTPS. Vì ý định của người dùng nằm trong
+**database** chứ không nằm trong tab trình duyệt, đóng tab hay tắt máy chẳng ảnh hưởng gì.
 
-> **Vercel không chạy được automation.** Function của Vercel sống theo từng request và bị cắt
-> sau vài phút; một lượt Mê Cung ôm Chromium liên tục tới 35 phút. Không có cách nào lách.
-
-Nên hệ thống tách làm hai nửa, và ranh giới ấy là quyết định thiết kế lớn nhất ở đây:
+Có **hai loại linh sứ**, và việc chọn loại nào không phải sở thích — nó do *hình dạng thời
+gian của nhiệm vụ* quyết định:
 
 ```
-┌─ Vercel ──────────────────────┐         ┌─ Máy chạy liên tục ────────────┐
-│  Next.js — control plane      │         │  scripts/worker.mjs            │
-│  • đăng ký / duyệt / phân quyền│  HTTPS  │  • xin việc (claim)            │
-│  • ngọc giản cấu hình          │◄───────►│  • mở Chromium, chạy nhiệm vụ  │
-│  • nút Khai Đàn = ghi 1 dòng DB│  Bearer │  • nhịp tim + kể chuyện        │
-│  • nhật ký cho người dùng đọc  │         │  • nghe lệnh Thu Đàn           │
-└───────────────────────────────┘         └────────────────────────────────┘
-                │                                       │
-                └────────► Neon Postgres ◄──────────────┘
+                      ┌──────────────── Vercel ────────────────┐
+                      │  Next.js control plane                 │
+   Khai Đàn ─────────►│  • đăng ký / duyệt / cấu hình          │
+                      │  • ghi job vào DB, chọn runner         │
+                      │  • /api/cron mỗi phút → SANDBOX        │
+                      └───┬────────────────────────────┬───────┘
+                          │                            │
+              ┌───────────▼──────────┐     ┌───────────▼─────────────┐
+              │ Vercel Sandbox       │     │ scripts/worker.mjs      │
+              │ microVM phù du       │     │ máy chạy liên tục       │
+              │ → Luyện Đan Đường    │     │ → Mê Cung               │
+              │   (mỗi lượt vài phút)│     │   (phiên liền 35 phút)  │
+              └──────────┬───────────┘     └───────────┬─────────────┘
+                         └──────► Neon Postgres ◄──────┘
 ```
 
-Web **không bao giờ** mở browser. Bấm Khai Đàn chỉ ghi một dòng `automation_jobs` với trạng
-thái `queued`. Một *linh sứ* (worker) — tiến trình Node chạy trên máy nào đó luôn bật — nhận
-việc, chạy, và kể lại qua HTTPS. Vì ý định của người dùng nằm trong **database** chứ không
-nằm trong tab trình duyệt, đóng tab hay tắt máy chẳng ảnh hưởng gì; mở lại ở máy khác vẫn
-thấy đúng lượt đang chạy.
+**Luyện Đan Đường** hợp sandbox hoàn hảo: mỗi lượt ghé chỉ vài phút (thu đan → phân giải →
+khai lô → giữ lửa ba nhịp → đọc đồng hồ → đi), rồi nghỉ ~26 phút chờ mẻ chín. Dựng VM, làm
+việc ngắn, tắt — không tốn gì lúc chờ.
 
-Linh sứ có thể đặt ở: máy tính cá nhân đang chạy sẵn bản desktop, một VPS rẻ tiền, Fly.io,
-Railway — bất cứ đâu chạy được Node dài hạn.
+**Mê Cung** thì không thể: nó phải tạo phòng, đứng chờ đủ 5 **người thật** (có thể hàng chục
+phút), rồi đánh liền một mạch tới 35 phút. Cả quá trình là MỘT phiên browser không đứt được
+— mất VM giữa chừng là mất luôn cái phòng đang đứng trong đó, và bốn người kia mất lượt oan.
+Không cắt thành lát 8 phút được.
+
+Nên `src/lib/runners/policy.ts` phủ quyết: bật Mê Cung là job tự chuyển sang linh sứ máy
+nhà, **kèm một dòng giải thích trong nhật ký** thay vì âm thầm làm khác ý người dùng.
+
+**Đường dự phòng tự động:** sandbox thất bại ba lát liên tiếp (thiếu quota, VM không dựng
+được, Chromium không lên) thì job tự đổi `runner` sang `local` và nằm chờ worker máy nhà —
+người dùng không phải làm gì, chỉ cần có một worker đang trực.
 
 ### Lưu config người dùng bằng gì?
 
@@ -147,6 +160,31 @@ plaintext ở đâu cả:
 Giá trị ghi từ trước khi có mã hoá vẫn đọc được bình thường và sẽ tự vào phong bì ở lần lưu
 kế tiếp — không cần downtime, không cần script migration.
 
+### Bước 2b — Vercel Sandbox (cho linh sứ sandbox)
+
+Sandbox chạy bằng OIDC tự động khi ở trên Vercel, nên **không cần token gì thêm** cho
+production. Chỉ cần hai thứ:
+
+**1. Cron đã cấu hình sẵn** trong `vercel.json` — chạy mỗi phút, gọi `/api/cron`, nhận đúng
+một job sandbox mỗi nhịp (một VM đang tính tiền là đủ; nhiều job thì lần lượt các nhịp sau).
+
+**2. Ảnh dựng sẵn (rất nên có).** Không có nó, mỗi lát mất ~30 giây chỉ để cài Chromium —
+đủ ăn hết ngân sách của một lát ngắn. Tạo một lần:
+
+```bash
+npx tsx scripts/createSandboxSnapshot.mts
+```
+
+Rồi thêm `AGENT_BROWSER_SNAPSHOT_ID` vào Environment Variables trên Vercel. Từ đó VM khởi
+động dưới một giây.
+
+Tuỳ chọn: đặt `CRON_SECRET` để gọi `/api/cron` bằng tay lúc thử
+(`curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron`). Cron của Vercel tự
+được nhận diện qua user-agent nên không cần biến này để chạy thật.
+
+> Chạy sandbox từ **máy nhà** (lúc dev) thì cần `VERCEL_TOKEN`, `VERCEL_TEAM_ID`,
+> `VERCEL_PROJECT_ID` — trên Vercel thì không.
+
 ### Bước 3 — Deploy
 
 ```bash
@@ -178,7 +216,7 @@ lỡ tay không được phép reset chìa khoá hệ thống đang chạy.
 
 Đăng nhập bằng tài khoản đó rồi **đổi mật khẩu ngay**.
 
-### Bước 5 — Chạy linh sứ (worker)
+### Bước 5 — Chạy linh sứ máy nhà (bắt buộc nếu dùng Mê Cung)
 
 Trên máy chạy liên tục:
 

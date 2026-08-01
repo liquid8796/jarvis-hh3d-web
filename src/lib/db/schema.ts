@@ -1,6 +1,7 @@
 import {
   bigserial,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -70,6 +71,21 @@ export const jobStatus = pgEnum("job_status", [
   "done",
 ]);
 
+/**
+ * Ai sẽ cầm browser cho lượt này.
+ *
+ * sandbox — Vercel Sandbox: microVM dựng theo yêu cầu, chạy một LÁT có giới hạn thời gian
+ *           rồi tắt. Hợp với nhiệm vụ chu kỳ ngắn (Luyện Đan Đường: mỗi lượt ghé vài phút,
+ *           rồi nghỉ ~26 phút chờ mẻ chín) — đúng hình dạng mà một VM phù du phục vụ tốt.
+ * local   — tiến trình worker trên máy chạy liên tục. Bắt buộc với nhiệm vụ cần một PHIÊN
+ *           browser sống dai: Mê Cung phải tạo phòng, chờ đủ 5 người thật, rồi đánh liền
+ *           tới 35 phút — mất VM giữa chừng là mất luôn cái phòng đang đứng trong đó.
+ *
+ * Chọn theo hình dạng thời gian của nhiệm vụ, không theo sở thích: đây là lý do một job
+ * mang sẵn runner của nó thay vì để runner nào rảnh thì giành.
+ */
+export const runnerKind = pgEnum("runner_kind", ["sandbox", "local"]);
+
 export const automationJobs = pgTable(
   "automation_jobs",
   {
@@ -84,6 +100,14 @@ export const automationJobs = pgTable(
      * distributed worker gets the simpler, predictable contract.)
      */
     configSnapshot: jsonb("config_snapshot").notNull().default({}),
+    /** Runner nào được phép giành job này — xem chú thích của `runnerKind`. */
+    runner: runnerKind("runner").notNull().default("sandbox"),
+    /**
+     * Số LÁT đã chạy. Một lượt sandbox không nhất thiết xong trong một lát: VM có trần thời
+     * gian, nên job quay lại hàng chờ và lát sau chạy tiếp. Đếm ở đây để (a) biết khi nào
+     * nên bỏ cuộc, và (b) chuyển sang runner dự phòng sau vài lát thất bại liên tiếp.
+     */
+    attempts: integer("attempts").notNull().default(0),
     workerId: text("worker_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp("started_at", { withTimezone: true }),
@@ -92,7 +116,9 @@ export const automationJobs = pgTable(
   },
   (t) => [
     index("jobs_user_idx").on(t.userId),
-    index("jobs_status_idx").on(t.status),
+    // Hàng chờ được quét theo (status, runner) ở mỗi nhịp cron và mỗi lần worker hỏi việc —
+    // index ghép đúng theo hình dạng câu truy vấn đó.
+    index("jobs_queue_idx").on(t.status, t.runner, t.createdAt),
   ],
 );
 

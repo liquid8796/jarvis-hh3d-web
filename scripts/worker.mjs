@@ -130,7 +130,10 @@ console.log(`Linh sứ「${WORKER_ID}」đang canh ${WEB_URL} …`);
 // song thì mở thêm tiến trình với WORKER_ID khác; việc giành job đã được Postgres phân xử.
 for (;;) {
   try {
-    const { job } = await call("claim", { workerId: WORKER_ID });
+    // Chỉ nhận job dành cho linh sứ máy nhà. Job sandbox đi đường /api/cron; nếu sandbox
+    // thất bại nhiều lát liên tiếp, server tự đổi runner của job sang `local` và nó sẽ rơi
+    // vào đây — đó chính là đường dự phòng, worker không cần biết gì thêm.
+    const { job } = await call("claim", { workerId: WORKER_ID, runner: "local" });
     if (job) {
       await handle(job);
       continue;

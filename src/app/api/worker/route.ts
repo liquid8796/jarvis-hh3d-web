@@ -21,7 +21,12 @@ import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
  */
 
 const bodySchema = z.discriminatedUnion("op", [
-  z.object({ op: z.literal("claim"), workerId: z.string().min(1).max(64) }),
+  // Worker máy nhà mặc định chỉ nhận job `local`; sandbox có đường riêng qua /api/cron.
+  z.object({
+    op: z.literal("claim"),
+    workerId: z.string().min(1).max(64),
+    runner: z.enum(["sandbox", "local"]).default("local"),
+  }),
   z.object({ op: z.literal("heartbeat"), jobId: z.string().uuid() }),
   z.object({
     op: z.literal("event"),
@@ -61,7 +66,7 @@ export async function POST(request: Request) {
 
   switch (body.op) {
     case "claim": {
-      const job = await claimNextJob(body.workerId);
+      const job = await claimNextJob(body.workerId, body.runner);
       if (!job) {
         return NextResponse.json({ job: null });
       }

@@ -17,6 +17,7 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
 
   const parsed = configSchema.safeParse({
     gameCookie: String(formData.get("gameCookie") ?? ""),
+    runner: String(formData.get("runner") ?? "sandbox"),
     quests: {
       meCung: {
         enabled: formData.get("meCungEnabled") === "on",

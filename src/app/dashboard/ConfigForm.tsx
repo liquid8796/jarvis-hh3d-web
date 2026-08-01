@@ -78,6 +78,22 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
         </p>
       </div>
 
+      <div className="mb-6">
+        <label className="label" htmlFor="runner">
+          Nơi vận hành đàn pháp
+        </label>
+        <select id="runner" name="runner" className="input" defaultValue={config.runner}>
+          <option value="sandbox">Sandbox trên Vercel (không cần máy riêng)</option>
+          <option value="local">Linh sứ máy nhà (máy chạy liên tục)</option>
+        </select>
+        <p className="mt-1 text-xs text-[var(--color-mist)]">
+          Sandbox dựng máy ảo theo từng lượt — hợp với Luyện Đan Đường vì mỗi lượt ghé chỉ
+          vài phút. <span className="text-[var(--color-gold-300)]">Mê Cung luôn cần linh sứ
+          máy nhà</span>: nó phải chờ đủ 5 người thật rồi đánh liền tới 35 phút, dài hơn tuổi
+          thọ một sandbox. Bật Mê Cung thì hệ thống tự chuyển và ghi rõ lý do trong nhật ký.
+        </p>
+      </div>
+
       {/* ---------------------------------------------------------------- Mê Cung */}
       <fieldset className="mb-5 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
         <legend className="px-2">

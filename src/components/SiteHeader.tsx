@@ -25,6 +25,11 @@ export async function SiteHeader() {
             <Link href={user.status === "active" ? "/dashboard" : "/pending"} className="btn btn-ghost">
               Linh Đài
             </Link>
+            {user.status === "active" && (
+              <Link href="/chat" className="btn btn-ghost">
+                Tụ Nghĩa Sảnh
+              </Link>
+            )}
             <form action={logoutAction}>
               <button type="submit" className="btn btn-ghost" title={`Đang đăng nhập: ${user.displayName}`}>
                 Xuất Quan

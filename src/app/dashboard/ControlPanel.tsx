@@ -143,7 +143,7 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
       )}
 
       <p className="mb-2 text-xs text-[var(--color-mist)]">
-        Đàn pháp chạy trên server. Đạo hữu có thể tắt trình duyệt, tắt máy — lượt vẫn tiếp
+        Đàn pháp do linh sứ thay mặt đạo hữu vận hành. Tắt trình duyệt, tắt máy — lượt vẫn tiếp
         diễn, mở lại trang là thấy đúng chỗ đang tới.
         {job?.workerId && (
           <>

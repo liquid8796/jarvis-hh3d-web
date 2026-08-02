@@ -1,6 +1,6 @@
 {
   "name": "jarvis-hh3d-web",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "private": true,
   "description": "Auto HH3D — control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn tự động chạy trên server.",
   "scripts": {
@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",
+    "@vercel/blob": "^2.6.1",
     "@vercel/sandbox": "^2.9.2",
     "bcryptjs": "^3.0.2",
     "drizzle-orm": "^0.44.4",

@@ -77,9 +77,8 @@ export function decideRunner(
       runner: "local",
       reason:
         preferred === "sandbox"
-          ? "Linh sứ sandbox đang trong thời gian thử nghiệm, hiện chỉ mở cho tông chủ — " +
-            "lượt này giao cho linh sứ máy nhà."
-          : "Giao cho linh sứ máy nhà.",
+          ? "Linh sứ viễn du chưa xuất quan — lượt này do linh sứ túc trực đảm nhiệm."
+          : "Giao cho linh sứ túc trực.",
     };
   }
 
@@ -88,9 +87,8 @@ export function decideRunner(
       runner: "local",
       reason:
         preferred === "sandbox"
-          ? "Sandbox chưa bật (cron của gói Hobby chỉ chạy 1 lần/ngày, không đủ để lái đàn " +
-            "pháp) — lượt này giao cho linh sứ máy nhà."
-          : "Giao cho linh sứ máy nhà.",
+          ? "Linh sứ viễn du đang bế quan — lượt này do linh sứ túc trực đảm nhiệm."
+          : "Giao cho linh sứ túc trực.",
     };
   }
 
@@ -99,22 +97,22 @@ export function decideRunner(
       runner: "local",
       reason:
         preferred === "sandbox"
-          ? "Mê Cung cần một phiên browser liền mạch (chờ đủ 5 người rồi đánh tới 35 phút), " +
-            "dài hơn tuổi thọ một sandbox — lượt này chuyển cho linh sứ máy nhà."
-          : "Mê Cung được giao cho linh sứ máy nhà — phiên browser phải sống liền mạch.",
+          ? "Mê Cung phải đi trọn một hơi từ lập phòng tới mãn trận, nên giao cho linh sứ " +
+            "túc trực — kẻ không bao giờ rời vị trí giữa chừng."
+          : "Mê Cung được giao cho linh sứ túc trực — trận này phải đi trọn một hơi.",
     };
   }
 
   if (preferred === "local") {
-    return { runner: "local", reason: "Theo lựa chọn của đạo hữu: chạy trên linh sứ máy nhà." };
+    return { runner: "local", reason: "Theo lựa chọn của đạo hữu: giao linh sứ túc trực." };
   }
 
   if (luyenDan) {
     return {
       runner: "sandbox",
-      reason: "Luyện Đan Đường chạy trên sandbox — mỗi lượt ghé vài phút, rất hợp VM phù du.",
+      reason: "Luyện Đan Đường giao cho linh sứ viễn du — mỗi lượt ghé lò chỉ vài phút.",
     };
   }
 
-  return { runner: "sandbox", reason: "Chạy trên sandbox." };
+  return { runner: "sandbox", reason: "Giao cho linh sứ viễn du." };
 }

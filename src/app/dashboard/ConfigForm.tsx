@@ -14,15 +14,24 @@ import type { EditableConfig } from "@/lib/services/configs";
  * hai công tắc nhiệm vụ, và chúng chỉ để LÀM MỜ phần tuỳ chọn bên dưới: giá trị vẫn được
  * gửi đi đầy đủ, nên tắt rồi bật lại không mất những gì đã chọn.
  */
-export function ConfigForm({
-  config,
-  canUseSandbox,
-}: {
-  config: EditableConfig;
-  /** Tông chủ mới mở được sandbox — xem `sandboxAllowedFor`. Ở đây chỉ để LÀM MỜ lựa chọn;
-      quyền thật được quyết lại ở server, cả lúc lưu lẫn lúc khai đàn. */
-  canUseSandbox: boolean;
-}) {
+/**
+ * Mười nhiệm vụ chỉ có công tắc — key khớp với configSchema và SIMPLE_QUESTS của engine.
+ * Mô tả viết cho người chơi, không phải cho người đọc mã.
+ */
+const SIMPLE_QUESTS: ReadonlyArray<{ key: string; name: string; hint: string }> = [
+  { key: "diemDanh", name: "Điểm Danh", hint: "Ghi danh mỗi ngày, nhận thưởng chuyên cần." },
+  { key: "hoangVuc", name: "Hoang Vực", hint: "Quét boss Hoang Vực theo lượt trong ngày." },
+  { key: "phucLoiDuong", name: "Phúc Lợi Đường", hint: "Lĩnh 4 phần phúc lợi mỗi ngày." },
+  { key: "thiLuyen", name: "Thí Luyện Tông Môn", hint: "3 lượt thí luyện mỗi ngày." },
+  { key: "biCanh", name: "Bí Cảnh Tông Môn", hint: "Quét bí cảnh 5 lượt mỗi ngày." },
+  { key: "teLe", name: "Tế Lễ Tông Môn", hint: "Tế 10 Tinh Thạch cho tông môn." },
+  { key: "phucLoiVip", name: "Phúc Lợi VIP", hint: "Nhận thêm lượt khắc trận văn theo hạng." },
+  { key: "vongQuay", name: "Vòng Quay Phúc Vận", hint: "Quay hết lượt phúc vận trong ngày." },
+  { key: "vanDap", name: "Vấn Đáp", hint: "Trả lời câu đã thuộc; câu lạ để dành cho đạo hữu." },
+  { key: "khoangMach", name: "Khoáng Mạch", hint: "Thu khoáng theo chu kỳ trong ngày." },
+];
+
+export function ConfigForm({ config }: { config: EditableConfig }) {
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
     saveConfigAction,
     null,
@@ -85,9 +94,9 @@ export function ConfigForm({
           spellCheck={false}
         />
         <p className="mt-1 text-xs text-[var(--color-mist)]">
-          Cookie được mã hoá AES-256-GCM trước khi vào database và chỉ được giải mã đúng lúc
+          Pháp khí được niêm phong trước khi cất vào tàng khố và chỉ được mở đúng khoảnh khắc
           linh sứ nhận việc — nó không bao giờ quay lại trình duyệt, kể cả của chính đạo hữu.
-          {hasCookie && " Để trống ô này khi lưu thì cookie cũ vẫn nguyên."}
+          {hasCookie && " Để trống ô này khi lưu thì pháp khí cũ vẫn nguyên."}
         </p>
       </div>
 
@@ -95,31 +104,16 @@ export function ConfigForm({
         <label className="label" htmlFor="runner">
           Nơi vận hành đàn pháp
         </label>
-        <select
-          id="runner"
-          name="runner"
-          className="input"
-          defaultValue={canUseSandbox ? config.runner : "local"}
-        >
-          <option value="local">Linh sứ máy nhà (máy chạy liên tục)</option>
-          <option value="sandbox" disabled={!canUseSandbox}>
-            Sandbox trên Vercel (không cần máy riêng)
-            {!canUseSandbox && " — đang thử nghiệm, chỉ tông chủ"}
-          </option>
+        {/* KHOÁ toàn phần theo yêu cầu: chỉ một hình thức vận hành đang mở. `disabled` ở đây
+            là trang trí — action lưu tự ép giá trị, không tin form. */}
+        <select id="runner" name="runner" className="input" defaultValue="local" disabled>
+          <option value="local">Linh sứ túc trực (đang phụng sự)</option>
+          <option value="sandbox">Linh sứ viễn du — chưa xuất quan</option>
         </select>
         <p className="mt-1 text-xs text-[var(--color-mist)]">
-          {!canUseSandbox && (
-            <>
-              <span className="text-[var(--color-gold-300)]">Sandbox đang trong thời gian
-              thử nghiệm</span> nên tạm thời chỉ tông chủ mở được — mỗi lát chạy là một máy ảo
-              tính tiền trên tài khoản chung, và chừng nào chưa đo được chi phí theo từng
-              người thì cánh cửa còn hẹp. Đàn pháp của đạo hữu chạy trên linh sứ máy nhà.{" "}
-            </>
-          )}
-          Sandbox dựng máy ảo theo từng lượt — hợp với Luyện Đan Đường vì mỗi lượt ghé chỉ
-          vài phút. <span className="text-[var(--color-gold-300)]">Mê Cung luôn cần linh sứ
-          máy nhà</span>: nó phải chờ đủ 5 người thật rồi đánh liền tới 35 phút, dài hơn tuổi
-          thọ một sandbox. Bật Mê Cung thì hệ thống tự chuyển và ghi rõ lý do trong nhật ký.
+          Mỗi đàn pháp do một linh sứ túc trực ngày đêm đảm nhiệm, đạo hữu không cần bận tâm
+          hậu trường. Các hình thức vận hành khác đang được tôi luyện — khi nào xuất quan sẽ
+          mở cho chọn tại đây.
         </p>
       </div>
 
@@ -147,8 +141,8 @@ export function ConfigForm({
         ))}
       </div>
       <p className="mb-4 text-xs text-[var(--color-mist)]">
-        Linh sứ tự nhận ra hạng tài khoản khi ghé hub nhiệm vụ (thẻ Phúc Lợi VIP chỉ hiện cho
-        tài khoản VIP) — tài khoản thường sẽ tự bỏ qua nhiệm vụ VIP, không cần khai gì ở đây.
+        Linh sứ tự nhận ra tài khoản của đạo hữu là VIP hay thường ngay khi ghé bảng nhiệm vụ
+        — tài khoản thường sẽ tự bỏ qua nhiệm vụ VIP, không cần khai gì ở đây.
       </p>
 
       {/* Tab Thường: thành thật là chỗ giữ chỗ, chứ không phải một tab trống vô cớ. */}
@@ -213,8 +207,29 @@ export function ConfigForm({
               defaultValue={config.quests.meCung.kickHp}
             />
             <p className="mt-1 text-xs text-[var(--color-mist)]">
-              0 = không trục xuất ai. Khác 0 = đá thành viên có HP dưới mức này để dành chỗ
-              cho người mạnh hơn.
+              0 = không trục xuất ai. Khác 0 = mời thành viên có HP dưới mức này ra để dành
+              chỗ cho người mạnh hơn.
+            </p>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="label" htmlFor="meCungKickIdle">
+              Trục xuất nếu không sẵn sàng sau (giây)
+            </label>
+            <input
+              id="meCungKickIdle"
+              name="meCungKickIdle"
+              type="number"
+              min={0}
+              max={3600}
+              step={5}
+              className="input font-mono"
+              defaultValue={config.quests.meCung.kickIdleSec}
+            />
+            <p className="mt-1 text-xs text-[var(--color-mist)]">
+              0 = không giục ai. Khác 0 = thành viên ngồi trong phòng quá số giây này mà chưa
+              bấm sẵn sàng sẽ bị mời ra — ghế của người chưa sẵn sàng là ghế người khác không
+              ngồi được. Đồng hồ tính từ lúc linh sứ nhìn thấy họ lần đầu.
             </p>
           </div>
 
@@ -295,6 +310,37 @@ export function ConfigForm({
               Đan rơi từ 1–4 sao. Chỉ viên bị phân giải mới hoàn lại dược liệu.
             </p>
           </div>
+        </div>
+      </fieldset>
+
+      {/* ------------------------------------------------------ Nhiệm vụ ngày còn lại */}
+      <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
+        <legend className="px-2 text-sm font-semibold text-[var(--color-parchment)]">
+          Nhiệm vụ ngày
+        </legend>
+        <p className="mb-3 text-xs text-[var(--color-mist)]">
+          Những việc mỗi ngày một lần — bật là linh sứ tự lo, không cần chỉnh gì thêm.
+        </p>
+        <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          {SIMPLE_QUESTS.map((q) => (
+            <label
+              key={q.key}
+              className="flex cursor-pointer items-start gap-2.5 text-sm text-[var(--color-parchment)]"
+            >
+              <input
+                type="checkbox"
+                name={`q_${q.key}`}
+                defaultChecked={
+                  (config.quests as Record<string, { enabled?: boolean }>)[q.key]?.enabled === true
+                }
+                className="mt-0.5 h-4 w-4 accent-[var(--color-jade-400)]"
+              />
+              <span>
+                {q.name}
+                <span className="block text-xs leading-snug text-[var(--color-mist)]">{q.hint}</span>
+              </span>
+            </label>
+          ))}
         </div>
       </fieldset>
       </div>

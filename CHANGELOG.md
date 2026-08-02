@@ -11,6 +11,35 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.9.0 — Tụ Nghĩa Sảnh, đủ 12 nhiệm vụ, và hậu trường rút vào cánh gà
+
+- **Tụ Nghĩa Sảnh — sảnh đàm đạo toàn tông môn** (`/chat`). Gửi/sửa/thu hồi, trả lời có
+  trích đoạn, thả cảm xúc (bấm lại là rút), emoji + sticker, gửi ảnh và file (kéo-thả,
+  dán từ clipboard), "đang chấp bút…", dải ngày, cuộn ngược lật trang cũ, nút về-cuối đếm
+  tin mới. NỘI DUNG tin là document JSONB — hình thù tin churns như hình thù config, mỗi
+  kiểu mới mà dùng cột là một migration; media thì KHÔNG vào database: bytes lên kho Blob,
+  document chỉ giữ URL. Thu hồi là soft-delete có vết — sảnh chung mà tin biến mất không
+  dấu tích là chỗ để gaslight nhau. Realtime bằng poll ~2.5s xin NGUYÊN trang mới nhất:
+  tin cũ cũng biến động (sửa, thu hồi, cảm xúc) nên cursor chỉ-tiến sẽ mù; ở quy mô một
+  tông môn, một trang mỗi 2.5s là giá rẻ cho việc không phải đồng bộ từng phần. Đã kiểm
+  đầu-tới-cuối bằng phiên thật: UTF-8 tròn vành, quote, reaction, sửa, thu hồi, typing,
+  upload lên kho thật.
+- **Đủ 12 nhiệm vụ như bản desktop.** Mười nhiệm vụ một-công-tắc vào form theo một bảng
+  dịch hai cột (key config ↔ tên trong hồ sơ) — thêm nhiệm vụ sau này là thêm một dòng ở
+  hai bảng, không thêm code. Hồ sơ nâng lên schema 42 và từ nay SINH BẰNG LỆNH
+  `export` của bộ fixture desktop, không chép tay: chép tay theo diff C# là hẹn ngày hai
+  bản lệch nhau ở đúng một dấu nháy trong script.
+- **Mê Cung thêm "trục xuất nếu không sẵn sàng sau N giây"** (0 = tắt) — ghế của người
+  không sẵn sàng là ghế người khác không ngồi được. Đồng hồ tính từ lúc linh sứ NHÌN THẤY
+  thành viên lần đầu: tool không làm chứng cho những giây nó không quan sát.
+- **Luyện Đan kiểm thu đan lần hai ngay trước khai lô** — mẻ có thể chín trong chính những
+  giây lượt này đang bận phân giải, và lượt kiểm đầu đã trôi qua từ trước đó.
+- **Hậu trường rút vào cánh gà.** Ô "Nơi vận hành đàn pháp" khoá hẳn (một lựa chọn đang
+  phụng sự, một "chưa xuất quan"); mọi text giải thích thôi nhắc hạ tầng — người chơi đọc
+  chuyện linh sứ và tàng khố, không đọc chuyện máy ảo và mã hoá. Đã quét trang sống: không
+  còn một chữ kỹ thuật nào lộ ra.
+- Suite: 62/62. Bảng chat migrate bằng file SQL commit như mọi migration khác.
+
 ## 0.8.1 — có đường đặt lại mật khẩu, vì seed cố ý không làm việc đó
 
 - **`npm run db:reset-password <tên>` ra đời.** `db:seed` **cố ý** không đổi mật khẩu của

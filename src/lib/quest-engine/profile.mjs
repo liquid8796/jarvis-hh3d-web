@@ -74,6 +74,24 @@ function keepLevelOf(choiceValue) {
 }
 
 /**
+ * Nhiệm vụ "một công tắc": key trong config web ↔ tên nhiệm vụ trong hồ sơ. Chúng không có
+ * option nào nên lớp dịch chỉ việc bật/tắt. Song sinh với danh sách trong configs.ts —
+ * thêm nhiệm vụ là thêm một dòng ở cả hai nơi.
+ */
+const SIMPLE_QUESTS = [
+  ["diemDanh", "Điểm Danh"],
+  ["hoangVuc", "Hoang Vực"],
+  ["phucLoiDuong", "Phúc Lợi Đường"],
+  ["thiLuyen", "Thí Luyện Tông Môn"],
+  ["biCanh", "Bí Cảnh Tông Môn"],
+  ["teLe", "Tế Lễ Tông Môn"],
+  ["phucLoiVip", "Phúc Lợi VIP — Khắc Trận Văn"],
+  ["vongQuay", "Vòng Quay Phúc Vận"],
+  ["vanDap", "Vấn Đáp"],
+  ["khoangMach", "Khoáng Mạch"],
+];
+
+/**
  * Áp cấu hình người dùng lên một hồ sơ mới và trả về nó.
  *
  * Mọi quest bắt đầu từ trạng thái tắt (hồ sơ trong repo đã vậy), nên thứ chạy đúng bằng thứ
@@ -96,6 +114,9 @@ export function profileForConfig(config, log) {
       // Ngưỡng HP là một con số tự do trên web, trong khi hồ sơ chỉ liệt kê vài nấc quen
       // thuộc. Giá trị ngoài danh sách vẫn phải được tôn trọng — xem setOption.
       setOption(meCung, "kickHp", String(mc.kickHp ?? 0), { allowFreeform: true, log });
+
+      // Ngưỡng "chưa sẵn sàng sau N giây" — cùng luật tự-nhập như kickHp.
+      setOption(meCung, "kickIdle", String(mc.kickIdleSec ?? 0), { allowFreeform: true, log });
 
       // capCheck là một cái công tắc trên web, còn trong hồ sơ nó là hai chuỗi khác nhau mà
       // bước `stopIf` đem so với trang.
@@ -128,6 +149,16 @@ export function profileForConfig(config, log) {
     }
   } else {
     log?.("Hồ sơ không có nhiệm vụ「Luyện Đan Đường」.");
+  }
+
+  // ---- Mười nhiệm vụ một-công-tắc ------------------------------------------------------
+  for (const [key, name] of SIMPLE_QUESTS) {
+    const quest = findQuest(profile, name);
+    if (!quest) {
+      log?.(`Hồ sơ không có nhiệm vụ「${name}」.`);
+      continue;
+    }
+    quest.enabled = config.quests?.[key]?.enabled === true;
   }
 
   return profile;

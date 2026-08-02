@@ -13,19 +13,16 @@ import { z } from "zod";
  * field's own default. That distinction is what lets a brand-new user — whose JSONB column
  * is literally `{}` — parse into a complete config instead of a validation error.
  */
+/** Hình thù chung của một nhiệm vụ chỉ có công tắc bật/tắt. */
+const simpleQuest = z.object({ enabled: z.boolean().default(false) }).prefault({});
+
 export const configSchema = z.object({
   /** The hoathinh3d login cookie bundle the worker automates with. */
   gameCookie: z.string().trim().max(8000).default(""),
   /**
-   * Ưu tiên của người dùng về nơi chạy. Chỉ là ƯU TIÊN: runners/policy.ts có quyền phủ
-   * quyết khi hình dạng nhiệm vụ không cho phép (Mê Cung luôn phải chạy `local`) hoặc khi
-   * người dùng chưa được mở sandbox, và luôn ghi rõ lý do vào nhật ký thay vì âm thầm làm
-   * khác ý.
-   *
-   * Mặc định `local`, không phải `sandbox`: mặc định phải là thứ chạy được cho MỌI tài
-   * khoản, còn sandbox hiện là cổng hẹp (xem `sandboxAllowedFor`). Một mặc định mà đa số
-   * người dùng không được phép dùng chỉ tổ đẻ ra một dòng "đã chuyển sang máy nhà" trong
-   * nhật ký của mọi lượt chạy đầu tiên.
+   * Nơi chạy. Hiện bị KHOÁ về `local` ở mọi tầng (UI disable, action ép lại lúc lưu) —
+   * lựa chọn viễn trình sẽ mở sau. Trường vẫn giữ trong schema vì document cũ đã mang nó,
+   * và policy vẫn đọc nó làm ưu tiên khi cánh cửa mở lại.
    */
   runner: z.enum(["sandbox", "local"]).default("local"),
   quests: z
@@ -37,10 +34,33 @@ export const configSchema = z.object({
           mode: z.enum(["is-normal", "is-hard", "is-nightmare"]).default("is-normal"),
           /** 0 = never kick; anything else is an HP floor (the desktop's kickHp). */
           kickHp: z.number().int().min(0).max(99_999_999).default(0),
+          /**
+           * 0 = không trục xuất; N > 0 = thành viên chưa bấm sẵn sàng sau N giây (tính từ
+           * lúc linh sứ nhìn thấy họ lần đầu) sẽ bị mời ra — ghế của người không sẵn sàng
+           * là ghế người khác không ngồi được. Song sinh với option `kickIdle` bên desktop.
+           */
+          kickIdleSec: z.number().int().min(0).max(3600).default(0),
           /** Stop when the daily huyền tinh cap is reached. */
           capCheck: z.boolean().default(true),
         })
         .prefault({}),
+      /**
+       * Mười nhiệm vụ "một công tắc" — đồng bộ đủ bộ từ bản desktop. Chúng không có tuỳ
+       * chọn nào ngoài bật/tắt, nhưng vẫn là object (chứ không phải boolean trần) để hôm
+       * nào một nhiệm vụ mọc thêm lựa chọn thì document cũ không phải đổi hình thù.
+       * Key ở đây ↔ tên nhiệm vụ trong hồ sơ do SIMPLE_QUESTS (quest-engine/profile.mjs)
+       * phiên dịch — thêm nhiệm vụ là thêm một dòng ở cả hai bảng.
+       */
+      diemDanh: simpleQuest,
+      hoangVuc: simpleQuest,
+      phucLoiDuong: simpleQuest,
+      thiLuyen: simpleQuest,
+      biCanh: simpleQuest,
+      teLe: simpleQuest,
+      phucLoiVip: simpleQuest,
+      vongQuay: simpleQuest,
+      vanDap: simpleQuest,
+      khoangMach: simpleQuest,
       luyenDan: z
         .object({
           enabled: z.boolean().default(false),

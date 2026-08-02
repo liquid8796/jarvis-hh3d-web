@@ -1,15 +1,15 @@
 {
-  "name": "Hoạt động hàng ngày (mặc định)",
-  "schemaVersion": 41,
+  "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
+  "schemaVersion": 42,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
       "id": "hoang-vuc",
-      "name": "Hoang Vực",
+      "name": "Hoang V\u1EF1c",
       "enabled": false,
       "kind": "customSteps",
       "matchTexts": [
-        "hoang vực",
+        "hoang v\u1EF1c",
         "hoang vuc"
       ],
       "pagePath": "/hoang-vuc",
@@ -23,19 +23,19 @@
           "action": "waitForSelector",
           "selector": "#boss-info",
           "timeoutMs": 25000,
-          "note": "chờ khối thông tin boss render"
+          "note": "ch\u1EDD kh\u1ED1i th\u00F4ng tin boss render"
         },
         {
           "action": "readCooldownSeconds",
           "selector": "#countdown-timer",
           "timeoutMs": 15000,
-          "note": "\"Chờ 7 phút 19 giây để tấn công lần tiếp theo.\" — không có thẻ này thì không đọc được gì, và đó chính là dấu hiệu đã hết lượt hôm nay"
+          "note": "\u0022Ch\u1EDD 7 ph\u00FAt 19 gi\u00E2y \u0111\u1EC3 t\u1EA5n c\u00F4ng l\u1EA7n ti\u1EBFp theo.\u0022 \u2014 kh\u00F4ng c\u00F3 th\u1EBB n\u00E0y th\u00EC kh\u00F4ng \u0111\u1ECDc \u0111\u01B0\u1EE3c g\u00EC, v\u00E0 \u0111\u00F3 ch\u00EDnh l\u00E0 d\u1EA5u hi\u1EC7u \u0111\u00E3 h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay"
         },
         {
           "action": "stopIf",
-          "text": "chưa đánh được (đang chờ lượt hoặc đã hết 5 lượt hôm nay)",
+          "text": "ch\u01B0a \u0111\u00E1nh \u0111\u01B0\u1EE3c (\u0111ang ch\u1EDD l\u01B0\u1EE3t ho\u1EB7c \u0111\u00E3 h\u1EBFt 5 l\u01B0\u1EE3t h\u00F4m nay)",
           "timeoutMs": 15000,
-          "note": "nút KHIÊU CHIẾN biến mất cả khi đang cooldown lẫn khi hết lượt; engine tự phân biệt — đọc được đồng hồ thì báo OnCooldown kèm thời gian, không đọc được thì AlreadyDone",
+          "note": "n\u00FAt KHI\u00CAU CHI\u1EBEN bi\u1EBFn m\u1EA5t c\u1EA3 khi \u0111ang cooldown l\u1EABn khi h\u1EBFt l\u01B0\u1EE3t; engine t\u1EF1 ph\u00E2n bi\u1EC7t \u2014 \u0111\u1ECDc \u0111\u01B0\u1EE3c \u0111\u1ED3ng h\u1ED3 th\u00EC b\u00E1o OnCooldown k\u00E8m th\u1EDDi gian, kh\u00F4ng \u0111\u1ECDc \u0111\u01B0\u1EE3c th\u00EC AlreadyDone",
           "condition": {
             "kind": "hidden",
             "selector": "#battle-button"
@@ -44,7 +44,7 @@
         {
           "action": "repeat",
           "timeoutMs": 15000,
-          "note": "kiểm tra TRƯỚC mỗi vòng, nên đang có +15% rồi thì không đổi lần nào. Trần 5 lần vì mỗi lần đổi tốn phí và phí tăng dần.",
+          "note": "ki\u1EC3m tra TR\u01AF\u1EDAC m\u1ED7i v\u00F2ng, n\u00EAn \u0111ang c\u00F3 \u002B15% r\u1ED3i th\u00EC kh\u00F4ng \u0111\u1ED5i l\u1EA7n n\u00E0o. Tr\u1EA7n 5 l\u1EA7n v\u00EC m\u1ED7i l\u1EA7n \u0111\u1ED5i t\u1ED1n ph\u00ED v\u00E0 ph\u00ED t\u0103ng d\u1EA7n.",
           "steps": [
             {
               "action": "click",
@@ -55,7 +55,7 @@
             {
               "action": "waitForCondition",
               "timeoutMs": 8000,
-              "note": "hộp xác nhận SweetAlert2 \"Đổi\"",
+              "note": "h\u1ED9p x\u00E1c nh\u1EADn SweetAlert2 \u0022\u0110\u1ED5i\u0022",
               "optional": true,
               "condition": {
                 "kind": "visible",
@@ -71,7 +71,7 @@
             {
               "action": "waitMilliseconds",
               "timeoutMs": 1200,
-              "note": "chờ ngũ hành mới áp vào"
+              "note": "ch\u1EDD ng\u0169 h\u00E0nh m\u1EDBi \u00E1p v\u00E0o"
             }
           ],
           "until": {
@@ -89,7 +89,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 15000,
-          "note": "màn đánh boss đã mở",
+          "note": "m\u00E0n \u0111\u00E1nh boss \u0111\u00E3 m\u1EDF",
           "condition": {
             "kind": "visible",
             "selector": "#boss-damage-screen .attack-button"
@@ -103,7 +103,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 25000,
-          "note": "bảng tổng kết sát thương hiện sau khi đòn đánh chạy xong",
+          "note": "b\u1EA3ng t\u1ED5ng k\u1EBFt s\u00E1t th\u01B0\u01A1ng hi\u1EC7n sau khi \u0111\u00F2n \u0111\u00E1nh ch\u1EA1y xong",
           "optional": true,
           "condition": {
             "kind": "visible",
@@ -114,36 +114,36 @@
           "action": "click",
           "selector": "#damage-summary-container .close-button",
           "timeoutMs": 6000,
-          "note": "đóng bảng tổng kết",
+          "note": "\u0111\u00F3ng b\u1EA3ng t\u1ED5ng k\u1EBFt",
           "optional": true
         },
         {
           "action": "click",
           "selector": "#boss-damage-screen .back-button",
           "timeoutMs": 6000,
-          "note": "trở lại trang boss để đọc đồng hồ",
+          "note": "tr\u1EDF l\u1EA1i trang boss \u0111\u1EC3 \u0111\u1ECDc \u0111\u1ED3ng h\u1ED3",
           "optional": true
         },
         {
           "action": "readCooldownSeconds",
           "selector": "#countdown-timer",
           "timeoutMs": 15000,
-          "note": "đồng hồ tới lượt kế tiếp, xuất hiện ngay sau khi đánh xong"
+          "note": "\u0111\u1ED3ng h\u1ED3 t\u1EDBi l\u01B0\u1EE3t k\u1EBF ti\u1EBFp, xu\u1EA5t hi\u1EC7n ngay sau khi \u0111\u00E1nh xong"
         }
       ],
       "options": [],
       "fallbackCooldownSeconds": 420,
+      "requiresVip": true,
       "order": 20,
-      "notes": "Đánh boss Hoang Vực, 5 lượt/ngày.",
-      "requiresVip": true
+      "notes": "\u0110\u00E1nh boss Hoang V\u1EF1c, 5 l\u01B0\u1EE3t/ng\u00E0y."
     },
     {
       "id": "phuc-loi-duong",
-      "name": "Phúc Lợi Đường",
+      "name": "Ph\u00FAc L\u1EE3i \u0110\u01B0\u1EDDng",
       "enabled": false,
       "kind": "customSteps",
       "matchTexts": [
-        "phúc lợi đường",
+        "ph\u00FAc l\u1EE3i \u0111\u01B0\u1EDDng",
         "phuc loi duong"
       ],
       "pagePath": "/nhiem-vu-hang-ngay",
@@ -157,13 +157,13 @@
           "action": "waitForSelector",
           "selector": ".nv-quest",
           "timeoutMs": 25000,
-          "note": "chờ hub render; .nv-quest tồn tại cả khi quest đã xong"
+          "note": "ch\u1EDD hub render; .nv-quest t\u1ED3n t\u1EA1i c\u1EA3 khi quest \u0111\u00E3 xong"
         },
         {
           "action": "stopIf",
-          "text": "hết 4 lượt hôm nay",
+          "text": "h\u1EBFt 4 l\u01B0\u1EE3t h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "hết lượt hôm nay → nút bị xoá khỏi DOM; dừng hẳn thay vì chờ timeout",
+          "note": "h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay \u2192 n\u00FAt b\u1ECB xo\u00E1 kh\u1ECFi DOM; d\u1EEBng h\u1EB3n thay v\u00EC ch\u1EDD timeout",
           "condition": {
             "kind": "hidden",
             "selector": "#nv-phucloi-open-btn"
@@ -173,13 +173,13 @@
           "action": "readCooldownSeconds",
           "selector": "#nv-phucloi-open-btn",
           "timeoutMs": 15000,
-          "note": "đọc trước: nếu đang đếm ngược thì đây chính là thời gian còn lại"
+          "note": "\u0111\u1ECDc tr\u01B0\u1EDBc: n\u1EBFu \u0111ang \u0111\u1EBFm ng\u01B0\u1EE3c th\u00EC \u0111\u00E2y ch\u00EDnh l\u00E0 th\u1EDDi gian c\u00F2n l\u1EA1i"
         },
         {
           "action": "stopIf",
-          "text": "đang cooldown",
+          "text": "\u0111ang cooldown",
           "timeoutMs": 15000,
-          "note": "nút còn đó nhưng bị khoá → dừng, không tốn timeout cho một cú click vô ích",
+          "note": "n\u00FAt c\u00F2n \u0111\u00F3 nh\u01B0ng b\u1ECB kho\u00E1 \u2192 d\u1EEBng, kh\u00F4ng t\u1ED1n timeout cho m\u1ED9t c\u00FA click v\u00F4 \u00EDch",
           "condition": {
             "kind": "disabled",
             "selector": "#nv-phucloi-open-btn"
@@ -193,7 +193,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 10000,
-          "note": "dấu ':' chỉ xuất hiện khi nút đã chuyển sang đồng hồ đếm ngược — đúng cho mọi quest bất kể chữ trung gian (\"Đang mở...\", \"Đang quét...\") khác nhau",
+          "note": "d\u1EA5u \u0027:\u0027 ch\u1EC9 xu\u1EA5t hi\u1EC7n khi n\u00FAt \u0111\u00E3 chuy\u1EC3n sang \u0111\u1ED3ng h\u1ED3 \u0111\u1EBFm ng\u01B0\u1EE3c \u2014 \u0111\u00FAng cho m\u1ECDi quest b\u1EA5t k\u1EC3 ch\u1EEF trung gian (\u0022\u0110ang m\u1EDF...\u0022, \u0022\u0110ang qu\u00E9t...\u0022) kh\u00E1c nhau",
           "optional": true,
           "condition": {
             "kind": "textMatches",
@@ -205,22 +205,22 @@
           "action": "readCooldownSeconds",
           "selector": "#nv-phucloi-open-btn",
           "timeoutMs": 15000,
-          "note": "đọc lại sau khi bấm"
+          "note": "\u0111\u1ECDc l\u1EA1i sau khi b\u1EA5m"
         }
       ],
       "options": [],
       "fallbackCooldownSeconds": 3600,
+      "requiresVip": true,
       "order": 30,
-      "notes": "Mở rương Phúc Lợi Đường nhận thưởng, 4 lượt/ngày.",
-      "requiresVip": true
+      "notes": "M\u1EDF r\u01B0\u01A1ng Ph\u00FAc L\u1EE3i \u0110\u01B0\u1EDDng nh\u1EADn th\u01B0\u1EDFng, 4 l\u01B0\u1EE3t/ng\u00E0y."
     },
     {
       "id": "thi-luyen-tong-mon",
-      "name": "Thí Luyện Tông Môn",
+      "name": "Th\u00ED Luy\u1EC7n T\u00F4ng M\u00F4n",
       "enabled": false,
       "kind": "customSteps",
       "matchTexts": [
-        "thí luyện",
+        "th\u00ED luy\u1EC7n",
         "thi luyen"
       ],
       "pagePath": "/nhiem-vu-hang-ngay",
@@ -234,13 +234,13 @@
           "action": "waitForSelector",
           "selector": ".nv-quest",
           "timeoutMs": 25000,
-          "note": "chờ hub render; .nv-quest tồn tại cả khi quest đã xong"
+          "note": "ch\u1EDD hub render; .nv-quest t\u1ED3n t\u1EA1i c\u1EA3 khi quest \u0111\u00E3 xong"
         },
         {
           "action": "stopIf",
-          "text": "hết 3 lượt hôm nay",
+          "text": "h\u1EBFt 3 l\u01B0\u1EE3t h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "hết lượt hôm nay → nút bị xoá khỏi DOM; dừng hẳn thay vì chờ timeout",
+          "note": "h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay \u2192 n\u00FAt b\u1ECB xo\u00E1 kh\u1ECFi DOM; d\u1EEBng h\u1EB3n thay v\u00EC ch\u1EDD timeout",
           "condition": {
             "kind": "hidden",
             "selector": "#nv-tltm-open-btn"
@@ -250,13 +250,13 @@
           "action": "readCooldownSeconds",
           "selector": "#nv-tltm-open-btn",
           "timeoutMs": 15000,
-          "note": "đọc trước: nếu đang đếm ngược thì đây chính là thời gian còn lại"
+          "note": "\u0111\u1ECDc tr\u01B0\u1EDBc: n\u1EBFu \u0111ang \u0111\u1EBFm ng\u01B0\u1EE3c th\u00EC \u0111\u00E2y ch\u00EDnh l\u00E0 th\u1EDDi gian c\u00F2n l\u1EA1i"
         },
         {
           "action": "stopIf",
-          "text": "đang cooldown",
+          "text": "\u0111ang cooldown",
           "timeoutMs": 15000,
-          "note": "nút còn đó nhưng bị khoá → dừng, không tốn timeout cho một cú click vô ích",
+          "note": "n\u00FAt c\u00F2n \u0111\u00F3 nh\u01B0ng b\u1ECB kho\u00E1 \u2192 d\u1EEBng, kh\u00F4ng t\u1ED1n timeout cho m\u1ED9t c\u00FA click v\u00F4 \u00EDch",
           "condition": {
             "kind": "disabled",
             "selector": "#nv-tltm-open-btn"
@@ -270,7 +270,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 10000,
-          "note": "dấu ':' chỉ xuất hiện khi nút đã chuyển sang đồng hồ đếm ngược — đúng cho mọi quest bất kể chữ trung gian (\"Đang mở...\", \"Đang quét...\") khác nhau",
+          "note": "d\u1EA5u \u0027:\u0027 ch\u1EC9 xu\u1EA5t hi\u1EC7n khi n\u00FAt \u0111\u00E3 chuy\u1EC3n sang \u0111\u1ED3ng h\u1ED3 \u0111\u1EBFm ng\u01B0\u1EE3c \u2014 \u0111\u00FAng cho m\u1ECDi quest b\u1EA5t k\u1EC3 ch\u1EEF trung gian (\u0022\u0110ang m\u1EDF...\u0022, \u0022\u0110ang qu\u00E9t...\u0022) kh\u00E1c nhau",
           "optional": true,
           "condition": {
             "kind": "textMatches",
@@ -282,22 +282,22 @@
           "action": "readCooldownSeconds",
           "selector": "#nv-tltm-open-btn",
           "timeoutMs": 15000,
-          "note": "đọc lại sau khi bấm"
+          "note": "\u0111\u1ECDc l\u1EA1i sau khi b\u1EA5m"
         }
       ],
       "options": [],
       "fallbackCooldownSeconds": 3600,
+      "requiresVip": true,
       "order": 40,
-      "notes": "Thí luyện tông môn nhận thưởng, 3 lượt/ngày.",
-      "requiresVip": true
+      "notes": "Th\u00ED luy\u1EC7n t\u00F4ng m\u00F4n nh\u1EADn th\u01B0\u1EDFng, 3 l\u01B0\u1EE3t/ng\u00E0y."
     },
     {
       "id": "bi-canh-tong-mon",
-      "name": "Bí Cảnh Tông Môn",
+      "name": "B\u00ED C\u1EA3nh T\u00F4ng M\u00F4n",
       "enabled": false,
       "kind": "customSteps",
       "matchTexts": [
-        "bí cảnh",
+        "b\u00ED c\u1EA3nh",
         "bi canh"
       ],
       "pagePath": "/nhiem-vu-hang-ngay",
@@ -311,13 +311,13 @@
           "action": "waitForSelector",
           "selector": ".nv-quest",
           "timeoutMs": 25000,
-          "note": "chờ hub render; .nv-quest tồn tại cả khi quest đã xong"
+          "note": "ch\u1EDD hub render; .nv-quest t\u1ED3n t\u1EA1i c\u1EA3 khi quest \u0111\u00E3 xong"
         },
         {
           "action": "stopIf",
-          "text": "hết 5 lượt hôm nay",
+          "text": "h\u1EBFt 5 l\u01B0\u1EE3t h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "hết lượt hôm nay → nút bị xoá khỏi DOM; dừng hẳn thay vì chờ timeout",
+          "note": "h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay \u2192 n\u00FAt b\u1ECB xo\u00E1 kh\u1ECFi DOM; d\u1EEBng h\u1EB3n thay v\u00EC ch\u1EDD timeout",
           "condition": {
             "kind": "hidden",
             "selector": "#nv-btm-attack-btn"
@@ -327,13 +327,13 @@
           "action": "readCooldownSeconds",
           "selector": "#nv-btm-attack-btn",
           "timeoutMs": 15000,
-          "note": "đọc trước: nếu đang đếm ngược thì đây chính là thời gian còn lại"
+          "note": "\u0111\u1ECDc tr\u01B0\u1EDBc: n\u1EBFu \u0111ang \u0111\u1EBFm ng\u01B0\u1EE3c th\u00EC \u0111\u00E2y ch\u00EDnh l\u00E0 th\u1EDDi gian c\u00F2n l\u1EA1i"
         },
         {
           "action": "stopIf",
-          "text": "đang cooldown",
+          "text": "\u0111ang cooldown",
           "timeoutMs": 15000,
-          "note": "nút còn đó nhưng bị khoá → dừng, không tốn timeout cho một cú click vô ích",
+          "note": "n\u00FAt c\u00F2n \u0111\u00F3 nh\u01B0ng b\u1ECB kho\u00E1 \u2192 d\u1EEBng, kh\u00F4ng t\u1ED1n timeout cho m\u1ED9t c\u00FA click v\u00F4 \u00EDch",
           "condition": {
             "kind": "disabled",
             "selector": "#nv-btm-attack-btn"
@@ -347,7 +347,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 10000,
-          "note": "dấu ':' chỉ xuất hiện khi nút đã chuyển sang đồng hồ đếm ngược — đúng cho mọi quest bất kể chữ trung gian (\"Đang mở...\", \"Đang quét...\") khác nhau",
+          "note": "d\u1EA5u \u0027:\u0027 ch\u1EC9 xu\u1EA5t hi\u1EC7n khi n\u00FAt \u0111\u00E3 chuy\u1EC3n sang \u0111\u1ED3ng h\u1ED3 \u0111\u1EBFm ng\u01B0\u1EE3c \u2014 \u0111\u00FAng cho m\u1ECDi quest b\u1EA5t k\u1EC3 ch\u1EEF trung gian (\u0022\u0110ang m\u1EDF...\u0022, \u0022\u0110ang qu\u00E9t...\u0022) kh\u00E1c nhau",
           "optional": true,
           "condition": {
             "kind": "textMatches",
@@ -359,22 +359,22 @@
           "action": "readCooldownSeconds",
           "selector": "#nv-btm-attack-btn",
           "timeoutMs": 15000,
-          "note": "đọc lại sau khi bấm"
+          "note": "\u0111\u1ECDc l\u1EA1i sau khi b\u1EA5m"
         }
       ],
       "options": [],
       "fallbackCooldownSeconds": 3600,
+      "requiresVip": true,
       "order": 60,
-      "notes": "Đánh Bí Cảnh Tông Môn nhận thưởng, 5 lượt/ngày.",
-      "requiresVip": true
+      "notes": "\u0110\u00E1nh B\u00ED C\u1EA3nh T\u00F4ng M\u00F4n nh\u1EADn th\u01B0\u1EDFng, 5 l\u01B0\u1EE3t/ng\u00E0y."
     },
     {
       "id": "te-le-tong-mon",
-      "name": "Tế Lễ Tông Môn",
+      "name": "T\u1EBF L\u1EC5 T\u00F4ng M\u00F4n",
       "enabled": false,
       "kind": "customSteps",
       "matchTexts": [
-        "tế lễ",
+        "t\u1EBF l\u1EC5",
         "te le"
       ],
       "pagePath": "/nhiem-vu-hang-ngay",
@@ -388,13 +388,13 @@
           "action": "waitForSelector",
           "selector": ".nv-quest",
           "timeoutMs": 25000,
-          "note": "chờ hub render; .nv-quest tồn tại cả khi quest đã xong"
+          "note": "ch\u1EDD hub render; .nv-quest t\u1ED3n t\u1EA1i c\u1EA3 khi quest \u0111\u00E3 xong"
         },
         {
           "action": "stopIf",
-          "text": "đã tế lễ hôm nay",
+          "text": "\u0111\u00E3 t\u1EBF l\u1EC5 h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "đã làm hôm nay → nút bị xoá khỏi DOM; dừng hẳn thay vì chờ timeout",
+          "note": "\u0111\u00E3 l\u00E0m h\u00F4m nay \u2192 n\u00FAt b\u1ECB xo\u00E1 kh\u1ECFi DOM; d\u1EEBng h\u1EB3n thay v\u00EC ch\u1EDD timeout",
           "condition": {
             "kind": "hidden",
             "selector": "#nv-tele-open-btn"
@@ -408,7 +408,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 15000,
-          "note": "chờ nút thật sự biến mất = site đã ghi nhận. Không đạt thì báo lỗi rõ ràng chứ không nhận vơ là xong",
+          "note": "ch\u1EDD n\u00FAt th\u1EADt s\u1EF1 bi\u1EBFn m\u1EA5t = site \u0111\u00E3 ghi nh\u1EADn. Kh\u00F4ng \u0111\u1EA1t th\u00EC b\u00E1o l\u1ED7i r\u00F5 r\u00E0ng ch\u1EE9 kh\u00F4ng nh\u1EADn v\u01A1 l\u00E0 xong",
           "condition": {
             "kind": "hidden",
             "selector": "#nv-tele-open-btn"
@@ -417,19 +417,19 @@
       ],
       "options": [],
       "fallbackCooldownSeconds": 14400,
+      "requiresVip": true,
       "order": 70,
-      "notes": "Tế lễ 10 Tinh Thạch đổi Tông Khố + Cống Hiến, 1 lần/ngày.",
-      "requiresVip": true
+      "notes": "T\u1EBF l\u1EC5 10 Tinh Th\u1EA1ch \u0111\u1ED5i T\u00F4ng Kh\u1ED1 \u002B C\u1ED1ng Hi\u1EBFn, 1 l\u1EA7n/ng\u00E0y."
     },
     {
       "id": "phuc-loi-vip-khac-tran-van",
-      "name": "Phúc Lợi VIP — Khắc Trận Văn",
+      "name": "Ph\u00FAc L\u1EE3i VIP \u2014 Kh\u1EAFc Tr\u1EADn V\u0103n",
       "enabled": false,
       "kind": "customSteps",
       "matchTexts": [
-        "khắc trận văn",
+        "kh\u1EAFc tr\u1EADn v\u0103n",
         "khac tran van",
-        "phúc lợi vip",
+        "ph\u00FAc l\u1EE3i vip",
         "phuc loi vip"
       ],
       "pagePath": "/nhiem-vu-hang-ngay",
@@ -443,20 +443,20 @@
           "action": "waitForSelector",
           "selector": ".nv-quest",
           "timeoutMs": 25000,
-          "note": "chờ hub render; .nv-quest tồn tại cả khi quest đã xong"
+          "note": "ch\u1EDD hub render; .nv-quest t\u1ED3n t\u1EA1i c\u1EA3 khi quest \u0111\u00E3 xong"
         },
         {
           "action": "waitForSelector",
           "selector": "#nv-pt-vip-quest",
           "timeoutMs": 10000,
-          "note": "chờ đúng thẻ quest này hiện — cổng .nv-quest chung có thể đã xanh từ thẻ khác",
+          "note": "ch\u1EDD \u0111\u00FAng th\u1EBB quest n\u00E0y hi\u1EC7n \u2014 c\u1ED5ng .nv-quest chung c\u00F3 th\u1EC3 \u0111\u00E3 xanh t\u1EEB th\u1EBB kh\u00E1c",
           "optional": true
         },
         {
           "action": "stopIf",
-          "text": "không thấy mục Phúc Lợi VIP trên hub (tài khoản không phải VIP?)",
+          "text": "kh\u00F4ng th\u1EA5y m\u1EE5c Ph\u00FAc L\u1EE3i VIP tr\u00EAn hub (t\u00E0i kho\u1EA3n kh\u00F4ng ph\u1EA3i VIP?)",
           "timeoutMs": 15000,
-          "note": "không có thẻ = quest không áp dụng cho tài khoản này; báo khác hẳn với 'đã làm rồi'",
+          "note": "kh\u00F4ng c\u00F3 th\u1EBB = quest kh\u00F4ng \u00E1p d\u1EE5ng cho t\u00E0i kho\u1EA3n n\u00E0y; b\u00E1o kh\u00E1c h\u1EB3n v\u1EDBi \u0027\u0111\u00E3 l\u00E0m r\u1ED3i\u0027",
           "condition": {
             "kind": "hidden",
             "selector": "#nv-pt-vip-quest"
@@ -464,9 +464,9 @@
         },
         {
           "action": "stopIf",
-          "text": "đã nhận hôm nay",
+          "text": "\u0111\u00E3 nh\u1EADn h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "đã làm hôm nay → nút bị xoá khỏi DOM; dừng hẳn thay vì chờ timeout",
+          "note": "\u0111\u00E3 l\u00E0m h\u00F4m nay \u2192 n\u00FAt b\u1ECB xo\u00E1 kh\u1ECFi DOM; d\u1EEBng h\u1EB3n thay v\u00EC ch\u1EDD timeout",
           "condition": {
             "kind": "hidden",
             "selector": "#nv-pt-claim-btn"
@@ -480,7 +480,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 6000,
-          "note": "modal \"Nhận Thành Công!\"",
+          "note": "modal \u0022Nh\u1EADn Th\u00E0nh C\u00F4ng!\u0022",
           "optional": true,
           "condition": {
             "kind": "visible",
@@ -491,25 +491,25 @@
           "action": "click",
           "selector": "#nv-modal-btn",
           "timeoutMs": 4000,
-          "note": "modal chặn tương tác, phải đóng lại",
+          "note": "modal ch\u1EB7n t\u01B0\u01A1ng t\u00E1c, ph\u1EA3i \u0111\u00F3ng l\u1EA1i",
           "optional": true
         }
       ],
       "options": [],
       "fallbackCooldownSeconds": 14400,
+      "requiresVip": true,
       "order": 80,
-      "notes": "Nhận lượt Khắc Trận Văn mỗi ngày — chỉ dành cho tài khoản VIP.",
-      "requiresVip": true
+      "notes": "Nh\u1EADn l\u01B0\u1EE3t Kh\u1EAFc Tr\u1EADn V\u0103n m\u1ED7i ng\u00E0y \u2014 ch\u1EC9 d\u00E0nh cho t\u00E0i kho\u1EA3n VIP."
     },
     {
       "id": "vong-quay-phuc-van",
-      "name": "Vòng Quay Phúc Vận",
+      "name": "V\u00F2ng Quay Ph\u00FAc V\u1EADn",
       "enabled": false,
       "kind": "customSteps",
       "matchTexts": [
-        "vòng quay phúc vận",
-        "phúc vận",
-        "vòng quay",
+        "v\u00F2ng quay ph\u00FAc v\u1EADn",
+        "ph\u00FAc v\u1EADn",
+        "v\u00F2ng quay",
         "vong quay"
       ],
       "pagePath": "/nhiem-vu-hang-ngay",
@@ -523,13 +523,13 @@
           "action": "waitForSelector",
           "selector": ".nv-quest",
           "timeoutMs": 25000,
-          "note": "chờ hub render; .nv-quest tồn tại cả khi quest đã xong"
+          "note": "ch\u1EDD hub render; .nv-quest t\u1ED3n t\u1EA1i c\u1EA3 khi quest \u0111\u00E3 xong"
         },
         {
           "action": "stopIf",
-          "text": "hết lượt quay hôm nay",
+          "text": "h\u1EBFt l\u01B0\u1EE3t quay h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "nút bị xoá khỏi DOM",
+          "note": "n\u00FAt b\u1ECB xo\u00E1 kh\u1ECFi DOM",
           "condition": {
             "kind": "hidden",
             "selector": "#nv-lottery-spin-btn"
@@ -537,9 +537,9 @@
         },
         {
           "action": "stopIf",
-          "text": "đã quay đủ 4 lượt hôm nay",
+          "text": "\u0111\u00E3 quay \u0111\u1EE7 4 l\u01B0\u1EE3t h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "tiến độ đã đầy thì không bấm gì nữa",
+          "note": "ti\u1EBFn \u0111\u1ED9 \u0111\u00E3 \u0111\u1EA7y th\u00EC kh\u00F4ng b\u1EA5m g\u00EC n\u1EEFa",
           "condition": {
             "kind": "textMatches",
             "selector": ".nv-quest:has(#nv-lottery-spin-btn) .nv-prog-txt",
@@ -549,19 +549,19 @@
         {
           "action": "repeat",
           "timeoutMs": 15000,
-          "note": "bấm quay cho tới khi UI đạt 4/4. Trần 4 lần vì một ngày nhiều nhất 4 lượt — lượt thứ 4 bị khoá cho tới khi các quest khác xong, nên cứ bấm thử; server từ chối thì tiến độ đứng yên, vòng lặp hết trần và lần ghé sau thử lại.",
+          "note": "b\u1EA5m quay cho t\u1EDBi khi UI \u0111\u1EA1t 4/4. Tr\u1EA7n 4 l\u1EA7n v\u00EC m\u1ED9t ng\u00E0y nhi\u1EC1u nh\u1EA5t 4 l\u01B0\u1EE3t \u2014 l\u01B0\u1EE3t th\u1EE9 4 b\u1ECB kho\u00E1 cho t\u1EDBi khi c\u00E1c quest kh\u00E1c xong, n\u00EAn c\u1EE9 b\u1EA5m th\u1EED; server t\u1EEB ch\u1ED1i th\u00EC ti\u1EBFn \u0111\u1ED9 \u0111\u1EE9ng y\u00EAn, v\u00F2ng l\u1EB7p h\u1EBFt tr\u1EA7n v\u00E0 l\u1EA7n gh\u00E9 sau th\u1EED l\u1EA1i.",
           "steps": [
             {
               "action": "click",
               "selector": "#nv-lottery-spin-btn",
               "timeoutMs": 5000,
-              "note": "optional + timeout ngắn: một cú bấm bị từ chối là chuyện bình thường ở đây, không phải lỗi của quest",
+              "note": "optional \u002B timeout ng\u1EAFn: m\u1ED9t c\u00FA b\u1EA5m b\u1ECB t\u1EEB ch\u1ED1i l\u00E0 chuy\u1EC7n b\u00ECnh th\u01B0\u1EDDng \u1EDF \u0111\u00E2y, kh\u00F4ng ph\u1EA3i l\u1ED7i c\u1EE7a quest",
               "optional": true
             },
             {
               "action": "waitMilliseconds",
               "timeoutMs": 4000,
-              "note": "chờ animation quay xong (API trả final_rotation vài nghìn độ) rồi mới quay tiếp"
+              "note": "ch\u1EDD animation quay xong (API tr\u1EA3 final_rotation v\u00E0i ngh\u00ECn \u0111\u1ED9) r\u1ED3i m\u1EDBi quay ti\u1EBFp"
             }
           ],
           "until": {
@@ -575,17 +575,17 @@
       ],
       "options": [],
       "fallbackCooldownSeconds": 3600,
+      "requiresVip": true,
       "order": 50,
-      "notes": "Quay Vòng Quay Phúc Vận nhận thưởng, tối đa 4 lượt/ngày.",
-      "requiresVip": true
+      "notes": "Quay V\u00F2ng Quay Ph\u00FAc V\u1EADn nh\u1EADn th\u01B0\u1EDFng, t\u1ED1i \u0111a 4 l\u01B0\u1EE3t/ng\u00E0y."
     },
     {
       "id": "van-dap",
-      "name": "Vấn Đáp",
+      "name": "V\u1EA5n \u0110\u00E1p",
       "enabled": false,
       "kind": "customSteps",
       "matchTexts": [
-        "vấn đáp",
+        "v\u1EA5n \u0111\u00E1p",
         "van dap"
       ],
       "pagePath": "/van-dap-tong-mon",
@@ -599,24 +599,24 @@
           "action": "waitForSelector",
           "selector": "#quiz-wrapper, #start-quiz-button",
           "timeoutMs": 25000,
-          "note": "chờ trang vấn đáp render — ngày mới có #start-quiz-button, ngày đã xong chỉ còn #quiz-wrapper với câu chúc mừng"
+          "note": "ch\u1EDD trang v\u1EA5n \u0111\u00E1p render \u2014 ng\u00E0y m\u1EDBi c\u00F3 #start-quiz-button, ng\u00E0y \u0111\u00E3 xong ch\u1EC9 c\u00F2n #quiz-wrapper v\u1EDBi c\u00E2u ch\u00FAc m\u1EEBng"
         },
         {
           "action": "stopIf",
-          "text": "đã hoàn thành vấn đáp hôm nay",
+          "text": "\u0111\u00E3 ho\u00E0n th\u00E0nh v\u1EA5n \u0111\u00E1p h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "trang tự báo \"Đạo hữu đã hoàn thành Vấn Đáp hôm nay!\" ngay khi mở — không còn gì để làm",
+          "note": "trang t\u1EF1 b\u00E1o \u0022\u0110\u1EA1o h\u1EEFu \u0111\u00E3 ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p h\u00F4m nay!\u0022 ngay khi m\u1EDF \u2014 kh\u00F4ng c\u00F2n g\u00EC \u0111\u1EC3 l\u00E0m",
           "condition": {
             "kind": "textMatches",
             "selector": "#quiz-wrapper",
-            "text": "hoàn thành Vấn Đáp"
+            "text": "ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p"
           }
         },
         {
           "action": "click",
           "selector": "#start-quiz-button",
           "timeoutMs": 8000,
-          "note": "BẮT ĐẦU VẤN ĐÁP — một cú bấm tải cả 5 câu của ngày (API 7cfa6143)",
+          "note": "B\u1EAET \u0110\u1EA6U V\u1EA4N \u0110\u00C1P \u2014 m\u1ED9t c\u00FA b\u1EA5m t\u1EA3i c\u1EA3 5 c\u00E2u c\u1EE7a ng\u00E0y (API 7cfa6143)",
           "optional": true,
           "when": {
             "kind": "visible",
@@ -626,7 +626,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 12000,
-          "note": "câu hỏi đầu tiên đã hiện (~1s sau khi bấm bắt đầu)",
+          "note": "c\u00E2u h\u1ECFi \u0111\u1EA7u ti\u00EAn \u0111\u00E3 hi\u1EC7n (~1s sau khi b\u1EA5m b\u1EAFt \u0111\u1EA7u)",
           "optional": true,
           "condition": {
             "kind": "visible",
@@ -636,12 +636,12 @@
         {
           "action": "repeat",
           "timeoutMs": 15000,
-          "note": "5 câu; thoát khi trang tự báo hoàn thành. Trần 6 vòng: 5 câu + 1 vòng đệm cho khoảnh khắc chữ hoàn thành chưa kịp render.",
+          "note": "5 c\u00E2u; tho\u00E1t khi trang t\u1EF1 b\u00E1o ho\u00E0n th\u00E0nh. Tr\u1EA7n 6 v\u00F2ng: 5 c\u00E2u \u002B 1 v\u00F2ng \u0111\u1EC7m cho kho\u1EA3nh kh\u1EAFc ch\u1EEF ho\u00E0n th\u00E0nh ch\u01B0a k\u1ECBp render.",
           "steps": [
             {
               "action": "waitForCondition",
               "timeoutMs": 10000,
-              "note": "chờ câu hỏi hiện và bấm được — khung quiz tàng hình ~1-1.5s giữa hai câu, KHÔNG ngủ theo giờ cố định",
+              "note": "ch\u1EDD c\u00E2u h\u1ECFi hi\u1EC7n v\u00E0 b\u1EA5m \u0111\u01B0\u1EE3c \u2014 khung quiz t\u00E0ng h\u00ECnh ~1-1.5s gi\u1EEFa hai c\u00E2u, KH\u00D4NG ng\u1EE7 theo gi\u1EDD c\u1ED1 \u0111\u1ECBnh",
               "optional": true,
               "condition": {
                 "kind": "enabled",
@@ -652,7 +652,7 @@
               "action": "answerQuiz",
               "selector": "#question",
               "timeoutMs": 15000,
-              "note": "đọc câu hỏi + 4 lựa chọn, tra đáp án rồi click theo TEXT — bỏ qua êm nếu lượt này không còn câu nào (vừa xong câu cuối)",
+              "note": "\u0111\u1ECDc c\u00E2u h\u1ECFi \u002B 4 l\u1EF1a ch\u1ECDn, tra \u0111\u00E1p \u00E1n r\u1ED3i click theo TEXT \u2014 b\u1ECF qua \u00EAm n\u1EBFu l\u01B0\u1EE3t n\u00E0y kh\u00F4ng c\u00F2n c\u00E2u n\u00E0o (v\u1EEBa xong c\u00E2u cu\u1ED1i)",
               "when": {
                 "kind": "visible",
                 "selector": "#quiz-container .option"
@@ -662,7 +662,7 @@
             {
               "action": "waitForCondition",
               "timeoutMs": 8000,
-              "note": "chờ đáp án đúng đổi xanh (~0.5-3.5s tuỳ tải server) = server đã ghi nhận câu trả lời",
+              "note": "ch\u1EDD \u0111\u00E1p \u00E1n \u0111\u00FAng \u0111\u1ED5i xanh (~0.5-3.5s tu\u1EF3 t\u1EA3i server) = server \u0111\u00E3 ghi nh\u1EADn c\u00E2u tr\u1EA3 l\u1EDDi",
               "optional": true,
               "condition": {
                 "kind": "visible",
@@ -676,7 +676,7 @@
             {
               "action": "waitForCondition",
               "timeoutMs": 8000,
-              "note": "chờ dấu xanh biến mất = trang đã sang câu kế (hoặc màn hoàn thành)",
+              "note": "ch\u1EDD d\u1EA5u xanh bi\u1EBFn m\u1EA5t = trang \u0111\u00E3 sang c\u00E2u k\u1EBF (ho\u1EB7c m\u00E0n ho\u00E0n th\u00E0nh)",
               "optional": true,
               "condition": {
                 "kind": "hidden",
@@ -691,7 +691,7 @@
           "until": {
             "kind": "textMatches",
             "selector": "#quiz-wrapper",
-            "text": "hoàn thành Vấn Đáp"
+            "text": "ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p"
           },
           "maxIterations": 6,
           "maxSeconds": 300
@@ -699,27 +699,27 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 10000,
-          "note": "lưới an toàn: hết vòng mà trang KHÔNG tự báo hoàn thành thì báo lỗi rõ ràng — không nhận vơ là xong như modal hub đã lừa được flow cũ",
+          "note": "l\u01B0\u1EDBi an to\u00E0n: h\u1EBFt v\u00F2ng m\u00E0 trang KH\u00D4NG t\u1EF1 b\u00E1o ho\u00E0n th\u00E0nh th\u00EC b\u00E1o l\u1ED7i r\u00F5 r\u00E0ng \u2014 kh\u00F4ng nh\u1EADn v\u01A1 l\u00E0 xong nh\u01B0 modal hub \u0111\u00E3 l\u1EEBa \u0111\u01B0\u1EE3c flow c\u0169",
           "condition": {
             "kind": "textMatches",
             "selector": "#quiz-wrapper",
-            "text": "hoàn thành Vấn Đáp"
+            "text": "ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p"
           }
         }
       ],
       "options": [],
       "fallbackCooldownSeconds": 14400,
+      "requiresVip": true,
       "order": 90,
-      "notes": "Trả lời 5 câu Vấn Đáp mỗi ngày lấy Tông Khố + Cống Hiến.",
-      "requiresVip": true
+      "notes": "Tr\u1EA3 l\u1EDDi 5 c\u00E2u V\u1EA5n \u0110\u00E1p m\u1ED7i ng\u00E0y l\u1EA5y T\u00F4ng Kh\u1ED1 \u002B C\u1ED1ng Hi\u1EBFn."
     },
     {
       "id": "diem-danh",
-      "name": "Điểm Danh",
+      "name": "\u0110i\u1EC3m Danh",
       "enabled": false,
       "kind": "customSteps",
       "matchTexts": [
-        "điểm danh",
+        "\u0111i\u1EC3m danh",
         "diem danh"
       ],
       "pagePath": "/nhiem-vu-hang-ngay",
@@ -733,13 +733,13 @@
           "action": "waitForSelector",
           "selector": ".nv-quest",
           "timeoutMs": 25000,
-          "note": "chờ hub render; .nv-quest tồn tại cả khi quest đã xong"
+          "note": "ch\u1EDD hub render; .nv-quest t\u1ED3n t\u1EA1i c\u1EA3 khi quest \u0111\u00E3 xong"
         },
         {
           "action": "stopIf",
-          "text": "đã điểm danh hôm nay",
+          "text": "\u0111\u00E3 \u0111i\u1EC3m danh h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "đã làm hôm nay → nút bị xoá khỏi DOM; dừng hẳn thay vì chờ timeout",
+          "note": "\u0111\u00E3 l\u00E0m h\u00F4m nay \u2192 n\u00FAt b\u1ECB xo\u00E1 kh\u1ECFi DOM; d\u1EEBng h\u1EB3n thay v\u00EC ch\u1EDD timeout",
           "condition": {
             "kind": "hidden",
             "selector": "#nv-checkin-btn"
@@ -753,7 +753,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 15000,
-          "note": "chờ nút thật sự biến mất = site đã ghi nhận. Không đạt thì báo lỗi rõ ràng chứ không nhận vơ là xong",
+          "note": "ch\u1EDD n\u00FAt th\u1EADt s\u1EF1 bi\u1EBFn m\u1EA5t = site \u0111\u00E3 ghi nh\u1EADn. Kh\u00F4ng \u0111\u1EA1t th\u00EC b\u00E1o l\u1ED7i r\u00F5 r\u00E0ng ch\u1EE9 kh\u00F4ng nh\u1EADn v\u01A1 l\u00E0 xong",
           "condition": {
             "kind": "hidden",
             "selector": "#nv-checkin-btn"
@@ -762,35 +762,35 @@
       ],
       "options": [],
       "fallbackCooldownSeconds": 14400,
+      "requiresVip": true,
       "order": 10,
-      "notes": "Điểm danh mỗi ngày nhận thưởng và giữ chuỗi ngày (streak).",
-      "requiresVip": true
+      "notes": "\u0110i\u1EC3m danh m\u1ED7i ng\u00E0y nh\u1EADn th\u01B0\u1EDFng v\u00E0 gi\u1EEF chu\u1ED7i ng\u00E0y (streak)."
     },
     {
       "id": "khoang-mach",
-      "name": "Khoáng Mạch",
+      "name": "Kho\u00E1ng M\u1EA1ch",
       "enabled": false,
       "kind": "labelMatch",
       "matchTexts": [
-        "thu hoạch",
+        "thu ho\u1EA1ch",
         "thu hoach",
-        "nhận thưởng",
+        "nh\u1EADn th\u01B0\u1EDFng",
         "nhan thuong"
       ],
       "steps": [],
       "options": [],
       "fallbackCooldownSeconds": 420,
+      "requiresVip": true,
       "order": 100,
-      "notes": "Thu hoạch tài nguyên Khoáng Mạch (nhãn chưa hiệu chỉnh nên tắt sẵn).",
-      "requiresVip": true
+      "notes": "Thu ho\u1EA1ch t\u00E0i nguy\u00EAn Kho\u00E1ng M\u1EA1ch (nh\u00E3n ch\u01B0a hi\u1EC7u ch\u1EC9nh n\u00EAn t\u1EAFt s\u1EB5n)."
     },
     {
       "id": "me-cung",
-      "name": "Mê Cung",
+      "name": "M\u00EA Cung",
       "enabled": false,
       "kind": "customSteps",
       "matchTexts": [
-        "mê cung",
+        "m\u00EA cung",
         "me cung"
       ],
       "pagePath": "/me-cung",
@@ -803,7 +803,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 8000,
-          "note": "còn phòng cũ từ lượt trước?",
+          "note": "c\u00F2n ph\u00F2ng c\u0169 t\u1EEB l\u01B0\u1EE3t tr\u01B0\u1EDBc?",
           "optional": true,
           "condition": {
             "kind": "visible",
@@ -814,27 +814,27 @@
           "action": "click",
           "selector": "#btn-disband-room",
           "timeoutMs": 6000,
-          "note": "giải tán phòng cũ",
+          "note": "gi\u1EA3i t\u00E1n ph\u00F2ng c\u0169",
           "optional": true
         },
         {
           "action": "click",
           "selector": "#confirm-overlay .confirm-btn-ok",
           "timeoutMs": 6000,
-          "note": "xác nhận giải tán phòng cũ",
+          "note": "x\u00E1c nh\u1EADn gi\u1EA3i t\u00E1n ph\u00F2ng c\u0169",
           "optional": true
         },
         {
           "action": "waitForSelector",
           "selector": "#lobby-overview",
           "timeoutMs": 25000,
-          "note": "chờ sảnh mê cung render — tới đây chắc chắn đang ở sảnh, không ở trong phòng"
+          "note": "ch\u1EDD s\u1EA3nh m\u00EA cung render \u2014 t\u1EDBi \u0111\u00E2y ch\u1EAFc ch\u1EAFn \u0111ang \u1EDF s\u1EA3nh, kh\u00F4ng \u1EDF trong ph\u00F2ng"
         },
         {
           "action": "stopIf",
-          "text": "đã đủ huyền tinh hôm nay",
+          "text": "\u0111\u00E3 \u0111\u1EE7 huy\u1EC1n tinh h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "\"Hôm nay đã nhận 385/385\" — hôm nay không cần đánh nữa; tuỳ chọn \"Không kiểm tra\" thay chuỗi này bằng sentinel không bao giờ khớp",
+          "note": "\u0022H\u00F4m nay \u0111\u00E3 nh\u1EADn 385/385\u0022 \u2014 h\u00F4m nay kh\u00F4ng c\u1EA7n \u0111\u00E1nh n\u1EEFa; tu\u1EF3 ch\u1ECDn \u0022Kh\u00F4ng ki\u1EC3m tra\u0022 thay chu\u1ED7i n\u00E0y b\u1EB1ng sentinel kh\u00F4ng bao gi\u1EDD kh\u1EDBp",
           "condition": {
             "kind": "textMatches",
             "selector": ".mc-ht-daily-text",
@@ -845,12 +845,12 @@
           "action": "click",
           "selector": "#lobby-overview .btn-create-room",
           "timeoutMs": 15000,
-          "note": "\"Lập Đội\" mở form tạo phòng"
+          "note": "\u0022L\u1EADp \u0110\u1ED9i\u0022 m\u1EDF form t\u1EA1o ph\u00F2ng"
         },
         {
           "action": "waitForCondition",
           "timeoutMs": 10000,
-          "note": "khối chọn độ khó đã hiện",
+          "note": "kh\u1ED1i ch\u1ECDn \u0111\u1ED9 kh\u00F3 \u0111\u00E3 hi\u1EC7n",
           "condition": {
             "kind": "visible",
             "selector": "#cr-mode-block"
@@ -860,19 +860,19 @@
           "action": "click",
           "selector": "#cr-mode-block .cr-mode-btn.{{mode}}",
           "timeoutMs": 5000,
-          "note": "chọn độ khó theo tuỳ chọn của người dùng",
+          "note": "ch\u1ECDn \u0111\u1ED9 kh\u00F3 theo tu\u1EF3 ch\u1ECDn c\u1EE7a ng\u01B0\u1EDDi d\u00F9ng",
           "optional": true
         },
         {
           "action": "click",
           "selector": "#confirm-overlay .confirm-btn-ok",
           "timeoutMs": 15000,
-          "note": "xác nhận \"Lập Đội\" — chỉ bấm nút ok theo selector, không quét nhãn"
+          "note": "x\u00E1c nh\u1EADn \u0022L\u1EADp \u0110\u1ED9i\u0022 \u2014 ch\u1EC9 b\u1EA5m n\u00FAt ok theo selector, kh\u00F4ng qu\u00E9t nh\u00E3n"
         },
         {
           "action": "waitForCondition",
           "timeoutMs": 20000,
-          "note": "đã vào phòng của mình",
+          "note": "\u0111\u00E3 v\u00E0o ph\u00F2ng c\u1EE7a m\u00ECnh",
           "condition": {
             "kind": "visible",
             "selector": "#btn-start"
@@ -880,16 +880,16 @@
         },
         {
           "action": "evaluateJavaScript",
-          "script": "() => { const thr = parseInt('{{kickHp}}', 10) || 0; window.__jvz = { roster: null, told: [] }; return '!Đã tạo phòng — chờ đủ 5 người sẵn sàng' + (thr > 0 ? ' (tự trục xuất HP dưới ' + thr.toLocaleString('vi-VN') + ')' : ''); }",
+          "script": "() =\u003E { const thr = parseInt(\u0027{{kickHp}}\u0027, 10) || 0; window.__jvz = { roster: null, told: [] }; return \u0027!\u0110\u00E3 t\u1EA1o ph\u00F2ng \u2014 ch\u1EDD \u0111\u1EE7 5 ng\u01B0\u1EDDi s\u1EB5n s\u00E0ng\u0027 \u002B (thr \u003E 0 ? \u0027 (t\u1EF1 tr\u1EE5c xu\u1EA5t HP d\u01B0\u1EDBi \u0027 \u002B thr.toLocaleString(\u0027vi-VN\u0027) \u002B \u0027)\u0027 : \u0027\u0027); }",
           "timeoutMs": 4000,
-          "note": "kể chuyện: phòng đã mở, đang tuyển người",
+          "note": "k\u1EC3 chuy\u1EC7n: ph\u00F2ng \u0111\u00E3 m\u1EDF, \u0111ang tuy\u1EC3n ng\u01B0\u1EDDi",
           "optional": true
         },
         {
           "action": "click",
           "selector": "#auto-next-stage-row .auto-ready-toggle",
           "timeoutMs": 4000,
-          "note": "bật \"Tự động chuyển ải\" nếu đang tắt — track thiếu class .on nghĩa là tắt",
+          "note": "b\u1EADt \u0022T\u1EF1 \u0111\u1ED9ng chuy\u1EC3n \u1EA3i\u0022 n\u1EBFu \u0111ang t\u1EAFt \u2014 track thi\u1EBFu class .on ngh\u0129a l\u00E0 t\u1EAFt",
           "optional": true,
           "when": {
             "kind": "hidden",
@@ -900,7 +900,7 @@
           "action": "click",
           "selector": "#auto-open-chest-row .auto-ready-toggle",
           "timeoutMs": 4000,
-          "note": "bật \"Tự động mở rương\" nếu đang tắt — thiếu toggle này rương cuối bị bỏ phí",
+          "note": "b\u1EADt \u0022T\u1EF1 \u0111\u1ED9ng m\u1EDF r\u01B0\u01A1ng\u0022 n\u1EBFu \u0111ang t\u1EAFt \u2014 thi\u1EBFu toggle n\u00E0y r\u01B0\u01A1ng cu\u1ED1i b\u1ECB b\u1ECF ph\u00ED",
           "optional": true,
           "when": {
             "kind": "hidden",
@@ -911,13 +911,13 @@
           "action": "click",
           "selector": "#room-invite-panel .btn-invite-share.btn-invite-lc",
           "timeoutMs": 6000,
-          "note": "mở \"Kêu gọi đồng đội\"",
+          "note": "m\u1EDF \u0022K\u00EAu g\u1ECDi \u0111\u1ED3ng \u0111\u1ED9i\u0022",
           "optional": true
         },
         {
           "action": "waitForCondition",
           "timeoutMs": 5000,
-          "note": "hộp kêu gọi đã mở",
+          "note": "h\u1ED9p k\u00EAu g\u1ECDi \u0111\u00E3 m\u1EDF",
           "optional": true,
           "condition": {
             "kind": "visible",
@@ -928,31 +928,31 @@
           "action": "click",
           "selector": "#mc-share-send",
           "timeoutMs": 5000,
-          "note": "gửi lời mời lên Phòng Chat Cộng Đồng + Sảnh Mê Cung",
+          "note": "g\u1EEDi l\u1EDDi m\u1EDDi l\u00EAn Ph\u00F2ng Chat C\u1ED9ng \u0110\u1ED3ng \u002B S\u1EA3nh M\u00EA Cung",
           "optional": true
         },
         {
           "action": "repeat",
           "timeoutMs": 15000,
-          "note": "mỗi vòng là một lượt chạy 5 ải; dừng khi \"385/385\" hoặc hết trần 6 vòng / 35 phút. Sau mỗi lượt (thắng hay bại) site tự reload về phòng, cả đội vẫn ở nguyên đó (bản ghi 20:10).",
+          "note": "m\u1ED7i v\u00F2ng l\u00E0 m\u1ED9t l\u01B0\u1EE3t ch\u1EA1y 5 \u1EA3i; d\u1EEBng khi \u0022385/385\u0022 ho\u1EB7c h\u1EBFt tr\u1EA7n 6 v\u00F2ng / 35 ph\u00FAt. Sau m\u1ED7i l\u01B0\u1EE3t (th\u1EAFng hay b\u1EA1i) site t\u1EF1 reload v\u1EC1 ph\u00F2ng, c\u1EA3 \u0111\u1ED9i v\u1EABn \u1EDF nguy\u00EAn \u0111\u00F3 (b\u1EA3n ghi 20:10).",
           "steps": [
             {
               "action": "repeat",
               "timeoutMs": 15000,
-              "note": "chờ phòng đủ 5 sẵn sàng, mỗi nhịp ~20s có kèm lượt xét trục xuất",
+              "note": "ch\u1EDD ph\u00F2ng \u0111\u1EE7 5 s\u1EB5n s\u00E0ng, m\u1ED7i nh\u1ECBp ~20s c\u00F3 k\u00E8m l\u01B0\u1EE3t x\u00E9t tr\u1EE5c xu\u1EA5t",
               "steps": [
                 {
                   "action": "evaluateJavaScript",
-                  "script": "() => { const S = window.__jvz = window.__jvz || { roster: null, told: [] }; for (const b of document.querySelectorAll('.btn-kick.jarvis-kick')) b.classList.remove('jarvis-kick'); const thr = parseInt('{{kickHp}}', 10) || 0; const fmt = v => v.toLocaleString('vi-VN'); const out = []; const seen = []; const cur = []; let n = 0; for (const btn of document.querySelectorAll('.player-card .btn-kick')) { const row = btn.closest('.player-card'); const nmEl = row && row.querySelector('.player-name'); const nm = (nmEl ? nmEl.textContent : '?').trim().replace(/^\\d+\\s*/, ''); const hp = row && row.querySelector('.pp-hp'); const digits = hp ? (hp.textContent || '').replace(/[^0-9]/g, '') : ''; const v = digits ? parseInt(digits, 10) : -1; cur.push(nm + '\\t' + v); const kick = thr > 0 && v >= 0 && v < thr; if (kick) { btn.classList.add('jarvis-kick'); n++; if (!S.told.includes(nm)) { S.told.push(nm); out.push('!Trục xuất «' + nm + '» — HP ' + fmt(v) + ' dưới ngưỡng ' + fmt(thr)); } } seen.push(v + (kick ? '!' : '')); } const names = cur.map(x => x.split('\\t')[0]); if (S.roster) { const prev = S.roster.map(x => x.split('\\t')[0]); for (const c of cur) { const pr = c.split('\\t'); if (!prev.includes(pr[0])) out.push('!«' + pr[0] + '» vào phòng — HP ' + fmt(+pr[1])); } for (const nm of prev) if (!names.includes(nm)) out.push('!«' + nm + '» rời phòng'); } S.roster = cur; S.told = S.told.filter(nm => names.includes(nm)); const ready = document.querySelector('#lobby-ready'); const bs = document.querySelector('#btn-start'); const r = bs ? bs.getBoundingClientRect() : null; out.push('kick-scan thr=' + thr + ' hp=[' + seen.join(',') + '] marked=' + n + ' ready=' + (ready ? ready.textContent.trim() : '?') + ' btnStart=' + (bs ? (bs.className || '(bare)') : 'MISSING') + ' rect=' + (r ? Math.round(r.width) + 'x' + Math.round(r.height) : '?') + ' anim=' + (bs ? getComputedStyle(bs).animationName : '?')); return out.join('\\n'); }",
+                  "script": "() =\u003E { const S = window.__jvz = window.__jvz || { roster: null, told: [] }; S.since = S.since || {}; for (const b of document.querySelectorAll(\u0027.btn-kick.jarvis-kick\u0027)) b.classList.remove(\u0027jarvis-kick\u0027); const thr = parseInt(\u0027{{kickHp}}\u0027, 10) || 0; const idle = parseInt(\u0027{{kickIdle}}\u0027, 10) || 0; const now = Date.now(); const fmt = v =\u003E v.toLocaleString(\u0027vi-VN\u0027); const out = []; const seen = []; const cur = []; let n = 0; for (const btn of document.querySelectorAll(\u0027.player-card .btn-kick\u0027)) { const row = btn.closest(\u0027.player-card\u0027); const nmEl = row \u0026\u0026 row.querySelector(\u0027.player-name\u0027); const nm = (nmEl ? nmEl.textContent : \u0027?\u0027).trim().replace(/^\\d\u002B\\s*/, \u0027\u0027); const hp = row \u0026\u0026 row.querySelector(\u0027.pp-hp\u0027); const digits = hp ? (hp.textContent || \u0027\u0027).replace(/[^0-9]/g, \u0027\u0027) : \u0027\u0027; const v = digits ? parseInt(digits, 10) : -1; cur.push(nm \u002B \u0027\\t\u0027 \u002B v); if (!(nm in S.since)) S.since[nm] = now; const isReady = !!(row \u0026\u0026 row.querySelector(\u0027.ready-badge.is-ready\u0027)); const idleFor = (now - S.since[nm]) / 1000; const kickHp = thr \u003E 0 \u0026\u0026 v \u003E= 0 \u0026\u0026 v \u003C thr; const kickIdle = idle \u003E 0 \u0026\u0026 !isReady \u0026\u0026 idleFor \u003E= idle; if (kickHp || kickIdle) { btn.classList.add(\u0027jarvis-kick\u0027); n\u002B\u002B; if (!S.told.includes(nm)) { S.told.push(nm); out.push(kickHp ? (\u0027!Tr\u1EE5c xu\u1EA5t \u00AB\u0027 \u002B nm \u002B \u0027\u00BB \u2014 HP \u0027 \u002B fmt(v) \u002B \u0027 d\u01B0\u1EDBi ng\u01B0\u1EE1ng \u0027 \u002B fmt(thr)) : (\u0027!Tr\u1EE5c xu\u1EA5t \u00AB\u0027 \u002B nm \u002B \u0027\u00BB \u2014 kh\u00F4ng s\u1EB5n s\u00E0ng sau \u0027 \u002B Math.round(idleFor) \u002B \u0027s (ng\u01B0\u1EE1ng \u0027 \u002B idle \u002B \u0027s)\u0027)); } } seen.push(v \u002B (kickHp ? \u0027!\u0027 : (kickIdle ? \u0027~\u0027 : \u0027\u0027))); } const names = cur.map(x =\u003E x.split(\u0027\\t\u0027)[0]); if (S.roster) { const prev = S.roster.map(x =\u003E x.split(\u0027\\t\u0027)[0]); for (const c of cur) { const pr = c.split(\u0027\\t\u0027); if (!prev.includes(pr[0])) out.push(\u0027!\u00AB\u0027 \u002B pr[0] \u002B \u0027\u00BB v\u00E0o ph\u00F2ng \u2014 HP \u0027 \u002B fmt(\u002Bpr[1])); } for (const nm of prev) if (!names.includes(nm)) out.push(\u0027!\u00AB\u0027 \u002B nm \u002B \u0027\u00BB r\u1EDDi ph\u00F2ng\u0027); } S.roster = cur; S.told = S.told.filter(nm =\u003E names.includes(nm)); for (const k of Object.keys(S.since)) if (!names.includes(k)) delete S.since[k]; const ready = document.querySelector(\u0027#lobby-ready\u0027); const bs = document.querySelector(\u0027#btn-start\u0027); const r = bs ? bs.getBoundingClientRect() : null; out.push(\u0027kick-scan thr=\u0027 \u002B thr \u002B \u0027 idle=\u0027 \u002B idle \u002B \u0027 hp=[\u0027 \u002B seen.join(\u0027,\u0027) \u002B \u0027] marked=\u0027 \u002B n \u002B \u0027 ready=\u0027 \u002B (ready ? ready.textContent.trim() : \u0027?\u0027) \u002B \u0027 btnStart=\u0027 \u002B (bs ? (bs.className || \u0027(bare)\u0027) : \u0027MISSING\u0027) \u002B \u0027 rect=\u0027 \u002B (r ? Math.round(r.width) \u002B \u0027x\u0027 \u002B Math.round(r.height) : \u0027?\u0027) \u002B \u0027 anim=\u0027 \u002B (bs ? getComputedStyle(bs).animationName : \u0027?\u0027)); return out.join(\u0027\\n\u0027); }",
                   "timeoutMs": 5000,
-                  "note": "đánh dấu nút Trục Xuất của thành viên có HP dưới ngưỡng {{kickHp}}",
+                  "note": "\u0111\u00E1nh d\u1EA5u n\u00FAt Tr\u1EE5c Xu\u1EA5t: HP d\u01B0\u1EDBi {{kickHp}}, ho\u1EB7c ch\u01B0a s\u1EB5n s\u00E0ng sau {{kickIdle}}s",
                   "optional": true
                 },
                 {
                   "action": "click",
                   "selector": ".btn-kick.jarvis-kick",
                   "timeoutMs": 2500,
-                  "note": "trục xuất một thành viên dưới ngưỡng HP — mỗi nhịp một người",
+                  "note": "tr\u1EE5c xu\u1EA5t m\u1ED9t th\u00E0nh vi\u00EAn d\u01B0\u1EDBi ng\u01B0\u1EE1ng HP \u2014 m\u1ED7i nh\u1ECBp m\u1ED9t ng\u01B0\u1EDDi",
                   "optional": true,
                   "when": {
                     "kind": "visible",
@@ -963,7 +963,7 @@
                   "action": "click",
                   "selector": "#confirm-overlay .confirm-btn-ok",
                   "timeoutMs": 2500,
-                  "note": "xác nhận trục xuất, nếu site hỏi",
+                  "note": "x\u00E1c nh\u1EADn tr\u1EE5c xu\u1EA5t, n\u1EBFu site h\u1ECFi",
                   "optional": true,
                   "when": {
                     "kind": "visible",
@@ -973,7 +973,7 @@
                 {
                   "action": "waitForCondition",
                   "timeoutMs": 20000,
-                  "note": "nhịp chờ ~20s — thoát sớm ngay khi #lobby-ready đạt 5",
+                  "note": "nh\u1ECBp ch\u1EDD ~20s \u2014 tho\u00E1t s\u1EDBm ngay khi #lobby-ready \u0111\u1EA1t 5",
                   "optional": true,
                   "condition": {
                     "kind": "textMatches",
@@ -992,16 +992,16 @@
             },
             {
               "action": "evaluateJavaScript",
-              "script": "() => { const S = window.__jvz = window.__jvz || { roster: null, told: [] }; for (const b of document.querySelectorAll('.btn-kick.jarvis-kick')) b.classList.remove('jarvis-kick'); const thr = parseInt('{{kickHp}}', 10) || 0; const fmt = v => v.toLocaleString('vi-VN'); const out = []; const seen = []; const cur = []; let n = 0; for (const btn of document.querySelectorAll('.player-card .btn-kick')) { const row = btn.closest('.player-card'); const nmEl = row && row.querySelector('.player-name'); const nm = (nmEl ? nmEl.textContent : '?').trim().replace(/^\\d+\\s*/, ''); const hp = row && row.querySelector('.pp-hp'); const digits = hp ? (hp.textContent || '').replace(/[^0-9]/g, '') : ''; const v = digits ? parseInt(digits, 10) : -1; cur.push(nm + '\\t' + v); const kick = thr > 0 && v >= 0 && v < thr; if (kick) { btn.classList.add('jarvis-kick'); n++; if (!S.told.includes(nm)) { S.told.push(nm); out.push('!Trục xuất «' + nm + '» — HP ' + fmt(v) + ' dưới ngưỡng ' + fmt(thr)); } } seen.push(v + (kick ? '!' : '')); } const names = cur.map(x => x.split('\\t')[0]); if (S.roster) { const prev = S.roster.map(x => x.split('\\t')[0]); for (const c of cur) { const pr = c.split('\\t'); if (!prev.includes(pr[0])) out.push('!«' + pr[0] + '» vào phòng — HP ' + fmt(+pr[1])); } for (const nm of prev) if (!names.includes(nm)) out.push('!«' + nm + '» rời phòng'); } S.roster = cur; S.told = S.told.filter(nm => names.includes(nm)); const ready = document.querySelector('#lobby-ready'); const bs = document.querySelector('#btn-start'); const r = bs ? bs.getBoundingClientRect() : null; out.push('kick-scan thr=' + thr + ' hp=[' + seen.join(',') + '] marked=' + n + ' ready=' + (ready ? ready.textContent.trim() : '?') + ' btnStart=' + (bs ? (bs.className || '(bare)') : 'MISSING') + ' rect=' + (r ? Math.round(r.width) + 'x' + Math.round(r.height) : '?') + ' anim=' + (bs ? getComputedStyle(bs).animationName : '?')); return out.join('\\n'); }",
+              "script": "() =\u003E { const S = window.__jvz = window.__jvz || { roster: null, told: [] }; S.since = S.since || {}; for (const b of document.querySelectorAll(\u0027.btn-kick.jarvis-kick\u0027)) b.classList.remove(\u0027jarvis-kick\u0027); const thr = parseInt(\u0027{{kickHp}}\u0027, 10) || 0; const idle = parseInt(\u0027{{kickIdle}}\u0027, 10) || 0; const now = Date.now(); const fmt = v =\u003E v.toLocaleString(\u0027vi-VN\u0027); const out = []; const seen = []; const cur = []; let n = 0; for (const btn of document.querySelectorAll(\u0027.player-card .btn-kick\u0027)) { const row = btn.closest(\u0027.player-card\u0027); const nmEl = row \u0026\u0026 row.querySelector(\u0027.player-name\u0027); const nm = (nmEl ? nmEl.textContent : \u0027?\u0027).trim().replace(/^\\d\u002B\\s*/, \u0027\u0027); const hp = row \u0026\u0026 row.querySelector(\u0027.pp-hp\u0027); const digits = hp ? (hp.textContent || \u0027\u0027).replace(/[^0-9]/g, \u0027\u0027) : \u0027\u0027; const v = digits ? parseInt(digits, 10) : -1; cur.push(nm \u002B \u0027\\t\u0027 \u002B v); if (!(nm in S.since)) S.since[nm] = now; const isReady = !!(row \u0026\u0026 row.querySelector(\u0027.ready-badge.is-ready\u0027)); const idleFor = (now - S.since[nm]) / 1000; const kickHp = thr \u003E 0 \u0026\u0026 v \u003E= 0 \u0026\u0026 v \u003C thr; const kickIdle = idle \u003E 0 \u0026\u0026 !isReady \u0026\u0026 idleFor \u003E= idle; if (kickHp || kickIdle) { btn.classList.add(\u0027jarvis-kick\u0027); n\u002B\u002B; if (!S.told.includes(nm)) { S.told.push(nm); out.push(kickHp ? (\u0027!Tr\u1EE5c xu\u1EA5t \u00AB\u0027 \u002B nm \u002B \u0027\u00BB \u2014 HP \u0027 \u002B fmt(v) \u002B \u0027 d\u01B0\u1EDBi ng\u01B0\u1EE1ng \u0027 \u002B fmt(thr)) : (\u0027!Tr\u1EE5c xu\u1EA5t \u00AB\u0027 \u002B nm \u002B \u0027\u00BB \u2014 kh\u00F4ng s\u1EB5n s\u00E0ng sau \u0027 \u002B Math.round(idleFor) \u002B \u0027s (ng\u01B0\u1EE1ng \u0027 \u002B idle \u002B \u0027s)\u0027)); } } seen.push(v \u002B (kickHp ? \u0027!\u0027 : (kickIdle ? \u0027~\u0027 : \u0027\u0027))); } const names = cur.map(x =\u003E x.split(\u0027\\t\u0027)[0]); if (S.roster) { const prev = S.roster.map(x =\u003E x.split(\u0027\\t\u0027)[0]); for (const c of cur) { const pr = c.split(\u0027\\t\u0027); if (!prev.includes(pr[0])) out.push(\u0027!\u00AB\u0027 \u002B pr[0] \u002B \u0027\u00BB v\u00E0o ph\u00F2ng \u2014 HP \u0027 \u002B fmt(\u002Bpr[1])); } for (const nm of prev) if (!names.includes(nm)) out.push(\u0027!\u00AB\u0027 \u002B nm \u002B \u0027\u00BB r\u1EDDi ph\u00F2ng\u0027); } S.roster = cur; S.told = S.told.filter(nm =\u003E names.includes(nm)); for (const k of Object.keys(S.since)) if (!names.includes(k)) delete S.since[k]; const ready = document.querySelector(\u0027#lobby-ready\u0027); const bs = document.querySelector(\u0027#btn-start\u0027); const r = bs ? bs.getBoundingClientRect() : null; out.push(\u0027kick-scan thr=\u0027 \u002B thr \u002B \u0027 idle=\u0027 \u002B idle \u002B \u0027 hp=[\u0027 \u002B seen.join(\u0027,\u0027) \u002B \u0027] marked=\u0027 \u002B n \u002B \u0027 ready=\u0027 \u002B (ready ? ready.textContent.trim() : \u0027?\u0027) \u002B \u0027 btnStart=\u0027 \u002B (bs ? (bs.className || \u0027(bare)\u0027) : \u0027MISSING\u0027) \u002B \u0027 rect=\u0027 \u002B (r ? Math.round(r.width) \u002B \u0027x\u0027 \u002B Math.round(r.height) : \u0027?\u0027) \u002B \u0027 anim=\u0027 \u002B (bs ? getComputedStyle(bs).animationName : \u0027?\u0027)); return out.join(\u0027\\n\u0027); }",
               "timeoutMs": 5000,
-              "note": "lượt xét trục xuất chốt hạ — phòng vừa đủ 5 vẫn phải qua được vòng này",
+              "note": "l\u01B0\u1EE3t x\u00E9t tr\u1EE5c xu\u1EA5t ch\u1ED1t h\u1EA1 \u2014 ph\u00F2ng v\u1EEBa \u0111\u1EE7 5 v\u1EABn ph\u1EA3i qua \u0111\u01B0\u1EE3c v\u00F2ng n\u00E0y",
               "optional": true
             },
             {
               "action": "click",
               "selector": ".btn-kick.jarvis-kick",
               "timeoutMs": 2500,
-              "note": "trục xuất nốt người dưới ngưỡng lọt vào phút chót",
+              "note": "tr\u1EE5c xu\u1EA5t n\u1ED1t ng\u01B0\u1EDDi d\u01B0\u1EDBi ng\u01B0\u1EE1ng l\u1ECDt v\u00E0o ph\u00FAt ch\u00F3t",
               "optional": true,
               "when": {
                 "kind": "visible",
@@ -1012,7 +1012,7 @@
               "action": "click",
               "selector": "#confirm-overlay .confirm-btn-ok",
               "timeoutMs": 2500,
-              "note": "xác nhận trục xuất, nếu site hỏi",
+              "note": "x\u00E1c nh\u1EADn tr\u1EE5c xu\u1EA5t, n\u1EBFu site h\u1ECFi",
               "optional": true,
               "when": {
                 "kind": "visible",
@@ -1022,12 +1022,12 @@
             {
               "action": "repeat",
               "timeoutMs": 15000,
-              "note": "bấm BẮT ĐẦU tối đa 4 nhịp — phòng hay nhấp nháy sẵn sàng, một nhịp xui không được phép tốn cả vòng chờ",
+              "note": "b\u1EA5m B\u1EAET \u0110\u1EA6U t\u1ED1i \u0111a 4 nh\u1ECBp \u2014 ph\u00F2ng hay nh\u1EA5p nh\u00E1y s\u1EB5n s\u00E0ng, m\u1ED9t nh\u1ECBp xui kh\u00F4ng \u0111\u01B0\u1EE3c ph\u00E9p t\u1ED1n c\u1EA3 v\u00F2ng ch\u1EDD",
               "steps": [
                 {
                   "action": "waitForCondition",
                   "timeoutMs": 15000,
-                  "note": "đợi số sẵn sàng về lại 5 trước mỗi nhịp bấm",
+                  "note": "\u0111\u1EE3i s\u1ED1 s\u1EB5n s\u00E0ng v\u1EC1 l\u1EA1i 5 tr\u01B0\u1EDBc m\u1ED7i nh\u1ECBp b\u1EA5m",
                   "optional": true,
                   "condition": {
                     "kind": "textMatches",
@@ -1039,7 +1039,7 @@
                   "action": "click",
                   "selector": "#btn-start:not(.blocked-start)",
                   "timeoutMs": 6000,
-                  "note": "BẮT ĐẦU — chỉ khi đủ 5 sẵn sàng VÀ nút không mang blocked-start; forceClick vì nút có animation, không bao giờ đứng yên đủ lâu cho Playwright",
+                  "note": "B\u1EAET \u0110\u1EA6U \u2014 ch\u1EC9 khi \u0111\u1EE7 5 s\u1EB5n s\u00E0ng V\u00C0 n\u00FAt kh\u00F4ng mang blocked-start; forceClick v\u00EC n\u00FAt c\u00F3 animation, kh\u00F4ng bao gi\u1EDD \u0111\u1EE9ng y\u00EAn \u0111\u1EE7 l\u00E2u cho Playwright",
                   "optional": true,
                   "when": {
                     "kind": "textMatches",
@@ -1052,7 +1052,7 @@
                   "action": "click",
                   "selector": "#confirm-overlay .confirm-btn-ok",
                   "timeoutMs": 4000,
-                  "note": "xác nhận vào ải",
+                  "note": "x\u00E1c nh\u1EADn v\u00E0o \u1EA3i",
                   "optional": true,
                   "when": {
                     "kind": "visible",
@@ -1062,7 +1062,7 @@
                 {
                   "action": "waitForCondition",
                   "timeoutMs": 8000,
-                  "note": "đã rời phòng vào ải? — until của vòng retry đọc lại đúng điều kiện này giữa hai nhịp",
+                  "note": "\u0111\u00E3 r\u1EDDi ph\u00F2ng v\u00E0o \u1EA3i? \u2014 until c\u1EE7a v\u00F2ng retry \u0111\u1ECDc l\u1EA1i \u0111\u00FAng \u0111i\u1EC1u ki\u1EC7n n\u00E0y gi\u1EEFa hai nh\u1ECBp",
                   "optional": true,
                   "condition": {
                     "kind": "hidden",
@@ -1079,16 +1079,16 @@
             },
             {
               "action": "evaluateJavaScript",
-              "script": "() => { const S = window.__jvz = window.__jvz || {}; const bs = document.querySelector('#btn-start'); const vis = bs && bs.getBoundingClientRect().width > 0; if (!vis && !S.battle) { S.battle = true; return '!Đủ đội — BẮT ĐẦU! Cả đội đang đánh ải'; } return ''; }",
+              "script": "() =\u003E { const S = window.__jvz = window.__jvz || {}; const bs = document.querySelector(\u0027#btn-start\u0027); const vis = bs \u0026\u0026 bs.getBoundingClientRect().width \u003E 0; if (!vis \u0026\u0026 !S.battle) { S.battle = true; return \u0027!\u0110\u1EE7 \u0111\u1ED9i \u2014 B\u1EAET \u0110\u1EA6U! C\u1EA3 \u0111\u1ED9i \u0111ang \u0111\u00E1nh \u1EA3i\u0027; } return \u0027\u0027; }",
               "timeoutMs": 4000,
-              "note": "kể chuyện: trận đã mở màn (và đặt cờ cho bản tin cuối lượt)",
+              "note": "k\u1EC3 chuy\u1EC7n: tr\u1EADn \u0111\u00E3 m\u1EDF m\u00E0n (v\u00E0 \u0111\u1EB7t c\u1EDD cho b\u1EA3n tin cu\u1ED1i l\u01B0\u1EE3t)",
               "optional": true
             },
             {
               "action": "click",
               "selector": "#auto-attack-track",
               "timeoutMs": 5000,
-              "note": "bật \"TỰ ĐỘNG\" đánh trong trận — reset mỗi trận nên trận nào cũng phải bật lại",
+              "note": "b\u1EADt \u0022T\u1EF0 \u0110\u1ED8NG\u0022 \u0111\u00E1nh trong tr\u1EADn \u2014 reset m\u1ED7i tr\u1EADn n\u00EAn tr\u1EADn n\u00E0o c\u0169ng ph\u1EA3i b\u1EADt l\u1EA1i",
               "optional": true,
               "when": {
                 "kind": "hidden",
@@ -1098,19 +1098,19 @@
             {
               "action": "repeat",
               "timeoutMs": 15000,
-              "note": "lái một lượt đánh: bấm hộ \"Đến ải kế tiếp\" khi cần, chờ về phòng",
+              "note": "l\u00E1i m\u1ED9t l\u01B0\u1EE3t \u0111\u00E1nh: b\u1EA5m h\u1ED9 \u0022\u0110\u1EBFn \u1EA3i k\u1EBF ti\u1EBFp\u0022 khi c\u1EA7n, ch\u1EDD v\u1EC1 ph\u00F2ng",
               "steps": [
                 {
                   "action": "click",
                   "selector": "#btn-next-stage",
                   "timeoutMs": 6000,
-                  "note": "qua ải kế tiếp — chỉ tồn tại khi hộp thưởng ải đang chờ (tức \"tự qua ải\" đang tắt)",
+                  "note": "qua \u1EA3i k\u1EBF ti\u1EBFp \u2014 ch\u1EC9 t\u1ED3n t\u1EA1i khi h\u1ED9p th\u01B0\u1EDFng \u1EA3i \u0111ang ch\u1EDD (t\u1EE9c \u0022t\u1EF1 qua \u1EA3i\u0022 \u0111ang t\u1EAFt)",
                   "optional": true
                 },
                 {
                   "action": "waitMilliseconds",
                   "timeoutMs": 4000,
-                  "note": "nhịp thăm dò giữa hai lần nhìn"
+                  "note": "nh\u1ECBp th\u0103m d\u00F2 gi\u1EEFa hai l\u1EA7n nh\u00ECn"
                 }
               ],
               "until": {
@@ -1122,9 +1122,9 @@
             },
             {
               "action": "evaluateJavaScript",
-              "script": "() => { const S = window.__jvz = window.__jvz || {}; if (!S.battle) return ''; S.battle = false; const t = document.querySelector('.mc-ht-daily-text'); const m = t ? (t.textContent || '').match(/(\\d+)\\s*\\/\\s*(\\d+)/) : null; if (!m) return '!Về phòng sau lượt đánh'; const now = +m[1]; const prev = S.ht; S.ht = now; const gain = prev != null ? now - prev : null; let tail = ''; if (gain != null) tail = gain > 0 ? ' (+' + gain + ')' : ' (không được cộng — đội thua ải?)'; return '!Xong lượt đánh — huyền tinh hôm nay: ' + now + '/' + m[2] + tail; }",
+              "script": "() =\u003E { const S = window.__jvz = window.__jvz || {}; if (!S.battle) return \u0027\u0027; S.battle = false; const t = document.querySelector(\u0027.mc-ht-daily-text\u0027); const m = t ? (t.textContent || \u0027\u0027).match(/(\\d\u002B)\\s*\\/\\s*(\\d\u002B)/) : null; if (!m) return \u0027!V\u1EC1 ph\u00F2ng sau l\u01B0\u1EE3t \u0111\u00E1nh\u0027; const now = \u002Bm[1]; const prev = S.ht; S.ht = now; const gain = prev != null ? now - prev : null; let tail = \u0027\u0027; if (gain != null) tail = gain \u003E 0 ? \u0027 (\u002B\u0027 \u002B gain \u002B \u0027)\u0027 : \u0027 (kh\u00F4ng \u0111\u01B0\u1EE3c c\u1ED9ng \u2014 \u0111\u1ED9i thua \u1EA3i?)\u0027; return \u0027!Xong l\u01B0\u1EE3t \u0111\u00E1nh \u2014 huy\u1EC1n tinh h\u00F4m nay: \u0027 \u002B now \u002B \u0027/\u0027 \u002B m[2] \u002B tail; }",
               "timeoutMs": 4000,
-              "note": "bản tin cuối lượt: huyền tinh bao nhiêu, được cộng bao nhiêu",
+              "note": "b\u1EA3n tin cu\u1ED1i l\u01B0\u1EE3t: huy\u1EC1n tinh bao nhi\u00EAu, \u0111\u01B0\u1EE3c c\u1ED9ng bao nhi\u00EAu",
               "optional": true
             }
           ],
@@ -1140,33 +1140,33 @@
           "action": "click",
           "selector": "#btn-disband-room",
           "timeoutMs": 8000,
-          "note": "giải tán phòng dù đủ huyền tinh hay hết giờ chờ — không để phòng treo lại",
+          "note": "gi\u1EA3i t\u00E1n ph\u00F2ng d\u00F9 \u0111\u1EE7 huy\u1EC1n tinh hay h\u1EBFt gi\u1EDD ch\u1EDD \u2014 kh\u00F4ng \u0111\u1EC3 ph\u00F2ng treo l\u1EA1i",
           "optional": true
         },
         {
           "action": "click",
           "selector": "#confirm-overlay .confirm-btn-ok",
           "timeoutMs": 8000,
-          "note": "xác nhận giải tán",
+          "note": "x\u00E1c nh\u1EADn gi\u1EA3i t\u00E1n",
           "optional": true
         }
       ],
       "options": [
         {
           "key": "mode",
-          "label": "Độ khó phòng",
+          "label": "\u0110\u1ED9 kh\u00F3 ph\u00F2ng",
           "choices": [
             {
               "value": "is-normal",
-              "label": "Thường"
+              "label": "Th\u01B0\u1EDDng"
             },
             {
               "value": "is-hard",
-              "label": "Khó"
+              "label": "Kh\u00F3"
             },
             {
               "value": "is-nightmare",
-              "label": "Ác Mộng"
+              "label": "\u00C1c M\u1ED9ng"
             }
           ],
           "allowCustom": false,
@@ -1174,65 +1174,93 @@
         },
         {
           "key": "kickHp",
-          "label": "Trục xuất theo HP",
+          "label": "Tr\u1EE5c xu\u1EA5t theo HP",
           "choices": [
             {
               "value": "0",
-              "label": "Không trục xuất"
+              "label": "Kh\u00F4ng tr\u1EE5c xu\u1EA5t"
             },
             {
               "value": "200000",
-              "label": "HP dưới 200.000"
+              "label": "HP d\u01B0\u1EDBi 200.000"
             },
             {
               "value": "300000",
-              "label": "HP dưới 300.000"
+              "label": "HP d\u01B0\u1EDBi 300.000"
             },
             {
               "value": "400000",
-              "label": "HP dưới 400.000"
+              "label": "HP d\u01B0\u1EDBi 400.000"
             },
             {
               "value": "500000",
-              "label": "HP dưới 500.000"
+              "label": "HP d\u01B0\u1EDBi 500.000"
             },
             {
               "value": "600000",
-              "label": "HP dưới 600.000"
+              "label": "HP d\u01B0\u1EDBi 600.000"
             }
           ],
-          "allowCustom": false,
+          "allowCustom": true,
           "selectedValue": "0"
         },
         {
           "key": "capCheck",
-          "label": "Kiểm tra huyền tinh",
+          "label": "Ki\u1EC3m tra huy\u1EC1n tinh",
           "choices": [
             {
               "value": "385/385",
-              "label": "Dừng khi đủ 385/385"
+              "label": "D\u1EEBng khi \u0111\u1EE7 385/385"
             },
             {
-              "value": "«không kiểm tra»",
-              "label": "Không kiểm tra — lượt nào cũng đánh hết trần"
+              "value": "\u00ABkh\u00F4ng ki\u1EC3m tra\u00BB",
+              "label": "Kh\u00F4ng ki\u1EC3m tra \u2014 l\u01B0\u1EE3t n\u00E0o c\u0169ng \u0111\u00E1nh h\u1EBFt tr\u1EA7n"
             }
           ],
           "allowCustom": false,
           "selectedValue": "385/385"
+        },
+        {
+          "key": "kickIdle",
+          "label": "Tr\u1EE5c xu\u1EA5t n\u1EBFu kh\u00F4ng s\u1EB5n s\u00E0ng sau (gi\u00E2y)",
+          "choices": [
+            {
+              "value": "0",
+              "label": "Kh\u00F4ng tr\u1EE5c xu\u1EA5t"
+            },
+            {
+              "value": "30",
+              "label": "Sau 30 gi\u00E2y"
+            },
+            {
+              "value": "60",
+              "label": "Sau 60 gi\u00E2y"
+            },
+            {
+              "value": "90",
+              "label": "Sau 90 gi\u00E2y"
+            },
+            {
+              "value": "120",
+              "label": "Sau 120 gi\u00E2y"
+            }
+          ],
+          "allowCustom": true,
+          "selectedValue": "0"
         }
       ],
       "fallbackCooldownSeconds": 3600,
+      "requiresVip": true,
       "order": 110,
-      "notes": "Đánh Mê Cung theo đội 5 người thật lấy huyền tinh mỗi ngày.",
-      "requiresVip": true
+      "notes": "\u0110\u00E1nh M\u00EA Cung theo \u0111\u1ED9i 5 ng\u01B0\u1EDDi th\u1EADt l\u1EA5y huy\u1EC1n tinh m\u1ED7i ng\u00E0y."
     },
     {
       "id": "luyen-dan-duong",
-      "name": "Luyện Đan Đường",
+      "name": "Luy\u1EC7n \u0110an \u0110\u01B0\u1EDDng",
       "enabled": false,
       "kind": "customSteps",
       "matchTexts": [
-        "luyện đan",
+        "luy\u1EC7n \u0111an",
         "luyen dan"
       ],
       "pagePath": "/luyen-dan-duong",
@@ -1246,12 +1274,12 @@
           "action": "waitForSelector",
           "selector": "#ld-app",
           "timeoutMs": 25000,
-          "note": "chờ trang lò render"
+          "note": "ch\u1EDD trang l\u00F2 render"
         },
         {
           "action": "waitForCondition",
           "timeoutMs": 25000,
-          "note": "chờ panel lò VẼ XONG theo thước đo opacity — shell chứa sẵn 3 nút dạng xương opacity-0, nên phải chờ nút THẬT có pixel; không hiện nổi trong 25s là trang hỏng và phải báo lỗi rõ ràng",
+          "note": "ch\u1EDD panel l\u00F2 V\u1EBC XONG theo th\u01B0\u1EDBc \u0111o opacity \u2014 shell ch\u1EE9a s\u1EB5n 3 n\u00FAt d\u1EA1ng x\u01B0\u01A1ng opacity-0, n\u00EAn ph\u1EA3i ch\u1EDD n\u00FAt TH\u1EACT c\u00F3 pixel; kh\u00F4ng hi\u1EC7n n\u1ED5i trong 25s l\u00E0 trang h\u1ECFng v\u00E0 ph\u1EA3i b\u00E1o l\u1ED7i r\u00F5 r\u00E0ng",
           "condition": {
             "kind": "visible",
             "selector": "#ldBtnCraft, #ldBtnTune, #ldBtnCollect"
@@ -1260,7 +1288,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 20000,
-          "note": "đệm chờ XHR trạng thái thật: lò đang luyện/đan thành sẽ hiện đồng hồ trong vài giây — lò rảnh không bao giờ hiện nên chờ trọn cửa sổ rồi mới được tin là rảnh; nét vẽ đầu tiên của trang là màn lò trống GIẢ",
+          "note": "\u0111\u1EC7m ch\u1EDD XHR tr\u1EA1ng th\u00E1i th\u1EADt: l\u00F2 \u0111ang luy\u1EC7n/\u0111an th\u00E0nh s\u1EBD hi\u1EC7n \u0111\u1ED3ng h\u1ED3 trong v\u00E0i gi\u00E2y \u2014 l\u00F2 r\u1EA3nh kh\u00F4ng bao gi\u1EDD hi\u1EC7n n\u00EAn ch\u1EDD tr\u1ECDn c\u1EEDa s\u1ED5 r\u1ED3i m\u1EDBi \u0111\u01B0\u1EE3c tin l\u00E0 r\u1EA3nh; n\u00E9t v\u1EBD \u0111\u1EA7u ti\u00EAn c\u1EE7a trang l\u00E0 m\u00E0n l\u00F2 tr\u1ED1ng GI\u1EA2",
           "optional": true,
           "condition": {
             "kind": "textMatches",
@@ -1270,7 +1298,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 90000,
-          "note": "đồng hồ lò đã về phút chót — nán lại chờ Thu Đan hiện thay vì bỏ đi",
+          "note": "\u0111\u1ED3ng h\u1ED3 l\u00F2 \u0111\u00E3 v\u1EC1 ph\u00FAt ch\u00F3t \u2014 n\u00E1n l\u1EA1i ch\u1EDD Thu \u0110an hi\u1EC7n thay v\u00EC b\u1ECF \u0111i",
           "optional": true,
           "condition": {
             "kind": "visible",
@@ -1285,7 +1313,7 @@
           "action": "click",
           "selector": "#ldBtnCollect",
           "timeoutMs": 5000,
-          "note": "Thu Đan — mẻ trước đã thành",
+          "note": "Thu \u0110an \u2014 m\u1EBB tr\u01B0\u1EDBc \u0111\u00E3 th\u00E0nh",
           "optional": true,
           "when": {
             "kind": "visible",
@@ -1295,7 +1323,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 15000,
-          "note": "bảng thưởng đan mở ~5-7s sau khi thu — nút Thu Đan còn trên màn ~3s (splash) rồi trang vẽ lại màn lò trống, nên phải đứng đây chờ modal",
+          "note": "b\u1EA3ng th\u01B0\u1EDFng \u0111an m\u1EDF ~5-7s sau khi thu \u2014 n\u00FAt Thu \u0110an c\u00F2n tr\u00EAn m\u00E0n ~3s (splash) r\u1ED3i trang v\u1EBD l\u1EA1i m\u00E0n l\u00F2 tr\u1ED1ng, n\u00EAn ph\u1EA3i \u0111\u1EE9ng \u0111\u00E2y ch\u1EDD modal",
           "optional": true,
           "condition": {
             "kind": "visible",
@@ -1309,7 +1337,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 15000,
-          "note": "lưới thứ hai gác theo ĐAN TRONG TÚI (bền, hiện ngay khi /collect về): nút Thu Đan biến mất nhanh thì lượt chờ này vẫn bắt được modal",
+          "note": "l\u01B0\u1EDBi th\u1EE9 hai g\u00E1c theo \u0110AN TRONG T\u00DAI (b\u1EC1n, hi\u1EC7n ngay khi /collect v\u1EC1): n\u00FAt Thu \u0110an bi\u1EBFn m\u1EA5t nhanh th\u00EC l\u01B0\u1EE3t ch\u1EDD n\u00E0y v\u1EABn b\u1EAFt \u0111\u01B0\u1EE3c modal",
           "optional": true,
           "condition": {
             "kind": "visible",
@@ -1324,7 +1352,7 @@
           "action": "click",
           "selector": "#ldModalCloseBtn",
           "timeoutMs": 5000,
-          "note": "đóng bảng thưởng",
+          "note": "\u0111\u00F3ng b\u1EA3ng th\u01B0\u1EDFng",
           "optional": true,
           "when": {
             "kind": "visible",
@@ -1333,16 +1361,16 @@
         },
         {
           "action": "evaluateJavaScript",
-          "script": "() => { const p = document.querySelector('#ldInventory .ld-cell--pill'); const vis = p && p.getBoundingClientRect().width > 0; return vis ? '!Đã thu đan — viên đan nằm trong túi' : ''; }",
+          "script": "() =\u003E { const p = document.querySelector(\u0027#ldInventory .ld-cell--pill\u0027); const vis = p \u0026\u0026 p.getBoundingClientRect().width \u003E 0; return vis ? \u0027!\u0110\u00E3 thu \u0111an \u2014 vi\u00EAn \u0111an n\u1EB1m trong t\u00FAi\u0027 : \u0027\u0027; }",
           "timeoutMs": 4000,
-          "note": "kể chuyện: thu đan thành công",
+          "note": "k\u1EC3 chuy\u1EC7n: thu \u0111an th\u00E0nh c\u00F4ng",
           "optional": true
         },
         {
           "action": "click",
           "selector": "#ldInventory .ld-cell--pill",
           "timeoutMs": 4000,
-          "note": "mở ô đan trong túi — chỉ khi túi thật sự có đan",
+          "note": "m\u1EDF \u00F4 \u0111an trong t\u00FAi \u2014 ch\u1EC9 khi t\u00FAi th\u1EADt s\u1EF1 c\u00F3 \u0111an",
           "optional": true,
           "when": {
             "kind": "visible",
@@ -1352,7 +1380,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 5000,
-          "note": "hộp thông tin viên đan mở ra",
+          "note": "h\u1ED9p th\u00F4ng tin vi\u00EAn \u0111an m\u1EDF ra",
           "optional": true,
           "condition": {
             "kind": "visible",
@@ -1367,7 +1395,7 @@
           "action": "click",
           "selector": "#ldModalCloseBtn",
           "timeoutMs": 4000,
-          "note": "viên đan này được GIỮ theo tuỳ chọn sao — đóng hộp thông tin, không phân giải",
+          "note": "vi\u00EAn \u0111an n\u00E0y \u0111\u01B0\u1EE3c GI\u1EEE theo tu\u1EF3 ch\u1ECDn sao \u2014 \u0111\u00F3ng h\u1ED9p th\u00F4ng tin, kh\u00F4ng ph\u00E2n gi\u1EA3i",
           "optional": true,
           "when": {
             "kind": "textMatches",
@@ -1379,7 +1407,7 @@
           "action": "click",
           "selector": "#ldModalDecompose",
           "timeoutMs": 4000,
-          "note": "PHÂN GIẢI",
+          "note": "PH\u00C2N GI\u1EA2I",
           "optional": true,
           "when": {
             "kind": "visible",
@@ -1389,7 +1417,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 5000,
-          "note": "hộp xác nhận phân giải (hoàn ~90% linh dược)",
+          "note": "h\u1ED9p x\u00E1c nh\u1EADn ph\u00E2n gi\u1EA3i (ho\u00E0n ~90% linh d\u01B0\u1EE3c)",
           "optional": true,
           "condition": {
             "kind": "visible",
@@ -1404,7 +1432,7 @@
           "action": "click",
           "selector": "#ldConfirmOk",
           "timeoutMs": 4000,
-          "note": "xác nhận phân giải",
+          "note": "x\u00E1c nh\u1EADn ph\u00E2n gi\u1EA3i",
           "optional": true,
           "when": {
             "kind": "visible",
@@ -1414,7 +1442,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 3000,
-          "note": "bảng linh dược nhận lại hiện ra",
+          "note": "b\u1EA3ng linh d\u01B0\u1EE3c nh\u1EADn l\u1EA1i hi\u1EC7n ra",
           "optional": true,
           "condition": {
             "kind": "visible",
@@ -1423,16 +1451,16 @@
         },
         {
           "action": "evaluateJavaScript",
-          "script": "() => { const ok = document.querySelector('#ldDecomposeRewardOk'); const vis = ok && ok.getBoundingClientRect().width > 0; return vis ? '!Phân giải viên đan — hoàn lại linh dược cho mẻ sau' : ''; }",
+          "script": "() =\u003E { const ok = document.querySelector(\u0027#ldDecomposeRewardOk\u0027); const vis = ok \u0026\u0026 ok.getBoundingClientRect().width \u003E 0; return vis ? \u0027!Ph\u00E2n gi\u1EA3i vi\u00EAn \u0111an \u2014 ho\u00E0n l\u1EA1i linh d\u01B0\u1EE3c cho m\u1EBB sau\u0027 : \u0027\u0027; }",
           "timeoutMs": 4000,
-          "note": "kể chuyện: phân giải thành công",
+          "note": "k\u1EC3 chuy\u1EC7n: ph\u00E2n gi\u1EA3i th\u00E0nh c\u00F4ng",
           "optional": true
         },
         {
           "action": "click",
           "selector": "#ldDecomposeRewardOk",
           "timeoutMs": 8000,
-          "note": "ĐÓNG — nút mở đầu là \"ĐỢI…\" bị khoá ~1.5s, Playwright tự chờ nó mở",
+          "note": "\u0110\u00D3NG \u2014 n\u00FAt m\u1EDF \u0111\u1EA7u l\u00E0 \u0022\u0110\u1EE2I\u2026\u0022 b\u1ECB kho\u00E1 ~1.5s, Playwright t\u1EF1 ch\u1EDD n\u00F3 m\u1EDF",
           "optional": true,
           "when": {
             "kind": "visible",
@@ -1440,17 +1468,60 @@
           }
         },
         {
+          "action": "click",
+          "selector": "#ldBtnCollect",
+          "timeoutMs": 5000,
+          "note": "Thu \u0110an l\u1EA7n hai \u2014 m\u1EBB v\u1EEBa ch\u00EDn trong l\u00FAc l\u01B0\u1EE3t n\u00E0y \u0111ang ph\u00E2n gi\u1EA3i",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#ldBtnCollect"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 15000,
+          "note": "ch\u1EDD b\u1EA3ng th\u01B0\u1EDFng c\u1EE7a l\u01B0\u1EE3t thu mu\u1ED9n \u2014 g\u00E1c theo \u0111an trong t\u00FAi nh\u01B0 l\u01B0\u1EE3t \u0111\u1EA7u",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#ldModalCloseBtn"
+          },
+          "when": {
+            "kind": "visible",
+            "selector": "#ldInventory .ld-cell--pill"
+          }
+        },
+        {
           "action": "evaluateJavaScript",
-          "script": "() => { const t = document.querySelector('#ldBtnTune'); (window.__jvzLd = window.__jvzLd || {}).pre = !!(t && t.getBoundingClientRect().width > 0); return ''; }",
+          "script": "() =\u003E { const m = document.querySelector(\u0027#ldModalCloseBtn\u0027); const vis = m \u0026\u0026 m.getBoundingClientRect().width \u003E 0; return vis ? \u0027!Thu \u0111an (ki\u1EC3m l\u1EA1i tr\u01B0\u1EDBc khai l\u00F4) \u2014 m\u1EBB tr\u01B0\u1EDBc v\u1EEBa k\u1ECBp ch\u00EDn\u0027 : \u0027\u0027; }",
           "timeoutMs": 4000,
-          "note": "ghi nhớ trạng thái lò trước pha khai lô (phục vụ tường thuật)",
+          "note": "k\u1EC3 chuy\u1EC7n: l\u01B0\u1EE3t thu mu\u1ED9n c\u00F3 th\u1EADt \u2014 b\u1EA3ng th\u01B0\u1EDFng \u0111ang m\u1EDF l\u00E0 b\u1EB1ng ch\u1EE9ng",
           "optional": true
         },
         {
           "action": "click",
-          "selector": ".ld-recipe-tier:has-text(\"{{tier}}\")",
+          "selector": "#ldModalCloseBtn",
+          "timeoutMs": 5000,
+          "note": "\u0111\u00F3ng b\u1EA3ng th\u01B0\u1EDFng c\u1EE7a l\u01B0\u1EE3t thu mu\u1ED9n",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#ldModalCloseBtn"
+          }
+        },
+        {
+          "action": "evaluateJavaScript",
+          "script": "() =\u003E { const t = document.querySelector(\u0027#ldBtnTune\u0027); (window.__jvzLd = window.__jvzLd || {}).pre = !!(t \u0026\u0026 t.getBoundingClientRect().width \u003E 0); return \u0027\u0027; }",
           "timeoutMs": 4000,
-          "note": "chọn phẩm đan theo tuỳ chọn",
+          "note": "ghi nh\u1EDB tr\u1EA1ng th\u00E1i l\u00F2 tr\u01B0\u1EDBc pha khai l\u00F4 (ph\u1EE5c v\u1EE5 t\u01B0\u1EDDng thu\u1EADt)",
+          "optional": true
+        },
+        {
+          "action": "click",
+          "selector": ".ld-recipe-tier:has-text(\u0022{{tier}}\u0022)",
+          "timeoutMs": 4000,
+          "note": "ch\u1ECDn ph\u1EA9m \u0111an theo tu\u1EF3 ch\u1ECDn",
           "optional": true,
           "when": {
             "kind": "visible",
@@ -1460,13 +1531,13 @@
         {
           "action": "waitMilliseconds",
           "timeoutMs": 800,
-          "note": "cho trang cập nhật nguyên liệu theo phẩm vừa chọn"
+          "note": "cho trang c\u1EADp nh\u1EADt nguy\u00EAn li\u1EC7u theo ph\u1EA9m v\u1EEBa ch\u1ECDn"
         },
         {
           "action": "click",
           "selector": "#ldBtnCraft",
           "timeoutMs": 5000,
-          "note": "Luyện Đan — mở hộp xác nhận khai lô",
+          "note": "Luy\u1EC7n \u0110an \u2014 m\u1EDF h\u1ED9p x\u00E1c nh\u1EADn khai l\u00F4",
           "optional": true,
           "when": {
             "kind": "visible",
@@ -1476,7 +1547,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 6000,
-          "note": "hộp xác nhận dùng 20 Tiên Ngọc",
+          "note": "h\u1ED9p x\u00E1c nh\u1EADn d\u00F9ng 20 Ti\u00EAn Ng\u1ECDc",
           "optional": true,
           "condition": {
             "kind": "visible",
@@ -1491,7 +1562,7 @@
           "action": "click",
           "selector": "#ldConfirmOk",
           "timeoutMs": 5000,
-          "note": "xác nhận khai lô — TỐN 20 Tiên Ngọc + dược liệu",
+          "note": "x\u00E1c nh\u1EADn khai l\u00F4 \u2014 T\u1ED0N 20 Ti\u00EAn Ng\u1ECDc \u002B d\u01B0\u1EE3c li\u1EC7u",
           "optional": true,
           "when": {
             "kind": "visible",
@@ -1501,7 +1572,7 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 12000,
-          "note": "chờ màn luyện thay màn lò trống — nút Điều Hòa xuất hiện ~3s sau xác nhận",
+          "note": "ch\u1EDD m\u00E0n luy\u1EC7n thay m\u00E0n l\u00F2 tr\u1ED1ng \u2014 n\u00FAt \u0110i\u1EC1u H\u00F2a xu\u1EA5t hi\u1EC7n ~3s sau x\u00E1c nh\u1EADn",
           "optional": true,
           "condition": {
             "kind": "visible",
@@ -1514,20 +1585,20 @@
         },
         {
           "action": "evaluateJavaScript",
-          "script": "() => { const S = window.__jvzLd = window.__jvzLd || {}; const t = document.querySelector('#ldBtnTune'); const vis = !!(t && t.getBoundingClientRect().width > 0); return (vis && !S.pre) ? '!Khai lô mẻ mới ({{tier}}) — đang luyện, sẽ giữ lửa 3 nhịp' : ''; }",
+          "script": "() =\u003E { const S = window.__jvzLd = window.__jvzLd || {}; const t = document.querySelector(\u0027#ldBtnTune\u0027); const vis = !!(t \u0026\u0026 t.getBoundingClientRect().width \u003E 0); return (vis \u0026\u0026 !S.pre) ? \u0027!Khai l\u00F4 m\u1EBB m\u1EDBi ({{tier}}) \u2014 \u0111ang luy\u1EC7n, s\u1EBD gi\u1EEF l\u1EEDa 3 nh\u1ECBp\u0027 : \u0027\u0027; }",
           "timeoutMs": 4000,
-          "note": "kể chuyện: đã khai lô mẻ mới",
+          "note": "k\u1EC3 chuy\u1EC7n: \u0111\u00E3 khai l\u00F4 m\u1EBB m\u1EDBi",
           "optional": true
         },
         {
           "action": "repeat",
           "timeoutMs": 15000,
-          "note": "lặp tới khi trang tự báo \"Đã giữ lửa đủ 3 lần — Đan Lô an toàn\". Ghé giữa chừng mà lò đã an toàn từ trước thì vòng chạy rỗng vài nhịp rồi thôi — mọi bước trong thân đều có điều kiện.",
+          "note": "l\u1EB7p t\u1EDBi khi trang t\u1EF1 b\u00E1o \u0022\u0110\u00E3 gi\u1EEF l\u1EEDa \u0111\u1EE7 3 l\u1EA7n \u2014 \u0110an L\u00F4 an to\u00E0n\u0022. Gh\u00E9 gi\u1EEFa ch\u1EEBng m\u00E0 l\u00F2 \u0111\u00E3 an to\u00E0n t\u1EEB tr\u01B0\u1EDBc th\u00EC v\u00F2ng ch\u1EA1y r\u1ED7ng v\u00E0i nh\u1ECBp r\u1ED3i th\u00F4i \u2014 m\u1ECDi b\u01B0\u1EDBc trong th\u00E2n \u0111\u1EC1u c\u00F3 \u0111i\u1EC1u ki\u1EC7n.",
           "steps": [
             {
               "action": "waitForCondition",
               "timeoutMs": 110000,
-              "note": "chờ lửa hạ về 68% — chỉ trước lần Điều Hòa đầu tiên",
+              "note": "ch\u1EDD l\u1EEDa h\u1EA1 v\u1EC1 68% \u2014 ch\u1EC9 tr\u01B0\u1EDBc l\u1EA7n \u0110i\u1EC1u H\u00F2a \u0111\u1EA7u ti\u00EAn",
               "optional": true,
               "condition": {
                 "kind": "textMatches",
@@ -1535,14 +1606,14 @@
               },
               "when": {
                 "kind": "textMatches",
-                "text": "cần 3 lần"
+                "text": "c\u1EA7n 3 l\u1EA7n"
               }
             },
             {
               "action": "click",
               "selector": "#ldBtnTune",
               "timeoutMs": 4000,
-              "note": "Điều Hòa — nút tự khoá vài giây sau mỗi lần bấm",
+              "note": "\u0110i\u1EC1u H\u00F2a \u2014 n\u00FAt t\u1EF1 kho\u00E1 v\u00E0i gi\u00E2y sau m\u1ED7i l\u1EA7n b\u1EA5m",
               "optional": true,
               "when": {
                 "kind": "enabled",
@@ -1552,7 +1623,7 @@
             {
               "action": "waitMilliseconds",
               "timeoutMs": 6500,
-              "note": "nhịp giữa hai lần Điều Hòa, theo đúng bản ghi (~6s)",
+              "note": "nh\u1ECBp gi\u1EEFa hai l\u1EA7n \u0110i\u1EC1u H\u00F2a, theo \u0111\u00FAng b\u1EA3n ghi (~6s)",
               "when": {
                 "kind": "visible",
                 "selector": "#ldBtnTune"
@@ -1560,15 +1631,15 @@
             },
             {
               "action": "evaluateJavaScript",
-              "script": "() => { const S = window.__jvzLd = window.__jvzLd || {}; const m = (document.body.innerText || '').match(/Giữ lửa:?\\s*(\\d)\\s*\\/\\s*3/i); if (!m) return ''; const n = +m[1]; if (S.tune === n) return ''; S.tune = n; return '!Giữ lửa ' + n + '/3' + (n >= 3 ? ' — Đan Lô an toàn' : ''); }",
+              "script": "() =\u003E { const S = window.__jvzLd = window.__jvzLd || {}; const m = (document.body.innerText || \u0027\u0027).match(/Gi\u1EEF l\u1EEDa:?\\s*(\\d)\\s*\\/\\s*3/i); if (!m) return \u0027\u0027; const n = \u002Bm[1]; if (S.tune === n) return \u0027\u0027; S.tune = n; return \u0027!Gi\u1EEF l\u1EEDa \u0027 \u002B n \u002B \u0027/3\u0027 \u002B (n \u003E= 3 ? \u0027 \u2014 \u0110an L\u00F4 an to\u00E0n\u0027 : \u0027\u0027); }",
               "timeoutMs": 4000,
-              "note": "kể chuyện: tiến độ giữ lửa, chỉ nói khi con số đổi",
+              "note": "k\u1EC3 chuy\u1EC7n: ti\u1EBFn \u0111\u1ED9 gi\u1EEF l\u1EEDa, ch\u1EC9 n\u00F3i khi con s\u1ED1 \u0111\u1ED5i",
               "optional": true
             }
           ],
           "until": {
             "kind": "textMatches",
-            "text": "giữ lửa đủ 3 lần"
+            "text": "gi\u1EEF l\u1EEDa \u0111\u1EE7 3 l\u1EA7n"
           },
           "maxIterations": 6,
           "maxSeconds": 240
@@ -1576,85 +1647,81 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 8000,
-          "note": "lưới an toàn: hết vòng giữ lửa mà vẫn chưa Điều Hòa được lần nào thì báo lỗi rõ ràng — mẻ này coi như hỏng, không nhận vơ là xong",
+          "note": "l\u01B0\u1EDBi an to\u00E0n: h\u1EBFt v\u00F2ng gi\u1EEF l\u1EEDa m\u00E0 v\u1EABn ch\u01B0a \u0110i\u1EC1u H\u00F2a \u0111\u01B0\u1EE3c l\u1EA7n n\u00E0o th\u00EC b\u00E1o l\u1ED7i r\u00F5 r\u00E0ng \u2014 m\u1EBB n\u00E0y coi nh\u01B0 h\u1ECFng, kh\u00F4ng nh\u1EADn v\u01A1 l\u00E0 xong",
           "condition": {
             "kind": "textNotMatches",
-            "text": "cần 3 lần"
+            "text": "c\u1EA7n 3 l\u1EA7n"
           },
           "when": {
             "kind": "textMatches",
-            "text": "cần 3 lần"
+            "text": "c\u1EA7n 3 l\u1EA7n"
           }
         },
         {
           "action": "readCooldownSeconds",
-          "script": "() => { const m = document.body.innerText.match(/thời gian còn lại\\s*([0-9]{1,2}):([0-9]{2}):([0-9]{2})/i); if (!m) return null; const left = (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]); return left > 0 ? left + 60 : null; }",
+          "script": "() =\u003E { const m = document.body.innerText.match(/th\u1EDDi gian c\u00F2n l\u1EA1i\\s*([0-9]{1,2}):([0-9]{2}):([0-9]{2})/i); if (!m) return null; const left = (\u002Bm[1]) * 3600 \u002B (\u002Bm[2]) * 60 \u002B (\u002Bm[3]); return left \u003E 0 ? left \u002B 60 : null; }",
           "timeoutMs": 15000,
-          "note": "đọc \"Thời gian còn lại\" của lò — lượt ghé sau quay lại đúng lúc thu đan; lò đứng yên ở 00:00:00 thì coi như không có đồng hồ, nghỉ trọn 45 phút"
+          "note": "\u0111\u1ECDc \u0022Th\u1EDDi gian c\u00F2n l\u1EA1i\u0022 c\u1EE7a l\u00F2 \u2014 l\u01B0\u1EE3t gh\u00E9 sau quay l\u1EA1i \u0111\u00FAng l\u00FAc thu \u0111an; l\u00F2 \u0111\u1EE9ng y\u00EAn \u1EDF 00:00:00 th\u00EC coi nh\u01B0 kh\u00F4ng c\u00F3 \u0111\u1ED3ng h\u1ED3, ngh\u1EC9 tr\u1ECDn 45 ph\u00FAt"
         }
       ],
       "options": [
         {
           "key": "tier",
-          "label": "Loại đan",
+          "label": "Lo\u1EA1i \u0111an",
           "choices": [
             {
-              "value": "Hạ Phẩm",
-              "label": "Hạ Phẩm"
+              "value": "H\u1EA1 Ph\u1EA9m",
+              "label": "H\u1EA1 Ph\u1EA9m"
             },
             {
-              "value": "Trung Phẩm",
-              "label": "Trung Phẩm"
+              "value": "Trung Ph\u1EA9m",
+              "label": "Trung Ph\u1EA9m"
             },
             {
-              "value": "Thượng Phẩm",
-              "label": "Thượng Phẩm"
+              "value": "Th\u01B0\u1EE3ng Ph\u1EA9m",
+              "label": "Th\u01B0\u1EE3ng Ph\u1EA9m"
             },
             {
-              "value": "Cực Phẩm",
-              "label": "Cực Phẩm"
+              "value": "C\u1EF1c Ph\u1EA9m",
+              "label": "C\u1EF1c Ph\u1EA9m"
             }
           ],
           "allowCustom": false,
-          "selectedValue": "Trung Phẩm"
+          "selectedValue": "H\u1EA1 Ph\u1EA9m"
         },
         {
           "key": "decompose",
-          "label": "Phân giải đan",
+          "label": "Ph\u00E2n gi\u1EA3i \u0111an",
           "choices": [
             {
-              "value": "«luôn phân giải»",
-              "label": "Phân giải tất cả"
+              "value": "\u00ABlu\u00F4n ph\u00E2n gi\u1EA3i\u00BB",
+              "label": "Ph\u00E2n gi\u1EA3i t\u1EA5t c\u1EA3"
             },
             {
-              "value": "dược khí 5 sao",
-              "label": "Giữ 5 sao, phân giải số còn lại"
+              "value": "d\u01B0\u1EE3c kh\u00ED 4 sao",
+              "label": "Gi\u1EEF 4 sao, ph\u00E2n gi\u1EA3i 3 sao tr\u1EDF xu\u1ED1ng"
             },
             {
-              "value": "dược khí 4 sao|dược khí 5 sao",
-              "label": "Giữ từ 4 sao, phân giải 3 sao trở xuống"
+              "value": "d\u01B0\u1EE3c kh\u00ED 3 sao|d\u01B0\u1EE3c kh\u00ED 4 sao",
+              "label": "Gi\u1EEF 3-4 sao, ph\u00E2n gi\u1EA3i 2 sao tr\u1EDF xu\u1ED1ng"
             },
             {
-              "value": "dược khí 3 sao|dược khí 4 sao|dược khí 5 sao",
-              "label": "Giữ từ 3 sao, phân giải 2 sao trở xuống"
+              "value": "d\u01B0\u1EE3c kh\u00ED 2 sao|d\u01B0\u1EE3c kh\u00ED 3 sao|d\u01B0\u1EE3c kh\u00ED 4 sao",
+              "label": "Gi\u1EEF t\u1EEB 2 sao, ch\u1EC9 ph\u00E2n gi\u1EA3i 1 sao"
             },
             {
-              "value": "dược khí 2 sao|dược khí 3 sao|dược khí 4 sao|dược khí 5 sao",
-              "label": "Giữ từ 2 sao, chỉ phân giải 1 sao"
-            },
-            {
-              "value": "dược khí",
-              "label": "Không phân giải (giữ tất cả)"
+              "value": "d\u01B0\u1EE3c kh\u00ED",
+              "label": "Kh\u00F4ng ph\u00E2n gi\u1EA3i (gi\u1EEF t\u1EA5t c\u1EA3)"
             }
           ],
           "allowCustom": false,
-          "selectedValue": "«luôn phân giải»"
+          "selectedValue": "\u00ABlu\u00F4n ph\u00E2n gi\u1EA3i\u00BB"
         }
       ],
       "fallbackCooldownSeconds": 2700,
+      "requiresVip": true,
       "order": 105,
-      "notes": "Tự luyện đan ở Luyện Đan Đường — mỗi mẻ TỐN dược liệu + 20 Tiên Ngọc.",
-      "requiresVip": true
+      "notes": "T\u1EF1 luy\u1EC7n \u0111an \u1EDF Luy\u1EC7n \u0110an \u0110\u01B0\u1EDDng \u2014 m\u1ED7i m\u1EBB T\u1ED0N d\u01B0\u1EE3c li\u1EC7u \u002B 20 Ti\u00EAn Ng\u1ECDc."
     }
   ]
 }

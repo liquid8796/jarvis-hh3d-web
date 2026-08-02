@@ -2,7 +2,6 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { requireActiveUser } from "@/lib/auth/guards";
 import { getEditableConfig } from "@/lib/services/configs";
 import { getActiveJob } from "@/lib/services/jobs";
-import { sandboxAllowedFor } from "@/lib/runners/policy";
 import { ConfigForm } from "./ConfigForm";
 import { ControlPanel } from "./ControlPanel";
 
@@ -32,7 +31,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
-          <ConfigForm config={config} canUseSandbox={sandboxAllowedFor(user)} />
+          <ConfigForm config={config} />
           <ControlPanel initiallyRunning={activeJob !== null} />
         </div>
       </main>

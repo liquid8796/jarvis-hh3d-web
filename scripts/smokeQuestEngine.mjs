@@ -132,9 +132,12 @@ async function main() {
   check("và việc đó được kể lại", notes.some((n) => n.includes("250000")), notes.join(" / "));
   check("capCheck=false → nhánh «không kiểm tra»", opt(meCung, "capCheck").selectedValue.includes("«"));
   check("tier → Cực Phẩm", opt(luyenDan, "tier").selectedValue === "Cực Phẩm");
+  // Hồ sơ 42 mang thang phân giải đã bỏ nấc 5★ (đan chỉ rơi 1–4★, desktop 1.35.0): "giữ từ
+  // 4 sao" giờ là block-list một mục. keepLevelOf đọc số sao NHỎ NHẤT trong giá trị nên tự
+  // thích nghi — ca này ghim đúng điều đó.
   check(
     "keepStarsFrom=4 → giữ 4 sao trở lên",
-    opt(luyenDan, "decompose").selectedValue === "dược khí 4 sao|dược khí 5 sao",
+    opt(luyenDan, "decompose").selectedValue === "dược khí 4 sao",
     opt(luyenDan, "decompose").selectedValue,
   );
 
@@ -203,7 +206,8 @@ async function main() {
   // từ hồi `sandbox` còn là mặc định vẫn mang đúng chữ đó, và nó không đi qua form lần nào.
   const denied = decideRunner({ ...onlyLuyenDan, runner: "sandbox" }, { sandboxAllowed: false });
   check("chưa được mở → ép về máy nhà", denied.runner === "local", denied.runner);
-  check("và nói rõ vì sao", denied.reason.includes("thử nghiệm"), denied.reason);
+  // Lời giải thích giờ nói giọng trong-thế-giới, không nói giọng hạ tầng.
+  check("và nói rõ vì sao", denied.reason.includes("chưa xuất quan"), denied.reason);
 
   process.env.SANDBOX_ENABLED = "1";
   const allowed = decideRunner({ ...onlyLuyenDan, runner: "sandbox" }, { sandboxAllowed: true });
@@ -217,6 +221,36 @@ async function main() {
   check(
     "quest không được bật thì vẫn tắt",
     profile.quests.filter((q) => q.enabled).length === 2,
+  );
+
+  // Schema 42: ngưỡng "chưa sẵn sàng sau N giây" đi cùng đường tự-nhập với kickHp.
+  const idleCfg = profileForConfig(
+    { ...cfg, quests: { ...cfg.quests, meCung: { ...cfg.quests.meCung, kickIdleSec: 45 } } },
+    () => {},
+  ).quests.find((q) => q.name === "Mê Cung");
+  check(
+    "kickIdleSec=45 → option kickIdle nhận '45'",
+    idleCfg.options.find((o) => o.key === "kickIdle")?.selectedValue === "45",
+    idleCfg.options.find((o) => o.key === "kickIdle")?.selectedValue,
+  );
+
+  // Mười nhiệm vụ một-công-tắc: bật một cái là đúng cái đó sáng đèn trong hồ sơ.
+  const withDaily = profileForConfig(
+    { ...cfg, quests: { ...cfg.quests, diemDanh: { enabled: true }, teLe: { enabled: true } } },
+    () => {},
+  );
+  check(
+    "bật Điểm Danh + Tế Lễ → hồ sơ sáng đúng hai đèn đó",
+    withDaily.quests.find((q) => q.name === "Điểm Danh")?.enabled === true &&
+      withDaily.quests.find((q) => q.name === "Tế Lễ Tông Môn")?.enabled === true &&
+      withDaily.quests.filter((q) => q.enabled).length === 4,
+    withDaily.quests.filter((q) => q.enabled).map((q) => q.name).join(" · "),
+  );
+  const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
+  check(
+    "hồ sơ đang ở schema 42",
+    loadProfileForSchema().schemaVersion === 42,
+    String(loadProfileForSchema().schemaVersion),
   );
 
   // --- kiểm trên trang thật ---------------------------------------------------------

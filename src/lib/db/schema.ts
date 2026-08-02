@@ -137,6 +137,62 @@ export const jobEvents = pgTable(
   (t) => [index("events_job_idx").on(t.jobId, t.id)],
 );
 
+/**
+ * Đàm đạo toàn tông môn — một sảnh chung, mọi môn đồ active đều nói và nghe.
+ *
+ * NỘI DUNG tin là một document JSONB (`body`), không phải cột: hình thù tin nhắn churns
+ * như hình thù config — hôm nay text + reply + đính kèm, mai thêm sticker, poll, mention —
+ * và mỗi lần thêm một kiểu là một migration nếu dùng cột. Metadata mà SQL cần sờ tới
+ * (ai gửi, lúc nào, đã xoá chưa) mới nằm ở cột. Media KHÔNG nằm trong database: file/ảnh
+ * đi lên blob store và document chỉ giữ URL — bảng tin nhắn sống lâu, và một database
+ * gánh ảnh chụp màn hình là một bản backup không ai kéo nổi.
+ *
+ * Xoá là SOFT (deletedAt): tin đã có người đọc thì "thu hồi" phải để lại vết — một sảnh
+ * chung mà tin biến mất không dấu tích là chỗ để gaslight nhau.
+ */
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Document: { text, replyTo?, attachments?: [{url,name,size,type}], sticker? } — Zod giữ hình thù ở tầng service. */
+    body: jsonb("body").notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    editedAt: timestamp("edited_at", { withTimezone: true }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  // Feed đọc theo (id DESC) phân trang; index thời gian phục vụ cả hai chiều cuộn.
+  (t) => [index("chat_created_idx").on(t.createdAt)],
+);
+
+/** Mỗi (tin, người, emoji) một dòng — bấm lại lần nữa là rút, nên PK ghép là toàn bộ ngữ nghĩa. */
+export const chatReactions = pgTable(
+  "chat_reactions",
+  {
+    messageId: uuid("message_id")
+      .notNull()
+      .references(() => chatMessages.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    emoji: text("emoji").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("chat_react_pk").on(t.messageId, t.userId, t.emoji)],
+);
+
+/** "Ai đang gõ" — một dòng mỗi người, ghi đè liên tục; coi là đang gõ khi typingAt còn tươi. */
+export const chatPresence = pgTable("chat_presence", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  typingAt: timestamp("typing_at", { withTimezone: true }),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type UserRow = typeof users.$inferSelect;
 export type JobRow = typeof automationJobs.$inferSelect;
 export type JobEventRow = typeof jobEvents.$inferSelect;
+export type ChatMessageRow = typeof chatMessages.$inferSelect;

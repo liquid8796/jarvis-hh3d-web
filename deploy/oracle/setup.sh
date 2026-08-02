@@ -43,14 +43,16 @@ mkdir -p "$APP_DIR"
 curl -fsSL "$WEB_URL/linh-su/goi-linh-su.tgz" | tar -xz -C "$APP_DIR"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 
-echo "== [4/6] Thư viện + Chromium =="
+echo "== [4/6] Chromium =="
 cd "$APP_DIR"
-sudo -u "$APP_USER" npm install --omit=dev --no-fund --no-audit --loglevel=error
-PW="$(node -p "require('$APP_DIR/package.json').dependencies['playwright-core']")"
+# Không `npm install`: playwright-core đã đi sẵn trong gói (xem scripts/buildWorkerBundle.mjs).
+# Và CLI tải browser là cli.js của CHÍNH bản ấy, nên không có cách nào lệch phiên bản —
+# lỗi "Executable doesn't exist" trở thành bất khả thi thay vì phải canh chừng.
+PWC="$APP_DIR/node_modules/playwright-core/cli.js"
 # Thư viện hệ thống cài bằng root; bản Chromium tải về ~/.cache của CHÍNH user chạy service
 # — hai bước tách nhau, vì gộp một lệnh thì browser rơi vào cache của root và worker mù.
-npx --yes "playwright@$PW" install-deps chromium
-sudo -u "$APP_USER" npx --yes "playwright@$PW" install chromium
+node "$PWC" install-deps chromium
+sudo -u "$APP_USER" node "$PWC" install chromium
 
 echo "== [5/6] Cấu hình =="
 cat > "$APP_DIR/.env" <<ENV

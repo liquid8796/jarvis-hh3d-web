@@ -40,7 +40,10 @@ WEB_URL='https://auto-hh3d.vercel.app' WORKER_TOKEN='<WORKER_TOKEN trên Vercel>
 ```
 
 Script idempotent — **cập nhật engine = chạy lại đúng lệnh đó** (nó tải gói mới nhất từ
-`/linh-su/goi-linh-su.tgz`, vốn được đóng lại ở mỗi deploy Vercel).
+`/linh-su/goi-linh-su.tgz`, vốn được đóng lại ở mỗi deploy Vercel). Gói đã mang sẵn
+playwright-core nên setup không cần `npm install`; Chromium tải bằng chính `cli.js` của bản
+ấy, thư viện hệ thống cài bằng root còn browser tải về cache của user `linhsu` — tách hai
+bước, vì gộp một lệnh thì browser rơi vào cache của root và worker mù.
 
 ## Vận hành
 

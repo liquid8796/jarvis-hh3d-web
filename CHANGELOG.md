@@ -11,6 +11,39 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.12.0 — linh sứ tự mang Node theo, người dùng không phải cài gì nữa
+
+- **Node "xách tay".** Installer tải bản Node chính thức vào thư mục cài và chỉ dùng bản đó
+  — bỏ hẳn winget/apt/brew, bỏ quyền admin, bỏ cả đoạn nạp lại PATH và câu "mở PowerShell
+  MỚI rồi chạy lại". Ngoài việc xoá rào cản, nó xoá luôn một lớp lỗi: linh sứ tự chạy lúc
+  đăng nhập, mà PATH lúc ấy khác PATH trong cửa sổ đang mở, nên `node` tìm qua PATH là lỗi
+  "chạy tay thì được, tự khởi động thì không". Bản tải về được đối chiếu **SHA-256** với
+  `SHASUMS256.txt` của nodejs.org — ta sắp chạy thứ này như một runtime, không tin suông.
+- **playwright-core đóng sẵn trong gói**, không qua npm: thuần JS, không phụ thuộc gì, nén
+  ~3MB. Đổi lại: không cần npm, không cần ra registry, và trình tải Chromium chính là
+  `cli.js` của bản đang chạy — lỗi "Executable doesn't exist" (CLI lệch phiên bản đặt sẵn
+  revision khác) trở thành **bất khả thi về mặt cấu trúc**, chứ không chỉ được canh chừng.
+- **Gọi tar bằng đường dẫn tuyệt đối `System32\tar.exe`.** Máy có Git for Windows trong PATH
+  đưa ta tới GNU tar, thứ đọc `C:\Users\...` thành «máy chủ C» rồi bỏ cuộc — và bỏ cuộc IM
+  LẶNG, vì PowerShell không ném lỗi khi lệnh ngoài trả mã khác 0. Triệu chứng hiện ra ba
+  bước sau dưới dạng `Move-Item: PathNotFound`, không nói gì về nguyên nhân. Giờ mọi lệnh
+  tar đi qua một hàm bọc có kiểm `$LASTEXITCODE`.
+- **Gỡ và cài lại giết ĐÚNG cả ba tầng** (run.ps1 → cmd → node), vòng nuôi trước tiên. Chỉ
+  giết `node` là sai: vòng nuôi dựng lại nó sau 10 giây, nên cài lại kết thúc với HAI vòng
+  nuôi cùng đọc một `.env` — hai linh sứ mang cùng một WORKER_ID, cùng giành job, cùng mở
+  browser trên một máy; còn gỡ cài thì để lại một tiến trình quay vô tận và thư mục bị khoá.
+- **Cài lại giữ nguyên WORKER_ID** đã có: ID là danh tính trong sổ điểm danh, sinh mới mỗi
+  lần cập nhật sẽ để lại một xác linh sứ "vắng mặt" sau MỖI lần, người dùng nhìn vào tưởng
+  mình đang nuôi cả đàn.
+- **Hai lỗi mã hoá tiếng Việt.** (a) Next phục vụ `.ps1` là `application/octet-stream` không
+  kèm charset, mà `Invoke-RestMethod` của PowerShell 5.1 khi thiếu charset thì giải mã
+  ISO-8859-1 — chữ trong script hỏng NGAY TRƯỚC KHI `iex` chạy nó ("Cài linh sứ" → "CÃ i
+  linh sá»©"). Đã khai `text/plain; charset=utf-8` trong `next.config.ts`. (b) Nhật ký ghi
+  bằng `*>>` của PowerShell bị ghi lại thành UTF-16 kèm cả stack trace `NativeCommandError`;
+  chuyển sang cho `cmd` đổ thẳng byte. Với một script tải runtime về chạy, một màn hình đầy
+  ký tự rác là điều tệ nhất có thể xảy ra cho lòng tin.
+- Nhật ký tự cắt khi quá 5MB — mất mạng một đêm là vài chục nghìn dòng "claim lỗi".
+
 ## 0.11.0 — sandbox về vườn, linh sứ dọn lên VM tông môn, và trang cài một-lệnh
 
 - **Vercel Sandbox bị bỏ hẳn** (`runners/sandbox.ts`, `policy.ts`, hai script snapshot, dep

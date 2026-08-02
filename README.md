@@ -299,25 +299,36 @@ lỡ tay không được phép reset chìa khoá hệ thống đang chạy.
 
 ### Bước 5 — Linh sứ túc trực của từng đạo hữu (không bắt buộc)
 
-Người dùng **không cần clone repo hay biết npm là gì**: mục **Linh Sứ** trên dashboard phát
-một lệnh cài duy nhất (Windows PowerShell hoặc Linux/macOS) mang sẵn linh phù của họ. Lệnh
-đó tải gói linh sứ, cài Node + Chromium nếu thiếu, đăng ký tự chạy cùng máy, và lên ca ngay
-— toàn bộ ở `public/linh-su/install.ps1` / `install.sh`.
+Người dùng **không cần cài sẵn bất cứ thứ gì** — không Node.js, không npm, không quyền quản
+trị. Mục **Linh Sứ** trên dashboard phát một lệnh cài duy nhất (Windows PowerShell hoặc
+Linux/macOS Terminal) mang sẵn linh phù của họ; dán vào là xong.
 
-Ba điều đáng biết về cơ chế:
+Cơ chế, và vì sao từng mảnh lại như vậy:
 
+- **Node "xách tay".** Script tải bản Node chính thức về ngay trong thư mục cài và chỉ dùng
+  bản đó, thay vì đòi người dùng cài Node (hay tự cài qua winget/apt). Ngoài chuyện bỏ được
+  một rào cản, nó còn xoá luôn một lớp lỗi: linh sứ tự chạy lúc đăng nhập, mà PATH lúc ấy
+  không giống PATH trong cửa sổ đang mở — một `node` tìm qua PATH là lỗi "chạy tay thì được,
+  tự khởi động thì không" kinh điển. Bản tải về được **đối chiếu SHA-256** với
+  `SHASUMS256.txt` của nodejs.org: ta sắp chạy thứ này như một runtime, không tin suông.
+- **playwright-core đi theo gói**, không qua npm — thuần JS, không phụ thuộc gì, nén còn
+  ~3MB. Nhờ vậy trình tải Chromium chính là `cli.js` của bản đang chạy, nên lỗi
+  "Executable doesn't exist" (CLI lệch phiên bản đặt sẵn revision khác) **bất khả thi về mặt
+  cấu trúc**, chứ không chỉ được canh chừng bằng kỷ luật.
 - **Linh phù chỉ hiện một lần** lúc phát — database giữ SHA-256, không giữ bản rõ. Quên thì
   phát lại (cái cũ tự hết hiệu lực).
 - Linh sứ cài kiểu này **chỉ nhận job của chủ linh phù** — điều kiện nằm ngay trong câu SQL
   claim, không phải phép lịch sự.
 - Gói cài (`/linh-su/goi-linh-su.tgz`) được `scripts/buildWorkerBundle.mjs` đóng ở mỗi
   deploy từ đúng engine đang chạy — không tồn tại "bản dành cho người cài" nào để lệch.
+- Cài lại = cập nhật, và **giữ nguyên WORKER_ID** đã có, để mục Linh Sứ không tích dần xác
+  linh sứ "vắng mặt" sau mỗi lần nâng cấp. Gỡ bằng `uninstall.ps1`/`uninstall.sh` trong thư
+  mục cài: xoá thư mục, cắt đường tự khởi động, hạ cả vòng nuôi lẫn worker.
 
 Dev muốn chạy worker thô từ repo thì vẫn được:
 
 ```bash
 WEB_URL=https://<app>.vercel.app WORKER_TOKEN=<token> npm run worker
-npx playwright@1.62.1 install chromium   # một lần; PHẢI đúng phiên bản của playwright-core
 ```
 
 ---
@@ -424,7 +435,7 @@ File SQL sinh ra **được commit** — lịch sử schema nằm trong git, kh�
 
 ## 6. Lịch sử phát hành
 
-Bản hiện tại: **0.11.0**.
+Bản hiện tại: **0.12.0**.
 
 Lịch sử nằm ở [CHANGELOG.md](CHANGELOG.md), tách riêng khỏi file này — hai tài liệu trả lời
 hai câu hỏi khác nhau: README nói *hệ thống chạy thế nào*, changelog nói *vì sao nó thành ra

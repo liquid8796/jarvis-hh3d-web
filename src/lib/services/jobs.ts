@@ -62,7 +62,12 @@ export async function startJob(
     return { ok: false, error: "Chưa có tài khoản hoathinh3d — dán chuỗi cookie đăng nhập vào phần Tài khoản trước." };
   }
 
-  if (!view.quests.meCung.enabled && !view.quests.luyenDan.enabled) {
+  // Duyệt MỌI nhiệm vụ, không liệt kê tên. Chốt này ra đời khi hồ sơ chỉ có Mê Cung và
+  // Luyện Đan, rồi mười nhiệm vụ ngày được thêm vào (v0.9.0) mà không ai nhớ tới nó — nên
+  // một đạo hữu bật đủ chín nhiệm vụ ngày vẫn bị dội lại "Chưa bật nhiệm vụ nào", mâu thuẫn
+  // thẳng với những ô đang tick trước mắt họ. Sổ điểm danh 02/08 cho thấy đúng một người
+  // thật rơi vào đó. Đọc từ dữ liệu thì nhiệm vụ thứ mười ba tự được tính.
+  if (!Object.values(view.quests).some((q) => q.enabled)) {
     return { ok: false, error: "Chưa bật nhiệm vụ nào — chọn ít nhất một nhiệm vụ để khai đàn." };
   }
 

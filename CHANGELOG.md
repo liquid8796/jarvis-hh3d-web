@@ -11,6 +11,18 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.14.1 — bật chín nhiệm vụ vẫn bị dội "chưa bật nhiệm vụ nào"
+
+- **Chốt khai đàn chỉ đếm hai nhiệm vụ trong số mười hai.** Nó ra đời khi hồ sơ chỉ có Mê
+  Cung và Luyện Đan; mười nhiệm vụ ngày thêm vào ở v0.9.0 mà không ai nhớ tới nó. Hệ quả:
+  một đạo hữu tick đủ chín nhiệm vụ ngày vẫn bị dội lại "Chưa bật nhiệm vụ nào — chọn ít
+  nhất một nhiệm vụ để khai đàn", mâu thuẫn thẳng với những ô đang sáng trước mắt họ.
+  Không có lỗi nào trong log, vì đứng từ phía máy thì mọi thứ diễn ra đúng như đã viết.
+  Giờ chốt duyệt `Object.values(quests)` — nhiệm vụ thứ mười ba tự được tính.
+- Phát hiện khi rà sổ đăng ký chứ không phải từ báo lỗi: bảy người thật đã vào, và người
+  DUY NHẤT lưu cấu hình lại rơi đúng vào cái bẫy này. Một lỗi không ai kêu là một lỗi khiến
+  người ta lặng lẽ bỏ đi.
+
 ## 0.14.0 — tải bộ cài rồi bấm đúp, cột trái thôi bị bóp, và linh sứ bận thôi bị coi là vắng
 
 - **Linh sứ ĐANG BẬN bị báo "vắng mặt".** Sổ điểm danh chỉ ghi ở `claim`, mà một linh sứ

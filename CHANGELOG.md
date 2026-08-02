@@ -11,6 +11,24 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.8.0 — bảo hoa rơi, footer về đúng đáy, và web vừa mọi màn hình
+
+- **Footer hết lơ lửng.** Trang auth chỉ cao 80dvh để căn giữa lá bài, nên dòng ký tên đứng
+  chơ vơ ở vạch 80% màn hình. Sticky footer kiểu cột dọc (body flex-column + margin-top:auto)
+  đưa nó về đáy khung nhìn khi trang ngắn, sau nội dung khi trang dài — đo trên trang sống:
+  khoảng cách tới đáy tài liệu = 0px ở cả ba trang.
+- **Login/Register có nút "← Về Trang Chủ".** Hai trang nghi lễ không mang SiteHeader, nên
+  trước đó ai lỡ bước vào chỉ còn nút Back của trình duyệt.
+- **Bảo hoa rơi trên trang chủ** — cánh hoa hồng phấn ánh tím của Bảo Hoa tiên tử (Phàm Nhân
+  Tu Tiên), vị tiên tử ký tên ở chân trang. Mười hai cánh hai lớp (hồng phấn + tím nhạt),
+  rơi nghiêng theo hai chu kỳ lệch pha để không bao giờ thành đàn; pointer-events none nên
+  hoa chỉ để ngắm, không chắn một cú bấm nào. Chỉ trang chủ có hoa — sảnh đón thì rắc hoa,
+  bàn làm việc thì không.
+- **Responsive cho mọi thiết bị.** Đệm trang co theo màn hình (px-4 → sm:px-6), header cho
+  phép xuống hàng thay vì ép ngang, hero co chữ ba nấc (3xl/4xl/5xl), veil đệm bằng clamp()
+  thay vì 2.5rem cứng từng đẩy tràn ngang máy 360px, bảng thành viên admin đã cuộn ngang từ
+  trước. Đo ở 375×812: tràn ngang 0px trên cả ba trang công khai.
+
 ## 0.7.0 — cái chờ thức dậy đúng lúc sự kiện xảy ra, và chữ thôi chìm vào trăng
 
 - **`waitForCondition` chuyển từ poll sang MutationObserver trong trang.** Vòng cũ lấy mẫu

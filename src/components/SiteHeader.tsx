@@ -8,7 +8,7 @@ export async function SiteHeader() {
   const user = await currentUser();
 
   return (
-    <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5">
+    <header className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-y-3 px-4 py-4 sm:px-6 sm:py-5">
       <Link href="/" className="flex items-center gap-3">
         <SectSeal size="2.6rem" />
         <span className="h-display text-lg font-semibold text-gilded">Auto HH3D</span>

@@ -22,7 +22,7 @@ export default async function DashboardPage() {
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-6xl px-6 pb-24">
+      <main className="mx-auto w-full max-w-6xl px-4 pb-24 sm:px-6">
         <div className="rise-in mb-8">
           <h1 className="h-display text-3xl font-bold text-gilded">Linh Đài</h1>
           <p className="mt-1 text-sm text-[var(--color-mist)]">

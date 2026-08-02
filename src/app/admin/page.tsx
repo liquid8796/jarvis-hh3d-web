@@ -34,7 +34,7 @@ export default async function AdminPage({
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-6xl px-6 pb-24">
+      <main className="mx-auto w-full max-w-6xl px-4 pb-24 sm:px-6">
         <div className="rise-in mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="h-display text-3xl font-bold text-gilded">Tông Môn</h1>

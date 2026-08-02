@@ -41,6 +41,11 @@ body {
   color: var(--color-parchment);
   font-family: var(--font-body);
   min-height: 100dvh;
+  /* Cột dọc + footer đẩy bằng margin-top:auto (xem .site-footer): footer DÍNH ĐÁY khung
+     nhìn khi trang ngắn và nằm sau nội dung khi trang dài. Thiếu nó, trang auth — vốn chỉ
+     cao 80dvh để căn giữa lá bài — thả dòng ký tên lơ lửng ở vạch 80% màn hình. */
+  display: flex;
+  flex-direction: column;
 }
 
 /* ---------------------------------------------------------------------------
@@ -57,9 +62,11 @@ body {
   background: #060b1a url("/backdrop.png") center / cover no-repeat;
 }
 
-/* Dòng ký tên cuối trang — nằm trên nền ảnh nên tự mang một dải mờ nhẹ cho khỏi chìm. */
+/* Dòng ký tên cuối trang — nằm trên nền ảnh nên tự mang một dải mờ nhẹ cho khỏi chìm.
+   margin-top:auto là nửa kia của sticky footer (xem body). */
 .site-footer {
   position: relative;
+  margin-top: auto;
   padding: 20px 24px 26px;
   text-align: center;
   font-size: 0.78rem;
@@ -151,14 +158,62 @@ body {
 
 /* Veil của hero trang chủ: vùng duy nhất chữ nằm đè trực tiếp lên mặt trăng của backdrop
    — chữ vàng gradient lẫn vào lõi trăng sáng, chữ sương lẫn vào quầng. Một tấm mờ tối
-   cục bộ, bo tròn, chỉ rộng bằng khối chữ: phần còn lại của tấm ảnh không bị che. */
+   cục bộ, bo tròn, chỉ rộng bằng khối chữ: phần còn lại của tấm ảnh không bị che.
+   Đệm co theo màn hình: 2.5rem cứng từng đẩy khối chữ tràn ngang trên máy 360px. */
 .hero-veil {
-  padding: 2rem 2.5rem 2.25rem;
+  padding: clamp(1.25rem, 4vw, 2rem) clamp(1rem, 5vw, 2.5rem) clamp(1.25rem, 4vw, 2.25rem);
   border-radius: 1.5rem;
   background: rgba(6, 11, 26, 0.58);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(232, 194, 92, 0.14);
   box-shadow: 0 8px 40px rgba(3, 6, 16, 0.45);
+}
+
+/* ---------------------------------------------------------------------------
+   Bảo hoa rơi — cánh hoa của Bảo Hoa tiên tử, chỉ rắc ở trang chủ.
+   Cánh hoa hồng phấn ánh tím, sáng mềm như phát quang; hình cánh đơn (hai góc
+   tròn chéo nhau), vừa rơi vừa nghiêng như bị gió đẩy. Hai chu kỳ lệch pha giữ
+   cho mười hai cánh không bao giờ rơi thành đàn — cùng thủ pháp với lá vàng cũ.
+--------------------------------------------------------------------------- */
+.petals {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.petals i {
+  position: absolute;
+  top: -5vh;
+  left: calc(2% + var(--i) * 8.3%);
+  width: 13px;
+  height: 10px;
+  background:
+    radial-gradient(120% 120% at 30% 25%, rgba(255, 236, 245, 0.95), rgba(248, 184, 208, 0.9) 45%, rgba(214, 130, 180, 0.85) 100%);
+  border-radius: 90% 4% 90% 4%;
+  box-shadow: 0 0 8px rgba(248, 184, 208, 0.45);
+  opacity: 0;
+  animation: petal-fall calc(11s + var(--i) * 1.9s) linear infinite;
+  animation-delay: calc(var(--i) * -2.7s);
+}
+
+/* Cánh chẵn nhỏ và tím hơn — một loài hoa, hai lớp cánh, cho chiều sâu. */
+.petals i:nth-child(2n) {
+  width: 9px;
+  height: 7px;
+  background:
+    radial-gradient(120% 120% at 30% 25%, rgba(243, 222, 255, 0.95), rgba(213, 165, 240, 0.85) 55%, rgba(168, 110, 205, 0.8) 100%);
+  box-shadow: 0 0 7px rgba(213, 165, 240, 0.4);
+}
+
+@keyframes petal-fall {
+  0% { transform: translate(0, -5vh) rotate(0deg); opacity: 0; }
+  6% { opacity: 0.9; }
+  45% { transform: translate(6vw, 46vh) rotate(160deg); }
+  70% { transform: translate(-2vw, 72vh) rotate(280deg); }
+  92% { opacity: 0.75; }
+  100% { transform: translate(4vw, 108vh) rotate(400deg); opacity: 0; }
 }
 
 .btn-danger {

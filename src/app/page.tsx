@@ -21,15 +21,23 @@ const PILLARS = [
 export default function LandingPage() {
   return (
     <>
+      {/* Bảo hoa rơi — cánh hoa hồng phấn của Bảo Hoa tiên tử (Phàm Nhân Tu Tiên), rắc
+          riêng cho trang chủ: đây là sảnh đón, và chân trang ký tên đúng vị tiên tử ấy.
+          pointer-events: none, nên hoa chỉ để ngắm, không bao giờ đứng chắn một cú bấm. */}
+      <div className="petals" aria-hidden>
+        {Array.from({ length: 12 }, (_, i) => (
+          <i key={i} style={{ "--i": i } as React.CSSProperties} />
+        ))}
+      </div>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-5xl px-6 pb-24">
+      <main className="mx-auto w-full max-w-5xl px-4 pb-24 sm:px-6">
         <section className="rise-in flex flex-col items-center py-14 text-center">
           <SectSeal size="5.5rem" />
           {/* Tấm veil chỉ ôm phần CHỮ của hero: đúng vùng mà mặt trăng trong ảnh nền làm
               chữ vàng lẫn chữ sương chìm nghỉm. Ấn ở trên và ba pillar bên dưới tự đứng
               được trên ảnh, nên chúng ở ngoài veil — ảnh được che ít nhất có thể. */}
           <div className="hero-veil mt-8 flex flex-col items-center">
-            <h1 className="h-display max-w-3xl text-4xl font-bold leading-tight md:text-5xl">
+            <h1 className="h-display max-w-3xl text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">
               <span className="text-gilded">Phàm nhân</span> cũng có thể
               <br />
               <span className="text-gilded">tu tiên bằng automation</span>

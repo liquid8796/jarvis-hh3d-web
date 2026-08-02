@@ -27,7 +27,7 @@ const SIMPLE_QUESTS: ReadonlyArray<{ key: string; name: string; hint: string }> 
   { key: "teLe", name: "Tế Lễ Tông Môn", hint: "Tế 10 Tinh Thạch cho tông môn." },
   { key: "phucLoiVip", name: "Phúc Lợi VIP", hint: "Nhận thêm lượt khắc trận văn theo hạng." },
   { key: "vongQuay", name: "Vòng Quay Phúc Vận", hint: "Quay hết lượt phúc vận trong ngày." },
-  { key: "vanDap", name: "Vấn Đáp", hint: "Trả lời câu đã thuộc; câu lạ để dành cho đạo hữu." },
+  { key: "vanDap", name: "Vấn Đáp", hint: "Tự trả lời câu đã biết. Câu lạ để bạn tự làm." },
   { key: "khoangMach", name: "Khoáng Mạch", hint: "Thu khoáng theo chu kỳ trong ngày." },
 ];
 
@@ -56,7 +56,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
             trên chính trang này người dùng cũng có một tài khoản Auto HH3D, nên một nút trần
             trụi ghi "Xoá tài khoản" là câu mời hiểu nhầm thành xoá danh tính của chính họ. */}
         <label className="label" htmlFor="gameCookie">
-          Tài khoản hoathinh3d — chuỗi cookie đăng nhập
+          Tài khoản hoathinh3d
         </label>
 
         {/* Cookie đi MỘT CHIỀU: nhập vào thì được, đọc ra thì không. Đã mã hoá trong
@@ -90,16 +90,16 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
           className="input h-24 resize-y font-mono text-xs"
           placeholder={
             hasCookie
-              ? "Để trống nếu giữ nguyên cookie đang dùng — dán chuỗi mới để thay thế"
-              : "Dán chuỗi cookie (wordpress_logged_in_…) tại đây"
+              ? "Để trống nếu giữ tài khoản cũ. Dán chuỗi mới để thay."
+              : "Dán chuỗi cookie đăng nhập vào đây"
           }
           autoComplete="off"
           spellCheck={false}
         />
         <p className="mt-1 text-xs text-[var(--color-mist)]">
-          Chuỗi này được niêm phong trước khi cất vào tàng khố và chỉ được mở đúng khoảnh khắc
-          linh sứ nhận việc — nó không bao giờ quay lại trình duyệt, kể cả của chính đạo hữu.
-          {hasCookie && " Để trống ô này khi lưu thì tài khoản cũ vẫn nguyên."}
+          Đây là chuỗi cookie giúp auto đăng nhập game thay bạn. Lưu xong sẽ được mã hoá và
+          không bao giờ hiện lại trên màn hình.
+          {hasCookie && " Để trống ô này khi lưu thì tài khoản cũ giữ nguyên."}
         </p>
       </div>
 
@@ -127,17 +127,15 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
         ))}
       </div>
       <p className="mb-4 text-xs text-[var(--color-mist)]">
-        Linh sứ tự nhận ra tài khoản của đạo hữu là VIP hay thường ngay khi ghé bảng nhiệm vụ
-        — tài khoản thường sẽ tự bỏ qua nhiệm vụ VIP, không cần khai gì ở đây.
+        Auto tự biết tài khoản của bạn là VIP hay thường, và tự bỏ qua nhiệm vụ không dùng
+        được. Bạn không phải chọn gì ở đây.
       </p>
 
       {/* Tab Thường: thành thật là chỗ giữ chỗ, chứ không phải một tab trống vô cớ. */}
       <div hidden={questTab !== "free"}>
         <div className="mb-6 rounded-xl border border-dashed border-[var(--color-ink-600)] p-6 text-center">
           <p className="text-sm text-[var(--color-mist)]">
-            Chưa có gì ở đây — mọi nhiệm vụ hiện có đều được ghi trên tài khoản VIP nên nằm cả
-            bên tab VIP. Flow cho tài khoản thường sẽ về tab này sau; phần nhận diện hạng thì
-            đã chạy rồi.
+            Đang làm. Các nhiệm vụ hiện có đều nằm ở tab VIP.
           </p>
         </div>
       </div>
@@ -193,8 +191,8 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
               defaultValue={config.quests.meCung.kickHp}
             />
             <p className="mt-1 text-xs text-[var(--color-mist)]">
-              0 = không trục xuất ai. Khác 0 = mời thành viên có HP dưới mức này ra để dành
-              chỗ cho người mạnh hơn.
+              Ai có HP thấp hơn mức này sẽ bị mời ra để nhường chỗ cho người khoẻ hơn.
+              Để 0 nếu không muốn đuổi ai.
             </p>
           </div>
 
@@ -213,9 +211,8 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
               defaultValue={config.quests.meCung.kickIdleSec}
             />
             <p className="mt-1 text-xs text-[var(--color-mist)]">
-              0 = không giục ai. Khác 0 = thành viên ngồi trong phòng quá số giây này mà chưa
-              bấm sẵn sàng sẽ bị mời ra — ghế của người chưa sẵn sàng là ghế người khác không
-              ngồi được. Đồng hồ tính từ lúc linh sứ nhìn thấy họ lần đầu.
+              Ai vào phòng mà chờ quá lâu không bấm sẵn sàng sẽ bị mời ra, để phòng khỏi kẹt.
+              Để 0 nếu không muốn giục.
             </p>
           </div>
 
@@ -228,7 +225,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
             />
             Dừng khi đã đủ huyền tinh trong ngày
             <span className="text-xs text-[var(--color-mist)]">
-              (tắt = đánh tới hết trần lượt)
+              (bỏ tick để đánh hết lượt)
             </span>
           </label>
         </div>
@@ -305,7 +302,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
           Nhiệm vụ ngày
         </legend>
         <p className="mb-3 text-xs text-[var(--color-mist)]">
-          Những việc mỗi ngày một lần — bật là linh sứ tự lo, không cần chỉnh gì thêm.
+          Mỗi ngày một lần. Tick là xong, không phải chỉnh gì thêm.
         </p>
         <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
           {SIMPLE_QUESTS.map((q) => (

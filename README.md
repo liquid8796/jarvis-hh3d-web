@@ -6,6 +6,9 @@ rồi automation **chạy trên server** dù đạo hữu đã tắt trình duy�
 Đây là bản web của [JarvisHH3D](../JarvisHH3D) (bản desktop). Hai sản phẩm chia nhau cùng
 một mô hình nhiệm vụ — Mê Cung, Luyện Đan Đường, cùng những tuỳ chọn ấy.
 
+> **Người dùng cuối đọc [HUONG-DAN.md](HUONG-DAN.md)** — hướng dẫn cày auto, viết cho
+> người mới, không nhắc gì tới hạ tầng. File này thì dành cho người vận hành.
+
 ---
 
 ## 1. Kiến trúc — và vì sao lại thế
@@ -442,7 +445,7 @@ File SQL sinh ra **được commit** — lịch sử schema nằm trong git, kh�
 
 ## 6. Lịch sử phát hành
 
-Bản hiện tại: **0.14.1**.
+Bản hiện tại: **0.15.0**.
 
 Lịch sử nằm ở [CHANGELOG.md](CHANGELOG.md), tách riêng khỏi file này — hai tài liệu trả lời
 hai câu hỏi khác nhau: README nói *hệ thống chạy thế nào*, changelog nói *vì sao nó thành ra

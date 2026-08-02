@@ -158,8 +158,8 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
       )}
 
       <p className="mb-2 text-xs text-[var(--color-mist)]">
-        Đàn pháp do linh sứ thay mặt đạo hữu vận hành. Tắt trình duyệt, tắt máy — lượt vẫn tiếp
-        diễn, mở lại trang là thấy đúng chỗ đang tới.
+        Bấm Khai Đàn xong bạn cứ tắt trình duyệt. Auto vẫn chạy, mở lại trang là thấy đang
+        tới đâu.
         {job?.workerId && (
           <>
             {" "}
@@ -188,7 +188,7 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
       >
         {events.length === 0 ? (
           <p className="py-10 text-center text-sm text-[var(--color-mist)]">
-            Nhật ký tu luyện sẽ hiện ở đây khi đàn pháp khởi động.
+            Bấm Khai Đàn để bắt đầu. Auto làm tới đâu sẽ kể ở đây.
           </p>
         ) : (
           events.map((e) => (

@@ -1,0 +1,151 @@
+# Hướng dẫn dùng Auto HH3D
+
+Auto này cày hộ bạn ở hoathinh3d: Mê Cung, Luyện Đan Đường, và các nhiệm vụ ngày.
+Bạn bấm nút một lần, nó chạy tiếp kể cả khi bạn tắt máy.
+
+Web: <https://auto-hh3d.vercel.app>
+
+---
+
+## 1. Vào được đã
+
+1. Vào trang, bấm **Bái sư** để đăng ký.
+2. Chờ tông chủ duyệt. Chưa duyệt thì bạn chỉ thấy phòng chờ.
+3. Duyệt xong, đăng nhập lại là vào **Linh Đài** — nơi làm mọi thứ.
+
+---
+
+## 2. Ba bước để chạy
+
+### Bước 1 — Đưa tài khoản game cho auto
+
+Auto cần đăng nhập game thay bạn, nên nó cần **chuỗi cookie** của tài khoản.
+Không phải mật khẩu. Bạn không đưa mật khẩu cho ai cả.
+
+**Lấy cookie trên máy tính (Chrome / Edge / Cốc Cốc):**
+
+1. Đăng nhập hoathinh3d như bình thường.
+2. Nhấn `F12` để mở bảng công cụ.
+3. Chọn tab **Application** (hoặc **Ứng dụng**).
+4. Cột trái, mở **Cookies** → bấm vào dòng `https://hoathinh3d.am`.
+5. Tìm dòng có tên bắt đầu bằng `wordpress_logged_in_`. Đây là dòng quan trọng nhất.
+6. Copy cả **Name** và **Value** của nó, ghép lại theo dạng `tên=giá_trị`.
+
+Dán vào ô **Tài khoản hoathinh3d** rồi bấm **Khắc Ngọc Giản**.
+
+> Cách nhanh hơn: cài tiện ích **Cookie-Editor**, bấm **Export → JSON**, rồi dán nguyên
+> cả cục vào ô đó. Auto đọc được cả hai kiểu.
+
+Lưu xong bạn sẽ thấy dòng **Đã lưu tài khoản (đã mã hoá)**, kèm số cookie nhận được.
+Nếu nó báo *không thấy cookie đăng nhập*, nghĩa là bạn copy thiếu dòng
+`wordpress_logged_in_...` — làm lại bước 5.
+
+**Vài điều nên biết:**
+
+- Chuỗi này được mã hoá khi lưu, và không bao giờ hiện lại trên màn hình.
+- Đăng nhập game ở máy khác, trình duyệt khác: **không sao**.
+- **Bấm Đăng xuất** trong game thì cookie chết, phải lấy lại chuỗi mới.
+- Cookie cũng tự hết hạn sau một thời gian. Khi auto báo hết phiên, lấy lại là xong.
+
+### Bước 2 — Chọn nhiệm vụ
+
+Tick những cái bạn muốn auto làm.
+
+| Nhiệm vụ | Ghi chú |
+|---|---|
+| **Mê Cung** | Auto tự lập phòng, chờ đủ 5 người, rồi đánh. Đây là nhiệm vụ dài nhất. |
+| **Luyện Đan Đường** | Thu đan → phân giải → khai lò mẻ mới → giữ lửa. Ghé lại mỗi ~26 phút. |
+| **Nhiệm vụ ngày** | Điểm Danh, Hoang Vực, Phúc Lợi Đường, Thí Luyện, Bí Cảnh, Tế Lễ, Phúc Lợi VIP, Vòng Quay, Vấn Đáp, Khoáng Mạch. Tick là xong, không phải chỉnh gì. |
+
+Mê Cung có vài tuỳ chọn đáng để ý:
+
+- **Trục xuất theo HP** — ai yếu hơn mức này thì mời ra để nhường chỗ. Để `0` là không đuổi ai.
+- **Trục xuất nếu không sẵn sàng sau (giây)** — ai vào phòng mà ngồi lì không bấm sẵn sàng
+  thì mời ra, kẻo kẹt phòng. Để `0` là không giục.
+- **Dừng khi đã đủ huyền tinh** — bỏ tick nếu muốn đánh hết lượt trong ngày.
+
+Auto tự biết tài khoản bạn là VIP hay thường, và tự bỏ qua nhiệm vụ bạn không dùng được.
+
+Chọn xong nhớ bấm **Khắc Ngọc Giản**.
+
+### Bước 3 — Khai Đàn
+
+Bấm **Khai Đàn**. Xong. Bạn có thể tắt trình duyệt, tắt máy, đi ngủ.
+
+Mở lại trang lúc nào cũng thấy auto đang làm tới đâu, trong khung **Nhật ký tu luyện**.
+Muốn dừng thì bấm **Thu Đàn** — auto dừng ở điểm an toàn gần nhất, không cắt ngang trận.
+
+---
+
+## 3. "Linh sứ" là gì, và khi nào bạn phải quan tâm
+
+Linh sứ là người thật sự mở trình duyệt và chơi hộ bạn. Web chỉ ghi nhận ý muốn của bạn;
+linh sứ mới là kẻ làm.
+
+Trong mục **Linh Sứ** bạn sẽ thấy một trong hai:
+
+**"Bạn không cần cài gì cả"** — có linh sứ tông môn trực sẵn, dùng chung cho mọi người.
+Cứ Khai Đàn là chạy. Bỏ qua phần còn lại của mục này.
+
+**"Chưa có linh sứ nào trực"** — bấm Khai Đàn lúc này thì đàn pháp phải nằm chờ.
+Bạn có thể tự nuôi một linh sứ trên máy mình:
+
+1. Bấm **Tạo bộ cài cho máy của tôi**.
+2. Bấm **⬇ Tải bộ cài cho Windows**. Tệp `cai-linh-su.cmd` về thư mục Tải xuống.
+3. Bấm đúp vào tệp đó. Windows hỏi thì chọn **Run anyway**.
+4. Đợi vài phút. Xong thì tên linh sứ hiện ở danh sách, kèm chấm xanh.
+
+Bạn **không cần cài Node.js hay phần mềm nào khác** — bộ cài mang sẵn mọi thứ, và không
+cần quyền quản trị.
+
+**Lưu ý quan trọng:** linh sứ máy nhà chỉ chạy khi máy bạn bật. Tắt máy là auto dừng.
+
+**Gỡ đi:** chạy `uninstall.ps1` trong thư mục cài
+(`%LOCALAPPDATA%\AutoHH3D\LinhSu`). Nó xoá sạch, máy trở lại như trước.
+
+> **Đừng bấm "Phát linh phù mới" nếu không cần.** Nó thay chìa khoá, và linh sứ đang chạy
+> sẽ lặng lẽ ngừng nhận việc cho tới khi bạn cài lại bằng bộ cài mới.
+
+---
+
+## 4. Khi có trục trặc
+
+| Bạn thấy | Nghĩa là | Làm gì |
+|---|---|---|
+| *Chưa có tài khoản game* | Chưa dán cookie | Làm lại Bước 1 |
+| *Chưa chọn nhiệm vụ nào* | Chưa tick nhiệm vụ nào | Tick rồi bấm Khắc Ngọc Giản |
+| *Auto đang chạy* | Đang có lượt chạy dở | Bấm Thu Đàn trước |
+| *Chuỗi cookie không đọc được* | Copy thiếu hoặc sai định dạng | Làm lại Bước 1, nhớ lấy dòng `wordpress_logged_in_` |
+| *Tài khoản hoathinh3d đã hết phiên đăng nhập* | Cookie hết hạn, hoặc bạn đã đăng xuất game | Lấy cookie mới, dán lại |
+| *Không có linh sứ nào tiếp nhận* | Không ai đang trực | Xem mục 3, cài linh sứ cho máy mình |
+| *Màn kiểm tra của trang game không tự qua* | Game đang chặn bot | Chờ lượt sau, auto tự thử lại |
+| Linh sứ chuyển sang **vắng** | Máy tắt, mạng rớt, hoặc bạn vừa phát linh phù mới | Bật máy lại, hoặc cài lại bằng bộ cài mới |
+
+Nhật ký đầy quá thì bấm **Dọn nhật ký** cho sạch. Lịch sử cũ mất luôn, nhưng lượt đang
+chạy không bị ảnh hưởng.
+
+---
+
+## 5. Hỏi nhanh đáp gọn
+
+**Auto có cần mở trình duyệt của tôi không?**
+Không. Bấm Khai Đàn xong bạn tắt hết cũng được.
+
+**Tôi đổi sang trình duyệt khác thì sao?**
+Chỉ cần đăng nhập lại vào web. Linh sứ không liên quan gì tới trình duyệt bạn dùng.
+
+**Có phải đưa mật khẩu game không?**
+Không bao giờ. Chỉ chuỗi cookie, và nó được mã hoá.
+
+**Nhiều người cùng chạy một lúc được không?**
+Được. Mỗi người một lượt riêng, không giẫm chân nhau.
+
+**Auto chạy Mê Cung mất bao lâu?**
+Chờ đủ người có thể vài chục phút, đánh xong tới 35 phút. Cứ để đó.
+
+**Tôi vừa sửa cấu hình lúc auto đang chạy?**
+Lượt đang chạy giữ cấu hình cũ. Lượt sau mới dùng bản mới.
+
+---
+
+Có gì lạ thì nhắn trong **Tụ Nghĩa Sảnh** — kèm ảnh chụp nhật ký thì dễ xem giúp hơn.

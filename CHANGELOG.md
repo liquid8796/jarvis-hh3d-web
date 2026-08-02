@@ -11,6 +11,24 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.15.0 — chữ trên Linh Đài nói tiếng người, và có hướng dẫn cho người mới
+
+- **Viết lại toàn bộ chữ hướng dẫn trên Linh Đài.** Giữ nguyên tên riêng có hồn (Linh Đài,
+  Khai Đàn, Ngọc Giản, Linh Sứ) — đó là bản sắc sản phẩm — nhưng phần GIẢI THÍCH thì nói
+  thẳng. Bỏ những câu gạch-ngang nối dài kiểu "được niêm phong trước khi cất vào tàng khố
+  và chỉ được mở đúng khoảnh khắc linh sứ nhận việc"; thay bằng "lưu xong sẽ được mã hoá và
+  không bao giờ hiện lại trên màn hình". Dòng đầu trang giờ nói ngay ba bước phải làm, vì
+  người mới mở trang cần biết việc của mình chứ không cần một câu chào hay ho.
+- Ba thông báo lỗi lúc Khai Đàn cũng viết lại: mỗi câu nói rõ **phải bấm gì tiếp theo**,
+  thay vì chỉ tuyên bố cái sai.
+- **Cảnh báo linh sứ vừa bị khai tử.** Phát linh phù mới thì linh sứ đang chạy ngừng nhận
+  việc, nhưng nó không chết hẳn — cứ quay vô ích và trên màn hình chỉ lặng lẽ thành "vắng".
+  Hộp xác nhận cảnh báo TRƯỚC khi bấm là chưa đủ; giờ có thêm một dòng đỏ hiện NGAY LÚC
+  người ta nhìn thấy hậu quả, kèm việc cần làm. Đúng chuyện đã xảy ra ngày 02/08.
+- **Thêm [HUONG-DAN.md](HUONG-DAN.md)** — hướng dẫn cho người chơi, không phải cho người
+  vận hành: lấy cookie thế nào (kèm cả đường Cookie-Editor), mỗi tuỳ chọn nghĩa là gì, khi
+  nào mới phải quan tâm tới "linh sứ", bảng tra lỗi thường gặp, và mấy câu hỏi nhanh.
+
 ## 0.14.1 — bật chín nhiệm vụ vẫn bị dội "chưa bật nhiệm vụ nào"
 
 - **Chốt khai đàn chỉ đếm hai nhiệm vụ trong số mười hai.** Nó ra đời khi hồ sơ chỉ có Mê

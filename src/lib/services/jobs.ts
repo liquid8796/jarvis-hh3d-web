@@ -53,13 +53,13 @@ export async function startJob(
 ): Promise<{ ok: true; job: JobRow } | { ok: false; error: string }> {
   const existing = await getActiveJob(userId);
   if (existing) {
-    return { ok: false, error: "Đàn pháp đang vận hành — dừng lượt hiện tại trước đã." };
+    return { ok: false, error: "Auto đang chạy. Bấm Thu Đàn để dừng trước đã." };
   }
 
   // Kiểm tra bằng bản KHÔNG chứa bí mật: ở đây chỉ cần biết cookie có tồn tại hay không.
   const view = await getEditableConfig(userId);
   if (!view.hasCookie) {
-    return { ok: false, error: "Chưa có tài khoản hoathinh3d — dán chuỗi cookie đăng nhập vào phần Tài khoản trước." };
+    return { ok: false, error: "Chưa có tài khoản game. Dán chuỗi cookie vào ô Tài khoản hoathinh3d rồi bấm Khắc Ngọc Giản." };
   }
 
   // Duyệt MỌI nhiệm vụ, không liệt kê tên. Chốt này ra đời khi hồ sơ chỉ có Mê Cung và
@@ -68,7 +68,7 @@ export async function startJob(
   // thẳng với những ô đang tick trước mắt họ. Sổ điểm danh 02/08 cho thấy đúng một người
   // thật rơi vào đó. Đọc từ dữ liệu thì nhiệm vụ thứ mười ba tự được tính.
   if (!Object.values(view.quests).some((q) => q.enabled)) {
-    return { ok: false, error: "Chưa bật nhiệm vụ nào — chọn ít nhất một nhiệm vụ để khai đàn." };
+    return { ok: false, error: "Chưa chọn nhiệm vụ nào. Tick ít nhất một nhiệm vụ rồi bấm Khắc Ngọc Giản." };
   }
 
   // Snapshot giữ nguyên cookie ở dạng ĐÃ MÃ HOÁ. Bảng jobs sống lâu hơn bảng config rất

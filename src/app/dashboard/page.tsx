@@ -27,9 +27,11 @@ export default async function DashboardPage() {
       <main className="mx-auto w-full max-w-6xl px-4 pb-24 sm:px-6">
         <div className="rise-in mb-8">
           <h1 className="h-display text-3xl font-bold text-gilded">Linh Đài</h1>
+          {/* Ba bước, nói ngay ở dòng đầu. Người mới mở trang này cần biết mình phải làm gì,
+              chứ không cần một câu chào hay ho. */}
           <p className="mt-1 text-sm text-[var(--color-mist)]">
-            Chào đạo hữu <span className="text-gilded">{user.displayName}</span> — khắc cấu hình,
-            khai đàn, rồi để linh sứ lo phần còn lại.
+            Chào <span className="text-gilded">{user.displayName}</span>. Ba bước: dán tài khoản
+            game → chọn nhiệm vụ → bấm Khai Đàn.
           </p>
         </div>
 

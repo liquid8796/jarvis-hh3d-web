@@ -1,8 +1,8 @@
 {
   "name": "jarvis-hh3d-web",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
-  "description": "Jarvis HH3D — control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn tự động chạy trên server.",
+  "description": "Auto HH3D — control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn tự động chạy trên server.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

@@ -1,6 +1,6 @@
 # Changelog
 
-Lịch sử phát hành của Jarvis HH3D — Web. Mới nhất ở trên.
+Lịch sử phát hành của Auto HH3D — Web (tên cũ: Jarvis HH3D). Mới nhất ở trên.
 
 Mỗi mục nói **cái gì đổi và vì sao**, thường là kể đích danh lần hỏng việc đã buộc phải đổi.
 Đó là chủ ý: đây là chỗ duy nhất lý do còn sống sót: mã nguồn chỉ giữ được kết quả của một
@@ -10,6 +10,24 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
+
+## 0.6.0 — thành Auto HH3D, và artwork thật thay cho bản dựng lại
+
+- **Đổi tên hiển thị: Jarvis HH3D → Auto HH3D** — title, header, chữ trên trang chủ. Tên
+  repo và tên gói giữ nguyên: đường link, remote và lịch sử không việc gì phải gãy theo một
+  cái tên hiển thị.
+- **Nền và ấn giờ là FILE GỐC**, không phải bản dựng lại. Bản 0.5.0 vẽ xấp xỉ cả cảnh đêm
+  lẫn con dấu bằng CSS/SVG vì chưa có file; giờ hai tấm gốc nằm trong `public/`
+  (`backdrop.png` — Nam Cung Uyển dưới trăng, `seal.png` — ấn thư pháp), nguyên vẹn từng
+  pixel, và toàn bộ trăng-lá-núi-chùa giả cùng font Dancing Script đã dọn đi: hai mặt trăng
+  trên một bầu trời là thứ không cứu được. Không phủ lớp tối lên ảnh — header và card tự
+  mang nền mờ của chúng, nên ảnh được để yên đúng như yêu cầu.
+- Ấn hiển thị qua `next/image` với `priority`: con dấu luôn đứng đầu màn hình, để lazy thì
+  nó là thứ nhấp nháy vào sau cùng ở đúng chỗ mắt nhìn trước tiên. Optimizer phục vụ bản
+  ~120px, không đẩy nguyên tấm 2.3MB xuống trình duyệt.
+- Chữ mới trên trang chủ: "Nhật Ký Tu Luyện" nói giọng tu chân ("log bằng ngôn ngữ nhân
+  tộc"), khối "Tông Môn Nghiêm Cẩn" thêm dòng "Chỉ dành cho thành viên Lạc Vân Tông", và
+  chân trang ký "© 2026 Bảo Hoa tiên tử. All rights reserved."
 
 ## 0.5.0 — hai hạng tài khoản, và trang web khoác áo đêm trăng
 

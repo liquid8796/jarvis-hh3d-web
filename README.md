@@ -1,4 +1,4 @@
-# Jarvis HH3D — Web
+# Auto HH3D — Web
 
 Control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ → tông môn duyệt → khai đàn,
 rồi automation **chạy trên server** dù đạo hữu đã tắt trình duyệt.
@@ -481,7 +481,7 @@ File SQL sinh ra **được commit** — lịch sử schema nằm trong git, kh�
 
 ## 6. Lịch sử phát hành
 
-Bản hiện tại: **0.5.0**.
+Bản hiện tại: **0.6.0**.
 
 Lịch sử nằm ở [CHANGELOG.md](CHANGELOG.md), tách riêng khỏi file này — hai tài liệu trả lời
 hai câu hỏi khác nhau: README nói *hệ thống chạy thế nào*, changelog nói *vì sao nó thành ra

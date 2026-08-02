@@ -10,10 +10,11 @@ const PILLARS = [
   {
     title: "Tông Môn Nghiêm Cẩn",
     body: "Bái sư là bước đầu; trưởng môn duyệt danh sách môn đồ, ai được phép khai đàn do tông môn quyết.",
+    badge: "Chỉ dành cho thành viên Lạc Vân Tông",
   },
   {
     title: "Nhật Ký Tu Luyện",
-    body: "Mọi lượt chạy kể chuyện bằng tiếng người: ai vào phòng, trục xuất ai, huyền tinh thu về bao nhiêu — từng dòng, từng thời khắc.",
+    body: "Mọi lượt chạy log bằng ngôn ngữ nhân tộc: ai vào phòng, trục xuất ai, huyền tinh thu về bao nhiêu — từng dòng, từng thời khắc.",
   },
 ];
 
@@ -30,7 +31,7 @@ export default function LandingPage() {
             <span className="text-gilded">tu tiên bằng automation</span>
           </h1>
           <p className="mt-6 max-w-xl text-base leading-relaxed text-[var(--color-mist)]">
-            Jarvis HH3D đưa cỗ máy nhiệm vụ ngày của hoathinh3d lên mây: cấu hình một lần,
+            Auto HH3D đưa cỗ máy nhiệm vụ ngày của hoathinh3d lên mây: cấu hình một lần,
             khai đàn một chạm, linh sứ trên server lo phần cày cuốc — đạo hữu chỉ việc thu
             linh thạch.
           </p>
@@ -53,6 +54,11 @@ export default function LandingPage() {
             >
               <h2 className="h-display mb-3 text-lg font-semibold text-gilded">{p.title}</h2>
               <p className="text-sm leading-relaxed text-[var(--color-mist)]">{p.body}</p>
+              {"badge" in p && (
+                <p className="mt-3 text-sm font-semibold text-[var(--color-gold-300)]">
+                  {p.badge}
+                </p>
+              )}
             </article>
           ))}
         </section>

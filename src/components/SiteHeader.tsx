@@ -11,7 +11,7 @@ export async function SiteHeader() {
     <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5">
       <Link href="/" className="flex items-center gap-3">
         <SectSeal size="2.6rem" />
-        <span className="h-display text-lg font-semibold text-gilded">Jarvis HH3D</span>
+        <span className="h-display text-lg font-semibold text-gilded">Auto HH3D</span>
       </Link>
 
       <nav className="flex items-center gap-3 text-sm">

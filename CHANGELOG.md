@@ -11,6 +11,20 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.8.1 — có đường đặt lại mật khẩu, vì seed cố ý không làm việc đó
+
+- **`npm run db:reset-password <tên>` ra đời.** `db:seed` **cố ý** không đổi mật khẩu của
+  tài khoản đã tồn tại — một lệnh seed lỡ tay không được phép reset chìa khoá của hệ thống
+  đang chạy. Điều đó đúng, nhưng nó để lại một ngõ cụt có thật: khi mật khẩu trưởng môn thất
+  lạc, chạy lại seed chỉ in "đã tồn tại — không đổi gì cả" rồi **thoát 0**, trông y hệt như
+  đã làm xong việc. Người dùng gõ mật khẩu mới vào `.env`, chạy seed, thấy màu xanh, và vẫn
+  không vào được — không một dòng nào nói rằng mật khẩu chưa hề bị đụng tới.
+- Script được làm cho **ồn ào** đúng ba chỗ đã từng cắn dự án này: tên tài khoản phải khai
+  tường minh (không mặc định, để không lỡ tay), database được **in ra trước khi ghi** (hai
+  database trên cùng một host đã một lần bị nhầm), và mật khẩu đi qua biến môi trường chứ
+  không qua tham số dòng lệnh — tham số sẽ nằm lại trong lịch sử shell và hiện trong bảng
+  tiến trình.
+
 ## 0.8.0 — bảo hoa rơi, footer về đúng đáy, và web vừa mọi màn hình
 
 - **Footer hết lơ lửng.** Trang auth chỉ cao 80dvh để căn giữa lá bài, nên dòng ký tên đứng

@@ -33,6 +33,11 @@ export function ConfigForm({
   const [cleared, setCleared] = useState(false);
   const hasCookie = config.hasCookie && !cleared;
 
+  // Hai tab nhiệm vụ, theo đúng cách site chia tài khoản. Tab chỉ ĐỔI HIỂN THỊ (display:
+  // none), không unmount: các ô nhập phải luôn nằm trong DOM để FormData lúc submit gom đủ
+  // giá trị — unmount tab VIP rồi bấm lưu từ tab Thường là lặng lẽ tắt hết nhiệm vụ.
+  const [questTab, setQuestTab] = useState<"vip" | "free">("vip");
+
   return (
     <form action={action} className="card card-hairline p-6">
       <h2 className="h-display mb-5 text-xl font-semibold text-gilded">Ngọc Giản Cấu Hình</h2>
@@ -118,6 +123,46 @@ export function ConfigForm({
         </p>
       </div>
 
+      {/* ------------------------------------------------------- Hai tab nhiệm vụ */}
+      <div className="mb-4 flex gap-1 rounded-xl border border-[var(--color-ink-600)]/60 p-1">
+        {(
+          [
+            ["vip", "Nhiệm vụ VIP"],
+            ["free", "Nhiệm vụ Thường"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setQuestTab(key)}
+            aria-pressed={questTab === key}
+            className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+              questTab === key
+                ? "bg-[var(--color-ink-600)]/70 text-[var(--color-gold-300)]"
+                : "text-[var(--color-mist)] hover:text-[var(--color-parchment)]"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="mb-4 text-xs text-[var(--color-mist)]">
+        Linh sứ tự nhận ra hạng tài khoản khi ghé hub nhiệm vụ (thẻ Phúc Lợi VIP chỉ hiện cho
+        tài khoản VIP) — tài khoản thường sẽ tự bỏ qua nhiệm vụ VIP, không cần khai gì ở đây.
+      </p>
+
+      {/* Tab Thường: thành thật là chỗ giữ chỗ, chứ không phải một tab trống vô cớ. */}
+      <div hidden={questTab !== "free"}>
+        <div className="mb-6 rounded-xl border border-dashed border-[var(--color-ink-600)] p-6 text-center">
+          <p className="text-sm text-[var(--color-mist)]">
+            Chưa có gì ở đây — mọi nhiệm vụ hiện có đều được ghi trên tài khoản VIP nên nằm cả
+            bên tab VIP. Flow cho tài khoản thường sẽ về tab này sau; phần nhận diện hạng thì
+            đã chạy rồi.
+          </p>
+        </div>
+      </div>
+
+      <div hidden={questTab !== "vip"}>
       {/* ---------------------------------------------------------------- Mê Cung */}
       <fieldset className="mb-5 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
         <legend className="px-2">
@@ -252,6 +297,7 @@ export function ConfigForm({
           </div>
         </div>
       </fieldset>
+      </div>
 
       <div className="flex flex-wrap items-center gap-4">
         <button type="submit" className="btn btn-gold" disabled={pending}>

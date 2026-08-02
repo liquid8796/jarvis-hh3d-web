@@ -7,7 +7,8 @@
  * bao giờ kéo theo một thư viện trình duyệt nặng nề mà nó không dùng.
  */
 
-import { createQuestEngine, enabledQuestsInOrder, QuestAborted } from "./engine.mjs";
+import { vipProbe } from "./boardScripts.mjs";
+import { createQuestEngine, enabledQuestsInOrder, questsForAccount, QuestAborted } from "./engine.mjs";
 import { profileForConfig } from "./profile.mjs";
 import { createSession } from "./session.mjs";
 
@@ -98,14 +99,13 @@ export async function runCycle(deps) {
 
   const translationNotes = [];
   const profile = profileForConfig(config, (m) => translationNotes.push(m));
-  const quests = enabledQuestsInOrder(profile);
+  const enabled = enabledQuestsInOrder(profile);
 
-  if (quests.length === 0) {
+  if (enabled.length === 0) {
     return { outcome: "done", message: "Không có nhiệm vụ nào được bật — kết thúc lượt." };
   }
 
   for (const note of translationNotes) await say(note, "warn");
-  await say(`Sẽ hành sự: ${quests.map((q) => q.name).join(" · ")}.`);
 
   const browser = await chromium.launch({ headless });
   let done = 0;
@@ -127,6 +127,47 @@ export async function runCycle(deps) {
         debug: (m) => log.debug("Trình duyệt", m),
       },
     });
+
+    // Hạng tài khoản quyết định kế hoạch, nên đọc nó TRƯỚC khi hứa hẹn gì. Ghé hub một lần —
+    // trang duy nhất mang tín hiệu — và poll thay vì đọc một phát: hub render làm hai đợt,
+    // probe tự trả null chừng nào chưa chứng minh được sự vắng mặt (xem vipProbe). Mọi ngả
+    // thất bại đều đổ về VIP: đó là hạng duy nhất mà hồ sơ hiện có được viết cho, và đoán
+    // nhầm "thường" nghĩa là lặng lẽ bỏ trống trọn một lượt của người ta.
+    let isVip = true;
+    const nav = await session.navigate(session.resolveUrl(profile.dailyQuestPath));
+    if (nav.ok) {
+      const probeDeadline = Date.now() + 20_000;
+      while (Date.now() < probeDeadline) {
+        const verdict = await session.evaluate(vipProbe);
+        if (typeof verdict === "boolean") {
+          isVip = verdict;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    } else {
+      await say(`Không mở được hub để xem hạng tài khoản (${nav.error}) — coi như VIP.`, "warn");
+    }
+
+    const quests = questsForAccount(profile, { isVip });
+    const leftOut = enabled.length - quests.length;
+
+    if (!isVip) {
+      await say(
+        leftOut > 0
+          ? `Tài khoản thường — để yên ${leftOut} nhiệm vụ VIP; flow nhiệm vụ thường sẽ có sau.`
+          : "Tài khoản thường.",
+      );
+    }
+
+    if (quests.length === 0) {
+      return {
+        outcome: "done",
+        message: "Tài khoản thường mà mọi nhiệm vụ đã bật đều là hàng VIP — chưa có gì để chạy.",
+      };
+    }
+
+    await say(`Sẽ hành sự: ${quests.map((q) => q.name).join(" · ")}.`);
 
     const engine = createQuestEngine({ log, shouldStop });
 

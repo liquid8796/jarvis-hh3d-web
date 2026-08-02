@@ -11,6 +11,34 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.5.0 — hai hạng tài khoản, và trang web khoác áo đêm trăng
+
+- **Nhiệm vụ tách hai tab: VIP và Thường** — theo đúng cách site chia tài khoản. Mọi nhiệm
+  vụ hiện có đều được ghi trên tài khoản VIP nên nằm cả bên tab VIP; tab Thường thành thật
+  là chỗ giữ chỗ, flow cho tài khoản thường sẽ về sau. Tab chỉ đổi hiển thị chứ không
+  unmount: các ô nhập phải luôn trong DOM để FormData lúc lưu gom đủ giá trị — unmount tab
+  VIP rồi bấm lưu từ tab Thường là lặng lẽ tắt hết nhiệm vụ.
+- **Linh sứ tự nhận ra hạng tài khoản**, không bắt người dùng khai. Tín hiệu là thẻ Phúc Lợi
+  VIP `#nv-pt-vip-quest` trên hub — site chỉ phục vụ thẻ này cho tài khoản VIP. Probe trả
+  ba đáp án và đáp án thứ ba là thứ đắt nhất: `null` khi CHƯA CHỨNG MINH ĐƯỢC sự vắng mặt.
+  Hub render làm hai đợt (bốn thẻ đầu tới ngay, đợt chứa thẻ VIP tới sau ~2.5 giây — đo từ
+  bản ghi thực địa), nên một probe vội sẽ phán "thường" ngay trong khe hở đó và một tài
+  khoản VIP mất trọn chu kỳ. Sự vắng mặt chỉ được tính khi một thẻ CÙNG ĐỢT đã có mặt.
+  Chính suite fixture bên desktop bắt được lỗi này trước khi nó kịp chạy thật (ca V6).
+- Mọi ngả mù — hub không mở được, probe không trả lời kịp — đều đổ về VIP: đó là hạng duy
+  nhất hồ sơ hiện có được viết cho, và đoán nhầm "thường" là lặng lẽ bỏ trống lượt của
+  người ta.
+- `requiresVip` vắng mặt trong hồ sơ cũ được đọc là TRUE, cùng chiều với bản desktop, cùng
+  lý do.
+- **Ấn tông môn vẽ lại theo mẫu thư pháp**: "Phàm nhân tu tiên" ba dòng bút lông vàng kim
+  (Dancing Script, subset vietnamese — font script thiếu subset sẽ rơi về font hệ thống ở
+  đúng những ký tự có dấu), lồng vòng tròn kép chấm-rời-xoay-chậm + nét liền.
+- **Nền chuyển thành đêm trăng**: trăng lớn toả quầng ba lớp lệch phải, trời xanh mực, dãy
+  núi và thuỷ đình + chùa nhỏ thắp đèn ấm ở chân trời, mặt nước loang vệt trăng, chín chiếc
+  lá vàng rơi theo nhịp riêng (hai chu kỳ nguyên tố giữ chúng không bao giờ khoá pha thành
+  đàn). Thuần CSS/SVG — không tải một tấm ảnh nào.
+- Suite: 55/55 (`npm run smoke`).
+
 ## 0.4.1 — tách lịch sử ra khỏi README
 
 - Lịch sử phát hành chuyển sang chính file này. README đã phình tới mức phần hướng dẫn bị

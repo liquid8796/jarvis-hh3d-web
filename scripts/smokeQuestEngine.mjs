@@ -160,6 +160,34 @@ async function main() {
     opt(keepNone, "decompose").selectedValue,
   );
 
+  console.log("\nHạng tài khoản");
+
+  const { questsForAccount } = await import("../src/lib/quest-engine/engine.mjs");
+  const { loadProfile } = await import("../src/lib/quest-engine/profile.mjs");
+
+  check(
+    "mọi quest trong hồ sơ đều khai requiresVip",
+    loadProfile().quests.every((q) => q.requiresVip === true),
+  );
+  check("tài khoản VIP chạy đủ những gì đã bật", questsForAccount(profile, { isVip: true }).length === 2);
+  check("tài khoản thường không đụng quest VIP", questsForAccount(profile, { isVip: false }).length === 0);
+
+  // Trường vắng mặt phải đọc là VIP-only: mọi quest có trước trường này đều được ghi trên
+  // tài khoản VIP, nên hồ sơ cũ thiếu trường phải hành xử như thể đã khai vậy. Đọc ngược
+  // chiều thì tài khoản thường chạy đủ 12 quest VIP — và hỏng cả 12.
+  const legacy = {
+    quests: [
+      { name: "cũ, thiếu trường", enabled: true, order: 1 },
+      { name: "mới, hàng thường", enabled: true, order: 2, requiresVip: false },
+    ],
+  };
+  const freePlan = questsForAccount(legacy, { isVip: false });
+  check(
+    "quest cũ thiếu trường được coi là VIP-only",
+    freePlan.length === 1 && freePlan[0].requiresVip === false,
+    freePlan.map((q) => q.name).join(", "),
+  );
+
   console.log("\nChính sách chọn linh sứ");
 
   const { decideRunner, sandboxAllowedFor } = await import("../src/lib/runners/policy.ts");

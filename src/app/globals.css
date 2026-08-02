@@ -44,24 +44,93 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
-   Bầu trời: gradient mực + tinh vân linh khí + sao. Ba lớp cố định sau nội
-   dung, không chặn tương tác.
+   Đêm trăng "Phàm Nhân Tu Tiên". Các lớp cố định sau nội dung, không chặn
+   tương tác: trời xanh mực → sao → trăng → mây → cảnh núi-chùa-nước → lá rơi.
 --------------------------------------------------------------------------- */
 .sky {
   position: fixed;
   inset: 0;
-  z-index: -3;
+  z-index: -6;
   background:
-    radial-gradient(1200px 600px at 80% -10%, rgba(116, 81, 214, 0.28), transparent 60%),
-    radial-gradient(900px 500px at 10% 110%, rgba(42, 168, 122, 0.16), transparent 60%),
-    radial-gradient(700px 400px at 50% 40%, rgba(212, 167, 51, 0.07), transparent 65%),
-    linear-gradient(180deg, #0b0918 0%, #07060f 55%, #0a0714 100%);
+    radial-gradient(1100px 700px at 72% 18%, rgba(140, 170, 235, 0.16), transparent 62%),
+    radial-gradient(900px 500px at 8% 108%, rgba(46, 88, 160, 0.18), transparent 60%),
+    radial-gradient(700px 400px at 30% 55%, rgba(212, 167, 51, 0.05), transparent 65%),
+    linear-gradient(180deg, #060d20 0%, #0a1631 48%, #081226 78%, #060b1a 100%);
+}
+
+/* Vầng trăng: lõi sáng ngà, vân bề mặt bằng vài đốm loang mờ, quầng lan rất rộng.
+   Đặt lệch phải-trên như tranh gốc; nhịp thở 14s đủ chậm để cảm thấy chứ không thấy. */
+.moon {
+  position: fixed;
+  top: 4vh;
+  right: 6vw;
+  width: min(46vmin, 430px);
+  height: min(46vmin, 430px);
+  z-index: -5;
+  border-radius: 999px;
+  background:
+    radial-gradient(38% 34% at 36% 30%, rgba(150, 160, 185, 0.35), transparent 70%),
+    radial-gradient(22% 20% at 64% 58%, rgba(140, 150, 175, 0.30), transparent 70%),
+    radial-gradient(16% 15% at 45% 72%, rgba(150, 158, 180, 0.28), transparent 70%),
+    radial-gradient(13% 12% at 72% 26%, rgba(148, 156, 178, 0.26), transparent 70%),
+    radial-gradient(100% 100% at 42% 38%, #fbf7e8 0%, #f0e9d2 45%, #ded6ba 78%, #cdc3a6 100%);
+  box-shadow:
+    0 0 70px 18px rgba(244, 238, 214, 0.30),
+    0 0 180px 70px rgba(214, 220, 240, 0.16),
+    0 0 340px 150px rgba(160, 180, 225, 0.10);
+  animation: moon-breathe 14s ease-in-out infinite;
+}
+
+@keyframes moon-breathe {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.06); }
+}
+
+/* Chân trời: SVG núi-chùa-mặt nước, dán đáy màn hình. */
+.scene {
+  position: fixed;
+  inset: auto 0 0 0;
+  width: 100%;
+  height: clamp(140px, 24vh, 260px);
+  z-index: -2;
+  pointer-events: none;
+}
+
+/* Lá vàng rơi: chín chiếc, mỗi chiếc tự trôi theo nhịp riêng suy từ --i. Hai số
+   nguyên tố 9.7/14.3 giữ cho các pha không bao giờ khoá vào nhau thành đàn. */
+.leaves {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.leaves i {
+  position: absolute;
+  top: -4vh;
+  left: calc(6% + var(--i) * 10.5%);
+  width: 11px;
+  height: 8px;
+  background: linear-gradient(120deg, #e8c25c, #c9952e 70%);
+  border-radius: 80% 10% 80% 10%;
+  opacity: 0;
+  animation: leaf-fall calc(13s + var(--i) * 2.3s) linear infinite;
+  animation-delay: calc(var(--i) * -3.1s);
+}
+
+@keyframes leaf-fall {
+  0% { transform: translate(0, -4vh) rotate(0deg); opacity: 0; }
+  8% { opacity: 0.85; }
+  50% { transform: translate(7vw, 48vh) rotate(200deg); }
+  88% { opacity: 0.7; }
+  100% { transform: translate(-3vw, 106vh) rotate(420deg); opacity: 0; }
 }
 
 .stars {
   position: fixed;
   inset: 0;
-  z-index: -2;
+  z-index: -4;
   background-image:
     radial-gradient(1.2px 1.2px at 12% 22%, rgba(255, 255, 255, 0.8), transparent),
     radial-gradient(1px 1px at 28% 64%, rgba(255, 255, 255, 0.5), transparent),
@@ -87,9 +156,9 @@ body {
   left: -50%;
   width: 200%;
   height: 42vh;
-  z-index: -1;
+  z-index: -3;
   pointer-events: none;
-  background: radial-gradient(60% 100% at 50% 100%, rgba(143, 137, 179, 0.10), transparent 70%);
+  background: radial-gradient(60% 100% at 50% 100%, rgba(120, 145, 200, 0.12), transparent 70%);
   filter: blur(30px);
 }
 
@@ -100,7 +169,7 @@ body {
 
 .clouds::after {
   bottom: -8vh;
-  background: radial-gradient(60% 100% at 50% 0%, rgba(116, 81, 214, 0.10), transparent 70%);
+  background: radial-gradient(60% 100% at 50% 0%, rgba(90, 120, 185, 0.10), transparent 70%);
   animation: drift 120s linear infinite reverse;
 }
 
@@ -276,21 +345,38 @@ body {
   height: 3rem;
 }
 
+/* Vòng ngoài: chấm rời, xoay rất chậm — "linh trận" của con dấu. Nét đôi như mẫu:
+   dotted bên ngoài, liền mảnh bên trong. */
 .seal::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  border: 1px dashed rgba(232, 194, 92, 0.55);
-  animation: seal-spin 24s linear infinite;
+  border: 2px dotted rgba(232, 194, 92, 0.6);
+  animation: seal-spin 40s linear infinite;
 }
 
 .seal::after {
   content: "";
   position: absolute;
-  inset: 6px;
+  inset: 9%;
   border-radius: 999px;
-  border: 1px solid rgba(232, 194, 92, 0.25);
+  border: 1px solid rgba(232, 194, 92, 0.45);
+}
+
+/* Ba dòng bút lông vàng kim. Nghiêng nhẹ như chữ viết tay; gradient + đổ bóng cho ra
+   ánh kim loại dập nổi thay vì chữ vàng phẳng. */
+.seal-script {
+  font-family: var(--font-brush), cursive;
+  font-weight: 700;
+  line-height: 0.94;
+  text-align: center;
+  transform: rotate(-4deg);
+  background: linear-gradient(160deg, #f8e7b5 0%, #e8c25c 38%, #caa032 62%, #f4d78d 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.55));
 }
 
 @keyframes seal-spin {

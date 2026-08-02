@@ -134,7 +134,8 @@
       "options": [],
       "fallbackCooldownSeconds": 420,
       "order": 20,
-      "notes": "Đánh boss Hoang Vực, 5 lượt/ngày."
+      "notes": "Đánh boss Hoang Vực, 5 lượt/ngày.",
+      "requiresVip": true
     },
     {
       "id": "phuc-loi-duong",
@@ -210,7 +211,8 @@
       "options": [],
       "fallbackCooldownSeconds": 3600,
       "order": 30,
-      "notes": "Mở rương Phúc Lợi Đường nhận thưởng, 4 lượt/ngày."
+      "notes": "Mở rương Phúc Lợi Đường nhận thưởng, 4 lượt/ngày.",
+      "requiresVip": true
     },
     {
       "id": "thi-luyen-tong-mon",
@@ -286,7 +288,8 @@
       "options": [],
       "fallbackCooldownSeconds": 3600,
       "order": 40,
-      "notes": "Thí luyện tông môn nhận thưởng, 3 lượt/ngày."
+      "notes": "Thí luyện tông môn nhận thưởng, 3 lượt/ngày.",
+      "requiresVip": true
     },
     {
       "id": "bi-canh-tong-mon",
@@ -362,7 +365,8 @@
       "options": [],
       "fallbackCooldownSeconds": 3600,
       "order": 60,
-      "notes": "Đánh Bí Cảnh Tông Môn nhận thưởng, 5 lượt/ngày."
+      "notes": "Đánh Bí Cảnh Tông Môn nhận thưởng, 5 lượt/ngày.",
+      "requiresVip": true
     },
     {
       "id": "te-le-tong-mon",
@@ -414,7 +418,8 @@
       "options": [],
       "fallbackCooldownSeconds": 14400,
       "order": 70,
-      "notes": "Tế lễ 10 Tinh Thạch đổi Tông Khố + Cống Hiến, 1 lần/ngày."
+      "notes": "Tế lễ 10 Tinh Thạch đổi Tông Khố + Cống Hiến, 1 lần/ngày.",
+      "requiresVip": true
     },
     {
       "id": "phuc-loi-vip-khac-tran-van",
@@ -493,7 +498,8 @@
       "options": [],
       "fallbackCooldownSeconds": 14400,
       "order": 80,
-      "notes": "Nhận lượt Khắc Trận Văn mỗi ngày — chỉ dành cho tài khoản VIP."
+      "notes": "Nhận lượt Khắc Trận Văn mỗi ngày — chỉ dành cho tài khoản VIP.",
+      "requiresVip": true
     },
     {
       "id": "vong-quay-phuc-van",
@@ -570,7 +576,8 @@
       "options": [],
       "fallbackCooldownSeconds": 3600,
       "order": 50,
-      "notes": "Quay Vòng Quay Phúc Vận nhận thưởng, tối đa 4 lượt/ngày."
+      "notes": "Quay Vòng Quay Phúc Vận nhận thưởng, tối đa 4 lượt/ngày.",
+      "requiresVip": true
     },
     {
       "id": "van-dap",
@@ -703,7 +710,8 @@
       "options": [],
       "fallbackCooldownSeconds": 14400,
       "order": 90,
-      "notes": "Trả lời 5 câu Vấn Đáp mỗi ngày lấy Tông Khố + Cống Hiến."
+      "notes": "Trả lời 5 câu Vấn Đáp mỗi ngày lấy Tông Khố + Cống Hiến.",
+      "requiresVip": true
     },
     {
       "id": "diem-danh",
@@ -755,7 +763,8 @@
       "options": [],
       "fallbackCooldownSeconds": 14400,
       "order": 10,
-      "notes": "Điểm danh mỗi ngày nhận thưởng và giữ chuỗi ngày (streak)."
+      "notes": "Điểm danh mỗi ngày nhận thưởng và giữ chuỗi ngày (streak).",
+      "requiresVip": true
     },
     {
       "id": "khoang-mach",
@@ -772,7 +781,8 @@
       "options": [],
       "fallbackCooldownSeconds": 420,
       "order": 100,
-      "notes": "Thu hoạch tài nguyên Khoáng Mạch (nhãn chưa hiệu chỉnh nên tắt sẵn)."
+      "notes": "Thu hoạch tài nguyên Khoáng Mạch (nhãn chưa hiệu chỉnh nên tắt sẵn).",
+      "requiresVip": true
     },
     {
       "id": "me-cung",
@@ -1213,7 +1223,8 @@
       ],
       "fallbackCooldownSeconds": 3600,
       "order": 110,
-      "notes": "Đánh Mê Cung theo đội 5 người thật lấy huyền tinh mỗi ngày."
+      "notes": "Đánh Mê Cung theo đội 5 người thật lấy huyền tinh mỗi ngày.",
+      "requiresVip": true
     },
     {
       "id": "luyen-dan-duong",
@@ -1642,7 +1653,8 @@
       ],
       "fallbackCooldownSeconds": 2700,
       "order": 105,
-      "notes": "Tự luyện đan ở Luyện Đan Đường — mỗi mẻ TỐN dược liệu + 20 Tiên Ngọc."
+      "notes": "Tự luyện đan ở Luyện Đan Đường — mỗi mẻ TỐN dược liệu + 20 Tiên Ngọc.",
+      "requiresVip": true
     }
   ]
 }

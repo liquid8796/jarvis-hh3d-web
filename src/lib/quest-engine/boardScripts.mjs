@@ -261,6 +261,31 @@ export async function labelMatchSweep(args) {
 }
 
 /**
+ * Đọc hạng tài khoản trên hub nhiệm vụ ngày. Trả `true` (VIP), `false` (thường) — hoặc
+ * `null` khi CHƯA CHỨNG MINH ĐƯỢC sự vắng mặt, và người gọi phải hiểu null là "chưa biết",
+ * không bao giờ là "thường".
+ *
+ * Tín hiệu là thẻ Phúc Lợi VIP `#nv-pt-vip-quest`: site chỉ phục vụ thẻ này cho tài khoản
+ * VIP. Kiểm SỰ TỒN TẠI trong DOM chứ không kiểm hiển thị — thẻ có thể nằm dưới nếp gấp.
+ *
+ * Cổng hai tầng vì hub render làm HAI ĐỢT: bốn thẻ đầu tới ngay, đợt chứa thẻ VIP tới sau
+ * vài giây (đo được ~2.5s trong bản ghi thực địa — chính là bẫy V5 của suite Phúc Lợi VIP
+ * bên desktop). Probe chỉ gate bằng `.nv-quest` sẽ phán "thường" ngay trong khe hở đó, và
+ * một lần phán nhầm là một tài khoản VIP mất trọn chu kỳ. Nên sự vắng mặt chỉ được tính khi
+ * một thẻ CÙNG ĐỢT đã có mặt — Luyện Đan / Khoáng Mạch / Thí Luyện / Tế Lễ / Hỷ Sự, những
+ * tên mà hạng nào cũng thấy. "Phúc lợi" KHÔNG dùng làm bằng chứng được: Phúc Lợi Đường nằm
+ * ở đợt MỘT và sẽ bảo lãnh cho một đợt chưa hề tới.
+ */
+export function vipProbe() {
+  if (!document.querySelector(".nv-quest")) return null;
+  const norm = (s) =>
+    (s == null ? "" : String(s)).toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/g, "d");
+  const text = norm(document.body ? document.body.innerText : "");
+  if (!/(luyen dan|khoang mach|thi luyen|te le|hy su)/.test(text)) return null;
+  return !!document.querySelector("#nv-pt-vip-quest");
+}
+
+/**
  * Còn thấy màn chắn Cloudflare không, và phiên WordPress đã đăng nhập chưa. `loggedIn` là
  * null khi trang không phát tín hiệu rõ ràng về phía nào.
  */

@@ -654,3 +654,15 @@ export function enabledQuestsInOrder(profile) {
     .filter((q) => q.enabled)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || String(a.name).localeCompare(String(b.name)));
 }
+
+/**
+ * Kế hoạch của một lượt, sau khi đã biết hạng tài khoản.
+ *
+ * `requiresVip` vắng mặt được đọc là TRUE — cùng chiều với mặc định bên desktop, và cùng
+ * lý do: mọi quest tồn tại trước khi trường này ra đời đều được ghi trên tài khoản VIP,
+ * nên một hồ sơ cũ thiếu trường phải được hiểu như thể nó đã khai vậy. Đọc ngược chiều thì
+ * một hồ sơ cũ trên tài khoản thường sẽ chạy đủ 12 quest VIP — và hỏng cả 12.
+ */
+export function questsForAccount(profile, { isVip }) {
+  return enabledQuestsInOrder(profile).filter((q) => isVip || q.requiresVip === false);
+}

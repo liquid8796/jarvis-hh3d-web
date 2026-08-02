@@ -168,6 +168,48 @@ async function main() {
     (leafCode.match(/require\(|node:fs|readFileSync|fileURLToPath/) ?? [])[0],
   );
 
+  // Engine web phải hiểu MỌI loại bước và MỌI loại điều kiện mà hồ sơ dùng.
+  //
+  // Hồ sơ được SINH RA từ bản desktop, nên một loại mới có thể theo lệnh `export` trôi
+  // sang mà không ai đụng vào mã web. Và cả hai chỗ đều nuốt cái lạ trong im lặng:
+  // `executeStep` trả "bước lạ", còn `conditionProbe` rơi vào `default: return false` —
+  // tức một `when` không bao giờ nổ, một `stopIf` không bao giờ chặn. Không dòng lỗi nào.
+  // Chốt này bắt đúng khoảnh khắc hồ sơ vượt lên trước engine.
+  const profileRaw = JSON.parse(
+    readFileSync(new URL("../src/lib/quest-engine/profile.json", import.meta.url), "utf8"),
+  );
+  const engineSrc = readFileSync(new URL("../src/lib/quest-engine/engine.mjs", import.meta.url), "utf8");
+  const scriptsSrc = readFileSync(new URL("../src/lib/quest-engine/boardScripts.mjs", import.meta.url), "utf8");
+
+  const usedActions = new Set();
+  const usedConds = new Set();
+  const walkSteps = (steps) => {
+    for (const s of steps ?? []) {
+      if (s.action) usedActions.add(s.action);
+      for (const c of [s.condition, s.when, s.until, s.stopIf]) if (c?.kind) usedConds.add(c.kind);
+      if (s.steps) walkSteps(s.steps);
+    }
+  };
+  for (const q of profileRaw.quests) walkSteps(q.steps);
+
+  const handledActions = new Set([...engineSrc.matchAll(/case\s+"([a-zA-Z]+)"/g)].map((m) => m[1]));
+  // Điều kiện được phân giải TRONG TRANG bởi conditionProbe, không phải trong engine.mjs.
+  const probeBody = scriptsSrc.slice(scriptsSrc.indexOf("export function conditionProbe"));
+  const handledConds = new Set([...probeBody.matchAll(/case\s+"([a-zA-Z]+)"/g)].map((m) => m[1]));
+
+  const missingActions = [...usedActions].filter((a) => !handledActions.has(a));
+  const missingConds = [...usedConds].filter((c) => !handledConds.has(c));
+  check(
+    `engine hiểu đủ ${usedActions.size} loại bước hồ sơ dùng`,
+    missingActions.length === 0,
+    missingActions.join(", "),
+  );
+  check(
+    `conditionProbe hiểu đủ ${usedConds.size} loại điều kiện hồ sơ dùng`,
+    missingConds.length === 0,
+    missingConds.join(", "),
+  );
+
   const notes = [];
   const cfg = {
     gameCookie: "a=b",

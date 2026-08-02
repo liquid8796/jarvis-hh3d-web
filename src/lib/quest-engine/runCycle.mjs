@@ -83,32 +83,62 @@ function formatDuration(seconds) {
  * nguyên nhân. Ở đây: đứng trước cổng, chờ màn kiểm tra tự qua (có hạn), rồi phán rõ —
  * bị chặn là nói bị chặn, hết phiên là nói hết phiên.
  */
-async function ensureReady(session, baseUrl, say, log) {
-  const nav = await session.navigate(baseUrl);
-  if (!nav.ok) {
-    return { ok: false, message: `Không mở được trang game (${nav.error}).` };
+async function ensureReady(session, baseUrl, say, log, { context, cookieJar }) {
+  /** Vào trang chủ rồi đọc trạng thái, chờ màn Cloudflare tự qua nếu có. */
+  async function probeOnce() {
+    const nav = await session.navigate(baseUrl);
+    if (!nav.ok) return { navError: nav.error };
+
+    const deadline = Date.now() + 45_000;
+    let probe = null;
+    let saidChallenge = false;
+
+    while (Date.now() < deadline) {
+      probe = await session.evaluate(readinessProbe);
+      if (probe == null) {
+        await new Promise((r) => setTimeout(r, 1_500));
+        continue;
+      }
+
+      if (!probe.challenge) break;
+
+      if (!saidChallenge) {
+        // Nói MỘT lần rồi chờ trong im lặng — màn kiểm tra dạng managed đôi khi tự qua
+        // sau vài giây, nhưng mỗi nhịp poll mà một dòng nhật ký thì thành rác.
+        await say("Trang game đang dựng màn kiểm tra (Cloudflare) — linh sứ đứng chờ trước cổng…", "warn");
+        saidChallenge = true;
+      }
+      await new Promise((r) => setTimeout(r, 2_000));
+    }
+    return { probe };
   }
 
-  const deadline = Date.now() + 45_000;
-  let probe = null;
-  let saidChallenge = false;
+  let { probe, navError } = await probeOnce();
+  if (navError) {
+    return { ok: false, message: `Không mở được trang game (${navError}).` };
+  }
 
-  while (Date.now() < deadline) {
-    probe = await session.evaluate(readinessProbe);
-    if (probe == null) {
-      await new Promise((r) => setTimeout(r, 1_500));
-      continue;
+  /**
+   * Hồ sơ bền không đăng nhập được thì TIÊM LẠI cookie người dùng đã dán, rồi thử lần nữa.
+   *
+   * Đây là chỗ vụ 02/08 nổ ra. Hồ sơ bền giữ cookie phiên do site tự làm mới, nên lúc mở
+   * ta cố ý KHÔNG đè chuỗi dán-tay lên trên — đè là tự tay đăng xuất một phiên đang lành.
+   * Nhưng phép kiểm ấy chỉ hỏi "có cookie đăng nhập không", không hỏi "nó còn sống không".
+   * Một cookie đã chết vẫn thoả mãn câu hỏi đó, nên linh sứ ôm cái xác đi tiếp, và trang lò
+   * render ở dạng chưa đăng nhập — `#ld-app` không bao giờ hiện. Lỗi nổi lên ở tên một
+   * selector vô tội, mười bước sau nguyên nhân thật.
+   *
+   * Cách chữa đúng là ĐỪNG TIN, HÃY THỬ: dùng hồ sơ khi nó còn chạy, quay về chuỗi người
+   * dùng dán khi nó chết. Không cần đoán, vì trang vừa trả lời rồi.
+   */
+  if (context && cookieJar?.length && probe && !probe.challenge && probe.loggedIn !== true) {
+    log.debug("Sẵn sàng", "Hồ sơ không đăng nhập được — tiêm lại cookie đã lưu rồi thử lần nữa.");
+    await context.clearCookies().catch(() => {});
+    await context.addCookies(cookieJar);
+    ({ probe, navError } = await probeOnce());
+    if (navError) {
+      return { ok: false, message: `Không mở được trang game (${navError}).` };
     }
-
-    if (!probe.challenge) break;
-
-    if (!saidChallenge) {
-      // Nói MỘT lần rồi chờ trong im lặng — màn kiểm tra dạng managed đôi khi tự qua
-      // sau vài giây, nhưng mỗi nhịp poll mà một dòng nhật ký thì thành rác.
-      await say("Trang game đang dựng màn kiểm tra (Cloudflare) — linh sứ đứng chờ trước cổng…", "warn");
-      saidChallenge = true;
-    }
-    await new Promise((r) => setTimeout(r, 2_000));
   }
 
   if (probe == null) {
@@ -235,7 +265,10 @@ export async function runCycle(deps) {
     const existing = profileDir ? await context.cookies(baseUrl) : [];
     const hasLogin = existing.some((c) => c.name.startsWith("wordpress_logged_in"));
     if (hasLogin) {
-      log.debug("Trình duyệt", "Hồ sơ đã có phiên đăng nhập — giữ nguyên, không tiêm cookie.");
+      // Chỉ là phỏng đoán ban đầu, KHÔNG phải phán quyết: có cookie đăng nhập không có
+      // nghĩa là nó còn sống. `ensureReady` sẽ hỏi thẳng trang, và tự tiêm lại chuỗi đã lưu
+      // nếu hồ sơ hoá ra đang ôm một cái xác.
+      log.debug("Trình duyệt", "Hồ sơ đã có phiên đăng nhập — thử dùng lại trước.");
     } else {
       await context.addCookies(cookieJar);
     }
@@ -251,8 +284,9 @@ export async function runCycle(deps) {
     });
 
     // Cổng sẵn sàng TRƯỚC mọi quest: bị Cloudflare chặn hay hết phiên đăng nhập phải được
-    // gọi đúng tên ở đây, không phải chết ở selector đầu tiên của một quest vô tội.
-    const ready = await ensureReady(session, baseUrl, say, log);
+    // gọi đúng tên ở đây, không phải chết ở selector đầu tiên của một quest vô tội. Đưa cả
+    // context và cookieJar vào để nó tự chữa được một hồ sơ mang cookie đã chết.
+    const ready = await ensureReady(session, baseUrl, say, log, { context, cookieJar });
     if (!ready.ok) {
       return { outcome: "failed", message: ready.message };
     }

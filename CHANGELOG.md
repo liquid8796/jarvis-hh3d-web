@@ -11,6 +11,33 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.15.2 — hồ sơ trình duyệt ôm một cái xác cookie, và Luyện Đan chết ở #ld-app
+
+- **Luyện Đan Đường hỏng với "Selector không bao giờ xuất hiện: #ld-app".** Trang lò thì
+  không sao — vào thẳng bằng cookie đã lưu là `#ld-app` hiện tức thì. Thủ phạm nằm ở hai
+  dòng nhật ký debug của linh sứ, đứng cạnh nhau và mâu thuẫn nhau:
+
+  ```
+  [debug] Hồ sơ đã có phiên đăng nhập — giữ nguyên, không tiêm cookie.
+  [debug] Không xác nhận được trạng thái đăng nhập — vẫn đi tiếp.
+  ```
+
+  Hồ sơ Chromium bền giữ cookie phiên do site tự làm mới, nên lúc mở ta cố ý KHÔNG đè chuỗi
+  người dùng dán lên trên — đè là tự tay đăng xuất một phiên đang lành. Nhưng phép kiểm ấy
+  chỉ hỏi *"có cookie đăng nhập không"*, không hỏi *"nó còn sống không"*. Một cookie đã chết
+  vẫn thoả mãn câu hỏi đó, nên linh sứ ôm cái xác đi tiếp và trang lò render ở dạng chưa
+  đăng nhập. Lỗi nổi lên ở tên một selector vô tội, mười bước sau nguyên nhân thật.
+- **Sửa: đừng tin, hãy thử.** `ensureReady` giờ hỏi thẳng trang; nếu hồ sơ không đăng nhập
+  được thì xoá cookie cũ, tiêm lại chuỗi đã lưu, rồi thử lần nữa. Dùng hồ sơ khi nó còn
+  chạy, quay về chuỗi người dùng dán khi nó chết — không cần đoán, vì trang vừa trả lời rồi.
+  Đã dựng lại đúng cảnh hỏng (nhét một cookie chết vào hồ sơ bền) và xem nó tự chữa.
+- **Chốt phủ sóng engine.** Hồ sơ được SINH RA từ bản desktop, nên một loại bước hay loại
+  điều kiện mới có thể theo lệnh `export` trôi sang mà không ai đụng vào mã web — và cả hai
+  chỗ đều nuốt cái lạ trong im lặng (`conditionProbe` rơi vào `default: return false`, tức
+  một `when` không bao giờ nổ). Smoke giờ đối chiếu mọi loại hồ sơ dùng với thứ engine
+  hiện thực. Hôm nay: 10 loại bước, 6 loại điều kiện, đủ cả.
+- Đã soát 10 nhiệm vụ ngày: mỗi ô tick nối đúng một quest trong hồ sơ, không ô nào trơ.
+
 ## 0.15.1 — chữ chìm vào ảnh nền, và một lời hứa đúng nửa vời
 
 - **Chữ trong mục Linh Sứ không đọc nổi.** Panel ấy tự pha nền `bg-ink-800/40` thay vì dùng

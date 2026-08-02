@@ -35,7 +35,8 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
   thái lành. Không có linh sứ thì cảnh báo đã được ghi ngay lúc Khai Đàn, còn ý định tiếp tục
   chờ cho tới khi có người nhận hoặc chủ nhân Thu Đàn.
 - **Job sống quanh năm nhưng log không phình quanh năm:** mỗi ranh giới vòng giữ 1.000 dòng
-  gần nhất. Dashboard hiện rõ “Đang nghỉ — vòng N lúc …” và nói thẳng “chỉ Thu Đàn mới dừng”.
+  gần nhất. Dashboard hiện rõ “Đang nghỉ — vòng N lúc …”, nói thẳng “chỉ Thu Đàn mới dừng”,
+  và khử trùng theo event id nếu poll định kỳ chạm đúng poll sau một thao tác.
 - Kiểm chứng: smoke **75/75**; integration trên database thật xác nhận lịch cooldown, refresh
   cấu hình, khóa đua hai worker, fallback `done→queued (~5m)` / `failed→queued (~30m)` và mọi
   đường Thu Đàn đều đúng; build Next.js production xanh.

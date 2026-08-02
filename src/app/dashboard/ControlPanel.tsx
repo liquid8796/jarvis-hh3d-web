@@ -78,8 +78,15 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
       const data = (await res.json()) as { job: FeedJob | null; events: FeedEvent[] };
       setJob(data.job);
       if (data.events.length > 0) {
-        cursor.current = data.events[data.events.length - 1].id;
-        setEvents((prev) => [...prev, ...data.events].slice(-400));
+        // Poll định kỳ và poll ngay sau server action có thể cùng bay. Nếu hai hồi đáp đọc
+        // chung một cursor, cả hai sẽ mang cùng event về; khử theo id và không cho hồi đáp
+        // chậm kéo cursor lùi để nhật ký không vẽ một dòng Thu Đàn hai lần.
+        cursor.current = Math.max(cursor.current, data.events[data.events.length - 1].id);
+        setEvents((prev) => {
+          const byId = new Map(prev.map((event) => [event.id, event]));
+          for (const event of data.events) byId.set(event.id, event);
+          return [...byId.values()].sort((a, b) => a.id - b.id).slice(-400);
+        });
       }
     } catch {
       // Mạng chớp tắt là chuyện thường của một trang mở hàng giờ; nhịp sau hỏi lại.

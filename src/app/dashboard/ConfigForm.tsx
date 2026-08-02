@@ -107,7 +107,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
         {/* KHOÁ toàn phần theo yêu cầu: chỉ một hình thức vận hành đang mở. `disabled` ở đây
             là trang trí — action lưu tự ép giá trị, không tin form. */}
         <select id="runner" name="runner" className="input" defaultValue="local" disabled>
-          <option value="local">Linh sứ túc trực (đang phụng sự)</option>
+          <option value="local">Linh sứ túc trực (máy nhà)</option>
           <option value="sandbox">Linh sứ viễn du — chưa xuất quan</option>
         </select>
         <p className="mt-1 text-xs text-[var(--color-mist)]">

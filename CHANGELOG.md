@@ -11,6 +11,31 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.10.0 — đàm đạo dọn về kho NoSQL, tin có hạn sống, Tông Môn chia tab
+
+- **Tin đàm đạo rời Postgres, sống trong kho NoSQL (Upstash Redis).** Hai loại dữ liệu
+  khác nhau cả nhịp ghi lẫn vòng đời: Postgres giữ danh tính và cấu hình — thứ sống lâu,
+  cần giao dịch; tin đàm đạo là dòng chảy tần suất cao tự hết hạn theo ngày, không JOIN
+  với ai. Hình dạng: mỗi tin một document JSON (kèm TÊN người gửi đóng băng lúc gửi —
+  NoSQL không JOIN, và tên tại thời điểm nói vốn trung thực hơn tên sau này đổi thành),
+  một ZSET làm mục lục thời gian (phân trang + quét hạn đều là một câu score-range), cảm
+  xúc là field hash — thêm/rút nguyên tử, không có đọc-rồi-ghi để mà đua. Ba bảng chat
+  trong Postgres đã DROP (migration 0003/0004).
+- **Kho chưa tạo không phải lỗi**: mọi đường trả `storeClosed`, API nói 503 kèm lời người
+  đọc hiểu, sảnh treo biển 🏮 "chưa khai mở" — phần còn lại của web không việc gì. Tông
+  chủ tạo kho qua Marketplace là sảnh tự sống dậy, không đổi một dòng code.
+- **Tin tự tan sau N ngày** (mặc định 7) — sảnh là dòng chảy, không phải tàng thư. Quét
+  chạy ở nhịp cron và "tiện đường" mỗi 10 phút khi có người đọc sảnh, nên không có cron
+  ngoài vẫn sạch. Số ngày do tông chủ đặt trong trang Tông Môn.
+- **Trang Tông Môn chia tab** — "Môn Đồ" (sổ bộ cũ) và "Đàm Đạo" (hạn lưu tin); khung tab
+  nhận nội dung server-render qua slot, thêm khu cấu hình sau này là thêm một mục vào
+  mảng. Tab đổi hiển thị chứ không unmount, bảng môn đồ giữ nguyên scroll và ô tìm kiếm
+  đang gõ dở.
+- Xuống dòng trong khung chat đổi sang **Alt+Enter** (Enter vẫn gửi); nhãn nơi vận hành
+  ghi rõ "Linh sứ túc trực (máy nhà)".
+- Cấu hình hệ thống có nhà mới: bảng `app_settings` một-document-JSONB, Zod gác hai chiều
+  — cùng triết lý với user_configs.
+
 ## 0.9.0 — Tụ Nghĩa Sảnh, đủ 12 nhiệm vụ, và hậu trường rút vào cánh gà
 
 - **Tụ Nghĩa Sảnh — sảnh đàm đạo toàn tông môn** (`/chat`). Gửi/sửa/thu hồi, trả lời có

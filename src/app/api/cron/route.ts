@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db/client";
 import { and, eq, sql } from "drizzle-orm";
+import { purgeExpiredChat } from "@/lib/services/chat";
 import { reapStaleJobs } from "@/lib/services/jobs";
 import { launchSandboxWorker } from "@/lib/runners/sandbox";
 import { sandboxAvailable } from "@/lib/runners/policy";
@@ -32,8 +33,10 @@ export async function GET(request: Request) {
   }
 
   // Quét dọn trước — job chết và job không ai nhận đều được kết thúc tử tế ở đây, nên hệ
-  // thống tự lành kể cả khi không ai mở dashboard.
+  // thống tự lành kể cả khi không ai mở dashboard. Tin đàm đạo quá hạn lưu (tông chủ đặt
+  // số ngày trong trang Tông Môn) cũng bị quét cùng nhịp; kho chưa tạo thì đây là no-op.
   await reapStaleJobs();
+  await purgeExpiredChat();
 
   const result = await ensureSandboxWorker();
   return NextResponse.json(result);

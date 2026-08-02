@@ -69,6 +69,8 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
   const [unseen, setUnseen] = useState(0);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [reachedTop, setReachedTop] = useState(false);
+  /** Kho NoSQL chưa được tông chủ tạo — sảnh treo biển thay vì giả vờ trống. */
+  const [storeClosed, setStoreClosed] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -103,7 +105,14 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
     const tick = async () => {
       try {
         const res = await fetch("/api/chat", { cache: "no-store" });
-        if (!res.ok || !alive) return;
+        if (!alive) return;
+        if (res.status === 503) {
+          const data = await res.json().catch(() => ({}));
+          setStoreClosed(String(data.error ?? "Tàng thư đàm đạo chưa khai mở."));
+          return;
+        }
+        if (!res.ok) return;
+        setStoreClosed(null);
         const data: { messages: Message[]; typing: string[] } = await res.json();
 
         const fresh = data.messages.filter((m) => !knownIds.current.has(m.id));
@@ -318,7 +327,13 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
           <p className="chat-top-note">— Khởi nguồn của sảnh —</p>
         )}
         {loadingOlder && <p className="chat-top-note">Đang lật trang cũ…</p>}
-        {messages.length === 0 && (
+        {storeClosed && (
+          <div className="chat-closed">
+            <span>🏮</span>
+            <p>{storeClosed}</p>
+          </div>
+        )}
+        {!storeClosed && messages.length === 0 && (
           <p className="chat-top-note">Sảnh còn tĩnh lặng — hãy là người khai bút.</p>
         )}
 
@@ -512,8 +527,17 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
           value={text}
           onChange={(e) => onType(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
+            // Enter gửi; Alt+Enter xuống dòng. Alt+Enter không tự chèn newline trong
+            // textarea nên phải tự tay đặt nó vào đúng vị trí con trỏ.
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            if (e.altKey) {
+              const el = e.currentTarget;
+              const { selectionStart: a, selectionEnd: b, value } = el;
+              const next = value.slice(0, a) + "\n" + value.slice(b);
+              onType(next);
+              requestAnimationFrame(() => el.setSelectionRange(a + 1, a + 1));
+            } else {
               void send();
             }
           }}
@@ -523,7 +547,7 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
           }}
           rows={1}
           maxLength={4000}
-          placeholder="Truyền âm cho cả tông môn… (Enter gửi, Shift+Enter xuống dòng)"
+          placeholder="Truyền âm cho cả tông môn… (Enter gửi, Alt+Enter xuống dòng)"
           className="chat-input"
         />
         <button type="button" className="btn btn-gold chat-send" onClick={() => void send()} disabled={uploading}>

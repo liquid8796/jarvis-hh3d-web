@@ -348,6 +348,21 @@ body {
   scroll-behavior: smooth;
 }
 
+.chat-closed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 14vh auto 0;
+  max-width: 380px;
+  text-align: center;
+  color: var(--color-mist);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.chat-closed span { font-size: 2.4rem; }
+
 .chat-top-note {
   text-align: center;
   font-size: 0.75rem;

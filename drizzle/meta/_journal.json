@@ -22,6 +22,20 @@
       "when": 1785650059655,
       "tag": "0002_new_excalibur",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785652903564,
+      "tag": "0003_milky_glorian",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785652939354,
+      "tag": "0004_stiff_misty_knight",
+      "breakpoints": true
     }
   ]
 }

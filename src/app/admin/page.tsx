@@ -1,6 +1,9 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { requireAdmin } from "@/lib/auth/guards";
+import { getAppSettings } from "@/lib/services/settings";
 import { countPending, listUsers } from "@/lib/services/users";
+import { AdminTabs } from "./AdminTabs";
+import { ChatSettingsForm } from "./ChatSettingsForm";
 import { UserTable } from "./UserTable";
 import { CreateUserPanel } from "./CreateUserPanel";
 
@@ -26,9 +29,10 @@ export default async function AdminPage({
       ? params.status
       : undefined;
 
-  const [users, pending] = await Promise.all([
+  const [users, pending, settings] = await Promise.all([
     listUsers({ search: params.q, status }),
     countPending(),
+    getAppSettings(),
   ]);
 
   return (
@@ -39,7 +43,7 @@ export default async function AdminPage({
           <div>
             <h1 className="h-display text-3xl font-bold text-gilded">Tông Môn</h1>
             <p className="mt-1 text-sm text-[var(--color-mist)]">
-              Sổ bộ môn đồ — duyệt người mới, phong quyền, đình quyền, trục xuất.
+              Sổ bộ môn đồ và các cấu hình chung của tông môn.
             </p>
           </div>
           {pending > 0 && (
@@ -49,11 +53,28 @@ export default async function AdminPage({
           )}
         </div>
 
-        <div className="mb-6">
-          <CreateUserPanel />
-        </div>
-
-        <UserTable users={users} query={params.q ?? ""} status={status ?? ""} />
+        {/* Mỗi khu cấu hình một tab — thêm tính năng sau này là thêm một mục vào mảng. */}
+        <AdminTabs
+          tabs={[
+            {
+              key: "monDo",
+              label: "Môn Đồ",
+              pane: (
+                <>
+                  <div className="mb-6">
+                    <CreateUserPanel />
+                  </div>
+                  <UserTable users={users} query={params.q ?? ""} status={status ?? ""} />
+                </>
+              ),
+            },
+            {
+              key: "damDao",
+              label: "Đàm Đạo",
+              pane: <ChatSettingsForm retentionDays={settings.chat.retentionDays} />,
+            },
+          ]}
+        />
       </main>
     </>
   );

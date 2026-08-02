@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/auth/guards";
 import {
+  STORE_CLOSED_MESSAGE,
   deleteMessage,
   editMessage,
   getFeed,
@@ -24,24 +25,42 @@ async function requireActive() {
   return user;
 }
 
+/**
+ * Quét hạn lưu "tiện đường": cron mỗi ngày một lần là lưới chính, nhưng một sảnh có người
+ * đọc thì tự sạch nhanh hơn thế — mỗi 10 phút, nhịp poll đầu tiên đi qua đây thả một lượt
+ * quét chạy nền. Biến module-level là per-instance và mất khi function nguội: chấp nhận
+ * được, vì quét trùng chỉ tốn một câu score-range rỗng.
+ */
+let lastPurgeAt = 0;
+function purgeOpportunistically() {
+  const now = Date.now();
+  if (now - lastPurgeAt < 10 * 60 * 1000) return;
+  lastPurgeAt = now;
+  import("@/lib/services/chat").then(({ purgeExpiredChat }) => purgeExpiredChat()).catch(() => {});
+}
+
 export async function GET(request: Request) {
   const user = await requireActive();
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  purgeOpportunistically();
+
   const url = new URL(request.url);
-  const cursor = (name: string) => {
-    const at = url.searchParams.get(`${name}At`);
-    const id = url.searchParams.get(`${name}Id`);
-    return at && id ? { at, id } : undefined;
-  };
+  const beforeAt = url.searchParams.get("beforeAt");
+  const beforeId = url.searchParams.get("beforeId");
 
   const feed = await getFeed({
     viewerId: user.id,
-    after: cursor("after"),
-    before: cursor("before"),
+    before: beforeAt && beforeId ? { at: beforeAt, id: beforeId } : undefined,
   });
+
+  // Kho chưa tạo không phải lỗi hệ thống — 503 kèm lời người đọc hiểu, client vẽ màn
+  // "chưa khai mở" thay vì một sảnh trống trơn nói dối.
+  if (feed.storeClosed) {
+    return NextResponse.json({ error: STORE_CLOSED_MESSAGE }, { status: 503 });
+  }
 
   return NextResponse.json(feed);
 }
@@ -61,7 +80,10 @@ export async function POST(request: Request) {
 
   switch (payload.op) {
     case "send": {
-      const result = await sendMessage(user.id, payload.body);
+      const result = await sendMessage(
+        { id: user.id, name: user.displayName, isAdmin: user.role === "admin" },
+        payload.body,
+      );
       return NextResponse.json(result, { status: result.ok ? 200 : 400 });
     }
 
@@ -81,7 +103,7 @@ export async function POST(request: Request) {
     }
 
     case "typing": {
-      await markTyping(user.id, payload.typing === true);
+      await markTyping({ id: user.id, name: user.displayName }, payload.typing === true);
       return NextResponse.json({ ok: true });
     }
 

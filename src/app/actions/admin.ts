@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/guards";
+import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
 import { adminCreate, adminDelete, adminUpdate, setStatus } from "@/lib/services/users";
 
 /**
@@ -139,4 +140,27 @@ export async function deleteUserAction(userId: string): Promise<AdminResult> {
 
   revalidatePath("/admin");
   return { ok: true, message: "Đã trục xuất đạo hữu khỏi tông môn." };
+}
+
+/**
+ * Cấu hình đàm đạo — tab "Đàm Đạo" của trang Tông Môn. Đọc-sửa-ghi trọn document qua Zod,
+ * nên một field mới thêm vào schema sau này không bị form cũ ghi đè mất.
+ */
+export async function saveChatSettingsAction(
+  _prev: AdminResult | null,
+  formData: FormData,
+): Promise<AdminResult> {
+  await requireAdmin();
+
+  const days = Number(formData.get("retentionDays"));
+  if (!Number.isInteger(days) || days < 1 || days > 365) {
+    return { ok: false, message: "Hạn lưu phải là số ngày nguyên trong khoảng 1–365." };
+  }
+
+  const settings = await getAppSettings();
+  settings.chat.retentionDays = days;
+  await saveAppSettings(settings);
+
+  revalidatePath("/admin");
+  return { ok: true, message: `Đã đặt hạn lưu đàm đạo: tin sống ${days} ngày rồi tự tan.` };
 }

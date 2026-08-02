@@ -134,14 +134,31 @@ body {
   box-shadow: 0 0 32px rgba(232, 194, 92, 0.38);
 }
 
+/* Nút ghost đứng THẲNG trên ảnh nền (header, hero) chứ không chỉ trên card, nên nó phải
+   tự mang nền: bản cũ trong suốt 96% biến mất hoàn toàn trên vệt nước sáng và tán lá vàng
+   của tấm backdrop. Nền tối mờ + viền đậm hơn giữ nguyên "chất ghost" cạnh nút vàng đặc,
+   nhưng không còn chỗ nào trên ảnh nuốt được nó. */
 .btn-ghost {
-  border-color: rgba(232, 194, 92, 0.3);
+  border-color: rgba(232, 194, 92, 0.5);
   color: var(--color-gold-300);
-  background: rgba(232, 194, 92, 0.04);
+  background: rgba(9, 12, 26, 0.62);
+  backdrop-filter: blur(6px);
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background: rgba(232, 194, 92, 0.1);
+  background: rgba(20, 24, 46, 0.78);
+}
+
+/* Veil của hero trang chủ: vùng duy nhất chữ nằm đè trực tiếp lên mặt trăng của backdrop
+   — chữ vàng gradient lẫn vào lõi trăng sáng, chữ sương lẫn vào quầng. Một tấm mờ tối
+   cục bộ, bo tròn, chỉ rộng bằng khối chữ: phần còn lại của tấm ảnh không bị che. */
+.hero-veil {
+  padding: 2rem 2.5rem 2.25rem;
+  border-radius: 1.5rem;
+  background: rgba(6, 11, 26, 0.58);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(232, 194, 92, 0.14);
+  box-shadow: 0 8px 40px rgba(3, 6, 16, 0.45);
 }
 
 .btn-danger {

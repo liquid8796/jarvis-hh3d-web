@@ -20,6 +20,7 @@
 
 import {
   conditionProbe,
+  conditionWaitSource,
   guideProbe,
   labelMatchSweep,
   menuProbe,
@@ -502,13 +503,30 @@ export function createQuestEngine(deps) {
         const timeout = clamp(step.timeoutMs, 500, 30 * 60 * 1000);
         const deadline = Date.now() + timeout;
 
-        while (Date.now() < deadline) {
+        // Cái chờ sống TRONG TRANG (conditionWaitSource): MutationObserver đánh thức nó
+        // ngay tại khoảnh khắc DOM đổi, nên trạng thái ngắn hơn một nhịp poll không còn
+        // lọt lưới — vòng lấy mẫu 300ms cũ mù đúng những ca đó, mà Mê Cung thì dựng toàn
+        // bằng chúng. Cắt lát thay vì một evaluate dài, để lệnh dừng và ngân sách bước
+        // vẫn cầm quyền từ ngoài này; trong một lát, phản ứng là tức thời.
+        for (;;) {
           throwIfStopped();
-          if (await checkCondition(session, step.condition)) return null;
-          await sleep(300);
-        }
 
-        return `Hết ${Math.round(timeout / 1000)}s chờ: ${describeCondition(step.condition)}`;
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) {
+            return `Hết ${Math.round(timeout / 1000)}s chờ: ${describeCondition(step.condition)}`;
+          }
+
+          const hit = await session.evaluate(
+            conditionWaitSource(step.condition, Math.min(remaining, 2000)),
+          );
+
+          if (hit === true) return null;
+
+          // undefined = chính evaluate hỏng — thường là một cú điều hướng rút trang khỏi
+          // chân cái chờ. Lùi một nhịp ngắn để trang hỏng thành một timeout có tên, không
+          // phải một vòng xoay nóng.
+          if (hit === undefined) await sleep(300);
+        }
       }
 
       case "repeat": {

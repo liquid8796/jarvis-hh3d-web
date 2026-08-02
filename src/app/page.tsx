@@ -23,25 +23,30 @@ export default function LandingPage() {
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-5xl px-6 pb-24">
-        <section className="rise-in flex flex-col items-center py-20 text-center">
+        <section className="rise-in flex flex-col items-center py-14 text-center">
           <SectSeal size="5.5rem" />
-          <h1 className="h-display mt-8 max-w-3xl text-4xl font-bold leading-tight md:text-5xl">
-            <span className="text-gilded">Phàm nhân</span> cũng có thể
-            <br />
-            <span className="text-gilded">tu tiên bằng automation</span>
-          </h1>
-          <p className="mt-6 max-w-xl text-base leading-relaxed text-[var(--color-mist)]">
-            Auto HH3D đưa cỗ máy nhiệm vụ ngày của hoathinh3d lên mây: cấu hình một lần,
-            khai đàn một chạm, linh sứ trên server lo phần cày cuốc — đạo hữu chỉ việc thu
-            linh thạch.
-          </p>
-          <div className="mt-10 flex gap-4">
-            <Link href="/register" className="btn btn-gold text-base">
-              Bái Sư Nhập Môn
-            </Link>
-            <Link href="/login" className="btn btn-ghost text-base">
-              Đã có đạo hiệu
-            </Link>
+          {/* Tấm veil chỉ ôm phần CHỮ của hero: đúng vùng mà mặt trăng trong ảnh nền làm
+              chữ vàng lẫn chữ sương chìm nghỉm. Ấn ở trên và ba pillar bên dưới tự đứng
+              được trên ảnh, nên chúng ở ngoài veil — ảnh được che ít nhất có thể. */}
+          <div className="hero-veil mt-8 flex flex-col items-center">
+            <h1 className="h-display max-w-3xl text-4xl font-bold leading-tight md:text-5xl">
+              <span className="text-gilded">Phàm nhân</span> cũng có thể
+              <br />
+              <span className="text-gilded">tu tiên bằng automation</span>
+            </h1>
+            <p className="mt-6 max-w-xl text-base leading-relaxed text-[var(--color-parchment)]/90">
+              Auto HH3D đưa cỗ máy nhiệm vụ ngày của hoathinh3d lên mây: cấu hình một lần,
+              khai đàn một chạm, linh sứ trên server lo phần cày cuốc — đạo hữu chỉ việc thu
+              linh thạch.
+            </p>
+            <div className="mt-8 flex gap-4">
+              <Link href="/register" className="btn btn-gold text-base">
+                Bái Sư Nhập Môn
+              </Link>
+              <Link href="/login" className="btn btn-ghost text-base">
+                Đã có đạo hiệu
+              </Link>
+            </div>
           </div>
         </section>
 

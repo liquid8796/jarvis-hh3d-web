@@ -381,6 +381,52 @@ async function main() {
     check("trần số vòng chặn được vòng lặp không có lối ra",
       (await page.evaluate(() => document.getElementById("tally").textContent)) === "3");
 
+    console.log("\nwaitForCondition realtime");
+
+    // Ca ăn tiền: một trạng thái chỉ LOÉ 150ms. Vòng poll 300ms cũ lấy mẫu trước và sau cú
+    // loé rồi kết luận "không có gì" — chính xác kiểu sự kiện mà Mê Cung không được phép
+    // hụt. MutationObserver được gọi ngay tại mutation nên phải bắt được.
+    await page.evaluate(() => {
+      const el = document.createElement("div");
+      el.id = "flash";
+      el.style.display = "none";
+      el.textContent = "loé";
+      document.body.appendChild(el);
+      setTimeout(() => { el.style.display = "block"; }, 400);
+      setTimeout(() => { el.style.display = "none"; }, 550);
+    });
+    const flash = await run(questOf([
+      { action: "waitForCondition", timeoutMs: 3000,
+        condition: { selector: "#flash", kind: "visible" } },
+    ]));
+    check("trạng thái loé 150ms được bắt", flash.outcome === "completed", flash.outcome);
+
+    // Thức dậy ngay tại mutation, không phải ở nhịp poll kế: phần tử hiện ở t=600ms, cả
+    // bước phải xong quanh đó chứ không phải cộng thêm một nhịp lấy mẫu.
+    await page.evaluate(() => {
+      const el = document.createElement("div");
+      el.id = "late";
+      el.style.display = "none";
+      el.textContent = "muộn";
+      document.body.appendChild(el);
+      setTimeout(() => { el.style.display = "block"; }, 600);
+    });
+    const t0 = Date.now();
+    const late = await run(questOf([
+      { action: "waitForCondition", timeoutMs: 5000,
+        condition: { selector: "#late", kind: "visible" } },
+    ]));
+    const lateMs = Date.now() - t0;
+    check("phần tử đến muộn vẫn được chờ tới nơi", late.outcome === "completed", late.outcome);
+    check("và thức dậy sát sự kiện (đo được " + lateMs + "ms)", lateMs < 1600, `${lateMs}ms`);
+
+    const never = await run(questOf([
+      { action: "waitForCondition", timeoutMs: 900,
+        condition: { selector: "#khong-bao-gio", kind: "visible" } },
+    ]));
+    check("điều kiện không bao giờ đúng vẫn ra timeout có tên",
+      never.outcome === "failed" && /Hết .*s chờ/.test(never.message ?? ""), never.message);
+
     console.log("\nBước tuỳ chọn & cooldown");
 
     const optional = await run(questOf([

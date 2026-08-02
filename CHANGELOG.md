@@ -11,6 +11,27 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.7.0 — cái chờ thức dậy đúng lúc sự kiện xảy ra, và chữ thôi chìm vào trăng
+
+- **`waitForCondition` chuyển từ poll sang MutationObserver trong trang.** Vòng cũ lấy mẫu
+  mỗi 300ms qua CDP; một trạng thái tồn tại ngắn hơn nhịp đó — hàng roster loé qua sảnh,
+  nút mở khoá trong chớp mắt giữa hai lần re-render — đơn giản là vô hình với nó. Giờ cái
+  chờ sống trong trang và được mutation đánh thức NGAY tại sự kiện: đo trên lưới, phần tử
+  hiện ở t=600ms thì bước xong ở t=605ms, và một trạng thái chỉ loé 150ms được bắt gọn —
+  ca mà vòng poll cũ trượt hẳn. Mê Cung dựng gần như toàn bộ bằng những cái chờ này (sảnh
+  đầy dần, phản ứng trục xuất, trận kết thúc), nên đây chính là "quan sát liên tục như
+  realtime". Cắt lát 2 giây để lệnh dừng và ngân sách bước vẫn cầm quyền từ bên ngoài;
+  tick 400ms trong trang làm lưới an toàn cho thay đổi hiếm hoi không kèm mutation. Bản
+  desktop đổi cùng cơ chế, cùng lúc.
+- **Chữ và nút bị ảnh nền nuốt được trả lại độ tương phản** — và CHỈ những chỗ bị nuốt.
+  Khối chữ hero trang chủ nằm đè đúng lõi trăng sáng nên chữ vàng gradient lẫn vào trăng:
+  thêm một tấm veil tối mờ (blur 10px) ôm sát khối chữ, ấn phía trên và ba pillar bên dưới
+  vẫn đứng thẳng trên ảnh. Nút ghost ("Nhập Môn", "Đã có đạo hiệu") vốn trong suốt 96% nên
+  biến mất trên vệt nước sáng và tán lá vàng: giờ tự mang nền tối mờ + viền đậm hơn, vẫn
+  là ghost đứng cạnh nút vàng đặc, nhưng không còn chỗ nào trên ảnh nuốt được nó.
+- Suite: 59/59 — bốn ca mới ghim đúng ngữ nghĩa realtime: bắt trạng thái loé 150ms, thức
+  dậy sát sự kiện (đo bằng đồng hồ), và timeout vẫn ra một câu có tên.
+
 ## 0.6.0 — thành Auto HH3D, và artwork thật thay cho bản dựng lại
 
 - **Đổi tên hiển thị: Jarvis HH3D → Auto HH3D** — title, header, chữ trên trang chủ. Tên

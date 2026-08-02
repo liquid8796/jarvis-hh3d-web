@@ -459,6 +459,62 @@ export function conditionProbe(arg) {
 }
 
 /**
+ * Dựng mã nguồn cho một lượt CHỜ TRONG TRANG: MutationObserver đánh giá lại điều kiện ngay
+ * tại khoảnh khắc DOM đổi, nên cái chờ thức dậy ĐÚNG LÚC sự kiện xảy ra thay vì ở nhịp poll
+ * kế tiếp. Trả `true` ngay khi điều kiện đúng, `false` khi hết `ceilingMs`.
+ *
+ * Đây là bản thay cho vòng poll 300ms cũ, và khác biệt không phải tiện nghi mà là đúng-sai:
+ * một trạng thái tồn tại ngắn hơn một nhịp poll — một hàng roster loé qua sảnh, một cái nút
+ * mở khoá trong chớp mắt giữa hai lần re-render — poll lấy mẫu thì không bao giờ thấy, còn
+ * observer thì được gọi ngay tại mutation. Mê Cung dựng gần như toàn bộ bằng những cái chờ
+ * này, và "tool nhìn hụt" ở quest đó là bốn người chơi thật mất lượt oan.
+ *
+ * Trả về CHUỖI mã (đã nhúng sẵn tham số) chứ không phải hàm: hàm serialize sang trang sẽ
+ * mất closure nên không ôm được `conditionProbe`; còn Playwright bản JS thì không truyền
+ * arg cho script dạng chuỗi. Nhúng probe + tham số vào nguồn là đường duy nhất đi qua cả
+ * hai ràng buộc. Tick 400ms là lưới an toàn cho thay đổi hiếm hoi không kèm mutation;
+ * observer mới là đường nhanh. Người gọi giữ timeout TỔNG và cắt lát lượt chờ này (xem
+ * engine) để lệnh dừng và ngân sách bước luôn cầm quyền.
+ */
+export function conditionWaitSource(condition, ceilingMs) {
+  const arg = {
+    selector: condition.selector ?? null,
+    kind: condition.kind,
+    text: condition.text ?? null,
+    ceilingMs: Math.max(50, Math.floor(ceilingMs)),
+  };
+
+  return `((arg) => {
+    const probe = ${conditionProbe.toString()};
+
+    return new Promise((resolve) => {
+      let done = false;
+      let obs = null, tick = null, cap = null;
+
+      const finish = (verdict) => {
+        if (done) return;
+        done = true;
+        if (obs) { try { obs.disconnect(); } catch (e) {} }
+        if (tick) clearInterval(tick);
+        if (cap) clearTimeout(cap);
+        resolve(verdict);
+      };
+
+      // Probe sập (node bị gỡ giữa mutation) phải đọc là "chưa", không bao giờ là một
+      // observer chết: mutation kế tiếp cứ thế kiểm lại.
+      const check = () => { try { if (probe(arg)) finish(true); } catch (e) {} };
+
+      obs = new MutationObserver(check);
+      obs.observe(document.documentElement,
+        { childList: true, subtree: true, attributes: true, characterData: true });
+      tick = setInterval(check, 400);
+      cap = setTimeout(() => finish(false), arg.ceilingMs);
+      check(); // điều kiện đã đúng sẵn thì không được bắt nó đợi một mutation
+    });
+  })(${JSON.stringify(arg)})`;
+}
+
+/**
  * Đọc một câu hỏi trắc nghiệm: đề bài cùng mọi đáp án theo đúng thứ tự đang hiển thị. Thứ
  * tự chỉ đúng cho riêng câu này — site xáo lại ở câu sau — nên chỉ số trả về có giá trị cho
  * tới khi có gì đó được bấm, không lâu hơn.

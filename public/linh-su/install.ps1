@@ -31,12 +31,26 @@ $NODE_VERSION = "v24.18.1"                 # LTS "Krypton"
 $token = $env:LINH_PHU
 $base = if ($env:LINH_SU_URL) { $env:LINH_SU_URL.TrimEnd("/") } else { "https://auto-hh3d.vercel.app" }
 
+$dir = Join-Path $env:LOCALAPPDATA "AutoHH3D\LinhSu"
+
+# Không có linh phù mà máy ĐÃ cài rồi → đây là lần CẬP NHẬT: tái dùng token trong .env cũ.
+# Nhờ vậy nâng cấp chỉ cần chạy lại lệnh cài không kèm gì — linh phù vốn chỉ hiện đúng một
+# lần lúc phát, bắt người dùng phát lại token chỉ để cập nhật là bắt họ trả giá vô cớ.
+if (-not $token) {
+  $oldEnv = Join-Path $dir ".env"
+  if (Test-Path $oldEnv) {
+    $line = Get-Content $oldEnv | Where-Object { $_ -match "^WORKER_TOKEN=(.+)$" } | Select-Object -First 1
+    if ($line -and $line -match "^WORKER_TOKEN=(.+)$") {
+      $token = $Matches[1].Trim()
+      Write-Host "Dùng lại linh phù của bản cài trước — đây là một lần cập nhật." -ForegroundColor Cyan
+    }
+  }
+}
+
 if (-not $token) {
   Write-Host "Thiếu linh phù. Hãy copy NGUYÊN VẸN lệnh cài từ mục Linh Sứ trên dashboard." -ForegroundColor Red
   exit 1
 }
-
-$dir = Join-Path $env:LOCALAPPDATA "AutoHH3D\LinhSu"
 $nodeDir = Join-Path $dir "node"
 $nodeExe = Join-Path $nodeDir "node.exe"
 $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"

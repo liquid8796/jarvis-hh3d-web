@@ -11,6 +11,38 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.13.0 — vụ án #lobby-overview: cookie JSON parse ra số không, và số không im lặng
+
+Lượt Mê Cung thật đầu tiên (job 2d6d4a73, 02/08) chết với "Selector không bao giờ xuất
+hiện: #lobby-overview". Điều tra bằng A/B trên site thật cho ra thủ phạm KHÔNG như dự đoán:
+
+- **Gốc rễ: người dùng dán bản xuất JSON của desktop** (`{url, cookies:[…]}`) — hành động
+  hợp lý nhất trần đời — nhưng `parseCookieString` chỉ hiểu dạng `a=1; b=2` nên trả MẢNG
+  RỖNG, không một lời phàn nàn. Browser đi tay trắng, /me-cung đá về trang chủ, và lỗi nổi
+  lên mười bước sau dưới tên một selector vô tội. Ba tầng đều lặng thinh: lúc dán (Zod chỉ
+  soát độ dài), lúc chạy (chỉ soát chuỗi khác rỗng), lúc chết (thông điệp nói về selector).
+- **Sửa tầng một — parser hiểu mọi định dạng hợp lý:** bản xuất JSON của desktop, mảng JSON
+  trần của extension, object phẳng, header `Cookie:` copy nguyên, xuống dòng làm dấu ngăn.
+  Cookie thuộc site KHÁC trong bản export "tất cả" bị loại — không tiêm rác vào phiên game.
+- **Sửa tầng hai — số không phải kêu to, ở thời điểm trung thực nhất:** lúc DÁN, action từ
+  chối lưu chuỗi parse ra 0 cookie và nói rõ định dạng nào được nhận; báo luôn số cookie đã
+  nhận và cảnh báo nếu thiếu `wordpress_logged_in_…`. Lúc CHẠY, runCycle từ chối lượt với
+  lời chỉ đường về Ngọc Giản thay vì để chết ở selector.
+- **Sửa tầng ba — port nốt những lớp desktop có mà web thiếu** (lộ ra trong cùng cuộc điều
+  tra, dù không phải thủ phạm hôm nay): UA thật thế chỗ "HeadlessChrome/…" (A/B đo được UA
+  cũ tự thú đúng chuỗi ấy), `--disable-blink-features=AutomationControlled` +
+  `ignoreDefaultArgs` (navigator.webdriver: true → false), timezone + viewport khớp desktop,
+  **hồ sơ Chromium bền trên đĩa** (token cf_clearance sống qua các lượt — mỗi lượt không
+  phải trình diện Cloudflare như người lạ; nằm cạnh worker nên gỡ cài là sạch theo), và
+  **cổng sẵn sàng** port từ EnsureReadyAsync — `readinessProbe` đã được port sang
+  boardScripts.mjs từ trước mà chưa từng có ai gọi. Giờ bị chặn là nói bị chặn, hết phiên
+  là nói hết phiên, trước khi quest đầu tiên chạy.
+- Installer chạy lại KHÔNG cần linh phù khi máy đã cài: tái dùng token trong .env cũ —
+  nâng cấp là một lệnh trần, không bắt ai phát lại linh phù (nó chỉ hiện một lần lúc phát).
+- Đã kiểm trên site thật với cookie thật: parser mới ra 5 cookie (có phiên đăng nhập, hạn
+  16/08), /me-cung đứng vững, **#lobby-overview render** — đúng selector từng chết.
+  Smoke 66/66 (7 ca mới cho parser).
+
 ## 0.12.1 — gọi thẳng là "tài khoản", và nhật ký dọn được
 
 - **"Pháp Khí" → "Tài khoản hoathinh3d".** Giọng trong-thế-giới vẫn giữ ở mọi chỗ khác

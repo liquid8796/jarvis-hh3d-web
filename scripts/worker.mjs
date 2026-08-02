@@ -21,6 +21,7 @@
  *   WEB_URL=https://<app>.vercel.app WORKER_TOKEN=... node scripts/worker.mjs
  */
 
+import { fileURLToPath } from "node:url";
 import { runCycle } from "../src/lib/quest-engine/runCycle.mjs";
 
 const WEB_URL = (process.env.WEB_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -63,6 +64,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * chờ một điều kiện, mỗi bước trong một repeat), nên nó phải là một phép đọc biến chứ không
  * phải một lời hứa. Nhịp tim nền là thứ cập nhật biến ấy.
  */
+/**
+ * Hồ sơ Chromium bền, nằm NGAY CẠNH worker: token cf_clearance mà Cloudflare cấp sau một
+ * lần kiểm tra sống trong hồ sơ, nên các lượt sau đi thẳng qua cổng thay vì trình diện lại
+ * như người lạ. Đặt cạnh worker (chứ không ở temp hay home) để gỡ cài là sạch theo.
+ */
+const PROFILE_DIR = fileURLToPath(new URL("./browser-profile", import.meta.url));
+
 async function runQuest({ config, say, shouldStop }) {
   await say("Linh sứ đã nhận ngọc giản, đang khởi lư…");
 
@@ -80,7 +88,7 @@ async function runQuest({ config, say, shouldStop }) {
     };
   }
 
-  return runCycle({ chromium, config, say, shouldStop });
+  return runCycle({ chromium, config, say, shouldStop, profileDir: PROFILE_DIR });
 }
 
 /** Một lượt trọn vẹn: nhịp tim chạy nền, engine chạy trước, kết thúc thì báo cáo. */

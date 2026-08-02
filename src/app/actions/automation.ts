@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requireActiveUser } from "@/lib/auth/guards";
 import { clearCookie, configSchema, saveConfig } from "@/lib/services/configs";
 import { clearLatestJobEvents, requestStop, startJob } from "@/lib/services/jobs";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore — module JS thuần của quest-engine, không có d.ts và không cần.
+import { DEFAULT_GAME_BASE_URL, parseCookieString } from "@/lib/quest-engine/runCycle.mjs";
 
 /**
  * Automation server actions — every one re-derives the caller from the session and
@@ -53,9 +56,35 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Cấu hình không hợp lệ." };
   }
 
+  // Soát cookie NGAY LÚC DÁN — thời điểm trung thực nhất, khi người dùng còn đứng đó và còn
+  // sửa được. Bài học 02/08: một bản xuất JSON được lưu êm ả, parse ra số không, và sự thật
+  // chỉ nổi lên ở một selector Mê Cung mười phút sau, dưới một cái tên chẳng liên quan.
+  const pastedCookie = parsed.data.gameCookie.trim();
+  let cookieNote = "";
+  if (pastedCookie.length > 0) {
+    const jar = parseCookieString(pastedCookie, process.env.GAME_BASE_URL || DEFAULT_GAME_BASE_URL) as {
+      name: string;
+    }[];
+    if (jar.length === 0) {
+      return {
+        ok: false,
+        message:
+          "Chuỗi cookie không đọc được — chưa lưu gì cả. Hãy dán dạng 'a=1; b=2' copy từ DevTools, " +
+          "hoặc nguyên bản xuất JSON của ứng dụng desktop.",
+      };
+    }
+
+    cookieNote = jar.some((c) => c.name.startsWith("wordpress_logged_in"))
+      ? ` Đã nhận ${jar.length} cookie, có phiên đăng nhập.`
+      : ` Đã nhận ${jar.length} cookie nhưng KHÔNG thấy cookie đăng nhập (wordpress_logged_in_…) — nếu lượt chạy báo hết phiên thì đây là lý do.`;
+  }
+
   await saveConfig(user.id, parsed.data);
   revalidatePath("/dashboard");
-  return { ok: true, message: "Đã khắc cấu hình vào ngọc giản. Lượt khai đàn kế tiếp sẽ dùng bản này." };
+  return {
+    ok: true,
+    message: `Đã khắc cấu hình vào ngọc giản. Lượt khai đàn kế tiếp sẽ dùng bản này.${cookieNote}`,
+  };
 }
 
 /** Rút cookie khỏi hệ thống — thứ duy nhất xoá được bí mật đã lưu. */

@@ -27,6 +27,13 @@ DIR="$HOME/.local/share/auto-hh3d/linh-su"
 NODE_DIR="$DIR/node"
 NODE="$NODE_DIR/bin/node"
 
+# Không có linh phù mà máy ĐÃ cài rồi → đây là lần CẬP NHẬT: tái dùng token trong .env cũ.
+# Nâng cấp chỉ cần chạy lại lệnh cài trần — không bắt ai phát lại linh phù chỉ để cập nhật.
+if [ -z "$TOKEN" ] && [ -f "$DIR/.env" ]; then
+  TOKEN="$(grep -m1 '^WORKER_TOKEN=' "$DIR/.env" | cut -d= -f2- || true)"
+  [ -n "$TOKEN" ] && echo "Dùng lại linh phù của bản cài trước — đây là một lần cập nhật."
+fi
+
 if [ -z "$TOKEN" ]; then
   echo "Thiếu linh phù. Hãy copy NGUYÊN VẸN lệnh cài từ mục Linh Sứ trên dashboard." >&2
   exit 1

@@ -7,7 +7,7 @@
  * bao giờ kéo theo một thư viện trình duyệt nặng nề mà nó không dùng.
  */
 
-import { vipProbe } from "./boardScripts.mjs";
+import { readinessProbe, vipProbe } from "./boardScripts.mjs";
 import { createQuestEngine, enabledQuestsInOrder, questsForAccount, QuestAborted } from "./engine.mjs";
 import { profileForConfig } from "./profile.mjs";
 import { createSession } from "./session.mjs";
@@ -16,15 +16,117 @@ import { createSession } from "./session.mjs";
 export const DEFAULT_GAME_BASE_URL = "https://hoathinh3d.am";
 
 /**
- * Chuỗi cookie kiểu `document.cookie` → mảng cookie của Playwright.
+ * UA của một Chrome desktop thật — thế chỗ UA mặc định của headless, vốn tự xưng
+ * "HeadlessChrome/…". Site nằm sau Cloudflare, và chuỗi ấy là lời tự thú.
  *
- * Người dùng dán đúng thứ họ copy được từ DevTools ("wordpress_logged_in_…=…; wordpress_sec_…=…"),
- * nên chỗ này cố ý dễ tính: bỏ qua mảnh rỗng, chỉ tách ở dấu `=` ĐẦU TIÊN (giá trị cookie
- * của WordPress có chứa `=` bên trong), và giao domain/path cho Playwright suy ra từ `url`.
+ * Ghim "151" cho khớp bản Chromium mà playwright-core 1.62 tải về: Cloudflare đối chiếu
+ * được UA header với client hints (Sec-CH-UA) do chính browser tự khai, nên một UA nói
+ * "Chrome 131" trên một engine 151 là một mâu thuẫn dâng tận miệng. Chrome thật từ lâu chỉ
+ * khai major version (x.0.0.0), nên dạng này không lệch gì với đời thật.
+ */
+const DESKTOP_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36";
+
+/**
+ * Cấu hình mở trình duyệt — port TRUNG THỰC từ PlaywrightBrowserSession.cs của bản desktop.
+ *
+ * Đây chính là chỗ lượt Mê Cung thật đầu tiên (02/08, job 2d6d4a73) chết: bản web mở
+ * `chromium.launch({ headless: true })` trần trụi — UA "HeadlessChrome", cờ automation bật
+ * nguyên — nên Cloudflare dựng màn kiểm tra, trang /me-cung không bao giờ render, và lỗi
+ * hiện ra ở tận `#lobby-overview` dưới cái tên của một selector vô tội. Bản desktop chạy
+ * cùng tài khoản, cùng ngày, cùng site thì êm — khác nhau đúng ở những dòng dưới đây.
+ */
+function launchProfile(headless) {
+  return {
+    headless,
+    userAgent: DESKTOP_USER_AGENT,
+    locale: "vi-VN",
+    timezoneId: "Asia/Ho_Chi_Minh",
+    viewport: { width: 1366, height: 768 },
+    // Tắt cờ `navigator.webdriver` và banner "being controlled by automated software" —
+    // hai dấu automation mà desktop cũng đã tắt từ đầu.
+    args: ["--disable-blink-features=AutomationControlled"],
+    ignoreDefaultArgs: ["--enable-automation"],
+  };
+}
+
+/**
+ * Chuỗi cookie người dùng dán → mảng cookie của Playwright. Hiểu MỌI định dạng hợp lý:
+ *
+ *   • `document.cookie` / header: "wordpress_logged_in_…=…; wordpress_sec_…=…"
+ *   • Bản xuất JSON của chính bản desktop: {"url": …, "cookies": [{name, value, domain, …}]}
+ *   • Mảng JSON trần của các extension Cookie-Editor: [{name, value, …}]
+ *   • Object phẳng: {"tên": "giá trị"}
+ *
+ * Dễ tính là BẮT BUỘC ở đây, vì bài học 02/08 (job 2d6d4a73): người dùng dán bản xuất JSON
+ * từ desktop — hành động hợp lý nhất trần đời — và parser cũ chỉ hiểu dạng chuỗi nên trả về
+ * MẢNG RỖNG, không một lời phàn nàn. Browser đi tay trắng, /me-cung đá về trang chủ, và lỗi
+ * nổi lên tận `#lobby-overview` dưới cái tên một selector vô tội. Người gọi phải coi kết
+ * quả rỗng là LỖI TO (xem chỗ gọi trong runCycle) — một chuỗi 1.455 ký tự ra số không thì
+ * chắc chắn không phải ý người dán.
  */
 export function parseCookieString(raw, url) {
+  const text = String(raw ?? "").trim();
+  if (!text) return [];
+
+  let host = "";
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    /* url hỏng thì bỏ lọc theo domain */
+  }
+
+  if (text.startsWith("{") || text.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(text);
+      const list = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.cookies)
+          ? parsed.cookies
+          : null;
+
+      if (list) {
+        const cookies = [];
+        for (const c of list) {
+          if (!c || typeof c.name !== "string" || !c.name || typeof c.value !== "string") continue;
+
+          // Chỉ giữ cookie thuộc đúng site đang nhắm tới: bản "export tất cả" của extension
+          // không được phép tiêm cookie của site khác vào phiên game.
+          const domain = typeof c.domain === "string" && c.domain ? c.domain : "";
+          const bare = domain.replace(/^\./, "");
+          if (bare && host && !host.endsWith(bare) && !bare.endsWith(host)) continue;
+
+          const cookie = { name: c.name, value: c.value };
+          if (domain) {
+            cookie.domain = domain;
+            cookie.path = typeof c.path === "string" && c.path ? c.path : "/";
+          } else {
+            cookie.url = url;
+          }
+
+          const expires = Number(c.expirationDate ?? c.expires);
+          if (Number.isFinite(expires) && expires > 0) cookie.expires = Math.floor(expires);
+          if (typeof c.secure === "boolean") cookie.secure = c.secure;
+          if (typeof c.httpOnly === "boolean") cookie.httpOnly = c.httpOnly;
+          cookies.push(cookie);
+        }
+        return cookies;
+      }
+
+      if (parsed && typeof parsed === "object") {
+        return Object.entries(parsed)
+          .filter(([name, value]) => name && typeof value === "string")
+          .map(([name, value]) => ({ name, value, url }));
+      }
+    } catch {
+      // Trông như JSON mà không parse được — rơi xuống đường chuỗi, biết đâu vẫn ra gì đó.
+    }
+  }
+
+  // Dạng chuỗi: bỏ tiền tố "Cookie:" nếu người dùng copy nguyên header, nhận cả xuống dòng
+  // làm dấu ngăn, chỉ tách ở dấu `=` ĐẦU TIÊN (giá trị cookie WordPress có chứa `=` bên trong).
   const cookies = [];
-  for (const part of String(raw ?? "").split(";")) {
+  for (const part of text.replace(/^cookie:\s*/i, "").split(/[;\n]/)) {
     const chunk = part.trim();
     if (!chunk) continue;
 
@@ -63,6 +165,70 @@ function formatDuration(seconds) {
 }
 
 /**
+ * Cổng sẵn sàng — port của EnsureReadyAsync bên desktop, và là lớp còn thiếu thứ hai.
+ *
+ * Không có nó, lượt chạy lao thẳng vào quest trên một trang có thể đang là màn Cloudflare
+ * hoặc màn đăng nhập, rồi chết ở selector đầu tiên với một thông điệp chẳng nói gì về
+ * nguyên nhân. Ở đây: đứng trước cổng, chờ màn kiểm tra tự qua (có hạn), rồi phán rõ —
+ * bị chặn là nói bị chặn, hết phiên là nói hết phiên.
+ */
+async function ensureReady(session, baseUrl, say, log) {
+  const nav = await session.navigate(baseUrl);
+  if (!nav.ok) {
+    return { ok: false, message: `Không mở được trang game (${nav.error}).` };
+  }
+
+  const deadline = Date.now() + 45_000;
+  let probe = null;
+  let saidChallenge = false;
+
+  while (Date.now() < deadline) {
+    probe = await session.evaluate(readinessProbe);
+    if (probe == null) {
+      await new Promise((r) => setTimeout(r, 1_500));
+      continue;
+    }
+
+    if (!probe.challenge) break;
+
+    if (!saidChallenge) {
+      // Nói MỘT lần rồi chờ trong im lặng — màn kiểm tra dạng managed đôi khi tự qua
+      // sau vài giây, nhưng mỗi nhịp poll mà một dòng nhật ký thì thành rác.
+      await say("Trang game đang dựng màn kiểm tra (Cloudflare) — linh sứ đứng chờ trước cổng…", "warn");
+      saidChallenge = true;
+    }
+    await new Promise((r) => setTimeout(r, 2_000));
+  }
+
+  if (probe == null) {
+    return { ok: false, message: "Không đọc được trạng thái trang game sau khi tải." };
+  }
+
+  if (probe.challenge) {
+    return {
+      ok: false,
+      message:
+        "Màn kiểm tra (Cloudflare) của trang game không tự qua — lượt này đành dừng, lượt sau sẽ thử lại.",
+    };
+  }
+
+  if (probe.loggedIn === false) {
+    return {
+      ok: false,
+      message:
+        "Tài khoản hoathinh3d đã hết phiên đăng nhập — dán chuỗi cookie mới ở Ngọc Giản Cấu Hình rồi khai đàn lại.",
+    };
+  }
+
+  if (probe.loggedIn == null) {
+    log.debug("Sẵn sàng", "Không xác nhận được trạng thái đăng nhập — vẫn đi tiếp.");
+  }
+
+  await say("Đã vào được trang game — phiên đăng nhập còn hiệu lực.", "success");
+  return { ok: true };
+}
+
+/**
  * @param {object} deps
  * @param {import('playwright-core').BrowserType} deps.chromium
  * @param {object} deps.config           UserConfig đã giải mã (gameCookie là plaintext)
@@ -70,6 +236,7 @@ function formatDuration(seconds) {
  * @param {() => boolean} deps.shouldStop  ĐỒNG BỘ — được gọi trong vòng lặp chặt
  * @param {string} [deps.baseUrl]
  * @param {number} [deps.budgetMs]       hết ngân sách thì dừng TỬ TẾ giữa hai nhiệm vụ
+ * @param {string} [deps.profileDir]     hồ sơ Chromium BỀN trên đĩa — xem ghi chú bên dưới
  */
 export async function runCycle(deps) {
   const {
@@ -80,12 +247,25 @@ export async function runCycle(deps) {
     baseUrl = process.env.GAME_BASE_URL || DEFAULT_GAME_BASE_URL,
     budgetMs = 0,
     headless = true,
+    profileDir = process.env.BROWSER_PROFILE_DIR || "",
   } = deps;
 
   if (!config?.gameCookie?.trim()) {
     return {
       outcome: "failed",
       message: "Chưa có tài khoản hoathinh3d — hãy dán chuỗi cookie đăng nhập trước.",
+    };
+  }
+
+  // Parse NGAY và coi số không là lỗi to — không bao giờ để browser đi tay trắng rồi chết
+  // ở một selector vô tội mười bước sau (đúng kịch bản 02/08).
+  const cookieJar = parseCookieString(config.gameCookie, baseUrl);
+  if (cookieJar.length === 0) {
+    return {
+      outcome: "failed",
+      message:
+        "Chuỗi cookie đã lưu không đọc được — vào Ngọc Giản Cấu Hình dán lại tài khoản " +
+        "hoathinh3d (dạng 'a=1; b=2' từ DevTools hoặc bản xuất JSON đều được).",
     };
   }
 
@@ -110,18 +290,46 @@ export async function runCycle(deps) {
 
   for (const note of translationNotes) await say(note, "warn");
 
-  const browser = await chromium.launch({ headless });
+  // Hồ sơ BỀN trên đĩa khi có chỗ đặt nó (worker truyền vào; smoke và các lượt một-lần thì
+  // không). Đây là lớp thứ ba học từ desktop: token cf_clearance mà Cloudflare cấp sau một
+  // lần kiểm tra SỐNG TRONG HỒ SƠ — context ẩn danh mở mới mỗi lượt là mỗi lượt lại trình
+  // diện trước Cloudflare như người lạ, còn hồ sơ bền thì một lần qua cửa là những lượt sau
+  // đi thẳng. Cookie phiên được site làm mới cũng nhờ vậy mà không bị chuỗi dán-tay cũ dần.
+  const fingerprint = launchProfile(headless);
+  let browser = null;
+  let context;
+  if (profileDir) {
+    context = await chromium.launchPersistentContext(profileDir, fingerprint);
+  } else {
+    browser = await chromium.launch({
+      headless,
+      args: fingerprint.args,
+      ignoreDefaultArgs: fingerprint.ignoreDefaultArgs,
+    });
+    context = await browser.newContext({
+      userAgent: fingerprint.userAgent,
+      locale: fingerprint.locale,
+      timezoneId: fingerprint.timezoneId,
+      viewport: fingerprint.viewport,
+    });
+  }
+
   let done = 0;
   let failed = 0;
 
   try {
-    const context = await browser.newContext({
-      viewport: { width: 1366, height: 900 },
-      locale: "vi-VN",
-    });
-    await context.addCookies(parseCookieString(config.gameCookie, baseUrl));
+    // Chỉ tiêm cookie khi hồ sơ CHƯA có phiên đăng nhập — đúng luật của desktop
+    // (InjectCookiesIfNeededAsync): site tự làm mới cookie phiên trong hồ sơ bền, và đè
+    // chuỗi dán-tay cũ hơn lên trên là tự tay đăng xuất một phiên đang lành lặn.
+    const existing = profileDir ? await context.cookies(baseUrl) : [];
+    const hasLogin = existing.some((c) => c.name.startsWith("wordpress_logged_in"));
+    if (hasLogin) {
+      log.debug("Trình duyệt", "Hồ sơ đã có phiên đăng nhập — giữ nguyên, không tiêm cookie.");
+    } else {
+      await context.addCookies(cookieJar);
+    }
 
-    const page = await context.newPage();
+    const page = context.pages().length > 0 ? context.pages()[0] : await context.newPage();
     const session = createSession(page, {
       baseUrl,
       log: {
@@ -130,6 +338,13 @@ export async function runCycle(deps) {
         debug: (m) => log.debug("Trình duyệt", m),
       },
     });
+
+    // Cổng sẵn sàng TRƯỚC mọi quest: bị Cloudflare chặn hay hết phiên đăng nhập phải được
+    // gọi đúng tên ở đây, không phải chết ở selector đầu tiên của một quest vô tội.
+    const ready = await ensureReady(session, baseUrl, say, log);
+    if (!ready.ok) {
+      return { outcome: "failed", message: ready.message };
+    }
 
     // Hạng tài khoản quyết định kế hoạch, nên đọc nó TRƯỚC khi hứa hẹn gì. Ghé hub một lần —
     // trang duy nhất mang tín hiệu — và poll thay vì đọc một phát: hub render làm hai đợt,
@@ -208,7 +423,8 @@ export async function runCycle(deps) {
       : { outcome: "done", message: `Đi hết một vòng — ${done} nhiệm vụ thuận lợi.` };
   } finally {
     // Đóng trong finally, và nuốt lỗi: một trình duyệt không đóng được không được phép ghi
-    // đè lên kết quả thật của lượt chạy.
-    await browser.close().catch(() => {});
+    // đè lên kết quả thật của lượt chạy. Với hồ sơ bền thì context CHÍNH LÀ browser.
+    await context.close().catch(() => {});
+    if (browser) await browser.close().catch(() => {});
   }
 }

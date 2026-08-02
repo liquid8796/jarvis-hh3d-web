@@ -108,6 +108,39 @@ async function main() {
   check("cookie tách ở dấu = ĐẦU TIÊN", cookies[0]?.value === "x|y|z=", `nhận ${cookies[0]?.value}`);
   check("cookie thứ hai vẫn còn", cookies.length === 2 && cookies[1].name === "other");
 
+  // Ca 02/08 nguyên bản: người dùng dán bản xuất JSON của desktop ({url, cookies:[…]}),
+  // parser cũ trả MẢNG RỖNG không một lời phàn nàn, browser đi tay trắng, và lỗi nổi lên ở
+  // tận #lobby-overview của Mê Cung. Từ nay JSON là công dân hạng nhất, và số không là lỗi.
+  const desktopExport = JSON.stringify({
+    url: "https://hoathinh3d.am",
+    cookies: [
+      { domain: ".hoathinh3d.am", name: "wordpress_logged_in_ab", value: "x|y", path: "/", expirationDate: 1786862460.3, secure: true, httpOnly: true },
+      { domain: "hoathinh3d.am", name: "fakesessid", value: "s1" },
+      { domain: ".google.com", name: "NID", value: "rác-site-khác" },
+    ],
+  });
+  const fromJson = parseCookieString(desktopExport, "https://hoathinh3d.am");
+  check("bản xuất JSON của desktop đọc được", fromJson.length === 2, `nhận ${fromJson.length}`);
+  check(
+    "cookie site KHÁC bị loại — export 'tất cả' không được tiêm rác",
+    !fromJson.some((c) => c.name === "NID"),
+  );
+  check(
+    "expirationDate → expires (giây, số nguyên)",
+    fromJson[0]?.expires === 1786862460,
+    `nhận ${fromJson[0]?.expires}`,
+  );
+
+  const fromArray = parseCookieString('[{"name":"a","value":"1"}]', "https://e.test");
+  check("mảng JSON trần của extension cũng đọc được", fromArray.length === 1 && fromArray[0].url === "https://e.test");
+
+  check("JSON không phải cookie → 0, để chỗ gọi từ chối to", parseCookieString('{"hello":42}', "https://e.test").length === 0);
+  check("rác không định dạng → 0", parseCookieString("xin chào thế giới", "https://e.test").length === 0);
+  check(
+    "header 'Cookie:' copy nguyên cũng hiểu",
+    parseCookieString("Cookie: a=1; b=2", "https://e.test").length === 2,
+  );
+
   const notes = [];
   const cfg = {
     gameCookie: "a=b",

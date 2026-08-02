@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { issueLinhPhuAction, revokeLinhPhuAction } from "@/app/actions/linhsu";
+import { forgetLinhSuAction, issueLinhPhuAction, revokeLinhPhuAction } from "@/app/actions/linhsu";
 
 /**
  * Mục LINH SỨ — nơi đạo hữu thấy ai đang trực và, NẾU MUỐN, tự nuôi một linh sứ riêng.
@@ -93,6 +93,11 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
   const [hasToken, setHasToken] = useState(initialHasToken);
   const [token, setToken] = useState<string | null>(null);
   const [showCommands, setShowCommands] = useState(false);
+  const [forgetError, setForgetError] = useState<string | null>(null);
+  // Tên đã bấm gỡ, giữ RIÊNG chứ không cắt thẳng khỏi `presence`: nhịp poll 12 giây vẫn đang
+  // chạy và nó ghi đè cả object bằng dữ liệu máy chủ, nên một phép cắt tại chỗ sẽ bị nhịp
+  // poll kế tiếp dựng dòng ấy dậy trong lúc lệnh xoá còn đang bay.
+  const [forgotten, setForgotten] = useState<string[]>([]);
   const [pending, startTransition] = useTransition();
 
   const poll = useCallback(async () => {
@@ -121,6 +126,31 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
         setToken(result.token);
         setHasToken(true);
         setShowCommands(false);
+      }
+    });
+  };
+
+  /**
+   * Gỡ một cái tên khỏi sổ. Biến mất khỏi màn hình NGAY rồi mới đợi máy chủ: dòng ấy đã
+   * "vắng mặt" từ lâu nên không có trạng thái nào để mất, còn một cái nút bấm xong đứng im
+   * ba nhịp poll thì người ta bấm lần nữa. Máy chủ từ chối thì trả nó về nguyên chỗ cũ.
+   */
+  const forget = (workerId: string) => {
+    if (
+      !confirm(
+        `Gỡ「${workerId}」khỏi danh sách?\n\nChỉ xoá cái tên ở đây thôi — máy đó không bị đụng gì. Nếu linh sứ ấy vẫn còn sống, nó sẽ tự hiện lại sau vài giây.`,
+      )
+    ) {
+      return;
+    }
+    setForgetError(null);
+    setForgotten((f) => (f.includes(workerId) ? f : [...f, workerId]));
+    startTransition(async () => {
+      const result = await forgetLinhSuAction(workerId);
+      if (!result.ok) {
+        setForgotten((f) => f.filter((id) => id !== workerId));
+        setForgetError(result.message ?? "Chưa gỡ được, thử lại sau một lát.");
+        void poll();
       }
     });
   };
@@ -176,8 +206,9 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
     );
   };
 
-  const noWorkerAtAll =
-    presence != null && !presence.sectOnline && !presence.mine.some((w) => w.online);
+  // Danh sách thật sự vẽ ra: bỏ những tên vừa bấm gỡ, kể cả khi nhịp poll chưa kịp biết.
+  const mine = (presence?.mine ?? []).filter((w) => !forgotten.includes(w.id));
+  const noWorkerAtAll = presence != null && !presence.sectOnline && !mine.some((w) => w.online);
 
   return (
     // Dùng chung `.card` với Ngọc Giản và Lư Khai Đàn, chứ không tự pha nền riêng. Bản đầu
@@ -206,16 +237,41 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
           </span>
         </div>
 
-        {(presence?.mine ?? []).map((w) => (
+        {mine.map((w) => (
           <div key={w.id} className="flex items-center gap-2">
             <Dot on={w.online} />
             <span className="min-w-0 truncate text-[var(--color-parchment)]">「{w.id}」</span>
             <span className="shrink-0 text-xs text-[var(--color-mist)]">
               {w.online ? "— đang trực" : `— ${timeAgo(w.lastSeen)}`}
             </span>
+            {/* Nút gỡ CHỈ hiện ở dòng đã vắng: linh sứ đang trực mà gỡ thì nó ghi tên lại sau
+                năm giây, và một cái nút không giữ được lời hứa còn tệ hơn không có nút. */}
+            {!w.online && (
+              <button
+                type="button"
+                onClick={() => forget(w.id)}
+                disabled={pending}
+                title="Gỡ khỏi danh sách"
+                aria-label={`Gỡ linh sứ ${w.id} khỏi danh sách`}
+                className="ml-auto shrink-0 rounded-md border border-[var(--color-ink-600)] px-1.5 text-xs leading-5 text-[var(--color-mist)] transition-colors hover:border-[#f2a0a0]/50 hover:text-[#f2a0a0] disabled:opacity-40"
+              >
+                ✕
+              </button>
+            )}
           </div>
         ))}
       </div>
+
+      {/* Cái tên xám nằm đó không tự giải thích được mình là gì. Nói ra, ngay cạnh nó. */}
+      {presence != null && mine.some((w) => !w.online) && (
+        <p className="mt-2 text-xs text-[var(--color-mist)]">
+          Dòng màu xám là máy đang tắt, hoặc bản cài cũ đã bỏ. Bấm{" "}
+          <span className="text-[var(--color-parchment)]">✕</span> để gỡ cái tên khỏi danh sách.
+        </p>
+      )}
+      {forgetError && (
+        <p className="mt-2 text-xs text-[#f2a0a0]">{forgetError}</p>
+      )}
 
       {/* Câu trả lời đúng cho hầu hết mọi người, nói TRƯỚC phần cài đặt. */}
       {presence?.sectOnline && (
@@ -236,7 +292,7 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
           cứ quay vô ích, bị từ chối mỗi 5 giây, và trên màn hình chỉ lặng lẽ chuyển thành
           "vắng". Đúng chuyện đã xảy ra ngày 02/08. Hộp xác nhận cảnh báo TRƯỚC khi bấm là
           chưa đủ: người ta cần được nhắc lại NGAY LÚC nhìn thấy hậu quả. */}
-      {token && presence != null && presence.mine.length > 0 && (
+      {token && presence != null && mine.length > 0 && (
         <p className="mt-3 rounded-lg border border-[#f2a0a0]/30 bg-[#f2a0a0]/5 p-3 text-xs text-[var(--color-mist)]">
           <span className="text-[#f2a0a0]">Linh sứ cũ của bạn vừa ngừng nhận việc.</span> Linh
           phù mới đã thay linh phù cũ. Tải bộ cài bên dưới rồi chạy lại trên máy đó là nó trực

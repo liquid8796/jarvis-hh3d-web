@@ -171,12 +171,19 @@ try {
 }
 
 # --- 5. Cấu hình -------------------------------------------------------------
-# WORKER_ID mang tên máy để dashboard hiện "linh sứ nhà ai" một cách dễ nhận ra, kèm bốn ký
-# tự ngẫu nhiên để hai máy trùng tên không giẫm lên nhau.
+# WORKER_ID mang tên máy để dashboard hiện "linh sứ nhà ai" một cách dễ nhận ra, kèm một hậu
+# tố để hai máy trùng tên không giẫm lên nhau.
 #
-# GIỮ NGUYÊN ID CŨ nếu máy này đã cài trước đó: ID là danh tính của linh sứ trong sổ điểm
-# danh, nên sinh mới mỗi lần cài lại sẽ để lại một xác linh sứ "vắng mặt" trong mục Linh Sứ
-# sau MỖI lần cập nhật — người dùng nhìn vào tưởng mình đang nuôi cả một đàn.
+# HẬU TỐ ẤY LÀ HÀM CỦA CÁI MÁY, KHÔNG PHẢI SỐ NGẪU NHIÊN. ID là danh tính của linh sứ trong
+# sổ điểm danh, và sổ ấy không bao giờ tự quên: mỗi ID mới để lại một xác "vắng mặt" nằm đó
+# vĩnh viễn, người dùng nhìn vào tưởng mình đang nuôi cả một đàn.
+#
+# Đọc lại .env cũ (bên dưới) cứu được đường CÀI ĐÈ, nhưng KHÔNG cứu được đường gỡ-rồi-cài-
+# lại: uninstall.ps1 xoá cả thư mục nên .env chết theo — mà đó lại đúng là đường ta bảo người
+# dùng đi khi cần dọn dẹp. Băm từ MachineGuid + tên tài khoản Windows thì cài lại bao nhiêu
+# lần cũng ra cùng một tên. MachineGuid do Windows sinh lúc cài hệ điều hành, không đổi theo
+# tên máy hay phần cứng; cộng thêm tên tài khoản vì thư mục cài là %LOCALAPPDATA% của từng
+# người, nên hai tài khoản trên cùng một máy là hai linh sứ thật, phải mang hai tên khác nhau.
 $workerId = $null
 $envPath = Join-Path $dir ".env"
 if (Test-Path $envPath) {
@@ -184,7 +191,21 @@ if (Test-Path $envPath) {
   if ($old -and $old -match "^WORKER_ID=(.+)$") { $workerId = $Matches[1].Trim() }
 }
 if (-not $workerId) {
-  $suffix = -join ((48..57) + (97..122) | Get-Random -Count 4 | ForEach-Object { [char]$_ })
+  $seed = $null
+  try {
+    $guid = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Cryptography" -Name MachineGuid -ErrorAction Stop).MachineGuid
+    if ($guid) { $seed = "$guid|$env:USERNAME" }
+  } catch {
+    # Registry không đọc được (chính sách nhóm, bản Windows lạ). Lùi về ngẫu nhiên bên dưới:
+    # một cái xác trong sổ vẫn hơn một bản cài không chạy.
+  }
+  if ($seed) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { $hash = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($seed)) } finally { $sha.Dispose() }
+    $suffix = -join ($hash[0..2] | ForEach-Object { $_.ToString("x2") })
+  } else {
+    $suffix = -join ((48..57) + (97..122) | Get-Random -Count 6 | ForEach-Object { [char]$_ })
+  }
   $workerId = ($env:COMPUTERNAME.ToLower() -replace "[^a-z0-9-]", "-") + "-" + $suffix
 }
 @(

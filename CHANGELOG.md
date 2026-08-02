@@ -11,6 +11,35 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.16.0 — cài lại một lần là mọc thêm một cái tên, và sổ điểm danh thì không biết quên
+
+- **Mục Linh Sứ hiện hai linh sứ trên một cái máy.** `desktop-lq9der0-wujq` chấm xanh,
+  `desktop-lq9der0-439u` chấm xám "28 phút trước" — cùng một máy, hai lần cài. Không có gì
+  hỏng: cổng Khai Đàn dùng `anyWorkerOnlineFor` với cửa sổ 30 giây nên cái xác không giả
+  được "có người trực", và việc giành job phân xử bằng scope của token chứ không bằng dòng
+  trong sổ. Nhưng màn hình ấy **nói dối bằng hình ảnh**, đúng điều mà chính comment trong
+  `install.ps1` đã sợ: *"người dùng nhìn vào tưởng mình đang nuôi cả một đàn."*
+- **Hậu tố của WORKER_ID thôi ngẫu nhiên, chuyển thành hàm của cái máy.** Băm SHA-256 từ
+  `MachineGuid` + tên tài khoản Windows (Linux/macOS: `machine-id`/`IOPlatformUUID` + uid),
+  lấy 6 ký tự hex. Cài lại bao nhiêu lần cũng ra đúng một tên.
+
+  Bản cũ *có* logic giữ ID — đọc lại từ `.env` — nhưng nó chỉ cứu được đường **cài đè**.
+  `uninstall` xoá cả thư mục nên `.env` chết theo, và **gỡ-rồi-cài-lại lại đúng là đường ta
+  bảo người dùng đi khi cần dọn dẹp**. Nghĩa là quy trình dọn dẹp chính thức là đường duy
+  nhất chắc chắn đẻ ra bia mộ. Không phải ai viết sai; khe hở nằm ở chỗ hai tệp gặp nhau.
+
+  Tên tài khoản có mặt trong hạt giống vì thư mục cài là `%LOCALAPPDATA%`/`$HOME` của từng
+  người: hai tài khoản trên cùng một máy là hai linh sứ thật, phải mang hai tên khác nhau.
+  Đọc registry hỏng thì lùi về ngẫu nhiên — một cái xác trong sổ vẫn hơn một bản cài không
+  chạy. Đã đo trên máy thật: ba lần chạy liên tiếp ra cùng `desktop-lq9der0-775e84`.
+- **Nút ✕ gỡ tên khỏi danh sách**, cho những cái xác đã sinh ra rồi — và cho máy đã bán, bản
+  cài đã bỏ. Chỉ hiện ở dòng đã vắng: linh sứ đang trực mà gỡ thì nó ghi tên lại sau năm
+  giây, và một cái nút không giữ được lời hứa còn tệ hơn không có nút. `forgetWorker` chốt
+  hai lớp — `userId` trong mệnh đề where, và `lastSeen` phải cũ hơn cửa sổ 30 giây.
+- Tên đã bấm gỡ giữ ở một state riêng chứ không cắt thẳng khỏi `presence`: nhịp poll 12 giây
+  ghi đè cả object bằng dữ liệu máy chủ, nên một phép cắt tại chỗ sẽ bị nhịp poll kế tiếp
+  dựng dòng ấy dậy trong lúc lệnh xoá còn đang bay.
+
 ## 0.15.2 — hồ sơ trình duyệt ôm một cái xác cookie, và Luyện Đan chết ở #ld-app
 
 - **Luyện Đan Đường hỏng với "Selector không bao giờ xuất hiện: #ld-app".** Trang lò thì

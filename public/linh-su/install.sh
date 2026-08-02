@@ -127,15 +127,40 @@ if [ "$OS_TAG" = "linux" ]; then
 fi
 
 # --- 5. Cấu hình -------------------------------------------------------------
-# GIỮ NGUYÊN ID CŨ nếu máy này đã cài trước đó: ID là danh tính của linh sứ trong sổ điểm
-# danh, nên sinh mới mỗi lần cài lại sẽ để lại một xác linh sứ "vắng mặt" trong mục Linh Sứ
-# sau MỖI lần cập nhật — người dùng nhìn vào tưởng mình đang nuôi cả một đàn.
+# HẬU TỐ CỦA WORKER_ID LÀ HÀM CỦA CÁI MÁY, KHÔNG PHẢI SỐ NGẪU NHIÊN. ID là danh tính của linh
+# sứ trong sổ điểm danh, và sổ ấy không bao giờ tự quên: mỗi ID mới để lại một xác "vắng mặt"
+# nằm đó vĩnh viễn, người dùng nhìn vào tưởng mình đang nuôi cả một đàn.
+#
+# Đọc lại .env cũ cứu được đường CÀI ĐÈ, nhưng KHÔNG cứu được đường gỡ-rồi-cài-lại:
+# uninstall.sh xoá cả thư mục nên .env chết theo — mà đó lại đúng là đường ta bảo người dùng
+# đi khi cần dọn dẹp. Băm từ danh tính máy + uid thì cài lại bao nhiêu lần cũng ra cùng một
+# tên; uid có mặt vì thư mục cài nằm trong $HOME của từng người, nên hai tài khoản trên cùng
+# một máy là hai linh sứ thật và phải mang hai tên khác nhau.
 WORKER_ID=""
 if [ -f "$DIR/.env" ]; then
   WORKER_ID="$(grep -m1 '^WORKER_ID=' "$DIR/.env" 2>/dev/null | cut -d= -f2- || true)"
 fi
 if [ -z "$WORKER_ID" ]; then
-  SUFFIX="$(LC_ALL=C tr -dc 'a-z0-9' </dev/urandom | head -c 4)"
+  # machine-id trên Linux; IOPlatformUUID trên macOS (không có /etc/machine-id).
+  MACHINE_SEED=""
+  for f in /etc/machine-id /var/lib/dbus/machine-id; do
+    if [ -z "$MACHINE_SEED" ] && [ -r "$f" ]; then MACHINE_SEED="$(cat "$f" 2>/dev/null || true)"; fi
+  done
+  if [ -z "$MACHINE_SEED" ] && command -v ioreg >/dev/null 2>&1; then
+    MACHINE_SEED="$(ioreg -rd1 -c IOPlatformExpertDevice 2>/dev/null | awk -F'"' '/IOPlatformUUID/{print $4; exit}')"
+  fi
+  HASHER=""
+  if command -v sha256sum >/dev/null 2>&1; then HASHER="sha256sum"
+  elif command -v shasum >/dev/null 2>&1; then HASHER="shasum -a 256"
+  fi
+  SUFFIX=""
+  if [ -n "$MACHINE_SEED" ] && [ -n "$HASHER" ]; then
+    # Đầu ra của sha256sum là "<hex>  -", `tr -dc '0-9a-f'` bỏ khoảng trắng lẫn dấu "-" và
+    # giữ đúng phần hex. Sáu ký tự — rộng hơn bốn ký tự ngẫu nhiên của bản trước.
+    SUFFIX="$(printf '%s|%s' "$MACHINE_SEED" "$(id -u)" | $HASHER | LC_ALL=C tr -dc '0-9a-f' | cut -c1-6)"
+  fi
+  # Máy không có cả machine-id lẫn sha256: một cái xác trong sổ vẫn hơn một bản cài không chạy.
+  if [ -z "$SUFFIX" ]; then SUFFIX="$(LC_ALL=C tr -dc 'a-z0-9' </dev/urandom | head -c 6)"; fi
   WORKER_ID="$(hostname -s | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-' | sed 's/-*$//')-$SUFFIX"
 fi
 cat > "$DIR/.env" <<ENV

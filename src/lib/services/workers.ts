@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hashWorkerToken, type WorkerScope } from "@/lib/auth/worker";
 import type { WorkerRow } from "@/lib/db/schema";
@@ -77,6 +77,36 @@ export async function anyWorkerOnlineFor(userId: string): Promise<boolean> {
       ),
     );
   return (rows[0]?.n ?? 0) > 0;
+}
+
+/**
+ * Gỡ một linh sứ khỏi sổ điểm danh.
+ *
+ * Sổ là sổ ĐĂNG KÝ chứ không phải danh sách tiến trình: `recordWorkerSeen` chỉ biết thêm và
+ * cập nhật, nên một dòng vào rồi ở lại vĩnh viễn. Máy đã bán, bản cài đã gỡ, hay một ID sinh
+ * ra trước khi hậu tố trở thành xác định — tất cả nằm lại đó, và người dùng đọc màn hình ấy
+ * như "tôi đang nuôi mấy linh sứ", không như "đây là những cái tên từng ghé qua".
+ *
+ * CHỈ gỡ được linh sứ ĐANG VẮNG. Một linh sứ còn sống ghi lại dòng của nó ở lần gõ cửa kế
+ * tiếp — nhiều nhất 5 giây sau — nên cho gỡ nó chỉ tạo ra một cái nút thỉnh thoảng mới có
+ * tác dụng, thứ khó chịu hơn là không có nút. Mệnh đề `userId` là lớp chặn thứ hai: không ai
+ * gỡ được linh sứ của người khác dù có gọi thẳng action với ID lạ.
+ *
+ * Trả về false khi không xoá được — nơi gọi phân biệt "vừa sống lại" với "đã xong".
+ */
+export async function forgetWorker(userId: string, workerId: string): Promise<boolean> {
+  const cutoff = new Date(Date.now() - ONLINE_WINDOW_MS);
+  const removed = await db()
+    .delete(schema.workers)
+    .where(
+      and(
+        eq(schema.workers.id, workerId),
+        eq(schema.workers.userId, userId),
+        lt(schema.workers.lastSeen, cutoff),
+      ),
+    )
+    .returning({ id: schema.workers.id });
+  return removed.length > 0;
 }
 
 /**

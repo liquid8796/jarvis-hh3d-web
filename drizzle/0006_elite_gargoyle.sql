@@ -1,0 +1,1 @@
+ALTER TABLE "automation_jobs" ADD COLUMN "next_run_at" timestamp with time zone DEFAULT now() NOT NULL;

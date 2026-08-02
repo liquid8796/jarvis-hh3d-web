@@ -1,6 +1,6 @@
 {
   "name": "jarvis-hh3d-web",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "private": true,
   "description": "Auto HH3D — control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn tự động chạy trên server.",
   "scripts": {
@@ -15,7 +15,8 @@
     "db:seed": "node scripts/seed.mjs",
     "db:reset-password": "node scripts/resetPassword.mjs",
     "worker": "node scripts/worker.mjs",
-    "smoke": "tsx scripts/smokeQuestEngine.mjs"
+    "smoke": "tsx scripts/smokeQuestEngine.mjs",
+    "verify:continuous": "tsx scripts/verifyContinuousJob.mts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",

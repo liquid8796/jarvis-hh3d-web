@@ -25,7 +25,14 @@ export async function GET(request: NextRequest) {
   const events = await eventsAfter(job.id, after);
 
   return NextResponse.json({
-    job: { id: job.id, status: job.status, createdAt: job.createdAt, workerId: job.workerId },
+    job: {
+      id: job.id,
+      status: job.status,
+      createdAt: job.createdAt,
+      nextRunAt: job.nextRunAt,
+      attempts: job.attempts,
+      workerId: job.workerId,
+    },
     events: events.map((e) => ({
       id: e.id,
       at: e.at,

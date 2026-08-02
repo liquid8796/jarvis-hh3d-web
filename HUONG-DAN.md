@@ -70,14 +70,15 @@ Chọn xong nhớ bấm **Khắc Ngọc Giản**.
 
 ### Bước 3 — Khai Đàn
 
-Bấm **Khai Đàn**. Xong. Tắt trình duyệt đi ngủ cũng được.
+Bấm **Khai Đàn**. Xong. Auto tự canh thời gian chờ rồi chạy hết vòng này sang vòng khác;
+không cần quay lại bấm Khai Đàn sau mỗi vòng. Tắt trình duyệt đi ngủ cũng được.
 
 Nhưng nhớ một điều: **tắt máy thì tuỳ ai đang chạy hộ bạn.** Linh sứ tông môn nằm ở máy
 khác nên vẫn chạy tiếp; còn linh sứ cài trên máy bạn thì tắt máy là nghỉ theo. Xem mục 3
 để biết mình đang thuộc trường hợp nào.
 
 Mở lại trang lúc nào cũng thấy auto đang làm tới đâu, trong khung **Nhật ký tu luyện**.
-Muốn dừng thì bấm **Thu Đàn** — auto dừng ở điểm an toàn gần nhất, không cắt ngang trận.
+Muốn dừng hẳn thì bấm **Thu Đàn** — auto dừng ở điểm an toàn gần nhất, không cắt ngang trận.
 
 ---
 

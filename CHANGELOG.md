@@ -11,6 +11,35 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.17.0 — Khai Đàn là một lời hứa sống dai, không phải vé đi đúng một vòng
+
+- **Hết một vòng không còn biến job thành `done`.** Đó là lý do ảnh thực địa hiện “Đi hết
+  một vòng — 10 nhiệm vụ thuận lợi”, rồi nút lập tức trở lại **Khai Đàn**: worker gọi
+  `complete(done)`, server hiểu chữ “complete” là kết thúc cả ý định. Giờ `done`/`failed`
+  chỉ kết thúc một vòng và cùng job được đưa về `queued`; chỉ **Thu Đàn** mới thành terminal.
+- **Thức dậy theo cooldown, không quay nóng.** Engine gửi cooldown dương sớm nhất của cả
+  vòng, dùng cùng luật với `CooldownPlanner` bên PC: không đồng hồ thì 5 phút; vòng chỉ có
+  lỗi thì 30 phút; sàn 30 giây, trần 24 giờ, jitter 0–25 giây. Cột `next_run_at` giữ lịch
+  trong Postgres nên Vercel không phải nuôi timer và worker có thể đóng browser lúc nghỉ.
+- **Tương thích ngay với linh sứ đã cài.** Worker cũ không biết trường `nextDelaySeconds`
+  vẫn gửi `complete` như trước; server tự dùng fallback rồi tái xếp job. Không bắt người dùng
+  gỡ/cài lại chỉ để nhận hành vi nhiều vòng. Gói cài mới gửi đồng hồ thật để chạy sát hơn.
+- **Thu Đàn không lọt qua khe giữa hai vòng.** Stop và complete đều chuyển trạng thái bằng
+  UPDATE nguyên tử: bấm đúng lúc `running → queued` vẫn kết thúc job, không có vòng kế âm thầm
+  sống lại. Cấu hình được làm mới ở ranh giới an toàn nên chỉnh giữa vòng chỉ áp dụng từ vòng
+  sau, không đổi một cú click đang bay.
+- **Hai linh sứ không thể cùng ôm một vòng.** Lệnh claim dùng `FOR UPDATE SKIP LOCKED`; nếu hai
+  worker hỏi việc đúng một nhịp thì chỉ một người nhận job, người kia bỏ qua thay vì chạy trùng.
+- **Hàng chờ không còn bị reaper giết sau hai phút.** Với job sống dai, `queued` có thể là đang
+  ngủ tới `next_run_at` hoặc chờ linh sứ bận làm Mê Cung cho người khác; cả hai đều là trạng
+  thái lành. Không có linh sứ thì cảnh báo đã được ghi ngay lúc Khai Đàn, còn ý định tiếp tục
+  chờ cho tới khi có người nhận hoặc chủ nhân Thu Đàn.
+- **Job sống quanh năm nhưng log không phình quanh năm:** mỗi ranh giới vòng giữ 1.000 dòng
+  gần nhất. Dashboard hiện rõ “Đang nghỉ — vòng N lúc …” và nói thẳng “chỉ Thu Đàn mới dừng”.
+- Kiểm chứng: smoke **75/75**; integration trên database thật xác nhận lịch cooldown, refresh
+  cấu hình, khóa đua hai worker, fallback `done→queued (~5m)` / `failed→queued (~30m)` và mọi
+  đường Thu Đàn đều đúng; build Next.js production xanh.
+
 ## 0.16.0 — cài lại một lần là mọc thêm một cái tên, và sổ điểm danh thì không biết quên
 
 - **Mục Linh Sứ hiện hai linh sứ trên một cái máy.** `desktop-lq9der0-wujq` chấm xanh,

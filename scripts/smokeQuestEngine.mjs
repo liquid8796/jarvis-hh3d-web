@@ -19,7 +19,7 @@ import { chromium } from "playwright-core";
 import { createQuestEngine } from "../src/lib/quest-engine/engine.mjs";
 import { createSession } from "../src/lib/quest-engine/session.mjs";
 import { parseCookieString } from "../src/lib/quest-engine/runCycle.mjs";
-import { parseCooldownSeconds } from "../src/lib/quest-engine/cooldown.mjs";
+import { computeNextDelaySeconds, parseCooldownSeconds } from "../src/lib/quest-engine/cooldown.mjs";
 import { profileForConfig } from "../src/lib/quest-engine/profile.mjs";
 
 const PAGE = `<!doctype html>
@@ -104,6 +104,35 @@ async function main() {
   );
   check("'2 giờ 5 phút' → 7500s", parseCooldownSeconds("còn 2 giờ 5 phút") === 7500);
   check("chữ không có thời gian → null", parseCooldownSeconds("chưa tới lượt") === null);
+
+  console.log("\nLịch nhiều vòng");
+  const noJitter = { random: () => 0 };
+  check(
+    "thức dậy theo cooldown sớm nhất",
+    computeNextDelaySeconds(
+      [
+        { outcome: "onCooldown", cooldownSeconds: 3723 },
+        { outcome: "completed", cooldownSeconds: 300 },
+      ],
+      noJitter,
+    ) === 300,
+  );
+  check(
+    "vòng không đọc được đồng hồ → ghé lại sau 5 phút",
+    computeNextDelaySeconds([], noJitter) === 300,
+  );
+  check(
+    "vòng chỉ có lỗi → nghỉ 30 phút, không quét dồn",
+    computeNextDelaySeconds([{ outcome: "failed" }], noJitter) === 1800,
+  );
+  check(
+    "cooldown quá ngắn vẫn có sàn 30 giây",
+    computeNextDelaySeconds([{ outcome: "completed", cooldownSeconds: 2 }], noJitter) === 30,
+  );
+  check(
+    "jitter lịch nằm trong 0–25 giây",
+    computeNextDelaySeconds([], { random: () => 0.999 }) === 325,
+  );
 
   const cookies = parseCookieString("wordpress_logged_in_ab=x|y|z=; other=2", "https://e.test");
   check("cookie tách ở dấu = ĐẦU TIÊN", cookies[0]?.value === "x|y|z=", `nhận ${cookies[0]?.value}`);

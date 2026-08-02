@@ -43,6 +43,13 @@
       "when": 1785658462874,
       "tag": "0005_blushing_lucky_pierre",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785696817746,
+      "tag": "0006_elite_gargoyle",
+      "breakpoints": true
     }
   ]
 }

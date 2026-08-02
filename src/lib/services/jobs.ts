@@ -20,13 +20,6 @@ const ACTIVE: JobRow["status"][] = ["queued", "running", "stopping"];
 /** A worker that has not heartbeat within this window is presumed dead. */
 const STALE_AFTER_MS = 3 * 60 * 1000;
 
-/**
- * Một job xếp hàng lâu hơn thế này mà chưa ai nhận thì coi như không có linh sứ nào đang
- * trực. Worker hỏi việc mỗi 5 giây, nên hai phút là đã rất rộng rãi — đủ cho một linh sứ
- * vừa khởi động lại xong kịp lên ca.
- */
-const UNCLAIMED_AFTER_MS = 2 * 60 * 1000;
-
 export async function getActiveJob(userId: string): Promise<JobRow | null> {
   const rows = await db()
     .select()
@@ -47,7 +40,7 @@ export async function getLatestJob(userId: string): Promise<JobRow | null> {
   return rows[0] ?? null;
 }
 
-/** Start = enqueue, with the config frozen into the job (edits change the NEXT run). */
+/** Start = create one durable intent; the same job is re-queued after every completed cycle. */
 export async function startJob(
   userId: string,
 ): Promise<{ ok: true; job: JobRow } | { ok: false; error: string }> {
@@ -81,7 +74,11 @@ export async function startJob(
     .values({ userId, configSnapshot: snapshot, runner: "local" })
     .returning();
 
-  await addEvent(rows[0].id, "info", "Đàn pháp đã lập.");
+  await addEvent(
+    rows[0].id,
+    "info",
+    "Đàn pháp đã lập — sẽ tự chạy liên tục qua nhiều vòng cho tới khi đạo hữu Thu Đàn.",
+  );
 
   // Nói thật NGAY LÚC NÀY nếu chẳng có linh sứ nào nhận nổi job — trước đây người dùng chỉ
   // biết điều đó sau sáu phút im lặng, khi reaper kết liễu job. Vẫn cho xếp hàng (một linh
@@ -105,25 +102,32 @@ export async function startJob(
  * ever stops between steps, never mid-click.
  */
 export async function requestStop(userId: string): Promise<void> {
-  const job = await getActiveJob(userId);
-  if (!job) {
-    return;
-  }
+  // Một UPDATE duy nhất đóng khe đua ở ranh giới hai vòng. Nếu worker vừa đổi `running`
+  // thành `queued` đúng lúc người dùng bấm, cùng câu lệnh này vẫn thấy `queued` và kết thúc
+  // nó; không còn cảnh nút Thu Đàn bấm trúng khe 1ms rồi job lặng lẽ sống tiếp.
+  const changed = await db().execute(sql`
+    update automation_jobs set
+      status = case
+        when status = 'queued' then 'stopped'::job_status
+        else 'stopping'::job_status
+      end,
+      finished_at = case when status = 'queued' then now() else finished_at end,
+      next_run_at = case when status = 'queued' then now() else next_run_at end
+    where user_id = ${userId}
+      and status in ('queued', 'running')
+    returning id, status
+  `);
 
-  if (job.status === "queued") {
-    await db()
-      .update(schema.automationJobs)
-      .set({ status: "stopped", finishedAt: new Date() })
-      .where(eq(schema.automationJobs.id, job.id));
-    await addEvent(job.id, "info", "Đã thu đàn — lượt chưa kịp chạy.");
-    return;
+  for (const row of changed.rows as Array<Record<string, unknown>>) {
+    const stoppedNow = String(row.status) === "stopped";
+    await addEvent(
+      String(row.id),
+      "info",
+      stoppedNow
+        ? "Đã thu đàn — vòng kế chưa kịp bắt đầu."
+        : "Đã gửi lệnh thu đàn — linh sứ sẽ dừng ở điểm an toàn kế tiếp.",
+    );
   }
-
-  await db()
-    .update(schema.automationJobs)
-    .set({ status: "stopping" })
-    .where(and(eq(schema.automationJobs.id, job.id), eq(schema.automationJobs.status, "running")));
-  await addEvent(job.id, "info", "Đã gửi lệnh thu đàn — linh sứ sẽ dừng ở điểm an toàn kế tiếp.");
 }
 
 // ---------------------------------------------------------------------------
@@ -144,19 +148,23 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
     scope.kind === "user" ? sql` and user_id = ${scope.userId}` : sql``;
 
   const claimed = await db().execute(sql`
+    with candidate as (
+      select id from automation_jobs
+      where status = 'queued'
+        and next_run_at <= now()${scopeFilter}
+      order by next_run_at, created_at
+      for update skip locked
+      limit 1
+    )
     update automation_jobs set
       status = 'running',
       worker_id = ${workerId},
       attempts = attempts + 1,
       started_at = coalesce(started_at, now()),
       last_heartbeat = now()
-    where id = (
-      select id from automation_jobs
-      where status = 'queued'${scopeFilter}
-      order by created_at
-      limit 1
-    )
-    returning *
+    from candidate
+    where automation_jobs.id = candidate.id
+    returning automation_jobs.*
   `);
 
   const row = (claimed.rows?.[0] ?? null) as Record<string, unknown> | null;
@@ -164,17 +172,25 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
     return null;
   }
 
-  await addEvent(String(row.id), "success", `Linh sứ「${workerId}」đã tiếp nhận đàn pháp.`);
+  const attempts = Number(row.attempts ?? 1);
+  await addEvent(
+    String(row.id),
+    "success",
+    attempts === 1
+      ? `Linh sứ「${workerId}」đã tiếp nhận đàn pháp.`
+      : `Linh sứ「${workerId}」bắt đầu vòng ${attempts}.`,
+  );
   return {
     id: String(row.id),
     userId: String(row.user_id),
     status: "running",
     configSnapshot: row.config_snapshot,
     runner: "local",
-    attempts: Number(row.attempts ?? 1),
+    attempts,
     workerId,
     createdAt: new Date(String(row.created_at)),
-    startedAt: new Date(),
+    nextRunAt: new Date(String(row.next_run_at)),
+    startedAt: row.started_at ? new Date(String(row.started_at)) : new Date(),
     finishedAt: null,
     lastHeartbeat: new Date(),
   } as JobRow;
@@ -238,6 +254,118 @@ export async function completeJob(
   await addEvent(jobId, outcome === "failed" ? "error" : "success", message);
 }
 
+export type WorkerCycleOutcome = "done" | "failed" | "stopped";
+
+export type WorkerCycleTransition = {
+  status: "queued" | "stopped";
+  nextRunAt: Date;
+};
+
+const MIN_NEXT_DELAY_SECONDS = 30;
+const MAX_NEXT_DELAY_SECONDS = 24 * 3600;
+const DEFAULT_NEXT_DELAY_SECONDS = 5 * 60;
+const FAILED_NEXT_DELAY_SECONDS = 30 * 60;
+
+function normalizeNextDelay(outcome: WorkerCycleOutcome, proposed?: number): number {
+  const fallback = outcome === "failed" ? FAILED_NEXT_DELAY_SECONDS : DEFAULT_NEXT_DELAY_SECONDS;
+  const seconds = typeof proposed === "number" && Number.isFinite(proposed)
+    ? Math.round(proposed)
+    : fallback;
+  return Math.max(MIN_NEXT_DELAY_SECONDS, Math.min(MAX_NEXT_DELAY_SECONDS, seconds));
+}
+
+function formatDelay(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) return minutes > 0 ? `${hours} giờ ${minutes} phút` : `${hours} giờ`;
+  if (minutes > 0) return `${minutes} phút`;
+  return `${seconds} giây`;
+}
+
+/** Giữ nhật ký của một job chạy quanh năm không phình vô hạn. */
+async function trimJobEvents(jobId: string, keep = 1000): Promise<void> {
+  await db().execute(sql`
+    delete from job_events
+    where job_id = ${jobId}
+      and id < coalesce((
+        select id from job_events
+        where job_id = ${jobId}
+        order by id desc
+        offset ${keep - 1}
+        limit 1
+      ), 0)
+  `);
+}
+
+/**
+ * Kết thúc MỘT VÒNG, không kết thúc ý định auto.
+ *
+ * `done` và `failed` đều quay về hàng chờ; thất bại chỉ nghỉ lâu hơn. Chỉ `stopped`, hoặc
+ * trạng thái `stopping` do người dùng vừa bấm Thu Đàn, mới biến job thành terminal. Phép
+ * chuyển trạng thái nằm trong một UPDATE để lệnh Thu Đàn không thể lọt qua khe giữa hai vòng.
+ */
+export async function completeWorkerCycle(
+  jobId: string,
+  outcome: WorkerCycleOutcome,
+  message: string,
+  proposedDelaySeconds?: number,
+): Promise<WorkerCycleTransition | null> {
+  const delaySeconds = normalizeNextDelay(outcome, proposedDelaySeconds);
+  const nextRunAt = new Date(Date.now() + delaySeconds * 1000);
+  const stopFromWorker = outcome === "stopped";
+
+  const updated = await db().execute(sql`
+    update automation_jobs set
+      status = case
+        when status = 'stopping' or ${stopFromWorker} then 'stopped'::job_status
+        else 'queued'::job_status
+      end,
+      finished_at = case
+        when status = 'stopping' or ${stopFromWorker} then now()
+        else null
+      end,
+      next_run_at = case
+        when status = 'stopping' or ${stopFromWorker} then now()
+        else ${nextRunAt}
+      end,
+      config_snapshot = case
+        when status = 'stopping' or ${stopFromWorker} then config_snapshot
+        else coalesce(
+          (select config from user_configs where user_id = automation_jobs.user_id),
+          config_snapshot
+        )
+      end,
+      last_heartbeat = now()
+    where id = ${jobId}
+      and status in ('running', 'stopping')
+    returning status, next_run_at, attempts
+  `);
+
+  const row = (updated.rows?.[0] ?? null) as Record<string, unknown> | null;
+  if (!row) return null;
+
+  const status = String(row.status) as WorkerCycleTransition["status"];
+  const actualNextRunAt = new Date(String(row.next_run_at));
+
+  if (status === "stopped") {
+    await addEvent(
+      jobId,
+      "success",
+      outcome === "stopped" ? message : `${message} Đã nhận lệnh Thu Đàn — không xếp vòng mới.`,
+    );
+  } else {
+    await addEvent(jobId, outcome === "failed" ? "error" : "success", message);
+    await addEvent(
+      jobId,
+      "info",
+      `Tự chạy vòng ${Number(row.attempts ?? 0) + 1} sau khoảng ${formatDelay(delaySeconds)} — chỉ Thu Đàn mới dừng hẳn.`,
+    );
+  }
+
+  await trimJobEvents(jobId);
+  return { status, nextRunAt: actualNextRunAt };
+}
+
 export async function addEvent(
   jobId: string,
   level: "info" | "success" | "warning" | "error",
@@ -280,13 +408,12 @@ export async function eventsAfter(jobId: string, afterId: number): Promise<JobEv
 }
 
 /**
- * Dọn dẹp hai kiểu job mắc kẹt.
+ * Dọn job đang chạy nhưng mất nhịp tim.
  *
- * 1) `running` mà nhịp tim im — linh sứ chết giữa chừng.
- * 2) `queued` mà KHÔNG AI nhận suốt một thời gian dài. Trường hợp này từng bị bỏ sót hoàn
- *    toàn: reaper cũ chỉ nhìn `running`/`stopping`, nên một job xếp hàng khi không có runner
- *    nào đang trực sẽ nằm đó VĨNH VIỄN, còn người dùng chỉ thấy mãi dòng "Chờ linh sứ tiếp
- *    nhận" mà không bao giờ biết là chẳng có linh sứ nào tồn tại. Thà nói thật.
+ * `queued` KHÔNG còn là xác: nó có thể đang ngủ tới `nextRunAt`, hoặc đang chờ một linh sứ
+ * bận làm vòng dài cho người khác. Kết liễu hàng chờ sau hai phút sẽ phá chính lời hứa auto
+ * liên tục. `startJob` đã ghi cảnh báo ngay khi không thấy ai trực; job cứ chờ tới khi có
+ * người nhận hoặc chủ nhân Thu Đàn.
  *
  * Gọi cơ hội từ đường đọc của dashboard — ở quy mô này chưa cần cron riêng.
  */
@@ -307,21 +434,4 @@ export async function reapStaleJobs(): Promise<void> {
     await completeJob(row.id, "failed", "Linh sứ mất liên lạc (quá 3 phút không hồi đáp) — lượt bị kết thúc.");
   }
 
-  const abandoned = await db()
-    .select({ id: schema.automationJobs.id })
-    .from(schema.automationJobs)
-    .where(
-      and(
-        eq(schema.automationJobs.status, "queued"),
-        sql`${schema.automationJobs.createdAt} < ${new Date(Date.now() - UNCLAIMED_AFTER_MS)}`,
-      ),
-    );
-
-  for (const row of abandoned) {
-    await completeJob(
-      row.id,
-      "failed",
-      "Không có linh sứ nào tiếp nhận đàn pháp. Nếu tình trạng kéo dài, cài linh sứ riêng ở mục Linh Sứ rồi khai đàn lại.",
-    );
-  }
 }

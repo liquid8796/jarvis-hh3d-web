@@ -18,6 +18,8 @@ type FeedJob = {
   id: string;
   status: JobStatus;
   createdAt: string;
+  nextRunAt: string;
+  attempts: number;
   workerId: string | null;
 };
 
@@ -42,6 +44,19 @@ const STATUS_TEXT: Record<JobStatus, string> = {
   failed: "Đàn pháp gặp trắc trở",
   done: "Đã viên mãn",
 };
+
+function describeStatus(job: FeedJob): string {
+  const next = new Date(job.nextRunAt);
+  if (job.status === "queued" && job.attempts > 0 && next.getTime() > Date.now() + 5000) {
+    return `Đang nghỉ — vòng ${job.attempts + 1} lúc ${next.toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+  }
+  return STATUS_TEXT[job.status];
+}
 
 export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }) {
   const [job, setJob] = useState<FeedJob | null>(null);
@@ -125,7 +140,7 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
               aria-hidden
             />
             <span className="text-[var(--color-mist)]">
-              {job ? STATUS_TEXT[job.status] : "Chưa khai đàn lần nào"}
+              {job ? describeStatus(job) : "Chưa khai đàn lần nào"}
             </span>
           </p>
         </div>
@@ -161,8 +176,9 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
           bỏ lửng ở đó thì người ta suy ra "tắt máy chắc cũng thế" — sai, nếu linh sứ đang
           nằm trên chính máy họ. Một câu hứa đúng một nửa còn tệ hơn không hứa. */}
       <p className="mb-2 text-xs text-[var(--color-mist)]">
-        Tắt trình duyệt thoải mái, auto vẫn chạy tiếp. Còn tắt máy thì tuỳ ai đang chạy: linh
-        sứ tông môn không sao, linh sứ nằm trên máy bạn sẽ dừng theo.
+        Khai Đàn một lần, linh sứ tự canh cooldown và chạy hết vòng này sang vòng khác; chỉ bấm
+        Thu Đàn mới dừng. Tắt trình duyệt thoải mái. Còn tắt máy thì tuỳ ai đang chạy: linh sứ
+        tông môn không sao, linh sứ nằm trên máy bạn sẽ dừng theo.
         {job?.workerId && (
           <>
             {" "}

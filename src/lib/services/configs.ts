@@ -110,8 +110,8 @@ async function readStored(userId: string): Promise<UserConfig> {
 }
 
 /**
- * Bản để đóng băng vào một job: y nguyên như trong database, cookie vẫn trong phong bì.
- * Worker sẽ nhận bản đã giải mã từ /api/worker, không phải từ đây.
+ * Bản để đóng băng cho một vòng: y nguyên như trong database, cookie vẫn trong phong bì.
+ * Worker nhận bản đã giải mã từ /api/worker; server làm mới snapshot ở ranh giới vòng kế.
  */
 export async function getStoredConfigForSnapshot(userId: string): Promise<UserConfig> {
   return readStored(userId);

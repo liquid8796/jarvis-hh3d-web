@@ -8,8 +8,9 @@
  * mở browser thật thì do tiến trình này làm, trên một cái máy chạy liên tục (VPS, máy nhà,
  * Fly.io, Railway… bất cứ chỗ nào chạy được Node dài hạn).
  *
- * Vòng đời: xin việc → nhận config snapshot → chạy → kể chuyện qua `event` → nhịp tim mỗi
- * 20 giây (và nghe xem người dùng có bấm Thu Đàn không) → báo kết thúc.
+ * Vòng đời một vòng: xin việc → nhận config snapshot → chạy → kể chuyện qua `event` → nhịp
+ * tim mỗi 20 giây (và nghe xem người dùng có bấm Thu Đàn không) → báo kết quả. Server đặt
+ * `nextRunAt` rồi trả cùng job về hàng chờ; worker cũ lẫn mới đều tự nhận vòng kế.
  *
  * Phần điều khiển trình duyệt là engine dùng chung ở `src/lib/quest-engine` — cùng bộ thông
  * dịch và cùng hồ sơ quest với bản desktop, nên tri thức về site chỉ có một bản gốc.

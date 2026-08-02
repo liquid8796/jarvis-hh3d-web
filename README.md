@@ -18,7 +18,14 @@ một mô hình nhiệm vụ — Mê Cung, Luyện Đan Đường, cùng những
 Web **không bao giờ** tự mở browser trong một function — function của Vercel sống theo
 request và bị cắt sau vài phút. Bấm Khai Đàn chỉ ghi một dòng `automation_jobs` trạng thái
 `queued`; một *linh sứ* nhận việc rồi kể lại qua HTTPS. Vì ý định của người dùng nằm trong
-**database** chứ không nằm trong tab trình duyệt, đóng tab hay tắt máy chẳng ảnh hưởng gì.
+**database** chứ không nằm trong tab trình duyệt, đóng tab chẳng ảnh hưởng gì. Tắt máy chỉ
+làm gián đoạn nếu chính máy ấy đang nuôi linh sứ; linh sứ tông môn ở máy khác thì vẫn chạy.
+
+Một lần Khai Đàn tạo **một ý định sống dai**, không phải một vé chạy đúng một vòng. Hết mỗi
+vòng, server đọc cooldown sớm nhất, đặt `next_run_at`, đóng browser trong lúc nghỉ rồi tự đưa
+cùng job trở lại hàng chờ. Chỉ Thu Đàn mới biến nó thành trạng thái kết thúc. Worker đời cũ
+không gửi được cooldown vẫn tương thích: server dùng 5 phút cho vòng thường, 30 phút cho vòng
+chỉ có lỗi; worker mới gửi đồng hồ thật để thức dậy đúng lúc hơn.
 
 Mọi linh sứ đều là **một tiến trình `worker.mjs` sống dai** — khác nhau ở *ai nuôi nó* và
 *chìa nó cầm*:
@@ -67,8 +74,8 @@ tử — không bao giờ có hai linh sứ ôm cùng một lượt.
 > ```
 >
 > Đây chính là lý do kiến trúc worker-sống-dai thắng: worker tự hỏi việc mỗi 5 giây, không
-> cần ai gõ cửa đánh thức. Cron chỉ còn là **lưới an toàn vệ sinh** — dọn job chết và job
-> không ai nhận, quét tin đàm đạo quá hạn — và những việc đó đã chạy tiện-đường mỗi lần có
+> cần ai gõ cửa đánh thức. Cron chỉ còn là **lưới an toàn vệ sinh** — dọn job đang chạy mất
+> nhịp tim, quét tin đàm đạo quá hạn — và những việc đó đã chạy tiện-đường mỗi lần có
 > người mở dashboard rồi. `vercel.json` để cron ở `0 3 * * *` cho những ngày không ai mở.
 > (Chính giới hạn cron này là một nửa lý do Vercel Sandbox bị bỏ ở v0.11; nửa kia là một
 > microVM phù du không bao giờ ôm nổi phiên Mê Cung 35 phút.)

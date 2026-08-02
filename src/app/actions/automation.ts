@@ -87,7 +87,7 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
   revalidatePath("/dashboard");
   return {
     ok: true,
-    message: `Đã khắc cấu hình vào ngọc giản. Lượt khai đàn kế tiếp sẽ dùng bản này.${cookieNote}`,
+    message: `Đã khắc cấu hình vào ngọc giản. Nếu đàn đang chạy, vòng kế tiếp sẽ dùng bản này.${cookieNote}`,
   };
 }
 
@@ -108,7 +108,10 @@ export async function startAction(): Promise<ActionResult> {
     return { ok: false, message: result.error };
   }
 
-  return { ok: true, message: "Đàn pháp đã lập — linh sứ sẽ tiếp nhận trong giây lát." };
+  return {
+    ok: true,
+    message: "Đàn pháp đã lập — linh sứ sẽ tự chạy các vòng cho tới khi bạn bấm Thu Đàn.",
+  };
 }
 
 /**

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authorizeWorker } from "@/lib/auth/worker";
-import { addEvent, claimNextJob, completeJob, heartbeat, jobBelongsTo } from "@/lib/services/jobs";
+import { addEvent, claimNextJob, completeWorkerCycle, heartbeat, jobBelongsTo } from "@/lib/services/jobs";
 import { recordWorkerSeen } from "@/lib/services/workers";
 import { configSchema } from "@/lib/services/configs";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
@@ -22,7 +22,7 @@ import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
  *   claim     — xin việc; trả về job kèm config snapshot, hoặc null nếu hàng chờ trống.
  *   heartbeat — "tôi còn sống"; trả về status HIỆN TẠI để worker biết người dùng đã bấm thu đàn.
  *   event     — một dòng nhật ký cho người dùng đọc.
- *   complete  — kết thúc, kèm lý do.
+ *   complete  — kết thúc một VÒNG; server tái xếp job, trừ khi người dùng đã Thu Đàn.
  */
 
 const bodySchema = z.discriminatedUnion("op", [
@@ -45,6 +45,9 @@ const bodySchema = z.discriminatedUnion("op", [
     jobId: z.string().uuid(),
     outcome: z.enum(["done", "failed", "stopped"]),
     message: z.string().min(1).max(2000),
+    // Worker mới đọc cooldown thật của cả vòng; worker cũ không gửi trường này và server
+    // dùng nhịp an toàn mặc định, nên deploy web là đủ để bản đang cài cũng tự lặp.
+    nextDelaySeconds: z.number().int().min(30).max(24 * 3600).optional(),
   }),
 ]);
 
@@ -131,8 +134,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "forbidden" }, { status: 403 });
       }
 
-      await completeJob(body.jobId, body.outcome, body.message);
-      return NextResponse.json({ ok: true });
+      const transition = await completeWorkerCycle(
+        body.jobId,
+        body.outcome,
+        body.message,
+        body.nextDelaySeconds,
+      );
+      if (!transition) {
+        return NextResponse.json({ error: "job is no longer active" }, { status: 409 });
+      }
+      return NextResponse.json({ ok: true, ...transition });
     }
   }
 }

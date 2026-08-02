@@ -70,7 +70,7 @@ export const userConfigs = pgTable("user_configs", {
 });
 
 /**
- * queued  — user pressed Khai Đàn; waiting for a worker to claim it.
+ * queued  — waiting for a worker, either immediately after Khai Đàn or until `nextRunAt`.
  * running — a worker claimed it and is heartbeating.
  * stopping — user pressed stop; the worker sees the flag on its next heartbeat and winds down.
  * stopped/failed/done — terminal.
@@ -105,21 +105,22 @@ export const automationJobs = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     status: jobStatus("status").notNull().default("queued"),
     /**
-     * The config as it stood at start — a snapshot, so an edit mid-run changes the NEXT run,
-     * not the one in flight. (The desktop engine learned live options the hard way; a
-     * distributed worker gets the simpler, predictable contract.)
+     * The config frozen for the CURRENT cycle. At the safe boundary between cycles the server
+     * refreshes it from user_configs, so edits never mutate a click in flight but do apply to
+     * the next automatic cycle.
      */
     configSnapshot: jsonb("config_snapshot").notNull().default({}),
     /** Runner nào được phép giành job này — xem chú thích của `runnerKind`. */
     runner: runnerKind("runner").notNull().default("local"),
-    /**
-     * Số LÁT đã chạy. Một lượt sandbox không nhất thiết xong trong một lát: VM có trần thời
-     * gian, nên job quay lại hàng chờ và lát sau chạy tiếp. Đếm ở đây để (a) biết khi nào
-     * nên bỏ cuộc, và (b) chuyển sang runner dự phòng sau vài lát thất bại liên tiếp.
-     */
+    /** Số vòng đã được linh sứ tiếp nhận; tăng mỗi lần job thức dậy khỏi lịch chờ. */
     attempts: integer("attempts").notNull().default(0),
     workerId: text("worker_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Lúc job đủ điều kiện được claim. Sau mỗi vòng, server đặt mốc này theo cooldown sớm
+     * nhất; cùng một job vì thế sống mãi qua nhiều vòng cho tới khi người dùng Thu Đàn.
+     */
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp("started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     lastHeartbeat: timestamp("last_heartbeat", { withTimezone: true }),

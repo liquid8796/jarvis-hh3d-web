@@ -8,6 +8,7 @@
  */
 
 import { readinessProbe, vipProbe } from "./boardScripts.mjs";
+import { computeNextDelaySeconds } from "./cooldown.mjs";
 import { DEFAULT_GAME_BASE_URL, parseCookieString } from "./cookies.mjs";
 import { createQuestEngine, enabledQuestsInOrder, questsForAccount, QuestAborted } from "./engine.mjs";
 import { profileForConfig } from "./profile.mjs";
@@ -73,6 +74,15 @@ function formatDuration(seconds) {
   if (h > 0) return `${h}h ${m}m`;
   if (m > 0) return `${m}m ${s % 60}s`;
   return `${s}s`;
+}
+
+/** Mọi kết quả không-phải-stop đều mang theo lịch vòng kế để server tái xếp đúng nhịp. */
+function scheduledCycleResult(outcome, message, results = []) {
+  return {
+    outcome,
+    message,
+    nextDelaySeconds: computeNextDelaySeconds(results, { cycleFailed: outcome === "failed" }),
+  };
 }
 
 /**
@@ -192,22 +202,23 @@ export async function runCycle(deps) {
   } = deps;
 
   if (!config?.gameCookie?.trim()) {
-    return {
-      outcome: "failed",
-      message: "Chưa có tài khoản hoathinh3d — hãy dán chuỗi cookie đăng nhập trước.",
-    };
+    return scheduledCycleResult(
+      "failed",
+      "Chưa có tài khoản hoathinh3d — hãy dán chuỗi cookie đăng nhập trước.",
+    );
   }
 
   // Parse NGAY và coi số không là lỗi to — không bao giờ để browser đi tay trắng rồi chết
   // ở một selector vô tội mười bước sau (đúng kịch bản 02/08).
   const cookieJar = parseCookieString(config.gameCookie, baseUrl);
   if (cookieJar.length === 0) {
-    return {
-      outcome: "failed",
-      message:
+    return scheduledCycleResult(
+      "failed",
+      (
         "Chuỗi cookie đã lưu không đọc được — vào Ngọc Giản Cấu Hình dán lại tài khoản " +
-        "hoathinh3d (dạng 'a=1; b=2' từ DevTools hoặc bản xuất JSON đều được).",
-    };
+        "hoathinh3d (dạng 'a=1; b=2' từ DevTools hoặc bản xuất JSON đều được)."
+      ),
+    );
   }
 
   const deadline = budgetMs > 0 ? Date.now() + budgetMs : Infinity;
@@ -226,7 +237,7 @@ export async function runCycle(deps) {
   const enabled = enabledQuestsInOrder(profile);
 
   if (enabled.length === 0) {
-    return { outcome: "done", message: "Không có nhiệm vụ nào được bật — kết thúc lượt." };
+    return scheduledCycleResult("done", "Không có nhiệm vụ nào được bật — sẽ kiểm tra lại ở vòng kế.");
   }
 
   for (const note of translationNotes) await say(note, "warn");
@@ -257,6 +268,7 @@ export async function runCycle(deps) {
 
   let done = 0;
   let failed = 0;
+  const results = [];
 
   try {
     // Chỉ tiêm cookie khi hồ sơ CHƯA có phiên đăng nhập — đúng luật của desktop
@@ -288,7 +300,7 @@ export async function runCycle(deps) {
     // context và cookieJar vào để nó tự chữa được một hồ sơ mang cookie đã chết.
     const ready = await ensureReady(session, baseUrl, say, log, { context, cookieJar });
     if (!ready.ok) {
-      return { outcome: "failed", message: ready.message };
+      return scheduledCycleResult("failed", ready.message);
     }
 
     // Hạng tài khoản quyết định kế hoạch, nên đọc nó TRƯỚC khi hứa hẹn gì. Ghé hub một lần —
@@ -324,10 +336,10 @@ export async function runCycle(deps) {
     }
 
     if (quests.length === 0) {
-      return {
-        outcome: "done",
-        message: "Tài khoản thường mà mọi nhiệm vụ đã bật đều là hàng VIP — chưa có gì để chạy.",
-      };
+      return scheduledCycleResult(
+        "done",
+        "Tài khoản thường mà mọi nhiệm vụ đã bật đều là hàng VIP — vòng này chưa có gì để chạy.",
+      );
     }
 
     await say(`Sẽ hành sự: ${quests.map((q) => q.name).join(" · ")}.`);
@@ -340,10 +352,11 @@ export async function runCycle(deps) {
       }
 
       if (Date.now() >= deadline) {
-        return {
-          outcome: "done",
-          message: `Hết ngân sách của lát này — xong ${done}/${quests.length}, phần còn lại để lượt sau.`,
-        };
+        return scheduledCycleResult(
+          "done",
+          `Hết ngân sách của lát này — xong ${done}/${quests.length}, phần còn lại để vòng sau.`,
+          results,
+        );
       }
 
       let outcome;
@@ -356,6 +369,8 @@ export async function runCycle(deps) {
         throw err;
       }
 
+      results.push(outcome);
+
       const shape = OUTCOME_TEXT[outcome.outcome] ?? OUTCOME_TEXT.skipped;
       await say(`${quest.name}: ${shape.say(outcome)}`, shape.level);
 
@@ -364,8 +379,8 @@ export async function runCycle(deps) {
     }
 
     return failed > 0
-      ? { outcome: "done", message: `Đi hết một vòng — ${done} thuận, ${failed} trắc trở.` }
-      : { outcome: "done", message: `Đi hết một vòng — ${done} nhiệm vụ thuận lợi.` };
+      ? scheduledCycleResult("done", `Đi hết một vòng — ${done} thuận, ${failed} trắc trở.`, results)
+      : scheduledCycleResult("done", `Đi hết một vòng — ${done} nhiệm vụ thuận lợi.`, results);
   } finally {
     // Đóng trong finally, và nuốt lỗi: một trình duyệt không đóng được không được phép ghi
     // đè lên kết quả thật của lượt chạy. Với hồ sơ bền thì context CHÍNH LÀ browser.

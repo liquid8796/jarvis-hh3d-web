@@ -194,14 +194,31 @@ export async function jobBelongsTo(jobId: string, scope: WorkerScope): Promise<b
   return rows[0]?.userId === scope.userId;
 }
 
-/** Heartbeat returns the job's CURRENT status so the worker learns about a stop request. */
-export async function heartbeat(jobId: string): Promise<JobRow["status"] | null> {
+/**
+ * Heartbeat returns the job's CURRENT status so the worker learns about a stop request —
+ * và trả kèm `workerId` để nơi gọi làm mới điểm danh.
+ *
+ * Vì sao phải trả workerId: sổ điểm danh chỉ được cập nhật ở `claim`, mà một linh sứ ĐANG
+ * BẬN thì thôi không claim nữa. Hệ quả đo được ngày 02/08: linh sứ chạy Mê Cung — phiên dài
+ * hàng chục phút — tụt khỏi sổ sau 30 giây và dashboard báo "vắng mặt" đúng lúc nó làm việc
+ * chăm chỉ nhất; tệ hơn, `startJob` đọc cùng cái sổ ấy nên cảnh báo sai "chưa thấy linh sứ
+ * nào". Nhịp tim 20 giây là bằng chứng sống chính xác hơn, và nó có sẵn.
+ *
+ * Lấy workerId từ CHÍNH DÒNG JOB chứ không bắt worker khai thêm: nhờ vậy những linh sứ đã
+ * cài từ trước không phải cập nhật gì mà vẫn được điểm danh đúng.
+ */
+export async function heartbeat(
+  jobId: string,
+): Promise<{ status: JobRow["status"]; workerId: string | null } | null> {
   const rows = await db()
     .update(schema.automationJobs)
     .set({ lastHeartbeat: new Date() })
     .where(eq(schema.automationJobs.id, jobId))
-    .returning({ status: schema.automationJobs.status });
-  return rows[0]?.status ?? null;
+    .returning({
+      status: schema.automationJobs.status,
+      workerId: schema.automationJobs.workerId,
+    });
+  return rows[0] ?? null;
 }
 
 export async function completeJob(

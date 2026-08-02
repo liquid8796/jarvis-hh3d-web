@@ -11,6 +11,43 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.14.0 — tải bộ cài rồi bấm đúp, cột trái thôi bị bóp, và linh sứ bận thôi bị coi là vắng
+
+- **Linh sứ ĐANG BẬN bị báo "vắng mặt".** Sổ điểm danh chỉ ghi ở `claim`, mà một linh sứ
+  đang chạy job thì thôi không claim nữa — nên nó tụt khỏi sổ sau 30 giây. Đo được lúc
+  linh sứ thật đang giữa một phiên Mê Cung: sống, 4 tiến trình, đang đánh ải, mà dashboard
+  báo vắng; và vì `startJob` đọc cùng cái sổ ấy, lượt kế tiếp sẽ nhận cảnh báo sai "chưa
+  thấy linh sứ nào điểm danh". Giờ **nhịp tim 20 giây cũng là điểm danh** — bằng chứng sống
+  chính xác hơn, và nó vốn đã có sẵn. `workerId` lấy từ chính dòng job chứ không bắt worker
+  khai thêm, nên những linh sứ đã cài từ trước không phải cập nhật gì.
+
+- **Không bắt ai gõ lệnh nữa.** Bấm "Tạo bộ cài" → tải về `cai-linh-su.cmd` → bấm đúp.
+  Tệp được dựng NGAY TRONG TRÌNH DUYỆT bằng Blob: linh phù vốn đã nằm ở client (action vừa
+  trả về), nên không cần thêm endpoint, và bí mật không bao giờ đi qua một URL để rồi nằm
+  lại trong log máy chủ. Cách dán lệnh vẫn còn, thu vào sau một dòng "hoặc cài bằng dòng
+  lệnh" cho máy chủ/SSH.
+- **Nói trước cái đúng cho hầu hết mọi người.** Khi linh sứ tông môn đang trực, mục Linh Sứ
+  mở đầu bằng "đạo hữu không cần cài gì cả" — phần cài đặt chỉ là lối rẽ. Đặt ngược lại là
+  bắt mọi người tưởng phải cài gì đó mới dùng được. Khi KHÔNG có linh sứ nào trực thì đổi
+  sang cảnh báo vàng, vì lúc ấy khai đàn thật sự sẽ nằm chờ.
+- **Lỗi layout: cột trái bị bóp còn một sợi chỉ.** Grid item lẫn flex item đều mặc định
+  `min-width: auto` — "không co nhỏ hơn nội dung" — nên một dòng lệnh dài không chỗ ngắt
+  trong `<pre>` đẩy cột phải phình ra ngoài phần của nó. `overflow-x-auto` trên chính cái
+  `<pre>` không cứu được: nó chỉ có tác dụng khi MỌI tổ tiên được phép co. Sửa bằng
+  `minmax(0,…)` trên track + `min-w-0` dọc theo chuỗi cha. Đo lại: 566/514 = 1.10 đúng tỉ lệ
+  thiết kế, không tràn ngang, kể cả lúc đang hiện lệnh dài lẫn ở màn hình 375px.
+- **Tệp .cmd phải THUẦN ASCII** — phát hiện khi chạy thật, không phải khi đọc code. cmd.exe
+  phân giải tệp batch theo codepage ANSI TRƯỚC khi dòng `chcp 65001` kịp có tác dụng, nên
+  một ký tự tiếng Việt trong tệp là cmd đếm sai byte rồi resume giữa dòng: đo được
+  `powershell` biến thành lệnh `ershell`, `echo.` thành `o.`. Giờ nội dung đi qua bộ lọc
+  ASCII (giữ `\n` — quên nó là ép cả tệp thành một dòng). Tiếng Việt người dùng thấy đến từ
+  install.ps1 tải qua HTTP; `chcp` có mặt chính là để hiển thị phần chữ ấy.
+- Phép đổi LF→CRLF cho `.cmd` được làm cho BẤT BIẾN (chuẩn hoá về LF trước) — bản đầu cho ra
+  `\r\r\n` vì nội dung đã viết sẵn CRLF rồi bị thay thêm lần nữa.
+
+Đã kiểm trên máy thật: một `.cmd` thuần ASCII dựng đúng khuôn panel sinh ra, chạy bằng
+`cmd /c`, tải được install.ps1 (13.497 byte) và in tiếng Việt từ script ấy ra đúng chữ.
+
 ## 0.13.1 — sửa hồi quy 0.13.0: server action của /dashboard sập vì hai realm `URL`
 
 Bản 0.13.0 cho `actions/automation.ts` import `parseCookieString` từ `runCycle.mjs`. Cái

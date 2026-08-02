@@ -102,13 +102,19 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "forbidden" }, { status: 403 });
       }
 
-      const status = await heartbeat(body.jobId);
-      if (!status) {
+      const beat = await heartbeat(body.jobId);
+      if (!beat) {
         return NextResponse.json({ error: "unknown job" }, { status: 404 });
       }
 
+      // Nhịp tim CŨNG là điểm danh: một linh sứ đang bận thì thôi không claim nữa, nên nếu
+      // chỉ claim mới ghi sổ thì nó biến mất khỏi sổ đúng lúc làm việc chăm chỉ nhất.
+      if (beat.workerId) {
+        await recordWorkerSeen(beat.workerId, scope);
+      }
+
       // `stopping` là tín hiệu người dùng đã bấm Thu Đàn; worker tự kết thúc ở điểm an toàn.
-      return NextResponse.json({ status });
+      return NextResponse.json({ status: beat.status });
     }
 
     case "event": {

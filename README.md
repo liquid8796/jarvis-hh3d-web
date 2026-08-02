@@ -299,9 +299,16 @@ lỡ tay không được phép reset chìa khoá hệ thống đang chạy.
 
 ### Bước 5 — Linh sứ túc trực của từng đạo hữu (không bắt buộc)
 
-Người dùng **không cần cài sẵn bất cứ thứ gì** — không Node.js, không npm, không quyền quản
-trị. Mục **Linh Sứ** trên dashboard phát một lệnh cài duy nhất (Windows PowerShell hoặc
-Linux/macOS Terminal) mang sẵn linh phù của họ; dán vào là xong.
+Trước hết: **hầu hết mọi người không cần bước này.** Linh sứ tông môn trên VM trực sẵn cho
+cả tông môn, nên mục Linh Sứ nói thẳng "đạo hữu không cần cài gì cả" khi nó đang online.
+Phần dưới là lối rẽ cho ai muốn lượt chạy đi từ chính máy mình (IP dân cư, không xếp hàng
+chung).
+
+Với người rẽ vào lối ấy: **không cần cài sẵn bất cứ thứ gì** — không Node.js, không npm,
+không quyền quản trị, và **không phải gõ lệnh**. Bấm "Tạo bộ cài" → tải `cai-linh-su.cmd` →
+bấm đúp. Tệp được dựng ngay trong trình duyệt bằng Blob (linh phù đã nằm sẵn ở client), nên
+bí mật không đi qua URL nào. Người dùng trên máy chủ/SSH vẫn có lệnh dán, thu sau một dòng
+"hoặc cài bằng dòng lệnh".
 
 Cơ chế, và vì sao từng mảnh lại như vậy:
 
@@ -435,7 +442,7 @@ File SQL sinh ra **được commit** — lịch sử schema nằm trong git, kh�
 
 ## 6. Lịch sử phát hành
 
-Bản hiện tại: **0.13.1**.
+Bản hiện tại: **0.14.0**.
 
 Lịch sử nằm ở [CHANGELOG.md](CHANGELOG.md), tách riêng khỏi file này — hai tài liệu trả lời
 hai câu hỏi khác nhau: README nói *hệ thống chạy thế nào*, changelog nói *vì sao nó thành ra

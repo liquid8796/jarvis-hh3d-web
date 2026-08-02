@@ -33,9 +33,15 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
+        {/* `minmax(0,…)` chứ không phải `1.1fr_1fr` trần, và `min-w-0` trên cột dọc.
+            Grid item lẫn flex item đều mặc định `min-width: auto` — tức "không co nhỏ hơn
+            nội dung". Một dòng lệnh cài dài không chỗ ngắt trong <pre> vì thế ĐẨY cột phải
+            phình ra ngoài phần của nó và bóp cột trái còn một sợi chỉ (ảnh 02/08). Và
+            `overflow-x-auto` trên chính cái <pre> không cứu được: nó chỉ có tác dụng khi
+            mọi tổ tiên đều được phép co xuống dưới bề rộng nội dung. */}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           <ConfigForm config={config} />
-          <div className="flex flex-col gap-6">
+          <div className="flex min-w-0 flex-col gap-6">
             <ControlPanel initiallyRunning={activeJob !== null} />
             <LinhSuPanel hasToken={tokenIssued} />
           </div>

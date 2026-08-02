@@ -4,9 +4,13 @@ import { revalidatePath } from "next/cache";
 import { requireActiveUser } from "@/lib/auth/guards";
 import { clearCookie, configSchema, saveConfig } from "@/lib/services/configs";
 import { clearLatestJobEvents, requestStop, startJob } from "@/lib/services/jobs";
+// Import từ module LÁ, KHÔNG phải từ runCycle.mjs. runCycle kéo theo profile.mjs, mà module
+// ấy đọc profile.json bằng `readFileSync(fileURLToPath(new URL(…)))` ngay ở thân module —
+// dưới Turbopack, `URL` trong bundle không phải `URL` của Node, nên fileURLToPath ném lỗi
+// lúc NẠP MODULE và kéo sập mọi server action của /dashboard. Xem đầu cookies.mjs.
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — module JS thuần của quest-engine, không có d.ts và không cần.
-import { DEFAULT_GAME_BASE_URL, parseCookieString } from "@/lib/quest-engine/runCycle.mjs";
+import { DEFAULT_GAME_BASE_URL, parseCookieString } from "@/lib/quest-engine/cookies.mjs";
 
 /**
  * Automation server actions — every one re-derives the caller from the session and

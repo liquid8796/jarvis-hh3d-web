@@ -13,6 +13,7 @@
  * Mỗi ca dưới đây là một chuyện đã xảy ra một lần rồi.
  */
 
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { chromium } from "playwright-core";
 import { createQuestEngine } from "../src/lib/quest-engine/engine.mjs";
@@ -139,6 +140,32 @@ async function main() {
   check(
     "header 'Cookie:' copy nguyên cũng hiểu",
     parseCookieString("Cookie: a=1; b=2", "https://e.test").length === 2,
+  );
+
+  // cookies.mjs phải là module LÁ, và đây là chốt giữ cho nó ở nguyên như vậy.
+  //
+  // Server action của Next import nó. Ngày nào nó mọc thêm một `import` — nhất là một
+  // đường dẫn ngược về engine, nơi profile.mjs đọc profile.json ngay ở thân module —
+  // thì /dashboard sập TOÀN BỘ server action ngay lúc nạp module, kèm một TypeError về
+  // `URL` chẳng nói gì về nguyên nhân, và CHỈ trên bản production (Turbopack thay `URL`
+  // bằng bản của nó nên `fileURLToPath` của Node từ chối). Dev không bao giờ tái hiện.
+  // Bỏ chú thích trước khi soát: chính tệp ấy KỂ về `readFileSync(fileURLToPath(…))` trong
+  // phần giải thích vì sao nó phải sạch, nên soát trên văn bản thô là tự bắt nhầm mình.
+  const leafCode = readFileSync(
+    new URL("../src/lib/quest-engine/cookies.mjs", import.meta.url),
+    "utf8",
+  )
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  check(
+    "cookies.mjs không import gì — an toàn cho bundle của Next",
+    !/^\s*import\s/m.test(leafCode),
+    (leafCode.match(/^\s*import\s.*$/m) ?? [])[0],
+  );
+  check(
+    "cookies.mjs không đụng đĩa",
+    !/require\(|node:fs|readFileSync|fileURLToPath/.test(leafCode),
+    (leafCode.match(/require\(|node:fs|readFileSync|fileURLToPath/) ?? [])[0],
   );
 
   const notes = [];

@@ -11,6 +11,34 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.13.1 — sửa hồi quy 0.13.0: server action của /dashboard sập vì hai realm `URL`
+
+Bản 0.13.0 cho `actions/automation.ts` import `parseCookieString` từ `runCycle.mjs`. Cái
+giá không thấy được lúc viết: kéo theo cả engine vào bundle của Next, trong đó `profile.mjs`
+đọc `profile.json` bằng `readFileSync(fileURLToPath(new URL(…)))` ngay ở THÂN MODULE.
+Turbopack thay `URL` bằng bản của nó, nên `fileURLToPath` của Node từ chối:
+
+```
+TypeError: The "path" argument must be of type string or an instance of URL.
+           Received an instance of URL
+```
+
+Lỗi xảy ra lúc NẠP MODULE, nên nó không giết riêng đường cookie — nó giết **mọi** server
+action của /dashboard, kể cả phát/thu hồi linh phù, những thứ chẳng liên quan gì tới cookie.
+Và chỉ trên bản production: máy dev không bundle nên `URL` chỉ có một.
+
+- **Tách `cookies.mjs` thành module LÁ** — không import gì, không đụng đĩa. Server action
+  import từ đó; `runCycle.mjs` re-export nên mọi nơi khác không phải đổi.
+- **Chốt hồi quy trong smoke**: khẳng định `cookies.mjs` không có `import` và không có
+  `readFileSync`/`fileURLToPath` (bỏ chú thích trước khi soát — chính tệp ấy kể về lỗi này).
+  Ngày nào ai đó nối nó về engine, smoke đỏ trước khi production đỏ.
+- Đã kiểm ở **chế độ production thật** (`next build` + `next start`, đúng Turbopack bundle
+  đã làm vỡ): đăng nhập → /dashboard → phát linh phù → phát lại → thu hồi. Không trang lỗi
+  nào, log sạch bóng `ERR_INVALID_ARG_TYPE`. Smoke 68/68.
+
+Bài học ghi lại cho lần sau: mã đi qua **cả** function của Next lẫn worker phải sạch —
+không đĩa, không phụ thuộc. Ranh giới ấy mới là thứ quyết định, không phải cái polyfill.
+
 ## 0.13.0 — vụ án #lobby-overview: cookie JSON parse ra số không, và số không im lặng
 
 Lượt Mê Cung thật đầu tiên (job 2d6d4a73, 02/08) chết với "Selector không bao giờ xuất

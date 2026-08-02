@@ -11,6 +11,22 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.12.1 — gọi thẳng là "tài khoản", và nhật ký dọn được
+
+- **"Pháp Khí" → "Tài khoản hoathinh3d".** Giọng trong-thế-giới vẫn giữ ở mọi chỗ khác
+  (linh sứ, tàng khố, ngọc giản), nhưng riêng ô này thì cái tên bóng bẩy che mất thứ người
+  dùng cần biết ngay: đây là tài khoản game của họ. Nút xoá ghi rõ **"Xoá tài khoản đã
+  lưu"** chứ không phải "Xoá tài khoản" — trên chính trang này họ cũng có một tài khoản
+  Auto HH3D, và một nút trần trụi là câu mời hiểu nhầm thành xoá danh tính của chính mình.
+- **Nút "Dọn nhật ký"** trên Lư Khai Đàn. Xoá THẬT ở phía server chứ không ẩn trong state
+  của React: con trỏ nhật ký reset về 0 mỗi lần tải lại trang, nên một phép "xoá" chỉ nằm
+  trong trình duyệt sẽ sống lại nguyên vẹn sau một lần F5. Chỉ chạm lượt gần nhất của chính
+  người bấm — `clearLatestJobEvents` tự tra job qua `getLatestJob(userId)` thay vì nhận
+  `jobId` từ ngoài, nên không tồn tại đường nào xoá nhầm nhật ký người khác.
+- Con trỏ nhật ký KHÔNG bị reset sau khi dọn: id của `job_events` là bigserial không dùng
+  lại, nên dòng mới vẫn chảy về; reset về 0 chỉ tổ kéo lại đúng những dòng vừa xoá nếu câu
+  DELETE về chậm hơn nhịp hỏi tin kế tiếp.
+
 ## 0.12.0 — linh sứ tự mang Node theo, người dùng không phải cài gì nữa
 
 - **Node "xách tay".** Installer tải bản Node chính thức vào thư mục cài và chỉ dùng bản đó

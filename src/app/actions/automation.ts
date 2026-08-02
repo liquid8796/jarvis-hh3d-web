@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireActiveUser } from "@/lib/auth/guards";
 import { clearCookie, configSchema, saveConfig } from "@/lib/services/configs";
-import { requestStop, startJob } from "@/lib/services/jobs";
+import { clearLatestJobEvents, requestStop, startJob } from "@/lib/services/jobs";
 
 /**
  * Automation server actions — every one re-derives the caller from the session and
@@ -63,7 +63,7 @@ export async function clearCookieAction(): Promise<ActionResult> {
   const user = await requireActiveUser();
   await clearCookie(user.id);
   revalidatePath("/dashboard");
-  return { ok: true, message: "Đã xoá pháp khí khỏi ngọc giản." };
+  return { ok: true, message: "Đã xoá tài khoản hoathinh3d khỏi ngọc giản." };
 }
 
 export async function startAction(): Promise<ActionResult> {
@@ -76,6 +76,20 @@ export async function startAction(): Promise<ActionResult> {
   }
 
   return { ok: true, message: "Đàn pháp đã lập — linh sứ sẽ tiếp nhận trong giây lát." };
+}
+
+/**
+ * Dọn nhật ký của lượt đang hiển thị. Không đụng tới lượt chạy: linh sứ vẫn làm việc, và
+ * những dòng nó kể từ giây này trở đi vẫn hiện ra như thường.
+ */
+export async function clearLogAction(): Promise<ActionResult> {
+  const user = await requireActiveUser();
+  const gone = await clearLatestJobEvents(user.id);
+  revalidatePath("/dashboard");
+  return {
+    ok: true,
+    message: gone > 0 ? `Đã dọn ${gone} dòng nhật ký.` : "Nhật ký vốn đã trống.",
+  };
 }
 
 export async function stopAction(): Promise<ActionResult> {

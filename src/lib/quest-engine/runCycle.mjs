@@ -83,7 +83,10 @@ export async function runCycle(deps) {
   } = deps;
 
   if (!config?.gameCookie?.trim()) {
-    return { outcome: "failed", message: "Chưa có pháp khí — hãy dán cookie đăng nhập trước." };
+    return {
+      outcome: "failed",
+      message: "Chưa có tài khoản hoathinh3d — hãy dán chuỗi cookie đăng nhập trước.",
+    };
   }
 
   const deadline = budgetMs > 0 ? Date.now() + budgetMs : Infinity;

@@ -52,8 +52,11 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
       <h2 className="h-display mb-5 text-xl font-semibold text-gilded">Ngọc Giản Cấu Hình</h2>
 
       <div className="mb-6">
+        {/* "Tài khoản" ở đây LUÔN đi kèm "hoathinh3d", và nút xoá luôn nói rõ "đã lưu":
+            trên chính trang này người dùng cũng có một tài khoản Auto HH3D, nên một nút trần
+            trụi ghi "Xoá tài khoản" là câu mời hiểu nhầm thành xoá danh tính của chính họ. */}
         <label className="label" htmlFor="gameCookie">
-          Pháp Khí — cookie đăng nhập hoathinh3d
+          Tài khoản hoathinh3d — chuỗi cookie đăng nhập
         </label>
 
         {/* Cookie đi MỘT CHIỀU: nhập vào thì được, đọc ra thì không. Đã mã hoá trong
@@ -61,7 +64,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
         <div className="mb-2 flex flex-wrap items-center gap-3">
           {hasCookie ? (
             <>
-              <span className="badge badge-active">Đã cất pháp khí (đã mã hoá)</span>
+              <span className="badge badge-active">Đã lưu tài khoản (đã mã hoá)</span>
               <button
                 type="button"
                 className="btn btn-ghost"
@@ -73,11 +76,11 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
                   })
                 }
               >
-                Xoá pháp khí
+                Xoá tài khoản đã lưu
               </button>
             </>
           ) : (
-            <span className="badge badge-pending">Chưa có pháp khí</span>
+            <span className="badge badge-pending">Chưa lưu tài khoản</span>
           )}
         </div>
 
@@ -94,9 +97,9 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
           spellCheck={false}
         />
         <p className="mt-1 text-xs text-[var(--color-mist)]">
-          Pháp khí được niêm phong trước khi cất vào tàng khố và chỉ được mở đúng khoảnh khắc
+          Chuỗi này được niêm phong trước khi cất vào tàng khố và chỉ được mở đúng khoảnh khắc
           linh sứ nhận việc — nó không bao giờ quay lại trình duyệt, kể cả của chính đạo hữu.
-          {hasCookie && " Để trống ô này khi lưu thì pháp khí cũ vẫn nguyên."}
+          {hasCookie && " Để trống ô này khi lưu thì tài khoản cũ vẫn nguyên."}
         </p>
       </div>
 

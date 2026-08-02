@@ -59,7 +59,7 @@ export async function startJob(
   // Kiểm tra bằng bản KHÔNG chứa bí mật: ở đây chỉ cần biết cookie có tồn tại hay không.
   const view = await getEditableConfig(userId);
   if (!view.hasCookie) {
-    return { ok: false, error: "Chưa có cookie đăng nhập game — dán vào phần Pháp Khí trước." };
+    return { ok: false, error: "Chưa có tài khoản hoathinh3d — dán chuỗi cookie đăng nhập vào phần Tài khoản trước." };
   }
 
   if (!view.quests.meCung.enabled && !view.quests.luyenDan.enabled) {
@@ -222,6 +222,29 @@ export async function addEvent(
   message: string,
 ): Promise<void> {
   await db().insert(schema.jobEvents).values({ jobId, level, message });
+}
+
+/**
+ * Xoá sạch nhật ký của lượt GẦN NHẤT — đúng cái người dùng đang nhìn thấy trên Lư Khai Đàn.
+ *
+ * Không nhận `jobId` từ người gọi mà tự tra lượt gần nhất CỦA CHÍNH HỌ: `getLatestJob` đã
+ * lọc theo userId, nên id đi vào câu DELETE không thể là job của người khác. Nhận jobId từ
+ * ngoài thì phải thêm một phép kiểm chủ sở hữu nữa, và một phép kiểm có thể bị quên.
+ *
+ * Xoá thật chứ không ẩn ở phía trình duyệt: con trỏ nhật ký reset về 0 mỗi lần tải lại
+ * trang, nên "xoá" chỉ trong state của React sẽ sống lại nguyên vẹn sau một lần F5.
+ */
+export async function clearLatestJobEvents(userId: string): Promise<number> {
+  const job = await getLatestJob(userId);
+  if (!job) {
+    return 0;
+  }
+
+  const gone = await db()
+    .delete(schema.jobEvents)
+    .where(eq(schema.jobEvents.jobId, job.id))
+    .returning({ id: schema.jobEvents.id });
+  return gone.length;
 }
 
 /** The dashboard's log feed: everything after `afterId`, oldest first, bounded. */

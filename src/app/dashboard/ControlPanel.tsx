@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { startAction, stopAction } from "@/app/actions/automation";
+import { clearLogAction, startAction, stopAction } from "@/app/actions/automation";
 
 /**
  * Lư Khai Đàn — nút start/stop và nhật ký tu luyện.
@@ -93,6 +93,21 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
     });
   };
 
+  const clearLog = () => {
+    if (!confirm("Dọn sạch nhật ký của lượt này? Những dòng đã ghi sẽ không lấy lại được.")) {
+      return;
+    }
+    startTransition(async () => {
+      const result = await clearLogAction();
+      setEvents([]);
+      // KHÔNG đụng tới con trỏ: id của job_events là bigserial, không bao giờ dùng lại, nên
+      // mọi dòng linh sứ kể từ đây đều mang id lớn hơn và vẫn chảy về bình thường. Reset
+      // con trỏ về 0 chỉ tổ kéo lại đúng những dòng vừa xoá nếu câu DELETE về chậm hơn nhịp
+      // hỏi tin kế tiếp.
+      setNotice(result.message);
+    });
+  };
+
   return (
     <section className="card card-hairline flex flex-col p-6">
       <div className="mb-5 flex items-start justify-between gap-4">
@@ -152,6 +167,20 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
           </>
         )}
       </p>
+
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold text-[var(--color-parchment)]">
+          Nhật ký tu luyện
+        </span>
+        <button
+          type="button"
+          onClick={clearLog}
+          disabled={pending || events.length === 0}
+          className="rounded-md border border-[var(--color-ink-600)] px-2 py-0.5 text-xs text-[var(--color-mist)] transition-colors hover:text-[var(--color-gold-300)] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Dọn nhật ký
+        </button>
+      </div>
 
       <div
         ref={logRef}

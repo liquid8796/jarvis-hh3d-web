@@ -14,7 +14,15 @@ import type { EditableConfig } from "@/lib/services/configs";
  * hai công tắc nhiệm vụ, và chúng chỉ để LÀM MỜ phần tuỳ chọn bên dưới: giá trị vẫn được
  * gửi đi đầy đủ, nên tắt rồi bật lại không mất những gì đã chọn.
  */
-export function ConfigForm({ config }: { config: EditableConfig }) {
+export function ConfigForm({
+  config,
+  canUseSandbox,
+}: {
+  config: EditableConfig;
+  /** Tông chủ mới mở được sandbox — xem `sandboxAllowedFor`. Ở đây chỉ để LÀM MỜ lựa chọn;
+      quyền thật được quyết lại ở server, cả lúc lưu lẫn lúc khai đàn. */
+  canUseSandbox: boolean;
+}) {
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
     saveConfigAction,
     null,
@@ -82,11 +90,27 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
         <label className="label" htmlFor="runner">
           Nơi vận hành đàn pháp
         </label>
-        <select id="runner" name="runner" className="input" defaultValue={config.runner}>
-          <option value="sandbox">Sandbox trên Vercel (không cần máy riêng)</option>
+        <select
+          id="runner"
+          name="runner"
+          className="input"
+          defaultValue={canUseSandbox ? config.runner : "local"}
+        >
           <option value="local">Linh sứ máy nhà (máy chạy liên tục)</option>
+          <option value="sandbox" disabled={!canUseSandbox}>
+            Sandbox trên Vercel (không cần máy riêng)
+            {!canUseSandbox && " — đang thử nghiệm, chỉ tông chủ"}
+          </option>
         </select>
         <p className="mt-1 text-xs text-[var(--color-mist)]">
+          {!canUseSandbox && (
+            <>
+              <span className="text-[var(--color-gold-300)]">Sandbox đang trong thời gian
+              thử nghiệm</span> nên tạm thời chỉ tông chủ mở được — mỗi lát chạy là một máy ảo
+              tính tiền trên tài khoản chung, và chừng nào chưa đo được chi phí theo từng
+              người thì cánh cửa còn hẹp. Đàn pháp của đạo hữu chạy trên linh sứ máy nhà.{" "}
+            </>
+          )}
           Sandbox dựng máy ảo theo từng lượt — hợp với Luyện Đan Đường vì mỗi lượt ghé chỉ
           vài phút. <span className="text-[var(--color-gold-300)]">Mê Cung luôn cần linh sứ
           máy nhà</span>: nó phải chờ đủ 5 người thật rồi đánh liền tới 35 phút, dài hơn tuổi
@@ -218,7 +242,9 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
               <option value={4}>Giữ 4 sao, phân giải 3 sao trở xuống</option>
               <option value={3}>Giữ từ 3 sao, phân giải 2 sao trở xuống</option>
               <option value={2}>Giữ từ 2 sao, chỉ phân giải 1 sao</option>
-              <option value={5}>Không phân giải (giữ tất cả)</option>
+              {/* 1, không phải 5. Con số là "giữ từ N sao trở lên", mà đan chỉ rơi 1–4 sao —
+                  nên "giữ từ 1" là giữ sạch, còn "giữ từ 5" sẽ phân giải sạch. Đúng ngược. */}
+              <option value={1}>Không phân giải (giữ tất cả)</option>
             </select>
             <p className="mt-1 text-xs text-[var(--color-mist)]">
               Đan rơi từ 1–4 sao. Chỉ viên bị phân giải mới hoàn lại dược liệu.

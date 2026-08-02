@@ -1,7 +1,8 @@
 import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { getEditableConfig, getStoredConfigForSnapshot } from "./configs";
-import { decideRunner, type RunnerKind } from "@/lib/runners/policy";
+import { decideRunner, sandboxAllowedFor, type RunnerKind } from "@/lib/runners/policy";
+import { findById } from "./users";
 import type { JobEventRow, JobRow } from "@/lib/db/schema";
 
 /**
@@ -71,7 +72,13 @@ export async function startJob(
   const snapshot = await getStoredConfigForSnapshot(userId);
 
   // Runner do HÌNH DẠNG NHIỆM VỤ quyết định, không phải do ai rảnh — xem runners/policy.ts.
-  const decision = decideRunner(view);
+  // Quyền dùng sandbox đọc lại từ DÒNG USER, không từ cấu hình đã lưu: cấu hình là thứ
+  // người dùng gửi lên, còn vai trò thì không. Tông chủ hạ quyền ai đó là lượt kế tiếp của
+  // họ đã về máy nhà, không phải chờ họ lưu lại form.
+  const owner = await findById(userId);
+  const decision = decideRunner(view, {
+    sandboxAllowed: owner ? sandboxAllowedFor(owner) : false,
+  });
 
   const rows = await db()
     .insert(schema.automationJobs)

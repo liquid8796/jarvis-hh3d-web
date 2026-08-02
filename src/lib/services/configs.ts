@@ -18,10 +18,16 @@ export const configSchema = z.object({
   gameCookie: z.string().trim().max(8000).default(""),
   /**
    * Ưu tiên của người dùng về nơi chạy. Chỉ là ƯU TIÊN: runners/policy.ts có quyền phủ
-   * quyết khi hình dạng nhiệm vụ không cho phép (Mê Cung luôn phải chạy `local`), và luôn
-   * ghi rõ lý do vào nhật ký thay vì âm thầm làm khác ý.
+   * quyết khi hình dạng nhiệm vụ không cho phép (Mê Cung luôn phải chạy `local`) hoặc khi
+   * người dùng chưa được mở sandbox, và luôn ghi rõ lý do vào nhật ký thay vì âm thầm làm
+   * khác ý.
+   *
+   * Mặc định `local`, không phải `sandbox`: mặc định phải là thứ chạy được cho MỌI tài
+   * khoản, còn sandbox hiện là cổng hẹp (xem `sandboxAllowedFor`). Một mặc định mà đa số
+   * người dùng không được phép dùng chỉ tổ đẻ ra một dòng "đã chuyển sang máy nhà" trong
+   * nhật ký của mọi lượt chạy đầu tiên.
    */
-  runner: z.enum(["sandbox", "local"]).default("sandbox"),
+  runner: z.enum(["sandbox", "local"]).default("local"),
   quests: z
     .object({
       meCung: z
@@ -39,7 +45,17 @@ export const configSchema = z.object({
         .object({
           enabled: z.boolean().default(false),
           tier: z.enum(["Hạ Phẩm", "Trung Phẩm", "Thượng Phẩm", "Cực Phẩm"]).default("Hạ Phẩm"),
-          /** Highest star that still gets decomposed; 0 = decompose everything, 5 = keep all. */
+          /**
+           * Giữ đan từ N sao TRỞ LÊN; phân giải phần còn lại.
+           *
+           *   0 = phân giải tất cả
+           *   1 = giữ tất cả (giữ từ 1 sao trở lên thì chẳng còn gì để phân giải)
+           *   2–5 = giữ từ N sao trở lên
+           *
+           * Đọc kỹ mốc 1 và 5. Đan chỉ rơi 1–4 sao, nên "giữ từ 5 sao" nghĩa là PHÂN GIẢI
+           * SẠCH — đúng ngược với "giữ tất cả". Hai giá trị này từng bị hoán chỗ giữa form
+           * và lớp dịch, và triệu chứng của nó là mất sạch đan mà không có lỗi nào.
+           */
           keepStarsFrom: z.number().int().min(0).max(5).default(0),
         })
         .prefault({}),

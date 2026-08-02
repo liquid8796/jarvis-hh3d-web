@@ -137,6 +137,55 @@ async function main() {
     opt(luyenDan, "decompose").selectedValue === "dược khí 4 sao|dược khí 5 sao",
     opt(luyenDan, "decompose").selectedValue,
   );
+
+  // Mốc 1 và 5 từng bị hoán chỗ giữa form và lớp dịch. Đan chỉ rơi 1–4 sao, nên "giữ từ 5"
+  // là phân giải sạch — chọn nhầm chỗ này thì người dùng bấm "giữ tất cả" rồi mất tất cả,
+  // và không có một dòng lỗi nào để lần ra.
+  const keepAll = profileForConfig(
+    { ...cfg, quests: { ...cfg.quests, luyenDan: { ...cfg.quests.luyenDan, keepStarsFrom: 1 } } },
+    () => {},
+  ).quests.find((q) => q.name === "Luyện Đan Đường");
+  check(
+    "keepStarsFrom=1 → giữ TẤT CẢ, không phân giải gì",
+    opt(keepAll, "decompose").selectedValue === "dược khí",
+    opt(keepAll, "decompose").selectedValue,
+  );
+  const keepNone = profileForConfig(
+    { ...cfg, quests: { ...cfg.quests, luyenDan: { ...cfg.quests.luyenDan, keepStarsFrom: 0 } } },
+    () => {},
+  ).quests.find((q) => q.name === "Luyện Đan Đường");
+  check(
+    "keepStarsFrom=0 → phân giải tất cả",
+    opt(keepNone, "decompose").selectedValue.includes("«"),
+    opt(keepNone, "decompose").selectedValue,
+  );
+
+  console.log("\nChính sách chọn linh sứ");
+
+  const { decideRunner, sandboxAllowedFor } = await import("../src/lib/runners/policy.ts");
+  const onlyLuyenDan = {
+    ...cfg,
+    quests: { ...cfg.quests, meCung: { ...cfg.quests.meCung, enabled: false } },
+  };
+
+  check("tông chủ được mở sandbox", sandboxAllowedFor({ role: "admin" }) === true);
+  check("đạo hữu thường thì chưa", sandboxAllowedFor({ role: "member" }) === false);
+
+  // Ràng buộc phải sống Ở ĐÂY chứ không chỉ ở form: một document đã nằm sẵn trong database
+  // từ hồi `sandbox` còn là mặc định vẫn mang đúng chữ đó, và nó không đi qua form lần nào.
+  const denied = decideRunner({ ...onlyLuyenDan, runner: "sandbox" }, { sandboxAllowed: false });
+  check("chưa được mở → ép về máy nhà", denied.runner === "local", denied.runner);
+  check("và nói rõ vì sao", denied.reason.includes("thử nghiệm"), denied.reason);
+
+  process.env.SANDBOX_ENABLED = "1";
+  const allowed = decideRunner({ ...onlyLuyenDan, runner: "sandbox" }, { sandboxAllowed: true });
+  check("được mở + chỉ Luyện Đan → sandbox", allowed.runner === "sandbox", allowed.reason);
+
+  // Quyền không được phép lấn át hình dạng nhiệm vụ: Mê Cung vẫn phải là máy nhà, kể cả với
+  // tông chủ, vì mất VM giữa trận là bốn người khác mất lượt oan.
+  const meCungAdmin = decideRunner({ ...cfg, runner: "sandbox" }, { sandboxAllowed: true });
+  check("Mê Cung vẫn về máy nhà kể cả với tông chủ", meCungAdmin.runner === "local", meCungAdmin.reason);
+  delete process.env.SANDBOX_ENABLED;
   check(
     "quest không được bật thì vẫn tắt",
     profile.quests.filter((q) => q.enabled).length === 2,

@@ -46,10 +46,42 @@ export function sandboxAvailable(): boolean {
   return process.env.SANDBOX_ENABLED === "1";
 }
 
-export function decideRunner(config: UserConfig): RunnerDecision {
+/**
+ * Ai được PHÉP chọn sandbox — khác hẳn câu hỏi sandbox có chạy được không.
+ *
+ * Cổng tạm thời, và cố ý hẹp: sandbox đã dựng xong và kiểm được, nhưng nó tiêu tiền compute
+ * của tài khoản Vercel dùng chung, và mỗi lát chạy sai là một VM chạy không. Cho tới khi
+ * theo dõi được chi phí theo từng người, chỉ tông chủ mở được nó — người khác vẫn thấy lựa
+ * chọn, thấy nó bị khoá, và biết vì sao.
+ *
+ * Mở lại cho tất cả = trả về `true` ở đây. Một chỗ duy nhất, vì cả UI, chỗ lưu và chỗ quyết
+ * định chạy đều hỏi hàm này.
+ */
+export function sandboxAllowedFor(user: { role: string }): boolean {
+  return user.role === "admin";
+}
+
+export function decideRunner(
+  config: UserConfig,
+  { sandboxAllowed }: { sandboxAllowed: boolean },
+): RunnerDecision {
   const meCung = config.quests.meCung.enabled;
   const luyenDan = config.quests.luyenDan.enabled;
   const preferred = config.runner;
+
+  // Kiểm quyền TRƯỚC mọi thứ khác, và kiểm ở đây chứ không chỉ lúc lưu. Một document đã
+  // nằm sẵn trong database từ trước khi có luật này vẫn mang `runner: "sandbox"` — bản đầu
+  // để đó làm mặc định — nên nếu chỉ chặn ở form thì mọi tài khoản cũ vẫn lọt.
+  if (!sandboxAllowed) {
+    return {
+      runner: "local",
+      reason:
+        preferred === "sandbox"
+          ? "Linh sứ sandbox đang trong thời gian thử nghiệm, hiện chỉ mở cho tông chủ — " +
+            "lượt này giao cho linh sứ máy nhà."
+          : "Giao cho linh sứ máy nhà.",
+    };
+  }
 
   if (!sandboxAvailable()) {
     return {

@@ -11,6 +11,40 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.11.0 — sandbox về vườn, linh sứ dọn lên VM tông môn, và trang cài một-lệnh
+
+- **Vercel Sandbox bị bỏ hẳn** (`runners/sandbox.ts`, `policy.ts`, hai script snapshot, dep
+  `@vercel/sandbox`, `outputFileTracingIncludes`). Nó thua ở hai chỗ không chữa được bằng
+  code: gói Hobby không có cron đủ dày để lái một VM phù du, và một microVM có trần thời
+  gian không bao giờ ôm nổi phiên Mê Cung 35 phút — trong khi MỘT worker sống dai trên VM
+  Always Free làm được cả hai việc, đơn giản hơn, không tính tiền compute theo lát. Enum
+  `runner_kind` giữ nguyên giá trị `sandbox` trong Postgres (job lịch sử còn mang nó; rút
+  một giá trị enum đã dùng là một cuộc phẫu thuật không đáng), nhưng không dòng code nào
+  còn ghi giá trị đó.
+- **Linh sứ tông môn trên Oracle Cloud Always Free** — kit dựng trọn ở `deploy/oracle/`:
+  chọn A1.Flex + Ubuntu 24.04 aarch64 (Playwright hỗ trợ chính thức, có Chromium arm64;
+  con AMD micro 1GB thì Chromium chết ngạt), `setup.sh` idempotent dựng Node 22 + Chromium
+  + systemd, cập nhật = chạy lại đúng một lệnh. VM chỉ mở SSH — worker là kẻ chỉ gọi ra.
+- **Linh phù: token worker riêng cho từng đạo hữu.** Trang cài đại trà mà phát WORKER_TOKEN
+  toàn cục là trao cho mỗi người quyền đọc cookie game của tất cả — nên token toàn cục rút
+  về làm chìa của linh sứ tông môn, còn mỗi đạo hữu cầm linh phù riêng (database chỉ giữ
+  SHA-256, bản rõ hiện đúng một lần lúc phát). Scope cắm thẳng vào câu SQL claim (linh sứ
+  riêng chỉ thấy hàng chờ của chủ mình) và ba op còn lại đi qua `jobBelongsTo` — thiếu nó
+  thì một linh phù hợp lệ bất kỳ complete được job người khác chỉ bằng cách đoán jobId.
+  Tài khoản bị khoá thì linh phù mất hiệu lực theo, không cần ai nhớ đi thu hồi.
+- **Mục Linh Sứ trên dashboard + cài một lệnh.** Người dùng không cần biết npm là gì:
+  panel phát lệnh cài cho Windows (PowerShell) và Linux/macOS, lệnh tải gói
+  `/linh-su/goi-linh-su.tgz` — được `buildWorkerBundle.mjs` đóng ở MỖI deploy từ đúng
+  engine đang chạy, không tồn tại bản thứ hai để lệch — cài Node/Chromium nếu thiếu, ghim
+  đúng phiên bản playwright-core đọc từ trong gói (lệch một nấc là "Executable doesn't
+  exist"), đăng ký tự chạy cùng máy (HKCU Run + vbs ẩn cửa sổ — không cần admin; systemd
+  user unit + linger; launchd), kèm sẵn uninstall.
+- **Sổ điểm danh linh sứ** (bảng `workers`, migration 0005): mỗi lần hỏi việc là một lần
+  điểm danh. Dashboard nói thật NGAY LÚC khai đàn là có linh sứ trực hay không — trước đây
+  sự thật ấy chỉ lộ ra sau sáu phút im lặng, khi reaper kết liễu job với một dòng lỗi. Hạn
+  không-ai-nhận rút từ 6 phút về 2 (worker hỏi mỗi 5 giây, không còn lý do gì để đợi VM
+  dựng); `/api/cron` chỉ còn là lưới vệ sinh.
+
 ## 0.10.0 — đàm đạo dọn về kho NoSQL, tin có hạn sống, Tông Môn chia tab
 
 - **Tin đàm đạo rời Postgres, sống trong kho NoSQL (Upstash Redis).** Hai loại dữ liệu

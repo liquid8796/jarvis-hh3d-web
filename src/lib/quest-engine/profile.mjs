@@ -15,9 +15,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-// Đọc bằng fs chứ không `import ... with { type: "json" }`: cùng một tệp này chạy ở ba nơi
-// — worker máy nhà, VM sandbox, và (gián tiếp) bundle của Next — mà mỗi nơi đối xử với
-// import attribute một kiểu. `fs` thì chỗ nào có Node cũng hiểu như nhau.
+// Đọc bằng fs chứ không `import ... with { type: "json" }`: cùng một tệp này chạy ở nhiều
+// nơi — worker trên VM tông môn, worker máy nhà (từ gói cài), smoke trên máy dev — mà mỗi
+// runtime đối xử với import attribute một kiểu. `fs` thì chỗ nào có Node cũng hiểu như nhau.
 const profileData = JSON.parse(
   readFileSync(fileURLToPath(new URL("./profile.json", import.meta.url)), "utf8"),
 );

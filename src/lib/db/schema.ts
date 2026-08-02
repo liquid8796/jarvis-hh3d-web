@@ -41,6 +41,19 @@ export const users = pgTable(
     passwordHash: text("password_hash").notNull(),
     role: userRole("role").notNull().default("user"),
     status: userStatus("status").notNull().default("pending"),
+    /**
+     * LINH PHÙ — token riêng cho linh sứ máy nhà của đạo hữu này, lưu dạng SHA-256.
+     *
+     * Vì sao không dùng chung WORKER_TOKEN: trang cài đặt phát lệnh cài cho MỌI thành viên,
+     * mà ai cầm token toàn cục là claim được job của tất cả — tức đọc được cookie game của
+     * tất cả. Nên token toàn cục rút về làm token của linh sứ tông môn (do người vận hành
+     * giữ), còn mỗi đạo hữu cầm một linh phù chỉ mở được job của chính mình.
+     *
+     * Chỉ lưu hash: bảng users bị lộ thì kẻ đọc trộm vẫn không có token để giả linh sứ.
+     * Bản rõ chỉ tồn tại đúng một lần — trong hồi đáp của action tạo linh phù.
+     */
+    workerTokenHash: text("worker_token_hash").unique(),
+    workerTokenCreatedAt: timestamp("worker_token_created_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -74,15 +87,12 @@ export const jobStatus = pgEnum("job_status", [
 /**
  * Ai sẽ cầm browser cho lượt này.
  *
- * sandbox — Vercel Sandbox: microVM dựng theo yêu cầu, chạy một LÁT có giới hạn thời gian
- *           rồi tắt. Hợp với nhiệm vụ chu kỳ ngắn (Luyện Đan Đường: mỗi lượt ghé vài phút,
- *           rồi nghỉ ~26 phút chờ mẻ chín) — đúng hình dạng mà một VM phù du phục vụ tốt.
- * local   — tiến trình worker trên máy chạy liên tục. Bắt buộc với nhiệm vụ cần một PHIÊN
- *           browser sống dai: Mê Cung phải tạo phòng, chờ đủ 5 người thật, rồi đánh liền
- *           tới 35 phút — mất VM giữa chừng là mất luôn cái phòng đang đứng trong đó.
- *
- * Chọn theo hình dạng thời gian của nhiệm vụ, không theo sở thích: đây là lý do một job
- * mang sẵn runner của nó thay vì để runner nào rảnh thì giành.
+ * Từ v0.11 mọi job đều là `local` — một tiến trình worker sống dai (linh sứ tông môn trên
+ * VM luôn trực, hoặc linh sứ máy nhà của chính đạo hữu). Giá trị `sandbox` chỉ còn trong
+ * enum vì Postgres không cho rút một giá trị enum đã dùng, và các job lịch sử vẫn mang nó;
+ * không dòng code nào còn GHI giá trị đó nữa. Vercel Sandbox bị bỏ vì hai lẽ: gói Hobby
+ * không có cron đủ dày để lái nó, và một VM Always Free chạy liên tục phục vụ được CẢ
+ * Mê Cung (phiên browser 35 phút không đứt) — thứ sandbox phù du không bao giờ làm nổi.
  */
 export const runnerKind = pgEnum("runner_kind", ["sandbox", "local"]);
 
@@ -101,7 +111,7 @@ export const automationJobs = pgTable(
      */
     configSnapshot: jsonb("config_snapshot").notNull().default({}),
     /** Runner nào được phép giành job này — xem chú thích của `runnerKind`. */
-    runner: runnerKind("runner").notNull().default("sandbox"),
+    runner: runnerKind("runner").notNull().default("local"),
     /**
      * Số LÁT đã chạy. Một lượt sandbox không nhất thiết xong trong một lát: VM có trần thời
      * gian, nên job quay lại hàng chờ và lát sau chạy tiếp. Đếm ở đây để (a) biết khi nào
@@ -151,6 +161,30 @@ export const appSettings = pgTable("app_settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Sổ ĐIỂM DANH linh sứ — mỗi worker từng gõ cửa /api/worker có một dòng, cập nhật
+ * `lastSeen` mỗi lần nó hỏi việc (5 giây một lần khi đang trực).
+ *
+ * Tồn tại để trả lời câu hỏi vận hành số một: "có linh sứ nào đang trực không?" — trước
+ * đây câu trả lời chỉ lộ ra sau sáu phút im lặng, khi reaper kết liễu job với một dòng lỗi.
+ * Giờ dashboard đọc bảng này và nói thật NGAY LÚC khai đàn; mục Linh Sứ cũng dựa vào đây
+ * để chỉ cho đạo hữu thấy linh sứ máy nhà của họ đã lên ca hay chưa.
+ *
+ * `userId` null = linh sứ tông môn (xác thực bằng token toàn cục, nhận job của mọi người).
+ * `userId` có giá trị = linh sứ riêng, xác thực bằng linh phù, chỉ nhận job của chủ mình.
+ */
+export const workers = pgTable(
+  "workers",
+  {
+    id: text("id").primaryKey(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    firstSeen: timestamp("first_seen", { withTimezone: true }).notNull().defaultNow(),
+    lastSeen: timestamp("last_seen", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("workers_user_idx").on(t.userId, t.lastSeen)],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type JobRow = typeof automationJobs.$inferSelect;
 export type JobEventRow = typeof jobEvents.$inferSelect;
+export type WorkerRow = typeof workers.$inferSelect;

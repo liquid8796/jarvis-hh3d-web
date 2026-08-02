@@ -20,9 +20,9 @@ export const configSchema = z.object({
   /** The hoathinh3d login cookie bundle the worker automates with. */
   gameCookie: z.string().trim().max(8000).default(""),
   /**
-   * Nơi chạy. Hiện bị KHOÁ về `local` ở mọi tầng (UI disable, action ép lại lúc lưu) —
-   * lựa chọn viễn trình sẽ mở sau. Trường vẫn giữ trong schema vì document cũ đã mang nó,
-   * và policy vẫn đọc nó làm ưu tiên khi cánh cửa mở lại.
+   * DI SẢN — từ v0.11 mọi lượt chạy đều do worker sống dai đảm nhiệm, không còn lựa chọn
+   * nơi chạy. Trường vẫn nằm trong schema vì document cũ đã mang nó (Zod strip là mất
+   * round-trip an toàn), nhưng không còn ai đọc giá trị này.
    */
   runner: z.enum(["sandbox", "local"]).default("local"),
   quests: z

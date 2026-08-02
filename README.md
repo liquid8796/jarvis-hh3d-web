@@ -17,79 +17,65 @@ request và bị cắt sau vài phút. Bấm Khai Đàn chỉ ghi một dòng `a
 `queued`; một *linh sứ* nhận việc rồi kể lại qua HTTPS. Vì ý định của người dùng nằm trong
 **database** chứ không nằm trong tab trình duyệt, đóng tab hay tắt máy chẳng ảnh hưởng gì.
 
-Có **hai loại linh sứ**, và việc chọn loại nào không phải sở thích — nó do *hình dạng thời
-gian của nhiệm vụ* quyết định:
+Mọi linh sứ đều là **một tiến trình `worker.mjs` sống dai** — khác nhau ở *ai nuôi nó* và
+*chìa nó cầm*:
 
 ```
                       ┌──────────────── Vercel ────────────────┐
                       │  Next.js control plane                 │
    Khai Đàn ─────────►│  • đăng ký / duyệt / cấu hình          │
-                      │  • ghi job vào DB, chọn runner         │
-                      │  • /api/cron mỗi phút → SANDBOX        │
+                      │  • ghi job vào DB, phát linh phù       │
+                      │  • sổ điểm danh linh sứ (bảng workers) │
                       └───┬────────────────────────────┬───────┘
-                          │                            │
+                          │ WORKER_TOKEN               │ linh phù (per-user)
               ┌───────────▼──────────┐     ┌───────────▼─────────────┐
-              │ Vercel Sandbox       │     │ scripts/worker.mjs      │
-              │ microVM phù du       │     │ máy chạy liên tục       │
-              │ → Luyện Đan Đường    │     │ → Mê Cung               │
-              │   (mỗi lượt vài phút)│     │   (phiên liền 35 phút)  │
-              └──────────┬───────────┘     └───────────┬─────────────┘
+              │ LINH SỨ TÔNG MÔN     │     │ LINH SỨ TÚC TRỰC        │
+              │ VM Oracle Always Free│     │ máy của từng đạo hữu    │
+              │ deploy/oracle/       │     │ cài 1 lệnh từ mục       │
+              │ → job của MỌI người  │     │ Linh Sứ trên dashboard  │
+              └──────────┬───────────┘     │ → CHỈ job của chủ mình  │
+                         │                 └───────────┬─────────────┘
                          └──────► Neon Postgres ◄──────┘
 ```
 
-**Luyện Đan Đường** hợp sandbox hoàn hảo: mỗi lượt ghé chỉ vài phút (thu đan → phân giải →
-khai lô → giữ lửa ba nhịp → đọc đồng hồ → đi), rồi nghỉ ~26 phút chờ mẻ chín. Dựng VM, làm
-việc ngắn, tắt — không tốn gì lúc chờ.
+- **Linh sứ tông môn** — worker do người vận hành nuôi trên một VM Oracle Cloud Always Free
+  (xem [deploy/oracle/README.md](deploy/oracle/README.md)), cầm `WORKER_TOKEN` toàn cục,
+  nhận job của mọi thành viên. Một VM chạy liên tục phục vụ được cả Mê Cung (phiên browser
+  35 phút không đứt) lẫn Luyện Đan Đường — thứ mà Vercel Sandbox phù du (đã bỏ từ v0.11)
+  không bao giờ làm nổi trên gói Hobby không có cron dày.
+- **Linh sứ túc trực** — worker trên máy của chính đạo hữu, cài bằng MỘT lệnh phát ở mục
+  Linh Sứ trên dashboard. Nó xác thực bằng **linh phù** riêng (token per-user, database chỉ
+  giữ SHA-256) nên chỉ nhận và chỉ đụng được job của chủ mình — phát token toàn cục cho
+  người dùng là trao quyền đọc cookie game của cả tông môn, nên điều đó không bao giờ xảy ra.
+- **Sổ điểm danh** — mỗi lần worker hỏi việc (5 giây/lần) là một lần điểm danh vào bảng
+  `workers`. Dashboard nhờ vậy nói thật *ngay lúc khai đàn* là có linh sứ trực hay không,
+  thay vì để job chờ sáu phút rồi chết câm.
 
-**Mê Cung** thì không thể: nó phải tạo phòng, đứng chờ đủ 5 **người thật** (có thể hàng chục
-phút), rồi đánh liền một mạch tới 35 phút. Cả quá trình là MỘT phiên browser không đứt được
-— mất VM giữa chừng là mất luôn cái phòng đang đứng trong đó, và bốn người kia mất lượt oan.
-Không cắt thành lát 8 phút được.
+Hai worker cùng đủ điều kiện tranh một job thì Postgres phân xử bằng một câu UPDATE nguyên
+tử — không bao giờ có hai linh sứ ôm cùng một lượt.
 
-Nên `src/lib/runners/policy.ts` phủ quyết: bật Mê Cung là job tự chuyển sang linh sứ máy
-nhà, **kèm một dòng giải thích trong nhật ký** thay vì âm thầm làm khác ý người dùng.
-
-**Đường dự phòng tự động:** sandbox thất bại ba lát liên tiếp (thiếu quota, VM không dựng
-được, Chromium không lên) thì job tự đổi `runner` sang `local` và nằm chờ worker máy nhà —
-người dùng không phải làm gì, chỉ cần có một worker đang trực.
-
-> ### ⚠️ Gói Hobby (free) của Vercel KHÔNG chạy được linh sứ sandbox
+> ### Ghi chú về gói Hobby của Vercel
 >
-> Sandbox không tự đi tìm việc — phải có cron gọi `/api/cron` mỗi phút. Nhưng gói Hobby
-> **chỉ cho cron một lần mỗi ngày**; `vercel --prod` từ chối thẳng biểu thức `* * * * *`:
+> Gói Hobby **chỉ cho cron một lần mỗi ngày**; `vercel --prod` từ chối thẳng biểu thức
+> `* * * * *`:
 >
 > ```
 > Error: Hobby accounts are limited to daily cron jobs.
 > ```
 >
-> Một lần mỗi ngày thì vô dụng với automation cần ghé lò mỗi ~26 phút. Nên **sandbox mặc
-> định TẮT**: `src/lib/runners/policy.ts` giao mọi job cho `local` trừ khi có
-> `SANDBOX_ENABLED=1`. Thà giao cho thứ chắc chắn chạy còn hơn xếp job vào hàng chờ không
-> ai đến lấy.
->
-> **Vẫn dùng được sandbox trên Hobby.** Hai giới hạn của gói free được né bằng thiết kế
-> chứ không bằng cách trả tiền:
->
-> - *Function chỉ sống 60 giây* → function **không chờ** sandbox. Nó dựng VM, nạp một script
->   worker vào, chạy ở chế độ `detached`, rồi trả về ngay. Sandbox sống tiếp bằng timeout
->   của chính nó và tự nói chuyện với `/api/worker` bằng đúng giao thức mà linh sứ máy nhà
->   dùng. Trần 60 giây trở nên vô hại.
-> - *Cron chỉ 1 lần/ngày* → **bấm Khai Đàn là thả sandbox ngay**, không đợi nhịp cron. Cron
->   hằng ngày chỉ còn làm việc quét dọn.
->
-> Muốn sandbox tự nhặt cả những job xếp hàng lúc bạn không ngồi trước máy (ví dụ lượt ghé lò
-> kế tiếp sau 26 phút) thì cần một cron dày hơn — xem "Cron miễn phí từ bên ngoài" bên dưới.
->
-> `vercel.json` để cron ở `0 3 * * *` (mỗi ngày một lần) cho deploy được trên Hobby. Nhịp
-> đó vẫn hữu ích: nó dọn job chết và job không ai nhận, nên hệ thống tự lành kể cả khi
-> không ai mở dashboard.
+> Đây chính là lý do kiến trúc worker-sống-dai thắng: worker tự hỏi việc mỗi 5 giây, không
+> cần ai gõ cửa đánh thức. Cron chỉ còn là **lưới an toàn vệ sinh** — dọn job chết và job
+> không ai nhận, quét tin đàm đạo quá hạn — và những việc đó đã chạy tiện-đường mỗi lần có
+> người mở dashboard rồi. `vercel.json` để cron ở `0 3 * * *` cho những ngày không ai mở.
+> (Chính giới hạn cron này là một nửa lý do Vercel Sandbox bị bỏ ở v0.11; nửa kia là một
+> microVM phù du không bao giờ ôm nổi phiên Mê Cung 35 phút.)
 
 ### Lưu config người dùng bằng gì?
 
 **JSONB trong chính Postgres đó** (bảng `user_configs`), không dùng store thứ hai. Lý do,
 theo thứ tự quan trọng:
 
-- Hình thù config **thay đổi liên tục** — bản desktop đã đi tới quest-profile schema 41. Cột
+- Hình thù config **thay đổi liên tục** — bản desktop đã đi tới quest-profile schema 42. Cột
   quan hệ sẽ thành một chuỗi migration bất tận; document thì co giãn tự nhiên.
 - JSONB **vẫn truy vấn được** bằng SQL khi admin cần hỏi ("ai đang bật Mê Cung?") — thứ mà
   một blob store không cho.
@@ -123,7 +109,7 @@ src/
 #### Bộ thông dịch nhiệm vụ, và vì sao nó dùng chung với bản desktop
 
 `quest-engine/` là bản JavaScript của `QuestEngine.cs` bên bản desktop, và nó đọc **cùng một
-tệp hồ sơ** (`profile.json`, schema 41) mà bản desktop dùng. Đó là điểm mấu chốt: hồ sơ ấy
+tệp hồ sơ** (`profile.json`, schema 42) mà bản desktop dùng. Đó là điểm mấu chốt: hồ sơ ấy
 không phải cấu hình, nó là **tri thức về site** — mỗi selector trong đó là một buổi tối ngồi
 xem trang thật, và vài cái là cả một đêm hỏng việc mới rút ra. Nếu web chép lại tri thức đó
 thành mã riêng thì hai bản sẽ trôi khỏi nhau ngay lần site đổi marker đầu tiên, và người sửa
@@ -224,56 +210,20 @@ plaintext ở đâu cả:
 Giá trị ghi từ trước khi có mã hoá vẫn đọc được bình thường và sẽ tự vào phong bì ở lần lưu
 kế tiếp — không cần downtime, không cần script migration.
 
-### Bước 2b — Vercel Sandbox (cho linh sứ sandbox)
+### Bước 2b — Linh sứ tông môn (VM Oracle Always Free)
 
-Sandbox chạy bằng OIDC tự động khi ở trên Vercel, nên **không cần token gì thêm** cho
-production. Chỉ cần hai thứ:
+Worker mà tông môn nuôi cho mọi thành viên. Toàn bộ hướng dẫn — chọn shape/OS, tạo VM,
+`setup.sh` một lệnh, vận hành, cập nhật — nằm ở [deploy/oracle/README.md](deploy/oracle/README.md).
 
-**1. Một người gõ cửa `/api/cron`.** Cron trong `vercel.json` để `0 3 * * *` — mỗi ngày một
-lần, vì gói Hobby không cho dày hơn (xem cảnh báo đầu README). Nhịp đó chỉ đủ để **quét dọn**
-job chết, không đủ để lái automation.
-
-Nhịp thật đến từ hai nguồn khác:
-
-- **Nút Khai Đàn** gọi thẳng `ensureSandboxWorker()` — bấm là VM dựng ngay, không phải đợi cron.
-- **Một dịch vụ cron ngoài** (cron-job.org…) gọi `/api/cron` mỗi phút kèm
-  `Authorization: Bearer $CRON_SECRET`. Không có nó thì sau khi lát sandbox đầu tiên kết
-  thúc, lượt ghé lò kế tiếp (~26 phút sau) sẽ không ai đến gõ cửa.
-
-Mỗi nhịp nhận đúng một job sandbox (một VM đang tính tiền là đủ; nhiều job thì lần lượt các
-nhịp sau).
-
-**2. Ảnh dựng sẵn (rất nên có).** Không có nó, mỗi lát mất hàng chục giây chỉ để cài
-`playwright-core` và tải Chromium — đủ ăn hết ngân sách của một lát ngắn. Tạo một lần:
+Tóm tắt: VM.Standard.A1.Flex (Ampere ARM, gói Always Free) + Ubuntu 24.04 aarch64, rồi:
 
 ```bash
-npx tsx scripts/createSandboxSnapshot.mts
+WEB_URL='https://<app>.vercel.app' WORKER_TOKEN='<token trên Vercel>' sudo -E bash setup.sh
 ```
 
-Rồi thêm `AGENT_BROWSER_SNAPSHOT_ID` vào Environment Variables trên Vercel. Từ đó VM khởi
-động dưới một giây.
-
-**Chụp xong thì KIỂM ẢNH**, đừng tin cái ID:
-
-```bash
-npx tsx scripts/verifySandboxSnapshot.mts
-```
-
-Nó dựng một VM từ ảnh, gửi sang đúng những tệp mà lượt chạy thật gửi, rồi bắt nó mở Chromium
-và chạy một bước của bộ thông dịch. Có mặt vì một ảnh hỏng **không kêu lúc chụp**: mọi lệnh
-cài đều thành công, ảnh chụp xong, ID trả về đẹp đẽ — rồi mỗi lát sandbox sau đó chết vì
-`Cannot find package 'playwright-core'` (cài `-g` thì Node không tra tới) hoặc
-`Executable doesn't exist` (CLI lệch phiên bản). Cả hai chỉ lộ ra trên production, trong một
-VM đã tự huỷ, sau khi người dùng bấm Khai Đàn.
-
-Tuỳ chọn: đặt `CRON_SECRET` để gọi `/api/cron` bằng tay lúc thử
-(`curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron`). Cron của Vercel tự
-được nhận diện qua user-agent nên không cần biến này để chạy thật.
-
-> Chạy sandbox từ **máy nhà** (lúc dev) cũng không cần token cá nhân: một lần
-> `vercel env pull` là `.env` có `VERCEL_OIDC_TOKEN`, và cả SDK lẫn script chụp ảnh đều tự
-> xác thực bằng nó. Token ấy hết hạn sau ~12 giờ — lúc đó pull lại, hoặc đặt hẳn
-> `VERCEL_TOKEN` + `VERCEL_TEAM_ID` + `VERCEL_PROJECT_ID` cho khỏi phải nhớ.
+Script tải **gói linh sứ** từ chính web (`/linh-su/goi-linh-su.tgz` — đóng lại ở mỗi deploy
+từ đúng engine đang chạy), dựng systemd service, và từ đó "cập nhật" nghĩa là chạy lại đúng
+một lệnh ấy.
 
 ### Bước 3 — Deploy
 
@@ -285,9 +235,10 @@ phải có đủ:
 | `DATABASE_URL` | ⚠️ đọc kỹ cảnh báo ngay dưới |
 | `AUTH_SECRET`, `ENCRYPTION_KEY`, `WORKER_TOKEN` | ba bí mật, mỗi cái 32 byte |
 | `WEB_URL` | `https://<app>.vercel.app`, kèm scheme |
-| `SANDBOX_ENABLED` | `1` nếu muốn dùng sandbox |
-| `AGENT_BROWSER_SNAPSHOT_ID` | từ Bước 2b |
 | `CRON_SECRET` | nếu dùng cron ngoài |
+
+(`SANDBOX_ENABLED` và `AGENT_BROWSER_SNAPSHOT_ID` là di sản của đường sandbox — từ v0.11
+không còn ai đọc, xoá được.)
 
 > **Bẫy `DATABASE_URL`.** Integration Neon của Vercel tự tạo biến này trỏ vào database **mặc
 > định** của project (`neondb`) — không phải database `jarvis` mà Jarvis dùng. Nếu để nguyên:
@@ -346,36 +297,28 @@ lỡ tay không được phép reset chìa khoá hệ thống đang chạy.
 
 Đăng nhập bằng tài khoản đó rồi **đổi mật khẩu ngay**.
 
-### Bước 5 — Chạy linh sứ máy nhà (bắt buộc nếu dùng Mê Cung)
+### Bước 5 — Linh sứ túc trực của từng đạo hữu (không bắt buộc)
 
-Trên máy chạy liên tục:
+Người dùng **không cần clone repo hay biết npm là gì**: mục **Linh Sứ** trên dashboard phát
+một lệnh cài duy nhất (Windows PowerShell hoặc Linux/macOS) mang sẵn linh phù của họ. Lệnh
+đó tải gói linh sứ, cài Node + Chromium nếu thiếu, đăng ký tự chạy cùng máy, và lên ca ngay
+— toàn bộ ở `public/linh-su/install.ps1` / `install.sh`.
 
-```bash
-git clone https://github.com/liquid8796/jarvis-hh3d-web.git
-cd jarvis-hh3d-web && npm install
+Ba điều đáng biết về cơ chế:
 
-WEB_URL=https://<app>.vercel.app \
-WORKER_TOKEN=<đúng chuỗi đã đặt trên Vercel> \
-WORKER_ID=linh-su-01 \
-npm run worker
-```
+- **Linh phù chỉ hiện một lần** lúc phát — database giữ SHA-256, không giữ bản rõ. Quên thì
+  phát lại (cái cũ tự hết hiệu lực).
+- Linh sứ cài kiểu này **chỉ nhận job của chủ linh phù** — điều kiện nằm ngay trong câu SQL
+  claim, không phải phép lịch sự.
+- Gói cài (`/linh-su/goi-linh-su.tgz`) được `scripts/buildWorkerBundle.mjs` đóng ở mỗi
+  deploy từ đúng engine đang chạy — không tồn tại "bản dành cho người cài" nào để lệch.
 
-Muốn chạy nhiều lượt song song thì mở thêm tiến trình với `WORKER_ID` khác — việc giành job
-đã được Postgres phân xử bằng một câu UPDATE nguyên tử, không bao giờ có hai worker ôm cùng
-một job.
-
-Cho nó sống dai qua reboot: `pm2 start scripts/worker.mjs --name jarvis-worker`, hoặc một
-systemd unit, hoặc Docker restart-policy.
-
-Linh sứ máy nhà cần một bản Chromium — cài một lần:
+Dev muốn chạy worker thô từ repo thì vẫn được:
 
 ```bash
-npx playwright@1.62.1 install chromium
+WEB_URL=https://<app>.vercel.app WORKER_TOKEN=<token> npm run worker
+npx playwright@1.62.1 install chromium   # một lần; PHẢI đúng phiên bản của playwright-core
 ```
-
-> Phải ĐÚNG phiên bản ấy. `playwright-core` đi tìm một revision Chromium cụ thể, và một CLI
-> lệch phiên bản sẽ đặt sẵn revision khác — lúc chạy báo "Executable doesn't exist", một câu
-> chẳng nói gì về nguyên nhân.
 
 ---
 
@@ -411,11 +354,11 @@ pm2 save && pm2 startup
 Nhược điểm duy nhất: máy tắt là automation dừng. Với một công cụ farm game cá nhân thì đó
 hiếm khi là vấn đề thật.
 
-### 2. Oracle Cloud Free Tier — máy chủ thật, miễn phí vĩnh viễn
+### 2. Oracle Cloud Free Tier — máy chủ thật, miễn phí vĩnh viễn (đường chính thức)
 
 Rộng rãi nhất trong các gói free: máy ảo ARM Ampere tới **4 vCPU / 24 GB RAM**, always-free
-(không phải trial). Thừa sức nuôi Chromium. Đây là lựa chọn tốt nhất nếu bạn muốn linh sứ
-chạy 24/7 mà không phụ thuộc máy nhà.
+(không phải trial). Thừa sức nuôi Chromium. Đây chính là nơi linh sứ tông môn đang sống —
+kit dựng hoàn chỉnh nằm ở [deploy/oracle/](deploy/oracle/README.md).
 
 Lưu ý thực tế: đăng ký cần thẻ (không bị trừ tiền), và khu vực nào đông thì có lúc báo hết
 capacity ARM — thử lại vào giờ khác hoặc đổi region.
@@ -444,17 +387,17 @@ khoảng trống giữa các phiên và cron của Actions hay bị trễ vài p
 > Hạn mức của các nhà cung cấp thay đổi liên tục — hãy kiểm tra lại trang giá trước khi
 > chọn, đừng tin con số trong tài liệu này là vĩnh viễn.
 
-### Cron miễn phí từ bên ngoài (nếu vẫn muốn dùng sandbox)
+### Cron miễn phí từ bên ngoài (tuỳ chọn, chỉ để vệ sinh)
 
-Nếu bạn thích đường sandbox nhưng không lên Pro: đặt `CRON_SECRET` trên Vercel, rồi dùng một
-dịch vụ cron-as-a-service miễn phí (cron-job.org, EasyCron…) gọi mỗi phút:
+`/api/cron` giờ chỉ quét dọn (job mồ côi, tin đàm đạo quá hạn) và việc đó đã chạy tiện-đường
+mỗi lần có người mở dashboard. Muốn lưới an toàn dày hơn nhịp 1 lần/ngày của Vercel Hobby:
+đặt `CRON_SECRET` rồi dùng một dịch vụ cron miễn phí (cron-job.org, EasyCron…) gọi
+mỗi 5–15 phút:
 
 ```
 GET https://<app>.vercel.app/api/cron
 Authorization: Bearer <CRON_SECRET>
 ```
-
-Rồi bật `SANDBOX_ENABLED=1`. Lúc đó chính sách runner mới giao job cho sandbox.
 
 ## 4. Vận hành
 
@@ -481,7 +424,7 @@ File SQL sinh ra **được commit** — lịch sử schema nằm trong git, kh�
 
 ## 6. Lịch sử phát hành
 
-Bản hiện tại: **0.10.0**.
+Bản hiện tại: **0.11.0**.
 
 Lịch sử nằm ở [CHANGELOG.md](CHANGELOG.md), tách riêng khỏi file này — hai tài liệu trả lời
 hai câu hỏi khác nhau: README nói *hệ thống chạy thế nào*, changelog nói *vì sao nó thành ra

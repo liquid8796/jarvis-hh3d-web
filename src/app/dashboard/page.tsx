@@ -2,8 +2,10 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { requireActiveUser } from "@/lib/auth/guards";
 import { getEditableConfig } from "@/lib/services/configs";
 import { getActiveJob } from "@/lib/services/jobs";
+import { hasWorkerToken } from "@/lib/services/workers";
 import { ConfigForm } from "./ConfigForm";
 import { ControlPanel } from "./ControlPanel";
+import { LinhSuPanel } from "./LinhSuPanel";
 
 export const metadata = { title: "Linh Đài" };
 
@@ -13,9 +15,10 @@ export const metadata = { title: "Linh Đài" };
  */
 export default async function DashboardPage() {
   const user = await requireActiveUser();
-  const [config, activeJob] = await Promise.all([
+  const [config, activeJob, tokenIssued] = await Promise.all([
     getEditableConfig(user.id),
     getActiveJob(user.id),
+    hasWorkerToken(user.id),
   ]);
 
   return (
@@ -32,7 +35,10 @@ export default async function DashboardPage() {
 
         <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
           <ConfigForm config={config} />
-          <ControlPanel initiallyRunning={activeJob !== null} />
+          <div className="flex flex-col gap-6">
+            <ControlPanel initiallyRunning={activeJob !== null} />
+            <LinhSuPanel hasToken={tokenIssued} />
+          </div>
         </div>
       </main>
     </>

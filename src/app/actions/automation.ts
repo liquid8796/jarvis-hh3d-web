@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireActiveUser } from "@/lib/auth/guards";
 import { clearCookie, configSchema, saveConfig } from "@/lib/services/configs";
-import { addEvent, requestStop, startJob } from "@/lib/services/jobs";
-import { ensureSandboxWorker } from "@/app/api/cron/route";
+import { requestStop, startJob } from "@/lib/services/jobs";
 
 /**
  * Automation server actions — every one re-derives the caller from the session and
@@ -74,16 +73,6 @@ export async function startAction(): Promise<ActionResult> {
 
   if (!result.ok) {
     return { ok: false, message: result.error };
-  }
-
-  // Thả linh sứ sandbox NGAY, không đợi nhịp cron kế tiếp — trên gói Hobby nhịp đó là mỗi
-  // ngày một lần, nên nếu chỉ trông vào cron thì bấm nút xong phải chờ tới hôm sau. Job
-  // `local` thì bỏ qua: worker máy nhà tự hỏi việc mỗi 5 giây.
-  if (result.job.runner === "sandbox") {
-    const launch = await ensureSandboxWorker();
-    if (!launch.launched) {
-      await addEvent(result.job.id, "warning", launch.reason);
-    }
   }
 
   return { ok: true, message: "Đàn pháp đã lập — linh sứ sẽ tiếp nhận trong giây lát." };

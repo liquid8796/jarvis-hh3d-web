@@ -191,33 +191,25 @@ async function main() {
     freePlan.map((q) => q.name).join(", "),
   );
 
-  console.log("\nChính sách chọn linh sứ");
+  console.log("\nLinh phù (worker token)");
 
-  const { decideRunner, sandboxAllowedFor } = await import("../src/lib/runners/policy.ts");
-  const onlyLuyenDan = {
-    ...cfg,
-    quests: { ...cfg.quests, meCung: { ...cfg.quests.meCung, enabled: false } },
-  };
+  // Một chỗ băm duy nhất — chỗ phát (issueWorkerToken) và chỗ soát (authorizeWorker) đều
+  // gọi hàm này; hai bên mà tự băm riêng thì lệch nhau là khoá mọi linh sứ ngoài cửa.
+  const { hashWorkerToken } = await import("../src/lib/auth/worker.ts");
+  check(
+    "hash ổn định — phát và soát gặp nhau",
+    hashWorkerToken("lp_abc") === hashWorkerToken("lp_abc"),
+  );
+  check(
+    "token khác → hash khác",
+    hashWorkerToken("lp_abc") !== hashWorkerToken("lp_abd"),
+  );
+  check(
+    "hash là sha-256 hex (64 ký tự) — khớp cột worker_token_hash",
+    /^[0-9a-f]{64}$/.test(hashWorkerToken("lp_abc")),
+    hashWorkerToken("lp_abc").slice(0, 12),
+  );
 
-  check("tông chủ được mở sandbox", sandboxAllowedFor({ role: "admin" }) === true);
-  check("đạo hữu thường thì chưa", sandboxAllowedFor({ role: "member" }) === false);
-
-  // Ràng buộc phải sống Ở ĐÂY chứ không chỉ ở form: một document đã nằm sẵn trong database
-  // từ hồi `sandbox` còn là mặc định vẫn mang đúng chữ đó, và nó không đi qua form lần nào.
-  const denied = decideRunner({ ...onlyLuyenDan, runner: "sandbox" }, { sandboxAllowed: false });
-  check("chưa được mở → ép về máy nhà", denied.runner === "local", denied.runner);
-  // Lời giải thích giờ nói giọng trong-thế-giới, không nói giọng hạ tầng.
-  check("và nói rõ vì sao", denied.reason.includes("chưa xuất quan"), denied.reason);
-
-  process.env.SANDBOX_ENABLED = "1";
-  const allowed = decideRunner({ ...onlyLuyenDan, runner: "sandbox" }, { sandboxAllowed: true });
-  check("được mở + chỉ Luyện Đan → sandbox", allowed.runner === "sandbox", allowed.reason);
-
-  // Quyền không được phép lấn át hình dạng nhiệm vụ: Mê Cung vẫn phải là máy nhà, kể cả với
-  // tông chủ, vì mất VM giữa trận là bốn người khác mất lượt oan.
-  const meCungAdmin = decideRunner({ ...cfg, runner: "sandbox" }, { sandboxAllowed: true });
-  check("Mê Cung vẫn về máy nhà kể cả với tông chủ", meCungAdmin.runner === "local", meCungAdmin.reason);
-  delete process.env.SANDBOX_ENABLED;
   check(
     "quest không được bật thì vẫn tắt",
     profile.quests.filter((q) => q.enabled).length === 2,

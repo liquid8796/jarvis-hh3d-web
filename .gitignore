@@ -16,3 +16,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Gói linh sứ — sinh ra ở prebuild từ scripts/buildWorkerBundle.mjs, không commit
+/public/linh-su/goi-linh-su.tgz

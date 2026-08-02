@@ -100,23 +100,6 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
         </p>
       </div>
 
-      <div className="mb-6">
-        <label className="label" htmlFor="runner">
-          Nơi vận hành đàn pháp
-        </label>
-        {/* KHOÁ toàn phần theo yêu cầu: chỉ một hình thức vận hành đang mở. `disabled` ở đây
-            là trang trí — action lưu tự ép giá trị, không tin form. */}
-        <select id="runner" name="runner" className="input" defaultValue="local" disabled>
-          <option value="local">Linh sứ túc trực (máy nhà)</option>
-          <option value="sandbox">Linh sứ viễn du — chưa xuất quan</option>
-        </select>
-        <p className="mt-1 text-xs text-[var(--color-mist)]">
-          Mỗi đàn pháp do một linh sứ túc trực ngày đêm đảm nhiệm, đạo hữu không cần bận tâm
-          hậu trường. Các hình thức vận hành khác đang được tôi luyện — khi nào xuất quan sẽ
-          mở cho chọn tại đây.
-        </p>
-      </div>
-
       {/* ------------------------------------------------------- Hai tab nhiệm vụ */}
       <div className="mb-4 flex gap-1 rounded-xl border border-[var(--color-ink-600)]/60 p-1">
         {(

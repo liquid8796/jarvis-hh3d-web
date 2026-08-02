@@ -12,7 +12,11 @@
  * 20 giây (và nghe xem người dùng có bấm Thu Đàn không) → báo kết thúc.
  *
  * Phần điều khiển trình duyệt là engine dùng chung ở `src/lib/quest-engine` — cùng bộ thông
- * dịch và cùng hồ sơ quest schema 41 với bản desktop, nên tri thức về site chỉ có một bản gốc.
+ * dịch và cùng hồ sơ quest với bản desktop, nên tri thức về site chỉ có một bản gốc.
+ *
+ * Token quyết định VAI TRÒ, server tự phân xử — worker không cần khai gì:
+ *   • WORKER_TOKEN của deployment (linh sứ tông môn) → nhận job của mọi thành viên.
+ *   • Linh phù cá nhân phát ở mục Linh Sứ           → chỉ nhận job của chính chủ.
  *
  *   WEB_URL=https://<app>.vercel.app WORKER_TOKEN=... node scripts/worker.mjs
  */
@@ -23,22 +27,10 @@ const WEB_URL = (process.env.WEB_URL ?? "http://localhost:3000").replace(/\/$/, 
 const TOKEN = process.env.WORKER_TOKEN;
 const WORKER_ID = process.env.WORKER_ID ?? `linh-su-${process.pid}`;
 const POLL_MS = Number(process.env.WORKER_POLL_MS ?? 5000);
-/**
- * Loại job worker này chịu nhận, ưu tiên theo thứ tự liệt kê.
- *
- * Mặc định nhận CẢ HAI: trên gói Hobby của Vercel, cron chỉ chạy được 1 lần/ngày nên
- * chẳng có ai lái job `sandbox` cả — nếu worker chỉ nhận `local` thì mọi job sandbox sẽ
- * nằm chờ tới lúc bị reaper kết liễu. Một máy đang trực thì cứ nhận hết, hơn là để job mục
- * trong hàng. Muốn tách vai trò thì đặt WORKER_RUNNERS=local.
- */
-const RUNNERS = (process.env.WORKER_RUNNERS ?? "local,sandbox")
-  .split(",")
-  .map((r) => r.trim())
-  .filter((r) => r === "local" || r === "sandbox");
 const HEARTBEAT_MS = 20_000;
 
 if (!TOKEN || TOKEN === "change-me") {
-  console.error("WORKER_TOKEN chưa đặt — phải trùng với biến cùng tên trên Vercel.");
+  console.error("WORKER_TOKEN chưa đặt — dùng linh phù phát ở mục Linh Sứ, hoặc token tông môn.");
   process.exit(1);
 }
 
@@ -127,19 +119,13 @@ async function handle(job) {
   }
 }
 
-console.log(`Linh sứ「${WORKER_ID}」đang canh ${WEB_URL} — nhận job: ${RUNNERS.join(", ")}`);
+console.log(`Linh sứ「${WORKER_ID}」đang canh ${WEB_URL}`);
 
 // Một job một lúc, tuần tự — một máy chỉ nuôi nổi một browser cho ra hồn. Muốn chạy song
 // song thì mở thêm tiến trình với WORKER_ID khác; việc giành job đã được Postgres phân xử.
 for (;;) {
   try {
-    // Hỏi lần lượt từng loại; loại đầu có việc là làm ngay.
-    let job = null;
-    for (const runner of RUNNERS) {
-      ({ job } = await call("claim", { workerId: WORKER_ID, runner }));
-      if (job) break;
-    }
-
+    const { job } = await call("claim", { workerId: WORKER_ID });
     if (job) {
       await handle(job);
       continue;

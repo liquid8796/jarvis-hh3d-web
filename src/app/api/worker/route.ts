@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authorizeWorker } from "@/lib/auth/worker";
-import { addEvent, claimNextJob, completeJob, heartbeat } from "@/lib/services/jobs";
+import { addEvent, claimNextJob, completeJob, heartbeat, jobBelongsTo } from "@/lib/services/jobs";
+import { recordWorkerSeen } from "@/lib/services/workers";
 import { configSchema } from "@/lib/services/configs";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 
@@ -13,6 +14,10 @@ import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
  * (thêm một trường vào heartbeat là đụng cả worker lẫn server). Một file giữ giao thức nằm
  * gọn trong một màn hình, và worker chỉ cần biết một URL.
  *
+ * Xác thực trả về SCOPE chứ không phải có/không: linh sứ tông môn (WORKER_TOKEN) đụng
+ * được mọi job, linh sứ riêng (linh phù) chỉ đụng được job của chủ mình. Claim đã lọc
+ * trong SQL; ba op còn lại đi qua `jobBelongsTo` — hai lớp, lớp nào thủng vẫn còn lớp kia.
+ *
  * Bốn thao tác dựng nên vòng đời một lượt chạy:
  *   claim     — xin việc; trả về job kèm config snapshot, hoặc null nếu hàng chờ trống.
  *   heartbeat — "tôi còn sống"; trả về status HIỆN TẠI để worker biết người dùng đã bấm thu đàn.
@@ -21,11 +26,12 @@ import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
  */
 
 const bodySchema = z.discriminatedUnion("op", [
-  // Worker máy nhà mặc định chỉ nhận job `local`; sandbox có đường riêng qua /api/cron.
+  // `runner` cũ của worker đời trước vẫn được CHẤP NHẬN nhưng bị bỏ qua — một linh sứ chưa
+  // cập nhật không nên vỡ chỉ vì server đi trước nó một bản.
   z.object({
     op: z.literal("claim"),
     workerId: z.string().min(1).max(64),
-    runner: z.enum(["sandbox", "local"]).default("local"),
+    runner: z.string().optional(),
   }),
   z.object({ op: z.literal("heartbeat"), jobId: z.string().uuid() }),
   z.object({
@@ -43,7 +49,8 @@ const bodySchema = z.discriminatedUnion("op", [
 ]);
 
 export async function POST(request: Request) {
-  if (!authorizeWorker(request)) {
+  const scope = await authorizeWorker(request);
+  if (!scope) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -66,14 +73,18 @@ export async function POST(request: Request) {
 
   switch (body.op) {
     case "claim": {
-      const job = await claimNextJob(body.workerId, body.runner);
+      // Điểm danh ở claim — op dày nhịp nhất, và là op duy nhất một linh sứ NHÀN RỖI vẫn
+      // gọi đều — nên "đang trực" nghĩa là tiến trình còn sống, không phải nó đang bận.
+      await recordWorkerSeen(body.workerId, scope);
+
+      const job = await claimNextJob(body.workerId, scope);
       if (!job) {
         return NextResponse.json({ job: null });
       }
 
       // ĐÂY là điểm duy nhất cookie rời khỏi phong bì. Nó xảy ra sau khi linh sứ đã chứng
-      // minh danh tính bằng WORKER_TOKEN, và đi tiếp trên HTTPS tới một máy sắp dùng chính
-      // cookie đó để đăng nhập — không sớm hơn một dòng nào.
+      // minh danh tính (token tông môn hoặc linh phù của đúng chủ job), và đi tiếp trên
+      // HTTPS tới một máy sắp dùng chính cookie đó để đăng nhập — không sớm hơn một dòng nào.
       const snapshot = configSchema.safeParse(job.configSnapshot);
       const config = snapshot.success ? snapshot.data : configSchema.parse({});
       const cookie =
@@ -87,6 +98,10 @@ export async function POST(request: Request) {
     }
 
     case "heartbeat": {
+      if (!(await jobBelongsTo(body.jobId, scope))) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+
       const status = await heartbeat(body.jobId);
       if (!status) {
         return NextResponse.json({ error: "unknown job" }, { status: 404 });
@@ -97,11 +112,19 @@ export async function POST(request: Request) {
     }
 
     case "event": {
+      if (!(await jobBelongsTo(body.jobId, scope))) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+
       await addEvent(body.jobId, body.level, body.message);
       return NextResponse.json({ ok: true });
     }
 
     case "complete": {
+      if (!(await jobBelongsTo(body.jobId, scope))) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+
       await completeJob(body.jobId, body.outcome, body.message);
       return NextResponse.json({ ok: true });
     }

@@ -1,7 +1,7 @@
 # Hướng dẫn dùng Auto HH3D
 
 Auto này cày hộ bạn ở hoathinh3d: Mê Cung, Luyện Đan Đường, và các nhiệm vụ ngày.
-Bạn bấm nút một lần, nó chạy tiếp kể cả khi bạn tắt máy.
+Bấm nút một lần rồi tắt trình duyệt đi làm việc khác, auto vẫn chạy tiếp.
 
 Web: <https://auto-hh3d.vercel.app>
 
@@ -70,7 +70,11 @@ Chọn xong nhớ bấm **Khắc Ngọc Giản**.
 
 ### Bước 3 — Khai Đàn
 
-Bấm **Khai Đàn**. Xong. Bạn có thể tắt trình duyệt, tắt máy, đi ngủ.
+Bấm **Khai Đàn**. Xong. Tắt trình duyệt đi ngủ cũng được.
+
+Nhưng nhớ một điều: **tắt máy thì tuỳ ai đang chạy hộ bạn.** Linh sứ tông môn nằm ở máy
+khác nên vẫn chạy tiếp; còn linh sứ cài trên máy bạn thì tắt máy là nghỉ theo. Xem mục 3
+để biết mình đang thuộc trường hợp nào.
 
 Mở lại trang lúc nào cũng thấy auto đang làm tới đâu, trong khung **Nhật ký tu luyện**.
 Muốn dừng thì bấm **Thu Đàn** — auto dừng ở điểm an toàn gần nhất, không cắt ngang trận.
@@ -129,7 +133,11 @@ chạy không bị ảnh hưởng.
 ## 5. Hỏi nhanh đáp gọn
 
 **Auto có cần mở trình duyệt của tôi không?**
-Không. Bấm Khai Đàn xong bạn tắt hết cũng được.
+Không. Bấm Khai Đàn xong là tắt trình duyệt được ngay.
+
+**Thế tắt máy thì sao?**
+Nếu linh sứ tông môn chạy hộ bạn thì không sao, nó nằm ở máy khác. Nếu bạn tự cài linh sứ
+trên máy mình thì tắt máy là auto dừng, bật lại là nó tự trực tiếp.
 
 **Tôi đổi sang trình duyệt khác thì sao?**
 Chỉ cần đăng nhập lại vào web. Linh sứ không liên quan gì tới trình duyệt bạn dùng.

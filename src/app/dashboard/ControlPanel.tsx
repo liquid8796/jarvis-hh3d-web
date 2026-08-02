@@ -157,9 +157,12 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
         </p>
       )}
 
+      {/* Nói cho ĐỦ, không chỉ nói phần hay ho. "Tắt trình duyệt vẫn chạy" là thật, nhưng
+          bỏ lửng ở đó thì người ta suy ra "tắt máy chắc cũng thế" — sai, nếu linh sứ đang
+          nằm trên chính máy họ. Một câu hứa đúng một nửa còn tệ hơn không hứa. */}
       <p className="mb-2 text-xs text-[var(--color-mist)]">
-        Bấm Khai Đàn xong bạn cứ tắt trình duyệt. Auto vẫn chạy, mở lại trang là thấy đang
-        tới đâu.
+        Tắt trình duyệt thoải mái, auto vẫn chạy tiếp. Còn tắt máy thì tuỳ ai đang chạy: linh
+        sứ tông môn không sao, linh sứ nằm trên máy bạn sẽ dừng theo.
         {job?.workerId && (
           <>
             {" "}

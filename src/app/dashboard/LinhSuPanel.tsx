@@ -180,7 +180,12 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
     presence != null && !presence.sectOnline && !presence.mine.some((w) => w.online);
 
   return (
-    <section className="rise-in min-w-0 rounded-2xl border border-[var(--color-ink-600)]/60 bg-[var(--color-ink-800)]/40 p-5">
+    // Dùng chung `.card` với Ngọc Giản và Lư Khai Đàn, chứ không tự pha nền riêng. Bản đầu
+    // để `bg-ink-800/40` — nền mờ 40% — nên ảnh nền trang xuyên thẳng qua và chữ xám nhạt
+    // biến mất trên những mảng sáng của ảnh. Chỉnh màu chữ theo nền thì không làm nổi bằng
+    // CSS (không có cách nào đọc được cái gì đang nằm dưới); cho thẻ một cái nền đủ đục mới
+    // là câu trả lời đúng — và `.card` đã sẵn có nền 86–92% kèm blur.
+    <section className="card card-hairline rise-in min-w-0 p-5">
       <h2 className="h-display text-lg font-bold text-gilded">Linh Sứ</h2>
       <p className="mt-1 text-xs text-[var(--color-mist)]">
         Linh sứ là người chạy auto giúp bạn. Phải có ít nhất một linh sứ đang trực thì bấm
@@ -245,7 +250,8 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
           Cho auto chạy trên máy của bạn
         </h3>
         <p className="mt-1 text-xs text-[var(--color-mist)]">
-          Máy bật là auto chạy. Bộ cài mang sẵn mọi thứ, bạn không phải cài thêm phần mềm nào.
+          Máy bật là auto chạy, <span className="text-[var(--color-parchment)]">tắt máy là auto
+          nghỉ</span>. Bộ cài mang sẵn mọi thứ, bạn không phải cài thêm phần mềm nào.
         </p>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">

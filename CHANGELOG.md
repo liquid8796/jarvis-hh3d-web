@@ -11,6 +11,22 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.15.1 — chữ chìm vào ảnh nền, và một lời hứa đúng nửa vời
+
+- **Chữ trong mục Linh Sứ không đọc nổi.** Panel ấy tự pha nền `bg-ink-800/40` thay vì dùng
+  `.card` như hai thẻ kia, nên ảnh nền trang xuyên thẳng qua. Đo được: tương phản **1.27:1**
+  — tức gần như vô hình trên những mảng sáng. Sửa bằng cách cho nó dùng chung `.card`.
+  Chỉnh màu chữ theo nền thì CSS không làm nổi (không có cách nào biết cái gì đang nằm
+  dưới); cho thẻ một cái nền đủ đục mới là câu trả lời đúng.
+- Rồi đo tiếp thì `.card` cũ (0.86) cũng chỉ đạt 4.23:1 — dưới chuẩn AA cho chữ nhỏ. Nâng
+  lên 0.93/0.96 **và** làm `--color-mist` sáng thêm một nấc (`#8f89b3` → `#9b96be`). Kết
+  quả **4.96:1**, tính theo trường hợp tệ nhất là nền trắng tinh nằm dưới. Chọn sửa cả màu
+  chữ thay vì chỉ làm thẻ đục thêm, vì nó cứu cả những dòng nằm NGOÀI thẻ.
+- **"Tắt trình duyệt vẫn chạy" là lời hứa đúng một nửa.** Thật, nhưng bỏ lửng ở đó thì
+  người ta suy ra "tắt máy chắc cũng thế" — sai, nếu linh sứ đang nằm trên chính máy họ.
+  Giờ nói đủ: tắt máy thì linh sứ tông môn không sao, linh sứ máy nhà dừng theo. Cùng một
+  đính chính ở mục Linh Sứ và trong HUONG-DAN.md (cả câu mở đầu lẫn mục hỏi đáp).
+
 ## 0.15.0 — chữ trên Linh Đài nói tiếng người, và có hướng dẫn cho người mới
 
 - **Viết lại toàn bộ chữ hướng dẫn trên Linh Đài.** Giữ nguyên tên riêng có hồn (Linh Đài,

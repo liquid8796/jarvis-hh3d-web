@@ -14,9 +14,12 @@ export async function SiteHeader() {
         <span className="h-display text-lg font-semibold text-gilded">Auto HH3D</span>
       </Link>
 
-      <nav className="flex items-center gap-3 text-sm">
+      <nav className="flex flex-wrap items-center justify-end gap-3 text-sm">
         {user ? (
           <>
+            <Link href="/profile" className="btn btn-ghost">
+              Hồ Sơ
+            </Link>
             {user.role === "admin" && (
               <Link href="/admin" className="btn btn-ghost">
                 Tông Môn

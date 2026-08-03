@@ -46,6 +46,20 @@ export function CreateUserPanel() {
           <input id="new-displayName" name="displayName" className="input" required />
         </div>
         <div>
+          <label className="label" htmlFor="new-email">
+            Email
+          </label>
+          <input
+            id="new-email"
+            name="email"
+            type="email"
+            className="input"
+            autoComplete="email"
+            required
+            maxLength={254}
+          />
+        </div>
+        <div>
           <label className="label" htmlFor="new-password">
             Mật khẩu
           </label>

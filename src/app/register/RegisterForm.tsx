@@ -23,6 +23,21 @@ export function RegisterForm() {
       </div>
 
       <div>
+        <label className="label" htmlFor="email">
+          Email
+        </label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          className="input"
+          autoComplete="email"
+          required
+          maxLength={254}
+        />
+      </div>
+
+      <div>
         <label className="label" htmlFor="password">
           Mật khẩu
         </label>

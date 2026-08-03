@@ -5,6 +5,12 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/guards";
 import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
 import { adminCreate, adminDelete, adminUpdate, setStatus } from "@/lib/services/users";
+import {
+  displayNameSchema,
+  emailSchema,
+  passwordSchema,
+  usernameSchema,
+} from "@/lib/validation/user";
 
 /**
  * Tông môn actions. Mỗi hàm mở đầu bằng `requireAdmin()` — không có ngoại lệ, kể cả những
@@ -17,21 +23,6 @@ export type AdminResult = { ok: boolean; message: string };
 
 const statusSchema = z.enum(["pending", "active", "disabled"]);
 const roleSchema = z.enum(["user", "admin"]);
-
-const usernameSchema = z
-  .string()
-  .trim()
-  .min(3, "Đạo hiệu cần ít nhất 3 ký tự.")
-  .max(32, "Đạo hiệu tối đa 32 ký tự.")
-  .regex(/^[a-zA-Z0-9_.-]+$/, "Đạo hiệu chỉ gồm chữ, số, gạch dưới, chấm, gạch ngang.");
-
-const displayNameSchema = z
-  .string()
-  .trim()
-  .min(2, "Danh xưng cần 2–64 ký tự.")
-  .max(64, "Danh xưng cần 2–64 ký tự.");
-
-const passwordSchema = z.string().min(8, "Mật khẩu cần ít nhất 8 ký tự.").max(128, "Mật khẩu quá dài.");
 
 /** Duyệt / tạm khoá / trả về hàng chờ. */
 export async function setStatusAction(userId: string, status: string): Promise<AdminResult> {
@@ -60,6 +51,7 @@ export async function createUserAction(_prev: AdminResult | null, formData: Form
     .object({
       username: usernameSchema,
       displayName: displayNameSchema,
+      email: emailSchema,
       password: passwordSchema,
       role: roleSchema,
       status: statusSchema,
@@ -67,6 +59,7 @@ export async function createUserAction(_prev: AdminResult | null, formData: Form
     .safeParse({
       username: formData.get("username"),
       displayName: formData.get("displayName"),
+      email: formData.get("email"),
       password: formData.get("password"),
       role: formData.get("role"),
       status: formData.get("status"),
@@ -97,12 +90,14 @@ export async function updateUserAction(_prev: AdminResult | null, formData: Form
   const parsed = z
     .object({
       displayName: displayNameSchema,
+      email: emailSchema,
       role: roleSchema,
       status: statusSchema,
       password: z.union([passwordSchema, z.literal("")]),
     })
     .safeParse({
       displayName: formData.get("displayName"),
+      email: formData.get("email"),
       role: formData.get("role"),
       status: formData.get("status"),
       password,
@@ -116,12 +111,17 @@ export async function updateUserAction(_prev: AdminResult | null, formData: Form
     return { ok: false, message: "Không thể tự hạ quyền hoặc tự khoá chính mình." };
   }
 
-  await adminUpdate(userId, {
+  const result = await adminUpdate(userId, {
     displayName: parsed.data.displayName,
+    email: parsed.data.email,
     role: parsed.data.role,
     status: parsed.data.status,
     password: parsed.data.password || undefined,
   });
+
+  if (!result.ok) {
+    return { ok: false, message: result.error };
+  }
 
   revalidatePath("/admin");
   return { ok: true, message: "Đã cập nhật đạo hữu." };

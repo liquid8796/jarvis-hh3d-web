@@ -331,7 +331,7 @@ export async function runCycle(deps) {
     if (!isVip) {
       await say(
         leftOut > 0
-          ? `Tài khoản thường — để yên ${leftOut} nhiệm vụ VIP; flow nhiệm vụ thường sẽ có sau.`
+          ? `Tài khoản thường — để yên ${leftOut} flow VIP; dùng các flow riêng của tab Nhiệm vụ Thường.`
           : "Tài khoản thường.",
       );
     }
@@ -339,7 +339,7 @@ export async function runCycle(deps) {
     if (quests.length === 0) {
       return scheduledCycleResult(
         "done",
-        "Tài khoản thường mà mọi nhiệm vụ đã bật đều là hàng VIP — vòng này chưa có gì để chạy.",
+        "Không có nhiệm vụ nào được bật cho hạng tài khoản này — vòng này chưa có gì để chạy.",
       );
     }
 

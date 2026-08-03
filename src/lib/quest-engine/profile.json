@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 42,
+  "schemaVersion": 43,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -765,6 +765,370 @@
       "requiresVip": true,
       "order": 10,
       "notes": "\u0110i\u1EC3m danh m\u1ED7i ng\u00E0y nh\u1EADn th\u01B0\u1EDFng v\u00E0 gi\u1EEF chu\u1ED7i ng\u00E0y (streak)."
+    },
+    {
+      "id": "diem-danh-thuong",
+      "name": "\u0110i\u1EC3m Danh",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "\u0111i\u1EC3m danh",
+        "diem danh"
+      ],
+      "pagePath": "/diem-danh",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/diem-danh",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#checkInButton",
+          "timeoutMs": 25000,
+          "note": "n\u00FAt t\u1ED3n t\u1EA1i \u1EDF c\u1EA3 hai tr\u1EA1ng th\u00E1i \u2014 ch\u1EC9 ch\u1EEF tr\u00EAn n\u00FAt kh\u00E1c nhau"
+        },
+        {
+          "action": "waitMilliseconds",
+          "timeoutMs": 1500,
+          "note": "ch\u1EDD tr\u1EA1ng th\u00E1i th\u1EADt t\u1EEB server \u00E1p v\u00E0o n\u00FAt \u2014 trang v\u1EBD khung tr\u01B0\u1EDBc, ch\u1EEF \u0111\u1EBFn sau"
+        },
+        {
+          "action": "stopIf",
+          "text": "\u0111\u00E3 \u0111i\u1EC3m danh h\u00F4m nay",
+          "timeoutMs": 15000,
+          "note": "match NGUY\u00CAN C\u1EE4M \u0022\u0111\u00E3 \u0111i\u1EC3m danh\u0022 \u2014 so s\u00E1nh b\u1ECF d\u1EA5u n\u00EAn match m\u1ED7i ch\u1EEF \u0022\u0111\u00E3\u0022 l\u00E0 d\u00EDnh \u0022da\u0022 trong \u0022Danh\u0022 c\u1EE7a ng\u00E0y c\u00F2n m\u1EDBi",
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#checkInButton",
+            "text": "\u0111\u00E3 \u0111i\u1EC3m danh"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#checkInButton",
+          "timeoutMs": 15000,
+          "note": "POST {action: daily_check_in} t\u1EDBi /wp-json/hh3d/v1/action"
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 15000,
+          "note": "ch\u1EDD n\u00FAt \u0111\u1ED5i th\u00E0nh \u0022\u0110\u00E3 \u0110i\u1EC3m Danh\u0022 = site \u0111\u00E3 ghi nh\u1EADn; quest gi\u1EEF streak n\u00EAn tr\u01B0\u1EE3t ph\u1EA3i k\u00EAu to, kh\u00F4ng nh\u1EADn v\u01A1 l\u00E0 xong",
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#checkInButton",
+            "text": "\u0111\u00E3 \u0111i\u1EC3m danh"
+          }
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 14400,
+      "requiresVip": false,
+      "order": 10,
+      "notes": "\u0110i\u1EC3m danh m\u1ED7i ng\u00E0y nh\u1EADn th\u01B0\u1EDFng v\u00E0 gi\u1EEF chu\u1ED7i ng\u00E0y (streak)."
+    },
+    {
+      "id": "phuc-loi-duong-thuong",
+      "name": "Ph\u00FAc L\u1EE3i \u0110\u01B0\u1EDDng",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "ph\u00FAc l\u1EE3i \u0111\u01B0\u1EDDng",
+        "phuc loi duong"
+      ],
+      "pagePath": "/phuc-loi-duong",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/nhiem-vu-hang-ngay",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".nv-quest",
+          "timeoutMs": 25000,
+          "note": "ch\u1EDD hub render; .nv-quest t\u1ED3n t\u1EA1i c\u1EA3 khi quest \u0111\u00E3 xong"
+        },
+        {
+          "action": "stopIf",
+          "text": "h\u1EBFt 4 r\u01B0\u01A1ng h\u00F4m nay",
+          "timeoutMs": 15000,
+          "note": "h\u00E0ng quest xong m\u1EA5t n\u00FAt \u0022L\u00E0m Ngay\u0022 v\u00E0 mang class done \u2014 \u0111\u00FAng t\u00EDn hi\u1EC7u n\u00FAt-bi\u1EBFn-m\u1EA5t m\u00E0 c\u00E1c quest hub v\u1EABn d\u1EEBng theo",
+          "condition": {
+            "kind": "hidden",
+            "selector": "a.btn-go[onclick*=\u0027phuc-loi-duong\u0027]"
+          }
+        },
+        {
+          "action": "navigate",
+          "text": "/phuc-loi-duong",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#countdown-timer",
+          "timeoutMs": 25000
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 10000,
+          "note": "trang v\u1EBD khung tr\u01B0\u1EDBc khi state v\u1EC1 (b\u00E0i h\u1ECDc trang l\u00F2) \u2014 ch\u1EDD \u0111\u1ED3ng h\u1ED3 c\u00F3 ch\u1EEF th\u1EADt; 00:00 ngh\u0129a l\u00E0 m\u1EDF \u0111\u01B0\u1EE3c ngay",
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#countdown-timer",
+            "text": ":"
+          }
+        },
+        {
+          "action": "readCooldownSeconds",
+          "selector": "#countdown-timer",
+          "timeoutMs": 15000,
+          "note": "\u0111\u1ECDc tr\u01B0\u1EDBc: \u0111\u1EBFn gi\u1EEFa cooldown l\u00E0 chuy\u1EC7n th\u01B0\u1EDDng, v\u00E0 s\u1ED1 n\u00E0y bi\u1EBFn c\u00E1i d\u1EEBng th\u00E0nh \u0022\u0111ang ch\u1EDD, c\u00F2n N ph\u00FAt\u0022 thay v\u00EC im l\u1EB7ng"
+        },
+        {
+          "action": "stopIf",
+          "text": "\u0111ang ch\u1EDD r\u01B0\u01A1ng k\u1EBF (30 ph\u00FAt gi\u1EEFa hai l\u1EA7n m\u1EDF)",
+          "timeoutMs": 15000,
+          "note": "kh\u00E1c 00:00 l\u00E0 c\u00F2n \u0111\u1EBFm \u2014 d\u1EEBng k\u00E8m th\u1EDDi gian \u0111\u00E3 \u0111\u1ECDc \u1EDF b\u01B0\u1EDBc tr\u00EAn",
+          "condition": {
+            "kind": "textNotMatches",
+            "selector": "#countdown-timer",
+            "text": "00:00"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#chest-1 img",
+          "timeoutMs": 4000,
+          "note": "r\u01B0\u01A1ng c\u00F3 hi\u1EC7u \u1EE9ng glow/pulse n\u00EAn ForceClick; When ch\u1EB7n c\u1EA3 b\u1EADc thang l\u1EA1i ngay khi m\u1ED9t r\u01B0\u01A1ng \u0111\u00E3 nh\u1EADn (\u0111\u1ED3ng h\u1ED3 nh\u1EA3y 30:00)",
+          "optional": true,
+          "when": {
+            "kind": "textMatches",
+            "selector": "#countdown-timer",
+            "text": "00:00"
+          },
+          "forceClick": true
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 4000,
+          "note": "claim th\u1EADt l\u00E0m \u0111\u1ED3ng h\u1ED3 \u0111\u1ED5i trong ~1.6s; r\u01B0\u01A1ng \u0111\u00E3 m\u1EDF t\u1EEB tr\u01B0\u1EDBc th\u00EC kh\u00F4ng c\u00F3 ph\u1EA3n \u1EE9ng \u2014 ch\u1EDD 4s r\u1ED3i th\u1EED r\u01B0\u01A1ng k\u1EBF",
+          "optional": true,
+          "condition": {
+            "kind": "textNotMatches",
+            "selector": "#countdown-timer",
+            "text": "00:00"
+          },
+          "when": {
+            "kind": "textMatches",
+            "selector": "#countdown-timer",
+            "text": "00:00"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#chest-2 img",
+          "timeoutMs": 4000,
+          "optional": true,
+          "when": {
+            "kind": "textMatches",
+            "selector": "#countdown-timer",
+            "text": "00:00"
+          },
+          "forceClick": true
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 4000,
+          "optional": true,
+          "condition": {
+            "kind": "textNotMatches",
+            "selector": "#countdown-timer",
+            "text": "00:00"
+          },
+          "when": {
+            "kind": "textMatches",
+            "selector": "#countdown-timer",
+            "text": "00:00"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#chest-3 img",
+          "timeoutMs": 4000,
+          "optional": true,
+          "when": {
+            "kind": "textMatches",
+            "selector": "#countdown-timer",
+            "text": "00:00"
+          },
+          "forceClick": true
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 4000,
+          "optional": true,
+          "condition": {
+            "kind": "textNotMatches",
+            "selector": "#countdown-timer",
+            "text": "00:00"
+          },
+          "when": {
+            "kind": "textMatches",
+            "selector": "#countdown-timer",
+            "text": "00:00"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#chest-4 img",
+          "timeoutMs": 4000,
+          "optional": true,
+          "when": {
+            "kind": "textMatches",
+            "selector": "#countdown-timer",
+            "text": "00:00"
+          },
+          "forceClick": true
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 4000,
+          "optional": true,
+          "condition": {
+            "kind": "textNotMatches",
+            "selector": "#countdown-timer",
+            "text": "00:00"
+          },
+          "when": {
+            "kind": "textMatches",
+            "selector": "#countdown-timer",
+            "text": "00:00"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 8000,
+          "note": "hub n\u00F3i ch\u01B0a xong \u002B \u0111\u1ED3ng h\u1ED3 n\u00F3i s\u1EB5n s\u00E0ng m\u00E0 kh\u00F4ng r\u01B0\u01A1ng n\u00E0o nh\u1EADn \u2192 trang \u0111\u00E3 \u0111\u1ED5i, ph\u1EA3i b\u00E1o to. (N\u1EBFu site \u0111\u1ED7 \u0111\u1ED3ng h\u1ED3 \u1EDF 00:00 sau r\u01B0\u01A1ng th\u1EE9 4 th\u00EC \u0111\u00E2y l\u00E0 m\u1ED9t l\u1EA7n b\u00E1o nh\u1EA7m m\u1ED7i ng\u00E0y \u2014 l\u1EA7n gh\u00E9 sau hub s\u1EBD tr\u1EA3 l\u1EDDi \u0022\u0111\u00E3 xong\u0022 v\u00E0 m\u1ECDi th\u1EE9 y\u00EAn.)",
+          "condition": {
+            "kind": "textNotMatches",
+            "selector": "#countdown-timer",
+            "text": "00:00"
+          }
+        },
+        {
+          "action": "readCooldownSeconds",
+          "selector": "#countdown-timer",
+          "timeoutMs": 15000,
+          "note": "\u0111\u1ECDc l\u1EA1i sau khi nh\u1EADn \u2014 ~30:00, \u0111\u1EC3 runner t\u1EF1 quay l\u1EA1i \u0111\u00FAng l\u00FAc"
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 1800,
+      "requiresVip": false,
+      "order": 30,
+      "notes": "M\u1EDF r\u01B0\u01A1ng Ph\u00FAc L\u1EE3i \u0110\u01B0\u1EDDng nh\u1EADn th\u01B0\u1EDFng, 4 l\u01B0\u1EE3t/ng\u00E0y."
+    },
+    {
+      "id": "vong-quay-phuc-van-thuong",
+      "name": "V\u00F2ng Quay Ph\u00FAc V\u1EADn",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "v\u00F2ng quay ph\u00FAc v\u1EADn",
+        "ph\u00FAc v\u1EADn",
+        "v\u00F2ng quay",
+        "vong quay"
+      ],
+      "pagePath": "/vong-quay-phuc-van",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/vong-quay-phuc-van",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#spinButton",
+          "timeoutMs": 25000
+        },
+        {
+          "action": "waitMilliseconds",
+          "timeoutMs": 1500,
+          "note": "ch\u1EEF tr\u00EAn n\u00FAt v\u00E0 s\u1ED1 l\u01B0\u1EE3t do JS \u00E1p sau khi trang v\u1EBD \u2014 \u0111\u1ECDc qu\u00E1 s\u1EDBm l\u00E0 \u0111\u1ECDc tr\u1EA1ng th\u00E1i gi\u1EA3"
+        },
+        {
+          "action": "stopIf",
+          "text": "h\u1EBFt l\u01B0\u1EE3t quay (l\u01B0\u1EE3t th\u1EE9 4 ch\u1EC9 m\u1EDF khi xong h\u1EBFt nhi\u1EC7m v\u1EE5 ng\u00E0y)",
+          "timeoutMs": 15000,
+          "note": "n\u00FAt t\u1EF1 vi\u1EBFt l\u1EA1i th\u00E0nh \u0022H\u1EBFt l\u01B0\u1EE3t\u0022 khi l\u01B0\u1EE3t v\u1EC1 0 \u2014 l\u01B0\u1EE3t 4 l\u00E0 chuy\u1EC7n c\u1EE7a l\u1EA7n gh\u00E9 sau, kh\u00F4ng \u0111\u00E1ng gi\u1EEF browser ch\u1EDD",
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#spinButton",
+            "text": "h\u1EBFt l\u01B0\u1EE3t"
+          }
+        },
+        {
+          "action": "repeat",
+          "timeoutMs": 15000,
+          "note": "#userTurns l\u00E0 s\u1ED1 l\u01B0\u1EE3t c\u00F2n l\u1EA1i, t\u1ED1i \u0111a 4/ng\u00E0y n\u00EAn \u00220\u0022 kh\u00F4ng th\u1EC3 l\u1EABn v\u00E0o \u002210\u0022. Tr\u1EA7n 5 v\u00F2ng: 4 l\u01B0\u1EE3t \u002B 1 v\u00F2ng \u0111\u1EC7m cho m\u1ED9t c\u00FA b\u1EA5m b\u1ECB nu\u1ED1t.",
+          "steps": [
+            {
+              "action": "click",
+              "selector": "#prizeSubtitle",
+              "timeoutMs": 2500,
+              "note": "\u0111\u00F3ng m\u00E0n ch\u00FAc m\u1EEBng c\u1EE7a l\u01B0\u1EE3t tr\u01B0\u1EDBc \u2014 n\u00F3 ph\u1EE7 l\u00EAn n\u00FAt v\u00E0 nu\u1ED1t c\u00FA b\u1EA5m (\u0111o \u0111\u01B0\u1EE3c trong recording 02/08)",
+              "optional": true,
+              "when": {
+                "kind": "visible",
+                "selector": "#prizeSubtitle"
+              }
+            },
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 2000,
+              "optional": true,
+              "condition": {
+                "kind": "hidden",
+                "selector": "#prizeSubtitle"
+              }
+            },
+            {
+              "action": "click",
+              "selector": "#spinButton",
+              "timeoutMs": 5000,
+              "note": "guard Enabled: n\u00FAt t\u1EF1 kho\u00E1 trong l\u00FAc b\u00E1nh xe quay",
+              "optional": true,
+              "when": {
+                "kind": "enabled",
+                "selector": "#spinButton"
+              }
+            },
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 12000,
+              "note": "b\u00E1nh xe quay ~8s r\u1ED3i n\u00FAt m\u1EDF l\u1EA1i; \u1EDF l\u01B0\u1EE3t cu\u1ED1i n\u00FAt th\u00E0nh \u0022H\u1EBFt l\u01B0\u1EE3t\u0022 v\u0129nh vi\u1EC5n \u2014 timeout \u0111\u01B0\u1EE3c tha v\u00E0 until b\u1EAFt s\u1ED1 0",
+              "optional": true,
+              "condition": {
+                "kind": "enabled",
+                "selector": "#spinButton"
+              }
+            }
+          ],
+          "until": {
+            "kind": "textMatches",
+            "selector": "#userTurns",
+            "text": "0"
+          },
+          "maxIterations": 5,
+          "maxSeconds": 120
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 3600,
+      "requiresVip": false,
+      "order": 50,
+      "notes": "Quay V\u00F2ng Quay Ph\u00FAc V\u1EADn nh\u1EADn th\u01B0\u1EDFng, t\u1ED1i \u0111a 4 l\u01B0\u1EE3t/ng\u00E0y."
     },
     {
       "id": "khoang-mach",

@@ -18,7 +18,9 @@ import type { EditableConfig } from "@/lib/services/configs";
  * Mười nhiệm vụ chỉ có công tắc — key khớp với configSchema và SIMPLE_QUESTS của engine.
  * Mô tả viết cho người chơi, không phải cho người đọc mã.
  */
-const SIMPLE_QUESTS: ReadonlyArray<{ key: string; name: string; hint: string }> = [
+type SimpleQuest = { key: string; name: string; hint: string };
+
+const SIMPLE_QUESTS: ReadonlyArray<SimpleQuest> = [
   { key: "diemDanh", name: "Điểm Danh", hint: "Ghi danh mỗi ngày, nhận thưởng chuyên cần." },
   { key: "hoangVuc", name: "Hoang Vực", hint: "Quét boss Hoang Vực theo lượt trong ngày." },
   { key: "phucLoiDuong", name: "Phúc Lợi Đường", hint: "Lĩnh 4 phần phúc lợi mỗi ngày." },
@@ -35,6 +37,43 @@ const SIMPLE_QUESTS: ReadonlyArray<{ key: string; name: string; hint: string }> 
   { key: "khoangMach", name: "Khoáng Mạch", hint: "Thu khoáng theo chu kỳ trong ngày." },
 ];
 
+const FREE_QUEST_KEYS = new Set(["diemDanh", "phucLoiDuong", "vongQuay"]);
+const FREE_QUESTS = SIMPLE_QUESTS.filter((quest) => FREE_QUEST_KEYS.has(quest.key));
+
+function SimpleQuestGrid({
+  quests,
+  enabled,
+  onToggle,
+}: {
+  quests: ReadonlyArray<SimpleQuest>;
+  enabled: Record<string, boolean>;
+  onToggle: (key: string, value: boolean) => void;
+}) {
+  return (
+    <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+      {quests.map((quest) => (
+        <label
+          key={quest.key}
+          className="flex cursor-pointer items-start gap-2.5 text-sm text-[var(--color-parchment)]"
+        >
+          <input
+            type="checkbox"
+            checked={enabled[quest.key] === true}
+            onChange={(event) => onToggle(quest.key, event.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-[var(--color-jade-400)]"
+          />
+          <span>
+            {quest.name}
+            <span className="block text-xs leading-snug text-[var(--color-mist)]">
+              {quest.hint}
+            </span>
+          </span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export function ConfigForm({ config }: { config: EditableConfig }) {
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
     saveConfigAction,
@@ -42,14 +81,25 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
   );
   const [meCung, setMeCung] = useState(config.quests.meCung.enabled);
   const [luyenDan, setLuyenDan] = useState(config.quests.luyenDan.enabled);
+  const [simpleEnabled, setSimpleEnabled] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(
+      SIMPLE_QUESTS.map((quest) => [
+        quest.key,
+        (config.quests as Record<string, { enabled?: boolean }>)[quest.key]?.enabled === true,
+      ]),
+    ),
+  );
   const [clearing, startClearing] = useTransition();
   const [cleared, setCleared] = useState(false);
   const hasCookie = config.hasCookie && !cleared;
 
-  // Hai tab nhiệm vụ, theo đúng cách site chia tài khoản. Tab chỉ ĐỔI HIỂN THỊ (display:
-  // none), không unmount: các ô nhập phải luôn nằm trong DOM để FormData lúc submit gom đủ
-  // giá trị — unmount tab VIP rồi bấm lưu từ tab Thường là lặng lẽ tắt hết nhiệm vụ.
+  // Hai tab nhiệm vụ, theo đúng cách site chia tài khoản. Ba mục có cả hai flow dùng chung
+  // một state; hidden inputs bên dưới là NGUỒN FormData duy nhất. Render hai checkbox cùng
+  // name sẽ tạo hai giá trị có thể lệch nhau khi người dùng đổi tab, nên tuyệt đối không làm.
   const [questTab, setQuestTab] = useState<"vip" | "free">("vip");
+  const toggleSimpleQuest = (key: string, value: boolean) => {
+    setSimpleEnabled((current) => ({ ...current, [key]: value }));
+  };
 
   return (
     <form action={action} className="card card-hairline p-6">
@@ -131,17 +181,31 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
         ))}
       </div>
       <p className="mb-4 text-xs text-[var(--color-mist)]">
-        Auto tự biết tài khoản của bạn là VIP hay thường, và tự bỏ qua nhiệm vụ không dùng
-        được. Bạn không phải chọn gì ở đây.
+        Auto tự biết tài khoản của bạn là VIP hay thường và chọn đúng flow. Ba nhiệm vụ có
+        mặt ở cả hai tab dùng chung công tắc: đổi bên nào cũng đồng bộ bên kia.
       </p>
 
-      {/* Tab Thường: thành thật là chỗ giữ chỗ, chứ không phải một tab trống vô cớ. */}
+      {/* Một input thật cho mỗi config key. Checkbox ở hai tab chỉ là hai mặt của cùng state. */}
+      {SIMPLE_QUESTS.map((quest) =>
+        simpleEnabled[quest.key] ? (
+          <input key={quest.key} type="hidden" name={`q_${quest.key}`} value="on" />
+        ) : null,
+      )}
+
       <div hidden={questTab !== "free"}>
-        <div className="mb-6 rounded-xl border border-dashed border-[var(--color-ink-600)] p-6 text-center">
-          <p className="text-sm text-[var(--color-mist)]">
-            Đang làm. Các nhiệm vụ hiện có đều nằm ở tab VIP.
+        <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
+          <legend className="px-2 text-sm font-semibold text-[var(--color-parchment)]">
+            Nhiệm vụ tài khoản thường
+          </legend>
+          <p className="mb-3 text-xs text-[var(--color-mist)]">
+            Ba flow chạy ở trang riêng vì hub tài khoản thường không có nút nhanh của VIP.
           </p>
-        </div>
+          <SimpleQuestGrid
+            quests={FREE_QUESTS}
+            enabled={simpleEnabled}
+            onToggle={toggleSimpleQuest}
+          />
+        </fieldset>
       </div>
 
       <div hidden={questTab !== "vip"}>
@@ -308,27 +372,11 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
         <p className="mb-3 text-xs text-[var(--color-mist)]">
           Mỗi ngày một lần. Tick là xong, không phải chỉnh gì thêm.
         </p>
-        <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-          {SIMPLE_QUESTS.map((q) => (
-            <label
-              key={q.key}
-              className="flex cursor-pointer items-start gap-2.5 text-sm text-[var(--color-parchment)]"
-            >
-              <input
-                type="checkbox"
-                name={`q_${q.key}`}
-                defaultChecked={
-                  (config.quests as Record<string, { enabled?: boolean }>)[q.key]?.enabled === true
-                }
-                className="mt-0.5 h-4 w-4 accent-[var(--color-jade-400)]"
-              />
-              <span>
-                {q.name}
-                <span className="block text-xs leading-snug text-[var(--color-mist)]">{q.hint}</span>
-              </span>
-            </label>
-          ))}
-        </div>
+        <SimpleQuestGrid
+          quests={SIMPLE_QUESTS}
+          enabled={simpleEnabled}
+          onToggle={toggleSimpleQuest}
+        />
       </fieldset>
       </div>
 

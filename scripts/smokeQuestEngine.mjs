@@ -86,6 +86,35 @@ const PAGE = `<!doctype html>
   </script>
 </body></html>`;
 
+// Ba trang giả dưới đây giữ đúng các selector/state transition nhìn thấy trong recording
+// 02/08. Chúng không mock Playwright: profile schema 43 vẫn điều khiển Chromium thật.
+const FREE_CHECKIN_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
+<button id="checkInButton">Điểm Danh</button>
+<script>checkInButton.onclick=()=>setTimeout(()=>{checkInButton.textContent='Đã Điểm Danh';checkInButton.dataset.claimed='1'},30)</script>`;
+
+const FREE_HUB_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
+<div class="nv-quest"><a class="btn-go" onclick="location.href='/phuc-loi-duong'">Làm Ngay ›</a></div>`;
+
+const FREE_WELFARE_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
+<div id="countdown-timer">00:00</div>
+<div id="chest-1"><img alt="Rương 1" style="width:40px;height:40px"></div>
+<div id="chest-2"><img alt="Rương 2" style="width:40px;height:40px"></div>
+<div id="chest-3"><img alt="Rương 3" style="width:40px;height:40px"></div>
+<div id="chest-4"><img alt="Rương 4" style="width:40px;height:40px"></div>
+<script>document.querySelectorAll('[id^=chest-] img').forEach((img,i)=>img.onclick=()=>{
+  if(countdown.textContent!=='00:00')return;
+  setTimeout(()=>{countdown.textContent='30:00';countdown.dataset.claimed=String(i+1)},30)
+});const countdown=document.getElementById('countdown-timer')</script>`;
+
+const FREE_WHEEL_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
+<div id="userTurns">2</div><button id="spinButton">Quay Ngay</button>
+<div id="prizeSubtitle" style="display:none">Chúc mừng đạo hữu</div>
+<script>let spins=0;prizeSubtitle.onclick=()=>prizeSubtitle.style.display='none';spinButton.onclick=()=>{
+  spinButton.disabled=true;setTimeout(()=>{spins++;userTurns.textContent=String(2-spins);
+  prizeSubtitle.style.display='block';spinButton.dataset.spins=String(spins);spinButton.disabled=false;
+  if(spins===2)spinButton.textContent='Hết lượt'},40)
+}</script>`;
+
 // ---------------------------------------------------------------------------------------
 
 let passed = 0;
@@ -426,8 +455,8 @@ async function main() {
   const { loadProfile } = await import("../src/lib/quest-engine/profile.mjs");
 
   check(
-    "mọi quest trong hồ sơ đều khai requiresVip",
-    loadProfile().quests.every((q) => q.requiresVip === true),
+    "mọi quest trong hồ sơ đều khai hạng VIP/Thường rõ ràng",
+    loadProfile().quests.every((q) => typeof q.requiresVip === "boolean"),
   );
   check("tài khoản VIP chạy đủ những gì đã bật", questsForAccount(profile, { isVip: true }).length === 2);
   check("tài khoản thường không đụng quest VIP", questsForAccount(profile, { isVip: false }).length === 0);
@@ -442,10 +471,12 @@ async function main() {
     ],
   };
   const freePlan = questsForAccount(legacy, { isVip: false });
+  const legacyVipPlan = questsForAccount(legacy, { isVip: true });
   check(
     "quest cũ thiếu trường được coi là VIP-only",
-    freePlan.length === 1 && freePlan[0].requiresVip === false,
-    freePlan.map((q) => q.name).join(", "),
+    freePlan.length === 1 && freePlan[0].requiresVip === false &&
+      legacyVipPlan.length === 1 && legacyVipPlan[0].name === "cũ, thiếu trường",
+    `VIP=${legacyVipPlan.map((q) => q.name).join(", ")} · thường=${freePlan.map((q) => q.name).join(", ")}`,
   );
 
   console.log("\nLinh phù (worker token)");
@@ -489,23 +520,33 @@ async function main() {
     () => {},
   );
   check(
-    "bật Điểm Danh + Tế Lễ → hồ sơ sáng đúng hai đèn đó",
-    withDaily.quests.find((q) => q.name === "Điểm Danh")?.enabled === true &&
+    "bật Điểm Danh + Tế Lễ → sáng cả hai flow Điểm Danh và đúng flow theo hạng",
+    withDaily.quests.filter((q) => q.name === "Điểm Danh").length === 2 &&
+      withDaily.quests.filter((q) => q.name === "Điểm Danh").every((q) => q.enabled) &&
       withDaily.quests.find((q) => q.name === "Tế Lễ Tông Môn")?.enabled === true &&
-      withDaily.quests.filter((q) => q.enabled).length === 4,
+      withDaily.quests.filter((q) => q.enabled).length === 5 &&
+      questsForAccount(withDaily, { isVip: true }).some((q) => q.id === "diem-danh") &&
+      !questsForAccount(withDaily, { isVip: true }).some((q) => q.id === "diem-danh-thuong") &&
+      questsForAccount(withDaily, { isVip: false }).some((q) => q.id === "diem-danh-thuong") &&
+      !questsForAccount(withDaily, { isVip: false }).some((q) => q.id === "diem-danh"),
     withDaily.quests.filter((q) => q.enabled).map((q) => q.name).join(" · "),
   );
   const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
   check(
-    "hồ sơ đang ở schema 42",
-    loadProfileForSchema().schemaVersion === 42,
+    "hồ sơ đang ở schema 43",
+    loadProfileForSchema().schemaVersion === 43,
     String(loadProfileForSchema().schemaVersion),
   );
 
   // --- kiểm trên trang thật ---------------------------------------------------------
-  const server = createServer((_req, res) => {
+  const server = createServer((req, res) => {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    res.end(PAGE);
+    const path = new URL(req.url ?? "/", "http://fixture.test").pathname.replace(/\/$/, "") || "/";
+    if (path === "/diem-danh") res.end(FREE_CHECKIN_PAGE);
+    else if (path === "/nhiem-vu-hang-ngay") res.end(FREE_HUB_PAGE);
+    else if (path === "/phuc-loi-duong") res.end(FREE_WELFARE_PAGE);
+    else if (path === "/vong-quay-phuc-van") res.end(FREE_WHEEL_PAGE);
+    else res.end(PAGE);
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -533,6 +574,33 @@ async function main() {
     const run = (quest) => engine.run(session, { dailyQuestPath: "/" }, quest);
     const quizEngine = createQuestEngine({ log, quiz: referenceQuiz });
     const runQuiz = (quest) => quizEngine.run(session, { dailyQuestPath: "/" }, quest);
+
+    console.log("\nBa flow tài khoản thường từ recording 02/08");
+    const exportedProfile = loadProfileForSchema();
+
+    const checkinFree = exportedProfile.quests.find((q) => q.id === "diem-danh-thuong");
+    const checkinResult = await run(checkinFree);
+    check("Điểm Danh mở trang riêng và chờ server đổi nhãn", checkinResult.outcome === "completed", checkinResult.outcome);
+    check("Điểm Danh đã phát claim thật", (await page.locator("#checkInButton").getAttribute("data-claimed")) === "1");
+
+    const welfareFree = exportedProfile.quests.find((q) => q.id === "phuc-loi-duong-thuong");
+    const welfareResult = await run(welfareFree);
+    check("Phúc Lợi Đường nhận đúng một rương mỗi lượt", welfareResult.outcome === "completed", welfareResult.outcome);
+    check(
+      "Phúc Lợi Đường đọc lại cooldown 30 phút",
+      welfareResult.cooldownSeconds === 1800 &&
+        (await page.locator("#countdown-timer").getAttribute("data-claimed")) === "1",
+      String(welfareResult.cooldownSeconds),
+    );
+
+    const wheelFree = exportedProfile.quests.find((q) => q.id === "vong-quay-phuc-van-thuong");
+    const wheelResult = await run(wheelFree);
+    check("Vòng Quay đóng overlay rồi quay tới hết lượt", wheelResult.outcome === "completed", wheelResult.outcome);
+    check(
+      "Vòng Quay tiêu hết hai lượt fixture",
+      (await page.locator("#spinButton").getAttribute("data-spins")) === "2" &&
+        (await page.locator("#userTurns").textContent()) === "0",
+    );
 
     console.log("\nĐiều kiện trên trang sống");
     await session.navigate(baseUrl);

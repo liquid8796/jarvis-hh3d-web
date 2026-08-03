@@ -73,7 +73,7 @@ export function UserTable({
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <input
           className="input max-w-xs"
-          placeholder="Tìm theo đạo hiệu hoặc danh xưng…"
+        placeholder="Tìm đạo hiệu, danh xưng hoặc email…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -122,6 +122,9 @@ export function UserTable({
                     {u.role === "admin" && <span className="badge badge-admin">Trưởng môn</span>}
                   </div>
                   <span className="font-mono text-xs text-[var(--color-mist)]">@{u.username}</span>
+                  <span className="block text-xs text-[var(--color-mist)]">
+                    {u.email ?? "Chưa có email"}
+                  </span>
                 </td>
                 <td className="px-3 py-3">
                   <span className={`badge badge-${u.status}`}>{STATUS_LABEL[u.status]}</span>
@@ -222,6 +225,20 @@ function EditDialog({
             className="input mb-4"
             defaultValue={user.displayName}
             required
+          />
+
+          <label className="label" htmlFor="edit-email">
+            Email
+          </label>
+          <input
+            id="edit-email"
+            name="email"
+            type="email"
+            className="input mb-4"
+            defaultValue={user.email ?? ""}
+            autoComplete="email"
+            required
+            maxLength={254}
           />
 
           <div className="mb-4 grid grid-cols-2 gap-3">

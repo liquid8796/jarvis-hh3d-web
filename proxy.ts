@@ -7,7 +7,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * in the server-side guards, which read the database; a cookie's presence is never treated
  * as authorization.
  */
-const PROTECTED_PREFIXES = ["/dashboard", "/admin", "/pending"];
+const PROTECTED_PREFIXES = ["/dashboard", "/admin", "/pending", "/profile"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -27,5 +27,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const proxyConfig = {
-  matcher: ["/dashboard/:path*", "/admin/:path*", "/pending"],
+  matcher: ["/dashboard/:path*", "/admin/:path*", "/pending", "/profile"],
 };

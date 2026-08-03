@@ -38,6 +38,9 @@ export const users = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     username: text("username").notNull().unique(),
     displayName: text("display_name").notNull(),
+    // Nullable only for accounts created before migration 0008. Every new registration and
+    // admin-created account must supply one; old members can add theirs from Hồ Sơ.
+    email: text("email").unique(),
     passwordHash: text("password_hash").notNull(),
     role: userRole("role").notNull().default("user"),
     status: userStatus("status").notNull().default("pending"),

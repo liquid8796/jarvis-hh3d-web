@@ -11,13 +11,14 @@ import type { UserRow } from "@/lib/db/schema";
 
 export type PublicUser = Pick<
   UserRow,
-  "id" | "username" | "displayName" | "role" | "status" | "createdAt" | "updatedAt"
+  "id" | "username" | "displayName" | "email" | "role" | "status" | "createdAt" | "updatedAt"
 >;
 
 const publicColumns = {
   id: schema.users.id,
   username: schema.users.username,
   displayName: schema.users.displayName,
+  email: schema.users.email,
   role: schema.users.role,
   status: schema.users.status,
   createdAt: schema.users.createdAt,
@@ -33,6 +34,15 @@ export async function findByUsername(username: string): Promise<UserRow | null> 
   return rows[0] ?? null;
 }
 
+export async function findByEmail(email: string): Promise<UserRow | null> {
+  const rows = await db()
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.email, email.trim().toLowerCase()))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function findById(id: string): Promise<PublicUser | null> {
   const rows = await db().select(publicColumns).from(schema.users).where(eq(schema.users.id, id)).limit(1);
   return rows[0] ?? null;
@@ -42,12 +52,17 @@ export async function findById(id: string): Promise<PublicUser | null> {
 export async function register(input: {
   username: string;
   displayName: string;
+  email: string;
   password: string;
 }): Promise<{ ok: true; user: PublicUser } | { ok: false; error: string }> {
   const username = input.username.toLowerCase();
+  const email = input.email.trim().toLowerCase();
   const existing = await findByUsername(username);
   if (existing) {
     return { ok: false, error: "Đạo hiệu này đã có người dùng." };
+  }
+  if (await findByEmail(email)) {
+    return { ok: false, error: "Email này đã được dùng cho một đạo hiệu khác." };
   }
 
   const rows = await db()
@@ -55,11 +70,19 @@ export async function register(input: {
     .values({
       username,
       displayName: input.displayName.trim(),
+      email,
       passwordHash: hashPassword(input.password),
     })
+    // Hai người có thể submit cùng lúc sau bước kiểm tra trên. Database phân xử, rồi ta
+    // đọc lại để trả thông báo thân thiện thay vì làm văng lỗi 500 vì unique constraint.
+    .onConflictDoNothing()
     .returning(publicColumns);
 
-  return { ok: true, user: rows[0] };
+  if (rows[0]) return { ok: true, user: rows[0] };
+  if (await findByUsername(username)) {
+    return { ok: false, error: "Đạo hiệu này đã có người dùng." };
+  }
+  return { ok: false, error: "Email này đã được dùng cho một đạo hiệu khác." };
 }
 
 export async function verifyCredentials(
@@ -86,7 +109,11 @@ export async function listUsers(options: {
   if (options.search) {
     const needle = `%${options.search.trim()}%`;
     conditions.push(
-      or(ilike(schema.users.username, needle), ilike(schema.users.displayName, needle)),
+      or(
+        ilike(schema.users.username, needle),
+        ilike(schema.users.displayName, needle),
+        ilike(schema.users.email, needle),
+      ),
     );
   }
 
@@ -126,22 +153,39 @@ export async function setStatus(
 export async function adminCreate(input: {
   username: string;
   displayName: string;
+  email: string;
   password: string;
   role: "user" | "admin";
   status: "pending" | "active" | "disabled";
 }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const email = input.email.trim().toLowerCase();
   const existing = await findByUsername(input.username);
   if (existing) {
     return { ok: false, error: "Đạo hiệu này đã có người dùng." };
   }
+  if (await findByEmail(email)) {
+    return { ok: false, error: "Email này đã được dùng cho một đạo hiệu khác." };
+  }
 
-  await db().insert(schema.users).values({
-    username: input.username.toLowerCase(),
-    displayName: input.displayName.trim(),
-    passwordHash: hashPassword(input.password),
-    role: input.role,
-    status: input.status,
-  });
+  const rows = await db()
+    .insert(schema.users)
+    .values({
+      username: input.username.toLowerCase(),
+      displayName: input.displayName.trim(),
+      email,
+      passwordHash: hashPassword(input.password),
+      role: input.role,
+      status: input.status,
+    })
+    .onConflictDoNothing()
+    .returning({ id: schema.users.id });
+
+  if (rows.length === 0) {
+    if (await findByUsername(input.username)) {
+      return { ok: false, error: "Đạo hiệu này đã có người dùng." };
+    }
+    return { ok: false, error: "Email này đã được dùng cho một đạo hiệu khác." };
+  }
 
   return { ok: true };
 }
@@ -150,18 +194,49 @@ export async function adminUpdate(
   id: string,
   input: {
     displayName?: string;
+    email?: string;
     password?: string;
     role?: "user" | "admin";
     status?: "pending" | "active" | "disabled";
   },
-): Promise<void> {
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (input.email !== undefined) {
+    const owner = await findByEmail(input.email);
+    if (owner && owner.id !== id) {
+      return { ok: false, error: "Email này đã được dùng cho một đạo hiệu khác." };
+    }
+  }
+
   const patch: Record<string, unknown> = { updatedAt: new Date() };
   if (input.displayName !== undefined) patch.displayName = input.displayName.trim();
+  if (input.email !== undefined) patch.email = input.email.trim().toLowerCase();
   if (input.password) patch.passwordHash = hashPassword(input.password);
   if (input.role) patch.role = input.role;
   if (input.status) patch.status = input.status;
 
-  await db().update(schema.users).set(patch).where(eq(schema.users.id, id));
+  try {
+    await db().update(schema.users).set(patch).where(eq(schema.users.id, id));
+    return { ok: true };
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return { ok: false, error: "Email này đã được dùng cho một đạo hiệu khác." };
+    }
+    throw error;
+  }
+}
+
+/** Self-service profile update; role, status, username and password remain out of reach. */
+export async function updateProfile(
+  id: string,
+  input: { displayName: string; email: string },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  return adminUpdate(id, input);
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  if ("code" in error && error.code === "23505") return true;
+  return "cause" in error && isUniqueViolation(error.cause);
 }
 
 /**

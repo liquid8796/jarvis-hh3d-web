@@ -1,0 +1,29 @@
+import { SiteHeader } from "@/components/SiteHeader";
+import { requireUser } from "@/lib/auth/guards";
+import { ProfileForm } from "./ProfileForm";
+
+export const metadata = { title: "Hồ Sơ" };
+
+export default async function ProfilePage() {
+  const user = await requireUser();
+
+  return (
+    <>
+      <SiteHeader />
+      <main className="mx-auto w-full max-w-xl px-4 pb-24 sm:px-6">
+        <div className="rise-in mt-6">
+          <h1 className="h-display text-3xl font-bold text-gilded">Hồ Sơ Đạo Hữu</h1>
+          <p className="mt-2 text-sm leading-relaxed text-[var(--color-mist)]">
+            Cập nhật danh xưng và email của chính bạn. Vai trò, trạng thái và đạo hiệu vẫn do
+            tông môn quản lý.
+          </p>
+          <ProfileForm
+            username={user.username}
+            displayName={user.displayName}
+            email={user.email}
+          />
+        </div>
+      </main>
+    </>
+  );
+}

@@ -2,7 +2,7 @@
  * Nối hai thế giới: cấu hình PHẲNG mà người dùng thấy trên web, và hồ sơ quest schema 41 mà
  * bộ thông dịch chạy.
  *
- * Vì sao không cho web sửa thẳng hồ sơ: hồ sơ là 12 nhiệm vụ × hàng trăm bước, và nó là nơi
+ * Vì sao không cho web sửa thẳng hồ sơ: hồ sơ là nhiều nhiệm vụ × hàng trăm bước, và nó là nơi
  * cất TRI THỨC VỀ SITE — thứ mà một cái form không nên mời người ta chỉnh. Cái người dùng
  * thực sự muốn quyết chỉ là vài lựa chọn ("Ác Mộng hay Thường", "trục xuất dưới bao nhiêu
  * HP"). Nên web giữ form nhỏ, còn ở đây một lớp dịch mỏng đặt các lựa chọn ấy vào đúng
@@ -28,6 +28,7 @@ export function loadProfile() {
 }
 
 const findQuest = (profile, name) => profile.quests.find((q) => q.name === name);
+const findQuests = (profile, name) => profile.quests.filter((q) => q.name === name);
 const findOption = (quest, key) => quest?.options?.find((o) => o.key === key);
 
 /**
@@ -74,9 +75,10 @@ function keepLevelOf(choiceValue) {
 }
 
 /**
- * Nhiệm vụ "một công tắc": key trong config web ↔ tên nhiệm vụ trong hồ sơ. Chúng không có
- * option nào nên lớp dịch chỉ việc bật/tắt. Song sinh với danh sách trong configs.ts —
- * thêm nhiệm vụ là thêm một dòng ở cả hai nơi.
+ * Nhiệm vụ "một công tắc": key trong config web ↔ tên nhiệm vụ trong hồ sơ. Một tên có thể
+ * có hai flow theo hạng tài khoản (VIP chạy nút nhanh ở hub, tài khoản thường chạy trang
+ * riêng). Công tắc phải bật cả hai; sau khi đọc hạng, engine chỉ lấy đúng flow của hạng đó.
+ * Song sinh với danh sách trong configs.ts — thêm nhiệm vụ là thêm một dòng ở cả hai nơi.
  */
 const SIMPLE_QUESTS = [
   ["diemDanh", "Điểm Danh"],
@@ -153,12 +155,13 @@ export function profileForConfig(config, log) {
 
   // ---- Mười nhiệm vụ một-công-tắc ------------------------------------------------------
   for (const [key, name] of SIMPLE_QUESTS) {
-    const quest = findQuest(profile, name);
-    if (!quest) {
+    const quests = findQuests(profile, name);
+    if (quests.length === 0) {
       log?.(`Hồ sơ không có nhiệm vụ「${name}」.`);
       continue;
     }
-    quest.enabled = config.quests?.[key]?.enabled === true;
+    const enabled = config.quests?.[key]?.enabled === true;
+    for (const quest of quests) quest.enabled = enabled;
   }
 
   return profile;

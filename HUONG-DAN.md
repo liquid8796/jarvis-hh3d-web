@@ -9,7 +9,7 @@ Web: <https://auto-hh3d.vercel.app>
 
 ## 1. Vào được đã
 
-1. Vào trang, bấm **Bái sư** để đăng ký.
+1. Vào trang, bấm **Bái sư** để đăng ký đạo hiệu, danh xưng và email.
 2. Chờ tông chủ duyệt. Chưa duyệt thì bạn chỉ thấy phòng chờ.
 3. Duyệt xong, đăng nhập lại là vào **Linh Đài** — nơi làm mọi thứ.
 
@@ -55,7 +55,7 @@ Tick những cái bạn muốn auto làm.
 |---|---|
 | **Mê Cung** | Auto tự lập phòng, chờ đủ 5 người, rồi đánh. Đây là nhiệm vụ dài nhất. |
 | **Luyện Đan Đường** | Thu đan → phân giải → khai lò mẻ mới → giữ lửa. Ghé lại mỗi ~26 phút. |
-| **Nhiệm vụ ngày** | Điểm Danh, Hoang Vực, Phúc Lợi Đường, Thí Luyện, Bí Cảnh, Tế Lễ, Phúc Lợi VIP, Vòng Quay, Vấn Đáp, Khoáng Mạch. Tick là xong, không phải chỉnh gì. |
+| **Nhiệm vụ ngày** | Điểm Danh, Hoang Vực, Phúc Lợi Đường, Thí Luyện, Bí Cảnh, Tế Lễ, Phúc Lợi VIP, Vòng Quay, Vấn Đáp, Khoáng Mạch. Tick là xong, không phải chỉnh gì. Điểm Danh, Phúc Lợi Đường và Vòng Quay có flow riêng cho tài khoản thường. |
 
 Riêng **Vấn Đáp**, linh sứ dùng cùng danh sách tham khảo với bản PC (hiện đọc được 255 câu).
 Nó chỉ trả lời khi đáp án trong danh sách khớp đúng một lựa chọn đang hiện; câu lạ hoặc nguồn
@@ -70,7 +70,11 @@ Mê Cung có vài tuỳ chọn đáng để ý:
   thì mời ra, kẻo kẹt phòng. Để `0` là không giục.
 - **Dừng khi đã đủ huyền tinh** — bỏ tick nếu muốn đánh hết lượt trong ngày.
 
-Auto tự biết tài khoản bạn là VIP hay thường, và tự bỏ qua nhiệm vụ bạn không dùng được.
+Auto tự biết tài khoản bạn là VIP hay thường, rồi chọn đúng flow của hạng đó. Với tài khoản
+thường, Phúc Lợi Đường mở một rương mỗi lượt và tự quay lại sau 30 phút; Vòng Quay sẽ ghé lại
+ở vòng sau để nhận lượt thứ tư khi các nhiệm vụ ngày khác đã đủ điều kiện.
+Ba nhiệm vụ thường nằm ngay trong tab **Nhiệm vụ Thường**; bật/tắt ở đó sẽ đồng bộ với công
+tắc cùng tên bên tab VIP, nên bạn không phải cấu hình hai lần.
 
 Chọn xong nhớ bấm **Khắc Ngọc Giản**.
 
@@ -90,6 +94,15 @@ Khi cạnh tiêu đề nhật ký hiện **● Trực tiếp**, trạng thái v�
 ngay, không phải chờ trang hỏi lại. Mạng chập chờn thì nó tự hiện **Đang nối lại…** và dùng nhịp
 dự phòng; bạn không cần F5. Cài đè linh sứ v0.19.0 một lần để nút Thu Đàn được máy đang bận
 nhận trong khoảng 5 giây thay vì nhịp 20 giây của bản cũ.
+
+Nếu linh sứ máy nhà được cài trước v0.20.0, hãy tạo lại bộ cài và cài đè một lần để nhận ba
+flow tài khoản thường mới. Cài đè giữ nguyên thư mục hồ sơ trình duyệt và không cần gỡ trước.
+
+### Sửa hồ sơ và bổ sung email
+
+Bấm **Hồ Sơ** trên thanh đầu trang để đổi danh xưng hiển thị hoặc email. Đạo hiệu đăng nhập
+không đổi ở đây. Tài khoản tạo từ bản cũ có thể chưa có email; chỉ cần điền một lần rồi bấm
+**Lưu Hồ Sơ**. Mỗi email chỉ dùng được cho một đạo hiệu.
 
 ---
 

@@ -11,6 +11,32 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.20.0 — tài khoản thường có ba flow thật; mỗi đạo hữu có email và tự sửa hồ sơ
+
+- **Đồng bộ nguyên profile schema 43 từ PC**, không chép selector bằng tay. Ba flow ghi trên
+  tài khoản thường ngày 02/08 chạy thẳng ở trang riêng vì hub của hạng này không có các nút
+  nhanh cũ: Điểm Danh dùng `/diem-danh` + `#checkInButton`; Phúc Lợi Đường mở bốn rương theo
+  thứ tự và đọc `#countdown-timer` 30 phút; Vòng Quay Phúc Vận dùng `#spinButton`,
+  `#userTurns` và tự đóng màn chúc mừng đang che nút.
+- **Một công tắc web bật cả cặp flow VIP/Thường, nhưng engine chỉ chọn đúng một hạng.** Vì ba
+  nhiệm vụ trùng mục tiêu nhưng khác toàn bộ selector, VIP không chạy lặp flow thường và tài
+  khoản thường không chạm nút VIP. Lượt quay thứ tư chỉ xuất hiện sau khi đủ điều kiện ngày;
+  job sống dai sẽ quay lại ở vòng sau thay vì giữ browser ngồi chờ.
+- **Tab “Nhiệm vụ Thường” không còn là placeholder rỗng.** Nó hiện đúng ba checkbox Điểm
+  Danh, Phúc Lợi Đường và Vòng Quay Phúc Vận. Ba công tắc dùng chung state với bản VIP nên
+  đổi ở tab nào cũng đồng bộ; FormData chỉ có một input chuẩn cho mỗi key, không thể lưu hai
+  giá trị trái nhau vì hai bản checkbox.
+- **Email được thêm bằng migration 0008, unique và chuẩn hoá chữ thường.** Cột nullable chỉ để
+  giữ nguyên 9 tài khoản cũ; đăng ký mới và tài khoản do admin tạo đều bắt buộc email hợp lệ.
+  Không backfill email giả, không làm mất hay khoá tài khoản hiện hữu.
+- **Trang Hồ Sơ cho từng người dùng** sửa đúng danh xưng + email của chính mình; đạo hiệu,
+  quyền và trạng thái không nằm trong payload cập nhật. Admin cũng thấy/tìm/sửa email trong
+  Tông Môn. Email trùng bị database lẫn service chặn, kể cả hai request đến cùng lúc.
+- Kiểm chứng: smoke Chromium thật **96/96**, trong đó sáu assert mới chạy nguyên ba flow trên
+  DOM giống recording; integration Neon xác nhận legacy `NULL`, đăng ký mới, chuẩn hoá,
+  unique, cập nhật nguyên tử và quyền tự sửa. TypeScript + production build đều là cổng phát
+  hành.
+
 ## 0.19.0 — Linh Đài nhận trạng thái trực tiếp, không chờ hai nhịp poll cộng dồn
 
 - **Gỡ đúng hai nút thắt đã đo được:** nhật ký/job trước đây chỉ được hỏi lại mỗi 3 giây khi

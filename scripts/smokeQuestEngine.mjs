@@ -21,6 +21,11 @@ import { createSession } from "../src/lib/quest-engine/session.mjs";
 import { parseCookieString } from "../src/lib/quest-engine/runCycle.mjs";
 import { computeNextDelaySeconds, parseCooldownSeconds } from "../src/lib/quest-engine/cooldown.mjs";
 import { profileForConfig } from "../src/lib/quest-engine/profile.mjs";
+import {
+  createQuizReferenceDirectory,
+  createReferenceQuiz,
+  parseQuizReferenceHtml,
+} from "../src/lib/quest-engine/quizReference.mjs";
 
 const PAGE = `<!doctype html>
 <html lang="vi"><head><meta charset="utf-8"><title>Sảnh thử</title>
@@ -44,6 +49,14 @@ const PAGE = `<!doctype html>
 
   <button id="btn-disabled" class="btn-disabled">Đã nhận</button>
 
+  <div id="quiz-fixture">
+    <div id="question">Vũ hồn thứ hai của Đường Tam là gì?</div>
+    <button class="quiz-option">Lam Ngân Thảo</button>
+    <button class="quiz-option">Nhu Cốt Thỏ</button>
+    <button class="quiz-option">Hạo Thiên Chùy</button>
+    <button class="quiz-option">Thất Bảo Lưu Ly Tháp</button>
+  </div>
+
   <div id="mode-normal" class="is-normal">phòng thường</div>
   <div id="mode-hard" class="is-hard">phòng khó</div>
 
@@ -60,6 +73,15 @@ const PAGE = `<!doctype html>
     document.getElementById('tick').addEventListener('click', () => {
       const el = document.getElementById('tally');
       el.textContent = String(Number(el.textContent) + 1);
+    });
+    document.querySelectorAll('#quiz-fixture .quiz-option').forEach((option) => {
+      option.addEventListener('click', (event) => {
+        if (!event.isTrusted) return;
+        document.getElementById('quiz-fixture').dataset.chosen = option.textContent.trim();
+        document.querySelectorAll('#quiz-fixture .quiz-option').forEach((item) => {
+          item.classList.toggle('correct', item.textContent.trim() === 'Hạo Thiên Chùy');
+        });
+      });
     });
   </script>
 </body></html>`;
@@ -133,6 +155,110 @@ async function main() {
     "jitter lịch nằm trong 0–25 giây",
     computeNextDelaySeconds([], { random: () => 0.999 }) === 325,
   );
+
+  console.log("\nDanh sách tham khảo Vấn Đáp");
+  const referencePage = `
+    <table>
+      <tr><td>1</td><td>Vũ hồn thứ hai của Đường Tam là gì?</td><td>3. Hạo Thiên Chùy</td></tr>
+      <tr><td>2</td><td><b>Công pháp nào của Hàn Lập?</b></td><td>Tất cả đáp án (ghi chú cộng đồng)</td></tr>
+      <tr><td>3</td><td>Câu đang có tranh luận?</td><td>1. Phương án A</td></tr>
+      <tr><td>4</td><td>Câu đang có tranh luận?</td><td>2. Phương án B</td></tr>
+      <tr><td>5</td><td>C&#226;u c&#243; entity &amp; HTML?</td><td>Đáp án entity</td></tr>
+    </table>`;
+  const parsedReference = parseQuizReferenceHtml(referencePage);
+  check("parser đọc đủ câu, gộp câu trùng", parsedReference.size === 4, `nhận ${parsedReference.size}`);
+  check(
+    "parser giải HTML entity trước khi fold",
+    parsedReference.has("cau co entity html"),
+    [...parsedReference.keys()].join(" / "),
+  );
+
+  let referenceFetches = 0;
+  const referenceLogs = [];
+  const referenceDirectory = createQuizReferenceDirectory({
+    fetchImpl: async () => {
+      referenceFetches++;
+      return { ok: true, status: 200, text: async () => referencePage };
+    },
+  });
+  const referenceQuiz = createReferenceQuiz({
+    url: "https://reference.test/list",
+    directory: referenceDirectory,
+    log: {
+      info: (_scope, message) => referenceLogs.push(message),
+      warning: (_scope, message) => referenceLogs.push(message),
+      debug: (_scope, message) => referenceLogs.push(message),
+    },
+  });
+
+  const listedAnswer = await referenceQuiz.resolve({
+    text: "Vu hon thu hai cua Duong Tam la gi ?",
+    options: ["Nhu Cốt Thỏ", "Hạo Thiên Chùy", "Lam Ngân Thảo"],
+  });
+  check(
+    "bỏ số thứ tự, bỏ dấu rồi chọn theo TEXT chứ không theo vị trí",
+    listedAnswer?.option === "Hạo Thiên Chùy" && listedAnswer.index === 1,
+    JSON.stringify(listedAnswer),
+  );
+  check("nhật ký gọi đúng nguồn danh sách tham khảo", listedAnswer?.source === "danh sách tham khảo");
+
+  const answerWithNote = await referenceQuiz.resolve({
+    text: "Công pháp nào của Hàn Lập?",
+    options: ["Thanh Nguyên Kiếm Quyết", "Tất cả đáp án", "Tam Chuyển Trọng Nguyên Công"],
+  });
+  check("ghi chú cuối `(…)` không làm lệch đáp án", answerWithNote?.option === "Tất cả đáp án");
+  check(
+    "hai lần tra trong 12 giờ chỉ tải danh sách một lần",
+    referenceFetches === 1,
+    `đã tải ${referenceFetches} lần`,
+  );
+  check(
+    "nguồn tự mâu thuẫn thì không chọn bừa",
+    (await referenceQuiz.resolve({
+      text: "Câu đang có tranh luận?",
+      options: ["Phương án A", "Phương án B", "Phương án C"],
+    })) === null,
+  );
+  check(
+    "câu không có trong danh sách thì trả null, không Gemini",
+    (await referenceQuiz.resolve({
+      text: "Câu hoàn toàn mới?",
+      options: ["A", "B", "C", "D"],
+    })) === null,
+  );
+
+  let fakeNow = 1_000;
+  let staleFetches = 0;
+  const staleWarnings = [];
+  const staleDirectory = createQuizReferenceDirectory({
+    freshnessMs: 50,
+    now: () => fakeNow,
+    fetchImpl: async () => {
+      staleFetches++;
+      if (staleFetches > 1) throw new Error("mạng thử nghiệm đứt");
+      return { ok: true, status: 200, text: async () => referencePage };
+    },
+  });
+  const staleQuiz = createReferenceQuiz({
+    url: "https://reference.test/stale",
+    directory: staleDirectory,
+    log: {
+      info() {},
+      debug() {},
+      warning: (_scope, message) => staleWarnings.push(message),
+    },
+  });
+  await staleQuiz.resolve({
+    text: "Vũ hồn thứ hai của Đường Tam là gì?",
+    options: ["Hạo Thiên Chùy", "Khác"],
+  });
+  fakeNow += 100;
+  const staleFallback = await staleQuiz.resolve({
+    text: "Vũ hồn thứ hai của Đường Tam là gì?",
+    options: ["Hạo Thiên Chùy", "Khác"],
+  });
+  check("refresh lỗi vẫn giữ bản cache cũ", staleFallback?.option === "Hạo Thiên Chùy");
+  check("refresh lỗi chỉ cảnh báo, không ném sập quest", staleWarnings.length === 1);
 
   const cookies = parseCookieString("wordpress_logged_in_ab=x|y|z=; other=2", "https://e.test");
   check("cookie tách ở dấu = ĐẦU TIÊN", cookies[0]?.value === "x|y|z=", `nhận ${cookies[0]?.value}`);
@@ -405,6 +531,8 @@ async function main() {
     });
     const engine = createQuestEngine({ log });
     const run = (quest) => engine.run(session, { dailyQuestPath: "/" }, quest);
+    const quizEngine = createQuestEngine({ log, quiz: referenceQuiz });
+    const runQuiz = (quest) => quizEngine.run(session, { dailyQuestPath: "/" }, quest);
 
     console.log("\nĐiều kiện trên trang sống");
     await session.navigate(baseUrl);
@@ -434,6 +562,50 @@ async function main() {
       (await cond({ selector: "#counter", kind: "textMatches", text: "999/385|120/385" })) === true);
     check("textNotMatches là phép PHỦ ĐỊNH của HOẶC",
       (await cond({ selector: "#counter", kind: "textNotMatches", text: "999/385|120/385" })) === false);
+
+    console.log("\nVấn Đáp trên trang sống");
+    infos.length = 0;
+    const quizResult = await runQuiz(questOf([
+      {
+        action: "answerQuiz",
+        selector: "#question",
+        optionsSelector: "#quiz-fixture .quiz-option",
+        timeoutMs: 5000,
+      },
+    ]));
+    check("engine dùng danh sách và hoàn tất bước answerQuiz", quizResult.outcome === "completed", quizResult.outcome);
+    check(
+      "đáp án đi qua click Playwright thật và được trang ghi nhận",
+      (await page.evaluate(() => document.getElementById("quiz-fixture").dataset.chosen)) === "Hạo Thiên Chùy",
+    );
+    check(
+      "nhật ký flow ghi nguồn danh sách tham khảo",
+      infos.some((message) => message.includes("danh sách tham khảo")),
+      infos.join(" / "),
+    );
+
+    await page.evaluate(() => {
+      document.getElementById("question").textContent = "Câu chưa hề có trong danh sách?";
+      delete document.getElementById("quiz-fixture").dataset.chosen;
+      document.querySelectorAll("#quiz-fixture .quiz-option").forEach((item) => item.classList.remove("correct"));
+    });
+    const unknownQuiz = await runQuiz(questOf([
+      {
+        action: "answerQuiz",
+        selector: "#question",
+        optionsSelector: "#quiz-fixture .quiz-option",
+        timeoutMs: 5000,
+      },
+    ]));
+    check(
+      "câu lạ kết thúc an toàn để giữ lượt",
+      unknownQuiz.outcome === "alreadyDone" && unknownQuiz.message.includes("chưa biết đáp án"),
+      `${unknownQuiz.outcome}: ${unknownQuiz.message}`,
+    );
+    check(
+      "câu lạ không bấm đại lựa chọn nào",
+      (await page.evaluate(() => document.getElementById("quiz-fixture").dataset.chosen)) === undefined,
+    );
 
     console.log("\nGuard, stopIf, kênh tường thuật");
 

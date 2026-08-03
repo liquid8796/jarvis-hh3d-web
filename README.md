@@ -133,6 +133,10 @@ Nên chia thế này:
   HP), lớp này đặt các lựa chọn ấy vào đúng `selectedValue` của hồ sơ.
 - **Trình duyệt được TIÊM VÀO.** `runCycle` nhận `chromium` từ người gọi, nên `quest-engine/`
   không phụ thuộc Playwright và bundle của Next không kéo theo thư viện nó không dùng.
+- **Vấn Đáp dùng cùng danh sách tham khảo với PC.** Worker tải toàn bộ bảng cộng đồng về máy,
+  cache 12 giờ rồi so câu/đáp án cục bộ. Nó bỏ dấu và số thứ tự nhưng chỉ chấp nhận đáp án
+  khớp nguyên vẹn một lựa chọn đang hiện; nguồn mâu thuẫn hoặc câu lạ thì dừng để giữ lượt.
+  Không có nhánh Gemini trên web.
 
 Lưới hồi quy chạy trên Chromium thật, trước một trang thật:
 
@@ -341,6 +345,10 @@ Cơ chế, và vì sao từng mảnh lại như vậy:
 - Cài lại = cập nhật, và **giữ nguyên WORKER_ID** đã có, để mục Linh Sứ không tích dần xác
   linh sứ "vắng mặt" sau mỗi lần nâng cấp. Gỡ bằng `uninstall.ps1`/`uninstall.sh` trong thư
   mục cài: xoá thư mục, cắt đường tự khởi động, hạ cả vòng nuôi lẫn worker.
+
+> Linh sứ cài trước **v0.18.0** phải cài đè một lần để nhận kho tham khảo Vấn Đáp. Không cần
+> gỡ trước và không cần phát linh phù mới. Muốn đổi nguồn thay vì URL mặc định của PC, đặt
+> `QUIZ_DIRECTORY_URL` trong môi trường của worker rồi khởi động lại.
 
 Dev muốn chạy worker thô từ repo thì vẫn được:
 

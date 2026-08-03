@@ -11,6 +11,30 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.18.0 — Vấn Đáp web dùng cùng danh sách tham khảo với PC, không hỏi Gemini
+
+- **Flow trước đây chỉ có tay mà không có đầu.** Hồ sơ web đã biết mở
+  `/van-dap-tong-mon`, đọc `#question`, bấm đáp án bằng input thật và nhìn lại marker
+  `.correct`; nhưng `runCycle` tạo engine mà không tiêm `quiz`. Gặp câu đầu, nó luôn tự thú
+  “bản web chưa có kho đáp án” rồi dừng — dòng UI “Tự trả lời câu đã biết” vì thế chưa đúng.
+- **Port nguyên tầng `QuizReferenceDirectory` của PC.** Worker tải toàn bộ bảng tại
+  `https://hh3d.phucthienlang.vn/user_search.php`, cache trong tiến trình 12 giờ và dùng chung
+  cho mọi vòng/account trên máy. Không gọi endpoint tìm kiếm theo từng câu; câu hỏi đang hiện
+  không bị gửi đi đâu.
+- **Khớp theo text, không theo số/vị trí.** Parser bỏ `3.` / `3)`, giải HTML entity, bỏ thẻ,
+  gộp khoảng trắng và fold dấu tiếng Việt. Đáp án chỉ được dùng khi khớp nguyên vẹn đúng một
+  trong các lựa chọn đang hiện; thứ tự bị site xáo không có ý nghĩa. Ghi chú cuối `(…)` được
+  thử bỏ như PC. Nếu nguồn tự mâu thuẫn hoặc đáp án không nằm trên màn hình thì không bấm.
+- **Không có Gemini đúng theo phạm vi yêu cầu.** Câu không có trong danh sách kết thúc quest
+  an toàn để giữ các lượt còn lại cho người dùng. Refresh nguồn hỏng vẫn dùng bản cache cũ;
+  lần đầu tải hỏng chỉ cảnh báo, không làm sập cả vòng automation.
+- URL có thể đổi bằng `QUIZ_DIRECTORY_URL` trên máy nuôi worker; để trống dùng cùng mặc định
+  với PC. Linh sứ đã cài trước v0.18.0 cần **cài lại một lần để cập nhật engine** — cài đè giữ
+  nguyên linh phù và `WORKER_ID`.
+- Kiểm chứng: smoke **90/90**, gồm Chromium thật xác nhận đáp án đi qua click Playwright và
+  câu lạ không bấm đại; nguồn cộng đồng thật trả HTTP 200, parser đọc đúng **255 câu duy nhất**
+  và resolver khớp lại được đáp án theo text.
+
 ## 0.17.0 — Khai Đàn là một lời hứa sống dai, không phải vé đi đúng một vòng
 
 - **Hết một vòng không còn biến job thành `done`.** Đó là lý do ảnh thực địa hiện “Đi hết

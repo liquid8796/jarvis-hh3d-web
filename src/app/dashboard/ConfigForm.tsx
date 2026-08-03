@@ -27,7 +27,11 @@ const SIMPLE_QUESTS: ReadonlyArray<{ key: string; name: string; hint: string }> 
   { key: "teLe", name: "Tế Lễ Tông Môn", hint: "Tế 10 Tinh Thạch cho tông môn." },
   { key: "phucLoiVip", name: "Phúc Lợi VIP", hint: "Nhận thêm lượt khắc trận văn theo hạng." },
   { key: "vongQuay", name: "Vòng Quay Phúc Vận", hint: "Quay hết lượt phúc vận trong ngày." },
-  { key: "vanDap", name: "Vấn Đáp", hint: "Tự trả lời câu đã biết. Câu lạ để bạn tự làm." },
+  {
+    key: "vanDap",
+    name: "Vấn Đáp",
+    hint: "Tra danh sách tham khảo như bản PC. Câu không có trong danh sách sẽ để bạn tự làm.",
+  },
   { key: "khoangMach", name: "Khoáng Mạch", hint: "Thu khoáng theo chu kỳ trong ngày." },
 ];
 

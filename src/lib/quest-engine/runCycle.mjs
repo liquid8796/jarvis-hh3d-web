@@ -12,6 +12,7 @@ import { computeNextDelaySeconds } from "./cooldown.mjs";
 import { DEFAULT_GAME_BASE_URL, parseCookieString } from "./cookies.mjs";
 import { createQuestEngine, enabledQuestsInOrder, questsForAccount, QuestAborted } from "./engine.mjs";
 import { profileForConfig } from "./profile.mjs";
+import { createReferenceQuiz, DEFAULT_QUIZ_REFERENCE_URL } from "./quizReference.mjs";
 import { createSession } from "./session.mjs";
 
 // Base URL + parser cookie sống ở module LÁ cookies.mjs (không import gì, không đụng đĩa)
@@ -344,7 +345,11 @@ export async function runCycle(deps) {
 
     await say(`Sẽ hành sự: ${quests.map((q) => q.name).join(" · ")}.`);
 
-    const engine = createQuestEngine({ log, shouldStop });
+    const quiz = createReferenceQuiz({
+      url: process.env.QUIZ_DIRECTORY_URL?.trim() || DEFAULT_QUIZ_REFERENCE_URL,
+      log,
+    });
+    const engine = createQuestEngine({ log, shouldStop, quiz });
 
     for (const quest of quests) {
       if (shouldStop()) {

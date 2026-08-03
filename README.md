@@ -107,14 +107,28 @@ Phân tầng nghiêm ngặt, mỗi tầng chỉ nói chuyện với tầng ngay 
 src/
   app/            # Route + UI. Server Components đọc, Server Actions ghi.
     actions/      #   Ranh giới ghi — mọi action mở đầu bằng một guard.
-    api/          #   Hai endpoint máy-nói-với-máy: feed cho client, /api/worker cho linh sứ.
+    api/          #   Feed/SSE cho client, /api/worker cho linh sứ.
   components/     # UI dùng chung, không biết gì về database.
   lib/
     auth/         # Phiên đăng nhập, guard phân quyền, cửa vào của worker.
     db/           # Schema Drizzle + client. Nơi DUY NHẤT biết hình thù bảng.
+    realtime/     # Kênh LISTEN/NOTIFY + contract SSE của Linh Đài.
     services/     # Quy tắc nghiệp vụ. Nơi DUY NHẤT viết truy vấn.
     quest-engine/ # Bộ thông dịch nhiệm vụ — JS thuần, không biết gì về Next hay database.
 ```
+
+#### Trạng thái Linh Đài đi trực tiếp như thế nào
+
+Job, log và sổ linh sứ vẫn lấy Postgres làm sự thật duy nhất. Migration `0007` chỉ gắn thêm
+“chuông cửa”: transaction nào thay đổi dữ liệu nhìn thấy được sẽ `NOTIFY` scope của đúng user.
+Route `/api/dashboard/stream` giữ một session `LISTEN` rồi đẩy snapshot qua SSE; nó không poll
+database liên tục. Browser giữ cursor bằng event id, tự reconnect/tiếp tục từ dòng cuối và có
+feed một-lần dự phòng nếu stream chập chờn. Vì đây là luồng server → browser một chiều nên SSE
+đúng hình hơn WebSocket và không cần thêm một dịch vụ realtime thứ ba.
+
+`LISTEN` phải đi qua kết nối unpooled nhưng vẫn đúng database của `DATABASE_URL`. Với Neon trên
+Vercel, code dùng `PGHOST_UNPOOLED` và giữ nguyên path/credentials; hạ tầng khác có thể đặt rõ
+`REALTIME_DATABASE_URL`. Đừng lấy mù `DATABASE_URL_UNPOOLED` nếu nó trỏ database mặc định khác.
 
 #### Bộ thông dịch nhiệm vụ, và vì sao nó dùng chung với bản desktop
 
@@ -182,7 +196,7 @@ admin hay job lifecycle — và không viết một dòng selector nào lần th
 
 ### Bước 2 — Biến môi trường
 
-Vercel → Project → **Settings** → **Environment Variables**. Thêm hai biến (`DATABASE_URL`
+Vercel → Project → **Settings** → **Environment Variables**. Thêm các biến (`DATABASE_URL`
 đã có sẵn từ bước 1):
 
 | Biến | Giá trị | Dùng để làm gì |
@@ -190,6 +204,7 @@ Vercel → Project → **Settings** → **Environment Variables**. Thêm hai bi�
 | `AUTH_SECRET` | 32 byte ngẫu nhiên | Ký JWT phiên đăng nhập |
 | `ENCRYPTION_KEY` | **đúng** 32 byte (64 hex) | Mã hoá cookie game trong database |
 | `WORKER_TOKEN` | 32 byte ngẫu nhiên | Bí mật chia sẻ để linh sứ gọi `/api/worker` |
+| `REALTIME_DATABASE_URL` | Tuỳ chọn | URL unpooled tới **cùng database**; Neon thường để trống được |
 
 Sinh chuỗi ngẫu nhiên:
 
@@ -346,9 +361,9 @@ Cơ chế, và vì sao từng mảnh lại như vậy:
   linh sứ "vắng mặt" sau mỗi lần nâng cấp. Gỡ bằng `uninstall.ps1`/`uninstall.sh` trong thư
   mục cài: xoá thư mục, cắt đường tự khởi động, hạ cả vòng nuôi lẫn worker.
 
-> Linh sứ cài trước **v0.18.0** phải cài đè một lần để nhận kho tham khảo Vấn Đáp. Không cần
-> gỡ trước và không cần phát linh phù mới. Muốn đổi nguồn thay vì URL mặc định của PC, đặt
-> `QUIZ_DIRECTORY_URL` trong môi trường của worker rồi khởi động lại.
+> Linh sứ cài trước **v0.19.0** nên cài đè một lần: bản trước v0.18 nhận thêm kho Vấn Đáp, mọi
+> bản cũ nhận heartbeat Thu Đàn 5 giây. Không cần gỡ trước hay phát linh phù mới. Muốn đổi
+> nguồn Vấn Đáp, đặt `QUIZ_DIRECTORY_URL` trong môi trường worker rồi khởi động lại.
 
 Dev muốn chạy worker thô từ repo thì vẫn được:
 

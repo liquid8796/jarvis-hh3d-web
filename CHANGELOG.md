@@ -11,6 +11,31 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.19.0 — Linh Đài nhận trạng thái trực tiếp, không chờ hai nhịp poll cộng dồn
+
+- **Gỡ đúng hai nút thắt đã đo được:** nhật ký/job trước đây chỉ được hỏi lại mỗi 3 giây khi
+  chạy (12 giây khi nghỉ), sổ linh sứ mỗi 12 giây, còn worker đang bận chỉ heartbeat mỗi 20
+  giây. Những cửa sổ ấy cộng dồn làm một trạng thái thật đã có trên server nhưng màn hình vẫn
+  đứng yên đủ lâu để người dùng tưởng linh sứ treo.
+- **Postgres giờ phát chuông trong chính transaction ghi dữ liệu.** Migration 0007 đặt trigger
+  trên lifecycle job, event mới và sổ worker; payload `NOTIFY` chỉ có user/topic, không mang
+  cookie hay nội dung log. `/api/dashboard/stream` giữ một `LISTEN` session unpooled rồi đẩy
+  snapshot qua SSE tới đúng user ngay khi chuông reo — không quay vòng query database.
+- **Một EventSource nuôi cả Lư Khai Đàn lẫn mục Linh Sứ.** Cursor là id `job_events`; reconnect
+  dùng `Last-Event-ID`, backlog trên 200 dòng tự chảy tiếp, event trùng được gộp, dọn log reset
+  đồng thời ở các tab. Dấu **● Trực tiếp** cho biết kênh đang sống; khi kênh rớt, browser tự
+  reconnect và feed một-lần 2 giây làm lưới an toàn, khi ổn chỉ soát lại mỗi 30 giây.
+- **Không đánh đổi hiệu năng React để lấy tốc độ.** Job/log và presence có context riêng, nên
+  một dòng nhật ký mới không bắt cả panel cài đặt linh sứ render lại. Heartbeat dời `lastSeen`
+  nhưng nếu trạng thái vẫn “đang trực” thì server chỉ hẹn lại giờ hết hạn, không gửi frame rác.
+- **Thu Đàn nhanh hơn trên gói worker mới:** heartbeat mặc định từ 20 giây xuống 5 giây, có thể
+  chỉnh bằng `WORKER_HEARTBEAT_MS`. Realtime trên trang có hiệu lực ngay sau deploy; linh sứ
+  cũ vẫn chạy, nhưng nên cài đè v0.19.0 một lần để nhận nhịp dừng 5 giây.
+- Kiểm chứng trên Neon thật: trigger `job/event/presence/reset` tới listener trong **56–155ms**;
+  qua trọn session cookie → Next route → SSE client, event tới sau **168ms** và reset sau
+  **223ms**. Có thêm verifier riêng cho cả tầng DB (`verify:realtime`) và HTTP stream
+  (`verify:realtime:sse`).
+
 ## 0.18.0 — Vấn Đáp web dùng cùng danh sách tham khảo với PC, không hỏi Gemini
 
 - **Flow trước đây chỉ có tay mà không có đầu.** Hồ sơ web đã biết mở

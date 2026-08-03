@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { forgetLinhSuAction, issueLinhPhuAction, revokeLinhPhuAction } from "@/app/actions/linhsu";
+import { useDashboardPresenceLive } from "./DashboardLiveProvider";
 
 /**
  * Mục LINH SỨ — nơi đạo hữu thấy ai đang trực và, NẾU MUỐN, tự nuôi một linh sứ riêng.
@@ -16,11 +17,6 @@ import { forgetLinhSuAction, issueLinhPhuAction, revokeLinhPhuAction } from "@/a
  * linh phù vốn đã nằm sẵn ở client (action vừa trả về), nên không cần thêm một endpoint,
  * và bí mật không bao giờ phải đi qua một URL để rồi nằm lại trong log máy chủ.
  */
-
-type PresenceWorker = { id: string; lastSeen: string; online: boolean };
-type Presence = { sectOnline: boolean; mine: PresenceWorker[] };
-
-const POLL_MS = 12_000;
 
 function timeAgo(iso: string): string {
   const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -89,31 +85,15 @@ function CopyBlock({ label, command }: { label: string; command: string }) {
 }
 
 export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }) {
-  const [presence, setPresence] = useState<Presence | null>(null);
+  const { presence, refresh } = useDashboardPresenceLive();
   const [hasToken, setHasToken] = useState(initialHasToken);
   const [token, setToken] = useState<string | null>(null);
   const [showCommands, setShowCommands] = useState(false);
   const [forgetError, setForgetError] = useState<string | null>(null);
-  // Tên đã bấm gỡ, giữ RIÊNG chứ không cắt thẳng khỏi `presence`: nhịp poll 12 giây vẫn đang
-  // chạy và nó ghi đè cả object bằng dữ liệu máy chủ, nên một phép cắt tại chỗ sẽ bị nhịp
-  // poll kế tiếp dựng dòng ấy dậy trong lúc lệnh xoá còn đang bay.
+  // Tên đã bấm gỡ giữ RIÊNG chứ không cắt thẳng khỏi `presence`: một frame SSE mới vẫn có
+  // thể về trong lúc lệnh xoá đang bay và dựng dòng ấy dậy nếu không có lớp che lạc quan này.
   const [forgotten, setForgotten] = useState<string[]>([]);
   const [pending, startTransition] = useTransition();
-
-  const poll = useCallback(async () => {
-    try {
-      const res = await fetch("/api/linh-su", { cache: "no-store" });
-      if (res.ok) setPresence((await res.json()) as Presence);
-    } catch {
-      /* mạng vấp một nhịp thì giữ màn hình cũ */
-    }
-  }, []);
-
-  useEffect(() => {
-    void poll();
-    const timer = setInterval(() => void poll(), POLL_MS);
-    return () => clearInterval(timer);
-  }, [poll]);
 
   const issue = () => {
     // Phát lại là THAY linh phù: linh sứ đang chạy bằng linh phù cũ sẽ bị từ chối ngay.
@@ -133,7 +113,7 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
   /**
    * Gỡ một cái tên khỏi sổ. Biến mất khỏi màn hình NGAY rồi mới đợi máy chủ: dòng ấy đã
    * "vắng mặt" từ lâu nên không có trạng thái nào để mất, còn một cái nút bấm xong đứng im
-   * ba nhịp poll thì người ta bấm lần nữa. Máy chủ từ chối thì trả nó về nguyên chỗ cũ.
+   * vài nhịp cập nhật thì người ta bấm lần nữa. Máy chủ từ chối thì trả nó về nguyên chỗ cũ.
    */
   const forget = (workerId: string) => {
     if (
@@ -150,7 +130,7 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
       if (!result.ok) {
         setForgotten((f) => f.filter((id) => id !== workerId));
         setForgetError(result.message ?? "Chưa gỡ được, thử lại sau một lát.");
-        void poll();
+        void refresh();
       }
     });
   };
@@ -206,7 +186,7 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
     );
   };
 
-  // Danh sách thật sự vẽ ra: bỏ những tên vừa bấm gỡ, kể cả khi nhịp poll chưa kịp biết.
+  // Danh sách thật sự vẽ ra: bỏ những tên vừa bấm gỡ, kể cả khi frame mới chưa kịp biết.
   const mine = (presence?.mine ?? []).filter((w) => !forgotten.includes(w.id));
   const noWorkerAtAll = presence != null && !presence.sectOnline && !mine.some((w) => w.online);
 

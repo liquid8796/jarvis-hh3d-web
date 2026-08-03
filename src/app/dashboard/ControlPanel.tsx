@@ -1,40 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { clearLogAction, startAction, stopAction } from "@/app/actions/automation";
+import { useDashboardJobLive } from "./DashboardLiveProvider";
+import type { DashboardJob, JobStatus } from "@/lib/realtime/dashboardTypes";
 
 /**
  * Lư Khai Đàn — nút start/stop và nhật ký tu luyện.
  *
- * Trạng thái thật nằm ở server: nút bấm chỉ gửi ý định, còn màn hình được vẽ lại từ những
- * gì `/api/jobs/feed` trả về. Đó là điều khiến việc đóng tab không có nghĩa lý gì — mở lại
+ * Trạng thái thật nằm ở server: nút bấm chỉ gửi ý định, còn màn hình được đẩy lại từ SSE
+ * (và feed một-lần khi reconnect). Đó là điều khiến việc đóng tab không có nghĩa lý gì — mở lại
  * ở máy khác vẫn thấy đúng lượt đang chạy, đúng nhật ký, vì chưa bao giờ có state nào chỉ
  * sống trong trình duyệt.
  */
 
-type JobStatus = "queued" | "running" | "stopping" | "stopped" | "failed" | "done";
-
-type FeedJob = {
-  id: string;
-  status: JobStatus;
-  createdAt: string;
-  nextRunAt: string;
-  attempts: number;
-  workerId: string | null;
-};
-
-type FeedEvent = {
-  id: number;
-  at: string;
-  level: "info" | "success" | "warning" | "error";
-  message: string;
-};
-
 const ACTIVE: JobStatus[] = ["queued", "running", "stopping"];
-
-/** Nhịp hỏi tin: dồn dập khi đàn đang chạy, thong thả khi đã nghỉ. */
-const POLL_ACTIVE_MS = 3000;
-const POLL_IDLE_MS = 12000;
 
 const STATUS_TEXT: Record<JobStatus, string> = {
   queued: "Chờ linh sứ tiếp nhận",
@@ -45,7 +25,7 @@ const STATUS_TEXT: Record<JobStatus, string> = {
   done: "Đã viên mãn",
 };
 
-function describeStatus(job: FeedJob): string {
+function describeStatus(job: DashboardJob): string {
   const next = new Date(job.nextRunAt);
   if (job.status === "queued" && job.attempts > 0 && next.getTime() > Date.now() + 5000) {
     return `Đang nghỉ — vòng ${job.attempts + 1} lúc ${next.toLocaleString("vi-VN", {
@@ -59,45 +39,12 @@ function describeStatus(job: FeedJob): string {
 }
 
 export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }) {
-  const [job, setJob] = useState<FeedJob | null>(null);
-  const [events, setEvents] = useState<FeedEvent[]>([]);
+  const { job, events, connected, refresh, clearEvents } = useDashboardJobLive();
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // Con trỏ nhật ký: chỉ xin những dòng SAU dòng cuối đã có, nên phiên chạy dài hàng giờ
-  // vẫn không kéo lại toàn bộ lịch sử mỗi 3 giây.
-  const cursor = useRef(0);
   const logRef = useRef<HTMLDivElement>(null);
   const running = job ? ACTIVE.includes(job.status) : initiallyRunning;
-
-  const poll = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/jobs/feed?after=${cursor.current}`, { cache: "no-store" });
-      if (!res.ok) return;
-
-      const data = (await res.json()) as { job: FeedJob | null; events: FeedEvent[] };
-      setJob(data.job);
-      if (data.events.length > 0) {
-        // Poll định kỳ và poll ngay sau server action có thể cùng bay. Nếu hai hồi đáp đọc
-        // chung một cursor, cả hai sẽ mang cùng event về; khử theo id và không cho hồi đáp
-        // chậm kéo cursor lùi để nhật ký không vẽ một dòng Thu Đàn hai lần.
-        cursor.current = Math.max(cursor.current, data.events[data.events.length - 1].id);
-        setEvents((prev) => {
-          const byId = new Map(prev.map((event) => [event.id, event]));
-          for (const event of data.events) byId.set(event.id, event);
-          return [...byId.values()].sort((a, b) => a.id - b.id).slice(-400);
-        });
-      }
-    } catch {
-      // Mạng chớp tắt là chuyện thường của một trang mở hàng giờ; nhịp sau hỏi lại.
-    }
-  }, []);
-
-  useEffect(() => {
-    void poll();
-    const id = setInterval(() => void poll(), running ? POLL_ACTIVE_MS : POLL_IDLE_MS);
-    return () => clearInterval(id);
-  }, [poll, running]);
 
   // Chỉ tự cuộn khi người đọc đang ở sát đáy — ai đang đọc lại dòng cũ thì không bị giật đi.
   useEffect(() => {
@@ -111,7 +58,7 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
     startTransition(async () => {
       const result = await fn();
       setNotice(result.message);
-      await poll();
+      await refresh();
     });
   };
 
@@ -121,8 +68,8 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
     }
     startTransition(async () => {
       const result = await clearLogAction();
-      setEvents([]);
-      // KHÔNG đụng tới con trỏ: id của job_events là bigserial, không bao giờ dùng lại, nên
+      clearEvents();
+      // KHÔNG đụng tới cursor trong provider: id của job_events là bigserial, không bao giờ dùng lại, nên
       // mọi dòng linh sứ kể từ đây đều mang id lớn hơn và vẫn chảy về bình thường. Reset
       // con trỏ về 0 chỉ tổ kéo lại đúng những dòng vừa xoá nếu câu DELETE về chậm hơn nhịp
       // hỏi tin kế tiếp.
@@ -198,14 +145,24 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
         <span className="text-xs font-semibold text-[var(--color-parchment)]">
           Nhật ký tu luyện
         </span>
-        <button
-          type="button"
-          onClick={clearLog}
-          disabled={pending || events.length === 0}
-          className="rounded-md border border-[var(--color-ink-600)] px-2 py-0.5 text-xs text-[var(--color-mist)] transition-colors hover:text-[var(--color-gold-300)] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Dọn nhật ký
-        </button>
+        <div className="flex items-center gap-2">
+          <span
+            role="status"
+            className={`text-[11px] ${
+              connected ? "text-[var(--color-jade-400)]" : "text-[var(--color-gold-300)]"
+            }`}
+          >
+            {connected ? "● Trực tiếp" : "↻ Đang nối lại…"}
+          </span>
+          <button
+            type="button"
+            onClick={clearLog}
+            disabled={pending || events.length === 0}
+            className="rounded-md border border-[var(--color-ink-600)] px-2 py-0.5 text-xs text-[var(--color-mist)] transition-colors hover:text-[var(--color-gold-300)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Dọn nhật ký
+          </button>
+        </div>
       </div>
 
       <div

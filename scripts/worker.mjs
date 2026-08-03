@@ -9,7 +9,7 @@
  * Fly.io, Railway… bất cứ chỗ nào chạy được Node dài hạn).
  *
  * Vòng đời một vòng: xin việc → nhận config snapshot → chạy → kể chuyện qua `event` → nhịp
- * tim mỗi 20 giây (và nghe xem người dùng có bấm Thu Đàn không) → báo kết quả. Server đặt
+ * tim mỗi 5 giây (và nghe xem người dùng có bấm Thu Đàn không) → báo kết quả. Server đặt
  * `nextRunAt` rồi trả cùng job về hàng chờ; worker cũ lẫn mới đều tự nhận vòng kế.
  *
  * Phần điều khiển trình duyệt là engine dùng chung ở `src/lib/quest-engine` — cùng bộ thông
@@ -29,7 +29,9 @@ const WEB_URL = (process.env.WEB_URL ?? "http://localhost:3000").replace(/\/$/, 
 const TOKEN = process.env.WORKER_TOKEN;
 const WORKER_ID = process.env.WORKER_ID ?? `linh-su-${process.pid}`;
 const POLL_MS = Number(process.env.WORKER_POLL_MS ?? 5000);
-const HEARTBEAT_MS = 20_000;
+// Năm giây là ranh giới người dùng còn cảm thấy nút Thu Đàn phản hồi tức thời. Cho phép chỉnh
+// để máy chủ riêng có thể tiết chế request, nhưng không nhận giá trị vô lý làm quay nóng CPU.
+const HEARTBEAT_MS = Math.max(1_000, Number(process.env.WORKER_HEARTBEAT_MS ?? 5_000) || 5_000);
 
 if (!TOKEN || TOKEN === "change-me") {
   console.error("WORKER_TOKEN chưa đặt — dùng linh phù phát ở mục Linh Sứ, hoặc token tông môn.");

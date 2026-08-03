@@ -40,6 +40,8 @@ export type WorkerPresence = {
   mineOnline: boolean;
   /** Linh sứ tông môn (userId null) có đang trực không. */
   sectOnline: boolean;
+  /** Lần điểm danh mới nhất của tông môn, để SSE tự hẹn đúng lúc trạng thái hết hạn. */
+  sectLastSeen: Date | null;
 };
 
 export async function getPresence(userId: string): Promise<WorkerPresence> {
@@ -53,14 +55,19 @@ export async function getPresence(userId: string): Promise<WorkerPresence> {
     .limit(10);
 
   const sect = await db()
-    .select({ n: sql<number>`count(*)::int` })
+    .select({ lastSeen: schema.workers.lastSeen })
     .from(schema.workers)
-    .where(and(isNull(schema.workers.userId), gt(schema.workers.lastSeen, cutoff)));
+    .where(isNull(schema.workers.userId))
+    .orderBy(desc(schema.workers.lastSeen))
+    .limit(1);
+
+  const sectLastSeen = sect[0]?.lastSeen ?? null;
 
   return {
     mine,
     mineOnline: mine.some((w) => w.lastSeen > cutoff),
-    sectOnline: (sect[0]?.n ?? 0) > 0,
+    sectOnline: sectLastSeen != null && sectLastSeen > cutoff,
+    sectLastSeen,
   };
 }
 

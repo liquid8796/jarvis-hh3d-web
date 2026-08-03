@@ -5,6 +5,7 @@ import { getActiveJob } from "@/lib/services/jobs";
 import { hasWorkerToken } from "@/lib/services/workers";
 import { ConfigForm } from "./ConfigForm";
 import { ControlPanel } from "./ControlPanel";
+import { DashboardLiveProvider } from "./DashboardLiveProvider";
 import { LinhSuPanel } from "./LinhSuPanel";
 
 export const metadata = { title: "Linh Đài" };
@@ -44,8 +45,10 @@ export default async function DashboardPage() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           <ConfigForm config={config} />
           <div className="flex min-w-0 flex-col gap-6">
-            <ControlPanel initiallyRunning={activeJob !== null} />
-            <LinhSuPanel hasToken={tokenIssued} />
+            <DashboardLiveProvider>
+              <ControlPanel initiallyRunning={activeJob !== null} />
+              <LinhSuPanel hasToken={tokenIssued} />
+            </DashboardLiveProvider>
           </div>
         </div>
       </main>

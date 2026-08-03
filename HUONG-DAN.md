@@ -60,8 +60,8 @@ Tick những cái bạn muốn auto làm.
 Riêng **Vấn Đáp**, linh sứ dùng cùng danh sách tham khảo với bản PC (hiện đọc được 255 câu).
 Nó chỉ trả lời khi đáp án trong danh sách khớp đúng một lựa chọn đang hiện; câu lạ hoặc nguồn
 mâu thuẫn sẽ được để lại cho bạn, không hỏi Gemini và không đoán bừa. Nếu đã cài linh sứ trước
-v0.18.0, hãy bấm **Tạo bộ cài cho máy của tôi** và cài đè một lần để cập nhật — không cần gỡ
-bản cũ hay phát linh phù mới.
+v0.19.0, hãy bấm **Tạo bộ cài cho máy của tôi** và cài đè một lần để nhận cả kho Vấn Đáp lẫn
+heartbeat 5 giây — không cần gỡ bản cũ hay phát linh phù mới.
 
 Mê Cung có vài tuỳ chọn đáng để ý:
 
@@ -85,6 +85,11 @@ khác nên vẫn chạy tiếp; còn linh sứ cài trên máy bạn thì tắt 
 
 Mở lại trang lúc nào cũng thấy auto đang làm tới đâu, trong khung **Nhật ký tu luyện**.
 Muốn dừng hẳn thì bấm **Thu Đàn** — auto dừng ở điểm an toàn gần nhất, không cắt ngang trận.
+
+Khi cạnh tiêu đề nhật ký hiện **● Trực tiếp**, trạng thái và từng dòng linh sứ kể được đẩy lên
+ngay, không phải chờ trang hỏi lại. Mạng chập chờn thì nó tự hiện **Đang nối lại…** và dùng nhịp
+dự phòng; bạn không cần F5. Cài đè linh sứ v0.19.0 một lần để nút Thu Đàn được máy đang bận
+nhận trong khoảng 5 giây thay vì nhịp 20 giây của bản cũ.
 
 ---
 

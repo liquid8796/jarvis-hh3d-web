@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/auth/guards";
-import { getPresence, ONLINE_WINDOW_MS } from "@/lib/services/workers";
+import { getPresenceFeed } from "@/lib/services/dashboard";
 
 /**
- * Sổ điểm danh linh sứ cho panel Linh Sứ — một READ thuần, client hỏi theo nhịp để cái
- * chấm "đang trực" phản ánh sự thật chứ không phải trí nhớ của lần tải trang.
+ * Ảnh chụp sổ linh sứ đời cũ/compatibility. Dashboard v0.19 nhận cùng dữ liệu qua SSE chung;
+ * route này vẫn là lưới an toàn và phục vụ tab cũ trong lúc rollout.
  */
 export async function GET() {
   const user = await currentUser();
@@ -12,15 +12,5 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const presence = await getPresence(user.id);
-  const cutoff = Date.now() - ONLINE_WINDOW_MS;
-
-  return NextResponse.json({
-    sectOnline: presence.sectOnline,
-    mine: presence.mine.map((w) => ({
-      id: w.id,
-      lastSeen: w.lastSeen,
-      online: w.lastSeen.getTime() > cutoff,
-    })),
-  });
+  return NextResponse.json(await getPresenceFeed(user.id));
 }

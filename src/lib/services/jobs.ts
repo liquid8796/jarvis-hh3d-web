@@ -4,6 +4,7 @@ import { getEditableConfig, getStoredConfigForSnapshot } from "./configs";
 import { anyWorkerOnlineFor } from "./workers";
 import type { WorkerScope } from "@/lib/auth/worker";
 import type { JobEventRow, JobRow } from "@/lib/db/schema";
+import { notifyDashboard } from "@/lib/realtime/dashboardChannel";
 
 /**
  * The automation job lifecycle — the heart of "bấm Start rồi đóng browser vẫn chạy".
@@ -223,7 +224,7 @@ export async function jobBelongsTo(jobId: string, scope: WorkerScope): Promise<b
  * BẬN thì thôi không claim nữa. Hệ quả đo được ngày 02/08: linh sứ chạy Mê Cung — phiên dài
  * hàng chục phút — tụt khỏi sổ sau 30 giây và dashboard báo "vắng mặt" đúng lúc nó làm việc
  * chăm chỉ nhất; tệ hơn, `startJob` đọc cùng cái sổ ấy nên cảnh báo sai "chưa thấy linh sứ
- * nào". Nhịp tim 20 giây là bằng chứng sống chính xác hơn, và nó có sẵn.
+ * nào". Nhịp tim định kỳ là bằng chứng sống chính xác hơn, và nó có sẵn.
  *
  * Lấy workerId từ CHÍNH DÒNG JOB chứ không bắt worker khai thêm: nhờ vậy những linh sứ đã
  * cài từ trước không phải cập nhật gì mà vẫn được điểm danh đúng.
@@ -394,17 +395,27 @@ export async function clearLatestJobEvents(userId: string): Promise<number> {
     .delete(schema.jobEvents)
     .where(eq(schema.jobEvents.jobId, job.id))
     .returning({ id: schema.jobEvents.id });
+  if (gone.length > 0) {
+    try {
+      await notifyDashboard({ userId, topic: "events-cleared" });
+    } catch (error) {
+      // Xoá đã thành công; mất một tiếng chuông realtime không được biến thao tác thành thất bại.
+      console.error("clearLatestJobEvents: không phát được tín hiệu realtime", error);
+    }
+  }
   return gone.length;
 }
 
 /** The dashboard's log feed: everything after `afterId`, oldest first, bounded. */
+export const JOB_EVENT_PAGE_SIZE = 200;
+
 export async function eventsAfter(jobId: string, afterId: number): Promise<JobEventRow[]> {
   return db()
     .select()
     .from(schema.jobEvents)
     .where(and(eq(schema.jobEvents.jobId, jobId), gt(schema.jobEvents.id, afterId)))
     .orderBy(schema.jobEvents.id)
-    .limit(200);
+    .limit(JOB_EVENT_PAGE_SIZE);
 }
 
 /**

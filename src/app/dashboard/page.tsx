@@ -42,15 +42,15 @@ export default async function DashboardPage() {
             phình ra ngoài phần của nó và bóp cột trái còn một sợi chỉ (ảnh 02/08). Và
             `overflow-x-auto` trên chính cái <pre> không cứu được: nó chỉ có tác dụng khi
             mọi tổ tiên đều được phép co xuống dưới bề rộng nội dung. */}
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-          <ConfigForm config={config} />
-          <div className="flex min-w-0 flex-col gap-6">
-            <DashboardLiveProvider>
+        <DashboardLiveProvider initialAccountTier={config.accountTier}>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+            <ConfigForm config={config} />
+            <div className="flex min-w-0 flex-col gap-6">
               <ControlPanel initiallyRunning={activeJob !== null} />
               <LinhSuPanel hasToken={tokenIssued} />
-            </DashboardLiveProvider>
+            </div>
           </div>
-        </div>
+        </DashboardLiveProvider>
       </main>
     </>
   );

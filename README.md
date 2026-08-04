@@ -85,7 +85,7 @@ tử — không bao giờ có hai linh sứ ôm cùng một lượt.
 **JSONB trong chính Postgres đó** (bảng `user_configs`), không dùng store thứ hai. Lý do,
 theo thứ tự quan trọng:
 
-- Hình thù config **thay đổi liên tục** — bản desktop đã đi tới quest-profile schema 43. Cột
+- Hình thù config **thay đổi liên tục** — bản desktop đã đi tới quest-profile schema 44. Cột
   quan hệ sẽ thành một chuỗi migration bất tận; document thì co giãn tự nhiên.
 - JSONB **vẫn truy vấn được** bằng SQL khi admin cần hỏi ("ai đang bật Mê Cung?") — thứ mà
   một blob store không cho.
@@ -133,7 +133,7 @@ Vercel, code dùng `PGHOST_UNPOOLED` và giữ nguyên path/credentials; hạ t�
 #### Bộ thông dịch nhiệm vụ, và vì sao nó dùng chung với bản desktop
 
 `quest-engine/` là bản JavaScript của `QuestEngine.cs` bên bản desktop, và nó đọc **cùng một
-tệp hồ sơ** (`profile.json`, schema 43) mà bản desktop dùng. Đó là điểm mấu chốt: hồ sơ ấy
+tệp hồ sơ** (`profile.json`, schema 44) mà bản desktop dùng. Đó là điểm mấu chốt: hồ sơ ấy
 không phải cấu hình, nó là **tri thức về site** — mỗi selector trong đó là một buổi tối ngồi
 xem trang thật, và vài cái là cả một đêm hỏng việc mới rút ra. Nếu web chép lại tri thức đó
 thành mã riêng thì hai bản sẽ trôi khỏi nhau ngay lần site đổi marker đầu tiên, và người sửa

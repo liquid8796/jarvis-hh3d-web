@@ -1,4 +1,5 @@
 import { eventsAfter, getLatestJob } from "./jobs";
+import { getEditableConfig } from "./configs";
 import { getPresence, ONLINE_WINDOW_MS } from "./workers";
 import type {
   DashboardEvent,
@@ -53,9 +54,10 @@ export async function getDashboardFeed(
   userId: string,
   after: number,
 ): Promise<DashboardLivePayload> {
-  const [feed, presence] = await Promise.all([
+  const [feed, presence, config] = await Promise.all([
     getJobFeed(userId, after),
     getPresenceFeed(userId),
+    getEditableConfig(userId),
   ]);
-  return { ...feed, presence };
+  return { ...feed, presence, accountTier: config.accountTier };
 }

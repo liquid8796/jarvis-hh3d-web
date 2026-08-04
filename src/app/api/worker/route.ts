@@ -3,24 +3,29 @@ import { z } from "zod";
 import { authorizeWorker } from "@/lib/auth/worker";
 import { addEvent, claimNextJob, completeWorkerCycle, heartbeat, jobBelongsTo } from "@/lib/services/jobs";
 import { recordWorkerSeen } from "@/lib/services/workers";
-import { configSchema, storedConfigSchema } from "@/lib/services/configs";
+import {
+  configSchema,
+  recordDetectedAccountTierForJob,
+  storedConfigSchema,
+} from "@/lib/services/configs";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 
 /**
  * Giao thức linh sứ — MỘT endpoint, phân nhánh theo `op`.
  *
- * Gộp làm một thay vì bốn route riêng là có chủ ý: cả bốn thao tác dùng chung đúng một
+ * Gộp làm một thay vì năm route riêng là có chủ ý: cả năm thao tác dùng chung đúng một
  * cách xác thực, chung một hình thù request/response, và chúng luôn thay đổi cùng nhau
  * (thêm một trường vào heartbeat là đụng cả worker lẫn server). Một file giữ giao thức nằm
  * gọn trong một màn hình, và worker chỉ cần biết một URL.
  *
  * Xác thực trả về SCOPE chứ không phải có/không: linh sứ tông môn (WORKER_TOKEN) đụng
  * được mọi job, linh sứ riêng (linh phù) chỉ đụng được job của chủ mình. Claim đã lọc
- * trong SQL; ba op còn lại đi qua `jobBelongsTo` — hai lớp, lớp nào thủng vẫn còn lớp kia.
+ * trong SQL; bốn op còn lại đi qua `jobBelongsTo` — hai lớp, lớp nào thủng vẫn còn lớp kia.
  *
- * Bốn thao tác dựng nên vòng đời một lượt chạy:
+ * Năm thao tác dựng nên vòng đời một lượt chạy:
  *   claim     — xin việc; trả về job kèm config snapshot, hoặc null nếu hàng chờ trống.
  *   heartbeat — "tôi còn sống"; trả về status HIỆN TẠI để worker biết người dùng đã bấm thu đàn.
+ *   accountTier — hạng vừa chứng minh trên hub, để giao diện khóa tab đối nghịch.
  *   event     — một dòng nhật ký cho người dùng đọc.
  *   complete  — kết thúc một VÒNG; server tái xếp job, trừ khi người dùng đã Thu Đàn.
  */
@@ -34,6 +39,11 @@ const bodySchema = z.discriminatedUnion("op", [
     runner: z.string().optional(),
   }),
   z.object({ op: z.literal("heartbeat"), jobId: z.string().uuid() }),
+  z.object({
+    op: z.literal("accountTier"),
+    jobId: z.string().uuid(),
+    tier: z.enum(["vip", "free"]),
+  }),
   z.object({
     op: z.literal("event"),
     jobId: z.string().uuid(),
@@ -119,6 +129,15 @@ export async function POST(request: Request) {
 
       // `stopping` là tín hiệu người dùng đã bấm Thu Đàn; worker tự kết thúc ở điểm an toàn.
       return NextResponse.json({ status: beat.status });
+    }
+
+    case "accountTier": {
+      if (!(await jobBelongsTo(body.jobId, scope))) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+
+      await recordDetectedAccountTierForJob(body.jobId, body.tier);
+      return NextResponse.json({ ok: true });
     }
 
     case "event": {

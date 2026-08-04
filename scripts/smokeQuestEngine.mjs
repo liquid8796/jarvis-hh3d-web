@@ -89,7 +89,7 @@ const PAGE = `<!doctype html>
 </body></html>`;
 
 // Ba trang giả dưới đây giữ đúng các selector/state transition nhìn thấy trong recording
-// 02/08. Chúng không mock Playwright: profile schema 43 vẫn điều khiển Chromium thật.
+// 02/08. Chúng không mock Playwright: profile schema 44 vẫn điều khiển Chromium thật.
 const FREE_CHECKIN_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
 <button id="checkInButton">Điểm Danh</button>
 <script>checkInButton.onclick=()=>setTimeout(()=>{checkInButton.textContent='Đã Điểm Danh';checkInButton.dataset.claimed='1'},30)</script>`;
@@ -494,6 +494,27 @@ async function main() {
     "mọi quest trong hồ sơ đều khai hạng VIP/Thường rõ ràng",
     loadProfile().quests.every((q) => typeof q.requiresVip === "boolean"),
   );
+
+  const shipped = loadProfile();
+  const comparableFlow = (quest) => {
+    const copy = structuredClone(quest);
+    delete copy.id;
+    delete copy.requiresVip;
+    return JSON.stringify(copy);
+  };
+  const copiedPairs = [
+    ["hoang-vuc", "hoang-vuc-thuong"],
+    ["van-dap", "van-dap-thuong"],
+  ];
+  check(
+    "Hoang Vực + Vấn Đáp thường là bản sao nguyên flow VIP, chỉ đổi id/hạng",
+    copiedPairs.every(([vipId, freeId]) => {
+      const vip = shipped.quests.find((q) => q.id === vipId);
+      const free = shipped.quests.find((q) => q.id === freeId);
+      return vip && free && vip.requiresVip === true && free.requiresVip === false &&
+        comparableFlow(vip) === comparableFlow(free);
+    }),
+  );
   check("tài khoản VIP chạy đủ những gì đã bật", questsForAccount(profile, { isVip: true }).length === 2);
   check("tài khoản thường không đụng quest VIP", questsForAccount(profile, { isVip: false }).length === 0);
 
@@ -569,8 +590,8 @@ async function main() {
   );
   const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
   check(
-    "hồ sơ đang ở schema 43",
-    loadProfileForSchema().schemaVersion === 43,
+    "hồ sơ đang ở schema 44",
+    loadProfileForSchema().schemaVersion === 44,
     String(loadProfileForSchema().schemaVersion),
   );
 

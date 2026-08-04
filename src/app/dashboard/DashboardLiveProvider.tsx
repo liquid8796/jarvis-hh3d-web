@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import type {
+  AccountTier,
   DashboardEvent,
   DashboardJob,
   DashboardLivePayload,
@@ -30,8 +31,13 @@ type DashboardPresenceLiveValue = {
   refresh: () => Promise<void>;
 };
 
+type DashboardAccountLiveValue = {
+  accountTier: AccountTier | null;
+};
+
 const DashboardJobLiveContext = createContext<DashboardJobLiveValue | null>(null);
 const DashboardPresenceLiveContext = createContext<DashboardPresenceLiveValue | null>(null);
+const DashboardAccountLiveContext = createContext<DashboardAccountLiveValue | null>(null);
 
 export function useDashboardJobLive(): DashboardJobLiveValue {
   const value = useContext(DashboardJobLiveContext);
@@ -42,6 +48,12 @@ export function useDashboardJobLive(): DashboardJobLiveValue {
 export function useDashboardPresenceLive(): DashboardPresenceLiveValue {
   const value = useContext(DashboardPresenceLiveContext);
   if (!value) throw new Error("useDashboardPresenceLive must be used inside DashboardLiveProvider");
+  return value;
+}
+
+export function useDashboardAccountLive(): DashboardAccountLiveValue {
+  const value = useContext(DashboardAccountLiveContext);
+  if (!value) throw new Error("useDashboardAccountLive must be used inside DashboardLiveProvider");
   return value;
 }
 
@@ -63,10 +75,17 @@ function sameVisiblePresence(left: DashboardPresence | null, right: DashboardPre
  * Một EventSource duy nhất nuôi cả trạng thái đàn, nhật ký và sổ linh sứ. Event ID chính là
  * cursor job_events nên reconnect tiếp tục đúng chỗ; poll một-lần chỉ còn là lưới an toàn.
  */
-export function DashboardLiveProvider({ children }: { children: ReactNode }) {
+export function DashboardLiveProvider({
+  children,
+  initialAccountTier = null,
+}: {
+  children: ReactNode;
+  initialAccountTier?: AccountTier | null;
+}) {
   const [job, setJob] = useState<DashboardJob | null>(null);
   const [events, setEvents] = useState<DashboardEvent[]>([]);
   const [presence, setPresence] = useState<DashboardPresence | null>(null);
+  const [accountTier, setAccountTier] = useState<AccountTier | null>(initialAccountTier);
   const [connected, setConnected] = useState(false);
   const cursor = useRef(0);
   const jobId = useRef<string | null>(null);
@@ -77,6 +96,7 @@ export function DashboardLiveProvider({ children }: { children: ReactNode }) {
     const changedJob = nextJobId !== jobId.current;
     jobId.current = nextJobId;
     setJob(payload.job);
+    setAccountTier(payload.accountTier);
     setPresence((previous) =>
       sameVisiblePresence(previous, payload.presence) ? previous : payload.presence,
     );
@@ -152,11 +172,14 @@ export function DashboardLiveProvider({ children }: { children: ReactNode }) {
     [job, events, connected, refresh, clearEvents],
   );
   const presenceValue = useMemo(() => ({ presence, refresh }), [presence, refresh]);
+  const accountValue = useMemo(() => ({ accountTier }), [accountTier]);
 
   return (
     <DashboardJobLiveContext.Provider value={jobValue}>
       <DashboardPresenceLiveContext.Provider value={presenceValue}>
-        {children}
+        <DashboardAccountLiveContext.Provider value={accountValue}>
+          {children}
+        </DashboardAccountLiveContext.Provider>
       </DashboardPresenceLiveContext.Provider>
     </DashboardJobLiveContext.Provider>
   );

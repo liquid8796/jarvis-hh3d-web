@@ -77,7 +77,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  */
 const PROFILE_ROOT = fileURLToPath(new URL("./browser-profiles/", import.meta.url));
 
-async function runQuest({ userId, config, say, shouldStop }) {
+async function runQuest({ userId, config, say, reportAccountTier, shouldStop }) {
   await say("Linh sứ đã nhận ngọc giản, đang khởi lư…");
 
   // Nạp Playwright TẠI ĐÂY chứ không ở đầu tệp: một máy chỉ dùng worker để canh việc vẫn
@@ -99,7 +99,7 @@ async function runQuest({ userId, config, say, shouldStop }) {
     gameCookie: config?.gameCookie,
   });
   await mkdir(profileDir, { recursive: true });
-  return runCycle({ chromium, config, say, shouldStop, profileDir });
+  return runCycle({ chromium, config, say, reportAccountTier, shouldStop, profileDir });
 }
 
 /** Một lượt trọn vẹn: nhịp tim chạy nền, engine chạy trước, kết thúc thì báo cáo. */
@@ -123,6 +123,10 @@ async function handle(job) {
       userId: job.userId,
       config: job.config,
       say: (message, level) => say(job.id, message, level),
+      reportAccountTier: (tier) =>
+        call("accountTier", { jobId: job.id, tier }).catch((err) => {
+          console.error("  không lưu được hạng tài khoản:", err.message);
+        }),
       shouldStop: () => stopping,
     });
     await call("complete", { jobId: job.id, ...result });

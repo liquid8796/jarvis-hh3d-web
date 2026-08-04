@@ -1,4 +1,5 @@
 export type JobStatus = "queued" | "running" | "stopping" | "stopped" | "failed" | "done";
+export type AccountTier = "vip" | "free";
 
 export type DashboardJob = {
   id: string;
@@ -33,5 +34,6 @@ export type DashboardLivePayload = {
   job: DashboardJob | null;
   events: DashboardEvent[];
   presence: DashboardPresence;
+  accountTier: AccountTier | null;
   resetEvents?: boolean;
 };

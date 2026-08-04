@@ -11,6 +11,22 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.21.0 — hạng tài khoản khóa đúng tab; tài khoản thường có thêm Hoang Vực và Vấn Đáp
+
+- **Đồng bộ profile schema 44 từ PC.** Hoang Vực và Vấn Đáp ở tab Thường là bản sao nguyên
+  flow trang riêng đã kiểm chứng của VIP, chỉ đổi id `*-thuong` và `requiresVip=false`.
+  Engine tiếp tục coi hai tab là hai kế hoạch loại trừ nhau, nên không có chuyện VIP chạy
+  thêm bản thường rồi nhận thưởng trùng.
+- **Tab đổi theo cookie thật, ngay trong lúc trang đang mở.** Worker dò hạng trên hub, gửi
+  verdict có xác thực về API; server vá đúng trường `accountTier` trong JSONB và phát tín hiệu
+  SSE. Linh Đài tự chuyển sang tab hợp lệ rồi disable tab đối nghịch, không cần F5.
+- **Đổi hoặc xoá cookie xoá luôn verdict cũ.** Hai tab mở lại cho tới khi worker chứng minh
+  hạng của cookie mới; việc vá verdict là một câu UPDATE JSONB nguyên tử nên không thể ghi đè
+  lựa chọn quest người dùng vừa lưu cùng thời điểm.
+- **Probe chập chờn không làm account thường chạy nhầm VIP.** Worker giữ verdict đã chứng minh
+  từ vòng trước; cookie chưa từng được dò mới dùng mặc định tương thích VIP.
+- Kiểm chứng: TypeScript sạch, production build thành công, smoke Chromium thật **103/103**.
+
 ## 0.20.1 — cookie account mới thắng dứt khoát profile VIP cũ
 
 - **Không còn một `browser-profile` dùng chung cho cả tông môn.** Mỗi cặp user + chuỗi cookie

@@ -4,7 +4,7 @@ export const DASHBOARD_CHANNEL = "jarvis_dashboard";
 
 export type DashboardSignal = {
   userId: string;
-  topic: "job" | "event" | "presence" | "events-cleared";
+  topic: "job" | "event" | "presence" | "events-cleared" | "config";
 };
 
 /**
@@ -35,7 +35,7 @@ export function parseDashboardSignal(payload: string | undefined): DashboardSign
     const value = JSON.parse(payload) as Partial<DashboardSignal>;
     if (
       typeof value.userId !== "string" ||
-      !["job", "event", "presence", "events-cleared"].includes(String(value.topic))
+      !["job", "event", "presence", "events-cleared", "config"].includes(String(value.topic))
     ) {
       return null;
     }

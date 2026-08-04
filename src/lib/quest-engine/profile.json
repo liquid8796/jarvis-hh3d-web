@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 43,
+  "schemaVersion": 44,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -828,6 +828,140 @@
       "notes": "\u0110i\u1EC3m danh m\u1ED7i ng\u00E0y nh\u1EADn th\u01B0\u1EDFng v\u00E0 gi\u1EEF chu\u1ED7i ng\u00E0y (streak)."
     },
     {
+      "id": "hoang-vuc-thuong",
+      "name": "Hoang V\u1EF1c",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "hoang v\u1EF1c",
+        "hoang vuc"
+      ],
+      "pagePath": "/hoang-vuc",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/hoang-vuc",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#boss-info",
+          "timeoutMs": 25000,
+          "note": "ch\u1EDD kh\u1ED1i th\u00F4ng tin boss render"
+        },
+        {
+          "action": "readCooldownSeconds",
+          "selector": "#countdown-timer",
+          "timeoutMs": 15000,
+          "note": "\u0022Ch\u1EDD 7 ph\u00FAt 19 gi\u00E2y \u0111\u1EC3 t\u1EA5n c\u00F4ng l\u1EA7n ti\u1EBFp theo.\u0022 \u2014 kh\u00F4ng c\u00F3 th\u1EBB n\u00E0y th\u00EC kh\u00F4ng \u0111\u1ECDc \u0111\u01B0\u1EE3c g\u00EC, v\u00E0 \u0111\u00F3 ch\u00EDnh l\u00E0 d\u1EA5u hi\u1EC7u \u0111\u00E3 h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay"
+        },
+        {
+          "action": "stopIf",
+          "text": "ch\u01B0a \u0111\u00E1nh \u0111\u01B0\u1EE3c (\u0111ang ch\u1EDD l\u01B0\u1EE3t ho\u1EB7c \u0111\u00E3 h\u1EBFt 5 l\u01B0\u1EE3t h\u00F4m nay)",
+          "timeoutMs": 15000,
+          "note": "n\u00FAt KHI\u00CAU CHI\u1EBEN bi\u1EBFn m\u1EA5t c\u1EA3 khi \u0111ang cooldown l\u1EABn khi h\u1EBFt l\u01B0\u1EE3t; engine t\u1EF1 ph\u00E2n bi\u1EC7t \u2014 \u0111\u1ECDc \u0111\u01B0\u1EE3c \u0111\u1ED3ng h\u1ED3 th\u00EC b\u00E1o OnCooldown k\u00E8m th\u1EDDi gian, kh\u00F4ng \u0111\u1ECDc \u0111\u01B0\u1EE3c th\u00EC AlreadyDone",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#battle-button"
+          }
+        },
+        {
+          "action": "repeat",
+          "timeoutMs": 15000,
+          "note": "ki\u1EC3m tra TR\u01AF\u1EDAC m\u1ED7i v\u00F2ng, n\u00EAn \u0111ang c\u00F3 \u002B15% r\u1ED3i th\u00EC kh\u00F4ng \u0111\u1ED5i l\u1EA7n n\u00E0o. Tr\u1EA7n 5 l\u1EA7n v\u00EC m\u1ED7i l\u1EA7n \u0111\u1ED5i t\u1ED1n ph\u00ED v\u00E0 ph\u00ED t\u0103ng d\u1EA7n.",
+          "steps": [
+            {
+              "action": "click",
+              "selector": "#change-element-button",
+              "timeoutMs": 6000,
+              "optional": true
+            },
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 8000,
+              "note": "h\u1ED9p x\u00E1c nh\u1EADn SweetAlert2 \u0022\u0110\u1ED5i\u0022",
+              "optional": true,
+              "condition": {
+                "kind": "visible",
+                "selector": ".swal2-confirm"
+              }
+            },
+            {
+              "action": "click",
+              "selector": ".swal2-confirm",
+              "timeoutMs": 6000,
+              "optional": true
+            },
+            {
+              "action": "waitMilliseconds",
+              "timeoutMs": 1200,
+              "note": "ch\u1EDD ng\u0169 h\u00E0nh m\u1EDBi \u00E1p v\u00E0o"
+            }
+          ],
+          "until": {
+            "kind": "visible",
+            "selector": "#boss-info .increase-damage"
+          },
+          "maxIterations": 5,
+          "maxSeconds": 90
+        },
+        {
+          "action": "click",
+          "selector": "#battle-button",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 15000,
+          "note": "m\u00E0n \u0111\u00E1nh boss \u0111\u00E3 m\u1EDF",
+          "condition": {
+            "kind": "visible",
+            "selector": "#boss-damage-screen .attack-button"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#boss-damage-screen .attack-button",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 25000,
+          "note": "b\u1EA3ng t\u1ED5ng k\u1EBFt s\u00E1t th\u01B0\u01A1ng hi\u1EC7n sau khi \u0111\u00F2n \u0111\u00E1nh ch\u1EA1y xong",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#damage-summary-container .close-button"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#damage-summary-container .close-button",
+          "timeoutMs": 6000,
+          "note": "\u0111\u00F3ng b\u1EA3ng t\u1ED5ng k\u1EBFt",
+          "optional": true
+        },
+        {
+          "action": "click",
+          "selector": "#boss-damage-screen .back-button",
+          "timeoutMs": 6000,
+          "note": "tr\u1EDF l\u1EA1i trang boss \u0111\u1EC3 \u0111\u1ECDc \u0111\u1ED3ng h\u1ED3",
+          "optional": true
+        },
+        {
+          "action": "readCooldownSeconds",
+          "selector": "#countdown-timer",
+          "timeoutMs": 15000,
+          "note": "\u0111\u1ED3ng h\u1ED3 t\u1EDBi l\u01B0\u1EE3t k\u1EBF ti\u1EBFp, xu\u1EA5t hi\u1EC7n ngay sau khi \u0111\u00E1nh xong"
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 420,
+      "requiresVip": false,
+      "order": 20,
+      "notes": "\u0110\u00E1nh boss Hoang V\u1EF1c, 5 l\u01B0\u1EE3t/ng\u00E0y."
+    },
+    {
       "id": "phuc-loi-duong-thuong",
       "name": "Ph\u00FAc L\u1EE3i \u0110\u01B0\u1EDDng",
       "enabled": false,
@@ -1129,6 +1263,140 @@
       "requiresVip": false,
       "order": 50,
       "notes": "Quay V\u00F2ng Quay Ph\u00FAc V\u1EADn nh\u1EADn th\u01B0\u1EDFng, t\u1ED1i \u0111a 4 l\u01B0\u1EE3t/ng\u00E0y."
+    },
+    {
+      "id": "van-dap-thuong",
+      "name": "V\u1EA5n \u0110\u00E1p",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "v\u1EA5n \u0111\u00E1p",
+        "van dap"
+      ],
+      "pagePath": "/van-dap-tong-mon",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/van-dap-tong-mon",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#quiz-wrapper, #start-quiz-button",
+          "timeoutMs": 25000,
+          "note": "ch\u1EDD trang v\u1EA5n \u0111\u00E1p render \u2014 ng\u00E0y m\u1EDBi c\u00F3 #start-quiz-button, ng\u00E0y \u0111\u00E3 xong ch\u1EC9 c\u00F2n #quiz-wrapper v\u1EDBi c\u00E2u ch\u00FAc m\u1EEBng"
+        },
+        {
+          "action": "stopIf",
+          "text": "\u0111\u00E3 ho\u00E0n th\u00E0nh v\u1EA5n \u0111\u00E1p h\u00F4m nay",
+          "timeoutMs": 15000,
+          "note": "trang t\u1EF1 b\u00E1o \u0022\u0110\u1EA1o h\u1EEFu \u0111\u00E3 ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p h\u00F4m nay!\u0022 ngay khi m\u1EDF \u2014 kh\u00F4ng c\u00F2n g\u00EC \u0111\u1EC3 l\u00E0m",
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#quiz-wrapper",
+            "text": "ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#start-quiz-button",
+          "timeoutMs": 8000,
+          "note": "B\u1EAET \u0110\u1EA6U V\u1EA4N \u0110\u00C1P \u2014 m\u1ED9t c\u00FA b\u1EA5m t\u1EA3i c\u1EA3 5 c\u00E2u c\u1EE7a ng\u00E0y (API 7cfa6143)",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#start-quiz-button"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 12000,
+          "note": "c\u00E2u h\u1ECFi \u0111\u1EA7u ti\u00EAn \u0111\u00E3 hi\u1EC7n (~1s sau khi b\u1EA5m b\u1EAFt \u0111\u1EA7u)",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#quiz-container .option"
+          }
+        },
+        {
+          "action": "repeat",
+          "timeoutMs": 15000,
+          "note": "5 c\u00E2u; tho\u00E1t khi trang t\u1EF1 b\u00E1o ho\u00E0n th\u00E0nh. Tr\u1EA7n 6 v\u00F2ng: 5 c\u00E2u \u002B 1 v\u00F2ng \u0111\u1EC7m cho kho\u1EA3nh kh\u1EAFc ch\u1EEF ho\u00E0n th\u00E0nh ch\u01B0a k\u1ECBp render.",
+          "steps": [
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 10000,
+              "note": "ch\u1EDD c\u00E2u h\u1ECFi hi\u1EC7n v\u00E0 b\u1EA5m \u0111\u01B0\u1EE3c \u2014 khung quiz t\u00E0ng h\u00ECnh ~1-1.5s gi\u1EEFa hai c\u00E2u, KH\u00D4NG ng\u1EE7 theo gi\u1EDD c\u1ED1 \u0111\u1ECBnh",
+              "optional": true,
+              "condition": {
+                "kind": "enabled",
+                "selector": "#quiz-container .option"
+              }
+            },
+            {
+              "action": "answerQuiz",
+              "selector": "#question",
+              "timeoutMs": 15000,
+              "note": "\u0111\u1ECDc c\u00E2u h\u1ECFi \u002B 4 l\u1EF1a ch\u1ECDn, tra \u0111\u00E1p \u00E1n r\u1ED3i click theo TEXT \u2014 b\u1ECF qua \u00EAm n\u1EBFu l\u01B0\u1EE3t n\u00E0y kh\u00F4ng c\u00F2n c\u00E2u n\u00E0o (v\u1EEBa xong c\u00E2u cu\u1ED1i)",
+              "when": {
+                "kind": "visible",
+                "selector": "#quiz-container .option"
+              },
+              "optionsSelector": "#quiz-container .option"
+            },
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 8000,
+              "note": "ch\u1EDD \u0111\u00E1p \u00E1n \u0111\u00FAng \u0111\u1ED5i xanh (~0.5-3.5s tu\u1EF3 t\u1EA3i server) = server \u0111\u00E3 ghi nh\u1EADn c\u00E2u tr\u1EA3 l\u1EDDi",
+              "optional": true,
+              "condition": {
+                "kind": "visible",
+                "selector": "#quiz-container .option.correct"
+              },
+              "when": {
+                "kind": "visible",
+                "selector": "#quiz-container .option"
+              }
+            },
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 8000,
+              "note": "ch\u1EDD d\u1EA5u xanh bi\u1EBFn m\u1EA5t = trang \u0111\u00E3 sang c\u00E2u k\u1EBF (ho\u1EB7c m\u00E0n ho\u00E0n th\u00E0nh)",
+              "optional": true,
+              "condition": {
+                "kind": "hidden",
+                "selector": "#quiz-container .option.correct"
+              },
+              "when": {
+                "kind": "visible",
+                "selector": "#quiz-container .option.correct"
+              }
+            }
+          ],
+          "until": {
+            "kind": "textMatches",
+            "selector": "#quiz-wrapper",
+            "text": "ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p"
+          },
+          "maxIterations": 6,
+          "maxSeconds": 300
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 10000,
+          "note": "l\u01B0\u1EDBi an to\u00E0n: h\u1EBFt v\u00F2ng m\u00E0 trang KH\u00D4NG t\u1EF1 b\u00E1o ho\u00E0n th\u00E0nh th\u00EC b\u00E1o l\u1ED7i r\u00F5 r\u00E0ng \u2014 kh\u00F4ng nh\u1EADn v\u01A1 l\u00E0 xong nh\u01B0 modal hub \u0111\u00E3 l\u1EEBa \u0111\u01B0\u1EE3c flow c\u0169",
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#quiz-wrapper",
+            "text": "ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p"
+          }
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 14400,
+      "requiresVip": false,
+      "order": 90,
+      "notes": "Tr\u1EA3 l\u1EDDi 5 c\u00E2u V\u1EA5n \u0110\u00E1p m\u1ED7i ng\u00E0y l\u1EA5y T\u00F4ng Kh\u1ED1 \u002B C\u1ED1ng Hi\u1EBFn."
     },
     {
       "id": "khoang-mach",

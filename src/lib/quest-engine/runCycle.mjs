@@ -185,6 +185,7 @@ async function ensureReady(session, baseUrl, say, log, { context, cookieJar }) {
  * @param {import('playwright-core').BrowserType} deps.chromium
  * @param {object} deps.config           UserConfig đã giải mã (gameCookie là plaintext)
  * @param {(message: string, level?: string) => Promise<void>|void} deps.say
+ * @param {(tier: "vip"|"free") => Promise<void>|void} [deps.reportAccountTier]
  * @param {() => boolean} deps.shouldStop  ĐỒNG BỘ — được gọi trong vòng lặp chặt
  * @param {string} [deps.baseUrl]
  * @param {number} [deps.budgetMs]       hết ngân sách thì dừng TỬ TẾ giữa hai nhiệm vụ
@@ -195,6 +196,7 @@ export async function runCycle(deps) {
     chromium,
     config,
     say,
+    reportAccountTier = async () => {},
     shouldStop = () => false,
     baseUrl = process.env.GAME_BASE_URL || DEFAULT_GAME_BASE_URL,
     budgetMs = 0,
@@ -307,9 +309,9 @@ export async function runCycle(deps) {
     // Hạng tài khoản quyết định kế hoạch, nên đọc nó TRƯỚC khi hứa hẹn gì. Ghé hub một lần —
     // trang duy nhất mang tín hiệu — và poll thay vì đọc một phát: hub render làm hai đợt,
     // probe tự trả null chừng nào chưa chứng minh được sự vắng mặt (xem vipProbe). Mọi ngả
-    // thất bại đều đổ về VIP: đó là hạng duy nhất mà hồ sơ hiện có được viết cho, và đoán
-    // nhầm "thường" nghĩa là lặng lẽ bỏ trống trọn một lượt của người ta.
-    let isVip = true;
+    // thất bại giữ bằng chứng của cookie này từ vòng trước; cookie chưa từng được dò mới
+    // mặc định VIP để tương thích với hồ sơ cũ.
+    let isVip = config?.accountTier !== "free";
     const nav = await session.navigate(session.resolveUrl(profile.dailyQuestPath));
     if (nav.ok) {
       const probeDeadline = Date.now() + 20_000;
@@ -317,12 +319,16 @@ export async function runCycle(deps) {
         const verdict = await session.evaluate(vipProbe);
         if (typeof verdict === "boolean") {
           isVip = verdict;
+          await reportAccountTier(verdict ? "vip" : "free");
           break;
         }
         await new Promise((r) => setTimeout(r, 500));
       }
     } else {
-      await say(`Không mở được hub để xem hạng tài khoản (${nav.error}) — coi như VIP.`, "warn");
+      await say(
+        `Không mở được hub để xem hạng tài khoản (${nav.error}) — giữ hạng ${isVip ? "VIP" : "thường"} đã biết.`,
+        "warn",
+      );
     }
 
     const quests = questsForAccount(profile, { isVip });

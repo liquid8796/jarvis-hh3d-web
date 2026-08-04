@@ -37,6 +37,7 @@ function frame(payload: DashboardLivePayload, eventId: number): Uint8Array {
 function visibleSignature(payload: DashboardLivePayload): string {
   return JSON.stringify({
     job: payload.job,
+    accountTier: payload.accountTier,
     presence: {
       sectOnline: payload.presence.sectOnline,
       mine: payload.presence.mine.map((worker) => ({

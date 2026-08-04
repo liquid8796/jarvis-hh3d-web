@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { decryptSecret, encryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
+import { notifyDashboard } from "@/lib/realtime/dashboardChannel";
 import { z } from "zod";
 
 /**
@@ -19,6 +20,8 @@ const simpleQuest = z.object({ enabled: z.boolean().default(false) }).prefault({
 export const configSchema = z.object({
   /** The hoathinh3d login cookie bundle the worker automates with. */
   gameCookie: z.string().trim().max(8000).default(""),
+  /** Hạng do worker chứng minh trên hub; null = cookie này chưa được dò. */
+  accountTier: z.enum(["vip", "free"]).nullable().default(null),
   /**
    * DI SẢN — từ v0.11 mọi lượt chạy đều do worker sống dai đảm nhiệm, không còn lựa chọn
    * nơi chạy. Trường vẫn nằm trong schema vì document cũ đã mang nó (Zod strip là mất
@@ -84,6 +87,7 @@ export const configSchema = z.object({
 });
 
 export type UserConfig = z.infer<typeof configSchema>;
+export type AccountTier = NonNullable<UserConfig["accountTier"]>;
 
 /**
  * Hình thù trong database/job snapshot.
@@ -163,11 +167,19 @@ export async function getConfigWithSecrets(userId: string): Promise<UserConfig> 
  */
 export async function saveConfig(userId: string, config: UserConfig): Promise<void> {
   const clean = configSchema.parse(config);
+  const previous = await readStored(userId);
 
   const cookie = clean.gameCookie.trim();
-  const stored = cookie.length > 0 ? encryptSecret(cookie) : (await readStored(userId)).gameCookie;
+  const replacingAccount = cookie.length > 0;
+  const stored = replacingAccount ? encryptSecret(cookie) : previous.gameCookie;
 
-  const document = storedConfigSchema.parse({ ...clean, gameCookie: stored });
+  const document = storedConfigSchema.parse({
+    ...clean,
+    gameCookie: stored,
+    // Một cookie mới có thể thuộc hạng đối nghịch. Chỉ worker nhìn hub mới được quyền
+    // phán lại; mọi lần lưu lựa chọn thông thường phải giữ nguyên bằng chứng cũ.
+    accountTier: replacingAccount ? null : previous.accountTier,
+  });
 
   await db()
     .insert(schema.userConfigs)
@@ -176,6 +188,10 @@ export async function saveConfig(userId: string, config: UserConfig): Promise<vo
       target: schema.userConfigs.userId,
       set: { config: document, updatedAt: sql`now()` },
     });
+
+  if (replacingAccount) {
+    await notifyDashboard({ userId, topic: "config" }).catch(() => undefined);
+  }
 }
 
 /**
@@ -192,7 +208,11 @@ export async function saveCookie(userId: string, value: string): Promise<void> {
   }
 
   const stored = await readStored(userId);
-  const document = storedConfigSchema.parse({ ...stored, gameCookie: encryptSecret(cookie) });
+  const document = storedConfigSchema.parse({
+    ...stored,
+    gameCookie: encryptSecret(cookie),
+    accountTier: null,
+  });
 
   await db()
     .insert(schema.userConfigs)
@@ -201,12 +221,14 @@ export async function saveCookie(userId: string, value: string): Promise<void> {
       target: schema.userConfigs.userId,
       set: { config: document, updatedAt: sql`now()` },
     });
+
+  await notifyDashboard({ userId, topic: "config" }).catch(() => undefined);
 }
 
 /** Xoá cookie hẳn — đường thoát khi người dùng muốn rút chìa khỏi hệ thống. */
 export async function clearCookie(userId: string): Promise<void> {
   const stored = await readStored(userId);
-  const document = storedConfigSchema.parse({ ...stored, gameCookie: "" });
+  const document = storedConfigSchema.parse({ ...stored, gameCookie: "", accountTier: null });
   await db()
     .insert(schema.userConfigs)
     .values({ userId, config: document, updatedAt: new Date() })
@@ -214,4 +236,34 @@ export async function clearCookie(userId: string): Promise<void> {
       target: schema.userConfigs.userId,
       set: { config: document, updatedAt: sql`now()` },
     });
+
+  await notifyDashboard({ userId, topic: "config" }).catch(() => undefined);
+}
+
+/**
+ * Ghi hạng do worker vừa đọc trên hub, theo job đã được route xác thực.
+ *
+ * JSONB được vá nguyên tử thay vì đọc-rồi-ghi cả document: người dùng có thể bấm lưu quest
+ * đúng lúc probe trả lời, và không bên nào được phép ghi đè thay đổi của bên kia. Chỉ phát
+ * realtime khi giá trị thực sự đổi để mỗi vòng không tạo một frame SSE thừa.
+ */
+export async function recordDetectedAccountTierForJob(
+  jobId: string,
+  tier: AccountTier,
+): Promise<void> {
+  const changed = await db().execute(sql`
+    update user_configs as config_row set
+      config = jsonb_set(config_row.config, '{accountTier}', to_jsonb(${tier}::text), true),
+      updated_at = now()
+    from automation_jobs as job
+    where job.id = ${jobId}
+      and config_row.user_id = job.user_id
+      and config_row.config ->> 'accountTier' is distinct from ${tier}
+    returning config_row.user_id
+  `);
+
+  const userId = changed.rows?.[0]?.user_id;
+  if (typeof userId === "string") {
+    await notifyDashboard({ userId, topic: "config" }).catch(() => undefined);
+  }
 }

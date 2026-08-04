@@ -8,6 +8,7 @@ import {
   type ActionResult,
 } from "@/app/actions/automation";
 import type { EditableConfig } from "@/lib/services/configs";
+import { useDashboardAccountLive } from "./DashboardLiveProvider";
 
 /**
  * Ngọc giản cấu hình. Uncontrolled inputs với defaultValue từ server — form chỉ là tấm
@@ -38,7 +39,13 @@ const SIMPLE_QUESTS: ReadonlyArray<SimpleQuest> = [
   { key: "khoangMach", name: "Khoáng Mạch", hint: "Thu khoáng theo chu kỳ trong ngày." },
 ];
 
-const FREE_QUEST_KEYS = new Set(["diemDanh", "phucLoiDuong", "vongQuay"]);
+const FREE_QUEST_KEYS = new Set([
+  "diemDanh",
+  "hoangVuc",
+  "phucLoiDuong",
+  "vongQuay",
+  "vanDap",
+]);
 const FREE_QUESTS = SIMPLE_QUESTS.filter((quest) => FREE_QUEST_KEYS.has(quest.key));
 
 function SimpleQuestGrid({
@@ -76,6 +83,7 @@ function SimpleQuestGrid({
 }
 
 export function ConfigForm({ config }: { config: EditableConfig }) {
+  const { accountTier } = useDashboardAccountLive();
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
     saveConfigAction,
     null,
@@ -128,10 +136,15 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
     });
   };
 
-  // Hai tab nhiệm vụ, theo đúng cách site chia tài khoản. Ba mục có cả hai flow dùng chung
+  // Hai tab nhiệm vụ, theo đúng cách site chia tài khoản. Năm mục có cả hai flow dùng chung
   // một state; hidden inputs bên dưới là NGUỒN FormData duy nhất. Render hai checkbox cùng
   // name sẽ tạo hai giá trị có thể lệch nhau khi người dùng đổi tab, nên tuyệt đối không làm.
-  const [questTab, setQuestTab] = useState<"vip" | "free">("vip");
+  const [preferredQuestTab, setPreferredQuestTab] = useState<"vip" | "free">(() =>
+    accountTier === "free" ? "free" : "vip",
+  );
+  const questTab = accountTier === "vip" || accountTier === "free"
+    ? accountTier
+    : preferredQuestTab;
   const toggleSimpleQuest = (key: string, value: boolean) => {
     setSimpleEnabled((current) => ({ ...current, [key]: value }));
   };
@@ -224,25 +237,37 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
             ["vip", "Nhiệm vụ VIP"],
             ["free", "Nhiệm vụ Thường"],
           ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setQuestTab(key)}
-            aria-pressed={questTab === key}
-            className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-              questTab === key
-                ? "bg-[var(--color-ink-600)]/70 text-[var(--color-gold-300)]"
-                : "text-[var(--color-mist)] hover:text-[var(--color-parchment)]"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+        ).map(([key, label]) => {
+          const disabled =
+            (accountTier === "vip" && key === "free") ||
+            (accountTier === "free" && key === "vip");
+          return (
+            <button
+              key={key}
+              type="button"
+              disabled={disabled}
+              onClick={() => setPreferredQuestTab(key)}
+              aria-pressed={questTab === key}
+              title={disabled ? "Cookie hiện tại thuộc hạng tài khoản đối nghịch." : undefined}
+              className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                disabled
+                  ? "cursor-not-allowed opacity-35"
+                  : questTab === key
+                    ? "bg-[var(--color-ink-600)]/70 text-[var(--color-gold-300)]"
+                    : "text-[var(--color-mist)] hover:text-[var(--color-parchment)]"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
       <p className="mb-4 text-xs text-[var(--color-mist)]">
-        Auto tự biết tài khoản của bạn là VIP hay thường và chọn đúng flow. Ba nhiệm vụ có
-        mặt ở cả hai tab dùng chung công tắc: đổi bên nào cũng đồng bộ bên kia.
+        {accountTier === "vip"
+          ? "Đã nhận diện tài khoản VIP — tab Nhiệm vụ Thường được khóa cho cookie hiện tại."
+          : accountTier === "free"
+            ? "Đã nhận diện tài khoản thường — tab Nhiệm vụ VIP được khóa cho cookie hiện tại."
+            : "Chưa dò được hạng của cookie này. Linh sứ sẽ nhận diện trên hub ở vòng chạy kế tiếp."}
       </p>
 
       {/* Một input thật cho mỗi config key. Checkbox ở hai tab chỉ là hai mặt của cùng state. */}
@@ -258,7 +283,8 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
             Nhiệm vụ tài khoản thường
           </legend>
           <p className="mb-3 text-xs text-[var(--color-mist)]">
-            Ba flow chạy ở trang riêng vì hub tài khoản thường không có nút nhanh của VIP.
+            Điểm Danh, Phúc Lợi Đường và Vòng Quay dùng trang riêng; Hoang Vực và Vấn Đáp
+            dùng lại nguyên flow trang riêng đã kiểm chứng ở tab VIP.
           </p>
           <SimpleQuestGrid
             quests={FREE_QUESTS}

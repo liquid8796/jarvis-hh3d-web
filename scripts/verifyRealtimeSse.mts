@@ -3,7 +3,7 @@
 import { neon } from "@neondatabase/serverless";
 import { SignJWT } from "jose";
 import type { DashboardLivePayload } from "../src/lib/realtime/dashboardTypes";
-import { addEvent, clearLatestJobEvents } from "../src/lib/services/jobs";
+import { addEvent, clearVisibleJobEvents } from "../src/lib/services/jobs";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv(".env.local");
@@ -105,7 +105,7 @@ try {
     }
   })();
 
-  await waitFor((payload) => payload.job === null);
+  await waitFor((payload) => payload.jobs.length === 0);
 
   const jobs = await sql`
     insert into automation_jobs (user_id, status, config_snapshot, runner, next_run_at)
@@ -121,7 +121,7 @@ try {
 
   const resetFrame = waitFor((payload) => payload.resetEvents === true);
   const resetStarted = Date.now();
-  await clearLatestJobEvents(userId);
+  await clearVisibleJobEvents(userId);
   const resetLatency = (await resetFrame).at - resetStarted;
 
   if (eventLatency >= 2_000 || resetLatency >= 2_000) {

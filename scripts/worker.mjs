@@ -34,6 +34,10 @@ const POLL_MS = Number(process.env.WORKER_POLL_MS ?? 5000);
 // Năm giây là ranh giới người dùng còn cảm thấy nút Thu Đàn phản hồi tức thời. Cho phép chỉnh
 // để máy chủ riêng có thể tiết chế request, nhưng không nhận giá trị vô lý làm quay nóng CPU.
 const HEARTBEAT_MS = Math.max(1_000, Number(process.env.WORKER_HEARTBEAT_MS ?? 5_000) || 5_000);
+// Số job (= số tài khoản) chạy CÙNG LÚC trong một tiến trình linh sứ. Mỗi job là một
+// Chromium riêng nên trần này là trần RAM: 2 vừa cho máy nhà, VM tông môn có thể nâng qua
+// biến môi trường. Kẹp 1–8 để một dấu phẩy gõ nhầm không mở tám mươi trình duyệt.
+const MAX_JOBS = Math.max(1, Math.min(8, Number(process.env.WORKER_MAX_JOBS ?? 2) || 2));
 
 if (!TOKEN || TOKEN === "change-me") {
   console.error("WORKER_TOKEN chưa đặt — dùng linh phù phát ở mục Linh Sứ, hoặc token tông môn.");
@@ -56,7 +60,10 @@ async function call(op, payload = {}) {
 }
 
 const say = (jobId, message, level = "info") =>
-  call("event", { jobId, level, message }).catch(() => {
+  // Engine nói "warn", giao thức nói "warning" — dịch ở đây, một chỗ duy nhất. Không dịch
+  // thì mọi dòng cảnh báo bị API trả 400 và catch bên dưới nuốt mất, người dùng vĩnh viễn
+  // không thấy cảnh báo nào trong nhật ký.
+  call("event", { jobId, level: level === "warn" ? "warning" : level, message }).catch(() => {
     /* mất một dòng nhật ký không đáng để đánh sập cả lượt chạy */
   });
 
@@ -110,11 +117,21 @@ async function handle(job) {
   const beat = setInterval(async () => {
     try {
       const { status } = await call("heartbeat", { jobId: job.id });
-      if (status === "stopping" || status === "stopped") {
+      // Bất kỳ trạng thái nào KHÔNG phải 'running' đều nghĩa là không còn ai chờ lượt này:
+      // 'stopping/stopped' là Thu Đàn, còn 'failed/done' là reaper đã kết liễu job (mất
+      // liên lạc dài rồi nối lại) — ôm browser chạy nốt một vòng không ai nhận chỉ tổ
+      // claim đè lên vòng kế.
+      if (status !== "running") {
         stopping = true;
       }
     } catch (err) {
       console.error("  nhịp tim lỗi:", err.message);
+      // 404 = job không còn tồn tại (tài khoản bị xoá kéo job theo); 403 = không còn thuộc
+      // quyền mình. Cả hai đều nghĩa là không còn ai chờ kết quả — dừng ở điểm an toàn kế,
+      // đừng ôm browser chạy nốt một vòng không ai nhận.
+      if (/HTTP 40[34]\b/.test(err.message)) {
+        stopping = true;
+      }
     }
   }, HEARTBEAT_MS);
 
@@ -143,20 +160,33 @@ async function handle(job) {
   }
 }
 
-console.log(`Linh sứ「${WORKER_ID}」đang canh ${WEB_URL}`);
+console.log(`Linh sứ「${WORKER_ID}」đang canh ${WEB_URL} (tối đa ${MAX_JOBS} đàn cùng lúc)`);
 
-// Một job một lúc, tuần tự — một máy chỉ nuôi nổi một browser cho ra hồn. Muốn chạy song
-// song thì mở thêm tiến trình với WORKER_ID khác; việc giành job đã được Postgres phân xử.
+// Nhiều job cùng lúc, mỗi job một Chromium — để một đạo hữu nuôi nhiều tài khoản thấy cả
+// đội chạy song song thay vì xếp hàng sau lưng nhau. `running` giữ các lượt đang bận; còn
+// ghế trống thì hỏi việc tiếp NGAY (không ngủ) cho tới khi hàng chờ cạn hoặc ghế đầy.
+// Việc giành job giữa nhiều linh sứ vẫn do Postgres phân xử như cũ.
+const running = new Set();
+
 for (;;) {
-  try {
-    const { job } = await call("claim", { workerId: WORKER_ID });
-    if (job) {
-      await handle(job);
-      continue;
+  let claimed = false;
+
+  if (running.size < MAX_JOBS) {
+    try {
+      const { job } = await call("claim", { workerId: WORKER_ID });
+      if (job) {
+        claimed = true;
+        // handle() tự nuốt mọi lỗi của chính nó (kể cả lỗi báo cáo complete), nên promise
+        // này không bao giờ reject — Set chỉ để đếm ghế.
+        const seat = handle(job).finally(() => running.delete(seat));
+        running.add(seat);
+      }
+    } catch (err) {
+      console.error("claim lỗi:", err.message);
     }
-  } catch (err) {
-    console.error("claim lỗi:", err.message);
   }
 
-  await sleep(POLL_MS);
+  if (!claimed) {
+    await sleep(POLL_MS);
+  }
 }

@@ -36,8 +36,8 @@ function frame(payload: DashboardLivePayload, eventId: number): Uint8Array {
 /** Bỏ lastSeen đang-online khỏi chữ ký: heartbeat vẫn dời hạn vắng nhưng không cần vẽ lại UI. */
 function visibleSignature(payload: DashboardLivePayload): string {
   return JSON.stringify({
-    job: payload.job,
-    accountTier: payload.accountTier,
+    jobs: payload.jobs,
+    accounts: payload.accounts,
     presence: {
       sectOnline: payload.presence.sectOnline,
       mine: payload.presence.mine.map((worker) => ({
@@ -140,6 +140,10 @@ export async function GET(request: NextRequest) {
         resetQueued = false;
 
         const payload = await getDashboardFeed(user.id, cursor);
+        // Feed đọc lùi JOB_EVENT_REPLAY_MARGIN dưới con trỏ để vớt dòng commit muộn; "mới"
+        // với stream này nghĩa là id vượt con trỏ — những dòng biên chỉ là hàng khử-trùng
+        // cho client, không được phép tự mình kích một frame.
+        const freshEvents = payload.events.filter((event) => event.id > cursor).length;
         if (payload.events.length > 0) {
           cursor = Math.max(cursor, payload.events[payload.events.length - 1].id);
         }
@@ -149,7 +153,7 @@ export async function GET(request: NextRequest) {
         scheduleExpiry(payload);
 
         const nextSignature = visibleSignature(payload);
-        if (force || resetEvents || payload.events.length > 0 || nextSignature !== signature) {
+        if (force || resetEvents || freshEvents > 0 || nextSignature !== signature) {
           signature = nextSignature;
           controller.enqueue(frame({ ...payload, resetEvents: resetEvents || undefined }, cursor));
         }

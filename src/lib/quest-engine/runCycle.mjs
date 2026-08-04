@@ -355,38 +355,103 @@ export async function runCycle(deps) {
       url: process.env.QUIZ_DIRECTORY_URL?.trim() || DEFAULT_QUIZ_REFERENCE_URL,
       log,
     });
-    const engine = createQuestEngine({ log, shouldStop, quiz });
 
-    for (const quest of quests) {
-      if (shouldStop()) {
+    // Hai nhịp hành sự. SONG SONG (mặc định): mỗi nhiệm vụ một tab riêng trong CÙNG phiên
+    // đăng nhập — vòng dài bằng nhiệm vụ chậm nhất thay vì tổng cộng dồn, đáng giá nhất khi
+    // Mê Cung (~35 phút) đứng chung hàng với các nhiệm vụ một phút. TUẦN TỰ (tắt trong Ngọc
+    // Giản): đúng nhịp bản desktop, cho ngày site trở chứng với nhiều tab. Lượt có ngân sách
+    // lát (budgetMs) luôn đi tuần tự: "hết giờ thì dừng giữa danh sách" chỉ có nghĩa khi
+    // danh sách được đi từng bước một.
+    const runParallel = config?.parallelQuests !== false && quests.length > 1 && deadline === Infinity;
+
+    if (runParallel) {
+      await say(`Chạy song song ${quests.length} nhiệm vụ — mỗi nhiệm vụ một tab riêng.`);
+
+      let sawAbort = false;
+      const settled = await Promise.all(
+        quests.map(async (quest) => {
+          if (shouldStop()) return { quest, aborted: true };
+
+          let questPage;
+          try {
+            questPage = await context.newPage();
+          } catch (err) {
+            return { quest, outcome: { outcome: "failed", message: `không mở được tab riêng (${err.message})` } };
+          }
+
+          // Session log mang tên nhiệm vụ: sáu tab cùng kể "Trình duyệt: …" thì không ai
+          // biết dòng nào của ai.
+          const questSession = createSession(questPage, {
+            baseUrl,
+            log: {
+              info: (m) => log.info(`Trình duyệt·${quest.name}`, m),
+              warning: (m) => log.warning(`Trình duyệt·${quest.name}`, m),
+              debug: (m) => log.debug(`Trình duyệt·${quest.name}`, m),
+            },
+          });
+          const questEngine = createQuestEngine({ log, shouldStop, quiz });
+
+          try {
+            return { quest, outcome: await questEngine.run(questSession, profile, quest) };
+          } catch (err) {
+            if (err instanceof QuestAborted) return { quest, aborted: true };
+            return { quest, outcome: { outcome: "failed", message: `trắc trở bất ngờ: ${err.message}` } };
+          } finally {
+            await questPage.close().catch(() => {});
+          }
+        }),
+      );
+
+      // Promise.all giữ nguyên thứ tự quests, nên phần tường thuật đọc như bản tuần tự.
+      for (const entry of settled) {
+        if (entry.aborted) {
+          sawAbort = true;
+          continue;
+        }
+        results.push(entry.outcome);
+        const shape = OUTCOME_TEXT[entry.outcome.outcome] ?? OUTCOME_TEXT.skipped;
+        await say(`${entry.quest.name}: ${shape.say(entry.outcome)}`, shape.level);
+        if (entry.outcome.outcome === "failed") failed++;
+        else done++;
+      }
+
+      if (sawAbort || shouldStop()) {
         return { outcome: "stopped", message: `Đã thu đàn giữa chừng — xong ${done}/${quests.length}.` };
       }
+    } else {
+      const engine = createQuestEngine({ log, shouldStop, quiz });
 
-      if (Date.now() >= deadline) {
-        return scheduledCycleResult(
-          "done",
-          `Hết ngân sách của lát này — xong ${done}/${quests.length}, phần còn lại để vòng sau.`,
-          results,
-        );
-      }
-
-      let outcome;
-      try {
-        outcome = await engine.run(session, profile, quest);
-      } catch (err) {
-        if (err instanceof QuestAborted) {
+      for (const quest of quests) {
+        if (shouldStop()) {
           return { outcome: "stopped", message: `Đã thu đàn giữa chừng — xong ${done}/${quests.length}.` };
         }
-        throw err;
+
+        if (Date.now() >= deadline) {
+          return scheduledCycleResult(
+            "done",
+            `Hết ngân sách của lát này — xong ${done}/${quests.length}, phần còn lại để vòng sau.`,
+            results,
+          );
+        }
+
+        let outcome;
+        try {
+          outcome = await engine.run(session, profile, quest);
+        } catch (err) {
+          if (err instanceof QuestAborted) {
+            return { outcome: "stopped", message: `Đã thu đàn giữa chừng — xong ${done}/${quests.length}.` };
+          }
+          throw err;
+        }
+
+        results.push(outcome);
+
+        const shape = OUTCOME_TEXT[outcome.outcome] ?? OUTCOME_TEXT.skipped;
+        await say(`${quest.name}: ${shape.say(outcome)}`, shape.level);
+
+        if (outcome.outcome === "failed") failed++;
+        else done++;
       }
-
-      results.push(outcome);
-
-      const shape = OUTCOME_TEXT[outcome.outcome] ?? OUTCOME_TEXT.skipped;
-      await say(`${quest.name}: ${shape.say(outcome)}`, shape.level);
-
-      if (outcome.outcome === "failed") failed++;
-      else done++;
     }
 
     return failed > 0

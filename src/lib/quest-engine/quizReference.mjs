@@ -136,7 +136,14 @@ export function createQuizReferenceDirectory({
   let loadedAt = 0;
   let loadedFrom = "";
   let loading = null;
-  let warned = false;
+  // Cảnh báo tính theo TỪNG nhật ký (mỗi job một object log riêng), không phải một lần cho
+  // cả tiến trình: worker giờ chạy nhiều job đồng thời, và job đầu tiên "tiêu" mất cảnh báo
+  // thì các tài khoản còn lại vĩnh viễn không biết vì sao Vấn Đáp bỏ lại câu hỏi cho họ.
+  let warnedLogs = new WeakSet();
+  // Sau một lượt tải hỏng, nghỉ một lúc thay vì để MỖI câu hỏi của MỖI job lại kích một
+  // lượt tải mới và ôm timeout tới 20 giây mỗi câu.
+  let failedAt = 0;
+  const FAILURE_RETRY_MS = 60_000;
 
   const isFresh = (url) =>
     entries.size > 0 &&
@@ -144,8 +151,8 @@ export function createQuizReferenceDirectory({
     now() - loadedAt < freshnessMs;
 
   const warnOnce = (log, message) => {
-    if (warned) return;
-    warned = true;
+    if (warnedLogs.has(log)) return;
+    warnedLogs.add(log);
     writeLog(log, "warning", message);
   };
 
@@ -179,11 +186,19 @@ export function createQuizReferenceDirectory({
     if (loading) await loading;
     if (isFresh(url)) return entries;
 
+    // Nguồn vừa hỏng thì đừng gõ cửa lại ngay — trả về những gì đang có (kể cả rỗng) và
+    // để lượt sau FAILURE_RETRY_MS thử lại. Vẫn nhắc mỗi nhật ký một lần vì sao thiếu đáp án.
+    if (failedAt && now() - failedAt < FAILURE_RETRY_MS) {
+      warnOnce(log, "Danh sách đáp án đang không đọc được — câu chưa biết sẽ để lại cho bạn.");
+      return entries;
+    }
+
     loading = (async () => {
       try {
         const html = await download(url);
         const parsed = parseQuizReferenceHtml(html);
         if (parsed.size === 0) {
+          failedAt = now();
           warnOnce(log, `Danh sách đáp án tại ${url} không có dòng nào đọc được.`);
           return entries;
         }
@@ -191,10 +206,12 @@ export function createQuizReferenceDirectory({
         entries = parsed;
         loadedAt = now();
         loadedFrom = url;
-        warned = false;
+        failedAt = 0;
+        warnedLogs = new WeakSet();
         writeLog(log, "info", `Đã nạp ${parsed.size} câu từ danh sách tham khảo.`);
         return entries;
       } catch (error) {
+        failedAt = now();
         warnOnce(
           log,
           `Không đọc được danh sách đáp án (${error instanceof Error ? error.message : String(error)}). Câu chưa biết sẽ để lại cho bạn.`,

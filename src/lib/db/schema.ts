@@ -1,5 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
   bigserial,
+  boolean,
   index,
   integer,
   jsonb,
@@ -7,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -63,6 +66,36 @@ export const users = pgTable(
   (t) => [index("users_status_idx").on(t.status)],
 );
 
+/**
+ * Tài khoản game của một đạo hữu — số nhiều, như bản desktop từ đầu.
+ *
+ * Cookie từng sống trong user_configs như một trường cấu hình, nghĩa là mỗi người đúng một
+ * tài khoản. Tách bảng vì: một người nuôi nhiều tài khoản và bật/tắt từng cái độc lập; hạng
+ * VIP/thường là thuộc tính CỦA COOKIE (hai tài khoản cùng chủ có thể khác hạng); và job phải
+ * biết mình chạy cho tài khoản nào để chọn đúng hồ sơ Chromium lẫn vá đúng verdict hạng.
+ *
+ * `cookieEnvelope` là phong bì AES-GCM y như user_configs từng giữ — cookie vẫn đi MỘT
+ * CHIỀU: vào từ form, ra duy nhất ở /api/worker sau khi linh sứ xác thực.
+ */
+export const gameAccounts = pgTable(
+  "game_accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    cookieEnvelope: text("cookie_envelope").notNull(),
+    /** Hạng do linh sứ chứng minh trên hub; null = cookie này chưa được dò. */
+    accountTier: text("account_tier").$type<"vip" | "free">(),
+    /** Tắt là đứng ngoài Khai Đàn — cấu hình và lịch sử giữ nguyên, chỉ không chạy. */
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("accounts_user_idx").on(t.userId, t.createdAt)],
+);
+
 /** One JSONB document per user — the quest/automation configuration. */
 export const userConfigs = pgTable("user_configs", {
   userId: uuid("user_id")
@@ -106,6 +139,11 @@ export const automationJobs = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /**
+     * Tài khoản game mà lượt này phục vụ. Nullable vì bảng jobs là lịch sử — các lượt trước
+     * khi có bảng game_accounts không có gì để trỏ. Xoá tài khoản kéo theo job của nó.
+     */
+    accountId: uuid("account_id").references(() => gameAccounts.id, { onDelete: "cascade" }),
     status: jobStatus("status").notNull().default("queued"),
     /**
      * The config frozen for the CURRENT cycle. At the safe boundary between cycles the server
@@ -133,6 +171,16 @@ export const automationJobs = pgTable(
     // Hàng chờ được quét theo (status, runner) ở mỗi nhịp cron và mỗi lần worker hỏi việc —
     // index ghép đúng theo hình dạng câu truy vấn đó.
     index("jobs_queue_idx").on(t.status, t.runner, t.createdAt),
+    // Linh Đài hỏi "job mới nhất của TỪNG tài khoản" mỗi lần dựng feed.
+    index("jobs_account_idx").on(t.accountId, t.createdAt),
+    // MỖI TÀI KHOẢN TỐI ĐA MỘT ĐÀN SỐNG — luật nằm ở database chứ không chỉ ở startJob,
+    // vì startJob là check-then-insert qua nhiều round-trip: hai lượt Khai Đàn đồng thời
+    // (hai tab, hai thiết bị) cùng thấy tài khoản còn rảnh rồi cùng insert. Hai job sống
+    // cùng cookie nghĩa là hai Chromium giành một hồ sơ và một nhân vật bị chạy nhiệm vụ
+    // đôi. INSERT phía service dùng ON CONFLICT DO NOTHING để kẻ đến sau lặng lẽ thua.
+    uniqueIndex("jobs_one_active_per_account")
+      .on(t.accountId)
+      .where(sql`status in ('queued', 'running', 'stopping')`),
   ],
 );
 
@@ -189,6 +237,7 @@ export const workers = pgTable(
 );
 
 export type UserRow = typeof users.$inferSelect;
+export type GameAccountRow = typeof gameAccounts.$inferSelect;
 export type JobRow = typeof automationJobs.$inferSelect;
 export type JobEventRow = typeof jobEvents.$inferSelect;
 export type WorkerRow = typeof workers.$inferSelect;

@@ -1,7 +1,5 @@
 import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
-import { decryptSecret, encryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
-import { notifyDashboard } from "@/lib/realtime/dashboardChannel";
 import { z } from "zod";
 
 /**
@@ -18,10 +16,26 @@ import { z } from "zod";
 const simpleQuest = z.object({ enabled: z.boolean().default(false) }).prefault({});
 
 export const configSchema = z.object({
-  /** The hoathinh3d login cookie bundle the worker automates with. */
+  /**
+   * Cookie đăng nhập của TÀI KHOẢN mà lượt chạy phục vụ.
+   *
+   * Từ khi có bảng game_accounts (migration 0009) trường này không còn sống trong
+   * user_configs — nó chỉ xuất hiện trong SNAPSHOT của job, nơi server ghép cookie của đúng
+   * tài khoản vào cấu hình chung trước khi trao cho linh sứ. Giữ trong schema để hình thù
+   * config mà worker nhận không đổi, và document cũ còn mang nó vẫn parse lành.
+   */
   gameCookie: z.string().trim().max(8000).default(""),
-  /** Hạng do worker chứng minh trên hub; null = cookie này chưa được dò. */
+  /**
+   * Hạng của TÀI KHOẢN trong snapshot — cùng số phận với gameCookie: nguồn sự thật nằm ở
+   * game_accounts.account_tier, trường này chỉ là bản ghép cho engine đọc.
+   */
   accountTier: z.enum(["vip", "free"]).nullable().default(null),
+  /**
+   * Chạy các nhiệm vụ của một vòng SONG SONG — mỗi nhiệm vụ một tab riêng trong cùng phiên
+   * đăng nhập. Vòng dài bằng nhiệm vụ chậm nhất thay vì tổng cộng dồn. Tắt để về tuần tự
+   * như bản desktop khi site trở chứng với nhiều tab.
+   */
+  parallelQuests: z.boolean().default(true),
   /**
    * DI SẢN — từ v0.11 mọi lượt chạy đều do worker sống dai đảm nhiệm, không còn lựa chọn
    * nơi chạy. Trường vẫn nằm trong schema vì document cũ đã mang nó (Zod strip là mất
@@ -104,12 +118,12 @@ export const storedConfigSchema = configSchema.extend({
 /**
  * Cấu hình như UI được phép nhìn thấy: mọi thứ, TRỪ cookie.
  *
- * `gameCookie` luôn là chuỗi rỗng ở đây — thay vào đó là `hasCookie`. Đó là chủ ý: một bí
- * mật đã mã hoá at-rest mà vẫn được render vào HTML mỗi lần mở trang thì coi như chưa mã
- * hoá — nó sẽ nằm trong cache trình duyệt, trong lịch sử, trong ảnh chụp màn hình. Nên
- * cookie chỉ đi MỘT CHIỀU: từ người dùng vào database, rồi từ database ra worker.
+ * `gameCookie` luôn là chuỗi rỗng ở đây. Đó là chủ ý: một bí mật đã mã hoá at-rest mà vẫn
+ * được render vào HTML mỗi lần mở trang thì coi như chưa mã hoá — nó sẽ nằm trong cache
+ * trình duyệt, trong lịch sử, trong ảnh chụp màn hình. Nên cookie chỉ đi MỘT CHIỀU: từ
+ * người dùng vào database (bảng game_accounts), rồi từ database ra worker.
  */
-export type EditableConfig = UserConfig & { hasCookie: boolean };
+export type EditableConfig = UserConfig;
 
 /** Đọc thô: parse JSONB về đúng hình thù hôm nay, cookie vẫn ở dạng phong bì. */
 async function readStored(userId: string): Promise<UserConfig> {
@@ -136,49 +150,22 @@ export async function getStoredConfigForSnapshot(userId: string): Promise<UserCo
 /** Dành cho trang cấu hình. Không bao giờ chứa cookie. */
 export async function getEditableConfig(userId: string): Promise<EditableConfig> {
   const stored = await readStored(userId);
-  return { ...stored, gameCookie: "", hasCookie: stored.gameCookie.length > 0 };
+  return { ...stored, gameCookie: "" };
 }
 
 /**
- * Dành cho lúc khai đàn: cookie đã giải mã, sẵn sàng cho worker.
- *
- * Tên hàm cố tình dài và cụ thể — đây là đường duy nhất trong hệ thống trả về plaintext,
- * nên nó phải nổi bật ở chỗ gọi. Giá trị chưa đóng phong bì (ghi từ trước khi có mã hoá)
- * vẫn đọc được, và lần lưu kế tiếp sẽ tự mã hoá.
- */
-export async function getConfigWithSecrets(userId: string): Promise<UserConfig> {
-  const stored = await readStored(userId);
-  if (stored.gameCookie.length === 0) {
-    return stored;
-  }
-
-  return configSchema.parse({
-    ...stored,
-    gameCookie: isEncrypted(stored.gameCookie)
-      ? decryptSecret(stored.gameCookie)
-      : stored.gameCookie,
-  });
-}
-
-/**
- * Ghi cấu hình. `gameCookie` rỗng nghĩa là "giữ nguyên cookie cũ" — bắt buộc phải thế, vì
- * form không còn nhận lại cookie để mà gửi lên; nếu rỗng bị hiểu là "xoá" thì mỗi lần sửa
- * độ khó phòng là mất cookie.
+ * Ghi cấu hình nhiệm vụ. Cookie KHÔNG đi đường này nữa — tài khoản sống ở bảng
+ * game_accounts (services/accounts.ts); mọi giá trị gameCookie/accountTier client gửi lên
+ * đều bị bỏ qua, và giá trị di sản còn nằm trong document cũ được giữ nguyên chứ không đè.
  */
 export async function saveConfig(userId: string, config: UserConfig): Promise<void> {
   const clean = configSchema.parse(config);
   const previous = await readStored(userId);
 
-  const cookie = clean.gameCookie.trim();
-  const replacingAccount = cookie.length > 0;
-  const stored = replacingAccount ? encryptSecret(cookie) : previous.gameCookie;
-
   const document = storedConfigSchema.parse({
     ...clean,
-    gameCookie: stored,
-    // Một cookie mới có thể thuộc hạng đối nghịch. Chỉ worker nhìn hub mới được quyền
-    // phán lại; mọi lần lưu lựa chọn thông thường phải giữ nguyên bằng chứng cũ.
-    accountTier: replacingAccount ? null : previous.accountTier,
+    gameCookie: previous.gameCookie,
+    accountTier: previous.accountTier,
   });
 
   await db()
@@ -188,82 +175,28 @@ export async function saveConfig(userId: string, config: UserConfig): Promise<vo
       target: schema.userConfigs.userId,
       set: { config: document, updatedAt: sql`now()` },
     });
-
-  if (replacingAccount) {
-    await notifyDashboard({ userId, topic: "config" }).catch(() => undefined);
-  }
 }
 
 /**
- * Chỉ thay tài khoản game, giữ nguyên toàn bộ lựa chọn nhiệm vụ hiện có.
+ * Ghi hạng do worker vừa đọc trên hub — vào ĐÚNG tài khoản mà job phục vụ.
  *
- * Nút "Lưu tài khoản" nằm ngay cạnh ô cookie không được phép vô tình ghi đè những checkbox
- * người dùng mới chỉnh nhưng chưa Khắc Ngọc Giản. Cookie vẫn đi qua cùng lớp schema + mã hóa
- * như đường lưu toàn bộ cấu hình.
- */
-export async function saveCookie(userId: string, value: string): Promise<void> {
-  const cookie = configSchema.shape.gameCookie.parse(value).trim();
-  if (cookie.length === 0) {
-    throw new Error("Cookie tài khoản không được để trống.");
-  }
-
-  const stored = await readStored(userId);
-  const document = storedConfigSchema.parse({
-    ...stored,
-    gameCookie: encryptSecret(cookie),
-    accountTier: null,
-  });
-
-  await db()
-    .insert(schema.userConfigs)
-    .values({ userId, config: document, updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: schema.userConfigs.userId,
-      set: { config: document, updatedAt: sql`now()` },
-    });
-
-  await notifyDashboard({ userId, topic: "config" }).catch(() => undefined);
-}
-
-/** Xoá cookie hẳn — đường thoát khi người dùng muốn rút chìa khỏi hệ thống. */
-export async function clearCookie(userId: string): Promise<void> {
-  const stored = await readStored(userId);
-  const document = storedConfigSchema.parse({ ...stored, gameCookie: "", accountTier: null });
-  await db()
-    .insert(schema.userConfigs)
-    .values({ userId, config: document, updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: schema.userConfigs.userId,
-      set: { config: document, updatedAt: sql`now()` },
-    });
-
-  await notifyDashboard({ userId, topic: "config" }).catch(() => undefined);
-}
-
-/**
- * Ghi hạng do worker vừa đọc trên hub, theo job đã được route xác thực.
- *
- * JSONB được vá nguyên tử thay vì đọc-rồi-ghi cả document: người dùng có thể bấm lưu quest
- * đúng lúc probe trả lời, và không bên nào được phép ghi đè thay đổi của bên kia. Chỉ phát
- * realtime khi giá trị thực sự đổi để mỗi vòng không tạo một frame SSE thừa.
+ * Một UPDATE nguyên tử qua join job → account: người dùng có thể sửa tài khoản đúng lúc
+ * probe trả lời, và không bên nào ghi đè bên kia. Chỉ ghi khi giá trị thực sự đổi; trigger
+ * jarvis_dashboard_account_change phát topic `config` trong cùng transaction nên không cần
+ * gọi notify tay. Job không gắn tài khoản (lịch sử trước migration 0009) thì không có gì
+ * để vá — bỏ qua trong im lặng.
  */
 export async function recordDetectedAccountTierForJob(
   jobId: string,
   tier: AccountTier,
 ): Promise<void> {
-  const changed = await db().execute(sql`
-    update user_configs as config_row set
-      config = jsonb_set(config_row.config, '{accountTier}', to_jsonb(${tier}::text), true),
+  await db().execute(sql`
+    update game_accounts as acc set
+      account_tier = ${tier},
       updated_at = now()
     from automation_jobs as job
     where job.id = ${jobId}
-      and config_row.user_id = job.user_id
-      and config_row.config ->> 'accountTier' is distinct from ${tier}
-    returning config_row.user_id
+      and acc.id = job.account_id
+      and acc.account_tier is distinct from ${tier}
   `);
-
-  const userId = changed.rows?.[0]?.user_id;
-  if (typeof userId === "string") {
-    await notifyDashboard({ userId, topic: "config" }).catch(() => undefined);
-  }
 }

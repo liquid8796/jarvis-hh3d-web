@@ -47,7 +47,10 @@ const bodySchema = z.discriminatedUnion("op", [
   z.object({
     op: z.literal("event"),
     jobId: z.string().uuid(),
-    level: z.enum(["info", "success", "warning", "error"]).default("info"),
+    // "warn" là cách engine gọi mức cảnh báo (OUTCOME_TEXT, các say(..., "warn") trong
+    // runCycle) — linh sứ ĐÃ CÀI ngoài kia vẫn gửi nguyên chữ đó. Từ chối nó là âm thầm vứt
+    // mọi dòng cảnh báo của họ; nhận rồi dịch về "warning" ở dưới thì không ai phải cài lại.
+    level: z.enum(["info", "success", "warning", "error", "warn"]).default("info"),
     message: z.string().min(1).max(2000),
   }),
   z.object({
@@ -145,7 +148,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "forbidden" }, { status: 403 });
       }
 
-      await addEvent(body.jobId, body.level, body.message);
+      await addEvent(body.jobId, body.level === "warn" ? "warning" : body.level, body.message);
       return NextResponse.json({ ok: true });
     }
 

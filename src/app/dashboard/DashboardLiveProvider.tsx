@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import type {
-  AccountTier,
+  DashboardAccount,
   DashboardEvent,
   DashboardJob,
   DashboardLivePayload,
@@ -19,7 +19,8 @@ import type {
 } from "@/lib/realtime/dashboardTypes";
 
 type DashboardJobLiveValue = {
-  job: DashboardJob | null;
+  /** Job mới nhất của từng tài khoản, theo thứ tự tạo tài khoản. */
+  jobs: DashboardJob[];
   events: DashboardEvent[];
   connected: boolean;
   refresh: () => Promise<void>;
@@ -32,7 +33,7 @@ type DashboardPresenceLiveValue = {
 };
 
 type DashboardAccountLiveValue = {
-  accountTier: AccountTier | null;
+  accounts: DashboardAccount[];
 };
 
 const DashboardJobLiveContext = createContext<DashboardJobLiveValue | null>(null);
@@ -72,31 +73,28 @@ function sameVisiblePresence(left: DashboardPresence | null, right: DashboardPre
 }
 
 /**
- * Một EventSource duy nhất nuôi cả trạng thái đàn, nhật ký và sổ linh sứ. Event ID chính là
- * cursor job_events nên reconnect tiếp tục đúng chỗ; poll một-lần chỉ còn là lưới an toàn.
+ * Một EventSource duy nhất nuôi trạng thái đàn (mỗi tài khoản một dòng), nhật ký, sổ linh sứ
+ * và danh sách tài khoản. Event ID chính là cursor job_events nên reconnect tiếp tục đúng
+ * chỗ; poll một-lần chỉ còn là lưới an toàn.
  */
 export function DashboardLiveProvider({
   children,
-  initialAccountTier = null,
+  initialAccounts = [],
 }: {
   children: ReactNode;
-  initialAccountTier?: AccountTier | null;
+  initialAccounts?: DashboardAccount[];
 }) {
-  const [job, setJob] = useState<DashboardJob | null>(null);
+  const [jobs, setJobs] = useState<DashboardJob[]>([]);
   const [events, setEvents] = useState<DashboardEvent[]>([]);
   const [presence, setPresence] = useState<DashboardPresence | null>(null);
-  const [accountTier, setAccountTier] = useState<AccountTier | null>(initialAccountTier);
+  const [accounts, setAccounts] = useState<DashboardAccount[]>(initialAccounts);
   const [connected, setConnected] = useState(false);
   const cursor = useRef(0);
-  const jobId = useRef<string | null>(null);
   const refreshing = useRef(false);
 
   const applyPayload = useCallback((payload: DashboardLivePayload) => {
-    const nextJobId = payload.job?.id ?? null;
-    const changedJob = nextJobId !== jobId.current;
-    jobId.current = nextJobId;
-    setJob(payload.job);
-    setAccountTier(payload.accountTier);
+    setJobs(payload.jobs);
+    setAccounts(payload.accounts);
     setPresence((previous) =>
       sameVisiblePresence(previous, payload.presence) ? previous : payload.presence,
     );
@@ -106,7 +104,11 @@ export function DashboardLiveProvider({
     }
 
     setEvents((previous) => {
-      const base = changedJob || payload.resetEvents ? [] : previous;
+      // Chỉ server (topic events-cleared) mới được lệnh xoá màn hình. Không đoán "đợt Khai
+      // Đàn mới" từ tập id job nữa: startJob tạo job TUẦN TỰ và mỗi INSERT một frame SSE,
+      // nên frame giữa chừng luôn trộn id cũ/mới và phép đoán không bao giờ trúng với đội
+      // nhiều tài khoản. Nhật ký cứ chảy liền mạch, có nhãn tài khoản, có nút Dọn.
+      const base = payload.resetEvents ? [] : previous;
       const byId = new Map(base.map((event) => [event.id, event]));
       for (const event of payload.events) byId.set(event.id, event);
       return [...byId.values()].sort((a, b) => a.id - b.id).slice(-400);
@@ -168,11 +170,11 @@ export function DashboardLiveProvider({
 
   const clearEvents = useCallback(() => setEvents([]), []);
   const jobValue = useMemo(
-    () => ({ job, events, connected, refresh, clearEvents }),
-    [job, events, connected, refresh, clearEvents],
+    () => ({ jobs, events, connected, refresh, clearEvents }),
+    [jobs, events, connected, refresh, clearEvents],
   );
   const presenceValue = useMemo(() => ({ presence, refresh }), [presence, refresh]);
-  const accountValue = useMemo(() => ({ accountTier }), [accountTier]);
+  const accountValue = useMemo(() => ({ accounts }), [accounts]);
 
   return (
     <DashboardJobLiveContext.Provider value={jobValue}>

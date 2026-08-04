@@ -11,6 +11,98 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.22.0 — nhiều tài khoản chạy cùng lúc; nhiệm vụ trong một vòng chạy song song
+
+Bản này đưa web lên ngang bản desktop ở đúng chỗ desktop mạnh nhất: **nhiều tài khoản**. Và
+đi xa hơn desktop một bước: các nhiệm vụ trong một vòng có thể chạy **song song**, mỗi nhiệm
+vụ một tab.
+
+- **Tài khoản game tách khỏi cấu hình, thành bảng riêng `game_accounts` (migration 0009).**
+  Cho tới nay cookie sống lẫn trong `user_configs`, nghĩa là mỗi người đúng một tài khoản.
+  Bảng riêng vì ba lẽ: một người nuôi nhiều tài khoản và bật/tắt từng cái độc lập; hạng
+  VIP/thường là thuộc tính CỦA COOKIE chứ không phải của người (hai tài khoản cùng chủ có
+  thể khác hạng); và job phải biết nó chạy cho tài khoản nào để linh sứ chọn đúng hồ sơ
+  Chromium lẫn server vá đúng verdict hạng. Migration tự chuyển cookie đang có thành
+  「Tài khoản 1」— phong bì mã hoá đi nguyên vẹn, verdict hạng đã chứng minh đi theo, job
+  đang sống được nối vào tài khoản mới, và cookie rời hẳn `user_configs` (một bí mật không
+  được phép có hai nhà).
+- **Ngọc Giản Cấu Hình có mục quản lý tài khoản:** thêm tài khoản mới (tên gợi nhớ + cookie),
+  thay cookie từng tài khoản (verdict hạng bị xoá để linh sứ dò lại), đổi tên, bật/tắt, xoá.
+  Tắt một tài khoản đang chạy là đàn của RIÊNG nó được thu — các tài khoản khác không bị vạ
+  lây; xoá bị từ chối khi đàn còn sống, để không bỏ một linh sứ bơ vơ với job đã biến mất.
+  Hai tài khoản cùng chủ mang cùng một cookie bị chặn ngay lúc lưu: cùng cookie là cùng một
+  hồ sơ Chromium (fingerprint băm theo cookie) — hai job đồng thời sẽ giành nhau một profile,
+  và cùng một nhân vật bị chạy nhiệm vụ hai lần.
+- **Khai Đàn lập một đàn cho MỖI tài khoản đang bật; Thu Đàn thu cả đội.** Mỗi tài khoản một
+  job sống dai với cooldown riêng — tài khoản A đang ngủ chờ Phúc Lợi không bắt tài khoản B
+  chờ theo. Snapshot của từng job = cấu hình nhiệm vụ chung GHÉP cookie/hạng của đúng tài
+  khoản nó phục vụ, ghép lại ở mỗi lần claim để sửa-giữa-chừng vẫn có hiệu lực ở vòng kế.
+  Bấm Khai Đàn khi một phần đội đang chạy chỉ bổ sung những tài khoản còn đứng ngoài.
+- **Linh sứ chạy nhiều đàn cùng lúc.** Một tiến trình worker giờ cầm tối đa
+  `WORKER_MAX_JOBS` job đồng thời (mặc định 2, kẹp 1–8 — mỗi job là một Chromium riêng nên
+  trần này là trần RAM). Ghế còn trống thì hỏi việc tiếp ngay, không ngủ giữa hai lần claim.
+  Nhịp tim gặp 404/403 (job bị xoá dưới chân, ví dụ tài khoản vừa bị xoá) được hiểu là lệnh
+  dừng ở điểm an toàn kế — không ôm browser chạy nốt một vòng không ai nhận.
+  **Linh sứ đã cài cần cài đè một lần** để nhận khả năng này; linh sứ cũ vẫn chạy đúng nhưng
+  tuần tự từng tài khoản một.
+- **Các nhiệm vụ trong một vòng chạy song song, mỗi nhiệm vụ một tab riêng** trong cùng phiên
+  đăng nhập — vòng dài bằng nhiệm vụ chậm nhất thay vì tổng cộng dồn, đáng giá nhất khi Mê
+  Cung (~35 phút) đứng chung hàng với các nhiệm vụ một phút. Tường thuật vẫn đọc được: log
+  của mỗi tab mang tên nhiệm vụ, phần kết quả kể theo đúng thứ tự cũ. Có công tắc「Chạy song
+  song các nhiệm vụ」trong Ngọc Giản (mặc định bật) để lui về tuần tự như bản PC nếu site
+  trở chứng với nhiều tab; lượt chạy có ngân sách lát (`budgetMs`) luôn đi tuần tự vì "hết
+  giờ thì dừng giữa danh sách" chỉ có nghĩa khi danh sách đi từng bước.
+- **Lư Khai Đàn hiện trạng thái TỪNG tài khoản** — mỗi tài khoản một dòng chấm màu + trạng
+  thái + linh sứ phụ trách. Nhật ký gộp chung, từng dòng mang nhãn「tài khoản」khi đội có
+  hơn một người. Hai tab Nhiệm vụ VIP/Thường **không khoá nữa** (đội hình có thể lẫn cả hai
+  hạng); mỗi tài khoản vẫn chỉ chạy đúng bộ thuộc hạng của nó, và phần chú thích cho biết
+  đội hình hiện tại mấy VIP, mấy thường, mấy chưa dò.
+- **Nhật ký chỉ tải phần ĐUÔI và tự đứng ở dòng mới nhất.** Lượt tải đầu lấy 200 dòng mới
+  nhất (trước đây là 200 dòng CỔ nhất của một job đã chạy cả tuần — mở trang là đọc chuyện
+  tuần trước); khung log mở ra là đứng sẵn ở đáy và bám theo dòng mới, chỉ ngừng bám khi
+  người đọc chủ động kéo lên xem lại. Câu mô tả「Khai Đàn một lần, linh sứ tự canh
+  cooldown…」rút khỏi mặt Lư — hành vi ấy giờ tự kể qua dòng trạng thái từng tài khoản.
+- **Một đợt review đối kháng (5 chiều × phản biện độc lập) chốt thêm một lớp thép** trước
+  khi phát hành:
+  - Index duy nhất một-phần `jobs_one_active_per_account` — MỖI tài khoản tối đa MỘT đàn
+    sống, luật nằm ở database chứ không chỉ ở startJob (vốn là check-then-insert qua nhiều
+    round-trip: hai lượt Khai Đàn đồng thời từ hai tab cùng thấy tài khoản rảnh rồi cùng
+    insert — hai Chromium sẽ giành một hồ sơ và một nhân vật bị chạy nhiệm vụ đôi). INSERT
+    dùng `ON CONFLICT DO NOTHING`, kẻ đến sau lặng lẽ thua.
+  - Snapshot drizzle 0009 được SINH bằng chính drizzle-kit rồi mới ghép phần backfill viết
+    tay — thiếu snapshot thì lần `db:generate` kế tiếp diff với snapshot 0008 và sinh lại
+    nguyên bộ DDL trùng, nổ `relation already exists` giữa chuỗi migration.
+  - Nhịp tim linh sứ coi MỌI trạng thái không phải `running` là lệnh dừng — job bị reaper
+    kết liễu (`failed`) không còn được ôm chạy nốt cả vòng không ai nhận.
+  - Level `"warn"` của engine được cả linh sứ lẫn API dịch về `"warning"` — trước đó mọi
+    dòng cảnh báo bị 400 và nuốt lặng lẽ, kể cả với linh sứ đã cài (sửa phía API nên bản cũ
+    không phải cài lại vẫn hết mất log).
+  - Vòng kết thúc của tài khoản đã tắt chuyển thẳng `stopped` thay vì re-queue thành zombie
+    "chờ linh sứ" vĩnh viễn; claim cũng bỏ qua đàn của tài khoản đã tắt (đóng khe đua của
+    toggle); reaper chỉ kết liễu job còn `running/stopping`, không giết nhầm job vừa
+    re-queue khoẻ mạnh.
+  - Nhật ký đọc lùi 50 id dưới con trỏ để vớt dòng commit muộn (hai job ghi đồng thời có
+    thể commit ngược thứ tự id); stream chỉ phát frame khi có dòng id thật sự mới nên nhịp
+    tim không thành frame thừa. Dọn nhật ký xoá màn hình TRƯỚC khi chờ server để không quét
+    oan dòng vừa đến.
+  - AccountManager đứng NGOÀI `<form>` cấu hình — React 19 reset uncontrolled input sau mỗi
+    form action, một cú Khắc Ngọc Giản không được phép xoá trắng chuỗi cookie đang gõ dở.
+    Form cấu hình thêm `noValidate`: input số invalid nằm trong tab đang ẩn từng chặn submit
+    mà không hiện nổi một lời; giờ Zod ở server là trọng tài và nó biết nói lỗi ra lời.
+  - Cảnh báo "không đọc được danh sách đáp án" của Vấn Đáp tính theo TỪNG job (WeakSet theo
+    log) thay vì một lần cho cả tiến trình — job đầu không còn "tiêu" mất cảnh báo của các
+    tài khoản sau; nguồn hỏng được nghỉ 60 giây thay vì mỗi câu hỏi lại ôm một timeout 20s.
+- **Triển khai:** chạy `npm run db:migrate` TRƯỚC khi deploy bản mới (code mới đọc bảng
+  `game_accounts`; migrate xong thì code cũ vẫn chạy được thêm một nhịp vì chỉ mất cookie
+  trong config khi ĐỌC — nhưng đừng nấn ná, và đừng rollback code sau khi đã migrate vì bản
+  cũ sẽ không thấy cookie nữa).
+- Kiểm chứng: TypeScript sạch, production build thành công, smoke Chromium thật **103/103**
+  (smoke lái engine trực tiếp nên không đổi số); hai script verify realtime đã cập nhật theo
+  payload `jobs[]`/`accounts[]`. Nhịp chạy song song và đa tài khoản chưa có lượt chạy thật
+  trên site — cần một lượt Khai Đàn thật để xác nhận, như mọi flow mới trước nay.
+
+---
+
 ## 0.21.0 — hạng tài khoản khóa đúng tab; tài khoản thường có thêm Hoang Vực và Vấn Đáp
 
 - **Đồng bộ profile schema 44 từ PC.** Hoang Vực và Vấn Đáp ở tab Thường là bản sao nguyên

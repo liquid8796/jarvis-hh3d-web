@@ -2,8 +2,21 @@
 
 import { revalidatePath } from "next/cache";
 import { requireActiveUser } from "@/lib/auth/guards";
-import { clearCookie, configSchema, saveConfig, saveCookie } from "@/lib/services/configs";
-import { clearLatestJobEvents, requestStop, startJob } from "@/lib/services/jobs";
+import {
+  addAccount,
+  deleteAccount,
+  renameAccount,
+  setAccountEnabled,
+  updateAccountCookie,
+} from "@/lib/services/accounts";
+import { configSchema, saveConfig } from "@/lib/services/configs";
+import {
+  clearVisibleJobEvents,
+  getActiveJobs,
+  requestStop,
+  requestStopForAccount,
+  startJob,
+} from "@/lib/services/jobs";
 // Import từ module LÁ, KHÔNG phải từ runCycle.mjs. runCycle kéo theo profile.mjs, mà module
 // ấy đọc profile.json bằng `readFileSync(fileURLToPath(new URL(…)))` ngay ở thân module —
 // dưới Turbopack, `URL` trong bundle không phải `URL` của Node, nên fileURLToPath ném lỗi
@@ -21,7 +34,9 @@ export type ActionResult = { ok: boolean; message: string };
 
 type CookieInspection = { ok: true; note: string } | { ok: false; message: string };
 
-/** Một nơi duy nhất soát chuỗi cookie cho cả nút lưu riêng lẫn nút lưu toàn bộ cấu hình. */
+const COOKIE_MAX_LENGTH = 8000;
+
+/** Một nơi duy nhất soát chuỗi cookie cho cả nút thêm tài khoản lẫn nút thay cookie. */
 function inspectCookie(pastedCookie: string): CookieInspection {
   const jar = parseCookieString(
     pastedCookie,
@@ -45,6 +60,23 @@ function inspectCookie(pastedCookie: string): CookieInspection {
   };
 }
 
+/** Cookie từ form: cắt khoảng trắng, chặn rỗng và chặn phình — trước khi đụng tới mã hoá. */
+function readCookieField(formData: FormData): { ok: true; cookie: string } | { ok: false; message: string } {
+  const cookie = String(formData.get("cookie") ?? "").trim();
+  if (cookie.length === 0) {
+    return { ok: false, message: "Hãy dán chuỗi cookie tài khoản trước khi bấm lưu." };
+  }
+  if (cookie.length > COOKIE_MAX_LENGTH) {
+    return { ok: false, message: `Chuỗi cookie dài bất thường (quá ${COOKIE_MAX_LENGTH} ký tự) — kiểm tra lại bản dán.` };
+  }
+  return { ok: true, cookie };
+}
+
+function readAccountId(formData: FormData): string | null {
+  const id = String(formData.get("accountId") ?? "").trim();
+  return id.length > 0 ? id : null;
+}
+
 export async function saveConfigAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const user = await requireActiveUser();
 
@@ -52,7 +84,9 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
   const simple = (key: string) => ({ enabled: formData.get(`q_${key}`) === "on" });
 
   const parsed = configSchema.safeParse({
-    gameCookie: String(formData.get("gameCookie") ?? ""),
+    // Cookie không đi đường này nữa — tài khoản sống ở bảng riêng với bộ action riêng.
+    gameCookie: "",
+    parallelQuests: formData.get("parallelQuests") === "on",
     // Nơi vận hành đang KHOÁ về linh sứ máy nhà — ép ở đây chứ không tin form, vì
     // `disabled` chỉ là một thuộc tính HTML và một POST dựng tay chẳng đi qua form lần nào.
     runner: "local",
@@ -86,51 +120,135 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Cấu hình không hợp lệ." };
   }
 
-  // Soát cookie NGAY LÚC DÁN — thời điểm trung thực nhất, khi người dùng còn đứng đó và còn
-  // sửa được. Bài học 02/08: một bản xuất JSON được lưu êm ả, parse ra số không, và sự thật
-  // chỉ nổi lên ở một selector Mê Cung mười phút sau, dưới một cái tên chẳng liên quan.
-  const pastedCookie = parsed.data.gameCookie.trim();
-  let cookieNote = "";
-  if (pastedCookie.length > 0) {
-    const inspection = inspectCookie(pastedCookie);
-    if (!inspection.ok) return inspection;
-    cookieNote = inspection.note;
-  }
-
   await saveConfig(user.id, parsed.data);
   revalidatePath("/dashboard");
   return {
     ok: true,
-    message: `Đã khắc cấu hình vào ngọc giản. Nếu đàn đang chạy, vòng kế tiếp sẽ dùng bản này.${cookieNote}`,
+    message: "Đã khắc cấu hình vào ngọc giản. Nếu đàn đang chạy, vòng kế tiếp sẽ dùng bản này.",
   };
 }
 
-/** Lưu riêng tài khoản game mà không ghi đè các lựa chọn nhiệm vụ chưa Khắc Ngọc Giản. */
-export async function saveCookieAction(formData: FormData): Promise<ActionResult> {
-  const user = await requireActiveUser();
-  const parsed = configSchema.shape.gameCookie.safeParse(String(formData.get("gameCookie") ?? ""));
-  if (!parsed.success || parsed.data.length === 0) {
-    return { ok: false, message: "Hãy dán chuỗi cookie tài khoản trước khi bấm Lưu tài khoản." };
-  }
+// ---------------------------------------------------------------------------
+// Tài khoản game — thêm / thay cookie / đổi tên / bật-tắt / xoá
+// ---------------------------------------------------------------------------
 
-  const inspection = inspectCookie(parsed.data);
+/** Thêm một tài khoản mới. Soát cookie NGAY LÚC DÁN — thời điểm trung thực nhất (bài học 02/08). */
+export async function addAccountAction(formData: FormData): Promise<ActionResult> {
+  const user = await requireActiveUser();
+
+  const field = readCookieField(formData);
+  if (!field.ok) return { ok: false, message: field.message };
+
+  const inspection = inspectCookie(field.cookie);
   if (!inspection.ok) return inspection;
 
-  await saveCookie(user.id, parsed.data);
+  const result = await addAccount(user.id, String(formData.get("label") ?? ""), field.cookie);
+  if (!result.ok) return { ok: false, message: result.error };
+
   revalidatePath("/dashboard");
   return {
     ok: true,
-    message: `Đã lưu tài khoản hoathinh3d và mã hóa cookie.${inspection.note}`,
+    message: `Đã lưu「${result.account.label}」và mã hoá cookie.${inspection.note}`,
   };
 }
 
-/** Rút cookie khỏi hệ thống — thứ duy nhất xoá được bí mật đã lưu. */
-export async function clearCookieAction(): Promise<ActionResult> {
+/** Thay cookie của một tài khoản sẵn có — verdict hạng cũ bị xoá để linh sứ dò lại. */
+export async function updateAccountCookieAction(formData: FormData): Promise<ActionResult> {
   const user = await requireActiveUser();
-  await clearCookie(user.id);
+
+  const accountId = readAccountId(formData);
+  if (!accountId) return { ok: false, message: "Thiếu tài khoản cần thay cookie." };
+
+  const field = readCookieField(formData);
+  if (!field.ok) return { ok: false, message: field.message };
+
+  const inspection = inspectCookie(field.cookie);
+  if (!inspection.ok) return inspection;
+
+  const result = await updateAccountCookie(user.id, accountId, field.cookie);
+  if (!result.ok) return { ok: false, message: result.error };
+
   revalidatePath("/dashboard");
-  return { ok: true, message: "Đã xoá tài khoản hoathinh3d khỏi ngọc giản." };
+  return {
+    ok: true,
+    message: `Đã thay cookie của「${result.account.label}」— hạng tài khoản sẽ được dò lại ở vòng chạy kế.${inspection.note}`,
+  };
 }
+
+export async function renameAccountAction(formData: FormData): Promise<ActionResult> {
+  const user = await requireActiveUser();
+
+  const accountId = readAccountId(formData);
+  if (!accountId) return { ok: false, message: "Thiếu tài khoản cần đổi tên." };
+
+  const result = await renameAccount(user.id, accountId, String(formData.get("label") ?? ""));
+  if (!result.ok) return { ok: false, message: result.error };
+
+  revalidatePath("/dashboard");
+  return { ok: true, message: `Đã đổi tên thành「${result.account.label}」.` };
+}
+
+/**
+ * Bật/tắt một tài khoản. Tắt là rút khỏi vòng chạy NGAY: đàn của tài khoản đó (nếu có) được
+ * thu trước rồi mới hạ cờ, để không còn khe nào cho một vòng mới len vào giữa hai bước.
+ */
+export async function toggleAccountAction(formData: FormData): Promise<ActionResult> {
+  const user = await requireActiveUser();
+
+  const accountId = readAccountId(formData);
+  if (!accountId) return { ok: false, message: "Thiếu tài khoản cần bật/tắt." };
+  const enabled = formData.get("enabled") === "on";
+
+  let stoppedJob = false;
+  if (!enabled) {
+    stoppedJob = await requestStopForAccount(user.id, accountId);
+  }
+
+  const result = await setAccountEnabled(user.id, accountId, enabled);
+  if (!result.ok) return { ok: false, message: result.error };
+
+  revalidatePath("/dashboard");
+  if (enabled) {
+    return {
+      ok: true,
+      message: `Đã bật「${result.account.label}」— bấm Khai Đàn để tài khoản này bắt đầu chạy.`,
+    };
+  }
+  return {
+    ok: true,
+    message: stoppedJob
+      ? `Đã tắt「${result.account.label}」và gửi lệnh thu đàn cho tài khoản này.`
+      : `Đã tắt「${result.account.label}」.`,
+  };
+}
+
+/** Xoá tài khoản — kéo theo toàn bộ lịch sử chạy của nó. Từ chối khi đàn còn sống. */
+export async function deleteAccountAction(formData: FormData): Promise<ActionResult> {
+  const user = await requireActiveUser();
+
+  const accountId = readAccountId(formData);
+  if (!accountId) return { ok: false, message: "Thiếu tài khoản cần xoá." };
+
+  // Xoá dưới chân một linh sứ đang chạy là bỏ nó bơ vơ với một job không còn tồn tại —
+  // bắt dừng trước, xoá sau, và nói rõ vì sao.
+  const active = await getActiveJobs(user.id);
+  if (active.some((job) => job.accountId === accountId)) {
+    return {
+      ok: false,
+      message: "Tài khoản này đang có đàn pháp chạy — tắt tài khoản (đàn sẽ được thu) rồi mới xoá được.",
+    };
+  }
+
+  const result = await deleteAccount(user.id, accountId);
+  if (!result.ok) return { ok: false, message: result.error };
+
+  revalidatePath("/dashboard");
+  return { ok: true, message: `Đã xoá「${result.label}」cùng lịch sử chạy của nó.` };
+}
+
+// ---------------------------------------------------------------------------
+// Khai Đàn / Thu Đàn / dọn nhật ký
+// ---------------------------------------------------------------------------
 
 export async function startAction(): Promise<ActionResult> {
   const user = await requireActiveUser();
@@ -141,19 +259,23 @@ export async function startAction(): Promise<ActionResult> {
     return { ok: false, message: result.error };
   }
 
+  const names = result.startedLabels.map((label) => `「${label}」`).join(" ");
   return {
     ok: true,
-    message: "Đàn pháp đã lập — linh sứ sẽ tự chạy các vòng cho tới khi bạn bấm Thu Đàn.",
+    message:
+      result.alreadyRunning > 0
+        ? `Đàn pháp đã lập thêm cho ${names} — ${result.alreadyRunning} tài khoản khác vẫn đang chạy.`
+        : `Đàn pháp đã lập cho ${names} — linh sứ sẽ tự chạy các vòng cho tới khi bạn bấm Thu Đàn.`,
   };
 }
 
 /**
- * Dọn nhật ký của lượt đang hiển thị. Không đụng tới lượt chạy: linh sứ vẫn làm việc, và
+ * Dọn nhật ký của các lượt đang hiển thị. Không đụng tới lượt chạy: linh sứ vẫn làm việc, và
  * những dòng nó kể từ giây này trở đi vẫn hiện ra như thường.
  */
 export async function clearLogAction(): Promise<ActionResult> {
   const user = await requireActiveUser();
-  const gone = await clearLatestJobEvents(user.id);
+  const gone = await clearVisibleJobEvents(user.id);
   revalidatePath("/dashboard");
   return {
     ok: true,
@@ -165,5 +287,5 @@ export async function stopAction(): Promise<ActionResult> {
   const user = await requireActiveUser();
   await requestStop(user.id);
   revalidatePath("/dashboard");
-  return { ok: true, message: "Đã gửi lệnh thu đàn." };
+  return { ok: true, message: "Đã gửi lệnh thu đàn cho mọi tài khoản đang chạy." };
 }

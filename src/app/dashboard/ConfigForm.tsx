@@ -1,13 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import {
-  clearCookieAction,
-  saveConfigAction,
-  saveCookieAction,
-  type ActionResult,
-} from "@/app/actions/automation";
+import { useActionState, useState } from "react";
+import { saveConfigAction, type ActionResult } from "@/app/actions/automation";
 import type { EditableConfig } from "@/lib/services/configs";
+import { AccountManager } from "./AccountManager";
 import { useDashboardAccountLive } from "./DashboardLiveProvider";
 
 /**
@@ -15,6 +11,10 @@ import { useDashboardAccountLive } from "./DashboardLiveProvider";
  * gương của JSONB, nộp lên là zod ở server quyết định đúng sai. Hai mảnh state duy nhất là
  * hai công tắc nhiệm vụ, và chúng chỉ để LÀM MỜ phần tuỳ chọn bên dưới: giá trị vẫn được
  * gửi đi đầy đủ, nên tắt rồi bật lại không mất những gì đã chọn.
+ *
+ * Cấu hình nhiệm vụ là MỘT bộ chung cho mọi tài khoản (y như bản desktop dùng một
+ * quests.json toàn cục): tab VIP áp cho các tài khoản hạng VIP, tab Thường cho các tài
+ * khoản hạng thường — mỗi tài khoản chỉ chạy đúng những nhiệm vụ thuộc hạng của nó.
  */
 /**
  * Mười nhiệm vụ chỉ có công tắc — key khớp với configSchema và SIMPLE_QUESTS của engine.
@@ -83,7 +83,7 @@ function SimpleQuestGrid({
 }
 
 export function ConfigForm({ config }: { config: EditableConfig }) {
-  const { accountTier } = useDashboardAccountLive();
+  const { accounts } = useDashboardAccountLive();
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
     saveConfigAction,
     null,
@@ -98,138 +98,36 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
       ]),
     ),
   );
-  const [clearing, startClearing] = useTransition();
-  const [savingAccount, startSavingAccount] = useTransition();
-  const [hasCookie, setHasCookie] = useState(config.hasCookie);
-  const [hasCookieDraft, setHasCookieDraft] = useState(false);
-  const [accountState, setAccountState] = useState<ActionResult | null>(null);
-  const cookieField = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => setHasCookie(config.hasCookie), [config.hasCookie]);
-  useEffect(() => {
-    if (!state?.ok) return;
-    setHasCookieDraft(false);
-    if (cookieField.current) cookieField.current.value = "";
-  }, [state]);
-
-  const accountBusy = pending || clearing || savingAccount;
-  const saveAccount = () => {
-    const value = cookieField.current?.value.trim() ?? "";
-    if (!value) {
-      setAccountState({
-        ok: false,
-        message: "Hãy dán chuỗi cookie tài khoản trước khi bấm Lưu tài khoản.",
-      });
-      return;
-    }
-
-    const formData = new FormData();
-    formData.set("gameCookie", value);
-    startSavingAccount(async () => {
-      const result = await saveCookieAction(formData);
-      setAccountState(result);
-      if (!result.ok) return;
-
-      setHasCookie(true);
-      setHasCookieDraft(false);
-      if (cookieField.current) cookieField.current.value = "";
-    });
-  };
-
-  // Hai tab nhiệm vụ, theo đúng cách site chia tài khoản. Năm mục có cả hai flow dùng chung
-  // một state; hidden inputs bên dưới là NGUỒN FormData duy nhất. Render hai checkbox cùng
-  // name sẽ tạo hai giá trị có thể lệch nhau khi người dùng đổi tab, nên tuyệt đối không làm.
-  const [preferredQuestTab, setPreferredQuestTab] = useState<"vip" | "free">(() =>
-    accountTier === "free" ? "free" : "vip",
+  // Hai tab nhiệm vụ, theo đúng cách site chia tài khoản. Không tab nào bị khoá: một đạo
+  // hữu có thể nuôi cùng lúc tài khoản VIP lẫn tài khoản thường, engine tự chọn đúng bộ cho
+  // từng tài khoản theo hạng đã dò. Mở sẵn tab Thường khi cả đội hình đều là hạng thường.
+  const [questTab, setQuestTab] = useState<"vip" | "free">(() =>
+    accounts.length > 0 && accounts.every((account) => account.accountTier === "free")
+      ? "free"
+      : "vip",
   );
-  const questTab = accountTier === "vip" || accountTier === "free"
-    ? accountTier
-    : preferredQuestTab;
+  const vipCount = accounts.filter((account) => account.accountTier === "vip").length;
+  const freeCount = accounts.filter((account) => account.accountTier === "free").length;
+  const unknownCount = accounts.length - vipCount - freeCount;
+
   const toggleSimpleQuest = (key: string, value: boolean) => {
     setSimpleEnabled((current) => ({ ...current, [key]: value }));
   };
 
   return (
-    <form action={action} className="card card-hairline p-6">
+    <section className="card card-hairline p-6">
       <h2 className="h-display mb-5 text-xl font-semibold text-gilded">Ngọc Giản Cấu Hình</h2>
 
-      <div className="mb-6">
-        {/* "Tài khoản" ở đây LUÔN đi kèm "hoathinh3d", và nút xoá luôn nói rõ "đã lưu":
-            trên chính trang này người dùng cũng có một tài khoản Auto HH3D, nên một nút trần
-            trụi ghi "Xoá tài khoản" là câu mời hiểu nhầm thành xoá danh tính của chính họ. */}
-        <label className="label" htmlFor="gameCookie">
-          Tài khoản hoathinh3d
-        </label>
+      {/* AccountManager đứng NGOÀI <form>: React 19 reset mọi uncontrolled input trong form
+          sau mỗi lần form action chạy xong — nếu để trong, một cú Khắc Ngọc Giản là chuỗi
+          cookie/tên tài khoản đang gõ dở bị xoá trắng. */}
+      <AccountManager />
 
-        {/* Cookie đi MỘT CHIỀU: nhập vào thì được, đọc ra thì không. Đã mã hoá trong
-            database rồi mà vẫn trả về trình duyệt mỗi lần mở trang thì coi như chưa mã hoá. */}
-        <div className="mb-2 flex flex-wrap items-center gap-3">
-          {hasCookie ? (
-            <>
-              <span className="badge badge-active">Đã lưu tài khoản (đã mã hoá)</span>
-            </>
-          ) : (
-            <span className="badge badge-pending">Chưa lưu tài khoản</span>
-          )}
-          <button
-            type="button"
-            className="btn btn-jade"
-            disabled={accountBusy || !hasCookieDraft}
-            onClick={saveAccount}
-          >
-            {savingAccount ? "Đang lưu…" : "Lưu tài khoản"}
-          </button>
-          {hasCookie && (
-            <button
-              type="button"
-              className="btn btn-ghost"
-              disabled={accountBusy}
-              onClick={() =>
-                startClearing(async () => {
-                  const result = await clearCookieAction();
-                  setAccountState(result);
-                  if (result.ok) setHasCookie(false);
-                })
-              }
-            >
-              Xoá tài khoản đã lưu
-            </button>
-          )}
-        </div>
-
-        <textarea
-          ref={cookieField}
-          id="gameCookie"
-          name="gameCookie"
-          className="input h-24 resize-y font-mono text-xs"
-          placeholder={
-            hasCookie
-              ? "Để trống nếu giữ tài khoản cũ. Dán chuỗi mới để thay."
-              : "Dán chuỗi cookie đăng nhập vào đây"
-          }
-          disabled={savingAccount}
-          onChange={(event) => {
-            setHasCookieDraft(event.currentTarget.value.trim().length > 0);
-            setAccountState(null);
-          }}
-          autoComplete="off"
-          spellCheck={false}
-        />
-        <p className="mt-1 text-xs text-[var(--color-mist)]">
-          Đây là chuỗi cookie giúp auto đăng nhập game thay bạn. Lưu xong sẽ được mã hoá và
-          không bao giờ hiện lại trên màn hình.
-          {hasCookie && " Để trống ô này khi lưu thì tài khoản cũ giữ nguyên."}
-        </p>
-        {accountState && (
-          <p
-            role="status"
-            className={`mt-2 text-sm ${accountState.ok ? "text-[var(--color-jade-300)]" : "text-[#f2a0a0]"}`}
-          >
-            {accountState.message}
-          </p>
-        )}
-      </div>
-
+      {/* noValidate: hai tab dùng `hidden`, một input số invalid nằm trong tab đang ẩn sẽ
+          bị native validation chặn submit mà không hiện được bong bóng lỗi nào — nút bấm
+          câm lặng. Zod ở server mới là trọng tài, và nó biết nói lỗi ra lời. */}
+      <form action={action} noValidate>
       {/* ------------------------------------------------------- Hai tab nhiệm vụ */}
       <div className="mb-4 flex gap-1 rounded-xl border border-[var(--color-ink-600)]/60 p-1">
         {(
@@ -237,37 +135,33 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
             ["vip", "Nhiệm vụ VIP"],
             ["free", "Nhiệm vụ Thường"],
           ] as const
-        ).map(([key, label]) => {
-          const disabled =
-            (accountTier === "vip" && key === "free") ||
-            (accountTier === "free" && key === "vip");
-          return (
-            <button
-              key={key}
-              type="button"
-              disabled={disabled}
-              onClick={() => setPreferredQuestTab(key)}
-              aria-pressed={questTab === key}
-              title={disabled ? "Cookie hiện tại thuộc hạng tài khoản đối nghịch." : undefined}
-              className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                disabled
-                  ? "cursor-not-allowed opacity-35"
-                  : questTab === key
-                    ? "bg-[var(--color-ink-600)]/70 text-[var(--color-gold-300)]"
-                    : "text-[var(--color-mist)] hover:text-[var(--color-parchment)]"
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setQuestTab(key)}
+            aria-pressed={questTab === key}
+            className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+              questTab === key
+                ? "bg-[var(--color-ink-600)]/70 text-[var(--color-gold-300)]"
+                : "text-[var(--color-mist)] hover:text-[var(--color-parchment)]"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
       <p className="mb-4 text-xs text-[var(--color-mist)]">
-        {accountTier === "vip"
-          ? "Đã nhận diện tài khoản VIP — tab Nhiệm vụ Thường được khóa cho cookie hiện tại."
-          : accountTier === "free"
-            ? "Đã nhận diện tài khoản thường — tab Nhiệm vụ VIP được khóa cho cookie hiện tại."
-            : "Chưa dò được hạng của cookie này. Linh sứ sẽ nhận diện trên hub ở vòng chạy kế tiếp."}
+        Một bộ cấu hình chung cho cả đội: tài khoản hạng VIP chạy tab VIP, hạng thường chạy
+        tab Thường — không tài khoản nào chạy nhầm bộ của hạng kia.
+        {accounts.length > 0 &&
+          ` Đội hình hiện tại: ${[
+            vipCount > 0 ? `${vipCount} VIP` : null,
+            freeCount > 0 ? `${freeCount} thường` : null,
+            unknownCount > 0 ? `${unknownCount} chưa dò hạng` : null,
+          ]
+            .filter(Boolean)
+            .join(", ")}.`}
       </p>
 
       {/* Một input thật cho mỗi config key. Checkbox ở hai tab chỉ là hai mặt của cùng state. */}
@@ -466,8 +360,25 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
       </fieldset>
       </div>
 
+      {/* --------------------------------------------------------------- Vận hành */}
+      <label className="mb-6 flex cursor-pointer items-start gap-2.5 text-sm text-[var(--color-parchment)]">
+        <input
+          type="checkbox"
+          name="parallelQuests"
+          defaultChecked={config.parallelQuests}
+          className="mt-0.5 h-4 w-4 accent-[var(--color-jade-400)]"
+        />
+        <span>
+          Chạy song song các nhiệm vụ
+          <span className="block text-xs leading-snug text-[var(--color-mist)]">
+            Mỗi nhiệm vụ một tab riêng trong cùng phiên — vòng chạy nhanh bằng nhiệm vụ chậm
+            nhất thay vì cộng dồn. Bỏ tick để chạy tuần tự như bản PC nếu site trở chứng.
+          </span>
+        </span>
+      </label>
+
       <div className="flex flex-wrap items-center gap-4">
-        <button type="submit" className="btn btn-gold" disabled={accountBusy}>
+        <button type="submit" className="btn btn-gold" disabled={pending}>
           {pending ? "Đang khắc…" : "Khắc Ngọc Giản"}
         </button>
         {state && (
@@ -479,6 +390,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
           </p>
         )}
       </div>
-    </form>
+      </form>
+    </section>
   );
 }

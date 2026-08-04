@@ -1,7 +1,8 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { requireActiveUser } from "@/lib/auth/guards";
+import { listAccounts } from "@/lib/services/accounts";
 import { getEditableConfig } from "@/lib/services/configs";
-import { getActiveJob } from "@/lib/services/jobs";
+import { getActiveJobs } from "@/lib/services/jobs";
 import { hasWorkerToken } from "@/lib/services/workers";
 import { ConfigForm } from "./ConfigForm";
 import { ControlPanel } from "./ControlPanel";
@@ -16,9 +17,10 @@ export const metadata = { title: "Linh Đài" };
  */
 export default async function DashboardPage() {
   const user = await requireActiveUser();
-  const [config, activeJob, tokenIssued] = await Promise.all([
+  const [config, accounts, activeJobs, tokenIssued] = await Promise.all([
     getEditableConfig(user.id),
-    getActiveJob(user.id),
+    listAccounts(user.id),
+    getActiveJobs(user.id),
     hasWorkerToken(user.id),
   ]);
 
@@ -31,8 +33,8 @@ export default async function DashboardPage() {
           {/* Ba bước, nói ngay ở dòng đầu. Người mới mở trang này cần biết mình phải làm gì,
               chứ không cần một câu chào hay ho. */}
           <p className="mt-1 text-sm text-[var(--color-mist)]">
-            Chào <span className="text-gilded">{user.displayName}</span>. Ba bước: dán tài khoản
-            game → chọn nhiệm vụ → bấm Khai Đàn.
+            Chào <span className="text-gilded">{user.displayName}</span>. Ba bước: thêm tài khoản
+            game → chọn nhiệm vụ → bấm Khai Đàn. Nhiều tài khoản thì chạy cùng lúc cả đội.
           </p>
         </div>
 
@@ -42,11 +44,11 @@ export default async function DashboardPage() {
             phình ra ngoài phần của nó và bóp cột trái còn một sợi chỉ (ảnh 02/08). Và
             `overflow-x-auto` trên chính cái <pre> không cứu được: nó chỉ có tác dụng khi
             mọi tổ tiên đều được phép co xuống dưới bề rộng nội dung. */}
-        <DashboardLiveProvider initialAccountTier={config.accountTier}>
+        <DashboardLiveProvider initialAccounts={accounts}>
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
             <ConfigForm config={config} />
             <div className="flex min-w-0 flex-col gap-6">
-              <ControlPanel initiallyRunning={activeJob !== null} />
+              <ControlPanel initiallyRunning={activeJobs.length > 0} />
               <LinhSuPanel hasToken={tokenIssued} />
             </div>
           </div>

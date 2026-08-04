@@ -11,7 +11,7 @@ import {
   realtimeDatabaseUrl,
 } from "../src/lib/realtime/dashboardChannel";
 import { getDashboardFeed } from "../src/lib/services/dashboard";
-import { addEvent, clearLatestJobEvents } from "../src/lib/services/jobs";
+import { addEvent, clearVisibleJobEvents } from "../src/lib/services/jobs";
 import { recordWorkerSeen } from "../src/lib/services/workers";
 import { loadEnv } from "./loadEnv.mjs";
 
@@ -80,12 +80,12 @@ try {
   const presenceMs = await presenceSignal;
 
   const snapshot = await getDashboardFeed(userId, 0);
-  assert(snapshot.job?.id === jobId, "snapshot không mang đúng job");
+  assert(snapshot.jobs.some((job) => job.id === jobId), "snapshot không mang đúng job");
   assert(snapshot.events.some((event) => event.message === "[verify] realtime event"), "snapshot thiếu event");
   assert(snapshot.presence.mine.some((worker) => worker.id === workerId && worker.online), "snapshot thiếu worker online");
 
   const clearSignal = waitForSignal(userId, "events-cleared");
-  const cleared = await clearLatestJobEvents(userId);
+  const cleared = await clearVisibleJobEvents(userId);
   const clearMs = await clearSignal;
   assert(cleared === 1, `phải xoá đúng 1 event, nhận ${cleared}`);
 

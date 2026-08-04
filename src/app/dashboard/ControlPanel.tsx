@@ -6,12 +6,13 @@ import { useDashboardJobLive } from "./DashboardLiveProvider";
 import type { DashboardJob, JobStatus } from "@/lib/realtime/dashboardTypes";
 
 /**
- * Lư Khai Đàn — nút start/stop và nhật ký tu luyện.
+ * Lư Khai Đàn — nút start/stop và nhật ký tu luyện, giờ cho CẢ ĐỘI tài khoản.
  *
  * Trạng thái thật nằm ở server: nút bấm chỉ gửi ý định, còn màn hình được đẩy lại từ SSE
  * (và feed một-lần khi reconnect). Đó là điều khiến việc đóng tab không có nghĩa lý gì — mở lại
  * ở máy khác vẫn thấy đúng lượt đang chạy, đúng nhật ký, vì chưa bao giờ có state nào chỉ
- * sống trong trình duyệt.
+ * sống trong trình duyệt. Mỗi tài khoản một dòng trạng thái; nhật ký gộp chung, từng dòng
+ * mang nhãn tài khoản đã kể ra nó.
  */
 
 const ACTIVE: JobStatus[] = ["queued", "running", "stopping"];
@@ -38,20 +39,29 @@ function describeStatus(job: DashboardJob): string {
   return STATUS_TEXT[job.status];
 }
 
+function statusDotClass(job: DashboardJob): string {
+  if (ACTIVE.includes(job.status)) return "bg-[var(--color-jade-400)] pulse-jade";
+  if (job.status === "failed") return "bg-[#f2a0a0]";
+  return "bg-[var(--color-ink-600)]";
+}
+
 export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }) {
-  const { job, events, connected, refresh, clearEvents } = useDashboardJobLive();
+  const { jobs, events, connected, refresh, clearEvents } = useDashboardJobLive();
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const logRef = useRef<HTMLDivElement>(null);
-  const running = job ? ACTIVE.includes(job.status) : initiallyRunning;
+  // Ghim đáy nhật ký: mở trang là đứng ở dòng MỚI NHẤT, và bám theo dòng mới chừng nào
+  // người đọc còn ở sát đáy. Ai đang kéo lên đọc lại dòng cũ thì không bị giật đi — chỉ khi
+  // họ tự kéo xuống đáy, nhật ký mới bám tiếp.
+  const pinnedToBottom = useRef(true);
 
-  // Chỉ tự cuộn khi người đọc đang ở sát đáy — ai đang đọc lại dòng cũ thì không bị giật đi.
+  const running = jobs.length > 0 ? jobs.some((job) => ACTIVE.includes(job.status)) : initiallyRunning;
+  const showLabels = jobs.length > 1;
+
   useEffect(() => {
     const el = logRef.current;
-    if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    if (atBottom) el.scrollTop = el.scrollHeight;
+    if (el && pinnedToBottom.current) el.scrollTop = el.scrollHeight;
   }, [events]);
 
   const run = (fn: () => Promise<{ ok: boolean; message: string }>) => {
@@ -63,12 +73,16 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
   };
 
   const clearLog = () => {
-    if (!confirm("Dọn sạch nhật ký của lượt này? Những dòng đã ghi sẽ không lấy lại được.")) {
+    if (!confirm("Dọn sạch nhật ký đang hiển thị? Những dòng đã ghi sẽ không lấy lại được.")) {
       return;
     }
     startTransition(async () => {
-      const result = await clearLogAction();
+      // Xoá màn hình TRƯỚC khi chờ server: dòng nào linh sứ ghi trong lúc câu DELETE đang
+      // bay sẽ được frame SSE (hoặc tín hiệu events-cleared của server) đưa về lại — còn xoá
+      // SAU thì chính những dòng mới ấy bị quét oan, và cursor đã vượt qua id của chúng nên
+      // không bao giờ được kéo lại cho tới khi F5.
       clearEvents();
+      const result = await clearLogAction();
       // KHÔNG đụng tới cursor trong provider: id của job_events là bigserial, không bao giờ dùng lại, nên
       // mọi dòng linh sứ kể từ đây đều mang id lớn hơn và vẫn chảy về bình thường. Reset
       // con trỏ về 0 chỉ tổ kéo lại đúng những dòng vừa xoá nếu câu DELETE về chậm hơn nhịp
@@ -79,25 +93,8 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
 
   return (
     <section className="card card-hairline flex flex-col p-6">
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <div>
-          <h2 className="h-display text-xl font-semibold text-gilded">Lư Khai Đàn</h2>
-          <p className="mt-1 flex items-center gap-2 text-sm">
-            <span
-              className={`inline-block h-2 w-2 rounded-full ${
-                running
-                  ? "bg-[var(--color-jade-400)] pulse-jade"
-                  : job?.status === "failed"
-                    ? "bg-[#f2a0a0]"
-                    : "bg-[var(--color-ink-600)]"
-              }`}
-              aria-hidden
-            />
-            <span className="text-[var(--color-mist)]">
-              {job ? describeStatus(job) : "Chưa khai đàn lần nào"}
-            </span>
-          </p>
-        </div>
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <h2 className="h-display text-xl font-semibold text-gilded">Lư Khai Đàn</h2>
 
         {running ? (
           <button
@@ -120,6 +117,36 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
         )}
       </div>
 
+      {/* Mỗi tài khoản một dòng trạng thái — bản web của bảng account trên desktop. */}
+      {jobs.length === 0 ? (
+        <p className="mb-3 flex items-center gap-2 text-sm">
+          <span className="inline-block h-2 w-2 rounded-full bg-[var(--color-ink-600)]" aria-hidden />
+          <span className="text-[var(--color-mist)]">Chưa khai đàn lần nào</span>
+        </p>
+      ) : (
+        <ul className="mb-3 space-y-1.5">
+          {jobs.map((job) => (
+            <li key={job.id} className="flex items-center gap-2 text-sm">
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${statusDotClass(job)}`}
+                aria-hidden
+              />
+              {job.accountLabel && (
+                <span className="font-semibold text-[var(--color-parchment)]">
+                  {job.accountLabel}
+                </span>
+              )}
+              <span className="text-[var(--color-mist)]">{describeStatus(job)}</span>
+              {job.workerId && ACTIVE.includes(job.status) && (
+                <span className="ml-auto font-mono text-[11px] text-[var(--color-mist)]">
+                  {job.workerId}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
       {notice && (
         <p role="status" className="mb-4 text-sm text-[var(--color-gold-300)]">
           {notice}
@@ -130,15 +157,8 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
           bỏ lửng ở đó thì người ta suy ra "tắt máy chắc cũng thế" — sai, nếu linh sứ đang
           nằm trên chính máy họ. Một câu hứa đúng một nửa còn tệ hơn không hứa. */}
       <p className="mb-2 text-xs text-[var(--color-mist)]">
-        Khai Đàn một lần, linh sứ tự canh cooldown và chạy hết vòng này sang vòng khác; chỉ bấm
-        Thu Đàn mới dừng. Tắt trình duyệt thoải mái. Còn tắt máy thì tuỳ ai đang chạy: linh sứ
-        tông môn không sao, linh sứ nằm trên máy bạn sẽ dừng theo.
-        {job?.workerId && (
-          <>
-            {" "}
-            Linh sứ phụ trách: <span className="font-mono">{job.workerId}</span>.
-          </>
-        )}
+        Tắt trình duyệt thoải mái. Còn tắt máy thì tuỳ ai đang chạy: linh sứ tông môn không
+        sao, linh sứ nằm trên máy bạn sẽ dừng theo.
       </p>
 
       <div className="mb-1 flex items-center justify-between gap-3">
@@ -167,6 +187,11 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
 
       <div
         ref={logRef}
+        onScroll={() => {
+          const el = logRef.current;
+          if (!el) return;
+          pinnedToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}
         className="h-80 overflow-y-auto rounded-xl border border-[var(--color-ink-600)]/60 bg-[var(--color-ink-950)]/60 p-3"
       >
         {events.length === 0 ? (
@@ -179,6 +204,9 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
               <span className="log-time">
                 {new Date(e.at).toLocaleTimeString("vi-VN", { hour12: false })}
               </span>{" "}
+              {showLabels && e.accountLabel && (
+                <span className="text-[var(--color-gold-300)]">「{e.accountLabel}」</span>
+              )}
               <span className={`log-${e.level}`}>{e.message}</span>
             </div>
           ))

@@ -57,7 +57,7 @@ Tick những cái bạn muốn auto làm.
 | **Luyện Đan Đường** | Thu đan → phân giải → khai lò mẻ mới → giữ lửa. Ghé lại mỗi ~26 phút. |
 | **Nhiệm vụ ngày** | Điểm Danh, Hoang Vực, Phúc Lợi Đường, Thí Luyện, Bí Cảnh, Tế Lễ, Phúc Lợi VIP, Vòng Quay, Vấn Đáp, Khoáng Mạch. Tick là xong, không phải chỉnh gì. Điểm Danh, Phúc Lợi Đường và Vòng Quay có flow riêng cho tài khoản thường. |
 
-Riêng **Vấn Đáp**, linh sứ dùng cùng danh sách tham khảo với bản PC (hiện đọc được 255 câu).
+Riêng **Vấn Đáp**, linh sứ tra danh sách đáp án cộng đồng (hiện đọc được 255 câu).
 Nó chỉ trả lời khi đáp án trong danh sách khớp đúng một lựa chọn đang hiện; câu lạ hoặc nguồn
 mâu thuẫn sẽ được để lại cho bạn, không hỏi Gemini và không đoán bừa. Nếu đã cài linh sứ trước
 v0.19.0, hãy bấm **Tạo bộ cài cho máy của tôi** và cài đè một lần để nhận cả kho Vấn Đáp lẫn

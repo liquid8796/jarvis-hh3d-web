@@ -11,6 +11,26 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.22.1 — nhật ký thôi bị bóp thành sợi chỉ dọc
+
+- **Mỗi dòng nhật ký lại đọc được.** `.log-line` là lưới đúng HAI ô — giờ, rồi nội dung —
+  nhưng bản 0.22.0 thêm nhãn tài khoản thành phần tử con thứ BA. Con thứ ba rơi xuống hàng
+  dưới, vào ô giờ rộng 4.4rem, nên lời kể bị ép thành một cột chữ dựng đứng một-hai từ mỗi
+  dòng (ảnh người dùng gửi 05/08). Nhãn giờ nằm CÙNG một ô với lời kể, lưới trở lại đúng
+  hai con như thiết kế ban đầu.
+- **Chuỗi dài không chỗ ngắt không đẩy được khung log tràn ngang nữa**: cột nội dung đổi
+  sang `minmax(0, 1fr)` kèm `overflow-wrap: anywhere` — một id linh sứ hay URL dài vốn đặt
+  sàn min-content cho cột, và sàn ấy thắng cả bề rộng khung.
+  Đo bằng Chromium thật trước/sau: ô nội dung từ 70px (khác hàng với giờ) lên 192px (cùng
+  hàng), năm kịch bản — có nhãn, không nhãn, nhãn 60 ký tự, URL không dấu cách — đều không
+  tràn.
+- **Bỏ những câu đối chiếu với bản PC trong giao diện và hướng dẫn.** Người dùng web không
+  cần biết bản desktop làm gì để hiểu một ô tick: gợi ý Vấn Đáp nói thẳng là tra danh sách
+  đáp án cộng đồng; công tắc chạy song song nói "bỏ tick để làm lần lượt từng nhiệm vụ";
+  lời báo lỗi cookie chỉ đúng tên tiện ích Cookie-Editor thay vì "ứng dụng desktop". Lý do
+  kỹ thuật trong comment và tài liệu dành cho người phát triển vẫn giữ nguyên — đó là nơi
+  đối chiếu hai bản còn có ích.
+
 ## 0.22.0 — nhiều tài khoản chạy cùng lúc; nhiệm vụ trong một vòng chạy song song
 
 Bản này đưa web lên ngang bản desktop ở đúng chỗ desktop mạnh nhất: **nhiều tài khoản**. Và

@@ -34,7 +34,7 @@ const SIMPLE_QUESTS: ReadonlyArray<SimpleQuest> = [
   {
     key: "vanDap",
     name: "Vấn Đáp",
-    hint: "Tra danh sách tham khảo như bản PC. Câu không có trong danh sách sẽ để bạn tự làm.",
+    hint: "Tra danh sách đáp án cộng đồng. Câu không có trong danh sách sẽ để bạn tự làm.",
   },
   { key: "khoangMach", name: "Khoáng Mạch", hint: "Thu khoáng theo chu kỳ trong ngày." },
 ];
@@ -372,7 +372,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
           Chạy song song các nhiệm vụ
           <span className="block text-xs leading-snug text-[var(--color-mist)]">
             Mỗi nhiệm vụ một tab riêng trong cùng phiên — vòng chạy nhanh bằng nhiệm vụ chậm
-            nhất thay vì cộng dồn. Bỏ tick để chạy tuần tự như bản PC nếu site trở chứng.
+            nhất thay vì cộng dồn. Bỏ tick để làm lần lượt từng nhiệm vụ nếu site trở chứng.
           </span>
         </span>
       </label>

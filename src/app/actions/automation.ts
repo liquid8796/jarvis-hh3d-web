@@ -48,7 +48,7 @@ function inspectCookie(pastedCookie: string): CookieInspection {
       ok: false,
       message:
         "Chuỗi cookie không đọc được — chưa lưu gì cả. Hãy dán dạng 'a=1; b=2' copy từ DevTools, " +
-        "hoặc nguyên bản xuất JSON của ứng dụng desktop.",
+        "hoặc nguyên bản xuất JSON của tiện ích Cookie-Editor.",
     };
   }
 

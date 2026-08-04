@@ -729,12 +729,18 @@ body {
 }
 
 /* Log feed */
+/* Đúng HAI ô: giờ, rồi nội dung. Mọi thứ thuộc về vế nội dung (nhãn tài khoản, lời kể)
+   phải nằm trong CÙNG một phần tử con — thêm một con thứ ba là nó rơi xuống hàng dưới,
+   vào ô giờ rộng 4.4rem, và câu chữ bị ép thành một sợi chỉ dọc.
+   `minmax(0, …)` + `anywhere`: id linh sứ hay selector dài không chỗ ngắt vốn đặt sàn
+   min-content cho cột, đủ sức đẩy cả khung log tràn ngang. */
 .log-line {
   display: grid;
-  grid-template-columns: 4.4rem 1fr;
+  grid-template-columns: 4.4rem minmax(0, 1fr);
   gap: 0.75rem;
   padding: 0.32rem 0;
   font-size: 0.85rem;
+  overflow-wrap: anywhere;
   border-bottom: 1px dashed rgba(143, 137, 179, 0.12);
 }
 

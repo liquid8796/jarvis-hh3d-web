@@ -203,11 +203,14 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
             <div key={e.id} className="log-line">
               <span className="log-time">
                 {new Date(e.at).toLocaleTimeString("vi-VN", { hour12: false })}
-              </span>{" "}
-              {showLabels && e.accountLabel && (
-                <span className="text-[var(--color-gold-300)]">「{e.accountLabel}」</span>
-              )}
-              <span className={`log-${e.level}`}>{e.message}</span>
+              </span>
+              {/* Một ô duy nhất cho vế nội dung — xem ghi chú ở .log-line. */}
+              <span className={`log-${e.level}`}>
+                {showLabels && e.accountLabel && (
+                  <span className="text-[var(--color-gold-300)]">{`「${e.accountLabel}」 `}</span>
+                )}
+                {e.message}
+              </span>
             </div>
           ))
         )}

@@ -55,7 +55,7 @@ Tick những cái bạn muốn auto làm.
 |---|---|
 | **Mê Cung** | Auto tự lập phòng, chờ đủ 5 người, rồi đánh. Đây là nhiệm vụ dài nhất. |
 | **Luyện Đan Đường** | Thu đan → phân giải → khai lò mẻ mới → giữ lửa. Ghé lại mỗi ~26 phút. |
-| **Nhiệm vụ ngày** | Điểm Danh, Hoang Vực, Phúc Lợi Đường, Thí Luyện, Bí Cảnh, Tế Lễ, Phúc Lợi VIP, Vòng Quay, Vấn Đáp, Khoáng Mạch. Tick là xong, không phải chỉnh gì. Điểm Danh, Phúc Lợi Đường và Vòng Quay có flow riêng cho tài khoản thường. |
+| **Nhiệm vụ ngày** | Điểm Danh, Hoang Vực, Phúc Lợi Đường, Thí Luyện, Bí Cảnh, Tế Lễ, Phúc Lợi VIP, Vòng Quay, Vấn Đáp, Khoáng Mạch. Tick là xong, không phải chỉnh gì. Bảy mục trong số này (Điểm Danh, Hoang Vực, Phúc Lợi Đường, Thí Luyện, Vòng Quay, Tế Lễ, Vấn Đáp) có flow riêng cho tài khoản thường; Mê Cung và Luyện Đan Đường chạy được cho cả hai hạng. |
 
 Riêng **Vấn Đáp**, linh sứ tra danh sách đáp án cộng đồng (hiện đọc được 255 câu).
 Nó chỉ trả lời khi đáp án trong danh sách khớp đúng một lựa chọn đang hiện; câu lạ hoặc nguồn
@@ -71,10 +71,12 @@ Mê Cung có vài tuỳ chọn đáng để ý:
 - **Dừng khi đã đủ huyền tinh** — bỏ tick nếu muốn đánh hết lượt trong ngày.
 
 Auto tự biết tài khoản bạn là VIP hay thường, rồi chọn đúng flow của hạng đó. Với tài khoản
-thường, Phúc Lợi Đường mở một rương mỗi lượt và tự quay lại sau 30 phút; Vòng Quay sẽ ghé lại
-ở vòng sau để nhận lượt thứ tư khi các nhiệm vụ ngày khác đã đủ điều kiện.
-Ba nhiệm vụ thường nằm ngay trong tab **Nhiệm vụ Thường**; bật/tắt ở đó sẽ đồng bộ với công
-tắc cùng tên bên tab VIP, nên bạn không phải cấu hình hai lần.
+thường: Phúc Lợi Đường mở một rương mỗi lượt rồi tự quay lại sau 30 phút, Thí Luyện mở rương
+thí luyện theo cùng nhịp 30 phút (3 lượt/ngày), Tế Lễ dâng 10 Tinh Thạch một lần mỗi ngày,
+còn Vòng Quay sẽ ghé lại ở vòng sau để nhận lượt thứ tư khi các nhiệm vụ ngày khác đã đủ
+điều kiện. Các nhiệm vụ thường nằm ngay trong tab **Nhiệm vụ Thường**; bật/tắt ở đó sẽ đồng
+bộ với công tắc cùng tên bên tab VIP, nên bạn không phải cấu hình hai lần. Mê Cung và Luyện
+Đan Đường đứng ngoài hai tab — một bộ tuỳ chọn dùng chung cho cả hai hạng.
 
 Chọn xong nhớ bấm **Khắc Ngọc Giản**.
 

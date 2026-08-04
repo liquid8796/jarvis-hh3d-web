@@ -43,7 +43,9 @@ const FREE_QUEST_KEYS = new Set([
   "diemDanh",
   "hoangVuc",
   "phucLoiDuong",
+  "thiLuyen",
   "vongQuay",
+  "teLe",
   "vanDap",
 ]);
 const FREE_QUESTS = SIMPLE_QUESTS.filter((quest) => FREE_QUEST_KEYS.has(quest.key));
@@ -177,8 +179,9 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
             Nhiệm vụ tài khoản thường
           </legend>
           <p className="mb-3 text-xs text-[var(--color-mist)]">
-            Điểm Danh, Phúc Lợi Đường và Vòng Quay dùng trang riêng; Hoang Vực và Vấn Đáp
-            dùng lại nguyên flow trang riêng đã kiểm chứng ở tab VIP.
+            Bảy nhiệm vụ chạy trên trang riêng của từng mục — hub tài khoản thường không có
+            nút bấm nhanh, nên auto đi thẳng vào trang. Mê Cung và Luyện Đan Đường nằm ở khối
+            dưới cùng: chúng chạy được cho cả hai hạng.
           </p>
           <SimpleQuestGrid
             quests={FREE_QUESTS}
@@ -188,7 +191,13 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
         </fieldset>
       </div>
 
-      <div hidden={questTab !== "vip"}>
+      {/* -------- Hai hoạt động dài: hiện ở MỌI tab, không nằm trong div ẩn nào --------
+          Từ schema 45 chúng có twin thường (me-cung-thuong, luyen-dan-duong-thuong) dùng
+          chung script và chung option — một bộ input duy nhất phục vụ cả hai hạng. Nhét
+          vào cả hai tab là nhân đôi input cùng name, đúng cái bẫy comment đầu file cấm. */}
+      <p className="mb-2 text-xs text-[var(--color-mist)]">
+        Hai hoạt động dài dưới đây chạy được cho cả hai hạng tài khoản.
+      </p>
       {/* ---------------------------------------------------------------- Mê Cung */}
       <fieldset className="mb-5 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
         <legend className="px-2">
@@ -345,6 +354,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
       </fieldset>
 
       {/* ------------------------------------------------------ Nhiệm vụ ngày còn lại */}
+      <div hidden={questTab !== "vip"}>
       <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
         <legend className="px-2 text-sm font-semibold text-[var(--color-parchment)]">
           Nhiệm vụ ngày

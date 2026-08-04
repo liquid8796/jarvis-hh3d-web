@@ -11,6 +11,36 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.23.0 — tab Thường đủ bộ: Tế Lễ và Thí Luyện có flow thật, Mê Cung và Luyện Đan mở cho cả hai hạng
+
+- **Đồng bộ profile schema 45 từ PC** (desktop 1.41.0), sinh bằng lệnh export như mọi lần —
+  không chép selector tay.
+- **Tế Lễ Tông Môn (thường)** — recording 05/08 trên tài khoản thường thật: hàng hub dẫn tới
+  trang thành viên tông môn (`/danh-sach-thanh-vien-tong-mon?nv_embed=1`), bấm `#te-le-button`,
+  xác nhận hộp SweetAlert2 「dùng 10 Tinh Thạch tế lễ cho Tông Môn?」bằng `.swal2-confirm`
+  (không bao giờ đụng Hủy), rồi CHỜ nút đổi thành 「Đã Tế Lễ」+ disabled — tế lễ TỐN Tinh
+  Thạch nên lễ bị từ chối phải kêu to, không nhận vơ là xong. So nguyên cụm 「đã tế lễ」theo
+  bài học bỏ-dấu của Điểm Danh.
+- **Thí Luyện Tông Môn (thường)** — recording 05/08: dạng Phúc Lợi Đường trên trang đơn giản
+  hơn (`/thi-luyen-tong-mon-hh3d/?nv_embed=1`) — cùng cổng `#countdown-timer` (00:00 = sẵn
+  sàng, mở xong nhảy 29:59), một điều khiển duy nhất là chính cái rương `#chestImage`
+  (ForceClick vì nó glow). Mỗi lượt ghé lấy một trong 3 lượt/ngày rồi báo cooldown ~30 phút;
+  「hết ngày」đọc từ hàng hub mất link — tín hiệu đã chứng minh ở Phúc Lợi Đường.
+- **Mê Cung và Luyện Đan Đường có twin thường** (`me-cung-thuong`, `luyen-dan-duong-thuong`)
+  — cùng cách Hoang Vực/Vấn Đáp đã làm: hub thường dẫn thẳng vào hai trang này (「Vào Ngay」,
+  recording 05/08), script đã kiểm chứng phục vụ cả hai hạng nguyên văn. Lớp dịch
+  `profileForConfig` áp công tắc VÀ MỌI option cho cả cặp twin — trước đây nó chỉ áp cho bản
+  tìm thấy đầu tiên, nghĩa là tài khoản thường sẽ chạy Mê Cung với option mặc định trong khi
+  người dùng đã gõ ngưỡng trục xuất 250.000.
+- **Hai fieldset Mê Cung / Luyện Đan rời khỏi tab VIP**, đứng thành khối chung hiện ở mọi
+  tab: chúng giờ thuộc cả hai hạng, và nhét vào cả hai tab là nhân đôi input cùng name —
+  đúng cái bẫy FormData mà comment đầu ConfigForm đã cấm từ 0.20.0. Tab Thường lên 7 mục
+  một-công-tắc (thêm Thí Luyện + Tế Lễ).
+- Kiểm chứng: smoke Chromium thật chạy nguyên hai flow mới trên DOM dựng theo recording
+  (kể cả lần ghé thứ hai của Tế Lễ phải dừng ở 「đã tế lễ hôm nay」và tuyệt đối không đụng
+  nút Hủy), bốn cặp twin được so bằng chứng cứ cấu trúc từng cặp; TypeScript + production
+  build là cổng phát hành như thường lệ.
+
 ## 0.22.1 — nhật ký thôi bị bóp thành sợi chỉ dọc
 
 - **Mỗi dòng nhật ký lại đọc được.** `.log-line` là lưới đúng HAI ô — giờ, rồi nội dung —

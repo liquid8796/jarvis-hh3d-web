@@ -95,7 +95,8 @@ const FREE_CHECKIN_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
 <script>checkInButton.onclick=()=>setTimeout(()=>{checkInButton.textContent='Đã Điểm Danh';checkInButton.dataset.claimed='1'},30)</script>`;
 
 const FREE_HUB_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
-<div class="nv-quest"><a class="btn-go" onclick="location.href='/phuc-loi-duong'">Làm Ngay ›</a></div>`;
+<div class="nv-quest"><a class="btn-go" onclick="location.href='/phuc-loi-duong'">Làm Ngay ›</a></div>
+<div class="nv-quest"><a class="btn-go" href="/thi-luyen-tong-mon-hh3d/?nv_embed=1">Làm Ngay ›</a></div>`;
 
 const FREE_WELFARE_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div id="countdown-timer">00:00</div>
@@ -107,6 +108,33 @@ const FREE_WELFARE_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
   if(countdown.textContent!=='00:00')return;
   setTimeout(()=>{countdown.textContent='30:00';countdown.dataset.claimed=String(i+1)},30)
 });const countdown=document.getElementById('countdown-timer')</script>`;
+
+// Trang thí luyện theo recording 05/08: một rương (#chestImage) + đồng hồ chung
+// #countdown-timer; mở rương lúc 00:00 là đồng hồ nhảy 29:59 trong ~2s.
+const FREE_TRIAL_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
+<div id="countdown-timer">00:00</div>
+<img id="chestImage" class="chest-close" alt="Rương thí luyện" style="width:60px;height:60px">
+<script>const timer=document.getElementById('countdown-timer');
+chestImage.onclick=()=>{if(timer.textContent!=='00:00')return;
+  setTimeout(()=>{timer.textContent='29:59';timer.dataset.claimed='1'},30)}</script>`;
+
+// Trang tế lễ theo recording 05/08: #te-le-button mở hộp SweetAlert2, xác nhận xong nút
+// đổi thành "Đã Tế Lễ" + disabled (~1.5s sau confirm ngoài đời, rút ngắn trong fixture).
+// Là HÀM vì site thật nhớ lễ PHÍA SERVER: lần ghé sau, trang render sẵn trạng thái đã tế —
+// đó chính là điều kiện StopIf của flow, và bài "lần hai phải dừng" kiểm đúng nó.
+const freeSacrificePage = (offered) => offered
+  ? `<!doctype html><html lang="vi"><meta charset="utf-8">
+<button id="te-le-button" class="btn btn-danger" disabled data-offered="1">Đã Tế Lễ</button>`
+  : `<!doctype html><html lang="vi"><meta charset="utf-8">
+<button id="te-le-button" class="btn btn-danger">Tế Lễ</button>
+<div id="modal" style="display:none"><p>Đạo hữu chắc chắn dùng 10 Tinh Thạch tế lễ cho Tông Môn?</p>
+<button class="swal2-confirm">Tế Lễ</button><button class="swal2-cancel">Hủy</button></div>
+<script>const btn=document.getElementById('te-le-button');const modal=document.getElementById('modal');
+btn.onclick=()=>{if(btn.disabled)return;modal.style.display='block'};
+document.querySelector('.swal2-cancel').onclick=()=>{modal.style.display='none';btn.dataset.cancelled='1'};
+document.querySelector('.swal2-confirm').onclick=()=>{modal.style.display='none';
+  fetch('/te-le-offered');
+  setTimeout(()=>{btn.textContent='Đã Tế Lễ';btn.disabled=true;btn.dataset.offered='1'},40)}</script>`;
 
 const FREE_WHEEL_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div id="userTurns">2</div><button id="spinButton">Quay Ngay</button>
@@ -505,9 +533,11 @@ async function main() {
   const copiedPairs = [
     ["hoang-vuc", "hoang-vuc-thuong"],
     ["van-dap", "van-dap-thuong"],
+    ["me-cung", "me-cung-thuong"],
+    ["luyen-dan-duong", "luyen-dan-duong-thuong"],
   ];
   check(
-    "Hoang Vực + Vấn Đáp thường là bản sao nguyên flow VIP, chỉ đổi id/hạng",
+    "bốn cặp twin thường là bản sao nguyên flow VIP, chỉ đổi id/hạng",
     copiedPairs.every(([vipId, freeId]) => {
       const vip = shipped.quests.find((q) => q.id === vipId);
       const free = shipped.quests.find((q) => q.id === freeId);
@@ -516,7 +546,23 @@ async function main() {
     }),
   );
   check("tài khoản VIP chạy đủ những gì đã bật", questsForAccount(profile, { isVip: true }).length === 2);
-  check("tài khoản thường không đụng quest VIP", questsForAccount(profile, { isVip: false }).length === 0);
+  check(
+    "tài khoản thường chạy TWIN của đúng hai quest đã bật, không đụng bản VIP",
+    questsForAccount(profile, { isVip: false }).length === 2 &&
+      questsForAccount(profile, { isVip: false }).every((q) => q.id.endsWith("-thuong")),
+    questsForAccount(profile, { isVip: false }).map((q) => q.id).join(", "),
+  );
+
+  // Twin phải nhận CÙNG option với bản VIP — lớp dịch từng chỉ áp cho bản đầu tiên tìm
+  // thấy, nghĩa là tài khoản thường chạy Mê Cung với ngưỡng trục xuất mặc định trong khi
+  // người dùng đã gõ 250.000.
+  const meCungFreeTwin = profile.quests.find((q) => q.id === "me-cung-thuong");
+  check(
+    "me-cung-thuong nhận cùng option với me-cung (kickHp tự nhập 250000)",
+    meCungFreeTwin?.enabled === true &&
+      meCungFreeTwin.options.find((o) => o.key === "kickHp")?.selectedValue === "250000",
+    meCungFreeTwin?.options.find((o) => o.key === "kickHp")?.selectedValue,
+  );
 
   // Trường vắng mặt phải đọc là VIP-only: mọi quest có trước trường này đều được ghi trên
   // tài khoản VIP, nên hồ sơ cũ thiếu trường phải hành xử như thể đã khai vậy. Đọc ngược
@@ -557,7 +603,8 @@ async function main() {
 
   check(
     "quest không được bật thì vẫn tắt",
-    profile.quests.filter((q) => q.enabled).length === 2,
+    // 4 = hai quest bật × cặp twin VIP/thường của mỗi quest (schema 45).
+    profile.quests.filter((q) => q.enabled).length === 4,
   );
 
   // Schema 42: ngưỡng "chưa sẵn sàng sau N giây" đi cùng đường tự-nhập với kickHp.
@@ -580,22 +627,26 @@ async function main() {
     "bật Điểm Danh + Tế Lễ → sáng cả hai flow Điểm Danh và đúng flow theo hạng",
     withDaily.quests.filter((q) => q.name === "Điểm Danh").length === 2 &&
       withDaily.quests.filter((q) => q.name === "Điểm Danh").every((q) => q.enabled) &&
-      withDaily.quests.find((q) => q.name === "Tế Lễ Tông Môn")?.enabled === true &&
-      withDaily.quests.filter((q) => q.enabled).length === 5 &&
+      withDaily.quests.filter((q) => q.name === "Tế Lễ Tông Môn").length === 2 &&
+      withDaily.quests.filter((q) => q.name === "Tế Lễ Tông Môn").every((q) => q.enabled) &&
+      // 8 = bốn quest bật (meCung, luyenDan, diemDanh, teLe) × cặp flow VIP/thường mỗi quest.
+      withDaily.quests.filter((q) => q.enabled).length === 8 &&
       questsForAccount(withDaily, { isVip: true }).some((q) => q.id === "diem-danh") &&
       !questsForAccount(withDaily, { isVip: true }).some((q) => q.id === "diem-danh-thuong") &&
       questsForAccount(withDaily, { isVip: false }).some((q) => q.id === "diem-danh-thuong") &&
-      !questsForAccount(withDaily, { isVip: false }).some((q) => q.id === "diem-danh"),
+      !questsForAccount(withDaily, { isVip: false }).some((q) => q.id === "diem-danh") &&
+      questsForAccount(withDaily, { isVip: false }).some((q) => q.id === "te-le-tong-mon-thuong"),
     withDaily.quests.filter((q) => q.enabled).map((q) => q.name).join(" · "),
   );
   const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
   check(
-    "hồ sơ đang ở schema 44",
-    loadProfileForSchema().schemaVersion === 44,
+    "hồ sơ đang ở schema 45",
+    loadProfileForSchema().schemaVersion === 45,
     String(loadProfileForSchema().schemaVersion),
   );
 
   // --- kiểm trên trang thật ---------------------------------------------------------
+  let teLeOffered = false;
   const server = createServer((req, res) => {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     const path = new URL(req.url ?? "/", "http://fixture.test").pathname.replace(/\/$/, "") || "/";
@@ -603,6 +654,9 @@ async function main() {
     else if (path === "/nhiem-vu-hang-ngay") res.end(FREE_HUB_PAGE);
     else if (path === "/phuc-loi-duong") res.end(FREE_WELFARE_PAGE);
     else if (path === "/vong-quay-phuc-van") res.end(FREE_WHEEL_PAGE);
+    else if (path === "/thi-luyen-tong-mon-hh3d") res.end(FREE_TRIAL_PAGE);
+    else if (path === "/danh-sach-thanh-vien-tong-mon") res.end(freeSacrificePage(teLeOffered));
+    else if (path === "/te-le-offered") { teLeOffered = true; res.end("ok"); }
     else res.end(PAGE);
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -657,6 +711,35 @@ async function main() {
       "Vòng Quay tiêu hết hai lượt fixture",
       (await page.locator("#spinButton").getAttribute("data-spins")) === "2" &&
         (await page.locator("#userTurns").textContent()) === "0",
+    );
+
+    console.log("\nHai flow tài khoản thường từ recording 05/08");
+
+    const trialFree = exportedProfile.quests.find((q) => q.id === "thi-luyen-tong-mon-thuong");
+    const trialResult = await run(trialFree);
+    check("Thí Luyện qua cổng hub rồi mở rương lúc 00:00", trialResult.outcome === "completed", trialResult.outcome);
+    check(
+      "Thí Luyện đọc lại cooldown ~30 phút từ đồng hồ vừa khởi động",
+      trialResult.cooldownSeconds === 29 * 60 + 59 &&
+        (await page.locator("#countdown-timer").getAttribute("data-claimed")) === "1",
+      String(trialResult.cooldownSeconds),
+    );
+
+    const sacrificeFree = exportedProfile.quests.find((q) => q.id === "te-le-tong-mon-thuong");
+    const sacrificeResult = await run(sacrificeFree);
+    check("Tế Lễ bấm nút, xác nhận swal2, chờ nút đổi chữ", sacrificeResult.outcome === "completed", sacrificeResult.outcome);
+    check(
+      "Tế Lễ đi qua confirm (không đụng Hủy) và site ghi nhận lễ",
+      (await page.locator("#te-le-button").getAttribute("data-offered")) === "1" &&
+        (await page.locator("#te-le-button").getAttribute("data-cancelled")) == null &&
+        (await page.locator("#te-le-button").textContent()) === "Đã Tế Lễ",
+    );
+
+    const sacrificeAgain = await run(sacrificeFree);
+    check(
+      "Tế Lễ lần hai dừng ở \"đã tế lễ hôm nay\", không bấm gì thêm",
+      sacrificeAgain.outcome === "alreadyDone" || sacrificeAgain.outcome === "onCooldown",
+      sacrificeAgain.outcome,
     );
 
     console.log("\nĐiều kiện trên trang sống");

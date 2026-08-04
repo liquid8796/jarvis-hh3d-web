@@ -27,7 +27,6 @@ export function loadProfile() {
   return structuredClone(profileData);
 }
 
-const findQuest = (profile, name) => profile.quests.find((q) => q.name === name);
 const findQuests = (profile, name) => profile.quests.filter((q) => q.name === name);
 const findOption = (quest, key) => quest?.options?.find((o) => o.key === key);
 
@@ -106,8 +105,14 @@ export function profileForConfig(config, log) {
   const profile = loadProfile();
 
   // ---- Mê Cung ----------------------------------------------------------------------
-  const meCung = findQuest(profile, "Mê Cung");
-  if (meCung) {
+  // Số NHIỀU từ schema 45: mỗi tên có cặp flow VIP/thường (me-cung + me-cung-thuong) dùng
+  // chung script. Công tắc và MỌI option áp cho cả cặp — engine lọc theo hạng lúc chạy;
+  // áp cho mỗi bản VIP là twin thường chạy với option mặc định, lệch ý người dùng.
+  const meCungTwins = findQuests(profile, "Mê Cung");
+  if (meCungTwins.length === 0) {
+    log?.("Hồ sơ không có nhiệm vụ「Mê Cung」.");
+  }
+  for (const meCung of meCungTwins) {
     meCung.enabled = config.quests?.meCung?.enabled === true;
     if (meCung.enabled) {
       const mc = config.quests.meCung;
@@ -128,13 +133,14 @@ export function profileForConfig(config, log) {
       const wanted = mc.capCheck === false ? capOff : capOn;
       if (wanted) setOption(meCung, "capCheck", wanted.value, { log });
     }
-  } else {
-    log?.("Hồ sơ không có nhiệm vụ「Mê Cung」.");
   }
 
   // ---- Luyện Đan Đường ---------------------------------------------------------------
-  const luyenDan = findQuest(profile, "Luyện Đan Đường");
-  if (luyenDan) {
+  const luyenDanTwins = findQuests(profile, "Luyện Đan Đường");
+  if (luyenDanTwins.length === 0) {
+    log?.("Hồ sơ không có nhiệm vụ「Luyện Đan Đường」.");
+  }
+  for (const luyenDan of luyenDanTwins) {
     luyenDan.enabled = config.quests?.luyenDan?.enabled === true;
     if (luyenDan.enabled) {
       const ld = config.quests.luyenDan;
@@ -149,8 +155,6 @@ export function profileForConfig(config, log) {
         log?.(`Không có mức phân giải nào ứng với "giữ từ ${keepFrom} sao" — giữ mặc định.`);
       }
     }
-  } else {
-    log?.("Hồ sơ không có nhiệm vụ「Luyện Đan Đường」.");
   }
 
   // ---- Mười nhiệm vụ một-công-tắc ------------------------------------------------------

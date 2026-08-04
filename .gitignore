@@ -14,6 +14,9 @@ next-env.d.ts
 .DS_Store
 .vercel
 
+# Cấu hình tooling của người viết mã — riêng của từng máy, không thuộc về repo dùng chung.
+.claude/
+
 .vercel
 .env*
 

@@ -15,10 +15,12 @@
 
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import { createQuestEngine } from "../src/lib/quest-engine/engine.mjs";
 import { createSession } from "../src/lib/quest-engine/session.mjs";
 import { parseCookieString } from "../src/lib/quest-engine/runCycle.mjs";
+import { profileDirForJob } from "../src/lib/quest-engine/browserProfile.mjs";
 import { computeNextDelaySeconds, parseCooldownSeconds } from "../src/lib/quest-engine/cooldown.mjs";
 import { profileForConfig } from "../src/lib/quest-engine/profile.mjs";
 import {
@@ -325,6 +327,40 @@ async function main() {
     "header 'Cookie:' copy nguyên cũng hiểu",
     parseCookieString("Cookie: a=1; b=2", "https://e.test").length === 2,
   );
+
+  // Worker tông môn chạy tuần tự cho nhiều người. Một profile chung từng khiến cookie VIP
+  // còn sống của lượt trước thắng cookie thường vừa lưu của lượt sau.
+  const profileRoot = fileURLToPath(new URL("../.smoke-browser-profiles/", import.meta.url));
+  const profileVip = profileDirForJob(profileRoot, {
+    userId: "user-a",
+    gameCookie: "wordpress_logged_in_ab=vip|session",
+  });
+  const profileVipAgain = profileDirForJob(profileRoot, {
+    userId: "user-a",
+    gameCookie: "wordpress_logged_in_ab=vip|session",
+  });
+  const profileThuong = profileDirForJob(profileRoot, {
+    userId: "user-a",
+    gameCookie: "wordpress_logged_in_ab=thuong|session",
+  });
+  const profileOtherUser = profileDirForJob(profileRoot, {
+    userId: "user-b",
+    gameCookie: "wordpress_logged_in_ab=vip|session",
+  });
+  check("cùng user + cookie tái dùng đúng profile bền", profileVip === profileVipAgain);
+  check("đổi cookie tạo profile sạch — VIP cũ không thắng account thường", profileVip !== profileThuong);
+  check("hai user không bao giờ dùng chung browser profile", profileVip !== profileOtherUser);
+  check(
+    "tên profile không làm lộ cookie",
+    !profileThuong.includes("wordpress_logged_in") && !profileThuong.includes("thuong"),
+  );
+
+  // AES-GCM + Base64 nở dài hơn plaintext. Trước v0.20.1, cookie JSON dài lưu thành công
+  // nhưng lần đọc kế tiếp bị schema 8.000 ký tự loại cả document về mặc định rỗng.
+  const { configSchema, storedConfigSchema } = await import("../src/lib/services/configs.ts");
+  const longEnvelope = `v1.${"a".repeat(10_700)}`;
+  check("schema plaintext vẫn chặn cookie quá 8.000 ký tự", !configSchema.safeParse({ gameCookie: longEnvelope }).success);
+  check("schema at-rest nhận phong bì Base64 dài hơn plaintext", storedConfigSchema.safeParse({ gameCookie: longEnvelope }).success);
 
   // cookies.mjs phải là module LÁ, và đây là chốt giữ cho nó ở nguyên như vậy.
   //

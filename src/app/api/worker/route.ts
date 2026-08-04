@@ -3,7 +3,7 @@ import { z } from "zod";
 import { authorizeWorker } from "@/lib/auth/worker";
 import { addEvent, claimNextJob, completeWorkerCycle, heartbeat, jobBelongsTo } from "@/lib/services/jobs";
 import { recordWorkerSeen } from "@/lib/services/workers";
-import { configSchema } from "@/lib/services/configs";
+import { configSchema, storedConfigSchema } from "@/lib/services/configs";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 
 /**
@@ -88,12 +88,13 @@ export async function POST(request: Request) {
       // ĐÂY là điểm duy nhất cookie rời khỏi phong bì. Nó xảy ra sau khi linh sứ đã chứng
       // minh danh tính (token tông môn hoặc linh phù của đúng chủ job), và đi tiếp trên
       // HTTPS tới một máy sắp dùng chính cookie đó để đăng nhập — không sớm hơn một dòng nào.
-      const snapshot = configSchema.safeParse(job.configSnapshot);
-      const config = snapshot.success ? snapshot.data : configSchema.parse({});
+      const snapshot = storedConfigSchema.safeParse(job.configSnapshot);
+      const storedConfig = snapshot.success ? snapshot.data : storedConfigSchema.parse({});
       const cookie =
-        config.gameCookie.length > 0 && isEncrypted(config.gameCookie)
-          ? decryptSecret(config.gameCookie)
-          : config.gameCookie;
+        storedConfig.gameCookie.length > 0 && isEncrypted(storedConfig.gameCookie)
+          ? decryptSecret(storedConfig.gameCookie)
+          : storedConfig.gameCookie;
+      const config = configSchema.parse({ ...storedConfig, gameCookie: cookie });
 
       return NextResponse.json({
         job: { id: job.id, userId: job.userId, config: { ...config, gameCookie: cookie } },

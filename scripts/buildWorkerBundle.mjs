@@ -38,16 +38,29 @@ const staging = mkdtempSync(path.join(tmpdir(), "linh-su-"));
 try {
   // 1. worker.mjs — rewrite đường import engine cho đúng hình dạng của gói.
   const workerSource = readFileSync(path.join(root, "scripts", "worker.mjs"), "utf8");
-  const needle = 'import { runCycle } from "../src/lib/quest-engine/runCycle.mjs";';
-  if (!workerSource.includes(needle)) {
-    throw new Error(
-      "buildWorkerBundle: không thấy dòng import quest-engine trong scripts/worker.mjs — " +
-        "đường dẫn đã đổi? Sửa `needle` cho khớp, đừng để gói phát ra bị hỏng im lặng.",
-    );
+  const importRewrites = [
+    [
+      'import { runCycle } from "../src/lib/quest-engine/runCycle.mjs";',
+      'import { runCycle } from "./quest-engine/runCycle.mjs";',
+    ],
+    [
+      'import { profileDirForJob } from "../src/lib/quest-engine/browserProfile.mjs";',
+      'import { profileDirForJob } from "./quest-engine/browserProfile.mjs";',
+    ],
+  ];
+  let bundledWorker = workerSource;
+  for (const [needle, replacement] of importRewrites) {
+    if (!bundledWorker.includes(needle)) {
+      throw new Error(
+        "buildWorkerBundle: không thấy một import quest-engine trong scripts/worker.mjs — " +
+          "đường dẫn đã đổi? Sửa `importRewrites` cho khớp, đừng để gói phát ra bị hỏng im lặng.",
+      );
+    }
+    bundledWorker = bundledWorker.replace(needle, replacement);
   }
   writeFileSync(
     path.join(staging, "worker.mjs"),
-    workerSource.replace(needle, 'import { runCycle } from "./quest-engine/runCycle.mjs";'),
+    bundledWorker,
   );
 
   // 2. Toàn bộ quest-engine — engine + profile.json là MỘT khối, thiếu profile là engine

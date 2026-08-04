@@ -53,7 +53,7 @@ export async function startJob(
   // Kiểm tra bằng bản KHÔNG chứa bí mật: ở đây chỉ cần biết cookie có tồn tại hay không.
   const view = await getEditableConfig(userId);
   if (!view.hasCookie) {
-    return { ok: false, error: "Chưa có tài khoản game. Dán chuỗi cookie vào ô Tài khoản hoathinh3d rồi bấm Khắc Ngọc Giản." };
+    return { ok: false, error: "Chưa có tài khoản game. Dán chuỗi cookie vào ô Tài khoản hoathinh3d rồi bấm Lưu tài khoản." };
   }
 
   // Duyệt MỌI nhiệm vụ, không liệt kê tên. Chốt này ra đời khi hồ sơ chỉ có Mê Cung và
@@ -161,6 +161,13 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
       status = 'running',
       worker_id = ${workerId},
       attempts = attempts + 1,
+      -- queued là ranh giới an toàn: chưa browser nào dùng snapshot này. Đọc lại config
+      -- ngay lúc claim để cookie/nhiệm vụ vừa lưu trong thời gian chờ có hiệu lực ở vòng tới,
+      -- thay vì bắt người dùng chịu thêm một vòng với ngọc giản cũ.
+      config_snapshot = coalesce(
+        (select config from user_configs where user_id = automation_jobs.user_id),
+        automation_jobs.config_snapshot
+      ),
       started_at = coalesce(started_at, now()),
       last_heartbeat = now()
     from candidate

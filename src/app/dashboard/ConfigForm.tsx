@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import {
   clearCookieAction,
   saveConfigAction,
+  saveCookieAction,
   type ActionResult,
 } from "@/app/actions/automation";
 import type { EditableConfig } from "@/lib/services/configs";
@@ -90,8 +91,42 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
     ),
   );
   const [clearing, startClearing] = useTransition();
-  const [cleared, setCleared] = useState(false);
-  const hasCookie = config.hasCookie && !cleared;
+  const [savingAccount, startSavingAccount] = useTransition();
+  const [hasCookie, setHasCookie] = useState(config.hasCookie);
+  const [hasCookieDraft, setHasCookieDraft] = useState(false);
+  const [accountState, setAccountState] = useState<ActionResult | null>(null);
+  const cookieField = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => setHasCookie(config.hasCookie), [config.hasCookie]);
+  useEffect(() => {
+    if (!state?.ok) return;
+    setHasCookieDraft(false);
+    if (cookieField.current) cookieField.current.value = "";
+  }, [state]);
+
+  const accountBusy = pending || clearing || savingAccount;
+  const saveAccount = () => {
+    const value = cookieField.current?.value.trim() ?? "";
+    if (!value) {
+      setAccountState({
+        ok: false,
+        message: "Hãy dán chuỗi cookie tài khoản trước khi bấm Lưu tài khoản.",
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("gameCookie", value);
+    startSavingAccount(async () => {
+      const result = await saveCookieAction(formData);
+      setAccountState(result);
+      if (!result.ok) return;
+
+      setHasCookie(true);
+      setHasCookieDraft(false);
+      if (cookieField.current) cookieField.current.value = "";
+    });
+  };
 
   // Hai tab nhiệm vụ, theo đúng cách site chia tài khoản. Ba mục có cả hai flow dùng chung
   // một state; hidden inputs bên dưới là NGUỒN FormData duy nhất. Render hai checkbox cùng
@@ -119,26 +154,38 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
           {hasCookie ? (
             <>
               <span className="badge badge-active">Đã lưu tài khoản (đã mã hoá)</span>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                disabled={clearing}
-                onClick={() =>
-                  startClearing(async () => {
-                    await clearCookieAction();
-                    setCleared(true);
-                  })
-                }
-              >
-                Xoá tài khoản đã lưu
-              </button>
             </>
           ) : (
             <span className="badge badge-pending">Chưa lưu tài khoản</span>
           )}
+          <button
+            type="button"
+            className="btn btn-jade"
+            disabled={accountBusy || !hasCookieDraft}
+            onClick={saveAccount}
+          >
+            {savingAccount ? "Đang lưu…" : "Lưu tài khoản"}
+          </button>
+          {hasCookie && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={accountBusy}
+              onClick={() =>
+                startClearing(async () => {
+                  const result = await clearCookieAction();
+                  setAccountState(result);
+                  if (result.ok) setHasCookie(false);
+                })
+              }
+            >
+              Xoá tài khoản đã lưu
+            </button>
+          )}
         </div>
 
         <textarea
+          ref={cookieField}
           id="gameCookie"
           name="gameCookie"
           className="input h-24 resize-y font-mono text-xs"
@@ -147,6 +194,11 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
               ? "Để trống nếu giữ tài khoản cũ. Dán chuỗi mới để thay."
               : "Dán chuỗi cookie đăng nhập vào đây"
           }
+          disabled={savingAccount}
+          onChange={(event) => {
+            setHasCookieDraft(event.currentTarget.value.trim().length > 0);
+            setAccountState(null);
+          }}
           autoComplete="off"
           spellCheck={false}
         />
@@ -155,6 +207,14 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
           không bao giờ hiện lại trên màn hình.
           {hasCookie && " Để trống ô này khi lưu thì tài khoản cũ giữ nguyên."}
         </p>
+        {accountState && (
+          <p
+            role="status"
+            className={`mt-2 text-sm ${accountState.ok ? "text-[var(--color-jade-300)]" : "text-[#f2a0a0]"}`}
+          >
+            {accountState.message}
+          </p>
+        )}
       </div>
 
       {/* ------------------------------------------------------- Hai tab nhiệm vụ */}
@@ -381,7 +441,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
-        <button type="submit" className="btn btn-gold" disabled={pending}>
+        <button type="submit" className="btn btn-gold" disabled={accountBusy}>
           {pending ? "Đang khắc…" : "Khắc Ngọc Giản"}
         </button>
         {state && (

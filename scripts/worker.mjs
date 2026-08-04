@@ -23,7 +23,9 @@
  */
 
 import { fileURLToPath } from "node:url";
+import { mkdir } from "node:fs/promises";
 import { runCycle } from "../src/lib/quest-engine/runCycle.mjs";
+import { profileDirForJob } from "../src/lib/quest-engine/browserProfile.mjs";
 
 const WEB_URL = (process.env.WEB_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const TOKEN = process.env.WORKER_TOKEN;
@@ -68,13 +70,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * phải một lời hứa. Nhịp tim nền là thứ cập nhật biến ấy.
  */
 /**
- * Hồ sơ Chromium bền, nằm NGAY CẠNH worker: token cf_clearance mà Cloudflare cấp sau một
- * lần kiểm tra sống trong hồ sơ, nên các lượt sau đi thẳng qua cổng thay vì trình diện lại
- * như người lạ. Đặt cạnh worker (chứ không ở temp hay home) để gỡ cài là sạch theo.
+ * Gốc chứa hồ sơ Chromium bền, nằm NGAY CẠNH worker: token cf_clearance mà Cloudflare cấp
+ * sau một lần kiểm tra sống trong hồ sơ, nên các lượt sau đi thẳng qua cổng thay vì trình
+ * diện lại như người lạ. Bên dưới gốc này, mỗi (user + cookie đã lưu) có một profile riêng:
+ * tài khoản của job trước tuyệt đối không được chảy sang job sau.
  */
-const PROFILE_DIR = fileURLToPath(new URL("./browser-profile", import.meta.url));
+const PROFILE_ROOT = fileURLToPath(new URL("./browser-profiles/", import.meta.url));
 
-async function runQuest({ config, say, shouldStop }) {
+async function runQuest({ userId, config, say, shouldStop }) {
   await say("Linh sứ đã nhận ngọc giản, đang khởi lư…");
 
   // Nạp Playwright TẠI ĐÂY chứ không ở đầu tệp: một máy chỉ dùng worker để canh việc vẫn
@@ -91,7 +94,12 @@ async function runQuest({ config, say, shouldStop }) {
     };
   }
 
-  return runCycle({ chromium, config, say, shouldStop, profileDir: PROFILE_DIR });
+  const profileDir = profileDirForJob(PROFILE_ROOT, {
+    userId,
+    gameCookie: config?.gameCookie,
+  });
+  await mkdir(profileDir, { recursive: true });
+  return runCycle({ chromium, config, say, shouldStop, profileDir });
 }
 
 /** Một lượt trọn vẹn: nhịp tim chạy nền, engine chạy trước, kết thúc thì báo cáo. */
@@ -112,6 +120,7 @@ async function handle(job) {
 
   try {
     const result = await runQuest({
+      userId: job.userId,
       config: job.config,
       say: (message, level) => say(job.id, message, level),
       shouldStop: () => stopping,

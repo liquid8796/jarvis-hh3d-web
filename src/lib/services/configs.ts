@@ -86,6 +86,18 @@ export const configSchema = z.object({
 export type UserConfig = z.infer<typeof configSchema>;
 
 /**
+ * Hình thù trong database/job snapshot.
+ *
+ * `configSchema` giới hạn cookie người dùng dán ở 8.000 ký tự. Sau AES-GCM + Base64, cùng
+ * plaintext ấy có thể dài hơn 8.000; dùng lại schema plaintext để đọc phong bì sẽ khiến Zod
+ * loại CẢ document và âm thầm rơi về config mặc định rỗng. Trần 40.000 bao phủ cả trường hợp
+ * xấu nhất của 8.000 UTF-16 code unit sau khi mã hoá, nhưng vẫn chặn dữ liệu phình vô hạn.
+ */
+export const storedConfigSchema = configSchema.extend({
+  gameCookie: z.string().trim().max(40_000).default(""),
+});
+
+/**
  * Cấu hình như UI được phép nhìn thấy: mọi thứ, TRỪ cookie.
  *
  * `gameCookie` luôn là chuỗi rỗng ở đây — thay vào đó là `hasCookie`. Đó là chủ ý: một bí
@@ -105,8 +117,8 @@ async function readStored(userId: string): Promise<UserConfig> {
 
   // Parsing on the way OUT as well as in: a document written by an older deploy still
   // comes back in today's shape, defaults filled — the JSONB twin of a schema migration.
-  const parsed = configSchema.safeParse(rows[0]?.config ?? {});
-  return parsed.success ? parsed.data : configSchema.parse({});
+  const parsed = storedConfigSchema.safeParse(rows[0]?.config ?? {});
+  return parsed.success ? parsed.data : storedConfigSchema.parse({});
 }
 
 /**
@@ -136,12 +148,12 @@ export async function getConfigWithSecrets(userId: string): Promise<UserConfig> 
     return stored;
   }
 
-  return {
+  return configSchema.parse({
     ...stored,
     gameCookie: isEncrypted(stored.gameCookie)
       ? decryptSecret(stored.gameCookie)
       : stored.gameCookie,
-  };
+  });
 }
 
 /**
@@ -155,7 +167,32 @@ export async function saveConfig(userId: string, config: UserConfig): Promise<vo
   const cookie = clean.gameCookie.trim();
   const stored = cookie.length > 0 ? encryptSecret(cookie) : (await readStored(userId)).gameCookie;
 
-  const document = { ...clean, gameCookie: stored };
+  const document = storedConfigSchema.parse({ ...clean, gameCookie: stored });
+
+  await db()
+    .insert(schema.userConfigs)
+    .values({ userId, config: document, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: schema.userConfigs.userId,
+      set: { config: document, updatedAt: sql`now()` },
+    });
+}
+
+/**
+ * Chỉ thay tài khoản game, giữ nguyên toàn bộ lựa chọn nhiệm vụ hiện có.
+ *
+ * Nút "Lưu tài khoản" nằm ngay cạnh ô cookie không được phép vô tình ghi đè những checkbox
+ * người dùng mới chỉnh nhưng chưa Khắc Ngọc Giản. Cookie vẫn đi qua cùng lớp schema + mã hóa
+ * như đường lưu toàn bộ cấu hình.
+ */
+export async function saveCookie(userId: string, value: string): Promise<void> {
+  const cookie = configSchema.shape.gameCookie.parse(value).trim();
+  if (cookie.length === 0) {
+    throw new Error("Cookie tài khoản không được để trống.");
+  }
+
+  const stored = await readStored(userId);
+  const document = storedConfigSchema.parse({ ...stored, gameCookie: encryptSecret(cookie) });
 
   await db()
     .insert(schema.userConfigs)
@@ -169,7 +206,7 @@ export async function saveConfig(userId: string, config: UserConfig): Promise<vo
 /** Xoá cookie hẳn — đường thoát khi người dùng muốn rút chìa khỏi hệ thống. */
 export async function clearCookie(userId: string): Promise<void> {
   const stored = await readStored(userId);
-  const document = { ...stored, gameCookie: "" };
+  const document = storedConfigSchema.parse({ ...stored, gameCookie: "" });
   await db()
     .insert(schema.userConfigs)
     .values({ userId, config: document, updatedAt: new Date() })

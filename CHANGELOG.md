@@ -11,6 +11,24 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.20.1 — cookie account mới thắng dứt khoát profile VIP cũ
+
+- **Không còn một `browser-profile` dùng chung cho cả tông môn.** Mỗi cặp user + chuỗi cookie
+  đã lưu có một hồ sơ Chromium riêng, với tên thư mục chỉ chứa SHA-256 rút gọn. Job của người
+  trước không thể để lại phiên đăng nhập cho người sau; cùng một người đổi VIP → thường sẽ đi
+  vào profile sạch và tiêm đúng cookie mới.
+- **Phiên được site tự refresh vẫn sống bền.** Các vòng dùng cùng chuỗi cookie tiếp tục tái dùng
+  đúng profile; chỉ khi người dùng chủ động lưu chuỗi khác fingerprint mới đổi. Không quay lại
+  lỗi lấy chuỗi dán-tay cũ đè lên phiên đã được site gia hạn sau mỗi vòng.
+- **Snapshot được làm mới ngay lúc worker claim job đang chờ.** Cookie hoặc nhiệm vụ sửa trong
+  thời gian `queued` có hiệu lực ở vòng kế, không phải chạy thừa thêm một vòng bằng ngọc giản cũ.
+- **Phong bì mã hoá không còn bị nhét qua trần 8.000 ký tự của plaintext.** Base64 làm cookie
+  JSON dài nở thêm; schema at-rest riêng nhận tối đa 40.000 ký tự rồi worker mới giải mã và
+  soát lại bằng schema plaintext. Không còn cảnh nút báo lưu thành công nhưng lần đọc sau cả
+  config rơi về mặc định rỗng.
+
+---
+
 ## 0.20.0 — tài khoản thường có ba flow thật; mỗi đạo hữu có email và tự sửa hồ sơ
 
 - **Đồng bộ nguyên profile schema 43 từ PC**, không chép selector bằng tay. Ba flow ghi trên

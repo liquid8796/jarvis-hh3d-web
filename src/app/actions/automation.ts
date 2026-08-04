@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireActiveUser } from "@/lib/auth/guards";
-import { clearCookie, configSchema, saveConfig } from "@/lib/services/configs";
+import { clearCookie, configSchema, saveConfig, saveCookie } from "@/lib/services/configs";
 import { clearLatestJobEvents, requestStop, startJob } from "@/lib/services/jobs";
 // Import từ module LÁ, KHÔNG phải từ runCycle.mjs. runCycle kéo theo profile.mjs, mà module
 // ấy đọc profile.json bằng `readFileSync(fileURLToPath(new URL(…)))` ngay ở thân module —
@@ -18,6 +18,32 @@ import { DEFAULT_GAME_BASE_URL, parseCookieString } from "@/lib/quest-engine/coo
  */
 
 export type ActionResult = { ok: boolean; message: string };
+
+type CookieInspection = { ok: true; note: string } | { ok: false; message: string };
+
+/** Một nơi duy nhất soát chuỗi cookie cho cả nút lưu riêng lẫn nút lưu toàn bộ cấu hình. */
+function inspectCookie(pastedCookie: string): CookieInspection {
+  const jar = parseCookieString(
+    pastedCookie,
+    process.env.GAME_BASE_URL || DEFAULT_GAME_BASE_URL,
+  ) as { name: string }[];
+
+  if (jar.length === 0) {
+    return {
+      ok: false,
+      message:
+        "Chuỗi cookie không đọc được — chưa lưu gì cả. Hãy dán dạng 'a=1; b=2' copy từ DevTools, " +
+        "hoặc nguyên bản xuất JSON của ứng dụng desktop.",
+    };
+  }
+
+  return {
+    ok: true,
+    note: jar.some((cookie) => cookie.name.startsWith("wordpress_logged_in"))
+      ? ` Đã nhận ${jar.length} cookie, có phiên đăng nhập.`
+      : ` Đã nhận ${jar.length} cookie nhưng KHÔNG thấy cookie đăng nhập (wordpress_logged_in_…) — nếu lượt chạy báo hết phiên thì đây là lý do.`,
+  };
+}
 
 export async function saveConfigAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const user = await requireActiveUser();
@@ -66,21 +92,9 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
   const pastedCookie = parsed.data.gameCookie.trim();
   let cookieNote = "";
   if (pastedCookie.length > 0) {
-    const jar = parseCookieString(pastedCookie, process.env.GAME_BASE_URL || DEFAULT_GAME_BASE_URL) as {
-      name: string;
-    }[];
-    if (jar.length === 0) {
-      return {
-        ok: false,
-        message:
-          "Chuỗi cookie không đọc được — chưa lưu gì cả. Hãy dán dạng 'a=1; b=2' copy từ DevTools, " +
-          "hoặc nguyên bản xuất JSON của ứng dụng desktop.",
-      };
-    }
-
-    cookieNote = jar.some((c) => c.name.startsWith("wordpress_logged_in"))
-      ? ` Đã nhận ${jar.length} cookie, có phiên đăng nhập.`
-      : ` Đã nhận ${jar.length} cookie nhưng KHÔNG thấy cookie đăng nhập (wordpress_logged_in_…) — nếu lượt chạy báo hết phiên thì đây là lý do.`;
+    const inspection = inspectCookie(pastedCookie);
+    if (!inspection.ok) return inspection;
+    cookieNote = inspection.note;
   }
 
   await saveConfig(user.id, parsed.data);
@@ -88,6 +102,25 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
   return {
     ok: true,
     message: `Đã khắc cấu hình vào ngọc giản. Nếu đàn đang chạy, vòng kế tiếp sẽ dùng bản này.${cookieNote}`,
+  };
+}
+
+/** Lưu riêng tài khoản game mà không ghi đè các lựa chọn nhiệm vụ chưa Khắc Ngọc Giản. */
+export async function saveCookieAction(formData: FormData): Promise<ActionResult> {
+  const user = await requireActiveUser();
+  const parsed = configSchema.shape.gameCookie.safeParse(String(formData.get("gameCookie") ?? ""));
+  if (!parsed.success || parsed.data.length === 0) {
+    return { ok: false, message: "Hãy dán chuỗi cookie tài khoản trước khi bấm Lưu tài khoản." };
+  }
+
+  const inspection = inspectCookie(parsed.data);
+  if (!inspection.ok) return inspection;
+
+  await saveCookie(user.id, parsed.data);
+  revalidatePath("/dashboard");
+  return {
+    ok: true,
+    message: `Đã lưu tài khoản hoathinh3d và mã hóa cookie.${inspection.note}`,
   };
 }
 

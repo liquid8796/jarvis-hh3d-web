@@ -5,10 +5,12 @@ import { addEvent, claimNextJob, completeWorkerCycle, heartbeat, jobBelongsTo } 
 import { recordWorkerSeen } from "@/lib/services/workers";
 import {
   configSchema,
+  enforceMazeCapPolicy,
   recordDetectedAccountTierForJob,
   seedLuyenDanThuong,
   storedConfigSchema,
 } from "@/lib/services/configs";
+import { findById } from "@/lib/services/users";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 
 /**
@@ -137,8 +139,27 @@ export async function POST(request: Request) {
           : storedConfig.gameCookie;
       const config = configSchema.parse({ ...storedConfig, gameCookie: cookie });
 
+      // Luật nhà của linh sứ tông môn, áp ở ĐÂY chứ không chỉ lúc lưu ngọc giản.
+      //
+      // Lúc lưu chỉ chạm được những người còn bấm nút; document đã nằm sẵn trong database
+      // với `capCheck: false` từ trước luật này thì không đường ghi nào với tới, và chủ nó
+      // sẽ cứ thế đánh hết lượt Mê Cung trên máy chung cho tới ngày họ tình cờ mở trang cấu
+      // hình. Cửa phát việc là chỗ duy nhất mọi vòng chạy đều đi qua.
+      //
+      // Gác theo SCOPE vì luật nói về CÁI MÁY, không phải về con người: linh sứ riêng chạy
+      // trên máy của chính đạo hữu, họ tiêu tài nguyên của mình và không ai phải xếp hàng
+      // sau lưng. Chỉ ghế chung mới có luật chung.
+      //
+      // Một phép đọc thêm cho mỗi lần PHÁT ĐƯỢC việc (không phải mỗi nhịp hỏi việc), tra
+      // theo khoá chính. Không tìm thấy chủ thì coi như người thường — luật siết, không nới.
+      let guarded = config;
+      if (scope.kind === "operator") {
+        const owner = await findById(job.userId);
+        guarded = enforceMazeCapPolicy(config, { isAdmin: owner?.role === "admin" });
+      }
+
       return NextResponse.json({
-        job: { id: job.id, userId: job.userId, config: { ...config, gameCookie: cookie } },
+        job: { id: job.id, userId: job.userId, config: { ...guarded, gameCookie: cookie } },
       });
     }
 

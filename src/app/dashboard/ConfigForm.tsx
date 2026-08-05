@@ -12,6 +12,10 @@ import { useDashboardAccountLive } from "./DashboardLiveProvider";
  * nhiệm vụ (Mê Cung + hai bản Luyện Đan) chỉ để LÀM MỜ phần tuỳ chọn bên dưới: giá trị
  * vẫn được gửi đi đầy đủ, nên tắt rồi bật lại không mất những gì đã chọn.
  *
+ * Đúng MỘT ô đi ngược luật ấy và có kiểm soát:「Dừng khi đã đủ huyền tinh」của Mê Cung. Nó
+ * là ô duy nhất server có quyền phủ quyết, nên nó phải vẽ được cái phủ quyết đó ra — xem
+ * CapLockDialog. Mọi ô còn lại vẫn thuần uncontrolled.
+ *
  * Cấu hình nhiệm vụ là MỘT bộ chung cho mọi tài khoản (y như bản desktop dùng một
  * quests.json toàn cục): tab VIP áp cho các tài khoản hạng VIP, tab Thường cho các tài
  * khoản hạng thường — mỗi tài khoản chỉ chạy đúng những nhiệm vụ thuộc hạng của nó.
@@ -244,13 +248,69 @@ function SimpleQuestGrid({
   );
 }
 
-export function ConfigForm({ config }: { config: EditableConfig }) {
+/**
+ * Hộp cảnh báo khi đạo hữu thường thử gỡ khoá「Dừng khi đã đủ huyền tinh」.
+ *
+ * Là một hộp thật chứ không phải một dòng chữ đỏ nhỏ bên dưới: hành động vừa rồi ĐÃ BỊ TỪ
+ * CHỐI, và một lời từ chối trôi qua trong ngoại vi tầm mắt sẽ bị đọc thành "tôi bấm hụt" —
+ * người ta bấm lại, lại hụt, rồi kết luận là trang hỏng.
+ */
+function CapLockDialog({ onClose }: { onClose: () => void }) {
+  // Esc đóng được: hộp này chỉ để báo tin, giam bàn phím lại trong nó là bất lịch sự.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="cap-lock-title"
+      onClick={onClose}
+    >
+      <div className="card card-hairline w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        <h3 id="cap-lock-title" className="h-display mb-3 text-lg font-semibold text-gilded">
+          Tuỳ chọn này đã bị khoá
+        </h3>
+        <p className="mb-3 text-sm leading-relaxed text-[var(--color-parchment)]">
+          Mỗi lượt Mê Cung giữ một phiên trình duyệt hàng chục phút. Linh sứ tông môn chỉ có
+          vài ghế và cả tông môn dùng chung, nên bỏ tick này là mở đường cho vài đàn đánh hết
+          lượt chiếm sạch chỗ — những đạo hữu còn lại xếp hàng cả ngày mà không hiểu vì sao.
+        </p>
+        <p className="mb-5 text-sm leading-relaxed text-[var(--color-mist)]">
+          Vì vậy「Dừng khi đã đủ huyền tinh trong ngày」luôn được bật. Chỉ tông chủ mới gỡ
+          được khoá này.
+        </p>
+        {/* type="button" là bắt buộc: hộp này nằm TRONG <form>, mà một <button> trần mặc
+            định là submit — bấm "Đã hiểu" sẽ khắc luôn ngọc giản. */}
+        <button type="button" className="btn btn-gold" onClick={onClose} autoFocus>
+          Đã hiểu
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmin: boolean }) {
   const { accounts } = useDashboardAccountLive();
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
     saveConfigAction,
     null,
   );
   const [meCung, setMeCung] = useState(config.quests.meCung.enabled);
+  /**
+   * Ô「Dừng khi đã đủ huyền tinh」là ô DUY NHẤT có kiểm soát trong khối này, vì nó là ô duy
+   * nhất có luật. Với đạo hữu thường nó khởi đầu bằng `true` bất kể trong ngọc giản đang ghi
+   * gì: document cũ có thể còn mang `false` từ trước khi có luật, và vẽ ra một ô chưa tick
+   * là hứa một điều mà cửa phát việc sẽ không giữ.
+   */
+  const [capCheck, setCapCheck] = useState(isAdmin ? config.quests.meCung.capCheck : true);
+  const [capLocked, setCapLocked] = useState(false);
   const [luyenDan, setLuyenDan] = useState(config.quests.luyenDan.enabled);
   const [luyenDanThuong, setLuyenDanThuong] = useState(config.quests.luyenDanThuong.enabled);
   const [simpleEnabled, setSimpleEnabled] = useState<Record<string, boolean>>(() =>
@@ -445,15 +505,31 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
           </div>
 
           <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--color-parchment)] sm:col-span-2">
+            {/* CỐ Ý không dùng `disabled`. Một ô bị khoá cứng nuốt luôn cú bấm: không có
+                sự kiện nào để mà cảnh báo, và người dùng chỉ thấy một ô không nhúc nhích.
+                Ô này nhận cú bấm, từ chối nó, rồi NÓI vì sao.
+
+                Việc ô tự tick lại là hợp đồng của input có kiểm soát trong React: handler
+                không đổi state thì React khôi phục DOM về đúng `checked` — nên chỉ cần
+                không gọi setCapCheck là ô quay lại như cũ. */}
             <input
               type="checkbox"
               name="meCungCapCheck"
-              defaultChecked={config.quests.meCung.capCheck}
+              checked={capCheck}
+              onChange={(event) => {
+                if (!isAdmin && !event.target.checked) {
+                  setCapLocked(true);
+                  return;
+                }
+                setCapCheck(event.target.checked);
+              }}
               className="h-4 w-4 accent-[var(--color-jade-400)]"
             />
             Dừng khi đã đủ huyền tinh trong ngày
             <span className="text-xs text-[var(--color-mist)]">
-              (bỏ tick để đánh hết lượt)
+              {isAdmin
+                ? "(bỏ tick để đánh hết lượt)"
+                : "(khoá bật — Mê Cung giữ ghế linh sứ tông môn rất lâu)"}
             </span>
           </label>
         </div>
@@ -533,6 +609,8 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
         )}
       </div>
       </form>
+
+      {capLocked && <CapLockDialog onClose={() => setCapLocked(false)} />}
     </section>
   );
 }

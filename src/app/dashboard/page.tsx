@@ -60,7 +60,7 @@ export default async function DashboardPage() {
             mọi tổ tiên đều được phép co xuống dưới bề rộng nội dung. */}
         <DashboardLiveProvider initialAccounts={accounts}>
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] xl:gap-8">
-            <ConfigForm config={config} />
+            <ConfigForm config={config} isAdmin={user.role === "admin"} />
             <div className="flex min-w-0 flex-col gap-6 xl:gap-8">
               <ControlPanel initiallyRunning={activeJobs.length > 0} />
               <LinhSuPanel hasToken={tokenIssued} />

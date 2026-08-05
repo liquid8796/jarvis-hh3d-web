@@ -698,6 +698,74 @@ async function main() {
     workerRouteSrc.includes("storedConfigSchema.safeParse(seedLuyenDanThuong("),
   );
 
+  console.log("\nKhoá「Dừng khi đủ huyền tinh」của Mê Cung trên tài nguyên chung");
+
+  // Mê Cung là nhiệm vụ duy nhất giữ một phiên trình duyệt hàng chục phút, và linh sứ tông
+  // môn chỉ có vài ghế. Bỏ tick「dừng khi đủ huyền tinh」= đánh hết lượt = một đàn ngồi gần
+  // trọn ngày trong đó. Nên với đạo hữu thường, luật bật lại nó; tông chủ được miễn.
+  const { enforceMazeCapPolicy } = await import("../src/lib/services/configs.ts");
+  const uncapped = configSchema.parse({
+    quests: {
+      meCung: { enabled: true, mode: "is-nightmare", kickHp: 250_000, capCheck: false },
+      diemDanh: { enabled: true },
+    },
+  });
+
+  const forced = enforceMazeCapPolicy(uncapped, { isAdmin: false });
+  check("đạo hữu thường: tick bị bật lại", forced.quests.meCung.capCheck === true);
+  check(
+    "và luật KHÔNG đụng vào bất kỳ lựa chọn nào khác",
+    forced.quests.meCung.mode === "is-nightmare" &&
+      forced.quests.meCung.kickHp === 250_000 &&
+      forced.quests.meCung.enabled === true &&
+      forced.quests.diemDanh.enabled === true,
+    JSON.stringify(forced.quests.meCung),
+  );
+  // Bản gốc phải còn nguyên: nơi gọi so tham chiếu để biết luật có ra tay không, mà một hàm
+  // sửa tại chỗ thì hai vế của phép so luôn là một.
+  check("luật không sửa vật gốc", uncapped.quests.meCung.capCheck === false);
+  check(
+    "tông chủ được miễn — bỏ tick là thật",
+    enforceMazeCapPolicy(uncapped, { isAdmin: true }).quests.meCung.capCheck === false,
+  );
+
+  // saveConfigAction phân biệt "đã ghi đè" với "không phải làm gì" bằng phép so THAM CHIẾU,
+  // và chỉ nói với người dùng khi thật sự có ghi đè. Hàm trả về vật mới ở ca không cần sửa
+  // là biến mọi lần lưu thành một lời cảnh báo sai.
+  const alreadyCapped = configSchema.parse({ quests: { meCung: { enabled: true, capCheck: true } } });
+  check(
+    "đã bật sẵn → trả về CHÍNH vật cũ (nơi gọi so tham chiếu để biết có ghi đè không)",
+    enforceMazeCapPolicy(alreadyCapped, { isAdmin: false }) === alreadyCapped,
+  );
+  check(
+    "tông chủ → cũng trả về chính vật cũ, không có gì để nói",
+    enforceMazeCapPolicy(uncapped, { isAdmin: true }) === uncapped,
+  );
+  check(
+    "và ca có ghi đè thì KHÁC tham chiếu",
+    enforceMazeCapPolicy(uncapped, { isAdmin: false }) !== uncapped,
+  );
+
+  // Hai cửa ghi/chạy phải cùng áp luật. Soát trên nguồn vì cả hai đều là route/action cần
+  // session hoặc token thật để gọi — cùng lý do và cùng cách với chốt seedLuyenDanThuong ở trên.
+  const automationSrc = readFileSync(
+    new URL("../src/app/actions/automation.ts", import.meta.url),
+    "utf8",
+  );
+  check(
+    "đường LƯU ngọc giản áp luật theo vai của người gọi",
+    /enforceMazeCapPolicy\(\s*parsed\.data,\s*\{\s*isAdmin: user\.role === "admin"/.test(automationSrc),
+  );
+  check(
+    "cửa PHÁT VIỆC của linh sứ tông môn cũng áp luật (phủ cả document cũ)",
+    workerRouteSrc.includes("enforceMazeCapPolicy(config, { isAdmin: owner?.role === \"admin\" })") &&
+      workerRouteSrc.includes('scope.kind === "operator"'),
+  );
+  check(
+    "và linh sứ RIÊNG không bị luật của ghế chung",
+    /if \(scope\.kind === "operator"\) \{[\s\S]{0,200}?enforceMazeCapPolicy/.test(workerRouteSrc),
+  );
+
   console.log("\nTrần số tab chạy song song");
 
   // Cái trần này ra đời từ 18 dòng lỗi thật trên linh sứ tông môn ngày 05/08: tám trang

@@ -9,7 +9,7 @@ import {
   setAccountEnabled,
   updateAccountCookie,
 } from "@/lib/services/accounts";
-import { configSchema, saveConfig } from "@/lib/services/configs";
+import { configSchema, enforceMazeCapPolicy, saveConfig } from "@/lib/services/configs";
 import {
   clearVisibleJobEvents,
   getActiveJobs,
@@ -129,11 +129,23 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Cấu hình không hợp lệ." };
   }
 
-  await saveConfig(user.id, parsed.data);
+  // Luật tài nguyên chung, áp ở SERVER chứ không tin ô tick: giao diện đã khoá tuỳ chọn
+  // này lại cho đạo hữu thường, nhưng `disabled` chỉ là một thuộc tính HTML và một POST
+  // dựng tay chẳng đi qua form lần nào (cùng lý do `runner` bị ép ở trên).
+  const guarded = enforceMazeCapPolicy(parsed.data, { isAdmin: user.role === "admin" });
+  await saveConfig(user.id, guarded);
   revalidatePath("/dashboard");
+
+  // So THAM CHIẾU: hàm luật trả về chính vật cũ khi không phải sửa gì. Nói ra khi nó đã ra
+  // tay — im lặng ghi đè một lựa chọn người ta vừa bấm là cách nhanh nhất để họ tin rằng
+  // ngọc giản này không nghe lời mình.
+  const overridden = guarded !== parsed.data;
   return {
     ok: true,
-    message: "Đã khắc cấu hình vào ngọc giản. Nếu đàn đang chạy, vòng kế tiếp sẽ dùng bản này.",
+    message: overridden
+      ? "Đã khắc cấu hình vào ngọc giản. Riêng「Dừng khi đã đủ huyền tinh」của Mê Cung được " +
+        "bật lại: linh sứ tông môn là tài nguyên chung, chỉ tông chủ mới gỡ khoá ấy được."
+      : "Đã khắc cấu hình vào ngọc giản. Nếu đàn đang chạy, vòng kế tiếp sẽ dùng bản này.",
   };
 }
 

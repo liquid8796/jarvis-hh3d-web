@@ -11,6 +11,36 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.28.0 — Mê Cung trên ghế chung luôn dừng khi đã đủ huyền tinh
+
+- **「Dừng khi đã đủ huyền tinh trong ngày」của Mê Cung bị khoá BẬT với đạo hữu thường.**
+  Mê Cung là nhiệm vụ duy nhất giữ một phiên trình duyệt hàng chục phút, mà linh sứ tông môn
+  chỉ có vài ghế và cả tông môn dùng chung. Bỏ tick ấy nghĩa là đánh hết lượt — một đàn có
+  thể ngồi trong Mê Cung gần trọn ngày, và vài đàn như vậy là những người còn lại xếp hàng
+  cả ngày mà không hiểu vì sao mãi không tới lượt. **Tông chủ được miễn**: người vận hành
+  cái VM ấy phải có đường tự quyết định dùng nó thế nào.
+- **Bấm vào ô đã khoá thì hiện hộp cảnh báo, rồi ô tự tick lại.** Cố ý KHÔNG dùng thuộc tính
+  `disabled`: một ô bị khoá cứng nuốt luôn cú bấm, không còn sự kiện nào để mà giải thích, và
+  người dùng chỉ thấy một ô không nhúc nhích — bấm lại, lại hụt, rồi kết luận trang hỏng. Ô
+  này nhận cú bấm, từ chối nó, rồi NÓI vì sao.
+- **Luật nằm ở ba lớp, vì mỗi lớp bịt đúng chỗ hai lớp kia không với tới.** Giao diện chỉ là
+  phép lịch sự — một POST dựng tay chẳng đi qua form lần nào. Đường **lưu** ngọc giản ép lại
+  theo vai của chính người gọi, và **nói ra** khi nó đã ghi đè (im lặng sửa một lựa chọn
+  người ta vừa bấm là cách nhanh nhất để họ tin ngọc giản không nghe lời mình). Nhưng đường
+  lưu chỉ chạm được những người còn bấm nút: **document đã nằm sẵn trong database với
+  `capCheck: false` từ trước luật này** thì không đường ghi nào với tới. Nên lớp thứ ba nằm ở
+  **cửa phát việc** — chỗ duy nhất mọi vòng chạy đều đi qua.
+- **Lớp thứ ba gác theo SCOPE của linh sứ, vì luật nói về CÁI MÁY chứ không về con người.**
+  Linh sứ riêng chạy trên máy của chính đạo hữu: họ tiêu tài nguyên của mình và không ai phải
+  xếp hàng sau lưng, nên ghế riêng không chịu luật của ghế chung. Chi phí: thêm đúng một phép
+  đọc theo khoá chính cho mỗi lần PHÁT ĐƯỢC việc — không phải mỗi nhịp hỏi việc. Không tra ra
+  chủ nhân thì coi như người thường: luật siết, không nới.
+- Kiểm chứng: smoke **164/164**, trong đó mười ca mới ghim luật thuần (tông chủ được miễn,
+  người thường bị ép, không đụng vào lựa chọn nào khác, không sửa vật gốc, và trả về CHÍNH
+  vật cũ khi không phải sửa — mẹo so tham chiếu mà đường lưu dựa vào để biết có nên báo hay
+  không) cùng ba chốt trên NGUỒN rằng cả hai cửa ghi/chạy đều áp luật và linh sứ riêng thì
+  không; TypeScript và production build sạch.
+
 ## 0.27.0 — Hàng đợi nói rõ mỗi tài khoản đang làm nhiệm vụ gì
 
 - **Mỗi dòng hàng đợi giờ kể tên nhiệm vụ đang chạy**, kèm bộ đếm「3/8 nhiệm vụ」. Trước đây

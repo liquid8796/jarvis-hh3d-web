@@ -121,6 +121,39 @@ export type UserConfig = z.infer<typeof configSchema>;
 export type AccountTier = NonNullable<UserConfig["accountTier"]>;
 
 /**
+ * Luật tài nguyên chung: Mê Cung của đạo hữu thường LUÔN dừng khi đã đủ huyền tinh trong ngày.
+ *
+ * Vì sao đúng một tuỳ chọn này bị khoá, giữa cả chục tuỳ chọn tự do khác: Mê Cung là nhiệm vụ
+ * duy nhất giữ một phiên trình duyệt HÀNG CHỤC PHÚT (~35 phút một lượt, xem chú thích ở
+ * runCycle) và nó cần bốn người khác. Bỏ tick「dừng khi đủ huyền tinh」nghĩa là đánh hết lượt,
+ * tức một đàn có thể ngồi trong Mê Cung gần như cả ngày. Linh sứ tông môn chỉ có vài ghế
+ * (WORKER_MAX_JOBS), nên vài đàn như vậy là cả tông môn hết chỗ chạy — người khác xếp hàng
+ * sau lưng mà không hiểu vì sao mãi không tới lượt.
+ *
+ * Tông chủ được miễn: người vận hành cái VM ấy phải có đường tự quyết định dùng nó thế nào.
+ *
+ * Hàm THUẦN và không đụng vào bản gốc — trả về chính `config` khi không phải sửa gì, nên nơi
+ * gọi so tham chiếu được để biết luật có ra tay hay không (saveConfigAction dùng đúng mẹo đó
+ * để nói thật với người dùng rằng lựa chọn của họ đã bị ghi đè).
+ */
+export function enforceMazeCapPolicy<T extends UserConfig>(
+  config: T,
+  { isAdmin }: { isAdmin: boolean },
+): T {
+  if (isAdmin || config.quests.meCung.capCheck) {
+    return config;
+  }
+
+  return {
+    ...config,
+    quests: {
+      ...config.quests,
+      meCung: { ...config.quests.meCung, capCheck: true },
+    },
+  };
+}
+
+/**
  * Hình thù trong database/job snapshot.
  *
  * `configSchema` giới hạn cookie người dùng dán ở 8.000 ký tự. Sau AES-GCM + Base64, cùng

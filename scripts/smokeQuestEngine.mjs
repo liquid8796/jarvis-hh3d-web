@@ -145,6 +145,73 @@ const FREE_WHEEL_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
   if(spins===2)spinButton.textContent='Hết lượt'},40)
 }</script>`;
 
+// Trang Tiên Duyên + modal Hỷ Sự Đường theo recording 05/08: nút .hy-su-btn mở modal, danh
+// sách tiệc nạp ASYNC (~80ms — đủ chậm để bắt lỗi phán "hết phòng chưa chúc" trên một danh
+// sách chưa kịp về), mỗi hàng mang trạng thái chúc riêng và link "Vào Chúc Ngay" target=_blank
+// — đúng cái link mà flow KHÔNG được click.
+const hySuHallPage = (rooms, blessed) => {
+  const rows = rooms
+    .map((room) => {
+      const done = blessed.has(room.id);
+      const href = room.type === "hong-nhan" ? `/hong-nhan/?id=${room.id}` : `/phong-cuoi?id=${room.id}`;
+      return `<div class="wedding-now-item${room.type === "hong-nhan" ? " type-hong-nhan" : ""}">
+        <div class="wedding-now-info">
+          <p class="wedding-now-couple"><strong>${room.couple}</strong></p>
+          <p class="wedding-now-blessing-status">Trạng thái: <span class="${done ? "blessed" : "not-blessed"}">${done ? "Đã chúc" : "Chưa chúc"}</span></p>
+        </div>
+        <div class="wedding-now-action"><a href="${href}" class="wedding-now-btn" target="_blank">Vào Chúc Ngay</a></div>
+      </div>`;
+    })
+    .join("");
+  return `<!doctype html><html lang="vi"><meta charset="utf-8">
+<button class="tien-duyen-btn hy-su-btn">Hỷ Sự Đường <span class="notification-badge">${rooms.length}</span></button>
+<div id="wedding-now-modal" style="display:none"><div id="wedding-now-body">Đang tải danh sách tiệc cưới...</div></div>
+<script>
+document.querySelector('.hy-su-btn').addEventListener('click', () => {
+  document.getElementById('wedding-now-modal').style.display = 'block';
+  setTimeout(() => { document.getElementById('wedding-now-body').innerHTML = ${JSON.stringify(rows)}; }, 80);
+});
+</script>`;
+};
+
+// Phòng cưới theo recording: form chúc phúc render sẵn, select mặc định tự điền textarea qua
+// onchange, "Gửi Chúc Phúc" mở hộp xác nhận, và server NHẬN là nút gửi bị gỡ khỏi DOM (~40ms
+// sau confirm ngoài đời là toast + gỡ nút). Confirm với lời chúc RỖNG bị từ chối — đó chính
+// là lưới bắt kịch bản script chọn-ngẫu-nhiên không điền được gì. Bao lì xì chỉ có ở một
+// phòng, để ghim cả nhánh nhặt lẫn nhánh guard-bỏ-qua.
+const hySuRoomPage = (id, alreadyBlessed, withLixi) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+<div class="blessing-section"><h2>Gửi Lời Chúc Phúc</h2>
+<div class="blessing-form">
+<select id="blessing-default-options" onchange="fillBlessingMessage()">
+  <option value="">🌿 Chọn lời chúc mặc định...</option>
+  <option value="Thiên duyên vạn kiếp, hội ngộ giữa hồng trần!">🔮 Lời chúc 1</option>
+  <option value="Duyên khởi từ tâm, đạo hợp bởi ý!">💫 Lời chúc 2</option>
+  <option value="Một bước nhập đạo, vạn kiếp thành tiên!">🔥 Lời chúc 3</option>
+</select>
+<textarea id="blessing-message"></textarea>
+${alreadyBlessed ? "" : '<button class="blessing-button" onclick="showConfirmModal()">Gửi Chúc Phúc</button>'}
+</div></div>
+${withLixi ? '<div class="lixi-envelope" style="width:40px;height:40px">🧧</div>' : ""}
+<div id="confirm-modal" style="display:none">
+  <button class="custom-modal-button cancel">Hủy Bỏ</button>
+  <button class="custom-modal-button confirm">Xác Nhận</button>
+</div>
+<script>
+function fillBlessingMessage(){document.getElementById('blessing-message').value=document.getElementById('blessing-default-options').value}
+function showConfirmModal(){document.getElementById('confirm-modal').style.display='block'}
+document.querySelector('.custom-modal-button.cancel').onclick=()=>{document.getElementById('confirm-modal').style.display='none'};
+document.querySelector('.custom-modal-button.confirm').onclick=()=>{
+  const msg=document.getElementById('blessing-message').value;
+  if(!msg)return;
+  document.getElementById('confirm-modal').style.display='none';
+  fetch('/hy-su-blessed?id=${id}&msg='+encodeURIComponent(msg)).then(()=>{
+    setTimeout(()=>{const b=document.querySelector('.blessing-button');if(b)b.remove()},40);
+  });
+};
+const lx=document.querySelector('.lixi-envelope');
+if(lx)lx.onclick=()=>{fetch('/hy-su-lixi?id=${id}');lx.remove()};
+</script>`;
+
 // ---------------------------------------------------------------------------------------
 
 let passed = 0;
@@ -840,16 +907,29 @@ async function main() {
   );
   const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
   check(
-    "hồ sơ đang ở schema 45",
-    loadProfileForSchema().schemaVersion === 45,
+    "hồ sơ đang ở schema 46",
+    loadProfileForSchema().schemaVersion === 46,
     String(loadProfileForSchema().schemaVersion),
   );
 
   // --- kiểm trên trang thật ---------------------------------------------------------
   let teLeOffered = false;
+
+  // Hỷ Sự Đường nhớ trạng thái PHÍA SERVER như site thật: chúc rồi thì lần mở modal sau
+  // phải thấy "Đã chúc". Phòng hồng-nhan cố ý đứng ĐẦU danh sách — flow phải chúc hai
+  // phòng /phong-cuoi (dạng trang đã có recording) trước rồi mới tới nó.
+  const hySuRooms = [
+    { id: "230", type: "hong-nhan", couple: "Trái Tim Mỹ Nhân 💕 Trái Tim Bao Dung" },
+    { id: "2534", type: "dao-lu", couple: "ミ★Ôɴԍтʀùмнн3ᴅ★彡 & 𝙐𝙮ê𝙣𝙉𝙝𝙞" },
+    { id: "2533", type: "dao-lu", couple: "1 Trái tim 1 Ngừi iu & Trái Tim Bất Chấp" },
+  ];
+  const hySuBlessed = new Map(); // id → lời chúc đã gửi, theo thứ tự vào phòng
+  const hySuLixi = [];
+
   const server = createServer((req, res) => {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    const path = new URL(req.url ?? "/", "http://fixture.test").pathname.replace(/\/$/, "") || "/";
+    const url = new URL(req.url ?? "/", "http://fixture.test");
+    const path = url.pathname.replace(/\/$/, "") || "/";
     if (path === "/diem-danh") res.end(FREE_CHECKIN_PAGE);
     else if (path === "/nhiem-vu-hang-ngay") res.end(FREE_HUB_PAGE);
     else if (path === "/phuc-loi-duong") res.end(FREE_WELFARE_PAGE);
@@ -857,6 +937,16 @@ async function main() {
     else if (path === "/thi-luyen-tong-mon-hh3d") res.end(FREE_TRIAL_PAGE);
     else if (path === "/danh-sach-thanh-vien-tong-mon") res.end(freeSacrificePage(teLeOffered));
     else if (path === "/te-le-offered") { teLeOffered = true; res.end("ok"); }
+    else if (path === "/tien-duyen") res.end(hySuHallPage(hySuRooms, hySuBlessed));
+    else if (path === "/phong-cuoi" || path === "/hong-nhan") {
+      const id = url.searchParams.get("id") ?? "";
+      res.end(hySuRoomPage(id, hySuBlessed.has(id), id === "2534"));
+    }
+    else if (path === "/hy-su-blessed") {
+      hySuBlessed.set(url.searchParams.get("id") ?? "", url.searchParams.get("msg") ?? "");
+      res.end("ok");
+    }
+    else if (path === "/hy-su-lixi") { hySuLixi.push(url.searchParams.get("id") ?? ""); res.end("ok"); }
     else res.end(PAGE);
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -949,6 +1039,55 @@ async function main() {
       infos.some((m) => m.includes("đã tế lễ hôm nay")) &&
         !infos.some((m) => /stopIf|repeat|until/.test(m)),
       infos.filter((m) => /stopIf|repeat|until/.test(m)).join(" / ") || "(sạch)",
+    );
+
+    console.log("\nHỷ Sự Đường từ recording 05/08");
+
+    // Vòng chúc phúc trọn vẹn: 3 phòng chưa chúc (hồng-nhan đứng đầu danh sách), mỗi vòng
+    // vào một phòng, chọn lời chúc ngẫu nhiên, gửi qua hộp xác nhận, quay về mở lại modal —
+    // cho tới khi server nói cả ba đều "Đã chúc".
+    const hySu = exportedProfile.quests.find((q) => q.id === "hy-su-duong-thuong");
+    const hySuFirst = await run(hySu);
+    check("chúc hết các phòng rồi hoàn tất", hySuFirst.outcome === "completed", `${hySuFirst.outcome}: ${hySuFirst.message}`);
+    check(
+      "cả ba phòng đều được chúc, /phong-cuoi (đã có recording) đi trước /hong-nhan (chưa)",
+      JSON.stringify([...hySuBlessed.keys()]) === JSON.stringify(["2534", "2533", "230"]),
+      [...hySuBlessed.keys()].join(","),
+    );
+    check(
+      "lời chúc gửi đi là một lựa chọn THẬT của select — chọn ngẫu nhiên không rơi vào ô trống",
+      [...hySuBlessed.values()].every((msg) => msg.trim().length > 0),
+      [...hySuBlessed.values()].join(" / "),
+    );
+    check(
+      "bao lì xì được nhặt đúng ở phòng đang phát, phòng không phát thì guard bỏ qua êm",
+      JSON.stringify(hySuLixi) === JSON.stringify(["2534"]),
+      hySuLixi.join(","),
+    );
+    check(
+      "tường thuật gọi tên từng cặp đôi được chúc",
+      infos.filter((m) => m.startsWith("Vào chúc phúc:")).length === 3,
+      infos.filter((m) => m.startsWith("Vào chúc phúc:")).join(" / "),
+    );
+
+    // Ghé lại khi đã chúc hết: modal vẫn mở, danh sách vẫn về, nhưng không còn .not-blessed
+    // nào — dừng bằng lời người, không bấm thêm gì.
+    const hySuAgain = await run(hySu);
+    check(
+      "lần hai dừng ở \"đã chúc phúc hết các tiệc đang mở\"",
+      hySuAgain.outcome === "alreadyDone" && hySuAgain.message === "đã chúc phúc hết các tiệc đang mở",
+      `${hySuAgain.outcome}: ${hySuAgain.message}`,
+    );
+    check("và không gửi thêm lời chúc nào", hySuBlessed.size === 3, String(hySuBlessed.size));
+
+    // Hết mùa cưới: modal mở ra danh sách RỖNG — phải phân biệt được với "đã chúc hết".
+    // (Ca này trả giá 15s chờ optional của danh sách — giữ nguyên timeout thật của hồ sơ.)
+    hySuRooms.length = 0;
+    const hySuEmpty = await run(hySu);
+    check(
+      "không có tiệc nào → dừng ở \"không có tiệc cưới nào đang diễn ra\"",
+      hySuEmpty.outcome === "alreadyDone" && hySuEmpty.message === "không có tiệc cưới nào đang diễn ra",
+      `${hySuEmpty.outcome}: ${hySuEmpty.message}`,
     );
 
     console.log("\nĐiều kiện trên trang sống");

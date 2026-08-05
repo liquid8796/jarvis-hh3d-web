@@ -11,6 +11,36 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.26.0 — Hỷ Sự Đường: đi chúc phúc các tiệc cưới (tab Thường)
+
+- **Nhiệm vụ mới ở tab Thường: Hỷ Sự Đường** — viết từ recording 05/08 trên site thật
+  (`hy-su-duong-20260805-223044`). Nút Hỷ Sự Đường bên `/tien-duyen` mở modal「Đại Điển
+  Đang Diễn Ra」; mỗi vòng vào phòng đầu tiên còn「Chưa chúc」, chọn NGẪU NHIÊN một lời
+  chúc mặc định (đúng ghi chú của người ghi hình), gửi qua hộp xác nhận rồi mở lại danh
+  sách — tới khi hết phòng chưa chúc. Không giới hạn lượt trong ngày: chính lời chúc là
+  thứ rút dần điều kiện dừng của vòng lặp.
+- **Vào phòng bằng điều hướng, không bấm link.**「Vào Chúc Ngay」mang `target=_blank` —
+  bấm nó là flow lạc sang tab thứ hai — nên script đọc href của hàng rồi `location.assign`
+  ngay trong tab. Phòng Đạo Lữ (`/phong-cuoi`, dạng trang đã có recording) đi trước phòng
+  Hồng Nhan (`/hong-nhan`, chưa ghi hình được): trang chưa kiểm chứng chỉ có thể làm hỏng
+  lượt SAU KHI mọi phòng đã kiểm chứng được chúc xong — và hỏng thì kêu to, đó là cách
+  trang ấy kiếm được recording của riêng nó.
+- **Ghi nhận = nút gửi biến mất khỏi DOM** (state event trong recording: server nhận là nút
+  bị gỡ hẳn; gửi bị từ chối thì nút ở lại). Mỗi lời chúc tốn 30 Tiên Ngọc, nhận 120 Tu Vi —
+  nên bước chờ ấy bắt buộc, quest tắt sẵn, và giá nói rõ ngay trên form (luật của Luyện
+  Đan Đường).
+- **Bao lì xì nhặt kiểu cơ hội**: trang phòng cưới có style `.lixi-envelope` nhưng chưa
+  recording nào bắt được lúc phát, nên cú bấm là optional + guard Visible — đoán sai
+  markup thì bước tự bỏ qua, flow chính không suy suyển.
+- Hồ sơ lên **schema 46**, xuất từ bản desktop 1.43.0 cùng đợt — hai sản phẩm vẫn đọc
+  chung một tri thức site. Form thêm đúng một công tắc ở tab Thường; tab VIP không thấy
+  nó, vì hồ sơ không có twin VIP — một ô tick ở đó là lời hứa suông.
+- Ghim bằng smoke trên Chromium thật trước sảnh cưới replica (server nhớ phòng đã chúc
+  đúng như site thật): chúc đủ ba phòng theo thứ tự ưu tiên, lời chúc ngẫu nhiên không rơi
+  vào ô trống, lì xì nhặt đúng một phòng đang phát, và hai lý do dừng phân biệt rõ —
+  「đã chúc phúc hết các tiệc đang mở」khác「không có tiệc cưới nào đang diễn ra」—
+  **138/138**.
+
 ## 0.25.2 — nhật ký tu luyện thôi nói tiếng của script
 
 - **「stopIf khớp — đã tế lễ hôm nay」giờ chỉ còn「đã tế lễ hôm nay」.** Lý do dừng vẫn hiện

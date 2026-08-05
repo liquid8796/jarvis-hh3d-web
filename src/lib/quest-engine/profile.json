@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 45,
+  "schemaVersion": 46,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -1572,6 +1572,193 @@
       "requiresVip": false,
       "order": 90,
       "notes": "Tr\u1EA3 l\u1EDDi 5 c\u00E2u V\u1EA5n \u0110\u00E1p m\u1ED7i ng\u00E0y l\u1EA5y T\u00F4ng Kh\u1ED1 \u002B C\u1ED1ng Hi\u1EBFn."
+    },
+    {
+      "id": "hy-su-duong-thuong",
+      "name": "H\u1EF7 S\u1EF1 \u0110\u01B0\u1EDDng",
+      "enabled": false,
+      "kind": "customSteps",
+      "matchTexts": [
+        "h\u1EF7 s\u1EF1 \u0111\u01B0\u1EDDng",
+        "hy su duong"
+      ],
+      "pagePath": "/tien-duyen",
+      "steps": [
+        {
+          "action": "navigate",
+          "text": "/tien-duyen",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".tien-duyen-btn.hy-su-btn",
+          "timeoutMs": 25000,
+          "note": "trang Ti\u00EAn Duy\u00EAn render xong m\u1EDBi c\u00F3 d\u00E3y n\u00FAt ch\u1EE9c n\u0103ng"
+        },
+        {
+          "action": "click",
+          "selector": ".tien-duyen-btn.hy-su-btn",
+          "timeoutMs": 15000,
+          "note": "m\u1EDF modal \u0022\u0110\u1EA1i \u0110i\u1EC3n \u0110ang Di\u1EC5n Ra\u0022 \u2014 badge \u0111\u1ECF tr\u00EAn n\u00FAt l\u00E0 s\u1ED1 ti\u1EC7c \u0111ang m\u1EDF"
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 10000,
+          "note": "modal \u0111\u00E3 m\u1EDF",
+          "condition": {
+            "kind": "visible",
+            "selector": "#wedding-now-body"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 15000,
+          "note": "danh s\u00E1ch ti\u1EC7c n\u1EA1p async (\u0022\u0110ang t\u1EA3i danh s\u00E1ch ti\u1EC7c c\u01B0\u1EDBi...\u0022) \u2014 ph\u1EA3i ch\u1EDD n\u00F3 v\u1EC1 r\u1ED3i m\u1EDBi \u0111\u01B0\u1EE3c ph\u00E1n \u0022h\u1EBFt ph\u00F2ng ch\u01B0a ch\u00FAc\u0022; optional v\u00EC h\u00F4m kh\u00F4ng c\u00F3 ti\u1EC7c n\u00E0o l\u00E0 chuy\u1EC7n b\u00ECnh th\u01B0\u1EDDng, StopIf/until b\u00EAn d\u01B0\u1EDBi m\u1EDBi l\u00E0 n\u01A1i tr\u1EA3 l\u1EDDi",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#wedding-now-body .wedding-now-item"
+          }
+        },
+        {
+          "action": "stopIf",
+          "text": "kh\u00F4ng c\u00F3 ti\u1EC7c c\u01B0\u1EDBi n\u00E0o \u0111ang di\u1EC5n ra",
+          "timeoutMs": 15000,
+          "note": "modal m\u1EDF m\u00E0 kh\u00F4ng c\u00F3 ph\u00F2ng n\u00E0o \u2014 ch\u1EDD ti\u1EC7c m\u1EDBi, kh\u00E1c h\u1EB3n \u0022\u0111\u00E3 ch\u00FAc h\u1EBFt\u0022 b\u00EAn d\u01B0\u1EDBi",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#wedding-now-body .wedding-now-item"
+          }
+        },
+        {
+          "action": "stopIf",
+          "text": "\u0111\u00E3 ch\u00FAc ph\u00FAc h\u1EBFt c\u00E1c ti\u1EC7c \u0111ang m\u1EDF",
+          "timeoutMs": 15000,
+          "note": "m\u1ECDi ph\u00F2ng \u0111\u1EC1u \u0022\u0110\u00E3 ch\u00FAc\u0022 \u2014 kh\u00F4ng c\u00F2n g\u00EC \u0111\u1EC3 l\u00E0m h\u00F4m nay, ti\u1EC7c m\u1EDBi s\u1EBD c\u00F3 badge m\u1EDBi",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#wedding-now-body .wedding-now-item .wedding-now-blessing-status .not-blessed"
+          }
+        },
+        {
+          "action": "repeat",
+          "timeoutMs": 15000,
+          "note": "m\u1ED7i v\u00F2ng ch\u00FAc m\u1ED9t ph\u00F2ng r\u1ED3i m\u1EDF l\u1EA1i danh s\u00E1ch \u2014 ch\u00EDnh l\u1EDDi ch\u00FAc l\u00E0 th\u1EE9 r\u00FAt d\u1EA7n \u0111i\u1EC1u ki\u1EC7n until. Tr\u1EA7n 15 v\u00F2ng ~ g\u1EA5p \u0111\u00F4i s\u1ED1 ti\u1EC7c t\u1EEBng th\u1EA5y c\u00F9ng l\u00FAc (6)",
+          "steps": [
+            {
+              "action": "evaluateJavaScript",
+              "script": "() =\u003E { const rows = [...document.querySelectorAll(\u0027#wedding-now-body .wedding-now-item\u0027)].filter((it) =\u003E it.querySelector(\u0027.wedding-now-blessing-status .not-blessed\u0027) \u0026\u0026 it.querySelector(\u0027a.wedding-now-btn\u0027)); if (rows.length === 0) return \u0027\u0027; const row = rows.find((it) =\u003E (it.querySelector(\u0027a.wedding-now-btn\u0027).getAttribute(\u0027href\u0027) || \u0027\u0027).includes(\u0027/phong-cuoi\u0027)) || rows[0]; const cp = row.querySelector(\u0027.wedding-now-couple\u0027); const couple = (cp ? cp.textContent : \u0027\u0027).replace(/\\s\u002B/g, \u0027 \u0027).trim(); const href = row.querySelector(\u0027a.wedding-now-btn\u0027).href; setTimeout(() =\u003E location.assign(href), 0); return \u0027!V\u00E0o ch\u00FAc ph\u00FAc: \u0027 \u002B couple; }",
+              "timeoutMs": 15000,
+              "note": "link \u0022V\u00E0o Ch\u00FAc Ngay\u0022 mang target=_blank n\u00EAn KH\u00D4NG click \u2014 \u0111\u1ECDc href c\u1EE7a ph\u00F2ng ch\u01B0a ch\u00FAc \u0111\u1EA7u ti\u00EAn (\u01B0u ti\u00EAn /phong-cuoi \u0111\u00E3 c\u00F3 recording) r\u1ED3i \u0111i\u1EC1u h\u01B0\u1EDBng ngay trong tab; setTimeout \u0111\u1EC3 c\u00E2u tr\u1EA3 l\u1EDDi kh\u00F4ng \u0111ua v\u1EDBi \u0111i\u1EC1u h\u01B0\u1EDBng"
+            },
+            {
+              "action": "waitForSelector",
+              "selector": "#blessing-default-options",
+              "timeoutMs": 25000,
+              "note": "sang trang ph\u00F2ng c\u01B0\u1EDBi \u2014 form ch\u00FAc ph\u00FAc n\u1EB1m s\u1EB5n trong HTML \u0111\u1EA7u, kh\u00F4ng ch\u1EDD JS"
+            },
+            {
+              "action": "evaluateJavaScript",
+              "script": "() =\u003E { const sel = document.querySelector(\u0027#blessing-default-options\u0027); if (!sel || sel.options.length \u003C 2) return \u0027\u0027; const pick = 1 \u002B Math.floor(Math.random() * (sel.options.length - 1)); sel.selectedIndex = pick; sel.dispatchEvent(new Event(\u0027change\u0027, { bubbles: true })); const box = document.querySelector(\u0027#blessing-message\u0027); if (box \u0026\u0026 !box.value) box.value = sel.value; return \u0027!L\u1EDDi ch\u00FAc ng\u1EABu nhi\u00EAn: \u0027 \u002B (sel.options[pick].textContent || \u0027\u0027).trim(); }",
+              "timeoutMs": 15000,
+              "note": "ch\u1ECDn NG\u1EAAU NHI\u00CAN m\u1ED9t l\u1EDDi ch\u00FAc m\u1EB7c \u0111\u1ECBnh (ghi ch\u00FA c\u1EE7a ch\u00EDnh recording); dispatch change \u0111\u1EC3 fillBlessingMessage() c\u1EE7a trang t\u1EF1 \u0111i\u1EC1n \u00F4 l\u1EDDi ch\u00FAc, g\u00E1n th\u1EB3ng l\u00E0m l\u01B0\u1EDBi \u0111\u1EE1 n\u1EBFu trang \u0111\u1ED5i c\u00E1ch \u0111i\u1EC1n"
+            },
+            {
+              "action": "click",
+              "selector": ".blessing-form .blessing-button",
+              "timeoutMs": 15000,
+              "note": "\u0022G\u1EEDi Ch\u00FAc Ph\u00FAc\u0022 \u2014 m\u1EDF h\u1ED9p x\u00E1c nh\u1EADn d\u00F9ng 30 Ti\u00EAn Ng\u1ECDc"
+            },
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 8000,
+              "note": "h\u1ED9p \u0022X\u00E1c Nh\u1EADn G\u1EEDi L\u1EDDi Ch\u00FAc\u0022 lu\u00F4n hi\u1EC7n \u2014 b\u1EAFt bu\u1ED9c, thi\u1EBFu l\u00E0 trang \u0111\u00E3 \u0111\u1ED5i",
+              "condition": {
+                "kind": "visible",
+                "selector": "#confirm-modal .custom-modal-button.confirm"
+              }
+            },
+            {
+              "action": "click",
+              "selector": "#confirm-modal .custom-modal-button.confirm",
+              "timeoutMs": 15000,
+              "note": "ch\u1EC9 b\u1EA5m \u0111\u00FAng n\u00FAt x\u00E1c nh\u1EADn theo selector \u2014 kh\u00F4ng bao gi\u1EDD \u0111\u1EE5ng \u0022H\u1EE7y B\u1ECF\u0022"
+            },
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 15000,
+              "note": "server nh\u1EADn l\u00E0 n\u00FAt g\u1EEDi b\u1ECB g\u1EE1 h\u1EB3n kh\u1ECFi DOM (m\u1ED7i ph\u00F2ng ch\u1EC9 ch\u00FAc m\u1ED9t l\u1EA7n); l\u1EDDi ch\u00FAc T\u1ED0N 30 Ti\u00EAn Ng\u1ECDc n\u00EAn g\u1EEDi tr\u01B0\u1EE3t ph\u1EA3i k\u00EAu to, kh\u00F4ng nh\u1EADn v\u01A1 l\u00E0 xong",
+              "condition": {
+                "kind": "hidden",
+                "selector": ".blessing-form .blessing-button"
+              }
+            },
+            {
+              "action": "click",
+              "selector": ".lixi-envelope",
+              "timeoutMs": 4000,
+              "note": "bao l\u00EC x\u00EC n\u1EBFu c\u1EB7p \u0111\u00F4i \u0111ang ph\u00E1t \u2014 thu\u1EA7n c\u01A1 h\u1ED9i: ch\u01B0a recording n\u00E0o b\u1EAFt \u0111\u01B0\u1EE3c l\u00FAc ph\u00E1t, n\u00EAn guard Visible \u002B optional \u0111\u1EC3 \u0111o\u00E1n sai kh\u00F4ng h\u1EA1i flow ch\u00EDnh",
+              "optional": true,
+              "when": {
+                "kind": "visible",
+                "selector": ".lixi-envelope"
+              }
+            },
+            {
+              "action": "waitMilliseconds",
+              "timeoutMs": 1200,
+              "note": "nh\u1ECBp l\u1EAFng cho request nh\u1EADn l\u00EC x\u00EC k\u1ECBp r\u1EDDi trang: b\u01B0\u1EDBc navigate kh\u00F4ng c\u00F3 humanDelay, \u0111i\u1EC1u h\u01B0\u1EDBng ngay sau c\u00FA b\u1EA5m l\u00E0 c\u00F3 th\u1EC3 c\u1EAFt ngang fetch \u0111ang bay"
+            },
+            {
+              "action": "navigate",
+              "text": "/tien-duyen",
+              "timeoutMs": 15000,
+              "note": "v\u1EC1 danh s\u00E1ch ki\u1EC3m c\u00F2n ph\u00F2ng ch\u01B0a ch\u00FAc n\u00E0o kh\u00F4ng (ghi ch\u00FA c\u1EE7a ch\u00EDnh recording)"
+            },
+            {
+              "action": "waitForSelector",
+              "selector": ".tien-duyen-btn.hy-su-btn",
+              "timeoutMs": 25000
+            },
+            {
+              "action": "click",
+              "selector": ".tien-duyen-btn.hy-su-btn",
+              "timeoutMs": 15000,
+              "note": "m\u1EDF modal \u0022\u0110\u1EA1i \u0110i\u1EC3n \u0110ang Di\u1EC5n Ra\u0022 \u2014 badge \u0111\u1ECF tr\u00EAn n\u00FAt l\u00E0 s\u1ED1 ti\u1EC7c \u0111ang m\u1EDF"
+            },
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 10000,
+              "note": "modal \u0111\u00E3 m\u1EDF",
+              "condition": {
+                "kind": "visible",
+                "selector": "#wedding-now-body"
+              }
+            },
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 15000,
+              "note": "danh s\u00E1ch ti\u1EC7c n\u1EA1p async (\u0022\u0110ang t\u1EA3i danh s\u00E1ch ti\u1EC7c c\u01B0\u1EDBi...\u0022) \u2014 ph\u1EA3i ch\u1EDD n\u00F3 v\u1EC1 r\u1ED3i m\u1EDBi \u0111\u01B0\u1EE3c ph\u00E1n \u0022h\u1EBFt ph\u00F2ng ch\u01B0a ch\u00FAc\u0022; optional v\u00EC h\u00F4m kh\u00F4ng c\u00F3 ti\u1EC7c n\u00E0o l\u00E0 chuy\u1EC7n b\u00ECnh th\u01B0\u1EDDng, StopIf/until b\u00EAn d\u01B0\u1EDBi m\u1EDBi l\u00E0 n\u01A1i tr\u1EA3 l\u1EDDi",
+              "optional": true,
+              "condition": {
+                "kind": "visible",
+                "selector": "#wedding-now-body .wedding-now-item"
+              }
+            }
+          ],
+          "until": {
+            "kind": "hidden",
+            "selector": "#wedding-now-body .wedding-now-item .wedding-now-blessing-status .not-blessed"
+          },
+          "maxIterations": 15,
+          "maxSeconds": 1800
+        }
+      ],
+      "options": [],
+      "fallbackCooldownSeconds": 3600,
+      "requiresVip": false,
+      "order": 95,
+      "notes": "Ch\u00FAc ph\u00FAc c\u00E1c ti\u1EC7c c\u01B0\u1EDBi \u0111ang m\u1EDF \u1EDF H\u1EF7 S\u1EF1 \u0110\u01B0\u1EDDng \u2014 m\u1ED7i l\u1EDDi ch\u00FAc t\u1ED1n 30 Ti\u00EAn Ng\u1ECDc, nh\u1EADn 120 Tu Vi."
     },
     {
       "id": "khoang-mach",

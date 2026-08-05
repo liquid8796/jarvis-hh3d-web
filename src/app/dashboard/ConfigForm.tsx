@@ -49,7 +49,27 @@ const FREE_QUEST_KEYS = new Set([
   "teLe",
   "vanDap",
 ]);
-const FREE_QUESTS = SIMPLE_QUESTS.filter((quest) => FREE_QUEST_KEYS.has(quest.key));
+
+/**
+ * Nhiệm vụ CHỈ có ở hạng thường — hồ sơ không có twin VIP, nên không được hiện ở lưới
+ * "Nhiệm vụ ngày" của tab VIP: engine không bao giờ chạy nó cho tài khoản VIP, một ô tick
+ * ở đó là lời hứa suông. Vẫn đi chung state và hidden input với mười nhiệm vụ kia.
+ */
+const FREE_ONLY_QUESTS: ReadonlyArray<SimpleQuest> = [
+  {
+    key: "hySuDuong",
+    name: "Hỷ Sự Đường",
+    hint: "Chúc phúc các tiệc cưới đang mở bên Tiên Duyên — mỗi lời chúc tốn 30 Tiên Ngọc, nhận 120 Tu Vi.",
+  },
+];
+
+const FREE_QUESTS = [
+  ...SIMPLE_QUESTS.filter((quest) => FREE_QUEST_KEYS.has(quest.key)),
+  ...FREE_ONLY_QUESTS,
+];
+
+/** Đủ bộ nhiệm vụ một-công-tắc — nguồn cho state và hidden input, bất kể lưới nào hiện gì. */
+const ALL_SIMPLE_QUESTS: ReadonlyArray<SimpleQuest> = [...SIMPLE_QUESTS, ...FREE_ONLY_QUESTS];
 
 /**
  * Luyện Đan Đường có HAI bản cấu hình — tab VIP khắc `luyenDan`, tab Thường khắc
@@ -146,9 +166,9 @@ function LuyenDanFieldset({
  * Một lưới nhiệm vụ một-công-tắc, kèm ô「Chọn tất cả」ở đầu.
  *
  * Ô tổng chỉ đụng ĐÚNG những nhiệm vụ của lưới đang hiện. Điều đó quan trọng vì hai lưới
- * dùng CHUNG một state: bảy mục của tab Thường là tập con của mười mục tab VIP, nên một ô
- * tổng quét cả bảng sẽ lặng lẽ bật Bí Cảnh và Phúc Lợi VIP cho người chỉ định bật đủ nhiệm
- * vụ của tài khoản thường.
+ * dùng CHUNG một state và chỉ giao nhau một phần: một ô tổng quét cả bảng sẽ lặng lẽ bật
+ * Bí Cảnh và Phúc Lợi VIP cho người chỉ định bật đủ nhiệm vụ của tài khoản thường — và
+ * ngược lại, bật cả Hỷ Sự Đường (thứ chỉ tab Thường có) từ tab VIP.
  *
  * Ba trạng thái, không phải hai: bật hết → tick, tắt hết → trống, bật một phần →
  * `indeterminate` (gạch ngang). React không có prop cho trạng thái ấy nên phải đặt thẳng
@@ -235,7 +255,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
   const [luyenDanThuong, setLuyenDanThuong] = useState(config.quests.luyenDanThuong.enabled);
   const [simpleEnabled, setSimpleEnabled] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(
-      SIMPLE_QUESTS.map((quest) => [
+      ALL_SIMPLE_QUESTS.map((quest) => [
         quest.key,
         (config.quests as Record<string, { enabled?: boolean }>)[quest.key]?.enabled === true,
       ]),
@@ -315,7 +335,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
       </p>
 
       {/* Một input thật cho mỗi config key. Checkbox ở hai tab chỉ là hai mặt của cùng state. */}
-      {SIMPLE_QUESTS.map((quest) =>
+      {ALL_SIMPLE_QUESTS.map((quest) =>
         simpleEnabled[quest.key] ? (
           <input key={quest.key} type="hidden" name={`q_${quest.key}`} value="on" />
         ) : null,
@@ -327,7 +347,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
             Nhiệm vụ tài khoản thường
           </legend>
           <p className="mb-3 text-xs text-[var(--color-mist)]">
-            Bảy nhiệm vụ chạy trên trang riêng của từng mục — hub tài khoản thường không có
+            Tám nhiệm vụ chạy trên trang riêng của từng mục — hub tài khoản thường không có
             nút bấm nhanh, nên auto đi thẳng vào trang. Khối dưới cùng: Mê Cung dùng chung
             tuỳ chọn cho cả hai hạng, còn Luyện Đan Đường có bản riêng cho hạng thường.
           </p>

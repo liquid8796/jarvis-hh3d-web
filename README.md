@@ -133,7 +133,7 @@ Vercel, code dùng `PGHOST_UNPOOLED` và giữ nguyên path/credentials; hạ t�
 #### Bộ thông dịch nhiệm vụ, và vì sao nó dùng chung với bản desktop
 
 `quest-engine/` là bản JavaScript của `QuestEngine.cs` bên bản desktop, và nó đọc **cùng một
-tệp hồ sơ** (`profile.json`, schema 44) mà bản desktop dùng. Đó là điểm mấu chốt: hồ sơ ấy
+tệp hồ sơ** (`profile.json`, schema 46) mà bản desktop dùng. Đó là điểm mấu chốt: hồ sơ ấy
 không phải cấu hình, nó là **tri thức về site** — mỗi selector trong đó là một buổi tối ngồi
 xem trang thật, và vài cái là cả một đêm hỏng việc mới rút ra. Nếu web chép lại tri thức đó
 thành mã riêng thì hai bản sẽ trôi khỏi nhau ngay lần site đổi marker đầu tiên, và người sửa

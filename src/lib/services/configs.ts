@@ -88,7 +88,7 @@ export const configSchema = z.object({
         })
         .prefault({}),
       /**
-       * Mười nhiệm vụ "một công tắc" — đồng bộ đủ bộ từ bản desktop. Chúng không có tuỳ
+       * Mười một nhiệm vụ "một công tắc" — đồng bộ đủ bộ từ bản desktop. Chúng không có tuỳ
        * chọn nào ngoài bật/tắt, nhưng vẫn là object (chứ không phải boolean trần) để hôm
        * nào một nhiệm vụ mọc thêm lựa chọn thì document cũ không phải đổi hình thù.
        * Key ở đây ↔ tên nhiệm vụ trong hồ sơ do SIMPLE_QUESTS (quest-engine/profile.mjs)
@@ -104,6 +104,11 @@ export const configSchema = z.object({
       vongQuay: simpleQuest,
       vanDap: simpleQuest,
       khoangMach: simpleQuest,
+      /**
+       * Hỷ Sự Đường — chúc phúc các tiệc cưới đang mở trên /tien-duyen. Chỉ có bản hạng
+       * thường (recording 05/08); mỗi lời chúc tốn 30 Tiên Ngọc nên form nói rõ giá.
+       */
+      hySuDuong: simpleQuest,
       /** Bản cho hạng VIP — twin `luyen-dan-duong` của hồ sơ. */
       luyenDan: luyenDanQuest,
       /** Bản cho hạng thường — twin `luyen-dan-duong-thuong`. Xem chú thích ở luyenDanQuest. */

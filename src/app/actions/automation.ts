@@ -80,7 +80,7 @@ function readAccountId(formData: FormData): string | null {
 export async function saveConfigAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const user = await requireActiveUser();
 
-  // Mười nhiệm vụ một-công-tắc dùng chung một khuôn tên field: q_<key>.
+  // Mười một nhiệm vụ một-công-tắc dùng chung một khuôn tên field: q_<key>.
   const simple = (key: string) => ({ enabled: formData.get(`q_${key}`) === "on" });
 
   const parsed = configSchema.safeParse({
@@ -121,6 +121,7 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
       vongQuay: simple("vongQuay"),
       vanDap: simple("vanDap"),
       khoangMach: simple("khoangMach"),
+      hySuDuong: simple("hySuDuong"),
     },
   });
 

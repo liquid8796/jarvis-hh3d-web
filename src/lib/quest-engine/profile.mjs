@@ -90,6 +90,7 @@ const SIMPLE_QUESTS = [
   ["vongQuay", "Vòng Quay Phúc Vận"],
   ["vanDap", "Vấn Đáp"],
   ["khoangMach", "Khoáng Mạch"],
+  ["hySuDuong", "Hỷ Sự Đường"],
 ];
 
 /**
@@ -164,7 +165,7 @@ export function profileForConfig(config, log) {
     }
   }
 
-  // ---- Mười nhiệm vụ một-công-tắc ------------------------------------------------------
+  // ---- Mười một nhiệm vụ một-công-tắc --------------------------------------------------
   for (const [key, name] of SIMPLE_QUESTS) {
     const quests = findQuests(profile, name);
     if (quests.length === 0) {

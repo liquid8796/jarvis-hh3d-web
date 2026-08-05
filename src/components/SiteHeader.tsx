@@ -45,7 +45,7 @@ export async function SiteHeader({ maxWidth = "max-w-5xl" }: { maxWidth?: string
                   Hàng Đợi
                 </Link>
                 <Link href="/chat" className="btn btn-ghost">
-                  Tụ Nghĩa Sảnh
+                  Nghị Sự Đường
                 </Link>
               </>
             )}

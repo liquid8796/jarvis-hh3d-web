@@ -185,4 +185,4 @@ Lượt đang chạy giữ cấu hình cũ. Lượt sau mới dùng bản mới.
 
 ---
 
-Có gì lạ thì nhắn trong **Tụ Nghĩa Sảnh** — kèm ảnh chụp nhật ký thì dễ xem giúp hơn.
+Có gì lạ thì nhắn trong **Nghị Sự Đường** — kèm ảnh chụp nhật ký thì dễ xem giúp hơn.

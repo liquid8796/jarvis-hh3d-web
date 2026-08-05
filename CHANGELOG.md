@@ -11,6 +11,39 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.25.1 — hàng đợi chuyển sang trực tiếp; Tụ Nghĩa Sảnh đổi tên thành Nghị Sự Đường
+
+- **Hàng đợi sống bằng SSE thay vì hỏi lại mỗi 5 giây.** Nhịp poll cũ có chạy — đo được màn
+  hình tự đổi sau đúng 5,0 giây, không cần F5 — nhưng năm giây là năm giây, và trang này tồn
+  tại để người ta đứng nhìn hàng chờ nhích. Kênh mới đo được **0,4 giây**.
+- **Route riêng `/api/queue/stream`, không dùng lại kênh của Linh Đài.** Kênh kia chỉ vẽ lại
+  khi tín hiệu mang đúng userId của người nghe; hàng đợi thì đàn của bất kỳ ai đổi cũng làm
+  thứ tự của mọi người đổi theo. Nới cái lọc ấy ra là biến một kênh riêng tư thành kênh chung
+  — một lỗi lọc sai ở đó sẽ rò dữ liệu người khác. Hai route tách bạch: kênh cũ giữ nguyên
+  luật riêng tư, kênh mới tự dựng payload **đã che tên** cho từng người nghe.
+- **Hai nguồn đánh thức, vì hàng đợi đổi theo hai cách.** NOTIFY của Postgres lo phần job
+  sinh ra / đổi trạng thái / đổi giờ chạy. Nhưng một đàn đang nghỉ tự vào hàng khi
+  `next_run_at` trôi qua — **không có thay đổi nào trong database để mà báo** — nên stream
+  còn hẹn sẵn một cái đồng hồ đúng mốc ấy. Thiếu nhánh này thì số thứ tự đứng im cho tới khi
+  tình cờ có ai đó làm việc khác. Kiểm chứng: một đàn hẹn hết cooldown sau 6 giây đã **tự**
+  nhảy vào hàng với số thứ tự 1, không ai đụng database và không F5.
+- Chủ đề `event` bị bỏ qua có chủ ý: mỗi dòng nhật ký của mọi linh sứ đều phát một tín hiệu,
+  mà nhật ký không hề xuất hiện trên trang này — nghe nó là tự bắt mình đọc lại database hàng
+  chục lần mỗi vòng chạy để rồi không vẽ gì khác.
+- **Huy hiệu「Trực tiếp」chỉ nói về kênh SSE**, không nói về việc dữ liệu có tới hay không.
+  Lưới an toàn (hỏi lại 30 giây khi kênh sống, 2 giây khi đứt) cố ý KHÔNG bật cờ ấy — kênh đã
+  đứt mà màn hình vẫn khoe "trực tiếp" là một lời nói dối nhỏ, đúng vào thứ người dùng dựa
+  vào để tin con số.
+- **Đổi tên「Tụ Nghĩa Sảnh」→「Nghị Sự Đường」** ở thanh điều hướng, tiêu đề trang, tiêu đề
+  phòng, mục cài đặt bên Tông Môn và trong hướng dẫn. Các entry CHANGELOG cũ giữ nguyên tên
+  cũ: chúng là lịch sử, sửa lại là làm sai bản ghi.
+- Câu giải thích luật hàng đợi rút gọn theo yêu cầu (bỏ vế nói về che tên — phần ấy đã tự
+  hiển nhiên trên bảng).
+- Kiểm chứng trên Chromium thật: 9 phép thử mới (câu chữ đúng từng chữ, câu cũ đã mất, thanh
+  điều hướng đổi tên, huy hiệu trực tiếp, chuyển trạng thái do đồng hồ, số thứ tự) + 14 phép
+  thử riêng tư hai-đạo-hữu chạy lại trên bản SSE + smoke **129/129**; TypeScript và production
+  build xanh.
+
 ## 0.25.0 — Hàng Đợi Công Việc: cả tông môn nhìn chung một hàng chờ
 
 - **Trang mới `/hang-doi`**, có lối vào ngay trên thanh trên cùng. Nó trả lời đúng một câu

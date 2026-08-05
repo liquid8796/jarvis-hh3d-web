@@ -7,12 +7,16 @@ import type { JobStatus } from "@/lib/realtime/dashboardTypes";
 /**
  * Bảng hàng đợi của cả tông môn.
  *
- * Hỏi lại mỗi 5 giây — đúng nhịp linh sứ hỏi việc, nên màn hình không bao giờ trễ hơn một
- * nhịp so với sự thật. Tab bị ẩn thì ngừng hỏi: một trang mở quên trong nền không có lý do
- * gì gõ cửa database cả ngày.
+ * Sống bằng SSE: Postgres đánh thức server ngay khi một đàn bất kỳ đổi trạng thái, và server
+ * đẩy ảnh chụp mới xuống. Nhịp hỏi-lại chỉ còn là LƯỚI AN TOÀN cho lúc EventSource rớt —
+ * 30 giây khi kênh sống (soát lại cho chắc), 2 giây khi nó đứt, y như Linh Đài.
+ *
+ * Tab bị ẩn thì ngừng hỏi lại: một trang mở quên trong nền không có lý do gì gõ cửa database
+ * cả ngày. Kênh SSE vẫn giữ nguyên — nó rẻ, và mở lại tốn hơn là để yên.
  */
 
-const POLL_MS = 5_000;
+const POLL_LIVE_MS = 30_000;
+const POLL_FALLBACK_MS = 2_000;
 
 const STATUS_TEXT: Record<JobStatus, string> = {
   queued: "Chờ tới lượt",
@@ -45,7 +49,12 @@ function describe(entry: QueueEntry): string {
 
 export function QueueBoard({ initial }: { initial: QueueSnapshot }) {
   const [snapshot, setSnapshot] = useState(initial);
-  const [live, setLive] = useState(true);
+  /**
+   * CHỈ nói về kênh SSE, không nói về việc dữ liệu có tới hay không. Nếu để lưới an toàn
+   * cũng bật cờ này thì lúc kênh trực tiếp đã đứt mà poll vẫn chạy, màn hình sẽ khoe "trực
+   * tiếp" — một lời nói dối nhỏ nhưng đúng vào thứ người dùng dựa vào để tin con số.
+   */
+  const [live, setLive] = useState(false);
   const inFlight = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -53,29 +62,38 @@ export function QueueBoard({ initial }: { initial: QueueSnapshot }) {
     inFlight.current = true;
     try {
       const response = await fetch("/api/queue", { cache: "no-store" });
-      if (response.ok) {
-        setSnapshot((await response.json()) as QueueSnapshot);
-        setLive(true);
-      } else {
-        setLive(false);
-      }
+      if (response.ok) setSnapshot((await response.json()) as QueueSnapshot);
     } catch {
-      // Mạng chớp tắt: giữ ảnh cũ và nói thật là đang mất nhịp; nhịp sau sẽ bù.
-      setLive(false);
+      // Mạng chớp tắt: giữ ảnh cũ, nhịp sau hoặc frame SSE kế tiếp sẽ bù vào.
     } finally {
       inFlight.current = false;
     }
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => void refresh(), POLL_MS);
+    const source = new EventSource("/api/queue/stream");
+    source.onopen = () => setLive(true);
+    source.onerror = () => setLive(false);
+    source.addEventListener("queue", (raw) => {
+      try {
+        setSnapshot(JSON.parse((raw as MessageEvent<string>).data) as QueueSnapshot);
+        setLive(true);
+      } catch {
+        // Một frame hỏng không được phép giết kênh; frame kế tiếp vẫn là ảnh chụp đầy đủ.
+      }
+    });
+    return () => source.close();
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => void refresh(), live ? POLL_LIVE_MS : POLL_FALLBACK_MS);
     const onVisible = () => void refresh();
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refresh]);
+  }, [refresh, live]);
 
   const { entries, running, waiting, sleeping } = snapshot;
 
@@ -92,16 +110,15 @@ export function QueueBoard({ initial }: { initial: QueueSnapshot }) {
           role="status"
           className={`text-[11px] ${live ? "text-[var(--color-jade-400)]" : "text-[var(--color-gold-300)]"}`}
         >
-          {live ? "● Đang theo dõi" : "↻ Mất nhịp — đang thử lại"}
+          {live ? "● Trực tiếp" : "↻ Đang nối lại…"}
         </span>
       </div>
 
       {/* Nói thẳng luật của hàng đợi, kẻo người dùng đếm số rồi tự suy ra sai. */}
       <p className="mb-4 text-xs leading-relaxed text-[var(--color-mist)]">
-        Số thứ tự là thứ tự linh sứ tông môn sẽ nhặt việc: đàn nào tới giờ trước thì đi trước.
-        Đàn đang nghỉ chưa xếp hàng — nó chỉ vào hàng khi hết cooldown. Ai đã cài linh sứ riêng
-        thì không phải chờ hàng chung, vì linh sứ ấy chỉ nhận việc của chủ nó. Tên đạo hữu khác
-        được che bớt; tài khoản game và cấu hình của họ không hiện ở đây.
+        Thứ tự linh sứ tông môn sẽ nhặt việc: đàn nào tới giờ trước thì đi trước. Đàn đang nghỉ
+        chưa xếp hàng — nó chỉ vào hàng khi hết cooldown. Ai đã cài linh sứ riêng thì không phải
+        chờ hàng chung, vì linh sứ ấy chỉ làm việc ở máy nhà.
       </p>
 
       {entries.length === 0 ? (

@@ -12,7 +12,7 @@ export function ChatSettingsForm({ retentionDays }: { retentionDays: number }) {
 
   return (
     <form action={action} className="card card-hairline max-w-xl p-6">
-      <h2 className="h-display mb-2 text-lg font-semibold text-gilded">Tụ Nghĩa Sảnh</h2>
+      <h2 className="h-display mb-2 text-lg font-semibold text-gilded">Nghị Sự Đường</h2>
       <p className="mb-5 text-sm text-[var(--color-mist)]">
         Sảnh đàm đạo là dòng chảy, không phải tàng thư — tin quá hạn sẽ tự tan để kho không
         phình theo năm tháng.

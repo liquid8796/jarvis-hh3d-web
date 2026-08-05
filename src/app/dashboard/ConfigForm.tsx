@@ -118,7 +118,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
   };
 
   return (
-    <section className="card card-hairline p-6">
+    <section className="card card-hairline p-6 xl:p-8">
       <h2 className="h-display mb-5 text-xl font-semibold text-gilded">Ngọc Giản Cấu Hình</h2>
 
       {/* AccountManager đứng NGOÀI <form>: React 19 reset mọi uncontrolled input trong form

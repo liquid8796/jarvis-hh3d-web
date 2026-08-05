@@ -196,7 +196,7 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
     // biến mất trên những mảng sáng của ảnh. Chỉnh màu chữ theo nền thì không làm nổi bằng
     // CSS (không có cách nào đọc được cái gì đang nằm dưới); cho thẻ một cái nền đủ đục mới
     // là câu trả lời đúng — và `.card` đã sẵn có nền 86–92% kèm blur.
-    <section className="card card-hairline rise-in min-w-0 p-5">
+    <section className="card card-hairline rise-in min-w-0 p-5 xl:p-7">
       <h2 className="h-display text-lg font-bold text-gilded">Linh Sứ</h2>
       <p className="mt-1 text-xs text-[var(--color-mist)]">
         Linh sứ là người chạy auto giúp bạn. Phải có ít nhất một linh sứ đang trực thì bấm

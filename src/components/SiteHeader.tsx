@@ -3,12 +3,23 @@ import { currentUser } from "@/lib/auth/guards";
 import { logoutAction } from "@/app/actions/auth";
 import { SectSeal } from "./SectSeal";
 
-/** Thanh trên cùng: ấn + tên môn phái bên trái, danh tính + lối đi bên phải. */
-export async function SiteHeader() {
+/**
+ * Thanh trên cùng: ấn + tên môn phái bên trái, danh tính + lối đi bên phải.
+ *
+ * `maxWidth` để trang tự nói bề rộng khung của mình. Mặc định giữ nguyên `max-w-5xl` nên
+ * mọi trang cũ không xê dịch một pixel; chỉ trang nào rộng hơn (Linh Đài) mới truyền vào,
+ * vì một thanh trên cùng hẹp hơn hàng thẻ bên dưới trông như bị lệch tâm.
+ *
+ * Nhận nguyên chuỗi lớp có sẵn trong mã nguồn, KHÔNG ghép chuỗi lúc chạy: Tailwind quét
+ * tĩnh, một lớp dựng bằng biến sẽ không bao giờ được sinh ra CSS.
+ */
+export async function SiteHeader({ maxWidth = "max-w-5xl" }: { maxWidth?: string } = {}) {
   const user = await currentUser();
 
   return (
-    <header className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-y-3 px-4 py-4 sm:px-6 sm:py-5">
+    <header
+      className={`mx-auto flex w-full ${maxWidth} flex-wrap items-center justify-between gap-y-3 px-4 py-4 sm:px-6 sm:py-5`}
+    >
       <Link href="/" className="flex items-center gap-3">
         <SectSeal size="2.6rem" />
         <span className="h-display text-lg font-semibold text-gilded">Auto HH3D</span>

@@ -12,6 +12,18 @@ import { LinhSuPanel } from "./LinhSuPanel";
 export const metadata = { title: "Linh Đài" };
 
 /**
+ * Bề rộng khung Linh Đài — thanh trên cùng và phần nội dung dùng CHUNG hằng số này, nếu
+ * không header sẽ thụt vào so với hàng thẻ (trước 05/08 header 1024px đứng trên nội dung
+ * 1152px, lệch 64px mỗi bên).
+ *
+ * 100rem = 1600px: trang này là bàn làm việc hai cột — danh sách tài khoản, hai tab nhiệm
+ * vụ với lưới tuỳ chọn hai cột, nhật ký chạy — nên 1152px cũ ép mỗi cột còn ~566px và mọi
+ * thứ bên trong phải chen nhau. Vẫn có trần, không thả tự do: một biểu mẫu kéo ngang hết
+ * màn 2560px thì mắt phải quét quá xa, và các dòng chữ dài ra là khó đọc hơn chứ không dễ.
+ */
+const SHELL_WIDTH = "max-w-[100rem]";
+
+/**
  * Linh Đài — trang làm việc của một đạo hữu đã được thu nhận: cấu hình đàn pháp bên trái,
  * lư khai đàn + nhật ký tu luyện bên phải. Server component đọc; mọi ghi đi qua actions.
  */
@@ -26,8 +38,10 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <SiteHeader />
-      <main className="mx-auto w-full max-w-6xl px-4 pb-24 sm:px-6">
+      <SiteHeader maxWidth={SHELL_WIDTH} />
+      {/* Lề ngang giữ đúng `px-4 sm:px-6` như thanh trên cùng — hai bên phải cùng một con
+          số, nếu không thì ấn môn phái sẽ lệch vài pixel so với mép thẻ bên dưới. */}
+      <main className={`mx-auto w-full ${SHELL_WIDTH} px-4 pb-24 sm:px-6`}>
         <div className="rise-in mb-8">
           <h1 className="h-display text-3xl font-bold text-gilded">Linh Đài</h1>
           {/* Ba bước, nói ngay ở dòng đầu. Người mới mở trang này cần biết mình phải làm gì,
@@ -45,9 +59,9 @@ export default async function DashboardPage() {
             `overflow-x-auto` trên chính cái <pre> không cứu được: nó chỉ có tác dụng khi
             mọi tổ tiên đều được phép co xuống dưới bề rộng nội dung. */}
         <DashboardLiveProvider initialAccounts={accounts}>
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] xl:gap-8">
             <ConfigForm config={config} />
-            <div className="flex min-w-0 flex-col gap-6">
+            <div className="flex min-w-0 flex-col gap-6 xl:gap-8">
               <ControlPanel initiallyRunning={activeJobs.length > 0} />
               <LinhSuPanel hasToken={tokenIssued} />
             </div>

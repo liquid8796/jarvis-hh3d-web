@@ -11,6 +11,24 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.23.1 — Linh Đài rộng ra 1600px, và thanh trên cùng thôi lệch tâm
+
+- **Khung Linh Đài lên 1600px** (từ 1152px). Đo trên màn 1920: mỗi cột từ 566/514px lên
+  796/724px, ô nhiệm vụ trong lưới hai cột từ ~245px lên 340px — mọi dòng gợi ý trước đây
+  gãy ba dòng giờ nằm gọn một-hai dòng. Vẫn có TRẦN chứ không thả tự do: một biểu mẫu kéo
+  ngang hết màn 2560px thì mắt phải quét quá xa, và dòng chữ dài ra là khó đọc hơn.
+- **Thanh trên cùng canh đúng mép thẻ.** Trước đây header rộng 1024px đứng trên nội dung
+  1152px, tức ấn môn phái thụt vào 64px so với hàng thẻ bên dưới — nay trang tự khai bề
+  rộng khung của mình cho header qua một prop, và cả hai dùng chung một hằng số nên không
+  thể lệch nhau nữa. Đo mép trái ấn so với mép trái thẻ: **0px** ở 1280/1600/1920.
+- **Thoáng hơn ở bên trong, không chỉ rộng hơn ở bên ngoài**: khoảng cách hai cột 24 → 32px,
+  ruột thẻ 24 → 32px, và khung nhật ký cao 320 → 416px (bên phải vốn kết thúc sớm hơn cột
+  trái rất nhiều, nên chỗ trống ấy trả về cho phần đáng đọc nhất).
+- Mọi thay đổi chỉ chạm màn **rộng hơn 1152px**; điện thoại và tablet không đổi một pixel.
+  Prop mới của header mặc định giữ nguyên `max-w-5xl` nên năm trang còn lại không xê dịch —
+  đã đo lại `/`, `/profile`, `/chat` (header vẫn đúng 1024px) và kiểm không tràn ngang ở
+  390/768/1024/1280/1920.
+
 ## 0.23.0 — tab Thường đủ bộ: Tế Lễ và Thí Luyện có flow thật, Mê Cung và Luyện Đan mở cho cả hai hạng
 
 - **Đồng bộ profile schema 45 từ PC** (desktop 1.41.0), sinh bằng lệnh export như mọi lần —

@@ -92,7 +92,7 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
   };
 
   return (
-    <section className="card card-hairline flex flex-col p-6">
+    <section className="card card-hairline flex flex-col p-6 xl:p-8">
       <div className="mb-4 flex items-start justify-between gap-4">
         <h2 className="h-display text-xl font-semibold text-gilded">Lư Khai Đàn</h2>
 
@@ -192,7 +192,7 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
           if (!el) return;
           pinnedToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
-        className="h-80 overflow-y-auto rounded-xl border border-[var(--color-ink-600)]/60 bg-[var(--color-ink-950)]/60 p-3"
+        className="h-80 overflow-y-auto rounded-xl border border-[var(--color-ink-600)]/60 bg-[var(--color-ink-950)]/60 p-3 xl:h-[26rem] xl:p-4"
       >
         {events.length === 0 ? (
           <p className="py-10 text-center text-sm text-[var(--color-mist)]">

@@ -11,6 +11,25 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.24.2 — mỗi khu nhiệm vụ có ô「Chọn tất cả」
+
+- **Hai khu nhiệm vụ một-công-tắc** (Nhiệm vụ ngày ở tab VIP, Nhiệm vụ tài khoản thường ở
+  tab Thường) có thêm một dòng đầu khu: ô「Chọn tất cả」bên trái, bộ đếm「N/M đang bật」bên
+  phải. Bật mười nhiệm vụ giờ là một cú bấm thay vì mười.
+- **Ô tổng chỉ đụng nhiệm vụ của CHÍNH khu nó.** Hai lưới dùng chung một state — bảy mục của
+  tab Thường là tập con của mười mục tab VIP — nên một ô tổng quét cả bảng sẽ lặng lẽ bật Bí
+  Cảnh và Phúc Lợi VIP cho người chỉ định bật đủ nhiệm vụ tài khoản thường. Đã ghim bằng
+  kiểm chứng: bấm ô tổng tab Thường xong, tab VIP còn đúng ba mục riêng của VIP.
+- **Ba trạng thái chứ không phải hai**: bật hết → tick, tắt hết → trống, bật một phần →
+  gạch ngang (`indeterminate`). Thiếu trạng thái thứ ba thì "đang bật 9/10" trông y hệt
+  "chưa bật gì".
+- Ô tổng **không mang `name`**, đúng luật đã đặt từ 0.20.0: nguồn FormData duy nhất vẫn là
+  các hidden input, nên không có đường nào để màn hình nói một đằng mà thứ được lưu một nẻo.
+- Kiểm chứng end-to-end trên Chromium thật với một đạo hữu tạm (xoá cascade sau khi xong):
+  14 phép thử đi hết đường bấm-chuột → hidden input → server action → JSONB, gồm cả vòng
+  "bấm khi đang dở thì bật hết, bấm khi đã đủ thì tắt hết" và phép đọc lại database xác nhận
+  lưu đúng ba mục đang hiện trên màn hình. TypeScript + production build + smoke 123/123 xanh.
+
 ## 0.24.1 — chạy song song có trần: tám trang cùng dựng làm các tab thua cuộc đua CPU
 
 - **Triệu chứng**: tài khoản thường「Donald Trump」rải lỗi `Selector không bao giờ xuất hiện`

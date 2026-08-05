@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { saveConfigAction, type ActionResult } from "@/app/actions/automation";
 import type { EditableConfig } from "@/lib/services/configs";
 import { AccountManager } from "./AccountManager";
@@ -142,37 +142,85 @@ function LuyenDanFieldset({
   );
 }
 
+/**
+ * Một lưới nhiệm vụ một-công-tắc, kèm ô「Chọn tất cả」ở đầu.
+ *
+ * Ô tổng chỉ đụng ĐÚNG những nhiệm vụ của lưới đang hiện. Điều đó quan trọng vì hai lưới
+ * dùng CHUNG một state: bảy mục của tab Thường là tập con của mười mục tab VIP, nên một ô
+ * tổng quét cả bảng sẽ lặng lẽ bật Bí Cảnh và Phúc Lợi VIP cho người chỉ định bật đủ nhiệm
+ * vụ của tài khoản thường.
+ *
+ * Ba trạng thái, không phải hai: bật hết → tick, tắt hết → trống, bật một phần →
+ * `indeterminate` (gạch ngang). React không có prop cho trạng thái ấy nên phải đặt thẳng
+ * lên DOM node; thiếu nó thì "bật 9/10" trông y hệt "chưa bật gì".
+ */
 function SimpleQuestGrid({
   quests,
   enabled,
   onToggle,
+  onToggleMany,
 }: {
   quests: ReadonlyArray<SimpleQuest>;
   enabled: Record<string, boolean>;
   onToggle: (key: string, value: boolean) => void;
+  onToggleMany: (keys: string[], value: boolean) => void;
 }) {
+  const selected = quests.filter((quest) => enabled[quest.key] === true).length;
+  const allOn = quests.length > 0 && selected === quests.length;
+  const someOn = selected > 0 && !allOn;
+  const master = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (master.current) master.current.indeterminate = someOn;
+  }, [someOn]);
+
   return (
-    <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-      {quests.map((quest) => (
-        <label
-          key={quest.key}
-          className="flex cursor-pointer items-start gap-2.5 text-sm text-[var(--color-parchment)]"
-        >
+    <>
+      <div className="mb-3 flex items-center justify-between gap-3 border-b border-[var(--color-ink-600)]/40 pb-2">
+        {/* Không có thuộc tính `name`: nguồn FormData duy nhất vẫn là các hidden input ở
+            ConfigForm. Ô này chỉ lái state, đúng như mọi checkbox nhiệm vụ khác. */}
+        <label className="flex cursor-pointer items-center gap-2.5 text-sm font-semibold text-[var(--color-parchment)]">
           <input
+            ref={master}
             type="checkbox"
-            checked={enabled[quest.key] === true}
-            onChange={(event) => onToggle(quest.key, event.target.checked)}
-            className="mt-0.5 h-4 w-4 accent-[var(--color-jade-400)]"
+            checked={allOn}
+            onChange={(event) =>
+              onToggleMany(
+                quests.map((quest) => quest.key),
+                event.target.checked,
+              )
+            }
+            className="h-4 w-4 accent-[var(--color-gold-400)]"
           />
-          <span>
-            {quest.name}
-            <span className="block text-xs leading-snug text-[var(--color-mist)]">
-              {quest.hint}
-            </span>
-          </span>
+          Chọn tất cả
         </label>
-      ))}
-    </div>
+        <span className="text-xs text-[var(--color-mist)]">
+          {selected}/{quests.length} đang bật
+        </span>
+      </div>
+
+      <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+        {quests.map((quest) => (
+          <label
+            key={quest.key}
+            className="flex cursor-pointer items-start gap-2.5 text-sm text-[var(--color-parchment)]"
+          >
+            <input
+              type="checkbox"
+              checked={enabled[quest.key] === true}
+              onChange={(event) => onToggle(quest.key, event.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-[var(--color-jade-400)]"
+            />
+            <span>
+              {quest.name}
+              <span className="block text-xs leading-snug text-[var(--color-mist)]">
+                {quest.hint}
+              </span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -206,9 +254,16 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
   const freeCount = accounts.filter((account) => account.accountTier === "free").length;
   const unknownCount = accounts.length - vipCount - freeCount;
 
-  const toggleSimpleQuest = (key: string, value: boolean) => {
-    setSimpleEnabled((current) => ({ ...current, [key]: value }));
+  // Một đường ghi duy nhất cho cả một ô lẫn cả lưới: ô「Chọn tất cả」bật mười công tắc
+  // trong MỘT lần cập nhật state, không phải mười lần gọi vòng quanh.
+  const toggleQuests = (keys: string[], value: boolean) => {
+    setSimpleEnabled((current) => {
+      const next = { ...current };
+      for (const key of keys) next[key] = value;
+      return next;
+    });
   };
+  const toggleSimpleQuest = (key: string, value: boolean) => toggleQuests([key], value);
 
   return (
     <section className="card card-hairline p-6 xl:p-8">
@@ -280,6 +335,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
             quests={FREE_QUESTS}
             enabled={simpleEnabled}
             onToggle={toggleSimpleQuest}
+            onToggleMany={toggleQuests}
           />
         </fieldset>
       </div>
@@ -421,6 +477,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
           quests={SIMPLE_QUESTS}
           enabled={simpleEnabled}
           onToggle={toggleSimpleQuest}
+          onToggleMany={toggleQuests}
         />
       </fieldset>
       </div>

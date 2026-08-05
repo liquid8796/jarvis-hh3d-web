@@ -942,6 +942,15 @@ async function main() {
       sacrificeAgain.outcome,
     );
 
+    // Nhật ký người dùng nói tiếng người (ảnh 05/08): lý do dừng hiện TRẦN, còn "stopIf",
+    // "repeat", "until" — ngôn ngữ của script — không được rơi vào kênh info/warning.
+    check(
+      "nhật ký kể lý do trần, không lộ từ ngữ của script",
+      infos.some((m) => m.includes("đã tế lễ hôm nay")) &&
+        !infos.some((m) => /stopIf|repeat|until/.test(m)),
+      infos.filter((m) => /stopIf|repeat|until/.test(m)).join(" / ") || "(sạch)",
+    );
+
     console.log("\nĐiều kiện trên trang sống");
     await session.navigate(baseUrl);
 

@@ -488,8 +488,10 @@ export function createQuestEngine(deps) {
         if (await checkCondition(session, step.condition)) {
           state.stopReason = step.text?.trim() ? step.text : `không có gì để làm (${describeCondition(step.condition)})`;
           // Info chứ không Debug: "đã đủ huyền tinh hôm nay" là câu trả lời người ta mở
-          // Hoạt động lên để tìm, không phải một chi tiết máy móc.
-          log.info(scope, `stopIf khớp — ${state.stopReason}`);
+          // Hoạt động lên để tìm, không phải một chi tiết máy móc. Và nói TRẦN câu trả lời:
+          // "stopIf khớp" là tên một loại bước trong script — ngôn ngữ của người viết flow,
+          // không phải của người đọc nhật ký (ảnh 05/08 là bằng chứng nó gây khó hiểu).
+          log.info(scope, state.stopReason);
         }
 
         return null;
@@ -579,7 +581,10 @@ export function createQuestEngine(deps) {
           }
         }
 
-        log.info(scope, `repeat kết thúc sau ${done} vòng — ${reason}.`);
+        // Debug chứ không Info: "repeat", "until", "trần số vòng" là ngôn ngữ của script.
+        // Câu chuyện người đọc cần đã nằm ở lời kể "!" của chính quest (Giữ lửa 1/3…) và
+        // dòng kết quả cuối lượt; chi tiết vòng lặp thuộc về console của máy đang chạy.
+        log.debug(scope, `repeat kết thúc sau ${done} vòng — ${reason}.`);
         return null;
       }
 

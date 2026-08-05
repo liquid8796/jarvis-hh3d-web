@@ -11,6 +11,22 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.25.2 — nhật ký tu luyện thôi nói tiếng của script
+
+- **「stopIf khớp — đã tế lễ hôm nay」giờ chỉ còn「đã tế lễ hôm nay」.** Lý do dừng vẫn hiện
+  ở mức info — đó là câu trả lời người ta mở nhật ký lên để tìm — nhưng nói TRẦN: "stopIf"
+  là tên một loại bước trong script, ngôn ngữ của người viết flow chứ không phải của người
+  đọc nhật ký (ảnh người dùng gửi 05/08 là bằng chứng nó gây khó hiểu).
+- **「repeat kết thúc sau 6 vòng — trần số vòng (6)」rút khỏi nhật ký người dùng**, xuống
+  kênh debug của máy đang chạy. Câu chuyện người đọc cần đã nằm ở lời kể của chính quest
+  (「Giữ lửa 1/3」…) và dòng kết quả cuối lượt (「Luyện Đan Đường: xong」); chi tiết vòng
+  lặp là chẩn đoán, không phải tường thuật.
+- Bản desktop sửa cùng cặp dòng trong cùng ngày (1.42.1) — hai sản phẩm là một tool, nhật
+  ký không được phép lệch giọng.
+- Ghim bằng smoke: kênh info sau một lượt chạy thật không được chứa "stopIf", "repeat" hay
+  "until", và lý do dừng phải hiện trần — **130/130**. Linh sứ cần cài đè để nhận (engine
+  nằm trong gói); linh sứ tông môn đã được cài trong đợt phát hành này.
+
 ## 0.25.1 — hàng đợi chuyển sang trực tiếp; Tụ Nghĩa Sảnh đổi tên thành Nghị Sự Đường
 
 - **Hàng đợi sống bằng SSE thay vì hỏi lại mỗi 5 giây.** Nhịp poll cũ có chạy — đo được màn

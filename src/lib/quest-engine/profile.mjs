@@ -176,5 +176,30 @@ export function profileForConfig(config, log) {
     for (const quest of quests) quest.enabled = enabled;
   }
 
+  // ---- Khi ngọc giản đi TRƯỚC engine ----------------------------------------------------
+  // Lớp dịch chỉ biết những khoá nó tự liệt kê ở trên; một khoá lạ trước nay rơi ra ngoài mà
+  // không ai hay. Đó chính là chuyện đêm 06/08: một đạo hữu bật Hỷ Sự Đường, ngọc giản lưu
+  // `hySuDuong: true`, snapshot của job mang nguyên giá trị ấy sang linh sứ — nhưng linh sứ
+  // đang chạy gói cũ, `SIMPLE_QUESTS` của nó chưa có dòng nào tên vậy, nên nhiệm vụ biến mất
+  // không để lại một dấu vết nào. Nhật ký chỉ liệt kê 7 nhiệm vụ và không hề nói vì sao thiếu
+  // cái thứ 8; phải lần ngược snapshot trong database mới tìm ra.
+  //
+  // Cái vắng mặt vốn không tự nói. Nên ở đây nó được gọi tên: câu này biến "flow mới không
+  // chạy" — một bí ẩn — thành "linh sứ cần cài đè", một việc làm được ngay.
+  const knownKeys = new Set([
+    ...SIMPLE_QUESTS.map(([key]) => key),
+    "meCung",
+    "luyenDan",
+    "luyenDanThuong",
+  ]);
+  for (const [key, value] of Object.entries(config.quests ?? {})) {
+    if (value?.enabled === true && !knownKeys.has(key)) {
+      log?.(
+        `Ngọc giản đang bật nhiệm vụ '${key}' mà bản engine của linh sứ này không biết — ` +
+          `linh sứ đang chạy gói cũ. Cài đè linh sứ để nhận nhiệm vụ mới.`,
+      );
+    }
+  }
+
   return profile;
 }

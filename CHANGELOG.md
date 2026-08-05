@@ -11,6 +11,39 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.29.0 — Hoang Vực phải chứng minh đòn đánh, và ngọc giản đi trước engine thì phải kêu lên
+
+Hai lỗi được báo cùng lúc, và hoá ra chỉ có một thứ chung: **sự im lặng**. Cả hai đều chạy
+hụt mà vẫn báo bình thường, nên không ai biết cho tới khi ngồi đếm số lượt.
+
+- **Hoang Vực báo「xong」cho những trận chưa từng đánh.** Nhật ký đêm 06/08:「Hoang Vực: xong」
+  cứ 7 phút một lần — đúng bằng `fallbackCooldownSeconds` 420 giây, tức KHÔNG lần nào đọc được
+  đồng hồ — trong khi「Lượt đánh còn lại」đứng nguyên ở 5 suốt đêm. Nguyên nhân: sau cú bấm Tấn
+  Công, **mọi bước còn lại đều `optional`** (bảng tổng kết, nút đóng, đường về) nên một cú bấm
+  bị trang nuốt cho ra kết quả y hệt một trận đánh thật.
+- **Giờ có một bước BẮT BUỘC ngay sau cú bấm: chờ nút KHIÊU CHIẾN biến mất.** Chọn nhân chứng
+  ấy vì nó trả lời cho CẢ HAI kết cục — đòn trúng thì vào cooldown ~7 phút, đòn cuối ngày thì
+  hết lượt, site đều ẩn nút; đó cũng chính là sự thật mà `stopIf` của quest này vẫn dựa vào từ
+  đầu. Đo trên trang thật: lúc cooldown nút mang `display:none`, nên phép kiểm `hidden` đọc
+  đúng kể cả khi màn đánh còn phủ lên trên. Áp cho cả hai hạng (bản thường dùng chung script).
+- **Ngọc giản bật một nhiệm vụ mà engine không biết → nay nói thẳng ra.** Đây là lỗi Hỷ Sự
+  Đường: đạo hữu bật nó, ngọc giản lưu `hySuDuong: true`, snapshot của job mang nguyên giá trị
+  ấy sang linh sứ — nhưng linh sứ đang chạy **gói cũ**, `SIMPLE_QUESTS` của nó chưa có khoá đó,
+  nên nhiệm vụ biến mất không để lại dấu vết. Nhật ký chỉ liệt kê 7 nhiệm vụ và không nói vì
+  sao thiếu cái thứ 8; phải lần ngược snapshot trong database mới tìm ra. Lớp dịch giờ đối
+  chiếu khoá đang bật với những khoá nó biết, và kêu lên:「linh sứ đang chạy gói cũ. Cài đè
+  linh sứ để nhận nhiệm vụ mới.」Một dòng ấy thay cho cả cuộc truy vết.
+- Hồ sơ lên **schema 47**, xuất từ bản desktop 1.44.0 cùng đợt.
+- Kiểm chứng: smoke **176/176** trên Chromium thật. Trong đó ca ăn tiền dựng lại ĐÚNG sự cố —
+  một trang boss mà nút Tấn Công nhận cú bấm rồi không làm gì: trước bản vá nó cho「xong」, giờ
+  nó `failed` và gọi đúng tên nhân chứng `#battle-button`; còn đòn đánh thật vẫn `completed` và
+  đọc được đồng hồ 7 phút 19 giây. Thêm một lượt chạy trên **site thật** xác nhận script đã sửa
+  vẫn đánh được: lượt 4 → 3, cooldown 437 giây. TypeScript và production build sạch.
+
+> **Phải cài đè linh sứ thì hai bản vá này mới có hiệu lực** — engine và hồ sơ nằm trong gói
+> linh sứ, deploy web chỉ phát hành gói mới chứ không đụng được vào tiến trình đang chạy ở máy
+> khác. Chính điều đó là lý do Hỷ Sự Đường không chạy từ đầu.
+
 ## 0.28.0 — Mê Cung trên ghế chung luôn dừng khi đã đủ huyền tinh
 
 - **「Dừng khi đã đủ huyền tinh trong ngày」của Mê Cung bị khoá BẬT với đạo hữu thường.**

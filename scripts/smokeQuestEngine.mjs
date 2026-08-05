@@ -151,6 +151,46 @@ const FREE_WHEEL_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
   if(spins===2)spinButton.textContent='Hết lượt'},40)
 }</script>`;
 
+/**
+ * Trang boss, dựng theo đúng những gì đo được trên trang thật ngày 06/08:
+ * `#countdown-timer` ẩn bằng display:none khi chưa đánh, `#battle-button` cũng ẩn bằng
+ * display:none ngay khi đòn được ghi nhận (nên phép kiểm `hidden` không bị lớp phủ đánh lừa).
+ *
+ * `broken` tái hiện CHÍNH sự cố: nút Tấn Công nhận cú bấm rồi không làm gì cả. Trước bản vá,
+ * ca đó cho ra「xong」y hệt một trận đánh thật.
+ */
+const bossPage = (broken) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+<div id="boss-info">
+  <div>Huyết Trư Địa Quỷ 61.55%</div>
+  <button class="battle-button" id="battle-button">KHIÊU CHIẾN</button>
+  <div class="increase-damage">Đạo hữu được tăng 15% sát thương</div>
+  <div>Lượt đánh còn lại: <span id="luot">5</span></div>
+</div>
+<div id="countdown-timer" style="display:none">Chờ 7 phút 19 giây để tấn công lần tiếp theo.</div>
+<div id="boss-damage-screen" style="display:none">
+  <button class="attack-button">⚔️Tấn Công</button><button class="back-button">Trở lại</button>
+</div>
+<div id="damage-summary-container" style="display:none"><button class="close-button">Đóng</button></div>
+<script>
+const $ = (s) => document.querySelector(s);
+$('#battle-button').onclick = () => setTimeout(() => { $('#boss-damage-screen').style.display = 'block'; }, 300);
+$('#boss-damage-screen .attack-button').onclick = () => {${
+  broken
+    ? "\n  /* đúng ca hỏng: site nuốt cú bấm, không gì đổi */"
+    : `
+  setTimeout(() => {
+    $('#battle-button').style.display = 'none';
+    $('#countdown-timer').style.display = 'block';
+    $('#luot').textContent = '4';
+    $('#damage-summary-container').style.display = 'block';
+    document.body.dataset.attacked = '1';
+  }, 200);`
+}
+};
+$('#damage-summary-container .close-button').onclick = () => { $('#damage-summary-container').style.display = 'none'; };
+$('#boss-damage-screen .back-button').onclick = () => { $('#boss-damage-screen').style.display = 'none'; };
+</script>`;
+
 // Trang Tiên Duyên + modal Hỷ Sự Đường theo recording 05/08: nút .hy-su-btn mở modal, danh
 // sách tiệc nạp ASYNC (~80ms — đủ chậm để bắt lỗi phán "hết phòng chưa chúc" trên một danh
 // sách chưa kịp về), mỗi hàng mang trạng thái chúc riêng và link "Vào Chúc Ngay" target=_blank
@@ -1024,10 +1064,78 @@ async function main() {
   );
   const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
   check(
-    "hồ sơ đang ở schema 46",
-    loadProfileForSchema().schemaVersion === 46,
+    "hồ sơ đang ở schema 47",
+    loadProfileForSchema().schemaVersion === 47,
     String(loadProfileForSchema().schemaVersion),
   );
+
+  console.log("\nHoang Vực phải CHỨNG MINH đòn đánh đã được ghi nhận");
+
+  // Sự cố 06/08: nhật ký báo「Hoang Vực: xong」suốt đêm, cứ 7 phút một lần — đúng bằng
+  // fallbackCooldownSeconds, tức không lần nào đọc được đồng hồ — trong khi「Lượt đánh còn
+  // lại」đứng nguyên ở 5. Nguyên nhân: sau cú bấm Tấn Công, MỌI bước đều `optional`, nên một
+  // cú bấm rơi vào hư không cho ra y hệt một trận đánh thật.
+  for (const bossId of ["hoang-vuc", "hoang-vuc-thuong"]) {
+    const boss = loadProfileForSchema().quests.find((q) => q.id === bossId);
+    const attackAt = boss.steps.findIndex(
+      (s) => s.action === "click" && s.selector === "#boss-damage-screen .attack-button",
+    );
+    const confirm = boss.steps[attackAt + 1];
+    check(
+      `${bossId}: ngay sau cú bấm Tấn Công là một bước xác nhận`,
+      attackAt >= 0 &&
+        confirm?.action === "waitForCondition" &&
+        confirm.condition?.kind === "hidden" &&
+        confirm.condition?.selector === "#battle-button",
+      JSON.stringify(confirm?.condition ?? confirm),
+    );
+    // Đây là cả sự khác biệt giữa bản đã sửa và bản gây ra sự cố. Một chữ `optional` ở đây là
+    // quay lại đúng cái im lặng cũ.
+    check(
+      `${bossId}: và bước ấy KHÔNG optional — trượt thì phải hỏng to`,
+      confirm?.optional !== true,
+      `optional=${confirm?.optional}`,
+    );
+  }
+
+  console.log("\nNgọc giản đi trước engine thì phải kêu lên");
+
+  // Nếu câu cảnh báo này có mặt từ đầu, cả cuộc truy vết Hỷ Sự Đường đêm 06/08 đã gói gọn
+  // trong một dòng nhật ký thay vì phải lần ngược snapshot trong database.
+  {
+    const notes = [];
+    profileForConfig(
+      { ...cfg, quests: { ...cfg.quests, nhiemVuTuongLai: { enabled: true } } },
+      (m) => notes.push(m),
+    );
+    check(
+      "bật một nhiệm vụ engine không biết → nói thẳng là linh sứ đang chạy gói cũ",
+      notes.some((n) => n.includes("nhiemVuTuongLai") && n.includes("gói cũ")),
+      notes.join(" / ") || "(im lặng)",
+    );
+
+    const quiet = [];
+    profileForConfig(
+      { ...cfg, quests: { ...cfg.quests, hySuDuong: { enabled: true } } },
+      (m) => quiet.push(m),
+    );
+    check(
+      "còn nhiệm vụ engine BIẾT thì không cảnh báo gì",
+      !quiet.some((n) => n.includes("gói cũ")),
+      quiet.join(" / ") || "(sạch)",
+    );
+    // Tắt cũng không được kêu: chỉ nhiệm vụ đang BẬT mà chạy hụt mới là chuyện đáng nói.
+    const offNotes = [];
+    profileForConfig(
+      { ...cfg, quests: { ...cfg.quests, nhiemVuTuongLai: { enabled: false } } },
+      (m) => offNotes.push(m),
+    );
+    check(
+      "khoá lạ nhưng đang TẮT thì im lặng",
+      !offNotes.some((n) => n.includes("nhiemVuTuongLai")),
+      offNotes.join(" / ") || "(sạch)",
+    );
+  }
 
   // --- kiểm trên trang thật ---------------------------------------------------------
   let teLeOffered = false;
@@ -1042,6 +1150,7 @@ async function main() {
   ];
   const hySuBlessed = new Map(); // id → lời chúc đã gửi, theo thứ tự vào phòng
   const hySuLixi = [];
+  let bossBroken = false;
 
   const server = createServer((req, res) => {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
@@ -1054,6 +1163,7 @@ async function main() {
     else if (path === "/thi-luyen-tong-mon-hh3d") res.end(FREE_TRIAL_PAGE);
     else if (path === "/danh-sach-thanh-vien-tong-mon") res.end(freeSacrificePage(teLeOffered));
     else if (path === "/te-le-offered") { teLeOffered = true; res.end("ok"); }
+    else if (path === "/hoang-vuc") res.end(bossPage(bossBroken));
     else if (path === "/tien-duyen") res.end(hySuHallPage(hySuRooms, hySuBlessed));
     else if (path === "/phong-cuoi" || path === "/hong-nhan") {
       const id = url.searchParams.get("id") ?? "";
@@ -1156,6 +1266,45 @@ async function main() {
       infos.some((m) => m.includes("đã tế lễ hôm nay")) &&
         !infos.some((m) => /stopIf|repeat|until/.test(m)),
       infos.filter((m) => /stopIf|repeat|until/.test(m)).join(" / ") || "(sạch)",
+    );
+
+    console.log("\nHoang Vực trên trang sống — hai kết cục của một cú bấm");
+
+    // Ca hỏng phải kêu to, và phải kêu NHANH: rút timeout của bước xác nhận xuống còn 3 giây
+    // trong bản sao dùng để thử. Giá trị thật (30s) đã được ghim ở phép kiểm cấu trúc phía
+    // trên — ở đây thứ đang thử là HÀNH VI, không phải con số.
+    const bossQuest = exportedProfile.quests.find((q) => q.id === "hoang-vuc");
+    const shortConfirm = structuredClone(bossQuest);
+    const confirmStep = shortConfirm.steps.find(
+      (s) => s.action === "waitForCondition" && s.condition?.selector === "#battle-button",
+    );
+    confirmStep.timeoutMs = 3000;
+
+    bossBroken = true;
+    const bossMiss = await run(shortConfirm);
+    check(
+      "cú bấm rơi vào hư không → HỎNG, không còn báo「xong」",
+      bossMiss.outcome === "failed",
+      `${bossMiss.outcome}: ${bossMiss.message}`,
+    );
+    check(
+      "và lời báo gọi đúng tên nhân chứng (#battle-button)",
+      String(bossMiss.message ?? "").includes("#battle-button"),
+      bossMiss.message,
+    );
+
+    bossBroken = false;
+    const bossHit = await run(bossQuest);
+    check("đòn đánh thật → hoàn tất", bossHit.outcome === "completed", `${bossHit.outcome}: ${bossHit.message}`);
+    check(
+      "và đọc được đồng hồ tới lượt kế (7 phút 19 giây)",
+      bossHit.cooldownSeconds === 439,
+      String(bossHit.cooldownSeconds),
+    );
+    check(
+      "site thật sự nhận đòn (lượt còn lại 5 → 4)",
+      (await page.getAttribute("body", "data-attacked")) === "1" &&
+        (await page.locator("#luot").innerText()) === "4",
     );
 
     console.log("\nHỷ Sự Đường từ recording 05/08");

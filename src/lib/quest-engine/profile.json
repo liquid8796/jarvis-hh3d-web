@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 46,
+  "schemaVersion": 47,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -99,6 +99,15 @@
           "action": "click",
           "selector": "#boss-damage-screen .attack-button",
           "timeoutMs": 15000
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 30000,
+          "note": "ch\u1EDD n\u00FAt KHI\u00CAU CHI\u1EBEN bi\u1EBFn m\u1EA5t = site \u0111\u00E3 ghi nh\u1EADn \u0111\u00F2n \u0111\u00E1nh (v\u00E0o cooldown, ho\u1EB7c h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay). C\u00F2n th\u1EA5y n\u00FAt ngh\u0129a l\u00E0 c\u00FA b\u1EA5m r\u01A1i v\u00E0o h\u01B0 kh\u00F4ng \u2014 ph\u1EA3i k\u00EAu to, v\u00EC nh\u1EADn v\u01A1 l\u00E0 xong cho m\u1ED9t tr\u1EADn ch\u01B0a t\u1EEBng \u0111\u00E1nh l\u00E0 c\u00E1ch m\u1EA5t c\u1EA3 ng\u00E0y l\u01B0\u1EE3t boss m\u00E0 kh\u00F4ng ai bi\u1EBFt",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#battle-button"
+          }
         },
         {
           "action": "waitForCondition",
@@ -923,6 +932,15 @@
           "action": "click",
           "selector": "#boss-damage-screen .attack-button",
           "timeoutMs": 15000
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 30000,
+          "note": "ch\u1EDD n\u00FAt KHI\u00CAU CHI\u1EBEN bi\u1EBFn m\u1EA5t = site \u0111\u00E3 ghi nh\u1EADn \u0111\u00F2n \u0111\u00E1nh (v\u00E0o cooldown, ho\u1EB7c h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay). C\u00F2n th\u1EA5y n\u00FAt ngh\u0129a l\u00E0 c\u00FA b\u1EA5m r\u01A1i v\u00E0o h\u01B0 kh\u00F4ng \u2014 ph\u1EA3i k\u00EAu to, v\u00EC nh\u1EADn v\u01A1 l\u00E0 xong cho m\u1ED9t tr\u1EADn ch\u01B0a t\u1EEBng \u0111\u00E1nh l\u00E0 c\u00E1ch m\u1EA5t c\u1EA3 ng\u00E0y l\u01B0\u1EE3t boss m\u00E0 kh\u00F4ng ai bi\u1EBFt",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#battle-button"
+          }
         },
         {
           "action": "waitForCondition",

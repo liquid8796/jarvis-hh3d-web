@@ -11,6 +11,34 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.25.0 — Hàng Đợi Công Việc: cả tông môn nhìn chung một hàng chờ
+
+- **Trang mới `/hang-doi`**, có lối vào ngay trên thanh trên cùng. Nó trả lời đúng một câu
+  hỏi mà Linh Đài không trả lời được: *đàn của tôi đứng thứ mấy, và vì sao chưa tới lượt?*
+  Trước đây mỗi người chỉ thấy đàn của chính mình, nên một lượt chờ lâu trông y hệt một lượt
+  hỏng.
+- **Số thứ tự là thứ tự THẬT.** Truy vấn sắp xếp đúng như câu `claimNextJob` của linh sứ
+  (`next_run_at`, rồi `created_at`), nên con số trên màn hình chính là thứ tự sẽ được nhặt
+  việc, không phải một cách sắp xếp riêng của giao diện. Ba trạng thái được tách bạch thay vì
+  gộp làm một: **đang chạy** (đã ra khỏi hàng), **chờ tới lượt** (đã tới giờ, đang xếp hàng),
+  **đang nghỉ** (chưa hết cooldown nên chưa vào hàng) — gộp lại là nói dối về độ dài hàng chờ.
+- **Tên đạo hữu khác được che 2/3**, giữ lại đầu tên đủ để chủ nhân tự nhận ra mình. Phép che
+  đếm theo code point (tên có dấu hoặc emoji cắt theo đơn vị UTF-16 sẽ ra ký tự lỗi) và luôn
+  che **ít nhất** hai phần ba — tên ngắn dưới ba ký tự bị che sạch, vì lộ một trong hai chữ
+  cái đã là quá nửa và lời hứa phải đúng với mọi cái tên.
+- **Ranh giới riêng tư được ghim bằng kiểm chứng, không bằng lời hứa.** Của người khác chỉ
+  hiện: tên đã che, trạng thái, thời điểm chạy kế, số vòng, và linh sứ thuộc hạng nào
+  (tông môn / riêng). KHÔNG BAO GIỜ: tên tài khoản game, cookie, cấu hình, id linh sứ riêng —
+  ba thứ đầu là bí mật, thứ tư là danh tính một cái máy cụ thể. Bài kiểm dựng hai đạo hữu tạm
+  rồi soát cả payload API lẫn HTML đã render, vì rò rỉ có thể nằm trong payload dù màn hình
+  không vẽ ra.
+- **Không dùng lại kênh SSE của Linh Đài**: kênh ấy lọc theo đúng một người, biến nó thành
+  kênh chung là mở đường cho một lỗi lọc sai làm rò dữ liệu người khác. Trang này có endpoint
+  đọc riêng, tự che tên ngay trong service, và hỏi lại mỗi 5 giây — ngừng hỏi khi tab bị ẩn.
+- Kiểm chứng: 14 phép thử end-to-end trên Chromium thật với hai đạo hữu tạm (xoá cascade sau
+  khi xong) + 6 assert cho phép che tên trong smoke (**129/129**); TypeScript + production
+  build xanh.
+
 ## 0.24.2 — mỗi khu nhiệm vụ có ô「Chọn tất cả」
 
 - **Hai khu nhiệm vụ một-công-tắc** (Nhiệm vụ ngày ở tab VIP, Nhiệm vụ tài khoản thường ở

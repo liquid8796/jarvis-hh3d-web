@@ -40,9 +40,14 @@ export async function SiteHeader({ maxWidth = "max-w-5xl" }: { maxWidth?: string
               Linh Đài
             </Link>
             {user.status === "active" && (
-              <Link href="/chat" className="btn btn-ghost">
-                Tụ Nghĩa Sảnh
-              </Link>
+              <>
+                <Link href="/hang-doi" className="btn btn-ghost">
+                  Hàng Đợi
+                </Link>
+                <Link href="/chat" className="btn btn-ghost">
+                  Tụ Nghĩa Sảnh
+                </Link>
+              </>
             )}
             <form action={logoutAction}>
               <button type="submit" className="btn btn-ghost" title={`Đang đăng nhập: ${user.displayName}`}>

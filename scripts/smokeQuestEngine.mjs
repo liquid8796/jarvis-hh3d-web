@@ -676,6 +676,42 @@ async function main() {
     check("danh sách rỗng không treo", (await mapWithLimit([], 3, async () => 1)).length === 0);
   }
 
+  console.log("\nChe tên trên Hàng Đợi Công Việc");
+
+  // Trang hàng đợi cố ý cho thấy job của người khác, nên phép che này là lằn ranh riêng tư
+  // duy nhất giữa hai đạo hữu — nó phải che ÍT NHẤT hai phần ba, với mọi độ dài tên, và
+  // không bao giờ trả về nguyên văn.
+  {
+    const { maskUsername } = await import("../src/lib/services/queue.ts");
+    const maskedShare = (name) => {
+      const masked = maskUsername(name);
+      const dots = [...masked].filter((c) => c === "•").length;
+      return dots / [...name].length;
+    };
+
+    check("tên thường: lộ đầu, che phần còn lại", maskUsername("thiennguyen") === "thi••••••••", maskUsername("thiennguyen"));
+    check(
+      "mọi độ dài đều bị che ít nhất 2/3",
+      ["ab", "tich", "admin", "tester", "hatruong", "trinhcongtin", "nhattieunaiha"].every(
+        (name) => maskedShare(name) >= 2 / 3 - 1e-9,
+      ),
+      ["ab", "tich", "admin"].map((n) => `${n}→${maskUsername(n)}`).join(" "),
+    );
+    check("tên một ký tự không lộ gì", maskUsername("x") === "•");
+    check("tên rỗng không nổ", maskUsername("") === "?" && maskUsername("   ") === "?");
+    check(
+      "không bao giờ trả về nguyên văn",
+      ["a", "ab", "abc", "người dùng", "hacxa777._-"].every((name) => maskUsername(name) !== name),
+    );
+    // Đếm theo code point: cắt theo đơn vị UTF-16 sẽ chặt đôi một ký tự và ra ký tự lỗi.
+    check(
+      "tên có dấu/emoji không bị chặt đôi ký tự",
+      !maskUsername("nguyễn🐉văn").includes("�") &&
+        [...maskUsername("nguyễn🐉văn")].length === [..."nguyễn🐉văn"].length,
+      maskUsername("nguyễn🐉văn"),
+    );
+  }
+
   console.log("\nHạng tài khoản");
 
   const { questsForAccount } = await import("../src/lib/quest-engine/engine.mjs");

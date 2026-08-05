@@ -98,10 +98,18 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
         kickIdleSec: Number(formData.get("meCungKickIdle") ?? 0) || 0,
         capCheck: formData.get("meCungCapCheck") === "on",
       },
+      // Hai bản Luyện Đan Đường — tab VIP và tab Thường là hai bộ field RIÊNG trên form
+      // (tiền tố luyenDan / luyenDanThuong). Trước đây chỉ có một bộ dùng chung, và khắc
+      // từ tab này là đè lựa chọn của tab kia.
       luyenDan: {
         enabled: formData.get("luyenDanEnabled") === "on",
         tier: String(formData.get("luyenDanTier") ?? "Hạ Phẩm"),
         keepStarsFrom: Number(formData.get("luyenDanKeepStars") ?? 0) || 0,
+      },
+      luyenDanThuong: {
+        enabled: formData.get("luyenDanThuongEnabled") === "on",
+        tier: String(formData.get("luyenDanThuongTier") ?? "Hạ Phẩm"),
+        keepStarsFrom: Number(formData.get("luyenDanThuongKeepStars") ?? 0) || 0,
       },
       diemDanh: simple("diemDanh"),
       hoangVuc: simple("hoangVuc"),

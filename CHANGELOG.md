@@ -11,6 +11,30 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.24.0 — Luyện Đan Đường: tab VIP và tab Thường thôi nhìn chung một bộ tuỳ chọn
+
+- **Lỗi được sửa**: từ 0.23.0, Luyện Đan Đường chạy được cho cả hai hạng nhưng chỉ mang MỘT
+  bộ tuỳ chọn đứng ngoài hai tab — khắc ngọc giản từ tab VIP là lặng lẽ đè loại đan, mức
+  phân giải và cả công tắc bật/tắt của tab Thường, và ngược lại. Ai muốn đội VIP luyện
+  Cực Phẩm còn đội thường chỉ luyện Hạ Phẩm là không có cách nào.
+- **Tách đôi cấu hình**: config mọc thêm `quests.luyenDanThuong` cạnh `quests.luyenDan`;
+  mỗi tab một fieldset với bộ field mang tên riêng (`luyenDan*` / `luyenDanThuong*`), và lớp
+  dịch áp mỗi bản cho đúng twin của hồ sơ theo `requiresVip`. Mê Cung vẫn là một bộ chung —
+  không ai kêu về nó, và hai bản Mê Cung chỉ khác nhau ở hạng là chuyện hồ sơ đã lo.
+- **Di trú không ai mất gì**: document cũ chưa có `luyenDanThuong` được GIEO bản thường từ
+  bản chung ngay lúc đọc — nếu để Zod tự điền default thì mọi tài khoản thường đang luyện
+  đan bỗng tắt ngầm sau deploy, không một dòng lỗi. Luật gieo đứng ở CẢ HAI cửa JSONB thô
+  gặp Zod: đường đọc của trang cấu hình, và op claim của /api/worker — nơi snapshot vừa
+  được claimNextJob/completeWorkerCycle chép thô từ user_configs bằng SQL, không hề đi qua
+  đường đọc kia (soát chéo lúc review mới lộ ra cửa thứ hai). Snapshot đóng băng trước
+  deploy còn thêm lưới dưới cùng trong lớp dịch: thiếu hẳn bản thường thì rơi về bộ chung
+  cũ, đúng hành vi lúc snapshot được khắc.
+- Smoke test thêm 8 ca ghim ranh giới mới: hai twin nhận đúng bộ của hạng mình, công tắc
+  không kéo nhau, snapshot cũ rơi về bộ chung, luật gieo khi đọc document cũ/mới, và chốt
+  giữ op claim phải gieo trước khi parse.
+- Linh sứ máy nhà chưa cài đè bundle mới vẫn chạy an toàn: engine cũ chỉ biết bộ chung nên
+  áp nó cho cả hai twin — đúng hành vi trước tách, tự hết khi cài đè.
+
 ## 0.23.1 — Linh Đài rộng ra 1600px, và thanh trên cùng thôi lệch tâm
 
 - **Khung Linh Đài lên 1600px** (từ 1152px). Đo trên màn 1920: mỗi cột từ 566/514px lên

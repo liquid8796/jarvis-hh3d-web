@@ -15,6 +15,32 @@ import { z } from "zod";
 /** Hình thù chung của một nhiệm vụ chỉ có công tắc bật/tắt. */
 const simpleQuest = z.object({ enabled: z.boolean().default(false) }).prefault({});
 
+/**
+ * Luyện Đan Đường — MỘT hình thù, HAI bản ghi (`luyenDan` cho hạng VIP, `luyenDanThuong`
+ * cho hạng thường). Trước 08/2026 chỉ có một bản dùng chung cho cả hai twin của hồ sơ, và
+ * đó chính là lỗi: khắc ngọc giản từ tab VIP là đè luôn lựa chọn của tab Thường và ngược
+ * lại — hai hạng muốn luyện hai loại đan khác nhau mà không thể. Tách đôi ở đây, và lớp
+ * dịch (quest-engine/profile.mjs) áp mỗi bản cho đúng twin theo `requiresVip`.
+ */
+const luyenDanQuest = z
+  .object({
+    enabled: z.boolean().default(false),
+    tier: z.enum(["Hạ Phẩm", "Trung Phẩm", "Thượng Phẩm", "Cực Phẩm"]).default("Hạ Phẩm"),
+    /**
+     * Giữ đan từ N sao TRỞ LÊN; phân giải phần còn lại.
+     *
+     *   0 = phân giải tất cả
+     *   1 = giữ tất cả (giữ từ 1 sao trở lên thì chẳng còn gì để phân giải)
+     *   2–5 = giữ từ N sao trở lên
+     *
+     * Đọc kỹ mốc 1 và 5. Đan chỉ rơi 1–4 sao, nên "giữ từ 5 sao" nghĩa là PHÂN GIẢI
+     * SẠCH — đúng ngược với "giữ tất cả". Hai giá trị này từng bị hoán chỗ giữa form
+     * và lớp dịch, và triệu chứng của nó là mất sạch đan mà không có lỗi nào.
+     */
+    keepStarsFrom: z.number().int().min(0).max(5).default(0),
+  })
+  .prefault({});
+
 export const configSchema = z.object({
   /**
    * Cookie đăng nhập của TÀI KHOẢN mà lượt chạy phục vụ.
@@ -78,24 +104,10 @@ export const configSchema = z.object({
       vongQuay: simpleQuest,
       vanDap: simpleQuest,
       khoangMach: simpleQuest,
-      luyenDan: z
-        .object({
-          enabled: z.boolean().default(false),
-          tier: z.enum(["Hạ Phẩm", "Trung Phẩm", "Thượng Phẩm", "Cực Phẩm"]).default("Hạ Phẩm"),
-          /**
-           * Giữ đan từ N sao TRỞ LÊN; phân giải phần còn lại.
-           *
-           *   0 = phân giải tất cả
-           *   1 = giữ tất cả (giữ từ 1 sao trở lên thì chẳng còn gì để phân giải)
-           *   2–5 = giữ từ N sao trở lên
-           *
-           * Đọc kỹ mốc 1 và 5. Đan chỉ rơi 1–4 sao, nên "giữ từ 5 sao" nghĩa là PHÂN GIẢI
-           * SẠCH — đúng ngược với "giữ tất cả". Hai giá trị này từng bị hoán chỗ giữa form
-           * và lớp dịch, và triệu chứng của nó là mất sạch đan mà không có lỗi nào.
-           */
-          keepStarsFrom: z.number().int().min(0).max(5).default(0),
-        })
-        .prefault({}),
+      /** Bản cho hạng VIP — twin `luyen-dan-duong` của hồ sơ. */
+      luyenDan: luyenDanQuest,
+      /** Bản cho hạng thường — twin `luyen-dan-duong-thuong`. Xem chú thích ở luyenDanQuest. */
+      luyenDanThuong: luyenDanQuest,
     })
     .prefault({}),
 });
@@ -125,6 +137,29 @@ export const storedConfigSchema = configSchema.extend({
  */
 export type EditableConfig = UserConfig;
 
+/**
+ * Di trú tại chỗ cho vụ tách Luyện Đan Đường (08/2026): document cũ chỉ có `luyenDan` dùng
+ * chung cho cả hai hạng. Nếu để Zod tự điền default cho `luyenDanThuong` thì mọi tài khoản
+ * thường đang luyện đan bỗng dưng TẮT sau deploy — lặng lẽ, không một dòng lỗi. Nên trước
+ * khi parse, gieo bản thường từ bản chung cũ: hành vi của người dùng cũ giữ nguyên cho tới
+ * khi chính họ khắc lại hai tab khác nhau (lúc đó cả hai key cùng có mặt và hàm này im lặng).
+ *
+ * Phải gọi ở MỌI nơi JSONB thô gặp Zod, hiện là hai: readStored dưới đây, và op claim của
+ * /api/worker — vì claimNextJob/completeWorkerCycle làm mới config_snapshot bằng cách chép
+ * THÔ user_configs.config trong SQL, không hề đi qua readStored. Thiếu chỗ thứ hai là đúng
+ * kịch bản tắt ngầm ở trên, chỉ khác cửa vào.
+ *
+ * Export để smoke test ghim được luật di trú mà không cần database.
+ */
+export function seedLuyenDanThuong(raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null) return raw;
+  const quests = (raw as { quests?: unknown }).quests;
+  if (typeof quests !== "object" || quests === null) return raw;
+  const { luyenDan, luyenDanThuong } = quests as Record<string, unknown>;
+  if (luyenDan === undefined || luyenDanThuong !== undefined) return raw;
+  return { ...raw, quests: { ...quests, luyenDanThuong: luyenDan } };
+}
+
 /** Đọc thô: parse JSONB về đúng hình thù hôm nay, cookie vẫn ở dạng phong bì. */
 async function readStored(userId: string): Promise<UserConfig> {
   const rows = await db()
@@ -135,7 +170,7 @@ async function readStored(userId: string): Promise<UserConfig> {
 
   // Parsing on the way OUT as well as in: a document written by an older deploy still
   // comes back in today's shape, defaults filled — the JSONB twin of a schema migration.
-  const parsed = storedConfigSchema.safeParse(rows[0]?.config ?? {});
+  const parsed = storedConfigSchema.safeParse(seedLuyenDanThuong(rows[0]?.config ?? {}));
   return parsed.success ? parsed.data : storedConfigSchema.parse({});
 }
 

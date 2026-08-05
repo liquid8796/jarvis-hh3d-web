@@ -513,6 +513,118 @@ async function main() {
     opt(keepNone, "decompose").selectedValue,
   );
 
+  console.log("\nLuyện Đan Đường tách theo hạng");
+
+  // Vụ 05/08: hai tab từng nhìn chung một bộ config, nên khắc ngọc giản từ tab VIP là đè
+  // loại đan/mức phân giải của tab Thường và ngược lại. Giờ `luyenDan` chỉ áp cho twin
+  // VIP, `luyenDanThuong` cho twin thường — bốn ca dưới ghim đúng ranh giới đó.
+  const splitCfg = {
+    ...cfg,
+    quests: {
+      ...cfg.quests,
+      luyenDan: { enabled: true, tier: "Cực Phẩm", keepStarsFrom: 4 },
+      luyenDanThuong: { enabled: true, tier: "Hạ Phẩm", keepStarsFrom: 1 },
+    },
+  };
+  const splitProfile = profileForConfig(splitCfg, () => {});
+  const ldVip = splitProfile.quests.find((q) => q.id === "luyen-dan-duong");
+  const ldFree = splitProfile.quests.find((q) => q.id === "luyen-dan-duong-thuong");
+  check(
+    "twin VIP nhận đúng bộ VIP (Cực Phẩm, giữ từ 4 sao)",
+    ldVip.enabled === true &&
+      opt(ldVip, "tier").selectedValue === "Cực Phẩm" &&
+      opt(ldVip, "decompose").selectedValue === "dược khí 4 sao",
+    `${opt(ldVip, "tier").selectedValue} / ${opt(ldVip, "decompose").selectedValue}`,
+  );
+  check(
+    "twin thường nhận bộ RIÊNG của nó (Hạ Phẩm, giữ tất cả) — không bị bản VIP đè",
+    ldFree.enabled === true &&
+      opt(ldFree, "tier").selectedValue === "Hạ Phẩm" &&
+      opt(ldFree, "decompose").selectedValue === "dược khí",
+    `${opt(ldFree, "tier").selectedValue} / ${opt(ldFree, "decompose").selectedValue}`,
+  );
+
+  // Công tắc cũng tách: bật một hạng không được kéo hạng kia sáng theo.
+  const vipOnly = profileForConfig(
+    { ...cfg, quests: { ...cfg.quests, luyenDanThuong: { enabled: false } } },
+    () => {},
+  );
+  check(
+    "tắt bản thường → twin thường tắt, twin VIP vẫn sáng",
+    vipOnly.quests.find((q) => q.id === "luyen-dan-duong").enabled === true &&
+      vipOnly.quests.find((q) => q.id === "luyen-dan-duong-thuong").enabled === false,
+  );
+  const freeOnly = profileForConfig(
+    {
+      ...cfg,
+      quests: {
+        ...cfg.quests,
+        luyenDan: { enabled: false },
+        luyenDanThuong: { enabled: true, tier: "Trung Phẩm", keepStarsFrom: 0 },
+      },
+    },
+    () => {},
+  );
+  const freeOnlyTwin = freeOnly.quests.find((q) => q.id === "luyen-dan-duong-thuong");
+  check(
+    "bật mỗi bản thường → chỉ twin thường sáng, đúng option của nó",
+    freeOnly.quests.find((q) => q.id === "luyen-dan-duong").enabled === false &&
+      freeOnlyTwin.enabled === true &&
+      opt(freeOnlyTwin, "tier").selectedValue === "Trung Phẩm",
+  );
+
+  // Snapshot đóng băng TRƯỚC deploy tách đôi không mang `luyenDanThuong` — twin thường
+  // phải rơi về bộ chung cũ (đúng hành vi lúc snapshot được khắc) chứ không tắt ngầm.
+  // `cfg` phía trên chính là một snapshot như vậy.
+  const ldFreeLegacy = profile.quests.find((q) => q.id === "luyen-dan-duong-thuong");
+  check(
+    "snapshot cũ thiếu luyenDanThuong → twin thường rơi về bộ chung (Cực Phẩm)",
+    ldFreeLegacy.enabled === true && opt(ldFreeLegacy, "tier").selectedValue === "Cực Phẩm",
+    opt(ldFreeLegacy, "tier").selectedValue,
+  );
+
+  // Di trú document JSONB cũ: đường đọc phải GIEO bản thường từ bản chung trước khi Zod
+  // điền default — nếu không, mọi tài khoản thường đang luyện đan bị tắt ngầm sau deploy.
+  const { seedLuyenDanThuong } = await import("../src/lib/services/configs.ts");
+  const seeded = storedConfigSchema.parse(
+    seedLuyenDanThuong({
+      quests: { luyenDan: { enabled: true, tier: "Thượng Phẩm", keepStarsFrom: 2 } },
+    }),
+  );
+  check(
+    "document cũ: luyenDanThuong được gieo nguyên bản từ luyenDan",
+    seeded.quests.luyenDanThuong.enabled === true &&
+      seeded.quests.luyenDanThuong.tier === "Thượng Phẩm" &&
+      seeded.quests.luyenDanThuong.keepStarsFrom === 2,
+  );
+  const untouched = storedConfigSchema.parse(
+    seedLuyenDanThuong({
+      quests: {
+        luyenDan: { enabled: true, tier: "Cực Phẩm" },
+        luyenDanThuong: { enabled: false },
+      },
+    }),
+  );
+  check(
+    "document đã tách: giữ nguyên hai bản, không gieo đè",
+    untouched.quests.luyenDanThuong.enabled === false &&
+      untouched.quests.luyenDan.enabled === true &&
+      untouched.quests.luyenDan.tier === "Cực Phẩm",
+  );
+
+  // Chốt giữ cho cửa thứ hai: op claim của /api/worker parse snapshot mà claimNextJob /
+  // completeWorkerCycle vừa chép THÔ từ user_configs bằng SQL — không qua readStored. Quên
+  // gieo ở đó là document cũ bị Zod điền default enabled=false cho bản thường, đúng kịch
+  // bản tắt ngầm mà luật di trú sinh ra để chặn.
+  const workerRouteSrc = readFileSync(
+    new URL("../src/app/api/worker/route.ts", import.meta.url),
+    "utf8",
+  );
+  check(
+    "op claim gieo luyenDanThuong trước khi parse snapshot",
+    workerRouteSrc.includes("storedConfigSchema.safeParse(seedLuyenDanThuong("),
+  );
+
   console.log("\nHạng tài khoản");
 
   const { questsForAccount } = await import("../src/lib/quest-engine/engine.mjs");
@@ -603,7 +715,8 @@ async function main() {
 
   check(
     "quest không được bật thì vẫn tắt",
-    // 4 = hai quest bật × cặp twin VIP/thường của mỗi quest (schema 45).
+    // 4 = hai quest bật × cặp twin VIP/thường của mỗi quest (schema 45). Twin thường của
+    // Luyện Đan sáng nhờ luật rơi-về của snapshot cũ — cfg này không mang luyenDanThuong.
     profile.quests.filter((q) => q.enabled).length === 4,
   );
 

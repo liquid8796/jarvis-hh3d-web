@@ -136,14 +136,21 @@ export function profileForConfig(config, log) {
   }
 
   // ---- Luyện Đan Đường ---------------------------------------------------------------
+  // KHÁC Mê Cung: từ 08/2026 mỗi twin có bộ cấu hình RIÊNG — `luyenDan` cho bản VIP,
+  // `luyenDanThuong` cho bản thường (`requiresVip: false`). Hồi còn dùng chung một bộ,
+  // khắc ngọc giản từ tab VIP là lặng lẽ đè lựa chọn của tab Thường và ngược lại.
+  // Snapshot đóng băng TRƯỚC deploy tách đôi chưa mang `luyenDanThuong` — twin thường rơi
+  // về bộ chung cũ, đúng hành vi mà snapshot ấy được khắc.
   const luyenDanTwins = findQuests(profile, "Luyện Đan Đường");
   if (luyenDanTwins.length === 0) {
     log?.("Hồ sơ không có nhiệm vụ「Luyện Đan Đường」.");
   }
   for (const luyenDan of luyenDanTwins) {
-    luyenDan.enabled = config.quests?.luyenDan?.enabled === true;
+    const ld = luyenDan.requiresVip === false
+      ? config.quests?.luyenDanThuong ?? config.quests?.luyenDan
+      : config.quests?.luyenDan;
+    luyenDan.enabled = ld?.enabled === true;
     if (luyenDan.enabled) {
-      const ld = config.quests.luyenDan;
       setOption(luyenDan, "tier", ld.tier, { log });
 
       const decompose = findOption(luyenDan, "decompose");

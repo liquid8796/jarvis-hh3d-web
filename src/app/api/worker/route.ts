@@ -6,6 +6,7 @@ import { recordWorkerSeen } from "@/lib/services/workers";
 import {
   configSchema,
   recordDetectedAccountTierForJob,
+  seedLuyenDanThuong,
   storedConfigSchema,
 } from "@/lib/services/configs";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
@@ -101,7 +102,12 @@ export async function POST(request: Request) {
       // ĐÂY là điểm duy nhất cookie rời khỏi phong bì. Nó xảy ra sau khi linh sứ đã chứng
       // minh danh tính (token tông môn hoặc linh phù của đúng chủ job), và đi tiếp trên
       // HTTPS tới một máy sắp dùng chính cookie đó để đăng nhập — không sớm hơn một dòng nào.
-      const snapshot = storedConfigSchema.safeParse(job.configSnapshot);
+      //
+      // seedLuyenDanThuong TRƯỚC parse, bắt buộc: snapshot này không đi qua readStored —
+      // claimNextJob và completeWorkerCycle chép THÔ user_configs.config bằng SQL. Document
+      // cũ chưa tách Luyện Đan mà parse trần thì Zod điền default enabled=false cho bản
+      // thường — mọi tài khoản thường đang luyện đan tắt ngầm ngay sau deploy.
+      const snapshot = storedConfigSchema.safeParse(seedLuyenDanThuong(job.configSnapshot));
       const storedConfig = snapshot.success ? snapshot.data : storedConfigSchema.parse({});
       const cookie =
         storedConfig.gameCookie.length > 0 && isEncrypted(storedConfig.gameCookie)

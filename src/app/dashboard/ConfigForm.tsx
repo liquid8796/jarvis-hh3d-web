@@ -8,13 +8,14 @@ import { useDashboardAccountLive } from "./DashboardLiveProvider";
 
 /**
  * Ngọc giản cấu hình. Uncontrolled inputs với defaultValue từ server — form chỉ là tấm
- * gương của JSONB, nộp lên là zod ở server quyết định đúng sai. Hai mảnh state duy nhất là
- * hai công tắc nhiệm vụ, và chúng chỉ để LÀM MỜ phần tuỳ chọn bên dưới: giá trị vẫn được
- * gửi đi đầy đủ, nên tắt rồi bật lại không mất những gì đã chọn.
+ * gương của JSONB, nộp lên là zod ở server quyết định đúng sai. Mấy mảnh state công tắc
+ * nhiệm vụ (Mê Cung + hai bản Luyện Đan) chỉ để LÀM MỜ phần tuỳ chọn bên dưới: giá trị
+ * vẫn được gửi đi đầy đủ, nên tắt rồi bật lại không mất những gì đã chọn.
  *
  * Cấu hình nhiệm vụ là MỘT bộ chung cho mọi tài khoản (y như bản desktop dùng một
  * quests.json toàn cục): tab VIP áp cho các tài khoản hạng VIP, tab Thường cho các tài
  * khoản hạng thường — mỗi tài khoản chỉ chạy đúng những nhiệm vụ thuộc hạng của nó.
+ * Riêng Luyện Đan Đường mang HAI bản tuỳ chọn, mỗi tab một bản (xem LuyenDanFieldset).
  */
 /**
  * Mười nhiệm vụ chỉ có công tắc — key khớp với configSchema và SIMPLE_QUESTS của engine.
@@ -49,6 +50,97 @@ const FREE_QUEST_KEYS = new Set([
   "vanDap",
 ]);
 const FREE_QUESTS = SIMPLE_QUESTS.filter((quest) => FREE_QUEST_KEYS.has(quest.key));
+
+/**
+ * Luyện Đan Đường có HAI bản cấu hình — tab VIP khắc `luyenDan`, tab Thường khắc
+ * `luyenDanThuong`. Bài học 05/08: hồi hai tab còn nhìn chung một bộ, khắc ngọc giản từ
+ * tab này là lặng lẽ đè loại đan/mức phân giải của tab kia. Cùng một khuôn fieldset,
+ * chỉ khác tiền tố tên field và bản config đằng sau — tiền tố khớp thẳng với key trong
+ * configSchema nên saveConfigAction đọc không cần bảng dịch.
+ */
+function LuyenDanFieldset({
+  prefix,
+  note,
+  accentClass,
+  config,
+  enabled,
+  onToggle,
+}: {
+  prefix: "luyenDan" | "luyenDanThuong";
+  note: string;
+  accentClass: string;
+  config: EditableConfig["quests"]["luyenDan"];
+  enabled: boolean;
+  onToggle: (value: boolean) => void;
+}) {
+  return (
+    <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
+      <legend className="px-2">
+        <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
+          <input
+            type="checkbox"
+            name={`${prefix}Enabled`}
+            defaultChecked={config.enabled}
+            onChange={(e) => onToggle(e.target.checked)}
+            className={`h-4 w-4 ${accentClass}`}
+          />
+          Luyện Đan Đường
+        </label>
+      </legend>
+
+      <p className="mb-3 text-xs text-[var(--color-mist)]">{note}</p>
+
+      <div
+        className={`grid gap-4 transition-opacity duration-300 sm:grid-cols-2 ${
+          enabled ? "opacity-100" : "pointer-events-none opacity-40"
+        }`}
+      >
+        <div>
+          <label className="label" htmlFor={`${prefix}Tier`}>
+            Loại đan
+          </label>
+          <select
+            id={`${prefix}Tier`}
+            name={`${prefix}Tier`}
+            className="input"
+            defaultValue={config.tier}
+          >
+            <option>Hạ Phẩm</option>
+            <option>Trung Phẩm</option>
+            <option>Thượng Phẩm</option>
+            <option>Cực Phẩm</option>
+          </select>
+          <p className="mt-1 text-xs text-[var(--color-mist)]">
+            Mỗi mẻ tốn dược liệu + 20 Tiên Ngọc.
+          </p>
+        </div>
+
+        <div>
+          <label className="label" htmlFor={`${prefix}KeepStars`}>
+            Phân giải đan
+          </label>
+          <select
+            id={`${prefix}KeepStars`}
+            name={`${prefix}KeepStars`}
+            className="input"
+            defaultValue={config.keepStarsFrom}
+          >
+            <option value={0}>Phân giải tất cả</option>
+            <option value={4}>Giữ 4 sao, phân giải 3 sao trở xuống</option>
+            <option value={3}>Giữ từ 3 sao, phân giải 2 sao trở xuống</option>
+            <option value={2}>Giữ từ 2 sao, chỉ phân giải 1 sao</option>
+            {/* 1, không phải 5. Con số là "giữ từ N sao", mà đan chỉ rơi 1–4 sao —
+                nên "giữ từ 1" là giữ sạch, còn "giữ từ 5" sẽ phân giải sạch. Đúng ngược. */}
+            <option value={1}>Không phân giải (giữ tất cả)</option>
+          </select>
+          <p className="mt-1 text-xs text-[var(--color-mist)]">
+            Đan rơi từ 1–4 sao. Chỉ viên bị phân giải mới hoàn lại dược liệu.
+          </p>
+        </div>
+      </div>
+    </fieldset>
+  );
+}
 
 function SimpleQuestGrid({
   quests,
@@ -92,6 +184,7 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
   );
   const [meCung, setMeCung] = useState(config.quests.meCung.enabled);
   const [luyenDan, setLuyenDan] = useState(config.quests.luyenDan.enabled);
+  const [luyenDanThuong, setLuyenDanThuong] = useState(config.quests.luyenDanThuong.enabled);
   const [simpleEnabled, setSimpleEnabled] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(
       SIMPLE_QUESTS.map((quest) => [
@@ -180,8 +273,8 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
           </legend>
           <p className="mb-3 text-xs text-[var(--color-mist)]">
             Bảy nhiệm vụ chạy trên trang riêng của từng mục — hub tài khoản thường không có
-            nút bấm nhanh, nên auto đi thẳng vào trang. Mê Cung và Luyện Đan Đường nằm ở khối
-            dưới cùng: chúng chạy được cho cả hai hạng.
+            nút bấm nhanh, nên auto đi thẳng vào trang. Khối dưới cùng: Mê Cung dùng chung
+            tuỳ chọn cho cả hai hạng, còn Luyện Đan Đường có bản riêng cho hạng thường.
           </p>
           <SimpleQuestGrid
             quests={FREE_QUESTS}
@@ -191,12 +284,14 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
         </fieldset>
       </div>
 
-      {/* -------- Hai hoạt động dài: hiện ở MỌI tab, không nằm trong div ẩn nào --------
-          Từ schema 45 chúng có twin thường (me-cung-thuong, luyen-dan-duong-thuong) dùng
-          chung script và chung option — một bộ input duy nhất phục vụ cả hai hạng. Nhét
-          vào cả hai tab là nhân đôi input cùng name, đúng cái bẫy comment đầu file cấm. */}
+      {/* -------- Mê Cung: hiện ở MỌI tab, không nằm trong div ẩn nào --------
+          Từ schema 45 nó có twin thường (me-cung-thuong) dùng chung script và chung
+          option — một bộ input duy nhất phục vụ cả hai hạng. Nhét vào cả hai tab là
+          nhân đôi input cùng name, đúng cái bẫy comment đầu file cấm. Luyện Đan Đường
+          thì NGƯỢC LẠI: hai bản config riêng, mỗi tab một fieldset với tên field riêng
+          (xem LuyenDanFieldset) — nên nó nằm TRONG div của từng tab, ngay bên dưới. */}
       <p className="mb-2 text-xs text-[var(--color-mist)]">
-        Hai hoạt động dài dưới đây chạy được cho cả hai hạng tài khoản.
+        Mê Cung chạy được cho cả hai hạng tài khoản — một bộ tuỳ chọn chung.
       </p>
       {/* ---------------------------------------------------------------- Mê Cung */}
       <fieldset className="mb-5 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
@@ -288,70 +383,30 @@ export function ConfigForm({ config }: { config: EditableConfig }) {
         </div>
       </fieldset>
 
-      {/* ----------------------------------------------------------- Luyện Đan Đường */}
-      <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
-        <legend className="px-2">
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
-            <input
-              type="checkbox"
-              name="luyenDanEnabled"
-              defaultChecked={config.quests.luyenDan.enabled}
-              onChange={(e) => setLuyenDan(e.target.checked)}
-              className="h-4 w-4 accent-[var(--color-gold-400)]"
-            />
-            Luyện Đan Đường
-          </label>
-        </legend>
-
-        <div
-          className={`grid gap-4 transition-opacity duration-300 sm:grid-cols-2 ${
-            luyenDan ? "opacity-100" : "pointer-events-none opacity-40"
-          }`}
-        >
-          <div>
-            <label className="label" htmlFor="luyenDanTier">
-              Loại đan
-            </label>
-            <select
-              id="luyenDanTier"
-              name="luyenDanTier"
-              className="input"
-              defaultValue={config.quests.luyenDan.tier}
-            >
-              <option>Hạ Phẩm</option>
-              <option>Trung Phẩm</option>
-              <option>Thượng Phẩm</option>
-              <option>Cực Phẩm</option>
-            </select>
-            <p className="mt-1 text-xs text-[var(--color-mist)]">
-              Mỗi mẻ tốn dược liệu + 20 Tiên Ngọc.
-            </p>
-          </div>
-
-          <div>
-            <label className="label" htmlFor="luyenDanKeepStars">
-              Phân giải đan
-            </label>
-            <select
-              id="luyenDanKeepStars"
-              name="luyenDanKeepStars"
-              className="input"
-              defaultValue={config.quests.luyenDan.keepStarsFrom}
-            >
-              <option value={0}>Phân giải tất cả</option>
-              <option value={4}>Giữ 4 sao, phân giải 3 sao trở xuống</option>
-              <option value={3}>Giữ từ 3 sao, phân giải 2 sao trở xuống</option>
-              <option value={2}>Giữ từ 2 sao, chỉ phân giải 1 sao</option>
-              {/* 1, không phải 5. Con số là "giữ từ N sao trở lên", mà đan chỉ rơi 1–4 sao —
-                  nên "giữ từ 1" là giữ sạch, còn "giữ từ 5" sẽ phân giải sạch. Đúng ngược. */}
-              <option value={1}>Không phân giải (giữ tất cả)</option>
-            </select>
-            <p className="mt-1 text-xs text-[var(--color-mist)]">
-              Đan rơi từ 1–4 sao. Chỉ viên bị phân giải mới hoàn lại dược liệu.
-            </p>
-          </div>
-        </div>
-      </fieldset>
+      {/* ----------------------------------------------------------- Luyện Đan Đường
+          Hai bản trong hai div tab — KHÔNG phải một bản dùng chung như trước. Cả hai vẫn
+          luôn nằm trong DOM (div chỉ `hidden`) nên cả hai bộ field cùng được nộp lên,
+          mỗi bộ một tiền tố tên riêng — không có input nào trùng name. */}
+      <div hidden={questTab !== "vip"}>
+        <LuyenDanFieldset
+          prefix="luyenDan"
+          note="Bản riêng cho tài khoản VIP — chỉnh ở đây không đụng tab Thường."
+          accentClass="accent-[var(--color-gold-400)]"
+          config={config.quests.luyenDan}
+          enabled={luyenDan}
+          onToggle={setLuyenDan}
+        />
+      </div>
+      <div hidden={questTab !== "free"}>
+        <LuyenDanFieldset
+          prefix="luyenDanThuong"
+          note="Bản riêng cho tài khoản thường — chỉnh ở đây không đụng tab VIP."
+          accentClass="accent-[var(--color-jade-400)]"
+          config={config.quests.luyenDanThuong}
+          enabled={luyenDanThuong}
+          onToggle={setLuyenDanThuong}
+        />
+      </div>
 
       {/* ------------------------------------------------------ Nhiệm vụ ngày còn lại */}
       <div hidden={questTab !== "vip"}>

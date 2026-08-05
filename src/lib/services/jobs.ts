@@ -5,6 +5,7 @@ import { getEditableConfig, getStoredConfigForSnapshot, storedConfigSchema } fro
 import { anyWorkerOnlineFor } from "./workers";
 import type { WorkerScope } from "@/lib/auth/worker";
 import type { JobEventRow, JobRow } from "@/lib/db/schema";
+import type { CycleProgress } from "@/lib/realtime/dashboardTypes";
 import { notifyDashboard } from "@/lib/realtime/dashboardChannel";
 
 /**
@@ -328,6 +329,10 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
         automation_jobs.config_snapshot
       ),
       started_at = coalesce(started_at, now()),
+      -- Vòng mới bắt đầu từ tờ giấy trắng. Không dọn ở đây thì tiến độ của vòng TRƯỚC
+      -- (thường là "8/8, đang chạy nhiệm vụ cuối") còn nguyên trên hàng đợi suốt quãng linh
+      -- sứ mở trình duyệt và qua cổng Cloudflare — vài chục giây kể một câu chuyện đã cũ.
+      cycle_progress = null,
       last_heartbeat = now()
     from candidate
     where automation_jobs.id = candidate.id
@@ -395,13 +400,24 @@ export async function jobBelongsTo(jobId: string, scope: WorkerScope): Promise<b
  *
  * Lấy workerId từ CHÍNH DÒNG JOB chứ không bắt worker khai thêm: nhờ vậy những linh sứ đã
  * cài từ trước không phải cập nhật gì mà vẫn được điểm danh đúng.
+ *
+ * `progress` cưỡi luôn nhịp tim này thay vì có op riêng: nó đổi đúng vào những lúc nhịp tim
+ * vẫn đang chạy, nên một op mới chỉ là thêm một request mỗi lần đổi mà không sớm hơn được
+ * giây nào. VẮNG MẶT KHÁC HẲN RỖNG — linh sứ đời cũ không biết trường này, và với nó cột
+ * phải được GIỮ NGUYÊN chứ không bị xoá trắng mỗi 5 giây; nên chỉ nhắc tới cột khi thật sự
+ * có tiến độ để ghi.
  */
 export async function heartbeat(
   jobId: string,
+  progress?: CycleProgress,
 ): Promise<{ status: JobRow["status"]; workerId: string | null } | null> {
   const rows = await db()
     .update(schema.automationJobs)
-    .set({ lastHeartbeat: new Date() })
+    .set(
+      progress === undefined
+        ? { lastHeartbeat: new Date() }
+        : { lastHeartbeat: new Date(), cycleProgress: progress },
+    )
     .where(eq(schema.automationJobs.id, jobId))
     .returning({
       status: schema.automationJobs.status,
@@ -420,7 +436,10 @@ export async function completeJob(
   // sẽ giết nhầm nó (và hai reaper đồng thời ghi event trùng).
   const rows = await db()
     .update(schema.automationJobs)
-    .set({ status: outcome, finishedAt: new Date() })
+    // cycleProgress về null cùng lúc: một job bị reaper kết liễu là một job không còn ai
+    // chạy nhiệm vụ nào cho nó, và tiến độ cuối cùng nó kịp khai giờ chỉ là một lời nói dối
+    // đông lạnh nằm chờ người đọc kế tiếp.
+    .set({ status: outcome, finishedAt: new Date(), cycleProgress: null })
     .where(
       and(
         eq(schema.automationJobs.id, jobId),
@@ -531,6 +550,9 @@ export async function completeWorkerCycle(
           config_snapshot
         )
       end,
+      -- Vòng đã xong thì không còn nhiệm vụ nào "đang chạy". Job quay về hàng chờ mà còn đeo
+      -- tiến độ cũ sẽ hiện trên Hàng Đợi là "đang nghỉ — Mê Cung" suốt cả cooldown.
+      cycle_progress = null,
       last_heartbeat = now()
     where id = ${jobId}
       and status in ('running', 'stopping')

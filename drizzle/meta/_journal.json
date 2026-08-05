@@ -71,6 +71,13 @@
       "when": 1785865138982,
       "tag": "0009_many_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785948943086,
+      "tag": "0010_queue_progress",
+      "breakpoints": true
     }
   ]
 }

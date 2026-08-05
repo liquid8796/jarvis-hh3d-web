@@ -237,6 +237,11 @@ async function ensureReady(session, baseUrl, say, log, { context, cookieJar }) {
  * @param {(message: string, level?: string) => Promise<void>|void} deps.say
  * @param {(tier: "vip"|"free") => Promise<void>|void} [deps.reportAccountTier]
  * @param {() => boolean} deps.shouldStop  ĐỒNG BỘ — được gọi trong vòng lặp chặt
+ * @param {(progress: {running: string[], done: number, total: number}) => void} [deps.reportProgress]
+ *   Vòng này đang chạy nhiệm vụ nào — Hàng Đợi Công Việc hiển thị nó. ĐỒNG BỘ, cùng lý do
+ *   với `shouldStop`: nó được gọi ở mỗi lần một nhiệm vụ vào/ra tay, tức trong đường chạy
+ *   nóng, và không có gì ở đây đáng để chờ một request. Người gọi chỉ việc gán vào một biến;
+ *   nhịp tim sẵn có sẽ mang nó đi.
  * @param {string} [deps.baseUrl]
  * @param {number} [deps.budgetMs]       hết ngân sách thì dừng TỬ TẾ giữa hai nhiệm vụ
  * @param {string} [deps.profileDir]     hồ sơ Chromium BỀN trên đĩa — xem ghi chú bên dưới
@@ -247,6 +252,7 @@ export async function runCycle(deps) {
     config,
     say,
     reportAccountTier = async () => {},
+    reportProgress = () => {},
     shouldStop = () => false,
     baseUrl = process.env.GAME_BASE_URL || DEFAULT_GAME_BASE_URL,
     budgetMs = 0,
@@ -401,6 +407,28 @@ export async function runCycle(deps) {
 
     await say(`Sẽ hành sự: ${quests.map((q) => q.name).join(" · ")}.`);
 
+    // Tiến độ vòng này, cho Hàng Đợi Công Việc. `runningNow` là SỐ NHIỀU vì nhánh song song
+    // có thể cầm tới ba nhiệm vụ cùng lúc — báo cáo một cái là nói dối về hai cái kia.
+    //
+    // `finished` đếm nhiệm vụ đã RỜI TAY, thuận hay trắc trở đều tính: câu hỏi trên màn hình
+    // là "còn bao nhiêu nữa", không phải "bao nhiêu cái thành công" (dòng kết quả cuối vòng
+    // mới là chỗ trả lời câu đó). Nó phải là biến riêng chứ không tái dùng `done`/`failed`:
+    // hai biến ấy chỉ được cộng SAU khi cả nhóm song song đã xong, nên chúng đứng im suốt
+    // quãng người dùng thật sự cần nhìn.
+    // Khoá theo ID chứ không theo TÊN, dù thứ hiện ra màn hình là tên: tên nhiệm vụ không
+    // hứa hẹn là duy nhất — cặp twin VIP/thường trong hồ sơ CỐ Ý trùng tên nhau. Hôm nay
+    // `questsForAccount` lọc theo hạng nên mỗi vòng chỉ còn một bản, nhưng một Set khoá theo
+    // tên đặt cược cả tính đúng đắn vào phép lọc ấy: ngày nào hai nhiệm vụ cùng tên cùng
+    // hạng gặp nhau, cái xong trước sẽ xoá tên của cái đang chạy. ID là khoá chính của hồ sơ.
+    const runningNow = new Map();
+    let finished = 0;
+    const publishProgress = () =>
+      reportProgress({ running: [...runningNow.values()], done: finished, total: quests.length });
+
+    // Phát ngay một lần: từ đây tới lúc nhiệm vụ đầu tiên vào tay còn cả quãng mở tab và
+    // dựng trang, và trong quãng đó hàng đợi nên nói "0/8" thay vì không nói gì.
+    publishProgress();
+
     const quiz = createReferenceQuiz({
       url: process.env.QUIZ_DIRECTORY_URL?.trim() || DEFAULT_QUIZ_REFERENCE_URL,
       log,
@@ -424,34 +452,52 @@ export async function runCycle(deps) {
         // lui ngay, không mở thêm tab nào nữa.
         if (shouldStop()) return { quest, aborted: true };
 
-        let questPage;
-        try {
-          questPage = await context.newPage();
-        } catch (err) {
-          return { quest, outcome: { outcome: "failed", message: `không mở được tab riêng (${err.message})` } };
-        }
-
-        // Session log mang tên nhiệm vụ: mấy tab cùng kể "Trình duyệt: …" thì không ai
-        // biết dòng nào của ai.
-        const questSession = createSession(questPage, {
-          baseUrl,
-          log: {
-            info: (m) => log.info(`Trình duyệt·${quest.name}`, m),
-            warning: (m) => log.warning(`Trình duyệt·${quest.name}`, m),
-            debug: (m) => log.debug(`Trình duyệt·${quest.name}`, m),
-          },
-        });
-        const questEngine = createQuestEngine({ log, shouldStop, quiz });
+        // Vào tay từ ĐÂY, trước cả lúc mở tab: dựng trang là phần chậm nhất của một nhiệm
+        // vụ ngắn, và một nhiệm vụ đang dựng trang vẫn là một nhiệm vụ đang được làm.
+        let aborted = false;
+        runningNow.set(quest.id, quest.name);
+        publishProgress();
 
         try {
-          return { quest, outcome: await questEngine.run(questSession, profile, quest) };
-        } catch (err) {
-          if (err instanceof QuestAborted) return { quest, aborted: true };
-          return { quest, outcome: { outcome: "failed", message: `trắc trở bất ngờ: ${err.message}` } };
+          let questPage;
+          try {
+            questPage = await context.newPage();
+          } catch (err) {
+            return { quest, outcome: { outcome: "failed", message: `không mở được tab riêng (${err.message})` } };
+          }
+
+          // Session log mang tên nhiệm vụ: mấy tab cùng kể "Trình duyệt: …" thì không ai
+          // biết dòng nào của ai.
+          const questSession = createSession(questPage, {
+            baseUrl,
+            log: {
+              info: (m) => log.info(`Trình duyệt·${quest.name}`, m),
+              warning: (m) => log.warning(`Trình duyệt·${quest.name}`, m),
+              debug: (m) => log.debug(`Trình duyệt·${quest.name}`, m),
+            },
+          });
+          const questEngine = createQuestEngine({ log, shouldStop, quiz });
+
+          try {
+            return { quest, outcome: await questEngine.run(questSession, profile, quest) };
+          } catch (err) {
+            if (err instanceof QuestAborted) {
+              aborted = true;
+              return { quest, aborted: true };
+            }
+            return { quest, outcome: { outcome: "failed", message: `trắc trở bất ngờ: ${err.message}` } };
+          } finally {
+            // Đóng tab NGAY khi nhiệm vụ xong — đó là điều khiến cái trần tab có nghĩa: chỗ
+            // vừa trống được nhường cho nhiệm vụ kế trong hàng đợi.
+            await questPage.close().catch(() => {});
+          }
         } finally {
-          // Đóng tab NGAY khi nhiệm vụ xong — đó là điều khiến cái trần tab có nghĩa: chỗ
-          // vừa trống được nhường cho nhiệm vụ kế trong hàng đợi.
-          await questPage.close().catch(() => {});
+          // Rời tay dù đi bằng ngả nào — kể cả ngả "không mở được tab riêng" ở trên, vốn
+          // return thẳng và sẽ để tên nhiệm vụ mắc kẹt trong `runningNow` tới hết vòng.
+          // Bị Thu Đàn thì KHÔNG tính là đã làm xong: nó chưa từng chạy tới nơi.
+          runningNow.delete(quest.id);
+          if (!aborted) finished++;
+          publishProgress();
         }
       });
 
@@ -488,6 +534,9 @@ export async function runCycle(deps) {
           );
         }
 
+        runningNow.set(quest.id, quest.name);
+        publishProgress();
+
         let outcome;
         try {
           outcome = await engine.run(session, profile, quest);
@@ -496,7 +545,14 @@ export async function runCycle(deps) {
             return { outcome: "stopped", message: `Đã thu đàn giữa chừng — xong ${done}/${quests.length}.` };
           }
           throw err;
+        } finally {
+          // Rời tay ở mọi ngả. Hai ngả bất thường (Thu Đàn, lỗi ném ra) đều kết thúc cả vòng
+          // ngay sau đây, nên `finished` chỉ cộng trên đường đi bình thường bên dưới.
+          runningNow.delete(quest.id);
         }
+
+        finished++;
+        publishProgress();
 
         results.push(outcome);
 

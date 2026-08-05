@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import { createQuestEngine } from "../src/lib/quest-engine/engine.mjs";
 import { createSession } from "../src/lib/quest-engine/session.mjs";
-import { mapWithLimit, parseCookieString } from "../src/lib/quest-engine/runCycle.mjs";
+import { mapWithLimit, parseCookieString, runCycle } from "../src/lib/quest-engine/runCycle.mjs";
 import { profileDirForJob } from "../src/lib/quest-engine/browserProfile.mjs";
 import { computeNextDelaySeconds, parseCooldownSeconds } from "../src/lib/quest-engine/cooldown.mjs";
 import { profileForConfig } from "../src/lib/quest-engine/profile.mjs";
@@ -39,6 +39,9 @@ const PAGE = `<!doctype html>
   .locked { pointer-events: none; }
 </style></head>
 <body>
+  <!-- Dấu "đã đăng nhập" mà readinessProbe tìm. Rỗng và không mang chữ nào: mấy ca dưới đây
+       hỏi cả trang bằng textMatches, một chữ thừa ở đây là một ca khác đổi kết quả. -->
+  <div id="wpadminbar"></div>
   <div id="counter">Huyền tinh hôm nay: <span id="cap">120/385</span></div>
   <div id="clock">Còn lại 01:02:03</div>
 
@@ -94,9 +97,12 @@ const FREE_CHECKIN_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
 <button id="checkInButton">Điểm Danh</button>
 <script>checkInButton.onclick=()=>setTimeout(()=>{checkInButton.textContent='Đã Điểm Danh';checkInButton.dataset.claimed='1'},30)</script>`;
 
+// Chữ "Thí Luyện" hiện THÀNH VĂN BẢN chứ không chỉ nằm trong href: vipProbe đọc innerText và
+// trả null chừng nào chưa thấy tên một nhiệm vụ nào — null nghĩa là "hub chưa render xong",
+// nên một hub thiếu chữ khiến runCycle poll đủ 20 giây rồi mới bỏ cuộc.
 const FREE_HUB_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div class="nv-quest"><a class="btn-go" onclick="location.href='/phuc-loi-duong'">Làm Ngay ›</a></div>
-<div class="nv-quest"><a class="btn-go" href="/thi-luyen-tong-mon-hh3d/?nv_embed=1">Làm Ngay ›</a></div>`;
+<div class="nv-quest"><span>Thí Luyện Tông Môn</span><a class="btn-go" href="/thi-luyen-tong-mon-hh3d/?nv_embed=1">Làm Ngay ›</a></div>`;
 
 const FREE_WELFARE_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div id="countdown-timer">00:00</div>
@@ -749,7 +755,50 @@ async function main() {
   // duy nhất giữa hai đạo hữu — nó phải che ÍT NHẤT hai phần ba, với mọi độ dài tên, và
   // không bao giờ trả về nguyên văn.
   {
-    const { maskUsername } = await import("../src/lib/services/queue.ts");
+    const { maskUsername, readProgress } = await import("../src/lib/services/queue.ts");
+
+    // Lằn ranh riêng tư thứ hai của trang này: tiến độ được thấy, TÊN nhiệm vụ thì không —
+    // tên nhiệm vụ là cấu hình nhiệm vụ, thứ nằm bên phía "không bao giờ" từ ngày trang ra
+    // đời. Con số đi qua để trả lời "ghế kia sắp trống chưa" mà không kể ai bật những gì.
+    const full = { running: ["Mê Cung", "Vấn Đáp"], done: 3, total: 8 };
+    check(
+      "dòng của mình: thấy đủ tên nhiệm vụ",
+      JSON.stringify(readProgress(full, true)) ===
+        JSON.stringify({ running: ["Mê Cung", "Vấn Đáp"], done: 3, total: 8 }),
+      JSON.stringify(readProgress(full, true)),
+    );
+    check(
+      "dòng người khác: còn con số, KHÔNG còn tên",
+      readProgress(full, false)?.running === null &&
+        readProgress(full, false)?.done === 3 &&
+        readProgress(full, false)?.total === 8,
+      JSON.stringify(readProgress(full, false)),
+    );
+    check(
+      "và tên người khác không lọt ra kể cả dưới dạng chuỗi",
+      !JSON.stringify(readProgress(full, false)).includes("Mê Cung"),
+      JSON.stringify(readProgress(full, false)),
+    );
+
+    // Cột jsonb sống lâu hơn mọi phiên bản code từng ghi vào nó. Một dòng méo mó phải thành
+    // "không biết" — tức hàng đợi trông y như trước khi có tính năng này — chứ không được
+    // ném ra giữa lúc dựng trang và làm trắng cả bảng.
+    check("null → không biết", readProgress(null, true) === null);
+    check("không phải object → không biết", readProgress("3/8", true) === null && readProgress(7, true) === null);
+    check("mảng trần → không biết", readProgress(["Mê Cung"], true) === null);
+    check("thiếu số đếm → không biết", readProgress({ running: ["Mê Cung"] }, true) === null);
+    check(
+      "thiếu mảng tên → vẫn đọc được con số, tên coi như rỗng",
+      JSON.stringify(readProgress({ done: 1, total: 4 }, true)) ===
+        JSON.stringify({ running: [], done: 1, total: 4 }),
+      JSON.stringify(readProgress({ done: 1, total: 4 }, true)),
+    );
+    check(
+      "phần tử rác trong mảng tên bị loại, phần còn lại vẫn dùng được",
+      JSON.stringify(readProgress({ running: ["Mê Cung", "", null, 5], done: 0, total: 2 }, true)) ===
+        JSON.stringify({ running: ["Mê Cung"], done: 0, total: 2 }),
+      JSON.stringify(readProgress({ running: ["Mê Cung", "", null, 5], done: 0, total: 2 }, true)),
+    );
     const maskedShare = (name) => {
       const masked = maskUsername(name);
       const dots = [...masked].filter((c) => c === "•").length;
@@ -1325,6 +1374,95 @@ async function main() {
       { action: "click", selector: "#khong-ton-tai", timeoutMs: 800 },
     ]));
     check("bước bắt buộc hỏng thì quest hỏng", fatal.outcome === "failed", fatal.outcome);
+
+    console.log("\nTiến độ vòng chạy — thứ Hàng Đợi Công Việc hiển thị");
+
+    // Chạy runCycle THẬT trên Chromium thật trước sảnh giả, chỉ để soi một thứ: chuỗi tiến
+    // độ nó phát ra. Đây là phần duy nhất của tính năng mà server không tự suy ra được, nên
+    // nếu nó im lặng hoặc kể sai thì hàng đợi nói dối — mà một cái đếm sai thì không ai bắt
+    // được bằng mắt.
+    //
+    // Hai nhiệm vụ hạng thường có sẵn trong hồ sơ, hai trang mà máy chủ giả này đã phục vụ
+    // cho các ca ở trên; đặt cuối cùng để không nhiệm vụ nào ở đây đụng vào trạng thái mà
+    // các ca trước còn cần.
+    const progressConfig = {
+      gameCookie: "wordpress_logged_in_smoke=1",
+      accountTier: "free",
+      runner: "local",
+      quests: { diemDanh: { enabled: true }, thiLuyen: { enabled: true } },
+    };
+
+    const parallelBeats = [];
+    const parallelCycle = await runCycle({
+      chromium,
+      baseUrl,
+      config: { ...progressConfig, parallelQuests: true },
+      say: () => {},
+      reportProgress: (beat) => parallelBeats.push(beat),
+      shouldStop: () => false,
+    });
+
+    check(
+      "vòng chạy tới nơi trên sảnh giả",
+      parallelCycle.outcome === "done",
+      `${parallelCycle.outcome}: ${parallelCycle.message}`,
+    );
+    check(
+      "nhịp đầu tiên đã nói '0/2' — hàng đợi có chữ ngay, không đợi nhiệm vụ đầu xong",
+      parallelBeats.length > 0 &&
+        parallelBeats[0].done === 0 &&
+        parallelBeats[0].total === 2 &&
+        parallelBeats[0].running.length === 0,
+      JSON.stringify(parallelBeats[0]),
+    );
+    check(
+      "nhịp cuối: xong cả hai, không còn nhiệm vụ nào trong tay",
+      parallelBeats.at(-1)?.done === 2 && parallelBeats.at(-1)?.running.length === 0,
+      JSON.stringify(parallelBeats.at(-1)),
+    );
+    check(
+      "gọi đúng tên cả hai nhiệm vụ đã chạy",
+      ["Điểm Danh", "Thí Luyện Tông Môn"].every((name) =>
+        parallelBeats.some((beat) => beat.running.includes(name)),
+      ),
+      [...new Set(parallelBeats.flatMap((beat) => beat.running))].join(" · ") || "(không tên nào)",
+    );
+    // Cái đếm chỉ được đi tới. Một `finished++` đặt nhầm chỗ trong nhánh song song là con số
+    // nhảy lùi giữa vòng — thứ người dùng đọc thành "chạy lại từ đầu".
+    check(
+      "số đã xong không bao giờ lùi, và không bao giờ vượt tổng",
+      parallelBeats.every(
+        (beat, i) =>
+          beat.total === 2 &&
+          beat.done <= beat.total &&
+          (i === 0 || beat.done >= parallelBeats[i - 1].done),
+      ),
+      parallelBeats.map((beat) => `${beat.done}/${beat.total}`).join(" → "),
+    );
+    // Tên mắc kẹt trong `runningNow` là lỗi dễ xảy ra nhất ở đây (một ngả return sớm quên
+    // dọn), và triệu chứng của nó là hàng đợi khoe một nhiệm vụ đã xong từ lâu.
+    check(
+      "không tên nào mắc kẹt lại sau khi nhiệm vụ đã rời tay",
+      parallelBeats.every((beat) => beat.running.length + beat.done <= beat.total),
+      parallelBeats.map((beat) => `[${beat.running.join(",")}]${beat.done}`).join(" → "),
+    );
+
+    const serialBeats = [];
+    const serialCycle = await runCycle({
+      chromium,
+      baseUrl,
+      config: { ...progressConfig, parallelQuests: false },
+      say: () => {},
+      reportProgress: (beat) => serialBeats.push(beat),
+      shouldStop: () => false,
+    });
+    check(
+      "nhánh tuần tự cũng kể tiến độ, và không bao giờ cầm hai nhiệm vụ một lúc",
+      serialCycle.outcome === "done" &&
+        serialBeats.at(-1)?.done === 2 &&
+        serialBeats.every((beat) => beat.running.length <= 1),
+      serialBeats.map((beat) => `[${beat.running.join(",")}]${beat.done}/${beat.total}`).join(" → "),
+    );
   } finally {
     await browser.close().catch(() => {});
     server.close();

@@ -25,7 +25,8 @@ import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
  *
  * Năm thao tác dựng nên vòng đời một lượt chạy:
  *   claim     — xin việc; trả về job kèm config snapshot, hoặc null nếu hàng chờ trống.
- *   heartbeat — "tôi còn sống"; trả về status HIỆN TẠI để worker biết người dùng đã bấm thu đàn.
+ *   heartbeat — "tôi còn sống", kèm tiến độ vòng này; trả về status HIỆN TẠI để worker biết
+ *               người dùng đã bấm thu đàn.
  *   accountTier — hạng vừa chứng minh trên hub, để giao diện khóa tab đối nghịch.
  *   event     — một dòng nhật ký cho người dùng đọc.
  *   complete  — kết thúc một VÒNG; server tái xếp job, trừ khi người dùng đã Thu Đàn.
@@ -39,7 +40,28 @@ const bodySchema = z.discriminatedUnion("op", [
     workerId: z.string().min(1).max(64),
     runner: z.string().optional(),
   }),
-  z.object({ op: z.literal("heartbeat"), jobId: z.string().uuid() }),
+  z.object({
+    op: z.literal("heartbeat"),
+    jobId: z.string().uuid(),
+    /**
+     * Vòng này đang chạy nhiệm vụ nào — thứ Hàng Đợi Công Việc hiển thị. Linh sứ đời cũ
+     * không gửi, và VẮNG MẶT phải khác RỖNG: vắng là "tôi không biết" (giữ nguyên cột), rỗng
+     * là "đang giữa hai nhiệm vụ" (ghi đè). Zod `.optional()` giữ đúng ranh giới ấy.
+     *
+     * Trần ở đây không phải cho linh sứ của chúng ta — nó gửi tên nhiệm vụ lấy từ hồ sơ, dài
+     * nhất khoảng ba chục ký tự. Nó dành cho một linh phù cá nhân bị dùng để bơm rác: đây là
+     * dữ liệu do người dùng điều khiển đi thẳng lên màn hình của CẢ TÔNG MÔN, nên độ dài và
+     * số lượng phải có trần trước khi chạm database. (React tự escape nên không có đường
+     * chèn mã; cái cần chặn là một dòng hàng đợi dài một cây số.)
+     */
+    progress: z
+      .object({
+        running: z.array(z.string().trim().min(1).max(120)).max(32),
+        done: z.number().int().min(0).max(999),
+        total: z.number().int().min(0).max(999),
+      })
+      .optional(),
+  }),
   z.object({
     op: z.literal("accountTier"),
     jobId: z.string().uuid(),
@@ -125,7 +147,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "forbidden" }, { status: 403 });
       }
 
-      const beat = await heartbeat(body.jobId);
+      const beat = await heartbeat(body.jobId, body.progress);
       if (!beat) {
         return NextResponse.json({ error: "unknown job" }, { status: 404 });
       }

@@ -12,6 +12,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { CycleProgress } from "@/lib/realtime/dashboardTypes";
 
 /**
  * One database for everything, on purpose.
@@ -165,6 +166,16 @@ export const automationJobs = pgTable(
     startedAt: timestamp("started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     lastHeartbeat: timestamp("last_heartbeat", { withTimezone: true }),
+    /**
+     * Vòng này đang chạy nhiệm vụ nào — linh sứ gửi kèm nhịp tim, server không tự suy ra
+     * được. NULL nghĩa là "không biết", và đó là trạng thái đúng ở ba lúc: job đang nghỉ,
+     * vòng vừa xong, và linh sứ đời cũ chưa biết gửi trường này.
+     *
+     * Ở đây chứ không phải một bảng riêng: nó là thuộc tính của ĐÚNG một vòng của đúng một
+     * job, sống và chết cùng dòng job, và luôn được đọc chung với dòng ấy. Một bảng riêng
+     * chỉ thêm một phép join cho mỗi lần vẽ hàng đợi mà không mua được gì.
+     */
+    cycleProgress: jsonb("cycle_progress").$type<CycleProgress>(),
   },
   (t) => [
     index("jobs_user_idx").on(t.userId),

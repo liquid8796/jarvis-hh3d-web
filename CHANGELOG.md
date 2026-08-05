@@ -11,6 +11,43 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.27.0 — Hàng đợi nói rõ mỗi tài khoản đang làm nhiệm vụ gì
+
+- **Mỗi dòng hàng đợi giờ kể tên nhiệm vụ đang chạy**, kèm bộ đếm「3/8 nhiệm vụ」. Trước đây
+  một đàn chạy bốn mươi phút chỉ hiện đúng hai chữ「Đang chạy」— không phân biệt được nó
+  đang cày Mê Cung hay đã treo từ lâu. Chạy song song thì hiện ĐỦ các nhiệm vụ đang trong
+  tay (mặc định tới 3 tab), vì kể một cái là nói dối về hai cái còn lại.
+- **Thứ này trước đây không tồn tại dưới dạng dữ liệu.** Tiến trình một vòng chỉ sống trong
+  văn xuôi của nhật ký (「Mê Cung: xong」), và dựng giao diện bằng cách dò chuỗi trong log
+  của chính mình là buộc một cột trên màn hình vào cách hành văn của một dòng log — mà bản
+  0.25.2 vừa viết lại đúng mấy dòng ấy. Nên linh sứ khai thẳng: cột `cycle_progress`
+  (migration 0010) và một trường mới **đi kèm nhịp tim sẵn có, không thêm một request nào**.
+- **Linh sứ đời cũ không vỡ, chỉ im.** Trường mới là tuỳ chọn: linh sứ chưa cài lại vẫn chạy
+  y như trước, dòng của nó chỉ thiếu phần tên nhiệm vụ. **Muốn thấy tên thì cài đè linh sứ**
+  (engine nằm trong gói) — linh sứ tông môn đã được cài trong đợt này.
+- **Vắng trường KHÁC HẲN gửi rỗng.** Vắng = "linh sứ đời cũ, giữ nguyên cột"; rỗng = "đang
+  giữa hai nhiệm vụ". Lẫn hai cái là biến mỗi nhịp tim của linh sứ cũ thành một lệnh xoá lặp
+  lại mỗi 5 giây.
+- **Trigger có mệnh đề `WHEN`, và đó là toàn bộ giá trị của nó.** Trigger `AFTER UPDATE OF
+  <cột>` của Postgres nổ khi cột được NHẮC TỚI trong `SET`, không phải khi giá trị đổi —
+  thiếu WHEN thì mỗi nhịp tim của mỗi đàn đánh thức MỌI trang hàng đợi đang mở để vẽ lại
+  đúng cái vừa vẽ. Đo được trên database thật: 5 lần gửi lại y nguyên tiến độ → **0 tín
+  hiệu**; đổi thật → 1; dọn về null → 1 (phải là `IS DISTINCT FROM`, `<>` gặp NULL trả NULL
+  và sẽ im lặng đúng hai lúc cần vẽ lại nhất).
+- **Ranh giới riêng tư dịch một nấc, có chủ ý.** Dòng của mình: đủ tên nhiệm vụ. Dòng người
+  khác: **chỉ con số**, không bao giờ có tên — tên nhiệm vụ là cấu hình nhiệm vụ, thứ nằm
+  bên phía「không bao giờ」từ ngày trang này ra đời. Con số được phép qua vì nó trả lời đúng
+  câu hỏi trang sinh ra để trả lời: cái ghế linh sứ tông môn kia sắp trống chưa.
+- Tiến độ được **dọn ở cả ba cửa** — nhận việc, xong vòng, và lúc reaper kết liễu một đàn
+  mất nhịp tim — nếu không thì một đàn đang nghỉ hiện lên là「đang nghỉ — Mê Cung」suốt cả
+  cooldown.
+- Kiểm chứng: smoke **154/154** trên Chromium thật, trong đó bảy ca mới lái `runCycle` THẬT
+  qua cả hai nhánh song song và tuần tự rồi soi chuỗi tiến độ nó phát ra (bộ đếm không lùi,
+  không tên nào mắc kẹt lại, nhánh tuần tự không bao giờ cầm hai nhiệm vụ một lúc);
+  `verify:continuous` trên database thật ghim vòng đời cột (ghi được, linh sứ cũ không bị
+  xoá trắng, dọn đúng ở claim/complete) và **dựng hai đạo hữu để chứng minh tên nhiệm vụ của
+  người khác không lọt ra ở bất kỳ đâu trong ảnh chụp**; TypeScript và production build sạch.
+
 ## 0.26.0 — Hỷ Sự Đường: đi chúc phúc các tiệc cưới (tab Thường)
 
 - **Nhiệm vụ mới ở tab Thường: Hỷ Sự Đường** — viết từ recording 05/08 trên site thật

@@ -47,6 +47,33 @@ function describe(entry: QueueEntry): string {
   })}`;
 }
 
+/**
+ * Đàn này có đang trong tay một linh sứ không.
+ *
+ * Tiến độ chỉ được phép hiện ở hai trạng thái ấy. Server đã dọn cột lúc xong vòng và lúc
+ * nhận việc, nên một dòng ĐANG NGHỈ mang tiến độ là chuyện không xảy ra — nhưng nếu có ngày
+ * nó xảy ra, cái giá là dòng "Đang nghỉ — Mê Cung", tức màn hình nói một câu sai. Rẻ hơn
+ * nhiều nếu chỗ vẽ cũng biết luật, thay vì tin rằng mọi đường ghi đều nhớ dọn.
+ */
+const isWorking = (entry: QueueEntry) => entry.status === "running" || entry.status === "stopping";
+
+/**
+ * Tên nhiệm vụ đang chạy của MỘT dòng — `null` khi không có gì để nói thêm.
+ *
+ * Trả về null cho dòng người khác là chuyện của server: `progress.running` đã là `null` từ
+ * lúc rời service (xem ranh giới riêng tư trong queue.ts), nên ở đây không có phép kiểm
+ * `entry.mine` nào để ai đó lỡ tay xoá. Giao diện chỉ vẽ những gì được đưa.
+ *
+ * Danh sách RỖNG mà vẫn đang chạy là một trạng thái thật, không phải thiếu dữ liệu: đó là
+ * quãng linh sứ mở trình duyệt, qua cổng Cloudflare và dò hạng tài khoản — có thể tới vài
+ * chục giây, và im lặng suốt quãng ấy trông y hệt một cái treo.
+ */
+function questPhrase(entry: QueueEntry): string | null {
+  const progress = entry.progress;
+  if (!progress || progress.running == null || !isWorking(entry)) return null;
+  return progress.running.length > 0 ? progress.running.join(" · ") : "đang chuẩn bị…";
+}
+
 export function QueueBoard({ initial }: { initial: QueueSnapshot }) {
   const [snapshot, setSnapshot] = useState(initial);
   /**
@@ -127,36 +154,62 @@ export function QueueBoard({ initial }: { initial: QueueSnapshot }) {
         </p>
       ) : (
         <ul className="space-y-2">
-          {entries.map((entry) => (
-            <li
-              key={entry.id}
-              className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border p-3 text-sm ${
-                entry.mine
-                  ? "border-[var(--color-gold-400)]/40 bg-[var(--color-gold-400)]/5"
-                  : "border-[var(--color-ink-600)]/60"
-              }`}
-            >
-              <span className="w-7 text-center font-mono text-xs text-[var(--color-mist)]">
-                {entry.queuePosition ?? "–"}
-              </span>
-              <span className={`inline-block h-2 w-2 rounded-full ${statusDot(entry)}`} aria-hidden />
+          {entries.map((entry) => {
+            const quests = questPhrase(entry);
+            const progress = entry.progress;
 
-              <span className="font-semibold text-[var(--color-parchment)]">{entry.owner}</span>
-              {entry.mine && <span className="badge badge-active">bạn</span>}
-              {entry.accountLabel && (
-                <span className="text-[var(--color-gold-300)]">「{entry.accountLabel}」</span>
-              )}
-
-              <span className="text-[var(--color-mist)]">{describe(entry)}</span>
-              <span className="text-xs text-[var(--color-mist)]">vòng {entry.attempts}</span>
-
-              {entry.workerKind && (
-                <span className="ml-auto font-mono text-[11px] text-[var(--color-mist)]">
-                  {entry.workerId ?? (entry.workerKind === "sect" ? "linh sứ tông môn" : "linh sứ riêng")}
+            return (
+              <li
+                key={entry.id}
+                className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border p-3 text-sm ${
+                  entry.mine
+                    ? "border-[var(--color-gold-400)]/40 bg-[var(--color-gold-400)]/5"
+                    : "border-[var(--color-ink-600)]/60"
+                }`}
+              >
+                <span className="w-7 text-center font-mono text-xs text-[var(--color-mist)]">
+                  {entry.queuePosition ?? "–"}
                 </span>
-              )}
-            </li>
-          ))}
+                <span className={`inline-block h-2 w-2 rounded-full ${statusDot(entry)}`} aria-hidden />
+
+                <span className="font-semibold text-[var(--color-parchment)]">{entry.owner}</span>
+                {entry.mine && <span className="badge badge-active">bạn</span>}
+                {entry.accountLabel && (
+                  <span className="text-[var(--color-gold-300)]">「{entry.accountLabel}」</span>
+                )}
+
+                <span className="text-[var(--color-mist)]">{describe(entry)}</span>
+
+                {/* Tên nhiệm vụ đang chạy. `title` mang bản đầy đủ cho lúc ba nhiệm vụ song
+                    song làm dòng dài quá khung — cắt chữ mà không còn đường đọc lại là đổi
+                    một câu trả lời lấy một dấu ba chấm. */}
+                {quests && (
+                  <span
+                    className="max-w-full truncate text-[var(--color-jade-300)]"
+                    title={quests}
+                  >
+                    {quests}
+                  </span>
+                )}
+
+                <span className="text-xs text-[var(--color-mist)]">vòng {entry.attempts}</span>
+
+                {/* Con số đi cùng MỌI dòng, kể cả của người khác — nó nói cái ghế linh sứ kia
+                    sắp trống chưa mà không hé lộ ai đang bật nhiệm vụ nào. */}
+                {progress && progress.total > 0 && isWorking(entry) && (
+                  <span className="text-xs text-[var(--color-mist)]">
+                    {progress.done}/{progress.total} nhiệm vụ
+                  </span>
+                )}
+
+                {entry.workerKind && (
+                  <span className="ml-auto font-mono text-[11px] text-[var(--color-mist)]">
+                    {entry.workerId ?? (entry.workerKind === "sect" ? "linh sứ tông môn" : "linh sứ riêng")}
+                  </span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

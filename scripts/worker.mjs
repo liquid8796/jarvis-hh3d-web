@@ -84,7 +84,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  */
 const PROFILE_ROOT = fileURLToPath(new URL("./browser-profiles/", import.meta.url));
 
-async function runQuest({ userId, config, say, reportAccountTier, shouldStop }) {
+async function runQuest({ userId, config, say, reportAccountTier, reportProgress, shouldStop }) {
   await say("Linh sứ đã nhận ngọc giản, đang khởi lư…");
 
   // Nạp Playwright TẠI ĐÂY chứ không ở đầu tệp: một máy chỉ dùng worker để canh việc vẫn
@@ -106,7 +106,7 @@ async function runQuest({ userId, config, say, reportAccountTier, shouldStop }) 
     gameCookie: config?.gameCookie,
   });
   await mkdir(profileDir, { recursive: true });
-  return runCycle({ chromium, config, say, reportAccountTier, shouldStop, profileDir });
+  return runCycle({ chromium, config, say, reportAccountTier, reportProgress, shouldStop, profileDir });
 }
 
 /** Một lượt trọn vẹn: nhịp tim chạy nền, engine chạy trước, kết thúc thì báo cáo. */
@@ -114,9 +114,22 @@ async function handle(job) {
   console.log(`→ nhận job ${job.id}`);
 
   let stopping = false;
+
+  // Tiến độ vòng này, cưỡi nhịp tim sẵn có — không thêm một request nào. Engine cập nhật
+  // biến này (đồng bộ, trong đường chạy nóng), nhịp tim kế tiếp mang nó đi; trễ tối đa đúng
+  // một nhịp, mà một nhịp là 5 giây trên một vòng thường dài hàng chục phút.
+  //
+  // `null` cho tới khi engine khai lần đầu, và `null` KHÔNG BAO GIỜ được gửi lên: với server,
+  // vắng trường này nghĩa là "linh sứ đời cũ, giữ nguyên cột đang có" — gửi null sẽ biến nó
+  // thành một lệnh xoá lặp lại mỗi 5 giây.
+  let progress = null;
+
   const beat = setInterval(async () => {
     try {
-      const { status } = await call("heartbeat", { jobId: job.id });
+      const { status } = await call("heartbeat", {
+        jobId: job.id,
+        ...(progress ? { progress } : {}),
+      });
       // Bất kỳ trạng thái nào KHÔNG phải 'running' đều nghĩa là không còn ai chờ lượt này:
       // 'stopping/stopped' là Thu Đàn, còn 'failed/done' là reaper đã kết liễu job (mất
       // liên lạc dài rồi nối lại) — ôm browser chạy nốt một vòng không ai nhận chỉ tổ
@@ -144,6 +157,9 @@ async function handle(job) {
         call("accountTier", { jobId: job.id, tier }).catch((err) => {
           console.error("  không lưu được hạng tài khoản:", err.message);
         }),
+      reportProgress: (next) => {
+        progress = next;
+      },
       shouldStop: () => stopping,
     });
     await call("complete", { jobId: job.id, ...result });

@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import { createQuestEngine } from "../src/lib/quest-engine/engine.mjs";
 import { createSession } from "../src/lib/quest-engine/session.mjs";
-import { parseCookieString } from "../src/lib/quest-engine/runCycle.mjs";
+import { mapWithLimit, parseCookieString } from "../src/lib/quest-engine/runCycle.mjs";
 import { profileDirForJob } from "../src/lib/quest-engine/browserProfile.mjs";
 import { computeNextDelaySeconds, parseCooldownSeconds } from "../src/lib/quest-engine/cooldown.mjs";
 import { profileForConfig } from "../src/lib/quest-engine/profile.mjs";
@@ -624,6 +624,57 @@ async function main() {
     "op claim gieo luyenDanThuong trước khi parse snapshot",
     workerRouteSrc.includes("storedConfigSchema.safeParse(seedLuyenDanThuong("),
   );
+
+  console.log("\nTrần số tab chạy song song");
+
+  // Cái trần này ra đời từ 18 dòng lỗi thật trên linh sứ tông môn ngày 05/08: tám trang
+  // khác nhau cùng dựng trên VM 2 nhân thì các tab thua cuộc đua báo "không thấy selector".
+  // Ba điều phải đúng: không bao giờ vượt trần, không bỏ sót nhiệm vụ nào, và thứ tự kết
+  // quả giữ nguyên (phần tường thuật một vòng phải đọc như bản tuần tự).
+  {
+    const items = Array.from({ length: 9 }, (_, i) => i);
+    let inFlight = 0;
+    let peak = 0;
+    const order = await mapWithLimit(items, 3, async (item) => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      // Trễ so le để mọi làn không cùng nhịp — đúng cảnh các nhiệm vụ dài ngắn khác nhau.
+      await new Promise((r) => setTimeout(r, item % 3 === 0 ? 18 : 6));
+      inFlight--;
+      return item * 2;
+    });
+    check("không bao giờ mở quá trần 3 tab", peak === 3, `đỉnh ${peak}`);
+    check("chạy đủ 9 nhiệm vụ, không sót", order.length === 9 && order.every((v, i) => v === i * 2));
+    check(
+      "kết quả giữ đúng thứ tự đầu vào dù chạy xen kẽ",
+      JSON.stringify(order) === JSON.stringify(items.map((i) => i * 2)),
+      order.join(","),
+    );
+  }
+  {
+    // Trần lớn hơn số nhiệm vụ, và trần 1 (tức tuần tự) — hai đầu mút của phép kẹp.
+    let peakWide = 0;
+    let liveWide = 0;
+    await mapWithLimit([1, 2], 8, async () => {
+      liveWide++;
+      peakWide = Math.max(peakWide, liveWide);
+      await new Promise((r) => setTimeout(r, 5));
+      liveWide--;
+    });
+    check("trần lớn hơn số nhiệm vụ thì chỉ mở đúng số nhiệm vụ", peakWide === 2, String(peakWide));
+
+    let peakOne = 0;
+    let liveOne = 0;
+    const seq = await mapWithLimit([1, 2, 3], 1, async (n) => {
+      liveOne++;
+      peakOne = Math.max(peakOne, liveOne);
+      await new Promise((r) => setTimeout(r, 3));
+      liveOne--;
+      return n;
+    });
+    check("trần 1 = chạy tuần tự", peakOne === 1 && JSON.stringify(seq) === "[1,2,3]", String(peakOne));
+    check("danh sách rỗng không treo", (await mapWithLimit([], 3, async () => 1)).length === 0);
+  }
 
   console.log("\nHạng tài khoản");
 

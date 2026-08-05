@@ -416,7 +416,10 @@ export function createQuestEngine(deps) {
       case "waitForSelector":
         return (await session.waitForSelector(step.selector ?? "", step.timeoutMs))
           ? null
-          : `Selector không bao giờ xuất hiện: ${step.selector}`;
+          // Nói ra CẢ thời gian đã chờ. "Selector không bao giờ xuất hiện" đọc như thể trang
+          // thiếu hẳn phần đó, và ngày 05/08 nó khiến mấy tab thua cuộc đua CPU trông y hệt
+          // một tính năng chưa mở — hai chuyện cần cách chữa hoàn toàn khác nhau.
+          : `Trang chưa dựng xong sau ${Math.round((step.timeoutMs ?? 15000) / 1000)}s — không thấy ${step.selector}`;
 
       case "click":
         await session.humanDelay();

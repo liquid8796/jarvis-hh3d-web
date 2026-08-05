@@ -11,6 +11,36 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.24.1 — chạy song song có trần: tám trang cùng dựng làm các tab thua cuộc đua CPU
+
+- **Triệu chứng**: tài khoản thường「Donald Trump」rải lỗi `Selector không bao giờ xuất hiện`
+  gần như mỗi vòng — 18 dòng lỗi trong 10 vòng — nhưng KHÔNG cố định ở nhiệm vụ nào: Luyện
+  Đan `#ld-app` 7 lần, Tế Lễ `#te-le-button` 4, Vấn Đáp 3, Vòng Quay 3, và một lần trượt cả
+  `.nv-quest` của chính hub. Cùng khoảng thời gian đó tài khoản VIP chạy 10 nhiệm vụ, **0
+  lỗi trong 9 vòng**.
+- **Nguyên nhân**: nhịp song song ở 0.22.0 mở **một tab cho MỖI nhiệm vụ, không giới hạn**.
+  Tài khoản thường bật 8 nhiệm vụ, và 8 nhiệm vụ ấy là **8 trang khác nhau** cùng dựng một
+  lúc trên VM 2 nhân; tab nào thua cuộc đua CPU thì hết 25 giây chờ mà trang chưa dựng xong,
+  và engine gọi đó là "selector không xuất hiện". Tài khoản VIP thoát nạn chỉ vì 7 trong 10
+  nhiệm vụ của nó bấm nút ngay trên hub — bảy tab cùng mở MỘT trang đã nằm trong cache, gần
+  như miễn phí. Đo tại chỗ trên VM lúc hai vòng chồng nhau: **load average 3.20 trên 2
+  nhân**, tức hàng đợi CPU dài gấp rưỡi số nhân. Bằng chứng chốt lại: vòng 11:34 hỏng ở
+  Hoang Vực + Tế Lễ — hai nhiệm vụ hoàn toàn khác — đúng vào giây tài khoản VIP mở thêm 10
+  tab. Không phải hạng tài khoản, không phải trang nào hỏng, không phải tính năng chưa mở.
+- **Cách chữa**: một vòng chỉ mở tối đa **3 tab cùng lúc**, tab xong thì nhường chỗ ngay cho
+  nhiệm vụ kế trong hàng đợi. Vẫn giữ gần trọn cái lợi của song song (vòng dài bằng đợt chậm
+  nhất, không phải tổng cộng dồn) mà mỗi trang đủ CPU để dựng. Con số 3 rút từ chính bằng
+  chứng: tài khoản VIP sống khoẻ với ~4 trang khác nhau một lúc. Người vận hành máy khoẻ hơn
+  nới bằng `WORKER_QUEST_TABS` (kẹp 1–8). Lưu ý nhân với `WORKER_MAX_JOBS`: 5 đàn × 3 tab là
+  trần 15 tab, nên máy yếu thì hạ một trong hai.
+- **Thông điệp lỗi nói đúng chuyện**: `Trang chưa dựng xong sau 25s — không thấy #ld-app`
+  thay cho `Selector không bao giờ xuất hiện`. Câu cũ đọc như thể trang thiếu hẳn phần đó,
+  và nó khiến một tab đói CPU trông y hệt một tính năng chưa mở — hai chuyện cần cách chữa
+  khác nhau.
+- Kiểm chứng: 6 assert mới cho bộ điều phối (không bao giờ vượt trần, không sót nhiệm vụ,
+  giữ đúng thứ tự kết quả dù chạy xen kẽ, trần lớn hơn số việc, trần 1 = tuần tự, danh sách
+  rỗng không treo) — smoke **123/123**; TypeScript + production build xanh.
+
 ## 0.24.0 — Luyện Đan Đường: tab VIP và tab Thường thôi nhìn chung một bộ tuỳ chọn
 
 - **Lỗi được sửa**: từ 0.23.0, Luyện Đan Đường chạy được cho cả hai hạng nhưng chỉ mang MỘT

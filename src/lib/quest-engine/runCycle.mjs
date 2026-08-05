@@ -77,6 +77,56 @@ function formatDuration(seconds) {
   return `${s}s`;
 }
 
+/**
+ * Bao nhiêu tab nhiệm vụ được mở CÙNG LÚC trong một vòng.
+ *
+ * Vì sao phải có trần, đo được trên linh sứ tông môn ngày 05/08: bản đầu của nhịp song song
+ * mở MỘT TAB CHO MỖI nhiệm vụ, không giới hạn. Tài khoản thường bật 8 nhiệm vụ, và tám
+ * nhiệm vụ ấy là tám TRANG KHÁC NHAU cùng dựng một lúc trên VM 2 nhân — kết quả là 18 dòng
+ * lỗi "selector không xuất hiện" rải ngẫu nhiên khắp các nhiệm vụ (Luyện Đan 7 lần, Tế Lễ 4,
+ * Vấn Đáp 3, Vòng Quay 3, và một lần trượt cả `.nv-quest` của chính hub). Cùng lúc đó tài
+ * khoản VIP chạy 10 nhiệm vụ mà KHÔNG lỗi lần nào — vì 7 trong số đó bấm nút ngay trên hub,
+ * tức bảy tab cùng mở một trang đã nằm sẵn trong cache, gần như miễn phí. Không phải hạng
+ * tài khoản, không phải trang nào hỏng: chỉ là số trang nặng dựng đồng thời.
+ *
+ * Ba là con số rút từ chính bằng chứng ấy: VIP sống khoẻ với ~4 trang khác nhau một lúc.
+ * Vẫn giữ gần trọn cái lợi của song song — vòng dài bằng đợt chậm nhất chứ không phải tổng
+ * cộng dồn. `WORKER_QUEST_TABS` để người vận hành máy khoẻ hơn tự nới; kẹp 1–8 để một dấu
+ * phẩy gõ nhầm không mở lại đúng cái bẫy vừa bịt.
+ */
+const DEFAULT_QUEST_TABS = 3;
+
+function questTabLimit() {
+  const raw = Number(process.env.WORKER_QUEST_TABS ?? DEFAULT_QUEST_TABS);
+  const wanted = Number.isFinite(raw) ? Math.round(raw) : DEFAULT_QUEST_TABS;
+  return Math.max(1, Math.min(8, wanted));
+}
+
+/**
+ * Chạy `worker` trên từng phần tử, tối đa `limit` cái một lúc, và trả kết quả THEO ĐÚNG THỨ
+ * TỰ ĐẦU VÀO — phần tường thuật của một vòng phải đọc như bản tuần tự, dù việc chạy xen kẽ.
+ *
+ * `cursor++` an toàn không cần khoá: JavaScript chạy một luồng, và giữa lúc đọc và lúc tăng
+ * không có `await` nào chen vào được.
+ */
+export async function mapWithLimit(items, limit, worker) {
+  const results = new Array(items.length);
+  const lanes = Math.max(1, Math.min(Math.round(limit) || 1, items.length));
+  let cursor = 0;
+
+  await Promise.all(
+    Array.from({ length: lanes }, async () => {
+      for (;;) {
+        const index = cursor++;
+        if (index >= items.length) return;
+        results[index] = await worker(items[index], index);
+      }
+    }),
+  );
+
+  return results;
+}
+
 /** Mọi kết quả không-phải-stop đều mang theo lịch vòng kế để server tái xếp đúng nhịp. */
 function scheduledCycleResult(outcome, message, results = []) {
   return {
@@ -365,44 +415,48 @@ export async function runCycle(deps) {
     const runParallel = config?.parallelQuests !== false && quests.length > 1 && deadline === Infinity;
 
     if (runParallel) {
-      await say(`Chạy song song ${quests.length} nhiệm vụ — mỗi nhiệm vụ một tab riêng.`);
+      const tabs = Math.min(questTabLimit(), quests.length);
+      await say(`Chạy song song ${quests.length} nhiệm vụ — tối đa ${tabs} tab cùng lúc.`);
 
       let sawAbort = false;
-      const settled = await Promise.all(
-        quests.map(async (quest) => {
-          if (shouldStop()) return { quest, aborted: true };
+      const settled = await mapWithLimit(quests, tabs, async (quest) => {
+        // Thu đàn giữa chừng: nhiệm vụ còn nằm trong hàng đợi của pool thấy cờ này và rút
+        // lui ngay, không mở thêm tab nào nữa.
+        if (shouldStop()) return { quest, aborted: true };
 
-          let questPage;
-          try {
-            questPage = await context.newPage();
-          } catch (err) {
-            return { quest, outcome: { outcome: "failed", message: `không mở được tab riêng (${err.message})` } };
-          }
+        let questPage;
+        try {
+          questPage = await context.newPage();
+        } catch (err) {
+          return { quest, outcome: { outcome: "failed", message: `không mở được tab riêng (${err.message})` } };
+        }
 
-          // Session log mang tên nhiệm vụ: sáu tab cùng kể "Trình duyệt: …" thì không ai
-          // biết dòng nào của ai.
-          const questSession = createSession(questPage, {
-            baseUrl,
-            log: {
-              info: (m) => log.info(`Trình duyệt·${quest.name}`, m),
-              warning: (m) => log.warning(`Trình duyệt·${quest.name}`, m),
-              debug: (m) => log.debug(`Trình duyệt·${quest.name}`, m),
-            },
-          });
-          const questEngine = createQuestEngine({ log, shouldStop, quiz });
+        // Session log mang tên nhiệm vụ: mấy tab cùng kể "Trình duyệt: …" thì không ai
+        // biết dòng nào của ai.
+        const questSession = createSession(questPage, {
+          baseUrl,
+          log: {
+            info: (m) => log.info(`Trình duyệt·${quest.name}`, m),
+            warning: (m) => log.warning(`Trình duyệt·${quest.name}`, m),
+            debug: (m) => log.debug(`Trình duyệt·${quest.name}`, m),
+          },
+        });
+        const questEngine = createQuestEngine({ log, shouldStop, quiz });
 
-          try {
-            return { quest, outcome: await questEngine.run(questSession, profile, quest) };
-          } catch (err) {
-            if (err instanceof QuestAborted) return { quest, aborted: true };
-            return { quest, outcome: { outcome: "failed", message: `trắc trở bất ngờ: ${err.message}` } };
-          } finally {
-            await questPage.close().catch(() => {});
-          }
-        }),
-      );
+        try {
+          return { quest, outcome: await questEngine.run(questSession, profile, quest) };
+        } catch (err) {
+          if (err instanceof QuestAborted) return { quest, aborted: true };
+          return { quest, outcome: { outcome: "failed", message: `trắc trở bất ngờ: ${err.message}` } };
+        } finally {
+          // Đóng tab NGAY khi nhiệm vụ xong — đó là điều khiến cái trần tab có nghĩa: chỗ
+          // vừa trống được nhường cho nhiệm vụ kế trong hàng đợi.
+          await questPage.close().catch(() => {});
+        }
+      });
 
-      // Promise.all giữ nguyên thứ tự quests, nên phần tường thuật đọc như bản tuần tự.
+      // mapWithLimit trả kết quả theo đúng thứ tự quests, nên phần tường thuật đọc như bản
+      // tuần tự dù việc chạy xen kẽ nhau.
       for (const entry of settled) {
         if (entry.aborted) {
           sawAbort = true;

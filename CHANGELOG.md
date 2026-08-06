@@ -11,6 +11,20 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.33.3 — fallback vh được cứu khỏi tay minifier
+
+- Bản 0.33.2 hứa「có fallback `100vh` cho trình duyệt cũ」— và trong MÃ NGUỒN thì đúng là
+  có: hai dòng cùng property, `100vh` trước làm lưới đỡ, `100lvh` sau đè lên. Nhưng đối
+  chiếu CSS production sau deploy: minifier của Next gộp cặp đôi ấy lại và **chỉ giữ dòng
+  sau**. Fallback tồn tại trong repo, không tồn tại trên trang — trình duyệt chưa biết lvh
+  (Chrome <108, iOS <15.4) thấy `height` vô hiệu, phần tử cao 0, mất hẳn tranh nền mobile.
+- Chuyển fallback vào khối `@supports not (height: 100lvh)` — thứ minifier không dám gộp.
+  Đã soi CSS đã build: cả `height:100lvh` lẫn khối @supports với `177.683vh` cùng có mặt.
+- Bài học ghi lại cho lần sau: fallback kiểu「hai dòng cùng property」phải được kiểm ở tầng
+  ĐÃ BUILD, không phải tầng mã nguồn — chỗ đứng của nó chính là chỗ minifier ra tay.
+
+---
+
 ## 0.33.2 — mobile được vuốt ngang để ngắm trọn tấm tranh nền
 
 - **`cover` trên điện thoại là một cái máy chém.** Ảnh nền gốc 1672×941; màn 375px phủ theo

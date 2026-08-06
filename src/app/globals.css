@@ -95,13 +95,23 @@ body {
     inset: auto;
     top: 0;
     flex-shrink: 0;
-    height: 100vh;
     height: 100lvh;
-    width: calc(100vh * (1672 / 941));
     width: calc(100lvh * (1672 / 941));
     min-width: 100%;
-    margin-bottom: -100vh;
     margin-bottom: -100lvh;
+  }
+
+  /* Fallback cho trình duyệt chưa biết lvh (Chrome <108, iOS <15.4): thiếu nó thì height
+     vô hiệu → phần tử cao 0 → mất hẳn tranh nền. KHÔNG viết kiểu hai dòng cùng property
+     (100vh rồi 100lvh đè lên) — đã thử, và minifier của Next gộp cặp đôi ấy lại chỉ giữ
+     dòng sau, tức là fallback chỉ tồn tại trong mã nguồn còn production thì không. Khối
+     @supports thì minifier không dám gộp. */
+  @supports not (height: 100lvh) {
+    .backdrop {
+      height: 100vh;
+      width: calc(100vh * (1672 / 941));
+      margin-bottom: -100vh;
+    }
   }
 }
 

@@ -133,8 +133,8 @@
         },
         {
           "action": "waitForCondition",
-          "timeoutMs": 45000,
-          "note": "ch\u1EDD n\u00FAt KHI\u00CAU CHI\u1EBEN bi\u1EBFn m\u1EA5t = site \u0111\u00E3 ghi nh\u1EADn \u0111\u00F2n \u0111\u00E1nh (v\u00E0o cooldown, ho\u1EB7c h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay). C\u00F2n th\u1EA5y n\u00FAt ngh\u0129a l\u00E0 c\u00FA b\u1EA5m r\u01A1i v\u00E0o h\u01B0 kh\u00F4ng \u2014 ph\u1EA3i k\u00EAu to, v\u00EC nh\u1EADn v\u01A1 l\u00E0 xong cho m\u1ED9t tr\u1EADn ch\u01B0a t\u1EEBng \u0111\u00E1nh l\u00E0 c\u00E1ch m\u1EA5t c\u1EA3 ng\u00E0y l\u01B0\u1EE3t boss m\u00E0 kh\u00F4ng ai bi\u1EBFt. B\u1EA3n ghi 06/08: \u0111\u00F2n \u0103n th\u00EC \u0111\u1ED3ng h\u1ED3 thay n\u00FAt sau ~12s",
+          "timeoutMs": 120000,
+          "note": "ch\u1EDD n\u00FAt KHI\u00CAU CHI\u1EBEN bi\u1EBFn m\u1EA5t = site \u0111\u00E3 ghi nh\u1EADn \u0111\u00F2n \u0111\u00E1nh (v\u00E0o cooldown, ho\u1EB7c h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay). C\u00F2n th\u1EA5y n\u00FAt ngh\u0129a l\u00E0 c\u00FA b\u1EA5m r\u01A1i v\u00E0o h\u01B0 kh\u00F4ng \u2014 ph\u1EA3i k\u00EAu to, v\u00EC nh\u1EADn v\u01A1 l\u00E0 xong cho m\u1ED9t tr\u1EADn ch\u01B0a t\u1EEBng \u0111\u00E1nh l\u00E0 c\u00E1ch m\u1EA5t c\u1EA3 ng\u00E0y l\u01B0\u1EE3t boss m\u00E0 kh\u00F4ng ai bi\u1EBFt. B\u1EA3n ghi 06/08: \u0111\u00F2n \u0103n th\u00EC \u0111\u1ED3ng h\u1ED3 thay n\u00FAt sau ~12s \u2014 tr\u00EAn m\u1ED9t tab r\u1EA3nh. Nh\u1EADt k\u00FD 07/08 01:03:55: ch\u1EA1y song song c\u1EA1nh m\u1ED9t tr\u1EADn M\u00EA Cung \u0111\u1EE7 \u0111\u1ED9i tr\u00EAn VM hai nh\u00E2n, 45s v\u1EABn kh\u00F4ng \u0111\u1EE7 cho ho\u1EA1t \u1EA3nh ch\u1EA1y xong \u2014 120s l\u00E0 10\u00D7 m\u1ED1c 12s, ch\u1EC9 ph\u1EA3i tr\u1EA3 gi\u00E1 khi tr\u1EADn th\u1EADt s\u1EF1 h\u1ECFng, v\u00E0 v\u1EABn n\u1EB1m xa d\u01B0\u1EDBi cooldown 450s.",
           "condition": {
             "kind": "hidden",
             "selector": "#battle-button"
@@ -997,8 +997,8 @@
         },
         {
           "action": "waitForCondition",
-          "timeoutMs": 45000,
-          "note": "ch\u1EDD n\u00FAt KHI\u00CAU CHI\u1EBEN bi\u1EBFn m\u1EA5t = site \u0111\u00E3 ghi nh\u1EADn \u0111\u00F2n \u0111\u00E1nh (v\u00E0o cooldown, ho\u1EB7c h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay). C\u00F2n th\u1EA5y n\u00FAt ngh\u0129a l\u00E0 c\u00FA b\u1EA5m r\u01A1i v\u00E0o h\u01B0 kh\u00F4ng \u2014 ph\u1EA3i k\u00EAu to, v\u00EC nh\u1EADn v\u01A1 l\u00E0 xong cho m\u1ED9t tr\u1EADn ch\u01B0a t\u1EEBng \u0111\u00E1nh l\u00E0 c\u00E1ch m\u1EA5t c\u1EA3 ng\u00E0y l\u01B0\u1EE3t boss m\u00E0 kh\u00F4ng ai bi\u1EBFt. B\u1EA3n ghi 06/08: \u0111\u00F2n \u0103n th\u00EC \u0111\u1ED3ng h\u1ED3 thay n\u00FAt sau ~12s",
+          "timeoutMs": 120000,
+          "note": "ch\u1EDD n\u00FAt KHI\u00CAU CHI\u1EBEN bi\u1EBFn m\u1EA5t = site \u0111\u00E3 ghi nh\u1EADn \u0111\u00F2n \u0111\u00E1nh (v\u00E0o cooldown, ho\u1EB7c h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay). C\u00F2n th\u1EA5y n\u00FAt ngh\u0129a l\u00E0 c\u00FA b\u1EA5m r\u01A1i v\u00E0o h\u01B0 kh\u00F4ng \u2014 ph\u1EA3i k\u00EAu to, v\u00EC nh\u1EADn v\u01A1 l\u00E0 xong cho m\u1ED9t tr\u1EADn ch\u01B0a t\u1EEBng \u0111\u00E1nh l\u00E0 c\u00E1ch m\u1EA5t c\u1EA3 ng\u00E0y l\u01B0\u1EE3t boss m\u00E0 kh\u00F4ng ai bi\u1EBFt. B\u1EA3n ghi 06/08: \u0111\u00F2n \u0103n th\u00EC \u0111\u1ED3ng h\u1ED3 thay n\u00FAt sau ~12s \u2014 tr\u00EAn m\u1ED9t tab r\u1EA3nh. Nh\u1EADt k\u00FD 07/08 01:03:55: ch\u1EA1y song song c\u1EA1nh m\u1ED9t tr\u1EADn M\u00EA Cung \u0111\u1EE7 \u0111\u1ED9i tr\u00EAn VM hai nh\u00E2n, 45s v\u1EABn kh\u00F4ng \u0111\u1EE7 cho ho\u1EA1t \u1EA3nh ch\u1EA1y xong \u2014 120s l\u00E0 10\u00D7 m\u1ED1c 12s, ch\u1EC9 ph\u1EA3i tr\u1EA3 gi\u00E1 khi tr\u1EADn th\u1EADt s\u1EF1 h\u1ECFng, v\u00E0 v\u1EABn n\u1EB1m xa d\u01B0\u1EDBi cooldown 450s.",
           "condition": {
             "kind": "hidden",
             "selector": "#battle-button"

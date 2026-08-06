@@ -11,6 +11,27 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.34.1 — ngân sách bằng chứng đòn đánh chịu được tab bị bỏ đói CPU
+
+- **45s được cân cho nhầm đêm.** Bản ghi 06/08 đo chuỗi thật trên MỘT tab rảnh: POST trả lời
+  ngay, hoạt ảnh ~11s, đồng hồ thay nút ở ~12s — và 45s (~4×) được tin là đủ cho ba tab trên
+  VM hai nhân. Nhật ký 07/08 01:03:55 phủ định điều đó: Hoang Vực chạy song song cạnh một
+  trận Mê Cung「Đủ đội」, hoạt ảnh của tab bị bỏ đói CPU chưa chạy xong ở giây 45, và một đòn
+  đánh THẬT SỰ TRÚNG bị báo thành `Hết 45s chờ: #battle-button hidden`. Tuần tự không bao
+  giờ hỏng — khác biệt chưa từng nằm ở flow, chỉ nằm ở việc ai đang ăn CPU bên cạnh.
+- **Bước bằng chứng giờ chờ tới 120s** — 10× mốc 12s đo được, vẫn xa dưới cooldown 450s. Đòn
+  trúng là thoả điều kiện NGAY lúc nút biến mất, nên sự hào phóng này miễn phí trên mọi trận
+  thắng; chỉ một trận thật sự hỏng mới phải trả trọn. Không đổi schema: cùng bước, cùng nhân
+  chứng, một con số.
+- **Một kịch bản cho cả hai chế độ vẫn là luật** (nguyên tắc từ 0.32.0): tuần tự với song
+  song chỉ khác nhau ở tốc độ trang vẽ — đúng thứ cửa sổ có hạn sinh ra để hấp thụ. Cửa sổ
+  chỉ đơn giản là quá nhỏ, nên KHÔNG rẽ nhánh timeout theo chế độ chạy: còn hai con số là
+  còn ngày chúng lệch nhau.
+- Smoke thêm chốt sàn `>= 120s` cho bước bằng chứng của cả hai twin — teo con số này lại là
+  mở cửa cho đúng đêm lỗi ấy quay về. **189 thuận, 0 nghịch.**
+
+---
+
 ## 0.34.0 — bế quan trùng tu: dừng cả tông môn mà không chém một đàn nào giữa vòng
 
 - **Tab Bảo Trì trong trang Tông Môn.** Trưởng môn khai bảo trì với một ước lượng số phút

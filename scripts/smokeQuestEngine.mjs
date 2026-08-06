@@ -1203,6 +1203,15 @@ async function main() {
       confirm?.optional !== true,
       `optional=${confirm?.optional}`,
     );
+    // Nhật ký 07/08 01:03:55: 45s không sống nổi cạnh một trận Mê Cung đủ đội trên VM hai
+    // nhân — hoạt ảnh của tab bị bỏ đói CPU chạy chưa xong thì bằng chứng chưa xuất hiện.
+    // 120s = 10× mốc 12s đo trên tab rảnh; teo con số này lại là mở cửa cho đúng đêm lỗi ấy
+    // quay về, nên sàn của nó bị đóng đinh ở đây.
+    check(
+      `${bossId}: ngân sách bằng chứng chịu được tab bị bỏ đói CPU (>= 120s)`,
+      (confirm?.timeoutMs ?? 0) >= 120000,
+      `timeoutMs=${confirm?.timeoutMs}`,
+    );
   }
 
   console.log("\nNgọc giản đi trước engine thì phải kêu lên");

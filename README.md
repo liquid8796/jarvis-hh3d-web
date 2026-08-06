@@ -1,7 +1,9 @@
 # Auto HH3D — Web
 
 Control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ → tông môn duyệt → khai đàn,
-rồi automation **chạy trên server** dù đạo hữu đã tắt trình duyệt.
+rồi automation **chạy trên server** dù đạo hữu đã tắt trình duyệt. Bước "tông môn duyệt" là
+một công tắc ở tab Môn Đồ của trang Tông Môn — tắt nó thì người mới bái sư xong vào thẳng
+Linh Đài; mặc định là BẬT.
 
 Đây là bản web của [JarvisHH3D](../JarvisHH3D) (bản desktop). Hai sản phẩm chia nhau cùng
 một mô hình nhiệm vụ — Mê Cung, Luyện Đan Đường, cùng những tuỳ chọn ấy.

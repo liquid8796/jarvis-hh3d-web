@@ -11,6 +11,46 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.33.0 — Cổng bái sư có công tắc, và mặc định luôn nghiêng về phía đóng
+
+- **Trưởng môn tắt được bước xét duyệt.** Tab Môn Đồ của trang Tông Môn có thêm một công
+  tắc: bật thì người mới bái sư dừng ở phòng chờ như xưa, tắt thì họ được thu nhận ngay lúc
+  dâng thiếp và vào thẳng Linh Đài. Công tắc nằm ngay TRÊN cái hàng chờ mà nó cai quản, chứ
+  không tách thành một tab cấu hình riêng — gạt xong là thấy hậu quả trong cùng một màn hình.
+- **Mặc định là BẬT, và đó là phần đáng kể nhất của thay đổi này.** Mọi document cấu hình đã
+  ghi trước bản này đều không có nhánh `membership`, nên giá trị default chính là thứ áp lên
+  tất cả chúng ngay khoảnh khắc deploy xong. Default `false` nghĩa là cổng tông môn tự mở
+  toang mà không một ai bấm gì. Một công tắc canh cửa chỉ được phép nghiêng về phía đóng khi
+  chưa ai nói gì.
+- **Trạng thái người mới sinh ra do tầng service quyết, không do người gọi truyền vào.**
+  `register()` tự đọc môn quy thay vì nhận `status` qua đối số. Lý do rất cụ thể: form bái sư
+  là thứ ngoài Internet chạm tới được, và hễ trạng thái khởi sinh đi vào bằng tham số thì sớm
+  muộn cũng có một đường gọi chuyền thẳng dữ liệu form xuống — lúc ấy kẻ gõ cửa tự phong cho
+  mình `active` bằng đúng một field thừa.
+- **Đích đến sau khi bái sư đọc trạng thái THẬT vừa ghi xuống**, không đoán lại theo công
+  tắc: giữa lúc `register()` đọc môn quy và lúc chuyển trang, trưởng môn có thể vừa gạt nó.
+- **Tắt cổng KHÔNG với tay ngược về quá khứ** — ai đã đứng sẵn trong hàng chờ vẫn đứng đó.
+  Đó là chủ ý (mở cổng là luật cho người tới sau, không phải một lệnh duyệt hàng loạt ngầm),
+  nhưng im lặng về nó thì hàng chờ thành cái hố: không còn ai nghĩ tới việc phải dọn. Nên form
+  đếm và nói thẳng「còn N đạo hữu trong hàng chờ」ngay khi tick tắt — **trước** lúc bấm lưu.
+- **Trang bái sư thôi hứa cứng.** Phụ đề của nó là lời hứa đầu tiên tông môn nói với người
+  lạ; hứa có bước xét duyệt trong khi cổng đang mở toang thì lời hứa ấy sai, và người ta phát
+  hiện đúng lúc vừa bấm Bái Sư. Giờ nó đọc môn quy thật.
+- **Và chính chỗ đó suýt hỏng theo kiểu chỉ bản build mới lộ ra.** `/register` là trang DUY
+  NHẤT trong cả control plane được prerender tĩnh — vì nó là trang duy nhất không đọc gì cả.
+  Cho nó đọc cấu hình mà không khai `force-dynamic` thì `next build` đọc công tắc đúng một
+  lần rồi đóng băng câu trả lời vào HTML: gạt công tắc xong, trang bái sư vẫn hứa hẹn quy
+  trình cũ cho tới lần deploy kế tiếp. Kèm theo đó, `next build` bắt đầu cần một database chỉ
+  để dịch xong một trang — đúng thứ mà `src/lib/db/client.ts` cố tình tránh. Đã kiểm chứng
+  bằng cách build với `DATABASE_URL` trỏ vào hư vô: build vẫn xanh.
+- **`npm run verify:membership`** đo cả hai chiều công tắc trên database thật, và chốt luôn
+  cái default: document rỗng cũng như document cũ (chỉ có `chat`) đều phải ra `requireApproval
+  = true`. Script động vào cấu hình toàn hệ thống thật nên nó in giá trị gốc ra trước khi
+  chạm, khôi phục trong `finally`, rồi ĐỌC LẠI để xác nhận — khôi phục hụt là loại thất bại
+  phải hét lên, vì hậu quả của nó là cổng tông môn nằm sai chiều trong im lặng.
+
+---
+
 ## 0.32.0 — Hoang Vực viết lại từ bản ghi 06/08 21:00, và mỗi hạng có nhịp riêng
 
 - **Vỏ trang boss KHÔNG trung lập — nó mời gọi, và đó chính là con bug.** Lấy thẳng từ DOM của

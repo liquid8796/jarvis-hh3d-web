@@ -52,9 +52,10 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
     role: result.user.role,
   });
 
-  // Fresh registrations are always pending — land them in the waiting room, which explains
-  // the approval step instead of a dashboard full of locked doors.
-  redirect("/pending");
+  // Đích đến do trạng thái THẬT vừa ghi xuống quyết định, không do đoán theo môn quy: giữa
+  // lúc `register()` đọc công tắc và lúc này, trưởng môn có thể vừa gạt nó. Còn chờ duyệt
+  // thì vào phòng chờ — nơi giải thích bước xét duyệt, thay vì một Linh Đài toàn cửa khoá.
+  redirect(result.user.status === "active" ? "/dashboard" : "/pending");
 }
 
 export async function loginAction(_prev: FormState, formData: FormData): Promise<FormState> {

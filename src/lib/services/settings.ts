@@ -18,6 +18,22 @@ export const appSettingsSchema = z.object({
       retentionDays: z.number().int().min(1).max(365).default(7),
     })
     .prefault({}),
+
+  membership: z
+    .object({
+      /**
+       * Cổng bái sư có người gác hay không: bật thì người mới dừng ở `pending` chờ trưởng
+       * môn điểm danh, tắt thì họ được thu nhận ngay lúc dâng thiếp.
+       *
+       * MẶC ĐỊNH `true`, và đó là phần quan trọng nhất của dòng này. Mọi document đã ghi
+       * trước bản này đều KHÔNG có nhánh `membership`, nên default chính là thứ áp lên tất
+       * cả chúng ngay khi deploy xong. Nếu default là `false`, cổng tông môn tự mở toang mà
+       * không một ai bấm gì — một công tắc canh cửa chỉ được phép nghiêng về phía ĐÓNG khi
+       * chưa ai nói gì.
+       */
+      requireApproval: z.boolean().default(true),
+    })
+    .prefault({}),
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;

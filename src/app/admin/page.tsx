@@ -4,6 +4,7 @@ import { getAppSettings } from "@/lib/services/settings";
 import { countPending, listUsers } from "@/lib/services/users";
 import { AdminTabs } from "./AdminTabs";
 import { ChatSettingsForm } from "./ChatSettingsForm";
+import { MembershipSettingsForm } from "./MembershipSettingsForm";
 import { UserTable } from "./UserTable";
 import { CreateUserPanel } from "./CreateUserPanel";
 
@@ -61,6 +62,12 @@ export default async function AdminPage({
               label: "Môn Đồ",
               pane: (
                 <>
+                  <div className="mb-6">
+                    <MembershipSettingsForm
+                      requireApproval={settings.membership.requireApproval}
+                      pendingCount={pending}
+                    />
+                  </div>
                   <div className="mb-6">
                     <CreateUserPanel />
                   </div>

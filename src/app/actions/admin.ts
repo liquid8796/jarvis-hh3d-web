@@ -143,6 +143,38 @@ export async function deleteUserAction(userId: string): Promise<AdminResult> {
 }
 
 /**
+ * Môn quy — công tắc xét duyệt, ở tab "Môn Đồ" ngay cạnh hàng chờ mà nó cai quản.
+ *
+ * `formData.get()` trả `null` khi checkbox KHÔNG được tick, vì trình duyệt đơn giản là không
+ * gửi field ấy đi. Nên `null` ở đây phải đọc là "TẮT", không phải "giữ nguyên" — đọc nhầm
+ * một lần là công tắc thành đường một chiều: bật được, không bao giờ tắt được.
+ */
+export async function saveMembershipSettingsAction(
+  _prev: AdminResult | null,
+  formData: FormData,
+): Promise<AdminResult> {
+  await requireAdmin();
+
+  const requireApproval = formData.get("requireApproval") !== null;
+
+  const settings = await getAppSettings();
+  settings.membership.requireApproval = requireApproval;
+  await saveAppSettings(settings);
+
+  // Chỉ /admin cần gọi tên ở đây. Trang bái sư cũng đổi lời theo công tắc này, nhưng nó tự
+  // khai `force-dynamic` nên vẽ lại từ database ở MỌI lượt ghé — nhắc tên nó ở đây chỉ khiến
+  // người đọc sau tưởng trang ấy có cache để mà xoá.
+  revalidatePath("/admin");
+
+  return {
+    ok: true,
+    message: requireApproval
+      ? "Cổng tông môn đã có người gác — người mới bái sư sẽ vào hàng chờ."
+      : "Cổng tông môn đã mở — người mới bái sư được thu nhận ngay, không qua hàng chờ.",
+  };
+}
+
+/**
  * Cấu hình đàm đạo — tab "Đàm Đạo" của trang Tông Môn. Đọc-sửa-ghi trọn document qua Zod,
  * nên một field mới thêm vào schema sau này không bị form cũ ghi đè mất.
  */

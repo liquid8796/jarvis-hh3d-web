@@ -1,6 +1,7 @@
 import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { getAppSettings } from "@/lib/services/settings";
 import type { UserRow } from "@/lib/db/schema";
 
 /**
@@ -48,7 +49,16 @@ export async function findById(id: string): Promise<PublicUser | null> {
   return rows[0] ?? null;
 }
 
-/** Registration: anyone may knock; everyone starts `pending` until an admin opens the gate. */
+/**
+ * Bái sư: ai cũng được gõ cửa. Người mới dừng lại ở `pending` hay vào thẳng `active` là do
+ * MÔN QUY quyết định (công tắc xét duyệt, tab Môn Đồ của trang Tông Môn).
+ *
+ * Luật ấy được đọc NGAY TẠI ĐÂY chứ không nhận từ tham số của người gọi. Form bái sư là thứ
+ * ngoài Internet chạm tới được: hễ trạng thái khởi sinh đi vào bằng đối số thì sớm muộn cũng
+ * có một đường gọi nào đó chuyền thẳng dữ liệu từ form xuống, và lúc ấy kẻ gõ cửa tự phong
+ * cho mình `active` chỉ bằng một field thừa. Trạng thái người mới sinh ra thuộc về tầng này,
+ * không thuộc về ai gọi nó.
+ */
 export async function register(input: {
   username: string;
   displayName: string;
@@ -65,6 +75,8 @@ export async function register(input: {
     return { ok: false, error: "Email này đã được dùng cho một đạo hiệu khác." };
   }
 
+  const { membership } = await getAppSettings();
+
   const rows = await db()
     .insert(schema.users)
     .values({
@@ -72,6 +84,7 @@ export async function register(input: {
       displayName: input.displayName.trim(),
       email,
       passwordHash: hashPassword(input.password),
+      status: membership.requireApproval ? "pending" : "active",
     })
     // Hai người có thể submit cùng lúc sau bước kiểm tra trên. Database phân xử, rồi ta
     // đọc lại để trả thông báo thân thiện thay vì làm văng lỗi 500 vì unique constraint.

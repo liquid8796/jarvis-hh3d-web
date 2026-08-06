@@ -10,8 +10,10 @@ Web: <https://auto-hh3d.vercel.app>
 ## 1. Vào được đã
 
 1. Vào trang, bấm **Bái sư** để đăng ký đạo hiệu, danh xưng và email.
-2. Chờ tông chủ duyệt. Chưa duyệt thì bạn chỉ thấy phòng chờ.
-3. Duyệt xong, đăng nhập lại là vào **Linh Đài** — nơi làm mọi thứ.
+2. Tuỳ tông chủ đang để cổng thế nào — chính trang bái sư nói rõ bạn rơi vào đường nào:
+   - **Còn xét duyệt:** chờ tông chủ duyệt, trong lúc đó bạn chỉ thấy phòng chờ.
+   - **Cổng đang mở:** bái sư xong là vào thẳng **Linh Đài**, không phải chờ ai.
+3. Vào được Linh Đài rồi thì làm mọi thứ ở đó.
 
 ---
 

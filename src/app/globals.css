@@ -65,6 +65,46 @@ body {
   background: #060b1a url("/backdrop.png") center / cover no-repeat;
 }
 
+/* Trên điện thoại, `cover` là một cái máy chém: màn 375px chỉ còn thấy ~26% bề ngang tấm
+   ảnh (ảnh gốc 1672×941, phủ theo chiều cao 812px là rộng 1443px). Yêu cầu của tông chủ:
+   người dùng mobile phải NGẮM ĐƯỢC TRỌN tấm tranh — nên trang được phép cuộn ngang, và cuộn
+   ngang ấy là để pan qua bức tranh, không phải vì nội dung bị tràn.
+
+   Cách làm: thôi `fixed` (fixed bị đóng đinh vào viewport, cuộn ngang không nhúc nhích) mà
+   chuyển sang `sticky` với kích thước ĐÚNG TỈ LỆ ẢNH — cao trọn khung nhìn, rộng theo tỉ lệ
+   1672/941. `top: 0` chỉ ghim chiều DỌC: cuộn xuống đọc nội dung thì tranh đứng yên như cũ,
+   còn chiều ngang không ghim nên vuốt sang là tranh trôi theo canvas — app nằm nguyên bên
+   trái đúng bề rộng màn hình, phần tranh thừa ra thò sang phải chờ được ngắm.
+
+   Từng con số đều có lý do:
+   - `inset: auto` + `top: 0`: luật gốc đặt `inset: 0`, mà với sticky thì `left: 0` nghĩa là
+     ghim luôn chiều ngang — đúng cái phải tháo ra.
+   - `100lvh` thay vì `100dvh`: bề rộng tính từ chiều cao, mà dvh co giãn theo thanh địa chỉ
+     mobile — mỗi lần thanh ấy trồi sụt là cả tấm ảnh đổi cỡ giữa lúc đang cuộn. lvh đứng yên.
+     Dòng `100vh` ngay trước là fallback cho trình duyệt chưa biết lvh.
+   - `min-width: 100%`: điện thoại xoay ngang thì khung nhìn rộng hơn ảnh tính theo chiều
+     cao — lúc ấy về lại cover quen thuộc, không mở cuộn ngang chỉ để lộ một dải màu lót.
+   - `margin-bottom` âm đúng bằng chiều cao: sticky nằm TRONG dòng chảy (khác fixed), không
+     trừ lại thì mọi nội dung bị đẩy xuống nguyên một màn hình.
+   - `flex-shrink: 0`: body là cột flex, không khoá thì chiều cao ảnh bị bóp khi trang dài.
+   - `background-size: cover` giữ nguyên nghĩa: phần tử đúng tỉ lệ ảnh nên cover = trọn ảnh,
+     không cắt gì nữa. */
+@media (max-width: 767px) {
+  .backdrop {
+    position: sticky;
+    inset: auto;
+    top: 0;
+    flex-shrink: 0;
+    height: 100vh;
+    height: 100lvh;
+    width: calc(100vh * (1672 / 941));
+    width: calc(100lvh * (1672 / 941));
+    min-width: 100%;
+    margin-bottom: -100vh;
+    margin-bottom: -100lvh;
+  }
+}
+
 /* Dòng ký tên cuối trang — nằm trên nền ảnh nên tự mang một dải mờ nhẹ cho khỏi chìm.
    margin-top:auto là nửa kia của sticky footer (xem body). */
 .site-footer {

@@ -1,6 +1,20 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro, Noto_Serif } from "next/font/google";
 import "./globals.css";
+
+/**
+ * `minimumScale: 1` là một nửa của tính năng pan tranh trên mobile (nửa kia là `.backdrop`
+ * sticky trong globals.css). Trang mobile giờ CỐ Ý rộng hơn khung nhìn — để vuốt ngang mà
+ * ngắm trọn tấm tranh nền — nhưng trình duyệt điện thoại gặp trang tràn ngang là tự thu nhỏ
+ * cho vừa ("overview mode"). Đo trong emulation: scale bị kéo xuống 0.26, cả canvas 1443px
+ * thu tí hon vào 375px — người dùng nhận một cái app kiến thay vì một bức tranh pan được.
+ * Ghim sàn zoom ở 1 thì phần tràn trở thành CUỘN, đúng ý đồ. Phóng TO để đọc chữ vẫn tự do.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  minimumScale: 1,
+};
 
 const display = Noto_Serif({
   subsets: ["latin", "vietnamese"],

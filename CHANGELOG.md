@@ -11,6 +11,34 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.33.2 — mobile được vuốt ngang để ngắm trọn tấm tranh nền
+
+- **`cover` trên điện thoại là một cái máy chém.** Ảnh nền gốc 1672×941; màn 375px phủ theo
+  chiều cao chỉ còn thấy 375/1443 ≈ **26% bề ngang** tấm tranh — Nam Cung Uyển dưới trăng mà
+  người xem mobile chưa từng thấy mặt trăng. Yêu cầu của tông chủ: mobile phải ngắm được TRỌN
+  bức tranh, bằng cuộn ngang lẫn dọc.
+- **Đổi `fixed` thành `sticky` đúng tỉ lệ ảnh, chỉ dưới 768px.** `fixed` bị đóng đinh vào
+  khung nhìn nên cuộn kiểu gì cũng không nhúc nhích; `sticky` với `top: 0` chỉ ghim chiều
+  DỌC — cuộn xuống đọc nội dung thì tranh đứng yên như cũ, còn chiều ngang không ghim nên
+  vuốt sang là tranh trôi theo canvas. App vẫn nằm nguyên bên trái đúng bề rộng màn hình;
+  phần tranh thừa thò sang phải chờ được ngắm. Đo thật: pan 600px thì header trôi −600 và
+  tranh lộ vùng mới, cuộn dọc 400px thì tranh vẫn ghim ở 0.
+- **Cái bẫy thật sự không nằm trong CSS mà nằm ở viewport.** Dựng xong phần sticky, đo trong
+  emulation mobile: `visualViewport.scale = 0.26` — trình duyệt điện thoại gặp trang tràn
+  ngang là tự thu nhỏ cho vừa ("overview mode"), người dùng nhận một cái app kiến tí hon
+  thay vì một bức tranh pan được, dù CSS đúng từng dòng. Vá bằng `minimumScale: 1` trong
+  viewport export của layout: phần tràn trở thành CUỘN chứ không thành zoom-out. Phóng to để
+  đọc chữ vẫn tự do — chỉ khoá chiều thu nhỏ.
+- **Hai lối thoát có chủ ý:** điện thoại xoay ngang (khung nhìn rộng hơn ảnh tính theo chiều
+  cao) thì `min-width: 100%` trả về cover quen thuộc, không mở cuộn ngang chỉ để lộ một dải
+  màu lót — đo ở 667×375: không tràn. Desktop từ 768px giữ nguyên `fixed`, không đổi một
+  pixel — đo ở 1280×800: vẫn `fixed`, không tràn ngang.
+- Chi tiết đơn vị: bề rộng tranh tính bằng `100lvh` chứ không `100dvh`, vì dvh co giãn theo
+  thanh địa chỉ mobile — mỗi lần nó trồi sụt là cả tấm ảnh đổi cỡ giữa lúc đang cuộn. Có
+  fallback `100vh` cho trình duyệt cũ.
+
+---
+
 ## 0.33.1 — cụm menu thôi nhảy ngang khi đổi tab
 
 - **Thanh trên cùng đứng yên một chỗ trên mọi trang.** Bề rộng của nó từng là THAM SỐ do

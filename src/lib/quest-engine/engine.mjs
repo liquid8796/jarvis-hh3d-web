@@ -26,10 +26,21 @@ import {
   menuProbe,
   quizCorrectAnswer,
   quizProbe,
+  selectorPresence,
 } from "./boardScripts.mjs";
 
 /** Lồng một repeat trong một repeat là hợp lệ; sâu hơn là lỗi cấu hình. */
 const MAX_REPEAT_DEPTH = 2;
+
+/**
+ * Một `stopIf` dạng VẮNG MẶT được cho bao lâu để trang chứng minh nó chỉ đang vẽ chậm.
+ *
+ * Chỉ tiêu tốn khi selector KHÔNG khớp phần tử nào — tức đúng những lúc câu trả lời còn mơ
+ * hồ. Nút đã có mặt mà đang ẩn thì trang đã trả lời rồi, và lượt dừng đi thẳng như trước.
+ * Tám giây phủ trọn đợt vẽ thứ hai đo được (2–4 giây, dài hơn khi ba tab cùng dựng trang),
+ * mà vẫn là một con số hữu hạn cho ngày trang thật sự bỏ hẳn một control.
+ */
+const STOP_CONFIRM_MS = 8000;
 
 /**
  * Ngân sách theo dõi dấu "đáp án đúng", và nhịp nhìn lại.
@@ -213,6 +224,63 @@ export function createQuestEngine(deps) {
     });
     return value === true;
   };
+
+  /**
+   * Một `stopIf` dạng VẮNG MẶT vừa khớp — nhưng nó có thật không, hay trang chưa vẽ tới đó?
+   *
+   * Trả về true khi lượt dừng là THẬT. Đây là chỗ đắt giá nhất của cả bộ thông dịch, nên nói
+   * rõ vì sao nó tồn tại: `hidden` của `conditionProbe` là「không phần tử nào khớp mà đang
+   * hiện」, và một selector CHƯA CÓ MẶT trong DOM cũng thoả mãn nguyên văn câu đó. Trang game
+   * vẽ làm hai đợt — vỏ do server dựng, còn ruột do một XHR trạng thái vẽ 2–4 giây sau — nên
+   * giữa hai đợt ấy MỌI nút của trang đều「hidden」. Lấy đúng một mẫu trong khoảng đó là đọc
+   *「trang chưa nói gì」thành「trang nói không có gì để làm」, và một `stopIf` thì kết thúc cả
+   * nhiệm vụ trong im lặng, ở mức alreadyDone — không một dòng lỗi nào.
+   *
+   * Đó chính là vụ Hoang Vực: bật chạy song song, ba tab cùng dựng trang, `#battle-button`
+   * tới muộn, và nhiệm vụ dừng ở「chưa đánh được (đang chờ lượt hoặc đã hết 5 lượt hôm nay)」
+   * mỗi vòng, suốt cả ngày, trong khi「Lượt đánh còn lại」không hề nhúc nhích khỏi 5.
+   *
+   * Phép phân biệt là SỰ CÓ MẶT TRONG DOM, không phải sự hiển thị: nút đang mang
+   * `display:none` là trang ĐÃ trả lời (đang cooldown / hết lượt) — dừng ngay, không tốn một
+   * mili giây nào. Chỉ khi selector không khớp gì cả ta mới nán lại chờ nó xuất hiện; nó hiện
+   * ra thì lượt dừng bị huỷ và nhiệm vụ đi tiếp, còn hết ngân sách thì lượt dừng là thật.
+   */
+  async function stopIsReal(session, condition, scope) {
+    if (condition.kind !== "hidden" || !condition.selector?.trim()) return true;
+
+    const present = await session.evaluate(selectorPresence, { selector: condition.selector });
+    if (typeof present === "number" && present > 0) return true;
+
+    log.debug(
+      scope,
+      `'${condition.selector}' chưa có mặt trong DOM — chờ tối đa ${Math.round(STOP_CONFIRM_MS / 1000)}s ` +
+        "xem trang có đang vẽ chậm không, trước khi tin là không có gì để làm.",
+    );
+
+    // Chờ điều kiện LẬT NGƯỢC: `visible` trên cùng selector thức dậy ngay khoảnh khắc phần tử
+    // được gắn vào và vẽ ra. Cắt lát để lệnh Thu Đàn vẫn cầm quyền từ ngoài này.
+    const deadline = Date.now() + STOP_CONFIRM_MS;
+    for (;;) {
+      throwIfStopped();
+
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) return true;
+
+      const appeared = await session.evaluate(
+        conditionWaitSource(
+          { kind: "visible", selector: condition.selector, text: null },
+          Math.min(remaining, 2000),
+        ),
+      );
+
+      if (appeared === true) {
+        log.debug(scope, `'${condition.selector}' đã hiện ra — trang chỉ vẽ chậm, không phải hết lượt.`);
+        return false;
+      }
+
+      if (appeared === undefined) await sleep(300);
+    }
+  }
 
   // -------------------------------------------------------------------------------------
 
@@ -485,7 +553,10 @@ export function createQuestEngine(deps) {
       case "stopIf": {
         if (!step.condition) return "stopIf không có điều kiện.";
 
-        if (await checkCondition(session, step.condition)) {
+        if (
+          (await checkCondition(session, step.condition)) &&
+          (await stopIsReal(session, step.condition, scope))
+        ) {
           state.stopReason = step.text?.trim() ? step.text : `không có gì để làm (${describeCondition(step.condition)})`;
           // Info chứ không Debug: "đã đủ huyền tinh hôm nay" là câu trả lời người ta mở
           // Hoạt động lên để tìm, không phải một chi tiết máy móc. Và nói TRẦN câu trả lời:

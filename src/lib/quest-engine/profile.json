@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 47,
+  "schemaVersion": 48,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -2610,11 +2610,11 @@
             {
               "action": "waitForCondition",
               "timeoutMs": 110000,
-              "note": "ch\u1EDD l\u1EEDa h\u1EA1 v\u1EC1 68% \u2014 ch\u1EC9 tr\u01B0\u1EDBc l\u1EA7n \u0110i\u1EC1u H\u00F2a \u0111\u1EA7u ti\u00EAn",
+              "note": "ch\u1EDD site M\u1EDE KHO\u00C1 n\u00FAt \u0110i\u1EC1u H\u00F2a (t\u1EE9c l\u1EEDa \u0111\u00E3 \u2264 68%) \u2014 ch\u1EC9 tr\u01B0\u1EDBc l\u1EA7n \u0111\u1EA7u ti\u00EAn",
               "optional": true,
               "condition": {
-                "kind": "textMatches",
-                "text": "68%"
+                "kind": "enabled",
+                "selector": "#ldBtnTune"
               },
               "when": {
                 "kind": "textMatches",
@@ -3549,11 +3549,11 @@
             {
               "action": "waitForCondition",
               "timeoutMs": 110000,
-              "note": "ch\u1EDD l\u1EEDa h\u1EA1 v\u1EC1 68% \u2014 ch\u1EC9 tr\u01B0\u1EDBc l\u1EA7n \u0110i\u1EC1u H\u00F2a \u0111\u1EA7u ti\u00EAn",
+              "note": "ch\u1EDD site M\u1EDE KHO\u00C1 n\u00FAt \u0110i\u1EC1u H\u00F2a (t\u1EE9c l\u1EEDa \u0111\u00E3 \u2264 68%) \u2014 ch\u1EC9 tr\u01B0\u1EDBc l\u1EA7n \u0111\u1EA7u ti\u00EAn",
               "optional": true,
               "condition": {
-                "kind": "textMatches",
-                "text": "68%"
+                "kind": "enabled",
+                "selector": "#ldBtnTune"
               },
               "when": {
                 "kind": "textMatches",

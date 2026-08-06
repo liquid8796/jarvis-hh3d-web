@@ -151,6 +151,16 @@ const FREE_WHEEL_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
   if(spins===2)spinButton.textContent='Hết lượt'},40)
 }</script>`;
 
+/** Khối điều khiển boss — thứ mà đợt vẽ thứ hai mang tới trên trang thật. */
+const bossControls = (state) =>
+  (state === "spent"
+    ? "" // hết lượt hôm nay: site xoá HẲN nút khỏi DOM
+    : `<button class="battle-button" id="battle-button"${
+        state === "cooldown" ? ' style="display:none"' : ""
+      }>KHIÊU CHIẾN</button>`) +
+  '<div class="increase-damage">Đạo hữu được tăng 15% sát thương</div>' +
+  `<div>Lượt đánh còn lại: <span id="luot">${state === "spent" ? "0" : "5"}</span></div>`;
+
 /**
  * Trang boss, dựng theo đúng những gì đo được trên trang thật ngày 06/08:
  * `#countdown-timer` ẩn bằng display:none khi chưa đánh, `#battle-button` cũng ẩn bằng
@@ -158,37 +168,106 @@ const FREE_WHEEL_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
  *
  * `broken` tái hiện CHÍNH sự cố: nút Tấn Công nhận cú bấm rồi không làm gì cả. Trước bản vá,
  * ca đó cho ra「xong」y hệt một trận đánh thật.
+ *
+ * @param broken  nút Tấn Công nhận cú bấm rồi không làm gì (sự cố 06/08)
+ * @param waveMs  khối điều khiển boss tới ở ĐỢT VẼ THỨ HAI, muộn ngần này — mô phỏng trang
+ *   vẽ hai đợt dưới sức ép ba tab cùng dựng. 0 = trang đủ ngay từ HTML server.
+ * @param state   "ready" (còn lượt) · "cooldown" (nút còn trong DOM nhưng display:none) ·
+ *   "spent" (hết lượt hôm nay — site XOÁ HẲN nút khỏi DOM)
  */
-const bossPage = (broken) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+const bossPage = (broken, { waveMs = 0, state = "ready" } = {}) => `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div id="boss-info">
   <div>Huyết Trư Địa Quỷ 61.55%</div>
-  <button class="battle-button" id="battle-button">KHIÊU CHIẾN</button>
-  <div class="increase-damage">Đạo hữu được tăng 15% sát thương</div>
-  <div>Lượt đánh còn lại: <span id="luot">5</span></div>
+  <div id="boss-slot">${waveMs > 0 ? "" : bossControls(state)}</div>
 </div>
-<div id="countdown-timer" style="display:none">Chờ 7 phút 19 giây để tấn công lần tiếp theo.</div>
+<div id="countdown-timer" style="display:${state === "cooldown" ? "block" : "none"}">Chờ 7 phút 19 giây để tấn công lần tiếp theo.</div>
 <div id="boss-damage-screen" style="display:none">
   <button class="attack-button">⚔️Tấn Công</button><button class="back-button">Trở lại</button>
 </div>
 <div id="damage-summary-container" style="display:none"><button class="close-button">Đóng</button></div>
 <script>
 const $ = (s) => document.querySelector(s);
-$('#battle-button').onclick = () => setTimeout(() => { $('#boss-damage-screen').style.display = 'block'; }, 300);
-$('#boss-damage-screen .attack-button').onclick = () => {${
-  broken
-    ? "\n  /* đúng ca hỏng: site nuốt cú bấm, không gì đổi */"
-    : `
-  setTimeout(() => {
-    $('#battle-button').style.display = 'none';
-    $('#countdown-timer').style.display = 'block';
-    $('#luot').textContent = '4';
-    $('#damage-summary-container').style.display = 'block';
-    document.body.dataset.attacked = '1';
-  }, 200);`
+${waveMs > 0 ? `setTimeout(() => { $('#boss-slot').innerHTML = ${JSON.stringify(bossControls(state))}; }, ${waveMs});` : ""}
+// Uỷ quyền ở document: khối điều khiển có thể tới ở đợt vẽ sau, nên không gắn tay vào nút.
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  if (t.id === 'battle-button') {
+    setTimeout(() => { $('#boss-damage-screen').style.display = 'block'; }, 300);
+  } else if (t.classList.contains('attack-button')) {${
+    broken
+      ? "\n    /* đúng ca hỏng: site nuốt cú bấm, không gì đổi */"
+      : `
+    setTimeout(() => {
+      $('#battle-button').style.display = 'none';
+      $('#countdown-timer').style.display = 'block';
+      $('#luot').textContent = '4';
+      $('#damage-summary-container').style.display = 'block';
+      document.body.dataset.attacked = '1';
+    }, 200);`
+  }
+  } else if (t.classList.contains('close-button')) {
+    $('#damage-summary-container').style.display = 'none';
+  } else if (t.classList.contains('back-button')) {
+    $('#boss-damage-screen').style.display = 'none';
+  }
+});
+</script>`;
+
+/**
+ * Trang Luyện Đan Đường, dựng theo bản ghi 29/07 + video của nó.
+ *
+ * Hai điều làm trang này khác mọi trang khác, và cả hai đều nằm trong bản vá:
+ *  • Vẽ HAI ĐỢT: `#ld-app` là vỏ server (chứa sẵn ba nút XƯƠNG opacity-0), panel thật do XHR
+ *    trạng thái vẽ `waveMs` sau.
+ *  • Lửa TỤT liên tục. Nút Điều Hòa bị site KHOÁ cho tới khi % ≤ 68, và chuỗi「68%」chỉ hiện
+ *    trên màn đúng khoảng một giây lúc kim quét qua con số ấy — `startFire` cho phép dựng lại
+ *    ca script tới SAU khoảnh khắc đó, tức đúng ca đã làm nổ lò.
+ */
+const furnacePage = ({ waveMs = 1200 } = {}) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+<div id="ld-app">
+  <button id="ldBtnCraft" style="opacity:0;width:120px;height:36px" disabled>Luyện Đan</button>
+  <button id="ldBtnTune" style="opacity:0;width:120px;height:36px" disabled>Điều Hòa</button>
+  <button id="ldBtnCollect" style="opacity:0;width:120px;height:36px" disabled>Thu Đan</button>
+  <div id="ldPanel"></div><div id="ldInventory"></div>
+</div>
+<div id="ldModal" style="display:none"><button id="ldModalCloseBtn">Đóng</button><button id="ldModalDecompose">Phân Giải</button></div>
+<div id="ldConfirm" style="display:none"><button id="ldConfirmOk">Xác Nhận</button></div>
+<div id="ldDecomposeReward" style="display:none"><button id="ldDecomposeRewardOk">ĐÓNG</button></div>
+<script>
+const $ = (s) => document.querySelector(s);
+let S = null;
+const show = (b, on) => { b.style.opacity = '1'; b.disabled = !on; };
+const hide = (b) => { b.style.opacity = '0'; b.disabled = true; };
+function render() {
+  if (!S) return;
+  const p = $('#ldPanel');
+  if (S.phase === 'cooking') {
+    hide($('#ldBtnCraft')); hide($('#ldBtnCollect'));
+    show($('#ldBtnTune'), S.tunes < 3 && !S.locked && (S.tunes > 0 || S.fire <= 68));
+    const pct = Math.max(0, Math.round(S.fire)) + '%';
+    // Đồng hồ mẻ đan có mặt trong MỌI trạng thái đang luyện — đó là thứ bước "đệm chờ XHR"
+    // của flow dò bằng chuỗi "00:" để biết panel thật đã về.
+    const clock = '<p>Thời gian còn lại 00:41:00</p>';
+    p.innerHTML = (S.tunes === 0
+      ? '<p>Lửa: <b>' + pct + '</b> — Còn 04:53 — cần 3 lần Điều Hòa khi % ≤ 68</p>'
+      : S.tunes >= 3
+        ? '<p>Đã giữ lửa đủ 3 lần — Đan Lô an toàn</p>'
+        : '<p>Lửa: <b>' + pct + '</b> — Giữ lửa: ' + S.tunes + '/3</p>') + clock;
+  } else {
+    hide($('#ldBtnTune')); hide($('#ldBtnCollect')); show($('#ldBtnCraft'), true);
+    p.innerHTML = '<button class="ld-recipe-tier">Hạ Phẩm</button><p>Đan Lô đã phát nổ.</p>';
+  }
 }
-};
-$('#damage-summary-container .close-button').onclick = () => { $('#damage-summary-container').style.display = 'none'; };
-$('#boss-damage-screen .back-button').onclick = () => { $('#boss-damage-screen').style.display = 'none'; };
+setTimeout(async () => {
+  S = await (await fetch('/ld-state')).json(); render();
+  setInterval(async () => { S = await (await fetch('/ld-state')).json(); render(); }, 300);
+}, ${waveMs});
+document.addEventListener('click', async (e) => {
+  if (e.target.id === 'ldBtnTune' && !e.target.disabled) {
+    S = await (await fetch('/ld-tune')).json();
+    render();
+  }
+});
 </script>`;
 
 // Trang Tiên Duyên + modal Hỷ Sự Đường theo recording 05/08: nút .hy-su-btn mở modal, danh
@@ -1064,8 +1143,8 @@ async function main() {
   );
   const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
   check(
-    "hồ sơ đang ở schema 47",
-    loadProfileForSchema().schemaVersion === 47,
+    "hồ sơ đang ở schema 48",
+    loadProfileForSchema().schemaVersion === 48,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1151,6 +1230,41 @@ async function main() {
   const hySuBlessed = new Map(); // id → lời chúc đã gửi, theo thứ tự vào phòng
   const hySuLixi = [];
   let bossBroken = false;
+  let bossWaveMs = 0;
+  let bossState = "ready";
+
+  // Lò luyện đan phía "server": lửa tụt theo thời gian thật, nút Điều Hòa chỉ mở khi % ≤ 68
+  // (lần đầu) hoặc khi đã hết khoá 6 giây (các lần sau) — đúng luật đo được trên trang thật.
+  // Nén tốc độ tụt để một ca smoke không tốn năm phút, nhưng giữ nguyên TỶ LỆ giữa ngưỡng 68,
+  // khoá 6 giây và ngòi nổ.
+  const furnace = { phase: "cooking", fire: 98, tunes: 0, lockedUntil: 0, tick: Date.now(), log: [] };
+  const FURNACE_DECAY_PER_SEC = 3;
+  // Khai lô lại NGAY TRƯỚC mỗi ca: lửa tụt theo đồng hồ treo tường, mà ca này chạy ở cuối
+  // suite — không đặt lại thì phép tính đầu tiên nuốt trọn số phút của mọi ca phía trước và
+  // lò nổ trước khi engine kịp chạm vào nó.
+  const relightFurnace = () =>
+    Object.assign(furnace, {
+      phase: "cooking", fire: 98, tunes: 0, lockedUntil: 0, tick: Date.now(), log: [],
+    });
+  const tickFurnace = () => {
+    const now = Date.now();
+    const dt = (now - furnace.tick) / 1000;
+    furnace.tick = now;
+    if (furnace.phase !== "cooking" || furnace.tunes >= 3) return furnace;
+    furnace.fire -= FURNACE_DECAY_PER_SEC * dt;
+    if (furnace.fire <= 0) {
+      furnace.phase = "exploded";
+      furnace.log.push("NỔ");
+    }
+    return furnace;
+  };
+  const furnaceJson = () =>
+    JSON.stringify({
+      phase: furnace.phase,
+      fire: furnace.fire,
+      tunes: furnace.tunes,
+      locked: Date.now() < furnace.lockedUntil,
+    });
 
   const server = createServer((req, res) => {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
@@ -1163,7 +1277,25 @@ async function main() {
     else if (path === "/thi-luyen-tong-mon-hh3d") res.end(FREE_TRIAL_PAGE);
     else if (path === "/danh-sach-thanh-vien-tong-mon") res.end(freeSacrificePage(teLeOffered));
     else if (path === "/te-le-offered") { teLeOffered = true; res.end("ok"); }
-    else if (path === "/hoang-vuc") res.end(bossPage(bossBroken));
+    else if (path === "/hoang-vuc") res.end(bossPage(bossBroken, { waveMs: bossWaveMs, state: bossState }));
+    else if (path === "/luyen-dan-duong") res.end(furnacePage({ waveMs: 900 }));
+    else if (path === "/ld-state") {
+      tickFurnace();
+      res.end(furnaceJson());
+    }
+    else if (path === "/ld-tune") {
+      tickFurnace();
+      if (
+        furnace.phase === "cooking" && furnace.tunes < 3 &&
+        Date.now() >= furnace.lockedUntil && (furnace.tunes > 0 || furnace.fire <= 68)
+      ) {
+        furnace.tunes += 1;
+        furnace.fire = Math.min(98, furnace.fire + 25);
+        furnace.lockedUntil = Date.now() + 2000;
+        furnace.log.push(`Điều Hòa ${furnace.tunes}`);
+      }
+      res.end(furnaceJson());
+    }
     else if (path === "/tien-duyen") res.end(hySuHallPage(hySuRooms, hySuBlessed));
     else if (path === "/phong-cuoi" || path === "/hong-nhan") {
       const id = url.searchParams.get("id") ?? "";
@@ -1305,6 +1437,81 @@ async function main() {
       "site thật sự nhận đòn (lượt còn lại 5 → 4)",
       (await page.getAttribute("body", "data-attacked")) === "1" &&
         (await page.locator("#luot").innerText()) === "4",
+    );
+
+    console.log("\nTrang vẽ hai đợt: 'chưa vẽ tới' KHÔNG được đọc thành 'không có gì để làm'");
+
+    // Đây là bug người dùng báo khi bật chạy song song: Hoang Vực không hoạt động, lần nào
+    // cũng vậy. Nguyên nhân không nằm ở Hoang Vực mà ở `stopIf`: nó lấy ĐÚNG MỘT MẪU của một
+    // điều kiện VẮNG MẶT (`hidden #battle-button`), và giữa hai đợt vẽ của trang thì mọi nút
+    // đều vắng mặt. Ba tab cùng dựng trang đẩy đợt hai tới muộn, mẫu ấy rơi vào khoảng trống,
+    // và nhiệm vụ dừng ở「chưa đánh được」— mức alreadyDone, không một dòng lỗi nào, mỗi vòng,
+    // suốt cả ngày, trong khi「Lượt đánh còn lại」không hề nhúc nhích.
+    bossWaveMs = 2500;
+    bossState = "ready";
+    const bossLate = await run(bossQuest);
+    check(
+      "nút KHIÊU CHIẾN tới ở đợt vẽ thứ hai → vẫn đánh, không bỏ cuộc",
+      bossLate.outcome === "completed",
+      `${bossLate.outcome}: ${bossLate.message}`,
+    );
+    check(
+      "và đòn đánh là thật (site ghi nhận, lượt 5 → 4)",
+      (await page.getAttribute("body", "data-attacked")) === "1" &&
+        (await page.locator("#luot").innerText()) === "4",
+    );
+
+    // Mặt kia của cùng một bản vá, và là thứ giữ cho nó không thành một cái thuế: khi trang
+    // ĐÃ trả lời, lượt dừng phải đi thẳng. Nút còn trong DOM mà mang display:none chính là
+    // câu trả lời「đang cooldown」— không có gì để chờ thêm, và không được chờ.
+    bossWaveMs = 0;
+    bossState = "cooldown";
+    const cooldownAt = Date.now();
+    const bossCooling = await run(bossQuest);
+    const cooldownMs = Date.now() - cooldownAt;
+    check(
+      "đang cooldown → dừng ngay, kèm đồng hồ đọc được",
+      bossCooling.outcome === "onCooldown" && bossCooling.cooldownSeconds === 439,
+      `${bossCooling.outcome}: ${bossCooling.cooldownSeconds}`,
+    );
+    check(
+      `và KHÔNG tốn thêm cửa sổ chờ nào (đo được ${(cooldownMs / 1000).toFixed(1)}s)`,
+      cooldownMs < 8000,
+      `${cooldownMs}ms`,
+    );
+
+    // Còn khi site XOÁ HẲN nút khỏi DOM — hết lượt hôm nay — thì cửa sổ chờ được tiêu trọn
+    // rồi lượt dừng vẫn đứng vững. Đó là cái giá đúng: chỉ trả khi câu trả lời thật sự mơ hồ.
+    bossState = "spent";
+    const bossSpent = await run(bossQuest);
+    check(
+      "hết lượt hôm nay (nút bị xoá khỏi DOM) → vẫn dừng đúng, chỉ chậm hơn một cửa sổ",
+      bossSpent.outcome === "alreadyDone" || bossSpent.outcome === "onCooldown",
+      `${bossSpent.outcome}: ${bossSpent.message}`,
+    );
+    bossState = "ready";
+
+    console.log("\nLuyện Đan Đường: giữ lửa phải bám TRẠNG THÁI, không bám một con số thoáng qua");
+
+    // Bug thứ hai người dùng báo:「thỉnh thoảng không điều hòa dẫn tới nổ đan lô」. Vòng giữ
+    // lửa từng chờ chuỗi「68%」hiện ra trên trang — mà chuỗi ấy chỉ sống đúng khoảng một giây,
+    // lúc kim lửa quét ngang con số 68. Chạy song song làm mỗi bước chậm đi một nhịp, script
+    // tới sau khoảnh khắc đó, và cái chờ 110 giây không bao giờ về — trong khi ngòi nổ của mẻ
+    // đan chỉ dài hơn thế một chút. Ngưỡng phải là một TRẠNG THÁI, và site giữ sẵn trạng thái
+    // ấy: nó khoá nút Điều Hòa cho tới khi % ≤ 68.
+    relightFurnace();
+    const ldQuest = exportedProfile.quests.find((q) => q.id === "luyen-dan-duong");
+    const ldRun = await run(ldQuest);
+    tickFurnace();
+    check(
+      "giữ lửa đủ 3 lần — Đan Lô an toàn",
+      furnace.tunes === 3 && furnace.phase === "cooking",
+      `${furnace.phase} · ${furnace.tunes}/3 · ${furnace.log.join(" → ") || "(không lần nào)"}`,
+    );
+    check(
+      "và lượt chạy tự nó cũng báo thuận",
+      ldRun.outcome === "completed" || ldRun.outcome === "onCooldown",
+      `${ldRun.outcome}: ${ldRun.message}`,
     );
 
     console.log("\nHỷ Sự Đường từ recording 05/08");

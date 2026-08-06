@@ -459,6 +459,28 @@ export function conditionProbe(arg) {
 }
 
 /**
+ * Selector này có khớp phần tử nào trong DOM không — bất kể nó đang hiện hay đang ẩn.
+ *
+ * Đây là phép phân biệt「CHƯA VẼ」với「ĐÃ VẼ RỒI ẨN ĐI」, và hai thứ ấy trông y hệt nhau
+ * dưới con mắt của `conditionProbe` kind `hidden`. Sự khác biệt không hề nhỏ: một nút đang
+ * mang `display:none` là trang ĐÃ TRẢ LỜI (hết lượt, đang cooldown); một nút chưa có mặt
+ * trong DOM là trang CHƯA NÓI GÌ CẢ. Xem ghi chú ở `stopIf` bên engine để biết cái giá của
+ * việc lẫn lộn hai điều đó.
+ *
+ * Selector hỏng đọc là 0 — cùng luật với mọi probe khác: cú pháp sai không được phép ném ra
+ * giữa một lượt chạy, nó chỉ có nghĩa là「không thấy gì」.
+ */
+export function selectorPresence(arg) {
+  const sel = arg && arg.selector ? String(arg.selector) : "";
+  if (!sel) return 0;
+  try {
+    return document.querySelectorAll(sel).length;
+  } catch (e) {
+    return 0;
+  }
+}
+
+/**
  * Dựng mã nguồn cho một lượt CHỜ TRONG TRANG: MutationObserver đánh giá lại điều kiện ngay
  * tại khoảnh khắc DOM đổi, nên cái chờ thức dậy ĐÚNG LÚC sự kiện xảy ra thay vì ở nhịp poll
  * kế tiếp. Trả `true` ngay khi điều kiện đúng, `false` khi hết `ceilingMs`.

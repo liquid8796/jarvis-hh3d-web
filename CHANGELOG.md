@@ -11,6 +11,46 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.30.0 — trang chưa kịp vẽ không phải là trang nói không
+
+Hai lỗi được báo cùng lúc, và cùng chỉ xuất hiện khi **bật chạy song song các nhiệm vụ**:
+Hoang Vực không hoạt động lần nào, còn Luyện Đan Đường thỉnh thoảng không điều hòa nên nổ
+đan lô. Hoá ra là **một nguyên nhân**: trang game vẽ làm hai đợt — vỏ do server dựng, ruột do
+một XHR trạng thái vẽ 2–4 giây sau — và engine đang đọc「chưa vẽ tới」y hệt「trang trả lời
+KHÔNG」. Chạy song song không tạo ra lỗi; nó chỉ kéo dài đúng cái khe hở ấy cho tới khi lỗi
+lộ ra. Cả hai đều **báo thành công** trong lúc chạy hụt, nên không ai biết cho tới khi ngồi
+đếm số lượt.
+
+- **`stopIf` thôi kết luận từ một mẫu duy nhất của sự VẮNG MẶT.** `hidden` nghĩa là「không
+  phần tử nào khớp mà đang hiện」— và một selector CHƯA CÓ MẶT trong DOM cũng thoả mãn nguyên
+  văn câu đó. Giữa hai đợt vẽ thì mọi nút của trang đều「hidden」. Với Hoang Vực, mẫu ấy rơi
+  vào khoảng trống và nhiệm vụ dừng ở「chưa đánh được (đang chờ lượt hoặc đã hết 5 lượt hôm
+  nay)」— mức alreadyDone, không một dòng lỗi — mỗi vòng, suốt cả ngày, trong khi「Lượt đánh
+  còn lại」không hề nhúc nhích khỏi 5.
+- **Phép phân biệt là SỰ CÓ MẶT TRONG DOM, không phải sự hiển thị — và chính điều đó giữ cho
+  bản vá gần như miễn phí.** Nút còn trong DOM mà mang `display:none` là trang ĐÃ trả lời
+  (đang cooldown, hết lượt): lượt dừng đi thẳng, không tốn một mili giây. Chỉ khi selector
+  không khớp gì cả engine mới nán lại 8 giây xem nó có hiện ra không — hiện ra thì lượt dừng
+  bị huỷ và nhiệm vụ đi tiếp, không hiện thì lượt dừng vốn là thật.
+- **Luyện Đan Đường chờ site MỞ KHOÁ nút Điều Hòa, thay vì chờ kim lửa chỉ đúng「68%」.** Chuỗi
+  cũ không mơ hồ, nhưng nó chỉ sống được khoảng một giây: lửa tụt ~0,33%/giây nên「68%」hiện ra
+  một lần rồi thành「67%」và không bao giờ quay lại. Tới muộn một nhịp là cái chờ 110 giây không
+  bao giờ về — dài hơn cả ngòi nổ của mẻ đan — và lò nổ với **0/3 lần giữ lửa**. Ngưỡng là một
+  TRẠNG THÁI, và site giữ sẵn trạng thái ấy: nó khoá nút cho tới khi % ≤ 68. Áp cho **cả hai
+  hạng** (VIP và Thường dùng chung script).
+- **Vì sao chỉ hỏng khi song song**: ba tab cùng dựng trang thì mỗi bước chậm đi một nhịp, đủ
+  để mẫu của `stopIf` rơi trước đợt vẽ thứ hai, và đủ để script tới lò sau khoảnh khắc「68%」.
+  Bản desktop chạy tuần tự nên thoát nạn — nhưng cùng hai bản vá đã được port sang đó (1.45.0),
+  vì engine và hồ sơ là tri thức dùng chung, để lệch là hẹn ngày gặp lại.
+- Hồ sơ lên **schema 48**, đồng bộ với desktop 1.45.0 cùng đợt.
+- Kiểm chứng: smoke **183/183** trên Chromium thật. Bảy ca mới dựng lại ĐÚNG hai sự cố bằng
+  fixture vẽ hai đợt và một kim lửa tụt thật: gỡ bản vá ra thì Hoang Vực trả alreadyDone với
+  lượt đánh nguyên vẹn và lò nổ ở 0/3, lắp vào thì lượt boss 5 → 4 và lò đạt 3/3 — Đan Lô an
+  toàn. Có cả ca giữ cho đường dừng hợp lệ không bị chậm đi (đang cooldown vẫn dừng tức thì).
+
+> **Phải cài đè linh sứ thì bản vá mới có hiệu lực** — engine và hồ sơ nằm trong gói linh sứ,
+> deploy web chỉ phát hành gói mới chứ không đụng được vào tiến trình đang chạy ở máy khác.
+
 ## 0.29.0 — Hoang Vực phải chứng minh đòn đánh, và ngọc giản đi trước engine thì phải kêu lên
 
 Hai lỗi được báo cùng lúc, và hoá ra chỉ có một thứ chung: **sự im lặng**. Cả hai đều chạy

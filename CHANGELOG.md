@@ -11,6 +11,32 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.33.1 — cụm menu thôi nhảy ngang khi đổi tab
+
+- **Thanh trên cùng đứng yên một chỗ trên mọi trang.** Bề rộng của nó từng là THAM SỐ do
+  trang truyền vào: năm trang (trang chủ, Tông Môn, Nghị Sự Đường, phòng chờ, Hồ Sơ) nhận mặc
+  định `max-w-5xl` = 1024px, còn Linh Đài với Hàng Đợi truyền `max-w-[100rem]` = 1600px. Đo
+  trên màn 1920: mép phải cụm menu nằm ở **1441** trên trang chủ và **1729** trên Linh Đài —
+  lệch **288 pixel mỗi bên**, và mắt bắt được ngay vì đó là thứ duy nhất có mặt ở cả hai
+  trang. Giờ nó là hằng số.
+- **Chốt ở bản RỘNG (1600px), không phải bản hẹp** — và đây là chỗ dễ chọn sai. Bề rộng nội
+  dung thì vẫn nên khác nhau giữa các trang (một form Hồ Sơ kéo ngang 1600px là vô lý), nhưng
+  phần vỏ thì không. Chốt vỏ ở 1024px sẽ khiến chính Linh Đài và Hàng Đợi — hai trang hay lui
+  tới nhất và cũng là hai trang có nội dung rộng 1600px — mang một thanh trên cùng thụt vào
+  so với hàng thẻ bên dưới, đúng cái lỗi mà tham số kia sinh ra để vá hồi 05/08. Chốt ở bản
+  rộng thì hai trang ấy vẫn thẳng hàng, còn các trang hẹp chỉ đơn giản là có vỏ rộng hơn ruột
+  — chuyện bình thường của mọi thanh điều hướng.
+- **Bỏ hẳn tham số chứ không chỉ đổi giá trị mặc định.** Còn cái núm thì còn đường lệch trở
+  lại ở trang tiếp theo ai đó thêm vào; bỏ nó đi thì TypeScript chặn ngay tại chỗ gọi.
+- **`SHELL_WIDTH` gom về một bản duy nhất.** Linh Đài và Hàng Đợi trước đây mỗi trang tự khai
+  một hằng cùng tên cùng giá trị — hai bản sao của cùng một con số là cách êm ái nhất để
+  chúng lệch nhau về sau.
+- Đo lại trên trình duyệt thật ở 1920px (vỏ 1024 → 1600, mép menu 1441 → 1729) và ở 375px
+  (vỏ vẫn co giãn tràn khung, không sinh cuộn ngang) — bản vá chỉ chạm màn rộng, đúng nơi có
+  lỗi.
+
+---
+
 ## 0.33.0 — Cổng bái sư có công tắc, và mặc định luôn nghiêng về phía đóng
 
 - **Trưởng môn tắt được bước xét duyệt.** Tab Môn Đồ của trang Tông Môn có thêm một công

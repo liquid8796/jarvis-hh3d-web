@@ -1,4 +1,4 @@
-import { SiteHeader } from "@/components/SiteHeader";
+import { SHELL_WIDTH, SiteHeader } from "@/components/SiteHeader";
 import { requireActiveUser } from "@/lib/auth/guards";
 import { listAccounts } from "@/lib/services/accounts";
 import { getEditableConfig } from "@/lib/services/configs";
@@ -10,18 +10,6 @@ import { DashboardLiveProvider } from "./DashboardLiveProvider";
 import { LinhSuPanel } from "./LinhSuPanel";
 
 export const metadata = { title: "Linh Đài" };
-
-/**
- * Bề rộng khung Linh Đài — thanh trên cùng và phần nội dung dùng CHUNG hằng số này, nếu
- * không header sẽ thụt vào so với hàng thẻ (trước 05/08 header 1024px đứng trên nội dung
- * 1152px, lệch 64px mỗi bên).
- *
- * 100rem = 1600px: trang này là bàn làm việc hai cột — danh sách tài khoản, hai tab nhiệm
- * vụ với lưới tuỳ chọn hai cột, nhật ký chạy — nên 1152px cũ ép mỗi cột còn ~566px và mọi
- * thứ bên trong phải chen nhau. Vẫn có trần, không thả tự do: một biểu mẫu kéo ngang hết
- * màn 2560px thì mắt phải quét quá xa, và các dòng chữ dài ra là khó đọc hơn chứ không dễ.
- */
-const SHELL_WIDTH = "max-w-[100rem]";
 
 /**
  * Linh Đài — trang làm việc của một đạo hữu đã được thu nhận: cấu hình đàn pháp bên trái,
@@ -38,9 +26,10 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <SiteHeader maxWidth={SHELL_WIDTH} />
-      {/* Lề ngang giữ đúng `px-4 sm:px-6` như thanh trên cùng — hai bên phải cùng một con
-          số, nếu không thì ấn môn phái sẽ lệch vài pixel so với mép thẻ bên dưới. */}
+      <SiteHeader />
+      {/* Trải trọn khung để thẳng hàng với thanh trên cùng, và lề ngang giữ đúng
+          `px-4 sm:px-6` như nó — hai bên phải cùng một con số, nếu không thì ấn môn phái sẽ
+          lệch vài pixel so với mép thẻ bên dưới. */}
       <main className={`mx-auto w-full ${SHELL_WIDTH} px-4 pb-24 sm:px-6`}>
         <div className="rise-in mb-8">
           <h1 className="h-display text-3xl font-bold text-gilded">Linh Đài</h1>

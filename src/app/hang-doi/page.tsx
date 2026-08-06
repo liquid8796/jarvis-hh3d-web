@@ -1,12 +1,9 @@
-import { SiteHeader } from "@/components/SiteHeader";
+import { SHELL_WIDTH, SiteHeader } from "@/components/SiteHeader";
 import { requireActiveUser } from "@/lib/auth/guards";
 import { getQueueSnapshot } from "@/lib/services/queue";
 import { QueueBoard } from "./QueueBoard";
 
 export const metadata = { title: "Hàng Đợi Công Việc" };
-
-/** Cùng bề rộng khung với Linh Đài — hai trang này đứng cạnh nhau trong cùng một luồng việc. */
-const SHELL_WIDTH = "max-w-[100rem]";
 
 /**
  * Hàng Đợi Công Việc — cả tông môn nhìn chung một hàng chờ.
@@ -24,7 +21,9 @@ export default async function QueuePage() {
 
   return (
     <>
-      <SiteHeader maxWidth={SHELL_WIDTH} />
+      <SiteHeader />
+      {/* Cùng khung với Linh Đài — hai trang đứng cạnh nhau trong một luồng việc, và cùng
+          thẳng hàng với thanh trên cùng. */}
       <main className={`mx-auto w-full ${SHELL_WIDTH} px-4 pb-24 sm:px-6`}>
         <div className="rise-in mb-8">
           <h1 className="h-display text-3xl font-bold text-gilded">Hàng Đợi Công Việc</h1>

@@ -11,6 +11,41 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.32.0 — Hoang Vực viết lại từ bản ghi 06/08 21:00, và mỗi hạng có nhịp riêng
+
+- **Vỏ trang boss KHÔNG trung lập — nó mời gọi, và đó chính là con bug.** Lấy thẳng từ DOM của
+  bản ghi: `#battle-button` được server giao ra đang **MỞ**, còn `#countdown-timer` giao ra
+  `display:none` và **RỖNG**. Sự thật đến sau bằng XHR, và nó chỉ biết **LẤY ĐI** lời mời. Nên
+  một trang chưa vẽ xong **trông y hệt** trang nói「đánh được」— mọi đêm Hoang Vực thất bại trên
+  linh sứ tông môn đều là một lượt ghé rơi vào giữa cooldown, đọc phải cái vỏ lạc quan ấy, rồi
+  lao vào một trận mà server sẽ từ chối. Bản 0.30.0 dạy engine rằng một **sự vắng mặt** có thể
+  là「chưa vẽ tới」; đây là đúng bài học đó lật ngược dấu — ở đây **sự có mặt của lời mời** mới
+  là lời nói dối. Flow giờ cho XHR trạng thái một cửa sổ có hạn trước khi tin lời mời.
+- **「Hết lượt」và「đang chờ」thôi dùng chung một câu.** Trang giữ sẵn một nhân chứng mà script cũ
+  bỏ qua: `.remaining-attacks` do **server render**, đúng ngay từ byte đầu tiên. Số 0 ở đó nghĩa
+  là hết ngày — và nó được hỏi **TRƯỚC** cửa sổ chờ, vì một tài khoản hết lượt không bao giờ mọc
+  ra đồng hồ, hỏi sau thì mỗi lượt ghé còn lại trong ngày đều phải trả trọn cửa sổ. Đo trên
+  trang thật: phép dừng giờ trả lời trong **0,8 giây** với đúng chữ「đã hết 5 lượt hôm nay」thay
+  vì đốt 12 giây để đoán.
+- **Mỗi hạng một nhịp, đúng như luật của site.** Trang boss tự in:「Tấn công boss mỗi 15 phút 1
+  lần」— đó là nhịp của tài khoản **thường**. Bản ghi quay trên tài khoản **VIP** đo được nửa còn
+  lại: hồi đáp của đòn đánh mang mốc đánh kế cách **451 giây**, trang đếm ngược từ「7 phút 20
+  giây」. `fallbackCooldownSeconds` giờ là **450 (VIP) / 900 (thường)**; con số 420 dùng chung
+  trước đây sai cho cả hai, và nó bắt tài khoản thường quay lại gần gấp đôi số lần họ có thể đánh.
+- **Bằng chứng đòn đánh được nới 30s → 45s.** Bản ghi bấm giờ cả chuỗi thật: POST trả lời ngay,
+  nhưng hoạt ảnh sát thương chạy ~11 giây và đồng hồ chỉ thay chỗ cái nút ở ~12 giây — trên
+  đường truyền nhà, một tab. Ba tab trên VM hai nhân mới là thứ ngân sách này sinh ra để chịu.
+- Hai hạng chạy **cùng một kịch bản**, và không có gì rẽ nhánh theo chế độ chạy: tuần tự với
+  song song chỉ khác nhau ở việc trang vẽ nhanh hay chậm — đúng thứ mà cửa sổ có hạn kia hấp thụ.
+- **Fixture được dựng lại cho trung thực, và đó là phần khiến phép thử có răng.** Nó giao đúng
+  cái vỏ mời gọi (nút mở, đồng hồ rỗng và ẩn) với XHR tới muộn; quan trọng hơn, server giả giờ
+  **từ chối theo sự thật của chính nó** chứ không theo thứ trang đã kịp vẽ — gác theo DOM thì
+  một flow bấm bừa vào vỏ trang lại được tha bổng đúng vào khoảnh khắc nó sai nhất. Ca đối chứng
+  vĩnh viễn chạy flow không-có-đệm trên chính cái bẫy ấy: nó bấm vào cooldown và bị từ chối.
+- Kiểm chứng: smoke **187/187**; trên **site thật**, phép dừng hết-lượt trả lời trong 0,8 giây
+  đúng lý do, và một lượt chạy trước đó đã đánh thật rồi đọc lại đồng hồ 436 giây. TypeScript và
+  production build sạch. Hồ sơ lên **schema 50**, cùng nhịp desktop 1.47.0.
+
 ## 0.31.0 — cổng Điều Hòa chờ vùng đếm được, không chờ nút mở khoá
 
 - **Lò nổ lần nữa (19:01 ngày 06/08), đúng một vòng sau bản vá 0.30.0 — và nhật ký kể lại

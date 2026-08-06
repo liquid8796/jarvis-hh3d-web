@@ -152,14 +152,14 @@ const FREE_WHEEL_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
 }</script>`;
 
 /** Khối điều khiển boss — thứ mà đợt vẽ thứ hai mang tới trên trang thật. */
-const bossControls = (state) =>
-  (state === "spent"
-    ? "" // hết lượt hôm nay: site xoá HẲN nút khỏi DOM
-    : `<button class="battle-button" id="battle-button"${
-        state === "cooldown" ? ' style="display:none"' : ""
-      }>KHIÊU CHIẾN</button>`) +
+/**
+ * Khối điều khiển boss, ĐÚNG như server giao trong bản ghi 06/08 21:00: nút KHIÊU CHIẾN vẽ
+ * sẵn và mở, bộ đếm lượt mang giá trị THẬT ngay từ HTML đầu tiên.
+ */
+const bossControls = (turnsLeft) =>
+  '<button class="battle-button" id="battle-button">KHIÊU CHIẾN</button>' +
   '<div class="increase-damage">Đạo hữu được tăng 15% sát thương</div>' +
-  `<div>Lượt đánh còn lại: <span id="luot">${state === "spent" ? "0" : "5"}</span></div>`;
+  `<div class="remaining-attacks">Lượt đánh còn lại: <span id="luot">${turnsLeft}</span></div>`;
 
 /**
  * Trang boss, dựng theo đúng những gì đo được trên trang thật ngày 06/08:
@@ -175,20 +175,30 @@ const bossControls = (state) =>
  * @param state   "ready" (còn lượt) · "cooldown" (nút còn trong DOM nhưng display:none) ·
  *   "spent" (hết lượt hôm nay — site XOÁ HẲN nút khỏi DOM)
  */
-const bossPage = (broken, { waveMs = 0, state = "ready" } = {}) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+const bossPage = (broken, { stateMs = 0, cooling = false, turnsLeft = 5 } = {}) => `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div id="boss-info">
   <div>Huyết Trư Địa Quỷ 61.55%</div>
-  <div id="boss-slot">${waveMs > 0 ? "" : bossControls(state)}</div>
+  <div id="boss-slot">${bossControls(turnsLeft)}</div>
 </div>
-<div id="countdown-timer" style="display:${state === "cooldown" ? "block" : "none"}">Chờ 7 phút 19 giây để tấn công lần tiếp theo.</div>
+<div id="countdown-timer" style="display:none"></div>
 <div id="boss-damage-screen" style="display:none">
   <button class="attack-button">⚔️Tấn Công</button><button class="back-button">Trở lại</button>
 </div>
 <div id="damage-summary-container" style="display:none"><button class="close-button">Đóng</button></div>
 <script>
 const $ = (s) => document.querySelector(s);
-${waveMs > 0 ? `setTimeout(() => { $('#boss-slot').innerHTML = ${JSON.stringify(bossControls(state))}; }, ${waveMs});` : ""}
-// Uỷ quyền ở document: khối điều khiển có thể tới ở đợt vẽ sau, nên không gắn tay vào nút.
+const startCooldown = () => {
+  $('#countdown-timer').textContent = 'Chờ 7 phút 19 giây để tấn công lần tiếp theo.';
+  $('#countdown-timer').style.display = 'block';
+  $('#battle-button').style.display = 'none';
+};
+// XHR trạng thái tới MUỘN, và nó chỉ biết LẤY ĐI lời mời — đúng như trang thật: vỏ trang
+// luôn chào "đánh được", sự thật đến sau mới rút lời chào ấy lại nếu đang cooldown.
+${
+  cooling
+    ? `setTimeout(startCooldown, ${stateMs});`
+    : `/* không cooldown: XHR về nhưng KHÔNG đổi gì — đó là lý do "chưa vẽ" và "đánh được" trông giống hệt nhau */`
+}
 document.addEventListener('click', (e) => {
   const t = e.target;
   if (t.id === 'battle-button') {
@@ -197,12 +207,15 @@ document.addEventListener('click', (e) => {
     broken
       ? "\n    /* đúng ca hỏng: site nuốt cú bấm, không gì đổi */"
       : `
+    // Server TỪ CHỐI theo sự thật của CHÍNH NÓ, không theo thứ trang đã kịp vẽ. Phân biệt này
+    // là cả giá trị của fixture: gác theo DOM thì một flow bấm bừa vào vỏ trang lại được cho
+    // qua đúng vào khoảnh khắc nó sai nhất — fixture hoá ra lại tha bổng chính cái bug.
+    if (${cooling ? "true" : "false"}) { document.body.dataset.refused = '1'; return; }
     setTimeout(() => {
-      $('#battle-button').style.display = 'none';
-      $('#countdown-timer').style.display = 'block';
-      $('#luot').textContent = '4';
+      $('#luot').textContent = String(Math.max(0, +$('#luot').textContent - 1));
       $('#damage-summary-container').style.display = 'block';
-      document.body.dataset.attacked = '1';
+      document.body.dataset.attacked = String(+(document.body.dataset.attacked || 0) + 1);
+      startCooldown();
     }, 200);`
   }
   } else if (t.classList.contains('close-button')) {
@@ -1032,10 +1045,19 @@ async function main() {
   );
 
   const shipped = loadProfile();
+  /**
+   * Hai twin phải giống nhau ở phần TRI THỨC VỀ SITE — từng bước, từng selector, từng ngưỡng
+   * thời gian. Ba thứ được phép khác, và chỉ ba: id, hạng, và nhịp ghé lại dự phòng.
+   *
+   * Cái thứ ba mới thêm và nó có lý do đo được: luật trên trang boss là「mỗi 15 phút 1 lần」
+   * cho tài khoản thường, còn bản ghi 06/08 trên tài khoản VIP đo được đúng một nửa (451s).
+   * Cùng một kịch bản, hai nhịp — nên phép so này nới đúng một trường, không nới cả nắm.
+   */
   const comparableFlow = (quest) => {
     const copy = structuredClone(quest);
     delete copy.id;
     delete copy.requiresVip;
+    delete copy.fallbackCooldownSeconds;
     return JSON.stringify(copy);
   };
   const copiedPairs = [
@@ -1045,7 +1067,7 @@ async function main() {
     ["luyen-dan-duong", "luyen-dan-duong-thuong"],
   ];
   check(
-    "bốn cặp twin thường là bản sao nguyên flow VIP, chỉ đổi id/hạng",
+    "bốn cặp twin thường là bản sao nguyên flow VIP, chỉ đổi id/hạng/nhịp ghé lại",
     copiedPairs.every(([vipId, freeId]) => {
       const vip = shipped.quests.find((q) => q.id === vipId);
       const free = shipped.quests.find((q) => q.id === freeId);
@@ -1149,8 +1171,8 @@ async function main() {
   );
   const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
   check(
-    "hồ sơ đang ở schema 49",
-    loadProfileForSchema().schemaVersion === 49,
+    "hồ sơ đang ở schema 50",
+    loadProfileForSchema().schemaVersion === 50,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1236,8 +1258,9 @@ async function main() {
   const hySuBlessed = new Map(); // id → lời chúc đã gửi, theo thứ tự vào phòng
   const hySuLixi = [];
   let bossBroken = false;
-  let bossWaveMs = 0;
-  let bossState = "ready";
+  let bossStateMs = 0;
+  let bossCooling = false;
+  let bossTurnsLeft = 5;
 
   // Lò luyện đan phía "server", đúng luật đo trong luyen-dan.min.js (06/08): lửa tụt theo
   // thời gian thật, cú Điều Hòa nào cũng được NHẬN nhưng chỉ được ĐẾM khi (lần đầu ≤ 68%)
@@ -1288,7 +1311,8 @@ async function main() {
     else if (path === "/thi-luyen-tong-mon-hh3d") res.end(FREE_TRIAL_PAGE);
     else if (path === "/danh-sach-thanh-vien-tong-mon") res.end(freeSacrificePage(teLeOffered));
     else if (path === "/te-le-offered") { teLeOffered = true; res.end("ok"); }
-    else if (path === "/hoang-vuc") res.end(bossPage(bossBroken, { waveMs: bossWaveMs, state: bossState }));
+    else if (path === "/hoang-vuc")
+      res.end(bossPage(bossBroken, { stateMs: bossStateMs, cooling: bossCooling, turnsLeft: bossTurnsLeft }));
     else if (path === "/luyen-dan-duong") res.end(furnacePage({ waveMs: 900 }));
     else if (path === "/ld-state") {
       tickFurnace();
@@ -1416,96 +1440,119 @@ async function main() {
       infos.filter((m) => /stopIf|repeat|until/.test(m)).join(" / ") || "(sạch)",
     );
 
-    console.log("\nHoang Vực trên trang sống — hai kết cục của một cú bấm");
+    console.log("\nHoang Vực — cooldown theo hạng tài khoản");
 
-    // Ca hỏng phải kêu to, và phải kêu NHANH: rút timeout của bước xác nhận xuống còn 3 giây
-    // trong bản sao dùng để thử. Giá trị thật (30s) đã được ghim ở phép kiểm cấu trúc phía
-    // trên — ở đây thứ đang thử là HÀNH VI, không phải con số.
+    // Luật in trên chính trang boss:「Tấn công boss mỗi 15 phút 1 lần, tối đa 5 lần mỗi ngày」.
+    // Đó là nhịp của tài khoản THƯỜNG. Bản ghi 06/08 21:00 quay trên tài khoản VIP đo được nửa
+    // còn lại: hồi đáp của đòn đánh mang mốc đánh kế cách 451 giây, và trang đếm ngược từ
+    //「7 phút 20 giây」— VIP đúng một nửa. Con số 420 dùng chung trước đây sai cho cả hai.
+    for (const [bossId, want] of [["hoang-vuc", 450], ["hoang-vuc-thuong", 900]]) {
+      const q = exportedProfile.quests.find((x) => x.id === bossId);
+      check(
+        `${bossId}: nhịp ghé lại dự phòng = ${want}s`,
+        q.fallbackCooldownSeconds === want,
+        String(q.fallbackCooldownSeconds),
+      );
+    }
+
+    console.log("\nHoang Vực — vỏ trang mời gọi KHÔNG phải lời mời thật");
+
     const bossQuest = exportedProfile.quests.find((q) => q.id === "hoang-vuc");
-    const shortConfirm = structuredClone(bossQuest);
-    const confirmStep = shortConfirm.steps.find(
-      (s) => s.action === "waitForCondition" && s.condition?.selector === "#battle-button",
-    );
-    confirmStep.timeoutMs = 3000;
+    const resetBoss = async () => {
+      bossBroken = false;
+      bossStateMs = 0;
+      bossCooling = false;
+      bossTurnsLeft = 5;
+      await page.goto(`${baseUrl}/hoang-vuc`, { waitUntil: "domcontentloaded" });
+    };
 
-    bossBroken = true;
-    const bossMiss = await run(shortConfirm);
+    // BẪY THẬT, tái hiện từ DOM của bản ghi: server giao nút KHIÊU CHIẾN đang MỞ và một đồng
+    // hồ RỖNG mang display:none. Sự thật (đang cooldown) chỉ tới sau, qua XHR, và nó chỉ biết
+    // LẤY ĐI lời mời. Nên một trang chưa vẽ xong trông y hệt trang nói「đánh được」— đây là
+    // toàn bộ nguyên nhân của những đêm Hoang Vực không đánh được lượt nào.
+    // 6000ms: đủ muộn để flow CŨ (không có đệm) chạy trọn tới cú bấm và bị từ chối TRƯỚC khi
+    // đồng hồ kịp hiện — nếu không, nó sẽ ăn may khi XHR tình cờ ẩn nút giúp, và phép đối
+    // chứng mất răng. Vẫn thừa trong cửa sổ 12s của flow mới.
+    bossCooling = true;
+    bossStateMs = 6000;
+    bossTurnsLeft = 3;
+    const bossTrap = await run(bossQuest);
     check(
-      "cú bấm rơi vào hư không → HỎNG, không còn báo「xong」",
-      bossMiss.outcome === "failed",
-      `${bossMiss.outcome}: ${bossMiss.message}`,
+      "đang cooldown mà vỏ trang mời gọi → CHỜ sự thật rồi dừng, không lao vào bấm",
+      bossTrap.outcome === "onCooldown" && bossTrap.cooldownSeconds === 439,
+      `${bossTrap.outcome}: ${bossTrap.cooldownSeconds}`,
     );
     check(
-      "và lời báo gọi đúng tên nhân chứng (#battle-button)",
-      String(bossMiss.message ?? "").includes("#battle-button"),
-      bossMiss.message,
+      "và tuyệt đối không có cú bấm nào bị server từ chối",
+      (await page.getAttribute("body", "data-refused")) == null &&
+        (await page.getAttribute("body", "data-attacked")) == null,
+      `refused=${await page.getAttribute("body", "data-refused")} attacked=${await page.getAttribute("body", "data-attacked")}`,
     );
 
-    bossBroken = false;
+    // ĐỐI CHỨNG, giữ vĩnh viễn: chính flow CŨ (không có đệm chờ XHR) trên cùng fixture phải
+    // lao vào bấm và bị server từ chối. Fixture nào để flow cũ đi qua êm là fixture đang nói dối.
+    const noBuffer = structuredClone(bossQuest);
+    noBuffer.steps = noBuffer.steps.filter(
+      (s) => !(s.action === "waitForCondition" && s.optional === true && s.condition?.selector === "#countdown-timer"),
+    );
+    const confirmOld = noBuffer.steps.find(
+      (s) => s.action === "waitForCondition" && s.condition?.selector === "#battle-button" && !s.optional,
+    );
+    confirmOld.timeoutMs = 3000; // hỏng thì hỏng nhanh, đang thử HÀNH VI chứ không thử con số
+    await page.goto(`${baseUrl}/hoang-vuc`, { waitUntil: "domcontentloaded" });
+    const bossOld = await run(noBuffer);
+    check(
+      "flow CŨ trên cùng cái bẫy: bấm vào cooldown và bị từ chối",
+      bossOld.outcome === "failed" && (await page.getAttribute("body", "data-refused")) === "1",
+      `${bossOld.outcome} · refused=${await page.getAttribute("body", "data-refused")}`,
+    );
+
+    console.log("\nHoang Vực — ba kết cục còn lại");
+
+    // Còn lượt, không cooldown: đánh thật, tiêu đúng một lượt.
+    await resetBoss();
     const bossHit = await run(bossQuest);
-    check("đòn đánh thật → hoàn tất", bossHit.outcome === "completed", `${bossHit.outcome}: ${bossHit.message}`);
+    check("đánh được → hoàn tất", bossHit.outcome === "completed", `${bossHit.outcome}: ${bossHit.message}`);
     check(
-      "và đọc được đồng hồ tới lượt kế (7 phút 19 giây)",
-      bossHit.cooldownSeconds === 439,
-      String(bossHit.cooldownSeconds),
-    );
-    check(
-      "site thật sự nhận đòn (lượt còn lại 5 → 4)",
-      (await page.getAttribute("body", "data-attacked")) === "1" &&
+      "đọc được đồng hồ tới lượt kế (7 phút 19 giây) và tiêu ĐÚNG một lượt (5 → 4)",
+      bossHit.cooldownSeconds === 439 &&
+        (await page.getAttribute("body", "data-attacked")) === "1" &&
         (await page.locator("#luot").innerText()) === "4",
+      `${bossHit.cooldownSeconds} · ${await page.locator("#luot").innerText()}`,
     );
 
-    console.log("\nTrang vẽ hai đợt: 'chưa vẽ tới' KHÔNG được đọc thành 'không có gì để làm'");
-
-    // Đây là bug người dùng báo khi bật chạy song song: Hoang Vực không hoạt động, lần nào
-    // cũng vậy. Nguyên nhân không nằm ở Hoang Vực mà ở `stopIf`: nó lấy ĐÚNG MỘT MẪU của một
-    // điều kiện VẮNG MẶT (`hidden #battle-button`), và giữa hai đợt vẽ của trang thì mọi nút
-    // đều vắng mặt. Ba tab cùng dựng trang đẩy đợt hai tới muộn, mẫu ấy rơi vào khoảng trống,
-    // và nhiệm vụ dừng ở「chưa đánh được」— mức alreadyDone, không một dòng lỗi nào, mỗi vòng,
-    // suốt cả ngày, trong khi「Lượt đánh còn lại」không hề nhúc nhích.
-    bossWaveMs = 2500;
-    bossState = "ready";
-    const bossLate = await run(bossQuest);
-    check(
-      "nút KHIÊU CHIẾN tới ở đợt vẽ thứ hai → vẫn đánh, không bỏ cuộc",
-      bossLate.outcome === "completed",
-      `${bossLate.outcome}: ${bossLate.message}`,
-    );
-    check(
-      "và đòn đánh là thật (site ghi nhận, lượt 5 → 4)",
-      (await page.getAttribute("body", "data-attacked")) === "1" &&
-        (await page.locator("#luot").innerText()) === "4",
-    );
-
-    // Mặt kia của cùng một bản vá, và là thứ giữ cho nó không thành một cái thuế: khi trang
-    // ĐÃ trả lời, lượt dừng phải đi thẳng. Nút còn trong DOM mà mang display:none chính là
-    // câu trả lời「đang cooldown」— không có gì để chờ thêm, và không được chờ.
-    bossWaveMs = 0;
-    bossState = "cooldown";
-    const cooldownAt = Date.now();
-    const bossCooling = await run(bossQuest);
-    const cooldownMs = Date.now() - cooldownAt;
-    check(
-      "đang cooldown → dừng ngay, kèm đồng hồ đọc được",
-      bossCooling.outcome === "onCooldown" && bossCooling.cooldownSeconds === 439,
-      `${bossCooling.outcome}: ${bossCooling.cooldownSeconds}`,
-    );
-    check(
-      `và KHÔNG tốn thêm cửa sổ chờ nào (đo được ${(cooldownMs / 1000).toFixed(1)}s)`,
-      cooldownMs < 8000,
-      `${cooldownMs}ms`,
-    );
-
-    // Còn khi site XOÁ HẲN nút khỏi DOM — hết lượt hôm nay — thì cửa sổ chờ được tiêu trọn
-    // rồi lượt dừng vẫn đứng vững. Đó là cái giá đúng: chỉ trả khi câu trả lời thật sự mơ hồ.
-    bossState = "spent";
+    // Hết lượt hôm nay: bộ đếm do server render sẵn nói ngay từ nét vẽ đầu, nên lượt dừng
+    // KHÔNG phải trả cửa sổ chờ nào — và nó nói đúng lý do, không lẫn với cooldown.
+    await resetBoss();
+    bossTurnsLeft = 0;
+    const spentAt = Date.now();
     const bossSpent = await run(bossQuest);
+    const spentMs = Date.now() - spentAt;
     check(
-      "hết lượt hôm nay (nút bị xoá khỏi DOM) → vẫn dừng đúng, chỉ chậm hơn một cửa sổ",
-      bossSpent.outcome === "alreadyDone" || bossSpent.outcome === "onCooldown",
+      "hết 5 lượt hôm nay → dừng đúng lý do, không lẫn với cooldown",
+      bossSpent.outcome === "alreadyDone" && bossSpent.message === "đã hết 5 lượt hôm nay",
       `${bossSpent.outcome}: ${bossSpent.message}`,
     );
-    bossState = "ready";
+    check(
+      `và không tốn cửa sổ chờ nào (đo được ${(spentMs / 1000).toFixed(1)}s) — bộ đếm là của server`,
+      spentMs < 12000 && (await page.getAttribute("body", "data-attacked")) == null,
+      `${spentMs}ms`,
+    );
+
+    // Cú bấm rơi vào hư không vẫn phải kêu to — bản vá 0.29.0, giữ nguyên giá trị.
+    await resetBoss();
+    bossBroken = true;
+    const shortConfirm = structuredClone(bossQuest);
+    shortConfirm.steps.find(
+      (s) => s.action === "waitForCondition" && s.condition?.selector === "#battle-button" && !s.optional,
+    ).timeoutMs = 3000;
+    const bossMiss = await run(shortConfirm);
+    check(
+      "cú bấm rơi vào hư không → HỎNG, không nhận vơ là xong",
+      bossMiss.outcome === "failed" && String(bossMiss.message ?? "").includes("#battle-button"),
+      `${bossMiss.outcome}: ${bossMiss.message}`,
+    );
+    await resetBoss();
 
     console.log("\nLuyện Đan Đường: giữ lửa phải chờ đúng VÙNG ĐẾM ĐƯỢC, không bấm bừa");
 

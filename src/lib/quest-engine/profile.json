@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 49,
+  "schemaVersion": 50,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -26,16 +26,47 @@
           "note": "ch\u1EDD kh\u1ED1i th\u00F4ng tin boss render"
         },
         {
+          "action": "stopIf",
+          "text": "\u0111\u00E3 h\u1EBFt 5 l\u01B0\u1EE3t h\u00F4m nay",
+          "timeoutMs": 15000,
+          "note": "b\u1ED9 \u0111\u1EBFm l\u01B0\u1EE3t do SERVER render s\u1EB5n n\u00EAn \u0111\u00FAng ngay t\u1EEB n\u00E9t v\u1EBD \u0111\u1EA7u \u2014 h\u1EBFt l\u01B0\u1EE3t l\u00E0 h\u1EBFt ng\u00E0y, kh\u00E1c h\u1EB3n \u0111ang ch\u1EDD cooldown",
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#boss-info .remaining-attacks",
+            "text": "c\u00F2n l\u1EA1i: 0"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 12000,
+          "note": "\u0111\u1EC7m ch\u1EDD XHR tr\u1EA1ng th\u00E1i: v\u1ECF trang lu\u00F4n v\u1EBD s\u1EB5n n\u00FAt KHI\u00CAU CHI\u1EBEN v\u00E0 m\u1ED9t \u0111\u1ED3ng h\u1ED3 R\u1ED6NG display:none, n\u00EAn trang ch\u01B0a v\u1EBD xong tr\u00F4ng y h\u1EC7t trang n\u00F3i \u0022\u0111\u00E1nh \u0111\u01B0\u1EE3c\u0022. \u0110ang cooldown th\u00EC \u0111\u1ED3ng h\u1ED3 hi\u1EC7n ngay khi s\u1EF1 th\u1EADt v\u1EC1; \u0111\u00E1nh \u0111\u01B0\u1EE3c th\u00EC ch\u1EDD tr\u1ECDn c\u1EEDa s\u1ED5 r\u1ED3i m\u1EDBi tin",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#countdown-timer"
+          }
+        },
+        {
           "action": "readCooldownSeconds",
           "selector": "#countdown-timer",
           "timeoutMs": 15000,
-          "note": "\u0022Ch\u1EDD 7 ph\u00FAt 19 gi\u00E2y \u0111\u1EC3 t\u1EA5n c\u00F4ng l\u1EA7n ti\u1EBFp theo.\u0022 \u2014 kh\u00F4ng c\u00F3 th\u1EBB n\u00E0y th\u00EC kh\u00F4ng \u0111\u1ECDc \u0111\u01B0\u1EE3c g\u00EC, v\u00E0 \u0111\u00F3 ch\u00EDnh l\u00E0 d\u1EA5u hi\u1EC7u \u0111\u00E3 h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay"
+          "note": "\u0022Ch\u1EDD 7 ph\u00FAt 19 gi\u00E2y \u0111\u1EC3 t\u1EA5n c\u00F4ng l\u1EA7n ti\u1EBFp theo.\u0022 \u2014 \u0111\u1ECDc TR\u01AF\u1EDAC khi d\u1EEBng, \u0111\u1EC3 c\u00E1i d\u1EEBng mang theo th\u1EDDi gian th\u1EADt thay v\u00EC im l\u1EB7ng"
         },
         {
           "action": "stopIf",
-          "text": "ch\u01B0a \u0111\u00E1nh \u0111\u01B0\u1EE3c (\u0111ang ch\u1EDD l\u01B0\u1EE3t ho\u1EB7c \u0111\u00E3 h\u1EBFt 5 l\u01B0\u1EE3t h\u00F4m nay)",
+          "text": "\u0111ang ch\u1EDD l\u01B0\u1EE3t k\u1EBF",
           "timeoutMs": 15000,
-          "note": "n\u00FAt KHI\u00CAU CHI\u1EBEN bi\u1EBFn m\u1EA5t c\u1EA3 khi \u0111ang cooldown l\u1EABn khi h\u1EBFt l\u01B0\u1EE3t; engine t\u1EF1 ph\u00E2n bi\u1EC7t \u2014 \u0111\u1ECDc \u0111\u01B0\u1EE3c \u0111\u1ED3ng h\u1ED3 th\u00EC b\u00E1o OnCooldown k\u00E8m th\u1EDDi gian, kh\u00F4ng \u0111\u1ECDc \u0111\u01B0\u1EE3c th\u00EC AlreadyDone",
+          "note": "\u0111\u1ED3ng h\u1ED3 \u0111ang ch\u1EA1y = c\u00F2n l\u01B0\u1EE3t nh\u01B0ng ch\u01B0a t\u1EDBi gi\u1EDD; b\u01B0\u1EDBc \u0111\u1ECDc ph\u00EDa tr\u00EAn \u0111\u00E3 c\u00F3 con s\u1ED1 n\u00EAn engine b\u00E1o OnCooldown k\u00E8m th\u1EDDi gian c\u00F2n l\u1EA1i",
+          "condition": {
+            "kind": "visible",
+            "selector": "#countdown-timer"
+          }
+        },
+        {
+          "action": "stopIf",
+          "text": "ch\u01B0a \u0111\u00E1nh \u0111\u01B0\u1EE3c (n\u00FAt KHI\u00CAU CHI\u1EBEN kh\u00F4ng c\u00F3 tr\u00EAn trang)",
+          "timeoutMs": 15000,
+          "note": "l\u01B0\u1EDBi cu\u1ED1i: n\u00FAt bi\u1EBFn m\u1EA5t v\u00EC m\u1ED9t l\u00FD do ch\u01B0a t\u1EEBng ghi nh\u1EADn",
           "condition": {
             "kind": "hidden",
             "selector": "#battle-button"
@@ -102,8 +133,8 @@
         },
         {
           "action": "waitForCondition",
-          "timeoutMs": 30000,
-          "note": "ch\u1EDD n\u00FAt KHI\u00CAU CHI\u1EBEN bi\u1EBFn m\u1EA5t = site \u0111\u00E3 ghi nh\u1EADn \u0111\u00F2n \u0111\u00E1nh (v\u00E0o cooldown, ho\u1EB7c h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay). C\u00F2n th\u1EA5y n\u00FAt ngh\u0129a l\u00E0 c\u00FA b\u1EA5m r\u01A1i v\u00E0o h\u01B0 kh\u00F4ng \u2014 ph\u1EA3i k\u00EAu to, v\u00EC nh\u1EADn v\u01A1 l\u00E0 xong cho m\u1ED9t tr\u1EADn ch\u01B0a t\u1EEBng \u0111\u00E1nh l\u00E0 c\u00E1ch m\u1EA5t c\u1EA3 ng\u00E0y l\u01B0\u1EE3t boss m\u00E0 kh\u00F4ng ai bi\u1EBFt",
+          "timeoutMs": 45000,
+          "note": "ch\u1EDD n\u00FAt KHI\u00CAU CHI\u1EBEN bi\u1EBFn m\u1EA5t = site \u0111\u00E3 ghi nh\u1EADn \u0111\u00F2n \u0111\u00E1nh (v\u00E0o cooldown, ho\u1EB7c h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay). C\u00F2n th\u1EA5y n\u00FAt ngh\u0129a l\u00E0 c\u00FA b\u1EA5m r\u01A1i v\u00E0o h\u01B0 kh\u00F4ng \u2014 ph\u1EA3i k\u00EAu to, v\u00EC nh\u1EADn v\u01A1 l\u00E0 xong cho m\u1ED9t tr\u1EADn ch\u01B0a t\u1EEBng \u0111\u00E1nh l\u00E0 c\u00E1ch m\u1EA5t c\u1EA3 ng\u00E0y l\u01B0\u1EE3t boss m\u00E0 kh\u00F4ng ai bi\u1EBFt. B\u1EA3n ghi 06/08: \u0111\u00F2n \u0103n th\u00EC \u0111\u1ED3ng h\u1ED3 thay n\u00FAt sau ~12s",
           "condition": {
             "kind": "hidden",
             "selector": "#battle-button"
@@ -141,7 +172,7 @@
         }
       ],
       "options": [],
-      "fallbackCooldownSeconds": 420,
+      "fallbackCooldownSeconds": 450,
       "requiresVip": true,
       "order": 20,
       "notes": "\u0110\u00E1nh boss Hoang V\u1EF1c, 5 l\u01B0\u1EE3t/ng\u00E0y."
@@ -859,16 +890,47 @@
           "note": "ch\u1EDD kh\u1ED1i th\u00F4ng tin boss render"
         },
         {
+          "action": "stopIf",
+          "text": "\u0111\u00E3 h\u1EBFt 5 l\u01B0\u1EE3t h\u00F4m nay",
+          "timeoutMs": 15000,
+          "note": "b\u1ED9 \u0111\u1EBFm l\u01B0\u1EE3t do SERVER render s\u1EB5n n\u00EAn \u0111\u00FAng ngay t\u1EEB n\u00E9t v\u1EBD \u0111\u1EA7u \u2014 h\u1EBFt l\u01B0\u1EE3t l\u00E0 h\u1EBFt ng\u00E0y, kh\u00E1c h\u1EB3n \u0111ang ch\u1EDD cooldown",
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#boss-info .remaining-attacks",
+            "text": "c\u00F2n l\u1EA1i: 0"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 12000,
+          "note": "\u0111\u1EC7m ch\u1EDD XHR tr\u1EA1ng th\u00E1i: v\u1ECF trang lu\u00F4n v\u1EBD s\u1EB5n n\u00FAt KHI\u00CAU CHI\u1EBEN v\u00E0 m\u1ED9t \u0111\u1ED3ng h\u1ED3 R\u1ED6NG display:none, n\u00EAn trang ch\u01B0a v\u1EBD xong tr\u00F4ng y h\u1EC7t trang n\u00F3i \u0022\u0111\u00E1nh \u0111\u01B0\u1EE3c\u0022. \u0110ang cooldown th\u00EC \u0111\u1ED3ng h\u1ED3 hi\u1EC7n ngay khi s\u1EF1 th\u1EADt v\u1EC1; \u0111\u00E1nh \u0111\u01B0\u1EE3c th\u00EC ch\u1EDD tr\u1ECDn c\u1EEDa s\u1ED5 r\u1ED3i m\u1EDBi tin",
+          "optional": true,
+          "condition": {
+            "kind": "visible",
+            "selector": "#countdown-timer"
+          }
+        },
+        {
           "action": "readCooldownSeconds",
           "selector": "#countdown-timer",
           "timeoutMs": 15000,
-          "note": "\u0022Ch\u1EDD 7 ph\u00FAt 19 gi\u00E2y \u0111\u1EC3 t\u1EA5n c\u00F4ng l\u1EA7n ti\u1EBFp theo.\u0022 \u2014 kh\u00F4ng c\u00F3 th\u1EBB n\u00E0y th\u00EC kh\u00F4ng \u0111\u1ECDc \u0111\u01B0\u1EE3c g\u00EC, v\u00E0 \u0111\u00F3 ch\u00EDnh l\u00E0 d\u1EA5u hi\u1EC7u \u0111\u00E3 h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay"
+          "note": "\u0022Ch\u1EDD 7 ph\u00FAt 19 gi\u00E2y \u0111\u1EC3 t\u1EA5n c\u00F4ng l\u1EA7n ti\u1EBFp theo.\u0022 \u2014 \u0111\u1ECDc TR\u01AF\u1EDAC khi d\u1EEBng, \u0111\u1EC3 c\u00E1i d\u1EEBng mang theo th\u1EDDi gian th\u1EADt thay v\u00EC im l\u1EB7ng"
         },
         {
           "action": "stopIf",
-          "text": "ch\u01B0a \u0111\u00E1nh \u0111\u01B0\u1EE3c (\u0111ang ch\u1EDD l\u01B0\u1EE3t ho\u1EB7c \u0111\u00E3 h\u1EBFt 5 l\u01B0\u1EE3t h\u00F4m nay)",
+          "text": "\u0111ang ch\u1EDD l\u01B0\u1EE3t k\u1EBF",
           "timeoutMs": 15000,
-          "note": "n\u00FAt KHI\u00CAU CHI\u1EBEN bi\u1EBFn m\u1EA5t c\u1EA3 khi \u0111ang cooldown l\u1EABn khi h\u1EBFt l\u01B0\u1EE3t; engine t\u1EF1 ph\u00E2n bi\u1EC7t \u2014 \u0111\u1ECDc \u0111\u01B0\u1EE3c \u0111\u1ED3ng h\u1ED3 th\u00EC b\u00E1o OnCooldown k\u00E8m th\u1EDDi gian, kh\u00F4ng \u0111\u1ECDc \u0111\u01B0\u1EE3c th\u00EC AlreadyDone",
+          "note": "\u0111\u1ED3ng h\u1ED3 \u0111ang ch\u1EA1y = c\u00F2n l\u01B0\u1EE3t nh\u01B0ng ch\u01B0a t\u1EDBi gi\u1EDD; b\u01B0\u1EDBc \u0111\u1ECDc ph\u00EDa tr\u00EAn \u0111\u00E3 c\u00F3 con s\u1ED1 n\u00EAn engine b\u00E1o OnCooldown k\u00E8m th\u1EDDi gian c\u00F2n l\u1EA1i",
+          "condition": {
+            "kind": "visible",
+            "selector": "#countdown-timer"
+          }
+        },
+        {
+          "action": "stopIf",
+          "text": "ch\u01B0a \u0111\u00E1nh \u0111\u01B0\u1EE3c (n\u00FAt KHI\u00CAU CHI\u1EBEN kh\u00F4ng c\u00F3 tr\u00EAn trang)",
+          "timeoutMs": 15000,
+          "note": "l\u01B0\u1EDBi cu\u1ED1i: n\u00FAt bi\u1EBFn m\u1EA5t v\u00EC m\u1ED9t l\u00FD do ch\u01B0a t\u1EEBng ghi nh\u1EADn",
           "condition": {
             "kind": "hidden",
             "selector": "#battle-button"
@@ -935,8 +997,8 @@
         },
         {
           "action": "waitForCondition",
-          "timeoutMs": 30000,
-          "note": "ch\u1EDD n\u00FAt KHI\u00CAU CHI\u1EBEN bi\u1EBFn m\u1EA5t = site \u0111\u00E3 ghi nh\u1EADn \u0111\u00F2n \u0111\u00E1nh (v\u00E0o cooldown, ho\u1EB7c h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay). C\u00F2n th\u1EA5y n\u00FAt ngh\u0129a l\u00E0 c\u00FA b\u1EA5m r\u01A1i v\u00E0o h\u01B0 kh\u00F4ng \u2014 ph\u1EA3i k\u00EAu to, v\u00EC nh\u1EADn v\u01A1 l\u00E0 xong cho m\u1ED9t tr\u1EADn ch\u01B0a t\u1EEBng \u0111\u00E1nh l\u00E0 c\u00E1ch m\u1EA5t c\u1EA3 ng\u00E0y l\u01B0\u1EE3t boss m\u00E0 kh\u00F4ng ai bi\u1EBFt",
+          "timeoutMs": 45000,
+          "note": "ch\u1EDD n\u00FAt KHI\u00CAU CHI\u1EBEN bi\u1EBFn m\u1EA5t = site \u0111\u00E3 ghi nh\u1EADn \u0111\u00F2n \u0111\u00E1nh (v\u00E0o cooldown, ho\u1EB7c h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay). C\u00F2n th\u1EA5y n\u00FAt ngh\u0129a l\u00E0 c\u00FA b\u1EA5m r\u01A1i v\u00E0o h\u01B0 kh\u00F4ng \u2014 ph\u1EA3i k\u00EAu to, v\u00EC nh\u1EADn v\u01A1 l\u00E0 xong cho m\u1ED9t tr\u1EADn ch\u01B0a t\u1EEBng \u0111\u00E1nh l\u00E0 c\u00E1ch m\u1EA5t c\u1EA3 ng\u00E0y l\u01B0\u1EE3t boss m\u00E0 kh\u00F4ng ai bi\u1EBFt. B\u1EA3n ghi 06/08: \u0111\u00F2n \u0103n th\u00EC \u0111\u1ED3ng h\u1ED3 thay n\u00FAt sau ~12s",
           "condition": {
             "kind": "hidden",
             "selector": "#battle-button"
@@ -974,7 +1036,7 @@
         }
       ],
       "options": [],
-      "fallbackCooldownSeconds": 420,
+      "fallbackCooldownSeconds": 900,
       "requiresVip": false,
       "order": 20,
       "notes": "\u0110\u00E1nh boss Hoang V\u1EF1c, 5 l\u01B0\u1EE3t/ng\u00E0y."

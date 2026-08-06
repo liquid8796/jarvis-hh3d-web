@@ -1,9 +1,11 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { requireAdmin } from "@/lib/auth/guards";
+import { countJobsForDrain } from "@/lib/services/jobs";
 import { getAppSettings } from "@/lib/services/settings";
 import { countPending, listUsers } from "@/lib/services/users";
 import { AdminTabs } from "./AdminTabs";
 import { ChatSettingsForm } from "./ChatSettingsForm";
+import { MaintenanceForm } from "./MaintenanceForm";
 import { MembershipSettingsForm } from "./MembershipSettingsForm";
 import { UserTable } from "./UserTable";
 import { CreateUserPanel } from "./CreateUserPanel";
@@ -30,10 +32,11 @@ export default async function AdminPage({
       ? params.status
       : undefined;
 
-  const [users, pending, settings] = await Promise.all([
+  const [users, pending, settings, drain] = await Promise.all([
     listUsers({ search: params.q, status }),
     countPending(),
     getAppSettings(),
+    countJobsForDrain(),
   ]);
 
   return (
@@ -79,6 +82,11 @@ export default async function AdminPage({
               key: "damDao",
               label: "Đàm Đạo",
               pane: <ChatSettingsForm retentionDays={settings.chat.retentionDays} />,
+            },
+            {
+              key: "baoTri",
+              label: settings.maintenance.active ? "Bảo Trì ●" : "Bảo Trì",
+              pane: <MaintenanceForm maintenance={settings.maintenance} drain={drain} />,
             },
           ]}
         />

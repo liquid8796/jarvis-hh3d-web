@@ -34,6 +34,33 @@ export const appSettingsSchema = z.object({
       requireApproval: z.boolean().default(true),
     })
     .prefault({}),
+
+  maintenance: z
+    .object({
+      /**
+       * Bế quan trùng tu: bật lên là cửa phát việc (op claim của /api/worker) đóng lại và
+       * Khai Đàn từ chối lập đàn mới — nhưng vòng đang chạy dở vẫn được về đích, vì bốn op
+       * còn lại của giao thức linh sứ không bị chạm. Mặc định TẮT, hiển nhiên: mọi document
+       * đã ghi trước bản này không có nhánh maintenance, và không ai muốn deploy xong thì
+       * cả tông môn tự dưng đóng cửa.
+       */
+      /**
+       * MỌI trường đều có .catch(): getAppSettings khi safeParse trượt là trả default cho
+       * CẢ document — nghĩa là một giá trị rác ở đây (ai đó sửa tay JSONB) sẽ kéo membership
+       * về BẬT lại ngoài ý muốn. .catch() cô lập thiệt hại vào đúng trường hỏng: trường ấy
+       * về default, hàng xóm không suy suyển. Mốc thời gian là chuỗi ISO và cố ý KHÔNG
+       * .datetime() — phía đọc tự phòng thân bằng Date.parse.
+       */
+      active: z.boolean().catch(false),
+      /** ISO — mốc bắt đầu, chân trái của thanh tiến độ. */
+      startedAt: z.string().nullable().catch(null),
+      /** ISO — hạn chót dự kiến do trưởng môn ước lượng; đồng hồ đếm ngược trỏ vào đây. */
+      expectedEndAt: z.string().nullable().catch(null),
+      /** Lời nhắn tuỳ ý hiện trong popup ("nâng cấp engine Hoang Vực…"). */
+      note: z.string().max(500).catch(""),
+    })
+    // .catch() khiến input type của object hết rỗng được — prefault phải mang đủ bốn giá trị.
+    .prefault({ active: false, startedAt: null, expectedEndAt: null, note: "" }),
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;

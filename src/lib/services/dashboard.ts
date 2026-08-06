@@ -1,10 +1,12 @@
 import { eventsForJobs, getCurrentJobsPerAccount } from "./jobs";
 import { listAccounts } from "./accounts";
+import { getAppSettings } from "./settings";
 import { getPresence, ONLINE_WINDOW_MS } from "./workers";
 import type {
   DashboardEvent,
   DashboardJob,
   DashboardLivePayload,
+  DashboardMaintenance,
   DashboardPresence,
 } from "@/lib/realtime/dashboardTypes";
 
@@ -59,15 +61,27 @@ export async function getPresenceFeed(userId: string): Promise<DashboardPresence
   };
 }
 
+/** Bản chiếu nhánh maintenance cho client — chỉ lộ những trường popup cần. */
+export async function getMaintenanceFeed(): Promise<DashboardMaintenance> {
+  const { maintenance } = await getAppSettings();
+  return {
+    active: maintenance.active,
+    startedAt: maintenance.startedAt,
+    expectedEndAt: maintenance.expectedEndAt,
+    note: maintenance.note,
+  };
+}
+
 /** Một ảnh chụp nhất quán về phần "sống" của Linh Đài, dùng cho cả SSE lẫn poll dự phòng. */
 export async function getDashboardFeed(
   userId: string,
   after: number,
 ): Promise<DashboardLivePayload> {
-  const [feed, presence, accounts] = await Promise.all([
+  const [feed, presence, accounts, maintenance] = await Promise.all([
     getJobsFeed(userId, after),
     getPresenceFeed(userId),
     listAccounts(userId),
+    getMaintenanceFeed(),
   ]);
-  return { ...feed, presence, accounts };
+  return { ...feed, presence, accounts, maintenance };
 }

@@ -2,12 +2,14 @@ import { SHELL_WIDTH, SiteHeader } from "@/components/SiteHeader";
 import { requireActiveUser } from "@/lib/auth/guards";
 import { listAccounts } from "@/lib/services/accounts";
 import { getEditableConfig } from "@/lib/services/configs";
+import { getMaintenanceFeed } from "@/lib/services/dashboard";
 import { getActiveJobs } from "@/lib/services/jobs";
 import { hasWorkerToken } from "@/lib/services/workers";
 import { ConfigForm } from "./ConfigForm";
 import { ControlPanel } from "./ControlPanel";
 import { DashboardLiveProvider } from "./DashboardLiveProvider";
 import { LinhSuPanel } from "./LinhSuPanel";
+import { MaintenanceOverlay } from "./MaintenanceOverlay";
 
 export const metadata = { title: "Linh Đài" };
 
@@ -17,11 +19,12 @@ export const metadata = { title: "Linh Đài" };
  */
 export default async function DashboardPage() {
   const user = await requireActiveUser();
-  const [config, accounts, activeJobs, tokenIssued] = await Promise.all([
+  const [config, accounts, activeJobs, tokenIssued, maintenance] = await Promise.all([
     getEditableConfig(user.id),
     listAccounts(user.id),
     getActiveJobs(user.id),
     hasWorkerToken(user.id),
+    getMaintenanceFeed(),
   ]);
 
   return (
@@ -47,7 +50,10 @@ export default async function DashboardPage() {
             phình ra ngoài phần của nó và bóp cột trái còn một sợi chỉ (ảnh 02/08). Và
             `overflow-x-auto` trên chính cái <pre> không cứu được: nó chỉ có tác dụng khi
             mọi tổ tiên đều được phép co xuống dưới bề rộng nội dung. */}
-        <DashboardLiveProvider initialAccounts={accounts}>
+        <DashboardLiveProvider initialAccounts={accounts} initialMaintenance={maintenance}>
+          {/* Popup trùng tu phủ toàn màn — đứng trong provider để ăn cùng nguồn live với
+              mọi panel, và đứng trước grid để không phụ thuộc bố cục bên dưới. */}
+          <MaintenanceOverlay />
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] xl:gap-8">
             <ConfigForm config={config} isAdmin={user.role === "admin"} />
             <div className="flex min-w-0 flex-col gap-6 xl:gap-8">

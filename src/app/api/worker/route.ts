@@ -10,6 +10,7 @@ import {
   seedLuyenDanThuong,
   storedConfigSchema,
 } from "@/lib/services/configs";
+import { getAppSettings } from "@/lib/services/settings";
 import { findById } from "@/lib/services/users";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 
@@ -117,6 +118,18 @@ export async function POST(request: Request) {
       // Điểm danh ở claim — op dày nhịp nhất, và là op duy nhất một linh sứ NHÀN RỖI vẫn
       // gọi đều — nên "đang trực" nghĩa là tiến trình còn sống, không phải nó đang bận.
       await recordWorkerSeen(body.workerId, scope);
+
+      // Bế quan trùng tu: đóng ĐÚNG MỘT cánh cửa này. Bốn op còn lại (heartbeat, event,
+      // accountTier, complete) mở nguyên, nên vòng đang chạy dở về đích đàng hoàng, kể xong
+      // câu chuyện của nó, rồi completeWorkerCycle tái xếp job vào hàng — nơi claim sẽ không
+      // phát ra nữa. Đó chính là "cho job dang dở hoàn thành rồi mới dừng": không cần dừng
+      // ai cả, chỉ cần thôi phát việc mới. Trùng tu xong, mọi đàn tự chạy tiếp, không ai
+      // phải bấm lại Khai Đàn. Điểm danh vẫn ghi ở trên — linh sứ đang trực chứ không chết,
+      // sổ trực mà báo "vắng" trong lúc trùng tu là dashboard tự bịa thêm một sự cố.
+      const { maintenance } = await getAppSettings();
+      if (maintenance.active) {
+        return NextResponse.json({ job: null });
+      }
 
       const job = await claimNextJob(body.workerId, scope);
       if (!job) {

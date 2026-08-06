@@ -60,11 +60,26 @@ export type DashboardPresence = {
   mine: DashboardWorker[];
 };
 
+/**
+ * Trạng thái bế quan trùng tu — bản chiếu của nhánh `maintenance` trong app_settings, đủ
+ * cho client vẽ popup: đếm ngược trỏ vào `expectedEndAt`, thanh tiến độ nội suy giữa hai
+ * mốc. Mốc là chuỗi ISO và client PHẢI tự phòng Date.parse hỏng — nguồn của chúng là một
+ * document JSONB không ai ép kiểu ở tầng ghi.
+ */
+export type DashboardMaintenance = {
+  active: boolean;
+  startedAt: string | null;
+  expectedEndAt: string | null;
+  note: string;
+};
+
 export type DashboardLivePayload = {
   /** Job mới nhất của TỪNG tài khoản, theo thứ tự tạo tài khoản. */
   jobs: DashboardJob[];
   events: DashboardEvent[];
   presence: DashboardPresence;
   accounts: DashboardAccount[];
+  /** Optional vì client có thể đang cầm frame của bản deploy cũ; vắng mặt = giữ nguyên. */
+  maintenance?: DashboardMaintenance;
   resetEvents?: boolean;
 };

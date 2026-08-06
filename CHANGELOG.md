@@ -11,6 +11,46 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.34.0 — bế quan trùng tu: dừng cả tông môn mà không chém một đàn nào giữa vòng
+
+- **Tab Bảo Trì trong trang Tông Môn.** Trưởng môn khai bảo trì với một ước lượng số phút
+  và một lời nhắn tuỳ ý; đang bảo trì thì dời hạn chót được (startedAt đứng yên — nó là chân
+  trái của thanh tiến độ, đổi giữa chừng là thanh nhảy ngược trước mắt người xem), và có nút
+  mở cửa lại. Kèm bảng drain: bao nhiêu đàn đang chạy nốt, bao nhiêu nằm chờ —「đang chạy」
+  về 0 là deploy an toàn.
+- **"Dừng tất cả job" bằng cách đóng ĐÚNG MỘT cánh cửa.** Giao thức linh sứ có năm op; bảo
+  trì chỉ khoá `claim`. Bốn op còn lại mở nguyên nên vòng đang chạy dở về đích đàng hoàng,
+  kể xong câu chuyện của nó, rồi `completeWorkerCycle` tái xếp job vào hàng — nơi claim sẽ
+  không phát ra nữa. Không cần giết ai cả: chỉ cần thôi phát việc mới. Mở cửa lại là mọi đàn
+  tự chạy tiếp từ vòng kế, không ai phải bấm lại Khai Đàn. Linh sứ vẫn điểm danh trong lúc
+  chờ — sổ trực mà báo「vắng」giữa lúc trùng tu là dashboard tự bịa thêm một sự cố.
+- **Khai Đàn từ chối ngay ở tầng service**, trước mọi phép kiểm khác — form nào, đường gọi
+  nào cũng đập vào cùng cánh cửa, kể cả cái tab mở từ hôm qua chưa từng thấy popup.
+- **Popup trên Linh Đài, hai đường tới cùng một chỗ.** Ai đang mở trang nhận qua frame SSE —
+  admin gạt công tắc là `notifyDashboard("*")` đẩy tới mọi stream trong giây kế; ai mới vào
+  nhận từ SSR qua `initialMaintenance`. Cả hai đổ về một context nên popup không cần biết
+  mình được báo bằng đường nào. Chữ ký frame của stream PHẢI học thêm trường maintenance —
+  thiếu nó thì gạt công tắc không đẩy frame nào, và popup chỉ hiện khi một job tình cờ đổi
+  trạng thái, tức đúng lúc hàng chờ lặng gió thì nó câm.
+- **Đồng hồ đếm ngược + thanh tiến độ, và tuyệt đối không đếm số âm.** Đếm ngược trỏ vào
+  hạn chót; thanh tiến độ nội suy giữa hai mốc. Quá hẹn thì nói「sắp xong」và ghim 100% —
+  một cái đồng hồ chạy lùi qua 0 rồi tiếp tục lùi là cách nhanh nhất để người xem kết luận
+  cả trang đã hỏng. Popup đóng được (còn ai muốn đọc nhật ký đàn đang chạy nốt), nhưng đóng
+  rồi vẫn còn dải mỏng ghim trên đỉnh — trạng thái trùng tu không được biến mất khỏi mắt.
+  Đợt trùng tu MỚI (startedAt đổi) thì popup tự bật lại.
+- **Một giá trị rác không được đánh chìm cả document.** `getAppSettings` khi parse trượt là
+  trả default cho cả document — nghĩa là một trường maintenance hỏng (ai đó sửa tay JSONB)
+  sẽ kéo `membership.requireApproval` về BẬT lại sau lưng trưởng môn. Mọi trường maintenance
+  vì thế mang `.catch()`: trường hỏng về default một mình, hàng xóm không suy suyển.
+- **`npm run verify:maintenance`** chạy trên database thật: document cũ mặc định TẮT (deploy
+  không tự đóng cửa tông môn), bật là feed mang cờ + hạn chót và Khai Đàn khoá đúng lý do,
+  gia hạn giữ nguyên startedAt, tắt là mọi cửa mở lại. In giá trị gốc trước khi chạm, khôi
+  phục trong finally, đọc lại xác nhận.
+- Không migration (nhánh mới trong JSONB `app_settings`), không đổi engine — linh sứ đang
+  cài không cần đụng tới: cửa claim đóng phía server, worker cũ chỉ thấy「chưa có việc」.
+
+---
+
 ## 0.33.3 — fallback vh được cứu khỏi tay minifier
 
 - Bản 0.33.2 hứa「có fallback `100vh` cho trình duyệt cũ」— và trong MÃ NGUỒN thì đúng là

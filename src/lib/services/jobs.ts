@@ -2,6 +2,7 @@ import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { listAccountsWithEnvelope } from "./accounts";
 import { getEditableConfig, getStoredConfigForSnapshot, storedConfigSchema } from "./configs";
+import { getAppSettings } from "./settings";
 import { anyWorkerOnlineFor } from "./workers";
 import type { WorkerScope } from "@/lib/auth/worker";
 import type { JobEventRow, JobRow } from "@/lib/db/schema";
@@ -113,6 +114,17 @@ export type StartOutcome =
  * những tài khoản còn đứng ngoài (ví dụ vừa bật thêm một tài khoản mới).
  */
 export async function startJob(userId: string): Promise<StartOutcome> {
+  // Bế quan trùng tu: kiểm TRƯỚC MỌI THỨ, và ở tầng service chứ không ở action — mọi đường
+  // gọi tương lai (API mới, cron, một action khác) đều phải đập vào cùng cánh cửa này.
+  // Popup trên Linh Đài đã báo trước, nhưng một tab mở từ hôm qua vẫn bấm được nút cũ.
+  const { maintenance } = await getAppSettings();
+  if (maintenance.active) {
+    return {
+      ok: false,
+      error: "Tông môn đang bế quan trùng tu — Khai Đàn tạm khoá tới khi mở cửa lại. Đàn đang chạy dở sẽ tự hoàn thành vòng rồi nghỉ.",
+    };
+  }
+
   const accounts = await listAccountsWithEnvelope(userId);
   if (accounts.length === 0) {
     return {
@@ -696,4 +708,25 @@ export async function reapStaleJobs(): Promise<void> {
     await completeJob(row.id, "failed", "Linh sứ mất liên lạc (quá 3 phút không hồi đáp) — lượt bị kết thúc.");
   }
 
+}
+
+/**
+ * Toàn cảnh drain cho tab Bảo Trì: bao nhiêu đàn còn chạy nốt vòng (running + stopping),
+ * bao nhiêu đàn nằm chờ mà cửa claim sẽ không phát ra. Trưởng môn nhìn số "đang chạy" về 0
+ * là biết drain xong, deploy an toàn.
+ */
+export async function countJobsForDrain(): Promise<{ running: number; queued: number }> {
+  const rows = await db()
+    .select({ status: schema.automationJobs.status, n: sql<number>`count(*)::int` })
+    .from(schema.automationJobs)
+    .where(inArray(schema.automationJobs.status, ACTIVE))
+    .groupBy(schema.automationJobs.status);
+
+  let running = 0;
+  let queued = 0;
+  for (const row of rows) {
+    if (row.status === "queued") queued += row.n;
+    else running += row.n;
+  }
+  return { running, queued };
 }

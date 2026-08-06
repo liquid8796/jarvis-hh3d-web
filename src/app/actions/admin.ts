@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/guards";
+import { notifyDashboard } from "@/lib/realtime/dashboardChannel";
 import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
 import { adminCreate, adminDelete, adminUpdate, setStatus } from "@/lib/services/users";
 import {
@@ -171,6 +172,77 @@ export async function saveMembershipSettingsAction(
     message: requireApproval
       ? "Cổng tông môn đã có người gác — người mới bái sư sẽ vào hàng chờ."
       : "Cổng tông môn đã mở — người mới bái sư được thu nhận ngay, không qua hàng chờ.",
+  };
+}
+
+/** Trần ước lượng: một ngày. Trùng tu lâu hơn thế thì con số không còn là ước lượng nữa. */
+const MAINTENANCE_MAX_MINUTES = 24 * 60;
+const MAINTENANCE_MAX_NOTE = 500;
+
+/**
+ * Khai bảo trì HOẶC dời hạn chót khi đang bảo trì — cùng một form, cùng một action.
+ *
+ * `startedAt` chỉ được đặt ở lần BẬT đầu tiên và giữ nguyên khi gia hạn: nó là chân trái
+ * của thanh tiến độ, đổi nó giữa chừng là thanh tiến độ nhảy ngược trước mắt người xem.
+ * `expectedEndAt` thì luôn tính lại từ BÂY GIỜ + số phút — trưởng môn đang trả lời câu
+ * "còn bao lâu nữa", không phải "tổng cộng bao lâu".
+ *
+ * NOTIFY với userId "*" — mọi Linh Đài đang mở đều nhận frame trong giây kế tiếp; ai vào
+ * sau nhận qua SSR. Không có đường nào phải đợi nhịp poll 30 giây.
+ */
+export async function startMaintenanceAction(
+  _prev: AdminResult | null,
+  formData: FormData,
+): Promise<AdminResult> {
+  await requireAdmin();
+
+  const minutes = Number(formData.get("minutes"));
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAINTENANCE_MAX_MINUTES) {
+    return { ok: false, message: `Ước lượng phải là số phút nguyên trong khoảng 1–${MAINTENANCE_MAX_MINUTES}.` };
+  }
+
+  const note = String(formData.get("note") ?? "").trim();
+  if (note.length > MAINTENANCE_MAX_NOTE) {
+    return { ok: false, message: `Lời nhắn tối đa ${MAINTENANCE_MAX_NOTE} ký tự.` };
+  }
+
+  const settings = await getAppSettings();
+  const now = new Date();
+  const extending = settings.maintenance.active && settings.maintenance.startedAt !== null;
+  settings.maintenance = {
+    active: true,
+    startedAt: extending ? settings.maintenance.startedAt : now.toISOString(),
+    expectedEndAt: new Date(now.getTime() + minutes * 60_000).toISOString(),
+    note,
+  };
+  await saveAppSettings(settings);
+  await notifyDashboard({ userId: "*", topic: "config" });
+
+  revalidatePath("/admin");
+  return {
+    ok: true,
+    message: extending
+      ? `Đã dời hạn chót: còn khoảng ${minutes} phút nữa.`
+      : `Tông môn bắt đầu bế quan trùng tu — dự kiến ${minutes} phút. Cửa phát việc đã đóng; đàn đang chạy sẽ hoàn thành nốt vòng.`,
+  };
+}
+
+export async function endMaintenanceAction(): Promise<AdminResult> {
+  await requireAdmin();
+
+  const settings = await getAppSettings();
+  if (!settings.maintenance.active) {
+    return { ok: false, message: "Tông môn có đang bế quan đâu mà mở cửa." };
+  }
+
+  settings.maintenance = { active: false, startedAt: null, expectedEndAt: null, note: "" };
+  await saveAppSettings(settings);
+  await notifyDashboard({ userId: "*", topic: "config" });
+
+  revalidatePath("/admin");
+  return {
+    ok: true,
+    message: "Đã mở cửa trở lại — cửa phát việc mở, các đàn nằm chờ sẽ tự chạy tiếp từ vòng kế.",
   };
 }
 

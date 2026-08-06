@@ -185,6 +185,11 @@ Chờ đủ người có thể vài chục phút, đánh xong tới 35 phút. C�
 **Tôi vừa sửa cấu hình lúc auto đang chạy?**
 Lượt đang chạy giữ cấu hình cũ. Lượt sau mới dùng bản mới.
 
+**Thấy popup「đang bế quan trùng tu」?**
+Tông chủ đang nâng cấp hệ thống. Popup có đồng hồ đếm ngược cho biết khi nào xong. Đàn đang
+chạy dở sẽ hoàn thành nốt vòng rồi nghỉ — không mất gì; mở cửa lại là mọi đàn tự chạy tiếp,
+bạn không phải bấm gì cả.
+
 ---
 
 Có gì lạ thì nhắn trong **Nghị Sự Đường** — kèm ảnh chụp nhật ký thì dễ xem giúp hơn.

@@ -228,6 +228,7 @@ const furnacePage = ({ waveMs = 1200 } = {}) => `<!doctype html><html lang="vi">
   <button id="ldBtnCraft" style="opacity:0;width:120px;height:36px" disabled>Luyện Đan</button>
   <button id="ldBtnTune" style="opacity:0;width:120px;height:36px" disabled>Điều Hòa</button>
   <button id="ldBtnCollect" style="opacity:0;width:120px;height:36px" disabled>Thu Đan</button>
+  <div id="ldStabilityWrap" style="width:220px;height:12px"></div>
   <div id="ldPanel"></div><div id="ldInventory"></div>
 </div>
 <div id="ldModal" style="display:none"><button id="ldModalCloseBtn">Đóng</button><button id="ldModalDecompose">Phân Giải</button></div>
@@ -243,7 +244,11 @@ function render() {
   const p = $('#ldPanel');
   if (S.phase === 'cooking') {
     hide($('#ldBtnCraft')); hide($('#ldBtnCollect'));
-    show($('#ldBtnTune'), S.tunes < 3 && !S.locked && (S.tunes > 0 || S.fire <= 68));
+    // Đúng luật đo trong luyen-dan.min.js (06/08): nút chỉ khoá khi lửa ≥ 99.99% hoặc đang
+    // cooldown — nó MỞ từ rất lâu trước ngưỡng 68. Còn "bấm bây giờ thì ĐƯỢC ĐẾM" là một
+    // trạng thái riêng, trang phát nó qua class is-tune-weak trên #ldStabilityWrap.
+    show($('#ldBtnTune'), S.tunes < 3 && !S.locked && S.fire < 99.99);
+    $('#ldStabilityWrap').classList.toggle('is-tune-weak', S.tunes < 3 && S.fire <= 68);
     const pct = Math.max(0, Math.round(S.fire)) + '%';
     // Đồng hồ mẻ đan có mặt trong MỌI trạng thái đang luyện — đó là thứ bước "đệm chờ XHR"
     // của flow dò bằng chuỗi "00:" để biết panel thật đã về.
@@ -255,6 +260,7 @@ function render() {
         : '<p>Lửa: <b>' + pct + '</b> — Giữ lửa: ' + S.tunes + '/3</p>') + clock;
   } else {
     hide($('#ldBtnTune')); hide($('#ldBtnCollect')); show($('#ldBtnCraft'), true);
+    $('#ldStabilityWrap').classList.remove('is-tune-weak');
     p.innerHTML = '<button class="ld-recipe-tier">Hạ Phẩm</button><p>Đan Lô đã phát nổ.</p>';
   }
 }
@@ -1143,8 +1149,8 @@ async function main() {
   );
   const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
   check(
-    "hồ sơ đang ở schema 48",
-    loadProfileForSchema().schemaVersion === 48,
+    "hồ sơ đang ở schema 49",
+    loadProfileForSchema().schemaVersion === 49,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1233,18 +1239,23 @@ async function main() {
   let bossWaveMs = 0;
   let bossState = "ready";
 
-  // Lò luyện đan phía "server": lửa tụt theo thời gian thật, nút Điều Hòa chỉ mở khi % ≤ 68
-  // (lần đầu) hoặc khi đã hết khoá 6 giây (các lần sau) — đúng luật đo được trên trang thật.
-  // Nén tốc độ tụt để một ca smoke không tốn năm phút, nhưng giữ nguyên TỶ LỆ giữa ngưỡng 68,
-  // khoá 6 giây và ngòi nổ.
-  const furnace = { phase: "cooking", fire: 98, tunes: 0, lockedUntil: 0, tick: Date.now(), log: [] };
-  const FURNACE_DECAY_PER_SEC = 3;
+  // Lò luyện đan phía "server", đúng luật đo trong luyen-dan.min.js (06/08): lửa tụt theo
+  // thời gian thật, cú Điều Hòa nào cũng được NHẬN nhưng chỉ được ĐẾM khi (lần đầu ≤ 68%)
+  // hoặc đã có lần đếm trước đó — bấm sớm là bấm vào hư không.
+  //
+  // Tốc độ tụt 0.55%/s là con số CÓ CHỦ ĐÍCH, không phải nén tuỳ tiện: nó giữ đúng bất đẳng
+  // thức của sự cố 19:01 — sáu vòng bấm của flow cũ (~46s) phải KẾT THÚC TRƯỚC khi lửa chạm
+  // 68 (ở đây: (98-68)/0.55 ≈ 55s). Nén nhanh hơn (bản cũ 3%/s → chạm 68 sau 10s) là vô tình
+  // cho flow cũ ăn may chạm vùng đếm được ngay trong sáu vòng — fixture xanh mà production
+  // nổ, đúng chuyện đã xảy ra.
+  const furnace = { phase: "cooking", fire: 98, tunes: 0, wasted: 0, lockedUntil: 0, tick: Date.now(), log: [] };
+  const FURNACE_DECAY_PER_SEC = 0.55;
   // Khai lô lại NGAY TRƯỚC mỗi ca: lửa tụt theo đồng hồ treo tường, mà ca này chạy ở cuối
   // suite — không đặt lại thì phép tính đầu tiên nuốt trọn số phút của mọi ca phía trước và
   // lò nổ trước khi engine kịp chạm vào nó.
   const relightFurnace = () =>
     Object.assign(furnace, {
-      phase: "cooking", fire: 98, tunes: 0, lockedUntil: 0, tick: Date.now(), log: [],
+      phase: "cooking", fire: 98, tunes: 0, wasted: 0, lockedUntil: 0, tick: Date.now(), log: [],
     });
   const tickFurnace = () => {
     const now = Date.now();
@@ -1293,6 +1304,11 @@ async function main() {
         furnace.fire = Math.min(98, furnace.fire + 25);
         furnace.lockedUntil = Date.now() + 2000;
         furnace.log.push(`Điều Hòa ${furnace.tunes}`);
+      } else {
+        // Cú bấm ngoài vùng đếm được — server thật nhận request rồi bỏ qua, và ĐẾM Ở ĐÂY là
+        // cách phép thử phân biệt "chờ đúng cửa" với "bấm bừa cho tới khi trúng".
+        furnace.wasted += 1;
+        furnace.log.push(`bấm hụt @${Math.round(furnace.fire)}%`);
       }
       res.end(furnaceJson());
     }
@@ -1491,22 +1507,60 @@ async function main() {
     );
     bossState = "ready";
 
-    console.log("\nLuyện Đan Đường: giữ lửa phải bám TRẠNG THÁI, không bám một con số thoáng qua");
+    console.log("\nLuyện Đan Đường: giữ lửa phải chờ đúng VÙNG ĐẾM ĐƯỢC, không bấm bừa");
 
-    // Bug thứ hai người dùng báo:「thỉnh thoảng không điều hòa dẫn tới nổ đan lô」. Vòng giữ
-    // lửa từng chờ chuỗi「68%」hiện ra trên trang — mà chuỗi ấy chỉ sống đúng khoảng một giây,
-    // lúc kim lửa quét ngang con số 68. Chạy song song làm mỗi bước chậm đi một nhịp, script
-    // tới sau khoảnh khắc đó, và cái chờ 110 giây không bao giờ về — trong khi ngòi nổ của mẻ
-    // đan chỉ dài hơn thế một chút. Ngưỡng phải là một TRẠNG THÁI, và site giữ sẵn trạng thái
-    // ấy: nó khoá nút Điều Hòa cho tới khi % ≤ 68.
+    // Sự cố nổ lò lần HAI (19:01 06/08), sau khi lần một đã được sửa. Lần một chờ chuỗi
+    // 「68%」— sống đúng một giây lúc kim quét ngang. Bản sửa đổi sang `enabled #ldBtnTune`
+    // với giả định site khoá nút tới khi % ≤ 68 — nhưng đọc luyen-dan.min.js trên trang thật
+    // thì nút mở từ 99.98%: sáu cú Điều Hòa bay đi ở ~99-85%, server nhận đủ sáu request và
+    // không đếm cú nào, lò nổ với 0/3. Cửa đúng là class `is-tune-weak` trang tự bật đúng
+    // lúc một cú bấm sẽ được tính. Fixture này giờ mô hình đúng cả hai: nút mở sớm VÀ vùng
+    // đếm được đến muộn — flow nào bấm theo nút sẽ bị `wasted` tố cáo.
     relightFurnace();
     const ldQuest = exportedProfile.quests.find((q) => q.id === "luyen-dan-duong");
+    for (const ldId of ["luyen-dan-duong", "luyen-dan-duong-thuong"]) {
+      const ld = exportedProfile.quests.find((q) => q.id === ldId);
+      const rep = ld.steps.find((s) => s.action === "repeat");
+      const gate = rep.steps[0];
+      check(
+        `${ldId}: cổng lần-đầu chờ vùng đếm được (is-tune-weak), không chờ nút mở khoá`,
+        gate.condition?.kind === "visible" &&
+          gate.condition?.selector === "#ldStabilityWrap.is-tune-weak" &&
+          rep.maxSeconds === 300,
+        JSON.stringify({ cond: gate.condition, maxSeconds: rep.maxSeconds }),
+      );
+    }
+    // Ca ĐỐI CHỨNG, giữ vĩnh viễn: chính flow 1.45.0 (cổng enabled) chạy trên fixture này
+    // phải THUA — bấm hụt ở ~98-75%, không cú nào được đếm, lưới an toàn tố cáo. Fixture cũ
+    // xanh với flow ấy rồi production nổ lò; ca này tồn tại để fixture không bao giờ được
+    // phép dễ tính như thế nữa. (Giá ~55s mỗi lượt smoke — rẻ hơn một mẻ 20 Tiên Ngọc.)
+    const ldOldFlow = structuredClone(ldQuest);
+    ldOldFlow.steps.find((s) => s.action === "repeat").steps[0].condition = {
+      kind: "enabled",
+      selector: "#ldBtnTune",
+    };
+    const ldOldRun = await run(ldOldFlow);
+    tickFurnace();
+    check(
+      "flow 1.45.0 (chờ nút mở khoá) trên fixture trung thực: bấm hụt và bị tố cáo",
+      ldOldRun.outcome === "failed" && furnace.tunes === 0 && furnace.wasted >= 1,
+      `${ldOldRun.outcome} · đếm ${furnace.tunes} · hụt ${furnace.wasted}`,
+    );
+
+    relightFurnace();
     const ldRun = await run(ldQuest);
     tickFurnace();
     check(
       "giữ lửa đủ 3 lần — Đan Lô an toàn",
       furnace.tunes === 3 && furnace.phase === "cooking",
       `${furnace.phase} · ${furnace.tunes}/3 · ${furnace.log.join(" → ") || "(không lần nào)"}`,
+    );
+    // Đây là ranh giới giữa "chờ đúng cửa" và "bấm bừa cho tới khi trúng": flow cũ trên
+    // fixture này bấm hụt đủ sáu phát ở ~98-73% rồi bỏ đi; flow đúng không hụt phát nào.
+    check(
+      "không một cú Điều Hòa nào bị bấm ngoài vùng đếm được",
+      furnace.wasted === 0,
+      `bấm hụt ${furnace.wasted} lần: ${furnace.log.join(" → ")}`,
     );
     check(
       "và lượt chạy tự nó cũng báo thuận",

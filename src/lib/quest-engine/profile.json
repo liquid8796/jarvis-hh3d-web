@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 48,
+  "schemaVersion": 49,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -2610,11 +2610,11 @@
             {
               "action": "waitForCondition",
               "timeoutMs": 110000,
-              "note": "ch\u1EDD site M\u1EDE KHO\u00C1 n\u00FAt \u0110i\u1EC1u H\u00F2a (t\u1EE9c l\u1EEDa \u0111\u00E3 \u2264 68%) \u2014 ch\u1EC9 tr\u01B0\u1EDBc l\u1EA7n \u0111\u1EA7u ti\u00EAn",
+              "note": "ch\u1EDD l\u1EEDa r\u01A1i v\u00E0o V\u00D9NG \u0110\u1EBEM \u0110\u01AF\u1EE2C (class is-tune-weak c\u1EE7a ch\u00EDnh trang, = pha b\u1EA5t \u1ED5n \u002B ch\u01B0a \u0111\u1EE7 3 l\u1EA7n \u002B % \u2264 68) \u2014 ch\u1EC9 tr\u01B0\u1EDBc l\u1EA7n \u0111\u1EA7u ti\u00EAn; n\u00FAt \u0110i\u1EC1u H\u00F2a m\u1EDF kho\u00E1 t\u1EEB 99.98% n\u00EAn tr\u1EA1ng th\u00E1i n\u00FAt kh\u00F4ng n\u00F3i \u0111\u01B0\u1EE3c \u0111i\u1EC1u n\u00E0y",
               "optional": true,
               "condition": {
-                "kind": "enabled",
-                "selector": "#ldBtnTune"
+                "kind": "visible",
+                "selector": "#ldStabilityWrap.is-tune-weak"
               },
               "when": {
                 "kind": "textMatches",
@@ -2654,7 +2654,7 @@
             "text": "gi\u1EEF l\u1EEDa \u0111\u1EE7 3 l\u1EA7n"
           },
           "maxIterations": 6,
-          "maxSeconds": 240
+          "maxSeconds": 300
         },
         {
           "action": "waitForCondition",
@@ -3549,11 +3549,11 @@
             {
               "action": "waitForCondition",
               "timeoutMs": 110000,
-              "note": "ch\u1EDD site M\u1EDE KHO\u00C1 n\u00FAt \u0110i\u1EC1u H\u00F2a (t\u1EE9c l\u1EEDa \u0111\u00E3 \u2264 68%) \u2014 ch\u1EC9 tr\u01B0\u1EDBc l\u1EA7n \u0111\u1EA7u ti\u00EAn",
+              "note": "ch\u1EDD l\u1EEDa r\u01A1i v\u00E0o V\u00D9NG \u0110\u1EBEM \u0110\u01AF\u1EE2C (class is-tune-weak c\u1EE7a ch\u00EDnh trang, = pha b\u1EA5t \u1ED5n \u002B ch\u01B0a \u0111\u1EE7 3 l\u1EA7n \u002B % \u2264 68) \u2014 ch\u1EC9 tr\u01B0\u1EDBc l\u1EA7n \u0111\u1EA7u ti\u00EAn; n\u00FAt \u0110i\u1EC1u H\u00F2a m\u1EDF kho\u00E1 t\u1EEB 99.98% n\u00EAn tr\u1EA1ng th\u00E1i n\u00FAt kh\u00F4ng n\u00F3i \u0111\u01B0\u1EE3c \u0111i\u1EC1u n\u00E0y",
               "optional": true,
               "condition": {
-                "kind": "enabled",
-                "selector": "#ldBtnTune"
+                "kind": "visible",
+                "selector": "#ldStabilityWrap.is-tune-weak"
               },
               "when": {
                 "kind": "textMatches",
@@ -3593,7 +3593,7 @@
             "text": "gi\u1EEF l\u1EEDa \u0111\u1EE7 3 l\u1EA7n"
           },
           "maxIterations": 6,
-          "maxSeconds": 240
+          "maxSeconds": 300
         },
         {
           "action": "waitForCondition",

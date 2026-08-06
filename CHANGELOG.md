@@ -11,6 +11,31 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.31.0 — cổng Điều Hòa chờ vùng đếm được, không chờ nút mở khoá
+
+- **Lò nổ lần nữa (19:01 ngày 06/08), đúng một vòng sau bản vá 0.30.0 — và nhật ký kể lại
+  từng giây.** Bản 0.30.0 đổi cổng chờ lần-Điều-Hòa-đầu từ chuỗi「68%」(sống đúng một giây)
+  sang `enabled #ldBtnTune`, với giả định site khoá nút tới khi lửa ≤ 68%. Đọc
+  `luyen-dan.min.js` trên trang thật thì giả định ấy sai: khoá nút chỉ là
+  `stability ≥ 99.99 || cooldown || request đang bay` — **nút mở từ 99.98%**. Vòng giữ lửa
+  vì thế bấm sáu cú ở ~99-85%, server nhận đủ sáu request và không đếm cú nào (Vt() chỉ tính
+  một cú vào 3 lần sống sót khi % ≤ 68), sáu vòng cạn trong ~46 giây, mẻ đan chết ở 0/3 —
+  khớp nhật ký production đến từng giây.
+- **Cổng mới là dấu hiệu「bấm bây giờ thì được đếm」của chính trang**: `#ldStabilityWrap`
+  mang class `is-tune-weak` đúng khi pha bất ổn đang chạy + chưa đủ 3 lần + lửa ≤ 68% — cùng
+  phép thử ba vế mà trang dùng cho nhãn của nó. Cú hai và ba vẫn đi theo nhịp 6.5s như bản
+  ghi (video gốc cho thấy chúng được đếm ở ~89%; cổng chỉ gác cú đầu).
+- **Ngân sách vòng phủ trọn pha bất ổn** (maxSeconds 240 → 300): tốc độ tụt nhân với áp suất
+  server đặt (0.5-1.5), riêng đường xuống 68% đã có thể mất ~64-190 giây.
+- **Fixture lần trước chính là đồng phạm, và nó bị xử trước tiên.** Nó mô hình nút
+  khoá-tới-68 — khớp với bản vá thay vì khớp với site — nên smoke 0.30.0 xanh trong khi
+  production nổ. Fixture giờ mô hình đúng cơ chế đo được: nút mở từ 99.98%, bộ đếm `wasted`
+  cho những cú bấm ngoài vùng đếm được, và tốc độ tụt đủ chậm để sáu cú bấm mù kết thúc
+  TRƯỚC khi lửa chạm 68 — giữ nguyên bất đẳng thức của sự cố thật. Một ca đối chứng vĩnh
+  viễn chạy chính flow 0.30.0 trên fixture ấy: đỏ (failed, đếm 0, hụt 6). Flow mới: 3/3,
+  không hụt phát nào — smoke **187/187**.
+- Hồ sơ lên **schema 49**, cùng nhịp desktop 1.46.0.
+
 ## 0.30.0 — trang chưa kịp vẽ không phải là trang nói không
 
 Hai lỗi được báo cùng lúc, và cùng chỉ xuất hiện khi **bật chạy song song các nhiệm vụ**:

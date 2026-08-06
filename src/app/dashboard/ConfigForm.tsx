@@ -590,7 +590,9 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
           Chạy song song các nhiệm vụ
           <span className="block text-xs leading-snug text-[var(--color-mist)]">
             Mỗi nhiệm vụ một tab riêng trong cùng phiên — vòng chạy nhanh bằng nhiệm vụ chậm
-            nhất thay vì cộng dồn. Bỏ tick để làm lần lượt từng nhiệm vụ nếu site trở chứng.
+            nhất thay vì cộng dồn. Chỉ áp cho các nhiệm vụ ngắn trên trang nhiệm vụ ngày;
+            nhiệm vụ có trang riêng (Hoang Vực, Mê Cung…) tự nhường nhau để trận đánh lớn
+            không bị đói tài nguyên. Bỏ tick để làm lần lượt từng nhiệm vụ nếu site trở chứng.
           </span>
         </span>
       </label>

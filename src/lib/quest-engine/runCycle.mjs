@@ -12,6 +12,7 @@ import { computeNextDelaySeconds } from "./cooldown.mjs";
 import { DEFAULT_GAME_BASE_URL, parseCookieString } from "./cookies.mjs";
 import { createQuestEngine, enabledQuestsInOrder, questsForAccount, QuestAborted } from "./engine.mjs";
 import { profileForConfig } from "./profile.mjs";
+import { acquireQuestSlot, isDedicatedPageQuest } from "./questGate.mjs";
 import { createReferenceQuiz, DEFAULT_QUIZ_REFERENCE_URL } from "./quizReference.mjs";
 import { createSession } from "./session.mjs";
 
@@ -446,11 +447,37 @@ export async function runCycle(deps) {
       const tabs = Math.min(questTabLimit(), quests.length);
       await say(`Chạy song song ${quests.length} nhiệm vụ — tối đa ${tabs} tab cùng lúc.`);
 
+      // Kế hoạch CHẠY xếp nhiệm vụ trang riêng ra cuối (phần tường thuật vẫn theo thứ tự
+      // hồ sơ — xem chỗ đọc `settled`). Lý do: trang riêng có thể phải xếp hàng ở cổng toàn
+      // cục sau trang riêng của một đàn khác, và một lane của pool bị waiter chiếm là một
+      // lane không chạy được nhiệm vụ hub nào — tệ nhất là cả ba lane cùng đứng xếp hàng
+      // trong khi đống nhiệm vụ hub phía sau hoàn toàn có thể chạy ngay.
+      const executionPlan = [
+        ...quests.filter((quest) => !isDedicatedPageQuest(profile, quest)),
+        ...quests.filter((quest) => isDedicatedPageQuest(profile, quest)),
+      ];
+
       let sawAbort = false;
-      const settled = await mapWithLimit(quests, tabs, async (quest) => {
+      const settledByPlan = await mapWithLimit(executionPlan, tabs, async (quest) => {
         // Thu đàn giữa chừng: nhiệm vụ còn nằm trong hàng đợi của pool thấy cờ này và rút
         // lui ngay, không mở thêm tab nào nữa.
         if (shouldStop()) return { quest, aborted: true };
+
+        // Cổng toàn cục TRƯỚC mọi thứ, kể cả trước lúc mở tab: dựng trang đã là tiêu CPU,
+        // và luật nhường đường tính từ byte đầu tiên chứ không từ cú click đầu tiên.
+        const slot = await acquireQuestSlot({
+          dedicated: isDedicatedPageQuest(profile, quest),
+          name: quest.name,
+          shouldStop,
+          onWait: ({ holder }) =>
+            log.debug(
+              `Quest:${quest.name}`,
+              holder
+                ? `nhường tài nguyên cho「${holder}」đang giữ trang riêng — xếp hàng chờ lượt.`
+                : "xếp hàng ở cổng điều phối — một nhiệm vụ trang riêng đang đợi phía trước.",
+            ),
+        });
+        if (slot.aborted) return { quest, aborted: true };
 
         // Vào tay từ ĐÂY, trước cả lúc mở tab: dựng trang là phần chậm nhất của một nhiệm
         // vụ ngắn, và một nhiệm vụ đang dựng trang vẫn là một nhiệm vụ đang được làm.
@@ -492,6 +519,8 @@ export async function runCycle(deps) {
             await questPage.close().catch(() => {});
           }
         } finally {
+          // Trả slot cổng toàn cục TRƯỚC hết — đàn khác đang xếp hàng sau slot này.
+          slot.release();
           // Rời tay dù đi bằng ngả nào — kể cả ngả "không mở được tab riêng" ở trên, vốn
           // return thẳng và sẽ để tên nhiệm vụ mắc kẹt trong `runningNow` tới hết vòng.
           // Bị Thu Đàn thì KHÔNG tính là đã làm xong: nó chưa từng chạy tới nơi.
@@ -501,8 +530,11 @@ export async function runCycle(deps) {
         }
       });
 
-      // mapWithLimit trả kết quả theo đúng thứ tự quests, nên phần tường thuật đọc như bản
-      // tuần tự dù việc chạy xen kẽ nhau.
+      // mapWithLimit trả theo thứ tự executionPlan; tường thuật thì theo thứ tự HỒ SƠ như
+      // mọi khi — người đọc không cần biết kế hoạch chạy đã xếp trang riêng ra cuối.
+      const byQuestId = new Map(settledByPlan.map((entry) => [entry.quest.id, entry]));
+      const settled = quests.map((quest) => byQuestId.get(quest.id));
+
       for (const entry of settled) {
         if (entry.aborted) {
           sawAbort = true;
@@ -534,6 +566,24 @@ export async function runCycle(deps) {
           );
         }
 
+        // Tuần tự trong đàn NÀY không có nghĩa là một mình trên máy: các đàn khác của cùng
+        // linh sứ vẫn chạy cạnh bên, nên nhánh này cũng phải qua cổng toàn cục như ai.
+        const slot = await acquireQuestSlot({
+          dedicated: isDedicatedPageQuest(profile, quest),
+          name: quest.name,
+          shouldStop,
+          onWait: ({ holder }) =>
+            log.debug(
+              `Quest:${quest.name}`,
+              holder
+                ? `nhường tài nguyên cho「${holder}」đang giữ trang riêng — xếp hàng chờ lượt.`
+                : "xếp hàng ở cổng điều phối — một nhiệm vụ trang riêng đang đợi phía trước.",
+            ),
+        });
+        if (slot.aborted) {
+          return { outcome: "stopped", message: `Đã thu đàn giữa chừng — xong ${done}/${quests.length}.` };
+        }
+
         runningNow.set(quest.id, quest.name);
         publishProgress();
 
@@ -546,6 +596,7 @@ export async function runCycle(deps) {
           }
           throw err;
         } finally {
+          slot.release();
           // Rời tay ở mọi ngả. Hai ngả bất thường (Thu Đàn, lỗi ném ra) đều kết thúc cả vòng
           // ngay sau đây, nên `finished` chỉ cộng trên đường đi bình thường bên dưới.
           runningNow.delete(quest.id);

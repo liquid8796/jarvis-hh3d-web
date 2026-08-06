@@ -20,6 +20,12 @@ import { chromium } from "playwright-core";
 import { createQuestEngine } from "../src/lib/quest-engine/engine.mjs";
 import { createSession } from "../src/lib/quest-engine/session.mjs";
 import { mapWithLimit, parseCookieString, runCycle } from "../src/lib/quest-engine/runCycle.mjs";
+import {
+  _observeGate,
+  _resetGate,
+  acquireQuestSlot,
+  isDedicatedPageQuest,
+} from "../src/lib/quest-engine/questGate.mjs";
 import { profileDirForJob } from "../src/lib/quest-engine/browserProfile.mjs";
 import { computeNextDelaySeconds, parseCooldownSeconds } from "../src/lib/quest-engine/cooldown.mjs";
 import { profileForConfig } from "../src/lib/quest-engine/profile.mjs";
@@ -1909,6 +1915,103 @@ async function main() {
     ]));
     check("bước bắt buộc hỏng thì quest hỏng", fatal.outcome === "failed", fatal.outcome);
 
+    console.log("\nCổng điều phối toàn cục — trang riêng không bao giờ cặp với trang riêng");
+
+    // Sự cố 07/08 01:03:55 dựng lại bằng chính hình dạng của nó: Mê Cung (trang riêng) đang
+    // đánh, Hoang Vực (trang riêng) muốn vào, các nhiệm vụ hub đứng quanh. Luật phải cho ra:
+    // Hoang Vực XẾP HÀNG chứ không chen vào cạnh Mê Cung, hub lấp đúng một chỗ đồng hành,
+    // và khi Mê Cung buông thì Hoang Vực vào TRƯỚC đám hub còn chờ.
+    {
+      const tick = () => new Promise((r) => setTimeout(r, 20));
+      const grab = (dedicated, name, shouldStop) => {
+        const holder = { admitted: false, aborted: false, slot: null };
+        holder.promise = acquireQuestSlot({ dedicated, name, shouldStop }).then((result) => {
+          if (result.aborted) holder.aborted = true;
+          else {
+            holder.admitted = true;
+            holder.slot = result;
+          }
+        });
+        return holder;
+      };
+
+      const meCung = grab(true, "Mê Cung");
+      await tick();
+      check("trang riêng thứ nhất vào ngay khi cổng trống", meCung.admitted, "Mê Cung chưa được vào");
+
+      const hoangVuc = grab(true, "Hoang Vực");
+      const hub1 = grab(false, "Điểm Danh");
+      const hub2 = grab(false, "Vòng Quay");
+      await tick();
+      check("trang riêng thứ hai PHẢI xếp hàng — không có cặp Mê Cung + Hoang Vực nào nữa", !hoangVuc.admitted, "Hoang Vực chen được vào");
+      check("một hub được làm bạn đồng hành (tổng = 2)", hub1.admitted, "hub1 không được vào");
+      check("hub thứ hai hết chỗ — trần đồng hành là 1", !hub2.admitted, "hub2 chen được vào");
+
+      hub1.slot.release();
+      await tick();
+      check(
+        "hub sau được vượt lên lấp chỗ đồng hành trống (trang riêng kế vẫn phải chờ chủ cổng)",
+        hub2.admitted && !hoangVuc.admitted,
+        `hub2=${hub2.admitted} hoangVuc=${hoangVuc.admitted}`,
+      );
+
+      meCung.slot.release();
+      await tick();
+      check("Mê Cung buông là Hoang Vực vào — trang riêng có ưu tiên trước hub xếp sau", hoangVuc.admitted, "Hoang Vực vẫn chờ");
+
+      hoangVuc.slot.release();
+      hub2.slot.release();
+
+      // Trang riêng đứng đợi thì hub MỚI không được chen ngang — thiếu luật này, dòng hub
+      // bất tận của các đàn khác bỏ đói trận đánh lớn vĩnh viễn.
+      const h1 = grab(false, "Hub A");
+      const h2 = grab(false, "Hub B");
+      await tick();
+      check("không trang riêng nào hoạt động → hub chạy tự do", h1.admitted && h2.admitted, `${h1.admitted}/${h2.admitted}`);
+      const boss = grab(true, "Boss");
+      const h3 = grab(false, "Hub C");
+      await tick();
+      check("boss chờ cổng rút về ≤1, hub mới phải nhường bước sau lưng nó", !boss.admitted && !h3.admitted, `boss=${boss.admitted} h3=${h3.admitted}`);
+      h1.slot.release();
+      await tick();
+      check("cổng rút về 1 là boss vào, hub C thành bạn đồng hành khi còn chỗ", boss.admitted && !h3.admitted, `boss=${boss.admitted} h3=${h3.admitted}`);
+      h2.slot.release();
+      await tick();
+      check("chỗ đồng hành trống ra là hub C vào", h3.admitted, "h3 vẫn chờ");
+      boss.slot.release();
+      h3.slot.release();
+
+      // Thu Đàn giữa lúc xếp hàng: waiter rút lui, không kẹt sau lưng ai.
+      const holderA = grab(true, "Đang giữ");
+      await tick();
+      let stopped = false;
+      const quitter = grab(true, "Sắp thu đàn", () => stopped);
+      await tick();
+      stopped = true;
+      await new Promise((r) => setTimeout(r, 700)); // nhịp poll 500ms phải tự nhặt nó ra
+      check("Thu Đàn trong hàng đợi → rút lui qua nhịp poll, không chờ ai buông cổng", quitter.aborted, `aborted=${quitter.aborted}`);
+      holderA.slot.release();
+
+      _resetGate();
+    }
+
+    // Phân loại phải đọc từ hồ sơ thật, không từ một danh sách tay: twin thường của Điểm
+    // Danh sống trên /diem-danh nên NÓ là trang riêng dù bản VIP là hub.
+    {
+      const classified = loadProfileForSchema();
+      const byId = (id) => classified.quests.find((q) => q.id === id);
+      check(
+        "phân loại theo hồ sơ: hoang-vuc & diem-danh-thuong = trang riêng; diem-danh & khoang-mach = hub",
+        isDedicatedPageQuest(classified, byId("hoang-vuc")) &&
+          isDedicatedPageQuest(classified, byId("diem-danh-thuong")) &&
+          !isDedicatedPageQuest(classified, byId("diem-danh")) &&
+          !isDedicatedPageQuest(classified, byId("khoang-mach")),
+        ["hoang-vuc", "diem-danh-thuong", "diem-danh", "khoang-mach"]
+          .map((id) => `${id}=${isDedicatedPageQuest(classified, byId(id))}`)
+          .join(" "),
+      );
+    }
+
     console.log("\nTiến độ vòng chạy — thứ Hàng Đợi Công Việc hiển thị");
 
     // Chạy runCycle THẬT trên Chromium thật trước sảnh giả, chỉ để soi một thứ: chuỗi tiến
@@ -1926,6 +2029,13 @@ async function main() {
       quests: { diemDanh: { enabled: true }, thiLuyen: { enabled: true } },
     };
 
+    // Hai nhiệm vụ của vòng này đều là TRANG RIÊNG ở hạng thường (/diem-danh và
+    // /thi-luyen-…), nên cổng toàn cục phải bắt chúng nối đuôi: dù bật song song, không
+    // khoảnh khắc nào được có 2 nhiệm vụ cùng chạy. Observer ghi mọi ảnh chụp cổng — đây là
+    // phép thử tích hợp của đúng đêm 07/08, chỉ khác là lần này có nhân chứng.
+    const gateSnapshots = [];
+    _observeGate((snap) => gateSnapshots.push(snap));
+
     const parallelBeats = [];
     const parallelCycle = await runCycle({
       chromium,
@@ -1935,6 +2045,14 @@ async function main() {
       reportProgress: (beat) => parallelBeats.push(beat),
       shouldStop: () => false,
     });
+
+    _observeGate(null);
+    check(
+      "cổng toàn cục: hai nhiệm vụ trang riêng NỐI ĐUÔI dù vòng bật song song (active tối đa = 1)",
+      gateSnapshots.length > 0 &&
+        gateSnapshots.every((snap) => snap.active <= 1 && snap.dedicatedActive <= 1),
+      gateSnapshots.map((snap) => `${snap.active}/${snap.dedicatedActive}`).join(" → ") || "(không ảnh nào)",
+    );
 
     check(
       "vòng chạy tới nơi trên sảnh giả",

@@ -11,6 +11,43 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.35.0 — song song chỉ dành cho hub; trang riêng có cổng nhường đường toàn cục
+
+- **Luật mới của tông chủ, sau đêm 07/08:** chạy song song chỉ dành cho các nhiệm vụ ngắn
+  trên `/nhiem-vu-hang-ngay`. Nhiệm vụ có TRANG RIÊNG (Hoang Vực, Mê Cung, Luyện Đan…) chỉ
+  được phép có tối đa MỘT nhiệm vụ khác chạy cùng lúc — **kể cả nhiệm vụ của đạo hữu khác**
+  trên cùng linh sứ. Mục đích: đảm bảo tài nguyên cho các trận dài, phức tạp; 0.34.1 nới
+  ngân sách là thuốc giảm đau, bản này là thuốc chữa.
+- **`questGate.mjs` — một bộ đếm cho cả tiến trình linh sứ**, xuyên mọi đàn và mọi đạo hữu
+  nó phục vụ. State mức module là chủ ý: worker chạy nhiều đàn trong cùng tiến trình Node,
+  nên "toàn cục trên cái máy này" chính là phạm vi tài nguyên (CPU) mà luật muốn bảo vệ.
+  Hai linh sứ trên hai máy khác nhau không cần biết nhau.
+- **Hai nhiệm vụ trang riêng KHÔNG bao giờ cặp với nhau**, dù "mỗi cái chỉ thấy 1 cái khác"
+  nghe như thoả luật — cặp Mê Cung + Hoang Vực chính là sự cố sinh ra luật này, và hai con
+  quái vật chia nhau hai nhân CPU thì chẳng con nào được đảm bảo gì. Trang riêng cầm cổng
+  MỘT MÌNH, với đúng một nhiệm vụ hub làm bạn đồng hành (tổng ≤ 2).
+- **Công bằng có chủ ý ở hai chiều.** Trang riêng đứng đợi thì hub mới không được chen
+  ngang (không có luật này, dòng hub bất tận của các đàn khác bỏ đói trận đánh lớn vĩnh
+  viễn); nhưng trang riêng ĐÃ cầm cổng thì hub sau được vượt lên lấp chỗ đồng hành trống —
+  chỗ ấy để không thì không ai được gì, và trang riêng kế tiếp không mất lượt.
+- **Chờ huỷ được:** Thu Đàn giữa lúc xếp hàng rút lui qua nhịp poll 500ms, không kẹt sau
+  một trận Mê Cung 35 phút của người khác chỉ để nói "tôi dừng đây".
+- **Nhánh tuần tự cũng đi qua cổng** — tuần tự trong đàn này không có nghĩa là một mình
+  trên máy: các đàn khác của cùng linh sứ vẫn chạy cạnh bên.
+- **Kế hoạch chạy xếp trang riêng ra cuối** (tường thuật vẫn theo thứ tự hồ sơ): một lane
+  của pool bị waiter chiếm là một lane không chạy được nhiệm vụ hub nào — tệ nhất là cả ba
+  lane cùng xếp hàng trong khi đống hub phía sau hoàn toàn có thể chạy ngay.
+- **Lỗi bắt được trong lúc viết test:** bản nháp đầu chỉ drain cổng khi có người buông —
+  một hub tới lúc chỗ đồng hành còn trống phải đợi nhịp poll 500ms vô cớ. Test 20ms vạch
+  trần; giờ acquire tự drain ngay trong cùng nhịp.
+- **Smoke 189 → 202:** dựng lại đúng hình sự cố (Mê Cung giữ cổng, Hoang Vực xếp hàng, hub
+  lấp một chỗ, buông là trang riêng vào trước), phân loại đọc từ hồ sơ thật (twin thường
+  của Điểm Danh sống trên `/diem-danh` nên NÓ là trang riêng dù bản VIP là hub), và một
+  observer gắn vào vòng chạy Chromium thật xác nhận hai nhiệm vụ trang riêng nối đuôi dù
+  vòng bật song song.
+
+---
+
 ## 0.34.1 — ngân sách bằng chứng đòn đánh chịu được tab bị bỏ đói CPU
 
 - **45s được cân cho nhầm đêm.** Bản ghi 06/08 đo chuỗi thật trên MỘT tab rảnh: POST trả lời

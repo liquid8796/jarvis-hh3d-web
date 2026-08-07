@@ -41,14 +41,11 @@ export function MaintenanceForm({
   return (
     <>
       <form action={startAction} className="card card-hairline p-6">
-        <h2 className="h-display mb-2 text-lg font-semibold text-gilded">
+        {/* `mb-5` chứ không `mb-2`: dòng dẫn nhập bên dưới tiêu đề đã bỏ, nên chính tiêu đề
+            phải gánh khoảng thở trước phần nội dung. */}
+        <h2 className="h-display mb-5 text-lg font-semibold text-gilded">
           Bế Quan Trùng Tu {maintenance.active && <span className="badge badge-pending ml-2 align-middle">ĐANG BẢO TRÌ</span>}
         </h2>
-        <p className="mb-5 text-sm text-[var(--color-mist)]">
-          Bật lên là cửa phát việc đóng và Khai Đàn tạm khoá. Đàn đang chạy dở <b>không</b> bị
-          chém giữa vòng — nó hoàn thành nốt rồi tự vào hàng chờ; mở cửa lại là mọi đàn tự
-          chạy tiếp, không ai phải bấm lại Khai Đàn.
-        </p>
 
         {maintenance.active && (
           <p className="mb-4 rounded-lg border border-[var(--color-gold-300)]/40 bg-[var(--color-ink-600)]/40 p-3 text-xs leading-relaxed">

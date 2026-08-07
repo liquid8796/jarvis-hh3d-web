@@ -12,11 +12,9 @@ export function ChatSettingsForm({ retentionDays }: { retentionDays: number }) {
 
   return (
     <form action={action} className="card card-hairline max-w-xl p-6">
-      <h2 className="h-display mb-2 text-lg font-semibold text-gilded">Nghị Sự Đường</h2>
-      <p className="mb-5 text-sm text-[var(--color-mist)]">
-        Sảnh đàm đạo là dòng chảy, không phải tàng thư — tin quá hạn sẽ tự tan để kho không
-        phình theo năm tháng.
-      </p>
+      {/* `mb-5` chứ không `mb-2`: dòng dẫn nhập bên dưới tiêu đề đã bỏ, nên chính tiêu đề
+          phải gánh khoảng thở trước ô nhập đầu tiên. */}
+      <h2 className="h-display mb-5 text-lg font-semibold text-gilded">Nghị Sự Đường</h2>
 
       <label className="label" htmlFor="retentionDays">
         Tin nhắn sống bao nhiêu ngày

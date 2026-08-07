@@ -11,6 +11,23 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.36.1 — bớt chữ trên các thẻ cấu hình
+
+- Bỏ năm đoạn văn giải thích dài trên giao diện: dòng dẫn nhập của Bế Quan Trùng Tu, Tên Miền
+  Game và Nghị Sự Đường; hộp cảnh báo cookie trong Tên Miền Game; và dòng mô tả dưới ô「Chạy
+  song song các nhiệm vụ」ở Linh Đài. Các thẻ cấu hình giờ giữ đúng phần thao tác.
+- **Giữ lại các dòng gợi ý ngắn gắn với ô nhập** (1–365 ngày, cách gõ tên miền, ý nghĩa mốc
+  đếm ngược) — chúng trả lời câu hỏi「gõ gì vào đây」, khác hẳn văn giải thích nền tảng.
+- Lời nhắc「đổi tên miền là mọi cookie đã lưu chết theo」vẫn còn nguyên ở hai chỗ nó thật sự
+  cần: thông báo sau khi lưu, và dòng lỗi chính vòng chạy nói ra khi phiên không dùng được.
+- Sửa kèm hai chỗ mà việc xoá chữ làm hỏng bố cục, và cả hai đều được ĐO chứ không đoán:
+  tiêu đề ba thẻ lên `mb-5` để không còn khoảng mồ côi (đo được: cả ba cách nhau đúng 20px
+  như nhau), và nhãn「Chạy song song」chuyển sang canh giữa vì `items-start` + `mt-0.5` vốn
+  sinh ra để giữ ô tick thẳng hàng với DÒNG ĐẦU của một nhãn nhiều dòng — không còn dòng nào
+  để canh thì nó thành lệch (đo lại sau khi sửa: lệch tâm 0px).
+
+---
+
 ## 0.36.0 — cổng sẵn sàng thôi nói dối, và tên miền game thành cấu hình chạy được
 
 Sự cố 07/08: chín nhiệm vụ liên tiếp báo `Trang chưa dựng xong sau 25s`, mỗi vòng bốn phút

@@ -9,8 +9,10 @@ import { saveGameDomainAction, type AdminResult } from "@/app/actions/admin";
  * Đứng chung tab Bảo Trì vì cùng một loại việc: thứ trưởng môn chạm vào khi hệ thống đang
  * trục trặc. Và hai thứ ấy thường đi cùng nhau — dời tên miền là một dịp nên bế quan.
  *
- * Cảnh báo về cookie nằm ngay trên nút bấm, không nằm trong thông báo sau khi lưu: hậu quả
- * cần được đọc TRƯỚC khi bấm, vì sau đó thì mọi tài khoản đã mất phiên rồi.
+ * Hậu quả「đổi tên miền là mọi cookie đã lưu chết theo」KHÔNG còn nằm trên nút bấm nữa —
+ * form giữ đúng phần thao tác. Lời nhắc ấy vẫn còn nguyên ở hai chỗ nó thật sự cần đến:
+ * thông báo trả về sau khi lưu (`saveGameDomainAction`), và dòng lỗi mà chính vòng chạy nói
+ * ra khi phiên đăng nhập không còn dùng được.
  */
 export function GameDomainForm({ baseUrl }: { baseUrl: string }) {
   const [state, action, pending] = useActionState<AdminResult | null, FormData>(
@@ -20,11 +22,9 @@ export function GameDomainForm({ baseUrl }: { baseUrl: string }) {
 
   return (
     <form action={action} className="card card-hairline p-6">
-      <h2 className="h-display mb-2 text-lg font-semibold text-gilded">Tên Miền Game</h2>
-      <p className="mb-5 text-sm text-[var(--color-mist)]">
-        hoathinh3d đổi tên miền định kỳ. Đổi ở đây là mọi linh sứ — cả trên VM tông môn lẫn máy
-        nhà từng đạo hữu — dùng tên miền mới ngay từ vòng chạy kế, không ai phải cài lại gì.
-      </p>
+      {/* `mb-5` chứ không `mb-2`: dòng dẫn nhập bên dưới tiêu đề đã bỏ, nên chính tiêu đề
+          phải gánh khoảng thở trước ô nhập. */}
+      <h2 className="h-display mb-5 text-lg font-semibold text-gilded">Tên Miền Game</h2>
 
       <label className="label" htmlFor="baseUrl">
         Tên miền đang dùng
@@ -45,14 +45,6 @@ export function GameDomainForm({ baseUrl }: { baseUrl: string }) {
         Gõ kiểu nào cũng được — <span className="font-mono">hoathinh3d.one</span> hay{" "}
         <span className="font-mono">https://hoathinh3d.one/</span> — đều được chuẩn hoá về đúng
         một origin.
-      </p>
-
-      {/* Hậu quả phải đọc được TRƯỚC khi bấm. */}
-      <p className="mt-4 rounded-lg border border-[var(--color-gold-300)]/40 bg-[var(--color-ink-600)]/40 p-3 text-xs leading-relaxed text-[var(--color-parchment)]">
-        <span className="font-semibold text-gilded">Đổi tên miền là mọi cookie đã lưu mất hiệu lực.</span>{" "}
-        Cookie gắn chặt vào tên miền nên chúng không đi theo được — sau khi đổi, từng đạo hữu
-        phải vào Linh Đài dán lại chuỗi cookie lấy từ tên miền MỚI. Đàn đang chạy sẽ báo hết
-        phiên đăng nhập cho tới khi việc đó xong.
       </p>
 
       <div className="mt-5 flex flex-wrap items-center gap-4">

@@ -969,47 +969,58 @@ async function main() {
   {
     const { maskUsername, readProgress } = await import("../src/lib/services/queue.ts");
 
-    // Lằn ranh riêng tư thứ hai của trang này: tiến độ được thấy, TÊN nhiệm vụ thì không —
-    // tên nhiệm vụ là cấu hình nhiệm vụ, thứ nằm bên phía "không bao giờ" từ ngày trang ra
-    // đời. Con số đi qua để trả lời "ghế kia sắp trống chưa" mà không kể ai bật những gì.
+    // Ranh giới ĐỔI PHÍA ngày 08/08/2026: tên nhiệm vụ đang chạy giờ hiện trên MỌI dòng, kể
+    // cả của người khác. Trước đó chỉ con số được qua. Ghim lại chiều mới để không ai vô tình
+    // dựng lại phép cắt cũ, và ghim luôn thứ KHÔNG đổi phía — tên chủ nhân vẫn phải che.
     const full = { running: ["Mê Cung", "Vấn Đáp"], done: 3, total: 8 };
     check(
-      "dòng của mình: thấy đủ tên nhiệm vụ",
-      JSON.stringify(readProgress(full, true)) ===
+      "tên nhiệm vụ hiện nguyên vẹn, không còn phụ thuộc dòng của ai",
+      JSON.stringify(readProgress(full)) ===
         JSON.stringify({ running: ["Mê Cung", "Vấn Đáp"], done: 3, total: 8 }),
-      JSON.stringify(readProgress(full, true)),
+      JSON.stringify(readProgress(full)),
     );
     check(
-      "dòng người khác: còn con số, KHÔNG còn tên",
-      readProgress(full, false)?.running === null &&
-        readProgress(full, false)?.done === 3 &&
-        readProgress(full, false)?.total === 8,
-      JSON.stringify(readProgress(full, false)),
+      "readProgress không còn nhận tham số riêng tư nào",
+      readProgress.length === 1,
+      `số tham số = ${readProgress.length}`,
+    );
+    // Từ hôm nay chuỗi này đi lên màn hình của cả tông môn, nên một dòng jsonb méo mó làm
+    // hỏng trang của tất cả chứ không của riêng ai. Trần đọc phải có răng.
+    check(
+      "mảng tên dài bất thường bị chặn ở trần hiển thị",
+      readProgress({ running: Array.from({ length: 40 }, (_, i) => `NV${i}`), done: 0, total: 40 })
+        .running.length === 12,
+      String(
+        readProgress({ running: Array.from({ length: 40 }, (_, i) => `NV${i}`), done: 0, total: 40 })
+          .running.length,
+      ),
     );
     check(
-      "và tên người khác không lọt ra kể cả dưới dạng chuỗi",
-      !JSON.stringify(readProgress(full, false)).includes("Mê Cung"),
-      JSON.stringify(readProgress(full, false)),
+      "tên dài bất thường bị loại, tên thật đứng cạnh vẫn qua",
+      JSON.stringify(
+        readProgress({ running: ["x".repeat(200), "Mê Cung"], done: 0, total: 2 }).running,
+      ) === JSON.stringify(["Mê Cung"]),
+      JSON.stringify(readProgress({ running: ["x".repeat(200), "Mê Cung"], done: 0, total: 2 }).running),
     );
 
     // Cột jsonb sống lâu hơn mọi phiên bản code từng ghi vào nó. Một dòng méo mó phải thành
     // "không biết" — tức hàng đợi trông y như trước khi có tính năng này — chứ không được
     // ném ra giữa lúc dựng trang và làm trắng cả bảng.
-    check("null → không biết", readProgress(null, true) === null);
-    check("không phải object → không biết", readProgress("3/8", true) === null && readProgress(7, true) === null);
-    check("mảng trần → không biết", readProgress(["Mê Cung"], true) === null);
-    check("thiếu số đếm → không biết", readProgress({ running: ["Mê Cung"] }, true) === null);
+    check("null → không biết", readProgress(null) === null);
+    check("không phải object → không biết", readProgress("3/8") === null && readProgress(7) === null);
+    check("mảng trần → không biết", readProgress(["Mê Cung"]) === null);
+    check("thiếu số đếm → không biết", readProgress({ running: ["Mê Cung"] }) === null);
     check(
       "thiếu mảng tên → vẫn đọc được con số, tên coi như rỗng",
-      JSON.stringify(readProgress({ done: 1, total: 4 }, true)) ===
+      JSON.stringify(readProgress({ done: 1, total: 4 })) ===
         JSON.stringify({ running: [], done: 1, total: 4 }),
-      JSON.stringify(readProgress({ done: 1, total: 4 }, true)),
+      JSON.stringify(readProgress({ done: 1, total: 4 })),
     );
     check(
       "phần tử rác trong mảng tên bị loại, phần còn lại vẫn dùng được",
-      JSON.stringify(readProgress({ running: ["Mê Cung", "", null, 5], done: 0, total: 2 }, true)) ===
+      JSON.stringify(readProgress({ running: ["Mê Cung", "", null, 5], done: 0, total: 2 })) ===
         JSON.stringify({ running: ["Mê Cung"], done: 0, total: 2 }),
-      JSON.stringify(readProgress({ running: ["Mê Cung", "", null, 5], done: 0, total: 2 }, true)),
+      JSON.stringify(readProgress({ running: ["Mê Cung", "", null, 5], done: 0, total: 2 })),
     );
     const maskedShare = (name) => {
       const masked = maskUsername(name);

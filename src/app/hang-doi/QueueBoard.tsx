@@ -60,9 +60,10 @@ const isWorking = (entry: QueueEntry) => entry.status === "running" || entry.sta
 /**
  * Tên nhiệm vụ đang chạy của MỘT dòng — `null` khi không có gì để nói thêm.
  *
- * Trả về null cho dòng người khác là chuyện của server: `progress.running` đã là `null` từ
- * lúc rời service (xem ranh giới riêng tư trong queue.ts), nên ở đây không có phép kiểm
- * `entry.mine` nào để ai đó lỡ tay xoá. Giao diện chỉ vẽ những gì được đưa.
+ * Không có phép kiểm `entry.mine` nào ở đây, và chưa bao giờ có: ranh giới riêng tư sống
+ * trọn trong service (xem queue.ts), nên giao diện chỉ vẽ đúng những gì được đưa. Nhờ vậy
+ * ngày 08/08/2026 tông chủ muốn thấy tên nhiệm vụ của mọi người, tệp này không phải đổi một
+ * dòng logic nào — mỗi chú thích này.
  *
  * Danh sách RỖNG mà vẫn đang chạy là một trạng thái thật, không phải thiếu dữ liệu: đó là
  * quãng linh sứ mở trình duyệt, qua cổng Cloudflare và dò hạng tài khoản — có thể tới vài
@@ -70,7 +71,7 @@ const isWorking = (entry: QueueEntry) => entry.status === "running" || entry.sta
  */
 function questPhrase(entry: QueueEntry): string | null {
   const progress = entry.progress;
-  if (!progress || progress.running == null || !isWorking(entry)) return null;
+  if (!progress || !isWorking(entry)) return null;
   return progress.running.length > 0 ? progress.running.join(" · ") : "đang chuẩn bị…";
 }
 
@@ -194,8 +195,8 @@ export function QueueBoard({ initial }: { initial: QueueSnapshot }) {
 
                 <span className="text-xs text-[var(--color-mist)]">vòng {entry.attempts}</span>
 
-                {/* Con số đi cùng MỌI dòng, kể cả của người khác — nó nói cái ghế linh sứ kia
-                    sắp trống chưa mà không hé lộ ai đang bật nhiệm vụ nào. */}
+                {/* Con số đi cùng MỌI dòng — nó trả lời "cái ghế linh sứ kia còn bao lâu nữa
+                    mới trống", câu hỏi mà một danh sách tên không trả lời thay được. */}
                 {progress && progress.total > 0 && isWorking(entry) && (
                   <span className="text-xs text-[var(--color-mist)]">
                     {progress.done}/{progress.total} nhiệm vụ

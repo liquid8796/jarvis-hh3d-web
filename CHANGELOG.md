@@ -11,6 +11,37 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.38.0 — Hàng Đợi nói rõ người khác đang làm nhiệm vụ nào
+
+- **Tên nhiệm vụ đang chạy giờ hiện trên MỌI dòng của Hàng Đợi Công Việc**, không riêng dòng
+  của mình. Trước đây dòng người khác chỉ có「9/11 nhiệm vụ」.
+- **Đây là một ranh giới riêng tư được DỊCH CÓ CHỦ Ý, không phải một chỗ rò rỉ** — và nó
+  được ghi lại đúng như vậy trong `queue.ts`. Luật cũ để tên nhiệm vụ bên phía「KHÔNG BAO
+  GIỜ」với lập luận: con số trả lời đúng câu hỏi trang này sinh ra để trả lời (ghế linh sứ
+  kia sắp trống chưa) mà không hé lộ ai bật nhiệm vụ nào. Lập luận ấy vẫn đúng về logic; thứ
+  đổi là điều tông môn MUỐN thấy. Người sau đọc mã nguồn sẽ thấy cả hai vế.
+- **Cái được lộ hẹp hơn「cấu hình nhiệm vụ」** — thứ vẫn nằm bên phía không bao giờ: đây là
+  các nhiệm vụ đang chạy NGAY LÚC NÀY của vòng hiện tại, không phải danh sách đã bật trong
+  ngọc giản, và nó biến mất ngay khi vòng chạy xong. Những ranh giới KHÔNG đổi phía vẫn
+  nguyên: tên chủ nhân còn che 2/3, tên tài khoản game và id linh sứ riêng vẫn chỉ mình thấy.
+- **Sửa đúng một nơi, vì phép cắt vốn đặt ở chỗ hẹp nhất.** `readProgress` là cửa duy nhất
+  mọi đường đọc hàng đợi đi qua, nên giao diện không phải đổi một dòng logic nào — chỉ đổi
+  mấy chú thích đang mô tả luật cũ.
+- **Tham số `mine` bị bỏ hẳn** khỏi `readProgress` thay vì để lại và luôn truyền `true`: một
+  tham số riêng tư không còn ai đọc là cái bẫy mời người sau tin rằng vẫn còn phép cắt.
+- **Thêm trần ở đường đọc** (12 tên, mỗi tên ≤60 ký tự). Zod của /api/worker vẫn là lớp canh
+  thật ở đường ghi; trần này có vì từ hôm nay chuỗi ấy đi thẳng lên màn hình của CẢ tông môn,
+  nên một dòng jsonb méo mó (bản cũ để lại, hay sửa tay) làm hỏng trang của tất cả chứ không
+  của riêng ai. Hai con số rộng gấp nhiều lần dữ liệu thật (tối đa 8 tab, tên dài nhất ~30
+  ký tự) nên không bao giờ chạm vào một hàng đợi lành lặn.
+- **Smoke 215 → 216**, và ba phép ghim luật cũ được viết lại thành ghim luật mới, cộng hai
+  phép mới cho trần đọc. Đã dựng thật giao diện trên một route tạm với dòng của người khác:
+  hiện「Mê Cung · Vấn Đáp」cho dòng đang chạy,「đang chuẩn bị…」cho dòng vừa mở trình duyệt,
+  và tên chủ nhân vẫn che. Route tạm đã xoá trước khi commit.
+- Không đụng engine → **không cần cài lại linh sứ**; `queue.ts` không nằm trong gói linh sứ.
+
+---
+
 ## 0.37.0 — trang chưa dựng xong thì tải lại và chạy lại, tối đa 3 lượt
 
 - **Nhiệm vụ gục vì「Trang chưa dựng xong sau Ns」giờ được chạy lại từ đầu, tối đa 3 lượt.**

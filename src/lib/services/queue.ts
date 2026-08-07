@@ -8,21 +8,30 @@ import type { CycleProgress, JobStatus } from "@/lib/realtime/dashboardTypes";
  *
  * <b>Ranh giới riêng tư</b>: trang này cố ý cho thấy job của người khác, nên phải nói rõ cái
  * gì được thấy và cái gì không. Của người khác: tên đã che, trạng thái, thời điểm chạy kế,
- * số vòng đã chạy, SỐ ĐẾM tiến độ vòng này, và linh sứ nào đang cầm (chỉ TÔNG MÔN hay RIÊNG,
- * không phải id máy). KHÔNG BAO GIỜ: tên tài khoản game, cookie, cấu hình nhiệm vụ, TÊN
- * nhiệm vụ đang chạy, id linh sứ riêng. Của chính mình thì thấy đủ.
+ * số vòng đã chạy, tiến độ vòng này — CẢ SỐ ĐẾM LẪN TÊN NHIỆM VỤ ĐANG CHẠY — và linh sứ nào
+ * đang cầm (chỉ TÔNG MÔN hay RIÊNG, không phải id máy). KHÔNG BAO GIỜ: tên tài khoản game,
+ * cookie, cấu hình nhiệm vụ đã lưu, id linh sứ riêng. Của chính mình thì thấy đủ.
  *
- * Vì sao con số được phép qua mà cái tên thì không: "3/8" trả lời đúng câu hỏi trang này
- * sinh ra để trả lời — cái ghế linh sứ tông môn kia sắp trống chưa — mà không hé lộ đạo hữu
- * ấy bật những nhiệm vụ nào. Danh sách tên thì hé lộ đúng cái đó, và cấu hình nhiệm vụ nằm
- * bên phía KHÔNG BAO GIỜ ngay từ ngày trang này ra đời. Ranh giới được dịch có chủ ý, không
- * phải vì tiện tay.
+ * <b>Tên nhiệm vụ đã ĐỔI PHÍA, ngày 08/08/2026, theo yêu cầu của tông chủ.</b> Trước đó chỉ
+ * con số "3/8" được qua, với lập luận: nó trả lời đúng câu hỏi trang này sinh ra để trả lời
+ * — cái ghế linh sứ tông môn kia sắp trống chưa — mà không hé lộ ai bật những nhiệm vụ nào.
+ * Lập luận ấy vẫn đúng về mặt logic; thứ đổi là điều tông môn MUỐN thấy. Ghi lại để người
+ * sau biết đây là một ranh giới được dịch có chủ ý, không phải một chỗ rò rỉ.
+ *
+ * Cái được lộ hẹp hơn "cấu hình nhiệm vụ" — thứ vẫn nằm bên phía KHÔNG BAO GIỜ: đây là
+ * những nhiệm vụ đang chạy NGAY LÚC NÀY của vòng này, không phải danh sách đã bật trong
+ * ngọc giản, và nó biến mất ngay khi vòng chạy xong.
  */
 
 /** Tiến độ một vòng, đã cắt theo ranh giới riêng tư ở đầu tệp. */
 export type QueueProgress = {
-  /** Tên nhiệm vụ đang chạy — CHỈ dòng của mình; dòng người khác luôn `null`. */
-  running: string[] | null;
+  /**
+   * Tên nhiệm vụ đang chạy ngay lúc này, MỌI dòng đều có — xem ghi chú "đổi phía" ở đầu tệp.
+   *
+   * Rỗng là một trạng thái THẬT, không phải thiếu dữ liệu: đó là quãng linh sứ mở trình
+   * duyệt, qua cổng Cloudflare và dò hạng tài khoản, trước khi nhiệm vụ đầu tiên bắt đầu.
+   */
+  running: string[];
   done: number;
   total: number;
 };
@@ -81,19 +90,24 @@ export function maskUsername(name: string): string {
 
 const ACTIVE_STATUSES = ["queued", "running", "stopping"] as const;
 
+/** Trần hiển thị cho danh sách tên nhiệm vụ — xem lý do trong `readProgress`. */
+const MAX_RUNNING_QUEST_NAMES = 12;
+const MAX_QUEST_NAME_LENGTH = 60;
+
 /**
  * Đọc cột `cycle_progress` về đúng hình thù, và trả `null` cho mọi thứ không phải hình thù
  * đó. Zod ở /api/worker đã canh cửa GHI, nên đây không phải lớp canh thứ hai — nó là lời
  * thừa nhận rằng cột jsonb này sống lâu hơn mọi phiên bản code đã ghi vào nó: một dòng do
  * bản cũ để lại, hay một lần sửa tay trên database, không được phép làm trắng cả trang.
  *
- * `mine` cắt tên nhiệm vụ ngay tại đây — chỗ hẹp nhất mà mọi đường đọc đều đi qua — nên
- * không tồn tại một đường nào lấy được ảnh chụp hàng đợi mà tên của người khác còn nguyên.
+ * Trước 08/08/2026 hàm này còn nhận `mine` để cắt tên nhiệm vụ của người khác. Tham số ấy đã
+ * bỏ hẳn thay vì để lại và luôn truyền `true`: một tham số riêng tư không còn ai đọc là một
+ * cái bẫy mời người sau tin rằng vẫn còn phép cắt ở đâu đó.
  *
  * Export vì cùng lý do với `maskUsername`: phép cắt riêng tư đáng được ghim bằng test trực
  * tiếp, không phải qua ba lớp database mới soi được.
  */
-export function readProgress(raw: unknown, mine: boolean): QueueProgress | null {
+export function readProgress(raw: unknown): QueueProgress | null {
   if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return null;
 
   const value = raw as Partial<CycleProgress>;
@@ -102,10 +116,20 @@ export function readProgress(raw: unknown, mine: boolean): QueueProgress | null 
   if (!Number.isFinite(done) || !Number.isFinite(total)) return null;
 
   const running = Array.isArray(value.running)
-    ? value.running.filter((name): name is string => typeof name === "string" && name.trim().length > 0)
+    ? value.running
+        .filter((name): name is string => typeof name === "string" && name.trim().length > 0)
+        // Trần ở ĐƯỜNG ĐỌC, dù Zod của /api/worker đã chặn ở đường ghi (≤32 tên, ≤120 ký tự).
+        // Không phải lớp canh thứ hai — mà vì từ hôm nay chuỗi này đi thẳng lên màn hình của
+        // MỌI đạo hữu, chứ không riêng chủ nó. Cột jsonb sống lâu hơn mọi phiên bản code đã
+        // ghi vào nó (một dòng do bản cũ để lại, một lần sửa tay), và một dòng như thế giờ
+        // làm hỏng trang của cả tông môn chứ không của một người. Hai con số dưới đây rộng
+        // gấp nhiều lần dữ liệu thật — tối đa 8 tab, tên dài nhất trong hồ sơ ~30 ký tự —
+        // nên chúng không bao giờ chạm vào một hàng đợi lành lặn.
+        .filter((name) => name.length <= MAX_QUEST_NAME_LENGTH)
+        .slice(0, MAX_RUNNING_QUEST_NAMES)
     : [];
 
-  return { running: mine ? running : null, done, total };
+  return { running, done, total };
 }
 
 /**
@@ -166,7 +190,7 @@ export async function getQueueSnapshot(viewerId: string): Promise<QueueSnapshot>
       workerId: mine && row.worker_id != null ? String(row.worker_id) : null,
       workerKind,
       queuePosition: queued ? ++position : null,
-      progress: readProgress(row.cycle_progress, mine),
+      progress: readProgress(row.cycle_progress),
     } satisfies QueueEntry;
   });
 

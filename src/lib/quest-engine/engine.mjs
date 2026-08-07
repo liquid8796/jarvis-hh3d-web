@@ -33,6 +33,23 @@ import {
 const MAX_REPEAT_DEPTH = 2;
 
 /**
+ * Một script hỏng vì TRANG CHƯA DỰNG XONG được chạy lại từ đầu, tối đa bấy nhiêu lượt.
+ *
+ * Vì sao chạy lại CẢ nhiệm vụ chứ không chỉ bước hỏng: bước hỏng thường đứng sau một trạng
+ * thái do các bước trước dựng nên. Ca 07/08 là ví dụ đúng nhất — Hỷ Sự Đường trượt
+ * `#blessing-default-options`, mà phần tử ấy nằm trong MODAL vừa được bước liền trước mở ra.
+ * Tải lại trang rồi thử lại đúng bước ấy là thử lại trong một thế giới mà modal đã biến mất:
+ * hỏng chắc chắn, ba lần liền, tốn thêm ba lần thời gian chờ.
+ *
+ * Chạy lại từ bước 0 thì an toàn vì MỌI nhiệm vụ customSteps trong hồ sơ đều mở màn bằng
+ * `navigate` tới trang của chính nó — nên "chạy lại nhiệm vụ" ĐÃ LÀ "tải lại trang", cộng
+ * thêm việc dựng lại đủ trạng thái mà bước hỏng cần. Phần việc đã làm xong ở lượt trước
+ * không bị làm lại: các script tự phát hiện bằng `stopIf`/`until` và bằng trạng thái site
+ * giữ phía server (Hỷ Sự Đường thấy "Đã chúc", Hoang Vực thấy đồng hồ cooldown).
+ */
+const MAX_PAGE_RENDER_ATTEMPTS = 3;
+
+/**
  * Một `stopIf` dạng VẮNG MẶT được cho bao lâu để trang chứng minh nó chỉ đang vẽ chậm.
  *
  * Chỉ tiêu tốn khi selector KHÔNG khớp phần tử nào — tức đúng những lúc câu trả lời còn mơ
@@ -406,8 +423,32 @@ export function createQuestEngine(deps) {
       return result(quest, "skipped", { message: "Nhiệm vụ tuỳ biến không có bước nào." });
     }
 
-    const state = { cooldown: null, lastRead: null, stopReason: null };
-    const error = await executeSteps(session, quest, quest.steps, state, 0);
+    const scope = `Quest:${quest.name}`;
+    let state;
+    let error;
+
+    // Chạy lại từ bước 0 khi — và CHỈ khi — script gục vì trang chưa dựng xong. Xem
+    // MAX_PAGE_RENDER_ATTEMPTS để biết vì sao đơn vị thử lại là cả nhiệm vụ.
+    //
+    // `state` dựng MỚI mỗi lượt, không tái dùng: cooldown/lastRead/stopReason của lượt hỏng
+    // mà sống sót sang lượt sau thì kết quả cuối cùng sẽ kể chuyện của một lượt đã chết.
+    //
+    // Thu Đàn giữa chừng ném QuestAborted từ `throwIfStopped` và KHÔNG bị bắt ở đây — nó
+    // xuyên thẳng lên `run`, đúng như trước. Một vòng thử lại nuốt mất tín hiệu dừng là cách
+    // biến nút Thu Đàn thành nút gợi ý.
+    for (let attempt = 1; ; attempt++) {
+      state = { cooldown: null, lastRead: null, stopReason: null, pageNotRendered: false };
+      error = await executeSteps(session, quest, quest.steps, state, 0);
+
+      if (!error || !state.pageNotRendered || attempt >= MAX_PAGE_RENDER_ATTEMPTS) break;
+
+      // Mức info: đây là thứ giải thích vì sao một nhiệm vụ tốn gấp đôi, gấp ba thời gian —
+      // im lặng ở đây là để người đọc nhật ký tự đoán.
+      log.info(
+        scope,
+        `${error} — tải lại trang rồi thử lại (lượt ${attempt + 1}/${MAX_PAGE_RENDER_ATTEMPTS}).`,
+      );
+    }
 
     if (error) return result(quest, "failed", { message: error });
 
@@ -465,6 +506,19 @@ export function createQuestEngine(deps) {
         log.debug(scope, `Bỏ qua bước tuỳ chọn ${verb(step.action)} trên '${step.selector ?? step.text ?? "-"}' — không có.`);
         continue;
       }
+
+      // Ghi NGUYÊN NHÂN lên state, ngay tại chỗ duy nhất một bước bắt buộc kết liễu script.
+      //
+      // Dùng state chứ không dò chữ trong thông điệp lỗi: `repeat` bọc lỗi của thân vòng
+      // thành "repeat vòng 3: …", nên một phép so chuỗi sẽ phải đoán qua nhiều lớp bọc và sẽ
+      // chết lặng vào ngày ai đó sửa lời văn. `state` là CÙNG MỘT object đi xuyên mọi tầng
+      // repeat, nên cờ dựng ở đáy nổi thẳng lên `runCustomSteps` không cần trung gian nào.
+      //
+      // Chỉ `waitForSelector`, KHÔNG phải `waitForCondition`: hai thứ nghe giống nhau nhưng
+      // một cái hỏi "trang vẽ xong chưa" (thử lại là vô hại), còn cái kia hỏi "chuyện đó xảy
+      // ra chưa" — và bước bằng-chứng-đòn-đánh của Hoang Vực chính là loại thứ hai. Chạy lại
+      // nó nghĩa là đánh boss thêm một lần nữa, đốt một lượt trong ngày của đạo hữu.
+      if (step.action === "waitForSelector") state.pageNotRendered = true;
 
       return error;
     }

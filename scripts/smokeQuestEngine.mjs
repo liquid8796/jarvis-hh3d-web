@@ -1275,6 +1275,20 @@ async function main() {
     '<!doctype html><html lang="vi"><meta charset="utf-8"><title>hoathinh3d</title>' +
     "<body><div>Đang tải…</div></body>";
 
+  /**
+   * Trang "chậm dựng": `#late-mark` chỉ xuất hiện từ lượt ghé thứ `flakyAppearsOnVisit`.
+   *
+   * `flakyVisits` là nhân chứng quan trọng nhất của cả nhóm ca dưới: nó đếm số lần trang
+   * THẬT SỰ được tải. Một phép thử chỉ nhìn outcome không phân biệt nổi "engine thử lại
+   * đúng 3 lượt" với "engine chờ lâu gấp ba trên cùng một trang".
+   */
+  let flakyVisits = 0;
+  let flakyAppearsOnVisit = Number.POSITIVE_INFINITY;
+  const flakyPage = (withMark) =>
+    '<!doctype html><html lang="vi"><meta charset="utf-8"><body><div id="wpadminbar"></div>' +
+    (withMark ? '<div id="late-mark">có rồi</div>' : "<div>chưa dựng xong</div>") +
+    "</body>";
+
   // Hỷ Sự Đường nhớ trạng thái PHÍA SERVER như site thật: chúc rồi thì lần mở modal sau
   // phải thấy "Đã chúc". Phòng hồng-nhan cố ý đứng ĐẦU danh sách — flow phải chúc hai
   // phòng /phong-cuoi (dạng trang đã có recording) trước rồi mới tới nó.
@@ -1343,6 +1357,10 @@ async function main() {
     const url = new URL(req.url ?? "/", "http://fixture.test");
     const path = url.pathname.replace(/\/$/, "") || "/";
     if (siteMute) return void res.end(MUTE_PAGE);
+    if (path === "/flaky") {
+      flakyVisits += 1;
+      return void res.end(flakyPage(flakyVisits >= flakyAppearsOnVisit));
+    }
     if (path === "/diem-danh") res.end(FREE_CHECKIN_PAGE);
     else if (path === "/nhiem-vu-hang-ngay") res.end(FREE_HUB_PAGE);
     else if (path === "/phuc-loi-duong") res.end(FREE_WELFARE_PAGE);
@@ -1938,6 +1956,77 @@ async function main() {
       { action: "click", selector: "#khong-ton-tai", timeoutMs: 800 },
     ]));
     check("bước bắt buộc hỏng thì quest hỏng", fatal.outcome === "failed", fatal.outcome);
+
+    console.log("\nTrang chưa dựng xong → tải lại và chạy lại cả nhiệm vụ, tối đa 3 lượt");
+
+    // Sự cố 07/08 22:09: 「Hỷ Sự Đường: repeat vòng 3: Trang chưa dựng xong sau 25s」. Chạy
+    // lại từ bước 0 chứ không chỉ bước hỏng — xem MAX_PAGE_RENDER_ATTEMPTS trong engine.mjs.
+    {
+      const flakyQuest = (extra = []) =>
+        questOf([
+          { action: "navigate", text: "/flaky", timeoutMs: 5000 },
+          ...extra,
+        ]);
+
+      // --- Hỏng lượt đầu, dựng kịp ở lượt hai → phải THÀNH CÔNG, và trang được tải 2 lần.
+      flakyVisits = 0;
+      flakyAppearsOnVisit = 2;
+      const recovered = await run(
+        flakyQuest([{ action: "waitForSelector", selector: "#late-mark", timeoutMs: 700 }]),
+      );
+      check(
+        "trang dựng kịp ở lượt hai → nhiệm vụ thành công nhờ chạy lại",
+        recovered.outcome === "completed" && flakyVisits === 2,
+        `${recovered.outcome}, số lượt tải trang = ${flakyVisits}`,
+      );
+
+      // --- Không bao giờ dựng → đúng BA lượt rồi bỏ cuộc. Con số này là cả yêu cầu.
+      flakyVisits = 0;
+      flakyAppearsOnVisit = Number.POSITIVE_INFINITY;
+      const exhausted = await run(
+        flakyQuest([{ action: "waitForSelector", selector: "#late-mark", timeoutMs: 700 }]),
+      );
+      check(
+        "không dựng nổi → thử ĐÚNG 3 lượt rồi mới chịu hỏng",
+        exhausted.outcome === "failed" && flakyVisits === 3,
+        `${exhausted.outcome}, số lượt tải trang = ${flakyVisits}`,
+      );
+
+      // --- Bước waitForSelector TUỲ CHỌN trượt thì không được châm ngòi thử lại: script đi
+      // tiếp bình thường, và cái hỏng sau đó là chuyện khác hẳn.
+      flakyVisits = 0;
+      flakyAppearsOnVisit = Number.POSITIVE_INFINITY;
+      const optionalMiss = await run(
+        flakyQuest([
+          { action: "waitForSelector", selector: "#late-mark", timeoutMs: 400, optional: true },
+          { action: "click", selector: "#khong-ton-tai", timeoutMs: 400 },
+        ]),
+      );
+      check(
+        "waitForSelector tuỳ chọn trượt → KHÔNG chạy lại, trang chỉ tải một lần",
+        optionalMiss.outcome === "failed" && flakyVisits === 1,
+        `${optionalMiss.outcome}, số lượt tải trang = ${flakyVisits}`,
+      );
+
+      // --- waitForCondition KHÔNG được chạy lại. Đây là hàng rào của Hoang Vực: bước bằng
+      // chứng đòn đánh là waitForCondition, và chạy lại nó nghĩa là đánh boss thêm lần nữa.
+      flakyVisits = 0;
+      flakyAppearsOnVisit = Number.POSITIVE_INFINITY;
+      const conditionMiss = await run(
+        flakyQuest([
+          {
+            action: "waitForCondition",
+            timeoutMs: 700,
+            condition: { kind: "visible", selector: "#late-mark" },
+          },
+        ]),
+      );
+      check(
+        "waitForCondition trượt → KHÔNG chạy lại (hàng rào cho bằng chứng đòn đánh Hoang Vực)",
+        conditionMiss.outcome === "failed" && flakyVisits === 1,
+        `${conditionMiss.outcome}, số lượt tải trang = ${flakyVisits}`,
+      );
+    }
 
     console.log("\nCổng điều phối toàn cục — trang riêng không bao giờ cặp với trang riêng");
 

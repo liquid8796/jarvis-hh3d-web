@@ -11,6 +11,40 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.37.0 — trang chưa dựng xong thì tải lại và chạy lại, tối đa 3 lượt
+
+- **Nhiệm vụ gục vì「Trang chưa dựng xong sau Ns」giờ được chạy lại từ đầu, tối đa 3 lượt.**
+  Trước đây một lần trang vẽ hụt là mất trọn nhiệm vụ ấy cho cả vòng chạy.
+- **Chạy lại CẢ nhiệm vụ, không chỉ bước hỏng — và đây là quyết định đáng kể nhất.** Nghe thì
+  「tải lại trang rồi thử lại bước ấy」có vẻ đúng nghĩa đen hơn, nhưng nó SAI với chính ca đã
+  báo: Hỷ Sự Đường trượt `#blessing-default-options`, mà phần tử đó nằm trong MODAL vừa được
+  bước liền trước mở ra. Tải lại trang là modal biến mất, nên thử lại đúng bước ấy sẽ hỏng
+  chắc chắn ba lần liền và tốn thêm ba lần thời gian chờ. Kiểm tra hồ sơ cho thấy **mọi**
+  nhiệm vụ customSteps đều mở màn bằng `navigate` tới trang của chính nó, nên「chạy lại nhiệm
+  vụ」ĐÃ LÀ「tải lại trang」— cộng thêm việc dựng lại đủ trạng thái mà bước hỏng cần.
+- **Chỉ `waitForSelector`, KHÔNG phải `waitForCondition`.** Hai thứ nghe giống nhau nhưng hỏi
+  hai câu khác nhau: một cái hỏi「trang vẽ xong chưa」(thử lại vô hại), cái kia hỏi「chuyện đó
+  xảy ra chưa」— và bước bằng-chứng-đòn-đánh của Hoang Vực chính là loại thứ hai. Chạy lại nó
+  nghĩa là đánh boss thêm lần nữa, đốt một lượt trong ngày của đạo hữu.
+- **Rủi ro làm lại tác dụng phụ đã được ĐO, không phỏng đoán.** Rà toàn hồ sơ tìm những
+  `waitForSelector` bắt buộc đứng sau một bước gây tác dụng phụ: chỉ có **đúng một** nhiệm vụ
+  — Hỷ Sự Đường, chính cái đã báo lỗi — và nó có sẵn hai chốt `stopIf`(「không có tiệc cưới
+  nào」/「đã chúc phúc hết」) cùng một `until`, cộng trạng thái site giữ phía server. Không
+  nhiệm vụ nào khác có thể làm lại một hành động.
+- **Nhận diện bằng cờ trên `state`, không dò chữ trong thông điệp lỗi.** `repeat` bọc lỗi
+  thành「repeat vòng 3: …」nên phép so chuỗi sẽ phải đoán qua nhiều lớp và sẽ chết lặng ngày
+  ai đó sửa lời văn; `state` là cùng một object đi xuyên mọi tầng repeat.
+- Bước tuỳ chọn trượt **không** châm ngòi chạy lại; **Thu Đàn** vẫn xuyên thẳng qua vòng thử
+  lại (một vòng lặp nuốt tín hiệu dừng là cách biến nút Thu Đàn thành nút gợi ý); mỗi lượt
+  dựng `state` MỚI để kết quả cuối không kể chuyện của một lượt đã chết.
+- Mỗi lần thử lại ghi một dòng **info** — đó là thứ giải thích vì sao một nhiệm vụ tốn gấp
+  đôi, gấp ba thời gian.
+- **Smoke 211 → 215**, với máy chủ giả mọc thêm một trang「chậm dựng」đếm số lượt tải THẬT.
+  Hai ca đối chứng đều được chứng minh có răng: gỡ ngòi thử lại thì hai phép đầu hỏng, còn
+  nới sang cả `waitForCondition` thì đúng phép canh Hoang Vực hỏng.
+
+---
+
 ## 0.36.1 — bớt chữ trên các thẻ cấu hình
 
 - Bỏ năm đoạn văn giải thích dài trên giao diện: dòng dẫn nhập của Bế Quan Trùng Tu, Tên Miền

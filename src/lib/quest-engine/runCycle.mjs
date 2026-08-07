@@ -144,12 +144,38 @@ function scheduledCycleResult(outcome, message, results = []) {
  * hoặc màn đăng nhập, rồi chết ở selector đầu tiên với một thông điệp chẳng nói gì về
  * nguyên nhân. Ở đây: đứng trước cổng, chờ màn kiểm tra tự qua (có hạn), rồi phán rõ —
  * bị chặn là nói bị chặn, hết phiên là nói hết phiên.
+ *
+ * Trả `{ ok, loginConfirmed }`. `loginConfirmed` là lời thú nhận có chủ ý: cổng này CHỈ đọc
+ * được trang chủ, mà trang chủ có thể im lặng về cả hai phía. Nó nói ra mình biết chắc tới
+ * đâu thay vì làm tròn thành「xong」, và người gọi — vốn ghé hub ngay sau đó — mới là chỗ có
+ * bằng chứng dứt điểm. Đêm 07/08 mất bốn phút mỗi vòng chỉ vì chỗ này từng làm tròn.
  */
 async function ensureReady(session, baseUrl, say, log, { context, cookieJar }) {
+  /**
+   * Tên miền mà lượt điều hướng THẬT SỰ dừng chân, nếu nó khác nơi ta gõ cửa. Site đổi TLD
+   * định kỳ (mx → am → …) và tên miền cũ 301 sang tên miền mới; cookie thì gắn chặt vào
+   * tên miền, nên chúng KHÔNG đi theo cú nhảy ấy và trang mới nhìn linh sứ như khách lạ.
+   * Bắt được sự thật này ở đây biến một đêm truy vết thành một dòng nhật ký.
+   */
+  let movedTo = null;
+
   /** Vào trang chủ rồi đọc trạng thái, chờ màn Cloudflare tự qua nếu có. */
   async function probeOnce() {
+    // Dọn trước mỗi lượt: hàm này chạy tới HAI lần (lượt sau là sau khi tiêm lại cookie),
+    // và `movedTo` phải kể về lượt điều hướng CUỐI chứ không giữ lại kết luận của lượt đầu.
+    movedTo = null;
+
     const nav = await session.navigate(baseUrl);
     if (!nav.ok) return { navError: nav.error };
+
+    if (nav.url) {
+      try {
+        const landed = new URL(nav.url).origin;
+        if (landed !== new URL(baseUrl).origin) movedTo = landed;
+      } catch {
+        // URL không phân tích được thì thôi — đây là phép chẩn đoán thêm, không phải cổng.
+      }
+    }
 
     const deadline = Date.now() + 45_000;
     let probe = null;
@@ -223,12 +249,26 @@ async function ensureReady(session, baseUrl, say, log, { context, cookieJar }) {
     };
   }
 
-  if (probe.loggedIn == null) {
-    log.debug("Sẵn sàng", "Không xác nhận được trạng thái đăng nhập — vẫn đi tiếp.");
+  if (probe.loggedIn !== true) {
+    // KHÔNG nói gì ở đây, và tuyệt đối không nói「phiên đăng nhập còn hiệu lực」— đó chính là
+    // lỗi đêm 07/08: `loggedIn == null` nghĩa là trang không phát tín hiệu nào về PHÍA NÀO
+    // (không dấu đã-đăng-nhập, cũng không form đăng nhập), thế mà cổng vẫn phát ra một dòng
+    // xanh khẳng định điều nó chưa hề chứng minh, rồi thả cả vòng chạy vào 9 nhiệm vụ. Mỗi
+    // nhiệm vụ chết sau 25 giây ở một selector vô tội — bốn phút đỏ rực mỗi vòng, nửa tiếng
+    // một lần, mà nhật ký không một lần nhắc tới nguyên nhân thật.
+    //
+    // Không cứng rắn hoá thành LỖI ở đây, vì mấy cái dấu kia chỉ là suy đoán: hôm nào site
+    // đổi markup của người ĐANG đăng nhập, một phán quyết cứng sẽ chặn đứng mọi automation
+    // dù tài khoản hoàn toàn lành. Thay vào đó trả sự thật「chưa xác nhận được」lên trên, để
+    // chỗ có bằng chứng TỐT HƠN phân xử: ngay sau đây vòng chạy vốn đã ghé hub và poll
+    // `.nv-quest` để dò hạng — bảng nhiệm vụ chỉ dựng cho thành viên đã đăng nhập, nên nó
+    // trả lời được đúng câu hỏi này mà không tốn thêm một lượt tải trang nào.
+    log.debug("Sẵn sàng", "Không xác nhận được trạng thái đăng nhập — để hub phân xử.");
+    return { ok: true, loginConfirmed: false, movedTo };
   }
 
   await say("Đã vào được trang game — phiên đăng nhập còn hiệu lực.", "success");
-  return { ok: true };
+  return { ok: true, loginConfirmed: true, movedTo };
 }
 
 /**
@@ -255,7 +295,11 @@ export async function runCycle(deps) {
     reportAccountTier = async () => {},
     reportProgress = () => {},
     shouldStop = () => false,
-    baseUrl = process.env.GAME_BASE_URL || DEFAULT_GAME_BASE_URL,
+    // Thứ tự nguồn có chủ ý: người gọi truyền thẳng (smoke) > tên miền server gửi kèm job >
+    // env của máy chạy linh sứ > hằng số trong mã nguồn. Server đứng TRÊN env vì đó là chỗ
+    // duy nhất trưởng môn sửa được mà không phải đụng vào từng máy; env vẫn giữ nguyên quyền
+    // phủ quyết cục bộ cho ai muốn trỏ linh sứ nhà mình đi chỗ khác để thử.
+    baseUrl = deps.config?.gameBaseUrl?.trim() || process.env.GAME_BASE_URL || DEFAULT_GAME_BASE_URL,
     budgetMs = 0,
     headless = true,
     profileDir = process.env.BROWSER_PROFILE_DIR || "",
@@ -369,12 +413,17 @@ export async function runCycle(deps) {
     // thất bại giữ bằng chứng của cookie này từ vòng trước; cookie chưa từng được dò mới
     // mặc định VIP để tương thích với hồ sơ cũ.
     let isVip = config?.accountTier !== "free";
+    // Hub có DỰNG NỔI bảng nhiệm vụ không — hỏi tiện thể trong đúng vòng poll dò hạng, vì
+    // `vipProbe` chỉ trả boolean khi `.nv-quest` đã có mặt. Trước đây vòng lặp này hết giờ
+    // trong im lặng: nó vừa bỏ ra 20 giây CHỨNG MINH hub không dựng, rồi không nói với ai.
+    let hubRendered = false;
     const nav = await session.navigate(session.resolveUrl(profile.dailyQuestPath));
     if (nav.ok) {
       const probeDeadline = Date.now() + 20_000;
       while (Date.now() < probeDeadline) {
         const verdict = await session.evaluate(vipProbe);
         if (typeof verdict === "boolean") {
+          hubRendered = true;
           isVip = verdict;
           await reportAccountTier(verdict ? "vip" : "free");
           break;
@@ -384,6 +433,39 @@ export async function runCycle(deps) {
     } else {
       await say(
         `Không mở được hub để xem hạng tài khoản (${nav.error}) — giữ hạng ${isVip ? "VIP" : "thường"} đã biết.`,
+        "warn",
+      );
+    }
+
+    // Hai nhân chứng cùng câm thì DỪNG, đừng đoán. Cổng sẵn sàng không tìm thấy dấu đăng
+    // nhập nào, và hub cũng không dựng nổi bảng nhiệm vụ — cộng lại nghĩa là thứ đang mở
+    // không phải trang game của một thành viên đã đăng nhập. Chạy tiếp là đốt 25 giây mỗi
+    // nhiệm vụ để rồi kể một câu chuyện sai về selector, đúng như đêm 07/08.
+    //
+    // Phải là PHÉP HỘI của hai điều kiện, không phải phép tuyển: hub không dựng mà phiên
+    // vẫn xác nhận được thì đó là site trở chứng chứ không phải chuyện đăng nhập, và các
+    // nhiệm vụ có trang riêng vẫn có thể chạy ngon — cắt vòng lúc ấy là phá hoại.
+    if (!hubRendered && !ready.loginConfirmed) {
+      return scheduledCycleResult(
+        "failed",
+        ready.movedTo
+          ? `Site đã dời tên miền: ${baseUrl} chuyển hướng sang ${ready.movedTo}. Cookie gắn theo ` +
+            "tên miền nên KHÔNG đi theo — trang mới nhìn linh sứ như khách lạ. Cần cập nhật tên " +
+            "miền game rồi dán lại chuỗi cookie lấy từ tên miền mới ở Ngọc Giản Cấu Hình."
+          : "Không xác nhận được phiên đăng nhập, và hub cũng không dựng nổi bảng nhiệm vụ — " +
+            "nhiều khả năng cookie đã hết hạn hoặc site đang chắn linh sứ. Dán chuỗi cookie mới ở " +
+            "Ngọc Giản Cấu Hình; lượt sau linh sứ vẫn sẽ tự thử lại.",
+      );
+    }
+
+    if (!ready.loginConfirmed) {
+      // Hub dựng được = thành viên đã đăng nhập, vì bảng nhiệm vụ không bao giờ hiện cho
+      // khách. Giờ mới được phép nói câu này — và nó là câu THẬT.
+      await say("Đã vào được trang game — phiên đăng nhập còn hiệu lực.", "success");
+    } else if (!hubRendered) {
+      await say(
+        "Hub không dựng xong bảng nhiệm vụ trong 20 giây — phiên đăng nhập vẫn còn, nên cứ đi " +
+          "tiếp; nhiệm vụ nào có trang riêng thì không phụ thuộc hub.",
         "warn",
       );
     }

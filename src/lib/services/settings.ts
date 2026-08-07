@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db/client";
+import { DEFAULT_GAME_BASE_URL, normalizeGameBaseUrl } from "@/lib/quest-engine/cookies.mjs";
 
 /**
  * Cấu hình toàn hệ thống — một document JSONB duy nhất, Zod gác CẢ HAI CHIỀU y như
@@ -61,6 +62,30 @@ export const appSettingsSchema = z.object({
     })
     // .catch() khiến input type của object hết rỗng được — prefault phải mang đủ bốn giá trị.
     .prefault({ active: false, startedAt: null, expectedEndAt: null, note: "" }),
+
+  game: z
+    .object({
+      /**
+       * Tên miền hoathinh3d ĐANG SỐNG. Site đổi TLD định kỳ (mx → am → one → …), và mỗi lần
+       * đổi là mọi automation đứng im cho tới khi có người sửa.
+       *
+       * Nằm trong app_settings chứ không phải hằng số trong mã nguồn, vì đó chính là bài học
+       * của 07/08/2026: cú dời `.am → .one` đã bắt cả tông môn chờ một lần deploy chỉ để đổi
+       * ba ký tự. Ở đây trưởng môn gõ tên miền mới và vòng chạy KẾ TIẾP đã dùng nó — không
+       * deploy, không sửa env trên VM, không cài lại linh sứ.
+       *
+       * `.catch()` rơi về hằng số trong mã nguồn: một giá trị rác ở đây (sửa tay JSONB) mà
+       * làm cả nhánh hỏng thì thà chạy bằng tên miền cũ còn hơn chạy bằng chuỗi rỗng.
+       */
+      baseUrl: z
+        .string()
+        .transform((value) => {
+          const parsed = normalizeGameBaseUrl(value);
+          return parsed.ok ? parsed.baseUrl : DEFAULT_GAME_BASE_URL;
+        })
+        .catch(DEFAULT_GAME_BASE_URL),
+    })
+    .prefault({ baseUrl: DEFAULT_GAME_BASE_URL }),
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;

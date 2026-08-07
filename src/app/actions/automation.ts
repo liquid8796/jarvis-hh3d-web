@@ -10,6 +10,7 @@ import {
   updateAccountCookie,
 } from "@/lib/services/accounts";
 import { configSchema, enforceMazeCapPolicy, saveConfig } from "@/lib/services/configs";
+import { getAppSettings } from "@/lib/services/settings";
 import {
   clearVisibleJobEvents,
   getActiveJobs,
@@ -23,7 +24,7 @@ import {
 // lúc NẠP MODULE và kéo sập mọi server action của /dashboard. Xem đầu cookies.mjs.
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — module JS thuần của quest-engine, không có d.ts và không cần.
-import { DEFAULT_GAME_BASE_URL, parseCookieString } from "@/lib/quest-engine/cookies.mjs";
+import { parseCookieString } from "@/lib/quest-engine/cookies.mjs";
 
 /**
  * Automation server actions — every one re-derives the caller from the session and
@@ -36,12 +37,17 @@ type CookieInspection = { ok: true; note: string } | { ok: false; message: strin
 
 const COOKIE_MAX_LENGTH = 8000;
 
-/** Một nơi duy nhất soát chuỗi cookie cho cả nút thêm tài khoản lẫn nút thay cookie. */
-function inspectCookie(pastedCookie: string): CookieInspection {
-  const jar = parseCookieString(
-    pastedCookie,
-    process.env.GAME_BASE_URL || DEFAULT_GAME_BASE_URL,
-  ) as { name: string }[];
+/**
+ * Một nơi duy nhất soát chuỗi cookie cho cả nút thêm tài khoản lẫn nút thay cookie.
+ *
+ * `baseUrl` phải là tên miền ĐANG SỐNG do trưởng môn đặt, không phải hằng số trong mã nguồn:
+ * bản xuất JSON của extension mang sẵn `domain`, và `parseCookieString` LOẠI mọi cookie
+ * không thuộc tên miền đang nhắm tới. Đối chiếu với tên miền cũ sau một cú dời TLD nghĩa là
+ * cookie mới dán đúng lại bị vứt sạch, rồi người dán nhận đúng câu「không đọc được」cho một
+ * chuỗi hoàn toàn hợp lệ.
+ */
+function inspectCookie(pastedCookie: string, baseUrl: string): CookieInspection {
+  const jar = parseCookieString(pastedCookie, baseUrl) as { name: string }[];
 
   if (jar.length === 0) {
     return {
@@ -160,7 +166,7 @@ export async function addAccountAction(formData: FormData): Promise<ActionResult
   const field = readCookieField(formData);
   if (!field.ok) return { ok: false, message: field.message };
 
-  const inspection = inspectCookie(field.cookie);
+  const inspection = inspectCookie(field.cookie, (await getAppSettings()).game.baseUrl);
   if (!inspection.ok) return inspection;
 
   const result = await addAccount(user.id, String(formData.get("label") ?? ""), field.cookie);
@@ -183,7 +189,7 @@ export async function updateAccountCookieAction(formData: FormData): Promise<Act
   const field = readCookieField(formData);
   if (!field.ok) return { ok: false, message: field.message };
 
-  const inspection = inspectCookie(field.cookie);
+  const inspection = inspectCookie(field.cookie, (await getAppSettings()).game.baseUrl);
   if (!inspection.ok) return inspection;
 
   const result = await updateAccountCookie(user.id, accountId, field.cookie);

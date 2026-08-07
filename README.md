@@ -5,6 +5,11 @@ rồi automation **chạy trên server** dù đạo hữu đã tắt trình duy�
 một công tắc ở tab Môn Đồ của trang Tông Môn — tắt nó thì người mới bái sư xong vào thẳng
 Linh Đài; mặc định là BẬT.
 
+**Site đổi tên miền thì sửa ở tab Bảo Trì**, không phải sửa mã nguồn: ô「Tên Miền Game」lưu
+vào `app_settings`, và /api/worker gửi kèm nó theo từng lần phát việc — mọi linh sứ, kể cả
+trên máy nhà đạo hữu, dùng tên miền mới ngay ở vòng chạy kế mà không phải cài lại. Đổi xong
+thì mọi tài khoản PHẢI dán lại cookie: cookie gắn theo tên miền nên không đi theo được.
+
 Đây là bản web của [JarvisHH3D](../JarvisHH3D) (bản desktop). Hai sản phẩm chia nhau cùng
 một mô hình nhiệm vụ — Mê Cung, Luyện Đan Đường, cùng những tuỳ chọn ấy.
 

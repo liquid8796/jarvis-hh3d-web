@@ -1262,6 +1262,19 @@ async function main() {
   // --- kiểm trên trang thật ---------------------------------------------------------
   let teLeOffered = false;
 
+  /**
+   * Công tắc dựng lại ĐÊM 07/08: site trả về một trang CÂM — không dấu đã-đăng-nhập, không
+   * form đăng nhập, không màn Cloudflare, và hub không có `.nv-quest`. Đúng thứ khiến
+   * `readinessProbe` trả `loggedIn: null` và `vipProbe` trả null mãi mãi.
+   *
+   * Bật lên là MỌI đường dẫn trả trang câm ấy — vì đó chính là hình dạng của sự cố: không
+   * riêng trang nào hỏng, cả site không còn là trang game của một thành viên đã đăng nhập.
+   */
+  let siteMute = false;
+  const MUTE_PAGE =
+    '<!doctype html><html lang="vi"><meta charset="utf-8"><title>hoathinh3d</title>' +
+    "<body><div>Đang tải…</div></body>";
+
   // Hỷ Sự Đường nhớ trạng thái PHÍA SERVER như site thật: chúc rồi thì lần mở modal sau
   // phải thấy "Đã chúc". Phòng hồng-nhan cố ý đứng ĐẦU danh sách — flow phải chúc hai
   // phòng /phong-cuoi (dạng trang đã có recording) trước rồi mới tới nó.
@@ -1316,9 +1329,20 @@ async function main() {
     });
 
   const server = createServer((req, res) => {
+    // "Tên miền CŨ" của fixture là `localhost`; mọi ca khác gõ cửa bằng 127.0.0.1 và được
+    // phục vụ như thường. Hai tên cùng trỏ một máy chủ nhưng KHÁC ORIGIN dưới mắt trình
+    // duyệt — đúng hình dạng cú dời TLD của site thật, mà không cần DNS hay tên miền thật.
+    const host = req.headers.host ?? "";
+    if (host.startsWith("localhost")) {
+      const port = host.split(":")[1] ?? "";
+      res.writeHead(301, { location: `http://127.0.0.1:${port}${req.url ?? "/"}` });
+      return void res.end();
+    }
+
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     const url = new URL(req.url ?? "/", "http://fixture.test");
     const path = url.pathname.replace(/\/$/, "") || "/";
+    if (siteMute) return void res.end(MUTE_PAGE);
     if (path === "/diem-danh") res.end(FREE_CHECKIN_PAGE);
     else if (path === "/nhiem-vu-hang-ngay") res.end(FREE_HUB_PAGE);
     else if (path === "/phuc-loi-duong") res.end(FREE_WELFARE_PAGE);
@@ -2115,6 +2139,149 @@ async function main() {
         serialBeats.every((beat) => beat.running.length <= 1),
       serialBeats.map((beat) => `[${beat.running.join(",")}]${beat.done}/${beat.total}`).join(" → "),
     );
+
+    console.log("\nTrang câm: dừng sớm và nói đúng nguyên nhân (sự cố 07/08)");
+
+    // Đêm 07/08: site trả trang câm, cổng sẵn sàng vẫn phát「phiên đăng nhập còn hiệu lực」
+    // rồi thả cả vòng vào 9 nhiệm vụ — mỗi cái chết sau 25 giây ở một selector vô tội. Bốn
+    // phút đỏ mỗi vòng, nửa tiếng một lần, không dòng nào nhắc tới nguyên nhân thật.
+    {
+      const muteLines = [];
+      const muteBeats = [];
+      const startedAt = Date.now();
+      let muteCycle;
+      siteMute = true;
+      try {
+        muteCycle = await runCycle({
+          chromium,
+          baseUrl,
+          config: { ...progressConfig, parallelQuests: true },
+          say: (message, level) => muteLines.push(`${level ?? "info"}: ${message}`),
+          reportProgress: (beat) => muteBeats.push(beat),
+          shouldStop: () => false,
+        });
+      } finally {
+        // Cờ này bịt MỌI đường dẫn của máy chủ giả — rò nó ra ngoài là mọi ca sau đều hỏng
+        // vì một lý do chẳng liên quan gì tới chúng.
+        siteMute = false;
+      }
+      const elapsedMs = Date.now() - startedAt;
+
+      check(
+        "trang câm → vòng chạy DỪNG, không lao vào nhiệm vụ nào",
+        muteCycle.outcome === "failed",
+        `${muteCycle.outcome}: ${muteCycle.message}`,
+      );
+      // Đây là cả sự khác biệt giữa bản đã sửa và bản gây ra sự cố.
+      check(
+        "và KHÔNG còn dòng nào khẳng định「phiên đăng nhập còn hiệu lực」",
+        !muteLines.some((line) => line.includes("phiên đăng nhập còn hiệu lực")),
+        muteLines.join(" | ") || "(im lặng)",
+      );
+      check(
+        "thông điệp gọi đúng tên hai nhân chứng đã câm, và chỉ đường sửa",
+        String(muteCycle.message).includes("phiên đăng nhập") &&
+          String(muteCycle.message).includes("hub") &&
+          String(muteCycle.message).includes("cookie"),
+        muteCycle.message,
+      );
+      // Không nhiệm vụ nào được cầm lên: `total` chỉ có mặt khi kế hoạch đã lập, mà vòng
+      // này dừng trước đó.
+      check(
+        "không nhiệm vụ nào bị đem ra đốt 25 giây",
+        muteBeats.length === 0,
+        muteBeats.map((beat) => `${beat.done}/${beat.total}`).join(" → "),
+      );
+      // Hai nhiệm vụ × 25s = 50s ở bản cũ; giờ chỉ tốn đúng quãng dò hub có trần 20s.
+      check(
+        "và dừng NHANH — không còn trả giá 25 giây cho mỗi nhiệm vụ",
+        elapsedMs < 45_000,
+        `${Math.round(elapsedMs / 1000)}s`,
+      );
+    }
+
+    console.log("\nSite dời tên miền: gọi đúng tên cú 301 (sự cố .am → .one)");
+
+    // Gõ cửa bằng "tên miền cũ" (localhost) mà máy chủ 301 sang 127.0.0.1: cùng một máy chủ,
+    // khác origin — đúng hình dạng một cú dời TLD, không cần DNS thật.
+    const oldDomainBase = baseUrl.replace("127.0.0.1", "localhost");
+    const runFromOldDomain = async (lines) =>
+      runCycle({
+        chromium,
+        baseUrl: oldDomainBase,
+        config: { ...progressConfig, parallelQuests: true },
+        say: (message, level) => lines.push(`${level ?? "info"}: ${message}`),
+        reportProgress: () => {},
+        shouldStop: () => false,
+      });
+
+    // NỬA THỨ NHẤT — dời tên miền mà phiên vẫn sống thì KHÔNG phải sự cố, và không được
+    // phép cắt vòng. Phép dừng cố ý là PHÉP HỘI của hai nhân chứng; ca này canh đúng điều
+    // đó, vì một cái dừng quá tay ở đây sẽ chặn đứng automation mỗi lần site đổi TLD dù
+    // mọi thứ vẫn chạy tốt.
+    {
+      const lines = [];
+      const benign = await runFromOldDomain(lines);
+      check(
+        "dời tên miền mà phiên vẫn sống → cứ chạy tiếp, không cắt vòng",
+        benign.outcome === "done",
+        `${benign.outcome}: ${benign.message}`,
+      );
+    }
+
+    // NỬA THỨ HAI — nguyên nhân THẬT của đêm 07/08: tên miền mới không nhận ra linh sứ nữa
+    // (cookie gắn theo tên miền nên không đi theo cú 301). Trước bản này, toàn bộ chuỗi ấy
+    // hiện ra dưới dạng chín dòng「không thấy .nv-quest」.
+    {
+      const lines = [];
+      let moved;
+      siteMute = true;
+      try {
+        moved = await runFromOldDomain(lines);
+      } finally {
+        siteMute = false;
+      }
+
+      check(
+        "dời tên miền + trang mới không nhận ra linh sứ → gọi đúng tên cú 301, cả hai đầu và việc phải làm",
+        moved.outcome === "failed" &&
+          String(moved.message).includes("dời tên miền") &&
+          String(moved.message).includes("localhost") &&
+          String(moved.message).includes("127.0.0.1") &&
+          String(moved.message).includes("cookie"),
+        `${moved.outcome}: ${moved.message}`,
+      );
+      check(
+        "và vẫn không có dòng nào khẳng định phiên đăng nhập còn hiệu lực",
+        !lines.some((line) => line.includes("phiên đăng nhập còn hiệu lực")),
+        lines.join(" | ") || "(im lặng)",
+      );
+    }
+
+    // NỬA THỨ BA — tên miền do SERVER gửi kèm job phải thắng hằng số trong mã nguồn của máy
+    // chạy linh sứ. Đây là cả cơ chế khiến trưởng môn đổi được tên miền mà không ai phải cài
+    // lại linh sứ.
+    //
+    // CỐ Ý KHÔNG truyền `baseUrl`: tham số truyền thẳng đứng TRÊN config trong thứ tự ưu
+    // tiên, nên truyền cả hai là phép thử xanh kể cả khi `gameBaseUrl` bị bỏ qua sạch. Bỏ nó
+    // đi thì đường duy nhất còn lại tới máy chủ giả là qua config — và nếu engine phớt lờ
+    // trường ấy, nó sẽ đi hỏi hoathinh3d thật rồi hỏng, đúng như phải thế.
+    {
+      const lines = [];
+      const fromConfig = await runCycle({
+        chromium,
+        config: { ...progressConfig, parallelQuests: true, gameBaseUrl: baseUrl },
+        say: (message, level) => lines.push(`${level ?? "info"}: ${message}`),
+        reportProgress: () => {},
+        shouldStop: () => false,
+      });
+
+      check(
+        "tên miền server gửi kèm job dẫn đường được cả vòng chạy — đổi tên miền không cần cài lại linh sứ",
+        fromConfig.outcome === "done" && lines.some((line) => line.includes("Điểm Danh")),
+        `${fromConfig.outcome}: ${fromConfig.message}`,
+      );
+    }
   } finally {
     await browser.close().catch(() => {});
     server.close();

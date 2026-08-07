@@ -17,6 +17,8 @@
  * đứng im trong một phiên bảo trì không ai khai.
  */
 import { neon } from "@neondatabase/serverless";
+// @ts-expect-error — module JS thuần của quest-engine, không có d.ts.
+import { normalizeGameBaseUrl } from "../src/lib/quest-engine/cookies.mjs";
 import { appSettingsSchema, getAppSettings, saveAppSettings } from "../src/lib/services/settings";
 import { getMaintenanceFeed } from "../src/lib/services/dashboard";
 import { startJob } from "../src/lib/services/jobs";
@@ -46,6 +48,38 @@ assert(legacy.maintenance.active === false, "document cũ (chưa có nhánh main
 assert(legacy.membership.requireApproval === false, "thêm nhánh mới không được nuốt cấu hình đã có");
 
 console.log("✔ Schema: cổng bảo trì mặc định TẮT trên mọi document cũ — deploy không tự đóng cửa tông môn.");
+
+// ---- Tên miền game: chuẩn hoá và phòng thân ----------------------------------------------
+
+for (const [input, want] of [
+  ["hoathinh3d.one", "https://hoathinh3d.one"],
+  ["https://hoathinh3d.one", "https://hoathinh3d.one"],
+  ["https://hoathinh3d.one/", "https://hoathinh3d.one"],
+  ["  https://hoathinh3d.one/nhiem-vu-hang-ngay?x=1  ", "https://hoathinh3d.one"],
+  ["HTTPS://HoaThinh3D.ONE", "https://hoathinh3d.one"],
+  ["http://hoathinh3d.one", "http://hoathinh3d.one"],
+] as const) {
+  const parsed = normalizeGameBaseUrl(input);
+  assert(parsed.ok && parsed.baseUrl === want, `「${input}」phải chuẩn hoá thành ${want}, nhận ${JSON.stringify(parsed)}`);
+}
+
+for (const bad of ["", "   ", "hoathinh3d", "localhost", "ftp://hoathinh3d.one", "a b.com", "x".repeat(250)]) {
+  const parsed = normalizeGameBaseUrl(bad);
+  assert(!parsed.ok && parsed.error.length > 0, `「${bad}」phải bị từ chối kèm lý do, nhận ${JSON.stringify(parsed)}`);
+}
+
+// Document rác không được để cả tông môn trỏ vào chuỗi rỗng — thà giữ hằng số trong mã nguồn.
+const garbageDomain = appSettingsSchema.parse({ game: { baseUrl: "không-phải-tên-miền" } });
+assert(
+  garbageDomain.game.baseUrl.startsWith("https://"),
+  `giá trị rác phải rơi về hằng số mặc định, nhận ${garbageDomain.game.baseUrl}`,
+);
+assert(
+  appSettingsSchema.parse({}).game.baseUrl.startsWith("https://hoathinh3d."),
+  "document rỗng phải có sẵn tên miền mặc định",
+);
+
+console.log("✔ Tên miền: chuẩn hoá mọi cách gõ, từ chối mọi giá trị hỏng, rác thì rơi về mặc định.");
 
 // ---- 2..5. Trên database thật -------------------------------------------------------------
 
@@ -106,6 +140,23 @@ try {
   assert(!normal.ok && normal.error.includes("tài khoản"), "hết bảo trì thì startJob phải quay về lỗi thường (user thử không có tài khoản game)");
 
   console.log("✔ Bật: feed mang cờ + hạn chót, Khai Đàn khoá đúng lý do. Gia hạn: startedAt đứng yên. Tắt: mọi cửa mở lại.");
+
+  // --- Đổi tên miền: ghi rồi đọc lại, và KHÔNG chạm hàng xóm -----------------
+  const beforeDomain = await getAppSettings();
+  const keptChat = beforeDomain.chat.retentionDays;
+  const keptApproval = beforeDomain.membership.requireApproval;
+
+  const withDomain = await getAppSettings();
+  withDomain.game.baseUrl = "https://hoathinh3d.example";
+  await saveAppSettings(withDomain);
+
+  const afterDomain = await getAppSettings();
+  assert(afterDomain.game.baseUrl === "https://hoathinh3d.example", "tên miền mới phải đọc lại được nguyên vẹn");
+  assert(afterDomain.chat.retentionDays === keptChat, "đổi tên miền không được đụng hạn lưu đàm đạo");
+  assert(afterDomain.membership.requireApproval === keptApproval, "đổi tên miền không được đụng công tắc xét duyệt");
+  assert(afterDomain.maintenance.active === false, "đổi tên miền không được tự bật bảo trì");
+
+  console.log("✔ Tên miền lưu được, đọc lại đúng, và không làm suy suyển cấu hình hàng xóm.");
 } finally {
   await sql`delete from users where username = ${username}`.catch(
     (error) => console.error("! Không dọn được tài khoản thử:", error),

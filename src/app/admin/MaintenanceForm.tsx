@@ -36,8 +36,10 @@ export function MaintenanceForm({
     return Number.isNaN(ms) ? "—" : new Date(ms).toLocaleString("vi-VN", { hour12: false });
   };
 
+  // Bề rộng và khoảng cách giữa các thẻ do TRANG quyết (xem admin/page.tsx) — form này chỉ
+  // dựng nội dung của chính nó, nếu không sẽ có hai lớp `max-w-2xl` lồng nhau.
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
+    <>
       <form action={startAction} className="card card-hairline p-6">
         <h2 className="h-display mb-2 text-lg font-semibold text-gilded">
           Bế Quan Trùng Tu {maintenance.active && <span className="badge badge-pending ml-2 align-middle">ĐANG BẢO TRÌ</span>}
@@ -123,6 +125,6 @@ export function MaintenanceForm({
           </div>
         </form>
       )}
-    </div>
+    </>
   );
 }

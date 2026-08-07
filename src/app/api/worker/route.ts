@@ -126,8 +126,8 @@ export async function POST(request: Request) {
       // ai cả, chỉ cần thôi phát việc mới. Trùng tu xong, mọi đàn tự chạy tiếp, không ai
       // phải bấm lại Khai Đàn. Điểm danh vẫn ghi ở trên — linh sứ đang trực chứ không chết,
       // sổ trực mà báo "vắng" trong lúc trùng tu là dashboard tự bịa thêm một sự cố.
-      const { maintenance } = await getAppSettings();
-      if (maintenance.active) {
+      const settings = await getAppSettings();
+      if (settings.maintenance.active) {
         return NextResponse.json({ job: null });
       }
 
@@ -171,8 +171,17 @@ export async function POST(request: Request) {
         guarded = enforceMazeCapPolicy(config, { isAdmin: owner?.role === "admin" });
       }
 
+      // Tên miền game ghép vào ĐÂY, cùng chỗ và cùng lý do với cookie: nó là sự thật của
+      // TOÀN HỆ THỐNG tại thời điểm phát việc, không phải thứ đông lạnh trong snapshot của
+      // job (job có thể đã nằm trong hàng chờ từ trước khi trưởng môn đổi tên miền). Ghép ở
+      // cửa phát việc nghĩa là mọi linh sứ, ở mọi máy, dùng tên miền mới ngay từ vòng kế —
+      // không cài lại, không sửa env, không deploy.
       return NextResponse.json({
-        job: { id: job.id, userId: job.userId, config: { ...guarded, gameCookie: cookie } },
+        job: {
+          id: job.id,
+          userId: job.userId,
+          config: { ...guarded, gameCookie: cookie, gameBaseUrl: settings.game.baseUrl },
+        },
       });
     }
 

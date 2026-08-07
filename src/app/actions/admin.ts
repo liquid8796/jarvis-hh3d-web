@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/guards";
 import { notifyDashboard } from "@/lib/realtime/dashboardChannel";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore — module JS thuần của quest-engine, không có d.ts và không cần. Import từ
+// module LÁ `cookies.mjs` chứ không qua runCycle.mjs, cùng lý do với automation.ts.
+import { normalizeGameBaseUrl } from "@/lib/quest-engine/cookies.mjs";
 import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
 import { adminCreate, adminDelete, adminUpdate, setStatus } from "@/lib/services/users";
 import {
@@ -172,6 +176,50 @@ export async function saveMembershipSettingsAction(
     message: requireApproval
       ? "Cổng tông môn đã có người gác — người mới bái sư sẽ vào hàng chờ."
       : "Cổng tông môn đã mở — người mới bái sư được thu nhận ngay, không qua hàng chờ.",
+  };
+}
+
+/**
+ * Đổi tên miền hoathinh3d đang sống.
+ *
+ * Site đổi TLD định kỳ (mx → am → one → …), và trước bản này mỗi cú dời bắt cả tông môn
+ * đứng im chờ một lần deploy chỉ để sửa ba ký tự — đêm 07/08/2026 mất nhiều giờ đúng vì
+ * chuyện đó. Giờ trưởng môn gõ tên miền mới, và vòng chạy KẾ TIẾP của mọi linh sứ (VM tông
+ * môn lẫn máy nhà từng đạo hữu) đã dùng nó, vì tên miền đi kèm mỗi lần phát việc.
+ *
+ * KHÔNG đụng tới cookie đã lưu, và đó là chủ ý: cookie gắn chặt vào tên miền nên sau một cú
+ * dời chúng đã chết sẵn — nhưng xoá hộ là tự tay vứt thứ duy nhất còn dùng được nếu trưởng
+ * môn gõ nhầm rồi sửa lại. Việc của action này là nói thẳng ra điều đó.
+ */
+export async function saveGameDomainAction(
+  _prev: AdminResult | null,
+  formData: FormData,
+): Promise<AdminResult> {
+  await requireAdmin();
+
+  const parsed = normalizeGameBaseUrl(String(formData.get("baseUrl") ?? ""));
+  if (!parsed.ok) {
+    return { ok: false, message: parsed.error };
+  }
+
+  const settings = await getAppSettings();
+  const previous = settings.game.baseUrl;
+  if (previous === parsed.baseUrl) {
+    return { ok: true, message: `Tên miền vẫn là ${parsed.baseUrl} — không có gì để đổi.` };
+  }
+
+  settings.game.baseUrl = parsed.baseUrl;
+  await saveAppSettings(settings);
+  await notifyDashboard({ userId: "*", topic: "config" });
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  return {
+    ok: true,
+    message:
+      `Đã đổi tên miền: ${previous} → ${parsed.baseUrl}. Linh sứ dùng ngay từ vòng kế. ` +
+      "LƯU Ý: cookie gắn theo tên miền, nên mọi tài khoản phải dán lại chuỗi cookie lấy từ " +
+      "tên miền mới, nếu không lượt chạy sẽ báo hết phiên đăng nhập.",
   };
 }
 

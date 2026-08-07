@@ -18,8 +18,64 @@
  * không đĩa, không phụ thuộc.
  */
 
-/** Tên miền game. Site đổi TLD định kỳ (…mx → …am), nên đây phải là cấu hình, không phải hằng số. */
-export const DEFAULT_GAME_BASE_URL = "https://hoathinh3d.am";
+/**
+ * Tên miền game. Site đổi TLD định kỳ (…mx → …am → …one), nên đây phải là cấu hình chứ
+ * không phải hằng số — biến môi trường `GAME_BASE_URL` đè lên được, để một cú dời tên miền
+ * chỉ tốn một lần sửa env thay vì một lần deploy.
+ *
+ * Cú dời 07/08/2026 (.am → .one) tốn của tông môn nhiều giờ chạy vô ích, và bài học không
+ * nằm ở con số này: cookie GẮN CHẶT vào tên miền, nên đổi tên miền là mọi phiên đăng nhập
+ * đã lưu chết theo, và đạo hữu BẮT BUỘC phải dán lại chuỗi cookie lấy từ tên miền mới. Cổng
+ * sẵn sàng giờ tự nhận ra cú 301 và nói thẳng điều đó (xem `movedTo` trong runCycle).
+ */
+export const DEFAULT_GAME_BASE_URL = "https://hoathinh3d.one";
+
+/**
+ * Chuẩn hoá thứ trưởng môn gõ vào ô tên miền thành một ORIGIN sạch, hoặc nói rõ vì sao không.
+ *
+ * Sống ở đây chứ không ở tầng action, vì cùng một luật phải áp cho cả người gõ lẫn giá trị
+ * đã nằm trong database: một origin lệch chuẩn (thừa dấu `/`, lẫn đường dẫn, thiếu scheme)
+ * đi vào `new URL(path, base)` sẽ đẻ ra những URL sai lặng lẽ — và cái giá của một tên miền
+ * sai là TOÀN BỘ automation đứng im, đúng như đêm 07/08.
+ *
+ * Nhận cả dạng trần「hoathinh3d.one」lẫn dạng đầy đủ; trả về đúng origin, không đuôi `/`.
+ * Chỉ http/https — một scheme lạ ở đây là dấu hiệu gõ nhầm, không phải nhu cầu thật.
+ *
+ * @param {string} raw
+ * @returns {{ ok: true, baseUrl: string } | { ok: false, error: string }}
+ */
+export function normalizeGameBaseUrl(raw) {
+  const text = String(raw ?? "").trim();
+  if (text.length === 0) {
+    return { ok: false, error: "Tên miền không được để trống." };
+  }
+  if (text.length > 200) {
+    return { ok: false, error: "Tên miền dài quá mức hợp lý (tối đa 200 ký tự)." };
+  }
+  // Khoảng trắng giữa chuỗi là dấu hiệu dán nhầm cả câu, không phải một tên miền.
+  if (/\s/.test(text)) {
+    return { ok: false, error: "Tên miền không được chứa khoảng trắng." };
+  }
+
+  const withScheme = /^https?:\/\//i.test(text) ? text : `https://${text}`;
+  let url;
+  try {
+    url = new URL(withScheme);
+  } catch {
+    return { ok: false, error: `Không đọc được「${text}」như một tên miền.` };
+  }
+
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    return { ok: false, error: "Chỉ nhận http hoặc https." };
+  }
+  // Phải có dấu chấm và không được là địa chỉ rỗng: "localhost" hay "abc" gần như luôn là
+  // gõ nhầm ở đây, và một tên miền gõ nhầm làm cả tông môn đứng im.
+  if (!url.hostname.includes(".") || url.hostname.startsWith(".") || url.hostname.endsWith(".")) {
+    return { ok: false, error: `「${url.hostname}」không giống một tên miền đầy đủ.` };
+  }
+
+  return { ok: true, baseUrl: url.origin };
+}
 
 /**
  * Chuỗi cookie người dùng dán → mảng cookie của Playwright. Hiểu MỌI định dạng hợp lý:

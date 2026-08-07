@@ -57,6 +57,17 @@ export const configSchema = z.object({
    */
   accountTier: z.enum(["vip", "free"]).nullable().default(null),
   /**
+   * Tên miền game của SNAPSHOT — cùng số phận với hai trường trên: nguồn sự thật là
+   * `app_settings.game.baseUrl` do trưởng môn đặt, và /api/worker ghép nó vào lúc phát việc.
+   *
+   * Đi theo từng job thay vì nằm trong env của linh sứ, vì linh sứ chạy trên máy KHÁC —
+   * trên VM tông môn lẫn trên máy nhà của từng đạo hữu. Bắt tên miền đi cùng công việc
+   * nghĩa là đổi tên miền là mọi linh sứ ngoài kia dùng ngay ở vòng sau, không ai phải cài
+   * lại hay sửa env. Rỗng = linh sứ tự quyết theo env/hằng số của chính nó, giữ cho bản cài
+   * đời cũ và các lượt chạy một-phát không phụ thuộc trường này.
+   */
+  gameBaseUrl: z.string().trim().max(200).default(""),
+  /**
    * Chạy các nhiệm vụ của một vòng SONG SONG — mỗi nhiệm vụ một tab riêng trong cùng phiên
    * đăng nhập. Vòng dài bằng nhiệm vụ chậm nhất thay vì tổng cộng dồn. Tắt để về tuần tự
    * như bản desktop khi site trở chứng với nhiều tab.

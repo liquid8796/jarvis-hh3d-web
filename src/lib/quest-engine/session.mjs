@@ -100,14 +100,17 @@ export function createSession(page, options) {
       try {
         if (sameUrl(page.url(), url)) {
           await page.reload({ waitUntil: "domcontentloaded", timeout: pageTimeoutMs });
-          return { ok: true };
+          return { ok: true, url: page.url() };
         }
 
         // Cố ý KHÔNG chờ mạng rảnh sau đó. Site này không bao giờ rảnh: nó long-poll tin
         // nhắn và giữ một socket mở, nên cái chờ ấy hết hạn nguyên vẹn ở MỌI lần điều
         // hướng. Mọi script quest đều tự mở đầu bằng việc chờ đúng phần tử nó cần.
         await page.goto(url, { waitUntil: "domcontentloaded", timeout: pageTimeoutMs });
-        return { ok: true };
+        // Trả về nơi THẬT SỰ dừng chân, không phải nơi định đến: site đổi TLD định kỳ và
+        // tên miền cũ 301 sang tên miền mới, nên hai giá trị này có ngày khác nhau — và
+        // ngày ấy, khoảng cách giữa chúng là toàn bộ lời giải thích.
+        return { ok: true, url: page.url() };
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err) };
       }

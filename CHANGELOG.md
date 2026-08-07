@@ -11,6 +11,57 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.36.0 — cổng sẵn sàng thôi nói dối, và tên miền game thành cấu hình chạy được
+
+Sự cố 07/08: chín nhiệm vụ liên tiếp báo `Trang chưa dựng xong sau 25s`, mỗi vòng bốn phút
+đỏ rực, nửa tiếng một lần, và nhật ký không một lần nhắc tới nguyên nhân. Truy ra hai tầng.
+
+- **Nguyên nhân ngoài đời: site dời tên miền.** `hoathinh3d.am` 301 sang `hoathinh3d.one`.
+  Cookie gắn chặt vào tên miền nên KHÔNG đi theo cú nhảy — tên miền mới nhìn linh sứ như
+  khách lạ. Đo được: các vòng chạy sạch tới 11:22, hỏng từ ~11:25, và bản 0.35.0 đã sống
+  yên 15 tiếng trước đó nên không phải thủ phạm.
+- **Nguyên nhân trong nhà, và là cái đáng xấu hổ: cổng sẵn sàng tuyên bố một điều nó chưa
+  hề chứng minh.** `readinessProbe` trả `loggedIn: null` khi trang không phát tín hiệu về
+  PHÍA NÀO — không dấu đã-đăng-nhập, cũng không form đăng nhập. Gặp `null`, cổng ghi một
+  dòng debug (chỉ vào journal, người dùng không thấy) rồi vẫn phát ra dòng XANH
+  「Đã vào được trang game — phiên đăng nhập còn hiệu lực」và thả cả vòng vào chín nhiệm vụ.
+  Đúng cái mà chú thích của chính hàm ấy nói nó sinh ra để ngăn.
+- **Và có tới HAI nhân chứng bị bỏ qua.** Ngay sau cổng, vòng chạy ghé hub poll `.nv-quest`
+  20 giây để dò hạng tài khoản. Hub không dựng → vòng lặp hết giờ trong im lặng: nó vừa bỏ
+  ra 20 giây CHỨNG MINH hub không dựng, rồi không nói với ai.
+- **Cách chữa: nói thật, rồi để nhân chứng tốt hơn phân xử.** `ensureReady` trả thêm
+  `loginConfirmed` và chỉ nói câu kia khi đã chứng minh được. Hai nhân chứng cùng câm thì
+  DỪNG vòng với thông điệp gọi đúng tên. Phải là PHÉP HỘI, không phải phép tuyển: hub không
+  dựng mà phiên vẫn xác nhận được thì đó là site trở chứng, và nhiệm vụ có trang riêng vẫn
+  chạy ngon — cắt vòng lúc ấy là phá hoại. Cố ý KHÔNG cứng rắn hoá `null` thành lỗi, vì mấy
+  cái dấu kia chỉ là suy đoán: hôm nào site đổi markup của người ĐANG đăng nhập, một phán
+  quyết cứng sẽ chặn đứng automation của những tài khoản hoàn toàn lành.
+- **Cổng còn tự nhận ra cú 301.** `session.navigate` trả về nơi THẬT SỰ dừng chân, và lệch
+  origin nghĩa là site đã dời — thông điệp gọi tên cả hai đầu. Một đêm truy vết thành một
+  dòng nhật ký.
+- **Tên miền game thành cấu hình chạy được — tab Bảo Trì của trang Tông Môn.** Trước bản này
+  mỗi cú dời TLD bắt cả tông môn chờ một lần deploy để sửa ba ký tự. Giờ trưởng môn gõ tên
+  miền mới, /api/worker ghép nó vào từng lần phát việc, và mọi linh sứ — VM tông môn lẫn máy
+  nhà từng đạo hữu — dùng ngay ở vòng kế: không deploy, không sửa env, không cài lại. Ghép ở
+  cửa phát việc chứ không đông lạnh trong snapshot, vì job có thể đã nằm trong hàng chờ từ
+  trước khi trưởng môn đổi.
+- **Ô nhập nhận mọi cách gõ** (`hoathinh3d.one`, `https://hoathinh3d.one/`, có cả đường dẫn)
+  và chuẩn hoá về đúng một origin; giá trị hỏng bị từ chối kèm lý do, giá trị rác trong
+  database rơi về hằng số trong mã nguồn thay vì để cả tông môn trỏ vào chuỗi rỗng.
+- **Soát cookie lúc dán cũng theo tên miền đang sống.** `parseCookieString` LOẠI cookie
+  không thuộc tên miền đang nhắm tới, nên đối chiếu với tên miền cũ nghĩa là chuỗi mới dán
+  đúng bị vứt sạch rồi người dán nhận đúng câu「không đọc được」cho một chuỗi hợp lệ.
+- **Cảnh báo về cookie nằm TRÊN nút bấm**, không nằm trong thông báo sau khi lưu: hậu quả
+  cần đọc trước khi bấm, vì sau đó thì mọi tài khoản đã mất phiên rồi.
+- **Smoke 211, và hai ca đối chứng đã được chứng minh có răng.** Máy chủ giả mọc thêm một
+  「trang câm」và một「tên miền cũ 301」: khôi phục hành vi cũ thì ca trang-câm hỏng cả 5 phép
+  và tái hiện nguyên văn ảnh chụp sự cố; gỡ `gameBaseUrl` khỏi thứ tự ưu tiên thì ca tên
+  miền hỏng đúng chỗ. Bắt được một phép thử xanh-vì-lý-do-sai trong lúc viết: nó truyền cả
+  `baseUrl` lẫn `config.gameBaseUrl`, mà tham số truyền thẳng luôn thắng — nên nó xanh kể cả
+  khi trường kia bị bỏ qua sạch.
+
+---
+
 ## 0.35.0 — song song chỉ dành cho hub; trang riêng có cổng nhường đường toàn cục
 
 - **Luật mới của tông chủ, sau đêm 07/08:** chạy song song chỉ dành cho các nhiệm vụ ngắn

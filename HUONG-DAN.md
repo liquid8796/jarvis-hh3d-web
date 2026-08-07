@@ -48,6 +48,9 @@ Nếu nó báo *không thấy cookie đăng nhập*, nghĩa là bạn copy thi�
 - Đăng nhập game ở máy khác, trình duyệt khác: **không sao**.
 - **Bấm Đăng xuất** trong game thì cookie chết, phải lấy lại chuỗi mới.
 - Cookie cũng tự hết hạn sau một thời gian. Khi auto báo hết phiên, lấy lại là xong.
+- **hoathinh3d đổi tên miền** (ví dụ `.am` → `.one`) thì cookie cũ cũng chết theo — cookie
+  gắn chặt vào tên miền, không đi theo được. Lúc ấy vào tên miền MỚI lấy chuỗi mới rồi dán
+  lại. Tông chủ sẽ cập nhật tên miền cho cả tông môn; việc của bạn chỉ là dán lại cookie.
 
 ### Bước 2 — Chọn nhiệm vụ
 
@@ -152,6 +155,8 @@ cần quyền quản trị.
 | *Auto đang chạy* | Đang có lượt chạy dở | Bấm Thu Đàn trước |
 | *Chuỗi cookie không đọc được* | Copy thiếu hoặc sai định dạng | Làm lại Bước 1, nhớ lấy dòng `wordpress_logged_in_` |
 | *Tài khoản hoathinh3d đã hết phiên đăng nhập* | Cookie hết hạn, hoặc bạn đã đăng xuất game | Lấy cookie mới, dán lại |
+| *Site đã dời tên miền: … sang …* | Game đổi tên miền, cookie cũ chết theo | Vào tên miền mới lấy cookie, dán lại |
+| *Không xác nhận được phiên đăng nhập, và hub cũng không dựng nổi…* | Cookie chết, hoặc game đang chắn | Dán cookie mới; nếu vẫn vậy thì báo tông chủ |
 | *Không có linh sứ nào tiếp nhận* | Không ai đang trực | Xem mục 3, cài linh sứ cho máy mình |
 | *Màn kiểm tra của trang game không tự qua* | Game đang chặn bot | Chờ lượt sau, auto tự thử lại |
 | Linh sứ chuyển sang **vắng** | Máy tắt, mạng rớt, hoặc bạn vừa phát linh phù mới | Bật máy lại, hoặc cài lại bằng bộ cài mới |

@@ -5,6 +5,7 @@ import { getAppSettings } from "@/lib/services/settings";
 import { countPending, listUsers } from "@/lib/services/users";
 import { AdminTabs } from "./AdminTabs";
 import { ChatSettingsForm } from "./ChatSettingsForm";
+import { GameDomainForm } from "./GameDomainForm";
 import { MaintenanceForm } from "./MaintenanceForm";
 import { MembershipSettingsForm } from "./MembershipSettingsForm";
 import { UserTable } from "./UserTable";
@@ -86,7 +87,14 @@ export default async function AdminPage({
             {
               key: "baoTri",
               label: settings.maintenance.active ? "Bảo Trì ●" : "Bảo Trì",
-              pane: <MaintenanceForm maintenance={settings.maintenance} drain={drain} />,
+              // Tên miền đứng chung tab với bảo trì: cùng là thứ trưởng môn chạm vào khi hệ
+              // thống trục trặc, và một cú dời tên miền thường là dịp nên bế quan.
+              pane: (
+                <div className="flex max-w-2xl flex-col gap-6">
+                  <GameDomainForm baseUrl={settings.game.baseUrl} />
+                  <MaintenanceForm maintenance={settings.maintenance} drain={drain} />
+                </div>
+              ),
             },
           ]}
         />

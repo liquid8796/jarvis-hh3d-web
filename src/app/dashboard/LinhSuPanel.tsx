@@ -5,10 +5,10 @@ import { forgetLinhSuAction, issueLinhPhuAction, revokeLinhPhuAction } from "@/a
 import { useDashboardPresenceLive } from "./DashboardLiveProvider";
 
 /**
- * Mục LINH SỨ — nơi đạo hữu thấy ai đang trực và, NẾU MUỐN, tự nuôi một linh sứ riêng.
+ * Mục KHÔI LỖI — nơi đạo hữu thấy ai đang trực và, NẾU MUỐN, tự nuôi một khôi lỗi riêng.
  *
  * Thứ tự trình bày ở đây là một quyết định, không phải tuỳ tiện: câu trả lời đúng cho hầu
- * hết mọi người là "đạo hữu không cần làm gì cả" — linh sứ tông môn trực sẵn cho tất cả.
+ * hết mọi người là "đạo hữu không cần làm gì cả" — khôi lỗi tông môn trực sẵn cho tất cả.
  * Nên phần đó lên trước, và phần cài đặt chỉ là lối rẽ cho người muốn lượt chạy đi từ máy
  * mình. Đặt ngược lại là bắt mọi người tưởng mình phải cài gì đó mới dùng được.
  *
@@ -96,8 +96,8 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
   const [pending, startTransition] = useTransition();
 
   const issue = () => {
-    // Phát lại là THAY linh phù: linh sứ đang chạy bằng linh phù cũ sẽ bị từ chối ngay.
-    if (hasToken && !confirm("Phát linh phù mới sẽ vô hiệu linh phù cũ — linh sứ đang dùng nó phải cài lại. Tiếp tục?")) {
+    // Phát lại là THAY linh phù: khôi lỗi đang chạy bằng linh phù cũ sẽ bị từ chối ngay.
+    if (hasToken && !confirm("Phát linh phù mới sẽ vô hiệu linh phù cũ — khôi lỗi đang dùng nó phải cài lại. Tiếp tục?")) {
       return;
     }
     startTransition(async () => {
@@ -118,7 +118,7 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
   const forget = (workerId: string) => {
     if (
       !confirm(
-        `Gỡ「${workerId}」khỏi danh sách?\n\nChỉ xoá cái tên ở đây thôi — máy đó không bị đụng gì. Nếu linh sứ ấy vẫn còn sống, nó sẽ tự hiện lại sau vài giây.`,
+        `Gỡ「${workerId}」khỏi danh sách?\n\nChỉ xoá cái tên ở đây thôi — máy đó không bị đụng gì. Nếu khôi lỗi ấy vẫn còn sống, nó sẽ tự hiện lại sau vài giây.`,
       )
     ) {
       return;
@@ -136,7 +136,7 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
   };
 
   const revoke = () => {
-    if (!confirm("Thu hồi linh phù? Linh sứ riêng của đạo hữu sẽ mất quyền ngay lập tức.")) {
+    if (!confirm("Thu hồi linh phù? Khôi lỗi riêng của đạo hữu sẽ mất quyền ngay lập tức.")) {
       return;
     }
     startTransition(async () => {
@@ -197,9 +197,9 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
     // CSS (không có cách nào đọc được cái gì đang nằm dưới); cho thẻ một cái nền đủ đục mới
     // là câu trả lời đúng — và `.card` đã sẵn có nền 86–92% kèm blur.
     <section className="card card-hairline rise-in min-w-0 p-5 xl:p-7">
-      <h2 className="h-display text-lg font-bold text-gilded">Linh Sứ</h2>
+      <h2 className="h-display text-lg font-bold text-gilded">Khôi Lỗi</h2>
       <p className="mt-1 text-xs text-[var(--color-mist)]">
-        Linh sứ là người chạy auto giúp bạn. Phải có ít nhất một linh sứ đang trực thì bấm
+        Khôi lỗi là người chạy auto giúp bạn. Phải có ít nhất một khôi lỗi đang trực thì bấm
         Khai Đàn mới có người làm.
       </p>
 
@@ -207,7 +207,7 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
       <div className="mt-4 space-y-2 text-sm">
         <div className="flex items-center gap-2">
           <Dot on={presence?.sectOnline ?? false} />
-          <span className="text-[var(--color-parchment)]">Linh sứ tông môn</span>
+          <span className="text-[var(--color-parchment)]">Khôi lỗi tông môn</span>
           <span className="text-xs text-[var(--color-mist)]">
             {presence == null
               ? "— đang xem sổ điểm danh…"
@@ -224,7 +224,7 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
             <span className="shrink-0 text-xs text-[var(--color-mist)]">
               {w.online ? "— đang trực" : `— ${timeAgo(w.lastSeen)}`}
             </span>
-            {/* Nút gỡ CHỈ hiện ở dòng đã vắng: linh sứ đang trực mà gỡ thì nó ghi tên lại sau
+            {/* Nút gỡ CHỈ hiện ở dòng đã vắng: khôi lỗi đang trực mà gỡ thì nó ghi tên lại sau
                 năm giây, và một cái nút không giữ được lời hứa còn tệ hơn không có nút. */}
             {!w.online && (
               <button
@@ -232,7 +232,7 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
                 onClick={() => forget(w.id)}
                 disabled={pending}
                 title="Gỡ khỏi danh sách"
-                aria-label={`Gỡ linh sứ ${w.id} khỏi danh sách`}
+                aria-label={`Gỡ khôi lỗi ${w.id} khỏi danh sách`}
                 className="ml-auto shrink-0 rounded-md border border-[var(--color-ink-600)] px-1.5 text-xs leading-5 text-[var(--color-mist)] transition-colors hover:border-[#f2a0a0]/50 hover:text-[#f2a0a0] disabled:opacity-40"
               >
                 ✕
@@ -257,24 +257,24 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
       {presence?.sectOnline && (
         <p className="mt-3 rounded-lg border border-[var(--color-jade-400)]/25 bg-[var(--color-jade-400)]/5 p-3 text-xs text-[var(--color-mist)]">
           <span className="text-[var(--color-jade-400)]">Bạn không cần cài gì cả.</span> Đã có
-          linh sứ tông môn trực sẵn, cứ Khai Đàn là chạy. Phần dưới chỉ dành cho ai muốn auto
+          khôi lỗi tông môn trực sẵn, cứ Khai Đàn là chạy. Phần dưới chỉ dành cho ai muốn auto
           chạy ngay trên máy mình.
         </p>
       )}
       {noWorkerAtAll && (
         <p className="mt-3 rounded-lg border border-[var(--color-gold-300)]/25 bg-[var(--color-gold-300)]/5 p-3 text-xs text-[var(--color-mist)]">
-          <span className="text-[var(--color-gold-300)]">Chưa có linh sứ nào trực.</span> Bấm
-          Khai Đàn lúc này thì sẽ phải nằm chờ. Cài linh sứ cho máy bạn ở dưới, vài phút là xong.
+          <span className="text-[var(--color-gold-300)]">Chưa có khôi lỗi nào trực.</span> Bấm
+          Khai Đàn lúc này thì sẽ phải nằm chờ. Cài khôi lỗi cho máy bạn ở dưới, vài phút là xong.
         </p>
       )}
 
-      {/* Phát linh phù mới KHAI TỬ linh sứ đang chạy bằng linh phù cũ — nó không chết hẳn mà
+      {/* Phát linh phù mới KHAI TỬ khôi lỗi đang chạy bằng linh phù cũ — nó không chết hẳn mà
           cứ quay vô ích, bị từ chối mỗi 5 giây, và trên màn hình chỉ lặng lẽ chuyển thành
           "vắng". Đúng chuyện đã xảy ra ngày 02/08. Hộp xác nhận cảnh báo TRƯỚC khi bấm là
           chưa đủ: người ta cần được nhắc lại NGAY LÚC nhìn thấy hậu quả. */}
       {token && presence != null && mine.length > 0 && (
         <p className="mt-3 rounded-lg border border-[#f2a0a0]/30 bg-[#f2a0a0]/5 p-3 text-xs text-[var(--color-mist)]">
-          <span className="text-[#f2a0a0]">Linh sứ cũ của bạn vừa ngừng nhận việc.</span> Linh
+          <span className="text-[#f2a0a0]">Khôi lỗi cũ của bạn vừa ngừng nhận việc.</span> Linh
           phù mới đã thay linh phù cũ. Tải bộ cài bên dưới rồi chạy lại trên máy đó là nó trực
           tiếp.
         </p>
@@ -348,12 +348,12 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
               </li>
               <li>
                 <span className="text-[var(--color-parchment)]">3.</span> Đợi vài phút cho tới khi
-                cửa sổ báo xong. Tên linh sứ sẽ hiện ở danh sách phía trên.
+                cửa sổ báo xong. Tên khôi lỗi sẽ hiện ở danh sách phía trên.
               </li>
             </ol>
 
             <p className="mt-3 text-xs text-[var(--color-mist)]">
-              Linh sứ tự bật lại mỗi lần mở máy. Muốn gỡ: chạy{" "}
+              Khôi lỗi tự bật lại mỗi lần mở máy. Muốn gỡ: chạy{" "}
               <span className="font-mono">uninstall</span> trong thư mục cài.
             </p>
 
@@ -376,7 +376,7 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
           hasToken && (
             <p className="mt-2 text-xs text-[var(--color-mist)]">
               Bạn đã tạo bộ cài trước đó rồi. Cần cài cho máy khác, hoặc lỡ đóng trang trước khi
-              tải? Bấm &quot;Phát linh phù mới&quot;. Lưu ý: linh sứ đang chạy sẽ ngừng, phải
+              tải? Bấm &quot;Phát linh phù mới&quot;. Lưu ý: khôi lỗi đang chạy sẽ ngừng, phải
               cài lại bằng bộ cài mới.
             </p>
           )

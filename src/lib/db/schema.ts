@@ -36,6 +36,18 @@ export const userRole = pgEnum("user_role", ["user", "admin"]);
  */
 export const userStatus = pgEnum("user_status", ["pending", "active", "disabled"]);
 
+/**
+ * Vai trò từ 08/08/2026 là MỘT MẢNG, không phải một enum đơn — một người có thể vừa là Gia
+ * chủ vừa là Trưởng môn. Mảng rỗng = môn đồ thường.
+ *
+ *   gia-chu — vai lớn nhất, MỘT MÌNH nó có quyền sửa/xoá vai của các Trưởng môn. Sinh ra vì
+ *             một lỗ hổng có thật: các Trưởng môn ngang quyền có thể hạ vai hay trục xuất
+ *             LẪN NHAU, nghĩa là admin nào cũng chỉ an toàn cho tới khi một admin khác đổi ý.
+ *   admin   — Trưởng môn: duyệt môn đồ, quản môn đồ thường; KHÔNG đụng được admin khác.
+ *
+ * Danh sách hợp lệ nằm ở `src/lib/auth/permissions.ts` — nơi giữ toàn bộ ma trận ai-được-làm-gì.
+ */
+
 export const users = pgTable(
   "users",
   {
@@ -46,17 +58,32 @@ export const users = pgTable(
     // admin-created account must supply one; old members can add theirs from Hồ Sơ.
     email: text("email").unique(),
     passwordHash: text("password_hash").notNull(),
+    /**
+     * CỘT DI SẢN — thay bằng `roles` từ 08/08/2026, còn nằm đây MỘT nhịp deploy nữa vì lý do
+     * expand-contract: migration chạy TRƯỚC deploy, và bản code cũ (vẫn đang phục vụ trong
+     * cửa sổ ấy) SELECT đích danh cột này — drop ngay là mọi trang 500 cho tới khi bản mới
+     * lên. Code mới không đọc nó, chỉ GHI GƯƠNG (mirror) để cửa sổ kia an toàn cả hai chiều.
+     * Migration kế tiếp sẽ drop cả cột lẫn enum user_role.
+     */
     role: userRole("role").notNull().default("user"),
+    /** Vai trò thật của hệ thống — xem ghi chú ở đầu tệp. Rỗng = môn đồ thường. */
+    roles: text("roles").array().notNull().default(sql`ARRAY[]::text[]`),
+    /**
+     * Tag trang trí — hiện thành huy hiệu cạnh tên trong Phòng Chat. Do Trưởng môn/Gia chủ
+     * ban (như đạo hiệu được ban trong môn phái), không phải tự nhận. Trần 3 tag × 20 ký tự
+     * gác ở tầng action; cột chỉ là mảng chữ.
+     */
+    tags: text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
     status: userStatus("status").notNull().default("pending"),
     /**
-     * LINH PHÙ — token riêng cho linh sứ máy nhà của đạo hữu này, lưu dạng SHA-256.
+     * LINH PHÙ — token riêng cho khôi lỗi máy nhà của đạo hữu này, lưu dạng SHA-256.
      *
      * Vì sao không dùng chung WORKER_TOKEN: trang cài đặt phát lệnh cài cho MỌI thành viên,
      * mà ai cầm token toàn cục là claim được job của tất cả — tức đọc được cookie game của
-     * tất cả. Nên token toàn cục rút về làm token của linh sứ tông môn (do người vận hành
+     * tất cả. Nên token toàn cục rút về làm token của khôi lỗi tông môn (do người vận hành
      * giữ), còn mỗi đạo hữu cầm một linh phù chỉ mở được job của chính mình.
      *
-     * Chỉ lưu hash: bảng users bị lộ thì kẻ đọc trộm vẫn không có token để giả linh sứ.
+     * Chỉ lưu hash: bảng users bị lộ thì kẻ đọc trộm vẫn không có token để giả khôi lỗi.
      * Bản rõ chỉ tồn tại đúng một lần — trong hồi đáp của action tạo linh phù.
      */
     workerTokenHash: text("worker_token_hash").unique(),
@@ -76,7 +103,7 @@ export const users = pgTable(
  * biết mình chạy cho tài khoản nào để chọn đúng hồ sơ Chromium lẫn vá đúng verdict hạng.
  *
  * `cookieEnvelope` là phong bì AES-GCM y như user_configs từng giữ — cookie vẫn đi MỘT
- * CHIỀU: vào từ form, ra duy nhất ở /api/worker sau khi linh sứ xác thực.
+ * CHIỀU: vào từ form, ra duy nhất ở /api/worker sau khi khôi lỗi xác thực.
  */
 export const gameAccounts = pgTable(
   "game_accounts",
@@ -87,7 +114,7 @@ export const gameAccounts = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     label: text("label").notNull(),
     cookieEnvelope: text("cookie_envelope").notNull(),
-    /** Hạng do linh sứ chứng minh trên hub; null = cookie này chưa được dò. */
+    /** Hạng do khôi lỗi chứng minh trên hub; null = cookie này chưa được dò. */
     accountTier: text("account_tier").$type<"vip" | "free">(),
     /** Tắt là đứng ngoài Khai Đàn — cấu hình và lịch sử giữ nguyên, chỉ không chạy. */
     enabled: boolean("enabled").notNull().default(true),
@@ -124,8 +151,8 @@ export const jobStatus = pgEnum("job_status", [
 /**
  * Ai sẽ cầm browser cho lượt này.
  *
- * Từ v0.11 mọi job đều là `local` — một tiến trình worker sống dai (linh sứ tông môn trên
- * VM luôn trực, hoặc linh sứ máy nhà của chính đạo hữu). Giá trị `sandbox` chỉ còn trong
+ * Từ v0.11 mọi job đều là `local` — một tiến trình worker sống dai (khôi lỗi tông môn trên
+ * VM luôn trực, hoặc khôi lỗi máy nhà của chính đạo hữu). Giá trị `sandbox` chỉ còn trong
  * enum vì Postgres không cho rút một giá trị enum đã dùng, và các job lịch sử vẫn mang nó;
  * không dòng code nào còn GHI giá trị đó nữa. Vercel Sandbox bị bỏ vì hai lẽ: gói Hobby
  * không có cron đủ dày để lái nó, và một VM Always Free chạy liên tục phục vụ được CẢ
@@ -154,7 +181,7 @@ export const automationJobs = pgTable(
     configSnapshot: jsonb("config_snapshot").notNull().default({}),
     /** Runner nào được phép giành job này — xem chú thích của `runnerKind`. */
     runner: runnerKind("runner").notNull().default("local"),
-    /** Số vòng đã được linh sứ tiếp nhận; tăng mỗi lần job thức dậy khỏi lịch chờ. */
+    /** Số vòng đã được khôi lỗi tiếp nhận; tăng mỗi lần job thức dậy khỏi lịch chờ. */
     attempts: integer("attempts").notNull().default(0),
     workerId: text("worker_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -167,9 +194,9 @@ export const automationJobs = pgTable(
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     lastHeartbeat: timestamp("last_heartbeat", { withTimezone: true }),
     /**
-     * Vòng này đang chạy nhiệm vụ nào — linh sứ gửi kèm nhịp tim, server không tự suy ra
+     * Vòng này đang chạy nhiệm vụ nào — khôi lỗi gửi kèm nhịp tim, server không tự suy ra
      * được. NULL nghĩa là "không biết", và đó là trạng thái đúng ở ba lúc: job đang nghỉ,
-     * vòng vừa xong, và linh sứ đời cũ chưa biết gửi trường này.
+     * vòng vừa xong, và khôi lỗi đời cũ chưa biết gửi trường này.
      *
      * Ở đây chứ không phải một bảng riêng: nó là thuộc tính của ĐÚNG một vòng của đúng một
      * job, sống và chết cùng dòng job, và luôn được đọc chung với dòng ấy. Một bảng riêng
@@ -226,16 +253,16 @@ export const appSettings = pgTable("app_settings", {
 });
 
 /**
- * Sổ ĐIỂM DANH linh sứ — mỗi worker từng gõ cửa /api/worker có một dòng, cập nhật
+ * Sổ ĐIỂM DANH khôi lỗi — mỗi worker từng gõ cửa /api/worker có một dòng, cập nhật
  * `lastSeen` mỗi lần nó hỏi việc (5 giây một lần khi đang trực).
  *
- * Tồn tại để trả lời câu hỏi vận hành số một: "có linh sứ nào đang trực không?" — trước
+ * Tồn tại để trả lời câu hỏi vận hành số một: "có khôi lỗi nào đang trực không?" — trước
  * đây câu trả lời chỉ lộ ra sau sáu phút im lặng, khi reaper kết liễu job với một dòng lỗi.
- * Giờ dashboard đọc bảng này và nói thật NGAY LÚC khai đàn; mục Linh Sứ cũng dựa vào đây
- * để chỉ cho đạo hữu thấy linh sứ máy nhà của họ đã lên ca hay chưa.
+ * Giờ dashboard đọc bảng này và nói thật NGAY LÚC khai đàn; mục Khôi Lỗi cũng dựa vào đây
+ * để chỉ cho đạo hữu thấy khôi lỗi máy nhà của họ đã lên ca hay chưa.
  *
- * `userId` null = linh sứ tông môn (xác thực bằng token toàn cục, nhận job của mọi người).
- * `userId` có giá trị = linh sứ riêng, xác thực bằng linh phù, chỉ nhận job của chủ mình.
+ * `userId` null = khôi lỗi tông môn (xác thực bằng token toàn cục, nhận job của mọi người).
+ * `userId` có giá trị = khôi lỗi riêng, xác thực bằng linh phù, chỉ nhận job của chủ mình.
  */
 export const workers = pgTable(
   "workers",

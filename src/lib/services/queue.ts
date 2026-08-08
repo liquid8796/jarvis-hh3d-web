@@ -8,13 +8,13 @@ import type { CycleProgress, JobStatus } from "@/lib/realtime/dashboardTypes";
  *
  * <b>Ranh giới riêng tư</b>: trang này cố ý cho thấy job của người khác, nên phải nói rõ cái
  * gì được thấy và cái gì không. Của người khác: tên đã che, trạng thái, thời điểm chạy kế,
- * số vòng đã chạy, tiến độ vòng này — CẢ SỐ ĐẾM LẪN TÊN NHIỆM VỤ ĐANG CHẠY — và linh sứ nào
+ * số vòng đã chạy, tiến độ vòng này — CẢ SỐ ĐẾM LẪN TÊN NHIỆM VỤ ĐANG CHẠY — và khôi lỗi nào
  * đang cầm (chỉ TÔNG MÔN hay RIÊNG, không phải id máy). KHÔNG BAO GIỜ: tên tài khoản game,
- * cookie, cấu hình nhiệm vụ đã lưu, id linh sứ riêng. Của chính mình thì thấy đủ.
+ * cookie, cấu hình nhiệm vụ đã lưu, id khôi lỗi riêng. Của chính mình thì thấy đủ.
  *
  * <b>Tên nhiệm vụ đã ĐỔI PHÍA, ngày 08/08/2026, theo yêu cầu của tông chủ.</b> Trước đó chỉ
  * con số "3/8" được qua, với lập luận: nó trả lời đúng câu hỏi trang này sinh ra để trả lời
- * — cái ghế linh sứ tông môn kia sắp trống chưa — mà không hé lộ ai bật những nhiệm vụ nào.
+ * — cái ghế khôi lỗi tông môn kia sắp trống chưa — mà không hé lộ ai bật những nhiệm vụ nào.
  * Lập luận ấy vẫn đúng về mặt logic; thứ đổi là điều tông môn MUỐN thấy. Ghi lại để người
  * sau biết đây là một ranh giới được dịch có chủ ý, không phải một chỗ rò rỉ.
  *
@@ -28,7 +28,7 @@ export type QueueProgress = {
   /**
    * Tên nhiệm vụ đang chạy ngay lúc này, MỌI dòng đều có — xem ghi chú "đổi phía" ở đầu tệp.
    *
-   * Rỗng là một trạng thái THẬT, không phải thiếu dữ liệu: đó là quãng linh sứ mở trình
+   * Rỗng là một trạng thái THẬT, không phải thiếu dữ liệu: đó là quãng khôi lỗi mở trình
    * duyệt, qua cổng Cloudflare và dò hạng tài khoản, trước khi nhiệm vụ đầu tiên bắt đầu.
    */
   running: string[];
@@ -47,17 +47,17 @@ export type QueueEntry = {
   status: JobStatus;
   attempts: number;
   nextRunAt: string;
-  /** Linh sứ đang cầm job: id đầy đủ cho dòng của mình, chỉ hạng cho dòng người khác. */
+  /** Khôi lỗi đang cầm job: id đầy đủ cho dòng của mình, chỉ hạng cho dòng người khác. */
   workerId: string | null;
   workerKind: "sect" | "personal" | null;
   /**
-   * Thứ tự trong hàng chờ của linh sứ tông môn, tính từ 1. `null` khi job chưa tới giờ
+   * Thứ tự trong hàng chờ của khôi lỗi tông môn, tính từ 1. `null` khi job chưa tới giờ
    * (đang nghỉ theo cooldown) hoặc đang chạy — hai trạng thái ấy không xếp hàng.
    */
   queuePosition: number | null;
   /**
-   * Vòng này đang làm tới đâu. `null` khi linh sứ chưa khai — job đang nghỉ, vòng vừa xong,
-   * hoặc linh sứ đời cũ chưa biết gửi. Giao diện phải chịu được `null` mà không mất chữ nào.
+   * Vòng này đang làm tới đâu. `null` khi khôi lỗi chưa khai — job đang nghỉ, vòng vừa xong,
+   * hoặc khôi lỗi đời cũ chưa biết gửi. Giao diện phải chịu được `null` mà không mất chữ nào.
    */
   progress: QueueProgress | null;
 };
@@ -136,7 +136,7 @@ export function readProgress(raw: unknown): QueueProgress | null {
  * Ảnh chụp hàng đợi tại thời điểm gọi.
  *
  * Thứ tự truy vấn CỐ Ý trùng với `claimNextJob` (`next_run_at`, rồi `created_at`), nên số
- * thứ tự hiện trên màn hình chính là thứ tự linh sứ tông môn sẽ nhặt việc — không phải một
+ * thứ tự hiện trên màn hình chính là thứ tự khôi lỗi tông môn sẽ nhặt việc — không phải một
  * cách sắp xếp riêng của giao diện rồi người dùng đoán nhầm là hàng chờ thật.
  */
 export async function getQueueSnapshot(viewerId: string): Promise<QueueSnapshot> {

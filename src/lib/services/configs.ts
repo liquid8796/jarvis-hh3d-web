@@ -69,7 +69,7 @@ export const configSchema = z.object({
    *
    * Từ khi có bảng game_accounts (migration 0009) trường này không còn sống trong
    * user_configs — nó chỉ xuất hiện trong SNAPSHOT của job, nơi server ghép cookie của đúng
-   * tài khoản vào cấu hình chung trước khi trao cho linh sứ. Giữ trong schema để hình thù
+   * tài khoản vào cấu hình chung trước khi trao cho khôi lỗi. Giữ trong schema để hình thù
    * config mà worker nhận không đổi, và document cũ còn mang nó vẫn parse lành.
    */
   gameCookie: z.string().trim().max(8000).default(""),
@@ -82,10 +82,10 @@ export const configSchema = z.object({
    * Tên miền game của SNAPSHOT — cùng số phận với hai trường trên: nguồn sự thật là
    * `app_settings.game.baseUrl` do trưởng môn đặt, và /api/worker ghép nó vào lúc phát việc.
    *
-   * Đi theo từng job thay vì nằm trong env của linh sứ, vì linh sứ chạy trên máy KHÁC —
+   * Đi theo từng job thay vì nằm trong env của khôi lỗi, vì khôi lỗi chạy trên máy KHÁC —
    * trên VM tông môn lẫn trên máy nhà của từng đạo hữu. Bắt tên miền đi cùng công việc
-   * nghĩa là đổi tên miền là mọi linh sứ ngoài kia dùng ngay ở vòng sau, không ai phải cài
-   * lại hay sửa env. Rỗng = linh sứ tự quyết theo env/hằng số của chính nó, giữ cho bản cài
+   * nghĩa là đổi tên miền là mọi khôi lỗi ngoài kia dùng ngay ở vòng sau, không ai phải cài
+   * lại hay sửa env. Rỗng = khôi lỗi tự quyết theo env/hằng số của chính nó, giữ cho bản cài
    * đời cũ và các lượt chạy một-phát không phụ thuộc trường này.
    */
   gameBaseUrl: z.string().trim().max(200).default(""),
@@ -112,7 +112,7 @@ export const configSchema = z.object({
           kickHp: z.number().int().min(0).max(99_999_999).default(0),
           /**
            * 0 = không trục xuất; N > 0 = thành viên chưa bấm sẵn sàng sau N giây (tính từ
-           * lúc linh sứ nhìn thấy họ lần đầu) sẽ bị mời ra — ghế của người không sẵn sàng
+           * lúc khôi lỗi nhìn thấy họ lần đầu) sẽ bị mời ra — ghế của người không sẵn sàng
            * là ghế người khác không ngồi được. Song sinh với option `kickIdle` bên desktop.
            */
           kickIdleSec: z.number().int().min(0).max(3600).default(0),
@@ -167,7 +167,7 @@ export type AccountTier = NonNullable<UserConfig["accountTier"]>;
  * Vì sao đúng một tuỳ chọn này bị khoá, giữa cả chục tuỳ chọn tự do khác: Mê Cung là nhiệm vụ
  * duy nhất giữ một phiên trình duyệt HÀNG CHỤC PHÚT (~35 phút một lượt, xem chú thích ở
  * runCycle) và nó cần bốn người khác. Bỏ tick「dừng khi đủ huyền tinh」nghĩa là đánh hết lượt,
- * tức một đàn có thể ngồi trong Mê Cung gần như cả ngày. Linh sứ tông môn chỉ có vài ghế
+ * tức một đàn có thể ngồi trong Mê Cung gần như cả ngày. Khôi lỗi tông môn chỉ có vài ghế
  * (WORKER_MAX_JOBS), nên vài đàn như vậy là cả tông môn hết chỗ chạy — người khác xếp hàng
  * sau lưng mà không hiểu vì sao mãi không tới lượt.
  *

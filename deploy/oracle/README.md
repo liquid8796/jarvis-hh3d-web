@@ -1,6 +1,6 @@
-# Oracle Cloud (OCI) — truy cập, linh sứ tông môn, tàng khố media
+# Oracle Cloud (OCI) — truy cập, khôi lỗi tông môn, tàng khố media
 
-Tông môn dùng **một** tài khoản OCI Always Free cho hai việc: nuôi **linh sứ tông môn** (worker
+Tông môn dùng **một** tài khoản OCI Always Free cho hai việc: nuôi **khôi lỗi tông môn** (worker
 chạy 24/7) và giữ **tàng khố media** (file đính kèm đàm đạo). Tệp này là chỗ duy nhất chép
 cách vào tài khoản ấy và cách phát hành lên nó — đọc từ trên xuống là đủ.
 
@@ -59,11 +59,11 @@ dán `~/.oci/jarvis_api_key_public.pem`.
 
 ---
 
-## 2. Linh sứ tông môn — worker trên VM
+## 2. Khôi lỗi tông môn — worker trên VM
 
 Tiến trình `worker.mjs` chạy 24/7 trên VM Always Free, thay hoàn toàn Vercel Sandbox từ v0.11.
 Nó cầm `WORKER_TOKEN` toàn cục nên nhận job của **mọi** thành viên; giữ token đó như giữ chìa
-tàng khố — không bao giờ đưa cho người dùng (họ có linh phù riêng, phát ở mục Linh Sứ).
+tàng khố — không bao giờ đưa cho người dùng (họ có linh phù riêng, phát ở mục Khôi Lỗi).
 
 | Thông số | Giá trị |
 |---|---|
@@ -110,7 +110,7 @@ systemctl restart auto-hh3d-linh-su    # khởi động lại
 
 - **Xoay token**: đổi `WORKER_TOKEN` trên Vercel → chạy lại lệnh cài đè. Trong lúc hai bên lệch,
   worker chỉ bị 401 rồi tự thử lại — không hỏng gì.
-- **Kiểm tra sống**: mục Linh Sứ trên dashboard hiện "Linh sứ tông môn — đang trực".
+- **Kiểm tra sống**: mục Khôi Lỗi trên dashboard hiện "Khôi lỗi tông môn — đang trực".
 
 ### Vì sao cấu hình VM là như vậy
 
@@ -209,7 +209,7 @@ byte → xoá. Object thử luôn bị dọn, kể cả khi một phép thử �
 
 - **IP datacenter**: site game nằm sau Cloudflare, và IP dải Oracle có thể bị thử thách gắt hơn
   IP dân cư. Engine có ReadinessProbe phát hiện màn chặn Cloudflare và thuật lại vào nhật ký job
-  — thấy dòng đó lặp nhiều thì đường lui là linh sứ máy nhà (IP dân cư, cài từ mục Linh Sứ).
+  — thấy dòng đó lặp nhiều thì đường lui là khôi lỗi máy nhà (IP dân cư, cài từ mục Khôi Lỗi).
 - **Thu hồi Always Free**: Oracle có quyền thu hồi instance A1 của tài khoản Free Tier khi vùng
   thiếu tài nguyên (hiếm, nhưng có). Nâng lên Pay As You Go (vẫn không mất phí trong hạn mức
   Always Free) thì hết bị.

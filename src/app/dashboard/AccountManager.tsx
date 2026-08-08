@@ -14,7 +14,7 @@ import type { DashboardAccount } from "@/lib/realtime/dashboardTypes";
 
 /**
  * Tài khoản hoathinh3d — số nhiều, như bản desktop. Danh sách sống bằng realtime: verdict
- * hạng do linh sứ dò được đẩy về qua SSE và huy hiệu đổi không cần F5.
+ * hạng do khôi lỗi dò được đẩy về qua SSE và huy hiệu đổi không cần F5.
  *
  * Component này đứng NGOÀI <form> của Ngọc Giản Cấu Hình (React 19 reset uncontrolled input
  * trong form sau mỗi action — draft cookie đang gõ không được phép bay theo một cú Khắc

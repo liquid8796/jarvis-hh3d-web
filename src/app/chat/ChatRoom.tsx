@@ -22,6 +22,7 @@ type Message = {
   userId: string;
   author: string;
   isAdmin: boolean;
+  tags: string[];
   text: string;
   sticker: string | null;
   attachments: Attachment[];
@@ -70,7 +71,7 @@ const fmtDay = (iso: string) =>
 const fmtSize = (n: number) =>
   n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`;
 
-export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: boolean } }) {
+export function ChatRoom({ me }: { me: { id: string; name: string } }) {
   const [store, setStore] = useState<Map<string, Message>>(new Map());
   const [typing, setTyping] = useState<string[]>([]);
   const [text, setText] = useState("");
@@ -449,6 +450,9 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
                     <span className="chat-author">
                       {msg.author}
                       {msg.isAdmin && <em className="chat-crown" title="Tông chủ">✦</em>}
+                      {msg.tags.map((t) => (
+                        <i key={t} className="chat-tag">{t}</i>
+                      ))}
                     </span>
                   )}
 
@@ -506,7 +510,7 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
                         {own && !msg.sticker && (
                           <button type="button" title="Sửa" onClick={() => setEditing({ id: msg.id, text: msg.text })}>✎</button>
                         )}
-                        {(own || me.isAdmin) && (
+                        {own && (
                           <button type="button" title="Thu hồi" onClick={() => void remove(msg.id)}>🗑</button>
                         )}
                       </span>
@@ -591,8 +595,7 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
             onGif={(g) => void sendGif(g)}
           />
         )}
-        <button type="button" className="chat-tool" title="Emoji" data-chat-popup-trigger onClick={() => openPanel("emoji")}>😊</button>
-        <button type="button" className="chat-tool" title="Sticker & GIF" data-chat-popup-trigger onClick={() => openPanel("sticker")}>🀄</button>
+        <button type="button" className="chat-tool" title="Emoji, sticker & GIF" data-chat-popup-trigger onClick={() => openPanel("emoji")}>😊</button>
         <button type="button" className="chat-tool" title="Gửi file" disabled={uploading} onClick={() => fileRef.current?.click()}>
           {uploading ? "…" : "📎"}
         </button>

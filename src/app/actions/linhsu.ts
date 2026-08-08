@@ -4,11 +4,11 @@ import { requireActiveUser } from "@/lib/auth/guards";
 import { forgetWorker, issueWorkerToken, revokeWorkerToken } from "@/lib/services/workers";
 
 /**
- * Vòng đời LINH PHÙ — token để linh sứ máy nhà của đạo hữu tự xưng danh.
+ * Vòng đời LINH PHÙ — token để khôi lỗi máy nhà của đạo hữu tự xưng danh.
  *
  * Bản rõ của linh phù chỉ tồn tại trong hồi đáp của `issueLinhPhuAction`: client hiển thị
  * đúng một lần trong lệnh cài rồi thôi; tàng khố chỉ giữ hash. Muốn xem lại? Không có gì
- * để xem lại — phát linh phù mới (cái cũ tự hết hiệu lực, linh sứ nào còn cầm sẽ bị từ
+ * để xem lại — phát linh phù mới (cái cũ tự hết hiệu lực, khôi lỗi nào còn cầm sẽ bị từ
  * chối ngay ở lần gõ cửa kế tiếp).
  */
 
@@ -38,10 +38,10 @@ export async function forgetLinhSuAction(
 ): Promise<{ ok: boolean; message?: string }> {
   const user = await requireActiveUser();
   if (typeof workerId !== "string" || workerId.length === 0) {
-    return { ok: false, message: "Không rõ gỡ linh sứ nào." };
+    return { ok: false, message: "Không rõ gỡ khôi lỗi nào." };
   }
   const removed = await forgetWorker(user.id, workerId);
   return removed
     ? { ok: true }
-    : { ok: false, message: "Linh sứ này vừa điểm danh lại — nó đang trực nên chưa gỡ được." };
+    : { ok: false, message: "Khôi lỗi này vừa điểm danh lại — nó đang trực nên chưa gỡ được." };
 }

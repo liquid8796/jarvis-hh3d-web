@@ -2,12 +2,12 @@ export type JobStatus = "queued" | "running" | "stopping" | "stopped" | "failed"
 export type AccountTier = "vip" | "free";
 
 /**
- * Linh sứ đang làm tới đâu trong VÒNG NÀY — thứ duy nhất trả lời được "đàn kia đang bận
+ * Khôi lỗi đang làm tới đâu trong VÒNG NÀY — thứ duy nhất trả lời được "đàn kia đang bận
  * nhiệm vụ gì", vì mọi thứ khác về một lượt chạy chỉ là văn xuôi trong job_events.
  *
  * `running` là số NHIỀU vì nhiệm vụ chạy song song (mặc định tới 3 tab cùng lúc): một
  * trường "nhiệm vụ hiện tại" số ít sẽ phải chọn bừa một cái trong ba và nói dối về hai cái
- * còn lại. Rỗng là một trạng thái thật, không phải thiếu dữ liệu — nó là quãng linh sứ đang
+ * còn lại. Rỗng là một trạng thái thật, không phải thiếu dữ liệu — nó là quãng khôi lỗi đang
  * mở trình duyệt, qua cổng Cloudflare hoặc dò hạng tài khoản, trước khi nhiệm vụ đầu bắt đầu.
  *
  * `total` đã lọc theo hạng tài khoản, nên nó là số nhiệm vụ vòng này THẬT SỰ chạy, không

@@ -28,7 +28,7 @@ export default async function QueuePage() {
         <div className="rise-in mb-8">
           <h1 className="h-display text-3xl font-bold text-gilded">Hàng Đợi Công Việc</h1>
           <p className="mt-1 text-sm text-[var(--color-mist)]">
-            Toàn bộ đàn pháp đang chạy và đang chờ trong tông môn, xếp đúng thứ tự linh sứ sẽ
+            Toàn bộ đàn pháp đang chạy và đang chờ trong tông môn, xếp đúng thứ tự khôi lỗi sẽ
             nhặt việc.
           </p>
         </div>

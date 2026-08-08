@@ -135,7 +135,7 @@ body {
    Ảnh nền trang có những mảng rất sáng, và chữ phụ (--color-mist) trên nền 0.86 chỉ đạt
    tương phản 3.78:1 — dưới chuẩn AA cho chữ nhỏ. 0.93 đưa lên 4.71:1, tính theo trường
    hợp tệ nhất là nền trắng tinh nằm dưới. Vẫn còn trong suốt và vẫn có blur, chỉ là đủ
-   đục để không ai phải nheo mắt. (Panel Linh Sứ từng tự pha nền 0.40 → 1.27:1, tức gần
+   đục để không ai phải nheo mắt. (Panel Khôi Lỗi từng tự pha nền 0.40 → 1.27:1, tức gần
    như vô hình; đó là lý do có ghi chú này.) */
 .card {
   background: linear-gradient(165deg, rgba(29, 25, 54, 0.93), rgba(12, 10, 26, 0.96));
@@ -357,6 +357,20 @@ body {
   background: rgba(185, 165, 255, 0.08);
 }
 
+/* Gia chủ — vai lớn nhất, mang sắc vàng của ấn tông môn chứ không phải tím của Trưởng môn. */
+.badge-owner {
+  color: var(--color-gold-300);
+  border-color: rgba(232, 194, 92, 0.55);
+  background: rgba(232, 194, 92, 0.1);
+}
+
+/* Tag trang trí do Trưởng môn/Gia chủ ban — nhã hơn huy hiệu vai, không tranh mắt với nó. */
+.badge-tag {
+  color: var(--color-mist);
+  border-color: rgba(143, 137, 179, 0.4);
+  background: rgba(143, 137, 179, 0.08);
+}
+
 /* Ấn tông môn: vòng tròn linh trận xoay chậm quanh chữ triện. */
 .seal {
   position: relative;
@@ -489,6 +503,21 @@ body {
 }
 
 .chat-crown { color: var(--color-gold-300); font-style: normal; margin-left: 4px; }
+
+/* Tag trang trí trong sảnh — viên nhỏ cạnh tên, đóng băng theo tin y như chính cái tên. */
+.chat-tag {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 194, 92, 0.3);
+  background: rgba(232, 194, 92, 0.08);
+  color: var(--color-gold-300);
+  font-style: normal;
+  font-size: 0.64rem;
+  line-height: 1.5;
+  vertical-align: 1px;
+}
 
 .chat-bubble {
   position: relative;
@@ -924,7 +953,7 @@ body {
 /* Đúng HAI ô: giờ, rồi nội dung. Mọi thứ thuộc về vế nội dung (nhãn tài khoản, lời kể)
    phải nằm trong CÙNG một phần tử con — thêm một con thứ ba là nó rơi xuống hàng dưới,
    vào ô giờ rộng 4.4rem, và câu chữ bị ép thành một sợi chỉ dọc.
-   `minmax(0, …)` + `anywhere`: id linh sứ hay selector dài không chỗ ngắt vốn đặt sàn
+   `minmax(0, …)` + `anywhere`: id khôi lỗi hay selector dài không chỗ ngắt vốn đặt sàn
    min-content cho cột, đủ sức đẩy cả khung log tràn ngang. */
 .log-line {
   display: grid;

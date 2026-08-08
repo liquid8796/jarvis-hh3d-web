@@ -5,7 +5,7 @@ import { randomBytes } from "node:crypto";
  * Tàng khố media — bytes của file đính kèm trong đàm đạo, sống ở OCI Object Storage.
  *
  * <b>Trước 08/08/2026 kho này là Vercel Blob.</b> Đổi kho vì một lý do rất trần tục: tông môn
- * đã có sẵn một tài khoản OCI đang nuôi linh sứ tông môn, và dung lượng ở đó là thứ đã trả
+ * đã có sẵn một tài khoản OCI đang nuôi khôi lỗi tông môn, và dung lượng ở đó là thứ đã trả
  * tiền (hoặc nằm trong hạn Always Free) — trong khi Vercel Blob tính tiền riêng theo GB lưu
  * và GB tải. Gộp về một nhà cũng bớt được một nhà cung cấp phải canh hạn mức.
  *

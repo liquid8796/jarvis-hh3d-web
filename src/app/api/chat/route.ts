@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/auth/guards";
+import { isAdminUser } from "@/lib/auth/permissions";
 import {
   STORE_CLOSED_MESSAGE,
   deleteMessage,
@@ -80,8 +81,10 @@ export async function POST(request: Request) {
 
   switch (payload.op) {
     case "send": {
+      // isAdmin và tags đọc từ bản ghi THẬT của người đang hỏi rồi đóng băng vào tin —
+      // không có trường nào trong body được quyền tự nhận.
       const result = await sendMessage(
-        { id: user.id, name: user.displayName, isAdmin: user.role === "admin" },
+        { id: user.id, name: user.displayName, isAdmin: isAdminUser(user), tags: user.tags },
         payload.body,
       );
       return NextResponse.json(result, { status: result.ok ? 200 : 400 });
@@ -93,7 +96,7 @@ export async function POST(request: Request) {
     }
 
     case "delete": {
-      const result = await deleteMessage(user, String(payload.id ?? ""));
+      const result = await deleteMessage({ id: user.id }, String(payload.id ?? ""));
       return NextResponse.json(result, { status: result.ok ? 200 : 400 });
     }
 

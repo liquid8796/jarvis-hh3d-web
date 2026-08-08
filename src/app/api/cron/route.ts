@@ -5,8 +5,8 @@ import { reapStaleJobs } from "@/lib/services/jobs";
 /**
  * Người quét dọn — và CHỈ quét dọn.
  *
- * Từ khi mọi lượt chạy đều do một worker sống dai đảm nhiệm (linh sứ tông môn trên VM,
- * hoặc linh sứ máy nhà của đạo hữu), không còn ai cần được "gõ cửa đánh thức" nữa: worker
+ * Từ khi mọi lượt chạy đều do một worker sống dai đảm nhiệm (khôi lỗi tông môn trên VM,
+ * hoặc khôi lỗi máy nhà của đạo hữu), không còn ai cần được "gõ cửa đánh thức" nữa: worker
  * tự hỏi việc mỗi 5 giây. Route này chỉ còn hai việc vệ sinh — kết liễu job đang chạy mất
  * nhịp tim, và quét tin đàm đạo quá hạn lưu. Cả hai đều được gọi TIỆN ĐƯỜNG từ
  * đường đọc của dashboard rồi, nên cron ngoài giờ là lưới an toàn cho những ngày không ai

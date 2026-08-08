@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { isAdminUser } from "./permissions";
 import { readSession } from "./session";
 import { findById, type PublicUser } from "@/lib/services/users";
 
@@ -37,9 +38,10 @@ export async function requireActiveUser(): Promise<PublicUser> {
   return user;
 }
 
+/** Gia chủ hay Trưởng môn đều qua — ai được đụng vào AI CỤ THỂ thì hỏi tiếp permissions.ts. */
 export async function requireAdmin(): Promise<PublicUser> {
   const user = await requireUser();
-  if (user.role !== "admin") {
+  if (!isAdminUser(user)) {
     redirect("/dashboard");
   }
 

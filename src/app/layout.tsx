@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     template: "%s · Auto HH3D",
   },
   description:
-    "Control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn là linh sứ tự vận hành trên server.",
+    "Control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn là khôi lỗi tự vận hành trên server.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

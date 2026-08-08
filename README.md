@@ -6,7 +6,7 @@ một công tắc ở tab Môn Đồ của trang Tông Môn — tắt nó thì n
 Linh Đài; mặc định là BẬT.
 
 **Site đổi tên miền thì sửa ở tab Bảo Trì**, không phải sửa mã nguồn: ô「Tên Miền Game」lưu
-vào `app_settings`, và /api/worker gửi kèm nó theo từng lần phát việc — mọi linh sứ, kể cả
+vào `app_settings`, và /api/worker gửi kèm nó theo từng lần phát việc — mọi khôi lỗi, kể cả
 trên máy nhà đạo hữu, dùng tên miền mới ngay ở vòng chạy kế mà không phải cài lại. Đổi xong
 thì mọi tài khoản PHẢI dán lại cookie: cookie gắn theo tên miền nên không đi theo được.
 
@@ -24,9 +24,9 @@ một mô hình nhiệm vụ — Mê Cung, Luyện Đan Đường, cùng những
 
 Web **không bao giờ** tự mở browser trong một function — function của Vercel sống theo
 request và bị cắt sau vài phút. Bấm Khai Đàn chỉ ghi một dòng `automation_jobs` trạng thái
-`queued`; một *linh sứ* nhận việc rồi kể lại qua HTTPS. Vì ý định của người dùng nằm trong
+`queued`; một *khôi lỗi* nhận việc rồi kể lại qua HTTPS. Vì ý định của người dùng nằm trong
 **database** chứ không nằm trong tab trình duyệt, đóng tab chẳng ảnh hưởng gì. Tắt máy chỉ
-làm gián đoạn nếu chính máy ấy đang nuôi linh sứ; linh sứ tông môn ở máy khác thì vẫn chạy.
+làm gián đoạn nếu chính máy ấy đang nuôi khôi lỗi; khôi lỗi tông môn ở máy khác thì vẫn chạy.
 
 Một lần Khai Đàn tạo **một ý định sống dai**, không phải một vé chạy đúng một vòng. Hết mỗi
 vòng, server đọc cooldown sớm nhất, đặt `next_run_at`, đóng browser trong lúc nghỉ rồi tự đưa
@@ -34,7 +34,7 @@ cùng job trở lại hàng chờ. Chỉ Thu Đàn mới biến nó thành trạ
 không gửi được cooldown vẫn tương thích: server dùng 5 phút cho vòng thường, 30 phút cho vòng
 chỉ có lỗi; worker mới gửi đồng hồ thật để thức dậy đúng lúc hơn.
 
-Mọi linh sứ đều là **một tiến trình `worker.mjs` sống dai** — khác nhau ở *ai nuôi nó* và
+Mọi khôi lỗi đều là **một tiến trình `worker.mjs` sống dai** — khác nhau ở *ai nuôi nó* và
 *chìa nó cầm*:
 
 ```
@@ -42,34 +42,34 @@ Mọi linh sứ đều là **một tiến trình `worker.mjs` sống dai** — k
                       │  Next.js control plane                 │
    Khai Đàn ─────────►│  • đăng ký / duyệt / cấu hình          │
                       │  • ghi job vào DB, phát linh phù       │
-                      │  • sổ điểm danh linh sứ (bảng workers) │
+                      │  • sổ điểm danh khôi lỗi (bảng workers)│
                       └───┬────────────────────────────┬───────┘
                           │ WORKER_TOKEN               │ linh phù (per-user)
               ┌───────────▼──────────┐     ┌───────────▼─────────────┐
-              │ LINH SỨ TÔNG MÔN     │     │ LINH SỨ TÚC TRỰC        │
+              │ KHÔI LỖI TÔNG MÔN    │     │ KHÔI LỖI TÚC TRỰC       │
               │ VM Oracle Always Free│     │ máy của từng đạo hữu    │
               │ deploy/oracle/       │     │ cài 1 lệnh từ mục       │
-              │ → job của MỌI người  │     │ Linh Sứ trên dashboard  │
+              │ → job của MỌI người  │     │ Khôi Lỗi trên dashboard │
               └──────────┬───────────┘     │ → CHỈ job của chủ mình  │
                          │                 └───────────┬─────────────┘
                          └──────► Neon Postgres ◄──────┘
 ```
 
-- **Linh sứ tông môn** — worker do người vận hành nuôi trên một VM Oracle Cloud Always Free
+- **Khôi lỗi tông môn** — worker do người vận hành nuôi trên một VM Oracle Cloud Always Free
   (xem [deploy/oracle/README.md](deploy/oracle/README.md)), cầm `WORKER_TOKEN` toàn cục,
   nhận job của mọi thành viên. Một VM chạy liên tục phục vụ được cả Mê Cung (phiên browser
   35 phút không đứt) lẫn Luyện Đan Đường — thứ mà Vercel Sandbox phù du (đã bỏ từ v0.11)
   không bao giờ làm nổi trên gói Hobby không có cron dày.
-- **Linh sứ túc trực** — worker trên máy của chính đạo hữu, cài bằng MỘT lệnh phát ở mục
-  Linh Sứ trên dashboard. Nó xác thực bằng **linh phù** riêng (token per-user, database chỉ
+- **Khôi lỗi túc trực** — worker trên máy của chính đạo hữu, cài bằng MỘT lệnh phát ở mục
+  Khôi Lỗi trên dashboard. Nó xác thực bằng **linh phù** riêng (token per-user, database chỉ
   giữ SHA-256) nên chỉ nhận và chỉ đụng được job của chủ mình — phát token toàn cục cho
   người dùng là trao quyền đọc cookie game của cả tông môn, nên điều đó không bao giờ xảy ra.
 - **Sổ điểm danh** — mỗi lần worker hỏi việc (5 giây/lần) là một lần điểm danh vào bảng
-  `workers`. Dashboard nhờ vậy nói thật *ngay lúc khai đàn* là có linh sứ trực hay không,
+  `workers`. Dashboard nhờ vậy nói thật *ngay lúc khai đàn* là có khôi lỗi trực hay không,
   thay vì để job chờ sáu phút rồi chết câm.
 
 Hai worker cùng đủ điều kiện tranh một job thì Postgres phân xử bằng một câu UPDATE nguyên
-tử — không bao giờ có hai linh sứ ôm cùng một lượt.
+tử — không bao giờ có hai khôi lỗi ôm cùng một lượt.
 
 > ### Ghi chú về gói Hobby của Vercel
 >
@@ -111,7 +111,7 @@ chưa". Từ 02/08 tới 08/08/2026 kho ấy là Upstash Redis; xem [CHANGELOG](
 **Còn BYTES của file đính kèm thì không nằm ở database nào cả** — chúng ở **OCI Object
 Storage** (bucket `jarvis-media`), và Mongo chỉ giữ URL. Kho media là thứ duy nhất trong hệ
 thống có nhu cầu phục vụ tải xuống công khai với dung lượng lớn, tức đúng thứ mà cả Postgres
-lẫn Mongo đều làm dở. Chọn OCI vì tông môn **đã** có tài khoản ấy để nuôi linh sứ, nên gộp về
+lẫn Mongo đều làm dở. Chọn OCI vì tông môn **đã** có tài khoản ấy để nuôi khôi lỗi, nên gộp về
 một nhà bớt được một nhà cung cấp phải canh hạn mức. Từ 02/08 tới 08/08/2026 kho ấy là Vercel
 Blob; xem mục 0.41.0 và [deploy/oracle/README.md](deploy/oracle/README.md).
 
@@ -127,7 +127,7 @@ Phân tầng nghiêm ngặt, mỗi tầng chỉ nói chuyện với tầng ngay 
 src/
   app/            # Route + UI. Server Components đọc, Server Actions ghi.
     actions/      #   Ranh giới ghi — mọi action mở đầu bằng một guard.
-    api/          #   Feed/SSE cho client, /api/worker cho linh sứ.
+    api/          #   Feed/SSE cho client, /api/worker cho khôi lỗi.
   components/     # UI dùng chung, không biết gì về database.
   lib/
     auth/         # Phiên đăng nhập, guard phân quyền, cửa vào của worker.
@@ -139,7 +139,7 @@ src/
 
 #### Trạng thái Linh Đài đi trực tiếp như thế nào
 
-Job, log và sổ linh sứ vẫn lấy Postgres làm sự thật duy nhất. Migration `0007` chỉ gắn thêm
+Job, log và sổ khôi lỗi vẫn lấy Postgres làm sự thật duy nhất. Migration `0007` chỉ gắn thêm
 “chuông cửa”: transaction nào thay đổi dữ liệu nhìn thấy được sẽ `NOTIFY` scope của đúng user.
 Route `/api/dashboard/stream` giữ một session `LISTEN` rồi đẩy snapshot qua SSE; nó không poll
 database liên tục. Browser giữ cursor bằng event id, tự reconnect/tiếp tục từ dòng cuối và có
@@ -226,7 +226,7 @@ Vercel → Project → **Settings** → **Environment Variables**. Thêm các bi
 |---|---|---|
 | `AUTH_SECRET` | 32 byte ngẫu nhiên | Ký JWT phiên đăng nhập |
 | `ENCRYPTION_KEY` | **đúng** 32 byte (64 hex) | Mã hoá cookie game trong database |
-| `WORKER_TOKEN` | 32 byte ngẫu nhiên | Bí mật chia sẻ để linh sứ gọi `/api/worker` |
+| `WORKER_TOKEN` | 32 byte ngẫu nhiên | Bí mật chia sẻ để khôi lỗi gọi `/api/worker` |
 | `REALTIME_DATABASE_URL` | Tuỳ chọn | URL unpooled tới **cùng database**; Neon thường để trống được |
 
 Sinh chuỗi ngẫu nhiên:
@@ -236,7 +236,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 > `WORKER_TOKEN` là thứ duy nhất đứng giữa Internet và quyền đọc cookie game của mọi thành
-> viên. Giữ như giữ mật khẩu; đổi nó là cắt ngay một linh sứ bị lộ.
+> viên. Giữ như giữ mật khẩu; đổi nó là cắt ngay một khôi lỗi bị lộ.
 >
 > `ENCRYPTION_KEY` thì **mất là mất luôn**: cookie đã lưu sẽ không giải mã được nữa và mọi
 > người phải dán lại. Hãy coi nó như bí mật vĩnh viễn của deployment — sao lưu chỗ an toàn,
@@ -256,13 +256,13 @@ plaintext ở đâu cả:
   render vào HTML mỗi lần mở trang thì coi như chưa mã hoá.
 - **Trong lịch sử job:** snapshot cấu hình cũng giữ cookie ở dạng đã mã hoá — bảng jobs sống
   lâu hơn bảng config rất nhiều.
-- **Giải mã đúng một lần:** tại `/api/worker` khi linh sứ đã xác thực bằng `WORKER_TOKEN`,
+- **Giải mã đúng một lần:** tại `/api/worker` khi khôi lỗi đã xác thực bằng `WORKER_TOKEN`,
   rồi đi tiếp trên HTTPS tới máy sắp dùng chính cookie đó.
 
 Giá trị ghi từ trước khi có mã hoá vẫn đọc được bình thường và sẽ tự vào phong bì ở lần lưu
 kế tiếp — không cần downtime, không cần script migration.
 
-### Bước 2b — Linh sứ tông môn (VM Oracle Always Free)
+### Bước 2b — Khôi lỗi tông môn (VM Oracle Always Free)
 
 Worker mà tông môn nuôi cho mọi thành viên. Toàn bộ hướng dẫn — chọn shape/OS, tạo VM,
 `setup.sh` một lệnh, vận hành, cập nhật — nằm ở [deploy/oracle/README.md](deploy/oracle/README.md).
@@ -273,7 +273,7 @@ Tóm tắt: VM.Standard.A1.Flex (Ampere ARM, gói Always Free) + Ubuntu 24.04 aa
 WEB_URL='https://<app>.vercel.app' WORKER_TOKEN='<token trên Vercel>' sudo -E bash setup.sh
 ```
 
-Script tải **gói linh sứ** từ chính web (`/linh-su/goi-linh-su.tgz` — đóng lại ở mỗi deploy
+Script tải **gói khôi lỗi** từ chính web (`/linh-su/goi-linh-su.tgz` — đóng lại ở mỗi deploy
 từ đúng engine đang chạy), dựng systemd service, và từ đó "cập nhật" nghĩa là chạy lại đúng
 một lệnh ấy.
 
@@ -349,10 +349,10 @@ lỡ tay không được phép reset chìa khoá hệ thống đang chạy.
 
 Đăng nhập bằng tài khoản đó rồi **đổi mật khẩu ngay**.
 
-### Bước 5 — Linh sứ túc trực của từng đạo hữu (không bắt buộc)
+### Bước 5 — Khôi lỗi túc trực của từng đạo hữu (không bắt buộc)
 
-Trước hết: **hầu hết mọi người không cần bước này.** Linh sứ tông môn trên VM trực sẵn cho
-cả tông môn, nên mục Linh Sứ nói thẳng "đạo hữu không cần cài gì cả" khi nó đang online.
+Trước hết: **hầu hết mọi người không cần bước này.** Khôi lỗi tông môn trên VM trực sẵn cho
+cả tông môn, nên mục Khôi Lỗi nói thẳng "đạo hữu không cần cài gì cả" khi nó đang online.
 Phần dưới là lối rẽ cho ai muốn lượt chạy đi từ chính máy mình (IP dân cư, không xếp hàng
 chung).
 
@@ -366,7 +366,7 @@ Cơ chế, và vì sao từng mảnh lại như vậy:
 
 - **Node "xách tay".** Script tải bản Node chính thức về ngay trong thư mục cài và chỉ dùng
   bản đó, thay vì đòi người dùng cài Node (hay tự cài qua winget/apt). Ngoài chuyện bỏ được
-  một rào cản, nó còn xoá luôn một lớp lỗi: linh sứ tự chạy lúc đăng nhập, mà PATH lúc ấy
+  một rào cản, nó còn xoá luôn một lớp lỗi: khôi lỗi tự chạy lúc đăng nhập, mà PATH lúc ấy
   không giống PATH trong cửa sổ đang mở — một `node` tìm qua PATH là lỗi "chạy tay thì được,
   tự khởi động thì không" kinh điển. Bản tải về được **đối chiếu SHA-256** với
   `SHASUMS256.txt` của nodejs.org: ta sắp chạy thứ này như một runtime, không tin suông.
@@ -376,15 +376,15 @@ Cơ chế, và vì sao từng mảnh lại như vậy:
   cấu trúc**, chứ không chỉ được canh chừng bằng kỷ luật.
 - **Linh phù chỉ hiện một lần** lúc phát — database giữ SHA-256, không giữ bản rõ. Quên thì
   phát lại (cái cũ tự hết hiệu lực).
-- Linh sứ cài kiểu này **chỉ nhận job của chủ linh phù** — điều kiện nằm ngay trong câu SQL
+- Khôi lỗi cài kiểu này **chỉ nhận job của chủ linh phù** — điều kiện nằm ngay trong câu SQL
   claim, không phải phép lịch sự.
 - Gói cài (`/linh-su/goi-linh-su.tgz`) được `scripts/buildWorkerBundle.mjs` đóng ở mỗi
   deploy từ đúng engine đang chạy — không tồn tại "bản dành cho người cài" nào để lệch.
-- Cài lại = cập nhật, và **giữ nguyên WORKER_ID** đã có, để mục Linh Sứ không tích dần xác
-  linh sứ "vắng mặt" sau mỗi lần nâng cấp. Gỡ bằng `uninstall.ps1`/`uninstall.sh` trong thư
+- Cài lại = cập nhật, và **giữ nguyên WORKER_ID** đã có, để mục Khôi Lỗi không tích dần xác
+  khôi lỗi "vắng mặt" sau mỗi lần nâng cấp. Gỡ bằng `uninstall.ps1`/`uninstall.sh` trong thư
   mục cài: xoá thư mục, cắt đường tự khởi động, hạ cả vòng nuôi lẫn worker.
 
-> Linh sứ cài trước **v0.19.0** nên cài đè một lần: bản trước v0.18 nhận thêm kho Vấn Đáp, mọi
+> Khôi lỗi cài trước **v0.19.0** nên cài đè một lần: bản trước v0.18 nhận thêm kho Vấn Đáp, mọi
 > bản cũ nhận heartbeat Thu Đàn 5 giây. Không cần gỡ trước hay phát linh phù mới. Muốn đổi
 > nguồn Vấn Đáp, đặt `QUIZ_DIRECTORY_URL` trong môi trường worker rồi khởi động lại.
 
@@ -409,9 +409,9 @@ npm run dev              # http://localhost:3000
 WEB_URL=http://localhost:3000 WORKER_TOKEN=<...> npm run worker
 ```
 
-## 3b. Chạy linh sứ ở đâu cho miễn phí
+## 3b. Chạy khôi lỗi ở đâu cho miễn phí
 
-Linh sứ chỉ cần một chỗ chạy Node **liên tục** (và một Chromium). Xếp theo mức tôi thật sự
+Khôi lỗi chỉ cần một chỗ chạy Node **liên tục** (và một Chromium). Xếp theo mức tôi thật sự
 khuyên dùng:
 
 ### 1. Chính máy đang chạy bản desktop — khuyến nghị số một
@@ -431,7 +431,7 @@ hiếm khi là vấn đề thật.
 ### 2. Oracle Cloud Free Tier — máy chủ thật, miễn phí vĩnh viễn (đường chính thức)
 
 Rộng rãi nhất trong các gói free: máy ảo ARM Ampere tới **4 vCPU / 24 GB RAM**, always-free
-(không phải trial). Thừa sức nuôi Chromium. Đây chính là nơi linh sứ tông môn đang sống —
+(không phải trial). Thừa sức nuôi Chromium. Đây chính là nơi khôi lỗi tông môn đang sống —
 kit dựng hoàn chỉnh nằm ở [deploy/oracle/](deploy/oracle/README.md).
 
 Lưu ý thực tế: đăng ký cần thẻ (không bị trừ tiền), và khu vực nào đông thì có lúc báo hết
@@ -483,7 +483,7 @@ Authorization: Bearer <CRON_SECRET>
 | Cấu hình + Khai Đàn | `/dashboard` |
 
 Vài lằn ranh an toàn đã cài sẵn: không thể xoá trưởng môn cuối cùng, không thể tự hạ quyền
-hay tự khoá chính mình, và một lượt chạy mà linh sứ im lặng quá 3 phút sẽ tự kết thúc với
+hay tự khoá chính mình, và một lượt chạy mà khôi lỗi im lặng quá 3 phút sẽ tự kết thúc với
 một dòng giải thích trung thực trong nhật ký.
 
 ## 5. Migration về sau

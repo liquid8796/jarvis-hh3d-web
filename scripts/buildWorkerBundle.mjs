@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Đóng GÓI LINH SỨ — public/linh-su/goi-linh-su.tgz — thứ mà install.ps1 / install.sh tải về.
+ * Đóng GÓI KHÔI LỖI — public/linh-su/goi-linh-su.tgz — thứ mà install.ps1 / install.sh tải về.
  *
  * Gói được SINH RA từ đúng những tệp repo đang chạy, không chép tay: worker.mjs + toàn bộ
- * quest-engine + playwright-core + một package.json tối thiểu. Nhờ vậy linh sứ máy nhà của
- * đạo hữu chạy đúng từng byte engine mà linh sứ tông môn chạy — không có "bản dành cho
+ * quest-engine + playwright-core + một package.json tối thiểu. Nhờ vậy khôi lỗi máy nhà của
+ * đạo hữu chạy đúng từng byte engine mà khôi lỗi tông môn chạy — không có "bản dành cho
  * người cài" nào để lệch.
  *
  * **playwright-core đi THEO GÓI, không cài qua npm.** Nó thuần JavaScript, không phụ thuộc
@@ -108,7 +108,7 @@ try {
   rmSync(path.join(staging, "..", tmpTgz), { force: true });
   const mb = (statSync(outFile).size / 1024 / 1024).toFixed(1);
   console.log(
-    `✔ gói linh sứ v${repoPkg.version} (playwright-core ${playwrightVersion}, ${mb}MB) → ${path.relative(root, outFile)}`,
+    `✔ gói khôi lỗi v${repoPkg.version} (playwright-core ${playwrightVersion}, ${mb}MB) → ${path.relative(root, outFile)}`,
   );
 } finally {
   rmSync(staging, { recursive: true, force: true });

@@ -8,6 +8,7 @@ import {
   updateUserAction,
   type AdminResult,
 } from "@/app/actions/admin";
+import { canEditRoles, canManageUser, isOwner, ROLE_LABEL, type Role } from "@/lib/auth/permissions";
 import type { PublicUser } from "@/lib/services/users";
 
 /**
@@ -23,10 +24,13 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export function UserTable({
+  viewer,
   users,
   query,
   status,
 }: {
+  /** Người đang ngồi ghế trị sự — quyết định nút nào hiện ra. Luật thật vẫn gác ở server. */
+  viewer: PublicUser;
   users: PublicUser[];
   query: string;
   status: string;
@@ -119,7 +123,11 @@ export function UserTable({
                 <td className="px-3 py-3">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-[var(--color-parchment)]">{u.displayName}</span>
-                    {u.role === "admin" && <span className="badge badge-admin">Trưởng môn</span>}
+                    {u.roles.includes("gia-chu") && <span className="badge badge-owner">Gia chủ</span>}
+                    {u.roles.includes("admin") && <span className="badge badge-admin">Trưởng môn</span>}
+                    {u.tags.map((t) => (
+                      <span key={t} className="badge badge-tag">{t}</span>
+                    ))}
                   </div>
                   <span className="font-mono text-xs text-[var(--color-mist)]">@{u.username}</span>
                   <span className="block text-xs text-[var(--color-mist)]">
@@ -133,6 +141,9 @@ export function UserTable({
                   {new Date(u.createdAt).toLocaleDateString("vi-VN")}
                 </td>
                 <td className="px-3 py-3">
+                  {!canManageUser(viewer, u) && u.id !== viewer.id ? (
+                    <p className="text-right text-xs text-[var(--color-mist)]">Việc của Gia chủ</p>
+                  ) : (
                   <div className="flex flex-wrap justify-end gap-2">
                     {u.status !== "active" && (
                       <button
@@ -155,10 +166,13 @@ export function UserTable({
                     <button className="btn btn-ghost" disabled={pending} onClick={() => setEditing(u)}>
                       Sửa
                     </button>
-                    <button className="btn btn-danger" disabled={pending} onClick={() => confirmDelete(u)}>
-                      Trục xuất
-                    </button>
+                    {u.id !== viewer.id && (
+                      <button className="btn btn-danger" disabled={pending} onClick={() => confirmDelete(u)}>
+                        Trục xuất
+                      </button>
+                    )}
                   </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -168,6 +182,7 @@ export function UserTable({
 
       {editing && (
         <EditDialog
+          viewer={viewer}
           user={editing}
           onClose={() => setEditing(null)}
           onDone={(result) => {
@@ -182,16 +197,19 @@ export function UserTable({
 
 /** Hộp sửa một đạo hữu — form thường, submit qua server action. */
 function EditDialog({
+  viewer,
   user,
   onClose,
   onDone,
 }: {
+  viewer: PublicUser;
   user: PublicUser;
   onClose: () => void;
   onDone: (result: AdminResult) => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const mayEditRoles = canEditRoles(viewer);
 
   return (
     <div
@@ -241,27 +259,64 @@ function EditDialog({
             maxLength={254}
           />
 
-          <div className="mb-4 grid grid-cols-2 gap-3">
-            <div>
-              <label className="label" htmlFor="edit-role">
-                Vai trò
-              </label>
-              <select id="edit-role" name="role" className="input" defaultValue={user.role}>
-                <option value="user">Môn đồ</option>
-                <option value="admin">Trưởng môn</option>
-              </select>
-            </div>
-            <div>
-              <label className="label" htmlFor="edit-status">
-                Trạng thái
-              </label>
-              <select id="edit-status" name="status" className="input" defaultValue={user.status}>
-                <option value="pending">Chờ duyệt</option>
-                <option value="active">Đã thu nhận</option>
-                <option value="disabled">Đình quyền</option>
-              </select>
-            </div>
+          {mayEditRoles && (
+            <fieldset className="mb-4">
+              <legend className="label">Vai trò (một người có thể giữ nhiều vai)</legend>
+              {/* Cờ "phần vai CÓ trong form" — thiếu nó, server không phân biệt được "bỏ hết
+                  tick" (thu mọi vai) với "form không bày phần vai" (giữ nguyên). */}
+              <input type="hidden" name="rolesSubmitted" value="1" />
+              <div className="flex gap-4">
+                {(Object.keys(ROLE_LABEL) as Role[]).map((role) => {
+                  const lockedOwnSeat = role === "gia-chu" && user.id === viewer.id && isOwner(viewer);
+                  return (
+                    <label key={role} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        name="roles"
+                        value={role}
+                        defaultChecked={user.roles.includes(role)}
+                        disabled={lockedOwnSeat}
+                      />
+                      {/* Checkbox disabled KHÔNG được trình duyệt gửi đi — thiếu dòng hidden
+                          này thì Gia chủ sửa hồ sơ CHÍNH MÌNH (chỉ đổi tên thôi) cũng bị
+                          server chặn oan vì "tự rời ngôi". Bắt được nhờ tự soi, không phải
+                          nhờ may. */}
+                      {lockedOwnSeat && <input type="hidden" name="roles" value="gia-chu" />}
+                      {ROLE_LABEL[role]}
+                    </label>
+                  );
+                })}
+              </div>
+              {isOwner(viewer) && user.id === viewer.id && (
+                <p className="mt-1 text-xs text-[var(--color-mist)]">
+                  Gia chủ không tự rời ngôi được — truyền ngôi cho người khác trước.
+                </p>
+              )}
+            </fieldset>
+          )}
+
+          <div className="mb-4">
+            <label className="label" htmlFor="edit-status">
+              Trạng thái
+            </label>
+            <select id="edit-status" name="status" className="input" defaultValue={user.status}>
+              <option value="pending">Chờ duyệt</option>
+              <option value="active">Đã thu nhận</option>
+              <option value="disabled">Đình quyền</option>
+            </select>
           </div>
+
+          <label className="label" htmlFor="edit-tags">
+            Tag trang trí (phân cách bằng dấu phẩy, tối đa 3 × 20 ký tự)
+          </label>
+          <input
+            id="edit-tags"
+            name="tags"
+            className="input mb-4"
+            defaultValue={user.tags.join(", ")}
+            placeholder="Ví dụ: Trận pháp sư, Luyện đan"
+            maxLength={80}
+          />
 
           <label className="label" htmlFor="edit-password">
             Mật khẩu mới

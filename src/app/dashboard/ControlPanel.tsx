@@ -18,7 +18,7 @@ import type { DashboardJob, JobStatus } from "@/lib/realtime/dashboardTypes";
 const ACTIVE: JobStatus[] = ["queued", "running", "stopping"];
 
 const STATUS_TEXT: Record<JobStatus, string> = {
-  queued: "Chờ linh sứ tiếp nhận",
+  queued: "Chờ khôi lỗi tiếp nhận",
   running: "Đàn pháp đang vận hành",
   stopping: "Đang thu đàn…",
   stopped: "Đã thu đàn",
@@ -77,14 +77,14 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
       return;
     }
     startTransition(async () => {
-      // Xoá màn hình TRƯỚC khi chờ server: dòng nào linh sứ ghi trong lúc câu DELETE đang
+      // Xoá màn hình TRƯỚC khi chờ server: dòng nào khôi lỗi ghi trong lúc câu DELETE đang
       // bay sẽ được frame SSE (hoặc tín hiệu events-cleared của server) đưa về lại — còn xoá
       // SAU thì chính những dòng mới ấy bị quét oan, và cursor đã vượt qua id của chúng nên
       // không bao giờ được kéo lại cho tới khi F5.
       clearEvents();
       const result = await clearLogAction();
       // KHÔNG đụng tới cursor trong provider: id của job_events là bigserial, không bao giờ dùng lại, nên
-      // mọi dòng linh sứ kể từ đây đều mang id lớn hơn và vẫn chảy về bình thường. Reset
+      // mọi dòng khôi lỗi kể từ đây đều mang id lớn hơn và vẫn chảy về bình thường. Reset
       // con trỏ về 0 chỉ tổ kéo lại đúng những dòng vừa xoá nếu câu DELETE về chậm hơn nhịp
       // hỏi tin kế tiếp.
       setNotice(result.message);
@@ -154,11 +154,11 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
       )}
 
       {/* Nói cho ĐỦ, không chỉ nói phần hay ho. "Tắt trình duyệt vẫn chạy" là thật, nhưng
-          bỏ lửng ở đó thì người ta suy ra "tắt máy chắc cũng thế" — sai, nếu linh sứ đang
+          bỏ lửng ở đó thì người ta suy ra "tắt máy chắc cũng thế" — sai, nếu khôi lỗi đang
           nằm trên chính máy họ. Một câu hứa đúng một nửa còn tệ hơn không hứa. */}
       <p className="mb-2 text-xs text-[var(--color-mist)]">
-        Tắt trình duyệt thoải mái. Còn tắt máy thì tuỳ ai đang chạy: linh sứ tông môn không
-        sao, linh sứ nằm trên máy bạn sẽ dừng theo.
+        Tắt trình duyệt thoải mái. Còn tắt máy thì tuỳ ai đang chạy: khôi lỗi tông môn không
+        sao, khôi lỗi nằm trên máy bạn sẽ dừng theo.
       </p>
 
       <div className="mb-1 flex items-center justify-between gap-3">

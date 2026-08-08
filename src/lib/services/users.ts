@@ -12,7 +12,7 @@ import type { UserRow } from "@/lib/db/schema";
 
 export type PublicUser = Pick<
   UserRow,
-  "id" | "username" | "displayName" | "email" | "role" | "status" | "createdAt" | "updatedAt"
+  "id" | "username" | "displayName" | "email" | "roles" | "tags" | "status" | "createdAt" | "updatedAt"
 >;
 
 const publicColumns = {
@@ -20,11 +20,20 @@ const publicColumns = {
   username: schema.users.username,
   displayName: schema.users.displayName,
   email: schema.users.email,
-  role: schema.users.role,
+  roles: schema.users.roles,
+  tags: schema.users.tags,
   status: schema.users.status,
   createdAt: schema.users.createdAt,
   updatedAt: schema.users.updatedAt,
 } as const;
+
+/**
+ * Giá trị GHI GƯƠNG cho cột di sản `role` — bản deploy cũ còn đọc nó trong cửa sổ giữa
+ * migrate và deploy (xem ghi chú tại cột trong schema.ts). Code mới không bao giờ ĐỌC.
+ */
+function legacyRoleOf(roles: readonly string[]): "user" | "admin" {
+  return roles.includes("admin") || roles.includes("gia-chu") ? "admin" : "user";
+}
 
 export async function findByUsername(username: string): Promise<UserRow | null> {
   const rows = await db()
@@ -168,7 +177,7 @@ export async function adminCreate(input: {
   displayName: string;
   email: string;
   password: string;
-  role: "user" | "admin";
+  roles: string[];
   status: "pending" | "active" | "disabled";
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const email = input.email.trim().toLowerCase();
@@ -187,7 +196,8 @@ export async function adminCreate(input: {
       displayName: input.displayName.trim(),
       email,
       passwordHash: hashPassword(input.password),
-      role: input.role,
+      roles: input.roles,
+      role: legacyRoleOf(input.roles),
       status: input.status,
     })
     .onConflictDoNothing()
@@ -209,7 +219,8 @@ export async function adminUpdate(
     displayName?: string;
     email?: string;
     password?: string;
-    role?: "user" | "admin";
+    roles?: string[];
+    tags?: string[];
     status?: "pending" | "active" | "disabled";
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -224,7 +235,11 @@ export async function adminUpdate(
   if (input.displayName !== undefined) patch.displayName = input.displayName.trim();
   if (input.email !== undefined) patch.email = input.email.trim().toLowerCase();
   if (input.password) patch.passwordHash = hashPassword(input.password);
-  if (input.role) patch.role = input.role;
+  if (input.roles) {
+    patch.roles = input.roles;
+    patch.role = legacyRoleOf(input.roles);
+  }
+  if (input.tags) patch.tags = input.tags;
   if (input.status) patch.status = input.status;
 
   try {
@@ -254,8 +269,9 @@ function isUniqueViolation(error: unknown): boolean {
 
 /**
  * Deletion cascades through configs, jobs and events by schema design — an expelled member
- * leaves nothing dangling. The LAST admin cannot be deleted; a control plane with no one
- * holding the keys is a locked room.
+ * leaves nothing dangling. The LAST Gia chủ cannot be deleted: only gia-chu may change
+ * roles, so the moment the last one is gone, no one can ever manage roles again — a control
+ * plane with no one holding the keys is a locked room.
  */
 export async function adminDelete(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const target = await findById(id);
@@ -263,13 +279,13 @@ export async function adminDelete(id: string): Promise<{ ok: true } | { ok: fals
     return { ok: false, error: "Không tìm thấy đạo hữu này." };
   }
 
-  if (target.role === "admin") {
-    const admins = await db()
+  if (target.roles.includes("gia-chu")) {
+    const owners = await db()
       .select({ n: sql<number>`count(*)::int` })
       .from(schema.users)
-      .where(eq(schema.users.role, "admin"));
-    if ((admins[0]?.n ?? 0) <= 1) {
-      return { ok: false, error: "Không thể xoá trưởng môn cuối cùng." };
+      .where(sql`'gia-chu' = any(${schema.users.roles})`);
+    if ((owners[0]?.n ?? 0) <= 1) {
+      return { ok: false, error: "Không thể xoá Gia chủ cuối cùng — truyền ngôi trước đã." };
     }
   }
 

@@ -36,9 +36,11 @@ if (existing.length > 0) {
 }
 
 const hash = bcrypt.hashSync(password, 12);
+// Tài khoản hạt giống giữ CẢ HAI vai: gia-chu (vai duy nhất đổi được vai người khác — không
+// có nó là hệ thống sinh ra đã khoá trái) và admin. Cột `role` là di sản, ghi gương 'admin'.
 await sql`
-  insert into users (username, display_name, password_hash, role, status)
-  values (${username}, ${process.env.ADMIN_DISPLAY_NAME ?? "Trưởng Môn"}, ${hash}, 'admin', 'active')
+  insert into users (username, display_name, password_hash, roles, role, status)
+  values (${username}, ${process.env.ADMIN_DISPLAY_NAME ?? "Trưởng Môn"}, ${hash}, ${["gia-chu", "admin"]}, 'admin', 'active')
 `;
 
-console.log(`✔ Đã tạo trưởng môn「${username}」. Đăng nhập rồi ĐỔI MẬT KHẨU ngay.`);
+console.log(`✔ Đã tạo Gia chủ「${username}」. Đăng nhập rồi ĐỔI MẬT KHẨU ngay.`);

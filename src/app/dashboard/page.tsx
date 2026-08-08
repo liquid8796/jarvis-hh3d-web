@@ -1,4 +1,5 @@
 import { SHELL_WIDTH, SiteHeader } from "@/components/SiteHeader";
+import { isAdminUser } from "@/lib/auth/permissions";
 import { requireActiveUser } from "@/lib/auth/guards";
 import { listAccounts } from "@/lib/services/accounts";
 import { getEditableConfig } from "@/lib/services/configs";
@@ -55,7 +56,7 @@ export default async function DashboardPage() {
               mọi panel, và đứng trước grid để không phụ thuộc bố cục bên dưới. */}
           <MaintenanceOverlay />
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] xl:gap-8">
-            <ConfigForm config={config} isAdmin={user.role === "admin"} />
+            <ConfigForm config={config} isAdmin={isAdminUser(user)} />
             <div className="flex min-w-0 flex-col gap-6 xl:gap-8">
               <ControlPanel initiallyRunning={activeJobs.length > 0} />
               <LinhSuPanel hasToken={tokenIssued} />

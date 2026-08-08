@@ -1,6 +1,6 @@
 /**
- * Cổng điều phối TOÀN CỤC cho nhiệm vụ — một bộ đếm cho cả tiến trình linh sứ, xuyên mọi
- * đàn và mọi đạo hữu mà linh sứ ấy đang phục vụ.
+ * Cổng điều phối TOÀN CỤC cho nhiệm vụ — một bộ đếm cho cả tiến trình khôi lỗi, xuyên mọi
+ * đàn và mọi đạo hữu mà khôi lỗi ấy đang phục vụ.
  *
  * Vì sao tồn tại: nhật ký 07/08 01:03:55. Hoang Vực (trang riêng /hoang-vuc) chạy song song
  * cạnh một trận Mê Cung đủ đội (trang riêng /me-cung) trên VM hai nhân — hoạt ảnh của tab bị
@@ -32,7 +32,7 @@
  *
  * Module-level state là CHỦ Ý, không phải tiện tay: worker chạy nhiều đàn trong cùng một
  * tiến trình Node, nên một bộ đếm mức module chính là "toàn cục trên cái máy này" — đúng
- * phạm vi tài nguyên (CPU) mà luật muốn bảo vệ. Hai linh sứ trên hai máy khác nhau không
+ * phạm vi tài nguyên (CPU) mà luật muốn bảo vệ. Hai khôi lỗi trên hai máy khác nhau không
  * cần biết nhau.
  */
 

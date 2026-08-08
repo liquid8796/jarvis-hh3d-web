@@ -5,10 +5,10 @@ import { hashWorkerToken, type WorkerScope } from "@/lib/auth/worker";
 import type { WorkerRow } from "@/lib/db/schema";
 
 /**
- * Sổ điểm danh linh sứ + vòng đời linh phù.
+ * Sổ điểm danh khôi lỗi + vòng đời linh phù.
  *
  * Điểm danh trả lời "có ai đang trực không" NGAY LÚC hỏi — trước đây câu này chỉ được trả
- * lời sau sáu phút im lặng, khi reaper kết liễu job. Một linh sứ được coi là ĐANG TRỰC nếu
+ * lời sau sáu phút im lặng, khi reaper kết liễu job. Một khôi lỗi được coi là ĐANG TRỰC nếu
  * nó hỏi việc trong vòng ONLINE_WINDOW_MS gần nhất; nhịp hỏi việc là 5 giây, nên cửa sổ
  * 30 giây đủ rộng để một cú vấp mạng không biến "đang trực" thành "vắng mặt".
  */
@@ -34,11 +34,11 @@ export async function recordWorkerSeen(workerId: string, scope: WorkerScope): Pr
 }
 
 export type WorkerPresence = {
-  /** Linh sứ riêng của đạo hữu này (nếu đã từng điểm danh). */
+  /** Khôi lỗi riêng của đạo hữu này (nếu đã từng điểm danh). */
   mine: WorkerRow[];
-  /** Có linh sứ nào của đạo hữu đang trực không. */
+  /** Có khôi lỗi nào của đạo hữu đang trực không. */
   mineOnline: boolean;
-  /** Linh sứ tông môn (userId null) có đang trực không. */
+  /** Khôi lỗi tông môn (userId null) có đang trực không. */
   sectOnline: boolean;
   /** Lần điểm danh mới nhất của tông môn, để SSE tự hẹn đúng lúc trạng thái hết hạn. */
   sectLastSeen: Date | null;
@@ -71,7 +71,7 @@ export async function getPresence(userId: string): Promise<WorkerPresence> {
   };
 }
 
-/** Có BẤT KỲ linh sứ nào đang trực nhận được job của user này không (riêng hoặc tông môn). */
+/** Có BẤT KỲ khôi lỗi nào đang trực nhận được job của user này không (riêng hoặc tông môn). */
 export async function anyWorkerOnlineFor(userId: string): Promise<boolean> {
   const cutoff = new Date(Date.now() - ONLINE_WINDOW_MS);
   const rows = await db()
@@ -87,17 +87,17 @@ export async function anyWorkerOnlineFor(userId: string): Promise<boolean> {
 }
 
 /**
- * Gỡ một linh sứ khỏi sổ điểm danh.
+ * Gỡ một khôi lỗi khỏi sổ điểm danh.
  *
  * Sổ là sổ ĐĂNG KÝ chứ không phải danh sách tiến trình: `recordWorkerSeen` chỉ biết thêm và
  * cập nhật, nên một dòng vào rồi ở lại vĩnh viễn. Máy đã bán, bản cài đã gỡ, hay một ID sinh
  * ra trước khi hậu tố trở thành xác định — tất cả nằm lại đó, và người dùng đọc màn hình ấy
- * như "tôi đang nuôi mấy linh sứ", không như "đây là những cái tên từng ghé qua".
+ * như "tôi đang nuôi mấy khôi lỗi", không như "đây là những cái tên từng ghé qua".
  *
- * CHỈ gỡ được linh sứ ĐANG VẮNG. Một linh sứ còn sống ghi lại dòng của nó ở lần gõ cửa kế
+ * CHỈ gỡ được khôi lỗi ĐANG VẮNG. Một khôi lỗi còn sống ghi lại dòng của nó ở lần gõ cửa kế
  * tiếp — nhiều nhất 5 giây sau — nên cho gỡ nó chỉ tạo ra một cái nút thỉnh thoảng mới có
  * tác dụng, thứ khó chịu hơn là không có nút. Mệnh đề `userId` là lớp chặn thứ hai: không ai
- * gỡ được linh sứ của người khác dù có gọi thẳng action với ID lạ.
+ * gỡ được khôi lỗi của người khác dù có gọi thẳng action với ID lạ.
  *
  * Trả về false khi không xoá được — nơi gọi phân biệt "vừa sống lại" với "đã xong".
  */
@@ -119,7 +119,7 @@ export async function forgetWorker(userId: string, workerId: string): Promise<bo
 /**
  * Phát linh phù mới. Bản rõ chỉ tồn tại trong giá trị trả về của hàm này — nơi gọi hiển
  * thị đúng một lần rồi thôi; database chỉ giữ hash. Phát lại là THAY: linh phù cũ hết
- * hiệu lực ngay ở request kế tiếp của bất kỳ linh sứ nào còn cầm nó.
+ * hiệu lực ngay ở request kế tiếp của bất kỳ khôi lỗi nào còn cầm nó.
  */
 export async function issueWorkerToken(userId: string): Promise<string> {
   // 32 byte ngẫu nhiên, base64url — 43 ký tự, không cần escape ở shell lẫn URL.
@@ -141,7 +141,7 @@ export async function hasWorkerToken(userId: string): Promise<boolean> {
   return rows[0]?.hash != null;
 }
 
-/** Thu hồi linh phù — linh sứ nào còn cầm nó sẽ bị từ chối từ request kế tiếp. */
+/** Thu hồi linh phù — khôi lỗi nào còn cầm nó sẽ bị từ chối từ request kế tiếp. */
 export async function revokeWorkerToken(userId: string): Promise<void> {
   await db()
     .update(schema.users)

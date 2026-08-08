@@ -62,9 +62,9 @@ Tick những cái bạn muốn auto làm.
 | **Luyện Đan Đường** | Thu đan → phân giải → khai lò mẻ mới → giữ lửa. Ghé lại mỗi ~26 phút. |
 | **Nhiệm vụ ngày** | Điểm Danh, Hoang Vực, Phúc Lợi Đường, Thí Luyện, Bí Cảnh, Tế Lễ, Phúc Lợi VIP, Vòng Quay, Vấn Đáp, Khoáng Mạch. Tick là xong, không phải chỉnh gì. Bảy mục trong số này (Điểm Danh, Hoang Vực, Phúc Lợi Đường, Thí Luyện, Vòng Quay, Tế Lễ, Vấn Đáp) có flow riêng cho tài khoản thường; Mê Cung và Luyện Đan Đường chạy được cho cả hai hạng. |
 
-Riêng **Vấn Đáp**, linh sứ tra danh sách đáp án cộng đồng (hiện đọc được 255 câu).
+Riêng **Vấn Đáp**, khôi lỗi tra danh sách đáp án cộng đồng (hiện đọc được 255 câu).
 Nó chỉ trả lời khi đáp án trong danh sách khớp đúng một lựa chọn đang hiện; câu lạ hoặc nguồn
-mâu thuẫn sẽ được để lại cho bạn, không hỏi Gemini và không đoán bừa. Nếu đã cài linh sứ trước
+mâu thuẫn sẽ được để lại cho bạn, không hỏi Gemini và không đoán bừa. Nếu đã cài khôi lỗi trước
 v0.19.0, hãy bấm **Tạo bộ cài cho máy của tôi** và cài đè một lần để nhận cả kho Vấn Đáp lẫn
 heartbeat 5 giây — không cần gỡ bản cũ hay phát linh phù mới.
 
@@ -92,19 +92,19 @@ Chọn xong nhớ bấm **Khắc Ngọc Giản**.
 Bấm **Khai Đàn**. Xong. Auto tự canh thời gian chờ rồi chạy hết vòng này sang vòng khác;
 không cần quay lại bấm Khai Đàn sau mỗi vòng. Tắt trình duyệt đi ngủ cũng được.
 
-Nhưng nhớ một điều: **tắt máy thì tuỳ ai đang chạy hộ bạn.** Linh sứ tông môn nằm ở máy
-khác nên vẫn chạy tiếp; còn linh sứ cài trên máy bạn thì tắt máy là nghỉ theo. Xem mục 3
+Nhưng nhớ một điều: **tắt máy thì tuỳ ai đang chạy hộ bạn.** Khôi lỗi tông môn nằm ở máy
+khác nên vẫn chạy tiếp; còn khôi lỗi cài trên máy bạn thì tắt máy là nghỉ theo. Xem mục 3
 để biết mình đang thuộc trường hợp nào.
 
 Mở lại trang lúc nào cũng thấy auto đang làm tới đâu, trong khung **Nhật ký tu luyện**.
 Muốn dừng hẳn thì bấm **Thu Đàn** — auto dừng ở điểm an toàn gần nhất, không cắt ngang trận.
 
-Khi cạnh tiêu đề nhật ký hiện **● Trực tiếp**, trạng thái và từng dòng linh sứ kể được đẩy lên
+Khi cạnh tiêu đề nhật ký hiện **● Trực tiếp**, trạng thái và từng dòng khôi lỗi kể được đẩy lên
 ngay, không phải chờ trang hỏi lại. Mạng chập chờn thì nó tự hiện **Đang nối lại…** và dùng nhịp
-dự phòng; bạn không cần F5. Cài đè linh sứ v0.19.0 một lần để nút Thu Đàn được máy đang bận
+dự phòng; bạn không cần F5. Cài đè khôi lỗi v0.19.0 một lần để nút Thu Đàn được máy đang bận
 nhận trong khoảng 5 giây thay vì nhịp 20 giây của bản cũ.
 
-Nếu linh sứ máy nhà được cài trước v0.20.0, hãy tạo lại bộ cài và cài đè một lần để nhận ba
+Nếu khôi lỗi máy nhà được cài trước v0.20.0, hãy tạo lại bộ cài và cài đè một lần để nhận ba
 flow tài khoản thường mới. Cài đè giữ nguyên thư mục hồ sơ trình duyệt và không cần gỡ trước.
 
 ### Sửa hồ sơ và bổ sung email
@@ -115,33 +115,33 @@ không đổi ở đây. Tài khoản tạo từ bản cũ có thể chưa có e
 
 ---
 
-## 3. "Linh sứ" là gì, và khi nào bạn phải quan tâm
+## 3. "Khôi lỗi" là gì, và khi nào bạn phải quan tâm
 
-Linh sứ là người thật sự mở trình duyệt và chơi hộ bạn. Web chỉ ghi nhận ý muốn của bạn;
-linh sứ mới là kẻ làm.
+Khôi lỗi là người thật sự mở trình duyệt và chơi hộ bạn. Web chỉ ghi nhận ý muốn của bạn;
+khôi lỗi mới là kẻ làm.
 
-Trong mục **Linh Sứ** bạn sẽ thấy một trong hai:
+Trong mục **Khôi Lỗi** bạn sẽ thấy một trong hai:
 
-**"Bạn không cần cài gì cả"** — có linh sứ tông môn trực sẵn, dùng chung cho mọi người.
+**"Bạn không cần cài gì cả"** — có khôi lỗi tông môn trực sẵn, dùng chung cho mọi người.
 Cứ Khai Đàn là chạy. Bỏ qua phần còn lại của mục này.
 
-**"Chưa có linh sứ nào trực"** — bấm Khai Đàn lúc này thì đàn pháp phải nằm chờ.
-Bạn có thể tự nuôi một linh sứ trên máy mình:
+**"Chưa có khôi lỗi nào trực"** — bấm Khai Đàn lúc này thì đàn pháp phải nằm chờ.
+Bạn có thể tự nuôi một khôi lỗi trên máy mình:
 
 1. Bấm **Tạo bộ cài cho máy của tôi**.
 2. Bấm **⬇ Tải bộ cài cho Windows**. Tệp `cai-linh-su.cmd` về thư mục Tải xuống.
 3. Bấm đúp vào tệp đó. Windows hỏi thì chọn **Run anyway**.
-4. Đợi vài phút. Xong thì tên linh sứ hiện ở danh sách, kèm chấm xanh.
+4. Đợi vài phút. Xong thì tên khôi lỗi hiện ở danh sách, kèm chấm xanh.
 
 Bạn **không cần cài Node.js hay phần mềm nào khác** — bộ cài mang sẵn mọi thứ, và không
 cần quyền quản trị.
 
-**Lưu ý quan trọng:** linh sứ máy nhà chỉ chạy khi máy bạn bật. Tắt máy là auto dừng.
+**Lưu ý quan trọng:** khôi lỗi máy nhà chỉ chạy khi máy bạn bật. Tắt máy là auto dừng.
 
 **Gỡ đi:** chạy `uninstall.ps1` trong thư mục cài
 (`%LOCALAPPDATA%\AutoHH3D\LinhSu`). Nó xoá sạch, máy trở lại như trước.
 
-> **Đừng bấm "Phát linh phù mới" nếu không cần.** Nó thay chìa khoá, và linh sứ đang chạy
+> **Đừng bấm "Phát linh phù mới" nếu không cần.** Nó thay chìa khoá, và khôi lỗi đang chạy
 > sẽ lặng lẽ ngừng nhận việc cho tới khi bạn cài lại bằng bộ cài mới.
 
 ---
@@ -157,9 +157,9 @@ cần quyền quản trị.
 | *Tài khoản hoathinh3d đã hết phiên đăng nhập* | Cookie hết hạn, hoặc bạn đã đăng xuất game | Lấy cookie mới, dán lại |
 | *Site đã dời tên miền: … sang …* | Game đổi tên miền, cookie cũ chết theo | Vào tên miền mới lấy cookie, dán lại |
 | *Không xác nhận được phiên đăng nhập, và hub cũng không dựng nổi…* | Cookie chết, hoặc game đang chắn | Dán cookie mới; nếu vẫn vậy thì báo tông chủ |
-| *Không có linh sứ nào tiếp nhận* | Không ai đang trực | Xem mục 3, cài linh sứ cho máy mình |
+| *Không có khôi lỗi nào tiếp nhận* | Không ai đang trực | Xem mục 3, cài khôi lỗi cho máy mình |
 | *Màn kiểm tra của trang game không tự qua* | Game đang chặn bot | Chờ lượt sau, auto tự thử lại |
-| Linh sứ chuyển sang **vắng** | Máy tắt, mạng rớt, hoặc bạn vừa phát linh phù mới | Bật máy lại, hoặc cài lại bằng bộ cài mới |
+| Khôi lỗi chuyển sang **vắng** | Máy tắt, mạng rớt, hoặc bạn vừa phát linh phù mới | Bật máy lại, hoặc cài lại bằng bộ cài mới |
 
 Nhật ký đầy quá thì bấm **Dọn nhật ký** cho sạch. Lịch sử cũ mất luôn, nhưng lượt đang
 chạy không bị ảnh hưởng.
@@ -172,11 +172,11 @@ chạy không bị ảnh hưởng.
 Không. Bấm Khai Đàn xong là tắt trình duyệt được ngay.
 
 **Thế tắt máy thì sao?**
-Nếu linh sứ tông môn chạy hộ bạn thì không sao, nó nằm ở máy khác. Nếu bạn tự cài linh sứ
+Nếu khôi lỗi tông môn chạy hộ bạn thì không sao, nó nằm ở máy khác. Nếu bạn tự cài khôi lỗi
 trên máy mình thì tắt máy là auto dừng, bật lại là nó tự trực tiếp.
 
 **Tôi đổi sang trình duyệt khác thì sao?**
-Chỉ cần đăng nhập lại vào web. Linh sứ không liên quan gì tới trình duyệt bạn dùng.
+Chỉ cần đăng nhập lại vào web. Khôi lỗi không liên quan gì tới trình duyệt bạn dùng.
 
 **Có phải đưa mật khẩu game không?**
 Không bao giờ. Chỉ chuỗi cookie, và nó được mã hoá.

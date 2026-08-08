@@ -48,7 +48,7 @@ function describe(entry: QueueEntry): string {
 }
 
 /**
- * Đàn này có đang trong tay một linh sứ không.
+ * Đàn này có đang trong tay một khôi lỗi không.
  *
  * Tiến độ chỉ được phép hiện ở hai trạng thái ấy. Server đã dọn cột lúc xong vòng và lúc
  * nhận việc, nên một dòng ĐANG NGHỈ mang tiến độ là chuyện không xảy ra — nhưng nếu có ngày
@@ -66,7 +66,7 @@ const isWorking = (entry: QueueEntry) => entry.status === "running" || entry.sta
  * dòng logic nào — mỗi chú thích này.
  *
  * Danh sách RỖNG mà vẫn đang chạy là một trạng thái thật, không phải thiếu dữ liệu: đó là
- * quãng linh sứ mở trình duyệt, qua cổng Cloudflare và dò hạng tài khoản — có thể tới vài
+ * quãng khôi lỗi mở trình duyệt, qua cổng Cloudflare và dò hạng tài khoản — có thể tới vài
  * chục giây, và im lặng suốt quãng ấy trông y hệt một cái treo.
  */
 function questPhrase(entry: QueueEntry): string | null {
@@ -144,9 +144,9 @@ export function QueueBoard({ initial }: { initial: QueueSnapshot }) {
 
       {/* Nói thẳng luật của hàng đợi, kẻo người dùng đếm số rồi tự suy ra sai. */}
       <p className="mb-4 text-xs leading-relaxed text-[var(--color-mist)]">
-        Thứ tự linh sứ tông môn sẽ nhặt việc: đàn nào tới giờ trước thì đi trước. Đàn đang nghỉ
-        chưa xếp hàng — nó chỉ vào hàng khi hết cooldown. Ai đã cài linh sứ riêng thì không phải
-        chờ hàng chung, vì linh sứ ấy chỉ làm việc ở máy nhà.
+        Thứ tự khôi lỗi tông môn sẽ nhặt việc: đàn nào tới giờ trước thì đi trước. Đàn đang nghỉ
+        chưa xếp hàng — nó chỉ vào hàng khi hết cooldown. Ai đã cài khôi lỗi riêng thì không phải
+        chờ hàng chung, vì khôi lỗi ấy chỉ làm việc ở máy nhà.
       </p>
 
       {entries.length === 0 ? (
@@ -195,7 +195,7 @@ export function QueueBoard({ initial }: { initial: QueueSnapshot }) {
 
                 <span className="text-xs text-[var(--color-mist)]">vòng {entry.attempts}</span>
 
-                {/* Con số đi cùng MỌI dòng — nó trả lời "cái ghế linh sứ kia còn bao lâu nữa
+                {/* Con số đi cùng MỌI dòng — nó trả lời "cái ghế khôi lỗi kia còn bao lâu nữa
                     mới trống", câu hỏi mà một danh sách tên không trả lời thay được. */}
                 {progress && progress.total > 0 && isWorking(entry) && (
                   <span className="text-xs text-[var(--color-mist)]">
@@ -205,7 +205,7 @@ export function QueueBoard({ initial }: { initial: QueueSnapshot }) {
 
                 {entry.workerKind && (
                   <span className="ml-auto font-mono text-[11px] text-[var(--color-mist)]">
-                    {entry.workerId ?? (entry.workerKind === "sect" ? "linh sứ tông môn" : "linh sứ riêng")}
+                    {entry.workerId ?? (entry.workerKind === "sect" ? "khôi lỗi tông môn" : "khôi lỗi riêng")}
                   </span>
                 )}
               </li>

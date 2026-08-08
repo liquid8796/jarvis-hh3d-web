@@ -18,7 +18,7 @@ import { getQueueSnapshot, type QueueSnapshot } from "@/lib/services/queue";
  * nguyên luật riêng tư của nó, kênh này tự dựng payload ĐÃ CHE TÊN cho từng người nghe.
  *
  * Hai nguồn đánh thức, vì hàng đợi đổi theo hai cách khác nhau:
- *   1. NOTIFY từ Postgres — job sinh ra, đổi trạng thái, đổi giờ chạy, đổi linh sứ.
+ *   1. NOTIFY từ Postgres — job sinh ra, đổi trạng thái, đổi giờ chạy, đổi khôi lỗi.
  *   2. ĐỒNG HỒ — một đàn đang nghỉ tự vào hàng đúng lúc `next_run_at` trôi qua, không có
  *      thay đổi nào trong database để mà báo. Thiếu nhánh này thì số thứ tự đứng im cho tới
  *      khi tình cờ có ai đó làm gì khác.
@@ -34,7 +34,7 @@ const KEEP_ALIVE_MS = 15_000;
 
 /**
  * Chỉ hai chủ đề làm hàng đợi đổi. Bỏ qua `event` là có chủ ý: mỗi dòng nhật ký của mọi
- * linh sứ đều phát một tín hiệu, mà nhật ký không hề xuất hiện trên trang này — nghe nó là
+ * khôi lỗi đều phát một tín hiệu, mà nhật ký không hề xuất hiện trên trang này — nghe nó là
  * tự bắt mình đọc lại database hàng chục lần mỗi vòng chạy để rồi không vẽ gì khác.
  */
 const QUEUE_TOPICS = new Set(["job", "config"]);

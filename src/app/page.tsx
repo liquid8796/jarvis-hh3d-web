@@ -5,7 +5,7 @@ import { SectSeal } from "@/components/SectSeal";
 const PILLARS = [
   {
     title: "Khai Đàn Viễn Trình",
-    body: "Bấm một nút trên Linh Đài, linh sứ trên server tự vận hành nhiệm vụ ngày — đóng trình duyệt, tắt máy, đàn pháp vẫn chạy.",
+    body: "Bấm một nút trên Linh Đài, khôi lỗi trên server tự vận hành nhiệm vụ ngày — đóng trình duyệt, tắt máy, đàn pháp vẫn chạy.",
   },
   {
     title: "Tông Môn Nghiêm Cẩn",
@@ -43,7 +43,7 @@ export default function LandingPage() {
             </h1>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-[var(--color-parchment)]/90">
               Auto HH3D đưa cỗ máy nhiệm vụ ngày của hoathinh3d lên mây: cấu hình một lần,
-              khai đàn một chạm, linh sứ trên server lo phần cày cuốc — đạo hữu chỉ việc thu
+              khai đàn một chạm, khôi lỗi trên server lo phần cày cuốc — đạo hữu chỉ việc thu
               linh thạch.
             </p>
             <div className="mt-8 flex gap-4">

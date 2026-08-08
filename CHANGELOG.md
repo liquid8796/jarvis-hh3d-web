@@ -11,6 +11,46 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.43.0 — vai Gia chủ, thu hồi chỉ của chủ tin, tag trang trí, và「linh sứ」thành「khôi lỗi」
+
+- **VÁ LỖ HỔNG: thu hồi tin của người khác.** Trước bản này admin thu hồi được tin của BẤT KỲ
+  ai — và tệ hơn, có một phép thử bảo chứng điều đó như một tính năng. "Thu hồi" nghĩa là TÔI
+  rút lời TÔI; để người khác rút được lời của bạn thì lịch sử đàm đạo thành thứ ai cầm quyền
+  nấy viết lại. Giờ quyền sở hữu nằm NGAY TRONG bộ lọc của câu update (`userId: viewer.id`,
+  không nhánh, không tham số role) — admin lẫn Gia chủ đều bị từ chối như nhau, và phép thử
+  đảo chiều: nó gác việc admin KHÔNG thu hồi được, kèm kiểm tin còn nguyên vẹn sau cú hụt.
+- **Vai mới「Gia chủ」(gia-chu) — và lý do nó phải tồn tại**: các Trưởng môn ngang quyền sửa
+  role hay trục xuất được LẪN NHAU, nghĩa là admin nào cũng chỉ an toàn cho tới khi một admin
+  khác đổi ý. Giờ: chỉ Gia chủ sửa/xoá được người mang vai; Trưởng môn quản môn đồ thường
+  thôi — và "không đụng được admin khác" bao trùm CẢ đổi trạng thái lẫn sửa hồ sơ, vì đình
+  quyền một admin cũng chính là vô hiệu hoá họ, chỉ là bằng cửa khác. Đổi VAI (kể cả thăng
+  môn đồ lên admin) là đặc quyền của riêng Gia chủ.
+- **Một người giữ được NHIỀU vai**: cột `role` enum đơn thay bằng mảng `roles` (migration
+  0011). Mảng rỗng = môn đồ thường; Gia chủ nghiễm nhiên có mọi quyền Trưởng môn. Cột cũ
+  GIỮ LẠI một nhịp deploy (ghi gương, không đọc) — migrate chạy trước deploy, drop ngay là
+  bản đang phục vụ 500 trong cửa sổ ấy. Bootstrap: admin LÂU ĐỜI NHẤT nhận gia-chu.
+- **Chống khoá cửa**: Gia chủ cuối cùng không xoá được và không tự rời ngôi được — chỉ
+  Gia chủ đổi được vai, nên khoảnh khắc người cuối rời ghế là hệ thống VĨNH VIỄN không còn
+  ai đổi vai được nữa. Muốn nghỉ thì truyền ngôi trước.
+- **Ma trận quyền là MỘT module thuần** ([permissions.ts](src/lib/auth/permissions.ts)) —
+  action nào đụng vào người khác cũng phải đọc lại người ấy từ DB rồi hỏi ma trận, không tin
+  role nào do form gửi kèm. `npm run verify:permissions` đóng đinh từng ô, chạy không cần DB.
+  Nó cứu bản này một lần trước khi phát hành: checkbox gia-chu của chính Gia chủ bị
+  `disabled` để khỏi tự bỏ — mà checkbox disabled thì trình duyệt KHÔNG GỬI, nên Gia chủ chỉ
+  đổi cái tên hiển thị của mình cũng bị chặn oan vì "tự rời ngôi". Vá bằng một hidden input.
+- **Tag trang trí cho đạo hữu**: Trưởng môn/Gia chủ ban tối đa 3 tag × 20 ký tự (tab Môn Đồ);
+  tag hiện thành huy hiệu cạnh tên trong Phòng Chat, và ĐÓNG BĂNG vào tin lúc gửi — cùng
+  triết lý với tên người gửi: huy hiệu tại thời điểm nói trung thực hơn huy hiệu sau này đổi.
+  isAdmin lẫn tags đều đọc từ bản ghi thật phía server, body không tự khai được.
+- **「Linh sứ」đổi tên thành「khôi lỗi」** (linh sứ tông môn → khôi lỗi tông môn, linh sứ
+  máy nhà/túc trực → khôi lỗi máy nhà/túc trực) ở MỌI chữ hiển thị và tài liệu. Định danh
+  máy GIỮ NGUYÊN có chủ ý: URL `/linh-su/*` nằm trong script cài của người dùng và setup.sh
+  đã nằm sẵn trên VM, service `auto-hh3d-linh-su` đang chạy, `WORKER_ID=tong-mon-linhsu` đã
+  ghi trong sổ điểm danh — đổi chúng là làm gãy các bản cài hiện có để đổi lấy một cái tên
+  mà máy móc chẳng bao giờ đọc to. CHANGELOG cũ và migration đã áp cũng giữ nguyên: sử sách
+  không viết lại.
+- **Xoá nút 🀄 khỏi thanh soạn** — khay ba tab mở từ nút 😊, một nút là đủ vào cả ba.
+
 ## 0.42.0 — khay chọn ba tab, và bấm ra ngoài thì nó chịu tắt
 
 - **Bấm ra ngoài đóng khay.** Khay emoji/sticker và khay thả cảm xúc trước đây chỉ tắt được

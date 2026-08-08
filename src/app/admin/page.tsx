@@ -25,7 +25,7 @@ export default async function AdminPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string }>;
 }) {
-  await requireAdmin();
+  const viewer = await requireAdmin();
 
   const params = await searchParams;
   const status =
@@ -76,9 +76,9 @@ export default async function AdminPage({
                       requireApproval={settings.membership.requireApproval}
                       pendingCount={pending}
                     />
-                    <CreateUserPanel />
+                    <CreateUserPanel viewer={viewer} />
                   </div>
-                  <UserTable users={users} query={params.q ?? ""} status={status ?? ""} />
+                  <UserTable viewer={viewer} users={users} query={params.q ?? ""} status={status ?? ""} />
                 </>
               ),
             },

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * LINH SỨ THAM CHIẾU — reference worker.
+ * KHÔI LỖI THAM CHIẾU — reference worker.
  *
  * Đây là nửa còn lại của lời hứa "bấm Khai Đàn rồi tắt browser vẫn chạy". Vercel không thể
  * giữ một phiên Chromium 35 phút: function của nó sống theo request và bị cắt sau vài phút.
@@ -16,8 +16,8 @@
  * dịch và cùng hồ sơ quest với bản desktop, nên tri thức về site chỉ có một bản gốc.
  *
  * Token quyết định VAI TRÒ, server tự phân xử — worker không cần khai gì:
- *   • WORKER_TOKEN của deployment (linh sứ tông môn) → nhận job của mọi thành viên.
- *   • Linh phù cá nhân phát ở mục Linh Sứ           → chỉ nhận job của chính chủ.
+ *   • WORKER_TOKEN của deployment (khôi lỗi tông môn) → nhận job của mọi thành viên.
+ *   • Linh phù cá nhân phát ở mục Khôi Lỗi           → chỉ nhận job của chính chủ.
  *
  *   WEB_URL=https://<app>.vercel.app WORKER_TOKEN=... node scripts/worker.mjs
  */
@@ -34,13 +34,13 @@ const POLL_MS = Number(process.env.WORKER_POLL_MS ?? 5000);
 // Năm giây là ranh giới người dùng còn cảm thấy nút Thu Đàn phản hồi tức thời. Cho phép chỉnh
 // để máy chủ riêng có thể tiết chế request, nhưng không nhận giá trị vô lý làm quay nóng CPU.
 const HEARTBEAT_MS = Math.max(1_000, Number(process.env.WORKER_HEARTBEAT_MS ?? 5_000) || 5_000);
-// Số job (= số tài khoản) chạy CÙNG LÚC trong một tiến trình linh sứ. Mỗi job là một
+// Số job (= số tài khoản) chạy CÙNG LÚC trong một tiến trình khôi lỗi. Mỗi job là một
 // Chromium riêng nên trần này là trần RAM: 2 vừa cho máy nhà, VM tông môn có thể nâng qua
 // biến môi trường. Kẹp 1–8 để một dấu phẩy gõ nhầm không mở tám mươi trình duyệt.
 const MAX_JOBS = Math.max(1, Math.min(8, Number(process.env.WORKER_MAX_JOBS ?? 2) || 2));
 
 if (!TOKEN || TOKEN === "change-me") {
-  console.error("WORKER_TOKEN chưa đặt — dùng linh phù phát ở mục Linh Sứ, hoặc token tông môn.");
+  console.error("WORKER_TOKEN chưa đặt — dùng linh phù phát ở mục Khôi Lỗi, hoặc token tông môn.");
   process.exit(1);
 }
 
@@ -85,7 +85,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PROFILE_ROOT = fileURLToPath(new URL("./browser-profiles/", import.meta.url));
 
 async function runQuest({ userId, config, say, reportAccountTier, reportProgress, shouldStop }) {
-  await say("Linh sứ đã nhận ngọc giản, đang khởi lư…");
+  await say("Khôi lỗi đã nhận ngọc giản, đang khởi lư…");
 
   // Nạp Playwright TẠI ĐÂY chứ không ở đầu tệp: một máy chỉ dùng worker để canh việc vẫn
   // chạy được `node scripts/worker.mjs` mà không cần cài Chromium, và lỗi thiếu thư viện
@@ -120,7 +120,7 @@ async function handle(job) {
   // một nhịp, mà một nhịp là 5 giây trên một vòng thường dài hàng chục phút.
   //
   // `null` cho tới khi engine khai lần đầu, và `null` KHÔNG BAO GIỜ được gửi lên: với server,
-  // vắng trường này nghĩa là "linh sứ đời cũ, giữ nguyên cột đang có" — gửi null sẽ biến nó
+  // vắng trường này nghĩa là "khôi lỗi đời cũ, giữ nguyên cột đang có" — gửi null sẽ biến nó
   // thành một lệnh xoá lặp lại mỗi 5 giây.
   let progress = null;
 
@@ -176,12 +176,12 @@ async function handle(job) {
   }
 }
 
-console.log(`Linh sứ「${WORKER_ID}」đang canh ${WEB_URL} (tối đa ${MAX_JOBS} đàn cùng lúc)`);
+console.log(`Khôi lỗi「${WORKER_ID}」đang canh ${WEB_URL} (tối đa ${MAX_JOBS} đàn cùng lúc)`);
 
 // Nhiều job cùng lúc, mỗi job một Chromium — để một đạo hữu nuôi nhiều tài khoản thấy cả
 // đội chạy song song thay vì xếp hàng sau lưng nhau. `running` giữ các lượt đang bận; còn
 // ghế trống thì hỏi việc tiếp NGAY (không ngủ) cho tới khi hàng chờ cạn hoặc ghế đầy.
-// Việc giành job giữa nhiều linh sứ vẫn do Postgres phân xử như cũ.
+// Việc giành job giữa nhiều khôi lỗi vẫn do Postgres phân xử như cũ.
 const running = new Set();
 
 for (;;) {

@@ -63,7 +63,7 @@ export function parseCooldownSeconds(text) {
  *
  * Failure không được phép làm lịch chạy dồn dập hơn: nếu mọi quest đều hỏng và chẳng đọc
  * được đồng hồ nào, nghỉ nửa giờ. Một vòng không có đồng hồ nhưng cũng không hỏng thì năm
- * phút ghé lại. Jitter nhỏ giữ nhiều linh sứ khỏi cùng thức dậy đúng một giây.
+ * phút ghé lại. Jitter nhỏ giữ nhiều khôi lỗi khỏi cùng thức dậy đúng một giây.
  */
 const WAIT_FLOOR_SECONDS = 30;
 const WAIT_CEILING_SECONDS = 24 * 3600;

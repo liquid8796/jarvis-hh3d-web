@@ -41,7 +41,7 @@ export const appSettingsSchema = z.object({
       /**
        * Bế quan trùng tu: bật lên là cửa phát việc (op claim của /api/worker) đóng lại và
        * Khai Đàn từ chối lập đàn mới — nhưng vòng đang chạy dở vẫn được về đích, vì bốn op
-       * còn lại của giao thức linh sứ không bị chạm. Mặc định TẮT, hiển nhiên: mọi document
+       * còn lại của giao thức khôi lỗi không bị chạm. Mặc định TẮT, hiển nhiên: mọi document
        * đã ghi trước bản này không có nhánh maintenance, và không ai muốn deploy xong thì
        * cả tông môn tự dưng đóng cửa.
        */
@@ -72,7 +72,7 @@ export const appSettingsSchema = z.object({
        * Nằm trong app_settings chứ không phải hằng số trong mã nguồn, vì đó chính là bài học
        * của 07/08/2026: cú dời `.am → .one` đã bắt cả tông môn chờ một lần deploy chỉ để đổi
        * ba ký tự. Ở đây trưởng môn gõ tên miền mới và vòng chạy KẾ TIẾP đã dùng nó — không
-       * deploy, không sửa env trên VM, không cài lại linh sứ.
+       * deploy, không sửa env trên VM, không cài lại khôi lỗi.
        *
        * `.catch()` rơi về hằng số trong mã nguồn: một giá trị rác ở đây (sửa tay JSONB) mà
        * làm cả nhánh hỏng thì thà chạy bằng tên miền cũ còn hơn chạy bằng chuỗi rỗng.

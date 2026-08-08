@@ -57,6 +57,8 @@ const storedMessageSchema = z.object({
   userId: z.string(),
   author: z.string().default("?"),
   isAdmin: z.boolean().default(false),
+  /** Tag trang trí ĐÓNG BĂNG lúc gửi, cùng triết lý với tên: huy hiệu tại thời điểm nói. */
+  tags: z.array(z.string()).default([]),
   text: z.string().default(""),
   sticker: z.string().nullish(),
   attachments: z.array(attachmentSchema).default([]),
@@ -75,6 +77,7 @@ export type ChatMessageView = {
   userId: string;
   author: string;
   isAdmin: boolean;
+  tags: string[];
   text: string;
   sticker: string | null;
   attachments: Attachment[];
@@ -259,6 +262,7 @@ export async function getFeed(options: {
       userId: m.userId,
       author: m.author,
       isAdmin: m.isAdmin,
+      tags: m.tags,
       text: m.deleted ? "" : m.text,
       sticker: m.deleted ? null : (m.sticker ?? null),
       attachments: m.deleted ? [] : m.attachments,
@@ -286,7 +290,7 @@ async function readTyping(col: Collection<TypingDoc>, viewerId: string): Promise
 }
 
 export async function sendMessage(
-  sender: { id: string; name: string; isAdmin: boolean },
+  sender: { id: string; name: string; isAdmin: boolean; tags: string[] },
   raw: unknown,
 ): Promise<{ ok: boolean; error?: string }> {
   const opened = store();
@@ -305,6 +309,7 @@ export async function sendMessage(
     userId: sender.id,
     author: sender.name,
     isAdmin: sender.isAdmin,
+    tags: sender.tags,
     text: body.text,
     sticker: body.sticker ?? null,
     attachments: body.attachments,
@@ -345,24 +350,28 @@ export async function editMessage(
 }
 
 /** Thu hồi giữ VẾT: document ở lại với cờ deleted, nội dung bị lột — sảnh chung mà tin
-    biến mất không dấu tích là chỗ để gaslight nhau. Quét hạn lưu mới là người xoá thật. */
+    biến mất không dấu tích là chỗ để gaslight nhau. Quét hạn lưu mới là người xoá thật.
+
+    CHỈ CHỦ TIN thu hồi được — admin cũng KHÔNG. Trước 08/08/2026 admin có đường riêng, và
+    đó là lỗ hổng chứ không phải tính năng: "thu hồi" trong sảnh nghĩa là "TÔI rút lời tôi",
+    để người khác rút được lời của bạn thì lịch sử đàm đạo thành thứ ai cầm quyền nấy viết
+    lại. Quyền sở hữu nằm NGAY TRONG bộ lọc của câu update — không có nhánh nào để một
+    tham số quên kiểm mở lại cửa ấy. */
 export async function deleteMessage(
-  viewer: { id: string; role: string },
+  viewer: { id: string },
   messageId: string,
 ): Promise<{ ok: boolean }> {
   const opened = store();
   if (!opened) return { ok: false };
 
   const { messages } = await opened;
-  const filter: Filter<StoredMessage> =
-    viewer.role === "admin"
-      ? { _id: messageId, deleted: false }
-      : { _id: messageId, deleted: false, userId: viewer.id };
-
-  const res = await messages.updateOne(filter, {
-    // Cảm xúc chết theo tin vì chúng nằm TRONG tin — bản Redis phải nhớ xoá một key thứ hai.
-    $set: { deleted: true, text: "", sticker: null, attachments: [], reactions: [] },
-  });
+  const res = await messages.updateOne(
+    { _id: messageId, deleted: false, userId: viewer.id },
+    {
+      // Cảm xúc chết theo tin vì chúng nằm TRONG tin — bản Redis phải nhớ xoá một key thứ hai.
+      $set: { deleted: true, text: "", sticker: null, attachments: [], reactions: [] },
+    },
+  );
   return { ok: res.matchedCount === 1 };
 }
 

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { isAdminUser } from "@/lib/auth/permissions";
 import { requireActiveUser } from "@/lib/auth/guards";
 import {
   addAccount,
@@ -93,7 +94,7 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
     // Cookie không đi đường này nữa — tài khoản sống ở bảng riêng với bộ action riêng.
     gameCookie: "",
     parallelQuests: formData.get("parallelQuests") === "on",
-    // Nơi vận hành đang KHOÁ về linh sứ máy nhà — ép ở đây chứ không tin form, vì
+    // Nơi vận hành đang KHOÁ về khôi lỗi máy nhà — ép ở đây chứ không tin form, vì
     // `disabled` chỉ là một thuộc tính HTML và một POST dựng tay chẳng đi qua form lần nào.
     runner: "local",
     quests: {
@@ -141,7 +142,7 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
   // Luật tài nguyên chung, áp ở SERVER chứ không tin ô tick: giao diện đã khoá tuỳ chọn
   // này lại cho đạo hữu thường, nhưng `disabled` chỉ là một thuộc tính HTML và một POST
   // dựng tay chẳng đi qua form lần nào (cùng lý do `runner` bị ép ở trên).
-  const guarded = enforceMazeCapPolicy(parsed.data, { isAdmin: user.role === "admin" });
+  const guarded = enforceMazeCapPolicy(parsed.data, { isAdmin: isAdminUser(user) });
   await saveConfig(user.id, guarded);
   revalidatePath("/dashboard");
 
@@ -153,7 +154,7 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
     ok: true,
     message: overridden
       ? "Đã khắc cấu hình vào ngọc giản. Riêng「Dừng khi đã đủ huyền tinh」của Mê Cung được " +
-        "bật lại: linh sứ tông môn là tài nguyên chung, chỉ tông chủ mới gỡ khoá ấy được."
+        "bật lại: khôi lỗi tông môn là tài nguyên chung, chỉ tông chủ mới gỡ khoá ấy được."
       : "Đã khắc cấu hình vào ngọc giản. Nếu đàn đang chạy, vòng kế tiếp sẽ dùng bản này.",
   };
 }
@@ -182,7 +183,7 @@ export async function addAccountAction(formData: FormData): Promise<ActionResult
   };
 }
 
-/** Thay cookie của một tài khoản sẵn có — verdict hạng cũ bị xoá để linh sứ dò lại. */
+/** Thay cookie của một tài khoản sẵn có — verdict hạng cũ bị xoá để khôi lỗi dò lại. */
 export async function updateAccountCookieAction(formData: FormData): Promise<ActionResult> {
   const user = await requireActiveUser();
 
@@ -259,7 +260,7 @@ export async function deleteAccountAction(formData: FormData): Promise<ActionRes
   const accountId = readAccountId(formData);
   if (!accountId) return { ok: false, message: "Thiếu tài khoản cần xoá." };
 
-  // Xoá dưới chân một linh sứ đang chạy là bỏ nó bơ vơ với một job không còn tồn tại —
+  // Xoá dưới chân một khôi lỗi đang chạy là bỏ nó bơ vơ với một job không còn tồn tại —
   // bắt dừng trước, xoá sau, và nói rõ vì sao.
   const active = await getActiveJobs(user.id);
   if (active.some((job) => job.accountId === accountId)) {
@@ -295,12 +296,12 @@ export async function startAction(): Promise<ActionResult> {
     message:
       result.alreadyRunning > 0
         ? `Đàn pháp đã lập thêm cho ${names} — ${result.alreadyRunning} tài khoản khác vẫn đang chạy.`
-        : `Đàn pháp đã lập cho ${names} — linh sứ sẽ tự chạy các vòng cho tới khi bạn bấm Thu Đàn.`,
+        : `Đàn pháp đã lập cho ${names} — khôi lỗi sẽ tự chạy các vòng cho tới khi bạn bấm Thu Đàn.`,
   };
 }
 
 /**
- * Dọn nhật ký của các lượt đang hiển thị. Không đụng tới lượt chạy: linh sứ vẫn làm việc, và
+ * Dọn nhật ký của các lượt đang hiển thị. Không đụng tới lượt chạy: khôi lỗi vẫn làm việc, và
  * những dòng nó kể từ giây này trở đi vẫn hiện ra như thường.
  */
 export async function clearLogAction(): Promise<ActionResult> {

@@ -82,7 +82,7 @@ function sameVisiblePresence(left: DashboardPresence | null, right: DashboardPre
 }
 
 /**
- * Một EventSource duy nhất nuôi trạng thái đàn (mỗi tài khoản một dòng), nhật ký, sổ linh sứ
+ * Một EventSource duy nhất nuôi trạng thái đàn (mỗi tài khoản một dòng), nhật ký, sổ khôi lỗi
  * và danh sách tài khoản. Event ID chính là cursor job_events nên reconnect tiếp tục đúng
  * chỗ; poll một-lần chỉ còn là lưới an toàn.
  */

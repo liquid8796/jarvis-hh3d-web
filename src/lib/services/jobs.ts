@@ -158,7 +158,7 @@ export async function startJob(userId: string): Promise<StartOutcome> {
   // Snapshot = cấu hình nhiệm vụ chung + cookie/hạng của ĐÚNG tài khoản này. Cookie giữ
   // nguyên dạng ĐÃ MÃ HOÁ: bảng jobs sống lâu hơn bảng config rất nhiều (nó là lịch sử),
   // nên để plaintext ở đây là tự tay dựng lại đúng cái lỗ vừa bịt. Giải mã diễn ra đúng
-  // một lần, ở /api/worker, khi linh sứ đã xác thực.
+  // một lần, ở /api/worker, khi khôi lỗi đã xác thực.
   const config = await getStoredConfigForSnapshot(userId);
   const workerOnline = await anyWorkerOnlineFor(userId);
   const startedLabels: string[] = [];
@@ -198,16 +198,16 @@ export async function startJob(userId: string): Promise<StartOutcome> {
       `Đàn pháp đã lập cho「${account.label}」— sẽ tự chạy liên tục qua nhiều vòng cho tới khi đạo hữu Thu Đàn.`,
     );
 
-    // Nói thật NGAY LÚC NÀY nếu chẳng có linh sứ nào nhận nổi job — trước đây người dùng chỉ
+    // Nói thật NGAY LÚC NÀY nếu chẳng có khôi lỗi nào nhận nổi job — trước đây người dùng chỉ
     // biết điều đó sau sáu phút im lặng, khi reaper kết liễu job. Vẫn cho xếp hàng (một linh
     // sứ có thể lên ca ngay sau đây), nhưng cảnh báo nằm sẵn trong nhật ký.
     if (workerOnline) {
-      await addEvent(jobId, "info", "Linh sứ đang trực — sẽ tiếp nhận trong giây lát.");
+      await addEvent(jobId, "info", "Khôi lỗi đang trực — sẽ tiếp nhận trong giây lát.");
     } else {
       await addEvent(
         jobId,
         "warning",
-        "Chưa thấy linh sứ nào điểm danh — đàn pháp sẽ chờ. Cài linh sứ riêng ở mục Linh Sứ nếu chờ quá lâu.",
+        "Chưa thấy khôi lỗi nào điểm danh — đàn pháp sẽ chờ. Cài khôi lỗi riêng ở mục Khôi Lỗi nếu chờ quá lâu.",
       );
     }
 
@@ -280,7 +280,7 @@ async function announceStops(rows: Array<Record<string, unknown>>): Promise<void
       "info",
       stoppedNow
         ? "Đã thu đàn — vòng kế chưa kịp bắt đầu."
-        : "Đã gửi lệnh thu đàn — linh sứ sẽ dừng ở điểm an toàn kế tiếp.",
+        : "Đã gửi lệnh thu đàn — khôi lỗi sẽ dừng ở điểm an toàn kế tiếp.",
     );
   }
 }
@@ -294,8 +294,8 @@ async function announceStops(rows: Array<Record<string, unknown>>): Promise<void
  * locking story: two workers racing get two different rows or one row and one null —
  * Postgres decides, nobody double-runs.
  *
- * Scope là hàng rào phân quyền, không phải tuỳ chọn: linh sứ tông môn (operator) nhận job
- * của bất kỳ ai; linh sứ riêng chỉ nhìn thấy hàng chờ CỦA CHỦ MÌNH — điều kiện nằm ngay
+ * Scope là hàng rào phân quyền, không phải tuỳ chọn: khôi lỗi tông môn (operator) nhận job
+ * của bất kỳ ai; khôi lỗi riêng chỉ nhìn thấy hàng chờ CỦA CHỦ MÌNH — điều kiện nằm ngay
  * trong câu SQL nên không tồn tại đường nào claim chéo, kể cả khi route quên kiểm.
  */
 export async function claimNextJob(workerId: string, scope: WorkerScope): Promise<JobRow | null> {
@@ -361,8 +361,8 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
     String(row.id),
     "success",
     attempts === 1
-      ? `Linh sứ「${workerId}」đã tiếp nhận đàn pháp.`
-      : `Linh sứ「${workerId}」bắt đầu vòng ${attempts}.`,
+      ? `Khôi lỗi「${workerId}」đã tiếp nhận đàn pháp.`
+      : `Khôi lỗi「${workerId}」bắt đầu vòng ${attempts}.`,
   );
   return {
     id: String(row.id),
@@ -404,18 +404,18 @@ export async function jobBelongsTo(jobId: string, scope: WorkerScope): Promise<b
  * Heartbeat returns the job's CURRENT status so the worker learns about a stop request —
  * và trả kèm `workerId` để nơi gọi làm mới điểm danh.
  *
- * Vì sao phải trả workerId: sổ điểm danh chỉ được cập nhật ở `claim`, mà một linh sứ ĐANG
- * BẬN thì thôi không claim nữa. Hệ quả đo được ngày 02/08: linh sứ chạy Mê Cung — phiên dài
+ * Vì sao phải trả workerId: sổ điểm danh chỉ được cập nhật ở `claim`, mà một khôi lỗi ĐANG
+ * BẬN thì thôi không claim nữa. Hệ quả đo được ngày 02/08: khôi lỗi chạy Mê Cung — phiên dài
  * hàng chục phút — tụt khỏi sổ sau 30 giây và dashboard báo "vắng mặt" đúng lúc nó làm việc
- * chăm chỉ nhất; tệ hơn, `startJob` đọc cùng cái sổ ấy nên cảnh báo sai "chưa thấy linh sứ
+ * chăm chỉ nhất; tệ hơn, `startJob` đọc cùng cái sổ ấy nên cảnh báo sai "chưa thấy khôi lỗi
  * nào". Nhịp tim định kỳ là bằng chứng sống chính xác hơn, và nó có sẵn.
  *
- * Lấy workerId từ CHÍNH DÒNG JOB chứ không bắt worker khai thêm: nhờ vậy những linh sứ đã
+ * Lấy workerId từ CHÍNH DÒNG JOB chứ không bắt worker khai thêm: nhờ vậy những khôi lỗi đã
  * cài từ trước không phải cập nhật gì mà vẫn được điểm danh đúng.
  *
  * `progress` cưỡi luôn nhịp tim này thay vì có op riêng: nó đổi đúng vào những lúc nhịp tim
  * vẫn đang chạy, nên một op mới chỉ là thêm một request mỗi lần đổi mà không sớm hơn được
- * giây nào. VẮNG MẶT KHÁC HẲN RỖNG — linh sứ đời cũ không biết trường này, và với nó cột
+ * giây nào. VẮNG MẶT KHÁC HẲN RỖNG — khôi lỗi đời cũ không biết trường này, và với nó cột
  * phải được GIỮ NGUYÊN chứ không bị xoá trắng mỗi 5 giây; nên chỉ nhắc tới cột khi thật sự
  * có tiến độ để ghi.
  */
@@ -524,7 +524,7 @@ export async function completeWorkerCycle(
   const stopFromWorker = outcome === "stopped";
 
   // Tài khoản đã tắt (hoặc job đời cũ mà tài khoản không còn) thì vòng này là vòng cuối:
-  // re-queue một đàn mà claim sẽ không bao giờ phát ra chỉ tạo zombie "chờ linh sứ" vĩnh
+  // re-queue một đàn mà claim sẽ không bao giờ phát ra chỉ tạo zombie "chờ khôi lỗi" vĩnh
   // viễn. Điều kiện nằm TRONG cùng câu UPDATE để không mở khe đua với toggleAccountAction.
   const accountRetired = sql`(
     automation_jobs.account_id is not null
@@ -684,7 +684,7 @@ export async function eventsForJobs(jobIds: string[], afterId: number): Promise<
 /**
  * Dọn job đang chạy nhưng mất nhịp tim.
  *
- * `queued` KHÔNG còn là xác: nó có thể đang ngủ tới `nextRunAt`, hoặc đang chờ một linh sứ
+ * `queued` KHÔNG còn là xác: nó có thể đang ngủ tới `nextRunAt`, hoặc đang chờ một khôi lỗi
  * bận làm vòng dài cho người khác. Kết liễu hàng chờ sau hai phút sẽ phá chính lời hứa auto
  * liên tục. `startJob` đã ghi cảnh báo ngay khi không thấy ai trực; job cứ chờ tới khi có
  * người nhận hoặc chủ nhân Thu Đàn.
@@ -705,7 +705,7 @@ export async function reapStaleJobs(): Promise<void> {
     );
 
   for (const row of stale) {
-    await completeJob(row.id, "failed", "Linh sứ mất liên lạc (quá 3 phút không hồi đáp) — lượt bị kết thúc.");
+    await completeJob(row.id, "failed", "Khôi lỗi mất liên lạc (quá 3 phút không hồi đáp) — lượt bị kết thúc.");
   }
 
 }

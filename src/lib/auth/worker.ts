@@ -3,17 +3,17 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 
 /**
- * Cửa vào của linh sứ (worker) — giờ có HAI loại chìa.
+ * Cửa vào của khôi lỗi (worker) — giờ có HAI loại chìa.
  *
  * Worker không phải là một người dùng: nó không có session, không có cookie trình duyệt,
  * và nó gọi từ một máy khác — nên nó tự xưng bằng bí mật trong header
- * `Authorization: Bearer <token>`. Điều đổi khác từ khi có trang cài linh sứ: token không
+ * `Authorization: Bearer <token>`. Điều đổi khác từ khi có trang cài khôi lỗi: token không
  * thể là MỘT bí mật dùng chung nữa, vì ai cầm bí mật chung là claim được job của tất cả —
  * tức đọc được cookie game của tất cả. Nên:
  *
- *   • WORKER_TOKEN (env) — chìa của LINH SỨ TÔNG MÔN, do người vận hành giữ, cắm vào VM
+ *   • WORKER_TOKEN (env) — chìa của KHÔI LỖI TÔNG MÔN, do người vận hành giữ, cắm vào VM
  *     luôn trực. Scope `operator`: nhận job của mọi thành viên.
- *   • Linh phù — token riêng từng đạo hữu, phát ở mục Linh Sứ, lưu trong users dưới dạng
+ *   • Linh phù — token riêng từng đạo hữu, phát ở mục Khôi Lỗi, lưu trong users dưới dạng
  *     SHA-256. Scope `user`: chỉ nhận job của chính chủ, và chỉ được chạm vào job của
  *     chính chủ ở mọi op còn lại.
  *
@@ -22,8 +22,8 @@ import { db, schema } from "@/lib/db/client";
  * index, nên phép tra bằng đẳng thức là đủ — và sau khi tra vẫn đối chiếu lại hash lần nữa
  * bằng timingSafeEqual cho chắc.
  *
- * Đổi WORKER_TOKEN trên Vercel cắt linh sứ tông môn bị lộ; bấm "thu hồi linh phù" cắt một
- * linh sứ riêng — cả hai có hiệu lực ngay ở request kế tiếp.
+ * Đổi WORKER_TOKEN trên Vercel cắt khôi lỗi tông môn bị lộ; bấm "thu hồi linh phù" cắt một
+ * khôi lỗi riêng — cả hai có hiệu lực ngay ở request kế tiếp.
  */
 
 export type WorkerScope =
@@ -41,7 +41,7 @@ function safeEqual(a: string, b: string): boolean {
   return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
 }
 
-/** Trả về scope của linh sứ đang gõ cửa, hoặc null nếu chìa không mở được gì. */
+/** Trả về scope của khôi lỗi đang gõ cửa, hoặc null nếu chìa không mở được gì. */
 export async function authorizeWorker(request: Request): Promise<WorkerScope | null> {
   const header = request.headers.get("authorization") ?? "";
   const presented = header.startsWith("Bearer ") ? header.slice(7) : "";
@@ -56,7 +56,7 @@ export async function authorizeWorker(request: Request): Promise<WorkerScope | n
     return { kind: "operator" };
   }
 
-  // Linh phù: tra hash. Chỉ tài khoản `active` mới dùng được — đạo hữu bị khoá thì linh sứ
+  // Linh phù: tra hash. Chỉ tài khoản `active` mới dùng được — đạo hữu bị khoá thì khôi lỗi
   // của họ cũng mất quyền theo, không cần ai nhớ đi thu hồi token.
   const hash = hashWorkerToken(presented);
   const rows = await db()

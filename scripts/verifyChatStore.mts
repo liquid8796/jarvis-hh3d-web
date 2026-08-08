@@ -46,8 +46,8 @@ const { getAppSettings } = await import("../src/lib/services/settings.ts");
 const RETENTION_DAYS = (await getAppSettings()).chat.retentionDays;
 console.log(`• hạn lưu đang cấu hình: ${RETENTION_DAYS} ngày.`);
 
-const admin = { id: "u-admin", name: "Trưởng môn", isAdmin: true };
-const member = { id: "u-member", name: "Đạo hữu", isAdmin: false };
+const admin = { id: "u-admin", name: "Trưởng môn", isAdmin: true, tags: [] as string[] };
+const member = { id: "u-member", name: "Đạo hữu", isAdmin: false, tags: ["Luyện đan"] };
 const client = new MongoClient(uri);
 
 try {
@@ -65,7 +65,11 @@ try {
   const first = feed.messages[0];
   assert(first.text === "xin chào tông môn", "nội dung phải nguyên vẹn");
   assert(first.author === "Đạo hữu", "tên người gửi phải đóng băng trong tin");
-  console.log("✔ Gửi/đọc: tin vào kho nguyên vẹn, tin rỗng và tin quá dài bị chặn.");
+  assert(
+    first.tags.length === 1 && first.tags[0] === "Luyện đan",
+    "tag trang trí phải ĐÓNG BĂNG vào tin lúc gửi, y như tên",
+  );
+  console.log("✔ Gửi/đọc: tin vào kho nguyên vẹn (kèm tag đóng băng), tin rỗng và tin quá dài bị chặn.");
 
   // ---- Cảm xúc: bật, tắt, và đếm theo người --------------------------------------
   assert((await chat.toggleReaction(member.id, first.id, "👍")).ok, "thả cảm xúc phải được");
@@ -114,8 +118,8 @@ try {
 
   // ---- Thu hồi: giữ vết, lột nội dung, cuốn theo cảm xúc --------------------------
   await chat.toggleReaction(admin.id, first.id, "😀");
-  assert(!(await chat.deleteMessage({ id: "u-la", role: "user" }, first.id)).ok, "người lạ không được thu hồi");
-  assert((await chat.deleteMessage({ id: member.id, role: "user" }, first.id)).ok, "chủ nhân phải thu hồi được");
+  assert(!(await chat.deleteMessage({ id: "u-la" }, first.id)).ok, "người lạ không được thu hồi");
+  assert((await chat.deleteMessage({ id: member.id }, first.id)).ok, "chủ nhân phải thu hồi được");
   feed = await chat.getFeed({ viewerId: admin.id });
   if (feed.storeClosed) throw new Error("unreachable");
   const gone = feed.messages.find((m) => m.id === first.id);
@@ -126,14 +130,25 @@ try {
   assert(!(await chat.editMessage(member.id, first.id, "hồi sinh")).ok, "tin đã thu hồi thì không sửa được nữa");
   console.log("✔ Thu hồi: giữ vết, lột nội dung + cảm xúc, tin trả lời biết tin gốc đã mất.");
 
-  // Trưởng môn thu hồi được tin của người khác.
-  await chat.sendMessage(member, { text: "tin sẽ bị trưởng môn thu" });
+  // ĐẢO CHIỀU 08/08/2026: trước đây admin thu hồi ĐƯỢC tin người khác và có phép thử bảo
+  // chứng điều đó như một tính năng. Đó là lỗ hổng: "thu hồi" nghĩa là TÔI rút lời TÔI —
+  // để người khác rút được lời của bạn thì lịch sử đàm đạo thành thứ ai cầm quyền nấy viết
+  // lại. Giờ phép thử gác chiều ngược: admin KHÔNG thu hồi được tin không phải của mình.
+  await chat.sendMessage(member, { text: "tin admin không được đụng" });
   feed = await chat.getFeed({ viewerId: admin.id });
   if (feed.storeClosed) throw new Error("unreachable");
-  const victim = feed.messages.find((m) => m.text === "tin sẽ bị trưởng môn thu");
+  const victim = feed.messages.find((m) => m.text === "tin admin không được đụng");
   assert(victim, "phải tìm được tin vừa gửi");
-  assert((await chat.deleteMessage({ id: admin.id, role: "admin" }, victim!.id)).ok, "trưởng môn phải thu hồi được tin người khác");
-  console.log("✔ Trưởng môn thu hồi được tin của người khác.");
+  assert(
+    !(await chat.deleteMessage({ id: admin.id }, victim!.id)).ok,
+    "admin KHÔNG được thu hồi tin người khác — quyền ấy đã bị bãi bỏ, kể cả Gia chủ",
+  );
+  feed = await chat.getFeed({ viewerId: member.id });
+  if (feed.storeClosed) throw new Error("unreachable");
+  const survivor = feed.messages.find((m) => m.id === victim!.id);
+  assert(survivor && !survivor.deleted && survivor.text === "tin admin không được đụng",
+    "tin phải còn NGUYÊN VẸN sau cú thu hồi hụt của admin");
+  console.log("✔ Thu hồi chỉ dành cho chủ tin — admin bị từ chối và tin còn nguyên.");
 
   // ---- Đang gõ -------------------------------------------------------------------
   await chat.markTyping({ id: member.id, name: "Đạo hữu" }, true);

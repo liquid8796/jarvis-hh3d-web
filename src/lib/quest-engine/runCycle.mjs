@@ -18,7 +18,7 @@ import { createSession } from "./session.mjs";
 
 // Base URL + parser cookie sống ở module LÁ cookies.mjs (không import gì, không đụng đĩa)
 // để server action của Next dùng được mà không kéo cả engine — và cả profile.json — vào
-// bundle. Re-export để mọi nơi đang import từ đây vẫn nguyên, và để gói linh sứ chỉ cần
+// bundle. Re-export để mọi nơi đang import từ đây vẫn nguyên, và để gói khôi lỗi chỉ cần
 // biết một cửa.
 export { DEFAULT_GAME_BASE_URL, parseCookieString } from "./cookies.mjs";
 
@@ -81,7 +81,7 @@ function formatDuration(seconds) {
 /**
  * Bao nhiêu tab nhiệm vụ được mở CÙNG LÚC trong một vòng.
  *
- * Vì sao phải có trần, đo được trên linh sứ tông môn ngày 05/08: bản đầu của nhịp song song
+ * Vì sao phải có trần, đo được trên khôi lỗi tông môn ngày 05/08: bản đầu của nhịp song song
  * mở MỘT TAB CHO MỖI nhiệm vụ, không giới hạn. Tài khoản thường bật 8 nhiệm vụ, và tám
  * nhiệm vụ ấy là tám TRANG KHÁC NHAU cùng dựng một lúc trên VM 2 nhân — kết quả là 18 dòng
  * lỗi "selector không xuất hiện" rải ngẫu nhiên khắp các nhiệm vụ (Luyện Đan 7 lần, Tế Lễ 4,
@@ -154,7 +154,7 @@ async function ensureReady(session, baseUrl, say, log, { context, cookieJar }) {
   /**
    * Tên miền mà lượt điều hướng THẬT SỰ dừng chân, nếu nó khác nơi ta gõ cửa. Site đổi TLD
    * định kỳ (mx → am → …) và tên miền cũ 301 sang tên miền mới; cookie thì gắn chặt vào
-   * tên miền, nên chúng KHÔNG đi theo cú nhảy ấy và trang mới nhìn linh sứ như khách lạ.
+   * tên miền, nên chúng KHÔNG đi theo cú nhảy ấy và trang mới nhìn khôi lỗi như khách lạ.
    * Bắt được sự thật này ở đây biến một đêm truy vết thành một dòng nhật ký.
    */
   let movedTo = null;
@@ -193,7 +193,7 @@ async function ensureReady(session, baseUrl, say, log, { context, cookieJar }) {
       if (!saidChallenge) {
         // Nói MỘT lần rồi chờ trong im lặng — màn kiểm tra dạng managed đôi khi tự qua
         // sau vài giây, nhưng mỗi nhịp poll mà một dòng nhật ký thì thành rác.
-        await say("Trang game đang dựng màn kiểm tra (Cloudflare) — linh sứ đứng chờ trước cổng…", "warn");
+        await say("Trang game đang dựng màn kiểm tra (Cloudflare) — khôi lỗi đứng chờ trước cổng…", "warn");
         saidChallenge = true;
       }
       await new Promise((r) => setTimeout(r, 2_000));
@@ -212,7 +212,7 @@ async function ensureReady(session, baseUrl, say, log, { context, cookieJar }) {
    * Đây là chỗ vụ 02/08 nổ ra. Hồ sơ bền giữ cookie phiên do site tự làm mới, nên lúc mở
    * ta cố ý KHÔNG đè chuỗi dán-tay lên trên — đè là tự tay đăng xuất một phiên đang lành.
    * Nhưng phép kiểm ấy chỉ hỏi "có cookie đăng nhập không", không hỏi "nó còn sống không".
-   * Một cookie đã chết vẫn thoả mãn câu hỏi đó, nên linh sứ ôm cái xác đi tiếp, và trang lò
+   * Một cookie đã chết vẫn thoả mãn câu hỏi đó, nên khôi lỗi ôm cái xác đi tiếp, và trang lò
    * render ở dạng chưa đăng nhập — `#ld-app` không bao giờ hiện. Lỗi nổi lên ở tên một
    * selector vô tội, mười bước sau nguyên nhân thật.
    *
@@ -296,9 +296,9 @@ export async function runCycle(deps) {
     reportProgress = () => {},
     shouldStop = () => false,
     // Thứ tự nguồn có chủ ý: người gọi truyền thẳng (smoke) > tên miền server gửi kèm job >
-    // env của máy chạy linh sứ > hằng số trong mã nguồn. Server đứng TRÊN env vì đó là chỗ
+    // env của máy chạy khôi lỗi > hằng số trong mã nguồn. Server đứng TRÊN env vì đó là chỗ
     // duy nhất trưởng môn sửa được mà không phải đụng vào từng máy; env vẫn giữ nguyên quyền
-    // phủ quyết cục bộ cho ai muốn trỏ linh sứ nhà mình đi chỗ khác để thử.
+    // phủ quyết cục bộ cho ai muốn trỏ khôi lỗi nhà mình đi chỗ khác để thử.
     baseUrl = deps.config?.gameBaseUrl?.trim() || process.env.GAME_BASE_URL || DEFAULT_GAME_BASE_URL,
     budgetMs = 0,
     headless = true,
@@ -450,11 +450,11 @@ export async function runCycle(deps) {
         "failed",
         ready.movedTo
           ? `Site đã dời tên miền: ${baseUrl} chuyển hướng sang ${ready.movedTo}. Cookie gắn theo ` +
-            "tên miền nên KHÔNG đi theo — trang mới nhìn linh sứ như khách lạ. Cần cập nhật tên " +
+            "tên miền nên KHÔNG đi theo — trang mới nhìn khôi lỗi như khách lạ. Cần cập nhật tên " +
             "miền game rồi dán lại chuỗi cookie lấy từ tên miền mới ở Ngọc Giản Cấu Hình."
           : "Không xác nhận được phiên đăng nhập, và hub cũng không dựng nổi bảng nhiệm vụ — " +
-            "nhiều khả năng cookie đã hết hạn hoặc site đang chắn linh sứ. Dán chuỗi cookie mới ở " +
-            "Ngọc Giản Cấu Hình; lượt sau linh sứ vẫn sẽ tự thử lại.",
+            "nhiều khả năng cookie đã hết hạn hoặc site đang chắn khôi lỗi. Dán chuỗi cookie mới ở " +
+            "Ngọc Giản Cấu Hình; lượt sau khôi lỗi vẫn sẽ tự thử lại.",
       );
     }
 
@@ -649,7 +649,7 @@ export async function runCycle(deps) {
         }
 
         // Tuần tự trong đàn NÀY không có nghĩa là một mình trên máy: các đàn khác của cùng
-        // linh sứ vẫn chạy cạnh bên, nên nhánh này cũng phải qua cổng toàn cục như ai.
+        // khôi lỗi vẫn chạy cạnh bên, nên nhánh này cũng phải qua cổng toàn cục như ai.
         const slot = await acquireQuestSlot({
           dedicated: isDedicatedPageQuest(profile, quest),
           name: quest.name,

@@ -2,13 +2,15 @@
 
 import { useActionState, useState } from "react";
 import { createUserAction, type AdminResult } from "@/app/actions/admin";
+import { canEditRoles, ROLE_LABEL, type Role } from "@/lib/auth/permissions";
+import type { PublicUser } from "@/lib/services/users";
 
 /**
  * Thu nhận thẳng một đạo hữu, không qua cổng đăng ký. Panel gập lại mặc định vì đây là
  * việc hiếm — thứ admin mở trang này để làm hằng ngày là duyệt hàng chờ, không phải tạo
  * người mới.
  */
-export function CreateUserPanel() {
+export function CreateUserPanel({ viewer }: { viewer: PublicUser }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState<AdminResult | null, FormData>(
     createUserAction,
@@ -76,15 +78,19 @@ export function CreateUserPanel() {
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label" htmlFor="new-role">
-              Vai trò
-            </label>
-            <select id="new-role" name="role" className="input" defaultValue="user">
-              <option value="user">Môn đồ</option>
-              <option value="admin">Trưởng môn</option>
-            </select>
-          </div>
+          {canEditRoles(viewer) && (
+            <fieldset>
+              <legend className="label">Vai trò</legend>
+              <div className="flex flex-col gap-1 pt-1">
+                {(Object.keys(ROLE_LABEL) as Role[]).map((role) => (
+                  <label key={role} className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="roles" value={role} />
+                    {ROLE_LABEL[role]}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
           <div>
             <label className="label" htmlFor="new-status">
               Trạng thái

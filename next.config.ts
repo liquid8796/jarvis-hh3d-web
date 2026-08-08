@@ -6,12 +6,12 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
 
   /**
-   * Hai script cài linh sứ PHẢI được khai là UTF-8 — không phải chuyện thẩm mỹ.
+   * Hai script cài khôi lỗi PHẢI được khai là UTF-8 — không phải chuyện thẩm mỹ.
    *
    * Next phục vụ tệp trong public/ với `application/octet-stream`, KHÔNG kèm charset. Mà
    * `Invoke-RestMethod` của PowerShell 5.1 (bản có sẵn trên mọi máy Windows) khi không thấy
    * charset thì mặc định giải mã ISO-8859-1 — nên mọi chữ tiếng Việt trong script biến thành
-   * ký tự rác NGAY TRƯỚC KHI `iex` chạy nó. Đo được: "Cài linh sứ" ra "CÃ i linh sá»©".
+   * ký tự rác NGAY TRƯỚC KHI `iex` chạy nó. Đo được: "Cài khôi lỗi" ra "CÃ i linh sá»©".
    *
    * Người dùng vẫn cài xong (mã lệnh là ASCII), nhưng họ đọc một màn hình đầy rác và không
    * biết chuyện gì đang xảy ra với máy mình — với một script tải runtime về chạy thì đó là

@@ -121,7 +121,7 @@ export async function addAccount(
 
 /**
  * Thay cookie của một tài khoản. Cookie mới có thể thuộc hạng đối nghịch nên verdict cũ bị
- * xoá — chỉ linh sứ nhìn hub mới được quyền phán lại (đúng luật đã đặt ở saveCookie cũ).
+ * xoá — chỉ khôi lỗi nhìn hub mới được quyền phán lại (đúng luật đã đặt ở saveCookie cũ).
  */
 export async function updateAccountCookie(
   userId: string,
@@ -187,7 +187,7 @@ export async function setAccountEnabled(
 
 /**
  * Xoá tài khoản. FK cascade kéo theo job và nhật ký của nó — nơi gọi phải chắc rằng không
- * còn job đang sống (actions kiểm và từ chối), vì một linh sứ đang cầm job bị xoá dưới chân
+ * còn job đang sống (actions kiểm và từ chối), vì một khôi lỗi đang cầm job bị xoá dưới chân
  * sẽ chỉ còn biết kể lỗi vào console của chính nó.
  */
 export async function deleteAccount(

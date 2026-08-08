@@ -119,7 +119,7 @@ try {
   //
   // Cột này là thứ Hàng Đợi Công Việc đọc để nói "đàn kia đang làm nhiệm vụ gì". Ba luật
   // dưới đây là ba cách nó có thể nói dối, và cả ba đều từng là kịch bản thật của cột khác:
-  // ghi rồi không dọn (kể chuyện vòng trước suốt cả cooldown), dọn quá tay (linh sứ đời cũ
+  // ghi rồi không dọn (kể chuyện vòng trước suốt cả cooldown), dọn quá tay (khôi lỗi đời cũ
   // bị xoá trắng mỗi 5 giây), và đánh thức cả tông môn mỗi nhịp tim.
   await sql`
     update automation_jobs
@@ -135,13 +135,13 @@ try {
     `nhịp tim phải ghi được tiến độ, nhận ${JSON.stringify(afterBeat[0]?.cycle_progress)}`,
   );
 
-  // Linh sứ ĐÃ CÀI ngoài kia không biết trường này. Với nó, nhịp tim phải là một phép
+  // Khôi lỗi ĐÃ CÀI ngoài kia không biết trường này. Với nó, nhịp tim phải là một phép
   // "tôi còn sống" thuần tuý — không phải một lệnh xoá lặp lại mỗi 5 giây.
   await heartbeat(jobId);
   const afterOldBeat = await sql`select cycle_progress from automation_jobs where id = ${jobId}`;
   assert(
     sameProgress(afterOldBeat[0]?.cycle_progress, beating),
-    "nhịp tim của linh sứ đời cũ (không gửi progress) phải GIỮ NGUYÊN cột, không xoá",
+    "nhịp tim của khôi lỗi đời cũ (không gửi progress) phải GIỮ NGUYÊN cột, không xoá",
   );
 
   // Vòng xong → không còn nhiệm vụ nào đang chạy. Thiếu phép dọn này thì một đàn đang nghỉ

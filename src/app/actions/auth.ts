@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { isAdminUser } from "@/lib/auth/permissions";
 import { z } from "zod";
 import { createSession, destroySession } from "@/lib/auth/session";
 import { register, verifyCredentials } from "@/lib/services/users";
@@ -46,10 +47,12 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
     return { error: result.error };
   }
 
+  // Claim `role` trong JWT là DI SẢN — không nơi nào đọc nó để phân quyền (guard nào cũng
+  // đọc lại DB), giữ cho cookie cũ và mới cùng hình dạng. Ghi gương từ roles.
   await createSession({
     sub: result.user.id,
     username: result.user.username,
-    role: result.user.role,
+    role: isAdminUser(result.user) ? "admin" : "user",
   });
 
   // Đích đến do trạng thái THẬT vừa ghi xuống quyết định, không do đoán theo môn quy: giữa
@@ -77,7 +80,7 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
     redirect(next);
   }
 
-  redirect(user.role === "admin" ? "/admin" : user.status === "active" ? "/dashboard" : "/pending");
+  redirect(isAdminUser(user) ? "/admin" : user.status === "active" ? "/dashboard" : "/pending");
 }
 
 export async function logoutAction(): Promise<void> {

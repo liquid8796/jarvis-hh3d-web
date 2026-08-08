@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isAdminUser } from "@/lib/auth/permissions";
 import { currentUser } from "@/lib/auth/guards";
 import { logoutAction } from "@/app/actions/auth";
 import { SectSeal } from "./SectSeal";
@@ -56,7 +57,7 @@ export async function SiteHeader() {
             <Link href="/profile" className="btn btn-ghost">
               Hồ Sơ
             </Link>
-            {user.role === "admin" && (
+            {isAdminUser(user) && (
               <Link href="/admin" className="btn btn-ghost">
                 Tông Môn
               </Link>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAdminUser } from "@/lib/auth/permissions";
 import { z } from "zod";
 import { authorizeWorker } from "@/lib/auth/worker";
 import { addEvent, claimNextJob, completeWorkerCycle, heartbeat, jobBelongsTo } from "@/lib/services/jobs";
@@ -15,15 +16,15 @@ import { findById } from "@/lib/services/users";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 
 /**
- * Giao thức linh sứ — MỘT endpoint, phân nhánh theo `op`.
+ * Giao thức khôi lỗi — MỘT endpoint, phân nhánh theo `op`.
  *
  * Gộp làm một thay vì năm route riêng là có chủ ý: cả năm thao tác dùng chung đúng một
  * cách xác thực, chung một hình thù request/response, và chúng luôn thay đổi cùng nhau
  * (thêm một trường vào heartbeat là đụng cả worker lẫn server). Một file giữ giao thức nằm
  * gọn trong một màn hình, và worker chỉ cần biết một URL.
  *
- * Xác thực trả về SCOPE chứ không phải có/không: linh sứ tông môn (WORKER_TOKEN) đụng
- * được mọi job, linh sứ riêng (linh phù) chỉ đụng được job của chủ mình. Claim đã lọc
+ * Xác thực trả về SCOPE chứ không phải có/không: khôi lỗi tông môn (WORKER_TOKEN) đụng
+ * được mọi job, khôi lỗi riêng (linh phù) chỉ đụng được job của chủ mình. Claim đã lọc
  * trong SQL; bốn op còn lại đi qua `jobBelongsTo` — hai lớp, lớp nào thủng vẫn còn lớp kia.
  *
  * Năm thao tác dựng nên vòng đời một lượt chạy:
@@ -36,7 +37,7 @@ import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
  */
 
 const bodySchema = z.discriminatedUnion("op", [
-  // `runner` cũ của worker đời trước vẫn được CHẤP NHẬN nhưng bị bỏ qua — một linh sứ chưa
+  // `runner` cũ của worker đời trước vẫn được CHẤP NHẬN nhưng bị bỏ qua — một khôi lỗi chưa
   // cập nhật không nên vỡ chỉ vì server đi trước nó một bản.
   z.object({
     op: z.literal("claim"),
@@ -47,11 +48,11 @@ const bodySchema = z.discriminatedUnion("op", [
     op: z.literal("heartbeat"),
     jobId: z.string().uuid(),
     /**
-     * Vòng này đang chạy nhiệm vụ nào — thứ Hàng Đợi Công Việc hiển thị. Linh sứ đời cũ
+     * Vòng này đang chạy nhiệm vụ nào — thứ Hàng Đợi Công Việc hiển thị. Khôi lỗi đời cũ
      * không gửi, và VẮNG MẶT phải khác RỖNG: vắng là "tôi không biết" (giữ nguyên cột), rỗng
      * là "đang giữa hai nhiệm vụ" (ghi đè). Zod `.optional()` giữ đúng ranh giới ấy.
      *
-     * Trần ở đây không phải cho linh sứ của chúng ta — nó gửi tên nhiệm vụ lấy từ hồ sơ, dài
+     * Trần ở đây không phải cho khôi lỗi của chúng ta — nó gửi tên nhiệm vụ lấy từ hồ sơ, dài
      * nhất khoảng ba chục ký tự. Nó dành cho một linh phù cá nhân bị dùng để bơm rác: đây là
      * dữ liệu do người dùng điều khiển đi thẳng lên màn hình của CẢ TÔNG MÔN, nên độ dài và
      * số lượng phải có trần trước khi chạm database. (React tự escape nên không có đường
@@ -74,7 +75,7 @@ const bodySchema = z.discriminatedUnion("op", [
     op: z.literal("event"),
     jobId: z.string().uuid(),
     // "warn" là cách engine gọi mức cảnh báo (OUTCOME_TEXT, các say(..., "warn") trong
-    // runCycle) — linh sứ ĐÃ CÀI ngoài kia vẫn gửi nguyên chữ đó. Từ chối nó là âm thầm vứt
+    // runCycle) — khôi lỗi ĐÃ CÀI ngoài kia vẫn gửi nguyên chữ đó. Từ chối nó là âm thầm vứt
     // mọi dòng cảnh báo của họ; nhận rồi dịch về "warning" ở dưới thì không ai phải cài lại.
     level: z.enum(["info", "success", "warning", "error", "warn"]).default("info"),
     message: z.string().min(1).max(2000),
@@ -115,7 +116,7 @@ export async function POST(request: Request) {
 
   switch (body.op) {
     case "claim": {
-      // Điểm danh ở claim — op dày nhịp nhất, và là op duy nhất một linh sứ NHÀN RỖI vẫn
+      // Điểm danh ở claim — op dày nhịp nhất, và là op duy nhất một khôi lỗi NHÀN RỖI vẫn
       // gọi đều — nên "đang trực" nghĩa là tiến trình còn sống, không phải nó đang bận.
       await recordWorkerSeen(body.workerId, scope);
 
@@ -124,7 +125,7 @@ export async function POST(request: Request) {
       // câu chuyện của nó, rồi completeWorkerCycle tái xếp job vào hàng — nơi claim sẽ không
       // phát ra nữa. Đó chính là "cho job dang dở hoàn thành rồi mới dừng": không cần dừng
       // ai cả, chỉ cần thôi phát việc mới. Trùng tu xong, mọi đàn tự chạy tiếp, không ai
-      // phải bấm lại Khai Đàn. Điểm danh vẫn ghi ở trên — linh sứ đang trực chứ không chết,
+      // phải bấm lại Khai Đàn. Điểm danh vẫn ghi ở trên — khôi lỗi đang trực chứ không chết,
       // sổ trực mà báo "vắng" trong lúc trùng tu là dashboard tự bịa thêm một sự cố.
       const settings = await getAppSettings();
       if (settings.maintenance.active) {
@@ -136,7 +137,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ job: null });
       }
 
-      // ĐÂY là điểm duy nhất cookie rời khỏi phong bì. Nó xảy ra sau khi linh sứ đã chứng
+      // ĐÂY là điểm duy nhất cookie rời khỏi phong bì. Nó xảy ra sau khi khôi lỗi đã chứng
       // minh danh tính (token tông môn hoặc linh phù của đúng chủ job), và đi tiếp trên
       // HTTPS tới một máy sắp dùng chính cookie đó để đăng nhập — không sớm hơn một dòng nào.
       //
@@ -152,14 +153,14 @@ export async function POST(request: Request) {
           : storedConfig.gameCookie;
       const config = configSchema.parse({ ...storedConfig, gameCookie: cookie });
 
-      // Luật nhà của linh sứ tông môn, áp ở ĐÂY chứ không chỉ lúc lưu ngọc giản.
+      // Luật nhà của khôi lỗi tông môn, áp ở ĐÂY chứ không chỉ lúc lưu ngọc giản.
       //
       // Lúc lưu chỉ chạm được những người còn bấm nút; document đã nằm sẵn trong database
       // với `capCheck: false` từ trước luật này thì không đường ghi nào với tới, và chủ nó
       // sẽ cứ thế đánh hết lượt Mê Cung trên máy chung cho tới ngày họ tình cờ mở trang cấu
       // hình. Cửa phát việc là chỗ duy nhất mọi vòng chạy đều đi qua.
       //
-      // Gác theo SCOPE vì luật nói về CÁI MÁY, không phải về con người: linh sứ riêng chạy
+      // Gác theo SCOPE vì luật nói về CÁI MÁY, không phải về con người: khôi lỗi riêng chạy
       // trên máy của chính đạo hữu, họ tiêu tài nguyên của mình và không ai phải xếp hàng
       // sau lưng. Chỉ ghế chung mới có luật chung.
       //
@@ -168,13 +169,13 @@ export async function POST(request: Request) {
       let guarded = config;
       if (scope.kind === "operator") {
         const owner = await findById(job.userId);
-        guarded = enforceMazeCapPolicy(config, { isAdmin: owner?.role === "admin" });
+        guarded = enforceMazeCapPolicy(config, { isAdmin: owner !== null && isAdminUser(owner) });
       }
 
       // Tên miền game ghép vào ĐÂY, cùng chỗ và cùng lý do với cookie: nó là sự thật của
       // TOÀN HỆ THỐNG tại thời điểm phát việc, không phải thứ đông lạnh trong snapshot của
       // job (job có thể đã nằm trong hàng chờ từ trước khi trưởng môn đổi tên miền). Ghép ở
-      // cửa phát việc nghĩa là mọi linh sứ, ở mọi máy, dùng tên miền mới ngay từ vòng kế —
+      // cửa phát việc nghĩa là mọi khôi lỗi, ở mọi máy, dùng tên miền mới ngay từ vòng kế —
       // không cài lại, không sửa env, không deploy.
       return NextResponse.json({
         job: {
@@ -195,7 +196,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "unknown job" }, { status: 404 });
       }
 
-      // Nhịp tim CŨNG là điểm danh: một linh sứ đang bận thì thôi không claim nữa, nên nếu
+      // Nhịp tim CŨNG là điểm danh: một khôi lỗi đang bận thì thôi không claim nữa, nên nếu
       // chỉ claim mới ghi sổ thì nó biến mất khỏi sổ đúng lúc làm việc chăm chỉ nhất.
       if (beat.workerId) {
         await recordWorkerSeen(beat.workerId, scope);

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Dựng LINH SỨ TÔNG MÔN trên VM Oracle Cloud Always Free — Ubuntu 24.04 aarch64.
+# Dựng KHÔI LỖI TÔNG MÔN trên VM Oracle Cloud Always Free — Ubuntu 24.04 aarch64.
 #
 # Chạy TRÊN VM (user mặc định `ubuntu`, có sudo):
 #   WEB_URL='https://auto-hh3d.vercel.app' WORKER_TOKEN='<token tông môn>' \
@@ -37,7 +37,7 @@ node --version
 echo "== [2/6] Người dùng dịch vụ =="
 id "$APP_USER" >/dev/null 2>&1 || useradd --system --create-home --shell /usr/sbin/nologin "$APP_USER"
 
-echo "== [3/6] Tải gói linh sứ =="
+echo "== [3/6] Tải gói khôi lỗi =="
 systemctl stop "$SERVICE" 2>/dev/null || true
 mkdir -p "$APP_DIR"
 curl -fsSL "$WEB_URL/linh-su/goi-linh-su.tgz" | tar -xz -C "$APP_DIR"
@@ -91,7 +91,7 @@ sleep 2
 systemctl --no-pager --lines=5 status "$SERVICE" || true
 
 echo ""
-echo "== Xong! Linh sứ tông môn đã lên ca. =="
+echo "== Xong! Khôi lỗi tông môn đã lên ca. =="
 echo "Nhật ký : journalctl -u $SERVICE -f"
 echo "Cập nhật: chạy lại đúng lệnh setup này."
-echo "Kiểm tra: mục Linh Sứ trên dashboard sẽ hiện 'Linh sứ tông môn — đang trực' trong ~30 giây."
+echo "Kiểm tra: mục Khôi Lỗi trên dashboard sẽ hiện 'Khôi lỗi tông môn — đang trực' trong ~30 giây."

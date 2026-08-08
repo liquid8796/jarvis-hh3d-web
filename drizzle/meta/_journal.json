@@ -78,6 +78,13 @@
       "when": 1785948943086,
       "tag": "0010_queue_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786203248100,
+      "tag": "0011_roles_and_tags",
+      "breakpoints": true
     }
   ]
 }

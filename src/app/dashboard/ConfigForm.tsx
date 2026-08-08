@@ -278,7 +278,7 @@ function CapLockDialog({ onClose }: { onClose: () => void }) {
           Tuỳ chọn này đã bị khoá
         </h3>
         <p className="mb-3 text-sm leading-relaxed text-[var(--color-parchment)]">
-          Mỗi lượt Mê Cung giữ một phiên trình duyệt hàng chục phút. Linh sứ tông môn chỉ có
+          Mỗi lượt Mê Cung giữ một phiên trình duyệt hàng chục phút. Khôi lỗi tông môn chỉ có
           vài ghế và cả tông môn dùng chung, nên bỏ tick này là mở đường cho vài đàn đánh hết
           lượt chiếm sạch chỗ — những đạo hữu còn lại xếp hàng cả ngày mà không hiểu vì sao.
         </p>
@@ -559,7 +559,7 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
             <span className="text-xs text-[var(--color-mist)]">
               {isAdmin
                 ? "(bỏ tick để đánh hết lượt)"
-                : "(khoá bật — Mê Cung giữ ghế linh sứ tông môn rất lâu)"}
+                : "(khoá bật — Mê Cung giữ ghế khôi lỗi tông môn rất lâu)"}
             </span>
           </label>
         </div>

@@ -883,7 +883,7 @@ async function main() {
 
   console.log("\nKhoá「Dừng khi đủ huyền tinh」của Mê Cung trên tài nguyên chung");
 
-  // Mê Cung là nhiệm vụ duy nhất giữ một phiên trình duyệt hàng chục phút, và linh sứ tông
+  // Mê Cung là nhiệm vụ duy nhất giữ một phiên trình duyệt hàng chục phút, và khôi lỗi tông
   // môn chỉ có vài ghế. Bỏ tick「dừng khi đủ huyền tinh」= đánh hết lượt = một đàn ngồi gần
   // trọn ngày trong đó. Nên với đạo hữu thường, luật bật lại nó; tông chủ được miễn.
   const { enforceMazeCapPolicy } = await import("../src/lib/services/configs.ts");
@@ -940,18 +940,18 @@ async function main() {
     /enforceMazeCapPolicy\(\s*parsed\.data,\s*\{\s*isAdmin: user\.role === "admin"/.test(automationSrc),
   );
   check(
-    "cửa PHÁT VIỆC của linh sứ tông môn cũng áp luật (phủ cả document cũ)",
+    "cửa PHÁT VIỆC của khôi lỗi tông môn cũng áp luật (phủ cả document cũ)",
     workerRouteSrc.includes("enforceMazeCapPolicy(config, { isAdmin: owner?.role === \"admin\" })") &&
       workerRouteSrc.includes('scope.kind === "operator"'),
   );
   check(
-    "và linh sứ RIÊNG không bị luật của ghế chung",
+    "và khôi lỗi RIÊNG không bị luật của ghế chung",
     /if \(scope\.kind === "operator"\) \{[\s\S]{0,200}?enforceMazeCapPolicy/.test(workerRouteSrc),
   );
 
   console.log("\nTrần số tab chạy song song");
 
-  // Cái trần này ra đời từ 18 dòng lỗi thật trên linh sứ tông môn ngày 05/08: tám trang
+  // Cái trần này ra đời từ 18 dòng lỗi thật trên khôi lỗi tông môn ngày 05/08: tám trang
   // khác nhau cùng dựng trên VM 2 nhân thì các tab thua cuộc đua báo "không thấy selector".
   // Ba điều phải đúng: không bao giờ vượt trần, không bỏ sót nhiệm vụ nào, và thứ tự kết
   // quả giữ nguyên (phần tường thuật một vòng phải đọc như bản tuần tự).
@@ -1171,7 +1171,7 @@ async function main() {
   console.log("\nLinh phù (worker token)");
 
   // Một chỗ băm duy nhất — chỗ phát (issueWorkerToken) và chỗ soát (authorizeWorker) đều
-  // gọi hàm này; hai bên mà tự băm riêng thì lệch nhau là khoá mọi linh sứ ngoài cửa.
+  // gọi hàm này; hai bên mà tự băm riêng thì lệch nhau là khoá mọi khôi lỗi ngoài cửa.
   const { hashWorkerToken } = await import("../src/lib/auth/worker.ts");
   check(
     "hash ổn định — phát và soát gặp nhau",
@@ -1283,7 +1283,7 @@ async function main() {
       (m) => notes.push(m),
     );
     check(
-      "bật một nhiệm vụ engine không biết → nói thẳng là linh sứ đang chạy gói cũ",
+      "bật một nhiệm vụ engine không biết → nói thẳng là khôi lỗi đang chạy gói cũ",
       notes.some((n) => n.includes("nhiemVuTuongLai") && n.includes("gói cũ")),
       notes.join(" / ") || "(im lặng)",
     );
@@ -2457,7 +2457,7 @@ async function main() {
       );
     }
 
-    // NỬA THỨ HAI — nguyên nhân THẬT của đêm 07/08: tên miền mới không nhận ra linh sứ nữa
+    // NỬA THỨ HAI — nguyên nhân THẬT của đêm 07/08: tên miền mới không nhận ra khôi lỗi nữa
     // (cookie gắn theo tên miền nên không đi theo cú 301). Trước bản này, toàn bộ chuỗi ấy
     // hiện ra dưới dạng chín dòng「không thấy .nv-quest」.
     {
@@ -2471,7 +2471,7 @@ async function main() {
       }
 
       check(
-        "dời tên miền + trang mới không nhận ra linh sứ → gọi đúng tên cú 301, cả hai đầu và việc phải làm",
+        "dời tên miền + trang mới không nhận ra khôi lỗi → gọi đúng tên cú 301, cả hai đầu và việc phải làm",
         moved.outcome === "failed" &&
           String(moved.message).includes("dời tên miền") &&
           String(moved.message).includes("localhost") &&
@@ -2487,8 +2487,8 @@ async function main() {
     }
 
     // NỬA THỨ BA — tên miền do SERVER gửi kèm job phải thắng hằng số trong mã nguồn của máy
-    // chạy linh sứ. Đây là cả cơ chế khiến trưởng môn đổi được tên miền mà không ai phải cài
-    // lại linh sứ.
+    // chạy khôi lỗi. Đây là cả cơ chế khiến trưởng môn đổi được tên miền mà không ai phải cài
+    // lại khôi lỗi.
     //
     // CỐ Ý KHÔNG truyền `baseUrl`: tham số truyền thẳng đứng TRÊN config trong thứ tự ưu
     // tiên, nên truyền cả hai là phép thử xanh kể cả khi `gameBaseUrl` bị bỏ qua sạch. Bỏ nó
@@ -2505,7 +2505,7 @@ async function main() {
       });
 
       check(
-        "tên miền server gửi kèm job dẫn đường được cả vòng chạy — đổi tên miền không cần cài lại linh sứ",
+        "tên miền server gửi kèm job dẫn đường được cả vòng chạy — đổi tên miền không cần cài lại khôi lỗi",
         fromConfig.outcome === "done" && lines.some((line) => line.includes("Điểm Danh")),
         `${fromConfig.outcome}: ${fromConfig.message}`,
       );

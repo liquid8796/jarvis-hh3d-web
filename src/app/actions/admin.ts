@@ -8,8 +8,14 @@ import { notifyDashboard } from "@/lib/realtime/dashboardChannel";
 // @ts-ignore — module JS thuần của quest-engine, không có d.ts và không cần. Import từ
 // module LÁ `cookies.mjs` chứ không qua runCycle.mjs, cùng lý do với automation.ts.
 import { normalizeGameBaseUrl } from "@/lib/quest-engine/cookies.mjs";
+import {
+  canEditRoles,
+  canManageUser,
+  normalizeRoles,
+  reviewRoleChange,
+} from "@/lib/auth/permissions";
 import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
-import { adminCreate, adminDelete, adminUpdate, setStatus } from "@/lib/services/users";
+import { adminCreate, adminDelete, adminUpdate, findById, setStatus } from "@/lib/services/users";
 import {
   displayNameSchema,
   emailSchema,
@@ -20,14 +26,36 @@ import {
 /**
  * Tông môn actions. Mỗi hàm mở đầu bằng `requireAdmin()` — không có ngoại lệ, kể cả những
  * hành động "nhỏ" như duyệt một người: form nào cũng có thể bị giả mạo, guard thì không thể
- * bị bỏ qua. Một admin tự hạ quyền hay tự khoá mình cũng bị chặn ở đây, vì một control
- * plane không còn ai giữ chìa là một căn phòng khoá trái.
+ * bị bỏ qua.
+ *
+ * Sau guard là MA TRẬN (permissions.ts): mọi action đụng vào một người khác phải đọc lại
+ * người ấy từ database rồi hỏi `canManageUser` — hỏi trên bản ghi THẬT, không phải trên
+ * role mà form gửi kèm, vì form là thứ ngoài Internet chạm tới được. Một admin tự hạ quyền
+ * hay tự khoá mình cũng bị chặn, vì control plane không còn ai giữ chìa là phòng khoá trái.
  */
 
 export type AdminResult = { ok: boolean; message: string };
 
 const statusSchema = z.enum(["pending", "active", "disabled"]);
-const roleSchema = z.enum(["user", "admin"]);
+
+/**
+ * Tag từ MỘT ô chữ, phân cách bằng dấu phẩy. Làm sạch ở server vì đây là ranh giới tin cậy:
+ * trần 3 tag × 20 ký tự là luật, không phải gợi ý của ô input.
+ */
+const MAX_TAGS = 3;
+const MAX_TAG_LENGTH = 20;
+
+function parseTags(raw: string): { ok: true; tags: string[] } | { ok: false; error: string } {
+  const tags = [...new Set(raw.split(",").map((t) => t.trim()).filter((t) => t.length > 0))];
+  if (tags.length > MAX_TAGS) {
+    return { ok: false, error: `Tối đa ${MAX_TAGS} tag cho một đạo hữu.` };
+  }
+  const tooLong = tags.find((t) => t.length > MAX_TAG_LENGTH);
+  if (tooLong) {
+    return { ok: false, error: `Tag「${tooLong.slice(0, 30)}…」dài quá ${MAX_TAG_LENGTH} ký tự.` };
+  }
+  return { ok: true, tags };
+}
 
 /** Duyệt / tạm khoá / trả về hàng chờ. */
 export async function setStatusAction(userId: string, status: string): Promise<AdminResult> {
@@ -41,6 +69,16 @@ export async function setStatusAction(userId: string, status: string): Promise<A
     return { ok: false, message: "Không thể tự khoá chính mình." };
   }
 
+  const target = await findById(userId);
+  if (!target) {
+    return { ok: false, message: "Không tìm thấy đạo hữu này." };
+  }
+  // Đình quyền một Trưởng môn cũng chính là vô hiệu hoá họ — nên nó đi qua đúng ma trận
+  // như trục xuất, không có cửa riêng "chỉ đổi trạng thái thôi mà".
+  if (userId !== admin.id && !canManageUser(admin, target)) {
+    return { ok: false, message: "Trưởng môn không đụng được người mang vai — việc của Gia chủ." };
+  }
+
   await setStatus(userId, parsed.data);
   revalidatePath("/admin");
 
@@ -50,7 +88,7 @@ export async function setStatusAction(userId: string, status: string): Promise<A
 }
 
 export async function createUserAction(_prev: AdminResult | null, formData: FormData): Promise<AdminResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
 
   const parsed = z
     .object({
@@ -58,7 +96,6 @@ export async function createUserAction(_prev: AdminResult | null, formData: Form
       displayName: displayNameSchema,
       email: emailSchema,
       password: passwordSchema,
-      role: roleSchema,
       status: statusSchema,
     })
     .safeParse({
@@ -66,7 +103,6 @@ export async function createUserAction(_prev: AdminResult | null, formData: Form
       displayName: formData.get("displayName"),
       email: formData.get("email"),
       password: formData.get("password"),
-      role: formData.get("role"),
       status: formData.get("status"),
     });
 
@@ -74,7 +110,14 @@ export async function createUserAction(_prev: AdminResult | null, formData: Form
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   }
 
-  const result = await adminCreate(parsed.data);
+  // Vai của người mới cũng là ĐỔI VAI — checkbox nằm trong form của Gia chủ, nhưng luật thì
+  // gác ở đây: admin thường gửi kèm field roles là bị từ chối, không phải bị lặng lẽ bỏ qua.
+  const requestedRoles = normalizeRoles(formData.getAll("roles").map(String));
+  if (requestedRoles.length > 0 && !canEditRoles(admin)) {
+    return { ok: false, message: "Chỉ Gia chủ mới được ban vai." };
+  }
+
+  const result = await adminCreate({ ...parsed.data, roles: requestedRoles });
   if (!result.ok) {
     return { ok: false, message: result.error };
   }
@@ -96,14 +139,12 @@ export async function updateUserAction(_prev: AdminResult | null, formData: Form
     .object({
       displayName: displayNameSchema,
       email: emailSchema,
-      role: roleSchema,
       status: statusSchema,
       password: z.union([passwordSchema, z.literal("")]),
     })
     .safeParse({
       displayName: formData.get("displayName"),
       email: formData.get("email"),
-      role: formData.get("role"),
       status: formData.get("status"),
       password,
     });
@@ -112,14 +153,44 @@ export async function updateUserAction(_prev: AdminResult | null, formData: Form
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." };
   }
 
-  if (userId === admin.id && (parsed.data.role !== "admin" || parsed.data.status !== "active")) {
-    return { ok: false, message: "Không thể tự hạ quyền hoặc tự khoá chính mình." };
+  const target = await findById(userId);
+  if (!target) {
+    return { ok: false, message: "Không tìm thấy đạo hữu này." };
+  }
+  if (userId !== admin.id && !canManageUser(admin, target)) {
+    return { ok: false, message: "Trưởng môn không đụng được người mang vai — việc của Gia chủ." };
+  }
+  if (userId === admin.id && parsed.data.status !== "active") {
+    return { ok: false, message: "Không thể tự khoá chính mình." };
+  }
+
+  const tagsParsed = parseTags(String(formData.get("tags") ?? ""));
+  if (!tagsParsed.ok) {
+    return { ok: false, message: tagsParsed.error };
+  }
+
+  // Vai: form của Gia chủ gửi kèm cờ `rolesSubmitted` — "phần vai CÓ mặt trong form này".
+  // Thiếu cờ = form không bày phần vai (admin thường) = giữ nguyên. Khác hẳn "bỏ hết tick"
+  // của Gia chủ, thứ PHẢI hiểu là thu mọi vai — không có cờ thì hai ý ấy trùng hình dạng
+  // (cùng là danh sách rỗng) và không phân xử nổi.
+  let nextRoles: string[] | undefined;
+  if (formData.get("rolesSubmitted") !== null) {
+    nextRoles = normalizeRoles(formData.getAll("roles").map(String));
+    const sameRoles =
+      nextRoles.length === target.roles.length && nextRoles.every((r) => target.roles.includes(r));
+    if (!sameRoles) {
+      const refusal = reviewRoleChange(admin, target, nextRoles);
+      if (refusal) {
+        return { ok: false, message: refusal };
+      }
+    }
   }
 
   const result = await adminUpdate(userId, {
     displayName: parsed.data.displayName,
     email: parsed.data.email,
-    role: parsed.data.role,
+    roles: nextRoles,
+    tags: tagsParsed.tags,
     status: parsed.data.status,
     password: parsed.data.password || undefined,
   });
@@ -136,6 +207,14 @@ export async function deleteUserAction(userId: string): Promise<AdminResult> {
   const admin = await requireAdmin();
   if (userId === admin.id) {
     return { ok: false, message: "Không thể tự trục xuất chính mình." };
+  }
+
+  const target = await findById(userId);
+  if (!target) {
+    return { ok: false, message: "Không tìm thấy đạo hữu này." };
+  }
+  if (!canManageUser(admin, target)) {
+    return { ok: false, message: "Trưởng môn không trục xuất được người mang vai — việc của Gia chủ." };
   }
 
   const result = await adminDelete(userId);
@@ -184,7 +263,7 @@ export async function saveMembershipSettingsAction(
  *
  * Site đổi TLD định kỳ (mx → am → one → …), và trước bản này mỗi cú dời bắt cả tông môn
  * đứng im chờ một lần deploy chỉ để sửa ba ký tự — đêm 07/08/2026 mất nhiều giờ đúng vì
- * chuyện đó. Giờ trưởng môn gõ tên miền mới, và vòng chạy KẾ TIẾP của mọi linh sứ (VM tông
+ * chuyện đó. Giờ trưởng môn gõ tên miền mới, và vòng chạy KẾ TIẾP của mọi khôi lỗi (VM tông
  * môn lẫn máy nhà từng đạo hữu) đã dùng nó, vì tên miền đi kèm mỗi lần phát việc.
  *
  * KHÔNG đụng tới cookie đã lưu, và đó là chủ ý: cookie gắn chặt vào tên miền nên sau một cú
@@ -217,7 +296,7 @@ export async function saveGameDomainAction(
   return {
     ok: true,
     message:
-      `Đã đổi tên miền: ${previous} → ${parsed.baseUrl}. Linh sứ dùng ngay từ vòng kế. ` +
+      `Đã đổi tên miền: ${previous} → ${parsed.baseUrl}. Khôi lỗi dùng ngay từ vòng kế. ` +
       "LƯU Ý: cookie gắn theo tên miền, nên mọi tài khoản phải dán lại chuỗi cookie lấy từ " +
       "tên miền mới, nếu không lượt chạy sẽ báo hết phiên đăng nhập.",
   };

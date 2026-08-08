@@ -11,17 +11,51 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
-## 0.44.3 —「Linh Đài」thành「Auto」
+## 0.47.0 — bảng bế quan phủ MỌI trang, và không tắt được
 
-- Nhãn nav, tiêu đề tab và tiêu đề trang của bàn làm việc đổi thành **Auto**.
-- Đổi cả những câu văn GỌI TÊN nó, không riêng cái nút: lời chào ở trang đăng nhập
-  ("trở lại Auto"), thẻ giới thiệu ngoài trang chủ, lời ở phòng chờ, popup bảo trì, dòng mô
-  tả công tắc xét duyệt, và lời nhắc của `db:reset-password`. Đổi mỗi nhãn nav thì phần còn
-  lại chỉ người dùng tới một trang không còn tên ấy.
-- Giữ nguyên **`"Auto HH3D — Linh Đài Tự Động"`** ở `layout.tsx`: đó là khẩu hiệu của cả
-  site chứ không phải tên trang — "Auto Tự Động" thì vô nghĩa. Đây là quyết định có cân
-  nhắc, không phải sót.
-- CHANGELOG giữ tên cũ như mọi lần: sử sách không viết lại.
+- **Trong lúc bảo trì, môn đồ thường không vào được trang nào.** Mỗi trang trả về bảng「Tông môn
+  đang bế quan trùng tu」kèm đồng hồ đếm ngược và lời nhắn của trưởng môn; **không có nút đóng**,
+  và cả trang chỉ còn đúng một thứ bấm được là **Xuất Quan**. Trước bản này popup chỉ phủ trang
+  Auto và đóng được bằng một nút — đóng rồi là đi lại khắp nơi bình thường.
+- **「Ẩn một trang」KHÔNG PHẢI「không cho vào trang ấy」, và đây là chỗ trả giá của bản này.**
+  Bản đầu làm theo cách dễ nghĩ nhất: layout gốc không vẽ `children`. Markup ra đúng như mong
+  đợi — chỉ có bảng chắn, không một pixel nào của trang. Nhưng Next dựng đoạn trang **song song**
+  với layout, nên nội dung `/dashboard` vẫn nằm nguyên trong flight payload: đo được ở **byte
+  13945** của hồi đáp, trong khi markup sạch trơn. Tức là dữ liệu của đạo hữu vẫn rời khỏi
+  server, và server vẫn làm trọn phần việc của trang cho một người sẽ không thấy gì.
+- Nên phép chặn thật nằm ở **`redirect()` trong `requireUser()`** — dòng đầu tiên của mọi trang
+  có guard, và nó kết thúc hồi đáp trước khi trang kịp dựng xong. Sau khi đổi, dấu vết nội dung
+  Auto biến mất khỏi hồi đáp. `MaintenanceGate` ở layout gốc lo phần còn lại: vẽ bảng cho những
+  trang KHÔNG có guard (trang chủ, cửa đăng nhập, trang bái sư) và vẽ dải nhắc cho ai đi qua được.
+- **Hai ngoại lệ, và chúng là ĐIỀU KIỆN để chế độ bế quan còn tắt được** — không phải nương tay:
+  - **Bậc trị sự đi qua tự do** (kèm dải nhắc mỏng trên đầu trang). Công tắc tắt bảo trì nằm
+    TRONG trang Tông Môn của họ; dựng bảng chắn trước mặt họ là khoá trái căn phòng chứa chìa
+    khoá của chính nó — đúng loại lỗi mà `permissions.ts` sinh ra để phòng.
+  - **Khách chưa đăng nhập cũng đi qua.** Cửa đăng nhập là đường DUY NHẤT để một trưởng môn vừa
+    hết phiên quay lại được với công tắc ấy. Khách vốn đã không vào được trang nào của thành
+    viên nên chỗ này không mở thêm cửa nào — chỉ giữ cửa vào.
+- **Hai đường đã thử và KHÔNG dùng được**, ghi ra để người sau khỏi đi lại:
+  - *Proxy gắn đường dẫn vào header rồi layout đọc ra* (để layout tự `redirect()` mà không đẩy
+    chính trang bế quan vào vòng lặp): `NextResponse.next({ request: { headers } })` **không**
+    chuyển được header tới lượt dựng RSC trong Next 16.2 — đo trên cả `next dev` lẫn `next
+    start`, proxy vẫn chạy (chuyển hướng khách khỏi `/dashboard` vẫn đúng) mà header không bao
+    giờ tới. Vì thế cửa ở layout không biết mình đang ở đâu, và vì thế nó không tự chuyển hướng.
+  - *`router.replace()` khi cửa mở lại*: nó đổi URL và đổi cả tiêu đề tab, mà **bảng chắn vẫn
+    nằm nguyên trên màn hình** — Next TÁI DÙNG layout khi điều hướng phía client, chỉ tải lại
+    đoạn trang đã đổi. Chỉ `router.refresh()` dựng lại được layout. Cũng chính vì lẽ đó mà
+    `/be-quan` phải tự mang bảng chắn trong trang, cho đường vào bằng điều hướng client.
+- **Nhịp soát `/api/maintenance` thay đường SSE cũ**: 10 giây khi đang bế quan, 60 giây khi mở,
+  và **nghỉ hẳn khi tab bị ẩn** (tab bỏ quên cả ngày là cái tốn nhiều lượt gọi nhất mà không ai
+  nhìn kết quả); quay lại tab thì hỏi ngay. Cờ bế quan vì thế rời khỏi payload của Auto — một
+  đường push riêng cho đúng trang mà môn đồ không vào được nữa là đường không còn ai đi.
+- `MaintenanceOverlay.tsx` của Auto bị xoá, cùng nhánh `maintenance` trong payload SSE và
+  context của nó. Đồng hồ đếm ngược giữ nguyên luật cũ: quá hẹn thì nói「sắp xong」và ghim thanh
+  ở 100%, tuyệt đối không đếm số âm.
+- Giá phải trả, nói thẳng: **một câu hỏi `app_settings` cho mỗi lượt vẽ trang**, dùng chung giữa
+  cửa và guard nhờ `cache()` của React. Phép đọc cấu hình đi TRƯỚC và cắt mạch khi cửa đang mở,
+  nên đường đi thường ngày không thêm lượt đọc `users` nào.
+- `npm run verify:maintenance` thêm mục kiểm phép quyết định thuần cho cả bốn vai, khách chưa
+  đăng nhập, và một vai lạ không được nhận vơ quyền trị sự.
 
 ## 0.46.0 — thêm Thái thượng trưởng lão và Chưởng môn, cùng bốn tag bấm một cái là xong
 
@@ -107,6 +141,18 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
   `.chat-avatar` đổi tên thành `.avatar`.
 - `npm run verify:avatar` — soi bytes, đặt tên object, vòng đời trong bảng (đặt → đổi → bỏ),
   và vòng đời thật trên kho OCI kể cả phép quét ảnh mồ côi.
+
+## 0.44.3 —「Linh Đài」thành「Auto」
+
+- Nhãn nav, tiêu đề tab và tiêu đề trang của bàn làm việc đổi thành **Auto**.
+- Đổi cả những câu văn GỌI TÊN nó, không riêng cái nút: lời chào ở trang đăng nhập
+  ("trở lại Auto"), thẻ giới thiệu ngoài trang chủ, lời ở phòng chờ, popup bảo trì, dòng mô
+  tả công tắc xét duyệt, và lời nhắc của `db:reset-password`. Đổi mỗi nhãn nav thì phần còn
+  lại chỉ người dùng tới một trang không còn tên ấy.
+- Giữ nguyên **`"Auto HH3D — Linh Đài Tự Động"`** ở `layout.tsx`: đó là khẩu hiệu của cả
+  site chứ không phải tên trang — "Auto Tự Động" thì vô nghĩa. Đây là quyết định có cân
+  nhắc, không phải sót.
+- CHANGELOG giữ tên cũ như mọi lần: sử sách không viết lại.
 
 ## 0.44.2 — chân trang ký tên đạo hữu, không ký tên hoa
 

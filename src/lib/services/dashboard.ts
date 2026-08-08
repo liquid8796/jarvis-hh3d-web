@@ -11,7 +11,7 @@ import type {
 } from "@/lib/realtime/dashboardTypes";
 
 /**
- * Feed của Lư Khai Đàn: job mới nhất của TỪNG tài khoản + nhật ký gộp của cả bộ, mỗi dòng
+ * Feed của Tế đàn auto: job mới nhất của TỪNG tài khoản + nhật ký gộp của cả bộ, mỗi dòng
  * mang nhãn tài khoản để người đọc còn biết ai đang kể. Con trỏ `after` là id bigserial
  * toàn cục của job_events nên một con trỏ phục vụ mọi job.
  */

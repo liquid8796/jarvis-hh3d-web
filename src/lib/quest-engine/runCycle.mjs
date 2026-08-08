@@ -476,7 +476,7 @@ export async function runCycle(deps) {
     if (!isVip) {
       await say(
         leftOut > 0
-          ? `Tài khoản thường — để yên ${leftOut} flow VIP; dùng các flow riêng của tab Nhiệm vụ Thường.`
+          ? `Tài khoản thường — để yên ${leftOut} flow VIP; dùng các flow riêng ở tab cùng tên.`
           : "Tài khoản thường.",
       );
     }

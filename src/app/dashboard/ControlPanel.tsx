@@ -6,7 +6,7 @@ import { useDashboardJobLive } from "./DashboardLiveProvider";
 import type { DashboardJob, JobStatus } from "@/lib/realtime/dashboardTypes";
 
 /**
- * Lư Khai Đàn — nút start/stop và nhật ký tu luyện, giờ cho CẢ ĐỘI tài khoản.
+ * Tế đàn auto — nút start/stop và nhật ký tu luyện, giờ cho CẢ ĐỘI tài khoản.
  *
  * Trạng thái thật nằm ở server: nút bấm chỉ gửi ý định, còn màn hình được đẩy lại từ SSE
  * (và feed một-lần khi reconnect). Đó là điều khiến việc đóng tab không có nghĩa lý gì — mở lại
@@ -94,7 +94,7 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
   return (
     <section className="card card-hairline flex flex-col p-6 xl:p-8">
       <div className="mb-4 flex items-start justify-between gap-4">
-        <h2 className="h-display text-xl font-semibold text-gilded">Lư Khai Đàn</h2>
+        <h2 className="h-display text-xl font-semibold text-gilded">Tế đàn auto</h2>
 
         {running ? (
           <button

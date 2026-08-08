@@ -191,7 +191,7 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
   const noWorkerAtAll = presence != null && !presence.sectOnline && !mine.some((w) => w.online);
 
   return (
-    // Dùng chung `.card` với Ngọc Giản và Lư Khai Đàn, chứ không tự pha nền riêng. Bản đầu
+    // Dùng chung `.card` với Ngọc Giản và Tế đàn auto, chứ không tự pha nền riêng. Bản đầu
     // để `bg-ink-800/40` — nền mờ 40% — nên ảnh nền trang xuyên thẳng qua và chữ xám nhạt
     // biến mất trên những mảng sáng của ảnh. Chỉnh màu chữ theo nền thì không làm nổi bằng
     // CSS (không có cách nào đọc được cái gì đang nằm dưới); cho thẻ một cái nền đủ đục mới

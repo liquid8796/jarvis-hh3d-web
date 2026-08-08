@@ -362,8 +362,8 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       <div className="mb-4 flex gap-1 rounded-xl border border-[var(--color-ink-600)]/60 p-1">
         {(
           [
-            ["vip", "Nhiệm vụ VIP"],
-            ["free", "Nhiệm vụ Thường"],
+            ["vip", "Tài khoản VIP"],
+            ["free", "Tài khoản thường"],
           ] as const
         ).map(([key, label]) => (
           <button

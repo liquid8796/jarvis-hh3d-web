@@ -79,7 +79,7 @@ Auto tự biết tài khoản bạn là VIP hay thường, rồi chọn đúng f
 thường: Phúc Lợi Đường mở một rương mỗi lượt rồi tự quay lại sau 30 phút, Thí Luyện mở rương
 thí luyện theo cùng nhịp 30 phút (3 lượt/ngày), Tế Lễ dâng 10 Tinh Thạch một lần mỗi ngày,
 còn Vòng Quay sẽ ghé lại ở vòng sau để nhận lượt thứ tư khi các nhiệm vụ ngày khác đã đủ
-điều kiện. Các nhiệm vụ thường nằm ngay trong tab **Nhiệm vụ Thường**; bật/tắt ở đó sẽ đồng
+điều kiện. Các nhiệm vụ thường nằm ngay trong tab **Tài khoản thường**; bật/tắt ở đó sẽ đồng
 bộ với công tắc cùng tên bên tab VIP, nên bạn không phải cấu hình hai lần. Mê Cung đứng
 ngoài hai tab — một bộ tuỳ chọn dùng chung cho cả hai hạng. Riêng **Luyện Đan Đường** mỗi
 tab có một bản tuỳ chọn riêng: loại đan và mức phân giải chỉnh trong tab VIP chỉ áp cho tài

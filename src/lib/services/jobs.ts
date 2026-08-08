@@ -43,7 +43,7 @@ export async function getLatestJob(userId: string): Promise<JobRow | null> {
 }
 
 /**
- * Job mới nhất của TỪNG tài khoản — cái Lư Khai Đàn hiển thị. Mỗi tài khoản một dòng trạng
+ * Job mới nhất của TỪNG tài khoản — cái Tế đàn auto hiển thị. Mỗi tài khoản một dòng trạng
  * thái, theo thứ tự tạo tài khoản; tài khoản chưa chạy lần nào không có dòng. Người dùng
  * từ thời một-cookie (mọi job đều thiếu account_id) được thấy lượt gần nhất của họ như cũ.
  */

@@ -11,6 +11,21 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.43.3 —「Nhiệm vụ VIP/Thường」thành「Tài khoản VIP/thường」,「Lư Khai Đàn」thành「Tế đàn auto」
+
+- Hai tab trong Ngọc Giản Cấu Hình đổi nhãn thành **Tài khoản VIP** / **Tài khoản thường** —
+  đúng hơn với thứ chúng chia: hai tab ấy chọn theo HẠNG TÀI KHOẢN, không phải theo nhiệm vụ.
+- Thẻ điều khiển đổi tiêu đề thành **Tế đàn auto**.
+- Đổi luôn mọi chỗ CÒN TRỎ tới tên cũ, không riêng hai dòng trong ảnh: dòng nhật ký của engine
+  chỉ người dùng sang "tab Nhiệm vụ Thường", mục hướng dẫn trong HUONG-DAN.md, và các chú
+  thích gọi thẻ ấy là "Lư Khai Đàn". Một cái tên đổi nửa vời thì phần còn lại chỉ người đọc
+  tới một chỗ không còn tồn tại.
+- Dòng nhật ký được viết lại cho khỏi lặp: "…dùng các flow riêng **ở tab cùng tên**" thay vì
+  nhắc "Tài khoản thường" hai lần trong một câu.
+- **Bản PC không đụng tới**: tab bên ấy vẫn tên「Nhiệm vụ VIP/thường」và các dòng log của nó
+  trỏ đúng vào tab của chính nó — sửa một bên sẽ làm bên kia nói sai về giao diện của mình.
+  CHANGELOG cũng giữ nguyên tên cũ: sử sách không viết lại.
+
 ## 0.43.2 — `dev:session`: xem được trang sau cửa đăng nhập mà không ai gõ mật khẩu
 
 - **`npm run dev:session`** phát một cookie phiên ngắn hạn (30 phút) cho một đạo hữu bất kỳ,

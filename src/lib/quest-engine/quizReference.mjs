@@ -92,7 +92,29 @@ export function parseQuizReferenceHtml(html) {
   return entries;
 }
 
-/** Exact folded match; nếu cần thì thử lại sau khi bỏ ghi chú cuối `(…)`. */
+/** Một chuỗi từ nằm trọn trong chuỗi kia, theo RANH GIỚI TỪ — "an" không khớp vào "khong". */
+function containsWords(haystack, needle) {
+  return needle.length > 0 && ` ${haystack} `.includes(` ${needle} `);
+}
+
+/**
+ * Khớp đáp án công bố với một trong các lựa chọn trên trang.
+ *
+ * Ba nấc, nới dần, và nấc nào cũng phải trỏ về ĐÚNG MỘT lựa chọn:
+ *   1. khớp tuyệt đối sau khi gấp chữ;
+ *   2. khớp lại sau khi bỏ ghi chú cuối `(…)` mà người soạn danh sách thêm vào;
+ *   3. một bên chứa trọn bên kia theo ranh giới từ.
+ *
+ * Nấc 3 sinh ra từ một ca thật ngày 09/08/2026: trang bày “Tất cả đáp án”, danh sách ghi
+ * “Tất cả đáp án trên (ĐCT, VĐCK, ĐPTK)”. Bỏ ghi chú xong vẫn còn thừa đúng chữ “trên”, nên
+ * hai nấc đầu đều trượt — và vì đó là câu SỐ MỘT, cả bài vấn đáp của tài khoản VIP chết đứng
+ * ở mọi lượt suốt hơn một giờ.
+ *
+ * Vì sao nấc này KHÔNG phải là đoán bừa: nó đòi biên giới từ (nên “an” không chui vào
+ * “khong”), và người gọi chỉ nhận kết quả khi TOÀN BỘ phép khớp trỏ về đúng một lựa chọn —
+ * mơ hồ thì `find` trả `null` và bài dừng, y như cũ. Trả lời sai tiêu một lượt trong ngày,
+ * nên thà không trả lời còn hơn trả lời liều.
+ */
 function matchOption(options, publishedAnswer) {
   const find = (wanted) => {
     if (!wanted) return null;
@@ -109,7 +131,20 @@ function matchOption(options, publishedAnswer) {
   const withoutNote = foldText(
     String(publishedAnswer ?? "").replace(TRAILING_NOTE_PATTERN, ""),
   );
-  return withoutNote && withoutNote !== exact ? find(withoutNote) : null;
+  if (withoutNote && withoutNote !== exact) {
+    const stripped = find(withoutNote);
+    if (stripped) return stripped;
+  }
+
+  const wanted = withoutNote || exact;
+  if (!wanted) return null;
+
+  const nested = options.filter((option) => {
+    const folded = foldText(option);
+    return containsWords(wanted, folded) || containsWords(folded, wanted);
+  });
+
+  return nested.length === 1 ? nested[0] : null;
 }
 
 function writeLog(log, level, message) {

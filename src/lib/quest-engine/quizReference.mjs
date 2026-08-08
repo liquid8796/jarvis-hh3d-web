@@ -241,7 +241,24 @@ export function createQuizReferenceDirectory({
 
       const current = await ensureLoaded(sourceUrl, log);
       const published = current.get(foldText(question.text));
-      if (!(published?.length > 0)) return null;
+
+      // Mỗi ngả trả `null` dưới đây đều KỂ RA vì sao, ở mức `warning` để nó tới được
+      // `job_events` — thứ dashboard hiển thị.
+      //
+      // Vì sao đáng mấy dòng này: một câu không tra được sẽ DỪNG cả bài vấn đáp, và trước
+      // bản này nhật ký chỉ nói "chưa biết đáp án: <câu hỏi>". Ngày 09/08/2026 một tài khoản
+      // VIP tắc ở đúng một câu suốt nhiều lượt liền; câu ấy CÓ trong danh sách, nên chỗ hỏng
+      // nằm ở bước khớp chữ — mà bốn lựa chọn trên trang thì không được ghi lại ở đâu cả.
+      // Phải tra ngược danh sách bằng tay mới biết. Cái vắng mặt vốn không tự nói: ghi ra
+      // đây thì lần tắc sau tự chỉ đích danh chữ nào lệch chữ nào.
+      if (!(published?.length > 0)) {
+        writeLog(
+          log,
+          "warning",
+          `“${short(question.text)}” chưa có trong danh sách tham khảo.`,
+        );
+        return null;
+      }
 
       const matched = new Set();
       for (const answer of published) {
@@ -250,13 +267,15 @@ export function createQuizReferenceDirectory({
       }
 
       if (matched.size !== 1) {
-        if (matched.size > 1) {
-          writeLog(
-            log,
-            "debug",
-            `Danh sách tự mâu thuẫn ở “${short(question.text)}” — không chọn bừa.`,
-          );
-        }
+        writeLog(
+          log,
+          "warning",
+          matched.size > 1
+            ? `Danh sách tự mâu thuẫn ở “${short(question.text)}” — không chọn bừa.`
+            : `“${short(question.text)}” có trong danh sách nhưng không khớp lựa chọn nào. ` +
+              `Danh sách ghi: ${published.map((a) => `“${short(a)}”`).join(" | ")}. ` +
+              `Trang đang bày: ${offered.map((o) => `“${short(o)}”`).join(" | ")}.`,
+        );
         return null;
       }
 

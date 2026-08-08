@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChatPicker, type PickerTab } from "./ChatPicker";
+import type { Gif } from "@/lib/services/gif";
 
 /**
  * Phòng Chat — client của sảnh đàm đạo.
@@ -32,9 +34,23 @@ type Message = {
 
 const POLL_MS = 2500;
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
-const EMOJIS =
-  "😀 😄 😆 🤣 😊 😍 🤩 😘 😜 🤔 🤨 😐 😴 🥱 😷 🤯 🥳 😎 🤗 😇 😅 😭 😤 😡 🤬 😱 🥺 😳 🙃 🫡 👍 👎 👏 🙏 💪 🤝 👊 ✌️ 🤞 🖐️ 💯 🔥 ✨ ⚡ 💥 ❤️ 💛 💚 💙 💜 🖤 💔 ⭐ 🌙 ☀️ 🌸 🍀 🎉 🎁 ⚔️ 🛡️ 🐉 🧧 🍵".split(" ");
-const STICKERS = "🐉 ⚔️ 🛡️ 🧙 🧝 🌪️ ⚡ 🔥 ❄️ 🌊 🏔️ 🌸 🍵 🧧 🀄 🏮 🎐 📜 🗡️ 🏹 💎 🪙 🌕 ☯️".split(" ");
+
+/** GIF của GIPHY gửi đi dưới dạng đính kèm — bong bóng đã biết vẽ mọi `image/*` thành ảnh. */
+const GIF_MIME = "image/gif";
+
+/**
+ * Hai dấu này gác phép "bấm ra ngoài thì đóng": thân khay mang `data-chat-popup`, nút mở khay
+ * mang `data-chat-popup-trigger`.
+ *
+ * Đánh dấu bằng thuộc tính chứ không phải bằng một rừng ref: khay cảm xúc mọc TRONG từng bong
+ * bóng tin, nên số popup bằng số tin đang hiển thị — giữ ref cho từng cái là giữ một Map phải
+ * dọn tay mỗi lần danh sách tin đổi. Một câu `closest()` thì không quan tâm có bao nhiêu cái.
+ *
+ * Nút mở cũng phải được tha: không thì bấm nút lúc khay đang mở sẽ bị đóng bởi tay này rồi
+ * mở lại ngay bởi `onClick` — khay không bao giờ tắt được bằng chính nút đã mở nó.
+ */
+const POPUP_ATTR = "data-chat-popup";
+const TRIGGER_ATTR = "data-chat-popup-trigger";
 
 const initialOf = (name: string) => (name.trim()[0] ?? "?").toUpperCase();
 
@@ -61,7 +77,7 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
   const [staged, setStaged] = useState<Attachment[]>([]);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
-  const [panel, setPanel] = useState<"none" | "emoji" | "sticker">("none");
+  const [panel, setPanel] = useState<PickerTab | "none">("none");
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState("");
@@ -138,6 +154,49 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
       clearInterval(timer);
     };
   }, [merge]);
+
+  // ---- Bấm ra ngoài thì đóng khay ------------------------------------------------------
+  const popupOpen = panel !== "none" || pickerFor !== null;
+
+  /** Mở khay này thì đóng khay kia — hai cái cùng bung ra một lúc là rối, không phải tính năng. */
+  const openPanel = (tab: PickerTab) => {
+    setPickerFor(null);
+    setPanel((current) => (current === tab ? "none" : tab));
+  };
+
+  const openReactionPicker = (id: string) => {
+    setPanel("none");
+    setPickerFor((current) => (current === id ? null : id));
+  };
+
+  useEffect(() => {
+    if (!popupOpen) return;
+
+    const closeAll = () => {
+      setPanel("none");
+      setPickerFor(null);
+    };
+
+    // `pointerdown` chứ không phải `click`: chuột nhấn xuống là đã có ý rời khay, và một cú
+    // kéo bắt đầu ngoài khay sẽ không bao giờ sinh ra `click` để mà đóng. Nó cũng bao luôn
+    // màn cảm ứng, khỏi phải nghe thêm `touchstart`.
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest(`[${POPUP_ATTR}], [${TRIGGER_ATTR}]`)) return;
+      closeAll();
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeAll();
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [popupOpen]);
 
   // Dính đáy: mỗi khi có tin mới và người xem đang ở đáy, cuộn theo.
   useEffect(() => {
@@ -230,6 +289,28 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
   const sendSticker = async (emoji: string) => {
     setPanel("none");
     if (await post({ op: "send", body: { text: "", sticker: emoji, replyTo: replyTo?.id ?? null } })) {
+      setReplyTo(null);
+      setStuck(true);
+      await refresh();
+    }
+  };
+
+  /**
+   * GIF đi đường ĐÍNH KÈM, không phải đường sticker: bytes ở lại CDN của GIPHY và tin chỉ giữ
+   * URL, nên bong bóng vẽ nó bằng đúng nhánh `image/*` đã có sẵn — không thêm một hình dạng
+   * tin nào để mọi chỗ khác phải học.
+   */
+  const sendGif = async (gif: Gif) => {
+    setPanel("none");
+    const ok = await post({
+      op: "send",
+      body: {
+        text: "",
+        attachments: [{ url: gif.url, name: gif.name, size: gif.size, type: GIF_MIME }],
+        replyTo: replyTo?.id ?? null,
+      },
+    });
+    if (ok) {
       setReplyTo(null);
       setStuck(true);
       await refresh();
@@ -420,7 +501,7 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
 
                     {!msg.deleted && (
                       <span className="chat-actions">
-                        <button type="button" title="Thả cảm xúc" onClick={() => setPickerFor(pickerFor === msg.id ? null : msg.id)}>😊</button>
+                        <button type="button" title="Thả cảm xúc" data-chat-popup-trigger onClick={() => openReactionPicker(msg.id)}>😊</button>
                         <button type="button" title="Trả lời" onClick={() => { setReplyTo(msg); inputRef.current?.focus(); }}>↩</button>
                         {own && !msg.sticker && (
                           <button type="button" title="Sửa" onClick={() => setEditing({ id: msg.id, text: msg.text })}>✎</button>
@@ -432,7 +513,7 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
                     )}
 
                     {pickerFor === msg.id && (
-                      <span className="chat-quickpick">
+                      <span className="chat-quickpick" data-chat-popup>
                         {QUICK_REACTIONS.map((e) => (
                           <button key={e} type="button" onClick={() => void react(msg.id, e)}>{e}</button>
                         ))}
@@ -494,24 +575,24 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
         </div>
       )}
 
-      {panel !== "none" && (
-        <div className="chat-panel">
-          {(panel === "emoji" ? EMOJIS : STICKERS).map((e) => (
-            <button
-              key={e}
-              type="button"
-              className={panel === "sticker" ? "big" : ""}
-              onClick={() => (panel === "emoji" ? (setText((t) => t + e), inputRef.current?.focus()) : void sendSticker(e))}
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-      )}
-
+      {/* Khay nằm TRONG thanh soạn để neo theo mép trên của nó — thanh cao lên khi ô nhập
+          xuống dòng, và khay phải trôi theo. Nó `position: absolute` nên không chen vào hàng
+          nút. */}
       <footer className="chat-composer">
-        <button type="button" className="chat-tool" title="Emoji" onClick={() => setPanel(panel === "emoji" ? "none" : "emoji")}>😊</button>
-        <button type="button" className="chat-tool" title="Sticker" onClick={() => setPanel(panel === "sticker" ? "none" : "sticker")}>🀄</button>
+        {panel !== "none" && (
+          <ChatPicker
+            tab={panel}
+            onTabChange={setPanel}
+            onEmoji={(e) => {
+              setText((t) => t + e);
+              inputRef.current?.focus();
+            }}
+            onSticker={(e) => void sendSticker(e)}
+            onGif={(g) => void sendGif(g)}
+          />
+        )}
+        <button type="button" className="chat-tool" title="Emoji" data-chat-popup-trigger onClick={() => openPanel("emoji")}>😊</button>
+        <button type="button" className="chat-tool" title="Sticker & GIF" data-chat-popup-trigger onClick={() => openPanel("sticker")}>🀄</button>
         <button type="button" className="chat-tool" title="Gửi file" disabled={uploading} onClick={() => fileRef.current?.click()}>
           {uploading ? "…" : "📎"}
         </button>

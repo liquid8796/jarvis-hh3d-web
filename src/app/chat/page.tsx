@@ -14,7 +14,9 @@ export default async function ChatPage() {
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-6 sm:px-6">
+      {/* 60rem = max-w-3xl (48rem) rộng thêm 25%. Viết thẳng con số chứ không ghép lúc chạy:
+          Tailwind quét tĩnh, lớp dựng bằng biến sẽ không bao giờ được sinh ra CSS. */}
+      <main className="mx-auto w-full max-w-[60rem] flex-1 px-4 pb-6 sm:px-6">
         <ChatRoom me={{ id: user.id, name: user.displayName, isAdmin: user.role === "admin" }} />
       </main>
     </>

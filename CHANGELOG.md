@@ -11,6 +11,57 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.42.0 — khay chọn ba tab, và bấm ra ngoài thì nó chịu tắt
+
+- **Bấm ra ngoài đóng khay.** Khay emoji/sticker và khay thả cảm xúc trước đây chỉ tắt được
+  bằng cách bấm lại đúng cái nút đã mở nó — mở xong rồi đi làm việc khác là nó nằm đấy che
+  mất tin. Nghe `pointerdown` ở `document`, và tha những gì mang `data-chat-popup` (thân khay)
+  hoặc `data-chat-popup-trigger` (nút mở). Thêm `Escape`.
+  - Dùng **thuộc tính** chứ không phải một rừng `ref`: khay cảm xúc mọc TRONG từng bong bóng
+    tin, nên số popup bằng số tin đang hiển thị. Một câu `closest()` không quan tâm có bao
+    nhiêu cái; một Map ref thì phải dọn tay mỗi lần danh sách tin đổi.
+  - Phải tha cả nút mở, nếu không: bấm nút lúc khay đang mở sẽ bị tay này đóng rồi `onClick`
+    mở lại ngay — khay không bao giờ tắt được bằng chính nút đã mở nó.
+  - `pointerdown` chứ không phải `click`: một cú kéo bắt đầu ngoài khay sẽ không bao giờ sinh
+    ra `click` để mà đóng. Nó cũng bao luôn màn cảm ứng.
+- **Khay gộp thành BA TAB — STICKER / EMOJI / GIF** ([ChatPicker.tsx](src/app/chat/ChatPicker.tsx)),
+  có mục "Gần đây" nhớ qua các phiên, tiêu đề mục dính trên đầu khi cuộn, và dải danh mục dưới
+  đáy để nhảy tới từng mục. Theme không đổi một sắc nào.
+  - Khay **nổi lên trên** dòng tin thay vì chen vào dòng chảy như trước: mở bảng cũ là cả sảnh
+    nhảy một nấc và chỗ đang đọc trôi mất.
+  - Neo theo **mép trên của thanh soạn** (`bottom: calc(100% + 6px)`) chứ không theo một con số
+    pixel — ô nhập cao dần tới 120px khi xuống dòng, và một khoảng cách cố định sẽ để khay
+    trườn lên đè chính nó.
+- **Tab GIF tìm thật qua GIPHY.** Khoá API **chỉ sống ở server**: client hỏi qua
+  `/api/chat/gif`, không bao giờ thấy khoá — đó là toàn bộ lý do có route đứng giữa thay vì
+  gọi thẳng. Chưa đặt `GIPHY_API_KEY` thì tab treo biển "chưa khai mở", emoji và sticker vẫn
+  chạy đủ. Gõ tìm có chờ 300ms; GIF gửi đi bằng đường **đính kèm** nên bong bóng vẽ nó bằng
+  đúng nhánh `image/*` đã có sẵn, không thêm hình dạng tin nào để mọi chỗ khác phải học.
+  - Bản đầu viết cho **Tenor**, đổi sang GIPHY trước khi phát hành vì Tenor thôi phát khoá
+    miễn phí. Hợp đồng của service (`gifSearchReady`, `searchGifs`, kiểu `Gif`) giữ nguyên
+    từng chữ nên route và khay chọn không đổi một dòng — đúng cái giá của việc nhốt nhà cung
+    cấp vào sau một service thay vì gọi thẳng từ component.
+  - **"Powered By GIPHY" là BẮT BUỘC** theo điều khoản của họ, không phải trang trí. Nó hiện
+    dưới đáy tab GIF mọi lúc API được dùng.
+- **GIF ở lại CDN của GIPHY, KHÔNG chép về tàng khố media**: vừa tốn dung lượng trong hạn
+  Always Free vốn đã hẹp, vừa chẳng bền hơn bản gốc.
+- **`npm run verify:gif` — 7 nhóm**, không tiêu một lượt hạn mức nào (dữ liệu mẫu, cộng một
+  `fetch` thay tạm để soi cách gọi). Nó gác đúng chỗ dữ liệu của bên thứ ba đi vào hệ thống:
+  - **Tài liệu GIPHY khai `width`/`height`/`size` là number, API thật trả CHUỖI.** Phép thử
+    đóng cả hai dạng lại, để lần sau ai "dọn cho gọn" thì nó kêu ngay thay vì để mọi kích cỡ
+    lặng lẽ thành NaN.
+  - Rendition `preview` của GIPHY là **MP4**; nhận nhầm nó là ảnh thì bong bóng ra một ô vỡ.
+  - **Mọi trần của `attachmentSchema` được vá TỪ ĐÂY** — tên rỗng có đường lui, tên dài cắt
+    còn 200, URL quá 2048 bị loại, bản gửi quá 64MB lùi xuống bản nhỏ hơn. Chỗ cuối là một
+    lỗi thật bắt được lúc tự soi lại: để nguyên thì một GIF quá khổ làm cả TIN bị từ chối
+    400, mà người gửi chỉ thấy "có trắc trở".
+  - `q` của GIPHY chặn **50 ký tự** — cắt ở service, không để API trả lỗi vì người ta dán cả
+    câu vào ô tìm.
+  - GIPHY trả **HTTP 200 kèm `meta.status` hỏng** (hay gặp: 403 khoá sai). Không soi chỗ ấy
+    thì lỗi khoá hiện ra thành "không có GIF nào khớp" — một lời nói dối êm ái dẫn người đi
+    sửa nhầm chỗ.
+- **Khung sảnh rộng thêm 25%** — `max-w-3xl` (48rem) → `max-w-[60rem]`.
+
 ## 0.41.1 —「Nghị Sự Đường」đổi tên thành「Phòng Chat」
 
 - **Đổi ở MỌI chỗ hiển thị, không chỉ nút được chỉ**: thanh điều hướng, tiêu đề tab trình

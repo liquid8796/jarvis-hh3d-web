@@ -5,7 +5,7 @@ import { SectSeal } from "@/components/SectSeal";
 const PILLARS = [
   {
     title: "Khai Đàn Viễn Trình",
-    body: "Bấm một nút trên Auto, khôi lỗi trên server tự vận hành nhiệm vụ ngày — đóng trình duyệt, tắt máy, đàn pháp vẫn chạy.",
+    body: "Bấm một nút trên Tế đàn, khôi lỗi trên server tự vận hành nhiệm vụ ngày — đóng trình duyệt, tắt máy, đàn pháp vẫn chạy.",
   },
   {
     title: "Tông Môn Nghiêm Cẩn",

@@ -108,6 +108,13 @@ JOIN với ai, nên nhét chung là bắt bản backup của danh tính gánh c�
 chưa". Từ 02/08 tới 08/08/2026 kho ấy là Upstash Redis; xem [CHANGELOG](CHANGELOG.md) mục
 0.40.0 để biết vì sao đổi sang Mongo. Cách dựng kho: [deploy/mongodb.md](deploy/mongodb.md).
 
+**Còn BYTES của file đính kèm thì không nằm ở database nào cả** — chúng ở **OCI Object
+Storage** (bucket `jarvis-media`), và Mongo chỉ giữ URL. Kho media là thứ duy nhất trong hệ
+thống có nhu cầu phục vụ tải xuống công khai với dung lượng lớn, tức đúng thứ mà cả Postgres
+lẫn Mongo đều làm dở. Chọn OCI vì tông môn **đã** có tài khoản ấy để nuôi linh sứ, nên gộp về
+một nhà bớt được một nhà cung cấp phải canh hạn mức. Từ 02/08 tới 08/08/2026 kho ấy là Vercel
+Blob; xem mục 0.41.0 và [deploy/oracle/README.md](deploy/oracle/README.md).
+
 Điểm tinh tế: config được **validate hai chiều** bằng Zod — cả lúc ghi lẫn lúc đọc. Một
 document viết bởi bản deploy cũ vẫn trở về đúng hình thù hôm nay với default được điền đủ.
 Đó là bản JSONB của một migration.

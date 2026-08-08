@@ -11,6 +11,43 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.41.0 — file đính kèm dọn nhà sang OCI Object Storage
+
+- **Kho media chuyển từ Vercel Blob sang OCI Object Storage** (bucket `jarvis-media`,
+  eu-frankfurt-1). Lý do trần tục: tông môn **đã** có tài khoản OCI nuôi linh sứ, và dung
+  lượng ở đó nằm trong hạn Always Free — trong khi Vercel Blob tính tiền riêng theo GB lưu và
+  GB tải. Gộp về một nhà cũng bớt được một nhà cung cấp phải canh hạn mức.
+- **Nói qua lớp tương thích S3, không qua SDK riêng của OCI.** `@aws-sdk/client-s3` đã được cả
+  thế giới soi từng đường ký request; cái giá phải trả chỉ là một biến endpoint, rẻ hơn nhiều
+  so với tự ký theo chuẩn riêng của OCI (RSA-SHA256 trên chuỗi header) chỉ để tải một tấm ảnh.
+- **GHI qua endpoint S3, ĐỌC bằng URL gốc của OCI** trên bucket `ObjectReadWithoutList` — ai có
+  URL thì đọc được, không ai liệt kê được bucket. Cố ý **không** dùng Pre-Authenticated Request:
+  PAR có hạn, mà URL thì nằm trong database vĩnh viễn — một hạn dùng âm thầm hết là cả album
+  ảnh cũ chết theo.
+- **Hai cái bẫy của lớp tương thích S3**, cả hai đều làm mọi lần tải lên chết mà lời báo lỗi
+  không chỉ về đúng chỗ:
+  1. OCI chỉ hiểu địa chỉ **path-style**, không hiểu virtual-host style mà SDK mặc định dùng.
+  2. Từ v3.729 SDK **tự gắn** `x-amz-checksum-crc32` vào mọi PutObject, mà OCI **từ chối** header
+     ấy. Phải tắt bằng `requestChecksumCalculation: "WHEN_REQUIRED"`.
+- **Trần dung lượng là quota cấp tenancy, không phải thuộc tính của bucket** — bucket OCI co
+  giãn, không có dung lượng để đặt. Chính sách `jarvis-object-storage-always-free` đặt trần
+  **19 GiB**, dưới hạn Always Free 20 GiB. Cố ý đặt ở **tenancy** chứ không ở compartment con:
+  hạn 20 GiB là hạn của cả tenancy, nên quota bó trong compartment con không thật sự chặn được.
+- **`npm run verify:media` — 6 nhóm**, trong đó vòng đời thật chạy trên bucket thật (tải lên →
+  tải về bằng HTTPS công khai, không mang chữ ký → so từng byte → xoá). Thiếu `OCI_*` thì phần
+  ấy bị bỏ qua và bản kê **nói rõ là đã bỏ qua** — một phép thử im lặng không chạy mà trông như
+  đã xanh là cách nhanh nhất để tin vào một kho chưa từng được chạm tới.
+- **Một lỗi của chính bản này bị phép thử bắt**: đường lui cho tên file rác từng áp lên cả
+  chuỗi *sau khi đã ghép đuôi*, nên `"???.png"` rửa xong thành `_.png` — chuỗi ấy CÓ chữ (trong
+  đuôi "png") nên đường lui không kích hoạt và tên file rút còn đúng một dấu gạch dưới. Đường
+  lui phải áp lên phần tên **sau khi tách đuôi**.
+- **Chuyển kho**: [scripts/migrateBlobToOci.mts](scripts/migrateBlobToOci.mts) chép bytes giữ
+  nguyên tên object rồi mới sửa URL trong `chat_messages` — không bao giờ trỏ tin vào một object
+  chưa tồn tại. Chỉ đọc từ Vercel Blob, không xoá gì bên đó. Thực tế chuyển 3 object (1.17MB),
+  và **0 tin nào trỏ tới chúng** — chúng là file mồ côi từ lần thử tính năng hôm 07/08.
+- Cách dựng và vận hành: [deploy/oracle/README.md](deploy/oracle/README.md), nay gom cả truy cập
+  tài khoản OCI, phát hành linh sứ tông môn, lẫn tàng khố media vào một chỗ.
+
 ## 0.40.0 — tin đàm đạo dọn nhà sang MongoDB
 
 - **Kho tin chuyển từ Upstash Redis sang MongoDB.** Hợp đồng công khai của `chat.ts` giữ

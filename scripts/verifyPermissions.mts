@@ -5,15 +5,24 @@
  * Vì sao đáng có: đây là những luật mà một dòng sai không văng lỗi nào cả — nó chỉ lặng lẽ
  * cho một Trưởng môn trục xuất một Trưởng môn khác, đúng cái lỗ hổng mà vai Gia chủ sinh ra
  * để bịt. Ma trận là hàm thuần nên đóng đinh từng ô một ở đây là rẻ và trọn.
+ *
+ * Từ 09/08/2026 có BỐN vai, tức 81 ô actor×target thay vì 9 — nhiều tới mức liệt kê tay thì
+ * vừa sót vừa không ai đọc. Nên phần lớn ô được quét bằng vòng lặp so với một BẢNG HẠNG viết
+ * tay ở dưới; những ô mang ý nghĩa lịch sử thì vẫn có dòng khẳng định riêng, vì một phép thử
+ * còn để kể lại vì sao luật ấy tồn tại.
  */
 import {
+  ASSIGNABLE_ROLES,
+  ROLE_LABEL,
   canEditRoles,
   canManageUser,
   isAdminUser,
   isOwner,
   normalizeRoles,
   reviewRoleChange,
+  type Role,
 } from "../src/lib/auth/permissions";
+import { MAX_TAGS, MAX_TAG_LENGTH, TAG_PRESETS, parseTags, splitTags } from "../src/lib/validation/tags";
 
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);
@@ -21,41 +30,113 @@ const assert = (condition: unknown, message: string) => {
 
 const owner = { id: "u-owner", roles: ["gia-chu"] };
 const ownerAdmin = { id: "u-owner-admin", roles: ["gia-chu", "admin"] };
+const elder = { id: "u-elder", roles: ["thai-thuong-truong-lao"] };
+const elder2 = { id: "u-elder-2", roles: ["thai-thuong-truong-lao"] };
+const master = { id: "u-master", roles: ["chuong-mon"] };
+const master2 = { id: "u-master-2", roles: ["chuong-mon"] };
 const admin = { id: "u-admin", roles: ["admin"] };
 const admin2 = { id: "u-admin-2", roles: ["admin"] };
 const member = { id: "u-member", roles: [] as string[] };
+const member2 = { id: "u-member-2", roles: [] as string[] };
+
+const EVERYONE = [owner, ownerAdmin, elder, elder2, master, master2, admin, admin2, member, member2];
+
+/**
+ * BẢNG HẠNG viết tay — cố ý KHÔNG hỏi `isAdminUser`. Một oracle đi hỏi chính thứ đang bị
+ * kiểm thì nó chỉ chứng minh code bằng chính code, và sẽ gật đầu với mọi lỗi mà code mắc.
+ * Thêm một vai mới ở permissions.ts mà quên khai hạng ở đây là phép thử dừng ngay — đúng ý.
+ */
+const RANK: Record<string, "gia-chu" | "tri-su" | "mon-do"> = {
+  "u-owner": "gia-chu",
+  "u-owner-admin": "gia-chu",
+  "u-elder": "tri-su",
+  "u-elder-2": "tri-su",
+  "u-master": "tri-su",
+  "u-master-2": "tri-su",
+  "u-admin": "tri-su",
+  "u-admin-2": "tri-su",
+  "u-member": "mon-do",
+  "u-member-2": "mon-do",
+};
+
+for (const person of EVERYONE) {
+  assert(RANK[person.id] !== undefined, `thiếu khai hạng cho ${person.id} trong bảng oracle`);
+}
+
+// ---- Vai nào cũng phải có nhãn và không trùng ----------------------------------------
+assert(new Set(ASSIGNABLE_ROLES).size === ASSIGNABLE_ROLES.length, "mã vai không được trùng nhau");
+for (const role of ASSIGNABLE_ROLES) {
+  assert(typeof ROLE_LABEL[role] === "string" && ROLE_LABEL[role].length > 0, `vai ${role} chưa có nhãn hiển thị`);
+}
+assert(ASSIGNABLE_ROLES[0] === "gia-chu", "gia-chu phải đứng ĐẦU — thứ tự này là thứ tự huy hiệu và thứ tự chuẩn hoá");
+assert(ASSIGNABLE_ROLES.length === 4, `đang có ${ASSIGNABLE_ROLES.length} vai — cập nhật bảng oracle rồi sửa con số này`);
+console.log(`✔ Bảng vai: ${ASSIGNABLE_ROLES.length} mã, không trùng, vai nào cũng có nhãn, gia-chu đứng đầu.`);
 
 // ---- Nhận vai -----------------------------------------------------------------------
 assert(isOwner(owner) && isOwner(ownerAdmin), "gia-chu phải được nhận là Gia chủ");
-assert(!isOwner(admin) && !isOwner(member), "không mang gia-chu thì không phải Gia chủ");
+assert(!isOwner(admin) && !isOwner(elder) && !isOwner(master) && !isOwner(member), "không mang gia-chu thì không phải Gia chủ");
 assert(isAdminUser(owner), "Gia chủ nghiễm nhiên có quyền trị sự — dù không đeo thêm vai admin");
 assert(isAdminUser(admin) && isAdminUser(ownerAdmin), "admin phải có quyền trị sự");
+assert(isAdminUser(elder), "Thái thượng trưởng lão phải có quyền trị sự — ngang admin là ngang ở đây");
+assert(isAdminUser(master), "Chưởng môn phải có quyền trị sự");
 assert(!isAdminUser(member), "môn đồ thường không có quyền trị sự");
-console.log("✔ Nhận vai: gia-chu ⊃ quyền admin, mảng rỗng là môn đồ thường.");
 
-// ---- Ai quản được ai ----------------------------------------------------------------
-assert(canManageUser(owner, admin), "Gia chủ phải quản được Trưởng môn");
-assert(canManageUser(owner, ownerAdmin), "Gia chủ quản được cả một Gia chủ khác");
-assert(canManageUser(owner, member), "Gia chủ quản được môn đồ");
-assert(canManageUser(admin, member), "Trưởng môn phải quản được môn đồ thường");
+// Mọi vai trong bảng, TRỪ không-vai, đều phải mở được cửa trị sự. Quét cả bảng nên thêm vai
+// mới mà quên xếp nó vào bậc admin là đỏ ngay, không phải chờ ai đó nhớ viết thêm một dòng.
+for (const role of ASSIGNABLE_ROLES) {
+  assert(isAdminUser({ roles: [role] }), `vai ${role} phải mở được cửa trị sự (requireAdmin)`);
+}
+console.log("✔ Nhận vai: cả bốn vai đều qua cửa trị sự, mảng rỗng là môn đồ thường.");
+
+// ---- Ai quản được ai: quét TRỌN ma trận ----------------------------------------------
+const expectManage = (actorId: string, targetId: string): boolean => {
+  if (RANK[actorId] === "gia-chu") return true;
+  if (RANK[actorId] === "tri-su") return RANK[targetId] === "mon-do";
+  return false;
+};
+
+let checked = 0;
+for (const actor of EVERYONE) {
+  for (const target of EVERYONE) {
+    const got = canManageUser(actor, target);
+    const want = expectManage(actor.id, target.id);
+    assert(
+      got === want,
+      `canManageUser(${actor.id} [${actor.roles.join("+") || "không vai"}], ` +
+        `${target.id} [${target.roles.join("+") || "không vai"}]) = ${got}, đáng lẽ ${want}`,
+    );
+    checked++;
+  }
+}
+console.log(`✔ Quản người: quét trọn ${checked} ô actor×target, không ô nào lệch bảng hạng.`);
+
+// Những ô mang ý nghĩa lịch sử — giữ dòng riêng để phép thử còn KỂ được vì sao luật tồn tại.
 assert(!canManageUser(admin, admin2), "LỖ HỔNG CŨ: Trưởng môn KHÔNG được quản Trưởng môn khác");
-assert(!canManageUser(admin, owner), "Trưởng môn không được quản Gia chủ");
-assert(!canManageUser(admin, ownerAdmin), "vai kép gia-chu+admin vẫn phải ngoài tầm Trưởng môn");
-assert(!canManageUser(member, member), "môn đồ không quản ai — kể cả môn đồ khác");
-assert(!canManageUser(member, admin), "môn đồ càng không quản được Trưởng môn");
-console.log("✔ Quản người: admin bị chặn trước admin, chỉ Gia chủ vượt được vạch ấy.");
+assert(!canManageUser(master, master2), "Chưởng môn cũng KHÔNG quản được Chưởng môn khác — cùng một lẽ ấy");
+assert(!canManageUser(elder, elder2), "Thái thượng trưởng lão cũng vậy");
+assert(!canManageUser(master, admin) && !canManageUser(admin, master), "ba vai bậc trị sự ngang nhau nên không ai đụng được ai");
+assert(!canManageUser(elder, owner) && !canManageUser(master, ownerAdmin), "không vai trị sự nào với tới Gia chủ");
+assert(canManageUser(owner, elder) && canManageUser(owner, master), "Gia chủ quản được cả hai vai mới");
+console.log("✔ Bậc trị sự: ba vai ngang nhau, không ai hạ được ai — chỉ Gia chủ vượt vạch.");
 
 // ---- Đổi vai ------------------------------------------------------------------------
 assert(canEditRoles(owner) && canEditRoles(ownerAdmin), "chỉ Gia chủ đổi vai — và phải được");
 assert(!canEditRoles(admin), "Trưởng môn không được đổi vai — kể cả thăng môn đồ lên admin");
+assert(!canEditRoles(elder) && !canEditRoles(master), "hai vai mới cũng KHÔNG được đổi vai — ngang admin thì ngang cả chỗ bị chặn");
 assert(!canEditRoles(member), "môn đồ không đổi vai");
 
 assert(reviewRoleChange(owner, admin, []) === null, "Gia chủ thu mọi vai của một admin: hợp lệ");
 assert(reviewRoleChange(owner, member, ["admin"]) === null, "Gia chủ thăng môn đồ lên admin: hợp lệ");
+assert(reviewRoleChange(owner, member, ["chuong-mon"]) === null, "Gia chủ phong Chưởng môn: hợp lệ");
+assert(
+  reviewRoleChange(owner, member, ["thai-thuong-truong-lao", "chuong-mon"]) === null,
+  "một người giữ CẢ HAI vai mới cùng lúc: hợp lệ — vai vốn là một tập hợp",
+);
 assert(reviewRoleChange(owner, admin, ["gia-chu", "admin"]) === null, "Gia chủ truyền ngôi (thêm gia-chu): hợp lệ");
 assert(reviewRoleChange(admin, member, ["admin"]) !== null, "admin thăng người khác phải bị từ chối");
+assert(reviewRoleChange(master, member, ["chuong-mon"]) !== null, "Chưởng môn phong Chưởng môn phải bị từ chối");
 assert(reviewRoleChange(admin, admin2, []) !== null, "admin hạ vai admin khác phải bị từ chối");
-console.log("✔ Đổi vai: đặc quyền của riêng Gia chủ.");
+console.log("✔ Đổi vai: đặc quyền của riêng Gia chủ, hai vai mới không được thừa hưởng.");
 
 // ---- Chống tự khoá cửa --------------------------------------------------------------
 assert(
@@ -67,18 +148,61 @@ assert(
   "tự hạ xuống admin cũng là rời ngôi — phải bị chặn nốt",
 );
 assert(
+  reviewRoleChange(owner, owner, ["chuong-mon"]) !== null,
+  "tự hạ xuống Chưởng môn cũng là rời ngôi — vai mới KHÔNG được là cửa sau để buông ngôi",
+);
+assert(
   reviewRoleChange(owner, owner, ["gia-chu"]) === null,
   "tự bỏ vai admin mà GIỮ ngôi gia-chu thì được — ngôi mới là thứ không được buông",
 );
-console.log("✔ Chống khoá cửa: Gia chủ không tự rời ngôi được, phải truyền ngôi trước.");
+console.log("✔ Chống khoá cửa: không có đường nào Gia chủ tự rời ngôi, kể cả qua vai mới.");
 
 // ---- Làm sạch mảng vai từ form ------------------------------------------------------
-assert(JSON.stringify(normalizeRoles(["admin", "gia-chu"])) === JSON.stringify(["gia-chu", "admin"]),
-  "thứ tự chuẩn hoá phải ổn định (gia-chu trước) bất kể form gửi kiểu gì");
+assert(
+  JSON.stringify(normalizeRoles(["admin", "gia-chu"])) === JSON.stringify(["gia-chu", "admin"]),
+  "thứ tự chuẩn hoá phải ổn định (gia-chu trước) bất kể form gửi kiểu gì",
+);
+assert(
+  JSON.stringify(normalizeRoles(["admin", "chuong-mon", "thai-thuong-truong-lao", "gia-chu"])) ===
+    JSON.stringify([...ASSIGNABLE_ROLES]),
+  "gửi đủ bốn vai theo thứ tự lộn xộn vẫn phải ra đúng thứ tự thang vai",
+);
 assert(normalizeRoles(["admin", "admin", "admin"]).length === 1, "vai lặp phải được gộp");
 assert(normalizeRoles(["hacker", "root", "superadmin"]).length === 0, "vai bịa phải bị vứt");
+assert(
+  normalizeRoles(["chuong_mon", "chuongmon", "Chưởng môn"]).length === 0,
+  "gõ gần đúng vẫn là vai bịa — mã vai so KHỚP TỪNG KÝ TỰ, không đoán ý",
+);
 assert(normalizeRoles([]).length === 0, "mảng rỗng ra mảng rỗng");
 console.log("✔ Làm sạch: vai bịa bị vứt, vai lặp được gộp, thứ tự ổn định.");
 
+// ---- Tag: trần và tag bày sẵn --------------------------------------------------------
+// Phép thử ĐÁNG GIÁ NHẤT ở khối này: mọi tag bày sẵn phải lọt trần. Trước bản này trần là 20
+// mà「Thái thượng trưởng lão」dài 22 — chip bấm vào được, Lưu thì bị từ chối, và không có gì
+// trên màn hình nói ra con số nào đã vượt.
+for (const preset of TAG_PRESETS) {
+  assert(
+    preset.length <= MAX_TAG_LENGTH,
+    `tag bày sẵn「${preset}」dài ${preset.length} ký tự, vượt trần ${MAX_TAG_LENGTH} — bấm được mà lưu không được`,
+  );
+}
+assert(TAG_PRESETS.length <= MAX_TAGS * 4, "danh sách bày sẵn dài quá thì nó là một cái menu, không phải lối tắt");
+assert(new Set(TAG_PRESETS.map((t) => t.toLowerCase())).size === TAG_PRESETS.length, "tag bày sẵn không được trùng nhau");
+
+assert(JSON.stringify(splitTags("a, , a ,b")) === JSON.stringify(["a", "b"]), "cắt tag: bỏ trùng, bỏ rỗng, bỏ khoảng trắng");
+assert(splitTags("").length === 0 && splitTags("   ,  ").length === 0, "ô trống ra không tag nào, không phải một tag rỗng");
+
+const full = parseTags(TAG_PRESETS.slice(0, MAX_TAGS).join(", "));
+assert(full.ok && full.tags.length === MAX_TAGS, `đúng ${MAX_TAGS} tag bày sẵn phải lọt`);
+assert(!parseTags(TAG_PRESETS.join(", ")).ok, `quá ${MAX_TAGS} tag phải bị từ chối`);
+assert(!parseTags("x".repeat(MAX_TAG_LENGTH + 1)).ok, "tag dài quá trần phải bị từ chối");
+assert(parseTags("x".repeat(MAX_TAG_LENGTH)).ok, "tag dài ĐÚNG bằng trần phải lọt — biên là biên, không phải vạch cấm");
+console.log(`✔ Tag: ${TAG_PRESETS.length} tag bày sẵn đều lọt trần ${MAX_TAG_LENGTH}, biên trần chuẩn xác.`);
+
 console.log("");
 console.log("TẤT CẢ XANH — ma trận quyền đóng đinh đủ các ô.");
+
+// Giữ `Role` được dùng tới để tsc không kêu import thừa, và cũng là một phép thử kiểu: mã lạ
+// gán vào `Role` phải không biên dịch được.
+const sampleRole: Role = "chuong-mon";
+assert(ASSIGNABLE_ROLES.includes(sampleRole), "mã mẫu phải nằm trong bảng vai");

@@ -8,7 +8,15 @@ import {
   updateUserAction,
   type AdminResult,
 } from "@/app/actions/admin";
-import { canEditRoles, canManageUser, isOwner, ROLE_LABEL, type Role } from "@/lib/auth/permissions";
+import {
+  ASSIGNABLE_ROLES,
+  canEditRoles,
+  canManageUser,
+  isOwner,
+  ROLE_LABEL,
+  type Role,
+} from "@/lib/auth/permissions";
+import { MAX_TAGS, MAX_TAG_LENGTH, TAG_PRESETS, parseTags, splitTags } from "@/lib/validation/tags";
 import type { PublicUser } from "@/lib/services/users";
 
 /**
@@ -21,6 +29,18 @@ const STATUS_LABEL: Record<string, string> = {
   pending: "Chờ duyệt",
   active: "Đã thu nhận",
   disabled: "Đình quyền",
+};
+
+/**
+ * Màu huy hiệu theo HẠNG QUYỀN, không theo tên vai — nên ba vai bậc trị sự dùng chung một
+ * màu là ĐÚNG, không phải lười: nhìn bảng mà đoán được ai đụng được ai thì màu phải nói về
+ * quyền. Chữ trên huy hiệu đã đủ phân biệt Chưởng môn với Trưởng môn.
+ */
+const ROLE_BADGE_CLASS: Record<Role, string> = {
+  "gia-chu": "badge-owner",
+  "thai-thuong-truong-lao": "badge-admin",
+  "chuong-mon": "badge-admin",
+  admin: "badge-admin",
 };
 
 export function UserTable({
@@ -123,8 +143,14 @@ export function UserTable({
                 <td className="px-3 py-3">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-[var(--color-parchment)]">{u.displayName}</span>
-                    {u.roles.includes("gia-chu") && <span className="badge badge-owner">Gia chủ</span>}
-                    {u.roles.includes("admin") && <span className="badge badge-admin">Trưởng môn</span>}
+                    {/* Duyệt theo ASSIGNABLE_ROLES chứ không theo `u.roles`: thứ tự huy hiệu
+                        khi ấy là thứ tự THANG VAI, giống nhau ở mọi hàng, không phụ thuộc
+                        vào việc Gia chủ tick ô nào trước lúc lưu. */}
+                    {ASSIGNABLE_ROLES.filter((role) => u.roles.includes(role)).map((role) => (
+                      <span key={role} className={`badge ${ROLE_BADGE_CLASS[role]}`}>
+                        {ROLE_LABEL[role]}
+                      </span>
+                    ))}
                     {u.tags.map((t) => (
                       <span key={t} className="badge badge-tag">{t}</span>
                     ))}
@@ -182,6 +208,11 @@ export function UserTable({
 
       {editing && (
         <EditDialog
+          // `key` theo id: hộp thoại giờ mang state riêng (ô tag), và state khởi tạo MỘT LẦN
+          // lúc mount. Hôm nay giữa hai lần mở luôn có một nhịp `editing = null` nên nó vẫn
+          // mount lại — nhưng đó là may, không phải bảo đảm: bỏ nhịp ấy đi thì hộp thoại của
+          // người sau hiện tag của người trước, và lưu đè lên thật.
+          key={editing.id}
           viewer={viewer}
           user={editing}
           onClose={() => setEditing(null)}
@@ -265,8 +296,10 @@ function EditDialog({
               {/* Cờ "phần vai CÓ trong form" — thiếu nó, server không phân biệt được "bỏ hết
                   tick" (thu mọi vai) với "form không bày phần vai" (giữ nguyên). */}
               <input type="hidden" name="rolesSubmitted" value="1" />
-              <div className="flex gap-4">
-                {(Object.keys(ROLE_LABEL) as Role[]).map((role) => {
+              {/* `flex-wrap` là bắt buộc từ lúc có bốn vai:「Thái thượng trưởng lão」một mình
+                  đã dài gần nửa hộp thoại, để một hàng cứng thì hai vai cuối bị đẩy khỏi mép. */}
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {ASSIGNABLE_ROLES.map((role) => {
                   const lockedOwnSeat = role === "gia-chu" && user.id === viewer.id && isOwner(viewer);
                   return (
                     <label key={role} className="flex items-center gap-2 text-sm">
@@ -306,17 +339,7 @@ function EditDialog({
             </select>
           </div>
 
-          <label className="label" htmlFor="edit-tags">
-            Tag trang trí (phân cách bằng dấu phẩy, tối đa 3 × 20 ký tự)
-          </label>
-          <input
-            id="edit-tags"
-            name="tags"
-            className="input mb-4"
-            defaultValue={user.tags.join(", ")}
-            placeholder="Ví dụ: Trận pháp sư, Luyện đan"
-            maxLength={80}
-          />
+          <TagField initial={user.tags} />
 
           <label className="label" htmlFor="edit-password">
             Mật khẩu mới
@@ -345,6 +368,91 @@ function EditDialog({
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Ô tag: chip bấm chọn + ô gõ tự do, và CHỈ MỘT nguồn sự thật — chuỗi trong ô input.
+ *
+ * Vì sao không giữ một mảng tag trong state rồi dựng chuỗi lúc submit: người dùng vẫn phải gõ
+ * được tag tuỳ ý, nên ô chữ là thứ bắt buộc phải có. Có cả mảng lẫn chuỗi là có hai bản chép
+ * của cùng một dữ liệu, và câu hỏi "bên nào đúng khi hai bên lệch" không có câu trả lời hay.
+ * Chip chỉ đọc chuỗi ra để biết cái nào đang bật, rồi ghi chuỗi mới về.
+ *
+ * So khớp KHÔNG phân biệt hoa thường, nhưng chèn vào theo đúng chính tả của preset: nếu không
+ * thì gõ tay「chưởng môn」rồi bấm chip「Chưởng môn」sẽ ra hai tag trông y hệt nhau nằm cạnh
+ * nhau, và người nhìn bảng không hiểu vì sao.
+ */
+function TagField({ initial }: { initial: string[] }) {
+  const [raw, setRaw] = useState(initial.join(", "));
+
+  const current = splitTags(raw);
+  const check = parseTags(raw);
+  const full = current.length >= MAX_TAGS;
+
+  const indexOfPreset = (preset: string) =>
+    current.findIndex((t) => t.toLowerCase() === preset.toLowerCase());
+
+  /**
+   * Cập nhật theo HÀM chứ không theo `current` của lượt vẽ này — và trần cũng kiểm lại BÊN
+   * TRONG. Đo được, không phải phòng xa: ba cú bấm rơi vào cùng một tick React thì cả ba cùng
+   * đọc một state cũ, và chỉ cú cuối sống sót. Tay người khó bấm nhanh tới vậy, nhưng "đúng
+   * nhờ kịp vẽ lại" thì không phải là đúng — thuộc tính `disabled` chỉ chặn ở lượt vẽ, còn
+   * đây mới là chỗ luật「tối đa {MAX_TAGS}」thật sự được giữ.
+   */
+  const togglePreset = (preset: string) => {
+    setRaw((prev) => {
+      const list = splitTags(prev);
+      const at = list.findIndex((t) => t.toLowerCase() === preset.toLowerCase());
+      if (at < 0 && list.length >= MAX_TAGS) return prev;
+      const next = at >= 0 ? list.filter((_, i) => i !== at) : [...list, preset];
+      return next.join(", ");
+    });
+  };
+
+  return (
+    <div className="mb-4">
+      <label className="label" htmlFor="edit-tags">
+        Tag trang trí (tối đa {MAX_TAGS} × {MAX_TAG_LENGTH} ký tự)
+      </label>
+
+      <div className="mb-2 flex flex-wrap gap-2">
+        {TAG_PRESETS.map((preset) => {
+          const on = indexOfPreset(preset) >= 0;
+          return (
+            <button
+              key={preset}
+              type="button"
+              // Hết chỗ thì chip CHƯA bật bị khoá — thà không bấm được còn hơn bấm xong mới
+              // biết bị từ chối; chip đang bật vẫn phải bấm được, vì đó là đường gỡ ra.
+              disabled={!on && full}
+              onClick={() => togglePreset(preset)}
+              aria-pressed={on}
+              // Chip chưa chọn là bản MỜ của chính cái nó sẽ thành, không phải một màu khác:
+              // `badge-disabled` sẵn có là màu ĐỎ của trạng thái đình quyền, dùng ở đây thì
+              // một cái tag chưa bấm trông như một lỗi.
+              className={`badge badge-tag ${on ? "" : "opacity-45"} disabled:opacity-20`}
+            >
+              {on ? "✓ " : "+ "}
+              {preset}
+            </button>
+          );
+        })}
+      </div>
+
+      <input
+        id="edit-tags"
+        name="tags"
+        className="input"
+        value={raw}
+        onChange={(e) => setRaw(e.target.value)}
+        placeholder="Ví dụ: Trận pháp sư, Luyện đan"
+        // Trần ký tự của cả ô, tính từ luật chứ không gõ tay một con số: đủ chỗ cho tối đa
+        // ngần ấy tag dài hết cỡ, cộng phần ", " ngăn giữa chúng.
+        maxLength={MAX_TAGS * MAX_TAG_LENGTH + (MAX_TAGS - 1) * 2}
+      />
+      {!check.ok && <p className="mt-1 text-xs text-[#f2a0a0]">{check.error}</p>}
     </div>
   );
 }

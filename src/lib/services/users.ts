@@ -1,5 +1,6 @@
 import { and, eq, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
+import { isAdminUser } from "@/lib/auth/permissions";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { getAppSettings } from "@/lib/services/settings";
 import type { UserRow } from "@/lib/db/schema";
@@ -45,9 +46,14 @@ const publicColumns = {
 /**
  * Giá trị GHI GƯƠNG cho cột di sản `role` — bản deploy cũ còn đọc nó trong cửa sổ giữa
  * migrate và deploy (xem ghi chú tại cột trong schema.ts). Code mới không bao giờ ĐỌC.
+ *
+ * Hỏi `isAdminUser` chứ KHÔNG liệt kê mã vai tại đây: enum `user_role` chỉ có `user|admin`,
+ * nên mọi vai bậc trị sự đều phải soi xuống thành `admin`. Chép tay danh sách vai ra chỗ này
+ * nghĩa là thêm một vai mới ở permissions.ts sẽ âm thầm ghi gương thành `user` — người ấy
+ * mất sạch quyền trong mắt bản deploy cũ, và không có phép thử nào ở đây kêu lên.
  */
 function legacyRoleOf(roles: readonly string[]): "user" | "admin" {
-  return roles.includes("admin") || roles.includes("gia-chu") ? "admin" : "user";
+  return isAdminUser({ roles }) ? "admin" : "user";
 }
 
 export async function findByUsername(username: string): Promise<UserRow | null> {

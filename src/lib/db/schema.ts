@@ -40,10 +40,16 @@ export const userStatus = pgEnum("user_status", ["pending", "active", "disabled"
  * Vai trò từ 08/08/2026 là MỘT MẢNG, không phải một enum đơn — một người có thể vừa là Gia
  * chủ vừa là Trưởng môn. Mảng rỗng = môn đồ thường.
  *
- *   gia-chu — vai lớn nhất, MỘT MÌNH nó có quyền sửa/xoá vai của các Trưởng môn. Sinh ra vì
+ *   gia-chu — vai lớn nhất, MỘT MÌNH nó có quyền sửa/xoá vai của người mang vai. Sinh ra vì
  *             một lỗ hổng có thật: các Trưởng môn ngang quyền có thể hạ vai hay trục xuất
  *             LẪN NHAU, nghĩa là admin nào cũng chỉ an toàn cho tới khi một admin khác đổi ý.
- *   admin   — Trưởng môn: duyệt môn đồ, quản môn đồ thường; KHÔNG đụng được admin khác.
+ *
+ *   Ba vai NGANG NHAU ở bậc trị sự (từ 09/08/2026) — duyệt môn đồ, quản môn đồ thường, và
+ *   KHÔNG đụng được người mang vai, kể cả người mang đúng vai của mình:
+ *     thai-thuong-truong-lao, chuong-mon, admin
+ *
+ * Cột này là `text[]` chứ không phải enum CỐ Ý: thêm một vai là thêm một chuỗi trong
+ * permissions.ts, không phải một migration `ALTER TYPE` trên database thật.
  *
  * Danh sách hợp lệ nằm ở `src/lib/auth/permissions.ts` — nơi giữ toàn bộ ma trận ai-được-làm-gì.
  */

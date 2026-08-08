@@ -52,7 +52,14 @@ if (!user) {
   process.exit(1);
 }
 
-const token = await new SignJWT({ username: user.username, role: user.roles?.includes("admin") || user.roles?.includes("gia-chu") ? "admin" : "user" })
+// Hỏi ma trận thay vì chép tay danh sách vai: bản chép tay ở đây từng chỉ biết hai vai, nên
+// một phiên đóng vai Chưởng môn sẽ mang claim "user" — vô hại (không ai đọc claim ấy để phân
+// quyền, guard đọc lại hàng user mỗi request) nhưng là một luật thứ hai sống lệch luật thật.
+const { isAdminUser } = await import("../src/lib/auth/permissions.ts");
+const token = await new SignJWT({
+  username: user.username,
+  role: isAdminUser({ roles: user.roles ?? [] }) ? "admin" : "user",
+})
   .setProtectedHeader({ alg: "HS256" })
   .setSubject(user.id)
   .setIssuedAt()

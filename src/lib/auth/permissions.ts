@@ -8,45 +8,77 @@
  *
  * Thang vai (từ 08/08/2026, một người có thể giữ NHIỀU vai cùng lúc):
  *
- *   gia-chu  — Gia chủ, vai lớn nhất. Một mình vai này sửa/xoá được các Trưởng môn, và cũng
+ *   gia-chu  — Gia chủ, vai lớn nhất. Một mình vai này sửa/xoá được người mang vai, và cũng
  *              là vai DUY NHẤT được đổi vai của bất kỳ ai. Sinh ra để bịt một lỗ hổng có
  *              thật: trước đây hai Trưởng môn ngang quyền hạ vai hay trục xuất được lẫn
  *              nhau — admin nào cũng chỉ an toàn cho tới khi một admin khác đổi ý.
- *   admin    — Trưởng môn. Duyệt, sửa, trục xuất MÔN ĐỒ THƯỜNG; không đụng được người mang
- *              vai (admin hay gia-chu), kể cả chính vai của mình.
+ *
+ *   Ba vai NGANG NHAU ở bậc trị sự — khác nhau ở danh xưng, không ở quyền:
+ *     thai-thuong-truong-lao — Thái thượng trưởng lão
+ *     chuong-mon             — Chưởng môn
+ *     admin                  — Trưởng môn
+ *   Cả ba: duyệt, sửa, trục xuất MÔN ĐỒ THƯỜNG; không đụng được người mang vai, kể cả người
+ *   mang đúng vai của mình. Nghe thì lạ — một Chưởng môn không sửa nổi một Chưởng môn khác —
+ *   nhưng đó CHÍNH LÀ lỗ hổng mà bậc Gia chủ sinh ra để bịt, và thêm vai mới không phải là
+ *   lý do để mở lại nó.
+ *
  *   (rỗng)   — môn đồ thường.
  *
- * Gia chủ nghiễm nhiên có mọi quyền Trưởng môn — cấp trên mà thiếu quyền cấp dưới thì vừa
- * vô lý vừa bắt mọi chỗ kiểm tra phải nhớ hỏi HAI vai.
+ * Gia chủ nghiễm nhiên có mọi quyền trị sự — cấp trên mà thiếu quyền cấp dưới thì vừa vô lý
+ * vừa bắt mọi chỗ kiểm tra phải nhớ hỏi đủ BỐN vai.
+ *
+ * Vì sao mã vai vẫn là tiếng Việt không dấu chứ không đổi sang tiếng Anh: mã đã nằm trong
+ * `users.roles` của database thật. Đổi mã là một cuộc di dân dữ liệu, mà giữa lúc migrate và
+ * deploy sẽ có một cửa sổ Gia chủ mang mã cũ trong khi code đã đọc mã mới — tức không còn ai
+ * đổi được vai, và đó đúng là căn phòng khoá trái mà cả tệp này sinh ra để phòng. Cái giá
+ * cho một bảng mã đẹp hơn không đáng.
  */
 
-export const ASSIGNABLE_ROLES = ["gia-chu", "admin"] as const;
+export const ASSIGNABLE_ROLES = ["gia-chu", "thai-thuong-truong-lao", "chuong-mon", "admin"] as const;
 export type Role = (typeof ASSIGNABLE_ROLES)[number];
 
 export const ROLE_LABEL: Record<Role, string> = {
   "gia-chu": "Gia chủ",
+  "thai-thuong-truong-lao": "Thái thượng trưởng lão",
+  "chuong-mon": "Chưởng môn",
   admin: "Trưởng môn",
 };
 
-type RoleBearer = { roles: string[] };
+/**
+ * Vai mang quyền trị sự, KHÔNG kể Gia chủ (vai ấy đi cửa riêng vì nó còn hơn thế).
+ *
+ * `satisfies` để một mã gõ sai bị bắt ngay tại dòng này thay vì im lặng thành "không ai có
+ * vai ấy"; `Set` để `isAdminUser` — thứ chạy trên mọi request có phiên — không phải quét
+ * mảng. Thêm một vai ngang admin về sau là thêm MỘT chuỗi vào đây, không đụng chỗ nào khác.
+ */
+const ADMIN_LEVEL_ROLES = ["thai-thuong-truong-lao", "chuong-mon", "admin"] as const satisfies readonly Role[];
+const ADMIN_LEVEL = new Set<string>(ADMIN_LEVEL_ROLES);
+
+/**
+ * `readonly` chứ không `string[]`: những hàm này chỉ ĐỌC vai, và nhận cả mảng chỉ-đọc thì
+ * nơi gọi khỏi phải sao chép mảng ra chỉ để chiều kiểu.
+ */
+type RoleBearer = { roles: readonly string[] };
 type Identified = RoleBearer & { id: string };
 
 export function isOwner(user: RoleBearer): boolean {
   return user.roles.includes("gia-chu");
 }
 
-/** "Có quyền trị sự" — Gia chủ hay Trưởng môn đều qua cửa này. */
+/** "Có quyền trị sự" — Gia chủ và cả ba vai ngang admin đều qua cửa này. */
 export function isAdminUser(user: RoleBearer): boolean {
-  return isOwner(user) || user.roles.includes("admin");
+  return isOwner(user) || user.roles.some((role) => ADMIN_LEVEL.has(role));
 }
 
 /**
  * A có được quản B không (sửa hồ sơ, đổi trạng thái, trục xuất)?
  *
  *   Gia chủ  → quản tất cả.
- *   Admin    → chỉ quản người KHÔNG mang vai. "Không đụng được admin khác" phải bao trùm cả
- *              đổi trạng thái lẫn sửa hồ sơ, không riêng gì xoá: đình quyền một admin hay
- *              đổi email của họ cũng chính là vô hiệu hoá họ, chỉ là bằng cửa khác.
+ *   Bậc trị  → chỉ quản người KHÔNG mang vai nào. "Không đụng được người mang vai" phải bao
+ *   sự       trùm cả đổi trạng thái lẫn sửa hồ sơ, không riêng gì xoá: đình quyền một Trưởng
+ *              môn hay đổi email của họ cũng chính là vô hiệu hoá họ, chỉ là bằng cửa khác.
+ *              Và nó bao trùm cả người mang CÙNG vai với mình — ba vai ở bậc này ngang nhau,
+ *              nên để họ hạ được nhau thì cả bậc chỉ an toàn tới khi có người đổi ý.
  *   Môn đồ   → không quản ai.
  *
  * Tự quản mình KHÔNG đi qua hàm này — các giới hạn tự thân (không tự khoá, không tự trục

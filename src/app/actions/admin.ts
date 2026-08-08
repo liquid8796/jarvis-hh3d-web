@@ -25,6 +25,7 @@ import {
 import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
 import { adminCreate, adminDelete, adminUpdate, findById, setStatus } from "@/lib/services/users";
 import { CHAT_PURGE_PHRASE, matchesChatPurgePhrase } from "@/lib/validation/chat";
+import { parseTags } from "@/lib/validation/tags";
 import {
   displayNameSchema,
   emailSchema,
@@ -46,25 +47,6 @@ import {
 export type AdminResult = { ok: boolean; message: string };
 
 const statusSchema = z.enum(["pending", "active", "disabled"]);
-
-/**
- * Tag từ MỘT ô chữ, phân cách bằng dấu phẩy. Làm sạch ở server vì đây là ranh giới tin cậy:
- * trần 3 tag × 20 ký tự là luật, không phải gợi ý của ô input.
- */
-const MAX_TAGS = 3;
-const MAX_TAG_LENGTH = 20;
-
-function parseTags(raw: string): { ok: true; tags: string[] } | { ok: false; error: string } {
-  const tags = [...new Set(raw.split(",").map((t) => t.trim()).filter((t) => t.length > 0))];
-  if (tags.length > MAX_TAGS) {
-    return { ok: false, error: `Tối đa ${MAX_TAGS} tag cho một đạo hữu.` };
-  }
-  const tooLong = tags.find((t) => t.length > MAX_TAG_LENGTH);
-  if (tooLong) {
-    return { ok: false, error: `Tag「${tooLong.slice(0, 30)}…」dài quá ${MAX_TAG_LENGTH} ký tự.` };
-  }
-  return { ok: true, tags };
-}
 
 /** Duyệt / tạm khoá / trả về hàng chờ. */
 export async function setStatusAction(userId: string, status: string): Promise<AdminResult> {

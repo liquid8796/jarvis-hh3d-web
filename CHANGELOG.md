@@ -23,6 +23,45 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
   nhắc, không phải sót.
 - CHANGELOG giữ tên cũ như mọi lần: sử sách không viết lại.
 
+## 0.46.0 — thêm Thái thượng trưởng lão và Chưởng môn, cùng bốn tag bấm một cái là xong
+
+- **Hai vai mới, quyền NGANG Trưởng môn**: `thai-thuong-truong-lao` và `chuong-mon`. Ba vai ấy
+  giờ khác nhau ở danh xưng chứ không ở quyền — cùng duyệt môn đồ, cùng không đụng được người
+  mang vai.
+- Hệ quả đáng nói nhất, và nó KHÔNG hiển nhiên: **một Chưởng môn không sửa/xoá được một Chưởng
+  môn khác**, cũng không đụng được Trưởng môn. Nghe vô lý cho tới khi nhớ ra vì sao vai Gia chủ
+  tồn tại (0.43.0): hai người ngang quyền hạ được nhau thì cả bậc ấy chỉ an toàn tới lúc có
+  người đổi ý. Thêm vai mới không phải là lý do để mở lại đúng cái lỗ hổng ấy.
+- Vì「ngang admin」đi qua đúng một hàm `isAdminUser`, hai vai mới **thừa hưởng trọn gói mọi thứ
+  admin có**: vào được trang Tông Môn, hiện ✦ trong Phòng Chat, và tắt được `capCheck` Mê Cung.
+  Cái cuối là một luật GAME chứ không phải UI — ghi ra đây vì nó là thứ dễ quên nhất khi thêm
+  một vai.
+- **Không có migration nào.** `users.roles` là `text[]`, nên vai mới chỉ là giá trị mới; đây
+  cũng là lý do mã vai giữ nguyên tiếng Việt không dấu thay vì đổi `gia-chu` → `owner` như dự
+  tính ban đầu. Đổi mã là di dân dữ liệu, và giữa migrate với deploy sẽ có một cửa sổ Gia chủ
+  mang mã cũ trong khi code đã đọc mã mới — tức không còn ai đổi được vai nữa. Một bảng mã đẹp
+  hơn không đáng cái giá đó.
+- **Tag bày sẵn**: Trưởng lão, Thánh nữ, Thái thượng trưởng lão, Chưởng môn — bấm chip là thêm,
+  bấm lại là gỡ, và **vẫn gõ tag tuỳ ý như cũ**. Chip chưa chọn tự khoá khi đã đủ 3 tag, thay
+  vì cho bấm rồi mới báo lỗi lúc Lưu.
+- **Trần độ dài tag 20 → 24.**「Thái thượng trưởng lão」dài **22 ký tự**: dưới trần cũ, tông môn
+  không thể lưu nổi cái tag mà chính họ muốn dùng, và lời từ chối thì không nói ra con số nào.
+  `verify:permissions` nay soát「mọi tag bày sẵn phải lọt trần」— chính là phép thử sẽ bắt được
+  ca này nếu ai đó thêm một tên dài hơn nữa.
+- Ô tag chuyển sang cập nhật theo hàm (`setRaw(prev => …)`) và kiểm lại trần NGAY TRONG đó.
+  Bắt được bằng phép đo trên trình duyệt thật: ba cú bấm rơi vào cùng một tick React thì cả ba
+  cùng đọc một state cũ và chỉ cú cuối sống sót. Thuộc tính `disabled` chỉ chặn ở lượt vẽ.
+- **Luật tag dọn sang `validation/tags.ts`, một tệp KHÔNG import gì cả.** Bản đầu để chúng
+  trong `validation/user.ts` cho gọn — nhưng tệp ấy import `zod` và dựng schema ở cấp module,
+  nên một component `"use client"` nhập một hằng số từ đó là gánh cả zod sang bundle trình
+  duyệt. Tách ra là hết.
+- Bảng môn đồ **vẽ huy hiệu và ô tick theo dữ liệu** thay vì gõ tay từng vai, nên thêm vai lần
+  sau không phải sờ vào bảng nữa. Ba vai bậc trị sự dùng CHUNG màu huy hiệu — cố ý: màu nói về
+  hạng quyền, còn chữ đã đủ phân biệt Chưởng môn với Trưởng môn.
+- `verify:permissions` quét **trọn 100 ô actor×target** so với một bảng hạng viết tay (cố ý
+  không hỏi `isAdminUser`, vì một oracle đi hỏi chính thứ đang bị kiểm thì gật đầu với mọi lỗi
+  của nó), và chặn luôn đường「tự hạ xuống Chưởng môn」như một cửa sau để Gia chủ rời ngôi.
+
 ## 0.45.0 — mọi đạo hữu đặt được ảnh đại diện
 
 - **Trang Hồ Sơ có mục「Ảnh đại diện」** — chọn một tấm PNG/JPEG/WebP/GIF, và nó hiện ngay cạnh

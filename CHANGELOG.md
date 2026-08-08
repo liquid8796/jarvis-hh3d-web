@@ -23,6 +23,52 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
   nhắc, không phải sót.
 - CHANGELOG giữ tên cũ như mọi lần: sử sách không viết lại.
 
+## 0.45.0 — mọi đạo hữu đặt được ảnh đại diện
+
+- **Trang Hồ Sơ có mục「Ảnh đại diện」** — chọn một tấm PNG/JPEG/WebP/GIF, và nó hiện ngay cạnh
+  tên trong Phòng Chat lẫn trên thanh đầu trang. Bỏ ảnh thì trở về vòng tròn chữ đầu như trước.
+  Mở cho MỌI người đã đăng nhập, kể cả người còn trong hàng chờ hay đang bị đình quyền — cùng
+  một luật với danh xưng và email ở ngay dưới, vì ảnh là danh tính chứ không phải đặc quyền của
+  thành viên đã duyệt.
+- **Ảnh được thu nhỏ NGAY TRÊN MÁY người dùng** về hình vuông cạnh 512px trước khi gửi. Một tấm
+  từ điện thoại nặng 3–8MB và rộng 4000px, còn vòng tròn nó sẽ nằm trong rộng 34px: gửi nguyên
+  bản là trả tiền đường truyền lẫn tiền lưu trữ cho phần không ai từng thấy, và phải nhét một
+  thư viện xử lý ảnh vào function — trong khi `canvas` có sẵn trong mọi trình duyệt. Đo được ở
+  một lượt kiểm: 800×600 (28,8 KB) → 512×512 WebP (8,1 KB). Cắt VUÔNG vì mọi chỗ hiển thị đều
+  là vòng tròn `object-fit: cover`, tức trình duyệt vốn đã cắt giữa đúng thế lúc vẽ.
+  - GIF động là ngoại lệ, đi nguyên bản: canvas chỉ vẽ được khung đầu, nên thu nhỏ một GIF động
+    là lặng lẽ giết phần động của nó. Đổi lại nó phải tự dưới 2MB.
+  - EXIF hướng ảnh được tôn trọng (`imageOrientation: "from-image"`), không thì ảnh dựng đứng
+    từ điện thoại vào tới đây là nằm ngang.
+- **Kiểu ảnh suy từ BYTES, không từ `file.type` mà client khai.** Bucket media công khai đọc,
+  nên nhãn ta ghi lên object chính là nhãn cả thế giới nhận được khi tải nó về — và cái nhãn ấy
+  là thứ DUY NHẤT ngăn trình duyệt hiển thị một tệp HTML như trang web trên một tên miền không
+  phải của mình. `\x89PNG` thì không khai gian được. Chỉ nhận đúng bốn định dạng; HTML, PDF, BMP
+  và cả WAV (`RIFF` nhưng không `WEBP`) đều bị trả về 415.
+- **Đổi ảnh xoá ảnh cũ, trong một câu lệnh không có khe hở.** `setAvatar` ghi ảnh mới và trả về
+  tên object CŨ bằng phép tự-join `from users prev` — ảnh chụp bảng trước khi ghi. Đọc-rồi-ghi
+  thì hai tab cùng đổi ảnh sẽ cùng đọc ra một key cũ, và một trong hai ảnh mới thành object
+  không ai trỏ tới, không ai biết để dọn. Thứ tự cũng có chủ ý: bảng trước, bytes sau — ngược
+  lại là mọi nơi treo ảnh vỡ, còn theo thứ tự này thì cùng lắm một tệp mồ côi nằm im.
+- **Key có hậu tố ngẫu nhiên chứ không phải `avatar/{userId}` cố định**, dù cố định thì khỏi cần
+  cột `avatar_key`. Lý do: kho stamp `immutable, max-age=30 ngày` lên mọi object, nên một key
+  bất biến nghĩa là trình duyệt còn giữ MẶT CŨ suốt một tháng sau khi đổi.
+- **Ảnh KHÔNG bị đóng băng vào tin nhắn**, khác với tên và tag. Cả ba đều là "danh tính lúc
+  nói", nhưng đổi ảnh là XOÁ object cũ: một URL đóng băng trong tin cũ sẽ thành ảnh vỡ ngay lần
+  đổi đầu tiên, còn một cái tên đóng băng thì chỉ là chuỗi chữ, không hỏng đi được. `/api/chat`
+  vì thế trả kèm một bản đồ `userId → URL`; phép tra ấy nằm ở ROUTE chứ không trong chat.ts, để
+  tầng MongoDB vẫn không biết gì về Postgres.
+- **Trục xuất một đạo hữu giờ quét cả ảnh của họ.** Cấu hình, job và nhật ký đi theo `on delete
+  cascade` của schema, nhưng bytes trong OCI thì không có ràng buộc nào biết tới — chúng là thứ
+  duy nhất của một thành viên không nằm trong Postgres. Quét theo TIỀN TỐ nên dọn luôn những ảnh
+  cũ mà một lần đổi ảnh trước đây có thể đã không xoá được. Quét trượt thì KHÔNG làm lượt trục
+  xuất thất bại — người ấy đã rời tông môn thật rồi.
+- Vòng tròn danh tính về MỘT bản dùng chung (`components/Avatar.tsx`) cho thanh đầu trang, trang
+  Hồ Sơ và sảnh đàm đạo; `initialOf`/`hueOf` thôi nằm riêng trong ChatRoom.tsx. Lớp CSS
+  `.chat-avatar` đổi tên thành `.avatar`.
+- `npm run verify:avatar` — soi bytes, đặt tên object, vòng đời trong bảng (đặt → đổi → bỏ),
+  và vòng đời thật trên kho OCI kể cả phép quét ảnh mồ côi.
+
 ## 0.44.2 — chân trang ký tên đạo hữu, không ký tên hoa
 
 - Chân trang đổi từ `© 2026 Bảo Hoa tiên tử` thành **`© 2026 Nam Cung Bình`**. Cái tên cũ vào

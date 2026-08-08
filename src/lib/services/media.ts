@@ -44,6 +44,12 @@ const ENV_KEYS = [ENV_REGION, ENV_NAMESPACE, ENV_BUCKET, ENV_ACCESS_KEY, ENV_SEC
 export const CHAT_PREFIX = "chat";
 
 /**
+ * Tiền tố ảnh đại diện. Nằm RIÊNG khỏi `chat/` vì hai vòng đời khác nhau hẳn: nút thanh tẩy
+ * sảnh quét sạch `chat/`, và nó không có quyền gì với mặt của người ta.
+ */
+export const AVATAR_PREFIX = "avatar";
+
+/**
  * Cache một tháng — đúng bằng mặc định cũ của Vercel Blob, nên hành vi trình duyệt không đổi.
  * Thêm `immutable` là an toàn TUYỆT ĐỐI ở đây, không phải liều: mỗi lần tải lên sinh một hậu
  * tố ngẫu nhiên mới, nên một key đã tồn tại thì nội dung của nó không bao giờ đổi nữa.
@@ -268,6 +274,119 @@ export async function putChatFile(input: PutChatFileInput): Promise<StoredFile> 
   );
 
   return { key, url: publicUrl(key, config) };
+}
+
+/**
+ * Bốn định dạng ảnh mà MỌI trình duyệt vẽ được. Danh sách này vừa là luật nhận ảnh đại diện,
+ * vừa là bảng tra đuôi file — nên không có đường nào ghi vào kho một kiểu nội dung mà bảng
+ * này chưa biết đặt tên cho.
+ */
+const IMAGE_KINDS = [
+  { contentType: "image/png", extension: ".png" },
+  { contentType: "image/jpeg", extension: ".jpg" },
+  { contentType: "image/webp", extension: ".webp" },
+  { contentType: "image/gif", extension: ".gif" },
+] as const;
+
+export type ImageKind = (typeof IMAGE_KINDS)[number];
+
+/** Byte đầu tiên cần soi. WebP phải đọc tới cả chữ "WEBP" ở offset 8. */
+const SNIFF_BYTES = 12;
+
+function startsWithAscii(bytes: Uint8Array, offset: number, ascii: string): boolean {
+  if (bytes.length < offset + ascii.length) return false;
+  for (let i = 0; i < ascii.length; i++) {
+    if (bytes[offset + i] !== ascii.charCodeAt(i)) return false;
+  }
+  return true;
+}
+
+/**
+ * Nhận diện ảnh bằng CHÍNH BYTES, không tin `file.type` mà client khai.
+ *
+ * Vì sao không tin: bucket này công khai đọc, nên kiểu nội dung ta ghi lên object là kiểu mà
+ * cả thế giới nhận được khi tải nó về. Client khai `image/png` cho một tệp HTML thì ta lưu
+ * một trang HTML dưới nhãn ảnh, trên một tên miền không phải của mình — và cái nhãn ấy là
+ * thứ DUY NHẤT ngăn trình duyệt hiển thị nó như trang web. Bytes thì không khai gian được:
+ * `\x89PNG` là PNG, không cần hỏi ai.
+ *
+ * `null` = không phải bốn định dạng trên. Ảnh đại diện là chỗ HẸP có thể siết chặt như vậy;
+ * đính kèm đàm đạo thì không, vì nó cố tình nhận mọi loại tệp.
+ */
+export function sniffImageKind(bytes: Uint8Array): ImageKind | null {
+  if (bytes.length < SNIFF_BYTES) return null;
+
+  const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (png.every((b, i) => bytes[i] === b)) return IMAGE_KINDS[0];
+
+  // JPEG có nhiều biến thể ở byte thứ tư (JFIF/Exif/…), nên chỉ ba byte đầu là phần bất biến.
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return IMAGE_KINDS[1];
+
+  if (startsWithAscii(bytes, 0, "RIFF") && startsWithAscii(bytes, 8, "WEBP")) return IMAGE_KINDS[2];
+
+  if (startsWithAscii(bytes, 0, "GIF87a") || startsWithAscii(bytes, 0, "GIF89a")) return IMAGE_KINDS[3];
+
+  return null;
+}
+
+/**
+ * Tên object cho một ảnh đại diện: `avatar/{userId}/{ngẫu nhiên}{đuôi}`.
+ *
+ * KHÔNG mang tên tệp gốc, khác với `chatObjectKey`. Hai lẽ: tên ấy chẳng để làm gì (không ai
+ * tải ảnh đại diện xuống theo tên), còn URL thì công khai — nên「IMG_4821_me_va_ban_gai.jpg」
+ * sẽ nằm vĩnh viễn trên một địa chỉ ai cũng đọc được. Đuôi file suy từ BYTES đã soi, không
+ * từ tên client gửi.
+ *
+ * Hậu tố ngẫu nhiên là điều kiện để `immutable` trong `CACHE_CONTROL` không nói dối — xem
+ * ghi chú tại cột `avatarKey` trong schema.
+ */
+export function avatarObjectKey(userId: string, kind: ImageKind): string {
+  const safeUser = sanitizeUserId(userId);
+  return [
+    AVATAR_PREFIX,
+    hasWordCharacter(safeUser) ? safeUser : "an-danh",
+    `${randomBytes(SUFFIX_BYTES).toString("base64url")}${kind.extension}`,
+  ].join("/");
+}
+
+/** Tải một ảnh đại diện lên kho. `kind` phải là kết quả của `sniffImageKind` trên chính bytes ấy. */
+export async function putAvatarFile(input: {
+  userId: string;
+  kind: ImageKind;
+  body: Uint8Array;
+}): Promise<StoredFile> {
+  const { client, config } = requireStore();
+  const key = avatarObjectKey(input.userId, input.kind);
+
+  await client.send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      Body: input.body,
+      ContentLength: input.body.byteLength,
+      ContentType: input.kind.contentType,
+      CacheControl: CACHE_CONTROL,
+    }),
+  );
+
+  return { key, url: publicUrl(key, config) };
+}
+
+/**
+ * Quét sạch mọi ảnh đại diện của một người — dùng khi trục xuất họ khỏi tông môn.
+ *
+ * Đi theo TIỀN TỐ chứ không theo `avatarKey` trong bảng, vì bảng chỉ nhớ ảnh ĐANG dùng: một
+ * lần đổi ảnh mà lệnh xoá ảnh cũ trượt sẽ để lại object không còn ai trỏ tới, và lúc trục
+ * xuất thì đó là dịp cuối cùng dọn được nó. Xoá dòng users rồi thì không còn gì để tra.
+ */
+export async function purgeUserAvatars(userId: string): Promise<MediaSweepResult> {
+  const safeUser = sanitizeUserId(userId);
+  // Tiền tố rỗng sẽ quét CẢ BUCKET (purgeObjectsUnder ném, nhưng chặn ở đây thì lời báo lỗi
+  // nói đúng chuyện gì đã xảy ra): một userId rửa xong còn rỗng là lỗi của người gọi.
+  if (!hasWordCharacter(safeUser)) {
+    throw new Error("purgeUserAvatars cần một userId thật — chuỗi rỗng không trỏ vào ai cả.");
+  }
+  return purgeObjectsUnder(`${AVATAR_PREFIX}/${safeUser}/`);
 }
 
 /** Tải lên tại một key CHO SẴN — dành cho script chuyển kho, nơi key phải giữ nguyên từ kho cũ. */

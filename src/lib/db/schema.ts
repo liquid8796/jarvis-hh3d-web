@@ -74,6 +74,22 @@ export const users = pgTable(
      * gác ở tầng action; cột chỉ là mảng chữ.
      */
     tags: text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
+    /**
+     * Ảnh đại diện — URL công khai trong tàng khố media (OCI), null = chưa đặt và giao diện
+     * vẽ vòng tròn chữ đầu như trước.
+     *
+     * HAI cột cho một tấm ảnh, và cột thứ hai không dư: `avatarKey` là tên object trong kho,
+     * thứ duy nhất `DeleteObject` nhận. Đổi ảnh là ghi ảnh mới rồi xoá ảnh cũ, nên phải biết
+     * ảnh cũ tên gì — suy ngược từ URL thì được về mặt chuỗi, nhưng đó là một phép giải mã
+     * chạy trước một lệnh XOÁ: đoán sai một ký tự là xoá nhầm object của người khác. Giữ
+     * nguyên văn cái tên đã ghi thì không có gì để đoán.
+     *
+     * Vì sao không dùng một key cố định `avatar/{userId}` rồi PUT ghi đè (khỏi cần cột này):
+     * kho stamp `immutable, max-age=30 ngày` lên mọi object, nên một key bất biến nghĩa là
+     * trình duyệt còn giữ MẶT CŨ suốt một tháng sau khi đổi.
+     */
+    avatarUrl: text("avatar_url"),
+    avatarKey: text("avatar_key"),
     status: userStatus("status").notNull().default("pending"),
     /**
      * LINH PHÙ — token riêng cho khôi lỗi máy nhà của đạo hữu này, lưu dạng SHA-256.

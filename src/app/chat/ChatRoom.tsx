@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatPicker, type PickerTab } from "./ChatPicker";
+import { Avatar } from "@/components/Avatar";
 import type { Gif } from "@/lib/services/gif";
 
 /**
@@ -53,15 +54,6 @@ const GIF_MIME = "image/gif";
 const POPUP_ATTR = "data-chat-popup";
 const TRIGGER_ATTR = "data-chat-popup-trigger";
 
-const initialOf = (name: string) => (name.trim()[0] ?? "?").toUpperCase();
-
-/** Màu avatar suy từ tên — ổn định giữa các lần tải, không cần lưu đâu cả. */
-function hueOf(name: string): number {
-  let h = 0;
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360;
-  return h;
-}
-
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
 
@@ -71,8 +63,35 @@ const fmtDay = (iso: string) =>
 const fmtSize = (n: number) =>
   n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`;
 
+/**
+ * Ảnh đại diện của những người có mặt trong trang tin, tra theo userId — server gửi kèm mỗi
+ * lượt trả feed. Không đóng băng vào tin nhắn: đổi ảnh là xoá object cũ, nên một URL nằm sẵn
+ * trong tin cũ sẽ thành ảnh vỡ. Xem `avatarsByUserId` bên services/users.ts.
+ */
+type AvatarMap = Record<string, string>;
+
+/**
+ * Hoà bản đồ ảnh mới vào bản đang giữ, và điều quan trọng nằm ở phép XOÁ.
+ *
+ * Server chỉ kể những người CÓ ảnh, nên một người vừa bỏ ảnh sẽ đơn giản là vắng mặt trong
+ * bản đồ mới. Hoà theo kiểu `{...cũ, ...mới}` thì URL cũ của họ sống mãi trong tab này — trỏ
+ * vào một object đã bị xoá, tức một ô ảnh vỡ. Nên với MỌI người có mặt trong trang tin vừa
+ * nhận, ta lấy giá trị mới hoặc bỏ hẳn khoá; người không có mặt trong trang này (tác giả của
+ * các trang cũ đã cuộn lên) thì giữ nguyên, vì trang ấy không nói gì về họ.
+ */
+function mergeAvatars(current: AvatarMap, messages: Message[], incoming: AvatarMap): AvatarMap {
+  const next = { ...current };
+  for (const message of messages) {
+    const url = incoming[message.userId];
+    if (url) next[message.userId] = url;
+    else delete next[message.userId];
+  }
+  return next;
+}
+
 export function ChatRoom({ me }: { me: { id: string; name: string } }) {
   const [store, setStore] = useState<Map<string, Message>>(new Map());
+  const [avatars, setAvatars] = useState<AvatarMap>({});
   const [typing, setTyping] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [staged, setStaged] = useState<Attachment[]>([]);
@@ -104,13 +123,16 @@ export function ChatRoom({ me }: { me: { id: string; name: string } }) {
     [store],
   );
 
-  const merge = useCallback((incoming: Message[]) => {
+  const merge = useCallback((incoming: Message[], incomingAvatars: AvatarMap = {}) => {
+    // Bản đồ ảnh vẫn phải được hoà kể cả khi trang tin RỖNG? Không — trang rỗng thì không có
+    // ai để nói về, và `mergeAvatars` sẽ không đụng tới khoá nào. Ra sớm cho khỏi vẽ lại.
     if (incoming.length === 0) return;
     setStore((prev) => {
       const next = new Map(prev);
       for (const msg of incoming) next.set(msg.id, msg);
       return next;
     });
+    setAvatars((prev) => mergeAvatars(prev, incoming, incomingAvatars));
   }, []);
 
   // ---- Nhịp poll -----------------------------------------------------------------------
@@ -130,12 +152,12 @@ export function ChatRoom({ me }: { me: { id: string; name: string } }) {
         }
         if (!res.ok) return;
         setStoreClosed(null);
-        const data: { messages: Message[]; typing: string[] } = await res.json();
+        const data: { messages: Message[]; typing: string[]; avatars?: AvatarMap } = await res.json();
 
         const fresh = data.messages.filter((m) => !knownIds.current.has(m.id));
         for (const m of data.messages) knownIds.current.add(m.id);
 
-        merge(data.messages);
+        merge(data.messages, data.avatars ?? {});
         setTyping(data.typing);
 
         // Người đang đọc lại quá khứ thì đừng giật họ xuống đáy — chỉ đếm tin mới cho cái
@@ -230,11 +252,11 @@ export function ChatRoom({ me }: { me: { id: string; name: string } }) {
         { cache: "no-store" },
       );
       if (!res.ok) return;
-      const data: { messages: Message[] } = await res.json();
+      const data: { messages: Message[]; avatars?: AvatarMap } = await res.json();
       if (data.messages.length === 0) setReachedTop(true);
       // Trang cũ không phải "tin mới" — ghi danh trước khi merge để nút về-cuối không đếm nhầm.
       for (const m of data.messages) knownIds.current.add(m.id);
-      merge(data.messages);
+      merge(data.messages, data.avatars ?? {});
       // Giữ nguyên chỗ đang đọc: bù đúng phần chiều cao vừa mọc thêm phía trên.
       requestAnimationFrame(() => {
         if (el) el.scrollTop += el.scrollHeight - prevHeight;
@@ -263,7 +285,7 @@ export function ChatRoom({ me }: { me: { id: string; name: string } }) {
     const res = await fetch("/api/chat", { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
-      merge(data.messages);
+      merge(data.messages, data.avatars ?? {});
       setTyping(data.typing);
     }
   };
@@ -437,12 +459,14 @@ export function ChatRoom({ me }: { me: { id: string; name: string } }) {
 
               <div className={`chat-row ${own ? "own" : ""} ${grouped ? "grouped" : ""}`}>
                 {!own && (
-                  <span
-                    className="chat-avatar"
-                    style={{ visibility: grouped ? "hidden" : "visible", background: `hsl(${hueOf(msg.author)} 45% 32%)` }}
-                  >
-                    {initialOf(msg.author)}
-                  </span>
+                  <Avatar
+                    name={msg.author}
+                    url={avatars[msg.userId]}
+                    size={34}
+                    // Tin nối tiếp cùng người thì vòng tròn ẨN mà vẫn CHIẾM chỗ, để mọi bong
+                    // bóng của cùng một người thẳng một hàng lề.
+                    className={grouped ? "invisible" : ""}
+                  />
                 )}
 
                 <div className="chat-bubble-col">

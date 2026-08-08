@@ -2,6 +2,7 @@ import Link from "next/link";
 import { isAdminUser } from "@/lib/auth/permissions";
 import { currentUser } from "@/lib/auth/guards";
 import { logoutAction } from "@/app/actions/auth";
+import { Avatar } from "./Avatar";
 import { SectSeal } from "./SectSeal";
 
 /**
@@ -54,7 +55,11 @@ export async function SiteHeader() {
       <nav className="flex flex-wrap items-center justify-end gap-3 text-sm">
         {user ? (
           <>
+            {/* Ảnh đại diện đứng ngay trong nút Hồ Sơ — đó là nơi đổi nó, nên đó cũng là nơi
+                nó nên xuất hiện. Cỡ 22px để nút không cao lên và cả hàng menu không xô lệch;
+                `.btn` vốn đã là inline-flex có gap nên không cần thêm lớp xếp hàng nào. */}
             <Link href="/profile" className="btn btn-ghost">
+              <Avatar name={user.displayName} url={user.avatarUrl} size={22} />
               Hồ Sơ
             </Link>
             {isAdminUser(user) && (

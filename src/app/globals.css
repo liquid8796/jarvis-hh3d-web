@@ -393,6 +393,44 @@ body {
   50% { box-shadow: 0 0 26px 7px rgba(232, 194, 92, 0.42); }
 }
 
+/* Vòng tròn danh tính — dùng ở thanh đầu trang, trang Hồ Sơ và sảnh đàm đạo. Đường kính, cỡ
+   chữ và màu nền do component đặt theo từng chỗ (xem components/Avatar.tsx); ở đây chỉ có
+   những gì KHÔNG đổi theo cỡ. Trước bản 0.45.0 lớp này tên `.chat-avatar` và chỉ sảnh đàm
+   đạo có nó. */
+.avatar {
+  flex: none;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-weight: 600;
+  color: var(--color-parchment);
+  border: 1px solid rgba(232, 194, 92, 0.25);
+  /* Chữ đầu không được chọn cùng nội dung tin khi người ta bôi đen để chép. */
+  user-select: none;
+}
+
+/* `cover` để ảnh không vuông không bị bóp méo — nó bị cắt giữa, đúng như lúc tải lên đã cắt. */
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Mục đổi ảnh trong trang Hồ Sơ: vòng tròn lớn bên trái, lời dẫn và hai nút bên phải. Xuống
+   một cột trên màn hẹp, vì 96px cộng một đoạn chữ không vừa bề ngang điện thoại. */
+.avatar-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+}
+
+.avatar-editor-side {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
 /* ---------------------------------------------------------------------------
    Tụ Nghĩa Sảnh — sảnh đàm đạo. Bong bóng hai phía, ngày chia dải, cảm xúc nảy
    nhẹ khi thả, ba chấm "đang chấp bút" thở theo nhịp. Mọi lớp nền tối mờ vì cả
@@ -473,19 +511,6 @@ body {
 @keyframes chat-in {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
-}
-
-.chat-avatar {
-  flex: none;
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: var(--color-parchment);
-  border: 1px solid rgba(232, 194, 92, 0.25);
 }
 
 .chat-bubble-col {

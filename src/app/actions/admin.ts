@@ -16,7 +16,12 @@ import {
   reviewRoleChange,
 } from "@/lib/auth/permissions";
 import { STORE_CLOSED_MESSAGE, purgeAllChat } from "@/lib/services/chat";
-import { describeSweep, purgeChatMedia, type MediaSweepResult } from "@/lib/services/media";
+import {
+  describeSweep,
+  purgeChatMedia,
+  purgeUserAvatars,
+  type MediaSweepResult,
+} from "@/lib/services/media";
 import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
 import { adminCreate, adminDelete, adminUpdate, findById, setStatus } from "@/lib/services/users";
 import { CHAT_PURGE_PHRASE, matchesChatPurgePhrase } from "@/lib/validation/chat";
@@ -226,8 +231,31 @@ export async function deleteUserAction(userId: string): Promise<AdminResult> {
     return { ok: false, message: result.error };
   }
 
+  /**
+   * Ảnh đại diện là thứ DUY NHẤT của một đạo hữu không nằm trong Postgres, nên nó là thứ duy
+   * nhất không tự chết theo dòng users: cấu hình, job, nhật ký đều đi theo `on delete cascade`
+   * của schema, còn bytes trong OCI thì không có ràng buộc nào biết tới chúng.
+   *
+   * SAU khi xoá dòng, không phải trước: xoá bytes trước rồi lệnh xoá dòng ngã ngựa là để lại
+   * một thành viên còn nguyên với ảnh vỡ. Và đi theo TIỀN TỐ nên nó dọn cả những ảnh cũ mà một
+   * lần đổi ảnh trước đây có thể đã không xoá được.
+   *
+   * Trượt thì KHÔNG làm lượt trục xuất thất bại — người ấy đã rời tông môn thật rồi, báo
+   * "không trục xuất được" là nói sai. Chỉ kể thêm một câu để trưởng môn biết còn bytes nằm lại.
+   */
+  let leftovers = "";
+  try {
+    const sweep = await purgeUserAvatars(userId);
+    if (!sweep.storeClosed && (sweep.failed > 0 || sweep.firstError !== null)) {
+      leftovers = ` Ảnh đại diện chưa dọn hết: ${describeSweep(sweep)}`;
+    }
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    leftovers = ` Ảnh đại diện còn nằm trong tàng khố: ${reason}`;
+  }
+
   revalidatePath("/admin");
-  return { ok: true, message: "Đã trục xuất đạo hữu khỏi tông môn." };
+  return { ok: !leftovers, message: `Đã trục xuất đạo hữu khỏi tông môn.${leftovers}` };
 }
 
 /**

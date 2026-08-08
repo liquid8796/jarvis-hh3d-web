@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/auth/guards";
 import { isAdminUser } from "@/lib/auth/permissions";
+import { avatarsByUserId } from "@/lib/services/users";
 import {
   STORE_CLOSED_MESSAGE,
   deleteMessage,
@@ -63,7 +64,24 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: STORE_CLOSED_MESSAGE }, { status: 503 });
   }
 
-  return NextResponse.json(feed);
+  /**
+   * Ảnh đại diện được ghép Ở ĐÂY, không phải trong `getFeed`.
+   *
+   * chat.ts là tầng của MongoDB và cố ý không biết gì về Postgres (xem ghi chú đầu tệp ấy:
+   * "Postgres giữ danh tính, Mongo giữ đàm đạo"). Route là chỗ hai kho gặp nhau, nên phép
+   * tra danh tính thuộc về nó — kéo services/users vào chat.ts là xoá đúng cái ranh giới đã
+   * dựng có chủ ý.
+   *
+   * Trả về MỘT map theo người thay vì gắn URL vào từng tin: một trang 50 tin của năm người
+   * thì đó là 5 mục thay vì 50 chuỗi lặp lại.
+   *
+   * Cái giá là một câu truy vấn Postgres nữa cho mỗi nhịp poll — cân nhắc rồi và nhận: nhịp
+   * này đã đi qua `currentUser()`, tức đã có sẵn MỘT lượt hỏi Postgres; câu thứ hai tra theo
+   * khoá chính của tối đa 50 id, và nó là cái giá để đổi ảnh không làm vỡ ảnh trong tin cũ.
+   */
+  const avatars = await avatarsByUserId(feed.messages.map((message) => message.userId));
+
+  return NextResponse.json({ ...feed, avatars });
 }
 
 export async function POST(request: Request) {

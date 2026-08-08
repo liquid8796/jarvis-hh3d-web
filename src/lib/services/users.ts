@@ -1,4 +1,4 @@
-import { and, eq, ilike, or, sql } from "drizzle-orm";
+import { and, eq, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { getAppSettings } from "@/lib/services/settings";
@@ -12,9 +12,23 @@ import type { UserRow } from "@/lib/db/schema";
 
 export type PublicUser = Pick<
   UserRow,
-  "id" | "username" | "displayName" | "email" | "roles" | "tags" | "status" | "createdAt" | "updatedAt"
+  | "id"
+  | "username"
+  | "displayName"
+  | "email"
+  | "roles"
+  | "tags"
+  | "avatarUrl"
+  | "status"
+  | "createdAt"
+  | "updatedAt"
 >;
 
+/**
+ * `avatarUrl` có mặt vì nó là danh tính công khai y như danh xưng — thanh đầu trang và sảnh
+ * đàm đạo đều vẽ nó. `avatarKey` thì KHÔNG: đó là tên object trong kho, một chi tiết lưu trữ
+ * chỉ `setAvatar`/`clearAvatar` cần, và mọi cột lọt vào đây là một cột chảy ra tới client.
+ */
 const publicColumns = {
   id: schema.users.id,
   username: schema.users.username,
@@ -22,6 +36,7 @@ const publicColumns = {
   email: schema.users.email,
   roles: schema.users.roles,
   tags: schema.users.tags,
+  avatarUrl: schema.users.avatarUrl,
   status: schema.users.status,
   createdAt: schema.users.createdAt,
   updatedAt: schema.users.updatedAt,
@@ -259,6 +274,80 @@ export async function updateProfile(
   input: { displayName: string; email: string },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   return adminUpdate(id, input);
+}
+
+// ---------------------------------------------------------------------------
+// Ảnh đại diện
+// ---------------------------------------------------------------------------
+
+/**
+ * Ghi ảnh mới và trả về tên object của ảnh CŨ, trong ĐÚNG MỘT câu lệnh.
+ *
+ * Phép tự-join `from users prev` đọc bảng ở ảnh chụp trước khi câu update ghi, nên
+ * `prev.avatar_key` là giá trị cũ — tức người gọi biết phải xoá object nào mà không cần một
+ * lượt SELECT riêng trước đó. Đọc-rồi-ghi để lại một khe giữa hai lượt đi: hai tab cùng đổi
+ * ảnh sẽ cùng đọc ra một key cũ, rồi một trong hai ảnh mới thành object không ai trỏ tới và
+ * không ai biết để dọn. Một câu lệnh thì không có khe ấy — cùng lối nghĩ với `editMessage`
+ * bên chat.ts, nơi quyền sở hữu nằm TRONG bộ lọc chứ không phải ở một phép kiểm trước đó.
+ *
+ * `null` trong `previousKey` nghĩa là người này chưa từng có ảnh, hoặc không có dòng nào khớp
+ * `id` — người gọi phân biệt hai ca ấy bằng `matched`.
+ */
+export async function setAvatar(
+  id: string,
+  avatar: { url: string; key: string },
+): Promise<{ matched: boolean; previousKey: string | null }> {
+  const result = await db().execute(sql`
+    update users u
+    set avatar_url = ${avatar.url}, avatar_key = ${avatar.key}, updated_at = now()
+    from users prev
+    where u.id = ${id} and prev.id = u.id
+    returning prev.avatar_key as previous_key
+  `);
+
+  const row = result.rows[0] as { previous_key: string | null } | undefined;
+  return { matched: row !== undefined, previousKey: row?.previous_key ?? null };
+}
+
+/** Bỏ ảnh, trả về tên object vừa thôi được dùng — cùng phép tự-join và cùng lý do như trên. */
+export async function clearAvatar(
+  id: string,
+): Promise<{ matched: boolean; previousKey: string | null }> {
+  const result = await db().execute(sql`
+    update users u
+    set avatar_url = null, avatar_key = null, updated_at = now()
+    from users prev
+    where u.id = ${id} and prev.id = u.id
+    returning prev.avatar_key as previous_key
+  `);
+
+  const row = result.rows[0] as { previous_key: string | null } | undefined;
+  return { matched: row !== undefined, previousKey: row?.previous_key ?? null };
+}
+
+/**
+ * Ảnh của một nhúm người, tra theo id — dành cho sảnh đàm đạo, nơi tin nhắn sống ở MongoDB
+ * và chỉ mang theo `userId`.
+ *
+ * Ảnh cố tình KHÔNG bị đóng băng vào tin nhắn như tên và tag, dù cả ba đều là "danh tính lúc
+ * nói". Lý do rất cụ thể: đổi ảnh là XOÁ object cũ, nên một URL đóng băng trong tin cũ sẽ
+ * thành ảnh vỡ ngay lần đổi đầu tiên. Tên đóng băng thì chỉ là một chuỗi, không hỏng đi được.
+ *
+ * Trả về map chỉ gồm người CÓ ảnh: người chưa đặt thì vắng mặt, và giao diện vẽ vòng tròn
+ * chữ đầu — nhỏ hơn cho đường truyền, và không có `null` nào để phía client phải phân biệt.
+ */
+export async function avatarsByUserId(ids: readonly string[]): Promise<Record<string, string>> {
+  const unique = [...new Set(ids)];
+  // `inArray` với mảng rỗng sinh ra SQL `in ()` — cú pháp lỗi ở Postgres. Và một lượt đi mạng
+  // để hỏi về không ai thì dù có chạy được cũng là một lượt thừa.
+  if (unique.length === 0) return {};
+
+  const rows = await db()
+    .select({ id: schema.users.id, avatarUrl: schema.users.avatarUrl })
+    .from(schema.users)
+    .where(and(inArray(schema.users.id, unique), isNotNull(schema.users.avatarUrl)));
+
+  return Object.fromEntries(rows.map((row) => [row.id, row.avatarUrl!]));
 }
 
 function isUniqueViolation(error: unknown): boolean {

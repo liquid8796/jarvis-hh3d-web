@@ -113,6 +113,20 @@ Bấm **Hồ Sơ** trên thanh đầu trang để đổi danh xưng hiển thị
 không đổi ở đây. Tài khoản tạo từ bản cũ có thể chưa có email; chỉ cần điền một lần rồi bấm
 **Lưu Hồ Sơ**. Mỗi email chỉ dùng được cho một đạo hiệu.
 
+### Đặt ảnh đại diện
+
+Cũng trong trang **Hồ Sơ**, mục ở trên cùng: bấm **Chọn ảnh**, chọn một tấm PNG, JPEG, WebP
+hoặc GIF. Ảnh hiện lên ngay cạnh tên bạn trong Phòng Chat và trên thanh đầu trang; chưa đặt
+thì hệ thống vẽ chữ đầu của danh xưng trên một màu nền riêng của bạn. Bấm **Bỏ ảnh** là trở
+về chữ đầu ấy.
+
+Ảnh thường được **tự thu nhỏ ngay trên máy bạn** về 512px và cắt vuông ở giữa trước khi gửi
+đi, nên chọn thẳng ảnh từ điện thoại cũng được, không cần cắt trước và không tốn nhiều mạng.
+Riêng **GIF động thì được giữ nguyên** để không mất phần động, nên tấm GIF phải dưới 2MB.
+
+Đổi ảnh là ảnh cũ bị xoá khỏi kho — không có chỗ nào giữ lại tấm trước đó. Ảnh không bị đóng
+băng vào từng tin nhắn: đổi một lần là mọi tin cũ của bạn trong sảnh cũng mang mặt mới.
+
 ---
 
 ## 3. "Khôi lỗi" là gì, và khi nào bạn phải quan tâm

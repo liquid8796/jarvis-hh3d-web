@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Kiểm chứng tàng khố media — cách đặt tên object, cách dựng URL, ranh giới cấu hình, và
- * phép sửa URL của script chuyển kho (chạy trên một mongod THẬT trong tiến trình).
+ * Kiểm chứng tàng khố media — cách đặt tên object, cách dựng URL, và ranh giới cấu hình.
  *
  * Phần KHÔNG cần mạng chạy ở mọi máy. Phần vòng đời thật (tải lên → tải về bằng HTTPS công
  * khai → xoá) chỉ chạy khi có đủ bộ biến OCI_* — và nó KHÔNG bị bỏ qua trong im lặng: cuối
@@ -11,8 +10,6 @@
  * Đặt `MEDIA_TEST_PREFIX` để đổi tiền tố của object thử (mặc định `verify/`); mọi object nó
  * tạo đều bị xoá ở cuối, kể cả khi một phép thử ở giữa ném.
  */
-import { MongoMemoryServer } from "mongodb-memory-server";
-import { MongoClient } from "mongodb";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -40,7 +37,6 @@ function restoreEnv() {
 }
 
 const media = await import("../src/lib/services/media.ts");
-const { rewriteAttachmentUrl, rewriteMessages } = await import("./migrateBlobToOci.mts");
 
 const FAKE = {
   OCI_REGION: "eu-frankfurt-1",
@@ -50,8 +46,6 @@ const FAKE = {
   OCI_SECRET_ACCESS_KEY: "bi-mat-thu",
 } as const;
 
-let mongod: MongoMemoryServer | null = null;
-let mongo: MongoClient | null = null;
 const created: string[] = [];
 
 try {
@@ -127,69 +121,6 @@ try {
   assert(new URL(url).pathname.endsWith("/o/chat/u-1/" + encodeURIComponent("ảnh.png")), `mã hoá sai: ${url}`);
   console.log("✔ URL công khai: đúng dạng gốc OCI, phân cấp giữ nguyên, chữ có dấu được mã hoá.");
 
-  // ---- Sửa URL: phần thuần ---------------------------------------------------------
-  const OLD_HOST = "https://5ymcwsef8dszpta0.public.blob.vercel-storage.com";
-  const mapping = new Map<string, string>([
-    ["chat/u-1/anh-abc.png", "https://objectstorage.eu-frankfurt-1.oraclecloud.com/n/ns/b/bk/o/chat/u-1/anh-abc.png"],
-    ["chat/u-1/ảnh-xyz.png", "https://objectstorage.eu-frankfurt-1.oraclecloud.com/n/ns/b/bk/o/chat/u-1/%E1%BA%A3nh-xyz.png"],
-  ]);
-
-  assert(rewriteAttachmentUrl(`${OLD_HOST}/chat/u-1/anh-abc.png`, mapping) !== null, "URL kho cũ phải được sửa");
-  assert(
-    rewriteAttachmentUrl(`${OLD_HOST}/chat/u-1/anh-abc.png?download=1`, mapping) !== null,
-    "downloadUrl (có query) cũng trỏ vào cùng object nên cũng phải sửa",
-  );
-  assert(
-    rewriteAttachmentUrl(`${OLD_HOST}/chat/u-1/${encodeURIComponent("ảnh-xyz.png")}`, mapping) !== null,
-    "tên có dấu nằm trong URL ở dạng phần trăm — phải giải mã rồi mới so",
-  );
-  assert(rewriteAttachmentUrl(`${OLD_HOST}/chat/u-1/khong-co.png`, mapping) === null, "object lạ thì để yên");
-  assert(rewriteAttachmentUrl("https://example.com/chat/u-1/anh-abc.png", mapping) === null, "host lạ thì để yên");
-  assert(rewriteAttachmentUrl("khong-phai-url", mapping) === null, "chuỗi không phải URL thì để yên");
-  assert(
-    rewriteAttachmentUrl(mapping.get("chat/u-1/anh-abc.png")!, mapping) === null,
-    "URL ĐÃ sửa rồi thì lần chạy sau phải để yên — đó là điều kiện để chạy lại được",
-  );
-  console.log("✔ Sửa URL (thuần): bắt đúng kho cũ, bỏ qua host lạ, chịu được query và chữ có dấu.");
-
-  // ---- Sửa URL: trên mongod thật ---------------------------------------------------
-  mongod = await MongoMemoryServer.create();
-  mongo = new MongoClient(mongod.getUri());
-  await mongo.connect();
-  const messages = mongo.db(`jarvis_media_test_${Date.now()}`).collection("chat_messages");
-
-  await messages.insertMany([
-    {
-      _id: "m-1",
-      attachments: [
-        { url: `${OLD_HOST}/chat/u-1/anh-abc.png`, name: "anh.png", size: 10, type: "image/png" },
-        { url: "https://example.com/ngoai.png", name: "ngoai.png", size: 10, type: "image/png" },
-      ],
-    },
-    { _id: "m-2", attachments: [{ url: `${OLD_HOST}/chat/u-1/ảnh-xyz.png`, name: "ảnh.png", size: 10, type: "image/png" }] },
-    { _id: "m-3", attachments: [] },
-  ] as never);
-
-  const dry = await rewriteMessages(messages as never, mapping, true);
-  assert(dry.scanned === 2, `chỉ quét tin CÓ đính kèm, phải là 2, đang là ${dry.scanned}`);
-  assert(dry.urlsChanged === 2, `phải đếm 2 URL cần sửa, đang là ${dry.urlsChanged}`);
-  const untouched = await messages.findOne({ _id: "m-1" } as never);
-  assert(
-    (untouched as never as { attachments: { url: string }[] }).attachments[0].url.includes("vercel-storage"),
-    "THỬ KHÔNG GHI mà đã ghi thì cả cơ chế dry-run là vô nghĩa",
-  );
-
-  const applied = await rewriteMessages(messages as never, mapping, false);
-  assert(applied.urlsChanged === 2 && applied.rewritten === 2, "chạy thật phải sửa đúng 2 URL trong 2 tin");
-
-  const m1 = (await messages.findOne({ _id: "m-1" } as never)) as never as { attachments: { url: string }[] };
-  assert(m1.attachments[0].url === mapping.get("chat/u-1/anh-abc.png"), "đính kèm của kho cũ phải trỏ sang kho mới");
-  assert(m1.attachments[1].url === "https://example.com/ngoai.png", "đính kèm ngoài phải còn NGUYÊN VẸN");
-
-  const again = await rewriteMessages(messages as never, mapping, false);
-  assert(again.urlsChanged === 0, `chạy lại phải không đổi gì nữa, đang đổi ${again.urlsChanged}`);
-  console.log("✔ Sửa URL (mongod thật): dry-run không ghi, link ngoài không bị đụng, chạy lại là bất biến.");
-
   // ---- Vòng đời thật trên OCI ------------------------------------------------------
   if (!hasRealConfig) {
     console.log("");
@@ -246,6 +177,4 @@ try {
     await media.deleteObject(key).catch((err) => console.error(`  (không xoá được ${key}: ${err})`));
   }
   media.closeMediaStore();
-  await mongo?.close().catch(() => {});
-  await mongod?.stop().catch(() => {});
 }

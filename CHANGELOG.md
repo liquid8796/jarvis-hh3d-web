@@ -11,6 +11,21 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.44.1 — dọn xác hai kho đã đóng
+
+- Kho **Vercel Blob** và **Upstash Redis** đều đã bị xoá khỏi Vercel, nên mọi thứ chỉ còn sống
+  vì chúng nay là mã chết: dependency `@vercel/blob` + `@upstash/redis`, và hai script chuyển
+  kho `migrateBlobToOci.mts` / `migrateChatToMongo.mts`.
+- Giữ lại một script chỉ chạy được với một kho không còn tồn tại là **giữ một cái bẫy**: người
+  đọc sau sẽ tưởng còn đường lui, chạy thử, rồi nhận `This store does not exist`.
+- `verify:media` bỏ hai nhóm kiểm phép sửa URL — chúng kiểm chính đoạn code vừa xoá. Nhóm còn
+  lại (đặt tên, URL công khai, ranh giới cấu hình, vòng đời thật trên OCI) không đổi, và
+  `mongodb-memory-server` cũng rời script này vì nó chỉ phục vụ hai nhóm ấy.
+- Mục 6 của [deploy/mongodb.md](deploy/mongodb.md) viết lại thành ghi chú lịch sử thay cho
+  hướng dẫn chạy một script không còn ở đó.
+- Media giờ chỉ còn MỘT nhà: OCI Object Storage (`jarvis-media`). Xem
+  [deploy/oracle/README.md](deploy/oracle/README.md).
+
 ## 0.44.0 — nút thanh tẩy sảnh đàm đạo: xoá sạch tin VÀ bytes đính kèm, trong một lần bấm
 
 - **Tab Đàm Đạo của trang Tông Môn có thêm thẻ「Thanh Tẩy Sảnh Đàm Đạo」** — xoá toàn bộ tin

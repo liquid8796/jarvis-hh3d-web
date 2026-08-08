@@ -87,26 +87,15 @@ CHAT_TEST_MONGODB_URI="<chuỗi kết nối>" npm run verify:chat
 
 ---
 
-## 6. Chuyển dữ liệu từ kho Redis cũ
+## 6. Kho Redis cũ — đã đóng
 
-**Đã chạy xong ngày 08/08/2026** — mục này để đối chiếu, hoặc phòng khi cần chạy lại.
+Trước 08/08/2026 tin đàm đạo sống ở Upstash Redis. Ngày 09/08/2026 kho ấy bị xoá và script
+chuyển dữ liệu (`scripts/migrateChatToMongo.mts`) cùng dependency `@upstash/redis` được dọn
+theo — giữ lại một script chỉ chạy được với một kho không còn tồn tại là giữ một cái bẫy cho
+người đọc sau.
 
-Trước 08/08/2026 tin sống ở Upstash Redis. Script chuyển sang Mongo:
-
-```bash
-npx tsx scripts/migrateChatToMongo.mts --dry-run   # xem sẽ chuyển bao nhiêu, không ghi gì
-npx tsx scripts/migrateChatToMongo.mts             # chuyển thật
-```
-
-Cần cả `MONGODB_URI` lẫn `KV_REST_API_URL`/`KV_REST_API_TOKEN` của kho cũ.
-
-- Chỉ **đọc** từ Redis, không xoá gì — kho cũ ở nguyên đó làm bản lui.
-- Ghi bằng upsert theo `_id`; tin đã có bên Mongo **không bị đè**, nên chạy lại bao nhiêu
-  lần cũng ra một kết quả.
-
-Khi nào yên tâm rằng không cần lui nữa thì xoá kho Upstash trong tab Storage, rồi dọn nốt
-`scripts/migrateChatToMongo.mts` và dependency `@upstash/redis` — chúng chỉ còn sống vì kho
-cũ còn đó.
+Muốn xem nó từng làm gì thì tra lịch sử git; mục 0.40.0 của [CHANGELOG](../CHANGELOG.md) kể
+vì sao đổi kho.
 
 ---
 

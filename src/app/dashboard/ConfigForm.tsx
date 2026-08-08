@@ -532,10 +532,6 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
               defaultValue={config.quests.meCung.chatFight}
               placeholder="để trống = không nhắn"
             />
-            <p className="mt-1 text-xs text-[var(--color-mist)]">
-              Nhắn vào Trò Chuyện Đội của phòng — mỗi lượt ghé gửi một lần lúc mở phòng và một
-              lần khi trận đầu mở màn, để đồng đội biết đây là auto.
-            </p>
           </div>
 
           <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--color-parchment)] sm:col-span-2">

@@ -11,6 +11,28 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.39.1 — ba thẻ giới thiệu thôi giọng dịch máy
+
+- **Viết lại ba thẻ ở trang chủ.** Bản cũ đọc ra「máy viết」vì bốn tật, và bản mới tránh
+  đúng bốn tật ấy: tiêu đề ghép bốn chữ Hán-Việt cho sang (「Tông Môn Nghiêm Cẩn」— không ai
+  đặt tên mục như vậy); cụm「ngôn ngữ nhân tộc」dịch sát từ *human language* mà tiếng Việt
+  không có; cả ba thẻ dùng chung một nhịp câu dài nối bằng dấu gạch ngang; và động từ tiếng
+  Anh chen giữa câu (「Mọi lượt chạy log bằng…」).
+- **Giữ nguyên chất tu tiên.** Linh Đài, khai đàn, đạo hữu, huyền tinh là tiếng nói của
+  chính sản phẩm, không phải thứ trang trí bỏ đi được. Thứ bỏ đi chỉ là giọng dịch máy.
+- **Thẻ giữa thôi hứa「phải được duyệt mới vào」.** Từ 0.33.0 trưởng môn tắt được bước xét
+  duyệt, nên một lời hứa cứng ở trang chủ sẽ sai đúng vào ngày họ tắt nó — cùng loại lỗi mà
+  trang bái sư đã phải sửa ở 0.33.0. Câu mới đúng ở cả hai chiều.
+- Xoá「Chỉ dành cho thành viên Lạc Vân Tông」, và xoá luôn nhánh render `badge` — không còn
+  thẻ nào mang badge thì nhánh ấy là mã chết.
+- Xoá dòng mô tả dưới hai ô lời nhắn Mê Cung ở Linh Đài.
+- Đo lại trên trình duyệt: ba thẻ cùng cao 181px (grid stretch nên bỏ badge không làm thẻ
+  giữa hụt xuống), mỗi thẻ đúng một đoạn, không còn vệt vàng của badge; mobile 375px nội
+  dung không tràn — phần cuộn ngang vẫn đúng bằng bề rộng tranh nền, tức tính năng pan của
+  0.33.2 chứ không phải hồi quy.
+
+---
+
 ## 0.39.0 — Mê Cung biết nhắn vào Trò Chuyện Đội (schema 51)
 
 - **Hai lời nhắn cấu hình được cho Mê Cung**, đọc từ recording 08/08 (`me-cung-20260808-104700`,

@@ -11,6 +11,15 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.44.2 — chân trang ký tên đạo hữu, không ký tên hoa
+
+- Chân trang đổi từ `© 2026 Bảo Hoa tiên tử` thành **`© 2026 Nam Cung Bình`**. Cái tên cũ vào
+  đó từ bản 0.5.x là vì lúc ấy nó đang là chủ đề của cả trang chủ — mưa cánh hoa lấy tên nàng,
+  nên chân trang cũng ký theo. Nhưng dòng ấy là dòng **bản quyền**, và bản quyền phải ghi người
+  giữ nó, không phải ghi cảm hứng thẩm mỹ của trang.
+- Mưa cánh hoa vẫn là **bảo hoa** và trong `page.tsx` / `globals.css` vẫn ghi rõ nguồn gốc cái
+  tên ấy — đổi chân trang không phải là xoá xuất xứ của hiệu ứng.
+
 ## 0.44.1 — dọn xác hai kho đã đóng
 
 - Kho **Vercel Blob** và **Upstash Redis** đều đã bị xoá khỏi Vercel, nên mọi thứ chỉ còn sống

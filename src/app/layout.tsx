@@ -48,7 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             header và card tự mang nền mờ của chúng. */}
         <div className="backdrop" aria-hidden />
         {children}
-        <footer className="site-footer">© 2026 Bảo Hoa tiên tử. All rights reserved.</footer>
+        <footer className="site-footer">© 2026 Nam Cung Bình. All rights reserved.</footer>
       </body>
     </html>
   );

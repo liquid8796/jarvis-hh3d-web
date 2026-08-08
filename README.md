@@ -102,6 +102,12 @@ theo thứ tự quan trọng:
 per-user ghi từ form), **Blob** (không truy vấn được), **KV/Redis** (thêm một store để đồng
 bộ, đổi lấy tốc độ mà bài toán này không cần).
 
+**Riêng tin đàm đạo thì ngược lại, và có lý do**: chúng nằm ở **MongoDB** (`chat_messages`,
+`chat_typing`) chứ không ở Postgres — dòng chảy tần suất cao, tự hết hạn theo ngày, không
+JOIN với ai, nên nhét chung là bắt bản backup của danh tính gánh cả nghìn câu "hôm nay cày
+chưa". Từ 02/08 tới 08/08/2026 kho ấy là Upstash Redis; xem [CHANGELOG](CHANGELOG.md) mục
+0.40.0 để biết vì sao đổi sang Mongo. Cách dựng kho: [deploy/mongodb.md](deploy/mongodb.md).
+
 Điểm tinh tế: config được **validate hai chiều** bằng Zod — cả lúc ghi lẫn lúc đọc. Một
 document viết bởi bản deploy cũ vẫn trở về đúng hình thù hôm nay với default được điền đủ.
 Đó là bản JSONB của một migration.

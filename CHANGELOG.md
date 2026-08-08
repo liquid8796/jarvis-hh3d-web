@@ -11,6 +11,49 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.40.0 — tin đàm đạo dọn nhà sang MongoDB
+
+- **Kho tin chuyển từ Upstash Redis sang MongoDB.** Hợp đồng công khai của `chat.ts` giữ
+  nguyên từng chữ, nên `/api/chat` và `/api/cron` không đổi một dòng nào.
+- **Mô hình document xoá được HAI thứ chắp vá mà key-value bắt phải có** — đây mới là lý do
+  đổi, không phải đổi cho khác:
+  1. Cảm xúc từng sống trong một HASH riêng `chat:react:{id}`, field ghép bằng một **dấu
+     phân cách tự chế** `U+0001` (vì ':' và '-' đều cắt sai: userId là UUID, emoji thì đủ
+     trò ZWJ). Giờ chúng là mảng con ngay trong tin, `$pull`/`$addToSet` nguyên tử.
+  2. Mục lục thời gian từng là một ZSET song song `chat:index` — mỗi lần ghi hay xoá phải
+     nhớ đụng vào **hai** chỗ. Giờ chỉ còn một index trên `createdAt`.
+  Kết quả đo được: xoá một tin là xoá một document (cảm xúc chết theo, không còn key thứ hai
+  để quên), và một trang tin là **một câu find** thay cho pipeline 2N lệnh.
+- **Sửa và thu hồi thành nguyên tử.** Bản Redis phải đọc-rồi-ghi, để hở một khe giữa hai
+  lượt đi; giờ quyền sở hữu nằm TRONG bộ lọc của câu update — hoặc trúng đúng tin của mình,
+  hoặc không trúng gì.
+- **Hạn lưu CỐ Ý không dùng TTL index của Mongo**: số ngày là thứ tông chủ đổi lúc chạy, mà
+  `expireAfterSeconds` nằm trong định nghĩa index — đổi nó phải `collMod`. Một câu xoá theo
+  khoảng đọc thẳng cấu hình hiện hành, đổi số là ăn ngay.
+- **`chat_typing` không thể phình**: `_id` = userId nên số dòng bị chặn trên bởi số thành
+  viên. Nhờ vậy bỏ luôn lượt dọn rác mà bản Redis phải chạy kèm MỖI nhịp poll 2,5 giây của
+  MỖI người; TTL 60s làm lưới cuối.
+- **Ranh giới lỗi giữ nguyên và được nói rõ**: *thiếu cấu hình* là「chưa khai mở」(503, sảnh
+  treo biển tử tế); *có cấu hình mà kết nối hỏng* thì để lỗi nổ kèm nguyên văn — báo「chưa
+  khai mở」cho một kho đang hỏng là dán nhãn sai lên sự cố và giấu mất manh mối duy nhất.
+- **Một lỗi thiết kế của chính bản này bị bắt bằng cách trả giá 2 lần chạy 600 giây**: pool
+  Mongo cache toàn cục (đúng cho web) khiến MỌI script treo mãi không thoát, và stdout ghi
+  ra file thì đệm lại nên nhìn như treo từ dòng đầu. Thêm `closeChatStore()` cho tiến trình
+  có điểm kết thúc; web function không bao giờ gọi.
+- **`npm run verify:chat` — 11 nhóm phép thử chạy trên một mongod THẬT** (bật trong tiến
+  trình, không cần Atlas, không đụng production): gửi/đọc, chặn tin rỗng và tin quá dài, đếm
+  cảm xúc theo người và bấm-lại-là-rút, sửa chỉ chủ nhân, trích đoạn trả lời theo nội dung
+  mới nhất, thu hồi giữ vết + lột cảm xúc, trưởng môn thu hồi tin người khác, "đang gõ"
+  không kể chính mình và mỗi người một dòng, phân trang 50 tin không chồng không hụt, quét
+  hạn lưu đúng số, và index tự dựng. Trước bản này `chat.ts` **không có lấy một phép thử
+  nào** — đổi cả kho lưu trữ mà không chạy thật thì không có gì để tin.
+- **Đã chuyển dữ liệu thật:** `scripts/migrateChatToMongo.mts` chỉ đọc Redis (kho cũ nguyên
+  vẹn làm bản lui), upsert theo `_id` nên chạy lại bao nhiêu lần cũng một kết quả — chạy lần
+  hai cho đúng `0 tin mới / 3 giữ nguyên`. Ba tin ấy đều là bia mộ đã thu hồi từ 02/08.
+- Hướng dẫn dựng kho: [deploy/mongodb.md](deploy/mongodb.md).
+
+---
+
 ## 0.39.3 — công tắc xét duyệt lên chung hàng với nút thu nhận
 
 - **Tab Môn Đồ có một thanh công cụ**: công tắc「Xét duyệt thành viên mới」bên trái, nút

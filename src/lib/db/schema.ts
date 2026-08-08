@@ -215,8 +215,9 @@ export const jobEvents = pgTable(
  * cùng triết lý với user_configs: hình thù churns theo tính năng (hôm nay là hạn lưu đàm
  * đạo, mai là gì nữa chưa biết), Zod giữ hình thù ở tầng service, cả hai chiều.
  *
- * LƯU Ý: tin nhắn đàm đạo KHÔNG ở đây và không ở Postgres — chúng sống trong kho NoSQL
- * (Upstash Redis) qua src/lib/services/chat.ts. Postgres chỉ giữ danh tính và cấu hình.
+ * LƯU Ý: tin nhắn đàm đạo KHÔNG ở đây và không ở Postgres — chúng sống trong MongoDB qua
+ * src/lib/services/chat.ts (trước 08/08/2026 là Upstash Redis). Postgres chỉ giữ danh tính
+ * và cấu hình.
  */
 export const appSettings = pgTable("app_settings", {
   id: text("id").primaryKey(),

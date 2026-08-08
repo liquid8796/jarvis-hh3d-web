@@ -1,6 +1,6 @@
 {
   "name": "jarvis-hh3d-web",
-  "version": "0.39.3",
+  "version": "0.40.0",
   "private": true,
   "description": "Auto HH3D — control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn tự động chạy trên server.",
   "scripts": {
@@ -21,6 +21,7 @@
     "verify:profile": "tsx scripts/verifyUserProfile.mts",
     "verify:membership": "tsx scripts/verifyMembershipApproval.mts",
     "verify:maintenance": "tsx scripts/verifyMaintenanceMode.mts",
+    "verify:chat": "tsx scripts/verifyChatStore.mts",
     "verify:realtime": "tsx scripts/verifyRealtimeDashboard.mts",
     "verify:realtime:sse": "tsx scripts/verifyRealtimeSse.mts"
   },
@@ -31,6 +32,7 @@
     "bcryptjs": "^3.0.2",
     "drizzle-orm": "^0.44.4",
     "jose": "^6.0.12",
+    "mongodb": "^7.5.0",
     "next": "^16.0.0",
     "playwright-core": "^1.62.1",
     "react": "^19.2.0",
@@ -42,6 +44,7 @@
     "@types/node": "^24.1.0",
     "@types/react": "^19.1.9",
     "drizzle-kit": "^0.31.4",
+    "mongodb-memory-server": "^11.2.0",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.9.2"
   }

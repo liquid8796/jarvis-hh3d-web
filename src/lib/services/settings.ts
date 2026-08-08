@@ -14,7 +14,7 @@ export const appSettingsSchema = z.object({
     .object({
       /**
        * Tin đàm đạo sống bao nhiêu ngày trước khi bị quét. Sảnh chung là dòng chảy, không
-       * phải tàng thư — giữ mãi thì kho NoSQL phình vô hạn vì những câu "hôm nay cày chưa".
+       * phải tàng thư — giữ mãi thì kho MongoDB phình vô hạn vì những câu "hôm nay cày chưa".
        */
       retentionDays: z.number().int().min(1).max(365).default(7),
     })

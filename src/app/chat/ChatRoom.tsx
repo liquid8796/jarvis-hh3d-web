@@ -69,7 +69,7 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
   const [unseen, setUnseen] = useState(0);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [reachedTop, setReachedTop] = useState(false);
-  /** Kho NoSQL chưa được tông chủ tạo — sảnh treo biển thay vì giả vờ trống. */
+  /** Kho MongoDB chưa được tông chủ tạo — sảnh treo biển thay vì giả vờ trống. */
   const [storeClosed, setStoreClosed] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);

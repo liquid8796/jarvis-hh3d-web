@@ -11,6 +11,20 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.43.2 — `dev:session`: xem được trang sau cửa đăng nhập mà không ai gõ mật khẩu
+
+- **`npm run dev:session`** phát một cookie phiên ngắn hạn (30 phút) cho một đạo hữu bất kỳ,
+  ký bằng chính `AUTH_SECRET` như `createSession()` — dán vào console trình duyệt là vào được.
+  Mọi trang đáng xem đều nằm sau `requireActiveUser()`, nên kiểm chứng bằng mắt luôn vướng
+  một bước đăng nhập; đường này gỡ đúng chỗ vướng ấy mà không đụng tới mật khẩu của ai.
+- Nó cũng làm được thứ mật khẩu KHÔNG làm nổi: **đóng vai bất kỳ ai mà không cần biết mật
+  khẩu của họ**. Muốn kiểm ma trận quyền cho đúng thì phải nhìn cùng một trang bằng mắt Gia
+  chủ, mắt Trưởng môn thường và mắt môn đồ — ba người, ba mật khẩu không ai biết.
+- Hạn 30 phút là **cố ý**: `AUTH_SECRET` dưới máy chính là secret của production, nên token
+  phát ra ở đây dùng được cả trên production. Script không mở thêm cửa nào — ai cầm
+  `AUTH_SECRET` thì vốn đã ký được phiên — nhưng nó khiến việc đó tiện, và tiện thì dễ buông
+  tay, nên token lỡ lọt ra chỉ sống được ít phút.
+
 ## 0.43.1 — script và `next dev` thôi bất đồng về biến môi trường
 
 - **`loadEnv()` đọc CẢ `.env.local` lẫn `.env`**, theo đúng thứ tự ưu tiên của Next (tệp

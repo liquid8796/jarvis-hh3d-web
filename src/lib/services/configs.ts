@@ -195,6 +195,39 @@ export function enforceMazeCapPolicy<T extends UserConfig>(
 }
 
 /**
+ * Nhiệm vụ CHƯA hiệu chỉnh xong — bị ép TẮT ở mọi đường, bất kể cấu hình nói gì.
+ *
+ * Hiện chỉ có Khoáng Mạch. Hồ sơ quest khai nó `enabled: false` kèm đúng một câu giải thích:
+ * *"nhãn chưa hiệu chỉnh nên tắt sẵn"* — `matchTexts` của nó (`thu hoạch`, `nhận thưởng`…)
+ * là những chuỗi ĐOÁN, chưa ai đối chiếu với trang thật. Nên bật nó lên KHÔNG phải là "chạy
+ * một nhiệm vụ chưa hoàn thiện", mà là thả engine đi bấm vào bất cứ nút nào tình cờ mang chữ
+ * ấy trên một trang chưa ai soi. Đó là lý do luật này siết ở tầng dữ liệu chứ không chỉ làm
+ * mờ một ô tick: ô tick chặn được ngón tay, không chặn được một POST dựng tay hay một cấu
+ * hình CŨ đã bật từ trước rồi nằm im trong database.
+ *
+ * Hàm THUẦN và không đụng bản gốc — trả về chính `config` khi không phải sửa gì, để nơi gọi
+ * so tham chiếu mà biết luật có ra tay không (cùng mẹo với `enforceMazeCapPolicy`).
+ */
+export const UNAVAILABLE_QUEST_KEYS = ["khoangMach"] as const;
+
+export type UnavailableQuestKey = (typeof UNAVAILABLE_QUEST_KEYS)[number];
+
+export function enforceUnavailableQuestPolicy<T extends UserConfig>(config: T): T {
+  const offenders = UNAVAILABLE_QUEST_KEYS.filter(
+    (key) => (config.quests as Record<string, { enabled?: boolean }>)[key]?.enabled === true,
+  );
+  if (offenders.length === 0) {
+    return config;
+  }
+
+  const quests = { ...config.quests } as Record<string, { enabled?: boolean }>;
+  for (const key of offenders) {
+    quests[key] = { ...quests[key], enabled: false };
+  }
+  return { ...config, quests: quests as T["quests"] };
+}
+
+/**
  * Hình thù trong database/job snapshot.
  *
  * `configSchema` giới hạn cookie người dùng dán ở 8.000 ký tự. Sau AES-GCM + Base64, cùng

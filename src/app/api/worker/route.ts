@@ -7,6 +7,7 @@ import { recordWorkerSeen } from "@/lib/services/workers";
 import {
   configSchema,
   enforceMazeCapPolicy,
+  enforceUnavailableQuestPolicy,
   recordDetectedAccountTierForJob,
   seedLuyenDanThuong,
   storedConfigSchema,
@@ -171,6 +172,12 @@ export async function POST(request: Request) {
         const owner = await findById(job.userId);
         guarded = enforceMazeCapPolicy(config, { isAdmin: owner !== null && isAdminUser(owner) });
       }
+
+      // Nhiệm vụ chưa hiệu chỉnh thì tắt cho MỌI scope, không riêng ghế chung: luật này không
+      // nói về tài nguyên mà về việc engine đi bấm theo nhãn ĐOÁN — chạy trên máy nhà đạo hữu
+      // cũng sai y như vậy. Áp ở đây thì một cấu hình đã bật từ trước, nằm im trong database,
+      // cũng không lọt được ra vòng chạy nào.
+      guarded = enforceUnavailableQuestPolicy(guarded);
 
       // Tên miền game ghép vào ĐÂY, cùng chỗ và cùng lý do với cookie: nó là sự thật của
       // TOÀN HỆ THỐNG tại thời điểm phát việc, không phải thứ đông lạnh trong snapshot của

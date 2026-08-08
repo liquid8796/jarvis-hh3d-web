@@ -10,7 +10,12 @@ import {
   setAccountEnabled,
   updateAccountCookie,
 } from "@/lib/services/accounts";
-import { configSchema, enforceMazeCapPolicy, saveConfig } from "@/lib/services/configs";
+import {
+  configSchema,
+  enforceMazeCapPolicy,
+  enforceUnavailableQuestPolicy,
+  saveConfig,
+} from "@/lib/services/configs";
 import { getAppSettings } from "@/lib/services/settings";
 import {
   clearVisibleJobEvents,
@@ -142,7 +147,9 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
   // Luật tài nguyên chung, áp ở SERVER chứ không tin ô tick: giao diện đã khoá tuỳ chọn
   // này lại cho đạo hữu thường, nhưng `disabled` chỉ là một thuộc tính HTML và một POST
   // dựng tay chẳng đi qua form lần nào (cùng lý do `runner` bị ép ở trên).
-  const guarded = enforceMazeCapPolicy(parsed.data, { isAdmin: isAdminUser(user) });
+  const guarded = enforceUnavailableQuestPolicy(
+    enforceMazeCapPolicy(parsed.data, { isAdmin: isAdminUser(user) }),
+  );
   await saveConfig(user.id, guarded);
   revalidatePath("/dashboard");
 

@@ -25,7 +25,12 @@ import { useDashboardAccountLive } from "./DashboardLiveProvider";
  * Mười nhiệm vụ chỉ có công tắc — key khớp với configSchema và SIMPLE_QUESTS của engine.
  * Mô tả viết cho người chơi, không phải cho người đọc mã.
  */
-type SimpleQuest = { key: string; name: string; hint: string };
+/**
+ * `unavailable` = lý do nhiệm vụ này chưa dùng được. Có mặt nghĩa là KHOÁ: ô tick mờ đi và
+ * bấm vào thì hiện lời giải thích. Để nguyên chuỗi lý do tại chỗ khai báo, đừng nhét vào một
+ * bảng riêng — người thêm nhiệm vụ mới đọc đúng một dòng là biết luật.
+ */
+type SimpleQuest = { key: string; name: string; hint: string; unavailable?: string };
 
 const SIMPLE_QUESTS: ReadonlyArray<SimpleQuest> = [
   { key: "diemDanh", name: "Điểm Danh", hint: "Ghi danh mỗi ngày, nhận thưởng chuyên cần." },
@@ -41,7 +46,15 @@ const SIMPLE_QUESTS: ReadonlyArray<SimpleQuest> = [
     name: "Vấn Đáp",
     hint: "Tra danh sách đáp án cộng đồng. Câu không có trong danh sách sẽ để bạn tự làm.",
   },
-  { key: "khoangMach", name: "Khoáng Mạch", hint: "Thu khoáng theo chu kỳ trong ngày." },
+  {
+    key: "khoangMach",
+    name: "Khoáng Mạch",
+    hint: "Thu khoáng theo chu kỳ trong ngày.",
+    unavailable:
+      "Nhiệm vụ này chưa được hoàn thiện. Nhãn nút trên trang Khoáng Mạch chưa được đối " +
+      "chiếu với site thật, nên bật lên là để auto bấm theo phỏng đoán — vì vậy nó tạm khoá. " +
+      "Xong phần hiệu chỉnh sẽ mở lại.",
+  },
 ];
 
 const FREE_QUEST_KEYS = new Set([
@@ -183,14 +196,20 @@ function SimpleQuestGrid({
   enabled,
   onToggle,
   onToggleMany,
+  onLocked,
 }: {
   quests: ReadonlyArray<SimpleQuest>;
   enabled: Record<string, boolean>;
   onToggle: (key: string, value: boolean) => void;
   onToggleMany: (keys: string[], value: boolean) => void;
+  onLocked: (quest: SimpleQuest) => void;
 }) {
-  const selected = quests.filter((quest) => enabled[quest.key] === true).length;
-  const allOn = quests.length > 0 && selected === quests.length;
+  // Nhiệm vụ đang khoá đứng NGOÀI mọi phép đếm và ngoài「Chọn tất cả」. Tính cả nó thì
+  // `allOn` không bao giờ đạt được — ô tổng mãi ở trạng thái lỡ dở, và người bấm「Chọn tất
+  // cả」sẽ thấy nó cứ bật lại lưng chừng mà không hiểu vì sao.
+  const openQuests = quests.filter((quest) => !quest.unavailable);
+  const selected = openQuests.filter((quest) => enabled[quest.key] === true).length;
+  const allOn = openQuests.length > 0 && selected === openQuests.length;
   const someOn = selected > 0 && !allOn;
   const master = useRef<HTMLInputElement>(null);
 
@@ -210,7 +229,7 @@ function SimpleQuestGrid({
             checked={allOn}
             onChange={(event) =>
               onToggleMany(
-                quests.map((quest) => quest.key),
+                openQuests.map((quest) => quest.key),
                 event.target.checked,
               )
             }
@@ -219,7 +238,7 @@ function SimpleQuestGrid({
           Chọn tất cả
         </label>
         <span className="text-xs text-[var(--color-mist)]">
-          {selected}/{quests.length} đang bật
+          {selected}/{openQuests.length} đang bật
         </span>
       </div>
 
@@ -227,16 +246,29 @@ function SimpleQuestGrid({
         {quests.map((quest) => (
           <label
             key={quest.key}
-            className="flex cursor-pointer items-start gap-2.5 text-sm text-[var(--color-parchment)]"
+            className={`flex items-start gap-2.5 text-sm ${
+              quest.unavailable
+                ? "cursor-not-allowed text-[var(--color-mist)]"
+                : "cursor-pointer text-[var(--color-parchment)]"
+            }`}
+            // Ô input `disabled` KHÔNG phát sự kiện click, nên người bấm vào nó sẽ không nhận
+            // được lời giải thích nào — bắt ở nhãn bao ngoài thì cả hàng đều bấm được.
+            onClick={quest.unavailable ? () => onLocked(quest) : undefined}
           >
             <input
               type="checkbox"
               checked={enabled[quest.key] === true}
+              disabled={quest.unavailable !== undefined}
               onChange={(event) => onToggle(quest.key, event.target.checked)}
-              className="mt-0.5 h-4 w-4 accent-[var(--color-jade-400)]"
+              className="mt-0.5 h-4 w-4 accent-[var(--color-jade-400)] disabled:opacity-50"
             />
             <span>
               {quest.name}
+              {quest.unavailable && (
+                <em className="ml-1.5 rounded px-1.5 py-0.5 align-[1px] text-[0.62rem] not-italic tracking-wide text-[var(--color-gold-300)] ring-1 ring-[var(--color-gold-400)]/40">
+                  chưa mở
+                </em>
+              )}
               <span className="block text-xs leading-snug text-[var(--color-mist)]">
                 {quest.hint}
               </span>
@@ -296,6 +328,44 @@ function CapLockDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+/**
+ * Hộp báo một nhiệm vụ chưa mở. Cùng khuôn với `CapLockDialog` ngay trên — hai hộp cùng nói
+ * "chỗ này bấm không được, và đây là lý do", nên chúng phải trông và cư xử giống hệt nhau.
+ */
+function QuestLockedDialog({ quest, onClose }: { quest: SimpleQuest; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="quest-locked-title"
+      onClick={onClose}
+    >
+      <div className="card card-hairline w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        <h3 id="quest-locked-title" className="h-display mb-3 text-lg font-semibold text-gilded">
+          {quest.name} — chưa mở
+        </h3>
+        <p className="mb-5 text-sm leading-relaxed text-[var(--color-parchment)]">
+          {quest.unavailable}
+        </p>
+        {/* type="button" là bắt buộc: hộp này nằm TRONG <form>, mà một <button> trần mặc
+            định là submit — bấm "Đã hiểu" sẽ khắc luôn ngọc giản. */}
+        <button type="button" className="btn btn-gold" onClick={onClose} autoFocus>
+          Đã hiểu
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmin: boolean }) {
   const { accounts } = useDashboardAccountLive();
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
@@ -313,11 +383,17 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
   const [capLocked, setCapLocked] = useState(false);
   const [luyenDan, setLuyenDan] = useState(config.quests.luyenDan.enabled);
   const [luyenDanThuong, setLuyenDanThuong] = useState(config.quests.luyenDanThuong.enabled);
+  /** Nhiệm vụ đang khoá mà người dùng vừa bấm vào — `null` là không có popup nào. */
+  const [lockedQuest, setLockedQuest] = useState<SimpleQuest | null>(null);
   const [simpleEnabled, setSimpleEnabled] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(
       ALL_SIMPLE_QUESTS.map((quest) => [
         quest.key,
-        (config.quests as Record<string, { enabled?: boolean }>)[quest.key]?.enabled === true,
+        // Nhiệm vụ đang khoá luôn khởi sinh TẮT, kể cả khi cấu hình cũ trong database còn
+        // bật: server đã ép tắt ở cửa phát việc, nên vẽ nó đang bật là nói dối người xem về
+        // thứ sắp chạy. Đây cũng là chỗ chặn hidden input `q_khoangMach` được sinh ra.
+        quest.unavailable === undefined &&
+          (config.quests as Record<string, { enabled?: boolean }>)[quest.key]?.enabled === true,
       ]),
     ),
   );
@@ -416,6 +492,7 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
             enabled={simpleEnabled}
             onToggle={toggleSimpleQuest}
             onToggleMany={toggleQuests}
+            onLocked={setLockedQuest}
           />
         </fieldset>
       </div>
@@ -604,6 +681,7 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
           enabled={simpleEnabled}
           onToggle={toggleSimpleQuest}
           onToggleMany={toggleQuests}
+          onLocked={setLockedQuest}
         />
       </fieldset>
       </div>
@@ -638,6 +716,7 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       </form>
 
       {capLocked && <CapLockDialog onClose={() => setCapLocked(false)} />}
+      {lockedQuest && <QuestLockedDialog quest={lockedQuest} onClose={() => setLockedQuest(null)} />}
     </section>
   );
 }

@@ -11,6 +11,22 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.39.2 — trả lại nguyên văn ba thẻ giới thiệu
+
+- **Hoàn nguyên bản viết lại ở 0.39.1.** Tông chủ muốn giữ nguyên giọng cũ; việc cần làm chỉ
+  là bỏ dòng「Chỉ dành cho thành viên Lạc Vân Tông」, không phải sửa văn phong. Bản 0.39.1 đi
+  quá phạm vi được giao, và mục này giữ lại để lần sau không ai lặp lại.
+- Ba tiêu đề và ba đoạn thân về đúng nguyên văn — lấy thẳng từ commit `8a03905` bằng
+  `git show` chứ không gõ tay: văn bản có dấu tiếng Việt và gạch ngang dài, gõ lại là mở
+  đường cho một sai khác không ai nhìn ra.
+- **Giữ lại đúng hai thứ của 0.39.1**: dòng badge đã xoá, và nhánh render `badge` cũng xoá
+  theo — không thẻ nào còn mang badge thì nhánh ấy là mã chết. Diff so với `8a03905` được
+  đối chiếu và đúng bằng hai khối ấy, không sót một chữ nào của văn bản cũ.
+- Đo lại trên trình duyệt: ba tiêu đề gốc trở lại, ba thẻ cùng cao 158px, mỗi thẻ một đoạn,
+  không còn chữ「Lạc Vân Tông」ở bất kỳ đâu trong `src/`.
+
+---
+
 ## 0.39.1 — ba thẻ giới thiệu thôi giọng dịch máy
 
 - **Viết lại ba thẻ ở trang chủ.** Bản cũ đọc ra「máy viết」vì bốn tật, và bản mới tránh

@@ -2,32 +2,18 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SectSeal } from "@/components/SectSeal";
 
-/**
- * Ba thẻ giới thiệu. Viết như người Việt nói, không như một bản dịch.
- *
- * Bản cũ đọc ra "máy viết" vì bốn tật, và bản này tránh đúng bốn tật ấy: tiêu đề ghép bốn
- * chữ Hán-Việt cho sang ("Tông Môn Nghiêm Cẩn" — không ai đặt tên mục như vậy); một chữ
- * "ngôn ngữ nhân tộc" dịch sát từ "human language" mà tiếng Việt không có; cả ba thẻ dùng
- * chung một nhịp câu dài nối bằng dấu gạch ngang; và động từ tiếng Anh chen giữa câu
- * ("Mọi lượt chạy log bằng…").
- *
- * Giữ nguyên chất tu tiên — Linh Đài, khai đàn, đạo hữu, huyền tinh là tiếng nói của chính
- * sản phẩm, không phải thứ trang trí bỏ đi được. Thứ bỏ đi là cái giọng dịch máy.
- */
 const PILLARS = [
   {
-    title: "Tắt máy vẫn chạy",
-    body: "Bấm Khai Đàn một lần trên Linh Đài rồi đóng trình duyệt, tắt máy đi ngủ. Linh sứ nằm trên server, cày nhiệm vụ ngày thay đạo hữu.",
+    title: "Khai Đàn Viễn Trình",
+    body: "Bấm một nút trên Linh Đài, linh sứ trên server tự vận hành nhiệm vụ ngày — đóng trình duyệt, tắt máy, đàn pháp vẫn chạy.",
   },
   {
-    // KHÔNG hứa "phải được duyệt mới vào": từ 0.33.0 trưởng môn tắt được bước xét duyệt,
-    // và một lời hứa cứng ở đây sẽ sai đúng vào ngày họ tắt nó. Câu này đúng ở cả hai chiều.
-    title: "Trưởng môn nắm sổ",
-    body: "Bái sư xong là có chỗ trong tông môn. Sổ môn đồ, quyền khai đàn, lịch bảo trì — trưởng môn coi hết ở một trang.",
+    title: "Tông Môn Nghiêm Cẩn",
+    body: "Bái sư là bước đầu; trưởng môn duyệt danh sách môn đồ, ai được phép khai đàn do tông môn quyết.",
   },
   {
-    title: "Nhật ký đọc là hiểu",
-    body: "Viết bằng tiếng Việt chứ không phải mã máy: ai vào phòng, đuổi ai ra, thu được bao nhiêu huyền tinh. Lúc nào muốn soi lại cũng có.",
+    title: "Nhật Ký Tu Luyện",
+    body: "Mọi lượt chạy log bằng ngôn ngữ nhân tộc: ai vào phòng, trục xuất ai, huyền tinh thu về bao nhiêu — từng dòng, từng thời khắc.",
   },
 ];
 

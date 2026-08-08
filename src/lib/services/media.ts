@@ -1,4 +1,10 @@
-import { DeleteObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { randomBytes } from "node:crypto";
 
 /**
@@ -297,10 +303,206 @@ export async function statObject(key: string): Promise<{ size: number } | null> 
   }
 }
 
-/** Xoá một object. Dùng trong kiểm chứng để dọn dấu vết; web không xoá file đính kèm. */
+/** Xoá một object. Dùng trong kiểm chứng để dọn dấu vết, và bởi phép quét sạch bên dưới. */
 export async function deleteObject(key: string): Promise<void> {
   const { client, config } = requireStore();
   await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }));
+}
+
+/**
+ * Số lệnh xoá chạy chồng nhau khi quét. Xoá tuần tự thì một sảnh nghìn tệp mất vài phút chỉ
+ * để ngồi đợi độ trễ mạng; mở quá rộng thì OCI bắt đầu trả 429. Tám là chỗ đứng giữa.
+ */
+const SWEEP_CONCURRENCY = 8;
+
+/** Trần của ListObjectsV2 — vừa là mặc định của API, vừa là số object mỗi lượt đi mạng. */
+const SWEEP_PAGE_SIZE = 1000;
+
+/**
+ * Trần số trang. Một triệu object thì đây không còn là tàng khố đàm đạo nữa mà là một sự cố;
+ * dừng lại và NÓI RA còn hơn quay vòng cho tới lúc function bị giết vì hết giờ.
+ */
+const SWEEP_MAX_PAGES = 1000;
+
+export type MediaSweepResult =
+  | { storeClosed: true }
+  | {
+      storeClosed?: false;
+      /** Số object đã xoá được. */
+      deleted: number;
+      /** Số object lệnh xoá trượt — chúng CÒN nằm trong kho. */
+      failed: number;
+      /** Tổng dung lượng của phần đã xoá, tính bằng byte. */
+      bytes: number;
+      /** Số trang đã duyệt. Có mặt để phép kiểm chứng soi được đường phân trang. */
+      pages: number;
+      /** Nguyên văn lỗi ĐẦU TIÊN, hoặc `null`. Đếm mà không kèm lý do thì không lần ra được. */
+      firstError: string | null;
+    };
+
+/**
+ * Đọc cho người, không cho máy: một sảnh vừa dọn nên nói「48.3 MB」chứ không phải dãy số byte.
+ */
+export function humanBytes(bytes: number): string {
+  const UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < UNITS.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  // Byte thì không có phần lẻ để mà làm tròn; từ KB trở lên mới cần một chữ số sau dấu chấm.
+  return `${unit === 0 ? value : value.toFixed(1)} ${UNITS[unit]}`;
+}
+
+/**
+ * Một câu kể lại chuyện vừa xảy ra với tàng khố, để action ghép vào lời báo cho trưởng môn.
+ *
+ * Ở CẠNH cái type nó mô tả, cùng chỗ với `STORE_CLOSED_MESSAGE` bên chat.ts và cùng một lý
+ * do: lời báo phải đổi theo hình dạng dữ liệu, nên để chúng xa nhau là để chúng lệch nhau.
+ * Thêm một lý do rất thực tế nữa — tệp `"use server"` chỉ được xuất ra hàm async, nên một
+ * hàm thuần nằm trong đó là một hàm KHÔNG phép thử nào với tới được.
+ *
+ * Hai chuyện trục trặc được kể RỜI nhau, vì chúng rời nhau thật: `failed` là số lệnh xoá bị
+ * từ chối, còn `firstError` xuất hiện MỘT MÌNH khi phép quét dừng ở trần số trang. Gộp lại
+ * là cách sinh ra dòng「NHƯNG 0 tệp xoá không được」— vô nghĩa, và tệ hơn: nó giấu lý do thật.
+ */
+export function describeSweep(sweep: MediaSweepResult): string {
+  if (sweep.storeClosed) {
+    return "Tàng khố media chưa khai mở nên không có tệp nào để quét.";
+  }
+
+  const trouble: string[] = [];
+  if (sweep.failed > 0) trouble.push(`${sweep.failed} tệp xoá không được`);
+  if (sweep.firstError) trouble.push(`lỗi đầu tiên: ${sweep.firstError}`);
+
+  if (trouble.length === 0) {
+    return sweep.deleted === 0
+      ? "Tàng khố media không còn tệp đính kèm nào."
+      : `Quét ${sweep.deleted} tệp đính kèm (${humanBytes(sweep.bytes)}) khỏi tàng khố.`;
+  }
+
+  return (
+    `Quét được ${sweep.deleted} tệp đính kèm (${humanBytes(sweep.bytes)}) khỏi tàng khố, ` +
+    `NHƯNG ${trouble.join(" — ")}. Bấm lại để quét nốt.`
+  );
+}
+
+/**
+ * Chạy `run` trên từng phần tử với trần số lượt chồng nhau. Không dùng `Promise.all` trên cả
+ * mảng: một sảnh nghìn tệp sẽ mở nghìn kết nối cùng lúc và kho trả lời bằng 429.
+ *
+ * `next++` an toàn không cần khoá — JavaScript chỉ nhường quyền ở `await`, mà phép tăng thì
+ * nằm gọn giữa hai lần nhường.
+ */
+async function forEachLimited<T>(
+  items: readonly T[],
+  limit: number,
+  run: (item: T) => Promise<void>,
+): Promise<void> {
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      await run(items[next++]);
+    }
+  });
+  await Promise.all(workers);
+}
+
+/**
+ * Quét sạch mọi object nằm dưới một tiền tố.
+ *
+ * Một lệnh xoá cho mỗi object, KHÔNG dùng DeleteObjects (xoá gộp 1000 key một lượt): lớp
+ * tương thích S3 của OCI không kể lệnh ấy trong danh sách hỗ trợ, còn `DeleteObject` thì đã
+ * được `verify:media` chạy thật trên kho thật. Chậm hơn một chút, đổi lấy việc chắc chắn chạy
+ * — và `SWEEP_CONCURRENCY` lấy lại phần lớn khoảng chênh ấy.
+ *
+ * Lệnh xoá trượt được ĐẾM chứ không ném: một object bị khoá quyền không có lý do gì kéo theo
+ * cả cuộc quét. Người gọi đọc `failed` và `firstError` rồi quyết định — và vì phép quét đi
+ * theo tiền tố chứ không theo danh sách nào cả, chạy lại lần nữa là dọn nốt.
+ *
+ * `pageSize` chỉ để phép kiểm chứng ép đường phân trang chạy thật với vài object thay vì phải
+ * dựng đủ một nghìn. Web luôn dùng mặc định.
+ */
+export async function purgeObjectsUnder(
+  prefix: string,
+  pageSize: number = SWEEP_PAGE_SIZE,
+): Promise<MediaSweepResult> {
+  // Tiền tố rỗng nghĩa là "cả bucket" — với một hàm mang tên xoá sạch thì đó không phải một
+  // tham số hợp lệ mà là một lỗi lập trình, nên nó ném chứ không âm thầm quét tất.
+  if (!prefix.trim()) {
+    throw new Error("purgeObjectsUnder cần một tiền tố — chuỗi rỗng sẽ quét sạch cả bucket.");
+  }
+  // `MaxKeys` không hợp lệ thì kho trả về trang RỖNG mà vẫn kèm token đi tiếp — tức vòng lặp
+  // dưới đây quay mãi không xoá được gì. Chặn ở cửa, vì đây là một hàm xuất ra ngoài.
+  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > SWEEP_PAGE_SIZE) {
+    throw new Error(`pageSize phải là số nguyên trong khoảng 1–${SWEEP_PAGE_SIZE}, nhận ${pageSize}.`);
+  }
+
+  const opened = store();
+  if (!opened) return { storeClosed: true };
+  const { client, config } = opened;
+
+  let deleted = 0;
+  let failed = 0;
+  let bytes = 0;
+  let pages = 0;
+  let firstError: string | null = null;
+  let cursor: string | undefined;
+
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({
+        Bucket: config.bucket,
+        Prefix: prefix,
+        MaxKeys: pageSize,
+        ContinuationToken: cursor,
+      }),
+    );
+    pages++;
+
+    const batch = (page.Contents ?? [])
+      .map((object) => ({ key: object.Key, size: object.Size ?? 0 }))
+      .filter((object): object is { key: string; size: number } => Boolean(object.key));
+
+    await forEachLimited(batch, SWEEP_CONCURRENCY, async ({ key, size }) => {
+      try {
+        await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }));
+        deleted++;
+        bytes += size;
+      } catch (err) {
+        failed++;
+        firstError ??= `${key}: ${err instanceof Error ? err.message : String(err)}`;
+      }
+    });
+
+    // Token của lượt sau tính từ key CUỐI đã liệt kê, nên việc vừa xoá cả trang không làm nó
+    // hỏng. `IsTruncated` mà không kèm token thì coi như hết — không có gì để hỏi tiếp.
+    cursor = page.IsTruncated ? page.NextContinuationToken : undefined;
+
+    if (cursor && pages >= SWEEP_MAX_PAGES) {
+      firstError ??= `Quét dừng ở trần ${SWEEP_MAX_PAGES} trang — kho còn object dưới「${prefix}」, chạy lại để quét tiếp.`;
+      break;
+    }
+  } while (cursor);
+
+  return { deleted, failed, bytes, pages, firstError };
+}
+
+/**
+ * Quét sạch bytes của mọi file đính kèm đàm đạo. Đi theo TIỀN TỐ `chat/` chứ không theo URL
+ * đọc từ tin nhắn, và đó là chủ ý kép:
+ *
+ *   1. File đã tải lên nhưng người gửi đổi ý không bấm gửi thì không tin nào nhắc tới — đi
+ *      theo tin nhắn là bỏ chúng nằm lại trả tiền lưu trữ mãi mãi.
+ *   2. Người gọi xoá tin TRƯỚC rồi mới quét bytes (xem ghi chú ở action): sau bước một thì
+ *      URL không còn tồn tại để mà đi theo. Tiền tố thì vẫn còn đó, nên một lần quét trượt
+ *      giữa chừng chỉ cần bấm lại là xong.
+ *
+ * GIF không nằm trong đây và không cần: chúng là URL của GIPHY, tông môn chưa từng giữ bytes.
+ */
+export async function purgeChatMedia(): Promise<MediaSweepResult> {
+  return purgeObjectsUnder(`${CHAT_PREFIX}/`);
 }
 
 function isNotFound(err: unknown): boolean {

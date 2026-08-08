@@ -437,3 +437,33 @@ export async function purgeExpiredChat(): Promise<{ purged: number }> {
   const res = await messages.deleteMany({ createdAt: { $lt: cutoff } });
   return { purged: res.deletedCount ?? 0 };
 }
+
+export type PurgeAllResult = { storeClosed: true } | { storeClosed?: false; messages: number };
+
+/**
+ * Thanh tẩy TOÀN BỘ sảnh — không nhìn ngày tháng, không chừa tin nào, kể cả tin đã thu hồi.
+ * Đây là nút của riêng Gia chủ trong trang Tông Môn, không phải một nhịp vệ sinh: quét hạn
+ * lưu là thứ chạy hằng ngày, còn cái này là "làm lại từ đầu".
+ *
+ * KHÔNG có đường lui, và ghi rõ ở đây để người đọc sau khỏi đi tìm: tin bị `deleteMany`
+ * chứ không gắn cờ, nên không có bản nháp nào nằm lại để phục hồi. Cờ `deleted` của thu hồi
+ * là để sảnh giữ vết một câu bị rút; xoá sạch cả sảnh thì chẳng còn sảnh nào để giữ vết cho.
+ *
+ * `chat_typing` bị dọn TRƯỚC, và thứ tự ấy là chủ ý: nó rẻ và vô hại, nên nếu kết nối có
+ * trục trặc thì lệnh ngã ngựa là lệnh chưa phá gì cả, thay vì ngã sau khi tin đã bay mất.
+ * Bỏ nó lại cũng chỉ sai trong 60 giây (index TTL), nhưng một dòng「đang gõ…」lơ lửng trên
+ * một sảnh vừa trống trơn thì trông như hệ thống hỏng.
+ *
+ * KHÔNG đụng tới bytes trong tàng khố media — đó là việc của `purgeChatMedia()` bên
+ * services/media.ts, và người gọi phải làm cả hai. Tách đôi vì hai kho có thể mở/đóng độc
+ * lập với nhau: một tông môn chưa dựng OCI vẫn phải xoá được tin.
+ */
+export async function purgeAllChat(): Promise<PurgeAllResult> {
+  const opened = store();
+  if (!opened) return { storeClosed: true };
+
+  const { messages, typing } = await opened;
+  await typing.deleteMany({});
+  const res = await messages.deleteMany({});
+  return { messages: res.deletedCount ?? 0 };
+}

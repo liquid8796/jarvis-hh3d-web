@@ -11,11 +11,15 @@ import { normalizeGameBaseUrl } from "@/lib/quest-engine/cookies.mjs";
 import {
   canEditRoles,
   canManageUser,
+  isOwner,
   normalizeRoles,
   reviewRoleChange,
 } from "@/lib/auth/permissions";
+import { STORE_CLOSED_MESSAGE, purgeAllChat } from "@/lib/services/chat";
+import { describeSweep, purgeChatMedia, type MediaSweepResult } from "@/lib/services/media";
 import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
 import { adminCreate, adminDelete, adminUpdate, findById, setStatus } from "@/lib/services/users";
+import { CHAT_PURGE_PHRASE, matchesChatPurgePhrase } from "@/lib/validation/chat";
 import {
   displayNameSchema,
   emailSchema,
@@ -394,4 +398,63 @@ export async function saveChatSettingsAction(
 
   revalidatePath("/admin");
   return { ok: true, message: `Đã đặt hạn lưu đàm đạo: tin sống ${days} ngày rồi tự tan.` };
+}
+
+/**
+ * Thanh tẩy sảnh đàm đạo — xoá SẠCH tin trong tàng thư (Mongo) và bytes đính kèm trong tàng
+ * khố media (OCI). Không có đường lui.
+ *
+ * BA hàng rào, và không cái nào thừa:
+ *   1. `requireAdmin()` như mọi action ở đây.
+ *   2. CHỈ GIA CHỦ. Cùng một mạch lý lẽ với `deleteMessage`: thu hồi lời nói là việc của
+ *      người đã nói: để một Trưởng môn xoá trắng lịch sử đàm đạo của cả tông môn thì sảnh
+ *      chung thành thứ ai cầm quyền nấy viết lại. Và permissions.ts đã nói rõ vì sao admin
+ *      không được là quyền lớn nhất — "admin nào cũng chỉ an toàn cho tới khi một admin khác
+ *      đổi ý".
+ *   3. Gõ tay câu xác nhận. Hàng rào này KHÔNG phải để chống kẻ gian (kẻ gian đã qua được
+ *      hàng rào 2 thì gửi thẳng chuỗi ấy) mà để chống chính mình lúc bấm nhầm — nhưng nó
+ *      vẫn được soát ở server, vì form là thứ ngoài Internet chạm tới được và một action
+ *      xoá sạch không nên gọi được bằng một cú POST trống.
+ *
+ * THỨ TỰ tin trước, bytes sau — cố ý:
+ *   • Quét bytes trước rồi tin ngã ngựa ⇒ cả sảnh treo đầy ảnh vỡ, ai cũng thấy.
+ *   • Xoá tin trước rồi bytes ngã ngựa ⇒ vài tệp mồ côi nằm im, không ai thấy, và lần bấm
+ *     sau dọn nốt vì phép quét đi theo TIỀN TỐ chứ không theo URL trong tin.
+ * Hỏng nửa chừng là chuyện phải tính tới, nên chọn nửa nào hỏng thì đỡ đau hơn.
+ */
+export async function purgeChatAction(
+  _prev: AdminResult | null,
+  formData: FormData,
+): Promise<AdminResult> {
+  const admin = await requireAdmin();
+  if (!isOwner(admin)) {
+    return { ok: false, message: "Thanh tẩy cả sảnh là việc của Gia chủ — Trưởng môn không mở được cửa này." };
+  }
+  if (!matchesChatPurgePhrase(String(formData.get("confirm") ?? ""))) {
+    return { ok: false, message: `Gõ đúng「${CHAT_PURGE_PHRASE}」vào ô xác nhận rồi hãy bấm.` };
+  }
+
+  const wiped = await purgeAllChat();
+  if (wiped.storeClosed) {
+    return { ok: false, message: STORE_CLOSED_MESSAGE };
+  }
+
+  // Cấu hình media đặt nửa vời thì `purgeChatMedia` NÉM (xem services/media.ts) — bắt lại ở
+  // đây để lời báo nói được cả hai chuyện: tin đã xoá xong, còn bytes thì chưa và vì sao.
+  let sweep: MediaSweepResult;
+  try {
+    sweep = await purgeChatMedia();
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      message: `Đã xoá ${wiped.messages} tin khỏi tàng thư, nhưng không quét được tàng khố media: ${reason}`,
+    };
+  }
+
+  const partial = !sweep.storeClosed && (sweep.failed > 0 || sweep.firstError !== null);
+  return {
+    ok: !partial,
+    message: `Đã thanh tẩy sảnh đàm đạo: xoá ${wiped.messages} tin. ${describeSweep(sweep)}`,
+  };
 }

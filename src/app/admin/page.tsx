@@ -1,9 +1,11 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { requireAdmin } from "@/lib/auth/guards";
+import { isOwner } from "@/lib/auth/permissions";
 import { countJobsForDrain } from "@/lib/services/jobs";
 import { getAppSettings } from "@/lib/services/settings";
 import { countPending, listUsers } from "@/lib/services/users";
 import { AdminTabs } from "./AdminTabs";
+import { ChatPurgePanel } from "./ChatPurgePanel";
 import { ChatSettingsForm } from "./ChatSettingsForm";
 import { GameDomainForm } from "./GameDomainForm";
 import { MaintenanceForm } from "./MaintenanceForm";
@@ -85,7 +87,14 @@ export default async function AdminPage({
             {
               key: "damDao",
               label: "Đàm Đạo",
-              pane: <ChatSettingsForm retentionDays={settings.chat.retentionDays} />,
+              // Hạn lưu và thanh tẩy là hai thẻ RỜI nhau: cùng một tab vì cùng nói về sảnh
+              // đàm đạo, nhưng không chung form — xem ghi chú trong ChatPurgePanel.
+              pane: (
+                <div className="flex flex-col gap-6">
+                  <ChatSettingsForm retentionDays={settings.chat.retentionDays} />
+                  <ChatPurgePanel canPurge={isOwner(viewer)} />
+                </div>
+              ),
             },
             {
               key: "baoTri",

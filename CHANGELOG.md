@@ -11,6 +11,48 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.44.0 — nút thanh tẩy sảnh đàm đạo: xoá sạch tin VÀ bytes đính kèm, trong một lần bấm
+
+- **Tab Đàm Đạo của trang Tông Môn có thêm thẻ「Thanh Tẩy Sảnh Đàm Đạo」** — xoá toàn bộ tin
+  khỏi MongoDB và quét sạch mọi tệp đính kèm khỏi OCI Object Storage. Trước bản này, hạn lưu
+  là đường DUY NHẤT để tin biến mất, mà hạn lưu thì tính theo ngày: muốn dọn sạch ngay thì
+  phải vào tận Atlas và OCI console mà xoá tay — hai nơi, hai lần đăng nhập, và không có gì
+  bảo đảm ai đó nhớ làm nốt nửa thứ hai.
+- **Xoá bytes đi theo TIỀN TỐ `chat/`, không theo URL đọc từ tin nhắn.** Hai lý do, và cả hai
+  đều từng là lỗ thật:
+  - Tệp đã tải lên nhưng người gửi đổi ý không bấm gửi thì KHÔNG tin nào nhắc tới nó — đi
+    theo tin nhắn là bỏ chúng nằm lại trả tiền lưu trữ mãi mãi.
+  - Tin bị xoá TRƯỚC bytes (cố ý — xem dưới), nên tới lượt quét bytes thì URL đã không còn
+    tồn tại để mà đi theo. Tiền tố thì vẫn còn đó, nên một lần quét trượt giữa chừng chỉ cần
+    bấm lại là dọn nốt.
+- **Thứ tự tin trước, bytes sau là một lựa chọn, không phải tình cờ.** Hỏng nửa chừng là
+  chuyện phải tính tới, nên câu hỏi thật là "hỏng nửa nào thì đỡ đau hơn": quét bytes trước
+  rồi tin ngã ngựa ⇒ cả sảnh treo đầy ảnh vỡ, ai cũng thấy; xoá tin trước rồi bytes ngã ngựa
+  ⇒ vài tệp mồ côi nằm im, không ai thấy, và lần bấm sau dọn nốt.
+- **Chỉ Gia chủ mở được cửa này.** Cùng mạch lý lẽ với「thu hồi chỉ của chủ tin」ở 0.43.0: để
+  một Trưởng môn xoá trắng lịch sử đàm đạo của cả tông môn thì sảnh chung thành thứ ai cầm
+  quyền nấy viết lại. Trưởng môn thường vẫn THẤY thẻ ấy kèm lời giải thích — một cái nút biến
+  mất không tự giải thích được chính nó.
+- **Phải gõ tay「XOA HET」thì nút mới sáng**, và server soát lại đúng câu ấy. Câu không dấu là
+  cố ý: một nút xoá sạch không thể phụ thuộc vào việc bộ gõ tiếng Việt có đang bật hay không.
+  Hàng rào này không chống kẻ gian (kẻ gian đã qua được hàng rào vai thì gửi thẳng chuỗi ấy)
+  mà chống chính mình lúc bấm nhầm — nhưng nó vẫn phải gác ở server, vì một action xoá sạch
+  không nên gọi được bằng một cú POST trống.
+- **`npm run verify:chat-purge`** — chạy thật trên một mongod trong tiến trình VÀ trên OCI
+  thật. Phép thử quan trọng nhất trong đó: đặt một object NGOÀI tiền tố rồi soát xem nó còn
+  nguyên sau lượt quét. Một phép quét rộng hơn ý định sẽ không báo lỗi gì cả — nó chỉ lặng lẽ
+  xoá nhiều hơn mức đáng xoá rồi báo thành công.
+  - Phép thử ép `MaxKeys=1` để **đường phân trang chạy thật** với ba object thay vì phải dựng
+    đủ một nghìn; nhờ vậy biết chắc OCI có trả `NextContinuationToken` dùng được, chứ không
+    phải tin rằng nó giống S3.
+  - Nó **KHÔNG** chạm vào tiền tố `chat/` của kho đang dùng: tự dựng tiền tố tạm mang dấu thời
+    gian rồi quét chính mình. Muốn soi luôn `purgeChatMedia()` thì đặt `CHAT_PURGE_TEST_BUCKET`
+    trỏ sang một bucket bỏ đi.
+- **Xoá từng object một, KHÔNG dùng `DeleteObjects` (xoá gộp 1000 key).** Lớp tương thích S3
+  của OCI không kể lệnh gộp trong danh sách hỗ trợ, còn `DeleteObject` thì đã được
+  `verify:media` chạy thật trên kho thật từ 0.41.0. Chậm hơn một chút, đổi lấy việc chắc chắn
+  chạy — và tám lệnh chồng nhau lấy lại phần lớn khoảng chênh ấy.
+
 ## 0.43.3 —「Nhiệm vụ VIP/Thường」thành「Tài khoản VIP/thường」,「Lư Khai Đàn」thành「Tế đàn auto」
 
 - Hai tab trong Ngọc Giản Cấu Hình đổi nhãn thành **Tài khoản VIP** / **Tài khoản thường** —

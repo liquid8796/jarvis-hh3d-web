@@ -401,6 +401,7 @@ WEB_URL=https://<app>.vercel.app WORKER_TOKEN=<token> npm run worker
 ```bash
 cp .env.example .env     # điền DATABASE_URL, AUTH_SECRET, WORKER_TOKEN, ADMIN_PASSWORD
 npm install
+npm run env:pull         # kéo MONGODB_URI, OCI_*, GIPHY_API_KEY từ Vercel về .env.local
 npm run db:migrate
 npm run db:seed
 npm run dev              # http://localhost:3000
@@ -408,6 +409,19 @@ npm run dev              # http://localhost:3000
 # cửa sổ khác:
 WEB_URL=http://localhost:3000 WORKER_TOKEN=<...> npm run worker
 ```
+
+> ### Hai tệp env, và vì sao `env:pull` đáng có một lệnh riêng
+>
+> `.env` là phần bạn tự điền và giữ lâu dài; `.env.local` là phần **kéo về từ Vercel** — kho
+> đàm đạo (`MONGODB_URI`), tàng khố media (`OCI_*`) và tab GIF (`GIPHY_API_KEY`) đều sống ở
+> đó vì chúng được cấp từ dashboard chứ không phải gõ tay. Khi hai tệp cùng khai một khoá,
+> **`.env.local` thắng** — đúng luật của Next.js, và `scripts/loadEnv.mjs` đọc theo đúng thứ
+> tự ấy nên `next dev` với mọi script `verify:*` luôn nhìn thấy cùng một cấu hình.
+>
+> Thiếu bước này thì hệ thống KHÔNG gãy — nó chỉ treo biển「chưa khai mở」ở sảnh đàm đạo, ô
+> đính kèm và tab GIF, còn lại chạy bình thường. Đó là chủ ý (thiếu cấu hình là một trạng
+> thái hợp lệ), nhưng nó cũng có nghĩa là một máy quên `env:pull` trông y hệt một máy đã cài
+> đúng — nên nếu thấy sảnh báo chưa khai mở, hãy nghi lệnh này trước khi nghi kho.
 
 ## 3b. Chạy khôi lỗi ở đâu cho miễn phí
 

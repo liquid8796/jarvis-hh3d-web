@@ -17,8 +17,6 @@ next-env.d.ts
 # Cấu hình tooling của người viết mã — riêng của từng máy, không thuộc về repo dùng chung.
 .claude/
 
-.vercel
-.env*
-
-# Gói linh sứ — sinh ra ở prebuild từ scripts/buildWorkerBundle.mjs, không commit
+# Gói khôi lỗi — sinh ra ở prebuild từ scripts/buildWorkerBundle.mjs, không commit
 /public/linh-su/goi-linh-su.tgz
+

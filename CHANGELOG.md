@@ -11,6 +11,29 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.43.1 — script và `next dev` thôi bất đồng về biến môi trường
+
+- **`loadEnv()` đọc CẢ `.env.local` lẫn `.env`**, theo đúng thứ tự ưu tiên của Next (tệp
+  trước thắng). Trước đó nó chỉ đọc `.env`, mà `vercel env pull` thì ghi vào `.env.local` —
+  nên sau khi kéo biến về, `next dev` thấy đủ kho còn `npm run verify:media` vẫn một mực báo
+  「kho chưa khai mở」. Cùng một máy, cùng một lúc, hai câu trả lời trái ngược, và không có gì
+  trên màn hình gợi ý vì sao. `MONGODB_URI`, `OCI_*` và `GIPHY_API_KEY` đều chỉ sống ở
+  `.env.local` nên cả ba kho cùng dính.
+  - Bằng chứng cái bẫy là thật, không phải phòng xa: `verifyRealtimeSse.mts` đã tự vá tay
+    bằng một dòng `loadEnv(".env.local")` thừa ra. Nay dọn — sửa ở gốc thì bản vá tay hết việc.
+- **`npm run env:pull`** — một lệnh cho việc ấy, thay vì phải nhớ cú pháp `vercel env pull`
+  kèm đúng môi trường. Kèm một mục trong README giải thích hai tệp env và vì sao thiếu bước
+  này thì hệ thống KHÔNG gãy mà chỉ treo biển「chưa khai mở」 — nghĩa là một máy quên chạy nó
+  trông y hệt một máy đã cài đúng.
+- **`db:migrate` in ra database nó sắp sửa**, trước khi sửa. Đổi thứ tự nạp env ở trên có
+  nghĩa là hai tệp lỡ trỏ hai nơi khác nhau thì cái được chọn không hiện ra ở đâu cả, mà
+  migration chạy nhầm database là loại sai lầm không có nút hoàn tác.
+  - Bản đầu của chính dòng in ấy **làm rò mật khẩu database** và bị bắt lúc tự soi lại:
+    `new URL()` ném TypeError mang nguyên chuỗi kết nối trong thuộc tính `input`, và Node in
+    thuộc tính ấy ra khi lỗi không được bắt. Đo thật, thấy mật khẩu trên màn hình. Tệ hơn:
+    `neon()` ở ngay dưới cũng viết thẳng `Connection string: <nguyên văn>`. Nên chuỗi hỏng
+    giờ bị chặn NGAY tại script với một lời báo không kèm giá trị — đã đo lại: 0 lần rò.
+
 ## 0.43.0 — vai Gia chủ, thu hồi chỉ của chủ tin, tag trang trí, và「linh sứ」thành「khôi lỗi」
 
 - **VÁ LỖ HỔNG: thu hồi tin của người khác.** Trước bản này admin thu hồi được tin của BẤT KỲ

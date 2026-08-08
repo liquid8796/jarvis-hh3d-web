@@ -1,22 +1,37 @@
 import { readFileSync } from "node:fs";
 
 /**
- * Nạp .env vào process.env cho các script chạy bằng Node thuần (migrate, seed) — Next.js tự
- * lo phần này, còn script thì không.
+ * Nạp biến môi trường vào process.env cho các script chạy bằng Node thuần (migrate, seed,
+ * verify) — Next.js tự lo phần này, còn script thì không.
  *
  * Dùng chung cho mọi script thay vì mỗi file chép một bản: bản chép tay trong migrate.mjs
  * từng đặt phép kiểm tra DATABASE_URL LÊN TRƯỚC đoạn nạp file, nên nó luôn báo "chưa đặt"
  * dù .env có đủ. Một hàm, một thứ tự đúng, gọi ở dòng đầu tiên.
  *
- * Biến đã có sẵn trong môi trường luôn THẮNG giá trị trong file — nhờ vậy CI hay Vercel có
- * thể ghi đè mà không cần sửa file.
+ * Đọc CẢ HAI tệp theo đúng thứ tự ưu tiên của Next.js — `.env.local` thắng `.env` — và đó là
+ * một cái bẫy đã cắn thật, không phải phòng xa. `vercel env pull` ghi vào `.env.local`, Next
+ * đọc `.env.local`, nhưng hàm này từng chỉ đọc `.env`. Hậu quả: kéo biến về xong thì `next
+ * dev` thấy đủ kho, còn `npm run verify:media` vẫn một mực báo "kho chưa khai mở" — cùng một
+ * máy, cùng một lúc, hai câu trả lời trái ngược, và không có gì trên màn hình gợi ý vì sao.
+ *
+ * Biến đã có sẵn trong môi trường luôn THẮNG cả hai tệp — nhờ vậy CI hay Vercel ghi đè được
+ * mà không cần sửa file. Chính luật "không ghi đè" ấy làm nên thứ tự trên: nạp `.env.local`
+ * trước thì giá trị của nó chiếm chỗ, và `.env` chỉ điền vào những khoá còn trống.
  */
-export function loadEnv(path = ".env") {
+const DEFAULT_FILES = [".env.local", ".env"];
+
+export function loadEnv(path) {
+  for (const file of path === undefined ? DEFAULT_FILES : [path]) {
+    loadEnvFile(file);
+  }
+}
+
+function loadEnvFile(path) {
   let text;
   try {
     text = readFileSync(path, "utf8");
   } catch {
-    return; // Không có .env là chuyện bình thường khi biến đã nằm sẵn trong môi trường.
+    return; // Vắng một tệp là chuyện bình thường — Vercel không có tệp nào cả.
   }
 
   for (const line of text.split("\n")) {

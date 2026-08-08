@@ -6,7 +6,8 @@ import type { DashboardLivePayload } from "../src/lib/realtime/dashboardTypes";
 import { addEvent, clearVisibleJobEvents } from "../src/lib/services/jobs";
 import { loadEnv } from "./loadEnv.mjs";
 
-loadEnv(".env.local");
+// Script này từng phải gọi thêm `loadEnv(".env.local")` bằng tay vì `loadEnv()` chỉ đọc
+// `.env`. Nay chính `loadEnv()` đọc cả hai theo thứ tự của Next, nên bản vá tay ấy đã dọn.
 loadEnv();
 
 if (!process.env.DATABASE_URL || !process.env.AUTH_SECRET) {

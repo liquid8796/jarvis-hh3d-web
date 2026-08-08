@@ -9,7 +9,7 @@ export const metadata = { title: "Hàng Đợi Công Việc" };
  * Hàng Đợi Công Việc — cả tông môn nhìn chung một hàng chờ.
  *
  * Câu hỏi trang này trả lời: "đàn của tôi đứng thứ mấy, và vì sao chưa tới lượt?". Trước đây
- * người dùng chỉ thấy đàn của chính mình trên Linh Đài, nên một lượt chờ lâu trông y hệt một
+ * người dùng chỉ thấy đàn của chính mình trên Auto, nên một lượt chờ lâu trông y hệt một
  * lượt hỏng. Thấy cả hàng thì cái chờ ấy có lý do.
  *
  * Server component dựng ảnh chụp đầu tiên để trang không loé lên khoảng trống; từ đó
@@ -22,7 +22,7 @@ export default async function QueuePage() {
   return (
     <>
       <SiteHeader />
-      {/* Cùng khung với Linh Đài — hai trang đứng cạnh nhau trong một luồng việc, và cùng
+      {/* Cùng khung với Auto — hai trang đứng cạnh nhau trong một luồng việc, và cùng
           thẳng hàng với thanh trên cùng. */}
       <main className={`mx-auto w-full ${SHELL_WIDTH} px-4 pb-24 sm:px-6`}>
         <div className="rise-in mb-8">

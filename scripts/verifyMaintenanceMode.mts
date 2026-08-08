@@ -3,7 +3,7 @@
  * Kiểm chứng chế độ BẾ QUAN TRÙNG TU, đầu này sang đầu kia ở tầng service:
  *
  *   1. Schema: document rỗng lẫn document cũ (chưa có nhánh maintenance) đều ra TẮT.
- *   2. Bật bảo trì → feed của Linh Đài mang đúng trạng thái (đường đi của popup).
+ *   2. Bật bảo trì → feed của Auto mang đúng trạng thái (đường đi của popup).
  *   3. Bật bảo trì → startJob từ chối với thông điệp bế quan (cửa Khai Đàn).
  *   4. Gia hạn giữ nguyên startedAt (thanh tiến độ không nhảy ngược).
  *   5. Tắt bảo trì → feed hạ cờ, startJob quay về lỗi thường ("chưa có tài khoản").
@@ -110,7 +110,7 @@ try {
   await saveAppSettings(on);
 
   const feedOn = await getMaintenanceFeed();
-  assert(feedOn.active === true, "feed Linh Đài phải mang cờ bảo trì khi đã bật");
+  assert(feedOn.active === true, "feed Auto phải mang cờ bảo trì khi đã bật");
   assert(feedOn.expectedEndAt === on.maintenance.expectedEndAt, "feed phải mang đúng hạn chót cho đồng hồ đếm ngược");
   assert(feedOn.note === "kiểm chứng tự động", "feed phải mang lời nhắn cho popup");
 

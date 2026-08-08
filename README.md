@@ -3,7 +3,7 @@
 Control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ → tông môn duyệt → khai đàn,
 rồi automation **chạy trên server** dù đạo hữu đã tắt trình duyệt. Bước "tông môn duyệt" là
 một công tắc ở tab Môn Đồ của trang Tông Môn — tắt nó thì người mới bái sư xong vào thẳng
-Linh Đài; mặc định là BẬT.
+Auto; mặc định là BẬT.
 
 **Site đổi tên miền thì sửa ở tab Bảo Trì**, không phải sửa mã nguồn: ô「Tên Miền Game」lưu
 vào `app_settings`, và /api/worker gửi kèm nó theo từng lần phát việc — mọi khôi lỗi, kể cả
@@ -132,12 +132,12 @@ src/
   lib/
     auth/         # Phiên đăng nhập, guard phân quyền, cửa vào của worker.
     db/           # Schema Drizzle + client. Nơi DUY NHẤT biết hình thù bảng.
-    realtime/     # Kênh LISTEN/NOTIFY + contract SSE của Linh Đài.
+    realtime/     # Kênh LISTEN/NOTIFY + contract SSE của Auto.
     services/     # Quy tắc nghiệp vụ. Nơi DUY NHẤT viết truy vấn.
     quest-engine/ # Bộ thông dịch nhiệm vụ — JS thuần, không biết gì về Next hay database.
 ```
 
-#### Trạng thái Linh Đài đi trực tiếp như thế nào
+#### Trạng thái Auto đi trực tiếp như thế nào
 
 Job, log và sổ khôi lỗi vẫn lấy Postgres làm sự thật duy nhất. Migration `0007` chỉ gắn thêm
 “chuông cửa”: transaction nào thay đổi dữ liệu nhìn thấy được sẽ `NOTIFY` scope của đúng user.

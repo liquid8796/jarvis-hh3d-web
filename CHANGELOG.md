@@ -11,6 +11,18 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.44.3 —「Linh Đài」thành「Auto」
+
+- Nhãn nav, tiêu đề tab và tiêu đề trang của bàn làm việc đổi thành **Auto**.
+- Đổi cả những câu văn GỌI TÊN nó, không riêng cái nút: lời chào ở trang đăng nhập
+  ("trở lại Auto"), thẻ giới thiệu ngoài trang chủ, lời ở phòng chờ, popup bảo trì, dòng mô
+  tả công tắc xét duyệt, và lời nhắc của `db:reset-password`. Đổi mỗi nhãn nav thì phần còn
+  lại chỉ người dùng tới một trang không còn tên ấy.
+- Giữ nguyên **`"Auto HH3D — Linh Đài Tự Động"`** ở `layout.tsx`: đó là khẩu hiệu của cả
+  site chứ không phải tên trang — "Auto Tự Động" thì vô nghĩa. Đây là quyết định có cân
+  nhắc, không phải sót.
+- CHANGELOG giữ tên cũ như mọi lần: sử sách không viết lại.
+
 ## 0.44.2 — chân trang ký tên đạo hữu, không ký tên hoa
 
 - Chân trang đổi từ `© 2026 Bảo Hoa tiên tử` thành **`© 2026 Nam Cung Bình`**. Cái tên cũ vào

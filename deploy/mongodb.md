@@ -3,7 +3,7 @@
 Sảnh **Phòng Chat** lưu tin ở MongoDB. Trang này là cách dựng kho và nối nó vào project.
 
 > Chưa có kho thì web **không hỏng**: sảnh treo biển「Tàng thư đàm đạo chưa khai mở」, mọi
-> phần khác của Linh Đài chạy bình thường. Nên bước này làm lúc nào cũng được.
+> phần khác của Auto chạy bình thường. Nên bước này làm lúc nào cũng được.
 
 ---
 

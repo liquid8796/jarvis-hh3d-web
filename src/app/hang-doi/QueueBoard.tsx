@@ -9,7 +9,7 @@ import type { JobStatus } from "@/lib/realtime/dashboardTypes";
  *
  * Sống bằng SSE: Postgres đánh thức server ngay khi một đàn bất kỳ đổi trạng thái, và server
  * đẩy ảnh chụp mới xuống. Nhịp hỏi-lại chỉ còn là LƯỚI AN TOÀN cho lúc EventSource rớt —
- * 30 giây khi kênh sống (soát lại cho chắc), 2 giây khi nó đứt, y như Linh Đài.
+ * 30 giây khi kênh sống (soát lại cho chắc), 2 giây khi nó đứt, y như Auto.
  *
  * Tab bị ẩn thì ngừng hỏi lại: một trang mở quên trong nền không có lý do gì gõ cửa database
  * cả ngày. Kênh SSE vẫn giữ nguyên — nó rẻ, và mở lại tốn hơn là để yên.

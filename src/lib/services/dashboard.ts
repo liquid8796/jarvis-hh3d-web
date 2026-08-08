@@ -72,7 +72,7 @@ export async function getMaintenanceFeed(): Promise<DashboardMaintenance> {
   };
 }
 
-/** Một ảnh chụp nhất quán về phần "sống" của Linh Đài, dùng cho cả SSE lẫn poll dự phòng. */
+/** Một ảnh chụp nhất quán về phần "sống" của Auto, dùng cho cả SSE lẫn poll dự phòng. */
 export async function getDashboardFeed(
   userId: string,
   after: number,

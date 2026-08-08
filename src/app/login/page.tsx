@@ -12,7 +12,7 @@ export default async function LoginPage({
   const { next } = await searchParams;
 
   return (
-    <AuthCard title="Nhập Môn" subtitle="Xưng đạo hiệu để trở lại Linh Đài.">
+    <AuthCard title="Nhập Môn" subtitle="Xưng đạo hiệu để trở lại Auto.">
       <LoginForm next={typeof next === "string" ? next : ""} />
       <p className="mt-6 text-center text-sm text-[var(--color-mist)]">
         Chưa gia nhập?{" "}

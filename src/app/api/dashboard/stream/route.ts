@@ -65,7 +65,7 @@ function nextPresenceExpiry(payload: DashboardLivePayload): number | null {
 }
 
 /**
- * Một kết nối SSE cho toàn Linh Đài. PostgreSQL đánh thức route bằng LISTEN/NOTIFY đúng lúc
+ * Một kết nối SSE cho toàn Auto. PostgreSQL đánh thức route bằng LISTEN/NOTIFY đúng lúc
  * job, log hoặc sổ khôi lỗi đổi; route chỉ đọc snapshot khi có tín hiệu, không poll DB liên tục.
  */
 export async function GET(request: NextRequest) {

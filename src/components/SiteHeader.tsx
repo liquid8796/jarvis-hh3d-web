@@ -6,14 +6,14 @@ import { SectSeal } from "./SectSeal";
 
 /**
  * Bề rộng khung của cả app — thanh trên cùng luôn dùng nó, và trang nào muốn nội dung trải
- * trọn khung thì dùng đúng hằng này (Linh Đài, Hàng Đợi).
+ * trọn khung thì dùng đúng hằng này (Auto, Hàng Đợi).
  *
- * 100rem = 1600px. Linh Đài là bàn làm việc hai cột — danh sách tài khoản, hai tab nhiệm vụ
+ * 100rem = 1600px. Auto là bàn làm việc hai cột — danh sách tài khoản, hai tab nhiệm vụ
  * với lưới tuỳ chọn hai cột, nhật ký chạy — nên mức 1152px cũ ép mỗi cột còn ~566px và mọi
  * thứ bên trong phải chen nhau. Vẫn có trần chứ không thả tự do: một biểu mẫu kéo ngang hết
  * màn 2560px thì mắt phải quét quá xa, và dòng chữ dài ra là khó đọc hơn chứ không dễ.
  *
- * MỘT bản duy nhất, ở đây. Trước đây Linh Đài và Hàng Đợi mỗi trang tự khai một hằng cùng
+ * MỘT bản duy nhất, ở đây. Trước đây Auto và Hàng Đợi mỗi trang tự khai một hằng cùng
  * tên cùng giá trị — hai bản sao của cùng một con số là cách êm ái nhất để chúng lệch nhau.
  *
  * Nguyên một chuỗi lớp có sẵn trong mã nguồn, KHÔNG ghép lúc chạy: Tailwind quét tĩnh, một
@@ -26,8 +26,8 @@ export const SHELL_WIDTH = "max-w-[100rem]";
  *
  * Bề rộng của nó là HẰNG SỐ, không phải tham số của trang. Trước đây nó nhận `maxWidth` để
  * mỗi trang tự nói khung của mình, và hậu quả là cụm menu NHẢY NGANG khi đổi tab: năm trang
- * dùng `max-w-5xl` (1024px) còn Linh Đài với Hàng Đợi dùng `max-w-[100rem]` (1600px). Đo
- * trên màn 1920: mép phải cụm menu ở 1441 trên trang chủ và 1729 trên Linh Đài — lệch 288
+ * dùng `max-w-5xl` (1024px) còn Auto với Hàng Đợi dùng `max-w-[100rem]` (1600px). Đo
+ * trên màn 1920: mép phải cụm menu ở 1441 trên trang chủ và 1729 trên Auto — lệch 288
  * pixel mỗi bên, chỉ vì bấm sang tab khác.
  *
  * Bề rộng nội dung thì vẫn nên khác nhau (một form hồ sơ rộng 100rem là vô lý), nhưng phần
@@ -63,7 +63,7 @@ export async function SiteHeader() {
               </Link>
             )}
             <Link href={user.status === "active" ? "/dashboard" : "/pending"} className="btn btn-ghost">
-              Linh Đài
+              Auto
             </Link>
             {user.status === "active" && (
               <>

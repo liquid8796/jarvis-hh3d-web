@@ -69,5 +69,5 @@ await sql`update users set password_hash = ${hash}, updated_at = now() where use
 const row = existing[0];
 console.log(`✔ Đã đặt lại mật khẩu cho「${username}」(role ${row.role}, status ${row.status}).`);
 if (row.status !== "active") {
-  console.log(`  Lưu ý: tài khoản đang ở trạng thái「${row.status}」— đăng nhập được nhưng chưa vào được Linh Đài.`);
+  console.log(`  Lưu ý: tài khoản đang ở trạng thái「${row.status}」— đăng nhập được nhưng chưa vào được Auto.`);
 }

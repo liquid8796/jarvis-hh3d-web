@@ -57,7 +57,7 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
 
   // Đích đến do trạng thái THẬT vừa ghi xuống quyết định, không do đoán theo môn quy: giữa
   // lúc `register()` đọc công tắc và lúc này, trưởng môn có thể vừa gạt nó. Còn chờ duyệt
-  // thì vào phòng chờ — nơi giải thích bước xét duyệt, thay vì một Linh Đài toàn cửa khoá.
+  // thì vào phòng chờ — nơi giải thích bước xét duyệt, thay vì một Auto toàn cửa khoá.
   redirect(result.user.status === "active" ? "/dashboard" : "/pending");
 }
 

@@ -12,10 +12,10 @@ import { DashboardLiveProvider } from "./DashboardLiveProvider";
 import { LinhSuPanel } from "./LinhSuPanel";
 import { MaintenanceOverlay } from "./MaintenanceOverlay";
 
-export const metadata = { title: "Linh Đài" };
+export const metadata = { title: "Auto" };
 
 /**
- * Linh Đài — trang làm việc của một đạo hữu đã được thu nhận: cấu hình đàn pháp bên trái,
+ * Auto — trang làm việc của một đạo hữu đã được thu nhận: cấu hình đàn pháp bên trái,
  * lư khai đàn + nhật ký tu luyện bên phải. Server component đọc; mọi ghi đi qua actions.
  */
 export default async function DashboardPage() {
@@ -36,7 +36,7 @@ export default async function DashboardPage() {
           lệch vài pixel so với mép thẻ bên dưới. */}
       <main className={`mx-auto w-full ${SHELL_WIDTH} px-4 pb-24 sm:px-6`}>
         <div className="rise-in mb-8">
-          <h1 className="h-display text-3xl font-bold text-gilded">Linh Đài</h1>
+          <h1 className="h-display text-3xl font-bold text-gilded">Auto</h1>
           {/* Ba bước, nói ngay ở dòng đầu. Người mới mở trang này cần biết mình phải làm gì,
               chứ không cần một câu chào hay ho. */}
           <p className="mt-1 text-sm text-[var(--color-mist)]">

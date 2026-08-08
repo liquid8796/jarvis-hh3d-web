@@ -209,7 +209,7 @@ export const automationJobs = pgTable(
     // Hàng chờ được quét theo (status, runner) ở mỗi nhịp cron và mỗi lần worker hỏi việc —
     // index ghép đúng theo hình dạng câu truy vấn đó.
     index("jobs_queue_idx").on(t.status, t.runner, t.createdAt),
-    // Linh Đài hỏi "job mới nhất của TỪNG tài khoản" mỗi lần dựng feed.
+    // Auto hỏi "job mới nhất của TỪNG tài khoản" mỗi lần dựng feed.
     index("jobs_account_idx").on(t.accountId, t.createdAt),
     // MỖI TÀI KHOẢN TỐI ĐA MỘT ĐÀN SỐNG — luật nằm ở database chứ không chỉ ở startJob,
     // vì startJob là check-then-insert qua nhiều round-trip: hai lượt Khai Đàn đồng thời

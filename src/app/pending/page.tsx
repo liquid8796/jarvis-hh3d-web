@@ -26,7 +26,7 @@ export default async function PendingPage() {
           <p className="mt-4 text-sm leading-relaxed text-[var(--color-mist)]">
             {disabled
               ? "Tông môn đã tạm đóng cửa với đạo hiệu này. Muốn rõ nguyên do, hãy liên hệ trưởng môn."
-              : "Trưởng môn sẽ xét duyệt trong thời gian tới. Khi được thu nhận, Linh Đài và đàn pháp tự động sẽ mở ra với đạo hữu — quay lại sau nhé."}
+              : "Trưởng môn sẽ xét duyệt trong thời gian tới. Khi được thu nhận, Auto và đàn pháp tự động sẽ mở ra với đạo hữu — quay lại sau nhé."}
           </p>
           <p className="mt-6 text-xs text-[var(--color-mist)]">
             Danh xưng: <span className="text-gilded">{user.displayName}</span> · Đạo hiệu:{" "}

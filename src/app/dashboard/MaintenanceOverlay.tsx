@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useDashboardMaintenanceLive } from "./DashboardLiveProvider";
 
 /**
- * Popup bế quan trùng tu trên Linh Đài.
+ * Popup bế quan trùng tu trên Auto.
  *
  * Ai đang mở trang nhận nó qua frame SSE (admin gạt công tắc là notifyDashboard "*" đẩy
  * ngay); ai mới vào nhận qua initialMaintenance từ SSR. Cả hai đường đổ về cùng một context
@@ -98,7 +98,7 @@ export function MaintenanceOverlay() {
         <h2 className="h-display text-xl font-bold text-gilded">Tông môn đang bế quan trùng tu</h2>
         <p className="mt-3 text-sm leading-relaxed text-[var(--color-mist)]">
           {maintenance.note.trim() ||
-            "Trưởng môn đang nâng cấp hệ thống. Linh Đài sẽ trở lại trong chốc lát."}
+            "Trưởng môn đang nâng cấp hệ thống. Auto sẽ trở lại trong chốc lát."}
         </p>
 
         <div className="mt-6">{bar}</div>

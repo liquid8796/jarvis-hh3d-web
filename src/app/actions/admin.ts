@@ -318,7 +318,7 @@ const MAINTENANCE_MAX_NOTE = 500;
  * `expectedEndAt` thì luôn tính lại từ BÂY GIỜ + số phút — trưởng môn đang trả lời câu
  * "còn bao lâu nữa", không phải "tổng cộng bao lâu".
  *
- * NOTIFY với userId "*" — mọi Linh Đài đang mở đều nhận frame trong giây kế tiếp; ai vào
+ * NOTIFY với userId "*" — mọi Auto đang mở đều nhận frame trong giây kế tiếp; ai vào
  * sau nhận qua SSR. Không có đường nào phải đợi nhịp poll 30 giây.
  */
 export async function startMaintenanceAction(

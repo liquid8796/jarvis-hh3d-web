@@ -62,7 +62,7 @@ export function MembershipSettingsForm({
       <p className="mt-2 text-xs text-[var(--color-mist)]">
         {checked
           ? "ĐANG BẬT — người mới bái sư dừng ở phòng chờ tới khi trưởng môn điểm danh."
-          : "ĐANG TẮT — người mới bái sư được thu nhận ngay và vào thẳng Linh Đài."}
+          : "ĐANG TẮT — người mới bái sư được thu nhận ngay và vào thẳng Auto."}
       </p>
 
       {/* Tắt cổng KHÔNG với tay ngược về quá khứ: ai đã đứng sẵn trong hàng chờ vẫn đứng đó,

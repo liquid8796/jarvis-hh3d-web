@@ -116,7 +116,7 @@ export type StartOutcome =
 export async function startJob(userId: string): Promise<StartOutcome> {
   // Bế quan trùng tu: kiểm TRƯỚC MỌI THỨ, và ở tầng service chứ không ở action — mọi đường
   // gọi tương lai (API mới, cron, một action khác) đều phải đập vào cùng cánh cửa này.
-  // Popup trên Linh Đài đã báo trước, nhưng một tab mở từ hôm qua vẫn bấm được nút cũ.
+  // Popup trên Auto đã báo trước, nhưng một tab mở từ hôm qua vẫn bấm được nút cũ.
   const { maintenance } = await getAppSettings();
   if (maintenance.active) {
     return {

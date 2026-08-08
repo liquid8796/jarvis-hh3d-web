@@ -39,8 +39,17 @@ export type MaintenanceView = "open" | "banner" | "wall";
  */
 export function maintenanceViewFor(
   maintenance: { active: boolean },
-  /** Chỉ cần mảng vai. Khai hình dạng tại đây thay vì mượn kiểu nội bộ của permissions.ts. */
-  viewer: { roles: readonly string[] } | null,
+  /**
+   * Chỉ cần mảng vai. Khai hình dạng tại đây thay vì mượn `RoleBearer` — kiểu ấy là nội bộ của
+   * permissions.ts và không xuất ra.
+   *
+   * `string[]` chứ KHÔNG phải `readonly string[]`, và đó là một chi tiết đã trả giá: bản đầu
+   * viết `readonly`, biên dịch sạch dưới máy vì cây làm việc lúc ấy đang mang một bản
+   * permissions.ts (chưa commit của phiên khác) đã nới `RoleBearer` thành readonly — còn HEAD
+   * thì chưa, nên build trên Vercel đỏ ngay ở `isAdminUser(viewer)`. Kiểu mutable đi qua được
+   * CẢ HAI bản: mảng đọc-ghi luôn gán được vào một tham số chỉ-đọc, chiều ngược lại thì không.
+   */
+  viewer: { roles: string[] } | null,
 ): MaintenanceView {
   if (!maintenance.active) return "open";
   if (viewer === null) return "banner";

@@ -61,10 +61,14 @@ export type DashboardPresence = {
 };
 
 /**
- * Trạng thái bế quan trùng tu — bản chiếu của nhánh `maintenance` trong app_settings, đủ
- * cho client vẽ popup: đếm ngược trỏ vào `expectedEndAt`, thanh tiến độ nội suy giữa hai
- * mốc. Mốc là chuỗi ISO và client PHẢI tự phòng Date.parse hỏng — nguồn của chúng là một
- * document JSONB không ai ép kiểu ở tầng ghi.
+ * Trạng thái bế quan trùng tu — bản chiếu của nhánh `maintenance` trong app_settings, đủ cho
+ * client vẽ bảng/dải: đếm ngược trỏ vào `expectedEndAt`, thanh tiến độ nội suy giữa hai mốc.
+ * Mốc là chuỗi ISO và client PHẢI tự phòng Date.parse hỏng — nguồn của chúng là một document
+ * JSONB không ai ép kiểu ở tầng ghi.
+ *
+ * Tên vẫn mang tiền tố `Dashboard` vì đây là nơi nó sinh ra, nhưng từ 09/08/2026 nó KHÔNG còn
+ * đi trong payload của Auto: người đọc nó giờ là MaintenanceGate ở layout gốc và
+ * /api/maintenance. Đổi tên là đổi ở năm chỗ để được một tiền tố đẹp hơn — chưa đáng.
  */
 export type DashboardMaintenance = {
   active: boolean;
@@ -79,7 +83,5 @@ export type DashboardLivePayload = {
   events: DashboardEvent[];
   presence: DashboardPresence;
   accounts: DashboardAccount[];
-  /** Optional vì client có thể đang cầm frame của bản deploy cũ; vắng mặt = giữ nguyên. */
-  maintenance?: DashboardMaintenance;
   resetEvents?: boolean;
 };

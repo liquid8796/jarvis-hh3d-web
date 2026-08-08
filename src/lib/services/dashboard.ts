@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { eventsForJobs, getCurrentJobsPerAccount } from "./jobs";
 import { listAccounts } from "./accounts";
 import { getAppSettings } from "./settings";
@@ -61,8 +62,21 @@ export async function getPresenceFeed(userId: string): Promise<DashboardPresence
   };
 }
 
-/** Bản chiếu nhánh maintenance cho client — chỉ lộ những trường popup cần. */
-export async function getMaintenanceFeed(): Promise<DashboardMaintenance> {
+/**
+ * Bản chiếu nhánh maintenance cho client — chỉ lộ những trường bảng/dải bế quan cần.
+ *
+ * Người đọc là MaintenanceGate (layout gốc), `requireUser()` và /api/maintenance. KHÔNG còn nằm
+ * trong payload của Auto: xem ghi chú tại `DashboardMaintenance` trong dashboardTypes.ts.
+ *
+ * `cache()` của React: MỘT lượt đọc cho mỗi request, dù cửa bế quan ở layout và guard của trang
+ * đều hỏi. Hai chỗ ấy chạy trong cùng một lượt dựng nên chúng luôn nhận cùng một câu trả lời —
+ * điều này còn quan trọng hơn việc tiết kiệm một câu truy vấn: nếu trưởng môn gạt công tắc đúng
+ * vào khoảnh khắc giữa hai phép đọc, layout và trang sẽ không bao giờ mâu thuẫn nhau.
+ *
+ * Ngoài lượt dựng của React (script kiểm chứng chẳng hạn) thì `cache()` chỉ đơn giản là gọi
+ * thẳng — không ghi nhớ gì, và cũng không cần.
+ */
+export const getMaintenanceFeed = cache(async function getMaintenanceFeed(): Promise<DashboardMaintenance> {
   const { maintenance } = await getAppSettings();
   return {
     active: maintenance.active,
@@ -70,18 +84,17 @@ export async function getMaintenanceFeed(): Promise<DashboardMaintenance> {
     expectedEndAt: maintenance.expectedEndAt,
     note: maintenance.note,
   };
-}
+});
 
 /** Một ảnh chụp nhất quán về phần "sống" của Auto, dùng cho cả SSE lẫn poll dự phòng. */
 export async function getDashboardFeed(
   userId: string,
   after: number,
 ): Promise<DashboardLivePayload> {
-  const [feed, presence, accounts, maintenance] = await Promise.all([
+  const [feed, presence, accounts] = await Promise.all([
     getJobsFeed(userId, after),
     getPresenceFeed(userId),
     listAccounts(userId),
-    getMaintenanceFeed(),
   ]);
-  return { ...feed, presence, accounts, maintenance };
+  return { ...feed, presence, accounts };
 }

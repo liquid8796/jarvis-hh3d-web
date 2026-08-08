@@ -3,7 +3,8 @@
  * Kiểm chứng chế độ BẾ QUAN TRÙNG TU, đầu này sang đầu kia ở tầng service:
  *
  *   1. Schema: document rỗng lẫn document cũ (chưa có nhánh maintenance) đều ra TẮT.
- *   2. Bật bảo trì → feed của Auto mang đúng trạng thái (đường đi của popup).
+ *   1b. Cửa bế quan: ai gặp bảng chắn, ai chỉ thấy dải nhắc (phép quyết định thuần).
+ *   2. Bật bảo trì → feed mang đúng trạng thái (đường đi của bảng chắn).
  *   3. Bật bảo trì → startJob từ chối với thông điệp bế quan (cửa Khai Đàn).
  *   4. Gia hạn giữ nguyên startedAt (thanh tiến độ không nhảy ngược).
  *   5. Tắt bảo trì → feed hạ cờ, startJob quay về lỗi thường ("chưa có tài khoản").
@@ -19,6 +20,8 @@
 import { neon } from "@neondatabase/serverless";
 // @ts-expect-error — module JS thuần của quest-engine, không có d.ts.
 import { normalizeGameBaseUrl } from "../src/lib/quest-engine/cookies.mjs";
+import { maintenanceViewFor } from "../src/lib/auth/maintenance";
+import { ASSIGNABLE_ROLES } from "../src/lib/auth/permissions";
 import { appSettingsSchema, getAppSettings, saveAppSettings } from "../src/lib/services/settings";
 import { getMaintenanceFeed } from "../src/lib/services/dashboard";
 import { startJob } from "../src/lib/services/jobs";
@@ -48,6 +51,40 @@ assert(legacy.maintenance.active === false, "document cũ (chưa có nhánh main
 assert(legacy.membership.requireApproval === false, "thêm nhánh mới không được nuốt cấu hình đã có");
 
 console.log("✔ Schema: cổng bảo trì mặc định TẮT trên mọi document cũ — deploy không tự đóng cửa tông môn.");
+
+// ---- 1b. Ai đi qua được cửa nào trong lúc bế quan ----------------------------------------
+// Phép quyết định của MaintenanceGate là một hàm THUẦN, nên nó kiểm được ở đây mà không cần
+// dựng React: chính vì thế nó nằm trong lib/auth/maintenance.ts chứ không nằm trong component.
+
+const OFF = { active: false } as const;
+const ON = { active: true } as const;
+const MEMBER = { roles: [] as string[] };
+
+for (const viewer of [null, MEMBER, { roles: ["admin"] }, { roles: ["gia-chu"] }]) {
+  assert(maintenanceViewFor(OFF, viewer) === "open", "cửa mở thì KHÔNG ai bị chắn, cũng không ai thấy dải nhắc");
+}
+
+assert(maintenanceViewFor(ON, MEMBER) === "wall", "môn đồ thường phải gặp bảng chắn ở mọi trang");
+assert(maintenanceViewFor(ON, { roles: ["choi-choi"] }) === "wall", "một vai lạ KHÔNG được coi là bậc trị sự");
+
+// Bốn vai này giữ được cửa vào trang Tông Môn — nơi có đúng cái công tắc tắt bảo trì. Chắn họ
+// là khoá trái căn phòng chứa chìa khoá của chính nó.
+for (const role of ASSIGNABLE_ROLES) {
+  assert(
+    maintenanceViewFor(ON, { roles: [role] }) === "banner",
+    `vai ${role} phải đi qua được trong lúc bế quan, không thì không ai tắt được bảo trì`,
+  );
+}
+assert(
+  maintenanceViewFor(ON, { roles: ["admin", "choi-choi"] }) === "banner",
+  "mang thêm một vai lạ không được làm mất quyền trị sự",
+);
+
+// Khách chưa đăng nhập PHẢI qua được: cửa đăng nhập là đường duy nhất để một trưởng môn vừa
+// hết phiên quay lại với công tắc ấy.
+assert(maintenanceViewFor(ON, null) === "banner", "khách chưa đăng nhập phải vào được cửa đăng nhập");
+
+console.log("✔ Cửa bế quan: môn đồ gặp bảng chắn; cả bốn vai và khách chưa đăng nhập vẫn đi qua được.");
 
 // ---- Tên miền game: chuẩn hoá và phòng thân ----------------------------------------------
 

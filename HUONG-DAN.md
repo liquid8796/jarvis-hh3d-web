@@ -113,6 +113,21 @@ Bấm **Hồ Sơ** trên thanh đầu trang để đổi danh xưng hiển thị
 không đổi ở đây. Tài khoản tạo từ bản cũ có thể chưa có email; chỉ cần điền một lần rồi bấm
 **Lưu Hồ Sơ**. Mỗi email chỉ dùng được cho một đạo hiệu.
 
+### Khi tông môn bế quan trùng tu
+
+Lúc trưởng môn khai bảo trì, **mọi trang đều đóng**: đạo hữu thấy một bảng「Tông môn đang bế quan
+trùng tu」kèm đồng hồ đếm ngược, và bảng đó **không tắt được** — không có nút đóng, vì trong lúc
+ấy không trang nào mở. Bảng chỉ có một nút duy nhất là **Xuất Quan**, cho ai muốn đăng xuất.
+
+Không phải làm gì cả và không mất gì cả:
+
+- Đàn đang chạy dở **vẫn hoàn thành nốt vòng** rồi nghỉ — khôi lỗi không bị cắt giữa nhiệm vụ.
+- Mở cửa lại là **mọi đàn tự chạy tiếp**, không cần Khai Đàn lại.
+- Bảng **tự biến mất** ngay khi cửa mở lại, không cần F5. Đạo hữu ở lại đúng trang đang muốn vào.
+
+Trưởng môn và các vai trị sự thì vẫn đi lại được mọi trang trong lúc bảo trì — họ chỉ thấy một
+dải nhắc mỏng trên đầu trang — vì công tắc tắt bảo trì nằm trong trang Tông Môn của họ.
+
 ### Đặt ảnh đại diện
 
 Cũng trong trang **Hồ Sơ**, mục ở trên cùng: bấm **Chọn ảnh**, chọn một tấm PNG, JPEG, WebP

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro, Noto_Serif } from "next/font/google";
+import { MaintenanceGate } from "@/components/MaintenanceGate";
 import "./globals.css";
 
 /**
@@ -28,6 +29,21 @@ const body = Be_Vietnam_Pro({
   variable: "--font-body",
 });
 
+/**
+ * Không trang nào được dựng sẵn lúc build, và từ bản 0.46.0 đó là điều BẮT BUỘC chứ không chỉ
+ * là mô tả thực trạng.
+ *
+ * Layout này giờ đọc cờ bế quan từ database. Trang nào Next dựng sẵn ở build sẽ ĐÓNG BĂNG cờ
+ * ấy vào HTML — build lúc đang bảo trì là trang đó treo bảng bế quan vĩnh viễn, build lúc mở
+ * cửa là nó không bao giờ treo. `/_not-found` chính là trang như thế: nó là trang duy nhất
+ * không tự chạm vào cookie nên nó là trang duy nhất từng được dựng tĩnh.
+ *
+ * Và nó còn giữ một lời hứa cũ: `next build` KHÔNG cần database để biên dịch (xem ghi chú
+ * trong db/client.ts về việc cố ý không tạo client lúc import). Dựng sẵn một trang đi qua
+ * layout này là bắt build phải gọi được Postgres.
+ */
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: {
     default: "Auto HH3D — Linh Đài Tự Động",
@@ -47,7 +63,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             một bầu trời là thứ không cứu được. Chữ vẫn đọc tốt không cần phủ tối lên ảnh —
             header và card tự mang nền mờ của chúng. */}
         <div className="backdrop" aria-hidden />
-        {children}
+        {/* Cửa bế quan đứng Ở ĐÂY để không một trang nào lọt ra ngoài nó — kể cả trang thêm
+            vào sau này, thứ mà một danh sách đường dẫn ở proxy sẽ luôn quên. Nền và chân
+            trang nằm NGOÀI cửa: chúng là cái vỏ, và bảng bế quan cũng cần được đứng trên tấm
+            tranh ấy. Xem components/MaintenanceGate.tsx cho toàn bộ lý lẽ. */}
+        <MaintenanceGate>{children}</MaintenanceGate>
         <footer className="site-footer">© 2026 Nam Cung Bình. All rights reserved.</footer>
       </body>
     </html>

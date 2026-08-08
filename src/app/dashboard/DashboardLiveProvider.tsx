@@ -15,7 +15,6 @@ import type {
   DashboardEvent,
   DashboardJob,
   DashboardLivePayload,
-  DashboardMaintenance,
   DashboardPresence,
 } from "@/lib/realtime/dashboardTypes";
 
@@ -40,7 +39,6 @@ type DashboardAccountLiveValue = {
 const DashboardJobLiveContext = createContext<DashboardJobLiveValue | null>(null);
 const DashboardPresenceLiveContext = createContext<DashboardPresenceLiveValue | null>(null);
 const DashboardAccountLiveContext = createContext<DashboardAccountLiveValue | null>(null);
-const DashboardMaintenanceLiveContext = createContext<DashboardMaintenance | null>(null);
 
 export function useDashboardJobLive(): DashboardJobLiveValue {
   const value = useContext(DashboardJobLiveContext);
@@ -57,13 +55,6 @@ export function useDashboardPresenceLive(): DashboardPresenceLiveValue {
 export function useDashboardAccountLive(): DashboardAccountLiveValue {
   const value = useContext(DashboardAccountLiveContext);
   if (!value) throw new Error("useDashboardAccountLive must be used inside DashboardLiveProvider");
-  return value;
-}
-
-/** Trạng thái bế quan trùng tu — null chỉ khi component đứng ngoài provider. */
-export function useDashboardMaintenanceLive(): DashboardMaintenance {
-  const value = useContext(DashboardMaintenanceLiveContext);
-  if (!value) throw new Error("useDashboardMaintenanceLive must be used inside DashboardLiveProvider");
   return value;
 }
 
@@ -85,29 +76,23 @@ function sameVisiblePresence(left: DashboardPresence | null, right: DashboardPre
  * Một EventSource duy nhất nuôi trạng thái đàn (mỗi tài khoản một dòng), nhật ký, sổ khôi lỗi
  * và danh sách tài khoản. Event ID chính là cursor job_events nên reconnect tiếp tục đúng
  * chỗ; poll một-lần chỉ còn là lưới an toàn.
+ *
+ * Cờ bế quan trùng tu KHÔNG còn đi qua đây. Nó từng là một trường trong payload để popup của
+ * Auto bật lên tức thì, nhưng từ 09/08/2026 bảng bế quan do layout gốc dựng cho MỌI trang —
+ * và trong lúc bế quan thì môn đồ thường không vào được Auto, nên một đường push riêng cho
+ * đúng trang họ không vào được là một đường không còn ai đi. Xem components/Maintenance.tsx.
  */
-const MAINTENANCE_OFF: DashboardMaintenance = {
-  active: false,
-  startedAt: null,
-  expectedEndAt: null,
-  note: "",
-};
-
 export function DashboardLiveProvider({
   children,
   initialAccounts = [],
-  initialMaintenance = MAINTENANCE_OFF,
 }: {
   children: ReactNode;
   initialAccounts?: DashboardAccount[];
-  /** SSR đưa sẵn để người MỚI VÀO thấy popup ngay từ frame đầu, không đợi feed. */
-  initialMaintenance?: DashboardMaintenance;
 }) {
   const [jobs, setJobs] = useState<DashboardJob[]>([]);
   const [events, setEvents] = useState<DashboardEvent[]>([]);
   const [presence, setPresence] = useState<DashboardPresence | null>(null);
   const [accounts, setAccounts] = useState<DashboardAccount[]>(initialAccounts);
-  const [maintenance, setMaintenance] = useState<DashboardMaintenance>(initialMaintenance);
   const [connected, setConnected] = useState(false);
   const cursor = useRef(0);
   const refreshing = useRef(false);
@@ -115,19 +100,6 @@ export function DashboardLiveProvider({
   const applyPayload = useCallback((payload: DashboardLivePayload) => {
     setJobs(payload.jobs);
     setAccounts(payload.accounts);
-    // Vắng mặt ≠ tắt: một frame từ bản deploy cũ (không biết trường này) không được phép
-    // hạ popup mà một frame mới vừa dựng lên.
-    if (payload.maintenance) {
-      setMaintenance((previous) => {
-        const next = payload.maintenance!;
-        return previous.active === next.active &&
-          previous.startedAt === next.startedAt &&
-          previous.expectedEndAt === next.expectedEndAt &&
-          previous.note === next.note
-          ? previous
-          : next;
-      });
-    }
     setPresence((previous) =>
       sameVisiblePresence(previous, payload.presence) ? previous : payload.presence,
     );
@@ -213,9 +185,7 @@ export function DashboardLiveProvider({
     <DashboardJobLiveContext.Provider value={jobValue}>
       <DashboardPresenceLiveContext.Provider value={presenceValue}>
         <DashboardAccountLiveContext.Provider value={accountValue}>
-          <DashboardMaintenanceLiveContext.Provider value={maintenance}>
-            {children}
-          </DashboardMaintenanceLiveContext.Provider>
+          {children}
         </DashboardAccountLiveContext.Provider>
       </DashboardPresenceLiveContext.Provider>
     </DashboardJobLiveContext.Provider>

@@ -38,9 +38,6 @@ function visibleSignature(payload: DashboardLivePayload): string {
   return JSON.stringify({
     jobs: payload.jobs,
     accounts: payload.accounts,
-    // Thiếu dòng này thì gạt công tắc bảo trì không đẩy frame nào — popup chỉ hiện khi có
-    // một job tình cờ đổi trạng thái, tức là đúng lúc hàng chờ lặng gió thì nó câm.
-    maintenance: payload.maintenance,
     presence: {
       sectOnline: payload.presence.sectOnline,
       mine: payload.presence.mine.map((worker) => ({

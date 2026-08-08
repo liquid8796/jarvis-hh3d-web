@@ -41,6 +41,28 @@ const luyenDanQuest = z
   })
   .prefault({});
 
+/**
+ * Làm sạch một lời nhắn chat trước khi nó rời tầng config.
+ *
+ * Đích đến của chuỗi này là một LITERAL trong nguồn bước `evaluateJavaScript` của hồ sơ
+ * (engine thay `{{chatLobby}}` bằng phép thay chuỗi trần — xem resolveForExecution), nên
+ * nháy đơn, nháy kép, backslash, backtick hay ký tự điều khiển đều là đường thoát khỏi
+ * literal ấy: nhẹ thì vỡ script và mất lời nhắn, nặng thì lời nhắn TRỞ THÀNH script. Loại
+ * tại biên — một nơi, cả hai chiều đọc/ghi — thay vì escape rải rác ở từng chỗ dùng.
+ *
+ * Trần 200 ký tự là `maxlength` của chính ô #mc-chat-input trên site.
+ */
+export function sanitizeChatMessage(raw: string): string {
+  return raw
+    .replace(/["'`\\\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 200);
+}
+
+/** Một lời nhắn đã qua làm sạch; 1000 là trần chống phình trước khi cắt còn 200. */
+const chatMessage = z.string().max(1000).default("").transform(sanitizeChatMessage);
+
 export const configSchema = z.object({
   /**
    * Cookie đăng nhập của TÀI KHOẢN mà lượt chạy phục vụ.
@@ -96,6 +118,14 @@ export const configSchema = z.object({
           kickIdleSec: z.number().int().min(0).max(3600).default(0),
           /** Stop when the daily huyền tinh cap is reached. */
           capCheck: z.boolean().default(true),
+          /**
+           * Lời nhắn tự động vào Trò Chuyện Đội (recording 08/08): một câu lúc mở phòng,
+           * một câu khi trận mở màn. Rỗng = không nhắn. Đi qua `sanitizeChatMessage` vì
+           * đích đến của chuỗi này là MỘT LITERAL trong nguồn bước evaluateJavaScript —
+           * xem chú thích của hàm ấy.
+           */
+          chatLobby: chatMessage,
+          chatFight: chatMessage,
         })
         .prefault({}),
       /**

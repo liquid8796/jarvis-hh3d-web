@@ -126,6 +126,11 @@ export function profileForConfig(config, log) {
       // Ngưỡng "chưa sẵn sàng sau N giây" — cùng luật tự-nhập như kickHp.
       setOption(meCung, "kickIdle", String(mc.kickIdleSec ?? 0), { allowFreeform: true, log });
 
+      // Hai lời nhắn Trò Chuyện Đội (recording 08/08) — chuỗi tự do đã được configs.ts làm
+      // sạch (sanitizeChatMessage) trước khi tới đây; rỗng là「không nhắn」và hợp lệ.
+      setOption(meCung, "chatLobby", mc.chatLobby ?? "", { allowFreeform: true, log });
+      setOption(meCung, "chatFight", mc.chatFight ?? "", { allowFreeform: true, log });
+
       // capCheck là một cái công tắc trên web, còn trong hồ sơ nó là hai chuỗi khác nhau mà
       // bước `stopIf` đem so với trang.
       const capOption = findOption(meCung, "capCheck");

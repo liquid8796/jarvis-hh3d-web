@@ -504,6 +504,40 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
             </p>
           </div>
 
+          <div>
+            <label className="label" htmlFor="meCungChatLobby">
+              Lời nhắn khi mở phòng
+            </label>
+            <input
+              id="meCungChatLobby"
+              name="meCungChatLobby"
+              type="text"
+              maxLength={200}
+              className="input"
+              defaultValue={config.quests.meCung.chatLobby}
+              placeholder="để trống = không nhắn"
+            />
+          </div>
+
+          <div>
+            <label className="label" htmlFor="meCungChatFight">
+              Lời nhắn khi vào trận
+            </label>
+            <input
+              id="meCungChatFight"
+              name="meCungChatFight"
+              type="text"
+              maxLength={200}
+              className="input"
+              defaultValue={config.quests.meCung.chatFight}
+              placeholder="để trống = không nhắn"
+            />
+            <p className="mt-1 text-xs text-[var(--color-mist)]">
+              Nhắn vào Trò Chuyện Đội của phòng — mỗi lượt ghé gửi một lần lúc mở phòng và một
+              lần khi trận đầu mở màn, để đồng đội biết đây là auto.
+            </p>
+          </div>
+
           <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--color-parchment)] sm:col-span-2">
             {/* CỐ Ý không dùng `disabled`. Một ô bị khoá cứng nuốt luôn cú bấm: không có
                 sự kiện nào để mà cảnh báo, và người dùng chỉ thấy một ô không nhúc nhích.

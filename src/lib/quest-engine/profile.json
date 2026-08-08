@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 50,
+  "schemaVersion": 51,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -2006,6 +2006,13 @@
           "optional": true
         },
         {
+          "action": "evaluateJavaScript",
+          "script": "() =\u003E { const msg = \u0027{{chatLobby}}\u0027.trim(); if (!msg) return \u0027\u0027; const input = document.querySelector(\u0027#mc-chat-input\u0027); if (!input || typeof window.sendChatMsg !== \u0027function\u0027) return \u0027chat: widget Tr\u00F2 Chuy\u1EC7n \u0110\u1ED9i ch\u01B0a s\u1EB5n s\u00E0ng \u2014 b\u1ECF qua l\u1EDDi nh\u1EAFn s\u1EA3nh\u0027; const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, \u0027value\u0027).set; set.call(input, msg); input.dispatchEvent(new Event(\u0027input\u0027, { bubbles: true })); window.sendChatMsg(); return \u0027!\u0110\u00E3 nh\u1EAFn v\u00E0o Tr\u00F2 Chuy\u1EC7n \u0110\u1ED9i:\u300C\u0027 \u002B msg \u002B \u0027\u300D\u0027; }",
+          "timeoutMs": 4000,
+          "note": "l\u1EDDi nh\u1EAFn v\u00E0o Tr\u00F2 Chuy\u1EC7n \u0110\u1ED9i ngay sau khi m\u1EDF ph\u00F2ng \u2014 recording 08/08: chat d\u00F9ng \u0111\u01B0\u1EE3c t\u1EEB s\u1EA3nh ch\u1EDD. Kh\u00F4ng m\u1EDF panel: #mc-chat-input n\u1EB1m s\u1EB5n trong DOM v\u00E0 sendChatMsg() l\u00E0 h\u00E0m to\u00E0n c\u1EE5c c\u1EE7a site, n\u00EAn \u0111\u1EB7t gi\u00E1 tr\u1ECB r\u1ED3i g\u1ECDi th\u1EB3ng \u2014 kh\u00F4ng c\u00F3 m\u00E0n m\u1EDF/\u0111\u00F3ng panel n\u00E0o \u0111\u1EC3 h\u1ECFng. R\u1ED7ng = \u0111\u1EA1o h\u1EEFu kh\u00F4ng c\u1EA5u h\u00ECnh, im l\u1EB7ng \u0111i ti\u1EBFp.",
+          "optional": true
+        },
+        {
           "action": "repeat",
           "timeoutMs": 15000,
           "note": "m\u1ED7i v\u00F2ng l\u00E0 m\u1ED9t l\u01B0\u1EE3t ch\u1EA1y 5 \u1EA3i; d\u1EEBng khi \u0022385/385\u0022 ho\u1EB7c h\u1EBFt tr\u1EA7n 6 v\u00F2ng / 35 ph\u00FAt. Sau m\u1ED7i l\u01B0\u1EE3t (th\u1EAFng hay b\u1EA1i) site t\u1EF1 reload v\u1EC1 ph\u00F2ng, c\u1EA3 \u0111\u1ED9i v\u1EABn \u1EDF nguy\u00EAn \u0111\u00F3 (b\u1EA3n ghi 20:10).",
@@ -2170,6 +2177,13 @@
               }
             },
             {
+              "action": "evaluateJavaScript",
+              "script": "() =\u003E { const msg = \u0027{{chatFight}}\u0027.trim(); if (!msg) return \u0027\u0027; if (window.__jvzChatFightSent) return \u0027\u0027; const input = document.querySelector(\u0027#mc-chat-input\u0027); if (!input || typeof window.sendChatMsg !== \u0027function\u0027) return \u0027chat: widget Tr\u00F2 Chuy\u1EC7n \u0110\u1ED9i ch\u01B0a s\u1EB5n s\u00E0ng \u2014 s\u1EBD th\u1EED l\u1EA1i \u1EDF tr\u1EADn sau\u0027; const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, \u0027value\u0027).set; set.call(input, msg); input.dispatchEvent(new Event(\u0027input\u0027, { bubbles: true })); window.sendChatMsg(); window.__jvzChatFightSent = true; return \u0027!\u0110\u00E3 nh\u1EAFn v\u00E0o Tr\u00F2 Chuy\u1EC7n \u0110\u1ED9i:\u300C\u0027 \u002B msg \u002B \u0027\u300D\u0027; }",
+              "timeoutMs": 4000,
+              "note": "l\u1EDDi nh\u1EAFn v\u00E0o Tr\u00F2 Chuy\u1EC7n \u0110\u1ED9i khi tr\u1EADn \u0111\u00E3 m\u1EDF m\u00E0n \u2014 recording 08/08 g\u1EEDi \u0111\u00FAng M\u1ED8T l\u1EA7n cho c\u1EA3 l\u01B0\u1EE3t gh\u00E9 ch\u1EE9 kh\u00F4ng ph\u1EA3i m\u1ED7i tr\u1EADn m\u1ED9t c\u00E2u, n\u00EAn c\u1EDD __jvzChatFightSent ch\u1EB7n c\u00E1c v\u00F2ng sau; navigate c\u1EE7a l\u01B0\u1EE3t gh\u00E9 k\u1EBF l\u00E0m trang n\u1EA1p m\u1EDBi v\u00E0 c\u1EDD t\u1EF1 s\u1EA1ch. Widget ch\u01B0a s\u1EB5n s\u00E0ng th\u00EC KH\u00D4NG \u0111\u1EB7t c\u1EDD \u2014 tr\u1EADn sau c\u00F2n \u0111\u01B0\u1EE3c th\u1EED l\u1EA1i.",
+              "optional": true
+            },
+            {
               "action": "repeat",
               "timeoutMs": 15000,
               "note": "l\u00E1i m\u1ED9t l\u01B0\u1EE3t \u0111\u00E1nh: b\u1EA5m h\u1ED9 \u0022\u0110\u1EBFn \u1EA3i k\u1EBF ti\u1EBFp\u0022 khi c\u1EA7n, ch\u1EDD v\u1EC1 ph\u00F2ng",
@@ -2321,6 +2335,30 @@
           ],
           "allowCustom": true,
           "selectedValue": "0"
+        },
+        {
+          "key": "chatLobby",
+          "label": "L\u1EDDi nh\u1EAFn khi m\u1EDF ph\u00F2ng",
+          "choices": [
+            {
+              "value": "",
+              "label": "\u00ABkh\u00F4ng nh\u1EAFn\u00BB"
+            }
+          ],
+          "allowCustom": true,
+          "selectedValue": ""
+        },
+        {
+          "key": "chatFight",
+          "label": "L\u1EDDi nh\u1EAFn khi v\u00E0o tr\u1EADn",
+          "choices": [
+            {
+              "value": "",
+              "label": "\u00ABkh\u00F4ng nh\u1EAFn\u00BB"
+            }
+          ],
+          "allowCustom": true,
+          "selectedValue": ""
         }
       ],
       "fallbackCooldownSeconds": 3600,
@@ -2945,6 +2983,13 @@
           "optional": true
         },
         {
+          "action": "evaluateJavaScript",
+          "script": "() =\u003E { const msg = \u0027{{chatLobby}}\u0027.trim(); if (!msg) return \u0027\u0027; const input = document.querySelector(\u0027#mc-chat-input\u0027); if (!input || typeof window.sendChatMsg !== \u0027function\u0027) return \u0027chat: widget Tr\u00F2 Chuy\u1EC7n \u0110\u1ED9i ch\u01B0a s\u1EB5n s\u00E0ng \u2014 b\u1ECF qua l\u1EDDi nh\u1EAFn s\u1EA3nh\u0027; const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, \u0027value\u0027).set; set.call(input, msg); input.dispatchEvent(new Event(\u0027input\u0027, { bubbles: true })); window.sendChatMsg(); return \u0027!\u0110\u00E3 nh\u1EAFn v\u00E0o Tr\u00F2 Chuy\u1EC7n \u0110\u1ED9i:\u300C\u0027 \u002B msg \u002B \u0027\u300D\u0027; }",
+          "timeoutMs": 4000,
+          "note": "l\u1EDDi nh\u1EAFn v\u00E0o Tr\u00F2 Chuy\u1EC7n \u0110\u1ED9i ngay sau khi m\u1EDF ph\u00F2ng \u2014 recording 08/08: chat d\u00F9ng \u0111\u01B0\u1EE3c t\u1EEB s\u1EA3nh ch\u1EDD. Kh\u00F4ng m\u1EDF panel: #mc-chat-input n\u1EB1m s\u1EB5n trong DOM v\u00E0 sendChatMsg() l\u00E0 h\u00E0m to\u00E0n c\u1EE5c c\u1EE7a site, n\u00EAn \u0111\u1EB7t gi\u00E1 tr\u1ECB r\u1ED3i g\u1ECDi th\u1EB3ng \u2014 kh\u00F4ng c\u00F3 m\u00E0n m\u1EDF/\u0111\u00F3ng panel n\u00E0o \u0111\u1EC3 h\u1ECFng. R\u1ED7ng = \u0111\u1EA1o h\u1EEFu kh\u00F4ng c\u1EA5u h\u00ECnh, im l\u1EB7ng \u0111i ti\u1EBFp.",
+          "optional": true
+        },
+        {
           "action": "repeat",
           "timeoutMs": 15000,
           "note": "m\u1ED7i v\u00F2ng l\u00E0 m\u1ED9t l\u01B0\u1EE3t ch\u1EA1y 5 \u1EA3i; d\u1EEBng khi \u0022385/385\u0022 ho\u1EB7c h\u1EBFt tr\u1EA7n 6 v\u00F2ng / 35 ph\u00FAt. Sau m\u1ED7i l\u01B0\u1EE3t (th\u1EAFng hay b\u1EA1i) site t\u1EF1 reload v\u1EC1 ph\u00F2ng, c\u1EA3 \u0111\u1ED9i v\u1EABn \u1EDF nguy\u00EAn \u0111\u00F3 (b\u1EA3n ghi 20:10).",
@@ -3109,6 +3154,13 @@
               }
             },
             {
+              "action": "evaluateJavaScript",
+              "script": "() =\u003E { const msg = \u0027{{chatFight}}\u0027.trim(); if (!msg) return \u0027\u0027; if (window.__jvzChatFightSent) return \u0027\u0027; const input = document.querySelector(\u0027#mc-chat-input\u0027); if (!input || typeof window.sendChatMsg !== \u0027function\u0027) return \u0027chat: widget Tr\u00F2 Chuy\u1EC7n \u0110\u1ED9i ch\u01B0a s\u1EB5n s\u00E0ng \u2014 s\u1EBD th\u1EED l\u1EA1i \u1EDF tr\u1EADn sau\u0027; const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, \u0027value\u0027).set; set.call(input, msg); input.dispatchEvent(new Event(\u0027input\u0027, { bubbles: true })); window.sendChatMsg(); window.__jvzChatFightSent = true; return \u0027!\u0110\u00E3 nh\u1EAFn v\u00E0o Tr\u00F2 Chuy\u1EC7n \u0110\u1ED9i:\u300C\u0027 \u002B msg \u002B \u0027\u300D\u0027; }",
+              "timeoutMs": 4000,
+              "note": "l\u1EDDi nh\u1EAFn v\u00E0o Tr\u00F2 Chuy\u1EC7n \u0110\u1ED9i khi tr\u1EADn \u0111\u00E3 m\u1EDF m\u00E0n \u2014 recording 08/08 g\u1EEDi \u0111\u00FAng M\u1ED8T l\u1EA7n cho c\u1EA3 l\u01B0\u1EE3t gh\u00E9 ch\u1EE9 kh\u00F4ng ph\u1EA3i m\u1ED7i tr\u1EADn m\u1ED9t c\u00E2u, n\u00EAn c\u1EDD __jvzChatFightSent ch\u1EB7n c\u00E1c v\u00F2ng sau; navigate c\u1EE7a l\u01B0\u1EE3t gh\u00E9 k\u1EBF l\u00E0m trang n\u1EA1p m\u1EDBi v\u00E0 c\u1EDD t\u1EF1 s\u1EA1ch. Widget ch\u01B0a s\u1EB5n s\u00E0ng th\u00EC KH\u00D4NG \u0111\u1EB7t c\u1EDD \u2014 tr\u1EADn sau c\u00F2n \u0111\u01B0\u1EE3c th\u1EED l\u1EA1i.",
+              "optional": true
+            },
+            {
               "action": "repeat",
               "timeoutMs": 15000,
               "note": "l\u00E1i m\u1ED9t l\u01B0\u1EE3t \u0111\u00E1nh: b\u1EA5m h\u1ED9 \u0022\u0110\u1EBFn \u1EA3i k\u1EBF ti\u1EBFp\u0022 khi c\u1EA7n, ch\u1EDD v\u1EC1 ph\u00F2ng",
@@ -3260,6 +3312,30 @@
           ],
           "allowCustom": true,
           "selectedValue": "0"
+        },
+        {
+          "key": "chatLobby",
+          "label": "L\u1EDDi nh\u1EAFn khi m\u1EDF ph\u00F2ng",
+          "choices": [
+            {
+              "value": "",
+              "label": "\u00ABkh\u00F4ng nh\u1EAFn\u00BB"
+            }
+          ],
+          "allowCustom": true,
+          "selectedValue": ""
+        },
+        {
+          "key": "chatFight",
+          "label": "L\u1EDDi nh\u1EAFn khi v\u00E0o tr\u1EADn",
+          "choices": [
+            {
+              "value": "",
+              "label": "\u00ABkh\u00F4ng nh\u1EAFn\u00BB"
+            }
+          ],
+          "allowCustom": true,
+          "selectedValue": ""
         }
       ],
       "fallbackCooldownSeconds": 3600,

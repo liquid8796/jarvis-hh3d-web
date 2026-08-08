@@ -699,6 +699,45 @@ async function main() {
   check("và việc đó được kể lại", notes.some((n) => n.includes("250000")), notes.join(" / "));
   check("capCheck=false → nhánh «không kiểm tra»", opt(meCung, "capCheck").selectedValue.includes("«"));
   check("tier → Cực Phẩm", opt(luyenDan, "tier").selectedValue === "Cực Phẩm");
+
+  // Lời nhắn Trò Chuyện Đội (recording 08/08): chuỗi phải qua sanitizeChatMessage rồi tới
+  // ĐỦ CẢ HAI twin — đích đến của nó là một literal trong nguồn evaluateJavaScript, nên
+  // nháy/backslash sống sót ở đây là script chết ở ngoài kia.
+  {
+    const { configSchema } = await import("../src/lib/services/configs.ts");
+    const parsed = configSchema.parse({
+      quests: {
+        meCung: {
+          enabled: true,
+          chatLobby: '  xin "chào"   \'đội\' `nhé`\\',
+          chatFight: "x".repeat(500),
+        },
+      },
+    });
+    check(
+      "lời nhắn được LÀM SẠCH ngay ở schema: nháy đơn/kép/backtick/backslash biến mất",
+      parsed.quests.meCung.chatLobby === "xin chào đội nhé",
+      JSON.stringify(parsed.quests.meCung.chatLobby),
+    );
+    check(
+      "và bị cắt ở trần 200 ký tự của chính ô nhập trên site",
+      parsed.quests.meCung.chatFight.length === 200,
+      String(parsed.quests.meCung.chatFight.length),
+    );
+
+    const chatProfile = profileForConfig(parsed);
+    const twins = chatProfile.quests.filter((q) => q.name === "Mê Cung");
+    check(
+      "cả HAI twin Mê Cung cùng nhận lời nhắn — công tắc và option áp cho cả cặp",
+      twins.length === 2 &&
+        twins.every(
+          (q) =>
+            opt(q, "chatLobby").selectedValue === "xin chào đội nhé" &&
+            opt(q, "chatFight").selectedValue.length === 200,
+        ),
+      twins.map((q) => opt(q, "chatLobby").selectedValue).join(" / "),
+    );
+  }
   // Hồ sơ 42 mang thang phân giải đã bỏ nấc 5★ (đan chỉ rơi 1–4★, desktop 1.35.0): "giữ từ
   // 4 sao" giờ là block-list một mục. keepLevelOf đọc số sao NHỎ NHẤT trong giá trị nên tự
   // thích nghi — ca này ghim đúng điều đó.
@@ -1188,8 +1227,10 @@ async function main() {
   );
   const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
   check(
-    "hồ sơ đang ở schema 50",
-    loadProfileForSchema().schemaVersion === 50,
+    // 51 = chat Mê Cung (recording 08/08). Bump schema là thay hồ sơ đã lưu bên desktop
+    // ngay lần mở đầu tiên — chốt này bắt mỗi cú bump phải là một quyết định có chủ ý.
+    "hồ sơ đang ở schema 51",
+    loadProfileForSchema().schemaVersion === 51,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1287,6 +1328,22 @@ async function main() {
     "<body><div>Đang tải…</div></body>";
 
   /**
+   * Trang giả widget Trò Chuyện Đội của Mê Cung — đúng hai mảnh mà bước chat đụng tới:
+   * ô #mc-chat-input và hàm toàn cục sendChatMsg() (site gắn nó vào nút gửi qua onclick).
+   * Fixture ghi lại mọi lần gửi vào window.__sent để phép thử đọc.
+   */
+  const MC_CHAT_PAGE =
+    '<!doctype html><html lang="vi"><meta charset="utf-8"><body><div id="wpadminbar"></div>' +
+    '<div id="mc-chat-widget"><input id="mc-chat-input" type="text" maxlength="200"></div>' +
+    "<script>window.__sent = []; window.sendChatMsg = () => { const el = document.getElementById('mc-chat-input'); if (el.value) { window.__sent.push(el.value); el.value = ''; } };</script>" +
+    "</body>";
+
+  /** Cùng trang nhưng widget VẮNG MẶT — phòng chat có thể chưa dựng khi bước chat tới lượt. */
+  const MC_CHAT_CUT_PAGE =
+    '<!doctype html><html lang="vi"><meta charset="utf-8"><body><div id="wpadminbar"></div>' +
+    "<div>không có widget</div></body>";
+
+  /**
    * Trang "chậm dựng": `#late-mark` chỉ xuất hiện từ lượt ghé thứ `flakyAppearsOnVisit`.
    *
    * `flakyVisits` là nhân chứng quan trọng nhất của cả nhóm ca dưới: nó đếm số lần trang
@@ -1368,6 +1425,8 @@ async function main() {
     const url = new URL(req.url ?? "/", "http://fixture.test");
     const path = url.pathname.replace(/\/$/, "") || "/";
     if (siteMute) return void res.end(MUTE_PAGE);
+    if (path === "/mc-chat") return void res.end(MC_CHAT_PAGE);
+    if (path === "/mc-chat-cut") return void res.end(MC_CHAT_CUT_PAGE);
     if (path === "/flaky") {
       flakyVisits += 1;
       return void res.end(flakyPage(flakyVisits >= flakyAppearsOnVisit));
@@ -2036,6 +2095,75 @@ async function main() {
         "waitForCondition trượt → KHÔNG chạy lại (hàng rào cho bằng chứng đòn đánh Hoang Vực)",
         conditionMiss.outcome === "failed" && flakyVisits === 1,
         `${conditionMiss.outcome}, số lượt tải trang = ${flakyVisits}`,
+      );
+    }
+
+    console.log("\nLời nhắn Trò Chuyện Đội của Mê Cung (recording 08/08)");
+
+    // Chạy ĐÚNG các bước chat trong hồ sơ thật (không chép lại script vào test — chép là
+    // hai bản sẽ lệch nhau ngày ai đó sửa một bên) trên fixture giả widget mc-chat.
+    {
+      const mc = loadProfileForSchema().quests.find((q) => q.id === "me-cung");
+      const lobbyStep = mc.steps.find((s) => s.script?.includes("{{chatLobby}}"));
+      const fightStep = mc.steps
+        .find((s) => s.action === "repeat")
+        .steps.find((s) => s.script?.includes("{{chatFight}}"));
+      check(
+        "hồ sơ có đủ hai bước chat, cả hai đều optional — lỡ hụt không được phép hỏng cả lượt Mê Cung",
+        Boolean(lobbyStep) && Boolean(fightStep) && lobbyStep.optional === true && fightStep.optional === true,
+        JSON.stringify({ lobby: Boolean(lobbyStep), fight: Boolean(fightStep) }),
+      );
+
+      const chatQuest = (steps, message) =>
+        questOf(
+          [{ action: "navigate", text: "/mc-chat", timeoutMs: 5000 }, ...steps],
+          [
+            { key: "chatLobby", label: "t", choices: [], allowCustom: true, selectedValue: message },
+            { key: "chatFight", label: "t", choices: [], allowCustom: true, selectedValue: message },
+          ],
+        );
+      const sentInPage = () => session.evaluate("() => window.__sent");
+
+      // --- Có lời nhắn → sendChatMsg của site nhận đúng chuỗi ---
+      const lobbySent = await run(chatQuest([lobbyStep], "đang tuyển người, auto đây"));
+      check(
+        "lời nhắn sảnh tới tay sendChatMsg nguyên vẹn",
+        lobbySent.outcome === "completed" &&
+          JSON.stringify(await sentInPage()) === JSON.stringify(["đang tuyển người, auto đây"]),
+        `${lobbySent.outcome}, __sent=${JSON.stringify(await sentInPage())}`,
+      );
+
+      // --- Lời nhắn rỗng → im lặng đi tiếp, không gửi gì ---
+      const lobbyEmpty = await run(chatQuest([lobbyStep], ""));
+      check(
+        "lời nhắn rỗng → không gửi gì, nhiệm vụ vẫn thuận",
+        lobbyEmpty.outcome === "completed" && (await sentInPage()).length === 0,
+        `${lobbyEmpty.outcome}, __sent=${JSON.stringify(await sentInPage())}`,
+      );
+
+      // --- Trận: gửi đúng MỘT lần cho cả lượt ghé, dù bước chạy lại mỗi trận ---
+      const fightTwice = await run(chatQuest([fightStep, fightStep, fightStep], "đang đánh boss"));
+      check(
+        "bước chat trận chạy 3 lần trong một lượt ghé → chỉ gửi MỘT tin (đúng recording)",
+        fightTwice.outcome === "completed" &&
+          JSON.stringify(await sentInPage()) === JSON.stringify(["đang đánh boss"]),
+        `${fightTwice.outcome}, __sent=${JSON.stringify(await sentInPage())}`,
+      );
+
+      // --- Widget vắng mặt (phòng chat chưa dựng) → bước optional, lượt vẫn thuận ---
+      const noWidget = await run(
+        questOf(
+          [{ action: "navigate", text: "/mc-chat-cut", timeoutMs: 5000 }, lobbyStep, fightStep],
+          [
+            { key: "chatLobby", label: "t", choices: [], allowCustom: true, selectedValue: "xin chào" },
+            { key: "chatFight", label: "t", choices: [], allowCustom: true, selectedValue: "xin chào" },
+          ],
+        ),
+      );
+      check(
+        "widget vắng mặt → cả hai bước chat lặng lẽ bỏ qua, không hỏng nhiệm vụ",
+        noWidget.outcome === "completed",
+        noWidget.outcome,
       );
     }
 

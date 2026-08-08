@@ -103,6 +103,9 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
         kickHp: Number(formData.get("meCungKickHp") ?? 0) || 0,
         kickIdleSec: Number(formData.get("meCungKickIdle") ?? 0) || 0,
         capCheck: formData.get("meCungCapCheck") === "on",
+        // Hai lời nhắn đi qua sanitizeChatMessage của schema — form không phải tự làm sạch.
+        chatLobby: String(formData.get("meCungChatLobby") ?? ""),
+        chatFight: String(formData.get("meCungChatFight") ?? ""),
       },
       // Hai bản Luyện Đan Đường — tab VIP và tab Thường là hai bộ field RIÊNG trên form
       // (tiền tố luyenDan / luyenDanThuong). Trước đây chỉ có một bộ dùng chung, và khắc

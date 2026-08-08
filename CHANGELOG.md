@@ -11,6 +11,34 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.39.0 — Mê Cung biết nhắn vào Trò Chuyện Đội (schema 51)
+
+- **Hai lời nhắn cấu hình được cho Mê Cung**, đọc từ recording 08/08 (`me-cung-20260808-104700`,
+  kèm ghi chú của tông chủ ngay trong video:「cần thêm config send/chat」): một câu lúc mở
+  phòng, một câu khi trận mở màn. Rỗng = không nhắn. Áp cho cả hai twin.
+- **Không có màn mở/đóng panel nào để hỏng.** Recording cho thấy người thật phải bấm nút
+  tròn mở「Trò Chuyện Đội」rồi gõ — nhưng DOM cho thấy `#mc-chat-input` nằm sẵn trong trang
+  dù panel đóng, và `sendChatMsg()` là hàm toàn cục của chính site (onclick của nút gửi).
+  Automation đặt giá trị bằng native setter + sự kiện `input`, rồi gọi thẳng hàm ấy.
+- **Trận chỉ nhắn MỘT lần cho cả lượt ghé** — đúng như recording, không phải mỗi trận một
+  câu: cờ `window.__jvzChatFightSent` chặn các vòng sau, và navigate của lượt ghé kế nạp
+  trang mới nên cờ tự sạch. Widget chưa sẵn sàng thì KHÔNG đặt cờ — trận sau còn được thử.
+  Cả hai bước đều `optional`: chat là phụ trợ, lỡ hụt không được phép hỏng lượt Mê Cung.
+- **`sanitizeChatMessage` ở biên config, và nó không phải trang trí.** Lời nhắn được nhúng
+  vào MỘT LITERAL trong nguồn bước `evaluateJavaScript` bằng phép thay chuỗi trần, nên nháy
+  đơn/kép, backslash, backtick, ký tự điều khiển đều là đường thoát khỏi literal — nhẹ thì
+  vỡ script mất lời nhắn, nặng thì lời nhắn TRỞ THÀNH script. Loại tại một nơi thay vì
+  escape rải rác; trần 200 ký tự đúng `maxlength` của ô nhập trên site.
+- **Hồ sơ bump schema 50 → 51**; đồng bộ với desktop 1.50.0 (bên đó hồ sơ đã lưu bị thay ở
+  lần mở đầu tiên — cần bật lại nhiệm vụ và chọn lại tuỳ chọn).
+- **Smoke 216 → 224.** Sanitize được ghim (nháy các loại biến mất, cắt đúng 200), cả hai
+  twin cùng nhận lời nhắn, và bốn ca chạy THẬT trên fixture giả widget — chạy đúng bước
+  trong hồ sơ chứ không chép script vào test (chép là hai bản lệch nhau ngày ai đó sửa một
+  bên): gửi nguyên vẹn tới `sendChatMsg`; rỗng thì im lặng; bước trận chạy 3 lần chỉ gửi 1
+  tin; widget vắng mặt thì lặng lẽ bỏ qua, lượt vẫn thuận.
+
+---
+
 ## 0.38.0 — Hàng Đợi nói rõ người khác đang làm nhiệm vụ nào
 
 - **Tên nhiệm vụ đang chạy giờ hiện trên MỌI dòng của Hàng Đợi Công Việc**, không riêng dòng

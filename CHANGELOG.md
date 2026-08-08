@@ -11,6 +11,15 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.41.1 —「Nghị Sự Đường」đổi tên thành「Phòng Chat」
+
+- **Đổi ở MỌI chỗ hiển thị, không chỉ nút được chỉ**: thanh điều hướng, tiêu đề tab trình
+  duyệt (`metadata.title`), tiêu đề trang, và mục cấu hình bên Tông Môn. Đổi mỗi cái nút thì
+  bấm「Phòng Chat」lại rơi vào một trang đề「Nghị Sự Đường」— nửa vời còn khó hiểu hơn tên cũ.
+- Hai tài liệu người dùng đọc ([HUONG-DAN.md](HUONG-DAN.md), [deploy/mongodb.md](deploy/mongodb.md))
+  đổi theo. CHANGELOG thì **không** — các mục cũ là lịch sử, và 0.25.1 kể đúng chuyện sảnh này
+  từng mang tên「Tụ Nghĩa Sảnh」; sửa lại thành tên hôm nay là bôi xoá chính cái vết ấy.
+
 ## 0.41.0 — file đính kèm dọn nhà sang OCI Object Storage
 
 - **Kho media chuyển từ Vercel Blob sang OCI Object Storage** (bucket `jarvis-media`,

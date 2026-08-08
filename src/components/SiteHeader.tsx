@@ -70,7 +70,7 @@ export async function SiteHeader() {
                   Hàng Đợi
                 </Link>
                 <Link href="/chat" className="btn btn-ghost">
-                  Nghị Sự Đường
+                  Phòng Chat
                 </Link>
               </>
             )}

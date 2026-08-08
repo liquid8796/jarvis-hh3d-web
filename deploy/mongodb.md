@@ -1,6 +1,6 @@
 # Kho đàm đạo — MongoDB trên Vercel
 
-Sảnh **Nghị Sự Đường** lưu tin ở MongoDB. Trang này là cách dựng kho và nối nó vào project.
+Sảnh **Phòng Chat** lưu tin ở MongoDB. Trang này là cách dựng kho và nối nó vào project.
 
 > Chưa có kho thì web **không hỏng**: sảnh treo biển「Tàng thư đàm đạo chưa khai mở」, mọi
 > phần khác của Linh Đài chạy bình thường. Nên bước này làm lúc nào cũng được.
@@ -31,7 +31,7 @@ lần là kho được nối:
 npx vercel --prod
 ```
 
-Vào **Nghị Sự Đường**: biển「chưa khai mở」biến mất, gõ thử một câu là xong.
+Vào **Phòng Chat**: biển「chưa khai mở」biến mất, gõ thử một câu là xong.
 
 ---
 

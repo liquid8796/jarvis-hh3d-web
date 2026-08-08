@@ -14,7 +14,7 @@ export function ChatSettingsForm({ retentionDays }: { retentionDays: number }) {
     <form action={action} className="card card-hairline max-w-xl p-6">
       {/* `mb-5` chứ không `mb-2`: dòng dẫn nhập bên dưới tiêu đề đã bỏ, nên chính tiêu đề
           phải gánh khoảng thở trước ô nhập đầu tiên. */}
-      <h2 className="h-display mb-5 text-lg font-semibold text-gilded">Nghị Sự Đường</h2>
+      <h2 className="h-display mb-5 text-lg font-semibold text-gilded">Phòng Chat</h2>
 
       <label className="label" htmlFor="retentionDays">
         Tin nhắn sống bao nhiêu ngày

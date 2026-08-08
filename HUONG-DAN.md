@@ -197,4 +197,4 @@ bạn không phải bấm gì cả.
 
 ---
 
-Có gì lạ thì nhắn trong **Nghị Sự Đường** — kèm ảnh chụp nhật ký thì dễ xem giúp hơn.
+Có gì lạ thì nhắn trong **Phòng Chat** — kèm ảnh chụp nhật ký thì dễ xem giúp hơn.

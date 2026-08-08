@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * Nghị Sự Đường — client của sảnh đàm đạo.
+ * Phòng Chat — client của sảnh đàm đạo.
  *
  * Realtime bằng POLLING, và đó là lựa chọn có chủ ý: mỗi nhịp ~2.5s client xin lại NGUYÊN
  * TRANG tin mới nhất rồi hoà vào kho theo id. Xin nguyên trang thay vì chỉ "tin sau mốc X"
@@ -315,7 +315,7 @@ export function ChatRoom({ me }: { me: { id: string; name: string; isAdmin: bool
     >
       <header className="chat-head">
         <div>
-          <h1 className="h-display text-lg font-semibold text-gilded">Nghị Sự Đường</h1>
+          <h1 className="h-display text-lg font-semibold text-gilded">Phòng Chat</h1>
           <p className="text-xs text-[var(--color-mist)]">
             Sảnh đàm đạo chung — mọi môn đồ đã nhập môn đều nghe thấy nhau.
           </p>

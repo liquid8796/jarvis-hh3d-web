@@ -11,6 +11,28 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.47.1 — Vấn Đáp: đáp án trang viết ngắn hơn danh sách vẫn phải khớp
+
+- **Bài vấn đáp của tài khoản VIP chết đứng ở mọi lượt** suốt hơn một giờ ngày 09/08/2026.
+  Trang bày「Tất cả đáp án」, danh sách tham khảo ghi「Tất cả đáp án trên (ĐCT, VĐCK, ĐPTK)」;
+  bỏ ghi chú trong ngoặc xong vẫn thừa đúng chữ「trên」, nên phép so khớp-tuyệt-đối trượt. Vì
+  đó là **câu số một**, cả bài dừng ngay ở đó — không trả lời được câu nào.
+  - Tài khoản thường bốc phải bộ câu khác nên trông vẫn chạy tốt. Bệnh KHÔNG phân biệt hạng,
+    nó chỉ trông như vậy.
+- **`matchOption` có nấc thứ ba**: một bên chứa trọn bên kia theo RANH GIỚI TỪ. Chỉ chạy sau
+  khi hai nấc khớp-tuyệt-đối đều trượt, nên không câu nào đang tra được bị đổi kết quả; và chỉ
+  trả lời khi ĐÚNG MỘT lựa chọn khớp — mơ hồ thì vẫn từ chối và dừng bài, vì trả lời sai tiêu
+  mất một trong năm lượt của ngày. Ranh giới từ là chỗ giữ an toàn:「an」không chui được vào
+ 「khong」, và bốn lựa chọn trơ trọi A/B/C/D không khớp bừa vào giữa chữ.
+- **Trước đó phải vá một điểm mù mới lần ra được nguyên nhân.** Khi bí đáp án, nhật ký chỉ nói
+ 「chưa biết đáp án: <câu hỏi>」— bốn lựa chọn trên trang, tức vế còn lại của phép so, không
+  được ghi ở đâu cả. Giờ mỗi ngả thất bại tự khai ở mức `warning` (mức tới được `job_events`):
+  câu không có trong danh sách / có nhưng không khớp lựa chọn nào — kèm CẢ đáp án công bố lẫn
+  các lựa chọn trên trang / danh sách tự mâu thuẫn. Đường tra được thì im lặng như cũ.
+  Chính dòng ấy chỉ đích danh chữ「trên」sau đúng một lượt chạy.
+- `verify:quiz-reference` đóng đinh cả ba nấc trên nguồn THẬT (255 câu), cộng hai ca
+  phải-từ-chối: hai lựa chọn cùng nằm trong đáp án, và lựa chọn một ký tự.
+
 ## 0.47.0 — bảng bế quan phủ MỌI trang, và không tắt được
 
 - **Trong lúc bảo trì, môn đồ thường không vào được trang nào.** Mỗi trang trả về bảng「Tông môn

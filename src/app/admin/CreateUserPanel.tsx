@@ -23,8 +23,11 @@ export function CreateUserPanel() {
     );
   }
 
+  // `w-full`: component này là một flex item trên thanh công cụ của tab Môn Đồ, đứng cạnh
+  // công tắc môn quy. Lúc gập chỉ là một cái nút nên nằm chung hàng là vừa; lúc mở ra là cả
+  // một biểu mẫu, và bề rộng 100% buộc nó xuống dòng riêng thay vì bị bóp cạnh công tắc.
   return (
-    <div className="card card-hairline p-6">
+    <div className="card card-hairline w-full p-6">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="h-display text-lg font-semibold text-gilded">Thu Nhận Đạo Hữu</h2>
         <button type="button" className="btn btn-ghost" onClick={() => setOpen(false)}>

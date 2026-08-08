@@ -66,13 +66,16 @@ export default async function AdminPage({
               label: "Môn Đồ",
               pane: (
                 <>
-                  <div className="mb-6">
+                  {/* Thanh công cụ của tab: công tắc môn quy bên trái, nút thu nhận bên
+                      phải, hai thứ NGANG HÀNG. `items-start` chứ không `items-center` —
+                      cụm bên trái cao hơn một cái nút (còn dòng trạng thái, và có lúc cả
+                      cảnh báo hàng chờ), nên căn giữa sẽ thả cái nút trôi xuống giữa chừng
+                      thay vì thẳng hàng với ô tick. */}
+                  <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                     <MembershipSettingsForm
                       requireApproval={settings.membership.requireApproval}
                       pendingCount={pending}
                     />
-                  </div>
-                  <div className="mb-6">
                     <CreateUserPanel />
                   </div>
                   <UserTable users={users} query={params.q ?? ""} status={status ?? ""} />

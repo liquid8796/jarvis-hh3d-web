@@ -11,6 +11,32 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.39.3 — công tắc xét duyệt lên chung hàng với nút thu nhận
+
+- **Tab Môn Đồ có một thanh công cụ**: công tắc「Xét duyệt thành viên mới」bên trái, nút
+  「+ Thu nhận đạo hữu mới」bên phải, ngang hàng nhau. Trước đây công tắc là một thẻ riêng
+  chiếm trọn bề ngang, nằm chồng lên trên cái nút.
+- **Công tắc dựng lại thành cụm điều khiển, không còn là thẻ có tiêu đề** — một thẻ mang h2
+  thì không thể ngang hàng với một cái nút. Tiêu đề「Môn Quy — Cổng Bái Sư」và dòng dẫn nhập
+  bỏ đi vì TRÙNG NGHĨA chứ không phải vì thiếu chỗ: nhãn ô tick đã nói đúng việc nó làm, còn
+  dòng trạng thái ngay dưới nói cụ thể hơn cả dòng dẫn nhập — nó kể tình trạng đang có thật.
+  Dòng trạng thái và cảnh báo hàng chờ giữ nguyên, không mất chữ nào.
+- **Panel thu nhận khi mở ra chiếm trọn dòng riêng** (`w-full`): lúc gập nó chỉ là một cái
+  nút nên nằm chung hàng là vừa, nhưng lúc mở ra là cả một biểu mẫu — không có ràng buộc ấy
+  thì nó bị bóp cạnh công tắc.
+- Đo trên trình duyệt ở hai trạng thái (đang bật / đang tắt còn 3 người chờ): **lệch tâm dọc
+  0px** giữa ô tick, nút「Lưu Môn Quy」và nút「+ Thu nhận đạo hữu mới」; mở panel thì thẻ rộng
+  đúng bằng cả hàng và tụt xuống dòng dưới; ở 375px thanh công cụ tự xuống dòng và không góp
+  một pixel nào vào cuộn ngang (phần cuộn ấy vẫn đúng bằng bề rộng tranh nền — tính năng pan
+  của 0.33.2).
+- **Bắt được một lỗ hổng trong cách tôi tự kiểm**: sau khi xoá route thử, `.next/dev/types`
+  còn tham chiếu nó nên `next build` hỏng ở bước type-check — mà những lượt trước tôi đọc kết
+  quả build bằng `grep` nên một lần hỏng như thế có thể lọt. Lần này dọn `.next` rồi chạy lại
+  và đọc ĐÚNG mã thoát: tsc 0, build 0. (Các bản deploy trước không bị ảnh hưởng: chúng dựng
+  từ `git archive` ra thư mục trắng, không có `.next` cũ.)
+
+---
+
 ## 0.39.2 — trả lại nguyên văn ba thẻ giới thiệu
 
 - **Hoàn nguyên bản viết lại ở 0.39.1.** Tông chủ muốn giữ nguyên giọng cũ; việc cần làm chỉ

@@ -137,7 +137,19 @@ try {
   page.on("console", (m) => m.type() === "error" && problems.push(m.text().slice(0, 160)));
   page.on("requestfailed", (r) => problems.push(`${r.method()} ${r.url().slice(0, 90)} — ${r.failure()?.errorText}`));
 
-  const res = await page.goto(`${origin}${path}`, { waitUntil: "networkidle", timeout: 45_000 });
+  // `networkidle` là mốc chờ TỐT NHẤT khi tới được: nó đợi cả ảnh và các lượt fetch sau khi
+  // hydrate. Nhưng có trang KHÔNG BAO GIỜ tới được nó — Phòng Chat poll `/api/chat` mỗi 2,5
+  // giây, nên dưới máy (nơi Mongo `mongodb+srv://` treo ~50s vì resolver không trả SRV) mạng
+  // không có lấy một khoảng 500ms nào lặng. Chờ cứng ở đó là script chết vì hết giờ và không
+  // chụp được gì, dù trang đã vẽ xong từ lâu. Nên: hụt thì lùi một nấc rồi chụp tiếp, và NÓI
+  // RA đã lùi — phần chờ ảnh `decode()` bên dưới vẫn giữ cho tấm ảnh không bị bấm sớm.
+  let res: Awaited<ReturnType<typeof page.goto>>;
+  try {
+    res = await page.goto(`${origin}${path}`, { waitUntil: "networkidle", timeout: 45_000 });
+  } catch {
+    console.log("⚠ mạng không lặng (trang có poll?) — lùi về `load` rồi chụp.");
+    res = await page.goto(`${origin}${path}`, { waitUntil: "load", timeout: 45_000 });
+  }
   console.log(`• ${path} → HTTP ${res?.status()} (đóng vai @${user.username}${roles.length ? ` [${roles.join(", ")}]` : ""})`);
 
   if (clickFirst) {

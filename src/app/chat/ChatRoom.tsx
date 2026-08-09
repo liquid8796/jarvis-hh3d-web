@@ -714,7 +714,6 @@ export function ChatRoom({
             onGif={(g) => void sendGif(g)}
           />
         )}
-        <button type="button" className="chat-tool" title="Emoji, sticker & GIF" data-chat-popup-trigger onClick={() => openPanel("emoji")}>💬</button>
         <input
           ref={fileRef}
           type="file"
@@ -722,6 +721,9 @@ export function ChatRoom({
           hidden
           onChange={(e) => { if (e.target.files?.length) void upload(e.target.files); e.target.value = ""; }}
         />
+        <button type="button" className="chat-tool" title="Gửi file" disabled={uploading} onClick={() => fileRef.current?.click()}>
+          {uploading ? "…" : "📎"}
+        </button>
         <textarea
           ref={inputRef}
           value={text}
@@ -750,11 +752,15 @@ export function ChatRoom({
           placeholder="Truyền âm cho cả tông môn… (Enter gửi, Alt+Enter xuống dòng)"
           className="chat-input"
         />
-        {/* Hai nút tròn bên phải theo bản thiết kế: kẹp file và ấn Truyền Âm (mũi tên).
-            Nút gửi là ICON chứ không còn chữ — chữ nằm ở title/aria cho ai cần đọc. */}
-        <button type="button" className="chat-tool" title="Gửi file" disabled={uploading} onClick={() => fileRef.current?.click()}>
-          {uploading ? "…" : "📎"}
-        </button>
+        {/* Hai nút tròn bên phải: khay Emoji/sticker/GIF và ấn Truyền Âm (mũi tên). Nút gửi là
+            ICON chứ không còn chữ — chữ nằm ở title/aria cho ai cần đọc.
+
+            Khay chọn mang mặt cười chứ không phải bong bóng thoại 💬 như trước: bong bóng đọc ra
+            là "nhắn tin", trùng nghĩa với chính ô nhập ngay bên cạnh. Cố ý dùng ĐÚNG 😊 của nút
+            thả cảm xúc trên mỗi tin — hai nút cùng một nghĩa "chọn một emoji", chung mặt chữ là
+            nhất quán chứ không phải lẫn. Đừng đổi sang 😀: Segoe UI Emoji vẽ nó mắt trắng to,
+            miệng há hồng, lạc hẳn khỏi tông vàng-cam của sảnh. */}
+        <button type="button" className="chat-tool" title="Emoji, sticker & GIF" data-chat-popup-trigger onClick={() => openPanel("emoji")}>😊</button>
         <button
           type="button"
           className="chat-send"

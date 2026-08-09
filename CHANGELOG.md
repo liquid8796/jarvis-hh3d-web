@@ -11,6 +11,42 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.48.0 — vai và quyền thành bảng thật trong database
+
+- **Ai mang vai nào giờ là một BẢNG (`user_roles`), không còn là cột mảng `users.roles`.** Quan
+  hệ "một đạo hữu giữ nhiều vai" vốn là nhiều–nhiều, mà một cột `text[]` thì không nói được
+  điều đó với database: không khoá ngoại, nên một mã vai gõ sai nằm im trong dữ liệu mà không
+  gì kêu lên; không index, nên "còn mấy Gia chủ" phải quét cả bảng users; và không câu SQL nào
+  hỏi được "ai đang mang vai này" mà không mở mảng ra.
+- **Thêm ba bảng danh mục**: `roles` (mã, nhãn, thứ tự thang vai), `permissions` (mã, nhãn),
+  `role_permissions` (vai nào mở được việc gì). Cùng migration `0013` di dân trọn dữ liệu cũ —
+  đã đo trên database thật: 9 đạo hữu, 1 người mang vai, 2 dòng `user_roles`, không sót ai.
+- **`permissions.ts` có bảng quyền, thay cho ba cách viết luật nằm ba nơi.** Trước bản này "ai
+  được làm gì" rải rác: một danh sách vai bậc trị sự trong `isAdminUser`, một phép `isOwner`
+  trong `canEditRoles`, và một phép `isOwner` nữa tận `purgeChatAction` bên actions. Giờ cả ba
+  hỏi cùng một hàm `hasPermission`, và nút「Thanh tẩy」ở trang Tông Môn hỏi đúng câu mà hàng rào
+  phía server hỏi — trước đó là hai phép kiểm giống nhau chép làm hai chỗ.
+- **Ma trận chạy vẫn ở code, cố ý** — `isAdminUser` bị hỏi ở mọi request có phiên, và hàm thuần
+  thì `verify:permissions` đóng đinh được từng ô không cần dựng gì. Ba bảng danh mục là bản sao
+  để SQL đọc được; `npm run verify:roles` so từng dòng và **đỏ khi lệch**, nên "thêm quyền mà
+  quên viết migration" hỏng ngay tại chỗ.
+- **Phía bị quản đổi cách hỏi: `bearsAnyRole` thay cho `isAdminUser`.** Hôm nay hai phép ấy
+  trùng kết quả (vai nào cũng là vai trị sự) nên không ô nào trong 100 ô actor×target đổi. Nhưng
+  chúng trả lời hai câu khác nhau, và ngày có một vai thuần trang trí thì cách viết cũ lặng lẽ
+  thả người mang vai ấy xuống hạng "quản được" — đúng loại lỗ hổng mà bậc Gia chủ sinh ra để bịt.
+- **Hai lỗ tự tìm ra khi soi lại, không phải do ai báo:**
+  - `npm run db:seed` chỉ ghi cột gương, tức một cài đặt MỚI sẽ dựng ra một Gia chủ mà hệ thống
+    không nhìn thấy vai — sinh ra đã khoá trái, đúng thứ vai gia-chu tồn tại để phòng. Giờ nó
+    ghi cả `user_roles` trong cùng một câu lệnh.
+  - `npm run dev:session` cũng đọc cột gương, tức một lượt kiểm giao diện đang kiểm nhầm hệ
+    thống.
+- **`verify:profile` đỏ quanh năm mà không ai biết**: nó khẳng định `after?.role === "user"`
+  trong khi `PublicUser` chưa bao giờ mang cột `role` — tức phép so luôn là `undefined === "user"`.
+  Đổi sang hỏi `roles`, và giờ nó xanh thật.
+- Cột `users.roles` và `users.role` còn nằm lại **một nhịp deploy** làm gương ghi-một-chiều:
+  `db:migrate` chạy trước `vercel deploy`, nên trong khoảng giữa hai lệnh bản code cũ vẫn đang
+  phục vụ và vẫn `select users.roles`. Drop sớm là toàn site 500 cho tới khi deploy xong.
+
 ## 0.47.1 — Vấn Đáp: đáp án trang viết ngắn hơn danh sách vẫn phải khớp
 
 - **Bài vấn đáp của tài khoản VIP chết đứng ở mọi lượt** suốt hơn một giờ ngày 09/08/2026.

@@ -13,13 +13,18 @@
  */
 import {
   ASSIGNABLE_ROLES,
+  PERMISSIONS,
+  PERMISSION_LABEL,
   ROLE_LABEL,
+  ROLE_PERMISSIONS,
   canEditRoles,
   canManageUser,
+  hasPermission,
   isAdminUser,
   isOwner,
   normalizeRoles,
   reviewRoleChange,
+  type Permission,
   type Role,
 } from "../src/lib/auth/permissions";
 import { MAX_TAGS, MAX_TAG_LENGTH, TAG_PRESETS, parseTags, splitTags } from "../src/lib/validation/tags";
@@ -87,6 +92,61 @@ for (const role of ASSIGNABLE_ROLES) {
   assert(isAdminUser({ roles: [role] }), `vai ${role} phải mở được cửa trị sự (requireAdmin)`);
 }
 console.log("✔ Nhận vai: cả bốn vai đều qua cửa trị sự, mảng rỗng là môn đồ thường.");
+
+// ---- Bảng quyền ----------------------------------------------------------------------
+assert(new Set(PERMISSIONS).size === PERMISSIONS.length, "mã quyền không được trùng nhau");
+for (const permission of PERMISSIONS) {
+  assert(
+    typeof PERMISSION_LABEL[permission] === "string" && PERMISSION_LABEL[permission].length > 0,
+    `quyền ${permission} chưa có nhãn hiển thị`,
+  );
+  assert(
+    ASSIGNABLE_ROLES.some((role) => ROLE_PERMISSIONS[role].includes(permission)),
+    `quyền ${permission} không vai nào nắm — một hàng rào không ai mở được là hàng rào chết`,
+  );
+}
+for (const role of ASSIGNABLE_ROLES) {
+  assert(ROLE_PERMISSIONS[role].length > 0, `vai ${role} không mở được việc gì thì nó là một cái nhãn`);
+  assert(
+    new Set(ROLE_PERMISSIONS[role]).size === ROLE_PERMISSIONS[role].length,
+    `vai ${role} khai trùng một quyền`,
+  );
+  for (const permission of ROLE_PERMISSIONS[role]) {
+    assert(PERMISSIONS.includes(permission), `vai ${role} khai một mã quyền không có trong danh mục: ${permission}`);
+  }
+}
+
+// "Gia chủ nghiễm nhiên có mọi quyền" — khẳng định trên TỪNG mã, không tin vào cách viết
+// `ROLE_PERMISSIONS['gia-chu'] = PERMISSIONS`. Ngày ai đó chép tay danh sách ấy ra là ngày
+// dòng này bắt được.
+for (const permission of PERMISSIONS) {
+  assert(hasPermission(owner, permission), `Gia chủ phải có quyền ${permission}`);
+}
+for (const role of ASSIGNABLE_ROLES) {
+  for (const permission of ROLE_PERMISSIONS[role]) {
+    assert(
+      ROLE_PERMISSIONS["gia-chu"].includes(permission),
+      `vai ${role} có quyền ${permission} mà Gia chủ thì không — cấp trên thiếu quyền cấp dưới là vô lý`,
+    );
+  }
+}
+
+/** Ba quyền chỉ Gia chủ được nắm. Đây là chỗ thang vai thật sự tách làm hai bậc. */
+const OWNER_ONLY = ["role_bearer.manage", "role.assign", "chat.purge"] as const satisfies readonly Permission[];
+for (const permission of OWNER_ONLY) {
+  for (const person of [elder, master, admin]) {
+    assert(!hasPermission(person, permission), `vai bậc trị sự KHÔNG được có quyền ${permission}`);
+  }
+  assert(hasPermission(owner, permission), `Gia chủ phải có quyền ${permission}`);
+}
+for (const permission of PERMISSIONS) {
+  assert(!hasPermission(member, permission), `môn đồ thường không được có quyền nào, kể cả ${permission}`);
+  assert(!hasPermission({ roles: ["choi-choi"] }, permission), `một mã vai bịa không được mở ra quyền ${permission}`);
+}
+console.log(
+  `✔ Bảng quyền: ${PERMISSIONS.length} mã, vai nào cũng có phần, Gia chủ trùm hết, ` +
+    `${OWNER_ONLY.length} quyền riêng của Gia chủ.`,
+);
 
 // ---- Ai quản được ai: quét TRỌN ma trận ----------------------------------------------
 const expectManage = (actorId: string, targetId: string): boolean => {

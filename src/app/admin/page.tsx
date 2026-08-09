@@ -1,6 +1,6 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { requireAdmin } from "@/lib/auth/guards";
-import { isOwner } from "@/lib/auth/permissions";
+import { hasPermission } from "@/lib/auth/permissions";
 import { countJobsForDrain } from "@/lib/services/jobs";
 import { getAppSettings } from "@/lib/services/settings";
 import { countPending, listUsers } from "@/lib/services/users";
@@ -92,7 +92,7 @@ export default async function AdminPage({
               pane: (
                 <div className="flex flex-col gap-6">
                   <ChatSettingsForm retentionDays={settings.chat.retentionDays} />
-                  <ChatPurgePanel canPurge={isOwner(viewer)} />
+                  <ChatPurgePanel canPurge={hasPermission(viewer, "chat.purge")} />
                 </div>
               ),
             },

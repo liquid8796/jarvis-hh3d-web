@@ -119,6 +119,40 @@ Blob; xem mục 0.41.0 và [deploy/oracle/README.md](deploy/oracle/README.md).
 document viết bởi bản deploy cũ vẫn trở về đúng hình thù hôm nay với default được điền đủ.
 Đó là bản JSONB của một migration.
 
+### Vai và quyền lưu ở đâu?
+
+**Bốn bảng quan hệ**, đúng hình dạng RBAC sách vở, vì đây là loại dữ liệu ngược hẳn với config:
+ít, ổn định, và cần JOIN.
+
+| Bảng | Giữ gì | Ai là gốc |
+|---|---|---|
+| `roles` | Danh mục vai: mã, nhãn, thứ tự thang vai | Bản sao của code |
+| `permissions` | Danh mục quyền: mã, nhãn | Bản sao của code |
+| `role_permissions` | Vai nào mở được việc gì | Bản sao của code |
+| `user_roles` | **Ai mang vai nào** — khoá chính ghép `(user_id, role_code)` | **Database là gốc** |
+
+Một đạo hữu giữ được nhiều vai cùng lúc, và đó là lý do `user_roles` tồn tại: quan hệ nhiều–
+nhiều thì phải là một bảng, không phải một cột mảng. Không mang vai nào = môn đồ thường.
+
+**Ma trận chạy thì vẫn ở code** ([`src/lib/auth/permissions.ts`](src/lib/auth/permissions.ts)),
+và ba bảng danh mục chỉ là bản sao. Hai lý do, cả hai đều đã cân:
+
+- `isAdminUser` được hỏi ở **mọi request có phiên**. Một lượt đi database cho mỗi phép hỏi ấy
+  là trả giá thật cho một bảng mà cả năm mới đổi một lần.
+- Ma trận là **hàm thuần**, nên `npm run verify:permissions` đóng đinh được từng ô mà không cần
+  dựng gì cả. Dời gốc xuống database là vứt luôn tính chất ấy.
+
+Cái giá của bản sao là nó lệch được. `npm run verify:roles` so **từng dòng** ba bảng danh mục
+với hằng số trong code và đỏ khi lệch — nên "thêm quyền mà quên viết migration" là một phép thử
+hỏng ngay, không phải một bí ẩn sáu tháng sau. Cùng script ấy chạy trọn đường cấp/thu vai trên
+database thật, vì đường ghi vai viết bằng SQL thô (một câu lệnh, để bốn phép ghi cùng sống hoặc
+cùng chết — `neon-http` không có transaction tương tác) nên `tsc` không soát hộ tên cột nào.
+
+> **Cột `users.roles` và `users.role` vẫn còn, nhưng đừng đọc.** Cả hai là gương ghi-một-chiều
+> trong đúng một nhịp deploy: `db:migrate` chạy **trước** `vercel deploy` (Bước 4), nên trong
+> khoảng giữa hai lệnh bản code cũ vẫn đang phục vụ và vẫn đọc chúng. Migration kế tiếp drop cả
+> hai cột lẫn enum `user_role`.
+
 ### Cấu trúc mã nguồn
 
 Phân tầng nghiêm ngặt, mỗi tầng chỉ nói chuyện với tầng ngay dưới:

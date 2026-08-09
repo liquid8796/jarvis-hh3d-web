@@ -41,9 +41,14 @@ if (!process.env.AUTH_SECRET || process.env.AUTH_SECRET === "change-me") {
 }
 
 const sql = neon(process.env.DATABASE_URL);
+// Vai đọc từ `user_roles` chứ không từ cột gương `users.roles` — phiên đóng vai phải nhìn
+// đúng thứ mà guard nhìn, nếu không thì một lượt kiểm giao diện đang kiểm nhầm hệ thống.
 const rows = await sql`
-  select id, username, display_name, roles, status
-  from users where username = ${username.toLowerCase()} limit 1
+  select u.id, u.username, u.display_name, u.status,
+         coalesce((select array_agg(ur.role_code order by r.sort_order)
+                     from user_roles ur join roles r on r.code = ur.role_code
+                    where ur.user_id = u.id), '{}') as roles
+    from users u where u.username = ${username.toLowerCase()} limit 1
 `;
 
 const user = rows[0];

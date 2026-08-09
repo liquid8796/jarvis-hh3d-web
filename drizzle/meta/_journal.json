@@ -92,6 +92,13 @@
       "when": 1786211545305,
       "tag": "0012_avatar",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786244752481,
+      "tag": "0013_roles_and_permissions",
+      "breakpoints": true
     }
   ]
 }

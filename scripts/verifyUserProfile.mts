@@ -66,7 +66,9 @@ try {
   const after = await findById(legacyId);
   assert(after?.displayName === "Legacy đã cập nhật", "lỗi email trùng không được ghi nửa chừng");
   assert(after?.email === legacyEmail, "email hồ sơ phải được chuẩn hoá chữ thường");
-  assert(after?.role === "user" && after.status === "active", "sửa hồ sơ không được chạm quyền/trạng thái");
+  // `roles` chứ không phải `role`: `PublicUser` chưa bao giờ mang cột di sản ấy, nên phép so
+  // cũ luôn là `undefined === "user"` — một phép thử đỏ quanh năm, tức không kiểm gì cả.
+  assert(after?.roles.length === 0 && after.status === "active", "sửa hồ sơ không được chạm quyền/trạng thái");
 
   console.log("✔ Email legacy/new, chuẩn hoá, unique và quyền tự sửa đều đúng.");
 } finally {

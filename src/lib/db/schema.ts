@@ -7,6 +7,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -37,21 +38,22 @@ export const userRole = pgEnum("user_role", ["user", "admin"]);
 export const userStatus = pgEnum("user_status", ["pending", "active", "disabled"]);
 
 /**
- * Vai trò từ 08/08/2026 là MỘT MẢNG, không phải một enum đơn — một người có thể vừa là Gia
- * chủ vừa là Trưởng môn. Mảng rỗng = môn đồ thường.
+ * VAI TRÒ: một người giữ được nhiều vai, và từ 09/08/2026 quan hệ ấy là một BẢNG THẬT
+ * (`user_roles`) chứ không còn là một cột mảng.
  *
  *   gia-chu — vai lớn nhất, MỘT MÌNH nó có quyền sửa/xoá vai của người mang vai. Sinh ra vì
  *             một lỗ hổng có thật: các Trưởng môn ngang quyền có thể hạ vai hay trục xuất
  *             LẪN NHAU, nghĩa là admin nào cũng chỉ an toàn cho tới khi một admin khác đổi ý.
  *
- *   Ba vai NGANG NHAU ở bậc trị sự (từ 09/08/2026) — duyệt môn đồ, quản môn đồ thường, và
- *   KHÔNG đụng được người mang vai, kể cả người mang đúng vai của mình:
+ *   Ba vai NGANG NHAU ở bậc trị sự — duyệt môn đồ, quản môn đồ thường, và KHÔNG đụng được
+ *   người mang vai, kể cả người mang đúng vai của mình:
  *     thai-thuong-truong-lao, chuong-mon, admin
  *
- * Cột này là `text[]` chứ không phải enum CỐ Ý: thêm một vai là thêm một chuỗi trong
- * permissions.ts, không phải một migration `ALTER TYPE` trên database thật.
+ * Không có vai nào = môn đồ thường.
  *
- * Danh sách hợp lệ nằm ở `src/lib/auth/permissions.ts` — nơi giữ toàn bộ ma trận ai-được-làm-gì.
+ * Bốn bảng ở cuối tệp này (`roles`, `permissions`, `role_permissions`, `user_roles`) là hình
+ * dạng chuẩn hoá của toàn bộ chuyện ấy. Ma trận CHẠY vẫn ở `src/lib/auth/permissions.ts` —
+ * xem ghi chú tại `rolePermissions` để biết vì sao có hai bản và bản nào là gốc.
  */
 
 export const users = pgTable(
@@ -72,7 +74,26 @@ export const users = pgTable(
      * Migration kế tiếp sẽ drop cả cột lẫn enum user_role.
      */
     role: userRole("role").notNull().default("user"),
-    /** Vai trò thật của hệ thống — xem ghi chú ở đầu tệp. Rỗng = môn đồ thường. */
+    /**
+     * CỘT DI SẢN THỨ HAI — vai thật đã dời sang bảng `user_roles` từ 09/08/2026; cột này ở lại
+     * đúng một nhịp deploy nữa, và CHỈ ĐƯỢC GHI GƯƠNG.
+     *
+     * Vì sao không drop luôn trong cùng migration: ở dự án này `npm run db:migrate` chạy TRƯỚC
+     * `vercel deploy` (README, Bước 4), nên trong khoảng giữa hai lệnh, bản code CŨ vẫn đang
+     * phục vụ và vẫn `select users.roles` ở mọi trang có phiên đăng nhập. Drop sớm là toàn site
+     * 500 cho tới khi deploy xong — không phải phòng xa, đó chính là lý do cột `role` phía trên
+     * còn sống.
+     *
+     * Cửa sổ ngược lại (đã migrate, chưa deploy) có một khe hẹp: bản code cũ đổi vai trong lúc
+     * ấy sẽ ghi cột này mà KHÔNG ghi `user_roles`. Chỉ Gia chủ đổi được vai và Gia chủ chính là
+     * người bấm deploy, nên khe ấy hẹp đúng bằng một lượt build; migration 0011 đã nhận đúng
+     * khe ấy khi dựng cột này từ `role`. Vá lại bằng cách chạy lại câu backfill trong
+     * `0013_roles_and_permissions.sql` — nó `on conflict do nothing` nên chạy mấy lần cũng vậy.
+     *
+     * Migration kế tiếp drop: `users.role`, `users.roles`, và enum `user_role`. Lúc ấy phải sửa
+     * theo `src/app/actions/auth.ts` (đang đọc `UserRow.roles` để đặt claim JWT) — nó vẫn đúng
+     * hôm nay vì `findByUsername` đắp đè cột này bằng phép đọc từ `user_roles`.
+     */
     roles: text("roles").array().notNull().default(sql`ARRAY[]::text[]`),
     /**
      * Tag trang trí — hiện thành huy hiệu cạnh tên trong Phòng Chat. Do Trưởng môn/Gia chủ
@@ -114,6 +135,90 @@ export const users = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("users_status_idx").on(t.status)],
+);
+
+/**
+ * DANH MỤC VAI. Mỗi dòng là một vai tồn tại; `sort_order` là thứ tự thang vai (gia-chu = 0),
+ * cũng chính là thứ tự huy hiệu trên giao diện và thứ tự `normalizeRoles` trả về.
+ *
+ * Khoá chính là MÃ VAI chứ không phải một `serial` vô nghĩa. Hai lý do: mã vai đã nằm sẵn
+ * trong `users.roles` của database thật nên backfill là một phép join thẳng, không cần bảng
+ * tra; và một dòng `user_roles` đọc bằng mắt trong psql nói luôn được người ấy là gì, thay vì
+ * một con số phải đi tra tiếp. Cái giá là mã vai không đổi tên được nếu không di dân — đúng
+ * điều `permissions.ts` đã chốt và giải thích.
+ */
+export const roles = pgTable("roles", {
+  code: text("code").primaryKey(),
+  label: text("label").notNull(),
+  sortOrder: integer("sort_order").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * DANH MỤC QUYỀN — từng việc cụ thể một vai mở ra được. Mã quyền có mặt trong code dưới dạng
+ * kiểu `Permission`, nên một mã gõ sai không biên dịch được.
+ */
+export const permissions = pgTable("permissions", {
+  code: text("code").primaryKey(),
+  label: text("label").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * VAI → QUYỀN. Bảng này là bản SAO của `ROLE_PERMISSIONS` trong `src/lib/auth/permissions.ts`,
+ * và chiều gốc là code → database, không phải ngược lại. Cố ý, vì hai lẽ:
+ *
+ *   1. Ma trận được hỏi trên MỌI request có phiên (`isAdminUser` chạy ở guard, ở thanh đầu
+ *      trang, ở mọi action). Một lượt đi database cho mỗi phép hỏi ấy là trả giá thật cho một
+ *      bảng mà cả năm mới đổi một lần.
+ *   2. `permissions.ts` là hàm THUẦN nên `npm run verify:permissions` đóng đinh được từng ô mà
+ *      không cần dựng gì. Dời gốc xuống database là vứt luôn tính chất ấy.
+ *
+ * Vậy bảng này để làm gì: để một câu SQL trả lời được "ai xoá sạch được sảnh đàm đạo" mà không
+ * phải đọc code, và để chính bản sao ấy bị soi. `npm run verify:roles` so từng dòng ba bảng
+ * danh mục với hằng số trong code và ĐỎ khi lệch — nên "quên viết migration sau khi thêm quyền"
+ * là một phép thử hỏng, không phải một bí ẩn về sau.
+ */
+export const rolePermissions = pgTable(
+  "role_permissions",
+  {
+    roleCode: text("role_code")
+      .notNull()
+      .references(() => roles.code, { onDelete: "cascade" }),
+    permissionCode: text("permission_code")
+      .notNull()
+      .references(() => permissions.code, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.roleCode, t.permissionCode] })],
+);
+
+/**
+ * NGƯỜI → VAI. Đây là nơi duy nhất trả lời được "đạo hữu này mang vai gì" kể từ 09/08/2026.
+ *
+ * Khoá chính ghép `(user_id, role_code)` làm luôn ba việc: cấm cấp trùng một vai hai lần, cho
+ * `on conflict do nothing` một đích để bám (nhờ đó phép ghi vai là idempotent), và chính nó là
+ * index cho câu hỏi thường gặp nhất — "vai của người này" — vì `user_id` đứng đầu.
+ *
+ * `role_code` thì `on delete restrict` chứ KHÔNG cascade như `user_id`: xoá một người là việc
+ * bình thường và vai của họ nên đi theo, còn xoá một VAI mà vẫn có người đang mang thì phải
+ * ngã ngựa và nói ra, không được lặng lẽ tước quyền của người ta. Index riêng cho `role_code`
+ * là để đếm ngược — "còn mấy Gia chủ" — phép đếm mà `adminDelete` hỏi trước mỗi lần trục xuất.
+ */
+export const userRoles = pgTable(
+  "user_roles",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    roleCode: text("role_code")
+      .notNull()
+      .references(() => roles.code, { onDelete: "restrict" }),
+    grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.roleCode] }),
+    index("user_roles_role_code_idx").on(t.roleCode),
+  ],
 );
 
 /**

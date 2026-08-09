@@ -1,6 +1,6 @@
-import { and, eq, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, eq, getTableColumns, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
-import { isAdminUser } from "@/lib/auth/permissions";
+import { isAdminUser, normalizeRoles, type Role } from "@/lib/auth/permissions";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { getAppSettings } from "@/lib/services/settings";
 import type { UserRow } from "@/lib/db/schema";
@@ -26,6 +26,25 @@ export type PublicUser = Pick<
 >;
 
 /**
+ * Vai của một đạo hữu, đọc từ bảng `user_roles` — nguồn duy nhất kể từ 09/08/2026. Cột
+ * `users.roles` vẫn còn nhưng chỉ là gương (xem schema.ts), nên KHÔNG chỗ nào ở đây đọc nó.
+ *
+ * Sắp theo `sort_order` chứ không theo lúc được ban: nhờ vậy mảng trả về luôn cùng thứ tự với
+ * `normalizeRoles` — giao diện vẽ huy hiệu theo thứ tự thang vai, và phép so "vai có đổi
+ * không" ở `updateUserAction` không bao giờ hiểu nhầm một mảng xáo thứ tự là một thay đổi.
+ *
+ * `coalesce` vì `array_agg` trả `null` khi không có dòng nào, mà môn đồ thường thì đúng là
+ * không có dòng nào — thiếu nó là mọi phép `.roles.includes(...)` phía trên ngã vì null.
+ */
+const rolesOfUser = sql<string[]>`coalesce(
+  (select array_agg(ur.role_code order by r.sort_order)
+     from ${schema.userRoles} ur
+     join ${schema.roles} r on r.code = ur.role_code
+    where ur.user_id = ${schema.users.id}),
+  '{}'::text[]
+)`;
+
+/**
  * `avatarUrl` có mặt vì nó là danh tính công khai y như danh xưng — thanh đầu trang và sảnh
  * đàm đạo đều vẽ nó. `avatarKey` thì KHÔNG: đó là tên object trong kho, một chi tiết lưu trữ
  * chỉ `setAvatar`/`clearAvatar` cần, và mọi cột lọt vào đây là một cột chảy ra tới client.
@@ -35,13 +54,22 @@ const publicColumns = {
   username: schema.users.username,
   displayName: schema.users.displayName,
   email: schema.users.email,
-  roles: schema.users.roles,
+  roles: rolesOfUser,
   tags: schema.users.tags,
   avatarUrl: schema.users.avatarUrl,
   status: schema.users.status,
   createdAt: schema.users.createdAt,
   updatedAt: schema.users.updatedAt,
 } as const;
+
+/**
+ * Trọn hàng users, nhưng `roles` bị ĐẮP ĐÈ bằng phép đọc từ `user_roles`.
+ *
+ * Không phải chi tiết thừa: `verifyCredentials` trả về hàng này và `loginAction` hỏi
+ * `isAdminUser(result.user)` để đặt claim cho phiên. Để nguyên `select()` thì đúng một đường
+ * trong cả hệ thống còn đọc cột gương — và nó lại là đường đăng nhập.
+ */
+const allColumnsWithRoles = { ...getTableColumns(schema.users), roles: rolesOfUser } as const;
 
 /**
  * Giá trị GHI GƯƠNG cho cột di sản `role` — bản deploy cũ còn đọc nó trong cửa sổ giữa
@@ -58,7 +86,7 @@ function legacyRoleOf(roles: readonly string[]): "user" | "admin" {
 
 export async function findByUsername(username: string): Promise<UserRow | null> {
   const rows = await db()
-    .select()
+    .select(allColumnsWithRoles)
     .from(schema.users)
     .where(eq(schema.users.username, username.toLowerCase()))
     .limit(1);
@@ -67,7 +95,7 @@ export async function findByUsername(username: string): Promise<UserRow | null> 
 
 export async function findByEmail(email: string): Promise<UserRow | null> {
   const rows = await db()
-    .select()
+    .select(allColumnsWithRoles)
     .from(schema.users)
     .where(eq(schema.users.email, email.trim().toLowerCase()))
     .limit(1);
@@ -193,6 +221,53 @@ export async function setStatus(
     .where(eq(schema.users.id, id));
 }
 
+/**
+ * Ghi TRỌN tập vai của một người — thêm cái thiếu, bỏ cái thừa — trong ĐÚNG MỘT câu lệnh.
+ *
+ * Vì sao một câu: bốn phép ghi ở đây (xoá vai cũ, thêm vai mới, đắp gương `users.roles`, đắp
+ * gương `users.role`) phải cùng sống hoặc cùng chết. Driver `neon-http` KHÔNG có transaction
+ * tương tác, nên "cùng sống hoặc cùng chết" chỉ có một hình dạng: một câu lệnh. CTE ghi dữ
+ * liệu được Postgres bảo đảm chạy đúng một lần dù câu chính không đọc tới, nên `removed` và
+ * `added` không cần ai tham chiếu.
+ *
+ * `wanted` lọc qua bảng `roles` chứ không tin thẳng mảng gửi vào, nên mã lạ bị BỎ chứ không
+ * làm ngã khoá ngoại — và cột gương được dựng lại TỪ `wanted`, tức gương không bao giờ chép
+ * được thứ mà bảng thật đã từ chối.
+ *
+ * Không có khe giữa xoá và thêm: cả hai đọc cùng một ảnh chụp, và vai vừa được giữ lại thì
+ * nằm trong `wanted` nên không rơi vào tầm của `removed` — người ta không mất quyền một
+ * micro-giây nào giữa chừng.
+ */
+async function writeRoles(id: string, codes: readonly Role[]): Promise<void> {
+  await db().execute(sql`
+    with wanted as (
+      select code, sort_order from roles where code = any(${sql.param(codes)}::text[])
+    ),
+    removed as (
+      delete from user_roles
+       where user_id = ${id} and role_code not in (select code from wanted)
+    ),
+    added as (
+      insert into user_roles (user_id, role_code)
+      select ${id}, code from wanted
+      on conflict do nothing
+    )
+    update users
+       set roles = coalesce((select array_agg(code order by sort_order) from wanted), '{}'::text[]),
+           role = ${legacyRoleOf(codes)},
+           updated_at = now()
+     where id = ${id}
+  `);
+}
+
+/**
+ * Tạo người kèm vai — cũng MỘT câu lệnh, cùng lý lẽ với `writeRoles`.
+ *
+ * Ca hỏng mà nó bịt rất cụ thể: hàng users vào được, phép cấp vai ngã ⇒ một Chưởng môn vừa
+ * được lập ra nhưng không mang vai nào, còn trưởng môn thì nhìn thấy một thông báo lỗi và
+ * không có cách nào biết người ấy đã tồn tại hay chưa. Trả giá bằng việc mất kiểm kiểu của
+ * drizzle cho bảy tên cột — nên `npm run verify:roles` chạy đúng đường này với vai kèm theo.
+ */
 export async function adminCreate(input: {
   username: string;
   displayName: string;
@@ -210,21 +285,30 @@ export async function adminCreate(input: {
     return { ok: false, error: "Email này đã được dùng cho một đạo hiệu khác." };
   }
 
-  const rows = await db()
-    .insert(schema.users)
-    .values({
-      username: input.username.toLowerCase(),
-      displayName: input.displayName.trim(),
-      email,
-      passwordHash: hashPassword(input.password),
-      roles: input.roles,
-      role: legacyRoleOf(input.roles),
-      status: input.status,
-    })
-    .onConflictDoNothing()
-    .returning({ id: schema.users.id });
+  const codes = normalizeRoles(input.roles);
+  const result = await db().execute(sql`
+    with new_user as (
+      insert into users (username, display_name, email, password_hash, roles, role, status)
+      values (
+        ${input.username.toLowerCase()},
+        ${input.displayName.trim()},
+        ${email},
+        ${hashPassword(input.password)},
+        ${sql.param(codes)}::text[],
+        ${legacyRoleOf(codes)},
+        ${input.status}
+      )
+      on conflict do nothing
+      returning id
+    ),
+    granted as (
+      insert into user_roles (user_id, role_code)
+      select nu.id, r.code from new_user nu join roles r on r.code = any(${sql.param(codes)}::text[])
+    )
+    select id from new_user
+  `);
 
-  if (rows.length === 0) {
+  if (result.rows.length === 0) {
     if (await findByUsername(input.username)) {
       return { ok: false, error: "Đạo hiệu này đã có người dùng." };
     }
@@ -256,22 +340,35 @@ export async function adminUpdate(
   if (input.displayName !== undefined) patch.displayName = input.displayName.trim();
   if (input.email !== undefined) patch.email = input.email.trim().toLowerCase();
   if (input.password) patch.passwordHash = hashPassword(input.password);
-  if (input.roles) {
-    patch.roles = input.roles;
-    patch.role = legacyRoleOf(input.roles);
-  }
   if (input.tags) patch.tags = input.tags;
   if (input.status) patch.status = input.status;
 
   try {
     await db().update(schema.users).set(patch).where(eq(schema.users.id, id));
-    return { ok: true };
   } catch (error) {
     if (isUniqueViolation(error)) {
       return { ok: false, error: "Email này đã được dùng cho một đạo hiệu khác." };
     }
     throw error;
   }
+
+  /**
+   * Vai đi SAU cùng, và là câu lệnh riêng — `user_roles` là bảng khác nên không nhét chung
+   * vào phép cập nhật hàng users được.
+   *
+   * Sau cùng thì hỏng ở đâu cũng đỡ đau: hồ sơ đã ghi, quyền giữ NGUYÊN như trước lượt sửa —
+   * tức đúng trạng thái mà trưởng môn đang nhìn thấy lúc bấm. Thứ tự ngược lại là cấp hay
+   * thu quyền xong rồi báo lỗi, để lại một người vừa đổi quyền mà không ai chủ ý.
+   *
+   * Và cả hai câu đều ghi TRỌN trạng thái mong muốn (không phải delta), còn form thì gửi trọn
+   * trạng thái ấy, nên bấm Lưu lại lần nữa là hội tụ — chính là điều thông báo lỗi đang bảo
+   * người ta làm.
+   */
+  if (input.roles) {
+    await writeRoles(id, normalizeRoles(input.roles));
+  }
+
+  return { ok: true };
 }
 
 /** Self-service profile update; role, status, username and password remain out of reach. */
@@ -375,10 +472,12 @@ export async function adminDelete(id: string): Promise<{ ok: true } | { ok: fals
   }
 
   if (target.roles.includes("gia-chu")) {
+    // Đếm thẳng trên `user_roles` — đây là phép hỏi mà `user_roles_role_code_idx` sinh ra để
+    // phục vụ, và nó không phải quét bảng users nữa.
     const owners = await db()
       .select({ n: sql<number>`count(*)::int` })
-      .from(schema.users)
-      .where(sql`'gia-chu' = any(${schema.users.roles})`);
+      .from(schema.userRoles)
+      .where(eq(schema.userRoles.roleCode, "gia-chu"));
     if ((owners[0]?.n ?? 0) <= 1) {
       return { ok: false, error: "Không thể xoá Gia chủ cuối cùng — truyền ngôi trước đã." };
     }

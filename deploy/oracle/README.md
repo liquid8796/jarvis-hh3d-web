@@ -71,7 +71,7 @@ tàng khố — không bao giờ đưa cho người dùng (họ có linh phù ri
 | SSH | `ssh -i ~/.ssh/jarvis_oci_ed25519 ubuntu@144.24.177.55` |
 | service | `auto-hh3d-linh-su.service` |
 | thư mục | `/opt/auto-hh3d/linh-su` |
-| env | `/opt/auto-hh3d/linh-su/.env` (`WEB_URL`, `WORKER_TOKEN`, `WORKER_ID=tong-mon-linhsu`) |
+| env | `/opt/auto-hh3d/linh-su/.env` (`WEB_URL`, `WORKER_TOKEN`, `WORKER_ID=tong-mon-khoiloi`) |
 
 ### Cài đè engine mới (phát hành)
 

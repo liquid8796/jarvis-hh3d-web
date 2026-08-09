@@ -11,6 +11,27 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.58.2 — khôi lỗi tông môn đổi tên thành `tong-mon-khoiloi`
+
+Trang Hàng Đợi vẽ THẲNG `worker_id` của đàn đã có khôi lỗi nhận (chỉ đàn chưa ai nhận mới ra
+nhãn đẹp「khôi lỗi tông môn」), nên cái tên `tong-mon-linhsu` hiện trên màn hình là DỮ LIỆU,
+không phải một chuỗi trong mã nguồn. Đổi nó là đổi ba nơi, và thứ tự bắt buộc:
+
+1. `WORKER_ID` trong `/opt/auto-hh3d/linh-su/.env` trên VM, rồi restart. Phải TRƯỚC — đổi
+   database trước thì nhịp tim kế tiếp lập tức dựng lại dòng cũ (`workers` là upsert theo id).
+2. Migration 0019: bảng `workers` và 51 dòng `automation_jobs.worker_id`.
+3. Bảng env trong `deploy/oracle/README.md`.
+
+**Cái giá của thứ tự ấy, và là lý do 0019 không phải một câu `UPDATE workers SET id`:** khôi
+lỗi khởi động lại và tự đăng ký tên mới chỉ trong vài giây, nên tới lúc migration chạy thì
+`tong-mon-khoiloi` ĐÃ tồn tại — đổi tên dòng cũ sang nó là đụng khoá chính. Đã ngã thật ở lần
+chạy đầu. Bản sau: đổi tên nếu chỗ mới còn trống, còn nếu đã có người thì kéo `first_seen` sớm
+hơn về dòng mới rồi mới xoá dòng cũ — nhờ vậy tông môn không mất ngày 04/08, ngày khôi lỗi lên
+ca lần đầu.
+
+Không đụng khôi lỗi máy nhà (`desktop-…`, `lt-…`) và đàn chưa ai nhận. Người dùng OS `linhsu`
+trên VM giữ nguyên — đó là tài khoản hệ thống, không phải cái tên hiện trên màn hình.
+
 ## 0.58.1 — vai PHÀM NHÂN cho người chờ duyệt, và mọi môn đồ thành Đệ tử
 
 Thang vai còn NĂM, `pham-nhan` đứng cuối vì nó là bậc thấp nhất — chưa nhập môn:

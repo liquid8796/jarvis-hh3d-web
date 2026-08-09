@@ -1,5 +1,6 @@
 import { SHELL_WIDTH, SiteHeader } from "@/components/SiteHeader";
 import { requireActiveUser } from "@/lib/auth/guards";
+import { hasPermission } from "@/lib/auth/permissions";
 import { getQueueSnapshot } from "@/lib/services/queue";
 import { QueueBoard } from "./QueueBoard";
 
@@ -38,7 +39,10 @@ export default async function QueuePage() {
           </p>
         </div>
 
-        <QueueBoard initial={snapshot} />
+        {/* Quyền tính Ở SERVER rồi mới truyền xuống. Cờ này chỉ quyết định có VẼ nút hay
+            không — luật thật gác trong `forceStopJobAction`, vì một cái nút ẩn thì fetch vẫn
+            gọi tới được. */}
+        <QueueBoard initial={snapshot} canForceStop={hasPermission(user, "job.force_stop")} />
       </main>
     </>
   );

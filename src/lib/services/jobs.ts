@@ -272,6 +272,77 @@ export async function requestStopForAccount(userId: string, accountId: string): 
   return rows.length > 0;
 }
 
+/**
+ * Kết cục một lượt dừng cưỡng bức. Ba nhánh CÓ THẬT, không phải một cờ boolean cho gọn: người
+ * bấm nút cần biết mình vừa dừng hẳn được một đàn, hay chỉ vừa gửi đi một lời nhắn mà khôi lỗi
+ * còn phải chạy nốt vòng — hai chuyện ấy khác nhau tới vài chục phút chờ.
+ */
+export type ForceStopOutcome =
+  | { ok: true; ended: boolean }
+  | { ok: false; reason: "not-found" | "already-stopping" };
+
+/**
+ * Dừng MỘT đàn theo id, bất kể của ai — nút Dừng trên trang Hàng Đợi.
+ *
+ * Phân quyền KHÔNG nằm ở đây mà ở action gọi vào (`job.force_stop`): tầng này chỉ biết dừng,
+ * và đó là chủ ý — một hàm service tự đoán quyền là một luật thứ hai sống lệch luật thật.
+ *
+ * Ngữ nghĩa mượn NGUYÊN của `requestStop`, không mạnh hơn: `queued` chết ngay, `running` đổi
+ * sang `stopping` rồi khôi lỗi tự thu ở điểm an toàn kế tiếp. Cân nhắc rồi mới chọn thế —
+ * một lệnh giết cứng (ép thẳng `stopped`) sẽ để khôi lỗi chạy nốt vòng rồi báo cáo vào một
+ * job đã terminal, và `reapStaleJobs` vốn đã dọn hộ ca khôi lỗi CHẾT trong 3 phút. Cái còn
+ * lại — khôi lỗi SỐNG mà vòng nào cũng hỏng rồi tự xếp lại — chính là ca cần lệnh này, và
+ * `stopping` cắt đúng vòng lặp ấy.
+ *
+ * Tự-join `prev` để biết trạng thái CŨ trong cùng một câu lệnh: `returning` chỉ trả về hàng
+ * MỚI, mà không có trạng thái cũ thì không phân biệt nổi "vừa dừng" với "đã dừng từ trước" —
+ * và bấm lại một đàn đang dừng sẽ đẻ thêm một dòng nhật ký nói dối là vừa có lệnh mới. Cùng
+ * lối nghĩ với `setAvatar` bên users.ts.
+ */
+export async function forceStopJob(jobId: string, actorName: string): Promise<ForceStopOutcome> {
+  const changed = await db().execute(sql`
+    update automation_jobs as job set
+      status = case
+        when job.status = 'queued' then 'stopped'::job_status
+        else 'stopping'::job_status
+      end,
+      finished_at = case when job.status = 'queued' then now() else job.finished_at end,
+      next_run_at = case when job.status = 'queued' then now() else job.next_run_at end
+    from automation_jobs as prev
+    where job.id = ${jobId}
+      and prev.id = job.id
+      and job.status in ('queued', 'running', 'stopping')
+    returning prev.status as was, job.user_id, job.status as now
+  `);
+
+  const row = changed.rows[0] as { was: string; user_id: string; now: string } | undefined;
+  // Không có hàng nào: id bịa, hoặc đàn đã về đích/đã dừng xong trước khi nút kịp bấm. Cả hai
+  // đều là "không còn gì để dừng" dưới mắt người dùng.
+  if (!row) return { ok: false, reason: "not-found" };
+  if (row.was === "stopping") return { ok: false, reason: "already-stopping" };
+
+  const ended = row.now === "stopped";
+  await addEvent(
+    jobId,
+    "warning",
+    ended
+      ? `Bậc trị sự「${actorName}」đã dừng đàn này — vòng kế chưa kịp bắt đầu.`
+      : `Bậc trị sự「${actorName}」đã dừng đàn này — khôi lỗi sẽ thu ở điểm an toàn kế tiếp.`,
+  );
+
+  /**
+   * Đánh thức realtime, thứ mà `requestStop` (nút Thu Đàn của chính chủ) KHÔNG làm — nó chỉ
+   * `revalidatePath("/dashboard")`, nên bảng Hàng Đợi phải đợi tới nhịp soát 30 giây.
+   *
+   * Ở đây thì không được phép đợi: người ra lệnh đang đứng nhìn đúng cái bảng ấy, và chủ nhân
+   * đàn cần biết ngay vì sao đàn của mình dừng. Kênh Hàng Đợi không lọc theo userId nên một
+   * tín hiệu đánh thức cả hai màn hình.
+   */
+  await notifyDashboard({ userId: String(row.user_id), topic: "job" });
+
+  return { ok: true, ended };
+}
+
 async function announceStops(rows: Array<Record<string, unknown>>): Promise<void> {
   for (const row of rows) {
     const stoppedNow = String(row.status) === "stopped";

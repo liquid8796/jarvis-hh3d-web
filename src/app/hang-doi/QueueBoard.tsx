@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { forceStopJobAction } from "@/app/actions/queue";
 import type { QueueEntry, QueueSnapshot } from "@/lib/services/queue";
 import type { JobStatus } from "@/lib/realtime/dashboardTypes";
 
@@ -75,8 +76,21 @@ function questPhrase(entry: QueueEntry): string | null {
   return progress.running.length > 0 ? progress.running.join(" · ") : "đang chuẩn bị…";
 }
 
-export function QueueBoard({ initial }: { initial: QueueSnapshot }) {
+export function QueueBoard({
+  initial,
+  canForceStop,
+}: {
+  initial: QueueSnapshot;
+  canForceStop: boolean;
+}) {
   const [snapshot, setSnapshot] = useState(initial);
+  /**
+   * Lời báo của lần dừng gần nhất. MỘT chỗ duy nhất cho cả bảng, không phải mỗi dòng một chỗ:
+   * người ta bấm dừng xong thì dòng ấy đổi trạng thái ngay (hoặc biến mất khỏi hàng đợi), nên
+   * một lời báo neo vào dòng sẽ trôi mất cùng với dòng.
+   */
+  const [notice, setNotice] = useState<{ ok: boolean; message: string } | null>(null);
+  const [stoppingId, setStoppingId] = useState<string | null>(null);
   /**
    * CHỈ nói về kênh SSE, không nói về việc dữ liệu có tới hay không. Nếu để lưới an toàn
    * cũng bật cờ này thì lúc kênh trực tiếp đã đứt mà poll vẫn chạy, màn hình sẽ khoe "trực
@@ -97,6 +111,43 @@ export function QueueBoard({ initial }: { initial: QueueSnapshot }) {
       inFlight.current = false;
     }
   }, []);
+
+  /**
+   * Dòng này còn dừng được không.
+   *
+   * `stopping` KHÔNG có nút, và đó là chủ ý: lệnh đã gửi rồi, khôi lỗi đang thu ở điểm an
+   * toàn. Vẽ thêm một cái nút cho nó là mời người ta bấm lại vì sốt ruột, rồi nhận một câu
+   * "đã nhận lệnh từ trước" — một cái nút chỉ để bị từ chối thì thà đừng có.
+   */
+  const canStop = (entry: QueueEntry) =>
+    canForceStop && (entry.status === "queued" || entry.status === "running");
+
+  /**
+   * Dừng một đàn. Hỏi lại trước khi làm — đây là việc đụng vào lượt chạy của NGƯỜI KHÁC, và
+   * họ sẽ mất phần việc còn dở của vòng này.
+   *
+   * `refresh()` sau khi xong dù server đã đánh thức kênh SSE: tín hiệu ấy đi qua Postgres rồi
+   * vòng lại, còn người vừa bấm thì đang nhìn chằm chằm vào cái dòng ấy. Một lượt hỏi thẳng
+   * cho họ câu trả lời ngay, và nếu kênh có tới sau thì nó chỉ vẽ lại đúng thứ đã vẽ.
+   */
+  const stop = async (entry: QueueEntry) => {
+    const who = entry.mine ? "đàn của chính mình" : `đàn của ${entry.owner}`;
+    if (!window.confirm(`Dừng ${who}? Vòng đang chạy sẽ không hoàn tất.`)) return;
+
+    setStoppingId(entry.id);
+    setNotice(null);
+    try {
+      const result = await forceStopJobAction(entry.id);
+      setNotice(result);
+    } catch {
+      // Server action ngã (mạng chớp, deploy giữa chừng): nói ra chứ không im lặng, vì người
+      // dùng vừa bấm một nút và cần biết nó có ăn hay không.
+      setNotice({ ok: false, message: "Không gửi được lệnh dừng — thử lại sau một nhịp." });
+    } finally {
+      setStoppingId(null);
+      await refresh();
+    }
+  };
 
   useEffect(() => {
     const source = new EventSource("/api/queue/stream");
@@ -203,15 +254,41 @@ export function QueueBoard({ initial }: { initial: QueueSnapshot }) {
                   </span>
                 )}
 
-                {entry.workerKind && (
-                  <span className="ml-auto font-mono text-[11px] text-[var(--color-mist)]">
-                    {entry.workerId ?? (entry.workerKind === "sect" ? "khôi lỗi tông môn" : "khôi lỗi riêng")}
+                {/* Cụm đuôi dòng gom làm MỘT và tự đẩy sang phải. Trước đây nhãn khôi lỗi tự
+                    mang `ml-auto`, nhưng dòng đang xếp hàng thì chưa có khôi lỗi nào — nút
+                    Dừng sẽ dính vào giữa dòng. Gom lại thì cả hai ca đều thẳng mép phải. */}
+                {(entry.workerKind || canStop(entry)) && (
+                  <span className="ml-auto flex items-center gap-2">
+                    {entry.workerKind && (
+                      <span className="font-mono text-[11px] text-[var(--color-mist)]">
+                        {entry.workerId ?? (entry.workerKind === "sect" ? "khôi lỗi tông môn" : "khôi lỗi riêng")}
+                      </span>
+                    )}
+                    {canStop(entry) && (
+                      <button
+                        type="button"
+                        className="btn btn-danger px-2.5 py-1 text-xs"
+                        disabled={stoppingId !== null}
+                        onClick={() => void stop(entry)}
+                      >
+                        {stoppingId === entry.id ? "Đang dừng…" : "Dừng"}
+                      </button>
+                    )}
                   </span>
                 )}
               </li>
             );
           })}
         </ul>
+      )}
+
+      {notice && (
+        <p
+          role="status"
+          className={`mt-4 text-sm ${notice.ok ? "text-[var(--color-jade-300)]" : "text-[#f2a0a0]"}`}
+        >
+          {notice.message}
+        </p>
       )}
     </section>
   );

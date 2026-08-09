@@ -87,6 +87,7 @@ export const PERMISSIONS = [
   "role_bearer.manage",
   "role.assign",
   "chat.purge",
+  "job.force_stop",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -96,6 +97,7 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   "role_bearer.manage": "Quản cả người mang vai",
   "role.assign": "Ban và thu vai",
   "chat.purge": "Thanh tẩy sảnh đàm đạo",
+  "job.force_stop": "Dừng đàn của người khác",
 };
 
 /**
@@ -106,13 +108,29 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
 const TRI_SU_PERMISSIONS = ["admin.panel", "member.manage"] as const satisfies readonly Permission[];
 
 /**
+ * Thái thượng trưởng lão = bậc trị sự CỘNG quyền dừng đàn của người khác.
+ *
+ * Đây là lần ĐẦU TIÊN ba vai bậc trị sự thôi ngang nhau, nên nó đáng một dòng giải thích chứ
+ * không được lẳng lặng trôi qua: từ 09/08/2026 tông chủ giao cho vai này việc gỡ những đàn
+ * kẹt mãi không thông trên trang Hàng Đợi. Chưởng môn và Trưởng môn KHÔNG có — cố ý, vì
+ * dừng đàn là đụng vào việc đang chạy của người khác, và tông môn muốn ít tay chạm vào đó.
+ *
+ * Câu「ba vai ngang nhau」ở đầu tệp vẫn đúng ở CHỖ NÓ NÓI: quản người. Chỗ chúng khác nhau
+ * giờ là đây, và chỉ đây.
+ */
+const THAI_THUONG_PERMISSIONS = [
+  ...TRI_SU_PERMISSIONS,
+  "job.force_stop",
+] as const satisfies readonly Permission[];
+
+/**
  * Gia chủ nhận NGUYÊN `PERMISSIONS`, không phải một danh sách chép tay. Nhờ vậy "Gia chủ
  * nghiễm nhiên có mọi quyền" thành đúng theo cấu tạo: thêm một quyền mới là Gia chủ có ngay,
  * không cần ai nhớ thêm tên nó vào một chỗ thứ hai.
  */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   "gia-chu": PERMISSIONS,
-  "thai-thuong-truong-lao": TRI_SU_PERMISSIONS,
+  "thai-thuong-truong-lao": THAI_THUONG_PERMISSIONS,
   "chuong-mon": TRI_SU_PERMISSIONS,
   /**
    * Đệ tử KHÔNG mở được việc gì cả, và mảng rỗng này là một lời khai chứ không phải một chỗ

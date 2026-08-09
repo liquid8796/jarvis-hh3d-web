@@ -176,21 +176,53 @@ for (const role of ASSIGNABLE_ROLES) {
   }
 }
 
-/** Ba quyền chỉ Gia chủ được nắm. Đây là chỗ thang vai thật sự tách làm hai bậc. */
-const OWNER_ONLY = ["role_bearer.manage", "role.assign", "chat.purge"] as const satisfies readonly Permission[];
-for (const permission of OWNER_ONLY) {
-  for (const person of [elder, master]) {
-    assert(!hasPermission(person, permission), `vai bậc trị sự KHÔNG được có quyền ${permission}`);
-  }
-  assert(hasPermission(owner, permission), `Gia chủ phải có quyền ${permission}`);
-}
+/**
+ * AI GIỮ QUYỀN GÌ — bảng viết tay, và là oracle mạnh nhất của tệp này.
+ *
+ * Trước 09/08/2026 chỗ này chỉ là một danh sách「ba quyền riêng của Gia chủ」, đủ dùng khi ba
+ * vai bậc trị sự còn ngang nhau y hệt. Ngày Thái thượng trưởng lão nhận riêng `job.force_stop`
+ * thì một danh sách như thế không nói được gì về sự khác biệt ấy — nó vẫn xanh dù ai đó lỡ
+ * tay ban quyền dừng đàn cho cả Trưởng môn.
+ *
+ * `Record<Permission, …>` nên thêm một mã quyền ở permissions.ts mà quên khai ở đây là KHÔNG
+ * biên dịch được. Và bảng này cố ý KHÔNG suy từ `ROLE_PERMISSIONS` — suy ra từ chính hằng số
+ * đang bị kiểm thì phép thử chỉ chứng minh code bằng code.
+ */
+const PERMISSION_HOLDERS: Record<Permission, readonly Role[]> = {
+  "admin.panel": ["gia-chu", "thai-thuong-truong-lao", "chuong-mon"],
+  "member.manage": ["gia-chu", "thai-thuong-truong-lao", "chuong-mon"],
+  "role_bearer.manage": ["gia-chu"],
+  "role.assign": ["gia-chu"],
+  "chat.purge": ["gia-chu"],
+  // Chỉ Gia chủ và Thái thượng trưởng lão. Chưởng môn và Trưởng môn KHÔNG — đây chính là
+  // chỗ ba vai bậc trị sự thôi ngang nhau, nên nó phải có một dòng đứng canh.
+  "job.force_stop": ["gia-chu", "thai-thuong-truong-lao"],
+};
+
 for (const permission of PERMISSIONS) {
+  for (const role of ASSIGNABLE_ROLES) {
+    const want = PERMISSION_HOLDERS[permission].includes(role);
+    const got = hasPermission({ roles: [role] }, permission);
+    assert(got === want, `vai ${role} × quyền ${permission}: code nói ${got}, bảng oracle nói ${want}`);
+  }
   assert(!hasPermission(member, permission), `môn đồ thường không được có quyền nào, kể cả ${permission}`);
   assert(!hasPermission({ roles: ["choi-choi"] }, permission), `một mã vai bịa không được mở ra quyền ${permission}`);
 }
+
+// Đeo thêm một danh xưng KHÔNG được lấy mất quyền đang có — `de-tu` là vai rỗng quyền, và
+// phép hỏi quét mọi vai người ta mang, nên nó không thể trừ đi của ai cái gì.
+assert(
+  hasPermission({ roles: ["thai-thuong-truong-lao", "de-tu"] }, "job.force_stop"),
+  "Thái thượng trưởng lão đeo thêm danh xưng đệ tử vẫn phải dừng được đàn",
+);
+assert(
+  !hasPermission({ roles: ["chuong-mon", "de-tu"] }, "job.force_stop"),
+  "Chưởng môn gom thêm danh xưng nào cũng KHÔNG ra được quyền dừng đàn",
+);
+
 console.log(
-  `✔ Bảng quyền: ${PERMISSIONS.length} mã, vai nào cũng có phần, Gia chủ trùm hết, ` +
-    `${OWNER_ONLY.length} quyền riêng của Gia chủ.`,
+  `✔ Bảng quyền: ${PERMISSIONS.length} mã × ${ASSIGNABLE_ROLES.length} vai quét trọn theo bảng oracle, ` +
+    `Gia chủ trùm hết, dừng đàn chỉ Gia chủ + Thái thượng trưởng lão.`,
 );
 
 // ---- Ai quản được ai: quét TRỌN ma trận ----------------------------------------------

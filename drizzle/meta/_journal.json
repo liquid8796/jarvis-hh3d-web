@@ -120,6 +120,13 @@
       "when": 1786248639720,
       "tag": "0016_drop_admin_role",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786252800000,
+      "tag": "0017_job_force_stop_permission",
+      "breakpoints": true
     }
   ]
 }

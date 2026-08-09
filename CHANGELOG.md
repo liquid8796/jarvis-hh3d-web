@@ -11,6 +11,32 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.52.1 — thẻ Khung Tag dời sang tab Đàm Đạo, và sổ khung về một nguồn
+
+- **Thẻ「Khung Tag」chuyển từ tab Môn Đồ sang tab Đàm Đạo**, đứng giữa hạn lưu và nút thanh
+  tẩy. Khung là chuyện của Phòng Chat nên nó ở cùng chỗ với mọi núm khác của Phòng Chat; thứ
+  tự trong tab theo mức nguy hiểm, thứ không có đường lui đứng cuối.
+- Đây KHÔNG phải một cú cắt-dán, và chỗ đó là phần đáng kể của bản vá: thẻ ấy đang là **nguồn
+  nuôi chip tag** trong hộp Sửa (tab Môn Đồ) qua `onFramesChange`. Hai tab là hai nhánh cây
+  khác nhau, nên dời thẻ đi là đứt dây — chip sẽ lặng lẽ đông cứng ở bộ mặc định.
+- **Sổ khung nay đi vào bằng PROP từ trang** thay vì mỗi bên tự `fetch`. Trang admin (server
+  component) vốn đã đọc `getAppSettings()` để lấy hạn lưu, nên sổ nằm sẵn trong tay — truyền
+  xuống cả `TagFrameManager` lẫn `UserTable` là xong. Chọn cách này thay vì cho mỗi bên tự
+  fetch vì `AdminTabs` chỉ bật `hidden` chứ không unmount: hai bản sao sẽ LỆCH NHAU thật —
+  thêm khung ở tab này, sang tab kia vẫn thấy danh sách cũ nằm nguyên đó.
+- Sau mỗi lần ghi thì `router.refresh()`. Route đã `revalidatePath("/admin")` từ đầu nhưng một
+  route handler không tự làm client vẽ lại (khác server action), nên lời gọi ấy trước nay
+  không có tác dụng gì; giờ nó mới thật sự dùng được.
+- **Gỡ `GET /api/admin/tag-frames`** — không còn ai gọi, và một endpoint đọc song song với
+  prop của trang là một đường thứ hai tới cùng dữ liệu, thứ chỉ chờ ngày trả lời lệch nhau.
+- Nút bị khoá tới khi server vẽ lại XONG (`sending || refreshing`), không chỉ tới khi `fetch`
+  xong — giữa hai mốc ấy danh sách trên màn hình vẫn là sổ cũ.
+- **`npm run shot` thêm `--click`** để chụp được giao diện có TAB (tab là state client nên URL
+  không chở tới đó được): `npm run shot -- --path admin --click "text=Đàm Đạo"`.
+- Kiểm trên trình duyệt thật, gồm cả phép thử đắt nhất: thêm một khung ở tab Đàm Đạo thì chip
+  bên tab Môn Đồ **tự mọc theo (5 → 6)** rồi gỡ ra là cả hai về lại 5 — đúng cái sẽ hỏng nếu
+  chỉ cắt-dán. Sổ sau đó về đúng 5 khung, không sót rác.
+
 ## 0.52.0 — thu hồi hai cột vai di sản, và ba phép thử đỏ kinh niên
 
 Nửa sau của 0.48.0: `user_roles` đã cầm sự thật trọn một nhịp deploy, giờ dọn nốt gương.

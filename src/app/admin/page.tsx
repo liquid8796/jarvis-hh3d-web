@@ -7,6 +7,7 @@ import { countPending, listUsers } from "@/lib/services/users";
 import { AdminTabs } from "./AdminTabs";
 import { ChatPurgePanel } from "./ChatPurgePanel";
 import { ChatSettingsForm } from "./ChatSettingsForm";
+import { TagFrameManager } from "./TagFrameManager";
 import { GameDomainForm } from "./GameDomainForm";
 import { MaintenanceForm } from "./MaintenanceForm";
 import { MembershipSettingsForm } from "./MembershipSettingsForm";
@@ -80,18 +81,28 @@ export default async function AdminPage({
                     />
                     <CreateUserPanel viewer={viewer} />
                   </div>
-                  <UserTable viewer={viewer} users={users} query={params.q ?? ""} status={status ?? ""} />
+                  {/* Sổ khung được QUẢN ở tab Đàm Đạo, nhưng chip tag trong hộp Sửa nằm đây
+                      — nên nhãn khung đi xuống từ trang, một nguồn cho cả hai tab. */}
+                  <UserTable
+                    viewer={viewer}
+                    users={users}
+                    query={params.q ?? ""}
+                    status={status ?? ""}
+                    frameLabels={settings.chat.tagFrames.map((frame) => frame.label)}
+                  />
                 </>
               ),
             },
             {
               key: "damDao",
               label: "Đàm Đạo",
-              // Hạn lưu và thanh tẩy là hai thẻ RỜI nhau: cùng một tab vì cùng nói về sảnh
-              // đàm đạo, nhưng không chung form — xem ghi chú trong ChatPurgePanel.
+              // Ba thẻ RỜI nhau: cùng một tab vì cùng nói về sảnh đàm đạo, nhưng không chung
+              // form — xem ghi chú trong ChatPurgePanel. Thứ tự theo mức nguy hiểm: chỉnh hạn
+              // lưu, rồi quản khung, và thanh tẩy — thứ không có đường lui — đứng cuối.
               pane: (
                 <div className="flex flex-col gap-6">
                   <ChatSettingsForm retentionDays={settings.chat.retentionDays} />
+                  <TagFrameManager frames={settings.chat.tagFrames} />
                   <ChatPurgePanel canPurge={hasPermission(viewer, "chat.purge")} />
                 </div>
               ),

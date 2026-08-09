@@ -56,6 +56,14 @@ const height = Number(arg("height", "1000"));
 /** Chờ một phần tử cụ thể xuất hiện trước khi bấm máy — trang có poll thì HTML đầu còn trống. */
 const waitFor = arg("wait");
 
+/**
+ * Bấm một thứ trước khi chụp — cần cho mọi giao diện có TAB, vì tab là state của client nên
+ * URL không chở tới đó được. Nhận cả selector CSS lẫn `text=…` của Playwright:
+ *
+ *   npm run shot -- --path admin --click "text=Đàm Đạo" --out anh.png
+ */
+const clickFirst = arg("click");
+
 if (!Number.isInteger(width) || !Number.isInteger(height) || width < 320 || height < 240) {
   throw new Error(`--width/--height phải là số nguyên hợp lý, nhận ${width}x${height}.`);
 }
@@ -114,6 +122,10 @@ try {
   const res = await page.goto(`${origin}${path}`, { waitUntil: "networkidle", timeout: 45_000 });
   console.log(`• ${path} → HTTP ${res?.status()} (đóng vai @${user.username}${roles.length ? ` [${roles.join(", ")}]` : ""})`);
 
+  if (clickFirst) {
+    await page.click(clickFirst, { timeout: 20_000 });
+    console.log(`• đã bấm「${clickFirst}」`);
+  }
   if (waitFor) {
     await page.waitForSelector(waitFor, { timeout: 20_000 });
   }

@@ -4,7 +4,7 @@ import { currentUser } from "@/lib/auth/guards";
 import { isAdminUser } from "@/lib/auth/permissions";
 import { deleteObject, mediaStoreReady, putTagFrameFile, sniffImageKind } from "@/lib/services/media";
 import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
-import { MAX_TAG_LENGTH, frameByLabel, normalizeTagLabel } from "@/lib/validation/tags";
+import { MAX_TAG_LENGTH, frameByLabel } from "@/lib/validation/tags";
 
 /**
  * Sổ khung tag: POST thêm một khung (multipart — bài vị nặng vài MB, vượt xa trần 1MB của
@@ -43,18 +43,10 @@ async function requireAdminApi() {
 }
 
 /**
- * Sổ khung cho trang Tông Môn. Tồn tại để thẻ quản khung TỰ nuôi dữ liệu của nó — trang
- * admin (server component) đang là chỗ nhiều phiên cùng sửa, một thẻ client tự lo lấy sổ
- * thì không phải chen thêm prop nào vào đó.
+ * KHÔNG có GET: sổ khung đi tới giao diện bằng prop từ `admin/page.tsx` (trang ấy đã đọc
+ * `getAppSettings()` sẵn), nên một endpoint đọc là một đường thứ hai tới cùng dữ liệu — thứ
+ * chỉ chờ ngày trả lời lệch với trang. Route này chỉ GHI.
  */
-export async function GET() {
-  const guard = await requireAdminApi();
-  if (guard.error) return guard.error;
-
-  const settings = await getAppSettings();
-  return NextResponse.json({ frames: settings.chat.tagFrames });
-}
-
 export async function POST(request: Request) {
   const guard = await requireAdminApi();
   if (guard.error) return guard.error;

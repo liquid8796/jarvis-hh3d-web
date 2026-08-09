@@ -18,7 +18,6 @@ import {
 } from "@/lib/auth/permissions";
 import { MAX_TAGS, MAX_TAG_LENGTH, TAG_PRESETS, parseTags, splitTags } from "@/lib/validation/tags";
 import type { PublicUser } from "@/lib/services/users";
-import { TagFrameManager } from "./TagFrameManager";
 
 /**
  * Bảng môn đồ. Ô tìm kiếm ghi vào URL (debounce 300ms) nên kết quả chia sẻ được và F5 vẫn
@@ -49,12 +48,19 @@ export function UserTable({
   users,
   query,
   status,
+  frameLabels,
 }: {
   /** Người đang ngồi ghế trị sự — quyết định nút nào hiện ra. Luật thật vẫn gác ở server. */
   viewer: PublicUser;
   users: PublicUser[];
   query: string;
   status: string;
+  /**
+   * Nhãn của các khung tag đang có trong sổ — nguồn cho chip bấm-chọn ở hộp Sửa. Đi vào bằng
+   * prop từ trang (server) chứ không tự fetch: sổ được quản ở tab Đàm Đạo, hai tab là hai
+   * nhánh cây khác nhau, và cả hai phải nhìn đúng MỘT sổ. Xem TagFrameManager.
+   */
+  frameLabels: string[];
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -93,12 +99,11 @@ export function UserTable({
     act(() => deleteUserAction(user.id));
   };
 
-  // Chip tag trong hộp Sửa: nhãn từ sổ khung khi sổ đã về, TAG_PRESETS khi sổ trống hay chưa
-  // tải xong — chip không được phép biến mất chỉ vì một lượt fetch còn đang bay.
-  const [presets, setPresets] = useState<readonly string[]>(TAG_PRESETS);
+  // Chip tag trong hộp Sửa: nhãn từ sổ khung, và TAG_PRESETS khi sổ còn trống — chip không
+  // được phép biến mất chỉ vì tông môn chưa gieo khung nào.
+  const presets: readonly string[] = frameLabels.length > 0 ? frameLabels : TAG_PRESETS;
 
   return (
-    <>
     <section className="card card-hairline p-6">
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <input
@@ -230,15 +235,6 @@ export function UserTable({
         />
       )}
     </section>
-
-    {/* Sổ khung nằm NGAY DƯỚI bảng: đặt tag ở hộp Sửa, quản bài vị của tag ở đây — một tầm
-        mắt. Nó cũng là nguồn nuôi chip: sổ về tới đâu, chip trong hộp Sửa mọc theo tới đó. */}
-    <TagFrameManager
-      onFramesChange={(frames) =>
-        setPresets(frames.length > 0 ? frames.map((frame) => frame.label) : TAG_PRESETS)
-      }
-    />
-    </>
   );
 }
 

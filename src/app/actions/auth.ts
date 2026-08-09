@@ -73,7 +73,15 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
     return { error: "Đạo hiệu hoặc mật khẩu không đúng." };
   }
 
-  await createSession({ sub: user.id, username: user.username, role: user.role });
+  // Cùng một phép suy như đường bái sư ở trên, và phải cùng: claim `role` là di sản hai giá
+  // trị (`user|admin`), nên nó được SOI XUỐNG từ vai thật chứ không đọc cột `users.role`.
+  // Đọc cột ấy là đường CUỐI CÙNG còn tin vào gương — và là đường đăng nhập, tức chỗ tệ nhất
+  // để một cột sắp bị drop còn được hỏi tới.
+  await createSession({
+    sub: user.id,
+    username: user.username,
+    role: isAdminUser(user) ? "admin" : "user",
+  });
 
   const next = String(formData.get("next") ?? "");
   if (next.startsWith("/") && !next.startsWith("//")) {

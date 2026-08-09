@@ -105,7 +105,9 @@ try {
 
   const openStored = await findById(openResult.user.id);
   assert(openStored?.status === "active", "cột status trong database phải là 'active'");
-  assert(openStored?.role === "user", "mở cổng KHÔNG được phát quyền trưởng môn cho ai");
+  // `roles` chứ không phải `role`: `PublicUser` bỏ cột di sản ấy từ lúc vai thành một TẬP HỢP,
+  // nên phép so cũ luôn là `undefined === "user"` — một phép thử đỏ quanh năm, tức không gác gì.
+  assert(openStored?.roles.length === 0, "mở cổng KHÔNG được phát quyền trưởng môn cho ai");
 
   // --- Tắt cổng không với tay ngược về quá khứ ------------------------------
   // Người đăng ký lúc cổng còn gác vẫn phải nằm nguyên trong hàng chờ; đây chính là cảnh báo

@@ -28,8 +28,6 @@ import type { CycleProgress } from "@/lib/realtime/dashboardTypes";
  * per-user config that changes from a form.
  */
 
-export const userRole = pgEnum("user_role", ["user", "admin"]);
-
 /**
  * pending — registered, waiting for an admin; can log in but sees only the waiting room.
  * active  — approved; automation features unlocked.
@@ -67,34 +65,19 @@ export const users = pgTable(
     email: text("email").unique(),
     passwordHash: text("password_hash").notNull(),
     /**
-     * CỘT DI SẢN — thay bằng `roles` từ 08/08/2026, còn nằm đây MỘT nhịp deploy nữa vì lý do
-     * expand-contract: migration chạy TRƯỚC deploy, và bản code cũ (vẫn đang phục vụ trong
-     * cửa sổ ấy) SELECT đích danh cột này — drop ngay là mọi trang 500 cho tới khi bản mới
-     * lên. Code mới không đọc nó, chỉ GHI GƯƠNG (mirror) để cửa sổ kia an toàn cả hai chiều.
-     * Migration kế tiếp sẽ drop cả cột lẫn enum user_role.
+     * KHÔNG có cột vai nào ở đây, và đó là chủ ý.
+     *
+     * Từng có hai: `role` (enum `user|admin`) rồi `roles` (`text[]`). Cả hai bị drop ở migration
+     * 0014 sau khi `user_roles` đã cầm sự thật được trọn một nhịp deploy. Thứ tự thu hồi NGƯỢC
+     * với thứ tự mở rộng, và nhầm chiều là hỏng thật:
+     *
+     *   • Thêm cột: migrate TRƯỚC, deploy sau — bản code cũ chưa biết cột mới, không sao.
+     *   • Bỏ cột:  deploy TRƯỚC, migrate sau — bản code cũ còn GHI vào cột ấy, drop sớm là
+     *              mọi lượt sửa người văng lỗi cho tới khi deploy xong.
+     *
+     * Ai cần vai thì hỏi `user_roles` (dưới đây), hoặc gọi `findById`/`findByUsername` — cả hai
+     * đã ghép sẵn mảng `roles` vào kết quả nên phía trên tầng service không thấy khác gì.
      */
-    role: userRole("role").notNull().default("user"),
-    /**
-     * CỘT DI SẢN THỨ HAI — vai thật đã dời sang bảng `user_roles` từ 09/08/2026; cột này ở lại
-     * đúng một nhịp deploy nữa, và CHỈ ĐƯỢC GHI GƯƠNG.
-     *
-     * Vì sao không drop luôn trong cùng migration: ở dự án này `npm run db:migrate` chạy TRƯỚC
-     * `vercel deploy` (README, Bước 4), nên trong khoảng giữa hai lệnh, bản code CŨ vẫn đang
-     * phục vụ và vẫn `select users.roles` ở mọi trang có phiên đăng nhập. Drop sớm là toàn site
-     * 500 cho tới khi deploy xong — không phải phòng xa, đó chính là lý do cột `role` phía trên
-     * còn sống.
-     *
-     * Cửa sổ ngược lại (đã migrate, chưa deploy) có một khe hẹp: bản code cũ đổi vai trong lúc
-     * ấy sẽ ghi cột này mà KHÔNG ghi `user_roles`. Chỉ Gia chủ đổi được vai và Gia chủ chính là
-     * người bấm deploy, nên khe ấy hẹp đúng bằng một lượt build; migration 0011 đã nhận đúng
-     * khe ấy khi dựng cột này từ `role`. Vá lại bằng cách chạy lại câu backfill trong
-     * `0013_roles_and_permissions.sql` — nó `on conflict do nothing` nên chạy mấy lần cũng vậy.
-     *
-     * Migration kế tiếp drop: `users.role`, `users.roles`, và enum `user_role`. Lúc ấy phải sửa
-     * theo `src/app/actions/auth.ts` (đang đọc `UserRow.roles` để đặt claim JWT) — nó vẫn đúng
-     * hôm nay vì `findByUsername` đắp đè cột này bằng phép đọc từ `user_roles`.
-     */
-    roles: text("roles").array().notNull().default(sql`ARRAY[]::text[]`),
     /**
      * Tag trang trí — hiện thành huy hiệu cạnh tên trong Phòng Chat. Do Trưởng môn/Gia chủ
      * ban (như đạo hiệu được ban trong môn phái), không phải tự nhận. Trần 3 tag × 20 ký tự

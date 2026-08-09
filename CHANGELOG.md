@@ -11,6 +11,34 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.52.0 — thu hồi hai cột vai di sản, và ba phép thử đỏ kinh niên
+
+Nửa sau của 0.48.0: `user_roles` đã cầm sự thật trọn một nhịp deploy, giờ dọn nốt gương.
+
+- **`users.role`, `users.roles` và enum `user_role` đã bị drop** (migration `0014`). Bảng
+  `users` không còn cột vai nào — vai là một quan hệ, và chỉ có một chỗ trả lời nó.
+- **Thứ tự thu hồi NGƯỢC với thứ tự mở rộng, và nhầm chiều là hỏng thật.** Thêm cột thì migrate
+  trước, deploy sau (bản cũ chưa biết cột mới). Bỏ cột thì **deploy trước, migrate sau** — bản
+  cũ còn *ghi* vào cột ấy, drop sớm là mọi lượt sửa người văng lỗi cho tới khi deploy xong.
+- **`0014` mở đầu bằng một chốt chặn, không xoá thẳng.** Nó đếm số đạo hữu còn vai trong cột
+  gương mà chưa có dòng nào trong `user_roles` rồi `RAISE EXCEPTION` nếu còn ai — vì với đúng
+  những người ấy, cột sắp bị xoá là bản DUY NHẤT còn giữ vai của họ, và một câu `DROP COLUMN`
+  thì không có nhật ký nào cả. Đây chính là khe hẹp mà 0.48.0 đã ghi lại: bản code cũ đổi vai
+  trong khoảng giữa migrate và deploy. Đã đo trước khi chạy: 0 người.
+- **Đường ĐĂNG NHẬP còn đọc cột di sản, và suýt bị bỏ quên.** `loginAction` đặt claim phiên từ
+  `user.role` trong khi đường bái sư ngay cạnh đã soi xuống từ vai thật — hai đường sinh đôi,
+  một đường bị bỏ lại. Chỗ tệ nhất để một cột sắp bị drop còn được hỏi tới.
+- **Ba phép thử đỏ quanh năm mà không ai biết, nay xanh thật:**
+  - `verify:membership` so `PublicUser.role` — cột chưa bao giờ có ở đó, nên phép so luôn là
+    `undefined === "user"`, tức nó không gác gì suốt từ lúc vai thành một TẬP HỢP.
+  - `smoke` có hai check dò NGUYÊN VĂN `user.role === "admin"` trong mã nguồn. Chúng vẫn kêu
+    "thiếu hàng rào" trong khi hàng rào có thật, chỉ là đã đổi tên thành `isAdminUser`. Một
+    phép thử dò nguyên văn nguồn phải được sửa cùng nhịp với nguồn, nếu không nó chỉ là tiếng ồn.
+- `PublicUser` giờ **cộng** `roles` vào chứ không `Pick` ra từ `UserRow`. Đó là chỗ tsc canh
+  giúp: thêm một đường đọc người mà quên phép ghép từ `user_roles` thì không biên dịch được,
+  thay vì lặng lẽ trả về một Gia chủ không mang vai nào.
+- `db:seed`, `db:reset-password`, `dev:session` cũng thôi đọc/ghi hai cột ấy.
+
 ## 0.51.0 — `npm run shot`: tự chụp được trang, và bài vị hết bé tí
 
 - **`npm run shot -- --path chat --out anh.png`** — chụp ảnh một trang của web đang chạy dưới

@@ -145,24 +145,20 @@ try {
   `) as { role_code: string }[];
   assert(
     JSON.stringify(rowsAfterCreate.map((r) => r.role_code)) === JSON.stringify(["admin", "gia-chu"]),
-    "user_roles phải có đúng hai dòng — đây là bảng thật, không phải cột gương",
+    "user_roles phải có đúng hai dòng — vai là quan hệ, không phải thuộc tính của hàng users",
   );
   console.log("✔ Tạo người kèm vai: user_roles có đủ dòng, đọc ra đúng thứ tự thang vai.");
 
-  // ---- 3. `findByUsername` đọc vai từ bảng thật, không đọc cột gương -------------------
-  // Bẻ gãy cột gương một cách cố ý. Nếu còn đường nào đọc `users.roles` thì nó lộ ra ngay.
-  await sql`update users set roles = array['choi-choi']::text[] where id = ${userId}`;
-  const whileMirrorLies = await findByUsername(username);
+  // ---- 3. Đường ĐĂNG NHẬP cũng phải thấy vai -------------------------------------------
+  // `findByUsername` trả về trọn hàng users, mà bảng users KHÔNG còn cột vai nào — vai phải
+  // được GHÉP vào từ `user_roles` (xem `allColumnsWithRoles`). Thiếu phép ghép ấy thì
+  // `loginAction` đặt claim "user" cho một Gia chủ, và không có gì kêu lên.
+  const asLogin = await findByUsername(username);
   assert(
-    JSON.stringify(whileMirrorLies?.roles) === JSON.stringify(["gia-chu", "admin"]),
-    `cột gương nói dối mà findByUsername vẫn phải đọc từ user_roles — nhận được ${JSON.stringify(whileMirrorLies?.roles)}`,
+    JSON.stringify(asLogin?.roles) === JSON.stringify(["gia-chu", "admin"]),
+    `đường đăng nhập phải thấy đủ vai — nhận được ${JSON.stringify(asLogin?.roles)}`,
   );
-  const whileMirrorLiesById = await findById(userId);
-  assert(
-    JSON.stringify(whileMirrorLiesById?.roles) === JSON.stringify(["gia-chu", "admin"]),
-    "findById cũng phải đọc từ user_roles",
-  );
-  console.log("✔ Đường đọc: bẻ gãy cột gương không lay chuyển được vai — bảng thật mới là gốc.");
+  console.log("✔ Đường đăng nhập: hàng users trơn không có vai, phép ghép từ user_roles bù đủ.");
 
   // ---- 4. Sửa vai: thu bớt, thêm mới, và mã bịa bị vứt ---------------------------------
   const demoted = await adminUpdate(userId, { roles: ["chuong-mon", "khong-co-that"] });
@@ -173,16 +169,6 @@ try {
     `mã bịa phải bị vứt, chỉ còn chuong-mon — nhận được ${JSON.stringify(afterDemote?.roles)}`,
   );
 
-  const mirror = (await sql`select roles, role from users where id = ${userId}`) as {
-    roles: string[];
-    role: string;
-  }[];
-  assert(
-    JSON.stringify(mirror[0].roles) === JSON.stringify(["chuong-mon"]),
-    `cột gương phải được dựng lại từ bảng thật — nhận được ${JSON.stringify(mirror[0].roles)}`,
-  );
-  assert(mirror[0].role === "admin", "cột di sản `role` phải soi Chưởng môn xuống thành 'admin'");
-
   const stripped = await adminUpdate(userId, { roles: [] });
   assert(stripped.ok, "thu sạch vai phải thành công");
   const afterStrip = await findById(userId);
@@ -192,12 +178,6 @@ try {
   );
   const noRows = (await sql`select count(*)::int as n from user_roles where user_id = ${userId}`) as { n: number }[];
   assert(noRows[0].n === 0, "thu sạch vai phải xoá hết dòng trong user_roles");
-  const strippedMirror = (await sql`select roles, role from users where id = ${userId}`) as {
-    roles: string[];
-    role: string;
-  }[];
-  assert(strippedMirror[0].roles.length === 0, "gương cũng phải rỗng theo");
-  assert(strippedMirror[0].role === "user", "cột di sản `role` phải trở về 'user'");
 
   const regranted = await adminUpdate(userId, { roles: ["gia-chu", "admin"] });
   assert(regranted.ok, "ban lại vai phải thành công");
@@ -206,7 +186,7 @@ try {
     JSON.stringify(afterRegrant?.roles) === JSON.stringify(["gia-chu", "admin"]),
     "ban lại vai phải khôi phục đủ",
   );
-  console.log("✔ Sửa vai: thu bớt, thu sạch, ban lại — bảng thật và cột gương luôn nói cùng một chuyện.");
+  console.log("✔ Sửa vai: thu bớt, thu sạch, ban lại — mỗi lượt ghi đặt lại TRỌN tập vai.");
 
   // ---- 5. Sửa hồ sơ KHÔNG được chạm vai -----------------------------------------------
   const renamed = await adminUpdate(userId, { displayName: "Kiểm vai (đã đổi tên)" });

@@ -57,7 +57,15 @@ const sql = neon(url);
 const [{ db, host }] = await sql`select current_database() db, inet_server_addr()::text host`;
 console.log(`• Database: ${db}  (host ${host ?? "?"})`);
 
-const existing = await sql`select id, role, status from users where username = ${username} limit 1`;
+// Vai đọc từ `user_roles` — cột `users.role` là di sản sắp bị drop, và dòng xác nhận dưới đây
+// chỉ đáng tin nếu nó kể đúng thứ mà guard sẽ nhìn thấy.
+const existing = await sql`
+  select u.id, u.status,
+         coalesce((select array_agg(ur.role_code order by r.sort_order)
+                     from user_roles ur join roles r on r.code = ur.role_code
+                    where ur.user_id = u.id), '{}') as roles
+    from users u where u.username = ${username} limit 1
+`;
 if (existing.length === 0) {
   console.error(`✗ Không có tài khoản「${username}」trong database「${db}」— không đổi gì cả.`);
   process.exit(1);
@@ -67,7 +75,9 @@ const hash = bcrypt.hashSync(password, 12);
 await sql`update users set password_hash = ${hash}, updated_at = now() where username = ${username}`;
 
 const row = existing[0];
-console.log(`✔ Đã đặt lại mật khẩu cho「${username}」(role ${row.role}, status ${row.status}).`);
+console.log(
+  `✔ Đã đặt lại mật khẩu cho「${username}」(vai ${row.roles.join(", ") || "môn đồ"}, status ${row.status}).`,
+);
 if (row.status !== "active") {
   console.log(`  Lưu ý: tài khoản đang ở trạng thái「${row.status}」— đăng nhập được nhưng chưa vào được Auto.`);
 }

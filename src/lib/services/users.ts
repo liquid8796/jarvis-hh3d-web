@@ -1,6 +1,6 @@
 import { and, eq, getTableColumns, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
-import { isAdminUser, normalizeRoles, type Role } from "@/lib/auth/permissions";
+import { normalizeRoles, type Role } from "@/lib/auth/permissions";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { getAppSettings } from "@/lib/services/settings";
 import type { UserRow } from "@/lib/db/schema";
@@ -11,23 +11,27 @@ import type { UserRow } from "@/lib/db/schema";
  * when the tông môn grows new membership rules.
  */
 
+/**
+ * `roles` được CỘNG vào chứ không `Pick` ra từ `UserRow`, vì bảng users không còn cột vai nào
+ * kể từ migration 0014 — vai là một quan hệ, và mọi phép đọc người ở đây ghép nó vào.
+ *
+ * Đây cũng chính là chỗ tsc canh giúp: ngày ai đó thêm một đường đọc người mà quên phép ghép,
+ * kiểu trả về thiếu `roles` và không biên dịch được, thay vì lặng lẽ trả về một Gia chủ không
+ * mang vai nào.
+ */
+type WithRoles = { roles: string[] };
+
 export type PublicUser = Pick<
   UserRow,
-  | "id"
-  | "username"
-  | "displayName"
-  | "email"
-  | "roles"
-  | "tags"
-  | "avatarUrl"
-  | "status"
-  | "createdAt"
-  | "updatedAt"
->;
+  "id" | "username" | "displayName" | "email" | "tags" | "avatarUrl" | "status" | "createdAt" | "updatedAt"
+> &
+  WithRoles;
+
+/** Trọn hàng users (kèm `passwordHash`) cộng vai — thứ mà đường đăng nhập cần. */
+export type FullUser = UserRow & WithRoles;
 
 /**
- * Vai của một đạo hữu, đọc từ bảng `user_roles` — nguồn duy nhất kể từ 09/08/2026. Cột
- * `users.roles` vẫn còn nhưng chỉ là gương (xem schema.ts), nên KHÔNG chỗ nào ở đây đọc nó.
+ * Vai của một đạo hữu, đọc từ bảng `user_roles` — nguồn DUY NHẤT kể từ 09/08/2026.
  *
  * Sắp theo `sort_order` chứ không theo lúc được ban: nhờ vậy mảng trả về luôn cùng thứ tự với
  * `normalizeRoles` — giao diện vẽ huy hiệu theo thứ tự thang vai, và phép so "vai có đổi
@@ -63,28 +67,16 @@ const publicColumns = {
 } as const;
 
 /**
- * Trọn hàng users, nhưng `roles` bị ĐẮP ĐÈ bằng phép đọc từ `user_roles`.
+ * Trọn hàng users, CỘNG thêm `roles` đọc từ `user_roles`.
  *
- * Không phải chi tiết thừa: `verifyCredentials` trả về hàng này và `loginAction` hỏi
- * `isAdminUser(result.user)` để đặt claim cho phiên. Để nguyên `select()` thì đúng một đường
- * trong cả hệ thống còn đọc cột gương — và nó lại là đường đăng nhập.
+ * `getTableColumns` chứ không phải `select()` trơn, vì bảng users KHÔNG còn cột `roles` nào để
+ * `select()` mang về — nó phải được ghép vào đây. `verifyCredentials` trả về hàng này và
+ * `loginAction` hỏi `isAdminUser(user)` trên đó, nên thiếu phép ghép là đường ĐĂNG NHẬP mất
+ * vai.
  */
 const allColumnsWithRoles = { ...getTableColumns(schema.users), roles: rolesOfUser } as const;
 
-/**
- * Giá trị GHI GƯƠNG cho cột di sản `role` — bản deploy cũ còn đọc nó trong cửa sổ giữa
- * migrate và deploy (xem ghi chú tại cột trong schema.ts). Code mới không bao giờ ĐỌC.
- *
- * Hỏi `isAdminUser` chứ KHÔNG liệt kê mã vai tại đây: enum `user_role` chỉ có `user|admin`,
- * nên mọi vai bậc trị sự đều phải soi xuống thành `admin`. Chép tay danh sách vai ra chỗ này
- * nghĩa là thêm một vai mới ở permissions.ts sẽ âm thầm ghi gương thành `user` — người ấy
- * mất sạch quyền trong mắt bản deploy cũ, và không có phép thử nào ở đây kêu lên.
- */
-function legacyRoleOf(roles: readonly string[]): "user" | "admin" {
-  return isAdminUser({ roles }) ? "admin" : "user";
-}
-
-export async function findByUsername(username: string): Promise<UserRow | null> {
+export async function findByUsername(username: string): Promise<FullUser | null> {
   const rows = await db()
     .select(allColumnsWithRoles)
     .from(schema.users)
@@ -93,7 +85,7 @@ export async function findByUsername(username: string): Promise<UserRow | null> 
   return rows[0] ?? null;
 }
 
-export async function findByEmail(email: string): Promise<UserRow | null> {
+export async function findByEmail(email: string): Promise<FullUser | null> {
   const rows = await db()
     .select(allColumnsWithRoles)
     .from(schema.users)
@@ -159,7 +151,7 @@ export async function register(input: {
 export async function verifyCredentials(
   username: string,
   password: string,
-): Promise<UserRow | null> {
+): Promise<FullUser | null> {
   const user = await findByUsername(username);
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return null;
@@ -224,15 +216,15 @@ export async function setStatus(
 /**
  * Ghi TRỌN tập vai của một người — thêm cái thiếu, bỏ cái thừa — trong ĐÚNG MỘT câu lệnh.
  *
- * Vì sao một câu: bốn phép ghi ở đây (xoá vai cũ, thêm vai mới, đắp gương `users.roles`, đắp
- * gương `users.role`) phải cùng sống hoặc cùng chết. Driver `neon-http` KHÔNG có transaction
- * tương tác, nên "cùng sống hoặc cùng chết" chỉ có một hình dạng: một câu lệnh. CTE ghi dữ
- * liệu được Postgres bảo đảm chạy đúng một lần dù câu chính không đọc tới, nên `removed` và
- * `added` không cần ai tham chiếu.
+ * Vì sao một câu: ba phép ghi ở đây (xoá vai cũ, thêm vai mới, đóng dấu `updated_at`) phải
+ * cùng sống hoặc cùng chết. Driver `neon-http` KHÔNG có transaction tương tác, nên "cùng sống
+ * hoặc cùng chết" chỉ có một hình dạng: một câu lệnh. CTE ghi dữ liệu được Postgres bảo đảm
+ * chạy đúng một lần dù câu chính không đọc tới, nên `removed` và `added` không cần ai tham
+ * chiếu — và chính vì thế câu `update users` cuối cùng vẫn cần thiết dù nó chỉ đóng dấu giờ:
+ * nó là câu CHÍNH giữ ba CTE lại với nhau.
  *
  * `wanted` lọc qua bảng `roles` chứ không tin thẳng mảng gửi vào, nên mã lạ bị BỎ chứ không
- * làm ngã khoá ngoại — và cột gương được dựng lại TỪ `wanted`, tức gương không bao giờ chép
- * được thứ mà bảng thật đã từ chối.
+ * làm ngã khoá ngoại.
  *
  * Không có khe giữa xoá và thêm: cả hai đọc cùng một ảnh chụp, và vai vừa được giữ lại thì
  * nằm trong `wanted` nên không rơi vào tầm của `removed` — người ta không mất quyền một
@@ -241,7 +233,7 @@ export async function setStatus(
 async function writeRoles(id: string, codes: readonly Role[]): Promise<void> {
   await db().execute(sql`
     with wanted as (
-      select code, sort_order from roles where code = any(${sql.param(codes)}::text[])
+      select code from roles where code = any(${sql.param(codes)}::text[])
     ),
     removed as (
       delete from user_roles
@@ -252,11 +244,7 @@ async function writeRoles(id: string, codes: readonly Role[]): Promise<void> {
       select ${id}, code from wanted
       on conflict do nothing
     )
-    update users
-       set roles = coalesce((select array_agg(code order by sort_order) from wanted), '{}'::text[]),
-           role = ${legacyRoleOf(codes)},
-           updated_at = now()
-     where id = ${id}
+    update users set updated_at = now() where id = ${id}
   `);
 }
 
@@ -288,14 +276,12 @@ export async function adminCreate(input: {
   const codes = normalizeRoles(input.roles);
   const result = await db().execute(sql`
     with new_user as (
-      insert into users (username, display_name, email, password_hash, roles, role, status)
+      insert into users (username, display_name, email, password_hash, status)
       values (
         ${input.username.toLowerCase()},
         ${input.displayName.trim()},
         ${email},
         ${hashPassword(input.password)},
-        ${sql.param(codes)}::text[],
-        ${legacyRoleOf(codes)},
         ${input.status}
       )
       on conflict do nothing

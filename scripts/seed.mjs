@@ -42,18 +42,17 @@ const seedRoles = ["gia-chu", "admin"];
  * Tài khoản hạt giống giữ CẢ HAI vai: gia-chu (vai duy nhất đổi được vai người khác — không
  * có nó là hệ thống sinh ra đã khoá trái) và admin.
  *
- * Vai THẬT nằm ở `user_roles`; `users.roles` và `users.role` là hai cột gương (xem schema.ts).
- * Phải ghi cả ba trong MỘT câu lệnh, và ba chỗ ấy không được quên chỗ nào: quên `user_roles`
- * là dựng ra một Gia chủ mà hệ thống không nhìn thấy vai — tức một cài đặt mới sinh ra đã khoá
- * trái, đúng thứ mà chính vai gia-chu sinh ra để phòng.
+ * Vai sống ở `user_roles`, nên hàng users và vai phải vào trong MỘT câu lệnh: hàng vào được mà
+ * phép cấp vai ngã là dựng ra một Gia chủ mà hệ thống không nhìn thấy vai — tức một cài đặt
+ * mới sinh ra đã khoá trái, đúng thứ mà chính vai gia-chu sinh ra để phòng.
  *
  * Cần `roles` đã có sẵn danh mục, nên `npm run db:migrate` phải chạy TRƯỚC — đúng thứ tự
  * README đã dặn, và nếu chạy ngược thì câu này ngã ngay chứ không âm thầm bỏ vai.
  */
 await sql`
   with new_user as (
-    insert into users (username, display_name, password_hash, roles, role, status)
-    values (${username}, ${process.env.ADMIN_DISPLAY_NAME ?? "Trưởng Môn"}, ${hash}, ${seedRoles}, 'admin', 'active')
+    insert into users (username, display_name, password_hash, status)
+    values (${username}, ${process.env.ADMIN_DISPLAY_NAME ?? "Trưởng Môn"}, ${hash}, 'active')
     returning id
   )
   insert into user_roles (user_id, role_code)

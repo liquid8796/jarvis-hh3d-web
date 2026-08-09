@@ -935,13 +935,17 @@ async function main() {
     new URL("../src/app/actions/automation.ts", import.meta.url),
     "utf8",
   );
+  // Dò `isAdminUser(...)` chứ không dò `user.role === "admin"`: vai đã thành một TẬP HỢP và
+  // cột `role` sắp bị drop. Hai phép dò cũ đỏ âm thầm suốt từ lúc ấy — chúng vẫn kêu "thiếu
+  // hàng rào" trong khi hàng rào có thật, chỉ là được viết bằng tên khác. Một phép thử dò
+  // nguyên văn nguồn phải được sửa cùng nhịp với nguồn, nếu không nó chỉ còn là tiếng ồn.
   check(
     "đường LƯU ngọc giản áp luật theo vai của người gọi",
-    /enforceMazeCapPolicy\(\s*parsed\.data,\s*\{\s*isAdmin: user\.role === "admin"/.test(automationSrc),
+    /enforceMazeCapPolicy\(\s*parsed\.data,\s*\{\s*isAdmin: isAdminUser\(user\)/.test(automationSrc),
   );
   check(
     "cửa PHÁT VIỆC của khôi lỗi tông môn cũng áp luật (phủ cả document cũ)",
-    workerRouteSrc.includes("enforceMazeCapPolicy(config, { isAdmin: owner?.role === \"admin\" })") &&
+    /enforceMazeCapPolicy\(config, \{ isAdmin: owner !== null && isAdminUser\(owner\) \}\)/.test(workerRouteSrc) &&
       workerRouteSrc.includes('scope.kind === "operator"'),
   );
   check(

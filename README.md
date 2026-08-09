@@ -148,10 +148,19 @@ hỏng ngay, không phải một bí ẩn sáu tháng sau. Cùng script ấy ch�
 database thật, vì đường ghi vai viết bằng SQL thô (một câu lệnh, để bốn phép ghi cùng sống hoặc
 cùng chết — `neon-http` không có transaction tương tác) nên `tsc` không soát hộ tên cột nào.
 
-> **Cột `users.roles` và `users.role` vẫn còn, nhưng đừng đọc.** Cả hai là gương ghi-một-chiều
-> trong đúng một nhịp deploy: `db:migrate` chạy **trước** `vercel deploy` (Bước 4), nên trong
-> khoảng giữa hai lệnh bản code cũ vẫn đang phục vụ và vẫn đọc chúng. Migration kế tiếp drop cả
-> hai cột lẫn enum `user_role`.
+> **Bảng `users` không còn cột vai nào.** `users.role` (enum `user|admin`) và `users.roles`
+> (`text[]`) đã bị drop ở migration `0014` sau khi `user_roles` cầm sự thật trọn một nhịp deploy.
+>
+> Thứ tự thu hồi **ngược** với thứ tự mở rộng, và nhầm chiều là hỏng thật:
+>
+> | | Thứ tự đúng | Vì sao |
+> |---|---|---|
+> | Thêm cột | migrate → deploy | bản code cũ chưa biết cột mới, không sao |
+> | Bỏ cột | deploy → migrate | bản code cũ còn **ghi** vào cột ấy; drop sớm là mọi lượt sửa người văng lỗi cho tới khi deploy xong |
+>
+> `0014` mở đầu bằng một **chốt chặn** đếm số đạo hữu còn vai trong cột gương mà chưa có dòng
+> nào trong `user_roles`, và `RAISE EXCEPTION` nếu còn ai — vì với những người ấy, cột sắp bị
+> xoá là bản duy nhất còn giữ vai của họ.
 
 ### Cấu trúc mã nguồn
 

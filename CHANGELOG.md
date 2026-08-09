@@ -11,6 +11,29 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.58.4 — cổng nhiệm vụ tách thành hai làn: 2 trang riêng + 3 hub
+
+Luật cũ cho ĐÚNG một nhiệm vụ trang riêng cộng ĐÚNG một hub đồng hành — tổng ≤ 2 cho cả khôi
+lỗi, kể cả của đạo hữu khác. Nó ra đời từ sự cố 07/08 (Mê Cung và Hoang Vực giành nhau hai
+nhân CPU, một đòn đánh trúng bị báo thành thất bại) và đã làm đúng việc của nó, nhưng cái giá
+là: hễ một người đánh Mê Cung là cả năm ghế tụt xuống 2, kể cả những đàn chỉ còn vài thao tác
+hub vụn vặt. Tông chủ nới lên **hai làn riêng, mỗi làn một trần, không tranh ngân sách nhau**:
+
+- Làn TRANG RIÊNG (`pagePath` khác `/nhiem-vu-hang-ngay`): tối đa **2**.
+- Làn HUB: tối đa **3**.
+- Cùng lắm 5 nhiệm vụ một lúc. Vẫn không phân biệt tài khoản — bộ đếm là của cả tiến trình.
+
+**Tách làn kéo theo một thay đổi không hiển nhiên: luật「hub phải nhường khi có trang riêng
+đứng đợi」bị GỠ BỎ.** Nó tồn tại vì hồi ấy hai loại tiêu chung một ngân sách, nên dòng hub bất
+tận từ các đàn khác sẽ bỏ đói trang riêng vĩnh viễn. Nay trang riêng có hai chỗ của riêng nó,
+hub nhường cũng chẳng mở thêm được chỗ nào cho nó — giữ luật ấy chỉ tổ bắt hub đứng im vô ích.
+FIFO trong LÀN thì giữ nguyên: một trang riêng không vượt mặt trang riêng đã xếp trước.
+
+Phép thử đóng đinh đủ bốn góc mới: hai trang riêng ĐƯỢC chạy cùng nhau (điều luật cũ cấm tuyệt
+đối), con thứ ba phải xếp hàng, ba hub vào đủ dù hai trang riêng đang chạy, hub thứ tư hết chỗ,
+và hub buông thì hub sau vào chứ KHÔNG mở chỗ cho trang riêng. Cộng một lượt chạy thật một vòng
+song song với observer soi mọi ảnh chụp cổng: không ảnh nào vượt trần. 234 thuận, 0 nghịch.
+
 ## 0.58.3 — bình chú cấu hình khôi lỗi khớp lại với thực tế
 
 Bình chú trong drop-in systemd của VM tính ngân sách bộ nhớ theo「5 ghế × ~1,8GB (Chromium +

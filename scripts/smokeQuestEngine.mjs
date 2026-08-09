@@ -2206,12 +2206,11 @@ async function main() {
       );
     }
 
-    console.log("\nCổng điều phối toàn cục — trang riêng không bao giờ cặp với trang riêng");
+    console.log("\nCổng điều phối toàn cục — hai làn riêng: trang riêng ≤ 2, hub ≤ 3");
 
-    // Sự cố 07/08 01:03:55 dựng lại bằng chính hình dạng của nó: Mê Cung (trang riêng) đang
-    // đánh, Hoang Vực (trang riêng) muốn vào, các nhiệm vụ hub đứng quanh. Luật phải cho ra:
-    // Hoang Vực XẾP HÀNG chứ không chen vào cạnh Mê Cung, hub lấp đúng một chỗ đồng hành,
-    // và khi Mê Cung buông thì Hoang Vực vào TRƯỚC đám hub còn chờ.
+    // Hai làn riêng: trang riêng ≤ 2, hub ≤ 3, không tranh ngân sách của nhau. Khối này dựng
+    // lại đúng hình dạng sự cố 07/08 (Mê Cung + Hoang Vực) — nay chúng ĐƯỢC cặp, vì tông chủ
+    // đã nới trần; cái phải canh giờ là con thứ BA và trần của từng làn.
     {
       const tick = () => new Promise((r) => setTimeout(r, 20));
       const grab = (dedicated, name, shouldStop) => {
@@ -2227,53 +2226,76 @@ async function main() {
       };
 
       const meCung = grab(true, "Mê Cung");
-      await tick();
-      check("trang riêng thứ nhất vào ngay khi cổng trống", meCung.admitted, "Mê Cung chưa được vào");
-
       const hoangVuc = grab(true, "Hoang Vực");
-      const hub1 = grab(false, "Điểm Danh");
-      const hub2 = grab(false, "Vòng Quay");
-      await tick();
-      check("trang riêng thứ hai PHẢI xếp hàng — không có cặp Mê Cung + Hoang Vực nào nữa", !hoangVuc.admitted, "Hoang Vực chen được vào");
-      check("một hub được làm bạn đồng hành (tổng = 2)", hub1.admitted, "hub1 không được vào");
-      check("hub thứ hai hết chỗ — trần đồng hành là 1", !hub2.admitted, "hub2 chen được vào");
-
-      hub1.slot.release();
       await tick();
       check(
-        "hub sau được vượt lên lấp chỗ đồng hành trống (trang riêng kế vẫn phải chờ chủ cổng)",
-        hub2.admitted && !hoangVuc.admitted,
-        `hub2=${hub2.admitted} hoangVuc=${hoangVuc.admitted}`,
+        "hai trang riêng ĐƯỢC chạy cùng nhau — đúng điều luật cũ cấm tuyệt đối",
+        meCung.admitted && hoangVuc.admitted,
+        `meCung=${meCung.admitted} hoangVuc=${hoangVuc.admitted}`,
+      );
+
+      const boss3 = grab(true, "Trang riêng thứ ba");
+      await tick();
+      check("trang riêng thứ BA phải xếp hàng — trần làn là 2", !boss3.admitted, "con thứ ba chen được vào");
+
+      const hubs = [grab(false, "Hub 1"), grab(false, "Hub 2"), grab(false, "Hub 3")];
+      await tick();
+      check(
+        "ba hub vào đủ dù hai trang riêng đang chạy — hai làn KHÔNG tranh ngân sách",
+        hubs.every((h) => h.admitted),
+        hubs.map((h) => h.admitted).join("/"),
+      );
+
+      const hub4 = grab(false, "Hub 4");
+      await tick();
+      check("hub thứ TƯ hết chỗ — trần làn hub là 3", !hub4.admitted, "hub4 chen được vào");
+      check(
+        "hub mới KHÔNG phải nhường trang riêng đang đợi — luật nhường đã gỡ cùng lúc tách làn",
+        !boss3.admitted,
+        "con thứ ba lại vào được",
+      );
+
+      hubs[0].slot.release();
+      await tick();
+      check(
+        "hub buông thì hub sau vào, KHÔNG mở chỗ cho trang riêng — hai làn độc lập",
+        hub4.admitted && !boss3.admitted,
+        `hub4=${hub4.admitted} boss3=${boss3.admitted}`,
       );
 
       meCung.slot.release();
       await tick();
-      check("Mê Cung buông là Hoang Vực vào — trang riêng có ưu tiên trước hub xếp sau", hoangVuc.admitted, "Hoang Vực vẫn chờ");
+      check("chỗ trang riêng trống ra là con thứ ba vào ngay", boss3.admitted, "con thứ ba vẫn chờ");
 
       hoangVuc.slot.release();
-      hub2.slot.release();
+      boss3.slot.release();
+      hubs[1].slot.release();
+      hubs[2].slot.release();
+      hub4.slot.release();
+      await tick();
 
-      // Trang riêng đứng đợi thì hub MỚI không được chen ngang — thiếu luật này, dòng hub
-      // bất tận của các đàn khác bỏ đói trận đánh lớn vĩnh viễn.
-      const h1 = grab(false, "Hub A");
-      const h2 = grab(false, "Hub B");
+      // FIFO TRONG LÀN: trang riêng xếp trước không bị con sau vượt mặt.
+      const full = [grab(true, "Giữ A"), grab(true, "Giữ B")];
       await tick();
-      check("không trang riêng nào hoạt động → hub chạy tự do", h1.admitted && h2.admitted, `${h1.admitted}/${h2.admitted}`);
-      const boss = grab(true, "Boss");
-      const h3 = grab(false, "Hub C");
+      const som = grab(true, "Đợi sớm");
       await tick();
-      check("boss chờ cổng rút về ≤1, hub mới phải nhường bước sau lưng nó", !boss.admitted && !h3.admitted, `boss=${boss.admitted} h3=${h3.admitted}`);
-      h1.slot.release();
+      const muon = grab(true, "Đợi muộn");
       await tick();
-      check("cổng rút về 1 là boss vào, hub C thành bạn đồng hành khi còn chỗ", boss.admitted && !h3.admitted, `boss=${boss.admitted} h3=${h3.admitted}`);
-      h2.slot.release();
+      check("cả hai chỗ trang riêng đã đầy", full.every((h) => h.admitted) && !som.admitted && !muon.admitted);
+      full[0].slot.release();
       await tick();
-      check("chỗ đồng hành trống ra là hub C vào", h3.admitted, "h3 vẫn chờ");
-      boss.slot.release();
-      h3.slot.release();
+      check(
+        "chỗ trống về tay kẻ đợi SỚM, không phải kẻ tới sau",
+        som.admitted && !muon.admitted,
+        `som=${som.admitted} muon=${muon.admitted}`,
+      );
+      full[1].slot.release();
+      som.slot.release();
+      await tick();
+      muon.slot?.release();
 
       // Thu Đàn giữa lúc xếp hàng: waiter rút lui, không kẹt sau lưng ai.
-      const holderA = grab(true, "Đang giữ");
+      const holderA = [grab(true, "Đang giữ 1"), grab(true, "Đang giữ 2")];
       await tick();
       let stopped = false;
       const quitter = grab(true, "Sắp thu đàn", () => stopped);
@@ -2281,7 +2303,7 @@ async function main() {
       stopped = true;
       await new Promise((r) => setTimeout(r, 700)); // nhịp poll 500ms phải tự nhặt nó ra
       check("Thu Đàn trong hàng đợi → rút lui qua nhịp poll, không chờ ai buông cổng", quitter.aborted, `aborted=${quitter.aborted}`);
-      holderA.slot.release();
+      for (const h of holderA) h.slot.release();
 
       _resetGate();
     }
@@ -2321,9 +2343,13 @@ async function main() {
     };
 
     // Hai nhiệm vụ của vòng này đều là TRANG RIÊNG ở hạng thường (/diem-danh và
-    // /thi-luyen-…), nên cổng toàn cục phải bắt chúng nối đuôi: dù bật song song, không
-    // khoảnh khắc nào được có 2 nhiệm vụ cùng chạy. Observer ghi mọi ảnh chụp cổng — đây là
-    // phép thử tích hợp của đúng đêm 07/08, chỉ khác là lần này có nhân chứng.
+    // /thi-luyen-…). Từ 09/08/2026 chúng ĐƯỢC chạy cùng nhau — làn trang riêng có hai chỗ —
+    // nên phép thử này thôi khẳng định "nối đuôi" mà canh hai TRẦN: không ảnh chụp nào được
+    // vượt 5 tổng hay 2 trang riêng. Observer ghi mọi ảnh chụp cổng, nên nếu một ngày ai đó
+    // nới trần mà quên chỗ này, dòng dưới đỏ ngay.
+    //
+    // Vẫn là phép thử tích hợp của đúng đêm 07/08 — thứ nó canh nay là cái TRẦN, không phải
+    // con số 1.
     const gateSnapshots = [];
     _observeGate((snap) => gateSnapshots.push(snap));
 
@@ -2339,9 +2365,9 @@ async function main() {
 
     _observeGate(null);
     check(
-      "cổng toàn cục: hai nhiệm vụ trang riêng NỐI ĐUÔI dù vòng bật song song (active tối đa = 1)",
+      "cổng toàn cục: không ảnh chụp nào vượt trần (tổng ≤ 5, trang riêng ≤ 2)",
       gateSnapshots.length > 0 &&
-        gateSnapshots.every((snap) => snap.active <= 1 && snap.dedicatedActive <= 1),
+        gateSnapshots.every((snap) => snap.active <= 5 && snap.dedicatedActive <= 2),
       gateSnapshots.map((snap) => `${snap.active}/${snap.dedicatedActive}`).join(" → ") || "(không ảnh nào)",
     );
 

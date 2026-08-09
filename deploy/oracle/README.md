@@ -72,6 +72,13 @@ tàng khố — không bao giờ đưa cho người dùng (họ có linh phù ri
 | service | `auto-hh3d-linh-su.service` |
 | thư mục | `/opt/auto-hh3d/linh-su` |
 | env | `/opt/auto-hh3d/linh-su/.env` (`WEB_URL`, `WORKER_TOKEN`, `WORKER_ID=tong-mon-khoiloi`) |
+| drop-in | `/etc/systemd/system/auto-hh3d-linh-su.service.d/override.conf` — `MemoryMax=10G`, `WORKER_MAX_JOBS=5`. **Không** có trong `.env` và **không** có trong `setup.sh` (script chỉ viết lại unit chính), nên soi hai chỗ ấy sẽ tưởng nhầm là 4G và 2 đàn. |
+
+**Mức song song, hai tầng:** 5 đàn cùng lúc (`WORKER_MAX_JOBS` ở drop-in trên), và mỗi đàn mở
+tối đa 3 tab nhiệm vụ (`WORKER_QUEST_TABS` không đặt ở đâu nên lấy `DEFAULT_QUEST_TABS = 3`
+trong `runCycle.mjs`). Cực đại 5 × 3 = 15 tab đồng thời. Đo ngày 09/08/2026 sau ~2h chạy thật:
+`MemoryPeak` ~1,92GB, `MemoryCurrent` ~0,63GB cho TOÀN service — nhưng đó là đỉnh của khoảng
+ấy, không phải đỉnh lúc cả 5 ghế cùng đầy, nên đừng nhân 1,92 cho 5 rồi kết luận.
 
 ### Cài đè engine mới (phát hành)
 

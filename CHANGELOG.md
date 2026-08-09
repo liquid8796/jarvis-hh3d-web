@@ -11,6 +11,28 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.58.3 — bình chú cấu hình khôi lỗi khớp lại với thực tế
+
+Bình chú trong drop-in systemd của VM tính ngân sách bộ nhớ theo「5 ghế × ~1,8GB (Chromium +
+~10 tab quest song song)」≈ 9GB. Con số **10 tab là sai**: `WORKER_QUEST_TABS` không được đặt ở
+đâu nên mã lấy `DEFAULT_QUEST_TABS = 3`. Lệch về phía an toàn (dùng ít hơn dự trù), nhưng ai
+đọc nó để chỉnh `WORKER_MAX_JOBS` về sau sẽ tính nhầm.
+
+Thay ước lượng bằng số ĐO trên chính máy ấy: `MemoryPeak` ~1,92GB, `MemoryCurrent` ~0,63GB cho
+TOÀN service sau ~2h chạy thật — kèm cảnh báo rằng đó là đỉnh của khoảng thời gian ấy, KHÔNG
+phải đỉnh lúc cả 5 ghế cùng đầy, nên đừng nhân 1,92 cho 5.
+
+**Phát hiện lớn hơn cái bình chú:** hai con số thật của production KHÔNG có trong repo.
+`setup.sh` ghi `MemoryMax=4G` và không đặt `WORKER_MAX_JOBS` (mặc định 2), trong khi VM chạy
+10G và 5 đàn — chênh lệch sống được vì `setup.sh` cố ý chỉ viết lại unit chính, không đụng
+drop-in. Ai soi `.env` hay `setup.sh` đều sẽ kết luận sai. Nay `setup.sh` có một dòng chỉ
+thẳng sang drop-in, và bảng vận hành trong `deploy/oracle/README.md` có hẳn một hàng cho nó
+cùng đoạn giải thích hai tầng song song (5 đàn × 3 tab = tối đa 15 tab đồng thời).
+
+Không đổi hành vi: sau khi ghi lại drop-in đã `daemon-reload` và xác nhận `MemoryMax` vẫn
+10737418240 byte, `WORKER_MAX_JOBS` vẫn 5, service vẫn `active`. Bản cũ giữ ở
+`/root/override.conf.bak` trên VM.
+
 ## 0.58.2 — khôi lỗi tông môn đổi tên thành `tong-mon-khoiloi`
 
 Trang Hàng Đợi vẽ THẲNG `worker_id` của đàn đã có khôi lỗi nhận (chỉ đàn chưa ai nhận mới ra

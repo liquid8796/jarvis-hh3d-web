@@ -11,6 +11,32 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.58.5 — mang hai danh xưng thì đeo cả hai bài vị
+
+Đạo hữu mang tag「Thánh nữ」và「Thái thượng trưởng lão」— CẢ HAI đều có khung trong tàng khố —
+nhưng chỉ「Thánh Nữ」hiện ra bài vị, còn cái kia nằm cạnh như một viên chữ trơn.
+
+Không phải lỗi ngẫu nhiên: `frameForTags` duyệt tag theo thứ tự mảng và lấy CÁI ĐẦU TIÊN có
+khung, đúng luật cũ「mỗi người một bài vị」. Luật ấy hợp lý cho tới khi gặp người mang hai danh
+xưng đều xứng có bài vị. Tông chủ chốt: có khung thì vẽ khung, đủ cả.
+
+`framesForTags` thay `frameForTags` (không giữ lại bản cũ — nó thành hàm chết). Trả MỌI khung
+khớp, theo đúng thứ tự tag đã sắp, dedup theo nhãn đã chuẩn hoá — hai tag「Thánh nữ」/「Thánh Nữ」
+trỏ cùng một khung thì vẽ một lần, vẽ hai lần trông như lỗi chứ không như vinh danh. Không tag
+nào có khung thì vẫn rơi về bài vị mặc định như cũ.
+
+Hai chỗ đi kèm, thiếu là hỏng: viên chữ nay lọc theo TẬP khung đã chọn chứ không chỉ một cái
+(không thì tag thứ hai vừa thành bài vị lại hiện thêm một viên chữ trùng tên ngay cạnh), và
+vương miện ✦ của tông chủ chỉ hiện khi KHÔNG có bài vị nào.
+
+Kiểm chứng: `verify:tag-frames` xanh với các ca mới (hai khung hiện đủ, thứ tự theo tag, tag
+trùng gộp một, đã có bài vị thật thì không kèm mặc định). Cộng một lượt dựng sảnh thật dưới máy
+với đúng bộ tag ấy — đo trong trang: 2 bài vị, 0 viên chữ, 0 vương miện.
+
+**Còn một chỗ chưa đẹp:** hai bài vị (~209px mỗi cái) cộng danh xưng vượt `max-width` 560px của
+cột bong bóng, nên bài vị thứ hai XUỐNG DÒNG — kể cả trên màn rộng, vì trần ấy là con số cứng.
+Chưa sửa: nới nó là đụng vào bố cục chung của mọi tin, cần tông chủ chốt.
+
 ## 0.58.4 — cổng nhiệm vụ tách thành hai làn: 2 trang riêng + 3 hub
 
 Luật cũ cho ĐÚNG một nhiệm vụ trang riêng cộng ĐÚNG một hub đồng hành — tổng ≤ 2 cho cả khôi

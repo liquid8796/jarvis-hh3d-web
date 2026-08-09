@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatPicker, type PickerTab } from "./ChatPicker";
 import { Avatar } from "@/components/Avatar";
 import { isSafeAttachmentUrl } from "@/lib/validation/chat";
-import { frameForTags, normalizeTagLabel, type TagFrame } from "@/lib/validation/tags";
+import { framesForTags, normalizeTagLabel, type TagFrame } from "@/lib/validation/tags";
 import type { Gif } from "@/lib/services/gif";
 
 /**
@@ -549,21 +549,28 @@ export function ChatRoom({
 
                 <div className="chat-bubble-col">
                   {!own && !grouped && (() => {
-                    // Mỗi người MỘT bài vị, như trong thiết kế: tag đầu tiên có khung thắng;
-                    // các tag còn lại vẫn là huy hiệu chữ; không tag nào có khung thì đeo
-                    // khung mặc định (bài vị「Đệ tử」). Sổ trống là sảnh vẽ y như trước.
-                    const frame = frameForTags(msg.tags, tagFrames);
-                    const plainTags = frame
-                      ? msg.tags.filter((t) => normalizeTagLabel(t) !== normalizeTagLabel(frame.label))
-                      : msg.tags;
+                    // Tag nào có khung thì đeo khung nấy — một người mang hai danh xưng đều
+                    // có bài vị thì hiện CẢ HAI. Tag không có khung mới rớt xuống làm huy
+                    // hiệu chữ; không tag nào có khung thì đeo khung mặc định (bài vị
+                    //「Đệ tử」). Sổ trống là sảnh vẽ y như trước.
+                    const frames = framesForTags(msg.tags, tagFrames);
+                    // So bằng nhãn ĐÃ CHUẨN HOÁ, và lọc theo TẬP khung đã chọn chứ không chỉ
+                    // một cái: thiếu bước này thì tag thứ hai vừa được vẽ thành bài vị lại
+                    // hiện thêm một viên chữ trùng tên ngay cạnh nó.
+                    const framed = new Set(frames.map((f) => normalizeTagLabel(f.label)));
+                    const plainTags = msg.tags.filter((t) => !framed.has(normalizeTagLabel(t)));
                     return (
                       <span className="chat-author">
                         {msg.author}
-                        {msg.isAdmin && !frame && <em className="chat-crown" title="Tông chủ">✦</em>}
-                        {frame && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img className="chat-tagframe" src={frame.url} alt={frame.label} title={frame.label} loading="lazy" decoding="async" />
+                        {/* Vương miện chỉ hiện khi KHÔNG có bài vị nào — bài vị đã nói đủ về
+                            thân phận rồi, thêm một dấu ✦ nữa là thừa. */}
+                        {msg.isAdmin && frames.length === 0 && (
+                          <em className="chat-crown" title="Tông chủ">✦</em>
                         )}
+                        {frames.map((f) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={f.label} className="chat-tagframe" src={f.url} alt={f.label} title={f.label} loading="lazy" decoding="async" />
+                        ))}
                         {plainTags.map((t) => (
                           <i key={t} className="chat-tag">{t}</i>
                         ))}

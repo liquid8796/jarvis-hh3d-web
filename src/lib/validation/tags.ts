@@ -86,16 +86,35 @@ export function normalizeTagLabel(raw: string): string {
 }
 
 /**
- * Khung cho một danh sách tag: tag ĐẦU TIÊN có khung thắng — mỗi người một bài vị, như trong
- * thiết kế; các tag còn lại vẫn hiện dạng chữ. Không tag nào có khung (kể cả danh sách rỗng)
- * thì rơi về khung mặc định, và không có khung mặc định thì `null` — sảnh vẽ như cũ.
+ * MỌI bài vị của một người, theo đúng thứ tự tag đã sắp.
+ *
+ * Bản trước tên `frameForTags` và trả về ĐÚNG MỘT khung — tag đầu tiên có khung thắng, phần
+ * còn lại rớt xuống làm huy hiệu chữ. Nghe hợp lý cho tới khi gặp người mang hai danh xưng mà
+ * CẢ HAI đều có bài vị riêng trong sổ: một cái hiện ra lộng lẫy, cái kia thành viên chữ trơn
+ * cạnh nó. Ngày 09/08/2026 tông chủ thấy「Thánh Nữ」đeo bài vị còn「Thái thượng trưởng lão」
+ * nằm bên như một mẩu chữ thừa, và chốt: có khung thì vẽ khung, đủ cả.
+ *
+ * DEDUP theo nhãn đã chuẩn hoá, không theo chuỗi thô: hai tag「Thánh nữ」và「Thánh Nữ」trỏ về
+ * cùng một khung, và vẽ hai lần cùng một tấm ảnh thì trông như lỗi chứ không như vinh danh.
+ *
+ * Không tag nào có khung (kể cả danh sách rỗng) thì rơi về khung mặc định — họ vẫn là đệ tử
+ * của tông môn. Sổ không có khung mặc định thì trả mảng RỖNG, và sảnh vẽ y như trước.
  */
-export function frameForTags(tags: readonly string[], frames: readonly TagFrame[]): TagFrame | null {
+export function framesForTags(tags: readonly string[], frames: readonly TagFrame[]): TagFrame[] {
+  const picked: TagFrame[] = [];
+  const seen = new Set<string>();
   for (const tag of tags) {
     const hit = frameByLabel(tag, frames);
-    if (hit) return hit;
+    if (!hit) continue;
+    const key = normalizeTagLabel(hit.label);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    picked.push(hit);
   }
-  return frames.find((frame) => frame.isDefault) ?? null;
+  if (picked.length > 0) return picked;
+
+  const fallback = frames.find((frame) => frame.isDefault);
+  return fallback ? [fallback] : [];
 }
 
 /** Khung mang nhãn này, hoặc `null`. */

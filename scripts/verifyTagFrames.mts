@@ -10,7 +10,7 @@
  */
 import {
   frameByLabel,
-  frameForTags,
+  framesForTags,
   normalizeTagLabel,
   type TagFrame,
 } from "../src/lib/validation/tags";
@@ -49,32 +49,50 @@ assert(frameByLabel("", SO_KHUNG) === null, "nhãn rỗng không khớp gì cả
 console.log("✔ Tra nhãn: khớp không phân biệt hoa thường, nhưng dấu tiếng Việt là luật cứng.");
 
 // ---- Chọn bài vị cho một người -------------------------------------------------------
+const nhan = (tags: string[], frames = SO_KHUNG) => framesForTags(tags, frames).map((f) => f.label);
+
 assert(
-  frameForTags(["Thánh nữ"], SO_KHUNG)?.label === "Thánh nữ",
+  JSON.stringify(nhan(["Thánh nữ"])) === JSON.stringify(["Thánh nữ"]),
   "một tag một khung: đeo đúng bài vị của mình",
 );
 assert(
-  frameForTags(["Luyện đan", "Thánh nữ"], SO_KHUNG)?.label === "Thánh nữ",
-  "tag không có khung phải bị lướt qua để tới tag có khung",
+  JSON.stringify(nhan(["Luyện đan", "Thánh nữ"])) === JSON.stringify(["Thánh nữ"]),
+  "tag không có khung bị lướt qua, KHÔNG chiếm chỗ của tag có khung",
+);
+
+// Đây là điều luật CŨ cấm và là cả lý do đổi hàm: bản trước chỉ cho tag đứng trước thắng, nên
+// người mang hai danh xưng đều có bài vị thì một cái lộng lẫy còn cái kia thành viên chữ trơn.
+assert(
+  JSON.stringify(nhan(["Trưởng lão", "Thánh nữ"])) === JSON.stringify(["Trưởng lão", "Thánh nữ"]),
+  "hai tag đều có khung: hiện CẢ HAI bài vị, theo đúng thứ tự tag đã sắp",
 );
 assert(
-  frameForTags(["Trưởng lão", "Thánh nữ"], SO_KHUNG)?.label === "Trưởng lão",
-  "hai tag đều có khung: tag ĐỨNG TRƯỚC thắng — thứ tự tag là thứ admin sắp, không phải chỗ ta chọn hộ",
+  JSON.stringify(nhan(["Thánh nữ", "Trưởng lão"])) === JSON.stringify(["Thánh nữ", "Trưởng lão"]),
+  "thứ tự bài vị đi theo thứ tự tag — thứ admin sắp, không phải chỗ ta xếp hộ",
 );
 assert(
-  frameForTags([], SO_KHUNG)?.label === "Đệ tử",
+  JSON.stringify(nhan(["Thánh nữ", "THÁNH  NỮ"])) === JSON.stringify(["Thánh nữ"]),
+  "hai tag trỏ cùng một khung chỉ vẽ MỘT lần — vẽ trùng trông như lỗi, không như vinh danh",
+);
+
+assert(
+  JSON.stringify(nhan([])) === JSON.stringify(["Đệ tử"]),
   "không tag nào: đeo bài vị mặc định (Đệ tử)",
 );
 assert(
-  frameForTags(["Luyện đan"], SO_KHUNG)?.label === "Đệ tử",
+  JSON.stringify(nhan(["Luyện đan"])) === JSON.stringify(["Đệ tử"]),
   "toàn tag không khung cũng rơi về mặc định — họ vẫn là đệ tử của tông môn",
 );
-assert(frameForTags([], []) === null, "sổ trống: không bài vị nào, sảnh vẽ như xưa");
 assert(
-  frameForTags(["Luyện đan"], [frame("Chưởng môn")]) === null,
-  "sổ không có mặc định và tag không khớp: null, KHÔNG được vơ bừa khung đầu sổ",
+  JSON.stringify(nhan(["Thánh nữ", "Luyện đan"])) === JSON.stringify(["Thánh nữ"]),
+  "đã có bài vị thật thì KHÔNG kèm thêm bài vị mặc định",
 );
-console.log("✔ Chọn bài vị: tag trước thắng, không khung thì về mặc định, sổ trống thì thôi.");
+assert(framesForTags([], []).length === 0, "sổ trống: không bài vị nào, sảnh vẽ như xưa");
+assert(
+  framesForTags(["Luyện đan"], [frame("Chưởng môn")]).length === 0,
+  "sổ không có mặc định và tag không khớp: rỗng, KHÔNG được vơ bừa khung đầu sổ",
+);
+console.log("✔ Chọn bài vị: có khung thì đeo đủ, trùng thì gộp, không khung thì về mặc định.");
 
 // ---- Tên object trong kho ------------------------------------------------------------
 const kind = sniffImageKind(

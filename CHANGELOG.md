@@ -11,6 +11,31 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.56.2 — `npm run shot` thôi treo, và thôi để lại Chromium mồ côi
+
+- **Tìm ra chỗ treo, và nó không phải `networkidle`.** Phép chờ ảnh trước khi bấm máy viết
+  `img.decode().catch(() => {})` — mà `.catch()` chỉ bắt lời hứa BỊ TỪ CHỐI, nó không cứu được
+  một lời hứa KHÔNG BAO GIỜ NGÃ NGŨ. Ảnh `loading="lazy"` chưa từng vào khung nhìn thì
+  `decode()` nằm đó mãi, và `page.evaluate` không có hạn giờ nào cả.
+  - Trang Tông Môn hội đủ điều kiện: `AdminTabs` vẽ MỌI tab rồi chỉ `hidden` tab không hoạt
+    động, nên ảnh trong tab đang ẩn không bao giờ tải. Đo được: lượt chụp `/admin` in
+    ra「đã bấm」rồi đứng im **hơn ba phút**, không tệp nào được ghi. Sau bản này: **12,2 giây**.
+  - Giờ phép chờ có trần 4 giây, và trần ấy nằm TRONG trang — hết giờ thì chụp với những gì đã
+    tải được. Một tấm ảnh thiếu vài hình còn hơn không có tấm nào.
+- **Đồng hồ canh giờ + thử lại**, vì "đã vá cái treo đã biết" không phải một lời hứa: mỗi lượt
+  có hạn (mặc định 90 giây, đổi bằng `--timeout`), hụt hạn thì GIẾT trình duyệt rồi thử lại một
+  lượt nữa, hết lượt thì thoát mã 1 kèm lý do — thay vì treo im lặng.
+  - Cả phép KHỞI ĐỘNG trình duyệt cũng nằm trong hạn ấy. Khe này suýt bị bỏ sót: `launchServer`
+    treo thì chưa có PID nào để giết, tức không hàng rào nào phía dưới với tới được.
+- **Dọn tiến trình theo PID, ba nấc**: `server.kill()` (đo được 101ms) → hạn chót cho chính lời
+  hứa ấy → `taskkill /T /F` cả cây nếu vẫn còn sống. Đổi sang `chromium.launchServer()` chính
+  là để có PID — `browser.process()` không tồn tại trên `Browser` của bản playwright-core này.
+  - **Giết theo PID, TUYỆT ĐỐI không quét theo tên.** Trên máy còn `next dev` của phiên khác và
+    Chrome thật của chủ máy; một lệnh `taskkill /IM chrome.exe` là giết luôn tab ngân hàng của
+    họ. Đây là lý do bản này không có tính năng "quét dọn Chromium mồ côi" nào cả.
+- Thoát tường minh sau khi chụp xong: `connect()` để lại socket, và một tiến trình node nằm lại
+  sau khi đã in「Đã chụp」đúng là thứ phiền toái cần dẹp.
+
 ## 0.56.1 — dọn nốt tấm nền Hàng Đợi khỏi repo
 
 - **`public/backdrop-hang-doi.png` đã đi** (1.8MB): bản 0.56.0 đưa nó lên tàng khố và gán cho

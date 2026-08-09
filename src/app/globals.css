@@ -530,7 +530,7 @@ body {
 .chat-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 14px 8px;
+  padding: 18px 26px 10px;
   scroll-behavior: smooth;
 }
 
@@ -579,9 +579,9 @@ body {
 
 .chat-row {
   display: flex;
-  gap: 14px;
+  gap: 20px;
   /* Bản thiết kế thở rộng: mỗi người một khoảnh, không phải một dòng log nén chặt. */
-  margin-top: 18px;
+  margin-top: 24px;
   animation: chat-in 0.22s ease-out;
 }
 
@@ -643,21 +643,33 @@ body {
   gap: 2px;
   /* Tên người nói trong bản thiết kế là chữ hiển thị lớn — cùng font với tiêu đề. */
   font-family: var(--font-display);
-  font-size: 1.02rem;
+  font-size: 1.2rem;
   font-weight: 600;
   color: var(--color-parchment);
-  margin: 0 0 5px 4px;
+  margin: 0 0 6px 4px;
 }
 
 .chat-crown { color: var(--color-gold-300); font-style: normal; margin-left: 4px; }
 
-/* Bài vị của tag — ảnh webp chữ khắc sẵn, glow nằm trong chính ảnh. 44px theo tỉ lệ bản
-   thiết kế (bài vị thấp hơn chân dung 56px một bậc); ảnh ~3:1 nên bề ngang tự ra ~130px. */
+/* Bài vị của tag — ảnh webp chữ khắc sẵn, glow nằm TRONG chính ảnh.
+ *
+ * 92px nghe như quá khổ cho một dòng chat, và đó là chỗ dễ sai nhất: chiều cao CSS KHÔNG
+ * phải chiều cao cái biển. Tệp gốc 920×291 mang một quầng sáng chiếm gần nửa khung, biển
+ * thật chỉ nằm ở dải giữa — nên ở 44px biển còn ~26px và chữ khắc trên nó mờ tịt. 92px cho
+ * biển ~55px, đúng cỡ trong bản thiết kế.
+ *
+ * `margin-block` âm thu lại phần quầng rỗng ấy để dòng tên không bị đội cao theo. Ai thay bộ
+ * khung khác (viền sát mép hơn) thì phải chỉnh lại cả hai con số này.
+ *
+ * Chỉ ĐO ĐƯỢC bằng ảnh chụp thật — `getComputedStyle` báo 44px là "đúng như đã khai", nó
+ * không biết trong 44px ấy có bao nhiêu phần là quầng sáng. Xem `npm run shot`.
+ */
 .chat-tagframe {
   display: inline-block;
-  height: 44px;
+  height: 92px;
   width: auto;
   margin-left: 10px;
+  margin-block: -16px;
   vertical-align: middle;
   user-select: none;
 }
@@ -681,11 +693,11 @@ body {
    vừa phải. Cấu trúc đến từ chênh sáng, không phải từ nét kẻ. */
 .chat-bubble {
   position: relative;
-  padding: 10px 14px 9px;
-  border-radius: 12px;
+  padding: 12px 18px 11px;
+  border-radius: 14px;
   background: rgba(41, 42, 78, 0.55);
   border: 1px solid transparent;
-  font-size: 0.92rem;
+  font-size: 1rem;
   line-height: 1.5;
 }
 

@@ -446,7 +446,7 @@ export function ChatRoom({
 
       <header className="chat-head">
         <div>
-          <h1 className="h-display text-2xl font-semibold text-gilded">Phòng Chat</h1>
+          <h1 className="h-display text-3xl font-semibold text-gilded">Phòng Chat</h1>
           <p className="text-xs text-[var(--color-mist)]">
             Sảnh đàm đạo chung — mọi môn đồ đã nhập môn đều nghe thấy nhau.
           </p>
@@ -489,9 +489,10 @@ export function ChatRoom({
                   <Avatar
                     name={msg.author}
                     url={avatars[msg.userId]}
-                    // 56 theo tỉ lệ của bản thiết kế: chân dung phải NHỈNH hơn bài vị (44px)
-                    // — nó là mặt người, bài vị chỉ là danh xưng đi kèm.
-                    size={56}
+                    // 78 — đo bằng MẮT trên ảnh chụp thật: ở 56px chân dung lọt thỏm cạnh
+                    // bài vị và cả hàng trông chật. Vẫn nhỉnh hơn bài vị (64px) một bậc, vì
+                    // nó là mặt người còn bài vị chỉ là danh xưng đi kèm.
+                    size={78}
                     // Tin nối tiếp cùng người thì vòng tròn ẨN mà vẫn CHIẾM chỗ, để mọi bong
                     // bóng của cùng một người thẳng một hàng lề.
                     className={grouped ? "invisible" : ""}
@@ -510,7 +511,7 @@ export function ChatRoom({
                     return (
                       <span className="chat-author">
                         {msg.author}
-                        {msg.isAdmin && <em className="chat-crown" title="Tông chủ">✦</em>}
+                        {msg.isAdmin && !frame && <em className="chat-crown" title="Tông chủ">✦</em>}
                         {frame && (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img className="chat-tagframe" src={frame.url} alt={frame.label} title={frame.label} loading="lazy" decoding="async" />

@@ -11,6 +11,27 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.51.0 — `npm run shot`: tự chụp được trang, và bài vị hết bé tí
+
+- **`npm run shot -- --path chat --out anh.png`** — chụp ảnh một trang của web đang chạy dưới
+  máy, kể cả trang sau cửa đăng nhập (ký phiên như `dev:session`, không ai gõ mật khẩu).
+  Dùng `playwright-core` + bộ Chromium đã có sẵn trong repo cho quest-engine, nên **không
+  thêm một dependency nào**.
+  - Vì sao cần: Browser pane của Claude Code chỉ dựng frame khi nó ĐANG HIỂN THỊ. Pane ẩn thì
+    `screenshot` hết giờ, ảnh `loading="lazy"` không bao giờ tải, `img.decode()` treo — tức
+    mọi lượt kiểm bằng MẮT đều phải nhờ tay người mở pane. Chromium do chính script khởi động
+    thì luôn dựng frame, dù không ai nhìn.
+  - Chụp ở `deviceScaleFactor: 2` để soi được chữ nhỏ; đợi mọi ảnh `decode()` xong mới bấm
+    máy; và **kể ra lỗi console/mạng** của trang — một tấm ảnh đẹp che được rất nhiều thứ hỏng.
+  - Nhận cả `--path chat` lẫn `--path /chat`: Git Bash trên Windows tự bẻ đối số bắt đầu bằng
+    `/` thành đường dẫn Windows (`/chat` → `C:/Program Files/Git/chat`), và script gỡ lại.
+- **Bài vị tăng 44px → 92px, chân dung 56 → 78px, chữ và khoảng thở lớn theo.** Cái sai không
+  nhìn ra bằng `getComputedStyle`: tệp khung gốc 920×291 mang một QUẦNG SÁNG chiếm gần nửa
+  khung ảnh, nên chiều cao CSS không phải chiều cao cái biển — ở 44px biển chỉ còn ~26px và
+  chữ khắc trên nó mờ tịt. Máy báo "44px, đúng như đã khai" và vẫn sai. `margin-block: -16px`
+  thu lại phần quầng rỗng để dòng tên không bị đội cao.
+- Bỏ dấu ✦ khi người nói đã có bài vị — bản thiết kế không có nó, và bài vị đã nói rõ thứ bậc.
+
 ## 0.50.1 — khung son 0.49.0 mới đổi MÀU ÁO, bản này đổi DÁNG KHUNG cho đúng thiết kế
 
 - Đạo hữu đặt bản thiết kế cạnh 0.49.0 và nói thẳng: vẫn giống cũ. Đúng — lần trước chỉ tô

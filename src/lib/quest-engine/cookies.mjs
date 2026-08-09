@@ -167,3 +167,52 @@ export function parseCookieString(raw, url) {
   }
   return cookies;
 }
+
+/**
+ * Cookie phiên đăng nhập của WordPress. Tên đầy đủ mang hậu tố COOKIEHASH (băm từ siteurl)
+ * nên khác nhau ở mỗi site — chỉ nhận diện được bằng TIỀN TỐ, không so bằng nhau được.
+ */
+export const LOGIN_COOKIE_PREFIX = "wordpress_logged_in_";
+
+/**
+ * Tên nhân vật trong game, đọc ra từ cookie đăng nhập. Dùng để tự đặt nhãn cho tài khoản khi
+ * đạo hữu bỏ trống ô「Tên gợi nhớ」— cùng phép với bản PC (`GameAccount.ExtractWordPressUser`),
+ * để hai bản gọi cùng một tài khoản bằng cùng một cái tên.
+ *
+ * Giá trị cookie có dạng `user|expiry|token|hmac` và đã được URL-encode, nên tên nằm ở đoạn
+ * trước dấu `|` đầu tiên.
+ *
+ * Sống ở module LÁ này chứ không nằm trong server action, vì đây là kiến thức về ĐỊNH DẠNG
+ * COOKIE — đúng thứ tệp này giữ, và cũng là nơi duy nhất bộ smoke test với tới được (server
+ * action kéo theo next/cache và cả tầng database, không đơn vị hoá được).
+ *
+ * Hai chỗ CỐ Ý khác bản PC, cả hai đều là ca xấu nhất chứ không phải ca thường:
+ *
+ *  1. `decodeURIComponent` NÉM khi gặp phần trăm hỏng (`%zz`, hay một dấu `%` lạc lõng), khác
+ *     `WebUtility.UrlDecode` bên C# vốn im lặng để nguyên. Một chuỗi dán thiếu đuôi là đủ dựng
+ *     ra cảnh ấy, mà một cái tên gợi nhớ thì không đáng để làm hỏng cả lượt lưu tài khoản —
+ *     nên bắt lại và dùng giá trị thô.
+ *  2. Bản PC lấy `pipe > 0 ? decoded[..pipe] : decoded`, tức giá trị bắt đầu bằng `|` cho ra
+ *     NGUYÊN chuỗi làm tên. Ở đây đoạn đầu rỗng nghĩa là không đọc được tên → trả `null` để
+ *     rơi về tên đánh số, thay vì khắc một chuỗi rác lên nhãn người ta phải nhìn mỗi ngày.
+ *
+ * @param {Array<{ name: string, value: string }>} jar Kết quả của `parseCookieString`.
+ * @returns {string | null} Tên đọc được, hoặc null khi không có cookie đăng nhập nào đọc nổi.
+ */
+export function detectWordPressUser(jar) {
+  const cookie = (jar ?? []).find(
+    (c) => typeof c?.name === "string" && c.name.toLowerCase().startsWith(LOGIN_COOKIE_PREFIX),
+  );
+  if (!cookie || typeof cookie.value !== "string" || !cookie.value) return null;
+
+  let decoded;
+  try {
+    decoded = decodeURIComponent(cookie.value);
+  } catch {
+    decoded = cookie.value;
+  }
+
+  const pipe = decoded.indexOf("|");
+  const user = (pipe >= 0 ? decoded.slice(0, pipe) : decoded).trim();
+  return user.length > 0 ? user : null;
+}

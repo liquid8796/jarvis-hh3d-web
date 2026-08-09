@@ -28,9 +28,16 @@ import {
 // ấy đọc profile.json bằng `readFileSync(fileURLToPath(new URL(…)))` ngay ở thân module —
 // dưới Turbopack, `URL` trong bundle không phải `URL` của Node, nên fileURLToPath ném lỗi
 // lúc NẠP MODULE và kéo sập mọi server action của /dashboard. Xem đầu cookies.mjs.
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore — module JS thuần của quest-engine, không có d.ts và không cần.
-import { parseCookieString } from "@/lib/quest-engine/cookies.mjs";
+//
+// Chỗ này từng có `@ts-ignore` với lời ghi "module JS thuần, không có d.ts". Đã ĐO 09/08/2026:
+// gỡ nó ra thì `tsc --noEmit` vẫn sạch — `allowJs` lo được, nên nó là dòng chết. Và import
+// dưới đây trải nhiều dòng, tức lỗi module (nếu có) rơi ở dòng cuối, ngoài tầm che của một
+// `@ts-ignore` đặt trên dòng đầu: nếu còn cần thật thì tsc đã đỏ ngay.
+import {
+  LOGIN_COOKIE_PREFIX,
+  detectWordPressUser,
+  parseCookieString,
+} from "@/lib/quest-engine/cookies.mjs";
 
 /**
  * Automation server actions — every one re-derives the caller from the session and
@@ -39,7 +46,9 @@ import { parseCookieString } from "@/lib/quest-engine/cookies.mjs";
 
 export type ActionResult = { ok: boolean; message: string };
 
-type CookieInspection = { ok: true; note: string } | { ok: false; message: string };
+type CookieInspection =
+  | { ok: true; note: string; detectedUser: string | null }
+  | { ok: false; message: string };
 
 const COOKIE_MAX_LENGTH = 8000;
 
@@ -53,7 +62,7 @@ const COOKIE_MAX_LENGTH = 8000;
  * chuỗi hoàn toàn hợp lệ.
  */
 function inspectCookie(pastedCookie: string, baseUrl: string): CookieInspection {
-  const jar = parseCookieString(pastedCookie, baseUrl) as { name: string }[];
+  const jar = parseCookieString(pastedCookie, baseUrl) as Array<{ name: string; value: string }>;
 
   if (jar.length === 0) {
     return {
@@ -68,10 +77,21 @@ function inspectCookie(pastedCookie: string, baseUrl: string): CookieInspection 
     };
   }
 
+  // Cùng MỘT phép nhận diện cho cả lời nhắn lẫn phép đoán tên, qua `LOGIN_COOKIE_PREFIX`.
+  // Trước đây chỗ này so tiền tố lỏng hơn ("wordpress_logged_in", thiếu gạch dưới cuối);
+  // để lệch nhau thì có ngày lời nhắn khoe「có phiên đăng nhập」trong khi phép đoán tên lại
+  // bảo không thấy gì. WordPress luôn gắn COOKIEHASH sau dấu gạch dưới ấy nên siết lại
+  // không mất trường hợp thật nào.
+  const detectedUser = detectWordPressUser(jar);
+  const hasLoginCookie = jar.some((cookie) =>
+    cookie.name.toLowerCase().startsWith(LOGIN_COOKIE_PREFIX),
+  );
+
   return {
     ok: true,
-    note: jar.some((cookie) => cookie.name.startsWith("wordpress_logged_in"))
-      ? ` Đã nhận ${jar.length} cookie, có phiên đăng nhập.`
+    detectedUser,
+    note: hasLoginCookie
+      ? ` Đã nhận ${jar.length} cookie, có phiên đăng nhập${detectedUser ? ` của「${detectedUser}」` : ""}.`
       : ` Đã nhận ${jar.length} cookie nhưng KHÔNG thấy cookie đăng nhập (wordpress_logged_in_…) — nếu lượt chạy báo hết phiên thì đây là lý do.`,
   };
 }
@@ -184,7 +204,16 @@ export async function addAccountAction(formData: FormData): Promise<ActionResult
   const inspection = inspectCookie(field.cookie, (await getAppSettings()).game.baseUrl);
   if (!inspection.ok) return inspection;
 
-  const result = await addAccount(user.id, String(formData.get("label") ?? ""), field.cookie);
+  // Ba nấc đặt tên, đúng thứ tự của bản PC (`GameAccount.ResolveLabel`): tên tự đặt → tên đọc
+  // được từ cookie → tên đánh số. Nấc cuối do `addAccount` tự cấp, nên ở đây chỉ cần đưa
+  // xuống chuỗi RỖNG khi hai nấc trên đều trống — `normalizeLabel` bên accounts.ts hiểu nhãn
+  // rỗng là "dùng fallback", và đó vẫn là nơi duy nhất biết số thứ tự tài khoản.
+  const typedLabel = String(formData.get("label") ?? "").trim();
+  const result = await addAccount(
+    user.id,
+    typedLabel || inspection.detectedUser || "",
+    field.cookie,
+  );
   if (!result.ok) return { ok: false, message: result.error };
 
   revalidatePath("/dashboard");

@@ -151,7 +151,9 @@ export function AccountManager() {
             id="newAccountLabel"
             ref={addLabelRef}
             className="input mb-3"
-            placeholder={`Ví dụ: Tài khoản ${accounts.length + 1}`}
+            // Nói ra cái mặc định, vì nó không còn là một con số vô hồn: để trống thì server
+            // đọc tên nhân vật ngay trong cookie vừa dán (xem `detectWordPressUser`).
+            placeholder="Để trống sẽ tự lấy tên tài khoản game trong cookie"
             maxLength={60}
             disabled={pending}
             onKeyDown={(event) => {

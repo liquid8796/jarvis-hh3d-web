@@ -11,6 +11,43 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.57.5 — bỏ trống ô tên thì tài khoản tự mang tên nhân vật trong cookie
+
+Ô「Tên gợi nhớ」để trống trước đây cho ra một cái nhãn vô hồn:「Tài khoản 2」. Nay nó lấy đúng
+tên nhân vật đọc được trong cookie vừa dán — cùng phép và cùng thứ tự ưu tiên với bản PC
+(`GameAccount.ResolveLabel`): **tên tự đặt → tên đọc từ cookie → tên đánh số**. Nấc cuối vẫn
+do `accounts.ts` cấp, vì đó là nơi duy nhất biết số thứ tự.
+
+Cookie đăng nhập WordPress mang giá trị `user|expiry|token|hmac` đã URL-encode, nên tên là
+đoạn trước dấu `|` đầu tiên. Hàm `detectWordPressUser` đặt trong `quest-engine/cookies.mjs`
+chứ không trong server action — đó là kiến thức về ĐỊNH DẠNG COOKIE, đúng thứ module lá ấy
+giữ, và cũng là nơi duy nhất `npm run smoke` với tới được (server action kéo theo `next/cache`
+và cả tầng database, không đơn vị hoá được).
+
+**Hai chỗ cố ý KHÁC bản PC, cả hai đều là ca xấu nhất:**
+
+- `decodeURIComponent` **ném** khi gặp phần trăm hỏng (`%zz`, hay một `%` lạc lõng), khác
+  `WebUtility.UrlDecode` bên C# vốn im lặng để nguyên. Một chuỗi dán thiếu đuôi là đủ dựng ra
+  cảnh ấy, mà một cái tên gợi nhớ thì không đáng để làm hỏng cả lượt lưu tài khoản — nên bắt
+  lại và dùng giá trị thô.
+- Bản PC lấy `pipe > 0 ? decoded[..pipe] : decoded`, tức giá trị bắt đầu bằng `|` cho ra
+  NGUYÊN chuỗi làm tên. Ở đây đoạn đầu rỗng nghĩa là không đọc được tên → rơi về tên đánh số,
+  thay vì khắc một chuỗi rác lên nhãn phải nhìn mỗi ngày.
+
+Thêm 11 phép thử trong `npm run smoke` cho đúng những ca ấy (235 thuận, 0 nghịch), và một lượt
+kiểm đầu-cuối đi đúng đường người dùng đi: để trống ô tên, dán cookie, bấm Lưu — nhãn ra đúng
+tên trong cookie, rồi xoá lại tài khoản thử bằng chính nút Xoá của giao diện.
+
+Nhân tiện hai chỗ nhỏ: lời nhắn sau khi lưu giờ khoe luôn tên đọc được (「có phiên đăng nhập
+của『…』」) để biết ngay mình vừa dán cookie của ai; và phép nhận diện cookie đăng nhập trong
+lời nhắn được siết lại cho khớp với phép đoán tên — trước nó so tiền tố lỏng hơn, thiếu gạch
+dưới cuối và phân biệt hoa thường, nên có thể khoe「có phiên đăng nhập」trong khi phép đoán tên
+lại bảo không thấy gì.
+
+Dọn một dòng chết: `@ts-ignore` trên lượt import `cookies.mjs`. Đã đo — gỡ ra thì `tsc --noEmit`
+vẫn sạch (`allowJs` lo được). Và import nay trải nhiều dòng nên lỗi module, nếu còn, sẽ rơi ở
+dòng cuối, ngoài tầm che của nó: còn cần thật thì tsc đã đỏ.
+
 ## 0.57.4 — dời tàng thư sang kho Postgres mới, và vá một phép thử đã đỏ từ 0.57.0
 
 - **Toàn bộ dữ liệu đã chuyển sang database Postgres mới** (`jarvis-auto-hh3d`, Neon

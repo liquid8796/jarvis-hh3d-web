@@ -20,6 +20,8 @@ import { chromium } from "playwright-core";
 import { createQuestEngine } from "../src/lib/quest-engine/engine.mjs";
 import { createSession } from "../src/lib/quest-engine/session.mjs";
 import { mapWithLimit, parseCookieString, runCycle } from "../src/lib/quest-engine/runCycle.mjs";
+// Nhập thẳng từ module LÁ: `detectWordPressUser` chỉ biết định dạng cookie, không đi qua engine.
+import { detectWordPressUser } from "../src/lib/quest-engine/cookies.mjs";
 import {
   _observeGate,
   _resetGate,
@@ -572,6 +574,39 @@ async function main() {
     "header 'Cookie:' copy nguyên cũng hiểu",
     parseCookieString("Cookie: a=1; b=2", "https://e.test").length === 2,
   );
+
+  // Tên tài khoản đọc từ cookie đăng nhập — dùng để tự đặt nhãn khi đạo hữu bỏ trống ô tên,
+  // đúng như bản PC. Nhãn sai thì không ai chết, nhưng nhãn NÉM thì hỏng cả lượt lưu tài
+  // khoản, nên các ca xấu ở đây quan trọng hơn ca đẹp.
+  const user = (jar) => detectWordPressUser(jar);
+  const loginCookie = (value) => [{ name: "wordpress_logged_in_9c1", value }];
+
+  check("tên đọc được từ cookie đăng nhập", user(loginCookie("daohuu|1786|tok|hmac")) === "daohuu");
+  check(
+    "giá trị URL-encode được giải mã trước khi cắt",
+    user(loginCookie("nam%20cung%20binh%7C1786%7Ctok")) === "nam cung binh",
+    `nhận ${user(loginCookie("nam%20cung%20binh%7C1786%7Ctok"))}`,
+  );
+  check("không có dấu | thì cả chuỗi là tên", user(loginCookie("chidanhthoi")) === "chidanhthoi");
+  check(
+    "lấy đúng cookie đăng nhập giữa đám cookie khác",
+    user([
+      { name: "fakesessid", value: "s1" },
+      { name: "WordPress_Logged_In_AB", value: "hoala|1|t" },
+    ]) === "hoala",
+  );
+
+  check("không có cookie đăng nhập → null", user([{ name: "fakesessid", value: "a|b" }]) === null);
+  check("jar rỗng → null", user([]) === null);
+  check("giá trị rỗng → null", user(loginCookie("")) === null);
+  check("đoạn tên rỗng (bắt đầu bằng |) → null, KHÔNG lấy cả chuỗi", user(loginCookie("|1786|tok")) === null);
+  check("đoạn tên toàn khoảng trắng → null", user(loginCookie("   |1786|tok")) === null);
+  check(
+    "phần trăm hỏng không được NÉM — rơi về giá trị thô",
+    user(loginCookie("%zz|1786")) === "%zz",
+    `nhận ${user(loginCookie("%zz|1786"))}`,
+  );
+  check("cookie thiếu trường value không làm sập", user([{ name: "wordpress_logged_in_x" }]) === null);
 
   // Worker tông môn chạy tuần tự cho nhiều người. Một profile chung từng khiến cookie VIP
   // còn sống của lượt trước thắng cookie thường vừa lưu của lượt sau.

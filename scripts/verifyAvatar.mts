@@ -21,6 +21,7 @@ const assert = (condition: unknown, message: string) => {
 
 const media = await import("../src/lib/services/media.ts");
 const users = await import("../src/lib/services/users.ts");
+const { isAnimatedImage } = await import("../src/lib/media/animatedImage.ts");
 
 const OCI_KEYS = ["OCI_REGION", "OCI_NAMESPACE", "OCI_BUCKET", "OCI_ACCESS_KEY_ID", "OCI_SECRET_ACCESS_KEY"] as const;
 const hasOci = OCI_KEYS.every((key) => (process.env[key] ?? "").trim().length > 0);
@@ -74,6 +75,60 @@ try {
   assert(media.sniffImageKind(new Uint8Array(0)) === null, "bytes rỗng phải bị từ chối, không được ném");
   assert(media.sniffImageKind(PNG_1X1.slice(0, 5)) === null, "quá ngắn để soi thì phải là null");
   console.log("✔ Soi bytes: nhận đúng 4 định dạng, từ chối HTML/PDF/BMP/WAV/rỗng/quá ngắn.");
+
+  // ---- Nhiều khung hay một khung ----------------------------------------------------
+  /**
+   * Phép quyết định「giữ nguyên bản hay cho qua canvas」của AvatarPicker. Sáu tệp dưới đây là
+   * ẢNH THẬT, dựng bằng canvas + phẫu thuật container trong trình duyệt rồi soi lại bằng
+   * `ImageDecoder` — mỗi tệp đều giải mã được, nên đây không phải mấy cái header bịa ra.
+   *
+   * Con số làm chuẩn là `frameCount`, KHÔNG phải cờ `animated`: Chrome trả `animated: true` cho
+   * cả một tấm GIF MỘT khung (vì container GIF vốn có khả năng động), nên tin vào cờ ấy là làm
+   * phẳng… không, là giữ nguyên bản mọi tấm GIF tĩnh. Đó chính là lý do phép đọc của ta ĐẾM
+   * khung chứ không tra một cờ.
+   */
+  const FIXTURES: Array<{ name: string; base64: string; frameCount: number }> = [
+    { name: "GIF động 2 khung", frameCount: 2, base64: "R0lGODlhAQABAIAAAP8AAAAA/yH/C05FVFNDQVBFMi4wAwEAAAAh+QQEMgAAACwAAAAAAQABAAACAkQBACH5BAQyAAAALAAAAAABAAEAAAICTAEAOw==" },
+    { name: "GIF tĩnh 1 khung", frameCount: 1, base64: "R0lGODlhAQABAIAAAP8AAAAA/ywAAAAAAQABAAACAkQBADs=" },
+    { name: "WebP động 2 khung", frameCount: 2, base64: "UklGRrwAAABXRUJQVlA4WAoAAAACAAAAAAAAAAAAQU5JTQYAAAAAAAAAAABBTk1GRAAAAAAAAAAAAAAAAAAAADIAAABWUDggLAAAAJABAJ0BKgEAAQABQCYloAJ0ugADmAD+9aD//qcf/Jx/8nH9fb/cGZ9XX+AAQU5NRkQAAAAAAAAAAAAAAAAAAAAyAAAAVlA4ICwAAACQAQCdASoBAAEAAUAmJaACdLoAA5gA/vWg//6nH/ycf/Jx/X2/3BmfV1/gAA==" },
+    // Tấm WebP tĩnh này mang cả một chunk ICCP TRƯỚC chunk ảnh, nên nó kiểm luôn phép đi qua
+    // chunk lạ: đọc hụt một chunk là lạc vị trí và đọc rác thành tag.
+    { name: "WebP tĩnh (có ICCP)", frameCount: 1, base64: "UklGRhoCAABXRUJQVlA4WAoAAAAgAAAAAAAAAAAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggLAAAAJABAJ0BKgEAAQABQCYloAJ0ugADmAD+9aD//qcf/Jx/8nH9fb/cGZ9XX+AA" },
+    { name: "APNG 2 khung", frameCount: 2, base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACGFjVEwAAAACAAAAAPONk3AAAAAaZmNUTAAAAAAAAAABAAAAAQAAAAAAAAAAADIAZAAA/rcUrAAAAA1JREFUeAFienEo5j8AAAD//zZHDQsAAAAaZmNUTAAAAAEAAAABAAAAAQAAAAAAAAAAADIAZAAAZcT+eAAAABFmZEFUAAAAAngBYnpxKOY/AAAA//8lS6NyAAAAAElFTkSuQmCC" },
+    { name: "PNG tĩnh", frameCount: 1, base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4AWJ6cSjmPwAAAP//NkcNCwAAAAZJREFUAwAHrAMI3iEsIgAAAABJRU5ErkJggg==" },
+  ];
+
+  for (const fixture of FIXTURES) {
+    const bytes = new Uint8Array(Buffer.from(fixture.base64, "base64"));
+    const want = fixture.frameCount >= 2;
+    const got = isAnimatedImage(bytes);
+    assert(
+      got === want,
+      `${fixture.name}: trình duyệt đếm ${fixture.frameCount} khung nên phải ra ${want}, mà phép đọc trả ${got}`,
+    );
+    // Mọi tệp động đều phải qua được cửa soi kiểu — không thì nhánh miễn trừ có nhận ra cũng
+    // vô nghĩa vì server sẽ trả 415.
+    assert(media.sniffImageKind(bytes) !== null, `${fixture.name}: phải qua được phép soi kiểu`);
+  }
+
+  // Chịu được tệp rác và tệp cắt cụt: trả về "tĩnh", KHÔNG ném, và KHÔNG quay vòng.
+  const animatedGif = new Uint8Array(Buffer.from(FIXTURES[0].base64, "base64"));
+  for (let cut = 1; cut < animatedGif.length; cut++) {
+    // Cắt ở mọi vị trí. Chỗ nào còn đủ hai Image Descriptor thì vẫn là động — điều PHẢI đúng là
+    // không tệp nào làm hàm này ném hay treo.
+    isAnimatedImage(animatedGif.slice(0, cut));
+  }
+  assert(!isAnimatedImage(new Uint8Array(0)), "bytes rỗng phải là tĩnh");
+  assert(!isAnimatedImage(ascii("GIF89a", 12)), "GIF chỉ có header, không khung nào, là tĩnh");
+  assert(!isAnimatedImage(jpeg), "JPEG không có khái niệm nhiều khung");
+  assert(!isAnimatedImage(ascii("<!doctype html><h1>hi</h1>")), "rác không phải ảnh động");
+  assert(!isAnimatedImage(wav), "RIFF mà không phải WEBP thì không đọc tiếp");
+  assert(
+    !isAnimatedImage(new Uint8Array(Buffer.concat([Buffer.from([0x89]), Buffer.from("PNG\r\n\x1a\n"), Buffer.alloc(4), Buffer.from("IDATxxxxacTL")]))),
+    "acTL đứng SAU IDAT là APNG hỏng — trình duyệt vẽ tĩnh thì ta cũng phải gọi là tĩnh",
+  );
+
+  console.log("✔ Đếm khung: GIF/WebP/APNG động đều nhận ra, bản tĩnh của cả ba đều không; rác và tệp cắt cụt không làm gì đổ.");
 
   // ---- Đặt tên object --------------------------------------------------------------
   const kind = media.sniffImageKind(PNG_1X1)!;

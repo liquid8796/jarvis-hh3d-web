@@ -11,6 +11,42 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.50.0 — ảnh đại diện động: WebP động và APNG được vào cùng GIF
+
+- **Cả BA loại ảnh động đều giữ được phần động**: GIF, WebP động, APNG. Trước bản này chỉ GIF
+  được miễn bước thu nhỏ; WebP động và APNG đi qua `canvas` nên về tới sảnh chỉ còn **khung đầu**
+  — mất động mà không một lời báo nào, đúng loại thất bại tệ nhất.
+- **Phép quyết định giờ ĐỌC BÊN TRONG TỆP, không tra `file.type`** — và đó là điểm cốt tử: một
+  tấm WebP tĩnh và một tấm WebP động mang **đúng cùng một kiểu MIME**, nên `file.type` không bao
+  giờ phân biệt nổi hai thứ ấy. `src/lib/media/animatedImage.ts` đi theo cấu trúc container:
+  - GIF — ĐẾM số Image Descriptor, đi đúng theo chuỗi block. Quét thô byte `0x2C` là trúng cả dữ
+    liệu pixel nén rồi báo động cho một tấm ảnh tĩnh.
+  - WebP — cờ ANIM trong chunk `VP8X`, hoặc có chunk `ANIM`/`ANMF`.
+  - APNG — có chunk `acTL` **nằm trước** `IDAT` đầu tiên. Đứng sau là APNG hỏng, và trình duyệt
+    vẽ tệp ấy thành ảnh tĩnh — nên ta cũng gọi nó là tĩnh, không thì ta giữ nguyên bản một tệp mà
+    người dùng vẫn thấy đứng im.
+- **KHÔNG dùng `ImageDecoder`** dù API ấy trả lời sẵn `animated`/`frameCount`: Firefox chưa có
+  nó, và một API vắng mặt sẽ khiến nhánh miễn trừ im lặng không chạy — người dùng Firefox mất
+  phần động mà không hiểu vì sao. Thêm một lý do đo được: Chrome trả `animated: true` cho cả một
+  tấm GIF **một khung** (container vốn có khả năng động), nên cờ ấy không dùng làm chuẩn được;
+  con số đáng tin là `frameCount`. Đọc container cho cùng câu trả lời ở mọi trình duyệt.
+- **Hệ quả tốt ngoài dự tính: GIF TĨNH giờ cũng được thu nhỏ.** Trước đây mọi tệp `.gif` đều đi
+  nguyên bản, nên một tấm GIF tĩnh 5MB bị từ chối vì trần 2MB — dù chẳng có phần động nào để giữ.
+  Giờ nó đi đường ảnh tĩnh: đo được 35 byte → 554 byte ở cỡ 1×1 (số nhỏ nghe ngược, nhưng ở cỡ
+  thật thì đây là đường thu nhỏ), và không còn bị trần 2MB chặn.
+- `image/apng` và `.apng` vào **bộ lọc hộp chọn tệp**. Thiếu chúng thì trình duyệt — vốn tra bộ
+  lọc theo ĐUÔI — làm mờ luôn tệp `.apng` ngay trong hộp chọn, tức tính năng chết ở bước đầu
+  tiên mà không có lời báo nào. Bắt được ca này ở vòng soát lại, không phải khi chạy.
+- Tên tệp gửi kèm multipart thu về **một hằng số** không đuôi: route ảnh đại diện không đọc
+  `file.name` một lần nào — nó suy đuôi thật từ bytes. Ba cái tên "đúng đuôi" trước đây chỉ tạo
+  ảo giác rằng chúng quyết định điều gì.
+- Trang Hồ Sơ **bỏ đoạn dẫn** dưới tiêu đề: mục ảnh đại diện và biểu mẫu ngay bên dưới đã tự nói
+  hết những gì nó nói.
+- `npm run verify:avatar` thêm mục đếm khung, chạy trên **sáu tệp ảnh THẬT** (dựng bằng canvas +
+  phẫu thuật container rồi soi lại bằng `ImageDecoder` — cả sáu đều giải mã được), so từng tệp
+  với `frameCount` mà trình duyệt đếm. Kèm phép cắt tệp ở **mọi vị trí** để chắc rằng tệp cắt cụt
+  không làm hàm ném hay quay vòng.
+
 ## 0.49.0 — Phòng Chat khoác khung son, và tag thành BÀI VỊ có hoa văn
 
 - **Sảnh đàm đạo đổi theo bản thiết kế mới**: khung viền vàng kép với ấn triện ở đỉnh, nền

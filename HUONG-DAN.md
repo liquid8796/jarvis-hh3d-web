@@ -130,14 +130,20 @@ dải nhắc mỏng trên đầu trang — vì công tắc tắt bảo trì nằ
 
 ### Đặt ảnh đại diện
 
-Cũng trong trang **Hồ Sơ**, mục ở trên cùng: bấm **Chọn ảnh**, chọn một tấm PNG, JPEG, WebP
-hoặc GIF. Ảnh hiện lên ngay cạnh tên bạn trong Phòng Chat và trên thanh đầu trang; chưa đặt
+Cũng trong trang **Hồ Sơ**, mục ở trên cùng: bấm **Chọn ảnh**, chọn một tấm PNG, JPEG, WebP,
+GIF hoặc APNG. Ảnh hiện lên ngay cạnh tên bạn trong Phòng Chat và trên thanh đầu trang; chưa đặt
 thì hệ thống vẽ chữ đầu của danh xưng trên một màu nền riêng của bạn. Bấm **Bỏ ảnh** là trở
 về chữ đầu ấy.
 
-Ảnh thường được **tự thu nhỏ ngay trên máy bạn** về 512px và cắt vuông ở giữa trước khi gửi
+Ảnh **tĩnh** được **tự thu nhỏ ngay trên máy bạn** về 512px và cắt vuông ở giữa trước khi gửi
 đi, nên chọn thẳng ảnh từ điện thoại cũng được, không cần cắt trước và không tốn nhiều mạng.
-Riêng **GIF động thì được giữ nguyên** để không mất phần động, nên tấm GIF phải dưới 2MB.
+
+Ảnh **động thì được giữ nguyên** để không mất phần động, và **cả ba loại ảnh động đều được**:
+GIF, WebP động và APNG. Chúng động thật trong Phòng Chat, không phải đứng im một khung. Đổi lại,
+vì không được thu nhỏ hộ nên **tấm ảnh động phải dưới 2MB**.
+
+Hệ thống nhận ra ảnh động bằng cách đọc bên trong tệp, không nhìn cái đuôi — nên một tấm GIF
+*tĩnh* vẫn được thu nhỏ như mọi ảnh tĩnh khác, dù nó mang đuôi `.gif`.
 
 Đổi ảnh là ảnh cũ bị xoá khỏi kho — không có chỗ nào giữ lại tấm trước đó. Ảnh không bị đóng
 băng vào từng tin nhắn: đổi một lần là mọi tin cũ của bạn trong sảnh cũng mang mặt mới.

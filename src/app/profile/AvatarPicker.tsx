@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
+import { isAnimatedImage } from "@/lib/media/animatedImage";
 
 /**
  * Đổi ảnh đại diện — chọn tệp, thu nhỏ NGAY TRÊN MÁY, rồi gửi lên /api/profile/avatar.
@@ -30,7 +31,26 @@ const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
  */
 const MAX_SOURCE_BYTES = 16 * 1024 * 1024;
 
-const ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
+/**
+ * Bộ lọc của hộp chọn tệp.
+ *
+ * `image/apng` và `.apng` có mặt vì APNG: trình duyệt tra bộ lọc theo ĐUÔI tệp, và một tệp tên
+ * `mat-cua-toi.apng` được tra ra `image/apng` — không có mục ấy thì nó bị làm mờ ngay trong hộp
+ * chọn, tức tính năng ảnh động APNG chết ngay ở bước đầu tiên mà không có lời báo nào. Bytes bên
+ * trong vẫn là PNG hợp lệ nên server soi ra `image/png` như thường.
+ *
+ * Bộ lọc này chỉ là tiện cho người chọn, KHÔNG phải hàng rào: ai cũng đổi được sang "All files".
+ * Luật thật nằm ở phép soi bytes phía server.
+ */
+const ACCEPT = "image/png,image/apng,image/jpeg,image/webp,image/gif,.apng";
+
+/**
+ * Tên gửi kèm trong multipart. CỐ Ý là một hằng số, không phải tên tệp gốc và cũng không mang
+ * đuôi: route ảnh đại diện không đọc `file.name` một lần nào — nó suy đuôi thật từ bytes rồi tự
+ * đặt tên object (xem `avatarObjectKey`). Một cái tên "đúng đuôi" ở đây chỉ tạo ảo giác rằng nó
+ * quyết định điều gì.
+ */
+const UPLOAD_FILENAME = "avatar";
 
 /** Chất lượng WebP. 0.9 gần như không phân biệt được bằng mắt ở cỡ này, mà nhẹ hơn PNG nhiều lần. */
 const WEBP_QUALITY = 0.9;
@@ -125,20 +145,34 @@ export function AvatarPicker({ name, url }: { name: string; url: string | null }
 
     setBusy("upload");
     try {
-      let upload: Blob = file;
-      let filename = "avatar";
+      let bytes: Uint8Array;
+      try {
+        bytes = new Uint8Array(await file.arrayBuffer());
+      } catch {
+        setError("Không đọc được tệp này — có thể nó vừa bị di chuyển hoặc đổi tên.");
+        return;
+      }
 
-      if (file.type === "image/gif") {
-        // GIF đi NGUYÊN BẢN: canvas chỉ vẽ được khung đầu, nên thu nhỏ một GIF động là lặng lẽ
-        // giết phần động của nó. Đổi lại, nó phải tự vừa trần của server ngay từ đầu.
+      let upload: Blob = file;
+
+      if (isAnimatedImage(bytes)) {
+        /**
+         * Ảnh ĐỘNG đi NGUYÊN BẢN — GIF, WebP động và APNG như nhau. Canvas chỉ vẽ được khung
+         * đầu, nên thu nhỏ một tệp nhiều khung là lặng lẽ giết phần động của nó.
+         *
+         * Xét theo BYTES chứ không theo `file.type`, và đó là điểm chính: một tấm WebP tĩnh và
+         * một tấm WebP động mang đúng cùng một kiểu MIME, nên `file.type` không bao giờ phân
+         * biệt được hai thứ ấy. Nhờ đọc container, GIF TĨNH giờ cũng được thu nhỏ như mọi ảnh
+         * tĩnh khác — trước đây mọi GIF đều đi nguyên bản, nên một tấm GIF tĩnh 5MB bị từ chối
+         * dù chẳng có phần động nào để mà giữ.
+         */
         if (file.size > MAX_UPLOAD_BYTES) {
           setError(
-            `Ảnh GIF phải dưới ${fmtMb(MAX_UPLOAD_BYTES)} vì nó được giữ nguyên để không mất phần động — ` +
-              "ảnh thường thì được tự thu nhỏ nên nặng bao nhiêu cũng được.",
+            `Ảnh động phải dưới ${fmtMb(MAX_UPLOAD_BYTES)} vì nó được giữ nguyên để không mất phần ` +
+              "động — ảnh tĩnh thì được tự thu nhỏ nên nặng bao nhiêu cũng được.",
           );
           return;
         }
-        filename = "avatar.gif";
       } else {
         let shrunk: { blob: Blob; type: string };
         try {
@@ -148,7 +182,6 @@ export function AvatarPicker({ name, url }: { name: string; url: string | null }
           return;
         }
         upload = shrunk.blob;
-        filename = shrunk.type === "image/webp" ? "avatar.webp" : "avatar.png";
 
         // Gần như không xảy ra ở cạnh 512px, nhưng nói ra thì hơn là để server trả 413 với một
         // con số mà người dùng không biết từ đâu ra.
@@ -159,7 +192,7 @@ export function AvatarPicker({ name, url }: { name: string; url: string | null }
       }
 
       const form = new FormData();
-      form.append("file", upload, filename);
+      form.append("file", upload, UPLOAD_FILENAME);
       const res = await fetch("/api/profile/avatar", { method: "POST", body: form });
       if (!res.ok) {
         setError(await failureOf(res));
@@ -204,8 +237,9 @@ export function AvatarPicker({ name, url }: { name: string; url: string | null }
         <div className="avatar-editor-side">
           <p className="text-xs leading-relaxed text-[var(--color-mist)]">
             Ảnh hiện cạnh tên bạn trong Phòng Chat và trên thanh đầu trang. Chưa đặt thì hệ
-            thống vẽ chữ đầu của danh xưng. Ảnh thường được tự thu nhỏ về 512px và cắt vuông
-            giữa; GIF động giữ nguyên nên phải dưới {fmtMb(MAX_UPLOAD_BYTES)}.
+            thống vẽ chữ đầu của danh xưng. Ảnh tĩnh được tự thu nhỏ về 512px và cắt vuông
+            giữa; ảnh động (GIF, WebP, APNG) giữ nguyên để không mất phần động, nên phải dưới{" "}
+            {fmtMb(MAX_UPLOAD_BYTES)}.
           </p>
 
           <div className="mt-3 flex flex-wrap gap-2">

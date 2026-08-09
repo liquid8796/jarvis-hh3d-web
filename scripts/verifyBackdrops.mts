@@ -83,7 +83,6 @@ console.log(`✔ Nền cứu hộ: globals.css và code cùng trỏ vào ${RESCU
 // ---- 2. Làm sạch URL: đây là hàng rào chống chèn CSS ------------------------------------
 const OK_URLS = [
   RESCUE_BACKDROP_URL,
-  "/backdrop-hang-doi.png",
   "https://objectstorage.eu-frankfurt-1.oraclecloud.com/n/fr5enftxwrc3/b/jarvis-media/o/backdrops/nen-a1B2c3D4e5F6g7H8.png",
   "https://objectstorage.eu-frankfurt-1.oraclecloud.com/n/x/b/y/o/backdrops/Th%C3%A1i-abc.webp",
 ];

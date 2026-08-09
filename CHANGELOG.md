@@ -11,6 +11,14 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.56.1 — dọn nốt tấm nền Hàng Đợi khỏi repo
+
+- **`public/backdrop-hang-doi.png` đã đi** (1.8MB): bản 0.56.0 đưa nó lên tàng khố và gán cho
+  trang Hàng Đợi, đã xác nhận production đang ăn ảnh từ OCI — nên bản trong repo chỉ còn là
+  trọng lượng chết. `public/backdrop.png` ở lại, nó là nấc cứu hộ.
+- **Script di dân `media:backdrops` cũng đi cùng.** Nó đọc đúng tệp vừa xoá, nên giữ lại là để
+  một lệnh chắc chắn ngã nằm trong package.json. Việc nó làm giờ là việc của tab Giao Diện.
+
 ## 0.56.0 — tấm nền dời sang tàng khố, và mỗi trang chọn được nền riêng
 
 - **Tab Giao Diện mới trong trang Tông Môn**: tải ảnh nền lên, xem lưới ảnh trong kho, và gán

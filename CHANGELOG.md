@@ -11,6 +11,39 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.57.4 — dời tàng thư sang kho Postgres mới, và vá một phép thử đã đỏ từ 0.57.0
+
+- **Toàn bộ dữ liệu đã chuyển sang database Postgres mới** (`jarvis-auto-hh3d`, Neon
+  `us-east-1`), rời kho cũ ở `ap-southeast-1`. 11 bảng, 1.941 dòng. Không đổi một dòng code
+  nào — đây là việc của biến môi trường và dữ liệu.
+  - Chép bằng `json_agg` bên cũ → `json_populate_recordset` bên mới, tức để CHÍNH Postgres
+    dựng lại từng giá trị về đúng kiểu cột. Một vòng qua JavaScript là một vòng có cơ hội biến
+    `text[]` thành chuỗi, timestamptz thành ISO lệch múi, hay bóp jsonb thành `[object Object]`.
+    (`pg_dump` không dùng được: máy làm việc không có bộ công cụ client của Postgres.)
+  - Schema bên mới dựng bằng CHÍNH bộ migration của repo, không chép DDL tay — nhờ đó bảng
+    `drizzle.__drizzle_migrations` bên mới khớp đúng repo.
+  - Đối chiếu bằng **md5 nội dung từng bảng**, không chỉ đếm dòng: đếm dòng không bắt được một
+    cột bị nuốt hay một mốc thời gian lệch múi. Cả 11 bảng khớp từng byte.
+  - `job_events_id_seq` được `setval` về max id (25889). Chép id tường minh KHÔNG đẩy sequence,
+    nên bỏ bước này là dòng nhật ký kế tiếp đâm vào một id đã tồn tại.
+  - **Bảng `workers` được so bằng phép loại trừ cột `last_seen`** — khôi lỗi ghi lại nhịp tim
+    5 giây một lần kể cả trong lúc bế quan (cửa claim đóng, nhưng nó vẫn gõ cửa và vẫn được
+    điểm danh). Đo được: hai bên lệch đúng 32 giây, mọi cột khác trùng khít.
+  - Chép lượt cuối trong lúc **đóng cửa tông môn**, để không có lượt ghi nào rơi vào kho cũ
+    giữa chừng. Cửa mở lại ngay sau khi production đã đọc kho mới.
+- **`PGHOST_UNPOOLED` bị gỡ khỏi Vercel**, và đó là cái bẫy suýt bị bỏ sót: realtime (LISTEN)
+  không dùng thẳng `DATABASE_URL` mà SUY ra host trực tiếp từ nó — ưu tiên `PGHOST_UNPOOLED`
+  nếu có. Biến ấy còn trỏ vào host kho CŨ, nên đổi mỗi `DATABASE_URL` là bảng Auto mất realtime
+  mà trang vẫn xanh. Gỡ đi thì phép suy `-pooler.` → `.` tự cho đúng host mới, và
+  `DATABASE_URL` trở lại làm nguồn DUY NHẤT như thiết kế đã định.
+- **Bảng mồ côi `password_resets` KHÔNG được mang theo** (0 dòng, không nằm trong schema.ts,
+  không migration nào tạo, không code nào đọc). Kho cũ đã áp 17 migration trong khi repo chỉ có
+  16 — đúng một migration đã bị gỡ khỏi repo, và bảng ấy là dấu vết còn lại của nó.
+- Vá `verify:maintenance`: nó đã ĐỎ từ bản 0.57.0 mà không ai chạy. Vòng lặp cũ quét trọn
+  `ASSIGNABLE_ROLES` và đòi **vai nào cũng** đi qua được lúc bế quan — đúng khi mọi vai đều là
+  vai trị sự, sai ngay khi có `de-tu`. Đệ tử phải gặp bảng chắn như mọi môn đồ; bảng viết tay
+  `ROLE_PASSES_MAINTENANCE` giờ bắt mỗi vai thêm về sau khai mình thuộc phía nào.
+
 ## 0.57.3 — chỉ đích danh một cách lấy cookie, thay cho lời tả định dạng
 
 Ô「Chuỗi cookie đăng nhập」trước đây mời người dùng bằng một câu tả ĐẦU RA:「'a=1; b=2' từ

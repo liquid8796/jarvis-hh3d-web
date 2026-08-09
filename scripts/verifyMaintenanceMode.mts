@@ -21,7 +21,7 @@ import { neon } from "@neondatabase/serverless";
 // @ts-expect-error — module JS thuần của quest-engine, không có d.ts.
 import { normalizeGameBaseUrl } from "../src/lib/quest-engine/cookies.mjs";
 import { maintenanceViewFor } from "../src/lib/auth/maintenance";
-import { ASSIGNABLE_ROLES } from "../src/lib/auth/permissions";
+import { ASSIGNABLE_ROLES, type Role } from "../src/lib/auth/permissions";
 import { appSettingsSchema, getAppSettings, saveAppSettings } from "../src/lib/services/settings";
 import { getMaintenanceFeed } from "../src/lib/services/dashboard";
 import { startJob } from "../src/lib/services/jobs";
@@ -67,14 +67,36 @@ for (const viewer of [null, MEMBER, { roles: ["admin"] }, { roles: ["gia-chu"] }
 assert(maintenanceViewFor(ON, MEMBER) === "wall", "môn đồ thường phải gặp bảng chắn ở mọi trang");
 assert(maintenanceViewFor(ON, { roles: ["choi-choi"] }) === "wall", "một vai lạ KHÔNG được coi là bậc trị sự");
 
-// Bốn vai này giữ được cửa vào trang Tông Môn — nơi có đúng cái công tắc tắt bảo trì. Chắn họ
-// là khoá trái căn phòng chứa chìa khoá của chính nó.
+/**
+ * Vai TRỊ SỰ giữ được cửa vào trang Tông Môn — nơi có đúng cái công tắc tắt bảo trì. Chắn họ là
+ * khoá trái căn phòng chứa chìa khoá của chính nó.
+ *
+ * `de-tu` KHÔNG nằm trong nhóm ấy, và đó là chủ ý: đệ tử là danh xưng của môn đồ thường nên
+ * trong lúc bế quan họ gặp bảng chắn như mọi môn đồ khác. Vòng lặp này trước đây quét TRỌN
+ * `ASSIGNABLE_ROLES` và đòi vai nào cũng qua cửa — một giả định đúng của thời mọi vai đều là vai
+ * trị sự, và nó đã ĐỎ ngay khi vai `de-tu` ra đời (bản 0.57.0). Bảng viết tay dưới đây là chỗ
+ * mỗi vai thêm về sau phải khai mình thuộc phía nào; `Record<Role, …>` nên bỏ trống là không
+ * biên dịch được.
+ */
+const ROLE_PASSES_MAINTENANCE: Record<Role, boolean> = {
+  "gia-chu": true,
+  "thai-thuong-truong-lao": true,
+  "chuong-mon": true,
+  admin: true,
+  "de-tu": false,
+};
+
 for (const role of ASSIGNABLE_ROLES) {
+  const want = ROLE_PASSES_MAINTENANCE[role] ? "banner" : "wall";
   assert(
-    maintenanceViewFor(ON, { roles: [role] }) === "banner",
-    `vai ${role} phải đi qua được trong lúc bế quan, không thì không ai tắt được bảo trì`,
+    maintenanceViewFor(ON, { roles: [role] }) === want,
+    `vai ${role} trong lúc bế quan phải thấy「${want}」— vai trị sự phải đi qua được, không thì không ai tắt được bảo trì; còn danh xưng của môn đồ thì phải bị chắn như môn đồ`,
   );
 }
+assert(
+  maintenanceViewFor(ON, { roles: ["de-tu", "admin"] }) === "banner",
+  "đeo thêm danh xưng đệ tử KHÔNG được lấy mất quyền đi qua của một Trưởng môn",
+);
 assert(
   maintenanceViewFor(ON, { roles: ["admin", "choi-choi"] }) === "banner",
   "mang thêm một vai lạ không được làm mất quyền trị sự",
@@ -84,7 +106,7 @@ assert(
 // hết phiên quay lại với công tắc ấy.
 assert(maintenanceViewFor(ON, null) === "banner", "khách chưa đăng nhập phải vào được cửa đăng nhập");
 
-console.log("✔ Cửa bế quan: môn đồ gặp bảng chắn; cả bốn vai và khách chưa đăng nhập vẫn đi qua được.");
+console.log("✔ Cửa bế quan: môn đồ VÀ đệ tử gặp bảng chắn; bốn vai trị sự và khách chưa đăng nhập đi qua được.");
 
 // ---- Tên miền game: chuẩn hoá và phòng thân ----------------------------------------------
 

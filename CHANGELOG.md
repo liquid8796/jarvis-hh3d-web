@@ -11,6 +11,32 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.54.0 — nút Ngắm Tranh: làm mờ cả trang để nhìn rõ tấm nền
+
+- **Một nút tròn ở góc trên bên phải, có mặt trên MỌI trang** (kể cả cửa đăng nhập và trang bái
+  sư — nơi tấm tranh lộ ra nhiều nhất). Bấm một cái là cả trang mờ xuống còn **12%**, đủ để ngắm
+  trọn mặt trăng và mái chùa sau những tấm thẻ đục nhất. Bấm lại, hoặc gõ **Esc**, là trở về.
+- **CHỈ MỜ, KHÔNG GIẤU** — và đó là cả yêu cầu, nên nó được đóng đinh bằng phép thử: không
+  `display:none`, không `visibility:hidden`, không `pointer-events:none`. Nội dung vẫn ở đó, vẫn
+  đọc được lờ mờ, và vẫn **bấm được** (đo tận nơi bằng `elementFromPoint`).
+- Cách làm: một thuộc tính `data-peek` trên `<body>`, rồi **một** luật CSS làm mờ mọi con trực
+  tiếp của body trừ tấm nền và chính cái nút. Chọn đường ấy thay vì bọc nội dung trong một thẻ
+  có `opacity` vì hai lẽ: nút phải nằm NGOÀI vùng mờ (bọc rồi đặt nút bên trong là tự làm mờ
+  luôn đường quay lại — người dùng kẹt trong một trang 12% không còn gì để bấm), và thanh đầu
+  trang / nội dung / chân trang vốn là ba con riêng của body nên một luật phủ trọn cả ba, phủ
+  luôn trang nào thêm vào sau này.
+- **KHÔNG lưu lại lựa chọn.** Đây là cử chỉ nhất thời — liếc nhìn tấm tranh rồi thôi. Lưu vào
+  localStorage thì hôm sau người ta tải trang và thấy cả web mờ tịt, và thứ đầu tiên họ nghĩ là
+  web hỏng chứ không phải "à mình đang bật chế độ ngắm".
+- Thanh đầu trang **chừa chỗ** ở mép phải (`--peek-gutter`) thay vì nút đi né nó. Bản đầu làm
+  ngược lại — ghim nút ngay dưới thanh ấy theo một con số `top` đoán theo chiều cao — và **đo ra
+  là sai**: ở khung 375px cụm menu XUỐNG DÒNG, cao tới 221px, nên nút rơi trúng giữa hàng nút.
+  Chiều cao hàng menu co giãn theo cả bề rộng màn lẫn số mục (khách thấy 2, Gia chủ thấy 6), nên
+  mọi con số đoán trước đều là bẫy chờ đúng người mở trúng. Sau khi đổi chiều: **0/6 mục bị che**
+  ở 375px, **0/2** ở desktop.
+- CSS của tính năng nằm ở `src/app/peek.css` chứ không nhập vào `globals.css`, vì lý do rất trần
+  tục: lúc viết, `globals.css` đang mang phần sửa chưa commit của một phiên khác.
+
 ## 0.53.0 — vá ba lỗ bảo mật: XSS lưu trữ trong sảnh, nhãn tệp do client khai, và cửa cron mở
 
 Một lượt rà soát cả website. Ba lỗ tìm được, vá cả ba; thứ tự dưới đây theo mức nguy hiểm.

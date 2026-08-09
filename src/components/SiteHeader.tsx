@@ -43,9 +43,16 @@ export const SHELL_WIDTH = "max-w-[100rem]";
 export async function SiteHeader() {
   const user = await currentUser();
 
+  // `paddingRight` chừa chỗ cho nút Ngắm Tranh ghim ở góc trên bên phải (biến `--peek-gutter`
+  // trong globals.css). Cụm menu ở đây biết XUỐNG DÒNG, và số mục thì đổi theo vai người xem —
+  // nên không có con số `top` nào đoán trước được chiều cao của nó để mà né. Đổi chiều: nút
+  // giữ nguyên góc, còn thanh này nhường chỗ.
   return (
     <header
       className={`mx-auto flex w-full ${SHELL_WIDTH} flex-wrap items-center justify-between gap-y-3 px-4 py-4 sm:px-6 sm:py-5`}
+      // Giá trị lui trong `var()` không thừa: biến kia biến mất thì cả `max()` thành vô hiệu ở
+      // bước tính giá trị, và padding rơi về 0 — cụm menu dính sát mép, chui xuống dưới nút.
+      style={{ paddingRight: "max(var(--peek-gutter, 4rem), 1rem)" }}
     >
       <Link href="/" className="flex items-center gap-3">
         <SectSeal size="2.6rem" />

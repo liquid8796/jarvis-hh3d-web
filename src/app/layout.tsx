@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro, Noto_Serif } from "next/font/google";
+import { BackdropPeek } from "@/components/BackdropPeek";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
 import "./globals.css";
+import "./peek.css";
 
 /**
  * `minimumScale: 1` là một nửa của tính năng pan tranh trên mobile (nửa kia là `.backdrop`
@@ -63,6 +65,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             một bầu trời là thứ không cứu được. Chữ vẫn đọc tốt không cần phủ tối lên ảnh —
             header và card tự mang nền mờ của chúng. */}
         <div className="backdrop" aria-hidden />
+        {/* Nút Ngắm Tranh đứng NGOÀI cửa bế quan và ngoài mọi thứ khác, ngay cạnh tấm nền —
+            nó là con trực tiếp duy nhất của body (cùng với nền) được miễn khỏi luật làm mờ,
+            nên nó không bao giờ tự mờ mất đường quay lại. Xem components/BackdropPeek.tsx. */}
+        <BackdropPeek />
         {/* Cửa bế quan đứng Ở ĐÂY để không một trang nào lọt ra ngoài nó — kể cả trang thêm
             vào sau này, thứ mà một danh sách đường dẫn ở proxy sẽ luôn quên. Nền và chân
             trang nằm NGOÀI cửa: chúng là cái vỏ, và bảng bế quan cũng cần được đứng trên tấm

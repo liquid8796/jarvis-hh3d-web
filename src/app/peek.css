@@ -1,0 +1,98 @@
+/**
+ * NGẮM TRANH — làm mờ cả trang để nhìn rõ tấm nền. Chỉ MỜ, không giấu.
+ *
+ * Nằm RIÊNG chứ không nhập vào globals.css, và lý do rất trần tục: lúc viết tính năng này,
+ * globals.css đang có phần sửa chưa commit của một phiên khác (nền riêng cho Hàng Đợi), nên
+ * commit tệp ấy là commit hộ việc của họ. Một tệp riêng cho một tính năng khép kín thì rẻ hơn
+ * hẳn việc chờ, và layout gốc nhập nó ngay cạnh globals.css.
+ */
+
+
+/* 0.12 là chỗ đứng giữa đo bằng mắt: đủ nhạt để thấy trọn mặt trăng và mái chùa sau những
+   tấm thẻ đục nhất, mà chữ vẫn còn hình hài — người ta vẫn nhận ra mình đang đứng ở trang
+   nào. Xuống 0 là giấu, mà giấu thì đã là một tính năng khác. */
+body[data-peek] > *:not(.backdrop):not(.peek-toggle) {
+  opacity: 0.12;
+}
+
+/* Transition đặt trên MỌI con trực tiếp chứ không riêng lúc bật, để chiều tắt cũng mượt như
+   chiều bật. `opacity` là thuộc tính hợp thành, trình duyệt chạy nó trên GPU nên một trang
+   dài cũng không giật. */
+body > *:not(.backdrop):not(.peek-toggle) {
+  transition: opacity 0.35s ease;
+}
+
+/* Ai đã xin bớt chuyển động thì đổi ngay lập tức, không có gì trôi. */
+@media (prefers-reduced-motion: reduce) {
+  body > *:not(.backdrop):not(.peek-toggle) {
+    transition: none;
+  }
+}
+
+/* Ghim ĐÚNG góc trên bên phải, và thanh đầu trang tự chừa chỗ cho nó (xem `--peek-gutter` ở
+   SiteHeader).
+
+   Bản đầu đặt nút ở NGAY DƯỚI thanh đầu trang để khỏi đè lên menu, với một con số `top` đoán
+   theo chiều cao thanh ấy. Sai, và đo được: ở khung 375px cụm menu XUỐNG DÒNG và cao tới
+   221px, nên nút rơi trúng giữa hàng nút. Chiều cao một hàng menu biết co giãn theo cả bề
+   rộng màn lẫn số mục (khách thấy 2 mục, Gia chủ thấy 6) — mọi con số `top` đoán trước đều là
+   một cái bẫy chờ ngày đúng người mở trúng. Nên thôi đoán: nút về đúng góc, và chỗ cho nó do
+   thanh đầu trang nhường ra bằng padding.
+
+   z-index 60: trên cả hộp thoại (z-50). Cố ý — nút này là đường DUY NHẤT để tắt chế độ ngắm,
+   nên nó phải là thứ không bao giờ bị che, kể cả khi một hộp thoại đang mở. */
+.peek-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-parchment);
+  background: rgba(12, 10, 26, 0.82);
+  border: 1px solid rgba(232, 194, 92, 0.28);
+  backdrop-filter: blur(6px);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .peek-toggle {
+    top: 1.25rem;
+    right: 1.5rem;
+  }
+}
+
+/**
+ * Chỗ mà thanh đầu trang phải chừa ở mép phải để không có mục menu nào chui xuống dưới nút
+ * Ngắm Tranh. Bằng bề rộng nút + khoảng cách mép + một chút thở.
+ *
+ * Là BIẾN chứ không phải một con số chép tay trong SiteHeader: bề rộng nút đổi thì chỗ chừa
+ * phải đổi theo, và hai con số ở hai tệp khác nhau là cách chúng lệch nhau.
+ */
+:root {
+  --peek-gutter: 4rem;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --peek-gutter: 4.5rem;
+  }
+}
+
+.peek-toggle:hover {
+  transform: translateY(-1px);
+  border-color: rgba(232, 194, 92, 0.55);
+  box-shadow: 0 0 18px rgba(232, 194, 92, 0.28);
+}
+
+/* Đang ngắm: nút sáng lên để nói rõ "cả trang đang mờ là do tôi", chứ không phải web hỏng. */
+.peek-toggle[aria-pressed="true"] {
+  border-color: var(--color-gold-400);
+  box-shadow: 0 0 22px rgba(232, 194, 92, 0.45);
+}

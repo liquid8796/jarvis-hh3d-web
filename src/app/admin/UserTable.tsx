@@ -156,9 +156,19 @@ export function UserTable({
 
             {users.map((u) => (
               <tr key={u.id} className="border-t border-[var(--color-ink-600)]/50 align-middle">
-                <td className="px-3 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-[var(--color-parchment)]">{u.displayName}</span>
+                {/* `w-[38%]` là thứ làm huy hiệu XUỐNG DÒNG được, không phải `flex-wrap` bên
+                    dưới. Bảng này auto-layout (`w-full min-w-[46rem]`) nằm trong một khung
+                    `overflow-x-auto`: thiếu trần bề rộng thì cột cứ nới ra ôm trọn hàng huy
+                    hiệu trên MỘT dòng rồi đẩy cả bảng trượt ngang — `flex-wrap` không có cớ
+                    gì để gãy dòng. Dùng phần trăm chứ không phải một con số rem: nó co theo
+                    bảng, và 38% của 46rem ≈ 17,5rem vẫn rộng hơn huy hiệu dài nhất
+                    (「Thái thượng trưởng lão」≈ 11rem) nên auto-layout không có lý do ép ngược. */}
+                <td className="w-[38%] px-3 py-3">
+                  {/* `items-start` chứ không `items-center`: khi đã gãy hai dòng, căn giữa làm
+                      danh xưng trôi xuống lửng lơ giữa khối huy hiệu. `gap-y` nhỏ hơn `gap-x`
+                      vì hai dòng huy hiệu sát nhau vẫn đọc được, còn thưa quá thì hàng phình. */}
+                  <div className="flex flex-wrap items-start gap-x-2 gap-y-1.5">
+                    <span className="font-semibold break-words text-[var(--color-parchment)]">{u.displayName}</span>
                     {/* Duyệt theo ASSIGNABLE_ROLES chứ không theo `u.roles`: thứ tự huy hiệu
                         khi ấy là thứ tự THANG VAI, giống nhau ở mọi hàng, không phụ thuộc
                         vào việc Gia chủ tick ô nào trước lúc lưu. */}

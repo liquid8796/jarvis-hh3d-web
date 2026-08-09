@@ -11,6 +11,27 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.58.6 — huy hiệu ở tab Môn Đồ xuống dòng khi nhiều quá
+
+Một người mang bốn huy hiệu (vai + tag) làm cả hàng kéo dài thành MỘT dòng, đẩy ba cột Trạng
+thái / Nhập môn / Thao tác tràn khỏi khung.
+
+**Chỗ dễ sửa sai:** thêm mỗi `flex-wrap` là vô tác dụng. Bảng này auto-layout
+(`w-full min-w-[46rem]`) nằm trong `overflow-x-auto`, nên cột danh xưng cứ nới ra ôm trọn hàng
+huy hiệu rồi để cả bảng trượt ngang — `flex-wrap` không có cớ gì để gãy dòng. Thứ thật sự làm
+nó xuống dòng là cái TRẦN bề rộng đặt lên ô: `w-[38%]`.
+
+Dùng phần trăm chứ không phải một con số rem: nó co theo bảng, và 38% của 46rem ≈ 17,5rem vẫn
+rộng hơn huy hiệu dài nhất (「Thái thượng trưởng lão」≈ 11rem) nên auto-layout không có lý do ép
+ngược lại. Kèm `items-start` thay `items-center` (đã gãy hai dòng thì căn giữa làm danh xưng
+trôi lửng lơ giữa khối huy hiệu) và `break-words` cho danh xưng dài không có chỗ ngắt.
+
+Đã chụp ở 1200px: huy hiệu gãy ba dòng, ba cột bên phải về đúng chỗ.
+
+**Thấy trong lúc kiểm, KHÔNG sửa:**「Thái thượng trưởng lão」hiện HAI lần trên cùng một hàng —
+một là huy hiệu VAI, một là huy hiệu TAG trùng tên. Lỗi có sẵn, không do lượt này; sửa nó là
+một quyết định thiết kế (giấu tag trùng nhãn vai?) nên để tông chủ chốt.
+
 ## 0.58.5 — mang hai danh xưng thì đeo cả hai bài vị
 
 Đạo hữu mang tag「Thánh nữ」và「Thái thượng trưởng lão」— CẢ HAI đều có khung trong tàng khố —

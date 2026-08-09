@@ -1,6 +1,12 @@
 import { and, eq, getTableColumns, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
-import { normalizeRoles, type Role } from "@/lib/auth/permissions";
+import {
+  ROLE_AWAITING,
+  ROLE_DISCIPLE,
+  ROLE_OWNER,
+  normalizeRoles,
+  type Role,
+} from "@/lib/auth/permissions";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { getAppSettings } from "@/lib/services/settings";
 import type { UserRow } from "@/lib/db/schema";
@@ -126,22 +132,53 @@ export async function register(input: {
   }
 
   const { membership } = await getAppSettings();
+  const status = membership.requireApproval ? "pending" : "active";
+  // Danh xưng đi theo TRẠNG THÁI, không do ai ban: còn chờ duyệt thì là Phàm nhân, vào thẳng
+  // được thì đã là Đệ tử. `setStatus` lo nốt cú thăng vai lúc duyệt.
+  const role = status === "pending" ? ROLE_AWAITING : ROLE_DISCIPLE;
 
-  const rows = await db()
-    .insert(schema.users)
-    .values({
-      username,
-      displayName: input.displayName.trim(),
-      email,
-      passwordHash: hashPassword(input.password),
-      status: membership.requireApproval ? "pending" : "active",
-    })
-    // Hai người có thể submit cùng lúc sau bước kiểm tra trên. Database phân xử, rồi ta
-    // đọc lại để trả thông báo thân thiện thay vì làm văng lỗi 500 vì unique constraint.
-    .onConflictDoNothing()
-    .returning(publicColumns);
+  /**
+   * MỘT câu lệnh cho cả hàng `users` lẫn dòng vai — cùng lý lẽ với `adminCreate`: hai câu
+   * riêng thì có một khe mà ở đó người mới đã tồn tại nhưng chưa mang danh xưng nào, và
+   * người gọi thì vừa nhận một thông báo lỗi nên tưởng chưa có gì được tạo.
+   *
+   * Không `returning` trọn `publicColumns` ở đây rồi trả thẳng: cột `roles` là một truy vấn
+   * con, mà CTE `granted` ghi trong CÙNG ảnh chụp nên câu `returning` KHÔNG nhìn thấy dòng
+   * vai vừa chèn — nó sẽ trả về một mảng vai rỗng, sai lặng lẽ. Nên: ghi nguyên tử trước,
+   * rồi đọc lại một lượt để có sự thật.
+   */
+  const created = await db().execute(sql`
+    with new_user as (
+      insert into users (username, display_name, email, password_hash, status)
+      values (
+        ${username},
+        ${input.displayName.trim()},
+        ${email},
+        ${hashPassword(input.password)},
+        ${status}
+      )
+      -- Hai người có thể submit cùng lúc sau bước kiểm tra trên. Database phân xử, rồi ta
+      -- đọc lại để trả thông báo thân thiện thay vì làm văng lỗi 500 vì unique constraint.
+      on conflict do nothing
+      returning id
+    ),
+    granted as (
+      insert into user_roles (user_id, role_code)
+      select nu.id, ${role} from new_user nu
+    )
+    select id from new_user
+  `);
 
-  if (rows[0]) return { ok: true, user: rows[0] };
+  const id = (created.rows[0] as { id?: string } | undefined)?.id;
+  if (id) {
+    const user = await findById(id);
+    // Vừa chèn xong mà đọc lại không thấy là chuyện KHÔNG được nuốt: nó nghĩa là hàng đã bị
+    // xoá ngay sau đó, hoặc ta đang đọc nhầm database.
+    if (!user) {
+      return { ok: false, error: "Đã lập được đạo hiệu nhưng không đọc lại được — thử đăng nhập xem sao." };
+    }
+    return { ok: true, user };
+  }
   if (await findByUsername(username)) {
     return { ok: false, error: "Đạo hiệu này đã có người dùng." };
   }
@@ -203,14 +240,56 @@ export async function countPending(): Promise<number> {
   return rows[0]?.n ?? 0;
 }
 
+/**
+ * Đổi trạng thái, và — CHỈ khi trạng thái mới là `active` — thăng danh xưng cho người vừa
+ * được duyệt: bỏ「Phàm nhân」, ban「Đệ tử」.
+ *
+ * Luật sống ở TẦNG NÀY chứ không trong nút bấm bên `admin.ts`, vì nó là một tính chất của cú
+ * chuyển trạng thái chứ không của một cái nút: ngày có thêm đường duyệt thứ hai (duyệt hàng
+ * loạt, tự duyệt theo môn quy) thì nó đã đúng sẵn, không cần ai nhớ chép lại.
+ *
+ * Ba điều CỐ Ý:
+ *
+ *  1. Chỉ chiều ĐI LÊN. Đẩy ngược một người về `pending` hay `disabled` KHÔNG thu lại danh
+ *     xưng — thu vai là việc của Gia chủ qua bảng môn đồ, và tự động hạ vai người ta khi
+ *     đình quyền tạm thời là một hành vi bất ngờ không ai yêu cầu.
+ *  2. Ban `de-tu` VÔ ĐIỀU KIỆN (trừ Gia chủ), không phải chỉ khi đang mang `pham-nhan`. Nhờ
+ *     vậy nó vừa là phép thăng vai, vừa là phép TỰ CHỮA cho những hàng cũ chưa có danh xưng
+ *     nào — chạy lại bao nhiêu lần cũng ra một kết quả.
+ *  3. Trừ Gia chủ, đúng như lệ「toàn bộ user trừ gia-chu là đệ tử」: một Gia chủ đeo thêm
+ *     nhãn Đệ tử thì vô nghĩa, dù chẳng mất quyền gì.
+ *
+ * MỘT câu lệnh, cùng lý lẽ với `writeRoles`: neon-http không có transaction tương tác, nên
+ * "trạng thái và danh xưng cùng sống hoặc cùng chết" chỉ có một hình dạng.
+ */
 export async function setStatus(
   id: string,
   status: "pending" | "active" | "disabled",
 ): Promise<void> {
-  await db()
-    .update(schema.users)
-    .set({ status, updatedAt: new Date() })
-    .where(eq(schema.users.id, id));
+  if (status !== "active") {
+    await db()
+      .update(schema.users)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(schema.users.id, id));
+    return;
+  }
+
+  await db().execute(sql`
+    with promoted as (
+      delete from user_roles
+       where user_id = ${id} and role_code = ${ROLE_AWAITING}
+    ),
+    granted as (
+      insert into user_roles (user_id, role_code)
+      select ${id}, ${ROLE_DISCIPLE}
+       where not exists (
+         select 1 from user_roles
+          where user_id = ${id} and role_code = ${ROLE_OWNER}
+       )
+      on conflict do nothing
+    )
+    update users set status = ${status}, updated_at = now() where id = ${id}
+  `);
 }
 
 /**
@@ -273,7 +352,12 @@ export async function adminCreate(input: {
     return { ok: false, error: "Email này đã được dùng cho một đạo hiệu khác." };
   }
 
-  const codes = normalizeRoles(input.roles);
+  // Không chọn danh xưng nào thì để TRẠNG THÁI quyết định, đúng như đường đăng ký tự nhiên.
+  // Thiếu nhánh này thì hàng chờ có hai loại người: kẻ tự gõ cửa (Phàm nhân) và kẻ được lập
+  // tay (không danh xưng nào) — mà chúng phải là một.
+  const chosen = normalizeRoles(input.roles);
+  const codes: readonly Role[] =
+    chosen.length > 0 ? chosen : [input.status === "pending" ? ROLE_AWAITING : ROLE_DISCIPLE];
   const result = await db().execute(sql`
     with new_user as (
       insert into users (username, display_name, email, password_hash, status)

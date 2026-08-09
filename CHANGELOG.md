@@ -11,6 +11,45 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.58.1 — vai PHÀM NHÂN cho người chờ duyệt, và mọi môn đồ thành Đệ tử
+
+Thang vai còn NĂM, `pham-nhan` đứng cuối vì nó là bậc thấp nhất — chưa nhập môn:
+
+    gia-chu › thai-thuong-truong-lao › chuong-mon › de-tu › pham-nhan
+
+**Vòng đời một người mới:** gõ cửa → `pending` + danh xưng「Phàm nhân」→ được duyệt → `active`
++ danh xưng「Đệ tử」. Phàm nhân là vai DUY NHẤT do TRẠNG THÁI quyết định chứ không do ai ban.
+
+Backfill: tám đạo hữu chưa mang vai nào nay là Đệ tử. Gia chủ không bị đụng tới —
+`[gia-chu, thai-thuong-truong-lao]` giữ nguyên. Lúc migration chạy không có ai đang chờ duyệt
+nên nhánh Phàm nhân là phép rỗng; nó có mặt cho những lần sau.
+
+**Ô nguy hiểm nhất là `ROLE_SHIELDS_BEARER["pham-nhan"] = false`.** Ghi `true` ở đó là khoá
+cửa hàng chờ lại từ bên trong: mỗi người mới đăng ký lập tức thành kẻ mà Chưởng môn và Thái
+thượng trưởng lão đều KHÔNG duyệt nổi, chỉ Gia chủ làm được — đúng cái bẫy `de-tu` đã vấp một
+lần. Có một dòng khẳng định riêng canh nó (`bậc trị sự PHẢI quản được phàm nhân`).
+
+**Luật thăng vai sống trong `setStatus`, không trong nút bấm**, vì nó là tính chất của cú
+chuyển trạng thái chứ không của một cái nút — ngày có đường duyệt thứ hai thì nó đã đúng sẵn.
+Ba điều cố ý ở đó:
+
+- **Chỉ chiều đi lên.** Đẩy ngược về `pending`/`disabled` KHÔNG thu lại danh xưng: thu vai là
+  việc của Gia chủ, tự hạ vai khi đình quyền tạm thời là hành vi bất ngờ không ai yêu cầu.
+- **Ban `de-tu` vô điều kiện** (trừ Gia chủ), không chỉ khi đang mang `pham-nhan` — nhờ vậy nó
+  vừa là phép thăng vai vừa là phép TỰ CHỮA cho hàng cũ chưa có danh xưng.
+- **Một câu lệnh.** `neon-http` không có transaction tương tác, nên "trạng thái và danh xưng
+  cùng sống hoặc cùng chết" chỉ có một hình dạng.
+
+Chỗ suýt sai trong `register`: KHÔNG trả thẳng `RETURNING` của câu chèn. Cột `roles` là một
+truy vấn con, mà CTE cấp vai ghi trong CÙNG ảnh chụp — `RETURNING` sẽ trả mảng vai RỖNG, sai
+lặng lẽ. Nên: ghi nguyên tử trước, đọc lại sau.
+
+Phép thử: `verify:permissions` quét trọn 169 ô actor×target; `verify:roles` thêm một lượt đi
+đường THẬT — dựng người chờ duyệt, kiểm họ mang đúng `["pham-nhan"]`, gọi `setStatus(active)`,
+kiểm đã thành `["de-tu"]`, rồi duyệt lần hai để chắc nó là phép rỗng. Một khẳng định cũ phải
+sửa vì nó đóng đinh hành vi cũ ("người mới phải ra mảng vai RỖNG") — nay nó đọc `status` để
+đúng ở cả hai nhánh của công tắc xét duyệt.
+
 ## 0.58.0 — Hàng Đợi có nút Dừng cho đàn kẹt mãi không thông
 
 - **Gia chủ và Thái thượng trưởng lão dừng được MỘT đàn bất kỳ** ngay trên trang Hàng Đợi —

@@ -40,6 +40,7 @@ import {
   findByUsername,
   listUsers,
   register,
+  setStatus,
 } from "../src/lib/services/users";
 import { loadEnv } from "./loadEnv.mjs";
 
@@ -227,12 +228,55 @@ try {
   });
   assert(joined.ok, `bái sư phải thành công: ${joined.ok ? "" : joined.error}`);
   if (joined.ok) {
+    // Trước 0018 chỗ này khẳng định người mới ra mảng vai RỖNG. Từ nay danh xưng đi theo
+    // TRẠNG THÁI và được cấp trong CÙNG câu lệnh tạo người: còn chờ duyệt thì Phàm nhân, vào
+    // thẳng được thì Đệ tử. Đọc `status` chứ không gõ cứng một vai, vì công tắc xét duyệt của
+    // môn quy quyết định nhánh nào — phép thử phải đúng ở cả hai.
+    const expected = joined.user.status === "pending" ? "pham-nhan" : "de-tu";
     assert(
-      Array.isArray(joined.user.roles) && joined.user.roles.length === 0,
-      `người mới phải ra mảng vai RỖNG ngay trong RETURNING — nhận được ${JSON.stringify(joined.user.roles)}`,
+      JSON.stringify(joined.user.roles) === JSON.stringify([expected]),
+      `người mới ở trạng thái ${joined.user.status} phải mang đúng ["${expected}"] — nhận được ${JSON.stringify(joined.user.roles)}`,
     );
   }
-  console.log("✔ Bái sư: người mới không mang vai nào, và phép đọc vai chạy được ngay trong RETURNING.");
+  console.log("✔ Bái sư: người mới mang đúng danh xưng theo trạng thái, cấp trong cùng câu lệnh tạo người.");
+
+  // ---- Duyệt = thăng vai: Phàm nhân → Đệ tử -------------------------------------------
+  // Trái tim của vòng đời vai, và nó chỉ đúng khi đi ĐƯỜNG THẬT: setStatus phải đổi trạng
+  // thái và hoán danh xưng trong cùng một câu lệnh. Dựng một người CHỜ DUYỆT rồi duyệt họ.
+  const waitingName = `${PREFIX}pn${stamp}`;
+  const madePending = await adminCreate({
+    username: waitingName,
+    displayName: "Phàm nhân kiểm vai",
+    email: `${waitingName}@example.com`,
+    password,
+    roles: [],
+    status: "pending",
+  });
+  assert(madePending.ok, `lập người chờ duyệt phải thành công: ${madePending.ok ? "" : madePending.error}`);
+  const waiting = await findByUsername(waitingName);
+  assert(waiting !== null, "vừa lập người chờ duyệt mà đọc lại không thấy");
+  assert(
+    JSON.stringify(waiting?.roles) === JSON.stringify(["pham-nhan"]),
+    `người chờ duyệt phải mang đúng ["pham-nhan"] — nhận được ${JSON.stringify(waiting?.roles)}`,
+  );
+
+  await setStatus(waiting!.id, "active");
+  const approved = await findById(waiting!.id);
+  assert(approved?.status === "active", `duyệt xong trạng thái phải là active — nhận ${approved?.status}`);
+  assert(
+    JSON.stringify(approved?.roles) === JSON.stringify(["de-tu"]),
+    `duyệt xong phải THAY Phàm nhân bằng Đệ tử — nhận được ${JSON.stringify(approved?.roles)}`,
+  );
+
+  // Duyệt lại một người ĐÃ active: không được nhân đôi vai, không được ngã.
+  await setStatus(waiting!.id, "active");
+  const again = await findById(waiting!.id);
+  assert(
+    JSON.stringify(again?.roles) === JSON.stringify(["de-tu"]),
+    `duyệt lần hai phải là phép rỗng — nhận được ${JSON.stringify(again?.roles)}`,
+  );
+  await adminDelete(waiting!.id);
+  console.log("✔ Duyệt: Phàm nhân thành Đệ tử trong một câu lệnh, và duyệt lại là phép rỗng.");
 
   // ---- 7. Hàng rào của chính database --------------------------------------------------
   let bogusRejected = false;

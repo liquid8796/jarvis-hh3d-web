@@ -31,6 +31,13 @@
  *              thường, không phải một bậc trị sự. Xem `ROLE_SHIELDS_BEARER` — thêm nó vào
  *              danh mục suýt nữa đã khiến chính Trưởng môn không quản nổi đệ tử.
  *
+ *   pham-nhan — Phàm nhân. Bậc THẤP NHẤT, và là vai duy nhất do TRẠNG THÁI quyết định chứ
+ *              không do ai ban: người vừa gõ cửa và đang chờ duyệt thì mang nó. Duyệt xong,
+ *              `setStatus` đổi nó thành `de-tu` — đó là toàn bộ vòng đời của vai này. Cũng
+ *              không mang quyền nào, và cũng KHÔNG che chắn người mang (xem
+ *              `ROLE_SHIELDS_BEARER`): che chắn kẻ đang chờ duyệt là khoá cửa hàng chờ lại
+ *              từ bên trong.
+ *
  *   (rỗng)   — môn đồ thường chưa được ban danh xưng nào.
  *
  * Gia chủ nghiễm nhiên có mọi quyền trị sự — cấp trên mà thiếu quyền cấp dưới thì vừa vô lý
@@ -53,14 +60,29 @@ export const ASSIGNABLE_ROLES = [
   "thai-thuong-truong-lao",
   "chuong-mon",
   "de-tu",
+  "pham-nhan",
 ] as const;
 export type Role = (typeof ASSIGNABLE_ROLES)[number];
+
+/**
+ * Ba mã vai được gọi ĐÍCH DANH ngoài tầng auth, nên chúng có tên thay vì nằm rải dưới dạng
+ * chuỗi gõ tay: `users.ts` cần đúng chúng cho vòng đời「gõ cửa → chờ duyệt → nhập môn」.
+ *
+ * `satisfies Role` chứ không `: Role` — giữ lại kiểu literal, nên gõ sai một mã là hỏng ngay
+ * ở đây chứ không lặng lẽ thành `string` rồi ngã dưới khoá ngoại lúc chạy.
+ */
+export const ROLE_OWNER = "gia-chu" satisfies Role;
+/** Vai của người ĐANG chờ duyệt. */
+export const ROLE_AWAITING = "pham-nhan" satisfies Role;
+/** Vai của người đã nhập môn. */
+export const ROLE_DISCIPLE = "de-tu" satisfies Role;
 
 export const ROLE_LABEL: Record<Role, string> = {
   "gia-chu": "Gia chủ",
   "thai-thuong-truong-lao": "Thái thượng trưởng lão",
   "chuong-mon": "Chưởng môn",
   "de-tu": "Đệ tử",
+  "pham-nhan": "Phàm nhân",
 };
 
 /**
@@ -138,6 +160,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
    * bằng một cái tên, chứ không phải để trao thêm quyền.
    */
   "de-tu": [],
+  /** Phàm nhân đang chờ duyệt — chưa nhập môn thì chưa có gì để mở. Cùng lẽ với `de-tu`. */
+  "pham-nhan": [],
 };
 
 /**
@@ -160,6 +184,14 @@ const ROLE_SHIELDS_BEARER: Record<Role, boolean> = {
   "thai-thuong-truong-lao": true,
   "chuong-mon": true,
   "de-tu": false,
+  /**
+   * `false`, và đây là ô NGUY HIỂM NHẤT của cả bảng. Phàm nhân là người ĐANG CHỜ DUYỆT — tức
+   * chính xác những người mà bậc trị sự phải ra tay: duyệt, hoặc từ chối. Ghi `true` ở đây là
+   * khoá cửa hàng chờ lại từ bên trong: mỗi người mới đăng ký lập tức thành kẻ mà Chưởng môn
+   * và Thái thượng trưởng lão đều KHÔNG duyệt nổi, chỉ Gia chủ làm được. Đúng cái bẫy mà
+   * `de-tu` đã vấp một lần và bình chú ở trên còn ghi.
+   */
+  "pham-nhan": false,
 };
 
 /**

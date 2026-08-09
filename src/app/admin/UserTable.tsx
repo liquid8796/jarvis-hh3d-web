@@ -43,6 +43,9 @@ const ROLE_BADGE_CLASS: Record<Role, string> = {
   // Đệ tử không mang quyền nào, nên nó KHÔNG được đeo màu của bậc trị sự — mượn sắc nhã của
   // huy hiệu tag. Đúng theo luật ghi ở trên: màu nói về quyền, và vai này không mở gì cả.
   "de-tu": "badge-tag",
+  // Cùng màu với Đệ tử, và đó là ĐÚNG theo luật ghi ở trên: màu nói về QUYỀN, mà cả hai vai
+  // này đều không mở được việc gì. Chữ trên huy hiệu phân biệt「Phàm nhân」với「Đệ tử」.
+  "pham-nhan": "badge-tag",
 };
 
 export function UserTable({

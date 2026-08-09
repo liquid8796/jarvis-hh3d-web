@@ -44,12 +44,15 @@ const member2 = { id: "u-member-2", roles: [] as string[] };
 /** Đệ tử: MANG một vai, nhưng vẫn là môn đồ thường — cả điểm khó của vai này nằm ở đây. */
 const disciple = { id: "u-disciple", roles: ["de-tu"] };
 const disciple2 = { id: "u-disciple-2", roles: ["de-tu"] };
+/** Phàm nhân: đang CHỜ DUYỆT. Bậc trị sự phải quản được họ — nếu không thì không ai duyệt nổi. */
+const mortal = { id: "u-mortal", roles: ["pham-nhan"] };
+const mortal2 = { id: "u-mortal-2", roles: ["pham-nhan"] };
 /** Vừa trị sự vừa đeo danh xưng đệ tử: tấm khiên của vai trị sự KHÔNG được mất đi vì thế. */
 const masterDisciple = { id: "u-master-disciple", roles: ["chuong-mon", "de-tu"] };
 
 const EVERYONE = [
   owner, ownerMaster, elder, elder2, master, master2,
-  masterDisciple, disciple, disciple2, member, member2,
+  masterDisciple, disciple, disciple2, mortal, mortal2, member, member2,
 ];
 
 /**
@@ -68,6 +71,10 @@ const RANK: Record<string, "gia-chu" | "tri-su" | "mon-do"> = {
   "u-master-disciple": "tri-su",
   // Đệ tử xếp hạng MÔN ĐỒ, dù có tên trong danh mục vai. Nếu bảng này ghi "tri-su" thì phép
   // quét ma trận bên dưới sẽ đỏ ở mọi ô「trị sự × đệ tử」— đúng cái lỗ hổng phải chặn.
+  // Phàm nhân xếp hạng MÔN ĐỒ — đây là ô quan trọng nhất của bảng này: ghi "tri-su" là
+  // hàng chờ tự khoá lại, không bậc trị sự nào duyệt được ai.
+  "u-mortal": "mon-do",
+  "u-mortal-2": "mon-do",
   "u-disciple": "mon-do",
   "u-disciple-2": "mon-do",
   "u-member": "mon-do",
@@ -85,11 +92,11 @@ for (const role of ASSIGNABLE_ROLES) {
 }
 assert(ASSIGNABLE_ROLES[0] === "gia-chu", "gia-chu phải đứng ĐẦU — thứ tự này là thứ tự huy hiệu và thứ tự chuẩn hoá");
 assert(
-  ASSIGNABLE_ROLES.at(-1) === "de-tu",
-  "de-tu phải đứng CUỐI — nó là bậc thấp nhất, và vị trí ấy chính là sort_order dưới database",
+  ASSIGNABLE_ROLES.at(-1) === "pham-nhan",
+  "pham-nhan phải đứng CUỐI — nó là bậc thấp nhất (chưa nhập môn), và vị trí ấy chính là sort_order dưới database",
 );
-assert(ASSIGNABLE_ROLES.length === 4, `đang có ${ASSIGNABLE_ROLES.length} vai — cập nhật bảng oracle rồi sửa con số này`);
-console.log(`✔ Bảng vai: ${ASSIGNABLE_ROLES.length} mã, không trùng, vai nào cũng có nhãn, gia-chu đầu — de-tu cuối.`);
+assert(ASSIGNABLE_ROLES.length === 5, `đang có ${ASSIGNABLE_ROLES.length} vai — cập nhật bảng oracle rồi sửa con số này`);
+console.log(`✔ Bảng vai: ${ASSIGNABLE_ROLES.length} mã, không trùng, vai nào cũng có nhãn, gia-chu đầu — pham-nhan cuối.`);
 
 // ---- Nhận vai -----------------------------------------------------------------------
 assert(isOwner(owner) && isOwner(ownerMaster), "gia-chu phải được nhận là Gia chủ");
@@ -101,6 +108,11 @@ assert(isAdminUser(master), "Chưởng môn phải có quyền trị sự");
 assert(!isAdminUser(member), "môn đồ thường không có quyền trị sự");
 
 assert(!isAdminUser(disciple), "ĐỆ TỬ KHÔNG có quyền trị sự — nó là danh xưng, không phải một bậc");
+assert(!isAdminUser(mortal), "PHÀM NHÂN KHÔNG có quyền trị sự — người còn đang chờ duyệt");
+assert(
+  canManageUser(master, mortal) && canManageUser(elder, mortal),
+  "bậc trị sự PHẢI quản được phàm nhân — không thì chính hàng chờ tự khoá lại, không ai duyệt được ai",
+);
 
 /**
  * HÌNH DẠNG từng vai — bảng VIẾT TAY, không suy từ `ROLE_PERMISSIONS`. Suy ra từ chính hằng số
@@ -119,6 +131,7 @@ const ROLE_SHAPE: Record<Role, { opensAdminDoor: boolean; labelOnly: boolean }> 
   "thai-thuong-truong-lao": { opensAdminDoor: true, labelOnly: false },
   "chuong-mon": { opensAdminDoor: true, labelOnly: false },
   "de-tu": { opensAdminDoor: false, labelOnly: true },
+  "pham-nhan": { opensAdminDoor: false, labelOnly: true },
 };
 
 for (const role of ASSIGNABLE_ROLES) {
@@ -127,7 +140,7 @@ for (const role of ASSIGNABLE_ROLES) {
     `vai ${role}: cửa trị sự mở ${isAdminUser({ roles: [role] })}, bảng oracle nói ${ROLE_SHAPE[role].opensAdminDoor}`,
   );
 }
-console.log("✔ Nhận vai: ba vai trị sự qua cửa, đệ tử và mảng rỗng thì không.");
+console.log("✔ Nhận vai: ba vai trị sự qua cửa, đệ tử/phàm nhân và mảng rỗng thì không.");
 
 // ---- Bảng quyền ----------------------------------------------------------------------
 assert(new Set(PERMISSIONS).size === PERMISSIONS.length, "mã quyền không được trùng nhau");
@@ -330,9 +343,9 @@ assert(
   "thứ tự chuẩn hoá phải ổn định (gia-chu trước) bất kể form gửi kiểu gì",
 );
 assert(
-  JSON.stringify(normalizeRoles(["de-tu", "chuong-mon", "thai-thuong-truong-lao", "gia-chu"])) ===
+  JSON.stringify(normalizeRoles(["de-tu", "pham-nhan", "chuong-mon", "thai-thuong-truong-lao", "gia-chu"])) ===
     JSON.stringify([...ASSIGNABLE_ROLES]),
-  "gửi đủ CẢ BỐN vai theo thứ tự lộn xộn vẫn phải ra đúng thứ tự thang vai",
+  "gửi đủ CẢ NĂM vai theo thứ tự lộn xộn vẫn phải ra đúng thứ tự thang vai",
 );
 assert(
   JSON.stringify(normalizeRoles(["de-tu", "gia-chu"])) === JSON.stringify(["gia-chu", "de-tu"]),

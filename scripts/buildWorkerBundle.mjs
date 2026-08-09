@@ -44,8 +44,8 @@ try {
       'import { runCycle } from "./quest-engine/runCycle.mjs";',
     ],
     [
-      'import { profileDirForJob } from "../src/lib/quest-engine/browserProfile.mjs";',
-      'import { profileDirForJob } from "./quest-engine/browserProfile.mjs";',
+      'import { profileDirForJob, sweepStaleProfiles } from "../src/lib/quest-engine/browserProfile.mjs";',
+      'import { profileDirForJob, sweepStaleProfiles } from "./quest-engine/browserProfile.mjs";',
     ],
   ];
   let bundledWorker = workerSource;

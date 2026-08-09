@@ -8,6 +8,7 @@
  */
 
 import { readinessProbe, vipProbe } from "./boardScripts.mjs";
+import { closeBrowserWithin } from "./browserShutdown.mjs";
 import { computeNextDelaySeconds } from "./cooldown.mjs";
 import { DEFAULT_GAME_BASE_URL, parseCookieString } from "./cookies.mjs";
 import { createQuestEngine, enabledQuestsInOrder, questsForAccount, QuestAborted } from "./engine.mjs";
@@ -701,9 +702,9 @@ export async function runCycle(deps) {
       ? scheduledCycleResult("done", `Đi hết một vòng — ${done} thuận, ${failed} trắc trở.`, results)
       : scheduledCycleResult("done", `Đi hết một vòng — ${done} nhiệm vụ thuận lợi.`, results);
   } finally {
-    // Đóng trong finally, và nuốt lỗi: một trình duyệt không đóng được không được phép ghi
-    // đè lên kết quả thật của lượt chạy. Với hồ sơ bền thì context CHÍNH LÀ browser.
-    await context.close().catch(() => {});
-    if (browser) await browser.close().catch(() => {});
+    // Đóng trong finally, có HẠN GIỜ, và không bao giờ ném: một trình duyệt không đóng được
+    // không được phép ghi đè lên kết quả thật của lượt chạy — mà cũng không được phép treo
+    // luôn cả cái ghế của worker. Xem browserShutdown.mjs cho lý do đầy đủ.
+    await closeBrowserWithin({ context, browser, profileDir, log });
   }
 }

@@ -32,6 +32,7 @@
     "verify:tag-frames": "tsx scripts/verifyTagFrames.mts",
     "verify:backdrops": "tsx scripts/verifyBackdrops.mts",
     "verify:sweep": "tsx scripts/verifySweep.mts",
+    "verify:profile-sweep": "node scripts/verifyProfileSweep.mjs",
     "verify:permissions": "tsx scripts/verifyPermissions.mts",
     "verify:force-stop": "tsx scripts/verifyForceStop.mts",
     "verify:roles": "tsx scripts/verifyRoleTables.mts",

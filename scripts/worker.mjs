@@ -25,7 +25,7 @@
 import { fileURLToPath } from "node:url";
 import { mkdir } from "node:fs/promises";
 import { runCycle } from "../src/lib/quest-engine/runCycle.mjs";
-import { profileDirForJob } from "../src/lib/quest-engine/browserProfile.mjs";
+import { profileDirForJob, sweepStaleProfiles } from "../src/lib/quest-engine/browserProfile.mjs";
 
 const WEB_URL = (process.env.WEB_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const TOKEN = process.env.WORKER_TOKEN;
@@ -38,6 +38,15 @@ const HEARTBEAT_MS = Math.max(1_000, Number(process.env.WORKER_HEARTBEAT_MS ?? 5
 // Chromium riêng nên trần này là trần RAM: 2 vừa cho máy nhà, VM tông môn có thể nâng qua
 // biến môi trường. Kẹp 1–8 để một dấu phẩy gõ nhầm không mở tám mươi trình duyệt.
 const MAX_JOBS = Math.max(1, Math.min(8, Number(process.env.WORKER_MAX_JOBS ?? 2) || 2));
+// Hồ sơ Chromium lâu không ai đụng thì dọn — mỗi lần người dùng dán cookie mới là một thư mục
+// hồ sơ mới ra đời và cái cũ thành rác vĩnh viễn. Mười bốn ngày là ngưỡng RỘNG có chủ ý: hồ sơ
+// mang token cf_clearance của Cloudflare, xoá sớm là bắt người ta qua cửa kiểm tra lại từ đầu.
+// Kẹp 1–365 để một biến môi trường gõ nhầm không hoá thành phép xoá sạch.
+const PROFILE_MAX_AGE_MS =
+  Math.max(1, Math.min(365, Number(process.env.WORKER_PROFILE_MAX_AGE_DAYS ?? 14) || 14)) *
+  24 * 60 * 60 * 1000;
+/** Giãn cách giữa hai lượt quét. Rác tích theo ngày nên sáu giờ đã là dày. */
+const PROFILE_SWEEP_EVERY_MS = 6 * 60 * 60 * 1000;
 
 if (!TOKEN || TOKEN === "change-me") {
   console.error("WORKER_TOKEN chưa đặt — dùng linh phù phát ở mục Khôi Lỗi, hoặc token tông môn.");
@@ -184,6 +193,13 @@ console.log(`Khôi lỗi「${WORKER_ID}」đang canh ${WEB_URL} (tối đa ${MAX
 // Việc giành job giữa nhiều khôi lỗi vẫn do Postgres phân xử như cũ.
 const running = new Set();
 
+/**
+ * Mốc quét hồ sơ kế tiếp. Đặt bằng "ngay bây giờ" chứ không phải "sáu giờ nữa": khôi lỗi trên
+ * VM chạy liền mạch hàng tuần (đo 09/08/2026: `NRestarts=0`), nên một phép dọn chỉ chạy sau
+ * một khoảng chờ dài là một phép dọn có thể không bao giờ chạy.
+ */
+let nextSweepAt = Date.now();
+
 for (;;) {
   let claimed = false;
 
@@ -203,6 +219,30 @@ for (;;) {
   }
 
   if (!claimed) {
+    // Dọn hồ sơ CHỈ KHI TAY KHÔNG — không job nào đang chạy nghĩa là không hồ sơ nào đang mở,
+    // nên phép xoá không thể giật mất thư mục dưới chân một Chromium đang dùng nó. Đây là lớp
+    // bảo vệ thứ nhất; ngưỡng mười bốn ngày là lớp thứ hai, độc lập với lớp này.
+    //
+    // Hàng đợi lúc nào cũng đầy thì phép dọn bị hoãn — chấp nhận có ý thức: lúc bận chính là
+    // lúc hồ sơ đang được dùng, và hàng đợi rồi sẽ cạn. Thà hoãn còn hơn xoá nhầm.
+    if (running.size === 0 && Date.now() >= nextSweepAt) {
+      // Đặt mốc TRƯỚC khi quét: một lượt quét lâu không được phép kéo theo lượt kế ngay sau nó.
+      nextSweepAt = Date.now() + PROFILE_SWEEP_EVERY_MS;
+      try {
+        const swept = await sweepStaleProfiles(PROFILE_ROOT, { maxAgeMs: PROFILE_MAX_AGE_MS });
+        // Chỉ kể khi có chuyện: một dòng "đã xoá 0" mỗi sáu giờ chỉ làm loãng nhật ký.
+        if (swept.removed > 0 || swept.failed > 0) {
+          console.log(
+            `Dọn hồ sơ trình duyệt: xoá ${swept.removed}, giữ ${swept.kept}` +
+              (swept.failed > 0 ? `, hụt ${swept.failed}` : "") + ".",
+          );
+        }
+      } catch (err) {
+        // Dọn nhà hỏng thì kể lại rồi đi tiếp — nó không có quyền chặn khôi lỗi nhận việc.
+        console.error("Dọn hồ sơ trình duyệt lỗi:", err.message);
+      }
+    }
+
     await sleep(POLL_MS);
   }
 }

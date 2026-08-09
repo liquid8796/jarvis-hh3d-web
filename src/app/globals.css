@@ -680,9 +680,10 @@ body {
   align-items: center;
   flex-wrap: wrap;
   gap: 2px;
-  /* Tên người nói trong bản thiết kế là chữ hiển thị lớn — cùng font với tiêu đề. */
+  /* Tên người nói trong bản thiết kế là chữ hiển thị lớn — cùng font với tiêu đề. 1.2rem lúc
+     đầu; hạ còn 1.05rem cùng lượt thu nhỏ chân dung và bài vị (xem `.chat-tagframe`). */
   font-family: var(--font-display);
-  font-size: 1.2rem;
+  font-size: 1.05rem;
   font-weight: 600;
   color: var(--color-parchment);
   margin: 0 0 6px 4px;
@@ -692,23 +693,30 @@ body {
 
 /* Bài vị của tag — ảnh webp chữ khắc sẵn, glow nằm TRONG chính ảnh.
  *
- * 92px nghe như quá khổ cho một dòng chat, và đó là chỗ dễ sai nhất: chiều cao CSS KHÔNG
+ * 74px nghe như quá khổ cho một dòng chat, và đó là chỗ dễ sai nhất: chiều cao CSS KHÔNG
  * phải chiều cao cái biển. Tệp gốc 920×291 mang một quầng sáng chiếm gần nửa khung, biển
- * thật chỉ nằm ở dải giữa — nên ở 44px biển còn ~26px và chữ khắc trên nó mờ tịt. 92px cho
- * biển ~55px, đúng cỡ trong bản thiết kế.
+ * thật chỉ nằm ở dải giữa (~0,6 chiều cao CSS) — nên ở 44px biển còn ~26px và chữ khắc trên
+ * nó mờ tịt. 74px cho biển ~44px, vẫn đọc rõ.
  *
- * `margin-block` âm thu lại phần quầng rỗng ấy để dòng tên không bị đội cao theo. Ai thay bộ
- * khung khác (viền sát mép hơn) thì phải chỉnh lại cả hai con số này.
+ * Từng là 92px (biển ~55px). Hạ xuống 74px ngày 09/08/2026 vì đạo hữu thấy cả hàng danh tính
+ * quá khổ; cùng lượt ấy chân dung 78→62px và tên 1.2→1.05rem, tức TOÀN hàng nhỏ đi ~20% chứ
+ * không riêng một món — đổi lẻ một thứ là hỏng thế cân giữa chân dung và bài vị. Đã dựng bàn
+ * thử bốn cỡ với đúng tấm webp thật trước khi chọn: ở 66px (biển ~40px) chữ bắt đầu bết, nên
+ * 74px là gần sàn rồi, đừng hạ tiếp mà không chụp lại.
+ *
+ * `margin-block` âm thu lại phần quầng rỗng ấy để dòng tên không bị đội cao theo, và nó phải
+ * co CÙNG TỈ LỆ với `height` — giữ nguyên -16px ở chiều cao 74px là ăn lẹm vào biển. Ai thay
+ * bộ khung khác (viền sát mép hơn) thì phải chỉnh lại cả hai con số này.
  *
  * Chỉ ĐO ĐƯỢC bằng ảnh chụp thật — `getComputedStyle` báo 44px là "đúng như đã khai", nó
  * không biết trong 44px ấy có bao nhiêu phần là quầng sáng. Xem `npm run shot`.
  */
 .chat-tagframe {
   display: inline-block;
-  height: 92px;
+  height: 74px;
   width: auto;
-  margin-left: 10px;
-  margin-block: -16px;
+  margin-left: 8px;
+  margin-block: -13px;
   vertical-align: middle;
   user-select: none;
 }

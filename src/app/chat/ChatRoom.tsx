@@ -533,10 +533,14 @@ export function ChatRoom({
                   <Avatar
                     name={msg.author}
                     url={avatars[msg.userId]}
-                    // 78 — đo bằng MẮT trên ảnh chụp thật: ở 56px chân dung lọt thỏm cạnh
-                    // bài vị và cả hàng trông chật. Vẫn nhỉnh hơn bài vị (64px) một bậc, vì
-                    // nó là mặt người còn bài vị chỉ là danh xưng đi kèm.
-                    size={78}
+                    // Đo bằng MẮT trên ảnh chụp thật, không suy từ con số. Từng là 78px; hạ
+                    // còn 62px ngày 09/08/2026 vì đạo hữu thấy cả hàng danh tính quá khổ.
+                    // Phải đi CÙNG LƯỢT với `.chat-tagframe` (92→74px) và `.chat-author`
+                    // (1.2→1.05rem) trong globals.css: chân dung giữ đúng tỉ lệ 0,77 so với
+                    // chiều cao dùng thật của bài vị (74 − 2×13 = 48px), vẫn nhỉnh hơn nó một
+                    // bậc vì đây là mặt người còn bài vị chỉ là danh xưng đi kèm. Đổi lẻ một
+                    // trong ba số là lệch thế cân ấy.
+                    size={62}
                     // Tin nối tiếp cùng người thì vòng tròn ẨN mà vẫn CHIẾM chỗ, để mọi bong
                     // bóng của cùng một người thẳng một hàng lề.
                     className={grouped ? "invisible" : ""}

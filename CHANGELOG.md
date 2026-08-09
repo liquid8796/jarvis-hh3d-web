@@ -11,6 +11,27 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.57.1 — hàng danh tính trong sảnh nhỏ lại một bậc
+
+Đạo hữu đặt ảnh chụp lên và nói chân dung với bài vị quá khổ. Đúng: ở 980px bề ngang, riêng
+hàng tên đã chiếm 60px chiều cao và bài vị dài 260px — nó át cả bong bóng chữ nằm ngay dưới.
+Cả hàng nhỏ đi ~20%: chân dung 78→62px, tên 1.2→1.05rem, bài vị 92→74px.
+
+**Ba con số này phải đi cùng nhau.** Chân dung giữ đúng tỉ lệ 0,77 so với chiều cao DÙNG THẬT
+của bài vị (74 − 2×13 = 48px, đo lại trong trang: đúng 48px) — sửa lẻ một món là lệch thế cân
+giữa mặt người và tấm biển bên cạnh. `margin-block` âm cũng phải co cùng tỉ lệ (−16→−13px):
+giữ nguyên −16px ở chiều cao 74px là ăn lẹm vào chính cái biển.
+
+Chỗ dễ sai vẫn là chỗ cũ: chiều cao CSS **không** phải chiều cao cái biển — tệp gốc 920×291
+mang quầng sáng chiếm gần nửa khung, biển thật chỉ ~0,6 chiều cao khai báo. Nên trước khi chọn
+số đã dựng bàn thử bốn cỡ với ĐÚNG tấm webp thật: 92px (biển ~55px), 80 (~48), 74 (~44), 66
+(~40). Ở 66px chữ khắc bắt đầu bết, nên 74px là gần sàn — ai muốn hạ tiếp thì phải chụp lại,
+đừng suy từ con số.
+
+Kiểm chứng dưới máy phải đi đường vòng vì Mongo không kết nối được từ đây (resolver không trả
+bản ghi SRV) nên sảnh luôn rỗng: chặn `/api/chat` bằng Playwright rồi trả tin dựng sẵn, để
+React vẽ đúng component với đúng CSS vừa biên dịch, chụp hai tấm mới/cũ trong cùng một trang.
+
 ## 0.57.0 — vai ĐỆ TỬ, và bài học về một tấm khiên phát nhầm
 
 - **Thêm vai `de-tu` (Đệ tử)** — danh xưng cho môn đồ thường, đứng CUỐI thang vai. Nó là vai

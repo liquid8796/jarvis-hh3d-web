@@ -21,3 +21,32 @@ export const CHAT_PURGE_PHRASE = "XOA HET";
 export function matchesChatPurgePhrase(raw: string): boolean {
   return raw.trim().replace(/\s+/g, " ").toUpperCase() === CHAT_PURGE_PHRASE;
 }
+
+/**
+ * URL đính kèm có AN TOÀN để đem gắn vào `href`/`src` không — tức có phải `https:` không.
+ *
+ * Sinh ra từ một lỗ hổng CÓ THẬT, không phải phòng xa: `z.string().url()` của Zod NHẬN
+ * `javascript:alert(1)`, `data:text/html,<script>…</script>` và `vbscript:` — đo được ngày
+ * 09/08/2026. Mà bong bóng tin vẽ mọi đính kèm thành `<a href={url}>`, nên một môn đồ bất kỳ
+ * chỉ cần POST thẳng vào /api/chat một đính kèm mang `javascript:` là gài được mã chạy TRÊN
+ * TÊN MIỀN CỦA CHÍNH CHÚNG TA trong trình duyệt của người bấm vào — kể cả một Trưởng môn.
+ * Cookie phiên là httpOnly nên không đọc trộm được, nhưng mã ấy gọi được mọi action/API dưới
+ * danh nghĩa nạn nhân, và đó đã là chiếm quyền.
+ *
+ * Chốt ở `https:` chứ không phải "chặn javascript:": danh sách CHO PHÉP thì một lược đồ lạ
+ * (`vbscript:`, `filesystem:`, một thứ trình duyệt thêm vào năm sau) mặc định nằm ngoài, còn
+ * danh sách CẤM thì mặc định nằm trong. Mọi URL hợp lệ của hệ thống đều là https: tàng khố OCI
+ * và CDN của GIPHY.
+ *
+ * Dùng ở CẢ HAI phía và đó là chủ ý: server chặn lúc GHI, client chặn lúc VẼ. Lớp thứ hai
+ * không thừa — nó phủ cả những tin đã nằm sẵn trong kho từ trước khi có lớp thứ nhất.
+ */
+export function isSafeAttachmentUrl(raw: unknown): raw is string {
+  if (typeof raw !== "string" || raw.length === 0 || raw.length > 2048) return false;
+  try {
+    return new URL(raw).protocol === "https:";
+  } catch {
+    // Không phân tích nổi thành URL thì càng không đem gắn vào href được.
+    return false;
+  }
+}

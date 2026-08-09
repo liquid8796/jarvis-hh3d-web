@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatPicker, type PickerTab } from "./ChatPicker";
 import { Avatar } from "@/components/Avatar";
+import { isSafeAttachmentUrl } from "@/lib/validation/chat";
 import { frameForTags, normalizeTagLabel, type TagFrame } from "@/lib/validation/tags";
 import type { Gif } from "@/lib/services/gif";
 
@@ -551,7 +552,15 @@ export function ChatRoom({
                         {msg.sticker && <span className="chat-sticker">{msg.sticker}</span>}
                         {msg.text && <span className="chat-text">{msg.text}</span>}
                         {msg.attachments.map((a) =>
-                          a.type.startsWith("image/") ? (
+                          // LỚP THỨ HAI của phép gác lược đồ URL (lớp thứ nhất chặn lúc ghi,
+                          // xem `isSafeAttachmentUrl`). Không thừa: nó phủ cả những tin đã nằm
+                          // trong kho từ trước khi có lớp kia. Không an toàn thì vẽ thành CHỮ
+                          // chết — người xem vẫn biết có tệp đính kèm, mà không có gì để bấm.
+                          !isSafeAttachmentUrl(a.url) ? (
+                            <span key={a.name} className="chat-file" title="Đính kèm bị chặn vì địa chỉ không hợp lệ">
+                              ⚠ <span>{a.name}</span> <small>đính kèm không hợp lệ</small>
+                            </span>
+                          ) : a.type.startsWith("image/") ? (
                             <a key={a.url} href={a.url} target="_blank" rel="noreferrer" className="chat-img">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img src={a.url} alt={a.name} loading="lazy" />

@@ -11,6 +11,48 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.53.0 — vá ba lỗ bảo mật: XSS lưu trữ trong sảnh, nhãn tệp do client khai, và cửa cron mở
+
+Một lượt rà soát cả website. Ba lỗ tìm được, vá cả ba; thứ tự dưới đây theo mức nguy hiểm.
+
+- **XSS LƯU TRỮ trong Phòng Chat — nặng nhất.** `z.string().url()` của Zod **NHẬN**
+  `javascript:alert(1)`, `data:text/html,<script>…</script>` và `vbscript:` — đo được, không
+  phải suy đoán. Mà bong bóng tin vẽ mọi đính kèm thành `<a href={url}>`, nên **bất kỳ môn đồ
+  nào** cũng chỉ cần POST thẳng vào `/api/chat` một đính kèm mang `javascript:` là gài được mã
+  chạy **trên chính tên miền của tông môn**, trong trình duyệt của người bấm vào — kể cả một
+  Trưởng môn. Cookie phiên là `httpOnly` nên không đọc trộm được, nhưng mã ấy gọi được mọi
+  action/API dưới danh nghĩa nạn nhân, và đó đã là chiếm quyền.
+  - Vá bằng danh sách **CHO PHÉP** (`https:`), không phải danh sách cấm: một lược đồ lạ mai kia
+    mặc định nằm ngoài, chứ không mặc định lọt vào. Mọi URL hợp lệ của hệ thống đều là https.
+  - **Hai lớp**: server chặn lúc GHI, client chặn lúc VẼ. Lớp thứ hai không thừa — nó phủ cả
+    những tin đã nằm trong kho từ trước khi có lớp thứ nhất; đính kèm không an toàn hiện thành
+    chữ chết「đính kèm không hợp lệ」, không có gì để bấm.
+- **Nhãn tệp đính kèm do CLIENT khai.** `/api/chat/upload` chép thẳng `file.type` xuống object.
+  Bucket công khai đọc, nên một môn đồ tải lên tệp HTML tự khai `text/html` (hoặc SVG có
+  `<script>`) là có ngay một trang web của họ chạy trên `objectstorage.…oraclecloud.com` — một
+  tên miền nghe rất chính danh để dựng trang lừa. Nhãn giờ do **BYTES** quyết định: soi ra ảnh
+  thì giữ nhãn ảnh thật (bong bóng vẫn vẽ `<img>` như cũ), còn lại ra `application/octet-stream`
+  kèm `Content-Disposition: attachment` — trình duyệt tải xuống thay vì dựng trang. PDF, zip,
+  tài liệu vẫn gửi bình thường. Cùng phép soi đã dùng cho ảnh đại diện từ 0.45.0.
+- **`/api/cron` mở cho cả Internet.** Route cho qua khi `user-agent` chứa chữ "vercel-cron" —
+  mà header thì do client đặt, nên một dòng `curl` là chạy được vòng quét. Hậu quả có giới hạn
+  (hai việc đều idempotent, chỉ đụng thứ vốn đã quá hạn) nhưng đó vẫn là một cửa mở và một
+  đường bào tài nguyên. Giờ **bắt buộc** `Authorization: Bearer CRON_SECRET`, so bằng
+  `timingSafeEqual`, và **fail closed** khi chưa đặt biến. Vercel Cron tự gắn header ấy khi
+  project có `CRON_SECRET` — đã xác nhận biến này có trong môi trường Production.
+- Siết thêm một nấc không tốn gì: `jwtVerify` khai rõ `algorithms: ["HS256"]`. Khoá đối xứng nên
+  jose vốn đã chỉ nhận HS*, nhưng viết ra thì khoá luôn cửa nếu mai có ai đổi sang khoá bất đối
+  xứng mà quên rằng phép xác minh đang mở cho mọi thuật toán khoá ấy hỗ trợ.
+- Những chỗ đã soi và **KHÔNG** thấy vấn đề, ghi ra để lần sau khỏi soi lại: phiên (cookie
+  `httpOnly`+`secure`+`sameSite=lax`), mật khẩu (bcrypt cost 12), linh phù khôi lỗi
+  (`timingSafeEqual`, hash SHA-256, fail closed), phong bì cookie game (AES-256-GCM, IV mới mỗi
+  lần), IDOR tài khoản game (mọi câu ghi đều kèm `userId` trong bộ lọc), tiêm NoSQL (mọi tham số
+  vào Mongo đều bị `String()` ép kiểu nên không lọt được toán tử), tiêm SQL (Drizzle tham số
+  hoá), và không có `dangerouslySetInnerHTML` hay `eval` nào trong mã nguồn.
+- `verify:chat` thêm mục chặn lược đồ URL; `verify:media` thêm mục nhãn-theo-bytes chạy **thật
+  trên OCI**: HTML tự khai là `anh.png` vẫn ra octet-stream + ép tải xuống, PNG thật giữ
+  `image/png` và KHÔNG bị ép tải (nếu không thì mọi ảnh trong sảnh biến thành link tải).
+
 ## 0.52.1 — thẻ Khung Tag dời sang tab Đàm Đạo, và sổ khung về một nguồn
 
 - **Thẻ「Khung Tag」chuyển từ tab Môn Đồ sang tab Đàm Đạo**, đứng giữa hạn lưu và nút thanh

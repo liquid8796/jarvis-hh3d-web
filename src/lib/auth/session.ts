@@ -59,7 +59,11 @@ export const readSession = cache(async (): Promise<SessionClaims | null> => {
   }
 
   try {
-    const { payload } = await jwtVerify(token, secret());
+    // Khoá đối xứng nên jose vốn đã chỉ nhận HS*, và `alg: none` thì không bao giờ qua được.
+    // Ghi thẳng danh sách cho phép vẫn đáng: nó biến một bảo đảm của thư viện thành một dòng
+    // đọc được ngay tại chỗ, và khoá luôn cửa nếu sau này có ai đổi `secret()` sang khoá bất
+    // đối xứng mà quên rằng phép xác minh đang mở cho mọi thuật toán khoá ấy hỗ trợ.
+    const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"] });
     if (typeof payload.sub !== "string") {
       return null;
     }

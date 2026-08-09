@@ -137,7 +137,6 @@ try {
     const stored = await media.putChatFile({
       userId: `${prefix}-${stamp}`,
       fileName: "kiểm chứng.txt",
-      contentType: "text/plain; charset=utf-8",
       body: payload,
     });
     created.push(stored.key);
@@ -152,20 +151,58 @@ try {
     assert(fetched.ok, `tải công khai phải được, đang là HTTP ${fetched.status} ${fetched.statusText}`);
     const back = new Uint8Array(await fetched.arrayBuffer());
     assert(Buffer.compare(Buffer.from(back), Buffer.from(payload)) === 0, "bytes tải về phải khớp từng byte");
+    // Tệp KHÔNG phải ảnh phải mang nhãn mờ + ép tải xuống. Đây là phép chặn XSS lưu trữ: bucket
+    // công khai đọc, nên một tệp giữ được nhãn `text/html` là một trang web của kẻ tải lên chạy
+    // trên tên miền của Oracle.
     assert(
-      (fetched.headers.get("content-type") ?? "").startsWith("text/plain"),
-      `kiểu nội dung phải được giữ, đang là ${fetched.headers.get("content-type")}`,
+      fetched.headers.get("content-type") === "application/octet-stream",
+      `tệp không phải ảnh phải mang nhãn mờ, đang là ${fetched.headers.get("content-type")}`,
+    );
+    assert(
+      (fetched.headers.get("content-disposition") ?? "").startsWith("attachment"),
+      `tệp không phải ảnh phải bị ép tải xuống, đang là ${fetched.headers.get("content-disposition")}`,
     );
     assert(
       (fetched.headers.get("cache-control") ?? "").includes("max-age=2592000"),
       `cache-control phải được giữ, đang là ${fetched.headers.get("cache-control")}`,
     );
 
-    await media.deleteObject(stored.key);
-    created.pop();
+    // Và đây là ca ĐỘC: một tệp HTML tự khai là ảnh. Nhãn phải do BYTES quyết định.
+    const html = new Uint8Array(Buffer.from("<!doctype html><script>alert(document.domain)</script>", "utf8"));
+    const evil = await media.putChatFile({ userId: `${prefix}-${stamp}`, fileName: "anh.png", body: html });
+    created.push(evil.key);
+    const evilFetched = await fetch(evil.url);
+    assert(
+      evilFetched.headers.get("content-type") === "application/octet-stream",
+      `HTML tự khai là ảnh vẫn phải ra nhãn mờ, đang là ${evilFetched.headers.get("content-type")}`,
+    );
+    assert(
+      (evilFetched.headers.get("content-disposition") ?? "").startsWith("attachment"),
+      "HTML phải bị ép tải xuống, không được dựng thành trang",
+    );
+
+    // Ảnh THẬT thì giữ nhãn ảnh thật, để bong bóng tin vẫn vẽ được <img>.
+    const png = new Uint8Array(
+      Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==", "base64"),
+    );
+    const good = await media.putChatFile({ userId: `${prefix}-${stamp}`, fileName: "that.png", body: png });
+    created.push(good.key);
+    const goodFetched = await fetch(good.url);
+    assert(
+      goodFetched.headers.get("content-type") === "image/png",
+      `PNG thật phải giữ nhãn image/png, đang là ${goodFetched.headers.get("content-type")}`,
+    );
+    assert(
+      goodFetched.headers.get("content-disposition") === null,
+      "ảnh thật KHÔNG bị ép tải xuống — nếu không thì mọi ảnh trong sảnh thành link tải",
+    );
+
+    for (const key of [evil.key, good.key, stored.key]) await media.deleteObject(key);
+    created.length = 0;
     assert((await media.statObject(stored.key)) === null, "xoá rồi thì HEAD phải trả về null, không phải ném");
 
     console.log(`✔ Vòng đời thật trên OCI (${process.env.OCI_BUCKET}): tải lên → tải công khai đúng byte → xoá sạch.`);
+    console.log("✔ Nhãn theo BYTES: HTML tự khai là ảnh vẫn ra octet-stream + ép tải xuống; PNG thật giữ image/png.");
   }
 
   console.log("");

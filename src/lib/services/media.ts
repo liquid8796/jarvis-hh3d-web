@@ -256,16 +256,43 @@ export function publicUrlOf(key: string): string {
 export type PutChatFileInput = {
   userId: string;
   fileName: string;
-  contentType: string;
   body: Uint8Array;
 };
 
-export type StoredFile = { key: string; url: string };
+export type StoredFile = { key: string; url: string; contentType: string };
 
-/** Tải một file đàm đạo lên kho. Trả về key (để lưu/đối soát) và URL công khai (để hiển thị). */
+/**
+ * Nhãn dành cho MỌI thứ không phải bốn định dạng ảnh đã soi được. Trình duyệt không dựng trang
+ * từ một octet-stream, nên đây là chỗ HTML/SVG/XML mất hết răng.
+ */
+const OPAQUE_CONTENT_TYPE = "application/octet-stream";
+
+/**
+ * Tải một file đàm đạo lên kho, và KHÔNG tin một chữ nào trong `file.type` mà client khai.
+ *
+ * Lý do là một lỗ hổng có thật: bucket này công khai đọc, nên nhãn ta ghi lên object CHÍNH LÀ
+ * nhãn cả thế giới nhận được khi tải nó về. Trước bản này route đính kèm chép thẳng `file.type`
+ * xuống, tức một môn đồ tải lên một tệp HTML tự khai `text/html` (hoặc một SVG có `<script>`)
+ * là có ngay một trang web của họ chạy trên `objectstorage.…oraclecloud.com` — một tên miền
+ * nghe rất chính danh để dựng trang lừa hoặc phát tán mã.
+ *
+ * Luật thay thế, đúng hai nhánh:
+ *   • Bytes soi ra một trong bốn định dạng ảnh → giữ nhãn ảnh THẬT ấy. Bong bóng tin vẫn vẽ
+ *     được `<img>` như cũ, và bốn định dạng đó không chạy được mã.
+ *   • Còn lại → `application/octet-stream` KÈM `Content-Disposition: attachment`. Trình duyệt
+ *     tải xuống thay vì dựng trang; PDF, zip, tài liệu vẫn gửi được như thường, chỉ là không
+ *     còn cửa nào để một tệp tự nhận mình là HTML.
+ *
+ * Tên trong `Content-Disposition` đi qua `encodeURIComponent` theo RFC 5987 — dạng mã hoá ấy
+ * không đẻ ra dấu nháy hay ký tự xuống dòng, nên không có đường chèn thêm header.
+ */
 export async function putChatFile(input: PutChatFileInput): Promise<StoredFile> {
   const { client, config } = requireStore();
   const key = chatObjectKey(input.userId, input.fileName);
+
+  const image = sniffImageKind(input.body);
+  const contentType = image?.contentType ?? OPAQUE_CONTENT_TYPE;
+  const downloadName = sanitizeFileName(input.fileName) || "tep";
 
   await client.send(
     new PutObjectCommand({
@@ -275,12 +302,15 @@ export async function putChatFile(input: PutChatFileInput): Promise<StoredFile> 
       // Khai độ dài tường minh để SDK không chuyển sang chunked encoding — lớp tương thích
       // của OCI không nhận dạng đó.
       ContentLength: input.body.byteLength,
-      ContentType: input.contentType,
+      ContentType: contentType,
+      ...(image
+        ? {}
+        : { ContentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}` }),
       CacheControl: CACHE_CONTROL,
     }),
   );
 
-  return { key, url: publicUrl(key, config) };
+  return { key, url: publicUrl(key, config), contentType };
 }
 
 /**
@@ -376,7 +406,7 @@ export async function putAvatarFile(input: {
     }),
   );
 
-  return { key, url: publicUrl(key, config) };
+  return { key, url: publicUrl(key, config), contentType: input.kind.contentType };
 }
 
 /**
@@ -410,7 +440,7 @@ export async function putTagFrameFile(input: { label: string; kind: ImageKind; b
     }),
   );
 
-  return { key, url: publicUrl(key, config) };
+  return { key, url: publicUrl(key, config), contentType: input.kind.contentType };
 }
 
 /**
@@ -445,7 +475,7 @@ export async function putObjectAt(key: string, body: Uint8Array, contentType: st
     }),
   );
 
-  return { key, url: publicUrl(key, config) };
+  return { key, url: publicUrl(key, config), contentType: contentType };
 }
 
 /** Kích thước object, hoặc `null` nếu chưa có. Dùng để script chuyển kho chạy lại được nhiều lần. */

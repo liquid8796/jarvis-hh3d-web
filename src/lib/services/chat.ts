@@ -1,5 +1,6 @@
 import { MongoClient, type Collection, type Db, type Filter } from "mongodb";
 import { z } from "zod";
+import { isSafeAttachmentUrl } from "@/lib/validation/chat";
 import { getAppSettings } from "./settings";
 
 /**
@@ -36,7 +37,8 @@ import { getAppSettings } from "./settings";
  */
 
 const attachmentSchema = z.object({
-  url: z.string().url().max(2048),
+  // `.url()` KHÔNG đủ: nó nhận cả `javascript:` lẫn `data:text/html`. Xem `isSafeAttachmentUrl`.
+  url: z.string().max(2048).refine(isSafeAttachmentUrl, "Đính kèm phải là một địa chỉ https."),
   name: z.string().trim().min(1).max(200),
   size: z.number().int().min(0).max(64 * 1024 * 1024),
   type: z.string().max(120).default("application/octet-stream"),
@@ -51,7 +53,14 @@ export const messageBodySchema = z.object({
 
 const reactionSchema = z.object({ emoji: z.string(), userId: z.string() });
 
-/** Document một tin như nó nằm trong kho. Zod gác cả hai chiều — y như mọi document khác. */
+/**
+ * Document một tin như nó nằm trong kho. Zod gác cả hai chiều — y như mọi document khác.
+ *
+ * Vì `attachmentSchema` gác CẢ chiều đọc, một tin mang đính kèm không phải https sẽ trượt
+ * `parseStored` và rơi khỏi trang tin — mất nguyên cả tin, kể cả phần chữ. Chấp nhận có ý
+ * thức: URL như thế không thể sinh ra từ đường ghi hợp lệ nào (kho OCI và GIPHY đều https),
+ * nên thứ duy nhất biến mất là một payload cố tình — và biến mất thì đúng hơn là được vẽ ra.
+ */
 const storedMessageSchema = z.object({
   _id: z.string(),
   userId: z.string(),

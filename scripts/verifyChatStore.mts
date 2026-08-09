@@ -71,6 +71,46 @@ try {
   );
   console.log("✔ Gửi/đọc: tin vào kho nguyên vẹn (kèm tag đóng băng), tin rỗng và tin quá dài bị chặn.");
 
+  // ---- Lược đồ URL của đính kèm (chặn XSS lưu trữ) --------------------------------
+  /**
+   * `z.string().url()` NHẬN `javascript:` và `data:text/html` — đo được, không phải phòng xa.
+   * Mà bong bóng tin vẽ đính kèm thành `<a href>`, nên một URL như thế là mã chạy trên chính
+   * tên miền của tông môn, trong trình duyệt của người bấm vào. Cửa ghi phải đóng lại.
+   */
+  const withUrl = (url: string) => ({
+    text: "",
+    attachments: [{ url, name: "x", size: 1, type: "image/png" }],
+  });
+
+  for (const nasty of [
+    "javascript:alert(document.domain)",
+    "JaVaScRiPt:alert(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "vbscript:msgbox(1)",
+    "http://khong-ma-hoa.example/anh.png",
+    "file:///etc/passwd",
+  ]) {
+    const sent = await chat.sendMessage(member, withUrl(nasty));
+    assert(!sent.ok, `đính kèm「${nasty.slice(0, 32)}」PHẢI bị từ chối lúc ghi`);
+  }
+
+  assert(
+    (await chat.sendMessage(member, withUrl("https://objectstorage.eu-frankfurt-1.oraclecloud.com/n/a/b/c/o/anh.png"))).ok,
+    "đính kèm https thật thì vẫn phải gửi được",
+  );
+  assert(
+    (await chat.sendMessage(member, withUrl("https://media3.giphy.com/media/abc/giphy.gif"))).ok,
+    "GIF của GIPHY cũng là https nên phải qua",
+  );
+
+  const afterUrls = await chat.getFeed({ viewerId: admin.id });
+  if (afterUrls.storeClosed) throw new Error("unreachable");
+  assert(
+    afterUrls.messages.length === 3,
+    `chỉ hai tin https được vào (cộng tin chào), đang có ${afterUrls.messages.length}`,
+  );
+  console.log("✔ Đính kèm: javascript:/data:/vbscript:/file:/http đều bị chặn lúc ghi; https thì qua.");
+
   // ---- Cảm xúc: bật, tắt, và đếm theo người --------------------------------------
   assert((await chat.toggleReaction(member.id, first.id, "👍")).ok, "thả cảm xúc phải được");
   assert((await chat.toggleReaction(admin.id, first.id, "👍")).ok, "người thứ hai thả cùng emoji phải được");

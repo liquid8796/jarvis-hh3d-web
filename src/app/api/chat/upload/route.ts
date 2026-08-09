@@ -42,7 +42,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const contentType = file.type || "application/octet-stream";
   // Đọc hết vào bộ nhớ là an toàn vì trần 8MB đã chặn ở trên (`file.size` là số byte runtime
   // ĐẾM ĐƯỢC khi bóc multipart, không phải con số client tự khai), và `ContentLength` tường
   // minh giúp SDK khỏi chuyển sang chunked encoding — thứ mà OCI không nhận.
@@ -51,7 +50,6 @@ export async function POST(request: Request) {
   const stored = await putChatFile({
     userId: user.id,
     fileName: file.name || "tep",
-    contentType,
     body,
   });
 
@@ -59,6 +57,9 @@ export async function POST(request: Request) {
     url: stored.url,
     name: file.name || "tep",
     size: body.byteLength,
-    type: contentType,
+    // Nhãn do KHO quyết định sau khi soi bytes, không phải `file.type` client khai — xem
+    // `putChatFile`. Trả về đúng nhãn đã ghi để bong bóng tin vẽ ảnh/tệp cho khớp với thứ
+    // trình duyệt sẽ thật sự nhận được.
+    type: stored.contentType,
   });
 }

@@ -496,6 +496,11 @@ body:has([data-backdrop="hang-doi"]) .backdrop {
  */
 .chat-frame {
   position: relative;
+  /* `display: flex` chứ không để khung con `height: 100%`: phần trăm ấy phân giải theo chiều
+     cao KHAI BÁO của bọc (cái calc), không theo `min-height`. Màn thấp hơn 560px thì bọc cao
+     420px mà khung con vẫn tính theo calc — ngắn hơn bọc, và hoa văn đáy (định vị theo bọc)
+     trôi hẳn ra khỏi viền. Là flex item thì con căng đúng chiều cao DÙNG THẬT, mọi trường hợp. */
+  display: flex;
   height: calc(100dvh - 140px);
   min-height: 420px;
 }
@@ -503,7 +508,8 @@ body:has([data-backdrop="hang-doi"]) .backdrop {
 .chat-shell {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 0;
   overflow: hidden;
   position: relative;
@@ -1134,7 +1140,10 @@ body:has([data-backdrop="hang-doi"]) .backdrop {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 12px 14px;
+  /* Đệm ngang 30px chứ không 14px: ngoặc góc dưới có tay dài 58px, và ở 14px hai nút tròn
+     nằm ĐÈ lên nét hoa văn — ảnh chụp cho thấy rõ. Trong bản thiết kế nút nằm gọn bên trong,
+     hoa văn thông suốt. */
+  padding: 12px 30px;
   border-top: 1px solid rgba(232, 194, 92, 0.2);
   background: linear-gradient(180deg, rgba(9, 12, 26, 0.4), rgba(24, 26, 58, 0.7));
 }

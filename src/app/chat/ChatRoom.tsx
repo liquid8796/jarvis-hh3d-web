@@ -56,6 +56,66 @@ const GIF_MIME = "image/gif";
 const POPUP_ATTR = "data-chat-popup";
 const TRIGGER_ATTR = "data-chat-popup-trigger";
 
+/** Bốn góc của khung, theo thứ tự vẽ. Tên lớp CSS quyết định vị trí và phép lật — xem globals.css. */
+const FRAME_CORNERS = ["tl", "tr", "bl", "br"] as const;
+
+/**
+ * Hoa văn của khung son: bốn ngoặc góc và ấn ở đỉnh. TRANG TRÍ THUẦN — `aria-hidden` và
+ * `pointer-events: none` (trong CSS), nên nó không bao giờ chắn một cú bấm hay lọt vào máy
+ * đọc màn hình.
+ *
+ * Vẽ bằng SVG chứ không phải ảnh: khung co giãn theo màn hình, mà một tấm PNG hoa văn thì
+ * hoặc vỡ hoặc phải kèm bản @2x — SVG thì nét nào cũng sắc ở mọi cỡ và không tốn byte tải.
+ *
+ * MỘT hình cho cả bốn góc, lật bằng `scale` trong CSS. Chép bốn path riêng là bốn chỗ phải
+ * nhớ sửa cùng lúc, và chỉ chờ ngày một góc lệch khỏi ba góc kia.
+ */
+function ChatFrameOrnaments() {
+  return (
+    <>
+      {FRAME_CORNERS.map((corner) => (
+        <svg key={corner} className={`chat-corner chat-corner-${corner}`} viewBox="0 0 58 58" aria-hidden>
+          {/* Nét CHÍNH: chạy song song với đường bo của khung — cung r=14 khớp với
+              border-radius 20px trừ đi khoảng cách 6px của ngoặc. */}
+          <path d="M57 6 H20 A14 14 0 0 0 6 20 V57" strokeWidth="1.6" strokeLinecap="round" />
+          {/* Nét PHỤ cách 5px, ngắn hơn — nét đôi CHỈ dày lên ở vùng góc, còn giữa cạnh vẫn
+              một nét, đúng như bản thiết kế. Bản trước để cách 8px và kéo dài quá tay, nên góc
+              trông thưa và rời rạc thay vì là một khối hoa văn.
+
+              CỐ Ý dừng ở hai nét: đã thử thêm một lớp mây cuộn nằm sâu trong góc cho giống
+              phần hoa văn thấp thoáng ở hình mẫu, nhưng ảnh chụp cho thấy nó ĐÈ LÊN chữ
+              "Phòng Chat" (header chỉ cách mép 22px) — và soi lại thì phần "hoa văn" ấy ở
+              hình mẫu nhiều khả năng là cành cây của ảnh nền lọt qua, không phải nét của
+              khung. Không thêm trang trí phỏng đoán để rồi phá chữ thật. */}
+          <path d="M42 11 H25 A14 14 0 0 0 11 25 V42" strokeWidth="1" strokeLinecap="round" opacity="0.6" />
+        </svg>
+      ))}
+
+      {/* viewBox cao 34 và ấn nằm ở ĐÚNG GIỮA (y=17): CSS kéo nó lên nửa chiều cao nên trục
+          ngang của ấn trùng khít đường viền trên — ấn cưỡi lên viền, không treo phía trên nó.
+          Vẽ được trọn vẹn là nhờ hoa văn nằm ở lớp BỌC chứ không trong `.chat-shell` (thứ có
+          `overflow: hidden`); xem ghi chú tại `.chat-frame`. */}
+      <svg className="chat-finial" viewBox="0 0 116 34" aria-hidden>
+        <g fill="none" stroke="currentColor" strokeLinecap="round">
+          {/* Cánh mây: vươn NGANG rồi cuộn lại sát ngọc, không sải lên như bản trước — sải lên
+              thì cả cụm đọc thành một chữ V toác, mất hẳn dáng cái ấn. */}
+          <path d="M45 17 C 38 8, 26 8, 19 15" strokeWidth="1.8" />
+          <path d="M71 17 C 78 8, 90 8, 97 15" strokeWidth="1.8" />
+          {/* Móc cuộn ở đầu cánh — nét kết, cho cánh không cụt lủn. */}
+          <path d="M19 15 C 14 20, 20 25, 24 21" strokeWidth="1.5" />
+          <path d="M97 15 C 102 20, 96 25, 92 21" strokeWidth="1.5" />
+          {/* Nét mảnh chạy dưới cánh, tan dần vào đường viền hai bên. */}
+          <path d="M44 21 C 36 16, 26 17, 16 21" strokeWidth="1.1" opacity="0.55" />
+          <path d="M72 21 C 80 16, 90 17, 100 21" strokeWidth="1.1" opacity="0.55" />
+        </g>
+        {/* Viên ngọc giữa: hình thoi ĐẶC, lồng một hình thoi màu nền cho ra chiều sâu. */}
+        <path d="M58 2 L70 17 L58 32 L46 17 Z" fill="currentColor" />
+        <path d="M58 10 L64 17 L58 24 L52 17 Z" fill="rgb(23,25,56)" />
+      </svg>
+    </>
+  );
+}
+
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
 
@@ -418,6 +478,7 @@ export function ChatRoom({
   let lastAt = 0;
 
   return (
+    <div className="chat-frame">
     <div
       className="chat-shell card card-hairline"
       onDragOver={(e) => e.preventDefault()}
@@ -426,24 +487,6 @@ export function ChatRoom({
         if (e.dataTransfer.files.length) void upload(e.dataTransfer.files);
       }}
     >
-      {/* Hoa văn của khung — bốn ngoặc góc và ấn ở đỉnh. Là phần TRANG TRÍ thuần nên nằm
-          ngoài dòng chảy nội dung, pointer-events tắt trong CSS; SVG tự vẽ để không tải
-          thêm một asset nào. */}
-      <i className="chat-corners" aria-hidden />
-      <span className="chat-finial" aria-hidden>
-        <svg viewBox="0 0 120 34" width="120" height="34">
-          <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-            {/* hai nhánh mây đối xứng */}
-            <path d="M10 22 C 26 12, 40 12, 50 18" />
-            <path d="M110 22 C 94 12, 80 12, 70 18" />
-            <path d="M18 24 C 30 18, 40 18, 48 22" opacity="0.55" />
-            <path d="M102 24 C 90 18, 80 18, 72 22" opacity="0.55" />
-          </g>
-          {/* ấn giữa: kim châm trên một cánh hoa */}
-          <path d="M60 4 L67 15 L60 28 L53 15 Z" fill="currentColor" opacity="0.9" />
-          <path d="M60 9 L63.5 15 L60 22 L56.5 15 Z" fill="#0b0e20" />
-        </svg>
-      </span>
 
       <header className="chat-head">
         <div>
@@ -725,6 +768,11 @@ export function ChatRoom({
           </svg>
         </button>
       </footer>
+    </div>
+
+    {/* Hoa văn vẽ SAU khung trong DOM nên nó nằm đè lên — và nằm NGOÀI `.chat-shell` nên
+        `overflow: hidden` của khung không cắt mất nửa trên của ấn. */}
+    <ChatFrameOrnaments />
     </div>
   );
 }

@@ -11,6 +11,38 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.55.1 — viền khung Phòng Chat vẽ lại cho khớp bản thiết kế
+
+Đạo hữu đặt ảnh hiện tại cạnh bản thiết kế và nói vẫn chưa giống. Đúng — ba chỗ lệch, và
+chỉ ảnh chụp mới lộ ra:
+
+- **Ngoặc góc từ `linear-gradient` sang SVG.** Gradient chỉ vẽ được hình CHỮ NHẬT, nên bốn
+  ngoặc luôn vuông trong khi khung thì bo tròn — nét ngoặc cắt ngang đường bo, trông như dán
+  lên. SVG vẽ được cung tròn nên ngoặc chạy song song với viền. Nét đôi cách 5px và chỉ dày
+  lên ở vùng góc, còn giữa cạnh vẫn một nét, đúng như bản thiết kế.
+- **Ấn đỉnh từng bị cắt mất nửa trên.** `.chat-shell` phải `overflow: hidden` (header và
+  thanh soạn có nền riêng, không cắt thì chúng vuông góc chồi ra khỏi bốn góc bo), và chính
+  cái cắt ấy xén đôi viên ngọc — nó hiện ra thành một hình chữ V cụt. Bản trước vá bằng cách
+  kéo ấn xuống rồi lấy một dải màu che chỗ nối: chữa triệu chứng. Nay tách một lớp bọc
+  `.chat-frame` KHÔNG cắt, hoa văn nằm ngoài khung con — ấn vẽ trọn vẹn, cưỡi đúng lên viền,
+  và cái dải che kia biến mất.
+- **Nút thanh soạn đè lên ngoặc góc dưới.** Đệm ngang 14px → 30px để hai nút tròn nằm gọn
+  bên trong, hoa văn thông suốt như bản thiết kế.
+
+Một lỗi tự gây rồi tự bắt trong lúc sửa: lớp bọc dùng `height: calc(...)` + `min-height`, mà
+khung con lại `height: 100%` — phần trăm ấy phân giải theo chiều cao KHAI BÁO, không theo
+`min-height`. Màn thấp hơn 560px thì bọc cao 420px còn con vẫn tính theo calc, ngắn hơn bọc,
+và hoa văn đáy trôi hẳn khỏi viền. Cho con làm flex item là căng đúng chiều cao dùng thật.
+Đã đo lại ở khung 900×520: cả bốn ngoặc bám khít viền.
+
+Cũng đã THỬ rồi BỎ một lớp mây cuộn nằm sâu trong góc, vì ảnh chụp cho thấy nó đè lên chữ
+「Phòng Chat」(header chỉ cách mép 22px) — và soi kỹ thì phần "hoa văn" ấy ở hình mẫu nhiều
+khả năng là cành cây của ảnh nền lọt qua, không phải nét của khung.
+
+- **`npm run shot` thêm `--clip x,y,rộng,cao`** để chụp đúng một vùng. Không có nó thì một
+  tấm 1450px thu vừa màn hình chỉ còn vài pixel cho nét viền, nhìn không phán được gì — mọi
+  kết luận ở trên đều đến từ các ảnh cắt vùng chụp ở 2×.
+
 ## 0.55.0 — Hàng Đợi có tấm nền riêng
 
 - **Trang Hàng Đợi Công Việc đổi sang「Tử Linh Tiên Tử」** (`public/backdrop-hang-doi.png`),

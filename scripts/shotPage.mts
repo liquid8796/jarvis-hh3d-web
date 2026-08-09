@@ -64,6 +64,24 @@ const waitFor = arg("wait");
  */
 const clickFirst = arg("click");
 
+/**
+ * Chụp ĐÚNG MỘT VÙNG thay vì cả khung nhìn: `--clip x,y,rộng,cao` (đơn vị CSS pixel).
+ *
+ * Cần cho việc so từng chi tiết hoa văn: một tấm 1450px thu về vừa màn hình thì nét viền chỉ
+ * còn vài pixel, nhìn không phán được gì. Cắt vùng rồi vẫn chụp ở 2× là soi được từng nét.
+ */
+const clipArg = arg("clip");
+const clip = clipArg
+  ? (() => {
+      const parts = clipArg.split(",").map((n) => Number(n.trim()));
+      if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) {
+        throw new Error(`--clip cần đúng bốn số "x,y,rộng,cao", nhận「${clipArg}」.`);
+      }
+      const [x, y, w, h] = parts;
+      return { x, y, width: w, height: h };
+    })()
+  : undefined;
+
 if (!Number.isInteger(width) || !Number.isInteger(height) || width < 320 || height < 240) {
   throw new Error(`--width/--height phải là số nguyên hợp lý, nhận ${width}x${height}.`);
 }
@@ -137,7 +155,7 @@ try {
   });
   await page.waitForTimeout(400);
 
-  await page.screenshot({ path: out, fullPage: flag("full") });
+  await page.screenshot({ path: out, fullPage: flag("full"), clip });
   console.log(`✔ Đã chụp → ${out}`);
 
   // Lỗi console/mạng NÓI RA chứ không nuốt: một tấm ảnh đẹp che được rất nhiều thứ hỏng.

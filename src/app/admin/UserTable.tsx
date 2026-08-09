@@ -41,6 +41,9 @@ const ROLE_BADGE_CLASS: Record<Role, string> = {
   "thai-thuong-truong-lao": "badge-admin",
   "chuong-mon": "badge-admin",
   admin: "badge-admin",
+  // Đệ tử không mang quyền nào, nên nó KHÔNG được đeo màu của bậc trị sự — mượn sắc nhã của
+  // huy hiệu tag. Đúng theo luật ghi ở trên: màu nói về quyền, và vai này không mở gì cả.
+  "de-tu": "badge-tag",
 };
 
 export function UserTable({

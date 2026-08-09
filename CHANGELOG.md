@@ -11,6 +11,41 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.57.0 — vai ĐỆ TỬ, và bài học về một tấm khiên phát nhầm
+
+- **Thêm vai `de-tu` (Đệ tử)** — danh xưng cho môn đồ thường, đứng CUỐI thang vai. Nó là vai
+  ĐẦU TIÊN của hệ thống **không mang quyền nào**: `ROLE_PERMISSIONS["de-tu"]` rỗng, không mở
+  trang Tông Môn, không quản ai, không đổi vai của ai. Trưởng môn ban nó cho ai thì người ấy
+  được gọi tên trong bảng môn đồ và trong sảnh đàm đạo, chấm hết.
+- **Chỗ khó nằm ở phép CHE CHẮN, không nằm ở việc thêm một dòng vào danh mục.** Trước bản này,
+  `canManageUser` che chắn *bất kỳ ai mang một vai có trong danh mục* khỏi bậc trị sự — một luật
+  đúng khi mọi vai đều là vai trị sự. Thả `de-tu` vào theo cách ấy là **trao cho mỗi đệ tử một
+  tấm khiên chắn cả ba bậc trị sự**: Trưởng môn, Chưởng môn và Thái thượng trưởng lão đều không
+  duyệt, không sửa, không trục xuất được họ nữa — chỉ Gia chủ làm nổi. Đúng ngược với ý nghĩa
+  của vai: đệ tử chính là người mà bậc trị sự sinh ra để quản.
+  - Tách đôi bằng `ROLE_SHIELDS_BEARER`, và cố ý là `Record<Role, boolean>` chứ không phải một
+    danh sách các vai được che: kiểu này bắt MỌI vai thêm về sau phải trả lời câu hỏi ấy ngay
+    tại chỗ, **không biên dịch được nếu bỏ trống**. Một danh sách thì im lặng bỏ sót, và bỏ sót
+    ở đây nghĩa là một vai trị sự mới lặng lẽ thành người ai cũng trục xuất được.
+  - Ba câu hỏi từ nay rời hẳn nhau: "mở được trang Tông Môn" (`isAdminUser`), "có tên trong danh
+    mục vai" (đúng cả với đệ tử), và "được che chắn khỏi bậc trị sự" — chỉ câu cuối được dùng ở
+    `canManageUser`.
+- **Hai hàng rào cũ đã ĐỎ đúng lúc, và đó là tin tốt**: `verify:permissions` khẳng định "vai nào
+  cũng phải mở được cửa trị sự" và "vai không mở được việc gì thì nó là một cái nhãn". Cả hai
+  đều là giả định đúng của thời bốn vai, và cả hai đều gãy khi có vai đầu tiên sinh ra để làm
+  cái nhãn. Thay bằng bảng `ROLE_SHAPE` viết tay (`opensAdminDoor` × `labelOnly`) — vẫn giữ đúng
+  nguyên tắc của tệp ấy: oracle phải VIẾT TAY, vì oracle đi hỏi chính thứ đang bị kiểm thì nó
+  gật đầu với mọi lỗi mà code mắc.
+- Huy hiệu「Đệ tử」dùng sắc nhã của tag, KHÔNG dùng màu của bậc trị sự — theo đúng luật đã ghi
+  tại `ROLE_BADGE_CLASS`: màu nói về QUYỀN, và vai này không mở gì cả.
+- Migration `0015` chỉ thêm một dòng vào danh mục `roles` (sort_order 4) và **không** thêm dòng
+  nào vào `role_permissions` — phép so của `verify:roles` là hai chiều, nên một ô thừa ở đó cũng
+  đỏ y như một ô thiếu.
+- Kiểm chứng: `verify:permissions` quét trọn **169 ô** actor×target (13 người, thêm một đệ tử,
+  một đệ tử thứ hai và một Trưởng môn đeo kèm danh xưng đệ tử — để chắc tấm khiên của vai trị sự
+  KHÔNG mất đi vì đeo thêm nhãn). `verify:roles` xanh trên database thật: 5 vai, 5 quyền, 11 ô
+  vai→quyền.
+
 ## 0.56.2 — `npm run shot` thôi treo, và thôi để lại Chromium mồ côi
 
 - **Tìm ra chỗ treo, và nó không phải `networkidle`.** Phép chờ ảnh trước khi bấm máy viết

@@ -28,7 +28,11 @@
  *   nhưng đó CHÍNH LÀ lỗ hổng mà bậc Gia chủ sinh ra để bịt, và thêm vai mới không phải là
  *   lý do để mở lại nó.
  *
- *   (rỗng)   — môn đồ thường.
+ *   de-tu    — Đệ tử. Vai ĐẦU TIÊN không mang quyền nào: nó là một danh xưng cho môn đồ
+ *              thường, không phải một bậc trị sự. Xem `ROLE_SHIELDS_BEARER` — thêm nó vào
+ *              danh mục suýt nữa đã khiến chính Trưởng môn không quản nổi đệ tử.
+ *
+ *   (rỗng)   — môn đồ thường chưa được ban danh xưng nào.
  *
  * Gia chủ nghiễm nhiên có mọi quyền trị sự — cấp trên mà thiếu quyền cấp dưới thì vừa vô lý
  * vừa bắt mọi chỗ kiểm tra phải nhớ hỏi đủ BỐN vai.
@@ -40,7 +44,18 @@
  * cho một bảng mã đẹp hơn không đáng.
  */
 
-export const ASSIGNABLE_ROLES = ["gia-chu", "thai-thuong-truong-lao", "chuong-mon", "admin"] as const;
+/**
+ * Thứ tự ở đây LÀ thang vai: nó quyết định `sort_order` dưới database (kiểm bởi
+ * `verify:roles`), thứ tự huy hiệu trên bảng môn đồ, và thứ tự `normalizeRoles` trả về. Nên
+ * `de-tu` đứng CUỐI — nó là bậc thấp nhất, không phải một vai trị sự xếp nhầm chỗ.
+ */
+export const ASSIGNABLE_ROLES = [
+  "gia-chu",
+  "thai-thuong-truong-lao",
+  "chuong-mon",
+  "admin",
+  "de-tu",
+] as const;
 export type Role = (typeof ASSIGNABLE_ROLES)[number];
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -48,6 +63,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   "thai-thuong-truong-lao": "Thái thượng trưởng lão",
   "chuong-mon": "Chưởng môn",
   admin: "Trưởng môn",
+  "de-tu": "Đệ tử",
 };
 
 /**
@@ -102,6 +118,35 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   "thai-thuong-truong-lao": TRI_SU_PERMISSIONS,
   "chuong-mon": TRI_SU_PERMISSIONS,
   admin: TRI_SU_PERMISSIONS,
+  /**
+   * Đệ tử KHÔNG mở được việc gì cả, và mảng rỗng này là một lời khai chứ không phải một chỗ
+   * chưa điền: vai này là DANH XƯNG cho môn đồ thường, để bảng môn đồ và sảnh đàm đạo gọi họ
+   * bằng một cái tên, chứ không phải để trao thêm quyền.
+   */
+  "de-tu": [],
+};
+
+/**
+ * Vai nào CHE CHẮN người mang nó khỏi bậc trị sự — tức chỉ Gia chủ mới đụng tới được.
+ *
+ * Tách khỏi "có mang vai nào không", và sự tách này là phần khó nhất của việc thêm `de-tu`.
+ * Trước bản này, `canManageUser` che chắn BẤT KỲ ai mang một vai có trong danh mục, vì hồi ấy
+ * mọi vai đều là vai trị sự nên hai câu ấy trùng kết quả. Thả `de-tu` vào danh mục theo cách
+ * cũ là biến mỗi đệ tử thành người mà Trưởng môn, Chưởng môn và Thái thượng trưởng lão đều
+ * KHÔNG duyệt, không sửa, không trục xuất được — chỉ Gia chủ làm nổi. Đúng ngược với ý nghĩa
+ * của vai: đệ tử chính là người mà bậc trị sự sinh ra để quản.
+ *
+ * Là `Record<Role, boolean>` chứ không phải một mảng các vai được che: kiểu này bắt MỌI vai
+ * thêm về sau phải trả lời câu hỏi ấy ngay tại đây, không biên dịch được nếu bỏ trống. Một
+ * danh sách thì im lặng bỏ sót, và bỏ sót ở đây nghĩa là một vai trị sự mới lặng lẽ trở thành
+ * người ai cũng trục xuất được.
+ */
+const ROLE_SHIELDS_BEARER: Record<Role, boolean> = {
+  "gia-chu": true,
+  "thai-thuong-truong-lao": true,
+  "chuong-mon": true,
+  admin: true,
+  "de-tu": false,
 };
 
 /**
@@ -110,6 +155,18 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
  */
 const GRANTS: ReadonlyMap<string, ReadonlySet<Permission>> = new Map(
   ASSIGNABLE_ROLES.map((role) => [role, new Set(ROLE_PERMISSIONS[role])] as const),
+);
+
+/**
+ * Cùng lẽ với `GRANTS`: dựng một lần lúc nạp module, rồi tra bằng `Set`.
+ *
+ * Là `Set<string>` chứ không tra thẳng `ROLE_SHIELDS_BEARER` bằng một phép ép kiểu: mảng vai
+ * đọc từ database là `string[]`, nên tra thẳng vào một `Record<Role, …>` sẽ phải nói dối trình
+ * biên dịch rằng mọi chuỗi đều là `Role`. `Set.has` nhận chuỗi bất kỳ mà không phải nói dối, và
+ * một mã lạ đơn giản là không có trong tập — tức quản được như môn đồ thường.
+ */
+const SHIELDED_ROLES: ReadonlySet<string> = new Set(
+  ASSIGNABLE_ROLES.filter((role) => ROLE_SHIELDS_BEARER[role]),
 );
 
 /**
@@ -125,12 +182,13 @@ export function hasPermission(user: RoleBearer, permission: Permission): boolean
 }
 
 /**
- * "Có mang vai nào không" — hỏi theo DANH MỤC chứ không phải `roles.length > 0`. Một mã lạ lọt
- * vào (không thể, vì `user_roles.role_code` có khoá ngoại — nhưng luật này không nên phụ thuộc
- * vào điều đó) sẽ không biến người ta thành kẻ bất khả xâm phạm mà không ai gỡ được.
+ * "Có mang vai nào ĐƯỢC CHE CHẮN không" — hỏi theo DANH MỤC chứ không phải `roles.length > 0`.
+ * Một mã lạ lọt vào (không thể, vì `user_roles.role_code` có khoá ngoại — nhưng luật này không
+ * nên phụ thuộc vào điều đó) sẽ không biến người ta thành kẻ bất khả xâm phạm mà không ai gỡ
+ * được: mã không có trong bảng thì `?? false`, tức quản được như môn đồ thường.
  */
-function bearsAnyRole(user: RoleBearer): boolean {
-  return user.roles.some((role) => GRANTS.has(role));
+function bearsShieldedRole(user: RoleBearer): boolean {
+  return user.roles.some((role) => SHIELDED_ROLES.has(role));
 }
 
 export function isOwner(user: RoleBearer): boolean {
@@ -153,18 +211,21 @@ export function isAdminUser(user: RoleBearer): boolean {
  *              nên để họ hạ được nhau thì cả bậc chỉ an toàn tới khi có người đổi ý.
  *   Môn đồ   → không quản ai.
  *
- * Phía BỊ QUẢN hỏi `bearsAnyRole`, không hỏi `isAdminUser`. Hôm nay hai phép ấy trùng kết quả
- * vì vai nào cũng là vai trị sự, nhưng chúng trả lời hai câu khác nhau: một câu là "mở được
- * trang Tông Môn", câu kia là "được che chắn khỏi bậc trị sự". Buộc chúng vào nhau nghĩa là
- * ngày có một vai thuần trang trí (không `admin.panel`), người mang vai ấy lặng lẽ rơi xuống
- * hạng quản được — đúng loại lỗ hổng cả tệp này sinh ra để bịt, và không có phép thử nào kêu.
+ * Phía BỊ QUẢN hỏi `bearsShieldedRole`, KHÔNG hỏi `isAdminUser` và cũng KHÔNG hỏi "có mang vai
+ * nào không". Ba câu ấy khác nhau, và ngày `de-tu` ra đời là ngày chúng tách hẳn:
+ *   • "mở được trang Tông Môn"      → `isAdminUser`
+ *   • "có tên trong danh mục vai"   → đúng cả với đệ tử
+ *   • "được che chắn khỏi bậc trị sự" → `ROLE_SHIELDS_BEARER`, và CHỈ câu này được dùng ở đây
+ * Bản trước hỏi câu thứ hai, hồi ấy vô hại vì mọi vai đều là vai trị sự. Giữ nguyên nó khi
+ * thêm `de-tu` là trao cho mỗi đệ tử một tấm khiên chắn cả ba bậc trị sự — không ai duyệt,
+ * sửa hay trục xuất họ được nữa ngoài Gia chủ.
  *
  * Tự quản mình KHÔNG đi qua hàm này — các giới hạn tự thân (không tự khoá, không tự trục
  * xuất, không tự rời ngôi Gia chủ) là luật riêng, gác ở action.
  */
 export function canManageUser(actor: RoleBearer, target: RoleBearer): boolean {
   if (hasPermission(actor, "role_bearer.manage")) return true;
-  if (hasPermission(actor, "member.manage")) return !bearsAnyRole(target);
+  if (hasPermission(actor, "member.manage")) return !bearsShieldedRole(target);
   return false;
 }
 

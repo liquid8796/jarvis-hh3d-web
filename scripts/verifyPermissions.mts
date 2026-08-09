@@ -43,8 +43,16 @@ const admin = { id: "u-admin", roles: ["admin"] };
 const admin2 = { id: "u-admin-2", roles: ["admin"] };
 const member = { id: "u-member", roles: [] as string[] };
 const member2 = { id: "u-member-2", roles: [] as string[] };
+/** Đệ tử: MANG một vai, nhưng vẫn là môn đồ thường — cả điểm khó của vai này nằm ở đây. */
+const disciple = { id: "u-disciple", roles: ["de-tu"] };
+const disciple2 = { id: "u-disciple-2", roles: ["de-tu"] };
+/** Vừa trị sự vừa đeo danh xưng đệ tử: tấm khiên của vai trị sự KHÔNG được mất đi vì thế. */
+const adminDisciple = { id: "u-admin-disciple", roles: ["admin", "de-tu"] };
 
-const EVERYONE = [owner, ownerAdmin, elder, elder2, master, master2, admin, admin2, member, member2];
+const EVERYONE = [
+  owner, ownerAdmin, elder, elder2, master, master2, admin, admin2,
+  adminDisciple, disciple, disciple2, member, member2,
+];
 
 /**
  * BẢNG HẠNG viết tay — cố ý KHÔNG hỏi `isAdminUser`. Một oracle đi hỏi chính thứ đang bị
@@ -60,6 +68,12 @@ const RANK: Record<string, "gia-chu" | "tri-su" | "mon-do"> = {
   "u-master-2": "tri-su",
   "u-admin": "tri-su",
   "u-admin-2": "tri-su",
+  // Đeo thêm danh xưng đệ tử KHÔNG hạ một Trưởng môn xuống hạng quản được.
+  "u-admin-disciple": "tri-su",
+  // Đệ tử xếp hạng MÔN ĐỒ, dù có tên trong danh mục vai. Nếu bảng này ghi "tri-su" thì phép
+  // quét ma trận bên dưới sẽ đỏ ở mọi ô「trị sự × đệ tử」— đúng cái lỗ hổng phải chặn.
+  "u-disciple": "mon-do",
+  "u-disciple-2": "mon-do",
   "u-member": "mon-do",
   "u-member-2": "mon-do",
 };
@@ -74,8 +88,12 @@ for (const role of ASSIGNABLE_ROLES) {
   assert(typeof ROLE_LABEL[role] === "string" && ROLE_LABEL[role].length > 0, `vai ${role} chưa có nhãn hiển thị`);
 }
 assert(ASSIGNABLE_ROLES[0] === "gia-chu", "gia-chu phải đứng ĐẦU — thứ tự này là thứ tự huy hiệu và thứ tự chuẩn hoá");
-assert(ASSIGNABLE_ROLES.length === 4, `đang có ${ASSIGNABLE_ROLES.length} vai — cập nhật bảng oracle rồi sửa con số này`);
-console.log(`✔ Bảng vai: ${ASSIGNABLE_ROLES.length} mã, không trùng, vai nào cũng có nhãn, gia-chu đứng đầu.`);
+assert(
+  ASSIGNABLE_ROLES.at(-1) === "de-tu",
+  "de-tu phải đứng CUỐI — nó là bậc thấp nhất, và vị trí ấy chính là sort_order dưới database",
+);
+assert(ASSIGNABLE_ROLES.length === 5, `đang có ${ASSIGNABLE_ROLES.length} vai — cập nhật bảng oracle rồi sửa con số này`);
+console.log(`✔ Bảng vai: ${ASSIGNABLE_ROLES.length} mã, không trùng, vai nào cũng có nhãn, gia-chu đầu — de-tu cuối.`);
 
 // ---- Nhận vai -----------------------------------------------------------------------
 assert(isOwner(owner) && isOwner(ownerAdmin), "gia-chu phải được nhận là Gia chủ");
@@ -86,12 +104,35 @@ assert(isAdminUser(elder), "Thái thượng trưởng lão phải có quyền tr
 assert(isAdminUser(master), "Chưởng môn phải có quyền trị sự");
 assert(!isAdminUser(member), "môn đồ thường không có quyền trị sự");
 
-// Mọi vai trong bảng, TRỪ không-vai, đều phải mở được cửa trị sự. Quét cả bảng nên thêm vai
-// mới mà quên xếp nó vào bậc admin là đỏ ngay, không phải chờ ai đó nhớ viết thêm một dòng.
+assert(!isAdminUser(disciple), "ĐỆ TỬ KHÔNG có quyền trị sự — nó là danh xưng, không phải một bậc");
+
+/**
+ * HÌNH DẠNG từng vai — bảng VIẾT TAY, không suy từ `ROLE_PERMISSIONS`. Suy ra từ chính hằng số
+ * đang bị kiểm thì phép thử chỉ chứng minh code bằng code, và sẽ gật đầu với mọi lỗi code mắc.
+ *
+ * Hai câu hỏi để RỜI nhau dù hôm nay chúng chia bảng vai y hệt nhau, vì đó đúng là loại nhầm
+ * lẫn mà `de-tu` vừa vạch ra: hợp nhất hai câu khác nhau chỉ vì tình cờ trùng kết quả là cách
+ * một trong hai lặng lẽ sai vào ngày có vai thứ sáu. Ngày có một vai nắm `chat.purge` mà không
+ * vào được trang Tông Môn, `opensAdminDoor: false` + `labelOnly: false` nói đúng ngay.
+ *
+ * `Record<Role, …>` nên thêm vai ở permissions.ts mà quên khai ở đây là KHÔNG biên dịch được —
+ * cùng một mẹo, cùng một lý do với `ROLE_SHIELDS_BEARER`.
+ */
+const ROLE_SHAPE: Record<Role, { opensAdminDoor: boolean; labelOnly: boolean }> = {
+  "gia-chu": { opensAdminDoor: true, labelOnly: false },
+  "thai-thuong-truong-lao": { opensAdminDoor: true, labelOnly: false },
+  "chuong-mon": { opensAdminDoor: true, labelOnly: false },
+  admin: { opensAdminDoor: true, labelOnly: false },
+  "de-tu": { opensAdminDoor: false, labelOnly: true },
+};
+
 for (const role of ASSIGNABLE_ROLES) {
-  assert(isAdminUser({ roles: [role] }), `vai ${role} phải mở được cửa trị sự (requireAdmin)`);
+  assert(
+    isAdminUser({ roles: [role] }) === ROLE_SHAPE[role].opensAdminDoor,
+    `vai ${role}: cửa trị sự mở ${isAdminUser({ roles: [role] })}, bảng oracle nói ${ROLE_SHAPE[role].opensAdminDoor}`,
+  );
 }
-console.log("✔ Nhận vai: cả bốn vai đều qua cửa trị sự, mảng rỗng là môn đồ thường.");
+console.log("✔ Nhận vai: bốn vai trị sự qua cửa, đệ tử và mảng rỗng thì không.");
 
 // ---- Bảng quyền ----------------------------------------------------------------------
 assert(new Set(PERMISSIONS).size === PERMISSIONS.length, "mã quyền không được trùng nhau");
@@ -106,7 +147,16 @@ for (const permission of PERMISSIONS) {
   );
 }
 for (const role of ASSIGNABLE_ROLES) {
-  assert(ROLE_PERMISSIONS[role].length > 0, `vai ${role} không mở được việc gì thì nó là một cái nhãn`);
+  // Hai chiều, theo đúng bảng hình dạng viết tay: vai trị sự mà rỗng quyền là quên đấu dây;
+  // vai danh xưng mà CÓ quyền là trao nhầm. Trước khi có `de-tu`, dòng này chỉ đòi "phải khác
+  // rỗng" — một luật đúng khi mọi vai đều là bậc trị sự, và sai ngay khi có vai đầu tiên
+  // sinh ra chỉ để làm cái nhãn.
+  assert(
+    (ROLE_PERMISSIONS[role].length === 0) === ROLE_SHAPE[role].labelOnly,
+    ROLE_SHAPE[role].labelOnly
+      ? `vai ${role} là danh xưng thuần, KHÔNG được mang quyền nào`
+      : `vai ${role} không mở được việc gì thì nó là một cái nhãn — khai vào ROLE_SHAPE nếu đó là ý`,
+  );
   assert(
     new Set(ROLE_PERMISSIONS[role]).size === ROLE_PERMISSIONS[role].length,
     `vai ${role} khai trùng một quyền`,
@@ -179,6 +229,33 @@ assert(!canManageUser(elder, owner) && !canManageUser(master, ownerAdmin), "khô
 assert(canManageUser(owner, elder) && canManageUser(owner, master), "Gia chủ quản được cả hai vai mới");
 console.log("✔ Bậc trị sự: ba vai ngang nhau, không ai hạ được ai — chỉ Gia chủ vượt vạch.");
 
+// ---- Đệ tử: MANG vai nhưng KHÔNG được che chắn ---------------------------------------
+// Đây là cái bẫy của cả tính năng. Trước khi có `de-tu`, phép che chắn hỏi "có mang vai nào
+// trong danh mục không" — hồi ấy vô hại vì mọi vai đều là vai trị sự. Giữ nguyên phép ấy khi
+// thêm `de-tu` là trao cho mỗi đệ tử một tấm khiên chắn cả ba bậc trị sự: không ai duyệt, sửa
+// hay trục xuất họ được nữa ngoài Gia chủ. Sáu dòng dưới đây là chỗ lỗi ấy sẽ kêu.
+assert(canManageUser(admin, disciple), "Trưởng môn PHẢI quản được đệ tử — đệ tử chính là người họ sinh ra để quản");
+assert(canManageUser(master, disciple), "Chưởng môn cũng phải quản được đệ tử");
+assert(canManageUser(elder, disciple), "Thái thượng trưởng lão cũng phải quản được đệ tử");
+assert(canManageUser(owner, disciple), "Gia chủ thì hiển nhiên");
+assert(!canManageUser(disciple, member), "đệ tử KHÔNG quản được ai — vai này không mở quyền nào");
+assert(!canManageUser(disciple, disciple2), "kể cả một đệ tử khác");
+
+// Trộn vai: tấm khiên đến TỪ vai trị sự, nên đeo thêm danh xưng đệ tử không gỡ nó ra.
+assert(
+  !canManageUser(admin2, adminDisciple),
+  "Trưởng môn đeo thêm danh xưng đệ tử vẫn là Trưởng môn — không được rơi xuống hạng quản được",
+);
+assert(isAdminUser(adminDisciple), "vai trị sự + danh xưng đệ tử thì vẫn qua được cửa trị sự");
+
+// Quyền: đệ tử không mở được MỘT việc nào trong danh mục.
+for (const permission of PERMISSIONS) {
+  assert(!hasPermission(disciple, permission), `đệ tử không được có quyền ${permission}`);
+}
+assert(ROLE_PERMISSIONS["de-tu"].length === 0, "ROLE_PERMISSIONS['de-tu'] phải RỖNG — nó là danh xưng, không phải bậc");
+assert(!canEditRoles(disciple), "đệ tử không đổi được vai của ai");
+console.log("✔ Đệ tử: mang vai mà vẫn là môn đồ — bậc trị sự quản được, và nó không mở quyền nào.");
+
 // ---- Đổi vai ------------------------------------------------------------------------
 assert(canEditRoles(owner) && canEditRoles(ownerAdmin), "chỉ Gia chủ đổi vai — và phải được");
 assert(!canEditRoles(admin), "Trưởng môn không được đổi vai — kể cả thăng môn đồ lên admin");
@@ -223,9 +300,13 @@ assert(
   "thứ tự chuẩn hoá phải ổn định (gia-chu trước) bất kể form gửi kiểu gì",
 );
 assert(
-  JSON.stringify(normalizeRoles(["admin", "chuong-mon", "thai-thuong-truong-lao", "gia-chu"])) ===
+  JSON.stringify(normalizeRoles(["de-tu", "admin", "chuong-mon", "thai-thuong-truong-lao", "gia-chu"])) ===
     JSON.stringify([...ASSIGNABLE_ROLES]),
-  "gửi đủ bốn vai theo thứ tự lộn xộn vẫn phải ra đúng thứ tự thang vai",
+  "gửi đủ CẢ NĂM vai theo thứ tự lộn xộn vẫn phải ra đúng thứ tự thang vai",
+);
+assert(
+  JSON.stringify(normalizeRoles(["de-tu", "gia-chu"])) === JSON.stringify(["gia-chu", "de-tu"]),
+  "đệ tử phải xếp SAU Gia chủ — nó là bậc thấp nhất, và thứ tự này là thứ tự huy hiệu",
 );
 assert(normalizeRoles(["admin", "admin", "admin"]).length === 1, "vai lặp phải được gộp");
 assert(normalizeRoles(["hacker", "root", "superadmin"]).length === 0, "vai bịa phải bị vứt");

@@ -20,9 +20,11 @@
 import { neon } from "@neondatabase/serverless";
 import { SignJWT } from "jose";
 import { chromium } from "playwright-core";
-import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { forget, remember } from "./browserRegistry.mjs";
+import { killByPid, stillAlive } from "./killBrowser.mjs";
+import { sweepOrphans } from "./sweepBrowsers.mjs";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -143,16 +145,6 @@ if (!Number.isInteger(ATTEMPT_TIMEOUT_MS) || ATTEMPT_TIMEOUT_MS < 5000) {
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const stillAlive = (pid: number): boolean => {
-  try {
-    // Tín hiệu 0 không gửi gì cả, chỉ hỏi "tiến trình này còn không". Đây là phép hỏi DUY NHẤT
-    // đáng tin ở đây: `tasklist` trong môi trường này trả về rỗng ngay cả khi Chromium đang chạy.
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 /**
  * Dừng trình duyệt cho BẰNG ĐƯỢC, và không bao giờ ném.
@@ -175,13 +167,13 @@ async function hardStop(server: Awaited<ReturnType<typeof chromium.launchServer>
   } catch {
     // Nuốt có chủ ý: đây là đường dọn dẹp, và nó chạy cả khi mọi thứ khác đã hỏng.
   }
-  if (pid !== undefined && stillAlive(pid)) {
-    try {
-      execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
-      console.log(`⚠ Chromium (pid ${pid}) không tự chết — đã taskkill cả cây.`);
-    } catch {
+  if (pid !== undefined) {
+    if (stillAlive(pid) && !killByPid(pid)) {
       console.log(`⚠ Chromium (pid ${pid}) không chết cả bằng taskkill — giết tay nếu còn thấy.`);
     }
+    // Xoá khỏi sổ SAU CÙNG: chết giữa chừng ở trên thì dòng sổ còn nguyên, và `shot:clean`
+    // của lượt sau sẽ nhặt nốt. Xoá trước là tự tay vứt mất manh mối duy nhất.
+    forget(pid);
   }
 }
 
@@ -295,6 +287,24 @@ function withDeadline<T>(work: Promise<T>, ms: number, what: string): Promise<T>
   ]).finally(() => clearTimeout(timer));
 }
 
+/**
+ * Dọn orphan CŨ trước khi mở thêm một cái mới — để một lần treo hôm qua không nằm lại ăn RAM
+ * tới hôm nay. Chỉ xét bản ghi cũ hơn mười phút, nên một lượt chụp của phiên khác đang chạy
+ * song song không bao giờ bị đụng vào (xem `ORPHAN_AGE_MS`).
+ *
+ * Hỏng thì KỆ: đây là việc dọn nhà, không phải việc chính. Một cuốn sổ rác hay một endpoint
+ * cứng đầu không có quyền chặn người ta chụp một tấm ảnh.
+ */
+try {
+  const swept = await sweepOrphans();
+  const total = swept.killed + swept.stale;
+  if (total > 0) {
+    console.log(`• Dọn ${total} trình duyệt bỏ lại từ lượt trước (${swept.killed} còn sống).`);
+  }
+} catch (err) {
+  console.log(`⚠ Dọn orphan không xong (${err instanceof Error ? err.message : String(err)}) — vẫn chụp tiếp.`);
+}
+
 let lastError: unknown = null;
 for (let attempt = 1; attempt <= MAX_ATTEMPTS && !interrupted; attempt++) {
   /**
@@ -306,6 +316,11 @@ for (let attempt = 1; attempt <= MAX_ATTEMPTS && !interrupted; attempt++) {
   let server: Awaited<ReturnType<typeof chromium.launchServer>>;
   try {
     server = await withDeadline(chromium.launchServer({ headless: true }), ATTEMPT_TIMEOUT_MS, "khởi động trình duyệt");
+    const pid = server.process().pid;
+    // Ghi sổ NGAY, trước cả lượt chụp: cuốn sổ chỉ có giá trị cho những lần script không về
+    // được tới đường dọn của chính nó (treo, Ctrl-C, máy sập). Ghi muộn là đúng những lần ấy
+    // không có gì trong sổ.
+    if (pid !== undefined) remember({ pid, wsEndpoint: server.wsEndpoint(), startedAt: Date.now() });
   } catch (err) {
     lastError = err;
     console.log(`✗ Lượt ${attempt}/${MAX_ATTEMPTS}: ${err instanceof Error ? err.message : String(err)}`);

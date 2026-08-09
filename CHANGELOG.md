@@ -11,6 +11,32 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.57.2 — quét dọn Chromium mồ côi, bằng sổ chứ không bằng cách quét tiến trình
+
+- **`npm run shot:clean`** dọn những Chromium mà một lần treo hay một cú Ctrl-C để lại. Lượt
+  chụp bình thường cũng tự dọn ở đầu mỗi lần chạy, nên thường không ai phải gõ tay.
+- **Không quét tiến trình — giữ MỘT CUỐN SỔ.** Hai lý do, và cả hai đều là lý do chắc:
+  - Quét theo TÊN là giết luôn Chrome thật của chủ máy: Chromium của Playwright cũng tên
+    `chrome.exe`.
+  - Quét theo ĐƯỜNG DẪN thì an toàn hơn, nhưng đo được trong môi trường này: `tasklist` và
+    `Get-CimInstance Win32_Process` **đều trả về rỗng ngay cả khi Chromium đang chạy**. Một
+    phép dọn dựa vào thứ có lúc không nhìn thấy gì là một phép dọn không kiểm chứng được.
+- **Bằng chứng trước, lệnh giết sau.** Sổ nhớ PID kèm `wsEndpoint`; lúc dọn thì BẮT TAY qua
+  chính endpoint ấy, và chỉ thứ trả lời được giao thức Playwright mới bị đụng tới. PID bị hệ
+  điều hành cấp lại cho tiến trình khác cũng không sao — tiến trình lạ không bắt tay được.
+- **Hàng rào tuổi**: mặc định chỉ dọn bản ghi cũ hơn 10 phút, nên một lượt chụp của phiên khác
+  đang chạy song song không bao giờ bị đụng. Một lượt có trần 90 giây × 2, nên mười phút là xa
+  hơn mọi lượt hợp lệ.
+  - **Cờ `--all` tháo hàng rào ấy, và nó nguy hiểm thật.** Chính lượt kiểm chứng đầu tiên của
+    bản này đã dùng `--all` rồi giết mất một trình duyệt mở 7 giây trước — gần như chắc chắn là
+    lượt chụp của một phiên đang chạy trên cùng cây làm việc. Giờ `--all` in ra danh sách những
+    gì nó sắp giết kèm tuổi, và `verify:sweep` **không dùng cờ ấy**.
+- **`npm run verify:sweep`** đóng đinh ba điều, vì đây là mã GIẾT TIẾN TRÌNH: nhặt đúng orphan,
+  chừa nguyên lượt đang chạy, và tuyệt đối không phát lệnh giết nào khi không bắt tay được.
+- Bỏ kết cục「đóng tử tế」khỏi phép dọn: đo ra là `browser.close()` trên một trình duyệt nối
+  qua `connect()` chỉ cắt dây, tiến trình server vẫn sống. Giữ cái nhãn ấy chỉ để nhật ký
+  nói「không đóng được」về một chuyện hoàn toàn bình thường.
+
 ## 0.57.1 — hàng danh tính trong sảnh nhỏ lại một bậc
 
 Đạo hữu đặt ảnh chụp lên và nói chân dung với bài vị quá khổ. Đúng: ở 980px bề ngang, riêng

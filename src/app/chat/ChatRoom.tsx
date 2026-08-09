@@ -59,140 +59,60 @@ const TRIGGER_ATTR = "data-chat-popup-trigger";
 /** Bốn góc của khung, theo thứ tự vẽ. Tên lớp CSS quyết định vị trí và phép lật — xem globals.css. */
 const FRAME_CORNERS = ["tl", "tr", "bl", "br"] as const;
 
-/** Bốn cạnh viền — div mảnh chạy giữa các góc, xem `.chat-edge` trong globals.css. */
-const FRAME_EDGES = ["t", "r", "b", "l"] as const;
-
 /**
- * Hoa văn của khung son, VẼ LẠI TỪ ĐẦU theo bản mẫu 09/08/2026 (bản trước chỉ gọt góc khung
- * cũ — đạo hữu bác). TRANG TRÍ THUẦN — `aria-hidden` và `pointer-events: none` (trong CSS).
+ * Hoa văn của khung son: bốn ngoặc góc và ấn ở đỉnh. TRANG TRÍ THUẦN — `aria-hidden` và
+ * `pointer-events: none` (trong CSS), nên nó không bao giờ chắn một cú bấm hay lọt vào máy
+ * đọc màn hình.
  *
- * Cấu trúc thật của bản mẫu, nhìn ra sau khi soi lại:
- *   1. Viền KÉP chạy TRỌN chu vi: nét ngoài + đường chỉ trong cách 13px (`.chat-innerline`),
- *      không phải "một nét viền + panel đảo có viền riêng".
- *   2. Góc vát 45° CÓ BẬC ở hai đầu vát — nét gãy hai nhịp, không phải vát trơn.
- *   3. Tấm panel là khoảng NẰM GIỮA hai đường ngang (dưới header, trên thanh soạn) nối thẳng
- *      vào đường chỉ trong — hai cạnh đứng của panel CHÍNH LÀ đường chỉ trong.
+ * Vẽ bằng SVG chứ không phải ảnh: khung co giãn theo màn hình, mà một tấm PNG hoa văn thì
+ * hoặc vỡ hoặc phải kèm bản @2x — SVG thì nét nào cũng sắc ở mọi cỡ và không tốn byte tải.
  *
- * `border` CSS không vẽ nổi hình ấy, nên viền dựng rời: bốn cạnh là div mảnh, bốn góc là SVG,
- * đường chỉ trong là một div border, còn NỀN cắt theo đường vát-có-bậc bằng clip-path — xem
- * `.chat-shell`. Toạ độ phải khớp nhau ở ba nơi: path góc `M88 1 H38 L33 6 H28 L6 28 V33 L1 38
- * V88`, clip-path của shell, và mép 84px nơi cạnh viền bắt đầu.
- *
- * MỘT hình cho cả bốn góc, lật bằng `scale` — không chép bốn bản path chỉ chờ ngày lệch nhau.
+ * MỘT hình cho cả bốn góc, lật bằng `scale` trong CSS. Chép bốn path riêng là bốn chỗ phải
+ * nhớ sửa cùng lúc, và chỉ chờ ngày một góc lệch khỏi ba góc kia.
  */
 function ChatFrameOrnaments() {
   return (
     <>
-      {FRAME_EDGES.map((edge) => (
-        <i key={edge} className={`chat-edge chat-edge-${edge}`} aria-hidden />
-      ))}
-      <i className="chat-innerline" aria-hidden />
       {FRAME_CORNERS.map((corner) => (
-        <svg key={corner} className={`chat-corner chat-corner-${corner}`} viewBox="0 0 88 88" aria-hidden>
-          {/* Nét NGOÀI: cạnh viền → bậc nhỏ 5px → vát 45° → bậc → cạnh kia. Đầu nét vuông
-              (butt) để hàn khít vào `.chat-edge` cùng màu đặc — bo tròn là hở khe sáng. */}
-          <path d="M88 1 H38 L33 6 H28 L6 28 V33 L1 38 V88" strokeWidth="1.4" />
-          {/* Nét TRONG: góc của đường chỉ `.chat-innerline` (inset 13px) — vát trơn, nối vào
-              đoạn chéo mà clip-path của đường chỉ đã cắt: (30,13.5)/(13.5,30) chung toạ độ. */}
-          <path d="M56 13.5 H30 L13.5 30 V56" strokeWidth="1" opacity="0.6" />
+        <svg key={corner} className={`chat-corner chat-corner-${corner}`} viewBox="0 0 58 58" aria-hidden>
+          {/* Nét CHÍNH: chạy song song với đường bo của khung — cung r=14 khớp với
+              border-radius 20px trừ đi khoảng cách 6px của ngoặc. */}
+          <path d="M57 6 H20 A14 14 0 0 0 6 20 V57" strokeWidth="1.6" strokeLinecap="round" />
+          {/* Nét PHỤ cách 5px, ngắn hơn — nét đôi CHỈ dày lên ở vùng góc, còn giữa cạnh vẫn
+              một nét, đúng như bản thiết kế. Bản trước để cách 8px và kéo dài quá tay, nên góc
+              trông thưa và rời rạc thay vì là một khối hoa văn.
+
+              CỐ Ý dừng ở hai nét: đã thử thêm một lớp mây cuộn nằm sâu trong góc cho giống
+              phần hoa văn thấp thoáng ở hình mẫu, nhưng ảnh chụp cho thấy nó ĐÈ LÊN chữ
+              "Phòng Chat" (header chỉ cách mép 22px) — và soi lại thì phần "hoa văn" ấy ở
+              hình mẫu nhiều khả năng là cành cây của ảnh nền lọt qua, không phải nét của
+              khung. Không thêm trang trí phỏng đoán để rồi phá chữ thật. */}
+          <path d="M42 11 H25 A14 14 0 0 0 11 25 V42" strokeWidth="1" strokeLinecap="round" opacity="0.6" />
         </svg>
       ))}
 
-      {/* Ấn đỉnh theo bản mẫu: LÁ CHẮN nhọn hai đầu cưỡi lên cặp viền trên (đỉnh vươn khỏi
-          khung, chân chạm qua đường chỉ trong), trong lồng nhành linh chi ba ngọn; hai bên là
-          cánh lá cuộn + kim châm thoi chốt đầu cánh. Thân ấn TÔ ĐẶC màu nền che đoạn viền chạy
-          sau lưng. Toạ độ neo: y=20 của viewBox trùng nét viền ngoài, y=33 trùng đường chỉ
-          trong (CSS đặt top:-19px). Vẽ trọn vẹn được là nhờ nằm ở lớp BỌC, ngoài clip-path. */}
-      <svg className="chat-finial" viewBox="0 0 140 56" aria-hidden>
+      {/* viewBox cao 34 và ấn nằm ở ĐÚNG GIỮA (y=17): CSS kéo nó lên nửa chiều cao nên trục
+          ngang của ấn trùng khít đường viền trên — ấn cưỡi lên viền, không treo phía trên nó.
+          Vẽ được trọn vẹn là nhờ hoa văn nằm ở lớp BỌC chứ không trong `.chat-shell` (thứ có
+          `overflow: hidden`); xem ghi chú tại `.chat-frame`. */}
+      <svg className="chat-finial" viewBox="0 0 116 34" aria-hidden>
         <g fill="none" stroke="currentColor" strokeLinecap="round">
-          <path d="M56 20 C51 20 48.5 16.5 44.5 15.5 C41.5 14.8 39.5 16.6 40.6 18.8" strokeWidth="1.2" />
-          <path d="M84 20 C89 20 91.5 16.5 95.5 15.5 C98.5 14.8 100.5 16.6 99.4 18.8" strokeWidth="1.2" />
-          <path d="M58 33 C53 33 50.5 36.5 46.5 37.5 C43.5 38.2 41.5 36.4 42.6 34.2" strokeWidth="1.1" opacity="0.8" />
-          <path d="M82 33 C87 33 89.5 36.5 93.5 37.5 C96.5 38.2 98.5 36.4 97.4 34.2" strokeWidth="1.1" opacity="0.8" />
+          {/* Cánh mây: vươn NGANG rồi cuộn lại sát ngọc, không sải lên như bản trước — sải lên
+              thì cả cụm đọc thành một chữ V toác, mất hẳn dáng cái ấn. */}
+          <path d="M45 17 C 38 8, 26 8, 19 15" strokeWidth="1.8" />
+          <path d="M71 17 C 78 8, 90 8, 97 15" strokeWidth="1.8" />
+          {/* Móc cuộn ở đầu cánh — nét kết, cho cánh không cụt lủn. */}
+          <path d="M19 15 C 14 20, 20 25, 24 21" strokeWidth="1.5" />
+          <path d="M97 15 C 102 20, 96 25, 92 21" strokeWidth="1.5" />
+          {/* Nét mảnh chạy dưới cánh, tan dần vào đường viền hai bên. */}
+          <path d="M44 21 C 36 16, 26 17, 16 21" strokeWidth="1.1" opacity="0.55" />
+          <path d="M72 21 C 80 16, 90 17, 100 21" strokeWidth="1.1" opacity="0.55" />
         </g>
-        <path d="M33 20 L36.4 17.4 L39.8 20 L36.4 22.6 Z" fill="currentColor" />
-        <path d="M100.2 20 L103.6 17.4 L107 20 L103.6 22.6 Z" fill="currentColor" />
-        <path
-          d="M70 4 C77 12 85 15 85 25 C85 35 78 43 70 49 C62 43 55 35 55 25 C55 15 63 12 70 4 Z"
-          fill="rgb(19,23,53)"
-          stroke="currentColor"
-          strokeWidth="1.5"
-        />
-        <path
-          d="M70 9.5 C75.5 15.5 81 17.8 81 25.6 C81 33.2 76 39.6 70 44 C64 39.6 59 33.2 59 25.6 C59 17.8 64.5 15.5 70 9.5 Z"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="0.9"
-          opacity="0.55"
-        />
-        <path d="M70 14.5 C67 18.5 67 23.5 70 26.5 C73 23.5 73 18.5 70 14.5 Z" fill="currentColor" />
-        <g fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
-          <path d="M70 27 V38.5" />
-          <path d="M70 31 C66 29.5 63.5 26 64 21.5" />
-          <path d="M70 31 C74 29.5 76.5 26 76 21.5" />
-        </g>
+        {/* Viên ngọc giữa: hình thoi ĐẶC, lồng một hình thoi màu nền cho ra chiều sâu. */}
+        <path d="M58 2 L70 17 L58 32 L46 17 Z" fill="currentColor" />
+        <path d="M58 10 L64 17 L58 24 L52 17 Z" fill="rgb(23,25,56)" />
       </svg>
     </>
-  );
-}
-
-/**
- * Mây như ý — bản mẫu đặt hai dấu mây ở mép phải: một trong header (trên đường chỉ), một
- * cưỡi góc phải dưới của tấm panel. Cùng một hình, hai chỗ đậu — vị trí do lớp CSS quyết.
- */
-function RuyiCloud({ className }: { className: string }) {
-  return (
-    <svg className={className} viewBox="0 0 56 24" aria-hidden>
-      <g fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
-        <path d="M9 21 C3 21 2 14 7 12 C6 6 14 2 18 7 C22 1 31 2 32 9 C38 7 43 12 40 16 C44 17 44 21 40 21 H9" />
-        <path d="M16 12 a3.2 3.2 0 1 1 4.4 3.3" />
-        <path d="M27 10 a3.6 3.6 0 1 1 4.6 4.1" />
-        <path d="M44 20 C48 19 51 20 54 22" opacity="0.6" />
-      </g>
-    </svg>
-  );
-}
-
-/** Đôi bong bóng thoại — mặt chữ của nút gửi file theo bản mẫu (chức năng vẫn ở `title`). */
-function IconBubbles() {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
-      <path
-        d="M15.5 3.2 h3.2 a3 3 0 0 1 3 3 v3 a3 3 0 0 1 -3 3 h-0.2 v2.4 l-2.8 -2.4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M4.6 6 h9 a3 3 0 0 1 3 3 v4.4 a3 3 0 0 1 -3 3 h-4.2 l-3.8 3.2 v-3.2 h-1 a3 3 0 0 1 -3 -3 V9 a3 3 0 0 1 3 -3 Z"
-        fill="currentColor"
-      />
-      <circle cx="6.9" cy="11.2" r="1" fill="rgb(15,17,40)" />
-      <circle cx="9.6" cy="11.2" r="1" fill="rgb(15,17,40)" />
-      <circle cx="12.3" cy="11.2" r="1" fill="rgb(15,17,40)" />
-    </svg>
-  );
-}
-
-/** Mặt cười NÉT chứ không phải emoji glyph: bản mẫu vẽ nó bằng nét vàng cùng tông với viền. */
-function IconSmile() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="23"
-      height="23"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      aria-hidden
-    >
-      <circle cx="12" cy="12" r="8.6" />
-      <path d="M8.3 14.1 C9.3 15.6 10.5 16.4 12 16.4 C13.5 16.4 14.7 15.6 15.7 14.1" />
-      <circle cx="9" cy="9.8" r="0.9" fill="currentColor" stroke="none" />
-      <circle cx="15" cy="9.8" r="0.9" fill="currentColor" stroke="none" />
-    </svg>
   );
 }
 
@@ -560,7 +480,7 @@ export function ChatRoom({
   return (
     <div className="chat-frame">
     <div
-      className="chat-shell"
+      className="chat-shell card card-hairline"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
@@ -568,16 +488,13 @@ export function ChatRoom({
       }}
     >
 
-      {/* Header là dải TRỐNG thuần trang trí, đúng như bản mẫu — không tiêu đề, không lời dẫn
-          (thanh điều hướng của trang đã ghi "Phòng Chat" rồi). h1 giữ lại cho máy đọc màn hình
-          và cho cây heading của trang, chỉ ẩn khỏi mắt. */}
       <header className="chat-head">
-        <h1 className="sr-only">Phòng Chat</h1>
-        <RuyiCloud className="chat-cloud chat-cloud-head" />
-        {/* Nét mây nhỏ mọc từ đầu TRÁI của đường chỉ dưới header — chi tiết mép trái bản mẫu. */}
-        <svg className="chat-headcurl" viewBox="0 0 26 14" aria-hidden>
-          <path d="M25 12 H8 C3 12 1 8 5 6 C8 5 10 8 8 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-        </svg>
+        <div>
+          <h1 className="h-display text-3xl font-semibold text-gilded">Phòng Chat</h1>
+          <p className="text-xs text-[var(--color-mist)]">
+            Sảnh đàm đạo chung — mọi môn đồ đã nhập môn đều nghe thấy nhau.
+          </p>
+        </div>
       </header>
 
       <div ref={scrollRef} onScroll={onScroll} className="chat-scroll">
@@ -789,14 +706,6 @@ export function ChatRoom({
           xuống dòng, và khay phải trôi theo. Nó `position: absolute` nên không chen vào hàng
           nút. */}
       <footer className="chat-composer">
-        {/* Mây như ý cưỡi lên góc phải dưới của tấm panel — neo theo composer để nó nằm yên
-            trên mép panel dù thanh soạn cao lên khi ô nhập xuống dòng. */}
-        <RuyiCloud className="chat-cloud chat-cloud-foot" />
-        {/* Nét mây đối xứng ở đầu TRÁI đường ranh dưới panel — bản mẫu có cả đôi trên/dưới,
-            cùng một hình, lật dọc bằng CSS. */}
-        <svg className="chat-footcurl" viewBox="0 0 26 14" aria-hidden>
-          <path d="M25 12 H8 C3 12 1 8 5 6 C8 5 10 8 8 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-        </svg>
         {panel !== "none" && (
           <ChatPicker
             tab={panel}
@@ -816,8 +725,8 @@ export function ChatRoom({
           hidden
           onChange={(e) => { if (e.target.files?.length) void upload(e.target.files); e.target.value = ""; }}
         />
-        <button type="button" className="chat-tool big" title="Gửi file" disabled={uploading} onClick={() => fileRef.current?.click()}>
-          {uploading ? "…" : <IconBubbles />}
+        <button type="button" className="chat-tool" title="Gửi file" disabled={uploading} onClick={() => fileRef.current?.click()}>
+          {uploading ? "…" : "📎"}
         </button>
         <textarea
           ref={inputRef}
@@ -844,20 +753,18 @@ export function ChatRoom({
           }}
           rows={1}
           maxLength={4000}
-          placeholder="Nhập nội dung trò chuyện..."
-          title="Enter gửi, Alt+Enter xuống dòng"
+          placeholder="Truyền âm cho cả tông môn… (Enter gửi, Alt+Enter xuống dòng)"
           className="chat-input"
         />
         {/* Hai nút tròn bên phải: khay Emoji/sticker/GIF và ấn Truyền Âm (mũi tên). Nút gửi là
             ICON chứ không còn chữ — chữ nằm ở title/aria cho ai cần đọc.
 
-            Cả ba nút quanh ô nhập vẽ icon bằng NÉT VÀNG (SVG) thay vì emoji glyph, theo bản mẫu
-            09/08/2026 — Segoe UI Emoji tô màu tự nhiên, lạc hẳn khỏi tông vàng-lam của khung.
-            Mặt cười của khay chọn vẫn ĐỒNG DẠNG với nút thả cảm xúc 😊 trên mỗi tin: cùng một
-            nghĩa "chọn một emoji", chỉ khác chất liệu vẽ. */}
-        <button type="button" className="chat-tool" title="Emoji, sticker & GIF" data-chat-popup-trigger onClick={() => openPanel("emoji")}>
-          <IconSmile />
-        </button>
+            Khay chọn mang mặt cười chứ không phải bong bóng thoại 💬 như trước: bong bóng đọc ra
+            là "nhắn tin", trùng nghĩa với chính ô nhập ngay bên cạnh. Cố ý dùng ĐÚNG 😊 của nút
+            thả cảm xúc trên mỗi tin — hai nút cùng một nghĩa "chọn một emoji", chung mặt chữ là
+            nhất quán chứ không phải lẫn. Đừng đổi sang 😀: Segoe UI Emoji vẽ nó mắt trắng to,
+            miệng há hồng, lạc hẳn khỏi tông vàng-cam của sảnh. */}
+        <button type="button" className="chat-tool" title="Emoji, sticker & GIF" data-chat-popup-trigger onClick={() => openPanel("emoji")}>😊</button>
         <button
           type="button"
           className="chat-send"
@@ -866,14 +773,8 @@ export function ChatRoom({
           onClick={() => void send()}
           disabled={uploading}
         >
-          {/* Cánh én giấy kiểu telegram — thân đặc + mảng tối đánh dấu NẾP GẤP như bản mẫu;
-              phép xoay chếch mũi nằm ở `.chat-send svg`. */}
-          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden>
-            <path
-              d="M23.2 2 1.9 10.2 c-0.9 0.35 -0.85 1.6 0.07 1.9 l5.6 1.85 2 6.2 c0.3 0.9 1.45 1.05 2 0.28 l2.6 -3.4 5.05 3.7 c0.83 0.6 2 0.13 2.2 -0.88 L23.2 2 Z"
-              fill="currentColor"
-            />
-            <path d="M8.8 13.6 19.7 5.1 10.6 15 l-0.05 3.7 -1.75 -5.1 Z" fill="rgb(15,17,40)" opacity="0.6" />
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden>
+            <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
           </svg>
         </button>
       </footer>

@@ -65,6 +65,47 @@ body {
   background: #060b1a url("/backdrop.png") center / cover no-repeat;
 }
 
+/* Hàng Đợi Công Việc mang tấm nền RIÊNG ("Tử Linh Tiên Tử", public/backdrop-hang-doi.png).
+   Trang ấy đánh dấu bằng `data-backdrop="hang-doi"` trên <main>, và luật này tìm dấu ấy —
+   `.backdrop` là con đầu của <body> trong layout gốc, tức KHÔNG phải tổ tiên của trang, nên
+   không có đường nào cho trang tự đổi nền mình ngoài việc đi vòng qua <body>.
+
+   Vì sao không dùng JS (`usePathname` rồi gắn class): tấm nền là thứ được vẽ SỚM NHẤT trên
+   trang, còn một quyết định chạy sau hydrate thì luôn đến sau nước sơn đầu tiên — người dùng
+   sẽ thấy tấm nền cũ loé lên rồi mới bị thay. Luật CSS thì đã nằm sẵn trong stylesheet ở
+   <head> lúc trình duyệt tính kiểu lần đầu.
+
+   ĐIỀU KIỆN để luật này không tốn gì, và nó đã được ĐO chứ không phải đoán: `.backdrop` nằm
+   TRƯỚC <main> trong HTML (byte 2264 so với 4387), nên nếu trình duyệt tính kiểu lúc dấu chưa
+   được phân tích thì `:has()` chưa khớp, nó tải tấm MẶC ĐỊNH rồi mới đổi — tức 2MB thừa cộng
+   một cú nháy ảnh. Dựng sân thử riêng với đúng hình dạng DOM này: gửi trọn tài liệu một cục
+   thì trình duyệt chỉ tải MỘT tấm (tấm đúng); cắt làm hai với 300ms ở giữa thì nó tải CẢ HAI.
+   Và trang thật gửi một cục — production trả trọn 17,5KB với TTFB 1,628s, tổng 1,631s, chênh
+   2,5ms, không một dấu streaming nào trong HTML.
+
+   Nó gửi một cục vì trang KHÔNG có `loading.tsx` (tức không có ranh giới Suspense phía trên),
+   và đó cũng chính là chủ ý đã ghi trong hang-doi/page.tsx: ảnh chụp đầu tiên dựng sẵn ở
+   server "để trang không loé lên khoảng trống". Nên nếu ai đó thêm `loading.tsx` cho trang
+   này, hãy biết là mình vừa đánh đổi thêm một lượt tải 2MB và một cú nháy nền — hai chủ ý ấy
+   đứng cùng một chỗ, không phải trùng hợp.
+
+   Trình duyệt chưa biết `:has()` (Firefox <121, Safari <15.4) bỏ qua trọn luật này và nhận
+   tấm nền mặc định — một trang vẫn đẹp, chỉ là không có nền riêng. Đó là mức xuống thang đúng
+   cho một chi tiết thuần trang trí.
+
+   Chỉ đắp đè MÀU và ẢNH, không đụng `center / cover no-repeat` của luật trên — và cũng không
+   cần đụng khối @media dưới đây, vì tấm này ĐÚNG BẰNG 1672×941 như tấm gốc nên phép pan tranh
+   trên mobile vẫn khớp tỉ lệ. Ngày thay bằng ảnh tỉ lệ khác thì phải sửa cả `width: calc(...)`
+   ở đó, nếu không tranh sẽ bị méo mà không có gì kêu lên.
+
+   Màu lót là màu trời của CHÍNH tấm này (đo ở dải mép trái: #050d20), cùng lẽ với #060b1a của
+   tấm gốc — hai màu gần như trùng mắt thường, nhưng cặp "ảnh nào lót nấy" nằm chung một luật
+   thì lần thay ảnh sau không ai phải đi tìm. */
+body:has([data-backdrop="hang-doi"]) .backdrop {
+  background-color: #050d20;
+  background-image: url("/backdrop-hang-doi.png");
+}
+
 /* Trên điện thoại, `cover` là một cái máy chém: màn 375px chỉ còn thấy ~26% bề ngang tấm
    ảnh (ảnh gốc 1672×941, phủ theo chiều cao 812px là rộng 1443px). Yêu cầu của tông chủ:
    người dùng mobile phải NGẮM ĐƯỢC TRỌN tấm tranh — nên trang được phép cuộn ngang, và cuộn
@@ -441,11 +482,28 @@ body {
    hoa văn ở đỉnh — và mỗi người mang bài vị nhỏ (khung tag) cạnh tên. Viền kép dựng bằng
    ::before (khung trong, cách mép 5px) thay vì ảnh nền: co giãn theo mọi cỡ màn hình và
    không tốn một byte tải thêm. */
+/**
+ * Lớp BỌC của khung — chỉ để hoa văn có chỗ tràn ra ngoài.
+ *
+ * `.chat-shell` buộc phải `overflow: hidden` (header và thanh soạn có nền riêng, không cắt thì
+ * chúng vuông góc chồi ra khỏi bốn góc bo). Nhưng cùng cái cắt ấy xén mất NỬA TRÊN của ấn đỉnh
+ * — thứ vốn phải cưỡi lên đường viền — và ấn hiện ra thành một hình chữ V cụt. Bản trước vá
+ * bằng cách kéo ấn xuống rồi lấy một dải màu che chỗ nối; đó là chữa triệu chứng. Tách một lớp
+ * bọc KHÔNG cắt là chữa đúng chỗ đau: ấn vẽ trọn vẹn và cái dải che kia biến mất.
+ *
+ * Kích thước dời lên đây, khung con cao 100% — nếu không thì bọc cao 0 và hoa văn (định vị
+ * tuyệt đối theo bọc) rơi hết về góc trên bên trái.
+ */
+.chat-frame {
+  position: relative;
+  height: calc(100dvh - 140px);
+  min-height: 420px;
+}
+
 .chat-shell {
   display: flex;
   flex-direction: column;
-  height: calc(100dvh - 140px);
-  min-height: 420px;
+  height: 100%;
   padding: 0;
   overflow: hidden;
   position: relative;
@@ -460,51 +518,60 @@ body {
     0 0 42px rgba(232, 194, 92, 0.07);
 }
 
-/* Khung TRONG của viền kép. pointer-events tắt để nó chỉ là nét vẽ, không chắn một cú bấm
-   nào; z-index cao hơn nội dung nhưng thấp hơn khay nổi (.chat-picker z-20, .chat-jump z-6). */
+/* Khung TRONG của viền kép — CHỈ mờ nhạt, vì trong bản thiết kế nét thứ hai gần như chỉ thấy
+   ở vùng góc (do ngoặc góc), còn giữa các cạnh thì mắt chỉ đọc ra MỘT nét. Để nó đậm ngang
+   nét ngoài là mép khung dày đục lên, đúng chỗ hình 1 lệch khỏi hình 2.
+   pointer-events tắt: nó chỉ là nét vẽ, không chắn một cú bấm nào. */
 .chat-shell::before {
   content: "";
   position: absolute;
-  inset: 5px;
-  border: 1px solid rgba(232, 194, 92, 0.22);
-  border-radius: 15px;
+  inset: 7px;
+  border: 1px solid rgba(232, 194, 92, 0.1);
+  border-radius: 14px;
   pointer-events: none;
   z-index: 3;
 }
 
-/* Bốn NGOẶC GÓC — nét kép chữ L ở mỗi góc, đúng dáng khung trong bản thiết kế. Một element,
-   tám dải gradient: mỗi góc một vạch ngang + một vạch dọc, không cần ảnh, không cần thêm DOM. */
-.chat-corners {
-  --nét: rgba(232, 194, 92, 0.75);
+/**
+ * Bốn NGOẶC GÓC. Trước 09/08/2026 chúng là tám dải `linear-gradient` — dựng nhanh, nhưng
+ * gradient chỉ vẽ được hình CHỮ NHẬT, nên góc luôn vuông trong khi khung thì bo tròn: nét
+ * ngoặc cắt ngang đường bo và trông như dán lên. SVG vẽ được cung tròn, nên ngoặc chạy SONG
+ * SONG với đường viền đúng như bản thiết kế.
+ *
+ * Một hình vẽ, bốn lần dùng, lật bằng `scale` — không chép bốn bản path khác nhau, thứ chỉ
+ * chờ ngày một góc được sửa mà ba góc kia thì không.
+ */
+.chat-corner {
   position: absolute;
-  inset: 10px;
+  width: 58px;
+  height: 58px;
+  fill: none;
+  stroke: var(--color-gold-300);
   pointer-events: none;
   z-index: 4;
-  background:
-    linear-gradient(var(--nét), var(--nét)) left 0 top 0 / 30px 2px,
-    linear-gradient(var(--nét), var(--nét)) left 0 top 0 / 2px 30px,
-    linear-gradient(var(--nét), var(--nét)) right 0 top 0 / 30px 2px,
-    linear-gradient(var(--nét), var(--nét)) right 0 top 0 / 2px 30px,
-    linear-gradient(var(--nét), var(--nét)) left 0 bottom 0 / 30px 2px,
-    linear-gradient(var(--nét), var(--nét)) left 0 bottom 0 / 2px 30px,
-    linear-gradient(var(--nét), var(--nét)) right 0 bottom 0 / 30px 2px,
-    linear-gradient(var(--nét), var(--nét)) right 0 bottom 0 / 2px 30px;
-  background-repeat: no-repeat;
 }
 
-/* Ấn ở đỉnh khung — SVG vẽ trong ChatRoom, ngồi đè lên mép trên như ấn trên bài vị. */
+.chat-corner-tl { top: 4px; left: 4px; }
+.chat-corner-tr { top: 4px; right: 4px; transform: scaleX(-1); }
+.chat-corner-bl { bottom: 4px; left: 4px; transform: scaleY(-1); }
+.chat-corner-br { bottom: 4px; right: 4px; transform: scale(-1); }
+
+/* Ấn ở đỉnh khung — SVG vẽ trong ChatRoom, ngồi ĐÈ lên mép trên như ấn đóng trên bài vị. */
 .chat-finial {
   position: absolute;
   top: 0;
   left: 50%;
-  transform: translate(-50%, -52%);
-  padding: 0 10px;
+  width: 116px;
+  height: 34px;
+  /* -50% theo chiều dọc: trục ngang của ấn trùng khít đường viền trên, nên ấn CƯỠI lên viền
+     như ấn đóng trên bài vị, chứ không treo lơ lửng phía trên nó. */
+  transform: translate(-50%, -50%);
   color: var(--color-gold-300);
-  background: transparent;
   pointer-events: none;
   z-index: 5;
-  filter: drop-shadow(0 0 8px rgba(232, 194, 92, 0.45));
+  filter: drop-shadow(0 0 9px rgba(232, 194, 92, 0.5));
 }
+
 
 .chat-head {
   position: relative;

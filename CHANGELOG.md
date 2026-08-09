@@ -11,6 +11,30 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.55.0 — Hàng Đợi có tấm nền riêng
+
+- **Trang Hàng Đợi Công Việc đổi sang「Tử Linh Tiên Tử」** (`public/backdrop-hang-doi.png`),
+  các trang khác giữ nguyên「Nam Cung Uyển dưới trăng」. Đây là lần đầu một trang mang nền riêng,
+  nên nó cũng là lần đầu cần một cơ chế cho việc ấy.
+- **Cơ chế là MỘT luật CSS, không phải JS.** Trang đánh dấu `data-backdrop="hang-doi"` trên
+  `<main>`, và `body:has(...) .backdrop` đổi ảnh. Không chọn `usePathname` rồi gắn class vì tấm
+  nền là thứ được vẽ sớm nhất trên trang — một quyết định chạy sau hydrate thì luôn đến sau
+  nước sơn đầu tiên, tức người dùng thấy nền cũ loé lên rồi mới bị thay.
+- **`:has()` là selector ĐỘNG, và đó là chỗ phải đo chứ không đoán.** `.backdrop` nằm trước
+  `<main>` trong HTML (byte 2264 so với 4387), nên nếu trình duyệt tính kiểu lúc dấu chưa được
+  phân tích thì nó tải tấm mặc định rồi mới đổi — 2MB thừa cộng một cú nháy. Dựng sân thử riêng
+  đúng hình dạng DOM ấy: gửi tài liệu một cục thì chỉ tải MỘT tấm, cắt làm hai với 300ms ở giữa
+  thì tải CẢ HAI. Trang thật gửi một cục (production: 17,5KB, TTFB 1,628s, tổng 1,631s — chênh
+  2,5ms), và đo lại trên trang thật thì đúng một tấm được tải ở cả desktop lẫn mobile.
+  - Nó gửi một cục vì trang không có `loading.tsx`, mà đó lại chính là chủ ý đã ghi sẵn trong
+    `hang-doi/page.tsx`. Hai chủ ý ấy giờ đứng chung một chỗ trong chú thích, không phải trùng hợp.
+- **Phép pan tranh trên mobile không phải đụng tới**: tấm mới đúng bằng 1672×941 như tấm gốc,
+  nên `width: calc(100lvh * (1672 / 941))` vẫn khớp — đo lại trên máy: 1443×812, tỉ lệ 1,7771.
+- **Màu lót đi theo ảnh**: `#050d20`, đo ở dải mép trái của chính tấm mới, cùng lẽ với `#060b1a`
+  của tấm gốc. Nó là thứ hiện ra trong tích tắc ảnh chưa tải xong và ở tỉ lệ màn hình cực đoan.
+- Đã kiểm cả đường điều hướng phía client — bấm「Hàng Đợi」rồi bấm「Auto」quay lại thì nền đổi
+  đúng cả hai chiều, không phải tải lại trang.
+
 ## 0.54.0 — nút Ngắm Tranh: làm mờ cả trang để nhìn rõ tấm nền
 
 - **Một nút tròn ở góc trên bên phải, có mặt trên MỌI trang** (kể cả cửa đăng nhập và trang bái

@@ -23,8 +23,12 @@ export default async function QueuePage() {
     <>
       <SiteHeader />
       {/* Cùng khung với Auto — hai trang đứng cạnh nhau trong một luồng việc, và cùng
-          thẳng hàng với thanh trên cùng. */}
-      <main className={`mx-auto w-full ${SHELL_WIDTH} px-4 pb-24 sm:px-6`}>
+          thẳng hàng với thanh trên cùng.
+
+          `data-backdrop` là DẤU cho luật `body:has(...)` trong globals.css đổi tấm nền của
+          riêng trang này. Thuộc tính, không phải class Tailwind: nó không vẽ gì cả, nó khai
+          một sự thật về trang để CSS ở nơi khác đọc. */}
+      <main data-backdrop="hang-doi" className={`mx-auto w-full ${SHELL_WIDTH} px-4 pb-24 sm:px-6`}>
         <div className="rise-in mb-8">
           <h1 className="h-display text-3xl font-bold text-gilded">Hàng Đợi Công Việc</h1>
           <p className="mt-1 text-sm text-[var(--color-mist)]">

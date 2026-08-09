@@ -11,6 +11,29 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.55.2 — khay emoji mang mặt cười, và đổi chỗ với nút kẹp file
+
+Thanh soạn Phòng Chat trước đây là `[💬] [ô nhập] [📎] [➤]`. Bong bóng thoại đọc ra là "nhắn
+tin" — trùng nghĩa với chính ô nhập ngay bên cạnh, nên nó chẳng nói được rằng bấm vào thì ra
+emoji. Nay là `[📎] [ô nhập] [😊] [➤]`: kẹp file sang trái, khay chọn sang phải sát ấn Truyền
+Âm. Mặt cười cố ý dùng ĐÚNG 😊 của nút thả cảm xúc trên mỗi tin — hai nút cùng một nghĩa
+"chọn một emoji" thì chung một mặt chữ là nhất quán, không phải lẫn.
+
+`.chat-picker` phải đổi neo `left` → `right` theo. Khay `position: absolute`, nên nút dời đi
+mà neo đứng yên thì khay rơi xuống ở tận đầu kia thanh soạn, như từ đâu hiện ra.
+
+Đã cân nhắc 😀 rồi bỏ: dựng thử bằng chính bộ Chromium của `npm run shot` cho thấy Segoe UI
+Emoji vẽ nó mắt TRẮNG to và miệng há màu hồng, lạc hẳn khỏi tông vàng-cam của sảnh — trong khi
+😊 là mặt cam, mắt hai nét cong, cùng bảng màu với viền khung. Đây là loại khác biệt mà đọc mã
+không thấy, phải dựng ảnh ra mới phán được.
+
+Kèm một vá cho `scripts/shotPage.mts`: `waitUntil: "networkidle"` **không bao giờ** tới trên
+`/chat` dưới máy phát triển — trang poll `/api/chat` mỗi 2,5 giây, mà kết nối Mongo dưới local
+treo ~50 giây (resolver máy nhà không trả bản ghi SRV), nên mạng không có nổi một khoảng lặng
+500ms. Script chết vì hết giờ dù trang đã vẽ xong từ lâu, và lần chụp đầu tiên chạy được chỉ
+là gặp may về nhịp. Nay hụt thì lùi về `load` rồi chụp tiếp, và in ra là đã lùi — mốc chờ ảnh
+`decode()` phía sau vẫn giữ cho không bấm máy sớm.
+
 ## 0.55.1 — viền khung Phòng Chat vẽ lại cho khớp bản thiết kế
 
 Đạo hữu đặt ảnh hiện tại cạnh bản thiết kế và nói vẫn chưa giống. Đúng — ba chỗ lệch, và

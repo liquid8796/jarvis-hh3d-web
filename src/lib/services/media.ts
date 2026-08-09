@@ -44,6 +44,13 @@ const ENV_KEYS = [ENV_REGION, ENV_NAMESPACE, ENV_BUCKET, ENV_ACCESS_KEY, ENV_SEC
 export const CHAT_PREFIX = "chat";
 
 /**
+ * Tiền tố các KHUNG TAG — bài vị hoa văn hiện cạnh tên trong Phòng Chat. Tách tiền tố riêng
+ * vì vòng đời khác hẳn `chat/`: khung là tài sản cấu hình do admin quản, KHÔNG bị cuốn theo
+ * nút thanh tẩy sảnh (thứ quét đúng tiền tố `chat/`).
+ */
+export const TAG_FRAME_PREFIX = "tag-frames";
+
+/**
  * Tiền tố ảnh đại diện. Nằm RIÊNG khỏi `chat/` vì hai vòng đời khác nhau hẳn: nút thanh tẩy
  * sảnh quét sạch `chat/`, và nó không có quyền gì với mặt của người ta.
  */
@@ -357,6 +364,40 @@ export async function putAvatarFile(input: {
 }): Promise<StoredFile> {
   const { client, config } = requireStore();
   const key = avatarObjectKey(input.userId, input.kind);
+
+  await client.send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      Body: input.body,
+      ContentLength: input.body.byteLength,
+      ContentType: input.kind.contentType,
+      CacheControl: CACHE_CONTROL,
+    }),
+  );
+
+  return { key, url: publicUrl(key, config) };
+}
+
+/**
+ * Tên object cho một khung tag: `tag-frames/{nhãn}-{ngẫu nhiên}{đuôi}`. Nhãn giữ lại trong
+ * tên để người vào OCI console còn biết object nào là khung nào; đuôi suy từ BYTES đã soi
+ * như avatar, không từ tên tệp client khai. Hậu tố ngẫu nhiên cùng lý do muôn thuở: hai lần
+ * upload cùng nhãn không được ghi đè nhau — bản cũ còn trong sổ (và trong cache trình duyệt
+ * với `immutable`) cho tới khi chính nó bị xoá khỏi sổ.
+ */
+export function tagFrameObjectKey(label: string, kind: ImageKind): string {
+  const stem = sanitizeFileName(label);
+  return [
+    TAG_FRAME_PREFIX,
+    `${hasWordCharacter(stem) ? stem : "khung"}-${randomBytes(SUFFIX_BYTES).toString("base64url")}${kind.extension}`,
+  ].join("/");
+}
+
+/** Tải một khung tag lên kho. Cùng đường ống với avatar — chỉ khác cách đặt tên. */
+export async function putTagFrameFile(input: { label: string; kind: ImageKind; body: Uint8Array }): Promise<StoredFile> {
+  const { client, config } = requireStore();
+  const key = tagFrameObjectKey(input.label, input.kind);
 
   await client.send(
     new PutObjectCommand({

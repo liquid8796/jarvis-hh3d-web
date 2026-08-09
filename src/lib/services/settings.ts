@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db/client";
 import { DEFAULT_GAME_BASE_URL, normalizeGameBaseUrl } from "@/lib/quest-engine/cookies.mjs";
+import type { TagFrame } from "@/lib/validation/tags";
 
 /**
  * Cấu hình toàn hệ thống — một document JSONB duy nhất, Zod gác CẢ HAI CHIỀU y như
@@ -17,6 +18,29 @@ export const appSettingsSchema = z.object({
        * phải tàng thư — giữ mãi thì kho MongoDB phình vô hạn vì những câu "hôm nay cày chưa".
        */
       retentionDays: z.number().int().min(1).max(365).default(7),
+
+      /**
+       * Sổ KHUNG TAG — bài vị hoa văn hiện cạnh tên trong Phòng Chat (xem validation/tags.ts
+       * cho luật so khớp). Nằm trong app_settings chứ không thành bảng riêng vì nó là danh
+       * sách cấu hình cỡ chục phần tử do admin quản — đúng loại dữ liệu mà document này sinh
+       * ra để giữ, và một bảng mới nghĩa là một migration trên database thật cho một tính
+       * năng không cần JOIN với ai.
+       *
+       * `.catch([])` theo đúng luật của tệp: một phần tử rác (sửa tay JSONB) làm hỏng cả
+       * mảng thì sảnh vẽ tag dạng chữ như trước — mất trang trí, không mất chức năng.
+       */
+      tagFrames: z
+        .array(
+          z.object({
+            id: z.string().min(1),
+            label: z.string().trim().min(1).max(24),
+            url: z.string().min(1).max(2048),
+            key: z.string().min(1).max(512),
+            isDefault: z.boolean().default(false),
+          }),
+        )
+        .catch([])
+        .default([]) satisfies z.ZodType<TagFrame[]>,
     })
     .prefault({}),
 

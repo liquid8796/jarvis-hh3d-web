@@ -11,6 +11,39 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.49.0 — Phòng Chat khoác khung son, và tag thành BÀI VỊ có hoa văn
+
+- **Sảnh đàm đạo đổi theo bản thiết kế mới**: khung viền vàng kép với ấn triện ở đỉnh, nền
+  lam thẫm, mốc ngày canh phải, chân dung mang vòng kim quang, ô nhập thuôn tròn với hai nút
+  tròn hai bên. Toàn bộ là CSS — không một ảnh nền nào phải tải thêm.
+- **Tag giờ hiện thành KHUNG (bài vị hoa văn) cạnh tên** trong Phòng Chat. Sổ khung sống
+  trong app_settings; bytes sống trong tàng khố media dưới tiền tố `tag-frames/` — CỐ Ý đứng
+  ngoài `chat/`, vì nút thanh tẩy sảnh quét theo tiền tố và một bộ khung nằm lọt trong đó sẽ
+  chết theo lần bấm. `verify:tag-frames` đóng đinh đúng điều này.
+- **Luật chọn bài vị** (frameForTags, thuần và có phép thử): tag ĐỨNG TRƯỚC thắng — thứ tự
+  tag là thứ admin sắp, không phải chỗ code chọn hộ; các tag còn lại vẫn là huy hiệu chữ;
+  không tag nào có khung thì đeo khung MẶC ĐỊNH (bài vị「Đệ tử」— môn đồ thường cũng có bài
+  vị, như trong bản thiết kế); sổ trống thì sảnh vẽ y như trước. So khớp bỏ hoa/thường và
+  khoảng trắng thừa, nhưng DẤU tiếng Việt là luật cứng —「chuong mon」là một tag khác.
+- **Trang Tông Môn có sổ Khung Tag** ngay dưới bảng môn đồ: xem, upload (nhãn + tệp + cờ
+  mặc định), gỡ. Upload đi qua route chứ không phải server action — bài vị nặng ~2.8MB,
+  vượt trần 1MB của action; cùng lý do với ảnh đại diện. Một nhãn một khung: trùng là 409,
+  muốn thay thì gỡ trước — cho hai khung cùng nhãn thì phép so khớp phải chọn hộ, và nó sẽ
+  chọn sai với một nửa số người nhìn.
+- **Chip tag trong hộp Sửa mọc theo sổ khung**: upload khung「Hộ pháp」xong là chip「Hộ pháp」
+  xuất hiện, không cần deploy. Sổ trống hay chưa tải xong thì chip rơi về bộ TAG_PRESETS cũ.
+- **`npm run seed:tag-frames -- <thư mục>`** gieo bộ khung gốc (5 bài vị: Chưởng môn, Trưởng
+  lão, Thái thượng trưởng lão, Thánh nữ, và Đệ tử làm mặc định) lên OCI rồi đăng ký vào sổ.
+  Chạy lại vô hại; đã chạy thật — cả 5 URL công khai trả 200 và giải mã được (920×291…351).
+  Không nhét 13MB webp vào `public/`: mỗi deploy sẽ chở ngần ấy cho những bytes không bao
+  giờ đổi, trong khi kho media đã có sẵn và khung upload sau này cũng đi đường ấy.
+- Sổ khung đi vào ChatRoom từ server render (một lần mỗi lượt tải trang), KHÔNG kẹp theo
+  nhịp poll 2.5s — cấu hình đổi vài lần một năm không có cửa đòi ghế trên mọi hồi đáp.
+- Kiểm chứng trên trình duyệt thật với mongod nội bộ (DNS SRV của Atlas hỏng ở máy dev):
+  đủ 6 nhánh vẽ — 4 bài vị đúng người, không-tag đeo Đệ tử, tag lạ đeo Đệ tử kèm huy hiệu
+  chữ — và trọn vòng API: upload 200, trùng nhãn 409, bytes công khai 200, gỡ 200/404, sổ
+  không sót rác.
+
 ## 0.48.0 — vai và quyền thành bảng thật trong database
 
 - **Ai mang vai nào giờ là một BẢNG (`user_roles`), không còn là cột mảng `users.roles`.** Quan

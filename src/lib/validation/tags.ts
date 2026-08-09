@@ -54,3 +54,53 @@ export function parseTags(raw: string): { ok: true; tags: string[] } | { ok: fal
   }
   return { ok: true, tags };
 }
+
+// ---------------------------------------------------------------------------------------
+// KHUNG TAG — tấm bài vị có hoa văn (ảnh webp, chữ khắc sẵn trong ảnh) hiện cạnh tên trong
+// Phòng Chat. Mỗi khung mang một NHÃN, và nhãn ấy chính là chuỗi tag: đạo hữu đeo tag nào
+// thì sảnh vẽ khung có nhãn ấy. Sổ khung sống trong app_settings (services/settings.ts);
+// bytes sống trong tàng khố media dưới tiền tố `tag-frames/`.
+//
+// Vẫn thuộc tệp không-import này vì đúng lý do cũ: ChatRoom và trang Tông Môn (đều
+// `"use client"`) cần phép so khớp, còn API upload cần cùng phép ấy ở ranh giới tin cậy.
+// ---------------------------------------------------------------------------------------
+
+/** Một khung trong sổ. `key` là tên object trong tàng khố — cần cho lúc xoá. */
+export type TagFrame = {
+  id: string;
+  /** Nhãn = chuỗi tag mà khung này đại diện. So khớp qua `normalizeTagLabel`. */
+  label: string;
+  url: string;
+  key: string;
+  /** Khung đeo cho người KHÔNG mang tag nào (bài vị「Đệ tử」). Tối đa một khung giữ cờ này. */
+  isDefault: boolean;
+};
+
+/**
+ * Chuẩn hoá nhãn để so khớp: bỏ khoảng trắng thừa, không phân biệt hoa thường.
+ * 「chưởng  môn」và「Chưởng Môn」là một — tag do tay người gõ, khác nhau một con chữ hoa
+ * mà mất khung thì không ai lần ra vì sao.
+ */
+export function normalizeTagLabel(raw: string): string {
+  return raw.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/**
+ * Khung cho một danh sách tag: tag ĐẦU TIÊN có khung thắng — mỗi người một bài vị, như trong
+ * thiết kế; các tag còn lại vẫn hiện dạng chữ. Không tag nào có khung (kể cả danh sách rỗng)
+ * thì rơi về khung mặc định, và không có khung mặc định thì `null` — sảnh vẽ như cũ.
+ */
+export function frameForTags(tags: readonly string[], frames: readonly TagFrame[]): TagFrame | null {
+  for (const tag of tags) {
+    const hit = frameByLabel(tag, frames);
+    if (hit) return hit;
+  }
+  return frames.find((frame) => frame.isDefault) ?? null;
+}
+
+/** Khung mang nhãn này, hoặc `null`. */
+export function frameByLabel(label: string, frames: readonly TagFrame[]): TagFrame | null {
+  const wanted = normalizeTagLabel(label);
+  if (!wanted) return null;
+  return frames.find((frame) => normalizeTagLabel(frame.label) === wanted) ?? null;
+}

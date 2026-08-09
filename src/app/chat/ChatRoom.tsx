@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatPicker, type PickerTab } from "./ChatPicker";
 import { Avatar } from "@/components/Avatar";
+import { frameForTags, normalizeTagLabel, type TagFrame } from "@/lib/validation/tags";
 import type { Gif } from "@/lib/services/gif";
 
 /**
@@ -89,7 +90,14 @@ function mergeAvatars(current: AvatarMap, messages: Message[], incoming: AvatarM
   return next;
 }
 
-export function ChatRoom({ me }: { me: { id: string; name: string } }) {
+export function ChatRoom({
+  me,
+  tagFrames,
+}: {
+  me: { id: string; name: string };
+  /** Sổ khung tag từ app_settings — server đưa lúc render, xem ghi chú bên page.tsx. */
+  tagFrames: TagFrame[];
+}) {
   const [store, setStore] = useState<Map<string, Message>>(new Map());
   const [avatars, setAvatars] = useState<AvatarMap>({});
   const [typing, setTyping] = useState<string[]>([]);
@@ -462,7 +470,9 @@ export function ChatRoom({ me }: { me: { id: string; name: string } }) {
                   <Avatar
                     name={msg.author}
                     url={avatars[msg.userId]}
-                    size={34}
+                    // 44 thay vì 34 từ bản khung son: chân dung giờ mang vòng kim quang và
+                    // đứng cạnh một bài vị cao 34px — nhỏ hơn bài vị thì lép vế.
+                    size={44}
                     // Tin nối tiếp cùng người thì vòng tròn ẨN mà vẫn CHIẾM chỗ, để mọi bong
                     // bóng của cùng một người thẳng một hàng lề.
                     className={grouped ? "invisible" : ""}
@@ -470,15 +480,28 @@ export function ChatRoom({ me }: { me: { id: string; name: string } }) {
                 )}
 
                 <div className="chat-bubble-col">
-                  {!own && !grouped && (
-                    <span className="chat-author">
-                      {msg.author}
-                      {msg.isAdmin && <em className="chat-crown" title="Tông chủ">✦</em>}
-                      {msg.tags.map((t) => (
-                        <i key={t} className="chat-tag">{t}</i>
-                      ))}
-                    </span>
-                  )}
+                  {!own && !grouped && (() => {
+                    // Mỗi người MỘT bài vị, như trong thiết kế: tag đầu tiên có khung thắng;
+                    // các tag còn lại vẫn là huy hiệu chữ; không tag nào có khung thì đeo
+                    // khung mặc định (bài vị「Đệ tử」). Sổ trống là sảnh vẽ y như trước.
+                    const frame = frameForTags(msg.tags, tagFrames);
+                    const plainTags = frame
+                      ? msg.tags.filter((t) => normalizeTagLabel(t) !== normalizeTagLabel(frame.label))
+                      : msg.tags;
+                    return (
+                      <span className="chat-author">
+                        {msg.author}
+                        {msg.isAdmin && <em className="chat-crown" title="Tông chủ">✦</em>}
+                        {frame && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img className="chat-tagframe" src={frame.url} alt={frame.label} title={frame.label} loading="lazy" decoding="async" />
+                        )}
+                        {plainTags.map((t) => (
+                          <i key={t} className="chat-tag">{t}</i>
+                        ))}
+                      </span>
+                    );
+                  })()}
 
                   <div className={`chat-bubble ${msg.sticker ? "sticker" : ""}`}>
                     {msg.replyTo && (

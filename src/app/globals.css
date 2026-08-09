@@ -436,6 +436,11 @@ body {
    nhẹ khi thả, ba chấm "đang chấp bút" thở theo nhịp. Mọi lớp nền tối mờ vì cả
    sảnh đứng trên tấm backdrop.
 --------------------------------------------------------------------------- */
+/* ---- Phòng Chat: khung son thếp vàng ---------------------------------------------------
+   Theo bản thiết kế 09/08/2026: sảnh là một TẤM BÀI VỊ LỚN — nền lam thẫm, viền vàng kép,
+   hoa văn ở đỉnh — và mỗi người mang bài vị nhỏ (khung tag) cạnh tên. Viền kép dựng bằng
+   ::before (khung trong, cách mép 5px) thay vì ảnh nền: co giãn theo mọi cỡ màn hình và
+   không tốn một byte tải thêm. */
 .chat-shell {
   display: flex;
   flex-direction: column;
@@ -444,12 +449,50 @@ body {
   padding: 0;
   overflow: hidden;
   position: relative;
+  border: 1px solid rgba(232, 194, 92, 0.5);
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(64, 58, 128, 0.35), transparent 60%),
+    linear-gradient(175deg, rgba(24, 26, 58, 0.97), rgba(13, 14, 34, 0.99));
+  box-shadow:
+    0 0 0 1px rgba(9, 12, 26, 0.9),
+    0 18px 60px rgba(0, 0, 0, 0.55),
+    0 0 42px rgba(232, 194, 92, 0.07);
+}
+
+/* Khung TRONG của viền kép. pointer-events tắt để nó chỉ là nét vẽ, không chắn một cú bấm
+   nào; z-index cao hơn nội dung nhưng thấp hơn khay nổi (.chat-picker z-20, .chat-jump z-6). */
+.chat-shell::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(232, 194, 92, 0.22);
+  border-radius: 15px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Hoa văn đỉnh khung — một chữ triện nhỏ ngồi giữa mép trên, như ấn trên bài vị. */
+.chat-shell::after {
+  content: "❖";
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0 14px;
+  color: var(--color-gold-300);
+  background: var(--color-ink, #0b0e20);
+  font-size: 0.8rem;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 4;
+  text-shadow: 0 0 10px rgba(232, 194, 92, 0.6);
 }
 
 .chat-head {
-  padding: 14px 18px;
-  border-bottom: 1px solid rgba(232, 194, 92, 0.14);
-  background: rgba(9, 12, 26, 0.55);
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid rgba(232, 194, 92, 0.18);
+  background: linear-gradient(180deg, rgba(32, 30, 70, 0.5), rgba(9, 12, 26, 0.25));
 }
 
 .chat-scroll {
@@ -481,21 +524,22 @@ body {
   padding: 8px 0;
 }
 
+/* Mốc ngày canh PHẢI, chữ vàng nhạt — như dòng「Chủ Nhật, 9/8/2026」trong bản thiết kế,
+   không còn hai vạch kẻ ngang chia đôi sảnh. */
 .chat-day {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 14px 0 10px;
-  color: var(--color-mist);
-  font-size: 0.72rem;
+  justify-content: flex-end;
+  margin: 16px 6px 10px;
+  color: rgba(232, 194, 92, 0.75);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
 }
 
-.chat-day::before,
-.chat-day::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: rgba(232, 194, 92, 0.14);
+.chat-day span {
+  padding: 2px 12px;
+  border: 1px solid rgba(232, 194, 92, 0.18);
+  border-radius: 999px;
+  background: rgba(20, 22, 50, 0.6);
 }
 
 .chat-row {
@@ -507,6 +551,41 @@ body {
 
 .chat-row.grouped { margin-top: 2px; }
 .chat-row.own { flex-direction: row-reverse; }
+
+/* Vòng kim quang quanh ảnh đại diện — CHỈ trong sảnh: nơi khác (thanh đầu trang, bảng môn
+   đồ) vòng tròn là chi tiết phụ, ở đây nó là chân dung trên bài vị. `.invisible` của tin
+   nối tiếp vẫn ẩn được vì box-shadow đi theo element. */
+.chat-row .avatar {
+  box-shadow:
+    0 0 0 2px rgba(232, 194, 92, 0.55),
+    0 0 14px rgba(232, 194, 92, 0.28);
+}
+
+/* ---- Sổ khung trong trang Tông Môn ---------------------------------------------------- */
+.tagframe-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid rgba(232, 194, 92, 0.16);
+  border-radius: 12px;
+  background: rgba(13, 15, 36, 0.6);
+}
+
+.tagframe-row img { height: 44px; width: auto; flex: none; }
+
+.tagframe-row-label {
+  flex: 1;
+  font-size: 0.86rem;
+  color: var(--color-parchment);
+}
+
+.tagframe-row-label i {
+  display: block;
+  font-style: normal;
+  font-size: 0.7rem;
+  color: var(--color-gold-300);
+}
 
 @keyframes chat-in {
   from { opacity: 0; transform: translateY(6px); }
@@ -522,12 +601,29 @@ body {
 .chat-row.own .chat-bubble-col { align-items: flex-end; }
 
 .chat-author {
-  font-size: 0.72rem;
-  color: var(--color-mist);
-  margin: 0 0 2px 4px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--color-parchment);
+  margin: 0 0 3px 4px;
 }
 
 .chat-crown { color: var(--color-gold-300); font-style: normal; margin-left: 4px; }
+
+/* Bài vị của tag — ảnh webp chữ khắc sẵn, glow nằm trong chính ảnh. Cao 34px là đọc được
+   chữ trên bài mà không biến mỗi dòng tên thành một tấm biển quảng cáo; ảnh ~3:1 nên bề
+   ngang tự ra ~100px. */
+.chat-tagframe {
+  display: inline-block;
+  height: 34px;
+  width: auto;
+  margin-left: 8px;
+  vertical-align: middle;
+  user-select: none;
+}
 
 /* Tag trang trí trong sảnh — viên nhỏ cạnh tên, đóng băng theo tin y như chính cái tên. */
 .chat-tag {
@@ -546,10 +642,11 @@ body {
 
 .chat-bubble {
   position: relative;
-  padding: 8px 12px 6px;
+  padding: 9px 13px 7px;
   border-radius: 14px;
-  background: rgba(20, 17, 39, 0.92);
-  border: 1px solid rgba(232, 194, 92, 0.12);
+  background: linear-gradient(170deg, rgba(30, 32, 66, 0.92), rgba(19, 20, 46, 0.94));
+  border: 1px solid rgba(120, 116, 180, 0.28);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
   font-size: 0.9rem;
   line-height: 1.45;
 }
@@ -909,36 +1006,47 @@ body {
   position: relative; /* Mốc neo của .chat-picker — xem ghi chú `bottom` ở đó. */
   display: flex;
   align-items: flex-end;
-  gap: 6px;
-  padding: 10px 12px;
-  border-top: 1px solid rgba(232, 194, 92, 0.14);
-  background: rgba(9, 12, 26, 0.65);
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid rgba(232, 194, 92, 0.2);
+  background: linear-gradient(180deg, rgba(9, 12, 26, 0.4), rgba(24, 26, 58, 0.7));
 }
 
+/* Nút tròn hai bên ô nhập — theo bản thiết kế: trái là khay emoji, phải là ấn Truyền Âm. */
 .chat-tool {
-  font-size: 1.15rem;
-  padding: 8px 6px;
-  border-radius: 8px;
-  transition: transform 0.12s ease;
+  font-size: 1.1rem;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 194, 92, 0.3);
+  background: rgba(20, 22, 50, 0.8);
+  transition: transform 0.12s ease, border-color 0.12s ease;
 }
 
-.chat-tool:hover:not(:disabled) { transform: scale(1.2); }
+.chat-tool:hover:not(:disabled) { transform: scale(1.12); border-color: rgba(232, 194, 92, 0.6); }
 
+/* Ô nhập thuôn tròn như trong bản thiết kế; placeholder nghiêng nhẹ như một lời mời. */
 .chat-input {
   flex: 1;
   resize: none;
   max-height: 120px;
-  background: rgba(20, 17, 39, 0.9);
-  border: 1px solid rgba(232, 194, 92, 0.18);
-  border-radius: 12px;
-  padding: 9px 12px;
+  background: rgba(13, 15, 36, 0.92);
+  border: 1px solid rgba(120, 116, 180, 0.35);
+  border-radius: 20px;
+  padding: 9px 16px;
   font-size: 0.9rem;
   color: var(--color-parchment);
 }
 
-.chat-input:focus { outline: none; border-color: rgba(232, 194, 92, 0.45); }
+.chat-input::placeholder { font-style: italic; color: rgba(143, 137, 179, 0.75); }
 
-.chat-send { padding: 9px 16px; }
+.chat-input:focus { outline: none; border-color: rgba(232, 194, 92, 0.5); }
+
+.chat-send { padding: 9px 18px; border-radius: 999px; }
 
 .chat-editbox { display: block; }
 .chat-editbox textarea {

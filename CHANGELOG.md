@@ -11,6 +11,16 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.57.6 — bỏ hai đoạn chữ dẫn giải trong Ngọc Giản
+
+- **Bỏ đoạn mở đầu của khối chọn hạng tài khoản** ("Một bộ cấu hình chung cho cả đội…") và
+  **đoạn mô tả khối Nhiệm vụ tài khoản thường** ("Tám nhiệm vụ chạy trên trang riêng…"). Hai
+  cái tab đã tự nói ra chúng làm gì, và bảng nhiệm vụ ngay dưới cũng vậy.
+- Giữ lại đúng dòng còn mang THÔNG TIN chứ không phải lời dẫn: `Đội hình hiện tại: 1 VIP.`
+  Nó giờ đứng một mình, nên điều kiện `accounts.length > 0` bọc CẢ thẻ `<p>` thay vì chỉ phần
+  chữ bên trong — không thì lúc chưa có tài khoản nào, đoạn rỗng ấy vẫn chiếm nguyên `mb-4`,
+  tức một khoảng trống 1rem không ai hiểu từ đâu ra.
+
 ## 0.57.5 — bỏ trống ô tên thì tài khoản tự mang tên nhân vật trong cookie
 
 Ô「Tên gợi nhớ」để trống trước đây cho ra một cái nhãn vô hồn:「Tài khoản 2」. Nay nó lấy đúng

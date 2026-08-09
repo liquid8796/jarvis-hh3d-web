@@ -457,18 +457,20 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
           </button>
         ))}
       </div>
-      <p className="mb-4 text-xs text-[var(--color-mist)]">
-        Một bộ cấu hình chung cho cả đội: tài khoản hạng VIP chạy tab VIP, hạng thường chạy
-        tab Thường — không tài khoản nào chạy nhầm bộ của hạng kia.
-        {accounts.length > 0 &&
-          ` Đội hình hiện tại: ${[
+      {/* Điều kiện bọc CẢ thẻ <p>, không phải chỉ phần chữ bên trong: chưa có tài khoản nào
+          thì đây là một đoạn rỗng, mà một đoạn rỗng vẫn mang nguyên `mb-4` — tức một khoảng
+          trống 1rem không ai hiểu từ đâu ra. */}
+      {accounts.length > 0 && (
+        <p className="mb-4 text-xs text-[var(--color-mist)]">
+          {`Đội hình hiện tại: ${[
             vipCount > 0 ? `${vipCount} VIP` : null,
             freeCount > 0 ? `${freeCount} thường` : null,
             unknownCount > 0 ? `${unknownCount} chưa dò hạng` : null,
           ]
             .filter(Boolean)
             .join(", ")}.`}
-      </p>
+        </p>
+      )}
 
       {/* Một input thật cho mỗi config key. Checkbox ở hai tab chỉ là hai mặt của cùng state. */}
       {ALL_SIMPLE_QUESTS.map((quest) =>
@@ -482,11 +484,6 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
           <legend className="px-2 text-sm font-semibold text-[var(--color-parchment)]">
             Nhiệm vụ tài khoản thường
           </legend>
-          <p className="mb-3 text-xs text-[var(--color-mist)]">
-            Tám nhiệm vụ chạy trên trang riêng của từng mục — hub tài khoản thường không có
-            nút bấm nhanh, nên auto đi thẳng vào trang. Khối dưới cùng: Mê Cung dùng chung
-            tuỳ chọn cho cả hai hạng, còn Luyện Đan Đường có bản riêng cho hạng thường.
-          </p>
           <SimpleQuestGrid
             quests={FREE_QUESTS}
             enabled={simpleEnabled}

@@ -444,18 +444,16 @@ body {
    sảnh đứng trên tấm backdrop.
 --------------------------------------------------------------------------- */
 /* ---- Phòng Chat: khung son thếp vàng ---------------------------------------------------
-   Theo bản thiết kế 09/08/2026: sảnh là một TẤM BÀI VỊ LỚN — nền lam thẫm, viền vàng kép,
-   hoa văn ở đỉnh — và mỗi người mang bài vị nhỏ (khung tag) cạnh tên. Viền kép dựng bằng
-   ::before (khung trong, cách mép 5px) thay vì ảnh nền: co giãn theo mọi cỡ màn hình và
-   không tốn một byte tải thêm. */
+   Theo bản mẫu 09/08/2026: sảnh là một TẤM BÀI VỊ LỚN — nền lam thẫm, viền vàng VÁT GÓC kèm
+   nét đôi, ấn ở đỉnh, mây như ý bên mép phải — và lòng khung là một tấm PANEL sáng hơn có
+   vân vải, nơi dòng tin chảy. Viền dựng rời tám mảnh trong ChatFrameOrnaments (xem ghi chú
+   ở đó); mọi thứ co giãn theo màn hình, không một tấm ảnh nền nào. */
 /**
- * Lớp BỌC của khung — chỉ để hoa văn có chỗ tràn ra ngoài.
+ * Lớp BỌC của khung — để hoa văn có chỗ tràn ra ngoài, và để BÓNG ĐỔ có chỗ sống.
  *
- * `.chat-shell` buộc phải `overflow: hidden` (header và thanh soạn có nền riêng, không cắt thì
- * chúng vuông góc chồi ra khỏi bốn góc bo). Nhưng cùng cái cắt ấy xén mất NỬA TRÊN của ấn đỉnh
- * — thứ vốn phải cưỡi lên đường viền — và ấn hiện ra thành một hình chữ V cụt. Bản trước vá
- * bằng cách kéo ấn xuống rồi lấy một dải màu che chỗ nối; đó là chữa triệu chứng. Tách một lớp
- * bọc KHÔNG cắt là chữa đúng chỗ đau: ấn vẽ trọn vẹn và cái dải che kia biến mất.
+ * `.chat-shell` bị clip-path cắt (cho nền ăn theo đường vát góc), mà clip-path cắt cả
+ * box-shadow của chính phần tử mang nó — nên bóng phải nằm ở đây, nơi không bị cắt. Ấn đỉnh
+ * cũng vậy: nó cưỡi lên viền, nửa trên nằm ngoài khung, đặt trong shell là bị xén mất.
  *
  * Kích thước dời lên đây, khung con cao 100% — nếu không thì bọc cao 0 và hoa văn (định vị
  * tuyệt đối theo bọc) rơi hết về góc trên bên trái.
@@ -469,6 +467,10 @@ body {
   display: flex;
   height: calc(100dvh - 140px);
   min-height: 420px;
+  border-radius: 12px;
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.55),
+    0 0 46px rgba(232, 194, 92, 0.05);
 }
 
 .chat-shell {
@@ -479,98 +481,162 @@ body {
   padding: 0;
   overflow: hidden;
   position: relative;
-  border: 1px solid rgba(232, 194, 92, 0.5);
-  border-radius: 20px;
+  /* Vát góc 45° theo bản mẫu — border CSS không vát được, nên khung này KHÔNG có border:
+     viền vàng là tám mảnh rời vẽ đè lên (xem ChatFrameOrnaments), còn nền cắt theo đường
+     vát bằng clip-path. Nét góc của viền chạy (30,1)→(1,30) tức x+y=31 — đường cắt ở đây
+     phải là ĐÚNG con số ấy để mép nền nằm khít dưới nét viền. */
+  clip-path: polygon(
+    31px 0,
+    calc(100% - 31px) 0,
+    100% 31px,
+    100% calc(100% - 31px),
+    calc(100% - 31px) 100%,
+    31px 100%,
+    0 calc(100% - 31px),
+    0 31px
+  );
   background:
-    radial-gradient(120% 90% at 50% 0%, rgba(64, 58, 128, 0.35), transparent 60%),
-    linear-gradient(175deg, rgba(24, 26, 58, 0.97), rgba(13, 14, 34, 0.99));
-  box-shadow:
-    0 0 0 1px rgba(9, 12, 26, 0.9),
-    0 18px 60px rgba(0, 0, 0, 0.55),
-    0 0 42px rgba(232, 194, 92, 0.07);
+    radial-gradient(120% 80% at 50% 0%, rgba(56, 60, 126, 0.35), transparent 55%),
+    linear-gradient(180deg, #1a1e44 0%, #141838 60%, #10132f 100%);
 }
 
-/* Khung TRONG của viền kép — CHỈ mờ nhạt, vì trong bản thiết kế nét thứ hai gần như chỉ thấy
-   ở vùng góc (do ngoặc góc), còn giữa các cạnh thì mắt chỉ đọc ra MỘT nét. Để nó đậm ngang
-   nét ngoài là mép khung dày đục lên, đúng chỗ hình 1 lệch khỏi hình 2.
-   pointer-events tắt: nó chỉ là nét vẽ, không chắn một cú bấm nào. */
+/* Đường chỉ TRONG của viền kép — CHỈ mờ nhạt, vì trong bản mẫu nét thứ hai gần như chỉ thấy
+   ở vùng góc, còn giữa các cạnh thì mắt chỉ đọc ra MỘT nét. Cũng vát góc cho ăn theo viền
+   ngoài; đoạn chéo bị clip cắt mất thì nét PHỤ của `.chat-corner` vẽ nối — (25,10)/(10,25)
+   là chung toạ độ giữa hai bên. pointer-events tắt: nét vẽ không chắn một cú bấm nào. */
 .chat-shell::before {
   content: "";
   position: absolute;
-  inset: 7px;
-  border: 1px solid rgba(232, 194, 92, 0.1);
-  border-radius: 14px;
+  inset: 10px;
+  border: 1px solid rgba(232, 194, 92, 0.14);
+  clip-path: polygon(
+    15px 0,
+    calc(100% - 15px) 0,
+    100% 15px,
+    100% calc(100% - 15px),
+    calc(100% - 15px) 100%,
+    15px 100%,
+    0 calc(100% - 15px),
+    0 15px
+  );
   pointer-events: none;
   z-index: 3;
 }
 
+/* Bốn CẠNH viền — div mảnh chạy giữa các góc. Màu ĐẶC chứ không alpha: mỗi cạnh đè lên tay
+   nét góc vài px ở chỗ nối, màu có alpha là chỗ ấy sáng gấp đôi thành một vệt. */
+.chat-edge {
+  position: absolute;
+  background: #d9b76a;
+  box-shadow: 0 0 7px rgba(232, 194, 92, 0.3);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.chat-edge-t { top: 0; left: 58px; right: 58px; height: 1.6px; }
+.chat-edge-b { bottom: 0; left: 58px; right: 58px; height: 1.6px; }
+.chat-edge-l { left: 0; top: 58px; bottom: 58px; width: 1.6px; }
+.chat-edge-r { right: 0; top: 58px; bottom: 58px; width: 1.6px; }
+
 /**
- * Bốn NGOẶC GÓC. Trước 09/08/2026 chúng là tám dải `linear-gradient` — dựng nhanh, nhưng
- * gradient chỉ vẽ được hình CHỮ NHẬT, nên góc luôn vuông trong khi khung thì bo tròn: nét
- * ngoặc cắt ngang đường bo và trông như dán lên. SVG vẽ được cung tròn, nên ngoặc chạy SONG
- * SONG với đường viền đúng như bản thiết kế.
+ * Bốn GÓC VÁT. Trước bản mẫu 09/08/2026 góc là cung tròn ôm theo border-radius; bản mẫu vát
+ * thẳng 45° kèm nét đôi, nên góc về lại SVG nét thẳng và border-radius biến mất khỏi khung.
  *
  * Một hình vẽ, bốn lần dùng, lật bằng `scale` — không chép bốn bản path khác nhau, thứ chỉ
  * chờ ngày một góc được sửa mà ba góc kia thì không.
  */
 .chat-corner {
   position: absolute;
-  width: 58px;
-  height: 58px;
+  width: 64px;
+  height: 64px;
   fill: none;
-  stroke: var(--color-gold-300);
+  stroke: #d9b76a;
+  filter: drop-shadow(0 0 5px rgba(232, 194, 92, 0.35));
   pointer-events: none;
   z-index: 4;
 }
 
-.chat-corner-tl { top: 4px; left: 4px; }
-.chat-corner-tr { top: 4px; right: 4px; transform: scaleX(-1); }
-.chat-corner-bl { bottom: 4px; left: 4px; transform: scaleY(-1); }
-.chat-corner-br { bottom: 4px; right: 4px; transform: scale(-1); }
+.chat-corner-tl { top: 0; left: 0; }
+.chat-corner-tr { top: 0; right: 0; transform: scaleX(-1); }
+.chat-corner-bl { bottom: 0; left: 0; transform: scaleY(-1); }
+.chat-corner-br { bottom: 0; right: 0; transform: scale(-1); }
 
 /* Ấn ở đỉnh khung — SVG vẽ trong ChatRoom, ngồi ĐÈ lên mép trên như ấn đóng trên bài vị. */
 .chat-finial {
   position: absolute;
   top: 0;
   left: 50%;
-  width: 116px;
-  height: 34px;
-  /* -50% theo chiều dọc: trục ngang của ấn trùng khít đường viền trên, nên ấn CƯỠI lên viền
-     như ấn đóng trên bài vị, chứ không treo lơ lửng phía trên nó. */
+  width: 120px;
+  height: 44px;
+  /* -50% theo chiều dọc: trục ngang của ấn (y=22 trong viewBox) trùng khít đường viền trên,
+     nên ấn CƯỠI lên viền như ấn đóng trên bài vị, chứ không treo lơ lửng phía trên nó. */
   transform: translate(-50%, -50%);
-  color: var(--color-gold-300);
+  color: #e3c176;
   pointer-events: none;
   z-index: 5;
   filter: drop-shadow(0 0 9px rgba(232, 194, 92, 0.5));
 }
 
+/* Mây như ý — hai dấu ở mép phải như bản mẫu: một đậu trong header ngay trên đường chỉ, một
+   cưỡi lên góc phải dưới của tấm panel (neo theo composer, xem ghi chú trong ChatRoom). */
+.chat-cloud {
+  position: absolute;
+  color: rgba(232, 194, 92, 0.75);
+  pointer-events: none;
+}
+
+.chat-cloud-head { right: 18px; bottom: 10px; width: 58px; height: 25px; }
+.chat-cloud-foot { right: 12px; top: -34px; width: 48px; height: 21px; z-index: 1; }
+
+/* Nét mây nhỏ mọc từ đầu trái của đường chỉ dưới header. */
+.chat-headcurl {
+  position: absolute;
+  left: 12px;
+  bottom: -7px;
+  width: 26px;
+  height: 14px;
+  color: rgba(232, 194, 92, 0.8);
+  pointer-events: none;
+  z-index: 4;
+}
 
 .chat-head {
   position: relative;
-  padding: 18px 22px 12px;
-  border-bottom: 1px solid rgba(232, 194, 92, 0.18);
-  background: linear-gradient(180deg, rgba(32, 30, 70, 0.5), rgba(9, 12, 26, 0.25));
+  /* Header là dải TRẦN trên nền khung như bản mẫu — không nền riêng, không border-bottom:
+     đường chỉ dưới nó chính là cạnh TRÊN của tấm panel `.chat-scroll`. */
+  padding: 20px 28px 14px;
 }
 
-/* Viên kim châm nhỏ đậu ở đầu phải của đường chỉ dưới header — chi tiết bên mép phải của
-   bản thiết kế. Nét trang trí thuần nên đi bằng pseudo-element, không thêm DOM. */
+/* Kim tinh bốn cánh đậu ở đầu phải của đường chỉ dưới header — chi tiết mép phải bản mẫu.
+   box-shadow không ăn theo clip-path nên quầng sáng đi bằng filter: drop-shadow. */
 .chat-head::after {
   content: "";
   position: absolute;
-  right: 14px;
-  bottom: -4px;
-  width: 7px;
-  height: 7px;
+  right: 26px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
   background: var(--color-gold-300);
-  transform: rotate(45deg);
-  box-shadow: 0 0 8px rgba(232, 194, 92, 0.6);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  filter: drop-shadow(0 0 6px rgba(232, 194, 92, 0.9));
+  z-index: 4;
 }
 
+/* Tấm PANEL giữa khung — sáng hơn nền, viền vàng mảnh, vân vải mờ (feTurbulence nội tuyến,
+   không tải một byte ảnh nào). Cạnh trên của nó là "đường chỉ dưới header" của bản mẫu. */
 .chat-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 18px 26px 10px;
+  margin: 0 16px;
+  padding: 18px 22px 12px;
   scroll-behavior: smooth;
+  border: 1px solid rgba(232, 194, 92, 0.32);
+  border-radius: 3px 3px 10px 10px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.62 0 0 0 0 0.66 0 0 0 0 0.92 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(130% 90% at 50% 0%, rgba(80, 88, 160, 0.12), transparent 60%),
+    linear-gradient(180deg, #20264c 0%, #1a1f40 100%);
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.3);
 }
 
 .chat-closed {
@@ -910,8 +976,9 @@ body {
 
 .chat-jump {
   position: absolute;
-  right: 18px;
-  bottom: 118px;
+  right: 34px;
+  /* Đủ cao để nổi trên thanh soạn (cao ~84px kể từ khi nút gửi lên 54px) lẫn mép panel. */
+  bottom: 132px;
   padding: 6px 14px;
   border-radius: 999px;
   background: rgba(9, 12, 26, 0.92);
@@ -1113,75 +1180,99 @@ body {
 }
 
 .chat-composer {
-  position: relative; /* Mốc neo của .chat-picker — xem ghi chú `bottom` ở đó. */
+  position: relative; /* Mốc neo của .chat-picker và mây góc panel — xem ghi chú ở mỗi bên. */
   display: flex;
   align-items: flex-end;
-  gap: 8px;
-  /* Đệm ngang 30px chứ không 14px: ngoặc góc dưới có tay dài 58px, và ở 14px hai nút tròn
-     nằm ĐÈ lên nét hoa văn — ảnh chụp cho thấy rõ. Trong bản thiết kế nút nằm gọn bên trong,
-     hoa văn thông suốt. */
-  padding: 12px 30px;
-  border-top: 1px solid rgba(232, 194, 92, 0.2);
-  background: linear-gradient(180deg, rgba(9, 12, 26, 0.4), rgba(24, 26, 58, 0.7));
+  gap: 10px;
+  /* Thanh soạn đứng TRẦN trên nền khung như bản mẫu — không nền riêng, không đường chỉ trên:
+     mép dưới của tấm panel đã là ranh giới rồi. Đệm ngang 26px cho nút tròn né tay ngoặc góc. */
+  padding: 13px 26px 17px;
 }
 
-/* Nút tròn quanh ô nhập: kẹp file bên trái, còn khay chọn (mặt cười) và ấn Truyền Âm
-   (mũi tên) bên phải. */
+/* Nút tròn quanh ô nhập: bong bóng thoại (gửi file) bên trái, mặt cười (khay chọn) và ấn
+   Truyền Âm (cánh én giấy) bên phải — cả ba là đĩa tối viền vàng như bản mẫu. */
 .chat-tool {
-  font-size: 1.1rem;
-  width: 42px;
-  height: 42px;
+  font-size: 1.05rem;
+  width: 47px;
+  height: 47px;
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 1px solid rgba(232, 194, 92, 0.35);
-  background: rgba(20, 22, 50, 0.8);
-  transition: transform 0.12s ease, border-color 0.12s ease;
-}
-
-.chat-tool:hover:not(:disabled) { transform: scale(1.12); border-color: rgba(232, 194, 92, 0.6); }
-
-/* Ấn Truyền Âm — vòng tròn vàng với mũi tên, thay cho nút chữ. */
-.chat-send {
-  width: 42px;
-  height: 42px;
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  border: 1px solid rgba(232, 194, 92, 0.55);
-  background: rgba(232, 194, 92, 0.1);
   color: var(--color-gold-300);
-  transition: transform 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+  border: 1.5px solid rgba(222, 186, 108, 0.85);
+  background: radial-gradient(circle at 34% 28%, rgba(56, 62, 118, 0.85), rgba(13, 16, 38, 0.97) 72%);
+  box-shadow: 0 0 12px rgba(232, 194, 92, 0.14), inset 0 0 10px rgba(0, 0, 0, 0.5);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
+
+.chat-tool:hover:not(:disabled) {
+  transform: scale(1.08);
+  box-shadow: 0 0 16px rgba(232, 194, 92, 0.3), inset 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Nút gửi file to hơn mặt cười một bậc — trong bản mẫu chỉ có ấn Truyền Âm và nó là cỡ lớn. */
+.chat-tool.big { width: 52px; height: 52px; }
+
+/* Ấn Truyền Âm — to hơn hai nút kia một bậc, viền sáng hơn, như trong bản mẫu. */
+.chat-send {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1.5px solid rgba(232, 196, 110, 0.95);
+  background: radial-gradient(circle at 34% 28%, rgba(64, 58, 110, 0.9), rgba(15, 17, 40, 0.98) 74%);
+  color: var(--color-gold-300);
+  box-shadow:
+    0 0 18px rgba(232, 194, 92, 0.25),
+    inset 0 0 0 2.5px rgba(9, 12, 28, 0.9),
+    inset 0 0 0 3.5px rgba(232, 194, 92, 0.3),
+    inset 0 0 12px rgba(0, 0, 0, 0.5);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+/* Cánh én chúc mũi lên như bản mẫu — xoay ở đây để path SVG giữ nguyên dạng nằm ngang dễ đọc. */
+.chat-send svg { transform: rotate(-26deg); }
 
 .chat-send:hover:not(:disabled) {
-  transform: scale(1.12);
-  background: rgba(232, 194, 92, 0.22);
-  box-shadow: 0 0 14px rgba(232, 194, 92, 0.35);
+  transform: scale(1.08);
+  box-shadow:
+    0 0 26px rgba(232, 194, 92, 0.45),
+    inset 0 0 0 2.5px rgba(9, 12, 28, 0.9),
+    inset 0 0 0 3.5px rgba(232, 194, 92, 0.3),
+    inset 0 0 12px rgba(0, 0, 0, 0.5);
 }
 
 .chat-send:disabled { opacity: 0.5; }
 
-/* Ô nhập thuôn tròn như trong bản thiết kế; placeholder nghiêng nhẹ như một lời mời. */
+/* Ô nhập thuôn tròn hai đầu như bản mẫu; placeholder chữ có chân, nghiêng, ánh vàng nhạt. */
 .chat-input {
   flex: 1;
   resize: none;
+  min-height: 47px;
   max-height: 120px;
-  background: rgba(13, 15, 36, 0.92);
-  border: 1px solid rgba(120, 116, 180, 0.35);
-  border-radius: 20px;
-  padding: 9px 16px;
-  font-size: 0.9rem;
+  background: linear-gradient(180deg, rgba(11, 14, 34, 0.95), rgba(16, 19, 44, 0.95));
+  border: 1px solid rgba(216, 181, 106, 0.55);
+  border-radius: 26px;
+  padding: 12px 22px 11px;
+  font-size: 0.95rem;
+  line-height: 1.5;
   color: var(--color-parchment);
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.45);
 }
 
-.chat-input::placeholder { font-style: italic; color: rgba(143, 137, 179, 0.75); }
+.chat-input::placeholder {
+  font-style: italic;
+  font-family: var(--font-display);
+  color: rgba(210, 185, 130, 0.55);
+  letter-spacing: 0.02em;
+}
 
-.chat-input:focus { outline: none; border-color: rgba(232, 194, 92, 0.5); }
+.chat-input:focus { outline: none; border-color: rgba(232, 194, 92, 0.8); }
 
 
 .chat-editbox { display: block; }

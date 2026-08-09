@@ -125,7 +125,7 @@ try {
     displayName: "Kiểm vai",
     email: `${username}@example.com`,
     password,
-    roles: ["admin", "gia-chu"],
+    roles: ["chuong-mon", "gia-chu"],
     status: "disabled",
   });
   assert(created.ok, `adminCreate kèm vai phải thành công: ${created.ok ? "" : created.error}`);
@@ -136,7 +136,7 @@ try {
 
   const afterCreate = await findById(userId);
   assert(
-    JSON.stringify(afterCreate?.roles) === JSON.stringify(["gia-chu", "admin"]),
+    JSON.stringify(afterCreate?.roles) === JSON.stringify(["gia-chu", "chuong-mon"]),
     `vai đọc ra phải theo thang vai, nhận được ${JSON.stringify(afterCreate?.roles)}`,
   );
 
@@ -144,7 +144,7 @@ try {
     select role_code from user_roles where user_id = ${userId} order by role_code
   `) as { role_code: string }[];
   assert(
-    JSON.stringify(rowsAfterCreate.map((r) => r.role_code)) === JSON.stringify(["admin", "gia-chu"]),
+    JSON.stringify(rowsAfterCreate.map((r) => r.role_code)) === JSON.stringify(["chuong-mon", "gia-chu"]),
     "user_roles phải có đúng hai dòng — vai là quan hệ, không phải thuộc tính của hàng users",
   );
   console.log("✔ Tạo người kèm vai: user_roles có đủ dòng, đọc ra đúng thứ tự thang vai.");
@@ -155,7 +155,7 @@ try {
   // `loginAction` đặt claim "user" cho một Gia chủ, và không có gì kêu lên.
   const asLogin = await findByUsername(username);
   assert(
-    JSON.stringify(asLogin?.roles) === JSON.stringify(["gia-chu", "admin"]),
+    JSON.stringify(asLogin?.roles) === JSON.stringify(["gia-chu", "chuong-mon"]),
     `đường đăng nhập phải thấy đủ vai — nhận được ${JSON.stringify(asLogin?.roles)}`,
   );
   console.log("✔ Đường đăng nhập: hàng users trơn không có vai, phép ghép từ user_roles bù đủ.");
@@ -179,11 +179,11 @@ try {
   const noRows = (await sql`select count(*)::int as n from user_roles where user_id = ${userId}`) as { n: number }[];
   assert(noRows[0].n === 0, "thu sạch vai phải xoá hết dòng trong user_roles");
 
-  const regranted = await adminUpdate(userId, { roles: ["gia-chu", "admin"] });
+  const regranted = await adminUpdate(userId, { roles: ["gia-chu", "chuong-mon"] });
   assert(regranted.ok, "ban lại vai phải thành công");
   const afterRegrant = await findById(userId);
   assert(
-    JSON.stringify(afterRegrant?.roles) === JSON.stringify(["gia-chu", "admin"]),
+    JSON.stringify(afterRegrant?.roles) === JSON.stringify(["gia-chu", "chuong-mon"]),
     "ban lại vai phải khôi phục đủ",
   );
   console.log("✔ Sửa vai: thu bớt, thu sạch, ban lại — mỗi lượt ghi đặt lại TRỌN tập vai.");
@@ -194,7 +194,7 @@ try {
   const afterRename = await findById(userId);
   assert(afterRename?.displayName === "Kiểm vai (đã đổi tên)", "tên hiển thị phải đổi thật");
   assert(
-    JSON.stringify(afterRename?.roles) === JSON.stringify(["gia-chu", "admin"]),
+    JSON.stringify(afterRename?.roles) === JSON.stringify(["gia-chu", "chuong-mon"]),
     "sửa hồ sơ mà không gửi vai thì vai phải giữ NGUYÊN, không bị thu mất",
   );
   console.log("✔ Sửa hồ sơ không kèm vai: vai giữ nguyên (đường `updateProfile` của mọi đạo hữu đi lối này).");
@@ -206,7 +206,7 @@ try {
   const listed = await listUsers({ search: username });
   assert(listed.length === 1, `tìm theo đạo hiệu phải ra đúng một người, nhận được ${listed.length}`);
   assert(
-    JSON.stringify(listed[0].roles) === JSON.stringify(["gia-chu", "admin"]),
+    JSON.stringify(listed[0].roles) === JSON.stringify(["gia-chu", "chuong-mon"]),
     `danh sách phải mang đủ vai theo thang vai — nhận được ${JSON.stringify(listed[0].roles)}`,
   );
   const listedPlainly = await listUsers({});
@@ -263,11 +263,11 @@ try {
 
   // Vai kiểm thử không nằm trong danh mục của code, nên `writeRoles` phải THU nó như mọi mã
   // lạ khác — tiện thể gỡ luôn ràng buộc để `finally` dọn được vai ấy.
-  const cleaned = await adminUpdate(userId, { roles: ["gia-chu", "admin"] });
+  const cleaned = await adminUpdate(userId, { roles: ["gia-chu", "chuong-mon"] });
   assert(cleaned.ok, "ghi lại vai phải thành công");
   const afterClean = await findById(userId);
   assert(
-    JSON.stringify(afterClean?.roles) === JSON.stringify(["gia-chu", "admin"]),
+    JSON.stringify(afterClean?.roles) === JSON.stringify(["gia-chu", "chuong-mon"]),
     `một lượt ghi vai phải thu cả vai ngoài danh mục — nhận được ${JSON.stringify(afterClean?.roles)}`,
   );
   console.log("✔ Hàng rào database: mã vai lạ bị khoá ngoại chặn, vai đang có người mang thì không xoá được.");

@@ -64,10 +64,10 @@ export async function setStatusAction(userId: string, status: string): Promise<A
   if (!target) {
     return { ok: false, message: "Không tìm thấy đạo hữu này." };
   }
-  // Đình quyền một Trưởng môn cũng chính là vô hiệu hoá họ — nên nó đi qua đúng ma trận
+  // Đình quyền một người mang vai cũng chính là vô hiệu hoá họ — nên nó đi qua đúng ma trận
   // như trục xuất, không có cửa riêng "chỉ đổi trạng thái thôi mà".
   if (userId !== admin.id && !canManageUser(admin, target)) {
-    return { ok: false, message: "Trưởng môn không đụng được người mang vai — việc của Gia chủ." };
+    return { ok: false, message: "Bậc trị sự không đụng được người mang vai — việc của Gia chủ." };
   }
 
   await setStatus(userId, parsed.data);
@@ -149,7 +149,7 @@ export async function updateUserAction(_prev: AdminResult | null, formData: Form
     return { ok: false, message: "Không tìm thấy đạo hữu này." };
   }
   if (userId !== admin.id && !canManageUser(admin, target)) {
-    return { ok: false, message: "Trưởng môn không đụng được người mang vai — việc của Gia chủ." };
+    return { ok: false, message: "Bậc trị sự không đụng được người mang vai — việc của Gia chủ." };
   }
   if (userId === admin.id && parsed.data.status !== "active") {
     return { ok: false, message: "Không thể tự khoá chính mình." };
@@ -205,7 +205,7 @@ export async function deleteUserAction(userId: string): Promise<AdminResult> {
     return { ok: false, message: "Không tìm thấy đạo hữu này." };
   }
   if (!canManageUser(admin, target)) {
-    return { ok: false, message: "Trưởng môn không trục xuất được người mang vai — việc của Gia chủ." };
+    return { ok: false, message: "Bậc trị sự không trục xuất được người mang vai — việc của Gia chủ." };
   }
 
   const result = await adminDelete(userId);
@@ -417,7 +417,7 @@ export async function saveChatSettingsAction(
  * BA hàng rào, và không cái nào thừa:
  *   1. `requireAdmin()` như mọi action ở đây.
  *   2. Quyền `chat.purge` — bảng quyền chỉ ban nó cho Gia chủ. Cùng một mạch lý lẽ với
- *      `deleteMessage`: thu hồi lời nói là việc của người đã nói, nên để một Trưởng môn xoá
+ *      `deleteMessage`: thu hồi lời nói là việc của người đã nói, nên để một người bậc trị sự xoá
  *      trắng lịch sử đàm đạo của cả tông môn thì sảnh chung thành thứ ai cầm quyền nấy viết
  *      lại. Và permissions.ts đã nói rõ vì sao admin không được là quyền lớn nhất — "admin
  *      nào cũng chỉ an toàn cho tới khi một admin khác đổi ý". Hỏi QUYỀN chứ không hỏi
@@ -439,7 +439,7 @@ export async function purgeChatAction(
 ): Promise<AdminResult> {
   const admin = await requireAdmin();
   if (!hasPermission(admin, "chat.purge")) {
-    return { ok: false, message: "Thanh tẩy cả sảnh là việc của Gia chủ — Trưởng môn không mở được cửa này." };
+    return { ok: false, message: "Thanh tẩy cả sảnh là việc của Gia chủ — bậc trị sự không mở được cửa này." };
   }
   if (!matchesChatPurgePhrase(String(formData.get("confirm") ?? ""))) {
     return { ok: false, message: `Gõ đúng「${CHAT_PURGE_PHRASE}」vào ô xác nhận rồi hãy bấm.` };

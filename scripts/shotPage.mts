@@ -113,7 +113,9 @@ if (!user) {
 const roles: string[] = user.roles ?? [];
 const token = await new SignJWT({
   username: user.username,
-  role: roles.some((r) => ["gia-chu", "admin", "chuong-mon", "thai-thuong-truong-lao"].includes(r)) ? "admin" : "user",
+  // `"admin"` bên PHẢI là claim của JWT phiên (`user | admin`), KHÔNG phải mã vai — vai
+  // `admin` đã bị gỡ khỏi thang vai, claim này thì giữ nguyên.
+  role: roles.some((r) => ["gia-chu", "chuong-mon", "thai-thuong-truong-lao"].includes(r)) ? "admin" : "user",
 })
   .setProtectedHeader({ alg: "HS256" })
   .setSubject(user.id as string)

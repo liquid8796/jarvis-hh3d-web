@@ -16,14 +16,13 @@
  *
  *   gia-chu  — Gia chủ, vai lớn nhất. Một mình vai này sửa/xoá được người mang vai, và cũng
  *              là vai DUY NHẤT được đổi vai của bất kỳ ai. Sinh ra để bịt một lỗ hổng có
- *              thật: trước đây hai Trưởng môn ngang quyền hạ vai hay trục xuất được lẫn
- *              nhau — admin nào cũng chỉ an toàn cho tới khi một admin khác đổi ý.
+ *              thật: trước đây hai vai trị sự ngang quyền hạ vai hay trục xuất được lẫn
+ *              nhau — ai cũng chỉ an toàn cho tới khi một người ngang vai đổi ý.
  *
- *   Ba vai NGANG NHAU ở bậc trị sự — khác nhau ở danh xưng, không ở quyền:
+ *   Hai vai ở bậc trị sự:
  *     thai-thuong-truong-lao — Thái thượng trưởng lão
  *     chuong-mon             — Chưởng môn
- *     admin                  — Trưởng môn
- *   Cả ba: duyệt, sửa, trục xuất MÔN ĐỒ THƯỜNG; không đụng được người mang vai, kể cả người
+ *   Cả hai: duyệt, sửa, trục xuất MÔN ĐỒ THƯỜNG; không đụng được người mang vai, kể cả người
  *   mang đúng vai của mình. Nghe thì lạ — một Chưởng môn không sửa nổi một Chưởng môn khác —
  *   nhưng đó CHÍNH LÀ lỗ hổng mà bậc Gia chủ sinh ra để bịt, và thêm vai mới không phải là
  *   lý do để mở lại nó.
@@ -53,7 +52,6 @@ export const ASSIGNABLE_ROLES = [
   "gia-chu",
   "thai-thuong-truong-lao",
   "chuong-mon",
-  "admin",
   "de-tu",
 ] as const;
 export type Role = (typeof ASSIGNABLE_ROLES)[number];
@@ -62,7 +60,6 @@ export const ROLE_LABEL: Record<Role, string> = {
   "gia-chu": "Gia chủ",
   "thai-thuong-truong-lao": "Thái thượng trưởng lão",
   "chuong-mon": "Chưởng môn",
-  admin: "Trưởng môn",
   "de-tu": "Đệ tử",
 };
 
@@ -80,7 +77,7 @@ export const ROLE_LABEL: Record<Role, string> = {
  * miền, đặt hạn lưu, bật/tắt bế quan) — một mã không ai hỏi tới thì không phải hàng rào, chỉ
  * là một dòng trong bảng chờ mục rữa.
  *
- * `admin.panel` và `member.manage` hiện do CÙNG bốn vai nắm giữ, và đó không phải trùng lặp:
+ * `admin.panel` và `member.manage` hiện do CÙNG ba vai nắm giữ, và đó không phải trùng lặp:
  * chúng trả lời hai câu khác nhau — "mở được trang Tông Môn" và "ra tay được với môn đồ".
  * Ngày có một vai chỉ để NGỒI XEM, hai câu ấy tách đôi ngay, và chỗ tách đã có sẵn tên.
  */
@@ -117,7 +114,6 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   "gia-chu": PERMISSIONS,
   "thai-thuong-truong-lao": TRI_SU_PERMISSIONS,
   "chuong-mon": TRI_SU_PERMISSIONS,
-  admin: TRI_SU_PERMISSIONS,
   /**
    * Đệ tử KHÔNG mở được việc gì cả, và mảng rỗng này là một lời khai chứ không phải một chỗ
    * chưa điền: vai này là DANH XƯNG cho môn đồ thường, để bảng môn đồ và sảnh đàm đạo gọi họ
@@ -145,7 +141,6 @@ const ROLE_SHIELDS_BEARER: Record<Role, boolean> = {
   "gia-chu": true,
   "thai-thuong-truong-lao": true,
   "chuong-mon": true,
-  admin: true,
   "de-tu": false,
 };
 
@@ -195,7 +190,7 @@ export function isOwner(user: RoleBearer): boolean {
   return user.roles.includes("gia-chu");
 }
 
-/** "Có quyền trị sự" — cửa `requireAdmin`. Cả bốn vai đều mở được. */
+/** "Có quyền trị sự" — cửa `requireAdmin`. Cả ba vai đều mở được. */
 export function isAdminUser(user: RoleBearer): boolean {
   return hasPermission(user, "admin.panel");
 }
@@ -229,7 +224,7 @@ export function canManageUser(actor: RoleBearer, target: RoleBearer): boolean {
   return false;
 }
 
-/** Đổi VAI là đặc quyền của riêng Gia chủ — admin thăng một môn đồ lên admin cũng là đổi vai. */
+/** Đổi VAI là đặc quyền của riêng Gia chủ — một Chưởng môn thăng ai đó lên ngang mình cũng là đổi vai. */
 export function canEditRoles(actor: RoleBearer): boolean {
   return hasPermission(actor, "role.assign");
 }

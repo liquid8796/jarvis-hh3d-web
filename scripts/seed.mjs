@@ -36,7 +36,7 @@ if (existing.length > 0) {
 }
 
 const hash = bcrypt.hashSync(password, 12);
-const seedRoles = ["gia-chu", "admin"];
+const seedRoles = ["gia-chu", "chuong-mon"];
 
 /**
  * Tài khoản hạt giống giữ CẢ HAI vai: gia-chu (vai duy nhất đổi được vai người khác — không

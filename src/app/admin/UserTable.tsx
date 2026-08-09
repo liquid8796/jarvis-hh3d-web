@@ -32,15 +32,14 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 /**
- * Màu huy hiệu theo HẠNG QUYỀN, không theo tên vai — nên ba vai bậc trị sự dùng chung một
+ * Màu huy hiệu theo HẠNG QUYỀN, không theo tên vai — nên hai vai bậc trị sự dùng chung một
  * màu là ĐÚNG, không phải lười: nhìn bảng mà đoán được ai đụng được ai thì màu phải nói về
- * quyền. Chữ trên huy hiệu đã đủ phân biệt Chưởng môn với Trưởng môn.
+ * quyền. Chữ trên huy hiệu đã đủ phân biệt Chưởng môn với Thái thượng trưởng lão.
  */
 const ROLE_BADGE_CLASS: Record<Role, string> = {
   "gia-chu": "badge-owner",
   "thai-thuong-truong-lao": "badge-admin",
   "chuong-mon": "badge-admin",
-  admin: "badge-admin",
   // Đệ tử không mang quyền nào, nên nó KHÔNG được đeo màu của bậc trị sự — mượn sắc nhã của
   // huy hiệu tag. Đúng theo luật ghi ở trên: màu nói về quyền, và vai này không mở gì cả.
   "de-tu": "badge-tag",

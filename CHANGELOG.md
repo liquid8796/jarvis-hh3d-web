@@ -11,6 +11,68 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.57.7 — xoá vai `admin`, gộp vào `chuong-mon`
+
+Thang vai còn BỐN: `gia-chu`, `thai-thuong-truong-lao`, `chuong-mon`, `de-tu`. Danh xưng
+「Trưởng môn」biến mất khỏi hệ thống.
+
+**Gộp được mà không mất gì của ai**, vì `admin` và `chuong-mon` xưa nay nắm ĐÚNG một bộ quyền
+(`TRI_SU_PERMISSIONS`) — chúng chỉ khác nhau ở cái tên. Đây là bỏ một danh xưng thừa, không
+phải hạ quyền. Lúc migration chạy, `user_roles` không có dòng nào mang `admin` (đã đếm trước
+và sau), nên không môn đồ nào bị đụng tới.
+
+Migration `0016` vẫn viết đủ bước chuyển người sang `chuong-mon` trước khi xoá, dù bước ấy là
+phép rỗng: nó phải đúng cả khi có người kịp nhận vai giữa lúc viết và lúc chạy trên production.
+`role_permissions` của `admin` tự rụng theo `ON DELETE CASCADE`.
+
+**Chỗ suýt sót:** `de-tu` phải tụt `sort_order` từ 4 xuống 3. Không phải thẩm mỹ —
+`verify:roles` khẳng định `sort_order` bằng ĐÚNG chỉ số của vai trong `ASSIGNABLE_ROLES`, mà
+`admin` vừa rời vị trí 3. Quên là thang vai dưới database thủng một nấc.
+
+**Bốn nghĩa của chữ "admin" trong repo, và chỉ MỘT bị xoá:**
+
+| Chỗ | Nghĩa | Đã đụng? |
+|---|---|---|
+| `ASSIGNABLE_ROLES`, bảng `roles` | mã VAI | **xoá** |
+| `role: "user" \| "admin"` trong JWT phiên | claim của token | giữ nguyên |
+| `/admin`, `/api/admin/*`, `admin.panel` | đường dẫn & mã QUYỀN | giữ nguyên |
+| `ADMIN_USERNAME`, đạo hiệu `admin` khi gieo mầm | TÊN ĐĂNG NHẬP | giữ nguyên |
+
+Trình biên dịch làm phần lớn việc rà: `ROLE_LABEL`, `ROLE_PERMISSIONS`, `ROLE_SHIELDS_BEARER`
+và `ROLE_BADGE_CLASS` đều là `Record<Role, …>`, nên bỏ `admin` khỏi `ASSIGNABLE_ROLES` là `tsc`
+tự chỉ ra từng chỗ còn khai thừa.
+
+Kèm theo: mấy câu báo lỗi xưng hô「Trưởng môn không đụng được người mang vai」đổi sang gọi theo
+BẬC (「Bậc trị sự…」) — giữ nguyên là gọi sai tên một Chưởng môn. Và bộ `verify:permissions`
+được dọn: hai fixture `admin`/`admin2` nay trùng hệt `master`/`master2` nên bỏ hẳn, còn dòng
+kiểm「ngang vai không ai đụng được ai」đổi sang cặp KHÁC vai (Thái thượng × Chưởng môn) — để
+nguyên thì nó so một fixture với chính nó.
+
+## 0.58.0 — Hàng Đợi có nút Dừng cho đàn kẹt mãi không thông
+
+- **Gia chủ và Thái thượng trưởng lão dừng được MỘT đàn bất kỳ** ngay trên trang Hàng Đợi —
+  dành cho lúc một đàn cứ kẹt vòng này qua vòng khác mà không ai gỡ được.
+- **Đây là lần đầu ba vai bậc trị sự thôi ngang nhau.** Chưởng môn KHÔNG có quyền này, cố ý:
+  dừng đàn là đụng vào việc đang chạy của người khác, và tông môn muốn ít tay chạm vào đó.
+  Câu「ba vai ngang nhau」ở đầu `permissions.ts` vẫn đúng ở chỗ nó nói — quản người — và giờ
+  có đúng một chỗ chúng khác nhau.
+- **Là lời THỈNH CẦU, không phải lệnh giết**, y hệt nút Thu Đàn của chính chủ: đàn đang xếp
+  hàng chết ngay, đàn đang chạy chuyển sang「đang thu」rồi khôi lỗi tự dừng ở điểm an toàn kế
+  tiếp. Cân nhắc rồi mới chọn thế — ép thẳng sang `stopped` sẽ để khôi lỗi chạy nốt vòng rồi
+  báo cáo vào một đàn đã terminal, mà `reapStaleJobs` vốn đã dọn hộ ca khôi lỗi CHẾT trong 3
+  phút. Ca còn lại — khôi lỗi SỐNG mà vòng nào cũng hỏng rồi tự xếp lại — chính là ca cần nút
+  này, và「đang thu」cắt đúng vòng lặp ấy.
+- **Nhật ký của đàn gọi đích danh người ra lệnh**, mức `warning`. Chủ đàn mở Auto lên phải
+  hiểu ngay vì sao đàn mình dừng, chứ không phải ngồi đoán.
+- **Bấm lại một đàn đang dừng thì bị từ chối và KHÔNG ghi thêm nhật ký** — một dòng nữa sẽ nói
+  dối là vừa có lệnh mới. Phân biệt được ca ấy nhờ tự-join đọc trạng thái CŨ trong cùng câu
+  lệnh, vì `returning` chỉ trả về hàng mới.
+- Lệnh này đánh thức realtime (`notifyDashboard`), thứ mà nút Thu Đàn của chính chủ không làm —
+  người ra lệnh đang đứng nhìn đúng cái bảng ấy, không có lý do bắt họ đợi nhịp soát 30 giây.
+- `npm run verify:force-stop` đóng đinh bảy điều trên database thật, trong đó có điều dễ chép
+  nhầm nhất: dừng một đàn KHÔNG được kéo theo đàn khác của cùng chủ (`requestStop` thì dừng
+  tất cả — hai hàm ở sát nhau và chỉ khác đúng chỗ ấy).
+
 ## 0.57.6 — bỏ hai đoạn chữ dẫn giải trong Ngọc Giản
 
 - **Bỏ đoạn mở đầu của khối chọn hạng tài khoản** ("Một bộ cấu hình chung cho cả đội…") và

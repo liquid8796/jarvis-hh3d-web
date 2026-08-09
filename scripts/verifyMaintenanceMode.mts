@@ -60,7 +60,7 @@ const OFF = { active: false } as const;
 const ON = { active: true } as const;
 const MEMBER = { roles: [] as string[] };
 
-for (const viewer of [null, MEMBER, { roles: ["admin"] }, { roles: ["gia-chu"] }]) {
+for (const viewer of [null, MEMBER, { roles: ["chuong-mon"] }, { roles: ["gia-chu"] }]) {
   assert(maintenanceViewFor(OFF, viewer) === "open", "cửa mở thì KHÔNG ai bị chắn, cũng không ai thấy dải nhắc");
 }
 
@@ -94,11 +94,11 @@ for (const role of ASSIGNABLE_ROLES) {
   );
 }
 assert(
-  maintenanceViewFor(ON, { roles: ["de-tu", "admin"] }) === "banner",
+  maintenanceViewFor(ON, { roles: ["de-tu", "chuong-mon"] }) === "banner",
   "đeo thêm danh xưng đệ tử KHÔNG được lấy mất quyền đi qua của một Trưởng môn",
 );
 assert(
-  maintenanceViewFor(ON, { roles: ["admin", "choi-choi"] }) === "banner",
+  maintenanceViewFor(ON, { roles: ["chuong-mon", "choi-choi"] }) === "banner",
   "mang thêm một vai lạ không được làm mất quyền trị sự",
 );
 

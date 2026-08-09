@@ -75,19 +75,19 @@ function ChatFrameOrnaments() {
     <>
       {FRAME_CORNERS.map((corner) => (
         <svg key={corner} className={`chat-corner chat-corner-${corner}`} viewBox="0 0 58 58" aria-hidden>
-          {/* Nét CHÍNH: chạy song song với đường bo của khung — cung r=14 khớp với
-              border-radius 20px trừ đi khoảng cách 6px của ngoặc. */}
-          <path d="M57 6 H20 A14 14 0 0 0 6 20 V57" strokeWidth="1.6" strokeLinecap="round" />
-          {/* Nét PHỤ cách 5px, ngắn hơn — nét đôi CHỈ dày lên ở vùng góc, còn giữa cạnh vẫn
-              một nét, đúng như bản thiết kế. Bản trước để cách 8px và kéo dài quá tay, nên góc
-              trông thưa và rời rạc thay vì là một khối hoa văn.
+          {/* MỘT nét duy nhất, chạy song song với đường bo của khung — cung r=14 khớp với
+              border-radius 20px trừ đi khoảng cách 6px của ngoặc.
 
-              CỐ Ý dừng ở hai nét: đã thử thêm một lớp mây cuộn nằm sâu trong góc cho giống
-              phần hoa văn thấp thoáng ở hình mẫu, nhưng ảnh chụp cho thấy nó ĐÈ LÊN chữ
-              "Phòng Chat" (header chỉ cách mép 22px) — và soi lại thì phần "hoa văn" ấy ở
-              hình mẫu nhiều khả năng là cành cây của ảnh nền lọt qua, không phải nét của
-              khung. Không thêm trang trí phỏng đoán để rồi phá chữ thật. */}
-          <path d="M42 11 H25 A14 14 0 0 0 11 25 V42" strokeWidth="1" strokeLinecap="round" opacity="0.6" />
+              Ngoặc góc từng có nét thứ hai chạy sâu hơn 5px (nét đôi ở vùng góc); bỏ ngày
+              09/08/2026 theo ý đạo hữu — tính từ mép khung vào thì các nét xếp 0px (viền
+              ngoài) → 7px (đường chỉ `.chat-shell::before`) → 10px (nét này), và nét thứ hai
+              nằm tận 15px là lớp TRONG CÙNG, đọc ra thành một khung nữa lồng bên trong. Hai
+              nét còn lại giữ nguyên: chúng mới là viền của khung.
+
+              VÀ ĐỪNG THÊM hoa văn nào vào sâu trong góc để "bù" lại chỗ trống. Đã thử một
+              lớp mây cuộn ở đó: ảnh chụp cho thấy nó ĐÈ LÊN chữ "Phòng Chat", vì header chỉ
+              cách mép 22px. Góc này không có chỗ cho lớp thứ hai. */}
+          <path d="M57 6 H20 A14 14 0 0 0 6 20 V57" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
       ))}
 

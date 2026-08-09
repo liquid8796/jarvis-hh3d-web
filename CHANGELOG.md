@@ -11,6 +11,27 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.50.1 — khung son 0.49.0 mới đổi MÀU ÁO, bản này đổi DÁNG KHUNG cho đúng thiết kế
+
+- Đạo hữu đặt bản thiết kế cạnh 0.49.0 và nói thẳng: vẫn giống cũ. Đúng — lần trước chỉ tô
+  lại màu trên bố cục cũ. Những thứ làm nên DÁNG của bản thiết kế thì còn thiếu cả, và bản
+  này bù từng cái một:
+  - **Bốn ngoặc góc** chữ L bằng tám dải gradient trên một element — không ảnh, không thêm DOM.
+  - **Ấn ở đỉnh** thành SVG hai nhánh mây ôm một kim châm, thay cho một ký tự ❖ bé xíu; kèm
+    viên kim châm nhỏ đậu cuối đường chỉ dưới header như trong hình.
+  - **Mốc ngày là chữ trần canh phải** với đường chỉ mảnh chạy từ trái tới — 0.49.0 bọc nó
+    trong một viên thuốc có viền, thứ không hề tồn tại trong bản thiết kế.
+  - **Bong bóng bỏ viền**: cấu trúc đến từ chênh sáng của khối màu, không phải nét kẻ; và
+    **mốc giờ dọn vào TRONG bong bóng, cuối dòng chữ**(「…thật đấy. 00:48」) bằng float phải
+    kèm clearfix — câu ngắn thì giờ cùng dòng, câu dài thì nó lặn xuống góc phải đáy.
+  - **Nút chữ「Truyền Âm」thành ấn tròn mũi tên**; khay chọn dời sang trái ô nhập (💬), kẹp
+    file đứng cạnh nút gửi — đúng đội hình ba nút tròn của bản thiết kế.
+  - Chân dung 56px nhỉnh hơn bài vị 44px một bậc, tên người nói mang font hiển thị serif,
+    hàng tin thở rộng 18px.
+- Đo trên trình duyệt thật (mongod nội bộ, đủ 5 nhân vật của bản thiết kế): 8 dải ngoặc góc,
+  ấn SVG có mặt, ngày không viền + kẻ chỉ trái, bong bóng viền trong suốt, giờ float phải và
+  ĐỨNG CÙNG DÒNG với câu ngắn, nút gửi 42px tròn — và gửi thật một tin bằng chính ấn mũi tên.
+
 ## 0.50.0 — ảnh đại diện động: WebP động và APNG được vào cùng GIF
 
 - **Cả BA loại ảnh động đều giữ được phần động**: GIF, WebP động, APNG. Trước bản này chỉ GIF

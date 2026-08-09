@@ -425,9 +425,28 @@ export function ChatRoom({
         if (e.dataTransfer.files.length) void upload(e.dataTransfer.files);
       }}
     >
+      {/* Hoa văn của khung — bốn ngoặc góc và ấn ở đỉnh. Là phần TRANG TRÍ thuần nên nằm
+          ngoài dòng chảy nội dung, pointer-events tắt trong CSS; SVG tự vẽ để không tải
+          thêm một asset nào. */}
+      <i className="chat-corners" aria-hidden />
+      <span className="chat-finial" aria-hidden>
+        <svg viewBox="0 0 120 34" width="120" height="34">
+          <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            {/* hai nhánh mây đối xứng */}
+            <path d="M10 22 C 26 12, 40 12, 50 18" />
+            <path d="M110 22 C 94 12, 80 12, 70 18" />
+            <path d="M18 24 C 30 18, 40 18, 48 22" opacity="0.55" />
+            <path d="M102 24 C 90 18, 80 18, 72 22" opacity="0.55" />
+          </g>
+          {/* ấn giữa: kim châm trên một cánh hoa */}
+          <path d="M60 4 L67 15 L60 28 L53 15 Z" fill="currentColor" opacity="0.9" />
+          <path d="M60 9 L63.5 15 L60 22 L56.5 15 Z" fill="#0b0e20" />
+        </svg>
+      </span>
+
       <header className="chat-head">
         <div>
-          <h1 className="h-display text-lg font-semibold text-gilded">Phòng Chat</h1>
+          <h1 className="h-display text-2xl font-semibold text-gilded">Phòng Chat</h1>
           <p className="text-xs text-[var(--color-mist)]">
             Sảnh đàm đạo chung — mọi môn đồ đã nhập môn đều nghe thấy nhau.
           </p>
@@ -470,9 +489,9 @@ export function ChatRoom({
                   <Avatar
                     name={msg.author}
                     url={avatars[msg.userId]}
-                    // 44 thay vì 34 từ bản khung son: chân dung giờ mang vòng kim quang và
-                    // đứng cạnh một bài vị cao 34px — nhỏ hơn bài vị thì lép vế.
-                    size={44}
+                    // 56 theo tỉ lệ của bản thiết kế: chân dung phải NHỈNH hơn bài vị (44px)
+                    // — nó là mặt người, bài vị chỉ là danh xưng đi kèm.
+                    size={56}
                     // Tin nối tiếp cùng người thì vòng tròn ẨN mà vẫn CHIẾM chỗ, để mọi bong
                     // bóng của cùng một người thẳng một hàng lề.
                     className={grouped ? "invisible" : ""}
@@ -642,10 +661,7 @@ export function ChatRoom({
             onGif={(g) => void sendGif(g)}
           />
         )}
-        <button type="button" className="chat-tool" title="Emoji, sticker & GIF" data-chat-popup-trigger onClick={() => openPanel("emoji")}>😊</button>
-        <button type="button" className="chat-tool" title="Gửi file" disabled={uploading} onClick={() => fileRef.current?.click()}>
-          {uploading ? "…" : "📎"}
-        </button>
+        <button type="button" className="chat-tool" title="Emoji, sticker & GIF" data-chat-popup-trigger onClick={() => openPanel("emoji")}>💬</button>
         <input
           ref={fileRef}
           type="file"
@@ -681,8 +697,22 @@ export function ChatRoom({
           placeholder="Truyền âm cho cả tông môn… (Enter gửi, Alt+Enter xuống dòng)"
           className="chat-input"
         />
-        <button type="button" className="btn btn-gold chat-send" onClick={() => void send()} disabled={uploading}>
-          Truyền Âm
+        {/* Hai nút tròn bên phải theo bản thiết kế: kẹp file và ấn Truyền Âm (mũi tên).
+            Nút gửi là ICON chứ không còn chữ — chữ nằm ở title/aria cho ai cần đọc. */}
+        <button type="button" className="chat-tool" title="Gửi file" disabled={uploading} onClick={() => fileRef.current?.click()}>
+          {uploading ? "…" : "📎"}
+        </button>
+        <button
+          type="button"
+          className="chat-send"
+          title="Truyền Âm (Enter)"
+          aria-label="Truyền Âm"
+          onClick={() => void send()}
+          disabled={uploading}
+        >
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden>
+            <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+          </svg>
         </button>
       </footer>
     </div>

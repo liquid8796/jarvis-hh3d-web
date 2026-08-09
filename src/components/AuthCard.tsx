@@ -10,14 +10,23 @@ import { SectSeal } from "./SectSeal";
 export function AuthCard({
   title,
   subtitle,
+  backdrop,
   children,
 }: {
   title: string;
   subtitle: string;
+  /**
+   * Mã trang cho tấm nền (xem `validation/backdrops.ts`). Khung này phục vụ HAI trang, và hai
+   * trang ấy chọn nền riêng được — nên mã phải đi vào từ ngoài, không nằm cứng ở đây.
+   */
+  backdrop: string;
   children: React.ReactNode;
 }) {
   return (
-    <main className="mx-auto flex min-h-[80dvh] w-full max-w-md flex-col items-center justify-center px-4 py-12 sm:px-6">
+    <main
+      data-backdrop={backdrop}
+      className="mx-auto flex min-h-[80dvh] w-full max-w-md flex-col items-center justify-center px-4 py-12 sm:px-6"
+    >
       <div className="card card-hairline rise-in w-full p-6 sm:p-8">
         <div className="mb-6 flex flex-col items-center text-center">
           <SectSeal size="3.6rem" />

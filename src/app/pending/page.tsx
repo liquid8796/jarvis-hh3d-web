@@ -17,7 +17,7 @@ export default async function PendingPage() {
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto flex w-full max-w-lg flex-col items-center px-4 py-20 text-center sm:px-6">
+      <main data-backdrop="pending" className="mx-auto flex w-full max-w-lg flex-col items-center px-4 py-20 text-center sm:px-6">
         <div className="card card-hairline rise-in w-full p-10">
           <SectSeal size="4.4rem" />
           <h1 className="h-display mt-6 text-2xl font-bold text-gilded">

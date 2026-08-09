@@ -52,58 +52,24 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
-   Nền: tấm ảnh gốc "Nam Cung Uyển dưới trăng" (public/backdrop.png), cố định
-   sau mọi nội dung. KHÔNG phủ lớp tối, không filter — yêu cầu là ảnh nguyên
-   vẹn, và độ đọc được đã do header/card tự lo bằng nền mờ của chính chúng.
-   Màu lót #060b1a chỉ hiện trong tích tắc ảnh chưa tải xong, và ở tỉ lệ màn
-   hình cực đoan mà cover phải cắt — nó là màu trời của chính tấm ảnh.
+   Nền: cố định sau mọi nội dung. KHÔNG phủ lớp tối, không filter — yêu cầu là
+   ảnh nguyên vẹn, và độ đọc được đã do header/card tự lo bằng nền mờ của chính
+   chúng. Màu lót #060b1a chỉ hiện trong tích tắc ảnh chưa tải xong, và ở tỉ lệ
+   màn hình cực đoan mà cover phải cắt — nó là màu trời của tấm ảnh gốc.
+
+   Tấm ghi ở đây là NỀN CỨU HỘ, đáy của một cái thang ba nấc: nền riêng của
+   trang → nền mặc định → tấm này. Hai nấc trên tới từ app_settings và được
+   layout gốc rót vào một thẻ <style> đặt TRƯỚC phần tử này (xem layout.tsx);
+   luật dưới đây chỉ còn hiệu lực khi tàng khố chưa mở, khi chưa ai đặt nền mặc
+   định, hoặc khi URL đã lưu không qua nổi phép làm sạch. Đó là lý do nó vẫn
+   được gõ cứng và tấm ảnh vẫn nằm trong repo: một tông môn không có nền còn
+   được, một tông môn chỉ còn màu đen trơn thì không.
 --------------------------------------------------------------------------- */
 .backdrop {
   position: fixed;
   inset: 0;
   z-index: -1;
   background: #060b1a url("/backdrop.png") center / cover no-repeat;
-}
-
-/* Hàng Đợi Công Việc mang tấm nền RIÊNG ("Tử Linh Tiên Tử", public/backdrop-hang-doi.png).
-   Trang ấy đánh dấu bằng `data-backdrop="hang-doi"` trên <main>, và luật này tìm dấu ấy —
-   `.backdrop` là con đầu của <body> trong layout gốc, tức KHÔNG phải tổ tiên của trang, nên
-   không có đường nào cho trang tự đổi nền mình ngoài việc đi vòng qua <body>.
-
-   Vì sao không dùng JS (`usePathname` rồi gắn class): tấm nền là thứ được vẽ SỚM NHẤT trên
-   trang, còn một quyết định chạy sau hydrate thì luôn đến sau nước sơn đầu tiên — người dùng
-   sẽ thấy tấm nền cũ loé lên rồi mới bị thay. Luật CSS thì đã nằm sẵn trong stylesheet ở
-   <head> lúc trình duyệt tính kiểu lần đầu.
-
-   ĐIỀU KIỆN để luật này không tốn gì, và nó đã được ĐO chứ không phải đoán: `.backdrop` nằm
-   TRƯỚC <main> trong HTML (byte 2264 so với 4387), nên nếu trình duyệt tính kiểu lúc dấu chưa
-   được phân tích thì `:has()` chưa khớp, nó tải tấm MẶC ĐỊNH rồi mới đổi — tức 2MB thừa cộng
-   một cú nháy ảnh. Dựng sân thử riêng với đúng hình dạng DOM này: gửi trọn tài liệu một cục
-   thì trình duyệt chỉ tải MỘT tấm (tấm đúng); cắt làm hai với 300ms ở giữa thì nó tải CẢ HAI.
-   Và trang thật gửi một cục — production trả trọn 17,5KB với TTFB 1,628s, tổng 1,631s, chênh
-   2,5ms, không một dấu streaming nào trong HTML.
-
-   Nó gửi một cục vì trang KHÔNG có `loading.tsx` (tức không có ranh giới Suspense phía trên),
-   và đó cũng chính là chủ ý đã ghi trong hang-doi/page.tsx: ảnh chụp đầu tiên dựng sẵn ở
-   server "để trang không loé lên khoảng trống". Nên nếu ai đó thêm `loading.tsx` cho trang
-   này, hãy biết là mình vừa đánh đổi thêm một lượt tải 2MB và một cú nháy nền — hai chủ ý ấy
-   đứng cùng một chỗ, không phải trùng hợp.
-
-   Trình duyệt chưa biết `:has()` (Firefox <121, Safari <15.4) bỏ qua trọn luật này và nhận
-   tấm nền mặc định — một trang vẫn đẹp, chỉ là không có nền riêng. Đó là mức xuống thang đúng
-   cho một chi tiết thuần trang trí.
-
-   Chỉ đắp đè MÀU và ẢNH, không đụng `center / cover no-repeat` của luật trên — và cũng không
-   cần đụng khối @media dưới đây, vì tấm này ĐÚNG BẰNG 1672×941 như tấm gốc nên phép pan tranh
-   trên mobile vẫn khớp tỉ lệ. Ngày thay bằng ảnh tỉ lệ khác thì phải sửa cả `width: calc(...)`
-   ở đó, nếu không tranh sẽ bị méo mà không có gì kêu lên.
-
-   Màu lót là màu trời của CHÍNH tấm này (đo ở dải mép trái: #050d20), cùng lẽ với #060b1a của
-   tấm gốc — hai màu gần như trùng mắt thường, nhưng cặp "ảnh nào lót nấy" nằm chung một luật
-   thì lần thay ảnh sau không ai phải đi tìm. */
-body:has([data-backdrop="hang-doi"]) .backdrop {
-  background-color: #050d20;
-  background-image: url("/backdrop-hang-doi.png");
 }
 
 /* Trên điện thoại, `cover` là một cái máy chém: màn 375px chỉ còn thấy ~26% bề ngang tấm

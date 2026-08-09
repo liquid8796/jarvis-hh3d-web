@@ -31,7 +31,7 @@ export default async function DashboardPage() {
       {/* Trải trọn khung để thẳng hàng với thanh trên cùng, và lề ngang giữ đúng
           `px-4 sm:px-6` như nó — hai bên phải cùng một con số, nếu không thì ấn môn phái sẽ
           lệch vài pixel so với mép thẻ bên dưới. */}
-      <main className={`mx-auto w-full ${SHELL_WIDTH} px-4 pb-24 sm:px-6`}>
+      <main data-backdrop="dashboard" className={`mx-auto w-full ${SHELL_WIDTH} px-4 pb-24 sm:px-6`}>
         <div className="rise-in mb-8">
           <h1 className="h-display text-3xl font-bold text-gilded">Auto</h1>
           {/* Ba bước, nói ngay ở dòng đầu. Người mới mở trang này cần biết mình phải làm gì,

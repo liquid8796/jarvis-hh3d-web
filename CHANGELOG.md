@@ -11,6 +11,41 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.56.0 — tấm nền dời sang tàng khố, và mỗi trang chọn được nền riêng
+
+- **Tab Giao Diện mới trong trang Tông Môn**: tải ảnh nền lên, xem lưới ảnh trong kho, và gán
+  nền cho từng trang. Không sửa mã, không deploy — đổi nền giờ là một cú bấm.
+- **Ảnh nằm ở OCI** (tiền tố `backdrops/`), **phép gán nằm ở `app_settings`**, và **luật CSS do
+  layout gốc dựng ở mỗi lượt vẽ trang**. Trước bản này cả hai tấm nền đều gõ cứng trong
+  `globals.css` và nằm trong `public/`.
+- **Lưới ảnh đọc THẲNG từ kho**, không qua một sổ trong `app_settings` — khác hẳn Khung Tag.
+  Nghĩa là không có hai bản danh sách để mà lệch nhau, và một tấm vừa tải lên là thấy ngay dù
+  chưa gán cho trang nào. Cái giá: kho không giữ nhãn, nên tên hiển thị suy từ key.
+- **Thang rơi ba nấc**: nền riêng của trang → nền mặc định (cũng là nền trang chủ) → tấm cứu hộ
+  `public/backdrop.png` còn nằm trong repo. Nấc cuối cố ý giữ lại: một tông môn thiếu nền riêng
+  thì vẫn đẹp, một tông môn chỉ còn màu đen trơn thì không.
+- **Trang tự khai mình là ai** bằng `data-backdrop`, vì layout gốc không biết nó đang dựng
+  đường dẫn nào — và đường "proxy gắn đường dẫn vào header" đã được đo là không chạy trên
+  Next 16.2. Chín trang khai dấu; trang chủ không, vì nó CHÍNH LÀ nền mặc định.
+- **Một lỗ bảo mật do chính phép thử bắt được, trong mã của bản này.** URL trong `app_settings`
+  đi thẳng vào một thẻ `<style>`, nên phép làm sạch ở đó là ranh giới tin cậy thật. Bản đầu cho
+  qua `//example.com/a.png` — dấu gạch chéo nằm trong bộ ký tự hợp lệ nên chuỗi ấy vẫn là
+  "gạch chéo rồi toàn ký tự hợp lệ", mà nó là URL theo GIAO THỨC TƯƠNG ĐỐI: trình duyệt sẽ tải
+  tấm nền từ một tên miền lạ. `verify:backdrops` đóng đinh 15 ngả thoát ra, và đúng ngả này là
+  ngả đã đỏ.
+- **Xoá ảnh đang dùng thì bị từ chối**, kèm tên những chỗ đang treo nó — thay vì để lại một URL
+  chết và một trang lặng lẽ rơi về nền mặc định.
+- **Client gửi KEY, server tự dựng URL.** Nếu nhận URL từ client thì phép làm sạch là hàng rào
+  duy nhất; nhận key rồi tự dựng thì URL luôn là URL của chính kho, và phép làm sạch thành lớp
+  thứ hai.
+- Cửa bế quan và tấm nền giờ **dùng chung một lượt đọc `app_settings`** (`getRenderSettings`,
+  bọc `cache()` của React). Không chung thì mỗi lượt vẽ trang tốn hai câu truy vấn cho cùng một
+  dòng JSONB — và tệ hơn, hai câu ấy có thể trả về hai đời cấu hình nếu trưởng môn bấm Lưu đúng
+  khe giữa chúng.
+- `npm run media:backdrops` đưa tấm Hàng Đợi đang có lên kho rồi gán đúng chỗ cũ, idempotent —
+  chạy SAU khi deploy, vì bản code cũ không biết nhánh `appearance` và `saveAppSettings` sẽ
+  nuốt mất nó.
+
 ## 0.55.2 — khay emoji mang mặt cười, và đổi chỗ với nút kẹp file
 
 Thanh soạn Phòng Chat trước đây là `[💬] [ô nhập] [📎] [➤]`. Bong bóng thoại đọc ra là "nhắn

@@ -57,6 +57,17 @@ export const TAG_FRAME_PREFIX = "tag-frames";
 export const AVATAR_PREFIX = "avatar";
 
 /**
+ * Tiền tố các TẤM NỀN. Cùng lẽ với `tag-frames/`: tài sản cấu hình do bậc trị sự quản, vòng
+ * đời độc lập với `chat/` nên nút thanh tẩy sảnh không đụng tới.
+ *
+ * Khác một điểm quan trọng so với khung tag: tiền tố này CHÍNH LÀ thư viện. Lưới ảnh trong
+ * tab Giao Diện liệt kê thẳng từ kho (`listObjectsUnder`) chứ không đọc một sổ trong
+ * app_settings — nên không có hai bản danh sách để mà lệch nhau, và một tấm tải lên là thấy
+ * ngay dù chưa gán cho trang nào.
+ */
+export const BACKDROP_PREFIX = "backdrops";
+
+/**
  * Cache một tháng — đúng bằng mặc định cũ của Vercel Blob, nên hành vi trình duyệt không đổi.
  * Thêm `immutable` là an toàn TUYỆT ĐỐI ở đây, không phải liều: mỗi lần tải lên sinh một hậu
  * tố ngẫu nhiên mới, nên một key đã tồn tại thì nội dung của nó không bao giờ đổi nữa.
@@ -424,6 +435,45 @@ export function tagFrameObjectKey(label: string, kind: ImageKind): string {
   ].join("/");
 }
 
+/**
+ * Tên object cho một tấm nền: `backdrops/{tên}-{ngẫu nhiên}{đuôi}`.
+ *
+ * Giữ lại tên người tải lên đặt vì lưới ảnh trong tab Giao Diện KHÔNG có sổ nào để tra nhãn —
+ * nó đọc thẳng từ kho, nên cái tên nằm trong key chính là thứ duy nhất phân biệt được hai tấm
+ * với nhau bằng mắt. Hậu tố ngẫu nhiên vẫn bắt buộc, cùng lý do muôn thuở: `immutable` trong
+ * `CACHE_CONTROL` chỉ không nói dối chừng nào một key đã tồn tại thì nội dung không đổi nữa.
+ */
+export function backdropObjectKey(name: string, kind: ImageKind): string {
+  const stem = sanitizeFileName(name);
+  return [
+    BACKDROP_PREFIX,
+    `${hasWordCharacter(stem) ? stem : "nen"}-${randomBytes(SUFFIX_BYTES).toString("base64url")}${kind.extension}`,
+  ].join("/");
+}
+
+/** Tải một tấm nền lên kho. Cùng đường ống với khung tag — chỉ khác cách đặt tên. */
+export async function putBackdropFile(input: {
+  name: string;
+  kind: ImageKind;
+  body: Uint8Array;
+}): Promise<StoredFile> {
+  const { client, config } = requireStore();
+  const key = backdropObjectKey(input.name, input.kind);
+
+  await client.send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      Body: input.body,
+      ContentLength: input.body.byteLength,
+      ContentType: input.kind.contentType,
+      CacheControl: CACHE_CONTROL,
+    }),
+  );
+
+  return { key, url: publicUrl(key, config), contentType: input.kind.contentType };
+}
+
 /** Tải một khung tag lên kho. Cùng đường ống với avatar — chỉ khác cách đặt tên. */
 export async function putTagFrameFile(input: { label: string; kind: ImageKind; body: Uint8Array }): Promise<StoredFile> {
   const { client, config } = requireStore();
@@ -529,6 +579,93 @@ export type MediaSweepResult =
       /** Nguyên văn lỗi ĐẦU TIÊN, hoặc `null`. Đếm mà không kèm lý do thì không lần ra được. */
       firstError: string | null;
     };
+
+/**
+ * Trần số object một lượt LIỆT KÊ trả về. Khác hẳn trần của phép quét: quét là việc chạy nền
+ * cho tới hết, còn liệt kê là thứ đổ vào một lưới ảnh cho người nhìn — vài trăm tấm nền đã là
+ * quá nhiều để chọn bằng mắt, và mỗi tấm còn kéo theo một lượt tải ảnh thật trong trình duyệt.
+ * Chạm trần thì NÓI RA (`truncated`) chứ không lặng lẽ cắt.
+ */
+const LIST_MAX_OBJECTS = 200;
+
+export type StoredObject = {
+  key: string;
+  url: string;
+  size: number;
+  /** ISO, hoặc `null` nếu kho không khai — giao diện sắp mới-trước theo nó. */
+  lastModified: string | null;
+};
+
+export type MediaListResult =
+  | { storeClosed: true }
+  | {
+      storeClosed?: false;
+      objects: StoredObject[];
+      /** Kho còn object nữa nhưng đã chạm trần `LIST_MAX_OBJECTS`. */
+      truncated: boolean;
+    };
+
+/**
+ * Liệt kê object dưới một tiền tố — phép ĐỌC song sinh với `purgeObjectsUnder`.
+ *
+ * Tách hàm riêng thay vì nhét thêm cờ vào phép quét, vì hai việc khác nhau ở chỗ căn bản: quét
+ * chạy tới hết và chịu được lỗi từng cái, còn liệt kê phải trả về NGUYÊN VẸN hoặc ném — một
+ * lưới ảnh thiếu vài tấm mà không nói gì sẽ khiến người quản tưởng mình đã lỡ xoá chúng.
+ *
+ * Sắp MỚI TRƯỚC: người vừa tải một tấm lên thì mong thấy nó ở đầu lưới, không phải đi tìm
+ * trong một danh sách xếp theo tên do kho quyết định.
+ */
+export async function listObjectsUnder(prefix: string): Promise<MediaListResult> {
+  // Cùng lý lẽ với `purgeObjectsUnder`: tiền tố rỗng nghĩa là "cả bucket", và với một hàm
+  // được gọi từ đường dẫn của giao diện thì đó là lỗi lập trình chứ không phải một tham số.
+  if (!prefix.trim()) {
+    throw new Error("listObjectsUnder cần một tiền tố — chuỗi rỗng sẽ liệt kê cả bucket.");
+  }
+
+  const opened = store();
+  if (!opened) return { storeClosed: true };
+  const { client, config } = opened;
+
+  const objects: StoredObject[] = [];
+  let cursor: string | undefined;
+  let truncated = false;
+
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({
+        Bucket: config.bucket,
+        Prefix: prefix,
+        // Xin vừa đủ phần còn thiếu, không xin trọn một nghìn rồi vứt đi.
+        MaxKeys: Math.min(SWEEP_PAGE_SIZE, LIST_MAX_OBJECTS - objects.length + 1),
+        ContinuationToken: cursor,
+      }),
+    );
+
+    for (const object of page.Contents ?? []) {
+      if (!object.Key) continue;
+      // Chính cái tiền tố (`backdrops/`) cũng là một object nếu ai đó tạo "thư mục" trong
+      // console của OCI — nó dài 0 byte và không phải ảnh, nên bỏ qua.
+      if (object.Key === prefix) continue;
+      if (objects.length >= LIST_MAX_OBJECTS) {
+        truncated = true;
+        break;
+      }
+      objects.push({
+        key: object.Key,
+        url: publicUrl(object.Key, config),
+        size: object.Size ?? 0,
+        lastModified: object.LastModified?.toISOString() ?? null,
+      });
+    }
+
+    cursor = truncated ? undefined : page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (cursor);
+
+  // `lastModified` null xuống cuối: không biết ngày thì không có cớ đứng trước tấm biết ngày.
+  objects.sort((a, b) => (b.lastModified ?? "").localeCompare(a.lastModified ?? ""));
+
+  return { objects, truncated };
+}
 
 /**
  * Đọc cho người, không cho máy: một sảnh vừa dọn nên nói「48.3 MB」chứ không phải dãy số byte.

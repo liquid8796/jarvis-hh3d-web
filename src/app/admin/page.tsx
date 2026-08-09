@@ -2,9 +2,12 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { requireAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
 import { countJobsForDrain } from "@/lib/services/jobs";
+import { BACKDROP_PREFIX, humanBytes, listObjectsUnder } from "@/lib/services/media";
 import { getAppSettings } from "@/lib/services/settings";
 import { countPending, listUsers } from "@/lib/services/users";
+import type { BackdropChoice } from "@/lib/validation/backdrops";
 import { AdminTabs } from "./AdminTabs";
+import { BackdropManager } from "./BackdropManager";
 import { ChatPurgePanel } from "./ChatPurgePanel";
 import { ChatSettingsForm } from "./ChatSettingsForm";
 import { TagFrameManager } from "./TagFrameManager";
@@ -36,17 +39,30 @@ export default async function AdminPage({
       ? params.status
       : undefined;
 
-  const [users, pending, settings, drain] = await Promise.all([
+  const [users, pending, settings, drain, backdropStore] = await Promise.all([
     listUsers({ search: params.q, status }),
     countPending(),
     getAppSettings(),
     countJobsForDrain(),
+    // Lưới ảnh nền đọc THẲNG từ tàng khố, không từ một sổ trong app_settings — xem ghi chú
+    // tại BACKDROP_PREFIX. Kho đóng thì thẻ tự nói ra, nên chỗ này không cần ném.
+    listObjectsUnder(`${BACKDROP_PREFIX}/`),
   ]);
+
+  // Đổi byte thành chữ Ở ĐÂY vì `humanBytes` sống trong media.ts — một module kéo theo cả SDK
+  // của S3, thứ tuyệt đối không được lọt vào bundle của trình duyệt.
+  const backdropImages: BackdropChoice[] = backdropStore.storeClosed
+    ? []
+    : backdropStore.objects.map((object) => ({
+        key: object.key,
+        url: object.url,
+        sizeLabel: humanBytes(object.size),
+      }));
 
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-6xl px-4 pb-24 sm:px-6">
+      <main data-backdrop="admin" className="mx-auto w-full max-w-6xl px-4 pb-24 sm:px-6">
         <div className="rise-in mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="h-display text-3xl font-bold text-gilded">Tông Môn</h1>
@@ -105,6 +121,21 @@ export default async function AdminPage({
                   <TagFrameManager frames={settings.chat.tagFrames} />
                   <ChatPurgePanel canPurge={hasPermission(viewer, "chat.purge")} />
                 </div>
+              ),
+            },
+            {
+              key: "giaoDien",
+              label: "Giao Diện",
+              // Tab RIÊNG chứ không nhét vào Đàm Đạo: tấm nền là chuyện của cả tông môn, mọi
+              // trang đều đứng trên nó — xếp nó cạnh hạn lưu tin nhắn là xếp nhầm hàng.
+              pane: (
+                <BackdropManager
+                  images={backdropImages}
+                  truncated={!backdropStore.storeClosed && backdropStore.truncated}
+                  storeClosed={Boolean(backdropStore.storeClosed)}
+                  defaultBackdrop={settings.appearance.defaultBackdrop}
+                  pageBackdrops={settings.appearance.pageBackdrops}
+                />
               ),
             },
             {

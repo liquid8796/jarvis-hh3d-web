@@ -119,6 +119,37 @@ Blob; xem mục 0.41.0 và [deploy/oracle/README.md](deploy/oracle/README.md).
 document viết bởi bản deploy cũ vẫn trở về đúng hình thù hôm nay với default được điền đủ.
 Đó là bản JSONB của một migration.
 
+### Tấm nền của từng trang
+
+**Ảnh nằm ở OCI** dưới tiền tố `backdrops/`, **phép gán nằm ở `app_settings`** (nhánh
+`appearance`), và **luật CSS do layout gốc dựng ra ở mỗi lượt vẽ trang**. Trưởng môn tải ảnh và
+chọn trang ở tab **Giao Diện** của trang Tông Môn — không phải sửa mã, không phải deploy.
+
+Thang rơi có ba nấc, và mỗi nấc có lý do tồn tại:
+
+| Nấc | Ở đâu | Khi nào dùng |
+|---|---|---|
+| Nền riêng của trang | `appearance.pageBackdrops[<mã trang>]` | Trang ấy đã được chọn ảnh |
+| Nền mặc định | `appearance.defaultBackdrop` | Trang chủ, và mọi trang chưa chọn |
+| Nền cứu hộ | `public/backdrop.png` trong repo | Tàng khố chưa mở, chưa ai đặt mặc định, hoặc URL đã lưu không qua nổi phép làm sạch |
+
+Nấc cuối cố ý ở lại trong repo: một tông môn thiếu nền riêng thì vẫn đẹp, một tông môn chỉ còn
+màu đen trơn thì không.
+
+**Trang tự khai mình là ai** bằng `data-backdrop="<mã>"` trên `<main>`, rồi
+`body:has([data-backdrop="…"]) .backdrop` đổi ảnh. Trông vòng vo, nhưng đó là đường duy nhất
+còn lại: layout gốc **không biết** nó đang dựng đường dẫn nào, và đường "proxy gắn đường dẫn
+vào header rồi layout đọc ra" đã được thử và đo là **không chạy trên Next 16.2** (xem chú thích
+trong `components/MaintenanceGate.tsx`).
+
+Sổ trang, phép làm sạch URL và phép dựng CSS nằm ở
+[`src/lib/validation/backdrops.ts`](src/lib/validation/backdrops.ts) — tệp thuần, không import
+gì, vì tab Giao Diện là component client. URL đi từ `app_settings` **thẳng vào một thẻ
+`<style>`**, nên phép làm sạch ở đó là một ranh giới tin cậy thật: nó dùng danh sách TRẮNG
+(đường dẫn cùng gốc, hoặc `https://` của kho), không phải lọc ký tự xấu.
+`npm run verify:backdrops` đóng đinh 15 ngả thoát ra — kể cả `//example.com/a.png`, thứ từng
+lọt qua bản đầu.
+
 ### Vai và quyền lưu ở đâu?
 
 **Bốn bảng quan hệ**, đúng hình dạng RBAC sách vở, vì đây là loại dữ liệu ngược hẳn với config:

@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { eventsForJobs, getCurrentJobsPerAccount } from "./jobs";
 import { listAccounts } from "./accounts";
-import { getAppSettings } from "./settings";
+import { getRenderSettings } from "./settings";
 import { getPresence, ONLINE_WINDOW_MS } from "./workers";
 import type {
   DashboardEvent,
@@ -77,7 +77,7 @@ export async function getPresenceFeed(userId: string): Promise<DashboardPresence
  * thẳng — không ghi nhớ gì, và cũng không cần.
  */
 export const getMaintenanceFeed = cache(async function getMaintenanceFeed(): Promise<DashboardMaintenance> {
-  const { maintenance } = await getAppSettings();
+  const { maintenance } = await getRenderSettings();
   return {
     active: maintenance.active,
     startedAt: maintenance.startedAt,

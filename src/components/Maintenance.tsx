@@ -103,7 +103,10 @@ export function MaintenanceWall({ maintenance }: { maintenance: DashboardMainten
   const { countdown, progress, overtime, hasWindow } = useClock(maintenance);
 
   return (
-    <main className="mx-auto flex min-h-[80vh] w-full max-w-md items-center justify-center px-4 py-10">
+    <main
+      data-backdrop="be-quan"
+      className="mx-auto flex min-h-[80vh] w-full max-w-md items-center justify-center px-4 py-10"
+    >
       <div className="card card-hairline rise-in w-full p-8 text-center">
         <div className="mb-3 text-3xl" aria-hidden>
           ⏳

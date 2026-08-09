@@ -25,6 +25,7 @@ export default async function RegisterPage() {
 
   return (
     <AuthCard
+      backdrop="register"
       title="Bái Sư Nhập Môn"
       subtitle={
         membership.requireApproval

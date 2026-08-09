@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db/client";
@@ -10,6 +11,16 @@ import type { TagFrame } from "@/lib/validation/tags";
  * đủ. Mỗi tính năng mới thêm một nhánh vào schema này (và một tab trong trang Tông Môn),
  * không thêm bảng.
  */
+/**
+ * Một tấm nền đã chọn. Giữ CẢ `key` lẫn `url`: url để vẽ, key để còn xoá được object và để
+ * lưới ảnh biết tấm nào đang được dùng — suy ngược url ra key là một phép giải mã chạy trước
+ * một lệnh XOÁ, đúng cái bẫy đã ghi ở cột `avatarKey` trong schema.ts.
+ */
+const backdropImageSchema = z.object({
+  key: z.string().min(1).max(512),
+  url: z.string().min(1).max(2048),
+});
+
 export const appSettingsSchema = z.object({
   chat: z
     .object({
@@ -87,6 +98,33 @@ export const appSettingsSchema = z.object({
     // .catch() khiến input type của object hết rỗng được — prefault phải mang đủ bốn giá trị.
     .prefault({ active: false, startedAt: null, expectedEndAt: null, note: "" }),
 
+  appearance: z
+    .object({
+      /**
+       * Nền MẶC ĐỊNH — cũng chính là nền trang chủ, và nền của mọi trang chưa ai chọn gì.
+       *
+       * `null` nghĩa là chưa ai đặt, và lúc ấy tấm cứu hộ trong `public/` lo (xem
+       * `RESCUE_BACKDROP_URL`). Một khái niệm, một ô để bấm: không có "nền trang chủ" tách
+       * khỏi "nền mặc định" để rồi phải nhớ giữ hai thứ cho khớp nhau.
+       */
+      defaultBackdrop: backdropImageSchema.nullable().catch(null),
+
+      /**
+       * Nền riêng của từng trang: mã trang → ảnh. Trang vắng mặt là "theo mặc định".
+       *
+       * `z.record` chứ không phải một object khai đủ chín khoá, vì sổ trang sống ở
+       * `validation/backdrops.ts` — nơi KHÔNG được import zod (nó đi vào bundle trình duyệt).
+       * Chép danh sách trang ra đây lần nữa là dựng một sự thật thứ hai để chờ ngày lệch;
+       * thay vào đó phía ĐỌC lọc theo sổ (`backdropCss` chỉ duyệt `BACKDROP_PAGES`), nên một
+       * mã lạ nằm trong document cũng không sinh ra được luật CSS nào.
+       *
+       * `.catch({})` theo đúng luật của tệp: một phần tử rác làm hỏng cả phép gán thì mọi
+       * trang về nền mặc định — mất trang trí, không mất chức năng.
+       */
+      pageBackdrops: z.record(z.string(), backdropImageSchema).catch({}),
+    })
+    .prefault({ defaultBackdrop: null, pageBackdrops: {} }),
+
   game: z
     .object({
       /**
@@ -126,6 +164,23 @@ export async function getAppSettings(): Promise<AppSettings> {
   const parsed = appSettingsSchema.safeParse(rows[0]?.value ?? {});
   return parsed.success ? parsed.data : appSettingsSchema.parse({});
 }
+
+/**
+ * `getAppSettings` cho ĐƯỜNG DỰNG TRANG — một lượt đọc duy nhất cho cả lượt dựng.
+ *
+ * Sinh ra vì layout gốc giờ hỏi cấu hình hai lần cho hai việc khác nhau: cửa bế quan
+ * (`getMaintenanceFeed`) và tấm nền (`getAppearanceFeed`). Không chung `cache()` thì mỗi lượt
+ * vẽ trang tốn hai câu truy vấn cho cùng một dòng JSONB — và tệ hơn, hai câu ấy có thể trả về
+ * hai đời cấu hình khác nhau nếu trưởng môn bấm Lưu đúng khe giữa chúng.
+ *
+ * KHÔNG bọc `cache()` thẳng lên `getAppSettings`: đó là API gốc, và các action lẫn script kiểm
+ * chứng đọc-rồi-ghi-rồi-đọc-lại qua nó (`verifyMaintenanceMode` chẳng hạn). Trong lượt dựng của
+ * React thì không có phép ghi nào, nên chỉ đường ấy mới an toàn để ghi nhớ.
+ *
+ * Ngoài lượt dựng của React, `cache()` chỉ là gọi thẳng — nên script dùng hàm này cũng không
+ * nhận phải dữ liệu cũ.
+ */
+export const getRenderSettings = cache(getAppSettings);
 
 export async function saveAppSettings(value: AppSettings): Promise<void> {
   const clean = appSettingsSchema.parse(value);

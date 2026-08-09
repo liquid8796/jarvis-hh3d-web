@@ -70,9 +70,9 @@ const TRIGGER_ATTR = "data-chat-popup-trigger";
  * không tay nào chép lại được quầng sáng và vân mây của một tấm ảnh.
  */
 const FRAME_HOTSPOTS = {
-  attach: { left: "6.2845%", top: "90.3315%", width: "4.4199%", height: "5.8932%" },
-  picker: { left: "81.0083%", top: "90.5157%", width: "4.1436%", height: "5.5249%" },
-  send: { left: "87.7072%", top: "90.2394%", width: "4.6961%", height: "6.2615%" },
+  attach: { left: "3.8629%", top: "91.2181%", width: "4.6647%", height: "6.0435%" },
+  picker: { left: "82.7260%", top: "91.4070%", width: "4.3731%", height: "5.6658%" },
+  send: { left: "89.7959%", top: "91.1237%", width: "4.9562%", height: "6.4211%" },
 } as const;
 
 const fmtTime = (iso: string) =>
@@ -714,8 +714,9 @@ export function ChatRoom({
           {/* Chỉ hiện khi đang tải — lúc rảnh nút phải TRỐNG để lộ hình chiếc kẹp vẽ trong ảnh. */}
           {uploading && <span className="chat-hotspot-busy">…</span>}
         </button>
-        {/* Ô nhập trong suốt đặt trùng lên khung đã vẽ. Không placeholder: chữ mời đã in trong
-            ảnh, và `.chat-input-cover` che nó đi ngay khi có người gõ. */}
+        {/* Ô nhập trong suốt đặt trùng lên khung đã vẽ. Không dùng thuộc tính `placeholder`:
+            chữ mời đã in sẵn trong ảnh, và `.chat-input-cover` xoá nó đi — ngay từ lúc BẤM VÀO
+            chứ không đợi gõ chữ đầu tiên (xem ghi chú ở lớp ấy). */}
         <textarea
           ref={inputRef}
           value={text}
@@ -745,9 +746,11 @@ export function ChatRoom({
           aria-label="Nhập nội dung trò chuyện"
           className={`chat-input ${text ? "typing" : ""}`}
         />
-        {/* Tấm che dòng chữ mời in sẵn trong ảnh. Chỉ dựng khi đã có chữ — nằm DƯỚI textarea
-            theo z-index nên không chắn con trỏ. */}
-        {text && <div className="chat-input-cover" aria-hidden />}
+        {/* Tấm che dòng chữ mời in sẵn trong ảnh. LUÔN dựng, và để CSS quyết lúc nào hiện —
+            `.chat-input:focus ~ &` cần nó có mặt trong DOM để chọn tới. Dựng theo điều kiện
+            như trước thì lúc mới bấm vào ô (chưa gõ) nó chưa tồn tại, và dòng mời nằm chồng
+            lên con trỏ. Nằm DƯỚI textarea theo z-index nên không chắn cú bấm nào. */}
+        <div className="chat-input-cover" aria-hidden />
         {/* Hai nút phải: khay Emoji/sticker/GIF và ấn Truyền Âm. Cả hai là vùng bấm TRỐNG —
             mặt cười và cánh én đã được vẽ trong tấm khung, thêm icon nữa là đè hai lớp. */}
         <button

@@ -458,8 +458,12 @@ body {
   position: relative;
   /* Rộng hết mức có thể NHƯNG không cao quá khung nhìn: `calc((100dvh - 190px) * 4/3)` là bề
      rộng lớn nhất mà chiều cao (rộng × 3/4) vẫn còn chỗ cho thanh đầu trang và dòng ký tên. */
-  width: min(100%, calc((100dvh - 190px) * 4 / 3));
-  aspect-ratio: 1448 / 1086;
+  /* Tỉ lệ của tấm ảnh SAU KHI CẮT rìa nền thừa (1372×1059). Cắt rồi thì mép ảnh gần như
+     trùng nét viền, nên không còn dải nền đặc chìa ra ngoài khung nữa.
+     Hệ số 1.15: đạo hữu yêu cầu nới khung thêm 15% ngày 10/08/2026. `min(100%, …)` vẫn kẹp
+     bề ngang, nên trên màn hẹp khung thu lại theo bề rộng thay vì tràn ra ngoài. */
+  width: min(100%, calc((100dvh - 190px) * 1.15 * 1372 / 1059));
+  aspect-ratio: 1372 / 1059;
   margin: 0 auto;
   /* Mốc của mọi `cqw` bên trong: chữ co theo BỀ RỘNG KHUNG, không theo bề rộng màn hình — nếu
      không thì trên màn siêu rộng khung đứng yên mà chữ cứ phình ra. */
@@ -497,10 +501,10 @@ body {
    để nó nuốt cú bấm thì vùng tin ngay dưới mất một dải cao 12%. */
 .chat-head {
   position: absolute;
-  left: 5.663%;
-  top: 2.6%;
-  width: 88.674%;
-  height: 12.4%;
+  left: 3.2070%;
+  top: 1.2499%;
+  width: 93.5860%;
+  height: 12.7161%;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -526,10 +530,10 @@ body {
 /* Vùng tin — đúng ô chữ nhật mà tấm khung chừa ra giữa hai đường kẻ. */
 .chat-scroll {
   position: absolute;
-  left: 5.663%;
-  top: 17.4954%;
-  width: 88.674%;
-  height: 68.8766%;
+  left: 3.2070%;
+  top: 16.5250%;
+  width: 93.5860%;
+  height: 70.6327%;
   overflow-y: auto;
   /* Cuộn hết tin thì DỪNG ở đó, không đẩy tiếp cả trang phía sau. */
   overscroll-behavior: contain;
@@ -875,8 +879,8 @@ body {
 /* Nút "về cuối" đậu ngay trên mép phải của vùng tin, trong lòng khung. */
 .chat-jump {
   position: absolute;
-  right: 7.5%;
-  bottom: 15%;
+  right: 5.1458%;
+  bottom: 14.2493%;
   z-index: 6;
   padding: 0.5cqw 1.2cqw;
   border-radius: 999px;
@@ -892,8 +896,8 @@ body {
    ô nhập nằm ở 91.53%, chừa thêm một nhịp cho khỏi dính. */
 .chat-trays {
   position: absolute;
-  left: 5.663%;
-  bottom: 9.6%;
+  left: 3.2070%;
+  bottom: 8.7116%;
   z-index: 5;
   width: 88.674%;
   display: flex;
@@ -942,8 +946,8 @@ body {
      dòng (tới 120px), nên một khoảng cách cố định sẽ để khay trườn lên đè chính nó. */
   /* Neo vào NÚT tròn trên tấm khung: thanh soạn nay phủ trọn khung nên `100%` của nó
      không còn là mép trên hàng nút nữa. */
-  bottom: 10.5%;
-  right: 7%;
+  bottom: 9.6346%;
+  right: 4.6181%;
   z-index: 20;
   width: min(360px, 46cqw);
   display: flex;
@@ -1148,12 +1152,16 @@ body {
 .chat-input-cover {
   position: absolute;
   z-index: 2;
-  left: 12.9834%;
-  top: 91.4365%;
-  width: 65.6077%;
-  height: 3.9595%;
+  left: 10.9329%;
+  top: 92.3513%;
+  width: 69.2419%;
+  height: 4.0605%;
   border-radius: 999px;
   pointer-events: none;
+  /* Mặc định TRỐNG, và hiện lên theo luật ở dưới. Dùng opacity chứ không display: chuyển
+     mượt được, và phần tử luôn có mặt để bộ chọn `~` với tới. */
+  opacity: 0;
+  transition: opacity 0.12s ease;
   background:
     radial-gradient(circle at 68% 36%, rgba(19, 26, 58, 0.55), transparent 43%),
     linear-gradient(96deg, #0c122b 0%, #091027 55%, #071024 100%);
@@ -1165,10 +1173,10 @@ body {
 .chat-input {
   position: absolute;
   z-index: 3;
-  left: 13.1215%;
-  top: 91.5285%;
-  width: 65.3315%;
-  height: 3.8674%;
+  left: 11.0787%;
+  top: 92.4457%;
+  width: 68.9504%;
+  height: 3.9660%;
   padding: 0;
   border: 0;
   outline: 0;
@@ -1182,9 +1190,19 @@ body {
   font: italic clamp(12px, 1.6575cqw, 24px) / 1.333 "Times New Roman", Times, serif;
 }
 
+/* Bấm vào ô là THẤY NGAY con trỏ, và dòng mời in trong ảnh biến mất — không phải đợi gõ ký
+   tự đầu tiên. Trước đây cả hai đều buộc vào `.typing` (tức là có chữ), nên lúc mới bấm vào
+   người ta gặp một ô câm: không con trỏ, mà chữ mời vẫn nằm đó chờ bị gõ đè lên.
+   Vẫn giữ nhánh `.typing` cho lúc ô mất focus mà chữ còn nguyên. */
+.chat-input:focus,
 .chat-input.typing {
   color: #d4ced6;
   caret-color: var(--color-gold-400);
+}
+
+.chat-input:focus ~ .chat-input-cover,
+.chat-input.typing ~ .chat-input-cover {
+  opacity: 1;
 }
 
 .chat-editbox { display: block; }

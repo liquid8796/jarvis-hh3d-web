@@ -55,10 +55,31 @@ node "$PWC" install-deps chromium
 sudo -u "$APP_USER" node "$PWC" install chromium
 
 echo "== [5/6] Cấu hình =="
+# WORKER_ID GIỮ NGUYÊN nếu .env đã có — định danh khôi lỗi là KHOÁ CHÍNH trong bảng `workers`
+# và nằm trong `automation_jobs.worker_id`, nên đổi nó giữa chừng là sinh một khôi lỗi thứ hai
+# trong sổ và bỏ lại đàn đang chạy dưới cái tên cũ.
+#
+# ĐÃ NGÃ THẬT ngày 09/08/2026: khôi lỗi tông môn được đổi tên sang `tong-mon-khoiloi` (đổi tay
+# trong .env + migration 0019), rồi một lượt cài đè chạy đúng script này ghi đè ngược về
+# `tong-mon-$(hostname -s)` = `tong-mon-linhsu`. Sổ mọc thêm một dòng rác, và trang Hàng Đợi —
+# thứ vẽ THẲNG `worker_id` — bắt đầu hiện sai tên. Phải sửa .env, restart, rồi dọn dòng ấy.
+#
+# Nên: dòng dưới là MẶC ĐỊNH CHO MÁY MỚI, không phải lệnh áp đặt cho mọi lượt chạy lại.
+EXISTING_WORKER_ID=""
+if [ -f "$APP_DIR/.env" ]; then
+  EXISTING_WORKER_ID="$(sed -n 's/^WORKER_ID=//p' "$APP_DIR/.env" | head -1)"
+fi
+WORKER_ID="${EXISTING_WORKER_ID:-tong-mon-$(hostname -s)}"
+if [ -n "$EXISTING_WORKER_ID" ]; then
+  echo "   giữ WORKER_ID đang dùng: $WORKER_ID"
+else
+  echo "   máy mới — đặt WORKER_ID: $WORKER_ID"
+fi
+
 cat > "$APP_DIR/.env" <<ENV
 WEB_URL=$WEB_URL
 WORKER_TOKEN=$WORKER_TOKEN
-WORKER_ID=tong-mon-$(hostname -s)
+WORKER_ID=$WORKER_ID
 ENV
 chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
 chmod 600 "$APP_DIR/.env"

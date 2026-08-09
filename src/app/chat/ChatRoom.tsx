@@ -56,65 +56,24 @@ const GIF_MIME = "image/gif";
 const POPUP_ATTR = "data-chat-popup";
 const TRIGGER_ATTR = "data-chat-popup-trigger";
 
-/** Bốn góc của khung, theo thứ tự vẽ. Tên lớp CSS quyết định vị trí và phép lật — xem globals.css. */
-const FRAME_CORNERS = ["tl", "tr", "bl", "br"] as const;
-
 /**
- * Hoa văn của khung son: bốn ngoặc góc và ấn ở đỉnh. TRANG TRÍ THUẦN — `aria-hidden` và
- * `pointer-events: none` (trong CSS), nên nó không bao giờ chắn một cú bấm hay lọt vào máy
- * đọc màn hình.
+ * Toạ độ các vùng bấm trên tấm khung, tính theo PHẦN TRĂM của ảnh gốc 1448×1086.
  *
- * Vẽ bằng SVG chứ không phải ảnh: khung co giãn theo màn hình, mà một tấm PNG hoa văn thì
- * hoặc vỡ hoặc phải kèm bản @2x — SVG thì nét nào cũng sắc ở mọi cỡ và không tốn byte tải.
+ * Vì sao phần trăm chứ không phải pixel: khung co giãn theo màn hình nhưng LUÔN giữ tỉ lệ 4:3
+ * (xem `.chat-frame` trong globals.css), nên một toạ độ theo % thì bám đúng chỗ ở mọi cỡ. Đây
+ * là những con số của bản mẫu chia cho 1448 (ngang) và 1086 (dọc) — đừng làm tròn thêm, lệch
+ * nửa phần trăm là hotspot trượt khỏi vòng tròn vẽ trong ảnh.
  *
- * MỘT hình cho cả bốn góc, lật bằng `scale` trong CSS. Chép bốn path riêng là bốn chỗ phải
- * nhớ sửa cùng lúc, và chỉ chờ ngày một góc lệch khỏi ba góc kia.
+ * Ba nút và ô nhập KHÔNG được vẽ bằng CSS: chúng đã nằm sẵn trong ảnh, kể cả dòng chữ mời
+ * "Nhập nội dung trò chuyện…". Phần tử thật chỉ là vùng bấm TRONG SUỐT đặt trùng lên. Đó là
+ * điều làm khung giống bản mẫu tuyệt đối — mọi lần trước vẽ lại bằng SVG/CSS đều trượt, vì
+ * không tay nào chép lại được quầng sáng và vân mây của một tấm ảnh.
  */
-function ChatFrameOrnaments() {
-  return (
-    <>
-      {FRAME_CORNERS.map((corner) => (
-        <svg key={corner} className={`chat-corner chat-corner-${corner}`} viewBox="0 0 58 58" aria-hidden>
-          {/* MỘT nét duy nhất, chạy song song với đường bo của khung — cung r=14 khớp với
-              border-radius 20px trừ đi khoảng cách 6px của ngoặc.
-
-              Ngoặc góc từng có nét thứ hai chạy sâu hơn 5px (nét đôi ở vùng góc); bỏ ngày
-              09/08/2026 theo ý đạo hữu — tính từ mép khung vào thì các nét xếp 0px (viền
-              ngoài) → 7px (đường chỉ `.chat-shell::before`) → 10px (nét này), và nét thứ hai
-              nằm tận 15px là lớp TRONG CÙNG, đọc ra thành một khung nữa lồng bên trong. Hai
-              nét còn lại giữ nguyên: chúng mới là viền của khung.
-
-              VÀ ĐỪNG THÊM hoa văn nào vào sâu trong góc để "bù" lại chỗ trống. Đã thử một
-              lớp mây cuộn ở đó: ảnh chụp cho thấy nó ĐÈ LÊN chữ "Phòng Chat", vì header chỉ
-              cách mép 22px. Góc này không có chỗ cho lớp thứ hai. */}
-          <path d="M57 6 H20 A14 14 0 0 0 6 20 V57" strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
-      ))}
-
-      {/* viewBox cao 34 và ấn nằm ở ĐÚNG GIỮA (y=17): CSS kéo nó lên nửa chiều cao nên trục
-          ngang của ấn trùng khít đường viền trên — ấn cưỡi lên viền, không treo phía trên nó.
-          Vẽ được trọn vẹn là nhờ hoa văn nằm ở lớp BỌC chứ không trong `.chat-shell` (thứ có
-          `overflow: hidden`); xem ghi chú tại `.chat-frame`. */}
-      <svg className="chat-finial" viewBox="0 0 116 34" aria-hidden>
-        <g fill="none" stroke="currentColor" strokeLinecap="round">
-          {/* Cánh mây: vươn NGANG rồi cuộn lại sát ngọc, không sải lên như bản trước — sải lên
-              thì cả cụm đọc thành một chữ V toác, mất hẳn dáng cái ấn. */}
-          <path d="M45 17 C 38 8, 26 8, 19 15" strokeWidth="1.8" />
-          <path d="M71 17 C 78 8, 90 8, 97 15" strokeWidth="1.8" />
-          {/* Móc cuộn ở đầu cánh — nét kết, cho cánh không cụt lủn. */}
-          <path d="M19 15 C 14 20, 20 25, 24 21" strokeWidth="1.5" />
-          <path d="M97 15 C 102 20, 96 25, 92 21" strokeWidth="1.5" />
-          {/* Nét mảnh chạy dưới cánh, tan dần vào đường viền hai bên. */}
-          <path d="M44 21 C 36 16, 26 17, 16 21" strokeWidth="1.1" opacity="0.55" />
-          <path d="M72 21 C 80 16, 90 17, 100 21" strokeWidth="1.1" opacity="0.55" />
-        </g>
-        {/* Viên ngọc giữa: hình thoi ĐẶC, lồng một hình thoi màu nền cho ra chiều sâu. */}
-        <path d="M58 2 L70 17 L58 32 L46 17 Z" fill="currentColor" />
-        <path d="M58 10 L64 17 L58 24 L52 17 Z" fill="rgb(23,25,56)" />
-      </svg>
-    </>
-  );
-}
+const FRAME_HOTSPOTS = {
+  attach: { left: "6.2845%", top: "90.3315%", width: "4.4199%", height: "5.8932%" },
+  picker: { left: "81.0083%", top: "90.5157%", width: "4.1436%", height: "5.5249%" },
+  send: { left: "87.7072%", top: "90.2394%", width: "4.6961%", height: "6.2615%" },
+} as const;
 
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
@@ -479,8 +438,15 @@ export function ChatRoom({
 
   return (
     <div className="chat-frame">
+    {/* Tấm khung. `alt=""` + aria-hidden: nó là TRANG TRÍ, mọi thứ đọc được đã nằm ở chữ thật
+        bên trên nó. Dùng <img> thường chứ không phải next/image — ảnh này luôn phủ trọn khung
+        với kích thước do CSS quyết (`background-size` không dùng được vì cần `priority` cho
+        thứ nằm ngay màn hình đầu), và bản .webp 38KB đã nhỏ hơn mọi biến thể mà bộ tối ưu
+        sinh ra. eslint-disable vì cùng lý do đó. */}
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img className="chat-frame-img" src="/chat-frame.webp" alt="" aria-hidden draggable={false} />
     <div
-      className="chat-shell card card-hairline"
+      className="chat-shell"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
@@ -488,13 +454,10 @@ export function ChatRoom({
       }}
     >
 
+      {/* Dải trên đường kẻ của tấm khung vốn để trống — đặt danh xưng sảnh vào đúng chỗ ấy. */}
       <header className="chat-head">
-        <div>
-          <h1 className="h-display text-3xl font-semibold text-gilded">Phòng Chat</h1>
-          <p className="text-xs text-[var(--color-mist)]">
-            Sảnh đàm đạo chung — mọi môn đồ đã nhập môn đều nghe thấy nhau.
-          </p>
-        </div>
+        <h1 className="h-display text-gilded">Phòng Chat</h1>
+        <p>Sảnh đàm đạo chung — mọi môn đồ đã nhập môn đều nghe thấy nhau.</p>
       </header>
 
       <div ref={scrollRef} onScroll={onScroll} className="chat-scroll">
@@ -689,23 +652,30 @@ export function ChatRoom({
         </button>
       )}
 
-      {notice && <p className="chat-notice">{notice}</p>}
+      {/* Ba khay báo trạng thái. Gom vào MỘT chồng vì layout của khung là toạ độ tuyệt đối:
+          để rời nhau thì lúc cả ba cùng hiện chúng nằm đè lên nhau ở cùng một mốc `bottom`.
+          Chồng này mọc NGƯỢC LÊN từ mép trên thanh nhập nên không bao giờ che ô nhập. */}
+      {(notice || replyTo || staged.length > 0) && (
+        <div className="chat-trays">
+          {notice && <p className="chat-notice">{notice}</p>}
 
-      {replyTo && (
-        <div className="chat-replybar">
-          <span>↩ Trả lời <b>{replyTo.author}</b>: {replyTo.text.slice(0, 60) || replyTo.sticker || "📎"}</span>
-          <button type="button" onClick={() => setReplyTo(null)}>✕</button>
-        </div>
-      )}
+          {replyTo && (
+            <div className="chat-replybar">
+              <span>↩ Trả lời <b>{replyTo.author}</b>: {replyTo.text.slice(0, 60) || replyTo.sticker || "📎"}</span>
+              <button type="button" onClick={() => setReplyTo(null)}>✕</button>
+            </div>
+          )}
 
-      {staged.length > 0 && (
-        <div className="chat-staged">
-          {staged.map((a, i) => (
-            <span key={a.url}>
-              {a.type.startsWith("image/") ? "🖼" : "📎"} {a.name}
-              <button type="button" onClick={() => setStaged(staged.filter((_, j) => j !== i))}>✕</button>
-            </span>
-          ))}
+          {staged.length > 0 && (
+            <div className="chat-staged">
+              {staged.map((a, i) => (
+                <span key={a.url}>
+                  {a.type.startsWith("image/") ? "🖼" : "📎"} {a.name}
+                  <button type="button" onClick={() => setStaged(staged.filter((_, j) => j !== i))}>✕</button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -732,9 +702,20 @@ export function ChatRoom({
           hidden
           onChange={(e) => { if (e.target.files?.length) void upload(e.target.files); e.target.value = ""; }}
         />
-        <button type="button" className="chat-tool" title="Gửi file" disabled={uploading} onClick={() => fileRef.current?.click()}>
-          {uploading ? "…" : "📎"}
+        <button
+          type="button"
+          className="chat-hotspot"
+          style={FRAME_HOTSPOTS.attach}
+          title="Gửi file"
+          aria-label="Gửi file"
+          disabled={uploading}
+          onClick={() => fileRef.current?.click()}
+        >
+          {/* Chỉ hiện khi đang tải — lúc rảnh nút phải TRỐNG để lộ hình chiếc kẹp vẽ trong ảnh. */}
+          {uploading && <span className="chat-hotspot-busy">…</span>}
         </button>
+        {/* Ô nhập trong suốt đặt trùng lên khung đã vẽ. Không placeholder: chữ mời đã in trong
+            ảnh, và `.chat-input-cover` che nó đi ngay khi có người gõ. */}
         <textarea
           ref={inputRef}
           value={text}
@@ -760,36 +741,35 @@ export function ChatRoom({
           }}
           rows={1}
           maxLength={4000}
-          placeholder="Truyền âm cho cả tông môn… (Enter gửi, Alt+Enter xuống dòng)"
-          className="chat-input"
+          title="Enter gửi, Alt+Enter xuống dòng"
+          aria-label="Nhập nội dung trò chuyện"
+          className={`chat-input ${text ? "typing" : ""}`}
         />
-        {/* Hai nút tròn bên phải: khay Emoji/sticker/GIF và ấn Truyền Âm (mũi tên). Nút gửi là
-            ICON chứ không còn chữ — chữ nằm ở title/aria cho ai cần đọc.
-
-            Khay chọn mang mặt cười chứ không phải bong bóng thoại 💬 như trước: bong bóng đọc ra
-            là "nhắn tin", trùng nghĩa với chính ô nhập ngay bên cạnh. Cố ý dùng ĐÚNG 😊 của nút
-            thả cảm xúc trên mỗi tin — hai nút cùng một nghĩa "chọn một emoji", chung mặt chữ là
-            nhất quán chứ không phải lẫn. Đừng đổi sang 😀: Segoe UI Emoji vẽ nó mắt trắng to,
-            miệng há hồng, lạc hẳn khỏi tông vàng-cam của sảnh. */}
-        <button type="button" className="chat-tool" title="Emoji, sticker & GIF" data-chat-popup-trigger onClick={() => openPanel("emoji")}>😊</button>
+        {/* Tấm che dòng chữ mời in sẵn trong ảnh. Chỉ dựng khi đã có chữ — nằm DƯỚI textarea
+            theo z-index nên không chắn con trỏ. */}
+        {text && <div className="chat-input-cover" aria-hidden />}
+        {/* Hai nút phải: khay Emoji/sticker/GIF và ấn Truyền Âm. Cả hai là vùng bấm TRỐNG —
+            mặt cười và cánh én đã được vẽ trong tấm khung, thêm icon nữa là đè hai lớp. */}
         <button
           type="button"
-          className="chat-send"
+          className="chat-hotspot"
+          style={FRAME_HOTSPOTS.picker}
+          title="Emoji, sticker & GIF"
+          aria-label="Emoji, sticker và GIF"
+          data-chat-popup-trigger
+          onClick={() => openPanel("emoji")}
+        />
+        <button
+          type="button"
+          className="chat-hotspot"
+          style={FRAME_HOTSPOTS.send}
           title="Truyền Âm (Enter)"
           aria-label="Truyền Âm"
           onClick={() => void send()}
           disabled={uploading}
-        >
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden>
-            <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
-          </svg>
-        </button>
+        />
       </footer>
     </div>
-
-    {/* Hoa văn vẽ SAU khung trong DOM nên nó nằm đè lên — và nằm NGOÀI `.chat-shell` nên
-        `overflow: hidden` của khung không cắt mất nửa trên của ấn. */}
-    <ChatFrameOrnaments />
     </div>
   );
 }

@@ -58,9 +58,13 @@ function inspectCookie(pastedCookie: string, baseUrl: string): CookieInspection 
   if (jar.length === 0) {
     return {
       ok: false,
+      // Chỉ đúng MỘT đường, và là đường mà ô nhập bên AccountManager cũng chỉ. Câu cũ mời
+      // người ta đi DevTools hoặc Cookie-Editor — đọc xong vẫn không biết bấm vào đâu, và
+      // giờ còn đá nhau với lời hướng dẫn ngay dưới ô dán.
       message:
-        "Chuỗi cookie không đọc được — chưa lưu gì cả. Hãy dán dạng 'a=1; b=2' copy từ DevTools, " +
-        "hoặc nguyên bản xuất JSON của tiện ích Cookie-Editor.",
+        "Chuỗi cookie không đọc được — chưa lưu gì cả. Dùng tiện ích Chrome J2TEAM Cookies: " +
+        "mở trang game đang đăng nhập, bấm vào tiện ích rồi chọn Export, dán nguyên chuỗi vừa " +
+        "chép vào đây.",
     };
   }
 

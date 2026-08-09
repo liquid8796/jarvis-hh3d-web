@@ -11,6 +11,29 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.57.3 — chỉ đích danh một cách lấy cookie, thay cho lời tả định dạng
+
+Ô「Chuỗi cookie đăng nhập」trước đây mời người dùng bằng một câu tả ĐẦU RA:「'a=1; b=2' từ
+DevTools hoặc bản xuất JSON」. Câu ấy đúng nhưng vô dụng với đa số — nó nói cái chuỗi trông
+như thế nào, không nói làm sao có được nó. Ai không quen DevTools đọc xong vẫn đứng im.
+
+Nay ô nhập chỉ còn「Dán chuỗi cookie đăng nhập vào đây」, và ngay dưới là một đường đi cụ thể:
+cài tiện ích Chrome **J2TEAM Cookies**, mở trang game đang đăng nhập, bấm tiện ích → **Export**,
+dán nguyên chuỗi vừa chép. Câu báo lỗi「chuỗi cookie không đọc được」cũng đổi theo đúng một
+đường ấy — trước nó chỉ sang DevTools và Cookie-Editor, tức đá nhau với dòng hướng dẫn nằm
+ngay dưới ô dán.
+
+**`parseCookieString` KHÔNG đổi.** Nó vẫn dễ tính như cũ và vẫn nhận cả bốn định dạng (chuỗi
+`a=1; b=2`, `{url, cookies:[…]}`, mảng JSON trần, object phẳng) — nói hẹp lại ở phần chữ không
+đóng đường nào cả, chỉ là chỉ cho người ta con đường ngắn nhất. Đã kiểm bằng một bản export
+đúng hình dạng J2TEAM Cookies: đọc ra 2 cookie của site game, và cookie `.facebook.com` lẫn
+trong bản "export tất cả" bị lọc bỏ đúng như thiết kế.
+
+Còn sót một chỗ CHƯA đổi, cố ý: câu báo lỗi trong `runCycle.mjs` (khi cookie đã lưu hết hạn
+giữa lượt chạy) vẫn nói「dạng 'a=1; b=2' từ DevTools hoặc bản xuất JSON」. Nó nằm trong
+quest-engine, mà sửa quest-engine thì phải cài đè khôi lỗi trên VM — một cái giá không tương
+xứng cho một câu chữ, nên để dành ghép vào lượt nào có sửa engine thật.
+
 ## 0.57.2 — quét dọn Chromium mồ côi, bằng sổ chứ không bằng cách quét tiến trình
 
 - **`npm run shot:clean`** dọn những Chromium mà một lần treo hay một cú Ctrl-C để lại. Lượt

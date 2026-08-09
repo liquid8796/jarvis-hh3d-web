@@ -165,11 +165,24 @@ export function AccountManager() {
             id="newAccountCookie"
             ref={addCookieRef}
             className="input h-24 resize-y font-mono text-xs"
-            placeholder="Dán chuỗi cookie đăng nhập vào đây ('a=1; b=2' từ DevTools hoặc bản xuất JSON)"
+            placeholder="Dán chuỗi cookie đăng nhập vào đây"
             disabled={pending}
             autoComplete="off"
             spellCheck={false}
           />
+          {/* Chỉ đích danh MỘT cách lấy cookie, thay cho lời mô tả định dạng cũ ("'a=1; b=2' từ
+              DevTools hoặc bản xuất JSON"). Lời cũ tả ĐẦU RA mà không nói làm sao có được nó —
+              người không rành DevTools đọc xong vẫn đứng im. Parser thì dễ tính như cũ, vẫn
+              nhận cả bốn định dạng (xem parseCookieString), nên nói hẹp lại ở đây không đóng
+              đường nào cả; chỉ là chỉ cho người ta con đường ngắn nhất.
+
+              Đã kiểm: bản xuất của J2TEAM Cookies đúng dạng {url, cookies:[…]} mà parser đọc
+              được, và cookie của site khác trong bản "export tất cả" bị nó lọc bỏ. */}
+          <p className="mt-1 text-xs text-[var(--color-mist)]">
+            Cách lấy: cài tiện ích Chrome <b>J2TEAM Cookies</b>, mở trang game đang đăng nhập,
+            bấm vào tiện ích rồi chọn <b>Export</b> để chép chuỗi cookie — dán thẳng vào ô trên,
+            giữ nguyên, không cần sửa gì.
+          </p>
           <p className="mt-1 text-xs text-[var(--color-mist)]">
             Cookie giúp auto đăng nhập game thay bạn. Lưu xong sẽ được mã hoá và không bao giờ
             hiện lại trên màn hình.

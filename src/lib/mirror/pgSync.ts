@@ -24,8 +24,21 @@ import { neon } from "@neondatabase/serverless";
  * Sai thứ tự là vi phạm khoá ngoại ngay dòng đầu tiên. Thêm bảng mới thì phải chèn đúng chỗ —
  * `assertTablesCovered` bên dưới bắt được nếu quên.
  */
+/**
+ * Thứ tự chép — cha trước con, vì khoá ngoại. `app_settings` đứng CUỐI dù nó chẳng có khoá
+ * ngoại nào, và đó là chủ ý đắt giá:
+ *
+ * Nó vừa là dữ liệu được chép, vừa là chỗ cỗ máy này ghi tiến độ của chính nó, vừa là nơi
+ * admin sửa thông báo bế quan trong lúc chờ. Đặt nó ở nhịp ĐẦU (bản cũ) nghĩa là mở một cửa
+ * sổ dài bằng cả lượt chạy để bản sao trở nên lạc hậu — và ngày 10/08/2026 cửa sổ ấy dính
+ * đúng một lượt: admin sửa ghi chú bế quan lúc 16:43:40, sau khi bảng đã chép xong lúc
+ * 16:42:10, nên đối chiếu đỏ và lượt chuyển chết. Đứng cuối thì cửa sổ co lại còn đúng thời
+ * gian của bước đối chiếu.
+ *
+ * Cửa sổ ấy KHÔNG bao giờ về 0, và đó là điều phải nói thẳng thay vì giấu: sửa cài đặt trong
+ * lúc chuyển trạm thì đối chiếu đỏ — đúng như nó phải thế, vì bản sao đã cũ thật.
+ */
 export const SYNC_TABLE_ORDER = [
-  "app_settings",
   "permissions",
   "roles",
   "users",
@@ -36,6 +49,7 @@ export const SYNC_TABLE_ORDER = [
   "workers",
   "automation_jobs",
   "job_events",
+  "app_settings",
 ] as const;
 
 export type SyncTable = (typeof SYNC_TABLE_ORDER)[number];
@@ -51,6 +65,12 @@ export const SYNC_PAGE_SIZE = 1000;
 const HEARTBEAT_COLUMNS: Partial<Record<SyncTable, readonly string[]>> = {
   workers: ["last_seen"],
   automation_jobs: ["last_heartbeat"],
+  // `saveAppSettings` chạm `updated_at` mỗi lần ghi, mà cỗ máy này ghi tiến độ mỗi nhịp — kể cả
+  // từng nhịp của chính bước đối chiếu. Cùng loại tiếng ồn với hai cột trên, chỉ khác là ở đây
+  // người gây ồn chính là người đang đo. Bỏ sót cột này ở lần vá đầu khiến lượt diễn tập thứ ba
+  // chết y hệt lượt thứ hai, vì bảng giả trong phép kiểm chỉ có (id, value) — không mang hình
+  // dạng thật của bảng. Đúng cái bẫy fixture đã trả giá một lần ở mongoSync.
+  app_settings: ["updated_at"],
 };
 
 /**

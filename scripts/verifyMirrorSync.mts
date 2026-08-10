@@ -10,7 +10,7 @@
  * phép bỏ qua cột nhịp tim lúc đối chiếu.
  */
 import { neon } from "@neondatabase/serverless";
-import { verifyDigestExpr } from "../src/lib/mirror/pgSync";
+import { SYNC_TABLE_ORDER, verifyDigestExpr } from "../src/lib/mirror/pgSync";
 import { MONGO_DEFAULT_DB, resolveMongoDbName } from "../src/lib/mongo/dbName";
 import { loadEnv } from "./loadEnv.mjs";
 
@@ -198,20 +198,34 @@ try {
 
   const settingsExpr = verifyDigestExpr("app_settings");
   ok(settingsExpr.includes("'mirrorSwitch'"), "biểu thức đối chiếu app_settings có loại khoá mirrorSwitch");
+  ok(settingsExpr.includes("- 'updated_at'"), "…VÀ loại cả cột updated_at — chỗ bản vá đầu bỏ sót");
   ok(verifyDigestExpr("users") === "to_jsonb(t)", "bảng không khai gì thì băm thẳng, không phù phép");
   ok(verifyDigestExpr("workers").includes("- 'last_seen'"), "workers vẫn loại cột nhịp tim như cũ");
+  ok(
+    SYNC_TABLE_ORDER[SYNC_TABLE_ORDER.length - 1] === "app_settings",
+    "app_settings chép CUỐI — cửa sổ lạc hậu co lại còn đúng bước đối chiếu",
+  );
 
+  // Bảng giả mang ĐÚNG BA CỘT của bảng thật, kể cả updated_at. Bản kiểm trước chỉ có (id, value)
+  // nên nó xanh trong khi đời thật đỏ — đúng cái bẫy fixture đã trả giá một lần ở mongoSync,
+  // vấp lại ngay trong cùng một buổi. Hình dạng của fixture LÀ một phần của phép kiểm.
   for (const schema of [SRC, DST]) {
-    await sql.query(`create table ${schema}.app_settings (id text primary key, value jsonb not null)`);
+    await sql.query(`create table ${schema}.app_settings (
+      id text primary key,
+      value jsonb not null,
+      updated_at timestamptz not null default now()
+    )`);
     await sql.query(
-      `insert into ${schema}.app_settings (id, value) values ('global', $1::jsonb)`,
+      `insert into ${schema}.app_settings (id, value, updated_at) values ('global', $1::jsonb, '2026-08-10T16:42:10Z')`,
       [JSON.stringify({ chat: { retentionDays: 14 }, mirrorSwitch: { phase: "idle", copiedRows: 0 } })],
     );
   }
-  // Nguồn nhúc nhích ĐÚNG như lúc chạy thật: mỗi nhịp một lần stamp vào mirrorSwitch.
-  await sql.query(`update ${SRC}.app_settings set value = jsonb_set(value, '{mirrorSwitch}', $1::jsonb, true)`, [
-    JSON.stringify({ phase: "verifying", copiedRows: 11458, note: "Đang chép job_events: 10000 dòng." }),
-  ]);
+  // Nguồn nhúc nhích ĐÚNG như lúc chạy thật: mỗi nhịp một lần stamp vào mirrorSwitch, và
+  // saveAppSettings đẩy updated_at theo — hai thứ luôn đi cùng nhau, nên phải kiểm cùng nhau.
+  await sql.query(
+    `update ${SRC}.app_settings set value = jsonb_set(value, '{mirrorSwitch}', $1::jsonb, true), updated_at = '2026-08-10T16:42:32Z'`,
+    [JSON.stringify({ phase: "verifying", copiedRows: 11458, note: "Đang chép job_events: 10000 dòng." })],
+  );
   ok(
     (await rawDigest(SRC, "to_jsonb(t)")) !== (await rawDigest(DST, "to_jsonb(t)")),
     "băm THẲNG thì hai bên lệch — tái hiện đúng lượt diễn tập đã chết",

@@ -176,6 +176,7 @@ Biến **phải GIỐNG nhau** ở mọi trạm — khác một cái là gãy đ
 | `ENCRYPTION_KEY` | Cookie game + sổ gương trong DB đồng bộ sang **không giải mã được** — chết cả quest engine |
 | `WORKER_TOKEN` | VM không gọi được trạm mới, và chữ ký bảng điều phối không xác minh được |
 | `OCI_*` (5 biến) | Mất media + mất luôn bảng điều phối |
+| `MONGODB_DB` (kể cả khi **cả hai đều không đặt**) | Máy đồng bộ giải tên database cho CẢ HAI trạm bằng biến của tiến trình đang chạy — lệch nhau là chép sảnh đàm đạo vào một database mà trạm gương không bao giờ đọc tới. Đối chiếu vẫn xanh vì hai bên cùng đếm 0 |
 | `CRON_SECRET`, `GIPHY_API_KEY`, `MONGODB_*` server-side khác | cron/GIF gãy tương ứng |
 
 Biến **riêng từng trạm**: `SITE_ID` (mới — định danh trạm, trùng `id` trong sổ gương),
@@ -191,7 +192,8 @@ trong env), không đi bằng session login — session chỉ ôm được một
 là `auto-hh3d`, gương đầu tiên `auto-hh3d-1`. Dùng LUÔN tên ấy làm `SITE_ID` và làm `id`
 trong sổ gương: một cái tên cho cả ba chỗ thì không bao giờ phải tra bảng đối chiếu.
 
-**BA BẪY ĐÃ TRẢ GIÁ khi dựng trạm gương đầu tiên (10/08/2026), đừng vấp lại:**
+**BỐN BẪY ĐÃ TRẢ GIÁ (10/08/2026), đừng vấp lại** — ba cái đầu khi dựng trạm gương, cái
+thứ tư khi bấm diễn tập:
 
 1. `vercel whoami --token <gương>` chạy TRONG thư mục repo trả `Not authorized` DÙ TOKEN
    TỐT — CLI đọc `.vercel/project.json` đang link project của tài khoản chính. Đã kết oan
@@ -206,6 +208,22 @@ trong sổ gương: một cái tên cho cả ba chỗ thì không bao giờ ph�
    tương tác thì treo rồi bị giết. Xoá bằng REST: `DELETE
    https://api.vercel.com/v9/projects/<tên>?slug=<team>`. Xoá project KHÔNG xoá database:
    hai resource Neon/Atlas chỉ rơi về trạng thái chưa nối, nối lại là xong.
+4. **Chuỗi Atlas không mang tên database, và một luật bị chép làm hai bản thì bản sao luôn
+   sai.** Lượt diễn tập đầu tiên gục ở bước `syncing` sau khi đã chép xong 11.458 dòng
+   Postgres: `mirror/mongoSync.ts` tự viết một `databaseName()` chỉ đọc path của URI rồi ném
+   lỗi nếu rỗng — mà nút Connect của Atlas cho ra `…mongodb.net/?retryWrites=…`, path rỗng ở
+   **cả hai** trạm. Ứng dụng thật thì vẫn chạy, vì `services/chat.ts` có ba nấc
+   (`MONGODB_DB` → path → mặc định `jarvis`). Nay chỉ còn MỘT luật ở `src/lib/mongo/dbName.ts`
+   cho cả hai nơi gọi. Hai hệ quả đáng nhớ hơn cả bản vá:
+   - `verify:mirror-sync` xanh 12/12 mà đời thật đỏ, vì fixture nào cũng có path. Phép kiểm
+     phải mang **hình dạng chuỗi mà nhà cung cấp thực sự phát ra**, không phải hình dạng
+     tiện cho người viết test. Nay có phép kiểm đúng chuỗi Atlas ấy.
+   - 「Kiểm mạch」báo `Mongo ✔` nhưng chỉ `ping` cụm — chưa hề chạm tới tên database, tức là
+     xanh ở đúng chỗ sắp gãy. Nay nó in tên database đã giải và có/chưa có `chat_messages`.
+   Cái bẫy nguy hiểm hơn (chưa từng nổ, nay đã chặn): trỏ đúng cụm mà **sai tên database** thì
+   nguồn đọc 0, đích nhận 0, `srcCount === destCount` — đối chiếu xanh mướt và trạm gương lên
+   ngôi với sảnh đàm đạo trống trơn. `assertSourceDb` dừng ngay khi `chat_messages` đang nằm ở
+   một database KHÁC trên cùng cụm (vắng ở mọi nơi thì không sao — tông môn chưa ai nhắn).
 
 Quy trình: tạo project Vercel (tài khoản nào cũng được) → đặt env theo hai bảng trên →
 deploy từ bản `git archive` (đường đã dùng vì vụ chặn git author — hoặc nối git của chính

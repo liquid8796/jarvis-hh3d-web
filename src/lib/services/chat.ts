@@ -1,5 +1,6 @@
 import { MongoClient, type Collection, type Db, type Filter } from "mongodb";
 import { z } from "zod";
+import { resolveMongoDbName } from "@/lib/mongo/dbName";
 import { isSafeAttachmentUrl } from "@/lib/validation/chat";
 import { getAppSettings } from "./settings";
 
@@ -135,16 +136,7 @@ function mongoUri(): string | null {
 
 /** Tên database: biến môi trường thắng, rồi tới đường dẫn trong URI, cuối cùng là mặc định. */
 function databaseName(uri: string): string {
-  const explicit = process.env.MONGODB_DB?.trim();
-  if (explicit) return explicit;
-  try {
-    // URI mongodb+srv:// có thể mang đường dẫn database, và integration của Vercel thì không.
-    const path = new URL(uri.replace(/^mongodb(\+srv)?:/, "http:")).pathname.replace(/^\//, "");
-    if (path) return decodeURIComponent(path);
-  } catch {
-    // URI lạ thì thôi — dùng mặc định, và lỗi thật (nếu có) sẽ nổ ở lúc connect với nguyên văn.
-  }
-  return "jarvis";
+  return resolveMongoDbName(uri, process.env.MONGODB_DB);
 }
 
 async function connect(uri: string): Promise<ChatStore> {

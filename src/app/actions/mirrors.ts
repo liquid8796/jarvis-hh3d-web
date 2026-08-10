@@ -7,6 +7,7 @@ import { neon } from "@neondatabase/serverless";
 import { requireAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
 import { encryptSecret, decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
+import { resolveMongoDbName } from "@/lib/mongo/dbName";
 import { getAppSettings, saveAppSettings, type AppSettings } from "@/lib/services/settings";
 
 /**
@@ -107,7 +108,12 @@ async function probeConnections(pg: string, mongo: string): Promise<{ ok: boolea
   try {
     await client.connect();
     await client.db().command({ ping: 1 });
-    notes.push("Mongo ✔");
+    // Nói luôn TÊN DATABASE đã giải, đừng chỉ ping cụm. Lượt chuyển trạm đầu tiên gãy đúng ở
+    // khâu tên database trong khi kiểm mạch vẫn báo「Mongo ✔」— vì ping chưa hề chạm tới nó.
+    // Vắng `chat_messages` KHÔNG phải lỗi (trạm gương mới thì chưa có gì), nhưng phải hiện ra.
+    const dbName = resolveMongoDbName(mongo, process.env.MONGODB_DB);
+    const seeded = await client.db(dbName).listCollections({ name: "chat_messages" }).hasNext();
+    notes.push(`Mongo ✔ (db「${dbName}」, chat_messages ${seeded ? "có" : "chưa có"})`);
   } catch (err) {
     notes.push(`Mongo ✗: ${err instanceof Error ? err.message.slice(0, 120) : "lỗi lạ"}`);
     ok = false;

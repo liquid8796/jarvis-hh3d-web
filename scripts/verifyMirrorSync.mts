@@ -10,6 +10,7 @@
  * phép bỏ qua cột nhịp tim lúc đối chiếu.
  */
 import { neon } from "@neondatabase/serverless";
+import { MONGO_DEFAULT_DB, resolveMongoDbName } from "../src/lib/mongo/dbName";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -103,6 +104,25 @@ async function digest(schema: string, table: string, skip: string[]): Promise<st
 
 const count = async (schema: string, table: string) =>
   one<{ n: number }>(await sql.query(`select count(*)::int as n from ${schema}.${q(table)}`)).n;
+
+// ---- tên database Mongo (thuần, không cần mạng) ------------------------------------------
+// Phần này đứng TRƯỚC mọi thứ đụng Postgres vì nó là chỗ đã làm gãy lượt chuyển trạm thật
+// ngày 10/08/2026, và vì nó chạy được cả trên máy không nối nổi Atlas (bệnh DNS SRV).
+// Bài học của lượt gãy ấy nằm ở dòng đầu tiên dưới đây: hình dạng chuỗi Atlas ĐỜI THẬT
+// không có tên database, mà fixture cũ thì cái nào cũng có — nên 12/12 xanh mà đời thật đỏ.
+{
+  const ATLAS = "mongodb+srv://u:p@atlas-jarvis-chat.cepk4xw.mongodb.net/?retryWrites=true&w=majority";
+  ok(resolveMongoDbName(ATLAS) === MONGO_DEFAULT_DB, `chuỗi Atlas đời thật (KHÔNG có path) → mặc định「${MONGO_DEFAULT_DB}」`);
+  ok(resolveMongoDbName(ATLAS, "  ") === MONGO_DEFAULT_DB, "MONGODB_DB toàn khoảng trắng thì coi như không đặt");
+  ok(resolveMongoDbName(ATLAS, "jarvis-khac") === "jarvis-khac", "MONGODB_DB thắng mọi nấc dưới");
+  ok(
+    resolveMongoDbName("mongodb+srv://u:p@host.mongodb.net/so-tay?retryWrites=true") === "so-tay",
+    "có path thì lấy path, và query string không dính vào tên",
+  );
+  ok(resolveMongoDbName("mongodb://localhost:27017/") === MONGO_DEFAULT_DB, "path rỗng (chỉ dấu /) → mặc định");
+  ok(resolveMongoDbName("mongodb+srv://u:p@host.net/t%C3%B4ng%20m%C3%B4n") === "tông môn", "path được giải mã percent-encoding");
+  ok(resolveMongoDbName("không-phải-uri") === MONGO_DEFAULT_DB, "URI hỏng thì lùi về mặc định chứ KHÔNG ném — lỗi thật để dành cho lúc connect");
+}
 
 try {
   await dropSchemas();

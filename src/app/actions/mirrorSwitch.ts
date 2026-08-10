@@ -238,7 +238,7 @@ export async function stepSwitchAction(): Promise<SwitchResult> {
         // Hết bảng: Mongo và sequence là hai việc cuối của giai đoạn chép.
         const seq = await resetSequences(src, dest);
         const mongo = await syncMongo(process.env.MONGODB_URI!, decryptSecret(entry.mongo));
-        const bad = mongo.filter((m) => !m.ok);
+        const bad = mongo.collections.filter((m) => !m.ok);
         if (bad.length > 0) {
           stamp(settings, {
             phase: "failed",
@@ -250,7 +250,7 @@ export async function stepSwitchAction(): Promise<SwitchResult> {
         stamp(settings, {
           phase: "verifying",
           tableIndex: 0,
-          note: `Đã chép xong Postgres + Mongo (${mongo.map((m) => `${m.collection}=${m.copied}`).join(", ")}); sequence: ${seq.join(", ") || "không có"}. Đang đối chiếu.`,
+          note: `Đã chép xong Postgres + Mongo (db「${mongo.srcDb}」→「${mongo.destDb}」: ${mongo.collections.map((m) => `${m.collection}=${m.copied}`).join(", ")}); sequence: ${seq.join(", ") || "không có"}. Đang đối chiếu.`,
         });
         await persist(settings);
         return { ok: true, message: "Chép xong — sang bước đối chiếu." };

@@ -9,6 +9,7 @@
 import { deepStrictEqual, strictEqual } from "node:assert";
 import { decideRequest, signControlDoc, parseControlDoc, verifyControlDoc, type ControlDoc } from "../src/lib/control/doc";
 import { readControlDoc, resetControlCacheForVerify } from "../src/lib/control/read";
+import { canSwitch } from "../src/lib/mirror/switchGuard";
 
 const TOKEN = "worker-token-danh-cho-kiem-chung";
 let passed = 0;
@@ -70,6 +71,29 @@ deepStrictEqual(decideRequest({ ...here, pathname: "/api/worker" }), {
 console.log("✔ /api/worker — 409 kèm địa chỉ, không redirect mù"); passed++;
 deepStrictEqual(decideRequest({ ...here, pathname: "/api/cron" }), { kind: "cron-skip" });
 console.log("✔ /api/cron trên trạm phụ — 204"); passed++;
+
+
+// ---- Luật phát lệnh chuyển trạm (mô hình promote) ---------------------------------------
+const BOOK = ["main", "auto-hh3d-1", "auto-hh3d-2"] as const;
+const gate = (currentSiteId: string, activeSiteId: string | null, targetId: string) =>
+  canSwitch({ currentSiteId, activeSiteId, targetId, knownIds: BOOK });
+
+ok(gate("main", "main", "auto-hh3d-1").allowed, "trạm đang hoạt động chuyển sang trạm khác — cho");
+ok(
+  gate("auto-hh3d-1", "auto-hh3d-1", "main").allowed,
+  "SAU KHI PROMOTE: trạm gương giờ là trạm hoạt động, chuyển ngược về main — cho (đây là điều bản cũ làm không được)",
+);
+ok(gate("auto-hh3d-1", "auto-hh3d-1", "auto-hh3d-2").allowed, "promote tiếp sang trạm thứ ba — cho");
+
+const notActive = gate("main", "auto-hh3d-1", "auto-hh3d-2");
+ok(!notActive.allowed && notActive.reason === "not-active", "trạm ĐÃ NGHỈ phát lệnh — chặn (chống chép database cũ đè lên đích)");
+const same = gate("main", "main", "main");
+ok(!same.allowed && same.reason === "same-site", "chuyển sang chính mình — chặn (nếu lọt, bước dọn đích xoá sạch nguồn)");
+const unknown = gate("main", "main", "khong-co-trong-so");
+ok(!unknown.allowed && unknown.reason === "unknown-target", "đích không có trong sổ — chặn");
+const noId = gate("", null, "main");
+ok(!noId.allowed && noId.reason === "no-site-id", "chưa khai SITE_ID — chặn");
+ok(gate("main", null, "auto-hh3d-1").allowed, "bảng chưa init — coi trạm đang chạy là trạm hoạt động (fail-open)");
 
 // ---- Đường đọc: tráo fetch --------------------------------------------------------------
 process.env.OCI_REGION = "eu-frankfurt-1";

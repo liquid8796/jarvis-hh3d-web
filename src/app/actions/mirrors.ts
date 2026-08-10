@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { MongoClient } from "mongodb";
 import { neon } from "@neondatabase/serverless";
 import { requireAdmin } from "@/lib/auth/guards";
@@ -206,4 +207,55 @@ export async function deleteMirrorAction(_prev: MirrorResult | null, formData: F
   await saveAppSettings(settings);
   revalidatePath("/admin");
   return { ok: true, message: `Đã xoá trạm「${id}」khỏi sổ.` };
+}
+
+/**
+ * Ghi CHÍNH TRẠM NÀY vào sổ — nút cứu khỏi cảnh cụt đường về.
+ *
+ * Sổ nằm trong `app_settings` nên nó ĐI THEO dữ liệu sang trạm mới mỗi lượt chuyển. Nếu sổ
+ * chỉ liệt kê những trạm KHÁC, thì sau khi chuyển sang B, trạm B nhận một cuốn sổ không có
+ * tên A — và không còn ai để pick mà quay về. Hệ phải đối xứng: sổ là danh mục MỌI trạm, kể
+ * cả trạm đang cầm bút.
+ *
+ * Chuỗi kết nối lấy từ env của chính trạm này, URL lấy từ header `host` của chính request —
+ * cả hai đều là sự thật tại chỗ, không phải thứ admin phải chép tay từ dashboard sang.
+ */
+export async function registerSelfAction(): Promise<MirrorResult> {
+  await requireSiteSwitch();
+
+  const siteId = (process.env.SITE_ID ?? "").trim();
+  if (!siteId) {
+    return { ok: false, message: "Trạm này chưa khai SITE_ID — đặt biến ấy trên Vercel rồi deploy lại đã." };
+  }
+  const pg = (process.env.DATABASE_URL ?? "").trim();
+  const mongo = (process.env.MONGODB_URI ?? "").trim();
+  if (!pg || !mongo) {
+    return { ok: false, message: "Trạm này thiếu DATABASE_URL hoặc MONGODB_URI — không tự khai được." };
+  }
+
+  const host = (await headers()).get("host");
+  if (!host) return { ok: false, message: "Không đọc được host của chính trang này." };
+  const url = `https://${host}`;
+
+  const settings = await getAppSettings();
+  const existing = settings.mirrors.find((m) => m.id === siteId);
+  const entry: AppSettings["mirrors"][number] = {
+    id: siteId,
+    name: existing?.name ?? `Trạm ${siteId}`,
+    url,
+    pg: encryptSecret(pg),
+    mongo: encryptSecret(mongo),
+    lastProbeAt: new Date().toISOString(),
+    lastProbeOk: true,
+    lastProbeNote: "Tự khai từ env của chính trạm — không cần kiểm mạch, nó đang chạy bằng chính hai chuỗi này.",
+  };
+  settings.mirrors = existing
+    ? settings.mirrors.map((m) => (m.id === siteId ? entry : m))
+    : [...settings.mirrors, entry];
+  await saveAppSettings(settings);
+  revalidatePath("/admin");
+  return {
+    ok: true,
+    message: `${existing ? "Đã cập nhật" : "Đã ghi"} trạm hiện tại「${siteId}」(${url}) vào sổ — giờ trạm khác có đường quay về đây.`,
+  };
 }

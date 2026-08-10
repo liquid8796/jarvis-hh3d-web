@@ -57,6 +57,11 @@ export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; s
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold">
                     {m.name} <span className="ml-1 font-mono text-xs text-[var(--color-mist)]">{m.id}</span>
+                    {m.id === switchState.currentSiteId && (
+                      <span className="ml-2 rounded-full border border-[rgba(76,201,154,0.5)] px-2 py-0.5 text-xs text-[var(--color-jade-300)]">
+                        trạm đang phục vụ
+                      </span>
+                    )}
                   </p>
                   <p className="truncate text-xs text-[var(--color-mist)]">
                     {m.url} · PG {m.pgHost} · Mongo {m.mongoHost}

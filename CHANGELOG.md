@@ -11,6 +11,28 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.63.0 — chuyển trạm là PROMOTE, và hai lỗ hổng của bản trước
+
+Đạo hữu chỉ ra đúng chỗ: hệ phải như promote standby thành master — trạm nào đang cầm bút
+cũng chọn được trạm khác làm trạm chính mới, và trạm được chọn thành nơi phát lệnh của lượt
+sau. Bản 0.62.0 không làm được, vì hai lỗ hổng chỉ lộ ra khi nghĩ theo mô hình ấy.
+
+**Cụt đường về.** Sổ chỉ liệt kê những trạm KHÁC, mà sổ lại nằm trong app_settings nên nó đi
+theo dữ liệu sang trạm mới mỗi lượt chuyển. Chuyển sang B xong, B nhận một cuốn sổ không có
+tên A — không còn ai để pick mà quay về. Nay sổ là danh mục MỌI trạm kể cả trạm đang cầm bút,
+và có nút「Ghi trạm này vào sổ」tự khai từ env + host của chính request, kèm cảnh báo khi sổ
+còn thiếu entry ấy.
+
+**Nguồn có thể sai — đây mới là cái nguy hiểm.** `/admin` được middleware miễn trừ chuyển
+hướng (admin phải còn cửa quay lui), nên trang ấy mở được trên một trạm ĐÃ NGHỈ. Mà lượt đồng
+bộ lấy nguồn từ `DATABASE_URL` của chính trạm đang chạy — phát lệnh từ trạm nghỉ nghĩa là chép
+một database đứng yên từ lần lật trước đè lên trạm đích. Nay chặn ở cả ba cửa (mở lượt, mỗi
+nhịp, lúc lật), vì mỗi nhịp là một request riêng và bảng có thể bị lật giữa chừng bởi lượt khác.
+
+Luật ấy tách thành `canSwitch()` thuần để kiểm chứng được: verify:control lên 28 phép, trong
+đó có phép「trạm gương sau khi promote chuyển ngược về main」— thứ bản cũ trả về "không có gì
+để chuyển".
+
 ## 0.62.0 — máy chuyển trạm: chép, đối chiếu, rồi mới lật bảng
 
 Phần 4 của hệ gương trạm. Nút「Chuyển trạm」trên tab Gương Trạm chạy một máy trạng thái sống

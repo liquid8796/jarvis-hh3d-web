@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { requireAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
 import { decryptSecret } from "@/lib/crypto/secretBox";
@@ -23,6 +24,7 @@ import {
   verifyTable,
 } from "@/lib/mirror/pgSync";
 import { syncMongo } from "@/lib/mirror/mongoSync";
+import { canSwitch } from "@/lib/mirror/switchGuard";
 
 /**
  * Máy trạng thái chuyển trạm — deploy/mirror/README.md §6.
@@ -53,6 +55,12 @@ export type SwitchView = {
   tableIndex: number;
   tableCount: number;
   drain: { running: number; queued: number };
+  /** SITE_ID của chính trạm đang phục vụ trang này. Rỗng nếu deploy chưa khai. */
+  currentSiteId: string;
+  /** Trạm này CÓ PHẢI trạm đang hoạt động không — chỉ nó mới được phát lệnh chuyển. */
+  isActiveSite: boolean;
+  /** Sổ đã có entry cho chính trạm này chưa. Thiếu là cụt đường về sau khi chuyển đi. */
+  selfInBook: boolean;
 };
 
 async function requireSiteSwitch() {
@@ -72,6 +80,24 @@ async function persist(settings: AppSettings): Promise<void> {
   revalidatePath("/admin");
 }
 
+/**
+ * Trạm chạy đoạn mã này có phải trạm ĐANG HOẠT ĐỘNG không.
+ *
+ * Quan trọng hơn vẻ ngoài: `/admin` được middleware MIỄN TRỪ chuyển hướng (để admin còn cửa
+ * quay lui), nên trang này mở được trên một trạm đã nghỉ. Mà `stepSwitchAction` lấy nguồn từ
+ * `DATABASE_URL` của chính trạm đang chạy — phát lệnh từ trạm nghỉ nghĩa là chép một database
+ * đứng yên từ lần lật trước ĐÈ LÊN trạm đích. Đó là mất dữ liệu thật, nên phải chặn từ cổng.
+ *
+ * Bảng chưa init (doc = null) thì coi như trạm này đang hoạt động: lúc ấy chưa có khái niệm
+ * "trạm khác", và fail-open là luật nền của cả tầng điều phối.
+ */
+async function activeSiteCheck(): Promise<{ currentSiteId: string; isActive: boolean; activeSiteId: string }> {
+  const currentSiteId = (process.env.SITE_ID ?? "").trim();
+  const doc = await readControlDoc();
+  if (!doc) return { currentSiteId, isActive: true, activeSiteId: "" };
+  return { currentSiteId, isActive: doc.activeSiteId === currentSiteId, activeSiteId: doc.activeSiteId };
+}
+
 function mirrorOf(settings: AppSettings, id: string) {
   const entry = settings.mirrors.find((m) => m.id === id);
   if (!entry) throw new Error(`Trạm「${id}」không còn trong sổ — lượt chuyển không đi tiếp được.`);
@@ -80,7 +106,7 @@ function mirrorOf(settings: AppSettings, id: string) {
 
 export async function switchStateForAdmin(): Promise<SwitchView> {
   await requireSiteSwitch();
-  const settings = await getAppSettings();
+  const [settings, site] = await Promise.all([getAppSettings(), activeSiteCheck()]);
   const s = settings.mirrorSwitch;
   return {
     phase: s.phase,
@@ -94,6 +120,9 @@ export async function switchStateForAdmin(): Promise<SwitchView> {
     tableIndex: s.tableIndex,
     tableCount: SYNC_TABLE_ORDER.length,
     drain: await countJobsForDrain(),
+    currentSiteId: site.currentSiteId,
+    isActiveSite: site.isActive,
+    selfInBook: site.currentSiteId !== "" && settings.mirrors.some((m) => m.id === site.currentSiteId),
   };
 }
 
@@ -121,10 +150,16 @@ export async function beginSwitchAction(_prev: SwitchResult | null, formData: Fo
     return { ok: false, message: `Gõ đúng mã trạm「${entry.id}」vào ô xác nhận thì mới đi tiếp.` };
   }
 
-  const doc = await readControlDoc();
-  if (doc && doc.activeSiteId === entry.id) {
-    return { ok: false, message: `Trạm「${entry.id}」ĐANG là trạm hoạt động — không có gì để chuyển.` };
-  }
+  // Toàn bộ luật "ai được phát lệnh, đi đâu" nằm ở canSwitch() — hàm thuần, verify:control
+  // bao từng nhánh. Ở đây chỉ là chỗ nối dây.
+  const site = await activeSiteCheck();
+  const gate = canSwitch({
+    currentSiteId: site.currentSiteId,
+    activeSiteId: site.activeSiteId || null,
+    targetId: entry.id,
+    knownIds: settings.mirrors.map((m) => m.id),
+  });
+  if (!gate.allowed) return { ok: false, message: gate.message };
 
   const now = new Date();
   settings.maintenance = {
@@ -156,6 +191,12 @@ export async function beginSwitchAction(_prev: SwitchResult | null, formData: Fo
  */
 export async function stepSwitchAction(): Promise<SwitchResult> {
   await requireSiteSwitch();
+  // Kiểm lại MỖI NHỊP, không chỉ lúc mở lượt: mỗi nhịp là một request riêng, và giữa hai nhịp
+  // thì bảng điều phối có thể đã bị lật bởi một lượt khác (hoặc bằng CLI).
+  const site = await activeSiteCheck();
+  if (!site.isActive) {
+    return { ok: false, message: `Trạm này không còn là trạm hoạt động (giờ là「${site.activeSiteId}」) — dừng lượt chuyển.` };
+  }
   const settings = await getAppSettings();
   const state = settings.mirrorSwitch;
 
@@ -282,6 +323,10 @@ export async function stepSwitchAction(): Promise<SwitchResult> {
  */
 export async function flipSwitchAction(): Promise<SwitchResult> {
   const user = await requireSiteSwitch();
+  const site = await activeSiteCheck();
+  if (!site.isActive) {
+    return { ok: false, message: `Trạm này không còn là trạm hoạt động (giờ là「${site.activeSiteId}」) — không lật hộ được.` };
+  }
   const settings = await getAppSettings();
   const state = settings.mirrorSwitch;
   if (state.phase !== "done") {

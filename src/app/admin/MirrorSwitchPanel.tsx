@@ -11,7 +11,7 @@ import {
   type SwitchResult,
   type SwitchView,
 } from "@/app/actions/mirrorSwitch";
-import type { MirrorView } from "@/app/actions/mirrors";
+import { registerSelfAction, type MirrorView } from "@/app/actions/mirrors";
 
 /**
  * Bảng điều khiển lượt chuyển trạm — deploy/mirror/README.md §6.
@@ -30,7 +30,8 @@ export function MirrorSwitchPanel({ mirrors, initial }: { mirrors: MirrorView[];
   const [notice, setNotice] = useState<SwitchResult | null>(null);
   const [running, setRunning] = useState(false);
   const [pending, startTransition] = useTransition();
-  const [targetId, setTargetId] = useState(mirrors[0]?.id ?? "");
+  const candidates = mirrors.filter((m) => m.id !== initial.currentSiteId);
+  const [targetId, setTargetId] = useState(candidates[0]?.id ?? "");
   const [confirmText, setConfirmText] = useState("");
 
   const busy = view.phase === "draining" || view.phase === "syncing" || view.phase === "verifying";
@@ -120,6 +121,40 @@ export function MirrorSwitchPanel({ mirrors, initial }: { mirrors: MirrorView[];
         )}
       </div>
 
+      {!view.isActiveSite && (
+        <p className="mb-4 rounded-lg border border-[rgba(255,120,120,0.45)] px-4 py-2 text-sm text-[#f2a0a0]">
+          Trạm này ({view.currentSiteId || "chưa khai SITE_ID"}) KHÔNG phải trạm đang hoạt động. Lệnh chuyển
+          phải phát từ trạm đang phục vụ — phát từ đây sẽ chép một database đã nghỉ đè lên trạm đích.
+        </p>
+      )}
+
+      {view.isActiveSite && !view.selfInBook && view.currentSiteId && (
+        <div className="mb-4 rounded-lg border border-[rgba(232,194,92,0.45)] px-4 py-3 text-sm">
+          <p className="text-[var(--color-gold-300)]">
+            Sổ chưa có entry cho chính trạm này ({view.currentSiteId}).
+          </p>
+          <p className="mt-1 text-xs text-[var(--color-mist)]">
+            Sổ đi theo dữ liệu sang trạm mới mỗi lượt chuyển. Thiếu entry của trạm này thì sau khi chuyển đi,
+            bên kia không còn ai để pick mà quay về.
+          </p>
+          <button
+            type="button"
+            className="btn btn-ghost mt-2 text-sm"
+            onClick={() =>
+              startTransition(async () => {
+                const res = await registerSelfAction();
+                setNotice(res);
+                setView(await switchStateForAdmin());
+                router.refresh();
+              })
+            }
+            disabled={pending}
+          >
+            Ghi trạm này vào sổ
+          </button>
+        </div>
+      )}
+
       {view.phase === "idle" || view.phase === "failed" ? (
         <form
           className="flex flex-col gap-3"
@@ -142,8 +177,8 @@ export function MirrorSwitchPanel({ mirrors, initial }: { mirrors: MirrorView[];
                 onChange={(e) => setTargetId(e.target.value)}
                 required
               >
-                {mirrors.length === 0 && <option value="">(sổ chưa có trạm nào)</option>}
-                {mirrors.map((m) => (
+                {candidates.length === 0 && <option value="">(sổ chưa có trạm nào khác)</option>}
+                {candidates.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name} — {m.id}
                   </option>
@@ -163,7 +198,7 @@ export function MirrorSwitchPanel({ mirrors, initial }: { mirrors: MirrorView[];
                 required
               />
             </div>
-            <button type="submit" className="btn btn-primary" disabled={mirrors.length === 0 || confirmText !== targetId}>
+            <button type="submit" className="btn btn-primary" disabled={candidates.length === 0 || confirmText !== targetId || !view.isActiveSite}>
               Bắt đầu chuyển
             </button>
           </div>

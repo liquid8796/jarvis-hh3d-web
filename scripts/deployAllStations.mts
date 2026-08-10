@@ -297,7 +297,21 @@ try {
     }
   }
 } finally {
-  rmSync(stage, { recursive: true, force: true });
+  // Dọn thư mục tạm KHÔNG được phép giết lượt chạy — đo được ngay lượt chạy thật đầu tiên:
+  // cả hai trạm đã phát hành xong, rồi `rmSync` ném EPERM và cuốn theo cả bảng tổng kết. Trên
+  // Windows tệp còn bị giữ handle một nhịp sau khi CLI thoát, mà `force: true` chỉ bỏ qua
+  // ENOENT chứ không bỏ qua EPERM.
+  //
+  // Hai lớp: `maxRetries` lo cái handle chưa kịp nhả, còn `try` lo mọi thứ còn lại. Bỏ quên
+  // một thư mục tạm là chuyện vặt; bỏ mất bảng tổng kết của một lượt phát hành thì không.
+  try {
+    rmSync(stage, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  } catch (err) {
+    console.warn(
+      `\n⚠ Không xoá được thư mục tạm ${stage} (${err instanceof Error ? err.message : "lỗi lạ"}).` +
+        " Phát hành KHÔNG bị ảnh hưởng — xoá tay lúc rảnh.",
+    );
+  }
 }
 
 // ---- 7. Dò lại hai cửa và tổng kết -----------------------------------------------------------

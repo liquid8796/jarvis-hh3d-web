@@ -24,7 +24,7 @@ import {
   verifyTable,
 } from "@/lib/mirror/pgSync";
 import { syncMongo } from "@/lib/mirror/mongoSync";
-import { canSwitch } from "@/lib/mirror/switchGuard";
+import { canFlip, canSwitch } from "@/lib/mirror/switchGuard";
 
 /**
  * Máy trạng thái chuyển trạm — deploy/mirror/README.md §6.
@@ -324,25 +324,18 @@ export async function stepSwitchAction(): Promise<SwitchResult> {
 export async function flipSwitchAction(): Promise<SwitchResult> {
   const user = await requireSiteSwitch();
   const site = await activeSiteCheck();
-  if (!site.isActive) {
-    return { ok: false, message: `Trạm này không còn là trạm hoạt động (giờ là「${site.activeSiteId}」) — không lật hộ được.` };
-  }
   const settings = await getAppSettings();
   const state = settings.mirrorSwitch;
-  if (state.phase !== "done") {
-    return { ok: false, message: `Chỉ lật được khi đối chiếu đã xanh (phase hiện tại: ${state.phase}).` };
-  }
-  // Lật sang CHÍNH MÌNH là vô nghĩa, và nó đã xảy ra thật: ngày 10/08/2026 trạm vừa lên ngôi
-  // thừa hưởng một bản ghi `done` trỏ vào chính nó, nút「Lật」hiện ra, và mỗi cú bấm đẻ một
-  // revision mới trong sổ bảng điều phối (2→3→4→5) mà chẳng đổi gì. Bản ghi thừa hưởng nay là
-  // `idle` nên cửa này gần như không còn ai gõ — nhưng chặn ở server vẫn phải có, vì UI không
-  // phải nơi có thẩm quyền, và một bản ghi cũ từ deploy đời trước vẫn có thể lọt tới đây.
-  if (state.targetId && state.targetId === site.currentSiteId) {
-    return {
-      ok: false,
-      message: `Trạm này CHÍNH LÀ「${state.targetId}」— lật sang chính mình không đổi gì. Bấm「Huỷ lượt chuyển」để dọn bản ghi cũ.`,
-    };
-  }
+
+  // Toàn bộ luật "được lật hay chưa" nằm ở canFlip() — hàm thuần, verify:control bao từng
+  // nhánh. Ở đây chỉ là chỗ nối dây, đúng như beginSwitchAction làm với canSwitch().
+  const gate = canFlip({
+    currentSiteId: site.currentSiteId,
+    activeSiteId: site.activeSiteId || null,
+    targetId: state.targetId,
+    phase: state.phase,
+  });
+  if (!gate.allowed) return { ok: false, message: gate.message };
   const entry = mirrorOf(settings, state.targetId);
 
   const workerToken = (process.env.WORKER_TOKEN ?? "").trim();

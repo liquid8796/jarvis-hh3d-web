@@ -60,3 +60,66 @@ export function canSwitch(input: {
 
   return { allowed: true };
 }
+
+export type FlipGate =
+  | { allowed: true }
+  | { allowed: false; reason: "no-site-id" | "not-active" | "not-ready" | "same-site"; message: string };
+
+/**
+ * Luật "được lật bảng điều phối hay chưa" — anh em của `canSwitch`, tách ra cùng một lý do.
+ *
+ * KHÔNG gọi lại `canSwitch`: ba nhánh nhìn giống nhau nhưng LỜI KỂ phải khác, vì hậu quả khác.
+ * Phát lệnh chuyển từ trạm nghỉ là chép database đã chết đè lên đích; còn lật từ trạm nghỉ chỉ
+ * là lật hộ một trạm không còn quyền. Dùng chung thông báo là nói sai với người đang gỡ rối, và
+ * một thông báo sai đắt hơn ba nhánh trùng hình.
+ *
+ * Nhánh `same-site` sinh ra từ diễn tập 10/08/2026: trạm vừa lên ngôi thừa hưởng một bản ghi
+ * `done` trỏ vào chính nó, nút「Lật」hiện ra, và mỗi cú bấm đẻ một revision mới trong sổ mà
+ * chẳng đổi gì (2→3→4→5).
+ */
+export function canFlip(input: {
+  currentSiteId: string;
+  activeSiteId: string | null;
+  /** `mirrorSwitch.targetId` — đích của lượt đang chờ lật. */
+  targetId: string;
+  /** `mirrorSwitch.phase`; chỉ `done` mới lật được. */
+  phase: string;
+}): FlipGate {
+  const { currentSiteId, activeSiteId, targetId, phase } = input;
+
+  if (!currentSiteId) {
+    return {
+      allowed: false,
+      reason: "no-site-id",
+      message: "Trạm này chưa khai SITE_ID — không xác định được nó là ai để lật bảng.",
+    };
+  }
+
+  // Bảng chưa init thì trạm đang chạy chính là trạm hoạt động — cùng luật fail-open với canSwitch.
+  const active = activeSiteId ?? currentSiteId;
+  if (active !== currentSiteId) {
+    return {
+      allowed: false,
+      reason: "not-active",
+      message: `Trạm này không còn là trạm hoạt động (giờ là「${active}」) — không lật hộ được.`,
+    };
+  }
+
+  if (phase !== "done") {
+    return {
+      allowed: false,
+      reason: "not-ready",
+      message: `Chỉ lật được khi đối chiếu đã xanh (phase hiện tại: ${phase}).`,
+    };
+  }
+
+  if (targetId && targetId === currentSiteId) {
+    return {
+      allowed: false,
+      reason: "same-site",
+      message: `Trạm này CHÍNH LÀ「${targetId}」— lật sang chính mình không đổi gì. Bấm「Huỷ lượt chuyển」để dọn bản ghi cũ.`,
+    };
+  }
+
+  return { allowed: true };
+}

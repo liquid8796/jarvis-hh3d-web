@@ -9,7 +9,7 @@
 import { deepStrictEqual, strictEqual } from "node:assert";
 import { decideRequest, signControlDoc, parseControlDoc, verifyControlDoc, type ControlDoc } from "../src/lib/control/doc";
 import { readControlDoc, resetControlCacheForVerify } from "../src/lib/control/read";
-import { canSwitch } from "../src/lib/mirror/switchGuard";
+import { canFlip, canSwitch } from "../src/lib/mirror/switchGuard";
 
 const TOKEN = "worker-token-danh-cho-kiem-chung";
 let passed = 0;
@@ -94,6 +94,30 @@ ok(!unknown.allowed && unknown.reason === "unknown-target", "đích không có t
 const noId = gate("", null, "main");
 ok(!noId.allowed && noId.reason === "no-site-id", "chưa khai SITE_ID — chặn");
 ok(gate("main", null, "auto-hh3d-1").allowed, "bảng chưa init — coi trạm đang chạy là trạm hoạt động (fail-open)");
+
+// ---- Luật LẬT bảng (anh em của canSwitch, hậu quả khác nên lời kể khác) -------------------
+const flip = (currentSiteId: string, activeSiteId: string | null, targetId: string, phase = "done") =>
+  canFlip({ currentSiteId, activeSiteId, targetId, phase });
+
+ok(flip("main", "main", "auto-hh3d-1").allowed, "đối chiếu xanh, đúng trạm hoạt động, đích là trạm khác — cho lật");
+ok(flip("main", null, "auto-hh3d-1").allowed, "bảng chưa init — fail-open như tầng chuyển hướng");
+
+const flipSelf = flip("auto-hh3d-1", "auto-hh3d-1", "auto-hh3d-1");
+ok(
+  !flipSelf.allowed && flipSelf.reason === "same-site",
+  "LẬT SANG CHÍNH MÌNH — chặn (trạm vừa lên ngôi thừa hưởng bản ghi done trỏ vào chính nó, mỗi cú bấm đẻ một revision vô nghĩa)",
+);
+for (const phase of ["idle", "draining", "syncing", "verifying", "failed"]) {
+  const notReady = flip("main", "main", "auto-hh3d-1", phase);
+  ok(!notReady.allowed && notReady.reason === "not-ready", `phase「${phase}」chưa xanh — chặn lật`);
+}
+const flipStale = flip("main", "auto-hh3d-1", "auto-hh3d-2");
+ok(!flipStale.allowed && flipStale.reason === "not-active", "trạm đã nghỉ lật hộ — chặn");
+ok(!flipStale.allowed && !flipStale.message.includes("chép"), "…và lời kể KHÔNG nói chuyện chép đè — lật không chép gì cả");
+const flipNoId = flip("", null, "auto-hh3d-1");
+ok(!flipNoId.allowed && flipNoId.reason === "no-site-id", "chưa khai SITE_ID — chặn lật");
+const flipEmptyTarget = flip("main", "main", "");
+ok(flipEmptyTarget.allowed, "targetId rỗng KHÔNG bị bắt nhầm thành same-site (chuỗi rỗng khớp chuỗi rỗng)");
 
 // ---- Đường đọc: tráo fetch --------------------------------------------------------------
 process.env.OCI_REGION = "eu-frankfurt-1";

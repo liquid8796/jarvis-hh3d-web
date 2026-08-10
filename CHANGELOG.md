@@ -11,6 +11,30 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.60.0 — bảng điều phối gương trạm và tầng chuyển hướng
+
+Hai phần đầu của lộ trình gương trạm (deploy/mirror/README.md §12). Chưa có gì đổi với người
+dùng hôm nay: trạm chưa đặt `SITE_ID` hay chưa init bảng thì middleware cho qua toàn bộ —
+fail-open là luật nền của cả tầng này, vì một biến env thiếu hay một lượt GET bucket hỏng
+không có quyền quỳ cả trạm.
+
+Lõi (`src/lib/control/doc.ts`) thuần và không SDK: schema bảng, chữ ký HMAC-SHA256 khoá
+`WORKER_TOKEN` (bucket đọc công khai — quyền ghi OCI là rào thứ nhất, chữ ký là rào thứ hai,
+và thứ nó gác chính là token mà VM sẽ gửi tới `activeUrl` của bảng), và phép quyết định
+chuyển hướng. Chuỗi ký viết tay từng trường theo thứ tự cố định — `JSON.stringify` cả object
+thì thứ tự khoá đi theo thứ tự chèn, hai phía parse lại là chữ ký thành xổ số.
+
+Đường đọc (`read.ts`) cache 30 giây, trần fetch 3 giây, revision đơn điệu — bản cũ quay lại
+(cache CDN, PUT đua nhau) không kéo được cả hệ về trạng thái trước. Middleware miễn trừ
+`/admin` `/login` `/api/admin` (admin phải vào được trạm cũ mà quay lui), trả 409 kèm địa chỉ
+cho `/api/worker` (khôi lỗi không đi theo redirect mù kèm Authorization), 204 cho `/api/cron`
+trạm phụ (hai trạm không đua nhau dọn dẹp). `verify:control` bao 19 phép: ký/giả mạo/khoá
+sai, từng nhánh quyết định (kể cả `/administrator` không được ăn theo miễn trừ `/admin`),
+và đường đọc với fetch tráo — bucket chết, 404, bảng giả, bản cũ.
+
+`mirror:control` là đường tay của bước `flipping`: ghi bảng có chữ ký rồi ĐỌC LẠI qua đúng
+con đường middleware dùng, khớp revision mới tin là xong.
+
 ## 0.59.1 — đàn đã khai lại rồi vẫn đeo nút Bắt Đầu
 
 Bậc trị sự bấm Bắt Đầu, đàn mới vào hàng chờ — nhưng dòng cũ vẫn nằm đó với nguyên cái nút,

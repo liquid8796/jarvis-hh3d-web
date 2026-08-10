@@ -1,6 +1,7 @@
 # Gương Trạm — thiết kế hệ thống trạm dự phòng (mirror site)
 
-> Bản thiết kế 10/08/2026, chưa thực thi. Đọc cùng [deploy/oracle/README.md](../oracle/README.md)
+> Bản thiết kế 10/08/2026. Trạng thái: phần 1–2 của §12 ĐÃ thực thi (0.60.0 — lõi bảng
+> điều phối + middleware); phần 3–5 chưa. Đọc cùng [deploy/oracle/README.md](../oracle/README.md)
 > (VM + Object Storage — hai thứ KHÔNG đổi trong mọi kịch bản) và ghi chú migrate database
 > 10/08/2026 (đổi `jarvis-auto-hh3d` → `jarvis-hh3d`): phần đồng bộ Postgres dưới đây chính là
 > bản sản phẩm hoá của quy trình đã chạy tay hôm ấy.
@@ -178,6 +179,11 @@ Biến **phải GIỐNG nhau** ở mọi trạm — khác một cái là gãy đ
 Biến **riêng từng trạm**: `SITE_ID` (mới — định danh trạm, trùng `id` trong sổ gương),
 `DATABASE_URL` (Neon của trạm ấy, đặt `--sensitive`), `MONGODB_URI` (Atlas của trạm ấy),
 `WEB_URL` nếu có nơi dùng.
+
+**Lệ đặt tên (10/08/2026):** mọi tài khoản đặt database TRÙNG TÊN — Neon `jarvis-hh3d`,
+MongoDB Atlas `atlas-jarvis-chat` — nên checklist chỉ phân biệt bằng TÀI KHOẢN, không bao
+giờ bằng tên database. Vercel CLI đi bằng API token (`--token`, đặt `VERCEL_TOKEN[_<trạm>]`
+trong env), không đi bằng session login — session chỉ ôm được một tài khoản một lúc.
 
 Quy trình: tạo project Vercel (tài khoản nào cũng được) → đặt env theo hai bảng trên →
 deploy từ bản `git archive` (đường đã dùng vì vụ chặn git author — hoặc nối git của chính

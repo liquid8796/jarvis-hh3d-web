@@ -11,9 +11,15 @@
  * Luật, đúng theo lời tông chủ đặt ra (sửa 09/08/2026 — xem đoạn "bản cũ" bên dưới):
  * HAI LÀN RIÊNG, mỗi làn một trần, không tranh ngân sách của nhau. Không phân biệt tài khoản:
  * bộ đếm là của cả tiến trình.
- *   - Làn HUB (pagePath = dailyQuestPath, thao tác ngắn trên /nhiem-vu-hang-ngay): tối đa 3.
+ *   - Làn HUB (pagePath = dailyQuestPath, thao tác ngắn trên /nhiem-vu-hang-ngay): tối đa 5.
  *   - Làn TRANG RIÊNG (pagePath khác): tối đa 2.
- *   → cùng lắm 5 nhiệm vụ chạy một lúc, và trần tab mỗi đàn vẫn do pool của vòng đó giữ.
+ *   → cùng lắm 7 nhiệm vụ chạy một lúc, và trần tab mỗi đàn vẫn do pool của vòng đó giữ.
+ *
+ * Vì sao hub nới 3→5 mà trang riêng GIỮ 2 (09/08/2026, sau khi VM lên 4 vCPU/24GB): hub là
+ * thao tác ngắn, gần như không ngốn CPU. Trang riêng thì ngược lại — sự cố 07/08 là HAI nhiệm
+ * vụ nặng trên HAI vCPU, tức tỉ lệ hỏng là 1 vCPU mỗi nhiệm vụ nặng. Giữ 2 trên 4 vCPU cho
+ * mỗi cái 2 vCPU, thoải mái gấp đôi ngưỡng đã gãy; nâng lên 3 là tụt về 1,33 và bò lại đúng
+ * vạch ấy. RAM dư thì nới được, CPU mới là thứ đã từng làm hỏng dữ liệu.
  *
  * BẢN CŨ, và vì sao nó đổi: luật đầu tiên cho ĐÚNG MỘT trang riêng cộng ĐÚNG MỘT hub đồng
  * hành — tổng ≤ 2 cho cả khôi lỗi. Nó sinh ra từ sự cố 07/08 nói trên và đã làm đúng việc của
@@ -49,7 +55,7 @@ export function isDedicatedPageQuest(profile, quest) {
 /** Trần làn TRANG RIÊNG — số nhiệm vụ nặng được chạy cùng lúc trên cả khôi lỗi. */
 const MAX_DEDICATED = 2;
 /** Trần làn HUB — thao tác ngắn trên trang nhiệm vụ hằng ngày. */
-const MAX_HUB = 3;
+const MAX_HUB = 5;
 
 const state = {
   /** Tổng nhiệm vụ đang chạy qua cổng, mọi đàn cộng lại — bằng dedicatedActive + hub. */

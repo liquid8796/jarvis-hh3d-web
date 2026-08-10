@@ -11,6 +11,30 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.58.7 — nới trần theo VM 4 vCPU/24GB: hub 3→5, 8 đàn, 4 tab
+
+VM đã lên **4 vCPU / 24 GB** (kịch trần Always Free A1), nên bộ số cũ — vốn đặt cho 2 vCPU —
+đã quá dè dặt. Nới:
+
+| | Cũ | Mới | Ở đâu |
+|---|---|---|---|
+| `MAX_HUB` | 3 | **5** | `questGate.mjs` |
+| `MAX_DEDICATED` | 2 | **giữ 2** | `questGate.mjs` |
+| `WORKER_MAX_JOBS` | 5 | **8** (kịch trần mã) | drop-in systemd |
+| `WORKER_QUEST_TABS` | (mặc định 3) | **4** | drop-in systemd |
+| `MemoryMax` | 10G | **18G** | drop-in systemd |
+
+Tổng nhiệm vụ chạy cùng lúc: 2 + 5 = **7**.
+
+**`MAX_DEDICATED` giữ nguyên 2, và đó là con số duy nhất cố ý không đụng.** Sự cố 07/08 là HAI
+nhiệm vụ nặng trên HAI vCPU — tỉ lệ hỏng là 1 vCPU mỗi nhiệm vụ nặng. Giữ 2 trên 4 vCPU cho mỗi
+cái 2 vCPU, gấp đôi ngưỡng đã gãy; nâng lên 3 là tụt về 1,33 và bò lại đúng vạch ấy. RAM dư thì
+nới được, CPU mới là thứ đã từng làm hỏng dữ liệu. Hub thì ngược lại — thao tác ngắn, gần như
+không ngốn CPU — nên nới thoải mái.
+
+`MemoryMax` 18G chừa ~6 GB cho OS. **Không có swap**, nên chạm trần là bị giết ngay, không có
+bước đệm — đó là lý do không lấy sát hơn.
+
 ## 0.58.6 — huy hiệu ở tab Môn Đồ xuống dòng khi nhiều quá
 
 Một người mang bốn huy hiệu (vai + tag) làm cả hàng kéo dài thành MỘT dòng, đẩy ba cột Trạng

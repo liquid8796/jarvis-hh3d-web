@@ -2206,9 +2206,9 @@ async function main() {
       );
     }
 
-    console.log("\nCổng điều phối toàn cục — hai làn riêng: trang riêng ≤ 2, hub ≤ 3");
+    console.log("\nCổng điều phối toàn cục — hai làn riêng: trang riêng ≤ 2, hub ≤ 5");
 
-    // Hai làn riêng: trang riêng ≤ 2, hub ≤ 3, không tranh ngân sách của nhau. Khối này dựng
+    // Hai làn riêng: trang riêng ≤ 2, hub ≤ 5, không tranh ngân sách của nhau. Khối này dựng
     // lại đúng hình dạng sự cố 07/08 (Mê Cung + Hoang Vực) — nay chúng ĐƯỢC cặp, vì tông chủ
     // đã nới trần; cái phải canh giờ là con thứ BA và trần của từng làn.
     {
@@ -2238,17 +2238,17 @@ async function main() {
       await tick();
       check("trang riêng thứ BA phải xếp hàng — trần làn là 2", !boss3.admitted, "con thứ ba chen được vào");
 
-      const hubs = [grab(false, "Hub 1"), grab(false, "Hub 2"), grab(false, "Hub 3")];
+      const hubs = [1, 2, 3, 4, 5].map((n) => grab(false, `Hub ${n}`));
       await tick();
       check(
-        "ba hub vào đủ dù hai trang riêng đang chạy — hai làn KHÔNG tranh ngân sách",
+        "năm hub vào đủ dù hai trang riêng đang chạy — hai làn KHÔNG tranh ngân sách",
         hubs.every((h) => h.admitted),
         hubs.map((h) => h.admitted).join("/"),
       );
 
-      const hub4 = grab(false, "Hub 4");
+      const hub4 = grab(false, "Hub 6");
       await tick();
-      check("hub thứ TƯ hết chỗ — trần làn hub là 3", !hub4.admitted, "hub4 chen được vào");
+      check("hub thứ SÁU hết chỗ — trần làn hub là 5", !hub4.admitted, "hub6 chen được vào");
       check(
         "hub mới KHÔNG phải nhường trang riêng đang đợi — luật nhường đã gỡ cùng lúc tách làn",
         !boss3.admitted,
@@ -2365,9 +2365,9 @@ async function main() {
 
     _observeGate(null);
     check(
-      "cổng toàn cục: không ảnh chụp nào vượt trần (tổng ≤ 5, trang riêng ≤ 2)",
+      "cổng toàn cục: không ảnh chụp nào vượt trần (tổng ≤ 7, trang riêng ≤ 2)",
       gateSnapshots.length > 0 &&
-        gateSnapshots.every((snap) => snap.active <= 5 && snap.dedicatedActive <= 2),
+        gateSnapshots.every((snap) => snap.active <= 7 && snap.dedicatedActive <= 2),
       gateSnapshots.map((snap) => `${snap.active}/${snap.dedicatedActive}`).join(" → ") || "(không ảnh nào)",
     );
 

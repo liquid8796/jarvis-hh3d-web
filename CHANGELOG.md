@@ -11,6 +11,40 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.58.8 — chép lại lối vào OCI, và cách cứu khi mất khoá SSH
+
+Ngày 10/08/2026 một phiên làm việc mở ra thì **không vào được gì cả**: `~/.ssh/jarvis_oci_ed25519`
+biến mất khỏi máy, `~/.oci/jarvis_api_key.pem` cũng không còn, và profile `[jarvis]` — thứ
+[deploy/oracle/README.md](deploy/oracle/README.md) dựng ra đúng để chuyện này không bao giờ chặn
+ai — thì không có trong `~/.oci/config`. Chỉ còn một session token chết từ bốn hôm trước. Tài
+liệu tả một cái máy không phải cái máy đang có. Lượt này chép lại cho khớp.
+
+**Fingerprint của `[jarvis]` nay là `e9:4b:11:…`.** Khoá `64:74:2f:…` mà tệp cũ ghi vẫn ACTIVE
+trên user nhưng phần riêng đã thất lạc — giữ lại phòng khi nó nằm ở máy khác, và ghi rõ là đừng
+lấy ra dùng. Mục「Dựng lại profile khi mất」hoá ra chỉ đúng **khi còn cặp khoá**; mất `.pem` thì
+khoá riêng không tái tạo được từ khoá công khai, nên phải đi lối trình duyệt một lần rồi tự đúc
+khoá mới. Công thức đầy đủ nằm trong tệp ấy, kèm bẫy đặt tên: session phải là `jarvis-session`
+chứ trùng tên `jarvis` là mục khoá-API bị đè.
+
+**Khoá API mới cần ~45 giây mới hiệu lực, và lan không đều giữa các endpoint** — object-storage
+nhận trước, `instance-agent` sau. Trong khoảng ấy OCI trả 401 `NotAuthenticated`, đọc hệt như
+"khoá chưa nằm trên user", và đủ sức lừa người ta đi sửa cấu hình đang đúng. Đúng cái bẫy đã
+chép cho khoá S3; hoá ra khoá API cũng thế.
+
+**Lối cứu khi mất khoá SSH, viết ra vì đã phải mò:** Run Command là ngõ cụt — plugin ấy mang
+`desired-state: ENABLED` nhưng agent chưa bao giờ báo nó về, nên lệnh nằm `ACCEPTED` vĩnh viễn.
+`agent-config` là ý muốn, `instance-agent plugin list` mới là hiện thực. Bastion thì được, vì
+agent CÓ liệt kê nó. Mấu chốt đắt nhất: **agent chỉ nạp plugin mới lúc khởi động** — bật rồi
+ngồi đợi là đợi mãi (đo 8 phút cho mỗi plugin, bất động), reboot xong thì `RUNNING` sau ~100
+giây. Và một cái bẫy nữa suýt nuốt trọn: Bastion tự nạp chính khoá của mình vào `authorized_keys`
+trong một khối gắn nhãn session, khối ấy **bị gỡ khi session hết hạn**, nên phép `grep` khoá để
+"khỏi thêm trùng" sẽ khớp vào dòng tạm rồi báo "đã có sẵn" mà không thêm gì — ba tiếng sau khoá
+cửa lại như cũ. So theo **chú thích**, đừng so theo phần khoá.
+
+**Kích cỡ VM: 4 OCPU / 24GB**, không phải 2/12 như bảng cũ. `shape-config` của OCI và
+`nproc`/`free` trên máy nói cùng một điều. Con số này là căn cứ của trần hub ở 0.58.7, nên chép
+sai chỗ này là tính sai chỗ kia.
+
 ## 0.58.7 — nới trần theo VM 4 vCPU/24GB: hub 3→5, 8 đàn, 4 tab
 
 VM đã lên **4 vCPU / 24 GB** (kịch trần Always Free A1), nên bộ số cũ — vốn đặt cho 2 vCPU —

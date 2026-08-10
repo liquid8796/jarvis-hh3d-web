@@ -23,13 +23,25 @@ Profile nằm trong `~/.oci/config`, ký bằng `~/.oci/jarvis_api_key.pem`:
 | user | `ocid1.user.oc1..aaaaaaaab3xazdjv2mqzgn3kpglwr6fl2vnapcgfl2uadz7qr2qstsabzpja` (hanam.tranle.5@gmail.com) |
 | tenancy | `ocid1.tenancy.oc1..aaaaaaaa7ja4sgwekszyo365l5uq7fdp6jfjuv2cxct6n6o34amuolvkfngq` |
 | region | `eu-frankfurt-1` (home region) |
-| fingerprint | `64:74:2f:93:7d:3e:8f:8f:ce:60:f6:e6:75:d1:40:a3` |
+| fingerprint | `e9:4b:11:60:e2:3a:04:70:ec:be:07:1f:ea:f3:5f:d2` |
 
 Khoá API **không hết hạn**, nên lối này dùng được trong mọi phiên mà không cần ai mở trình duyệt.
 
+> Trên user còn một khoá cũ `64:74:2f:93:…` (10/08/2026 vẫn ACTIVE) mà **phần riêng đã thất
+> lạc** — nó là fingerprint tệp này ghi trước đây. Giữ lại vì không loại trừ được khả năng
+> `.pem` của nó nằm ở một máy khác; đừng lấy nó ra dùng, và đừng tưởng gặp nó là gặp profile
+> đang chạy.
+
+**Khoá mới cần ~45 giây mới hiệu lực, và lan không đều giữa các endpoint.** Vừa upload xong mà
+gọi ngay thì OCI trả **401 `NotAuthenticated`** — đọc y hệt lỗi "khoá chưa nằm trên user" ở mục
+dựng lại bên dưới, nhưng là lỗi **chưa lan tới nơi**. Tệ hơn: object-storage nhận khoá trước,
+còn `instance-agent` thì sau, nên sẽ có giai đoạn lệnh này chạy được mà lệnh kia vẫn 401. Đúng
+cái bẫy đã ghi cho khoá S3 ở mục 3 — hoá ra khoá API cũng vậy. Thử lại là hết, đừng đi sửa cấu hình.
+
 ### Lối cũ: session token — hay chết, và chết thì không tự cứu được
 
-`~/.oci/sessions/{DEFAULT,nampro,nampro8796}` là session token của `oci session authenticate`.
+Mỗi thư mục con trong `~/.oci/sessions/` là một session token của `oci session authenticate`
+(10/08/2026 trên máy làm việc: `linhsu-bootstrap`, `jarvis-session`).
 Chúng sống **tối đa 60 phút**, và quá hạn refresh thì `oci session refresh` trả lời dứt khoát:
 
 ```
@@ -41,6 +53,26 @@ trên trình duyệt, tức **phải là đạo hữu tự làm**. Đó chính l
 để chuyện đó không bao giờ chặn một phiên làm việc nữa.
 
 ### Dựng lại profile `jarvis` khi mất
+
+Phần dưới chỉ dùng được **khi cặp khoá còn**. Mất `~/.oci/jarvis_api_key.pem` thì không có
+đường vá: khoá riêng không tái tạo được từ khoá công khai đang nằm trên OCI, nên dù Console
+vẫn hiện fingerprint cũ ACTIVE, nó đã thành một dòng chết. Lúc ấy phải đi lối trình duyệt
+đúng một lần rồi tự đúc khoá mới:
+
+```bash
+oci session authenticate --region eu-frankfurt-1 --profile-name jarvis-session
+openssl genrsa -out ~/.oci/jarvis_api_key.pem 2048
+openssl rsa -pubout -in ~/.oci/jarvis_api_key.pem -out ~/.oci/jarvis_api_key_public.pem
+oci iam user api-key upload --user-id <user OCID ở bảng trên> \
+  --key-file ~/.oci/jarvis_api_key_public.pem --profile jarvis-session --auth security_token
+```
+
+Rồi chép mục `[jarvis]` với fingerprint mà lệnh upload trả về, và nối thêm một dòng
+`OCI_API_KEY` vào cuối tệp `.pem` — thiếu nó thì mọi lệnh đều kèm một dòng cảnh báo nhiễu mắt.
+Đặt tên session là
+`jarvis-session` chứ **không** phải `jarvis`: hai profile phải sống cạnh nhau trong lúc chuyển,
+trùng tên là mục khoá-API bị session token đè mất. Mỗi user tối đa **3 khoá API**, nên còn chỗ
+cho một lần đúc mà chưa cần xoá gì.
 
 Nếu `~/.oci/config` mất mục `[jarvis]` nhưng cặp khoá còn:
 
@@ -79,6 +111,49 @@ tối đa 3 tab nhiệm vụ (`WORKER_QUEST_TABS` không đặt ở đâu nên l
 trong `runCycle.mjs`). Cực đại 5 × 3 = 15 tab đồng thời. Đo ngày 09/08/2026 sau ~2h chạy thật:
 `MemoryPeak` ~1,92GB, `MemoryCurrent` ~0,63GB cho TOÀN service — nhưng đó là đỉnh của khoảng
 ấy, không phải đỉnh lúc cả 5 ghế cùng đầy, nên đừng nhân 1,92 cho 5 rồi kết luận.
+
+### Mất khoá SSH thì vào lại bằng gì
+
+Đã trả giá ngày 10/08/2026: `~/.ssh/jarvis_oci_ed25519` biến mất khỏi máy làm việc, và cổng 22
+trả `Permission denied (publickey)` — VM sống nhăn nhưng không ai vào được. Đường ra:
+
+**Đừng đụng tới Run Command.** Plugin `Compute Instance Run Command` mang `desired-state:
+ENABLED` trong `agent-config` của instance này, nhưng agent **chưa bao giờ báo nó về** — nó
+không nằm trong 10 plugin agent liệt kê, kể cả sau reboot. Lệnh gửi qua `instance-agent command
+create` sẽ nằm `ACCEPTED`/`VISIBLE` vĩnh viễn, `time-updated` không nhúc nhích. `agent-config`
+là **ý muốn**, không phải hiện thực; muốn biết hiện thực thì hỏi:
+
+```bash
+oci instance-agent plugin list --compartment-id <tenancy> --instanceagent-id <instance OCID> --all
+```
+
+**Bastion mới là cần cẩu**, vì agent CÓ liệt kê nó (dù `STOPPED`) — plugin agent biết mặt thì
+bật được, plugin nó chưa từng nhắc tới thì không.
+
+1. Bật plugin: `oci compute instance update --instance-id <id> --agent-config …` với
+   `pluginsConfig: [{name:'Bastion', desiredState:'ENABLED'}]`. Gửi **trọn** object agent-config
+   kể cả `isManagementDisabled`/`isMonitoringDisabled`, thiếu trường là reset nhầm thứ khác.
+2. **Reboot.** Đây là mấu chốt và không hiển nhiên: agent chỉ nạp plugin mới **lúc khởi động**.
+   Bật rồi ngồi đợi thì đợi mãi — đã đo 8 phút cho Run Command và 8 phút cho Bastion, không
+   nhúc nhích; reboot xong thì Bastion `RUNNING` ngay ở lần dò đầu tiên, ~100 giây sau lệnh.
+   Reboot an toàn vì unit có `Restart=always` + `WantedBy=multi-user.target` và `setup.sh` chạy
+   `systemctl enable --now` — khôi lỗi tự đứng dậy. Nhưng **khai bảo trì và chờ「đang chạy」về 0**
+   trước đã, kẻo cắt ngang đàn của người ta.
+3. Dựng bastion trong **đúng subnet của VM**, `--client-cidr-list` bó vào IP của máy mình, rồi
+   `oci bastion session create-managed-ssh --target-os-username ubuntu --ssh-public-key-file <pub>`.
+   Session kết thúc ở **`ACTIVE`**, không phải `SUCCEEDED` — `--wait-for-state SUCCEEDED` sẽ
+   quay vô ích tới hết giờ. Session đầu tạo ngay sau khi plugin vừa lên có thể treo `CREATING`
+   mãi (đã gặp: 10 phút); xoá đi tạo lại sau vài phút thì `ACTIVE` trong 75 giây.
+4. Vào được rồi thì **thêm một dòng khoá mang chú thích RIÊNG**:
+
+> **Bẫy đã trả giá:** Bastion tự nạp chính khoá công khai của bạn vào `authorized_keys`, nằm
+> trong một khối gắn nhãn `#ocid1.bastionsession…`. Khối ấy **bị gỡ khi session hết hạn**. Một
+> phép `grep -qF "$KEY"` để "khỏi thêm trùng" sẽ khớp đúng vào dòng tạm ấy rồi báo "đã có sẵn"
+> và không thêm gì cả — ba tiếng sau khoá cửa lại như cũ. Hãy so theo **chú thích** (ví dụ
+> `jarvis-oci-vinhvien`) chứ đừng so theo phần khoá.
+
+Cuối cùng xoá bastion rồi **SSH thẳng vào IP công khai** để nghiệm thu: lúc ấy mọi dòng tạm đã
+biến mất, vào được nghĩa là dòng vĩnh viễn thật sự đứng một mình.
 
 ### Cài đè engine mới (phát hành)
 
@@ -125,7 +200,7 @@ systemctl restart auto-hh3d-linh-su    # khởi động lại
 |---|---|---|
 | Shape | **VM.Standard.A1.Flex** (Ampere ARM) | Always Free cho tới 4 OCPU + 24GB RAM cho A1 — dư sức nuôi Chromium. Hai con `VM.Standard.E2.1.Micro` (x86, 1GB) cũng free nhưng 1GB thì Chromium chết ngạt. |
 | OS | **Ubuntu 24.04 LTS (aarch64)** | Distro được Playwright hỗ trợ chính thức: `playwright install-deps` biết đúng danh sách gói hệ thống; Chromium có bản linux-arm64. Oracle Linux thì phải tự mò danh sách thư viện. |
-| Kích cỡ | 2 OCPU / 12GB | Một worker chỉ chạy MỘT browser một lúc. Lấy 4/24 cũng free nhưng vùng hay hết capacity A1 — yêu cầu càng nhỏ càng dễ được cấp. |
+| Kích cỡ | **4 OCPU / 24GB** | Trọn hạn Always Free của A1. Bảng này từng ghi 2/12 với lý do "xin nhỏ cho dễ được cấp" — đo lại ngày 10/08/2026 thì máy thật là 4 OCPU / 24GB (`shape-config` của OCI và `nproc`/`free` trên máy nói cùng một điều). Con số ấy là căn cứ của trần hub trong engine, nên chép sai ở đây là tính sai ở đó. |
 | Mạng | Chỉ mở SSH (22) | Worker chỉ gọi RA (HTTPS tới web + game). Không cổng nào cần mở vào. |
 
 ### Dựng lại VM từ đầu (một lần)

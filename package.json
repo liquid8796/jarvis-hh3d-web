@@ -23,6 +23,7 @@
     "smoke": "tsx scripts/smokeQuestEngine.mjs",
     "verify:continuous": "tsx scripts/verifyContinuousJob.mts",
     "verify:quiz-reference": "node scripts/verifyQuizReference.mjs",
+    "verify:maze-cap": "node scripts/verifyMazeCapMark.mjs",
     "verify:profile": "tsx scripts/verifyUserProfile.mts",
     "verify:avatar": "tsx scripts/verifyAvatar.mts",
     "verify:membership": "tsx scripts/verifyMembershipApproval.mts",

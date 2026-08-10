@@ -1905,14 +1905,27 @@
           "note": "ch\u1EDD s\u1EA3nh m\u00EA cung render \u2014 t\u1EDBi \u0111\u00E2y ch\u1EAFc ch\u1EAFn \u0111ang \u1EDF s\u1EA3nh, kh\u00F4ng \u1EDF trong ph\u00F2ng"
         },
         {
+          "action": "waitForSelector",
+          "selector": ".mc-ht-daily-text",
+          "timeoutMs": 8000,
+          "note": "ch\u1EDD \u00F4 huy\u1EC1n tinh v\u1EBD ra \u2014 trang v\u1EBD hai \u0111\u1EE3t, \u0111\u1ECDc s\u1EDBm l\u00E0 t\u01B0\u1EDFng ch\u01B0a \u0111\u1EA7y tr\u1EA7n",
+          "optional": true
+        },
+        {
+          "action": "evaluateJavaScript",
+          "script": "() =\u003E { /* C\u1EAFm c\u1EDD \u0022\u0111\u00E3 \u0111\u1EE7 huy\u1EC1n tinh h\u00F4m nay\u0022 l\u00EAn \u003Cbody\u003E V\u00C0 l\u00EAn ch\u00EDnh \u00F4 ch\u1EEF, \u0111\u1EC3 stopIf/until ch\u1EC9 ph\u1EA3i h\u1ECFi m\u1ED9t c\u00E2u visible \u2014 c\u00F9ng l\u1ED1i \u0111\u00E1nh d\u1EA5u v\u1EDBi .btn-kick.jarvis-kick. V\u00CC SAO KH\u00D4NG SO CHU\u1ED6I N\u1EEEA: tr\u1EA7n ng\u00E0y KH\u00C1C NHAU theo t\u00E0i kho\u1EA3n (nh\u1EADt k\u00FD 10/08/2026: 200 v\u00E0 360), n\u00EAn \u0022385/385\u0022 c\u1EE7a b\u1EA3n ghi h\u00ECnh kh\u00F4ng bao gi\u1EDD kh\u1EDBp \u2014 M\u00EA Cung c\u1EE9 \u0111\u00E1nh h\u1EBFt 6 v\u00F2ng d\u00F9 \u0111\u00E3 \u0111\u1EA7y tr\u1EA7n t\u1EEB s\u00E1ng. */ const MARK = \u0027jvz-cap-full\u0027; const els = document.querySelectorAll(\u0027.mc-ht-daily-text\u0027); if (document.body) document.body.classList.remove(MARK); for (const el of els) el.classList.remove(MARK); /* \u00AB\u2026\u00BB l\u00E0 quy \u01B0\u1EDBc \u0022l\u1EF1a ch\u1ECDn r\u1ED7ng\u0022 c\u1EE7a h\u1ED3 s\u01A1 (xem profile.mjs) \u2014 t\u1EE9c ng\u01B0\u1EDDi d\u00F9ng \u0111\u00E3 t\u1EAFt l\u01B0\u1EE3t ki\u1EC3m tra. */ if (\u0027{{capCheck}}\u0027.indexOf(\u0027\\u00AB\u0027) \u003E= 0) return \u0027cap-scan: t\u1EAFt ki\u1EC3m tra\u0027; if (els.length === 0) return \u0027cap-scan: ch\u01B0a th\u1EA5y \u00F4 huy\u1EC1n tinh\u0027; /* \u0022H\u00F4m nay \u0111\u00E3 nh\u1EADn 1.200/1.200\u0022 \u2014 d\u1EA5u ch\u1EA5m l\u00E0 ph\u00E2n c\u00E1ch h\u00E0ng ngh\u00ECn ki\u1EC3u vi-VN. Kh\u00F4ng b\u00F3c ra tr\u01B0\u1EDBc khi \u0111\u1ECDc s\u1ED1 th\u00EC \u00221.200/1.200\u0022 ho\u00E1 th\u00E0nh 200/1 v\u00E0 t\u01B0\u1EDFng \u0111\u00E3 \u0111\u1EA7y. */ const m = (els[0].textContent || \u0027\u0027).match(/(\\d[\\d.,\\u00A0 ]*)\\s*\\/\\s*(\\d[\\d.,\\u00A0 ]*)/); if (!m) return \u0027cap-scan: \u00F4 huy\u1EC1n tinh kh\u00F4ng c\u00F3 d\u1EA1ng x/y\u0027; const got = parseInt(m[1].replace(/\\D/g, \u0027\u0027), 10); const cap = parseInt(m[2].replace(/\\D/g, \u0027\u0027), 10); if (!(cap \u003E 0)) return \u0027cap-scan: tr\u1EA7n ng\u00E0y = 0, kh\u00F4ng tin \u0111\u01B0\u1EE3c\u0027; if (got \u003E= cap) { if (document.body) document.body.classList.add(MARK); els[0].classList.add(MARK); } return \u0027cap-scan \u0027 \u002B got \u002B \u0027/\u0027 \u002B cap \u002B (got \u003E= cap ? \u0027 \u2014 \u0110\u00C3 \u0110\u1EA6Y\u0027 : \u0027\u0027); }",
+          "timeoutMs": 4000,
+          "note": "\u0111\u1ECDc tr\u1EA7n huy\u1EC1n tinh ngay tr\u00EAn trang r\u1ED3i c\u1EAFm c\u1EDD \u2014 tr\u1EA7n m\u1ED7i t\u00E0i kho\u1EA3n m\u1ED9t kh\u00E1c, kh\u00F4ng so chu\u1ED7i \u0111\u01B0\u1EE3c",
+          "optional": true
+        },
+        {
           "action": "stopIf",
           "text": "\u0111\u00E3 \u0111\u1EE7 huy\u1EC1n tinh h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "\u0022H\u00F4m nay \u0111\u00E3 nh\u1EADn 385/385\u0022 \u2014 h\u00F4m nay kh\u00F4ng c\u1EA7n \u0111\u00E1nh n\u1EEFa; tu\u1EF3 ch\u1ECDn \u0022Kh\u00F4ng ki\u1EC3m tra\u0022 thay chu\u1ED7i n\u00E0y b\u1EB1ng sentinel kh\u00F4ng bao gi\u1EDD kh\u1EDBp",
+          "note": "\u0110\u1EE7 tr\u1EA7n huy\u1EC1n tinh h\u00F4m nay th\u00EC kh\u1ECFi m\u1EDF ph\u00F2ng \u2014 c\u1EDD do b\u01B0\u1EDBc \u0111\u1ECDc tr\u1EA7n li\u1EC1n tr\u01B0\u1EDBc c\u1EAFm; tu\u1EF3 ch\u1ECDn \u0022Kh\u00F4ng ki\u1EC3m tra\u0022 l\u00E0m b\u01B0\u1EDBc \u1EA5y kh\u00F4ng bao gi\u1EDD c\u1EAFm c\u1EDD",
           "condition": {
-            "kind": "textMatches",
-            "selector": ".mc-ht-daily-text",
-            "text": "{{capCheck}}"
+            "kind": "visible",
+            "selector": "body.jvz-cap-full, .mc-ht-daily-text.jvz-cap-full"
           }
         },
         {
@@ -2015,7 +2028,7 @@
         {
           "action": "repeat",
           "timeoutMs": 15000,
-          "note": "m\u1ED7i v\u00F2ng l\u00E0 m\u1ED9t l\u01B0\u1EE3t ch\u1EA1y 5 \u1EA3i; d\u1EEBng khi \u0022385/385\u0022 ho\u1EB7c h\u1EBFt tr\u1EA7n 6 v\u00F2ng / 35 ph\u00FAt. Sau m\u1ED7i l\u01B0\u1EE3t (th\u1EAFng hay b\u1EA1i) site t\u1EF1 reload v\u1EC1 ph\u00F2ng, c\u1EA3 \u0111\u1ED9i v\u1EABn \u1EDF nguy\u00EAn \u0111\u00F3 (b\u1EA3n ghi 20:10).",
+          "note": "m\u1ED7i v\u00F2ng l\u00E0 m\u1ED9t l\u01B0\u1EE3t ch\u1EA1y 5 \u1EA3i; d\u1EEBng khi \u0111\u1EA7y tr\u1EA7n huy\u1EC1n tinh ng\u00E0y (b\u01B0\u1EDBc \u0111\u1ECDc tr\u1EA7n cu\u1ED1i th\u00E2n v\u00F2ng c\u1EAFm c\u1EDD) ho\u1EB7c h\u1EBFt tr\u1EA7n 6 v\u00F2ng / 35 ph\u00FAt. Sau m\u1ED7i l\u01B0\u1EE3t (th\u1EAFng hay b\u1EA1i) site t\u1EF1 reload v\u1EC1 ph\u00F2ng, c\u1EA3 \u0111\u1ED9i v\u1EABn \u1EDF nguy\u00EAn \u0111\u00F3 (b\u1EA3n ghi 20:10).",
           "steps": [
             {
               "action": "repeat",
@@ -2214,12 +2227,18 @@
               "timeoutMs": 4000,
               "note": "b\u1EA3n tin cu\u1ED1i l\u01B0\u1EE3t: huy\u1EC1n tinh bao nhi\u00EAu, \u0111\u01B0\u1EE3c c\u1ED9ng bao nhi\u00EAu",
               "optional": true
+            },
+            {
+              "action": "evaluateJavaScript",
+              "script": "() =\u003E { /* C\u1EAFm c\u1EDD \u0022\u0111\u00E3 \u0111\u1EE7 huy\u1EC1n tinh h\u00F4m nay\u0022 l\u00EAn \u003Cbody\u003E V\u00C0 l\u00EAn ch\u00EDnh \u00F4 ch\u1EEF, \u0111\u1EC3 stopIf/until ch\u1EC9 ph\u1EA3i h\u1ECFi m\u1ED9t c\u00E2u visible \u2014 c\u00F9ng l\u1ED1i \u0111\u00E1nh d\u1EA5u v\u1EDBi .btn-kick.jarvis-kick. V\u00CC SAO KH\u00D4NG SO CHU\u1ED6I N\u1EEEA: tr\u1EA7n ng\u00E0y KH\u00C1C NHAU theo t\u00E0i kho\u1EA3n (nh\u1EADt k\u00FD 10/08/2026: 200 v\u00E0 360), n\u00EAn \u0022385/385\u0022 c\u1EE7a b\u1EA3n ghi h\u00ECnh kh\u00F4ng bao gi\u1EDD kh\u1EDBp \u2014 M\u00EA Cung c\u1EE9 \u0111\u00E1nh h\u1EBFt 6 v\u00F2ng d\u00F9 \u0111\u00E3 \u0111\u1EA7y tr\u1EA7n t\u1EEB s\u00E1ng. */ const MARK = \u0027jvz-cap-full\u0027; const els = document.querySelectorAll(\u0027.mc-ht-daily-text\u0027); if (document.body) document.body.classList.remove(MARK); for (const el of els) el.classList.remove(MARK); /* \u00AB\u2026\u00BB l\u00E0 quy \u01B0\u1EDBc \u0022l\u1EF1a ch\u1ECDn r\u1ED7ng\u0022 c\u1EE7a h\u1ED3 s\u01A1 (xem profile.mjs) \u2014 t\u1EE9c ng\u01B0\u1EDDi d\u00F9ng \u0111\u00E3 t\u1EAFt l\u01B0\u1EE3t ki\u1EC3m tra. */ if (\u0027{{capCheck}}\u0027.indexOf(\u0027\\u00AB\u0027) \u003E= 0) return \u0027cap-scan: t\u1EAFt ki\u1EC3m tra\u0027; if (els.length === 0) return \u0027cap-scan: ch\u01B0a th\u1EA5y \u00F4 huy\u1EC1n tinh\u0027; /* \u0022H\u00F4m nay \u0111\u00E3 nh\u1EADn 1.200/1.200\u0022 \u2014 d\u1EA5u ch\u1EA5m l\u00E0 ph\u00E2n c\u00E1ch h\u00E0ng ngh\u00ECn ki\u1EC3u vi-VN. Kh\u00F4ng b\u00F3c ra tr\u01B0\u1EDBc khi \u0111\u1ECDc s\u1ED1 th\u00EC \u00221.200/1.200\u0022 ho\u00E1 th\u00E0nh 200/1 v\u00E0 t\u01B0\u1EDFng \u0111\u00E3 \u0111\u1EA7y. */ const m = (els[0].textContent || \u0027\u0027).match(/(\\d[\\d.,\\u00A0 ]*)\\s*\\/\\s*(\\d[\\d.,\\u00A0 ]*)/); if (!m) return \u0027cap-scan: \u00F4 huy\u1EC1n tinh kh\u00F4ng c\u00F3 d\u1EA1ng x/y\u0027; const got = parseInt(m[1].replace(/\\D/g, \u0027\u0027), 10); const cap = parseInt(m[2].replace(/\\D/g, \u0027\u0027), 10); if (!(cap \u003E 0)) return \u0027cap-scan: tr\u1EA7n ng\u00E0y = 0, kh\u00F4ng tin \u0111\u01B0\u1EE3c\u0027; if (got \u003E= cap) { if (document.body) document.body.classList.add(MARK); els[0].classList.add(MARK); } return \u0027cap-scan \u0027 \u002B got \u002B \u0027/\u0027 \u002B cap \u002B (got \u003E= cap ? \u0027 \u2014 \u0110\u00C3 \u0110\u1EA6Y\u0027 : \u0027\u0027); }",
+              "timeoutMs": 4000,
+              "note": "\u0111\u1ECDc l\u1EA1i tr\u1EA7n huy\u1EC1n tinh sau l\u01B0\u1EE3t \u0111\u00E1nh \u2014 until \u0111\u1ECDc \u0111\u00FAng c\u1EDD n\u00E0y \u1EDF \u0111\u1EA7u v\u00F2ng sau",
+              "optional": true
             }
           ],
           "until": {
-            "kind": "textMatches",
-            "selector": ".mc-ht-daily-text",
-            "text": "{{capCheck}}"
+            "kind": "visible",
+            "selector": "body.jvz-cap-full, .mc-ht-daily-text.jvz-cap-full"
           },
           "maxIterations": 6,
           "maxSeconds": 2100
@@ -2297,8 +2316,8 @@
           "label": "Ki\u1EC3m tra huy\u1EC1n tinh",
           "choices": [
             {
-              "value": "385/385",
-              "label": "D\u1EEBng khi \u0111\u1EE7 385/385"
+              "value": "\u0111\u1EE7 tr\u1EA7n ng\u00E0y",
+              "label": "D\u1EEBng khi \u0111\u1EE7 huy\u1EC1n tinh h\u00F4m nay"
             },
             {
               "value": "\u00ABkh\u00F4ng ki\u1EC3m tra\u00BB",
@@ -2306,7 +2325,7 @@
             }
           ],
           "allowCustom": false,
-          "selectedValue": "385/385"
+          "selectedValue": "\u0111\u1EE7 tr\u1EA7n ng\u00E0y"
         },
         {
           "key": "kickIdle",
@@ -2882,14 +2901,27 @@
           "note": "ch\u1EDD s\u1EA3nh m\u00EA cung render \u2014 t\u1EDBi \u0111\u00E2y ch\u1EAFc ch\u1EAFn \u0111ang \u1EDF s\u1EA3nh, kh\u00F4ng \u1EDF trong ph\u00F2ng"
         },
         {
+          "action": "waitForSelector",
+          "selector": ".mc-ht-daily-text",
+          "timeoutMs": 8000,
+          "note": "ch\u1EDD \u00F4 huy\u1EC1n tinh v\u1EBD ra \u2014 trang v\u1EBD hai \u0111\u1EE3t, \u0111\u1ECDc s\u1EDBm l\u00E0 t\u01B0\u1EDFng ch\u01B0a \u0111\u1EA7y tr\u1EA7n",
+          "optional": true
+        },
+        {
+          "action": "evaluateJavaScript",
+          "script": "() =\u003E { /* C\u1EAFm c\u1EDD \u0022\u0111\u00E3 \u0111\u1EE7 huy\u1EC1n tinh h\u00F4m nay\u0022 l\u00EAn \u003Cbody\u003E V\u00C0 l\u00EAn ch\u00EDnh \u00F4 ch\u1EEF, \u0111\u1EC3 stopIf/until ch\u1EC9 ph\u1EA3i h\u1ECFi m\u1ED9t c\u00E2u visible \u2014 c\u00F9ng l\u1ED1i \u0111\u00E1nh d\u1EA5u v\u1EDBi .btn-kick.jarvis-kick. V\u00CC SAO KH\u00D4NG SO CHU\u1ED6I N\u1EEEA: tr\u1EA7n ng\u00E0y KH\u00C1C NHAU theo t\u00E0i kho\u1EA3n (nh\u1EADt k\u00FD 10/08/2026: 200 v\u00E0 360), n\u00EAn \u0022385/385\u0022 c\u1EE7a b\u1EA3n ghi h\u00ECnh kh\u00F4ng bao gi\u1EDD kh\u1EDBp \u2014 M\u00EA Cung c\u1EE9 \u0111\u00E1nh h\u1EBFt 6 v\u00F2ng d\u00F9 \u0111\u00E3 \u0111\u1EA7y tr\u1EA7n t\u1EEB s\u00E1ng. */ const MARK = \u0027jvz-cap-full\u0027; const els = document.querySelectorAll(\u0027.mc-ht-daily-text\u0027); if (document.body) document.body.classList.remove(MARK); for (const el of els) el.classList.remove(MARK); /* \u00AB\u2026\u00BB l\u00E0 quy \u01B0\u1EDBc \u0022l\u1EF1a ch\u1ECDn r\u1ED7ng\u0022 c\u1EE7a h\u1ED3 s\u01A1 (xem profile.mjs) \u2014 t\u1EE9c ng\u01B0\u1EDDi d\u00F9ng \u0111\u00E3 t\u1EAFt l\u01B0\u1EE3t ki\u1EC3m tra. */ if (\u0027{{capCheck}}\u0027.indexOf(\u0027\\u00AB\u0027) \u003E= 0) return \u0027cap-scan: t\u1EAFt ki\u1EC3m tra\u0027; if (els.length === 0) return \u0027cap-scan: ch\u01B0a th\u1EA5y \u00F4 huy\u1EC1n tinh\u0027; /* \u0022H\u00F4m nay \u0111\u00E3 nh\u1EADn 1.200/1.200\u0022 \u2014 d\u1EA5u ch\u1EA5m l\u00E0 ph\u00E2n c\u00E1ch h\u00E0ng ngh\u00ECn ki\u1EC3u vi-VN. Kh\u00F4ng b\u00F3c ra tr\u01B0\u1EDBc khi \u0111\u1ECDc s\u1ED1 th\u00EC \u00221.200/1.200\u0022 ho\u00E1 th\u00E0nh 200/1 v\u00E0 t\u01B0\u1EDFng \u0111\u00E3 \u0111\u1EA7y. */ const m = (els[0].textContent || \u0027\u0027).match(/(\\d[\\d.,\\u00A0 ]*)\\s*\\/\\s*(\\d[\\d.,\\u00A0 ]*)/); if (!m) return \u0027cap-scan: \u00F4 huy\u1EC1n tinh kh\u00F4ng c\u00F3 d\u1EA1ng x/y\u0027; const got = parseInt(m[1].replace(/\\D/g, \u0027\u0027), 10); const cap = parseInt(m[2].replace(/\\D/g, \u0027\u0027), 10); if (!(cap \u003E 0)) return \u0027cap-scan: tr\u1EA7n ng\u00E0y = 0, kh\u00F4ng tin \u0111\u01B0\u1EE3c\u0027; if (got \u003E= cap) { if (document.body) document.body.classList.add(MARK); els[0].classList.add(MARK); } return \u0027cap-scan \u0027 \u002B got \u002B \u0027/\u0027 \u002B cap \u002B (got \u003E= cap ? \u0027 \u2014 \u0110\u00C3 \u0110\u1EA6Y\u0027 : \u0027\u0027); }",
+          "timeoutMs": 4000,
+          "note": "\u0111\u1ECDc tr\u1EA7n huy\u1EC1n tinh ngay tr\u00EAn trang r\u1ED3i c\u1EAFm c\u1EDD \u2014 tr\u1EA7n m\u1ED7i t\u00E0i kho\u1EA3n m\u1ED9t kh\u00E1c, kh\u00F4ng so chu\u1ED7i \u0111\u01B0\u1EE3c",
+          "optional": true
+        },
+        {
           "action": "stopIf",
           "text": "\u0111\u00E3 \u0111\u1EE7 huy\u1EC1n tinh h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "\u0022H\u00F4m nay \u0111\u00E3 nh\u1EADn 385/385\u0022 \u2014 h\u00F4m nay kh\u00F4ng c\u1EA7n \u0111\u00E1nh n\u1EEFa; tu\u1EF3 ch\u1ECDn \u0022Kh\u00F4ng ki\u1EC3m tra\u0022 thay chu\u1ED7i n\u00E0y b\u1EB1ng sentinel kh\u00F4ng bao gi\u1EDD kh\u1EDBp",
+          "note": "\u0110\u1EE7 tr\u1EA7n huy\u1EC1n tinh h\u00F4m nay th\u00EC kh\u1ECFi m\u1EDF ph\u00F2ng \u2014 c\u1EDD do b\u01B0\u1EDBc \u0111\u1ECDc tr\u1EA7n li\u1EC1n tr\u01B0\u1EDBc c\u1EAFm; tu\u1EF3 ch\u1ECDn \u0022Kh\u00F4ng ki\u1EC3m tra\u0022 l\u00E0m b\u01B0\u1EDBc \u1EA5y kh\u00F4ng bao gi\u1EDD c\u1EAFm c\u1EDD",
           "condition": {
-            "kind": "textMatches",
-            "selector": ".mc-ht-daily-text",
-            "text": "{{capCheck}}"
+            "kind": "visible",
+            "selector": "body.jvz-cap-full, .mc-ht-daily-text.jvz-cap-full"
           }
         },
         {
@@ -2992,7 +3024,7 @@
         {
           "action": "repeat",
           "timeoutMs": 15000,
-          "note": "m\u1ED7i v\u00F2ng l\u00E0 m\u1ED9t l\u01B0\u1EE3t ch\u1EA1y 5 \u1EA3i; d\u1EEBng khi \u0022385/385\u0022 ho\u1EB7c h\u1EBFt tr\u1EA7n 6 v\u00F2ng / 35 ph\u00FAt. Sau m\u1ED7i l\u01B0\u1EE3t (th\u1EAFng hay b\u1EA1i) site t\u1EF1 reload v\u1EC1 ph\u00F2ng, c\u1EA3 \u0111\u1ED9i v\u1EABn \u1EDF nguy\u00EAn \u0111\u00F3 (b\u1EA3n ghi 20:10).",
+          "note": "m\u1ED7i v\u00F2ng l\u00E0 m\u1ED9t l\u01B0\u1EE3t ch\u1EA1y 5 \u1EA3i; d\u1EEBng khi \u0111\u1EA7y tr\u1EA7n huy\u1EC1n tinh ng\u00E0y (b\u01B0\u1EDBc \u0111\u1ECDc tr\u1EA7n cu\u1ED1i th\u00E2n v\u00F2ng c\u1EAFm c\u1EDD) ho\u1EB7c h\u1EBFt tr\u1EA7n 6 v\u00F2ng / 35 ph\u00FAt. Sau m\u1ED7i l\u01B0\u1EE3t (th\u1EAFng hay b\u1EA1i) site t\u1EF1 reload v\u1EC1 ph\u00F2ng, c\u1EA3 \u0111\u1ED9i v\u1EABn \u1EDF nguy\u00EAn \u0111\u00F3 (b\u1EA3n ghi 20:10).",
           "steps": [
             {
               "action": "repeat",
@@ -3191,12 +3223,18 @@
               "timeoutMs": 4000,
               "note": "b\u1EA3n tin cu\u1ED1i l\u01B0\u1EE3t: huy\u1EC1n tinh bao nhi\u00EAu, \u0111\u01B0\u1EE3c c\u1ED9ng bao nhi\u00EAu",
               "optional": true
+            },
+            {
+              "action": "evaluateJavaScript",
+              "script": "() =\u003E { /* C\u1EAFm c\u1EDD \u0022\u0111\u00E3 \u0111\u1EE7 huy\u1EC1n tinh h\u00F4m nay\u0022 l\u00EAn \u003Cbody\u003E V\u00C0 l\u00EAn ch\u00EDnh \u00F4 ch\u1EEF, \u0111\u1EC3 stopIf/until ch\u1EC9 ph\u1EA3i h\u1ECFi m\u1ED9t c\u00E2u visible \u2014 c\u00F9ng l\u1ED1i \u0111\u00E1nh d\u1EA5u v\u1EDBi .btn-kick.jarvis-kick. V\u00CC SAO KH\u00D4NG SO CHU\u1ED6I N\u1EEEA: tr\u1EA7n ng\u00E0y KH\u00C1C NHAU theo t\u00E0i kho\u1EA3n (nh\u1EADt k\u00FD 10/08/2026: 200 v\u00E0 360), n\u00EAn \u0022385/385\u0022 c\u1EE7a b\u1EA3n ghi h\u00ECnh kh\u00F4ng bao gi\u1EDD kh\u1EDBp \u2014 M\u00EA Cung c\u1EE9 \u0111\u00E1nh h\u1EBFt 6 v\u00F2ng d\u00F9 \u0111\u00E3 \u0111\u1EA7y tr\u1EA7n t\u1EEB s\u00E1ng. */ const MARK = \u0027jvz-cap-full\u0027; const els = document.querySelectorAll(\u0027.mc-ht-daily-text\u0027); if (document.body) document.body.classList.remove(MARK); for (const el of els) el.classList.remove(MARK); /* \u00AB\u2026\u00BB l\u00E0 quy \u01B0\u1EDBc \u0022l\u1EF1a ch\u1ECDn r\u1ED7ng\u0022 c\u1EE7a h\u1ED3 s\u01A1 (xem profile.mjs) \u2014 t\u1EE9c ng\u01B0\u1EDDi d\u00F9ng \u0111\u00E3 t\u1EAFt l\u01B0\u1EE3t ki\u1EC3m tra. */ if (\u0027{{capCheck}}\u0027.indexOf(\u0027\\u00AB\u0027) \u003E= 0) return \u0027cap-scan: t\u1EAFt ki\u1EC3m tra\u0027; if (els.length === 0) return \u0027cap-scan: ch\u01B0a th\u1EA5y \u00F4 huy\u1EC1n tinh\u0027; /* \u0022H\u00F4m nay \u0111\u00E3 nh\u1EADn 1.200/1.200\u0022 \u2014 d\u1EA5u ch\u1EA5m l\u00E0 ph\u00E2n c\u00E1ch h\u00E0ng ngh\u00ECn ki\u1EC3u vi-VN. Kh\u00F4ng b\u00F3c ra tr\u01B0\u1EDBc khi \u0111\u1ECDc s\u1ED1 th\u00EC \u00221.200/1.200\u0022 ho\u00E1 th\u00E0nh 200/1 v\u00E0 t\u01B0\u1EDFng \u0111\u00E3 \u0111\u1EA7y. */ const m = (els[0].textContent || \u0027\u0027).match(/(\\d[\\d.,\\u00A0 ]*)\\s*\\/\\s*(\\d[\\d.,\\u00A0 ]*)/); if (!m) return \u0027cap-scan: \u00F4 huy\u1EC1n tinh kh\u00F4ng c\u00F3 d\u1EA1ng x/y\u0027; const got = parseInt(m[1].replace(/\\D/g, \u0027\u0027), 10); const cap = parseInt(m[2].replace(/\\D/g, \u0027\u0027), 10); if (!(cap \u003E 0)) return \u0027cap-scan: tr\u1EA7n ng\u00E0y = 0, kh\u00F4ng tin \u0111\u01B0\u1EE3c\u0027; if (got \u003E= cap) { if (document.body) document.body.classList.add(MARK); els[0].classList.add(MARK); } return \u0027cap-scan \u0027 \u002B got \u002B \u0027/\u0027 \u002B cap \u002B (got \u003E= cap ? \u0027 \u2014 \u0110\u00C3 \u0110\u1EA6Y\u0027 : \u0027\u0027); }",
+              "timeoutMs": 4000,
+              "note": "\u0111\u1ECDc l\u1EA1i tr\u1EA7n huy\u1EC1n tinh sau l\u01B0\u1EE3t \u0111\u00E1nh \u2014 until \u0111\u1ECDc \u0111\u00FAng c\u1EDD n\u00E0y \u1EDF \u0111\u1EA7u v\u00F2ng sau",
+              "optional": true
             }
           ],
           "until": {
-            "kind": "textMatches",
-            "selector": ".mc-ht-daily-text",
-            "text": "{{capCheck}}"
+            "kind": "visible",
+            "selector": "body.jvz-cap-full, .mc-ht-daily-text.jvz-cap-full"
           },
           "maxIterations": 6,
           "maxSeconds": 2100
@@ -3274,8 +3312,8 @@
           "label": "Ki\u1EC3m tra huy\u1EC1n tinh",
           "choices": [
             {
-              "value": "385/385",
-              "label": "D\u1EEBng khi \u0111\u1EE7 385/385"
+              "value": "\u0111\u1EE7 tr\u1EA7n ng\u00E0y",
+              "label": "D\u1EEBng khi \u0111\u1EE7 huy\u1EC1n tinh h\u00F4m nay"
             },
             {
               "value": "\u00ABkh\u00F4ng ki\u1EC3m tra\u00BB",
@@ -3283,7 +3321,7 @@
             }
           ],
           "allowCustom": false,
-          "selectedValue": "385/385"
+          "selectedValue": "\u0111\u1EE7 tr\u1EA7n ng\u00E0y"
         },
         {
           "key": "kickIdle",

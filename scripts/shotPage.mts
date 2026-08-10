@@ -40,6 +40,22 @@ function arg(name: string, fallback?: string): string | undefined {
 const flag = (name: string) => process.argv.includes(`--${name}`);
 
 /**
+ * Mọi lần xuất hiện của một cờ, theo đúng thứ tự gõ — cho những cờ LẶP ĐƯỢC.
+ *
+ * Sinh ra vì `--click` một lần là không đủ, và điều đó đã chặn hai lượt kiểm chứng khác nhau:
+ * trang Tông Môn bày nội dung theo tab, nên mở tab đã tiêu mất cú bấm duy nhất và cái nút cần
+ * thử thì không ai bấm tới được. Playwright tôn trọng actionability nên không thể nhắm thẳng
+ * vào nút nằm trong khối `hidden` — đường duy nhất là bấm lần lượt như người thật.
+ */
+function args(name: string): string[] {
+  const found: string[] = [];
+  for (let i = 0; i < process.argv.length; i++) {
+    if (process.argv[i] === `--${name}` && process.argv[i + 1] !== undefined) found.push(process.argv[i + 1]);
+  }
+  return found;
+}
+
+/**
  * Đường dẫn trang. Nhận cả `chat` lẫn `/chat` — CỐ Ý, vì Git Bash trên Windows tự dịch một
  * đối số bắt đầu bằng `/` thành đường dẫn Windows: `--path /chat` tới tay script đã thành
  * `C:/Program Files/Git/chat`. Chấp nhận dạng không gạch chéo là lối thoát khỏi cái bẫy ấy
@@ -65,7 +81,8 @@ const waitFor = arg("wait");
  *
  *   npm run shot -- --path admin --click "text=Đàm Đạo" --out anh.png
  */
-const clickFirst = arg("click");
+// Bấm lần lượt theo đúng thứ tự gõ — `--click "text=Bảo Trì" --click "text=Lưu Hạn Lưu"`.
+const clicks = args("click");
 
 /**
  * Chụp ĐÚNG MỘT VÙNG thay vì cả khung nhìn: `--clip x,y,rộng,cao` (đơn vị CSS pixel).
@@ -212,9 +229,9 @@ async function shoot(server: Awaited<ReturnType<typeof chromium.launchServer>>):
   }
   console.log(`• ${path} → HTTP ${res?.status()} (đóng vai @${user.username}${roles.length ? ` [${roles.join(", ")}]` : ""})`);
 
-  if (clickFirst) {
-    await page.click(clickFirst, { timeout: 20_000 });
-    console.log(`• đã bấm「${clickFirst}」`);
+  for (const selector of clicks) {
+    await page.click(selector, { timeout: 20_000 });
+    console.log(`• đã bấm「${selector}」`);
   }
   if (waitFor) {
     await page.waitForSelector(waitFor, { timeout: 20_000 });

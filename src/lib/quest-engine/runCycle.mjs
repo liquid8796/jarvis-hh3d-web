@@ -11,6 +11,7 @@ import { readinessProbe, vipProbe } from "./boardScripts.mjs";
 import { closeBrowserWithin } from "./browserShutdown.mjs";
 import { computeNextDelaySeconds } from "./cooldown.mjs";
 import { DEFAULT_GAME_BASE_URL, parseCookieString } from "./cookies.mjs";
+import { isDailyQuotaQuest, reachedDailyQuota } from "./dailyQuota.mjs";
 import { createQuestEngine, enabledQuestsInOrder, questsForAccount, QuestAborted } from "./engine.mjs";
 import { profileForConfig } from "./profile.mjs";
 import { acquireQuestSlot, isDedicatedPageQuest } from "./questGate.mjs";
@@ -136,6 +137,29 @@ function scheduledCycleResult(outcome, message, results = []) {
     message,
     nextDelaySeconds: computeNextDelaySeconds(results, { cycleFailed: outcome === "failed" }),
   };
+}
+
+/**
+ * Thức dậy SAU mốc sang ngày một nhịp, không đúng vào giây ấy: đồng hồ của khôi lỗi và đồng hồ
+ * của site không bao giờ khớp tới từng giây, và ghé sớm nửa giây là một vòng nữa đọc ra
+ *「vẫn đủ lượt」rồi lại ngủ tiếp.
+ */
+const DAILY_RESET_OVERSHOOT_SECONDS = 60;
+
+/**
+ * Ngủ tới lượt kiểm kế tiếp khi cả vòng chẳng còn gì để làm vì mọi nhiệm vụ đã đủ lượt ngày.
+ *
+ * Đi qua đúng bộ lập lịch của mọi vòng khác (sàn 30 giây, trần 24 giờ, jitter) thay vì tự kẹp
+ * lấy — một nhánh lịch thứ hai là một nhánh sẽ trôi lệch. Server gửi `resetsInSeconds` kèm lúc
+ * phát việc; vắng nó (server đời cũ, hoặc lượt chạy tay) thì rơi về nhịp ghé lại mặc định,
+ * nghĩa là mất phần tiết kiệm chứ không mất tính đúng đắn.
+ */
+function delayUntilDailyReset(resetsInSeconds) {
+  return Number.isFinite(resetsInSeconds) && resetsInSeconds > 0
+    ? computeNextDelaySeconds([
+        { outcome: "alreadyDone", cooldownSeconds: resetsInSeconds + DAILY_RESET_OVERSHOOT_SECONDS },
+      ])
+    : computeNextDelaySeconds([]);
 }
 
 /**
@@ -287,6 +311,11 @@ async function ensureReady(session, baseUrl, say, log, { context, cookieJar }) {
  * @param {string} [deps.baseUrl]
  * @param {number} [deps.budgetMs]       hết ngân sách thì dừng TỬ TẾ giữa hai nhiệm vụ
  * @param {string} [deps.profileDir]     hồ sơ Chromium BỀN trên đĩa — xem ghi chú bên dưới
+ * @param {{questIds?: string[], resetsInSeconds?: number}} [deps.dailyDone]
+ *   SỔ ĐỦ LƯỢT HÔM NAY của chính đàn này, do server gửi kèm lúc phát việc: những nhiệm vụ đã
+ *   chứng minh là hết lượt trong ngày ở một vòng TRƯỚC, cộng số giây còn lại tới mốc sang
+ *   ngày. Vắng mặt = vòng đầu của một lần Khai Đàn (sổ trắng, kiểm lại tất) hoặc server đời
+ *   cũ chưa biết gửi. Xem dailyQuota.mjs cho phạm vi.
  */
 export async function runCycle(deps) {
   const {
@@ -304,6 +333,7 @@ export async function runCycle(deps) {
     budgetMs = 0,
     headless = true,
     profileDir = process.env.BROWSER_PROFILE_DIR || "",
+    dailyDone = null,
   } = deps;
 
   if (!config?.gameCookie?.trim()) {
@@ -346,6 +376,59 @@ export async function runCycle(deps) {
   }
 
   for (const note of translationNotes) await say(note, "warn");
+
+  /**
+   * Cắt khỏi kế hoạch những nhiệm vụ đã đủ lượt hôm nay, và nói ra đã cắt cái gì.
+   *
+   * Lọc LẠI theo danh sách nhiệm vụ ngày dù server đã lọc trước khi ghi: sổ sống lâu hơn một
+   * lần deploy, nên một ID bị rút khỏi `DAILY_QUOTA_QUEST_IDS` phải hết hiệu lực NGAY chứ
+   * không đợi tới mốc sang ngày.
+   */
+  const doneToday = new Set(dailyDone?.questIds ?? []);
+  const splitPlanForToday = (plan) => {
+    const keep = [];
+    const skipped = [];
+    for (const quest of plan) {
+      (doneToday.has(quest.id) && isDailyQuotaQuest(quest) ? skipped : keep).push(quest);
+    }
+    return { keep, skipped };
+  };
+
+  /** Vòng không còn gì để làm — ngủ tới sau mốc sang ngày thay vì ghé lại mỗi năm phút. */
+  const nothingLeftToday = (skipped) => ({
+    outcome: "done",
+    message:
+      `Cả ${skipped.length} nhiệm vụ đều đã đủ lượt hôm nay — vòng này không đụng tới cái nào. ` +
+      "Sẽ kiểm lại sau khi sang ngày mới; muốn kiểm ngay thì Thu Đàn rồi Khai Đàn lại.",
+    nextDelaySeconds: delayUntilDailyReset(dailyDone?.resetsInSeconds),
+    // Không khai gì mới: những cái này đã nằm sẵn trong sổ, và một lượt ghi lặp chỉ tốn một
+    // câu UPDATE để viết lại đúng thứ đang có.
+    dailyCapQuestIds: [],
+  });
+
+  /**
+   * KHÔNG mở trình duyệt cho một vòng chẳng có gì để làm — phần tiết kiệm lớn nhất của cả
+   * tính năng, vì dựng Chromium và qua cổng Cloudflare đắt hơn mọi nhiệm vụ ngày cộng lại.
+   *
+   * Chỉ được phép tắt máy sớm khi hạng tài khoản đã được CHỨNG MINH: hạng quyết định kế hoạch
+   * (hai bộ flow loại trừ nhau), nên đoán hạng ở đây là có ngày bỏ trắng cả một ngày chạy vì
+   * một phỏng đoán. `accountTier` là verdict hub đã dò, server ghép vào snapshot ở mỗi lần
+   * phát việc; chưa từng dò được thì nó là null và vòng này cứ mở như thường — phép lọc thật
+   * vẫn nằm sau cổng hub, chỗ hạng đã chắc.
+   */
+  const provenTier =
+    config.accountTier === "vip" ? true : config.accountTier === "free" ? false : null;
+  if (provenTier !== null) {
+    const presumed = questsForAccount(profile, { isVip: provenTier });
+    const { keep, skipped } = splitPlanForToday(presumed);
+    if (presumed.length > 0 && keep.length === 0) {
+      await say(
+        `Đã đủ lượt hôm nay cả ${skipped.length} nhiệm vụ (${skipped.map((q) => q.name).join(" · ")}) — ` +
+          "vòng này không mở trình duyệt.",
+      );
+      return nothingLeftToday(skipped);
+    }
+  }
 
   // Hồ sơ BỀN trên đĩa khi có chỗ đặt nó (worker truyền vào; smoke và các lượt một-lần thì
   // không). Đây là lớp thứ ba học từ desktop: token cf_clearance mà Cloudflare cấp sau một
@@ -471,8 +554,8 @@ export async function runCycle(deps) {
       );
     }
 
-    const quests = questsForAccount(profile, { isVip });
-    const leftOut = enabled.length - quests.length;
+    const tierPlan = questsForAccount(profile, { isVip });
+    const leftOut = enabled.length - tierPlan.length;
 
     if (!isVip) {
       await say(
@@ -482,12 +565,35 @@ export async function runCycle(deps) {
       );
     }
 
-    if (quests.length === 0) {
+    if (tierPlan.length === 0) {
       return scheduledCycleResult(
         "done",
         "Không có nhiệm vụ nào được bật cho hạng tài khoản này — vòng này chưa có gì để chạy.",
       );
     }
+
+    // Sổ đủ lượt cắt lần thứ hai. Nhánh tắt máy sớm phía trên chạy trên hạng ĐÃ BIẾT từ trước;
+    // đây là hạng hub vừa chứng minh, và nó mới là hạng có thẩm quyền. Cùng một luật, hai chỗ
+    // áp, vì phần thưởng của mỗi chỗ khác nhau: chỗ kia tiết kiệm cả một trình duyệt, chỗ này
+    // tiết kiệm từng trang nhiệm vụ.
+    const { keep: quests, skipped: skippedToday } = splitPlanForToday(tierPlan);
+    if (skippedToday.length > 0) {
+      await say(
+        `Bỏ qua ${skippedToday.length} nhiệm vụ đã đủ lượt hôm nay: ` +
+          `${skippedToday.map((q) => q.name).join(" · ")}.`,
+      );
+    }
+
+    if (quests.length === 0) {
+      return nothingLeftToday(skippedToday);
+    }
+
+    /**
+     * Nhiệm vụ nào VỪA khai là đã đủ lượt hôm nay — server nhận ở cuối vòng rồi ghi vào sổ, để
+     * vòng sau khỏi mở trang của chúng. Chỉ chứa cái quan sát được TRONG vòng này; những cái
+     * đã nằm sẵn trong sổ không lặp lại, vì server hợp nhất chứ không ghi đè.
+     */
+    const cappedToday = [];
 
     await say(`Sẽ hành sự: ${quests.map((q) => q.name).join(" · ")}.`);
 
@@ -624,6 +730,7 @@ export async function runCycle(deps) {
           continue;
         }
         results.push(entry.outcome);
+        if (reachedDailyQuota(entry.quest, entry.outcome)) cappedToday.push(entry.quest.id);
         const shape = OUTCOME_TEXT[entry.outcome.outcome] ?? OUTCOME_TEXT.skipped;
         await say(`${entry.quest.name}: ${shape.say(entry.outcome)}`, shape.level);
         if (entry.outcome.outcome === "failed") failed++;
@@ -642,11 +749,14 @@ export async function runCycle(deps) {
         }
 
         if (Date.now() >= deadline) {
-          return scheduledCycleResult(
-            "done",
-            `Hết ngân sách của lát này — xong ${done}/${quests.length}, phần còn lại để vòng sau.`,
-            results,
-          );
+          return {
+            ...scheduledCycleResult(
+              "done",
+              `Hết ngân sách của lát này — xong ${done}/${quests.length}, phần còn lại để vòng sau.`,
+              results,
+            ),
+            dailyCapQuestIds: cappedToday,
+          };
         }
 
         // Tuần tự trong đàn NÀY không có nghĩa là một mình trên máy: các đàn khác của cùng
@@ -689,6 +799,7 @@ export async function runCycle(deps) {
         publishProgress();
 
         results.push(outcome);
+        if (reachedDailyQuota(quest, outcome)) cappedToday.push(quest.id);
 
         const shape = OUTCOME_TEXT[outcome.outcome] ?? OUTCOME_TEXT.skipped;
         await say(`${quest.name}: ${shape.say(outcome)}`, shape.level);
@@ -698,9 +809,21 @@ export async function runCycle(deps) {
       }
     }
 
-    return failed > 0
-      ? scheduledCycleResult("done", `Đi hết một vòng — ${done} thuận, ${failed} trắc trở.`, results)
-      : scheduledCycleResult("done", `Đi hết một vòng — ${done} nhiệm vụ thuận lợi.`, results);
+    if (cappedToday.length > 0) {
+      await say(
+        `Đã đủ lượt hôm nay: ${quests
+          .filter((quest) => cappedToday.includes(quest.id))
+          .map((quest) => quest.name)
+          .join(" · ")} — từ vòng sau khôi lỗi không mở lại trang của chúng nữa.`,
+      );
+    }
+
+    return {
+      ...(failed > 0
+        ? scheduledCycleResult("done", `Đi hết một vòng — ${done} thuận, ${failed} trắc trở.`, results)
+        : scheduledCycleResult("done", `Đi hết một vòng — ${done} nhiệm vụ thuận lợi.`, results)),
+      dailyCapQuestIds: cappedToday,
+    };
   } finally {
     // Đóng trong finally, có HẠN GIỜ, và không bao giờ ném: một trình duyệt không đóng được
     // không được phép ghi đè lên kết quả thật của lượt chạy — mà cũng không được phép treo

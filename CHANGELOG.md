@@ -11,6 +11,53 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.68.0 — nhiệm vụ ngày đã đủ lượt thì thôi mở lại
+
+Chín nhiệm vụ ngày (Điểm Danh, Phúc Lợi Đường, Hoang Vực, Thí Luyện, Tế Lễ, Phúc Lợi VIP, Vòng
+Quay, Vấn Đáp, Bí Cảnh) trước bản này được mở lại **mỗi vòng, cả ngày**, kể cả khi lượt đã hết
+từ sáng. Mỗi lượt mở là một trang nặng dựng trên một VM hai nhân, và bảy vòng sau đó chỉ để đọc
+lại đúng một câu trả lời đã biết.
+
+Nay mỗi đàn giữ một **sổ đủ lượt hôm nay**. Vòng nào thấy một nhiệm vụ tự báo hết lượt thì ghi
+tên nó vào sổ; các vòng sau không mở trang ấy nữa. Cả kế hoạch đã đủ lượt thì vòng ấy **không
+mở trình duyệt** và ngủ tới sau mốc sang ngày — thay vì ghé lại mỗi năm phút để đẻ thêm 288
+dòng nhật ký mỗi ngày cho một tài khoản đã xong việc.
+
+Bốn quyết định đáng ghi, mỗi cái vá một cách hỏng khác nhau:
+
+- **Sổ nằm trên JOB, không trên tài khoản.** Nhờ vậy luật「Khai Đàn lại thì kiểm lại từ vòng 1」
+  được thoả mà không cần một dòng mã nào: một lần Khai Đàn là một dòng job mới với sổ trắng. Nó
+  cũng chính là đường thoát hiểm — ghi nhầm thì Thu Đàn rồi Khai Đàn lại là xoá sạch, không cần
+  ai vào database.
+- **NGUỒN của lượt dừng mới là thứ được nhớ, không phải kết cục.** `alreadyDone` là một kết cục
+  hai nghĩa: Hoang Vực dừng vì hết 5 lượt, còn Vấn Đáp cũng dừng y hệt khi *khôi lỗi chưa biết
+  đáp án*. Cái thứ hai là giới hạn của ta chứ không phải của tài khoản, và nhớ nó thành「đã đủ
+  lượt」là khoá cứng nhiệm vụ cả ngày đúng vào lúc kho đáp án có thể vừa học thêm được câu ấy.
+  Nên engine đánh dấu ngay tại bước `stopIf` — chỗ duy nhất TRANG GAME tự phán — thay vì để nơi
+  trên dò chữ trong thông điệp mà đoán.
+- **Phạm vi khai rõ, không suy đoán.** `dailyQuota.mjs` liệt kê từng ID. Mê Cung và Luyện Đan
+  Đường đứng ngoài dù chúng cũng ra `alreadyDone`: ở đó kết cục ấy có thể chỉ là một trạng thái
+  thoáng qua của cái lò, và nhớ nhầm là tắt mất nhiệm vụ đáng giá nhất trong ngày, trong im
+  lặng. `npm run smoke` đối chiếu danh sách với hồ sơ thật cả hai chiều, nên một cú đổi ID bên
+  hồ sơ là một phép thử đỏ chứ không phải một tính năng tự tắt.
+- **Ngày là ngày theo GIỜ VIỆT NAM, và lời khai mang theo ngày của nó.** Server phát ngày lúc
+  claim, khôi lỗi trả lại nguyên văn lúc complete. Một vòng bắt đầu 23h50 và kết thúc 00h30 đã
+  quan sát trạng thái của hôm qua; nhận nó vào sổ hôm nay là bỏ trắng chín nhiệm vụ suốt một
+  ngày. Lời khai quá hạn bị từ chối — thà kiểm thừa một vòng còn hơn nghỉ nhầm một ngày.
+
+Nhánh tắt-máy-sớm chỉ chạy khi **hạng tài khoản đã được chứng minh**: hạng quyết định kế hoạch
+(VIP và thường là hai bộ flow loại trừ nhau), nên đoán hạng ở đó là có ngày bỏ trắng cả một
+ngày chạy vì một phỏng đoán. Chưa dò được hạng thì cứ mở trình duyệt như thường, và phép lọc
+thật nằm sau cổng hub — chỗ hạng đã chắc.
+
+Tương thích hai chiều với khôi lỗi đã cài ngoài kia: bản cũ không gửi lời khai nên sổ đứng yên
+và mọi thứ chạy y như trước; bản mới gặp một trạm chưa deploy thì không nhận được sổ nên cũng
+chạy y như trước. Không ai phải cài lại cái gì.
+
+18 phép mới trong `npm run smoke` canh nửa engine; `npm run verify:daily-quota` canh nửa còn
+lại trên database thật — câu SQL hợp nhất là SQL thô, nên `tsc` không soát hộ được một tên cột
+hay một phép ép kiểu nào trong đó.
+
 ## 0.67.0 — một cú bấm, mọi trạm cùng một commit
 
 `deploy-all-stations.bat` ở gốc repo: bấm đúp là mọi trạm trong sổ gương nhận cùng một commit.

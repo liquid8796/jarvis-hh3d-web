@@ -247,12 +247,19 @@ Nên chia thế này:
   cache 12 giờ rồi so câu/đáp án cục bộ. Nó bỏ dấu và số thứ tự nhưng chỉ chấp nhận đáp án
   khớp nguyên vẹn một lựa chọn đang hiện; nguồn mâu thuẫn hoặc câu lạ thì dừng để giữ lượt.
   Không có nhánh Gemini trên web.
+- **Nhiệm vụ ngày đã đủ lượt thì thôi mở lại.** Mỗi đàn giữ một *sổ đủ lượt hôm nay*
+  (`automation_jobs.daily_done`, ngày theo giờ Việt Nam): vòng nào thấy một trong chín nhiệm
+  vụ ngày tự báo hết lượt thì vòng sau không mở trang ấy nữa, và khi cả kế hoạch đã đủ lượt
+  thì vòng ấy không mở trình duyệt luôn mà ngủ tới sau mốc sang ngày. Phạm vi khai rõ trong
+  `quest-engine/dailyQuota.mjs` — Mê Cung và Luyện Đan Đường cố ý đứng ngoài. Sổ nằm trên
+  JOB nên **Thu Đàn rồi Khai Đàn lại là xoá sạch**, và vòng 1 của lần khai mới luôn kiểm đủ.
 
 Lưới hồi quy chạy trên Chromium thật, trước một trang thật:
 
 ```bash
 npm run smoke
 npm run verify:profile
+npm run verify:daily-quota   # chạm database thật, tự dọn theo tiền tố __quota_
 ```
 
 Mỗi ca trong đó là một chuyện đã xảy ra một lần rồi — nút BẮT ĐẦU không chịu đứng yên nên

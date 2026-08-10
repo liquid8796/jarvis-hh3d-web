@@ -437,7 +437,13 @@ export function createQuestEngine(deps) {
     // xuyên thẳng lên `run`, đúng như trước. Một vòng thử lại nuốt mất tín hiệu dừng là cách
     // biến nút Thu Đàn thành nút gợi ý.
     for (let attempt = 1; ; attempt++) {
-      state = { cooldown: null, lastRead: null, stopReason: null, pageNotRendered: false };
+      state = {
+        cooldown: null,
+        lastRead: null,
+        stopReason: null,
+        pageNotRendered: false,
+        dailyCapReached: false,
+      };
       error = await executeSteps(session, quest, quest.steps, state, 0);
 
       if (!error || !state.pageNotRendered || attempt >= MAX_PAGE_RENDER_ATTEMPTS) break;
@@ -462,6 +468,11 @@ export function createQuestEngine(deps) {
         : result(quest, "alreadyDone", {
             cooldownSeconds: quest.fallbackCooldownSeconds,
             message: state.stopReason,
+            // Thứ quyết định là NGUỒN của câu「không còn gì để làm」, không phải bản thân câu
+            // ấy. `true` = một bước `stopIf` khớp, tức chính TRANG GAME trả lời; các ngả khác
+            // cùng về `alreadyDone` (Vấn Đáp gặp câu chưa biết đáp án) là giới hạn của khôi
+            // lỗi, và nhớ chúng thành「đã đủ lượt」là khoá nhầm cả ngày — xem dailyQuota.mjs.
+            dailyCapReached: state.dailyCapReached === true,
           });
     }
 
@@ -612,6 +623,11 @@ export function createQuestEngine(deps) {
           (await stopIsReal(session, step.condition, scope))
         ) {
           state.stopReason = step.text?.trim() ? step.text : `không có gì để làm (${describeCondition(step.condition)})`;
+          // Đánh dấu NGUỒN của lượt dừng ngay tại đây, chỗ duy nhất trang game tự phán. Không
+          // có cờ này thì nơi trên chỉ còn cách dò chữ trong `stopReason` để đoán xem lượt
+          // dừng là「hết lượt hôm nay」hay「ta chưa biết đáp án」— một phép đoán chết lặng vào
+          // ngày ai đó sửa lời văn của một quest trong hồ sơ.
+          state.dailyCapReached = true;
           // Info chứ không Debug: "đã đủ huyền tinh hôm nay" là câu trả lời người ta mở
           // Hoạt động lên để tìm, không phải một chi tiết máy móc. Và nói TRẦN câu trả lời:
           // "stopIf khớp" là tên một loại bước trong script — ngôn ngữ của người viết flow,

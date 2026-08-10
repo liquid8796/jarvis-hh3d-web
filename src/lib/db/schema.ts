@@ -326,6 +326,21 @@ export const automationJobs = pgTable(
      * lỗi đời cũ) — nơi đọc phải chịu được NULL mà không gọi nhầm là kẹt.
      */
     cycleProgressAt: timestamp("cycle_progress_at", { withTimezone: true }),
+    /**
+     * SỔ ĐỦ LƯỢT HÔM NAY — nhiệm vụ ngày nào của đàn này đã chứng minh là hết lượt, và cho
+     * ngày nào. Vòng sau đọc sổ rồi bỏ hẳn những nhiệm vụ ấy: không mở trang, không tốn tab.
+     *
+     * Ở trên JOB chứ không trên `game_accounts`, và đó chính là cách luật「Khai Đàn lại thì
+     * kiểm lại」được thoả mà không cần thêm một dòng mã nào: một lần Khai Đàn là một dòng job
+     * mới với sổ trắng, nên vòng 1 luôn kiểm đủ. Đó cũng là đường thoát hiểm — ghi nhầm một
+     * nhiệm vụ là「đã đủ lượt」thì Thu Đàn rồi Khai Đàn lại là xoá sạch, không cần ai vào
+     * database.
+     *
+     * `day` là NGÀY THEO GIỜ VIỆT NAM (xem `vietnamDayKey` trong services/jobs.ts), vì mốc
+     * reset của game theo giờ ấy. Sổ mang ngày cũ được đọc thành sổ trắng chứ không xoá —
+     * lượt ghi kế tiếp tự viết đè, nên không cần một tiến trình dọn nào.
+     */
+    dailyDone: jsonb("daily_done").$type<DailyQuotaMemory>(),
   },
   (t) => [
     index("jobs_user_idx").on(t.userId),
@@ -346,6 +361,18 @@ export const automationJobs = pgTable(
 );
 
 /** The user-facing activity feed, one narrated line per row — the web twin of the desktop app's Activity log. */
+/**
+ * Hình dạng của `automation_jobs.daily_done`. Cố tình PHẲNG và nhỏ: nó đi qua dây mỗi lần phát
+ * việc, và mọi trường thêm vào đây là một trường phải giữ tương thích với những khôi lỗi đã
+ * cài ngoài kia.
+ */
+export type DailyQuotaMemory = {
+  /** Ngày theo giờ Việt Nam, dạng `YYYY-MM-DD`. Khác hôm nay = sổ này đã hết hiệu lực. */
+  day: string;
+  /** ID nhiệm vụ trong hồ sơ quest — xem `DAILY_QUOTA_QUEST_IDS` cho phạm vi hợp lệ. */
+  questIds: string[];
+};
+
 export const jobEvents = pgTable(
   "job_events",
   {

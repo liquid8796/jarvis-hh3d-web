@@ -5,7 +5,7 @@ import { getEditableConfig, getStoredConfigForSnapshot, storedConfigSchema } fro
 import { getAppSettings } from "./settings";
 import { anyWorkerOnlineFor } from "./workers";
 import type { WorkerScope } from "@/lib/auth/worker";
-import type { JobEventRow, JobRow } from "@/lib/db/schema";
+import type { DailyQuotaMemory, JobEventRow, JobRow } from "@/lib/db/schema";
 import type { CycleProgress } from "@/lib/realtime/dashboardTypes";
 import { notifyDashboard } from "@/lib/realtime/dashboardChannel";
 
@@ -455,6 +455,93 @@ async function announceStops(rows: Array<Record<string, unknown>>): Promise<void
 }
 
 // ---------------------------------------------------------------------------
+// Sổ đủ lượt hôm nay
+// ---------------------------------------------------------------------------
+
+/**
+ * Việt Nam là UTC+7 QUANH NĂM — không có giờ mùa hè kể từ 1975, nên một hằng số là đủ và
+ * `Intl` ở đây chỉ mua thêm một phụ thuộc vào dữ liệu múi giờ của runtime.
+ *
+ * Vì sao không dùng thẳng giờ UTC cho gọn: mốc reset nhiệm vụ ngày của game theo giờ Việt Nam.
+ * Lệch bảy tiếng nghĩa là mỗi ngày có một cửa sổ bảy tiếng mà sổ nói「chưa sang ngày」trong khi
+ * game đã mở lại lượt — chín nhiệm vụ nằm im suốt cửa sổ ấy, mỗi ngày, mà nhật ký không có một
+ * dòng nào để lần ra.
+ */
+const VIETNAM_UTC_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+/** Hôm nay theo giờ Việt Nam, dạng `YYYY-MM-DD`. Khoá của sổ đủ lượt. */
+export function vietnamDayKey(at: Date = new Date()): string {
+  return new Date(at.getTime() + VIETNAM_UTC_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/** Còn bao nhiêu giây nữa tới nửa đêm giờ Việt Nam — lúc trần lượt ngày mở lại. */
+function secondsUntilVietnamDayEnd(at: Date = new Date()): number {
+  const shifted = at.getTime() + VIETNAM_UTC_OFFSET_MS;
+  const nextMidnight = Math.floor(shifted / DAY_MS) * DAY_MS + DAY_MS;
+  return Math.ceil((nextMidnight - shifted) / 1000);
+}
+
+/**
+ * Sổ đủ lượt ở dạng khôi lỗi đọc được, kèm ngày và mốc sang ngày.
+ *
+ * `day` đi theo để khôi lỗi TRẢ LẠI nguyên văn ở cuối vòng: một vòng dài có thể vắt qua nửa
+ * đêm, và lời khai của nó thuộc về cái ngày nó bắt đầu chứ không phải cái ngày nó kết thúc.
+ */
+export type DailyQuotaPlan = {
+  day: string;
+  questIds: string[];
+  resetsInSeconds: number;
+};
+
+/**
+ * Đọc sổ của một đàn ra kế hoạch cho vòng sắp tới.
+ *
+ * Sổ mang ngày cũ được đọc thành SỔ TRẮNG chứ không phải lỗi: hết hiệu lực là hết hiệu lực,
+ * và lượt ghi kế tiếp sẽ viết đè — nên không cần một tiến trình dọn nào, cũng không có cửa sổ
+ * nào mà một sổ quá hạn còn bịt được nhiệm vụ.
+ */
+export function dailyQuotaPlan(
+  memory: DailyQuotaMemory | null | undefined,
+  at: Date = new Date(),
+): DailyQuotaPlan {
+  const day = vietnamDayKey(at);
+  const questIds =
+    memory?.day === day && Array.isArray(memory.questIds)
+      ? memory.questIds.filter((id): id is string => typeof id === "string" && id.length > 0)
+      : [];
+  return { day, questIds, resetsInSeconds: secondsUntilVietnamDayEnd(at) };
+}
+
+/**
+ * Ghi thêm vào sổ những nhiệm vụ vừa khai là đã đủ lượt hôm nay.
+ *
+ * HỢP NHẤT trong một câu lệnh, không đọc-rồi-ghi: phép `||` nối hai mảng jsonb rồi
+ * `jsonb_agg(distinct …)` khử trùng, và nhánh `case` vứt bỏ phần của ngày cũ ngay tại chỗ. Một
+ * đàn chỉ có đúng một khôi lỗi cầm nên khe đua là hẹp, nhưng đọc-rồi-ghi ở đây còn tốn một
+ * lượt đi database mà chẳng mua được gì.
+ *
+ * Người gọi đã đối chiếu `day` với hôm nay (xem `completeWorkerCycle`); ở đây `day` chỉ còn là
+ * khoá để ghi.
+ */
+async function mergeDailyQuota(jobId: string, day: string, questIds: string[]): Promise<void> {
+  await db().execute(sql`
+    update automation_jobs set daily_done = jsonb_build_object(
+      'day', ${day}::text,
+      'questIds', (
+        select coalesce(jsonb_agg(distinct quest_id), '[]'::jsonb)
+        from jsonb_array_elements_text(
+          (case
+            when daily_done->>'day' = ${day} then coalesce(daily_done->'questIds', '[]'::jsonb)
+            else '[]'::jsonb
+          end) || ${JSON.stringify(questIds)}::jsonb
+        ) as quest_id
+      )
+    )
+    where id = ${jobId}
+  `);
+}
+
+// ---------------------------------------------------------------------------
 // Worker protocol
 // ---------------------------------------------------------------------------
 
@@ -550,6 +637,9 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
     startedAt: row.started_at ? new Date(String(row.started_at)) : new Date(),
     finishedAt: null,
     lastHeartbeat: new Date(),
+    // Sổ đủ lượt đi CÙNG lượt phát việc: nó là thứ khôi lỗi phải biết trước khi mở trình
+    // duyệt, và một lượt đọc riêng chỉ thêm một round-trip cho đúng dòng vừa cầm trên tay.
+    dailyDone: (row.daily_done ?? null) as DailyQuotaMemory | null,
   } as JobRow;
 }
 
@@ -717,6 +807,7 @@ export async function completeWorkerCycle(
   outcome: WorkerCycleOutcome,
   message: string,
   proposedDelaySeconds?: number,
+  dailyReport?: { day: string; questIds: string[] },
 ): Promise<WorkerCycleTransition | null> {
   const delaySeconds = normalizeNextDelay(outcome, proposedDelaySeconds);
   const nextRunAt = new Date(Date.now() + delaySeconds * 1000);
@@ -776,6 +867,26 @@ export async function completeWorkerCycle(
 
   const status = String(row.status) as WorkerCycleTransition["status"];
   const actualNextRunAt = new Date(String(row.next_run_at));
+
+  /**
+   * Ghi sổ đủ lượt — sau khi biết chắc job còn sống, và chỉ khi lời khai còn thuộc về HÔM NAY.
+   *
+   * Hai cánh cửa, mỗi cánh chặn một cách hỏng khác nhau:
+   *
+   *   • `status === "queued"` — đàn đã Thu thì sổ của nó là rác: dòng job thành lịch sử và
+   *     lần Khai Đàn sau dựng dòng mới với sổ trắng. Ghi vào đây chỉ tốn một câu lệnh.
+   *   • `day === hôm nay` — khôi lỗi trả lại cái ngày server phát lúc claim. Một vòng vắt qua
+   *     nửa đêm mang về phát hiện của HÔM QUA; nhận nó vào sổ hôm nay là bỏ trắng chín nhiệm
+   *     vụ suốt một ngày. Từ chối thì tệ nhất là vòng sau kiểm lại một lượt — rẻ hơn nhiều.
+   */
+  if (
+    status === "queued" &&
+    dailyReport &&
+    dailyReport.questIds.length > 0 &&
+    dailyReport.day === vietnamDayKey()
+  ) {
+    await mergeDailyQuota(jobId, dailyReport.day, dailyReport.questIds);
+  }
 
   if (status === "stopped") {
     await addEvent(

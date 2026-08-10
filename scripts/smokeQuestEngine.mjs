@@ -29,6 +29,10 @@ import {
   isDedicatedPageQuest,
 } from "../src/lib/quest-engine/questGate.mjs";
 import { profileDirForJob } from "../src/lib/quest-engine/browserProfile.mjs";
+import {
+  DAILY_QUOTA_QUEST_IDS,
+  reachedDailyQuota,
+} from "../src/lib/quest-engine/dailyQuota.mjs";
 import { computeNextDelaySeconds, parseCooldownSeconds } from "../src/lib/quest-engine/cooldown.mjs";
 import { profileForConfig } from "../src/lib/quest-engine/profile.mjs";
 import {
@@ -104,6 +108,12 @@ const PAGE = `<!doctype html>
 const FREE_CHECKIN_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
 <button id="checkInButton">Điểm Danh</button>
 <script>checkInButton.onclick=()=>setTimeout(()=>{checkInButton.textContent='Đã Điểm Danh';checkInButton.dataset.claimed='1'},30)</script>`;
+
+// Cùng trang ấy ở trạng thái SITE ĐÃ NHỚ: ghé lại trong ngày là nút render sẵn chữ "Đã Điểm
+// Danh". Phải là một trang riêng chứ không phải trạng thái còn sót của ca trước — ca kia kiểm
+// đường bấm được, và hai ca dùng chung một trạng thái là hai ca ràng buộc nhau vô cớ.
+const FREE_CHECKIN_DONE_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
+<button id="checkInButton">Đã Điểm Danh</button>`;
 
 // Chữ "Thí Luyện" hiện THÀNH VĂN BẢN chứ không chỉ nằm trong href: vipProbe đọc innerText và
 // trả null chừng nào chưa thấy tên một nhiệm vụ nào — null nghĩa là "hub chưa render xong",
@@ -1352,6 +1362,8 @@ async function main() {
 
   // --- kiểm trên trang thật ---------------------------------------------------------
   let teLeOffered = false;
+  /** Trang Điểm Danh trả về trạng thái đã-điểm-danh — bật cho ca sổ đủ lượt ở cuối tệp. */
+  let checkInDone = false;
 
   /**
    * Công tắc dựng lại ĐÊM 07/08: site trả về một trang CÂM — không dấu đã-đăng-nhập, không
@@ -1470,7 +1482,7 @@ async function main() {
       flakyVisits += 1;
       return void res.end(flakyPage(flakyVisits >= flakyAppearsOnVisit));
     }
-    if (path === "/diem-danh") res.end(FREE_CHECKIN_PAGE);
+    if (path === "/diem-danh") res.end(checkInDone ? FREE_CHECKIN_DONE_PAGE : FREE_CHECKIN_PAGE);
     else if (path === "/nhiem-vu-hang-ngay") res.end(FREE_HUB_PAGE);
     else if (path === "/phuc-loi-duong") res.end(FREE_WELFARE_PAGE);
     else if (path === "/vong-quay-phuc-van") res.end(FREE_WHEEL_PAGE);
@@ -2575,6 +2587,258 @@ async function main() {
         `${fromConfig.outcome}: ${fromConfig.message}`,
       );
     }
+
+    console.log("\nSổ đủ lượt hôm nay — nhiệm vụ ngày đã đủ lượt thì vòng sau không mở lại");
+
+    // PHẠM VI, đối chiếu HAI CHIỀU với hồ sơ thật. Danh sách trong dailyQuota.mjs khoá theo ID,
+    // nên một cú đổi ID bên hồ sơ sẽ lặng lẽ tắt tính năng — không có ca này thì cái tắt ấy chỉ
+    // lộ ra qua việc mỗi vòng lại mở đủ chín trang như cũ, thứ không ai nhìn ra bằng mắt.
+    {
+      const profileNow = loadProfileForSchema();
+      const idsInProfile = new Set(profileNow.quests.map((quest) => quest.id));
+      const strayIds = [...DAILY_QUOTA_QUEST_IDS].filter((id) => !idsInProfile.has(id));
+      check(
+        "mọi ID trong sổ nhiệm vụ ngày còn tồn tại trong hồ sơ",
+        strayIds.length === 0,
+        strayIds.join(", ") || "(sạch)",
+      );
+
+      // Chiều ngược: chín cái tên được yêu cầu, quy về ID. Cặp twin VIP/thường trùng tên nhau
+      // và trần lượt là của TÀI KHOẢN, nên cả hai bản đều phải có mặt.
+      const dailyNames = [
+        "Điểm Danh",
+        "Phúc Lợi Đường",
+        "Hoang Vực",
+        "Thí Luyện Tông Môn",
+        "Tế Lễ Tông Môn",
+        "Phúc Lợi VIP — Khắc Trận Văn",
+        "Vòng Quay Phúc Vận",
+        "Vấn Đáp",
+        "Bí Cảnh Tông Môn",
+      ];
+      const missing = profileNow.quests
+        .filter((quest) => dailyNames.includes(quest.name) && !DAILY_QUOTA_QUEST_IDS.has(quest.id))
+        .map((quest) => quest.id);
+      check(
+        "cả chín nhiệm vụ ngày đều có trong sổ, kể cả twin VIP/thường",
+        missing.length === 0,
+        missing.join(", ") || "(đủ)",
+      );
+
+      // Và KHÔNG được lan sang những nhiệm vụ mà `alreadyDone` chỉ là một trạng thái thoáng
+      // qua: nhớ nhầm Mê Cung là tắt mất nhiệm vụ đáng giá nhất của cả ngày, trong im lặng.
+      const intruders = profileNow.quests
+        .filter((quest) =>
+          ["Mê Cung", "Luyện Đan Đường", "Khoáng Mạch", "Hỷ Sự Đường"].includes(quest.name),
+        )
+        .filter((quest) => DAILY_QUOTA_QUEST_IDS.has(quest.id))
+        .map((quest) => quest.id);
+      check(
+        "Mê Cung · Luyện Đan · Khoáng Mạch · Hỷ Sự Đường đứng ngoài sổ",
+        intruders.length === 0,
+        intruders.join(", ") || "(sạch)",
+      );
+    }
+
+    // NGUỒN của lượt dừng mới là thứ quyết định, không phải kết cục `alreadyDone`. Đây là chỗ
+    // cả thiết kế đứng hoặc đổ: hai ca dưới đây cùng ra `alreadyDone`, và chỉ MỘT trong hai
+    // được phép vào sổ.
+    {
+      // Về lại sảnh thử TRƯỚC mỗi ca: mấy vòng runCycle phía trên đã kéo trang này đi khắp nơi,
+      // và một điều kiện không khớp vì phần tử không có mặt trông y hệt một điều kiện sai.
+      const asDailyQuest = (steps) => ({
+        ...questOf([{ action: "navigate", text: "/", timeoutMs: 15000 }, ...steps]),
+        id: "diem-danh",
+        name: "Điểm Danh",
+      });
+
+      const bySite = await run(
+        asDailyQuest([
+          {
+            action: "stopIf",
+            text: "hết lượt hôm nay",
+            condition: { kind: "textMatches", selector: "#btn-disabled", text: "Đã nhận" },
+          },
+        ]),
+      );
+      check(
+        "trang game tự nói hết lượt → alreadyDone CÓ dấu đủ lượt ngày",
+        bySite.outcome === "alreadyDone" && bySite.dailyCapReached === true,
+        `${bySite.outcome} cap=${bySite.dailyCapReached}`,
+      );
+      check("…và được ghi vào sổ", reachedDailyQuota({ id: "diem-danh" }, bySite) === true);
+
+      // Vấn Đáp dừng vì KHÔI LỖI chưa biết đáp án — giới hạn của ta, không phải của tài khoản.
+      // Ghi nó vào sổ là khoá cứng nhiệm vụ cả ngày đúng vào lúc kho đáp án có thể vừa học
+      // thêm được câu ấy ở vòng sau.
+      const byUs = await run(
+        asDailyQuest([
+          {
+            action: "answerQuiz",
+            selector: "#question",
+            optionsSelector: "#quiz-fixture .quiz-option",
+            timeoutMs: 5000,
+          },
+        ]),
+      );
+      check(
+        "chưa có kho đáp án → vẫn alreadyDone nhưng KHÔNG có dấu đủ lượt ngày",
+        byUs.outcome === "alreadyDone" && byUs.dailyCapReached === false,
+        `${byUs.outcome} cap=${byUs.dailyCapReached}: ${byUs.message}`,
+      );
+      check("…nên không vào sổ", reachedDailyQuota({ id: "diem-danh" }, byUs) === false);
+
+      // Lớp gác thứ hai: dấu đúng, nhưng nhiệm vụ không nằm trong phạm vi thì vẫn đứng ngoài.
+      check(
+        "nhiệm vụ ngoài phạm vi mang dấu vẫn không vào sổ",
+        reachedDailyQuota({ id: "me-cung" }, bySite) === false,
+      );
+    }
+
+    // --- ba ca tích hợp trên runCycle thật --------------------------------------------
+    const dailyConfig = {
+      gameCookie: "wordpress_logged_in_smoke=1",
+      accountTier: "free",
+      runner: "local",
+      quests: { diemDanh: { enabled: true }, thiLuyen: { enabled: true } },
+    };
+    /** Mở trình duyệt trong ca này là SAI — nên cái được truyền vào sẽ kêu to. */
+    const forbiddenChromium = {
+      launch: () => {
+        throw new Error("vòng này lẽ ra không được mở trình duyệt");
+      },
+      launchPersistentContext: () => {
+        throw new Error("vòng này lẽ ra không được mở trình duyệt");
+      },
+    };
+
+    {
+      const lines = [];
+      const beats = [];
+      const partial = await runCycle({
+        chromium,
+        baseUrl,
+        config: dailyConfig,
+        dailyDone: { day: "2026-08-11", questIds: ["diem-danh-thuong"], resetsInSeconds: 3600 },
+        say: (message) => lines.push(message),
+        reportProgress: (beat) => beats.push(beat),
+        shouldStop: () => false,
+      });
+
+      check(
+        "sổ có Điểm Danh → vòng này chỉ còn hành sự Thí Luyện",
+        partial.outcome === "done" &&
+          lines.some((line) => line.startsWith("Sẽ hành sự: Thí Luyện Tông Môn.")) &&
+          beats.at(-1)?.total === 1,
+        `${partial.outcome} | ${lines.filter((l) => l.startsWith("Sẽ hành sự")).join(" / ")} | total=${beats.at(-1)?.total}`,
+      );
+      check(
+        "…và nói ra đã bỏ qua cái gì, không lặng lẽ bớt việc",
+        lines.some((line) => line.includes("Bỏ qua 1 nhiệm vụ đã đủ lượt hôm nay: Điểm Danh")),
+        lines.join(" | "),
+      );
+    }
+
+    {
+      const lines = [];
+      const idle = await runCycle({
+        chromium: forbiddenChromium,
+        baseUrl,
+        config: dailyConfig,
+        dailyDone: {
+          day: "2026-08-11",
+          questIds: ["diem-danh-thuong", "thi-luyen-tong-mon-thuong"],
+          resetsInSeconds: 3600,
+        },
+        say: (message) => lines.push(message),
+        reportProgress: () => {},
+        shouldStop: () => false,
+      });
+
+      check(
+        "mọi nhiệm vụ đã đủ lượt → KHÔNG mở trình duyệt lần nào",
+        idle.outcome === "done" && lines.some((line) => line.includes("không mở trình duyệt")),
+        `${idle.outcome}: ${idle.message}`,
+      );
+      // Ngủ tới sau mốc sang ngày thay vì ghé lại mỗi năm phút: 3600 + 60 nhịp trễ + jitter
+      // 0–25 giây. Không có chốt này thì một tài khoản đã xong việc vẫn đẻ 288 dòng nhật ký
+      // mỗi ngày và chôn mất phần kể chuyện thật.
+      check(
+        "…và ngủ tới sau mốc sang ngày, không ghé lại sau 5 phút",
+        idle.nextDelaySeconds >= 3660 && idle.nextDelaySeconds <= 3685,
+        String(idle.nextDelaySeconds),
+      );
+      check("…không khai thêm gì vào sổ", Array.isArray(idle.dailyCapQuestIds) && idle.dailyCapQuestIds.length === 0);
+    }
+
+    // Hạng CHƯA CHỨNG MINH thì cấm tắt máy sớm: hạng quyết định kế hoạch, và đoán sai ở đây là
+    // bỏ trắng cả một ngày chạy. Bằng chứng duy nhất chấp nhận được là trình duyệt VẪN mở.
+    {
+      let opened = false;
+      try {
+        await runCycle({
+          chromium: forbiddenChromium,
+          baseUrl,
+          config: { ...dailyConfig, accountTier: null },
+          dailyDone: {
+            day: "2026-08-11",
+            questIds: ["diem-danh-thuong", "thi-luyen-tong-mon-thuong", "diem-danh", "thi-luyen-tong-mon"],
+            resetsInSeconds: 3600,
+          },
+          say: () => {},
+          reportProgress: () => {},
+          shouldStop: () => false,
+        });
+      } catch (err) {
+        opened = String(err.message).includes("không được mở trình duyệt");
+      }
+      check("hạng chưa dò được → vẫn mở trình duyệt, không tắt máy sớm theo phỏng đoán", opened);
+    }
+
+    {
+      const cycleLines = [];
+      checkInDone = true;
+      let observed;
+      try {
+        observed = await runCycle({
+          chromium,
+          baseUrl,
+          config: dailyConfig,
+          dailyDone: { day: "2026-08-11", questIds: [], resetsInSeconds: 3600 },
+          say: (message) => cycleLines.push(message),
+          reportProgress: () => {},
+          shouldStop: () => false,
+        });
+      } finally {
+        checkInDone = false;
+      }
+
+      check(
+        "vòng gặp nhiệm vụ đã đủ lượt → khai đúng một cái tên về cho server",
+        observed.outcome === "done" &&
+          Array.isArray(observed.dailyCapQuestIds) &&
+          observed.dailyCapQuestIds.length === 1 &&
+          observed.dailyCapQuestIds[0] === "diem-danh-thuong",
+        `${observed.outcome}: ${JSON.stringify(observed.dailyCapQuestIds)}`,
+      );
+      check(
+        "…và báo cho người đọc biết vòng sau sẽ thôi mở trang ấy",
+        cycleLines.some((line) => line.includes("Đã đủ lượt hôm nay: Điểm Danh")),
+        cycleLines.join(" | "),
+      );
+    }
+
+    // Cửa giao thức: sổ chỉ có nghĩa khi nó đi được cả hai chiều trên dây. Hai chốt đọc thẳng
+    // mã nguồn route vì đây là chỗ duy nhất nối engine với database, và nó không có phép thử
+    // nào khác chạy được mà không dựng cả Next.
+    check(
+      "op claim gửi kèm sổ đủ lượt của đúng đàn ấy",
+      workerRouteSrc.includes("dailyDone: dailyQuotaPlan(job.dailyDone)"),
+    );
+    check(
+      "op complete chuyển tiếp lời khai kèm NGÀY, và bỏ qua khi thiếu một trong hai",
+      /body\.dailyDay && body\.dailyCapQuestIds\?\.length/.test(workerRouteSrc),
+    );
   } finally {
     await browser.close().catch(() => {});
     server.close();

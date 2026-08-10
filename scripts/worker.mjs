@@ -85,7 +85,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  */
 const PROFILE_ROOT = fileURLToPath(new URL("./browser-profiles/", import.meta.url));
 
-async function runQuest({ userId, config, say, reportAccountTier, reportProgress, shouldStop }) {
+async function runQuest({
+  userId,
+  config,
+  dailyDone,
+  say,
+  reportAccountTier,
+  reportProgress,
+  shouldStop,
+}) {
   await say("Khôi lỗi đã nhận ngọc giản, đang khởi lư…");
 
   // Nạp Playwright TẠI ĐÂY chứ không ở đầu tệp: một máy chỉ dùng worker để canh việc vẫn
@@ -107,7 +115,16 @@ async function runQuest({ userId, config, say, reportAccountTier, reportProgress
     gameCookie: config?.gameCookie,
   });
   await mkdir(profileDir, { recursive: true });
-  return runCycle({ chromium, config, say, reportAccountTier, reportProgress, shouldStop, profileDir });
+  return runCycle({
+    chromium,
+    config,
+    dailyDone,
+    say,
+    reportAccountTier,
+    reportProgress,
+    shouldStop,
+    profileDir,
+  });
 }
 
 /** Một lượt trọn vẹn: nhịp tim chạy nền, engine chạy trước, kết thúc thì báo cáo. */
@@ -153,6 +170,7 @@ async function handle(job) {
     const result = await runQuest({
       userId: job.userId,
       config: job.config,
+      dailyDone: job.dailyDone,
       say: (message, level) => say(job.id, message, level),
       reportAccountTier: (tier) =>
         call("accountTier", { jobId: job.id, tier }).catch((err) => {
@@ -163,7 +181,16 @@ async function handle(job) {
       },
       shouldStop: () => stopping,
     });
-    await call("complete", { jobId: job.id, ...result });
+    // TRẢ LẠI cái ngày server đã phát ở `claim`, không tự lấy ngày trên máy này. Một vòng bắt
+    // đầu 23h50 và kết thúc 00h30 đã quan sát trạng thái của NGÀY HÔM QUA; khai theo đồng hồ
+    // của khôi lỗi là ghi phát hiện của hôm qua vào sổ của hôm nay, rồi bỏ trắng chín nhiệm vụ
+    // suốt một ngày mà không ai biết vì sao. Server đối chiếu ngày này với ngày hiện tại của
+    // nó và bỏ qua lời khai đã cũ — thà kiểm thừa một vòng còn hơn nghỉ nhầm một ngày.
+    await call("complete", {
+      jobId: job.id,
+      ...result,
+      ...(job.dailyDone?.day ? { dailyDay: job.dailyDone.day } : {}),
+    });
     console.log(`✔ job ${job.id} — ${result.outcome}`);
   } catch (err) {
     await call("complete", {

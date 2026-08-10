@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import { isAdminUser } from "@/lib/auth/permissions";
 import { z } from "zod";
 import { authorizeWorker } from "@/lib/auth/worker";
-import { addEvent, claimNextJob, completeWorkerCycle, heartbeat, jobBelongsTo } from "@/lib/services/jobs";
+import {
+  addEvent,
+  claimNextJob,
+  completeWorkerCycle,
+  dailyQuotaPlan,
+  heartbeat,
+  jobBelongsTo,
+} from "@/lib/services/jobs";
 import { recordWorkerSeen } from "@/lib/services/workers";
 import {
   configSchema,
@@ -89,6 +96,19 @@ const bodySchema = z.discriminatedUnion("op", [
     // Worker mới đọc cooldown thật của cả vòng; worker cũ không gửi trường này và server
     // dùng nhịp an toàn mặc định, nên deploy web là đủ để bản đang cài cũng tự lặp.
     nextDelaySeconds: z.number().int().min(30).max(24 * 3600).optional(),
+    /**
+     * Nhiệm vụ ngày vừa chứng minh là hết lượt trong vòng này, và NGÀY mà lời khai ấy thuộc
+     * về (nguyên văn cái server phát ở `claim`). Cả hai đều optional: khôi lỗi đời cũ không
+     * gửi, và với chúng tính năng chỉ đơn giản là không có — không có gì vỡ.
+     *
+     * Trần ở đây gác cùng một cửa với `progress`: linh phù cá nhân là dữ liệu do người dùng
+     * điều khiển. ID nhiệm vụ dài nhất trong hồ sơ là 26 ký tự và cả hồ sơ có 22 nhiệm vụ,
+     * nên 64 × 64 đã rộng gấp nhiều lần thực tế mà vẫn chặn được một lượt bơm rác vào jsonb.
+     * Giá trị lạ lọt qua đây cũng vô hại: engine lọc lại theo `DAILY_QUOTA_QUEST_IDS` trước
+     * khi bỏ qua bất cứ nhiệm vụ nào.
+     */
+    dailyCapQuestIds: z.array(z.string().trim().min(1).max(64)).max(64).optional(),
+    dailyDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   }),
 ]);
 
@@ -189,6 +209,10 @@ export async function POST(request: Request) {
           id: job.id,
           userId: job.userId,
           config: { ...guarded, gameCookie: cookie, gameBaseUrl: settings.game.baseUrl },
+          // Sổ đủ lượt hôm nay của chính đàn này. Sổ mang ngày cũ ra khỏi đây thành sổ trắng,
+          // nên khôi lỗi không cần biết gì về múi giờ — nó chỉ đọc danh sách và trả lại `day`
+          // nguyên văn ở `complete`.
+          dailyDone: dailyQuotaPlan(job.dailyDone),
         },
       });
     }
@@ -241,6 +265,12 @@ export async function POST(request: Request) {
         body.outcome,
         body.message,
         body.nextDelaySeconds,
+        // Thiếu MỘT trong hai thì lời khai không dùng được: danh sách mà không có ngày thì
+        // không biết nó thuộc về hôm nào, còn ngày mà không có danh sách thì chẳng có gì để
+        // ghi. Cả hai ca ấy đều là khôi lỗi đời cũ, và với chúng sổ đứng yên.
+        body.dailyDay && body.dailyCapQuestIds?.length
+          ? { day: body.dailyDay, questIds: body.dailyCapQuestIds }
+          : undefined,
       );
       if (!transition) {
         return NextResponse.json({ error: "job is no longer active" }, { status: 409 });

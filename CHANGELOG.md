@@ -11,6 +11,23 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.58.10 — deploy được: bỏ `.git` ra khỏi thư mục deploy
+
+Mục 0.58.9 chẩn đúng bệnh nhưng **kê sai thuốc**. Nó bảo đặt email commit thành địa chỉ gắn với
+tài khoản GitHub; thực tế đã thử hai địa chỉ — kể cả `60702632+liquid8796@users.noreply.github.com`,
+thứ GitHub cấp riêng cho chính chủ repo nên về lý không thể "không khớp" — và Vercel vẫn chặn y
+nguyên cả hai lần.
+
+Thứ gỡ được là bỏ hẳn danh tính đi: `vercel --prod` chạy từ một bản xuất **không có `.git`**.
+Không có `.git` thì CLI không đính metadata commit, không có gì cho Vercel đối chiếu, nên không
+còn gì để chặn. Công thức ba dòng nằm ở [README.md](README.md), mục「Bước 3 — Deploy」.
+
+**Dấu hiệu phân biệt, đắt hơn cả công thức:** deploy chạy thật thì log hiện `Uploading (…KB)`
+rồi `Building…`. Lúc bị chặn thì **không có dòng `Uploading` nào cả** — deployment vẫn sinh ra,
+vẫn được gắn alias, `vercel ls` hiện `UNKNOWN`, `vercel inspect` hiện `Builds . [0ms]`, và
+`--logs` trả về rỗng. Tôi đã đọc nhầm bộ triệu chứng ấy hai lần: lần đầu tưởng tải lên dở dang,
+lần sau tưởng sai email. Cả hai lần đều đi sửa thứ không hỏng. Nhìn dòng `Uploading` trước đã.
+
 ## 0.58.9 — push `master` KHÔNG deploy, và vì sao `vercel --prod` cũng kẹt
 
 [README.md](README.md) viết rằng import repo vào Vercel là "mỗi lần push lên `master` là tự

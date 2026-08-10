@@ -412,15 +412,26 @@ vercel --prod
 > deployment tạo được, hiện `UNKNOWN`, rồi nằm im: không có một dòng nhật ký build nào, vì bản
 > dựng chưa từng khởi động. Đừng đi tìm lỗi trong mã lúc ấy; chỗ hỏng nằm ở danh tính commit.
 >
-> Thuốc là đặt email commit thành địa chỉ gắn với tài khoản GitHub:
+> **Đổi email commit KHÔNG gỡ được.** Đã thử hai địa chỉ — kể cả
+> `60702632+liquid8796@users.noreply.github.com`, thứ mà GitHub cấp riêng cho chính tài khoản chủ
+> repo nên không thể "không khớp" — và cả hai vẫn bị chặn y nguyên. Đừng đi lại đường ấy.
+>
+> **Thuốc là deploy từ một bản xuất KHÔNG có `.git`.** Không có `.git` thì CLI không có metadata
+> commit để đính, không có gì cho Vercel đối chiếu, nên không còn gì để chặn:
 >
 > ```bash
-> git config user.email hanam.tranle.5@gmail.com   # đặt cho RIÊNG repo này
+> STAGE=$(mktemp -d)
+> git archive HEAD | (cd "$STAGE" && tar -x)   # đúng cây của commit đang đứng, không kèm .git
+> mkdir -p "$STAGE/.vercel" && cp .vercel/project.json "$STAGE/.vercel/"
+> (cd "$STAGE" && vercel --prod --yes)
 > ```
 >
-> Đặt ở cấp repo chứ không phải `--global`: máy làm việc mang email công ty ở toàn cục và các
-> repo khác vẫn cần nó. Và nhớ rằng cấu hình chỉ áp cho commit **về sau** — commit đã tạo bằng
-> email cũ thì phải `commit --amend` mới đổi được danh tính, hoặc chồng lên nó một commit mới.
+> `.vercel/project.json` phải chép theo, nếu không CLI không biết đây là project nào. Và `STAGE`
+> phải nằm NGOÀI cây repo — git dò ngược lên thư mục cha, đặt bên trong là nó tìm thấy `.git`
+> của repo mẹ và ta quay lại vạch xuất phát.
+>
+> Dấu hiệu nhận ra đã đi đúng: log hiện `Uploading (…KB)` rồi `Building…`. Còn khi bị chặn thì
+> tuyệt nhiên không có dòng `Uploading` nào — deployment sinh ra rỗng và chết lặng ở đó.
 
 ### Bước 4 — Tạo bảng và trưởng môn đầu tiên
 

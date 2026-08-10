@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { forceStopJobAction } from "@/app/actions/queue";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { forceStartJobAction, forceStopJobAction } from "@/app/actions/queue";
 import type { QueueEntry, QueueSnapshot } from "@/lib/services/queue";
 import type { JobStatus } from "@/lib/realtime/dashboardTypes";
 
@@ -28,15 +28,28 @@ const STATUS_TEXT: Record<JobStatus, string> = {
   done: "Viên mãn",
 };
 
+/** Dòng đã tắt hẳn — còn nằm trên bảng một lúc chỉ để có chỗ bấm Bắt Đầu. */
+const isFinished = (entry: QueueEntry) => entry.status === "stopped" || entry.status === "failed";
+
 function statusDot(entry: QueueEntry): string {
   if (entry.status === "running") return "bg-[var(--color-jade-400)] pulse-jade";
   if (entry.status === "stopping") return "bg-[var(--color-gold-300)]";
+  if (entry.status === "failed") return "bg-[#c96a6a]";
+  if (entry.status === "stopped") return "bg-[var(--color-ink-600)]";
   return entry.queuePosition == null ? "bg-[var(--color-ink-600)]" : "bg-[var(--color-gold-400)]";
 }
 
+/**
+ * Hai nhánh `stopped`/`failed` KHÔNG được quên, và đây là chỗ dễ quên nhất: trước khi bảng
+ * giữ lại dòng đã tắt, mọi trạng thái không phải running/stopping/queued đều rơi xuống nhánh
+ * cuối và được kể là "Đang nghỉ — tới lượt lúc…". Với một đàn đã dừng hẳn thì câu ấy là một
+ * lời hứa sai: nó sẽ không tới lượt nào cả.
+ */
 function describe(entry: QueueEntry): string {
   if (entry.status === "running") return "Đang chạy";
   if (entry.status === "stopping") return "Đang thu đàn";
+  if (entry.status === "failed") return "Trắc trở — đã dừng";
+  if (entry.status === "stopped") return "Đã thu đàn";
   if (entry.queuePosition != null) return `Chờ tới lượt · thứ ${entry.queuePosition}`;
 
   const at = new Date(entry.nextRunAt);
@@ -46,6 +59,21 @@ function describe(entry: QueueEntry): string {
     hour: "2-digit",
     minute: "2-digit",
   })}`;
+}
+
+/**
+ * "1 giờ 12 phút" chứ không phải "72 phút" — con số này để một người ước lượng mức độ nghiêm
+ * trọng trong một giây, và giờ/phút đọc nhanh hơn một số phút lớn. Dưới một phút thì nói
+ * "vừa xong" thay vì "0 phút", dù ngưỡng kẹt 45 phút khiến ca ấy không xảy ra ở tab này —
+ * hàm định dạng không nên phụ thuộc vào ngưỡng của người gọi.
+ */
+function formatDuration(ms: number): string {
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return "vừa xong";
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${minutes} phút`;
+  return rest === 0 ? `${hours} giờ` : `${hours} giờ ${rest} phút`;
 }
 
 /**
@@ -76,21 +104,40 @@ function questPhrase(entry: QueueEntry): string | null {
   return progress.running.length > 0 ? progress.running.join(" · ") : "đang chuẩn bị…";
 }
 
+const TABS = [
+  { id: "queue", label: "Hàng đợi" },
+  { id: "stuck", label: "Đang kẹt" },
+] as const;
+
+type TabId = (typeof TABS)[number]["id"];
+
 export function QueueBoard({
   initial,
   canForceStop,
+  canForceStart,
 }: {
   initial: QueueSnapshot;
   canForceStop: boolean;
+  canForceStart: boolean;
 }) {
   const [snapshot, setSnapshot] = useState(initial);
+  const [tab, setTab] = useState<TabId>("queue");
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   /**
    * Lời báo của lần dừng gần nhất. MỘT chỗ duy nhất cho cả bảng, không phải mỗi dòng một chỗ:
    * người ta bấm dừng xong thì dòng ấy đổi trạng thái ngay (hoặc biến mất khỏi hàng đợi), nên
    * một lời báo neo vào dòng sẽ trôi mất cùng với dòng.
    */
   const [notice, setNotice] = useState<{ ok: boolean; message: string } | null>(null);
-  const [stoppingId, setStoppingId] = useState<string | null>(null);
+  /**
+   * Lệnh đang bay — MỘT ô cho cả Dừng lẫn Bắt Đầu, không phải hai state song song.
+   *
+   * Hai ô riêng thì mỗi nút chỉ tự khoá chính mình, và người sốt ruột bấm Bắt Đầu ở dòng dưới
+   * trong lúc lệnh Dừng chưa về. Một ô chung khoá cả bảng cho tới khi có câu trả lời: cả hai
+   * hành động đều đổi hàng đợi, và bảng đang cầm một ảnh chụp đã cũ thì mọi nút trên nó đều
+   * đang nói về một thế giới sắp không còn đúng.
+   */
+  const [pending, setPending] = useState<{ id: string; kind: "stop" | "start" } | null>(null);
   /**
    * CHỈ nói về kênh SSE, không nói về việc dữ liệu có tới hay không. Nếu để lưới an toàn
    * cũng bật cờ này thì lúc kênh trực tiếp đã đứt mà poll vẫn chạy, màn hình sẽ khoe "trực
@@ -123,6 +170,16 @@ export function QueueBoard({
     canForceStop && (entry.status === "queued" || entry.status === "running");
 
   /**
+   * Nút Bắt Đầu chỉ sáng khi đàn ĐÃ TẮT HẲN và còn khai lại được — `restartable` do server
+   * quyết (xem queue.ts), vì nó cần biết tài khoản còn sống và đang bật, hai điều client
+   * không được phép biết về người khác.
+   *
+   * Không có nút Bắt Đầu cho dòng `stopping`: lệnh dừng còn đang trên đường, khai lại lúc ấy
+   * chỉ để nhận về "đàn này đang chạy rồi". Chờ nó tắt hẳn rồi nút tự hiện.
+   */
+  const canStart = (entry: QueueEntry) => canForceStart && entry.restartable;
+
+  /**
    * Dừng một đàn. Hỏi lại trước khi làm — đây là việc đụng vào lượt chạy của NGƯỜI KHÁC, và
    * họ sẽ mất phần việc còn dở của vòng này.
    *
@@ -134,7 +191,7 @@ export function QueueBoard({
     const who = entry.mine ? "đàn của chính mình" : `đàn của ${entry.owner}`;
     if (!window.confirm(`Dừng ${who}? Vòng đang chạy sẽ không hoàn tất.`)) return;
 
-    setStoppingId(entry.id);
+    setPending({ id: entry.id, kind: "stop" });
     setNotice(null);
     try {
       const result = await forceStopJobAction(entry.id);
@@ -144,9 +201,50 @@ export function QueueBoard({
       // dùng vừa bấm một nút và cần biết nó có ăn hay không.
       setNotice({ ok: false, message: "Không gửi được lệnh dừng — thử lại sau một nhịp." });
     } finally {
-      setStoppingId(null);
+      setPending(null);
       await refresh();
     }
+  };
+
+  /**
+   * Khai đàn hộ. Cũng hỏi lại như lúc dừng, và cũng vì cùng một lý do: đây là bắt máy của
+   * người khác chạy. Nhẹ tay hơn lệnh dừng thật, nhưng "nhẹ hơn" không có nghĩa là "không cần
+   * hỏi" — chủ nhân có thể vừa cố ý dừng nó xong.
+   */
+  const start = async (entry: QueueEntry) => {
+    const who = entry.mine ? "đàn của chính mình" : `đàn của ${entry.owner}`;
+    if (!window.confirm(`Khai lại ${who}? Đàn mới sẽ vào hàng chờ ngay.`)) return;
+
+    setPending({ id: entry.id, kind: "start" });
+    setNotice(null);
+    try {
+      const result = await forceStartJobAction(entry.id);
+      setNotice(result);
+    } catch {
+      setNotice({ ok: false, message: "Không gửi được lệnh khai đàn — thử lại sau một nhịp." });
+    } finally {
+      setPending(null);
+      await refresh();
+    }
+  };
+
+  /**
+   * Điều hướng tab bằng phím mũi tên — bắt buộc với `role="tablist"`, vì một tablist chỉ nghe
+   * chuột là một tablist nói dối trình đọc màn hình về cách dùng nó. Roving tabIndex đi kèm:
+   * chỉ tab đang chọn nằm trong vòng Tab, còn lại nhường cho mũi tên.
+   */
+  const onTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const current = TABS.findIndex((item) => item.id === tab);
+    let next = current;
+    if (event.key === "ArrowRight") next = (current + 1) % TABS.length;
+    else if (event.key === "ArrowLeft") next = (current - 1 + TABS.length) % TABS.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = TABS.length - 1;
+    else return;
+
+    event.preventDefault();
+    setTab(TABS[next].id);
+    tabRefs.current[next]?.focus();
   };
 
   useEffect(() => {
@@ -174,7 +272,109 @@ export function QueueBoard({
     };
   }, [refresh, live]);
 
-  const { entries, running, waiting, sleeping } = snapshot;
+  const { entries, running, waiting, sleeping, stuck } = snapshot;
+  const stuckEntries = entries.filter((entry) => entry.stuckFor != null);
+
+  /**
+   * Một dòng, dùng cho CẢ HAI tab.
+   *
+   * Tab Đang Kẹt là một lát cắt của cùng bộ dữ liệu, không phải một bảng khác — nên nó phải
+   * là cùng một khuôn vẽ. Chép đôi khối JSX này là hẹn trước ngày hai tab lệch nhau: ai đó
+   * sửa nút ở tab trên, quên tab dưới, và người trực ca đêm nhìn hai màn hình nói hai chuyện.
+   */
+  const renderRow = (entry: QueueEntry) => {
+    const quests = questPhrase(entry);
+    const progress = entry.progress;
+    const busy = pending !== null;
+
+    return (
+      <li
+        key={entry.id}
+        className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border p-3 text-sm ${
+          entry.stuckFor != null
+            ? "border-[#c96a6a]/45 bg-[#c96a6a]/5"
+            : entry.mine
+              ? "border-[var(--color-gold-400)]/40 bg-[var(--color-gold-400)]/5"
+              : isFinished(entry)
+                ? "border-[var(--color-ink-600)]/40 bg-[var(--color-ink-600)]/20"
+                : "border-[var(--color-ink-600)]/60"
+        }`}
+      >
+        <span className="w-7 text-center font-mono text-xs text-[var(--color-mist)]">
+          {entry.queuePosition ?? "–"}
+        </span>
+        <span className={`inline-block h-2 w-2 rounded-full ${statusDot(entry)}`} aria-hidden />
+
+        <span className="font-semibold text-[var(--color-parchment)]">{entry.owner}</span>
+        {entry.mine && <span className="badge badge-active">bạn</span>}
+        {entry.accountLabel && (
+          <span className="text-[var(--color-gold-300)]">「{entry.accountLabel}」</span>
+        )}
+
+        <span className="text-[var(--color-mist)]">{describe(entry)}</span>
+
+        {/* Tên nhiệm vụ đang chạy. `title` mang bản đầy đủ cho lúc ba nhiệm vụ song song làm
+            dòng dài quá khung — cắt chữ mà không còn đường đọc lại là đổi một câu trả lời lấy
+            một dấu ba chấm. */}
+        {quests && (
+          <span className="max-w-full truncate text-[var(--color-jade-300)]" title={quests}>
+            {quests}
+          </span>
+        )}
+
+        {/* Huy hiệu kẹt hiện ở CẢ hai tab, không riêng tab Đang Kẹt: người mở Hàng Đợi vì việc
+            khác cũng cần đập vào mắt cái đang hỏng, chứ không phải chỉ ai nhớ bấm sang tab. */}
+        {entry.stuckFor != null && (
+          <span className="badge badge-pending" title="Tiến độ không nhích suốt quãng này">
+            kẹt {formatDuration(entry.stuckFor)}
+          </span>
+        )}
+
+        <span className="text-xs text-[var(--color-mist)]">vòng {entry.attempts}</span>
+
+        {/* Con số đi cùng MỌI dòng — nó trả lời "cái ghế khôi lỗi kia còn bao lâu nữa mới
+            trống", câu hỏi mà một danh sách tên không trả lời thay được. */}
+        {progress && progress.total > 0 && isWorking(entry) && (
+          <span className="text-xs text-[var(--color-mist)]">
+            {progress.done}/{progress.total} nhiệm vụ
+          </span>
+        )}
+
+        {/* Cụm đuôi dòng gom làm MỘT và tự đẩy sang phải. Trước đây nhãn khôi lỗi tự mang
+            `ml-auto`, nhưng dòng đang xếp hàng thì chưa có khôi lỗi nào — nút Dừng sẽ dính vào
+            giữa dòng. Gom lại thì mọi ca đều thẳng mép phải. */}
+        {(entry.workerKind || canStop(entry) || canStart(entry)) && (
+          <span className="ml-auto flex items-center gap-2">
+            {entry.workerKind && (
+              <span className="font-mono text-[11px] text-[var(--color-mist)]">
+                {entry.workerId ?? (entry.workerKind === "sect" ? "khôi lỗi tông môn" : "khôi lỗi riêng")}
+              </span>
+            )}
+            {canStop(entry) && (
+              <button
+                type="button"
+                className="btn btn-danger px-2.5 py-1 text-xs"
+                disabled={busy}
+                onClick={() => void stop(entry)}
+              >
+                {pending?.id === entry.id && pending.kind === "stop" ? "Đang dừng…" : "Dừng"}
+              </button>
+            )}
+            {canStart(entry) && (
+              <button
+                type="button"
+                className="btn btn-gold px-2.5 py-1 text-xs"
+                disabled={busy}
+                onClick={() => void start(entry)}
+              >
+                {pending?.id === entry.id && pending.kind === "start" ? "Đang khai…" : "Bắt Đầu"}
+              </button>
+            )}
+          </span>
+        )}
+      </li>
+    );
+  };
 
   return (
     <section className="card card-hairline p-6 xl:p-8">
@@ -200,88 +400,82 @@ export function QueueBoard({
         chờ hàng chung, vì khôi lỗi ấy chỉ làm việc ở máy nhà.
       </p>
 
-      {entries.length === 0 ? (
-        <p className="py-10 text-center text-sm text-[var(--color-mist)]">
-          Cả tông môn đang rảnh — chưa có đàn nào chờ hay chạy.
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {entries.map((entry) => {
-            const quests = questPhrase(entry);
-            const progress = entry.progress;
+      <div
+        role="tablist"
+        aria-label="Cách xem hàng đợi"
+        className="queue-tabs mb-4"
+        onKeyDown={onTabKeyDown}
+      >
+        {TABS.map((item, index) => {
+          const active = tab === item.id;
+          // Tab Hàng đợi đếm đàn CÒN SỐNG, không đếm `entries.length`: mảng ấy nay mang thêm
+          // cả dòng đã tắt còn nán lại, nên lấy độ dài của nó là để huy hiệu cãi nhau với
+          // đúng dòng tóm tắt nằm ngay bên trên.
+          const count = item.id === "stuck" ? stuck : running + waiting + sleeping;
+          return (
+            <button
+              key={item.id}
+              ref={(node) => {
+                tabRefs.current[index] = node;
+              }}
+              type="button"
+              role="tab"
+              id={`queue-tab-${item.id}`}
+              aria-selected={active}
+              aria-controls={`queue-panel-${item.id}`}
+              /* Roving tabIndex: chỉ tab đang chọn nằm trong vòng Tab, phần còn lại đi bằng
+                 phím mũi tên — đúng khuôn tablist mà trình đọc màn hình chờ đợi. */
+              tabIndex={active ? 0 : -1}
+              className={active ? "active" : ""}
+              onClick={() => setTab(item.id)}
+            >
+              {item.label}
+              {count > 0 && (
+                <span className={`queue-tab-count ${item.id === "stuck" ? "is-warn" : ""}`}>{count}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-            return (
-              <li
-                key={entry.id}
-                className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border p-3 text-sm ${
-                  entry.mine
-                    ? "border-[var(--color-gold-400)]/40 bg-[var(--color-gold-400)]/5"
-                    : "border-[var(--color-ink-600)]/60"
-                }`}
-              >
-                <span className="w-7 text-center font-mono text-xs text-[var(--color-mist)]">
-                  {entry.queuePosition ?? "–"}
-                </span>
-                <span className={`inline-block h-2 w-2 rounded-full ${statusDot(entry)}`} aria-hidden />
-
-                <span className="font-semibold text-[var(--color-parchment)]">{entry.owner}</span>
-                {entry.mine && <span className="badge badge-active">bạn</span>}
-                {entry.accountLabel && (
-                  <span className="text-[var(--color-gold-300)]">「{entry.accountLabel}」</span>
-                )}
-
-                <span className="text-[var(--color-mist)]">{describe(entry)}</span>
-
-                {/* Tên nhiệm vụ đang chạy. `title` mang bản đầy đủ cho lúc ba nhiệm vụ song
-                    song làm dòng dài quá khung — cắt chữ mà không còn đường đọc lại là đổi
-                    một câu trả lời lấy một dấu ba chấm. */}
-                {quests && (
-                  <span
-                    className="max-w-full truncate text-[var(--color-jade-300)]"
-                    title={quests}
-                  >
-                    {quests}
-                  </span>
-                )}
-
-                <span className="text-xs text-[var(--color-mist)]">vòng {entry.attempts}</span>
-
-                {/* Con số đi cùng MỌI dòng — nó trả lời "cái ghế khôi lỗi kia còn bao lâu nữa
-                    mới trống", câu hỏi mà một danh sách tên không trả lời thay được. */}
-                {progress && progress.total > 0 && isWorking(entry) && (
-                  <span className="text-xs text-[var(--color-mist)]">
-                    {progress.done}/{progress.total} nhiệm vụ
-                  </span>
-                )}
-
-                {/* Cụm đuôi dòng gom làm MỘT và tự đẩy sang phải. Trước đây nhãn khôi lỗi tự
-                    mang `ml-auto`, nhưng dòng đang xếp hàng thì chưa có khôi lỗi nào — nút
-                    Dừng sẽ dính vào giữa dòng. Gom lại thì cả hai ca đều thẳng mép phải. */}
-                {(entry.workerKind || canStop(entry)) && (
-                  <span className="ml-auto flex items-center gap-2">
-                    {entry.workerKind && (
-                      <span className="font-mono text-[11px] text-[var(--color-mist)]">
-                        {entry.workerId ?? (entry.workerKind === "sect" ? "khôi lỗi tông môn" : "khôi lỗi riêng")}
-                      </span>
-                    )}
-                    {canStop(entry) && (
-                      <button
-                        type="button"
-                        className="btn btn-danger px-2.5 py-1 text-xs"
-                        disabled={stoppingId !== null}
-                        onClick={() => void stop(entry)}
-                      >
-                        {stoppingId === entry.id ? "Đang dừng…" : "Dừng"}
-                      </button>
-                    )}
-                  </span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+      {tab === "queue" && (
+        <div role="tabpanel" id="queue-panel-queue" aria-labelledby="queue-tab-queue" tabIndex={0}>
+          {entries.length === 0 ? (
+            <p className="py-10 text-center text-sm text-[var(--color-mist)]">
+              Cả tông môn đang rảnh — chưa có đàn nào chờ hay chạy.
+            </p>
+          ) : (
+            <ul className="space-y-2">{entries.map(renderRow)}</ul>
+          )}
+        </div>
       )}
 
+      {tab === "stuck" && (
+        <div role="tabpanel" id="queue-panel-stuck" aria-labelledby="queue-tab-stuck" tabIndex={0}>
+          <p className="mb-4 text-xs leading-relaxed text-[var(--color-mist)]">
+            Đàn mà khôi lỗi <strong className="text-[var(--color-parchment)]">vẫn còn sống</strong> —
+            nhịp tim đều — nhưng tiến độ không nhích một nấc nào suốt hơn 45 phút. Khôi lỗi mất
+            liên lạc thì đã có phép dọn tự động lo, không hiện ở đây. Ngưỡng 45 phút cố ý dài hơn
+            một ván Mê Cung chạy đúng luật (~35 phút) để đàn khoẻ không bị réo nhầm.
+          </p>
+
+          {stuckEntries.length === 0 ? (
+            <p className="py-10 text-center text-sm text-[var(--color-jade-300)]">
+              Không có đàn nào kẹt — mọi khôi lỗi đang tiến việc bình thường.
+            </p>
+          ) : (
+            <>
+              <ul className="space-y-2">{stuckEntries.map(renderRow)}</ul>
+              <p className="mt-4 text-xs leading-relaxed text-[var(--color-mist)]">
+                Cách gỡ: bấm <strong className="text-[var(--color-parchment)]">Dừng</strong> rồi đợi
+                dòng chuyển sang「Đã thu đàn」— khôi lỗi thu ở điểm an toàn nên có thể mất một lúc —
+                sau đó nút <strong className="text-[var(--color-parchment)]">Bắt Đầu</strong> hiện ra
+                ở chính dòng ấy.
+              </p>
+            </>
+          )}
+        </div>
+      )}
       {notice && (
         <p
           role="status"

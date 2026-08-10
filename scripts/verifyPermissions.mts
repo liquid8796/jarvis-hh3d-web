@@ -210,6 +210,9 @@ const PERMISSION_HOLDERS: Record<Permission, readonly Role[]> = {
   // Chỉ Gia chủ và Thái thượng trưởng lão. Chưởng môn và Trưởng môn KHÔNG — đây chính là
   // chỗ ba vai bậc trị sự thôi ngang nhau, nên nó phải có một dòng đứng canh.
   "job.force_stop": ["gia-chu", "thai-thuong-truong-lao"],
+  // Khai đàn hộ đi cùng bộ với dừng đàn: ai gỡ được đàn kẹt thì phải dựng lại được, bằng
+  // không họ chỉ cầm nửa việc. Vẫn là MÃ RIÊNG để bảng phân quyền không nói dối về phạm vi.
+  "job.force_start": ["gia-chu", "thai-thuong-truong-lao"],
 };
 
 for (const permission of PERMISSIONS) {
@@ -231,6 +234,10 @@ assert(
 assert(
   !hasPermission({ roles: ["chuong-mon", "de-tu"] }, "job.force_stop"),
   "Chưởng môn gom thêm danh xưng nào cũng KHÔNG ra được quyền dừng đàn",
+);
+assert(
+  !hasPermission({ roles: ["chuong-mon", "de-tu"] }, "job.force_start"),
+  "Chưởng môn cũng KHÔNG được khai đàn hộ người khác",
 );
 
 console.log(

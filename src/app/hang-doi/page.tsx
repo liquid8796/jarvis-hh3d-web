@@ -42,7 +42,11 @@ export default async function QueuePage() {
         {/* Quyền tính Ở SERVER rồi mới truyền xuống. Cờ này chỉ quyết định có VẼ nút hay
             không — luật thật gác trong `forceStopJobAction`, vì một cái nút ẩn thì fetch vẫn
             gọi tới được. */}
-        <QueueBoard initial={snapshot} canForceStop={hasPermission(user, "job.force_stop")} />
+        <QueueBoard
+          initial={snapshot}
+          canForceStop={hasPermission(user, "job.force_stop")}
+          canForceStart={hasPermission(user, "job.force_start")}
+        />
       </main>
     </>
   );

@@ -110,6 +110,7 @@ export const PERMISSIONS = [
   "role.assign",
   "chat.purge",
   "job.force_stop",
+  "job.force_start",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -120,6 +121,7 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   "role.assign": "Ban và thu vai",
   "chat.purge": "Thanh tẩy sảnh đàm đạo",
   "job.force_stop": "Dừng đàn của người khác",
+  "job.force_start": "Khai đàn hộ người khác",
 };
 
 /**
@@ -130,7 +132,7 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
 const TRI_SU_PERMISSIONS = ["admin.panel", "member.manage"] as const satisfies readonly Permission[];
 
 /**
- * Thái thượng trưởng lão = bậc trị sự CỘNG quyền dừng đàn của người khác.
+ * Thái thượng trưởng lão = bậc trị sự CỘNG quyền đụng vào đàn của người khác.
  *
  * Đây là lần ĐẦU TIÊN ba vai bậc trị sự thôi ngang nhau, nên nó đáng một dòng giải thích chứ
  * không được lẳng lặng trôi qua: từ 09/08/2026 tông chủ giao cho vai này việc gỡ những đàn
@@ -139,10 +141,17 @@ const TRI_SU_PERMISSIONS = ["admin.panel", "member.manage"] as const satisfies r
  *
  * Câu「ba vai ngang nhau」ở đầu tệp vẫn đúng ở CHỖ NÓ NÓI: quản người. Chỗ chúng khác nhau
  * giờ là đây, và chỉ đây.
+ *
+ * `job.force_start` đi kèm từ 10/08/2026 và là một mã RIÊNG chứ không núp dưới `force_stop`:
+ * hai việc khác nhau thật — dừng là cắt việc đang chạy, khai lại là bắt máy của người khác
+ * làm việc. Gộp chúng thì cái nhãn「Dừng đàn của người khác」trên bảng phân quyền nói dối về
+ * thứ nó thực sự mở ra. Cùng vai vì cùng một lối nghĩ: ai được gỡ đàn kẹt thì phải được dựng
+ * nó dậy, bằng không họ chỉ có nửa việc và phải đi nhờ Gia chủ nửa còn lại.
  */
 const THAI_THUONG_PERMISSIONS = [
   ...TRI_SU_PERMISSIONS,
   "job.force_stop",
+  "job.force_start",
 ] as const satisfies readonly Permission[];
 
 /**

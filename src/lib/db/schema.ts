@@ -313,6 +313,19 @@ export const automationJobs = pgTable(
      * chỉ thêm một phép join cho mỗi lần vẽ hàng đợi mà không mua được gì.
      */
     cycleProgress: jsonb("cycle_progress").$type<CycleProgress>(),
+    /**
+     * Lúc `cycle_progress` ĐỔI lần gần nhất — không phải lúc nhận nhịp tim gần nhất.
+     *
+     * Hai thứ ấy khác nhau, và chính chỗ khác nhau đó là toàn bộ lý do cột này tồn tại:
+     * `last_heartbeat` nhảy mỗi 5 giây kể cả khi khôi lỗi đang đứng chôn chân ở một nhiệm vụ,
+     * nên nó chứng minh được "máy còn sống" nhưng KHÔNG chứng minh được "việc còn tiến". Một
+     * đàn kẹt trông y hệt một đàn khoẻ nếu chỉ nhìn nhịp tim.
+     *
+     * Ghi bằng `is distinct from` ngay trong câu UPDATE của heartbeat, nên không có vòng
+     * đọc-rồi-ghi nào để mà đua. NULL với đàn chưa từng khai tiến độ (đang nghỉ, hoặc khôi
+     * lỗi đời cũ) — nơi đọc phải chịu được NULL mà không gọi nhầm là kẹt.
+     */
+    cycleProgressAt: timestamp("cycle_progress_at", { withTimezone: true }),
   },
   (t) => [
     index("jobs_user_idx").on(t.userId),

@@ -1,0 +1,1 @@
+ALTER TABLE "automation_jobs" ADD COLUMN "cycle_progress_at" timestamp with time zone;

@@ -60,6 +60,22 @@ export type QueueEntry = {
    * hoặc khôi lỗi đời cũ chưa biết gửi. Giao diện phải chịu được `null` mà không mất chữ nào.
    */
   progress: QueueProgress | null;
+  /**
+   * Đã đứng yên ở đúng một tiến độ bao nhiêu MILI GIÂY — `null` nghĩa là không kẹt.
+   *
+   * Tính ở server chứ không ở trình duyệt, vì phép so cần `cycle_progress_at`, thứ không đi
+   * xuống client: gửi một dấu thời gian thô rồi để mỗi màn hình tự kết luận là mời hai cái
+   * đồng hồ lệch nhau cãi nhau về việc ai đang kẹt.
+   */
+  stuckFor: number | null;
+  /**
+   * Đàn đã dừng và còn khai lại được. Chỉ đúng với dòng đã kết thúc gần đây mà tài khoản của
+   * nó vẫn còn sống và đang bật — nút Bắt Đầu chỉ nên hiện ở chỗ bấm vào là có chuyện xảy ra.
+   *
+   * Đây là cờ VẼ, không phải cờ quyền: luật thật gác trong `forceStartJob`, nơi mọi cánh cửa
+   * của `startJob` được đi lại đủ.
+   */
+  restartable: boolean;
 };
 
 export type QueueSnapshot = {
@@ -68,6 +84,8 @@ export type QueueSnapshot = {
   running: number;
   waiting: number;
   sleeping: number;
+  /** Bao nhiêu đàn đang kẹt — số trên huy hiệu của tab Đang Kẹt. */
+  stuck: number;
 };
 
 /**
@@ -89,6 +107,43 @@ export function maskUsername(name: string): string {
 }
 
 const ACTIVE_STATUSES = ["queued", "running", "stopping"] as const;
+
+/**
+ * Đứng yên bao lâu ở MỘT tiến độ thì gọi là kẹt.
+ *
+ * 45 phút, và con số ấy phải lớn hơn nhiệm vụ dài nhất chạy đúng luật chứ không phải một số
+ * tròn cho đẹp: Mê Cung chờ đủ 5 người rồi đánh có thể ngốn tới ~35 phút mà tiến độ không
+ * nhích một nấc nào — hoàn toàn khoẻ mạnh. Lấy 30 phút là mỗi ván Mê Cung tử tế đều bị réo
+ * tên, và một danh sách toàn báo động giả thì người ta thôi đọc nó, tức là mất luôn cái tab.
+ */
+const STUCK_AFTER_MS = 45 * 60_000;
+
+/**
+ * Nhịp tim còn được coi là sống. Trùng ngưỡng của `reapStaleJobs` (3 phút) là CỐ Ý: quá mốc
+ * ấy job thuộc về reaper, và tab này không nên tranh việc — "khôi lỗi chết" đã có đường xử lý
+ * tự động rồi, còn thứ tab này săn là ca ngược lại và nguy hiểm hơn vì không ai dọn hộ: khôi
+ * lỗi CÒN SỐNG, vẫn gửi nhịp tim đều, mà việc thì đứng im.
+ */
+const HEARTBEAT_ALIVE_MS = 3 * 60_000;
+
+/**
+ * Đàn đã dừng còn nán lại trên bảng bao lâu để còn bấm Bắt Đầu.
+ *
+ * 30 phút: đủ dài cho một bậc trị sự dừng đàn, đi soi nhật ký rồi quay lại khai đàn hộ; đủ
+ * ngắn để Hàng Đợi không biến thành sổ lịch sử. Ai cần xa hơn thì đọc nhật ký của đàn, đó
+ * mới là chỗ giữ lịch sử.
+ */
+const RESTARTABLE_WINDOW_MS = 30 * 60_000;
+
+/**
+ * Đọc một cột boolean về đúng `true`/`false`, không tin driver trả sẵn kiểu gì.
+ *
+ * Cùng lối với `String(row.status)` và `Number(row.attempts)` ở dưới: đường `execute(sql…)`
+ * trả về hàng thô, và một `=== true` đặt thẳng lên giá trị thô sẽ âm thầm ra `false` nếu
+ * driver đưa lên `'t'`. Cái giá của lần âm thầm ấy là nút Bắt Đầu không bao giờ hiện, mà
+ * không có lỗi nào để lần theo — đúng loại hỏng tệ nhất.
+ */
+const isTrue = (value: unknown): boolean => value === true || value === "t" || value === "true";
 
 /** Trần hiển thị cho danh sách tên nhiệm vụ — xem lý do trong `readProgress`. */
 const MAX_RUNNING_QUEST_NAMES = 12;
@@ -143,9 +198,10 @@ export async function getQueueSnapshot(viewerId: string): Promise<QueueSnapshot>
   const result = await db().execute(sql`
     select
       job.id, job.user_id, job.status, job.attempts, job.next_run_at, job.worker_id,
-      job.cycle_progress,
+      job.cycle_progress, job.cycle_progress_at, job.last_heartbeat, job.finished_at,
       usr.username,
       acc.label as account_label,
+      acc.enabled as account_enabled,
       case when job.worker_id is null then null
            when w.id is null then 'personal'
            when w.user_id is null then 'sect'
@@ -155,7 +211,16 @@ export async function getQueueSnapshot(viewerId: string): Promise<QueueSnapshot>
     left join game_accounts as acc on acc.id = job.account_id
     left join workers as w on w.id = job.worker_id
     where job.status in ('queued', 'running', 'stopping')
-    order by job.next_run_at, job.created_at
+       or (
+         job.status in ('stopped', 'failed')
+         and job.finished_at > now() - ${`${RESTARTABLE_WINDOW_MS} milliseconds`}::interval
+       )
+    -- Dòng còn sống luôn đứng trước dòng đã tắt; TRONG mỗi nhóm thì giữ nguyên thứ tự cũ
+    -- (next_run_at, created_at) — thứ tự ấy chính là thứ tự khôi lỗi nhặt việc, và số thứ tự
+    -- hiện trên màn hình phải tiếp tục nói đúng điều đó.
+    order by
+      case when job.status in ('queued', 'running', 'stopping') then 0 else 1 end,
+      job.next_run_at, job.created_at
   `);
 
   const rows = (result.rows ?? []) as Array<Record<string, unknown>>;
@@ -164,18 +229,45 @@ export async function getQueueSnapshot(viewerId: string): Promise<QueueSnapshot>
   let running = 0;
   let waiting = 0;
   let sleeping = 0;
+  let stuck = 0;
 
   const entries = rows.map((row) => {
     const status = String(row.status) as JobStatus;
     const nextRunAt = new Date(String(row.next_run_at));
     const mine = String(row.user_id) === viewerId;
+    const finished = status === "stopped" || status === "failed";
 
     // "Đang xếp hàng" = đã tới giờ mà chưa ai nhặt. Job chưa tới giờ đang NGHỈ, job đang
     // chạy thì đã ra khỏi hàng — gộp cả ba làm một con số sẽ nói dối về độ dài hàng chờ.
+    // Dòng đã tắt KHÔNG được đếm vào bất cứ ô nào: nó không còn ở trong hàng đợi nữa, nó chỉ
+    // đang nán lại trên màn hình.
     const queued = status === "queued" && nextRunAt.getTime() <= now;
-    if (queued) waiting++;
+    if (finished) {
+      // không đếm
+    } else if (queued) waiting++;
     else if (status === "queued") sleeping++;
     else running++;
+
+    /**
+     * Kẹt = khôi lỗi CÒN SỐNG mà tiến độ đứng yên quá lâu.
+     *
+     * Ba điều kiện, thiếu một là sai hẳn nghĩa: phải đang `running` (đàn đã xin dừng thì đang
+     * trên đường thu, réo nó lên là nhiễu), nhịp tim phải còn tươi (mất nhịp là việc của
+     * reaper, không phải của người), và phải BIẾT tiến độ đổi lúc nào — `cycle_progress_at`
+     * NULL nghĩa là chưa từng khai tiến độ nào, mà "không biết" thì không được phép kết luận.
+     */
+    const progressAt = row.cycle_progress_at == null ? null : new Date(String(row.cycle_progress_at));
+    const beatAt = row.last_heartbeat == null ? null : new Date(String(row.last_heartbeat));
+    const idleFor = progressAt == null ? null : now - progressAt.getTime();
+    const stuckFor =
+      status === "running" &&
+      idleFor != null &&
+      idleFor >= STUCK_AFTER_MS &&
+      beatAt != null &&
+      now - beatAt.getTime() <= HEARTBEAT_ALIVE_MS
+        ? idleFor
+        : null;
+    if (stuckFor != null) stuck++;
 
     const workerKind = row.worker_kind == null ? null : (String(row.worker_kind) as "sect" | "personal");
 
@@ -191,10 +283,14 @@ export async function getQueueSnapshot(viewerId: string): Promise<QueueSnapshot>
       workerKind,
       queuePosition: queued ? ++position : null,
       progress: readProgress(row.cycle_progress),
+      stuckFor,
+      // `account_enabled` là NULL khi tài khoản đã bị xoá (left join không khớp) — phép đọc
+      // này gộp cả "đã xoá" lẫn "đang tắt" về cùng một câu trả lời: không khai lại được.
+      restartable: finished && isTrue(row.account_enabled),
     } satisfies QueueEntry;
   });
 
-  return { entries, running, waiting, sleeping };
+  return { entries, running, waiting, sleeping, stuck };
 }
 
 export { ACTIVE_STATUSES };

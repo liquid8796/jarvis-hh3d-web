@@ -343,6 +343,104 @@ export async function forceStopJob(jobId: string, actorName: string): Promise<Fo
   return { ok: true, ended };
 }
 
+/**
+ * Vì sao một lượt khai đàn hộ có thể không thành. Mỗi nhánh là một câu KHÁC NHAU nói với
+ * người bấm, vì cách xử lý khác nhau hẳn: tài khoản bị chủ tắt thì phải đi hỏi chủ, còn đàn
+ * đã chạy lại rồi thì chỉ cần tải lại trang.
+ */
+export type ForceStartOutcome =
+  | { ok: true; accountLabel: string }
+  | {
+      ok: false;
+      reason: "not-found" | "still-active" | "account-gone" | "account-disabled" | "maintenance" | "no-quests";
+    };
+
+/**
+ * Khai đàn hộ MỘT tài khoản, từ dòng đàn đã dừng trên trang Hàng Đợi.
+ *
+ * Nhận `stoppedJobId` chứ không nhận `accountId`, và đó là một lựa chọn về AN TOÀN chứ không
+ * phải về tiện tay: id tài khoản của người khác không bao giờ được gửi xuống trình duyệt (xem
+ * ranh giới riêng tư ở queue.ts), nên nếu action nhận accountId thì hoặc phải rò id ấy ra
+ * client, hoặc phải bịa một lớp ánh xạ. Đi từ id đàn thì server tự tra ra chủ và tài khoản.
+ *
+ * Đàn CŨ không được đụng tới: một job terminal là một dòng lịch sử, và lịch sử thì không viết
+ * lại. Lượt này lập một đàn MỚI, đúng như `startJob` vẫn làm — nhờ vậy số vòng, mốc thời gian
+ * và nhật ký của lượt cũ còn nguyên để sau này còn soi lại vì sao nó kẹt.
+ *
+ * Mọi cánh cửa của `startJob` đều phải đi qua lại đủ, không được rút gọn cái nào: bảo trì,
+ * tài khoản còn sống và đang bật, và có ít nhất một nhiệm vụ được tick. Rút gọn một cửa ở đây
+ * là đẻ ra một đường khai đàn có luật lỏng hơn đường chính — và luật lỏng hơn thì sớm muộn
+ * cũng thành luật thật.
+ */
+export async function forceStartJob(stoppedJobId: string, actorName: string): Promise<ForceStartOutcome> {
+  const found = await db().execute(sql`
+    select user_id, account_id, status
+    from automation_jobs
+    where id = ${stoppedJobId}
+  `);
+  const job = found.rows[0] as { user_id: string; account_id: unknown; status: string } | undefined;
+  if (!job) return { ok: false, reason: "not-found" };
+
+  // Còn sống thì không có gì để khai lại — và nếu cứ chạy tiếp, index
+  // jobs_one_active_per_account sẽ nuốt lặng lẽ cái INSERT rồi ta báo một lời thành công rỗng.
+  if (job.status === "queued" || job.status === "running" || job.status === "stopping") {
+    return { ok: false, reason: "still-active" };
+  }
+  if (job.account_id == null) return { ok: false, reason: "account-gone" };
+
+  const ownerId = String(job.user_id);
+  const accountId = String(job.account_id);
+
+  const { maintenance } = await getAppSettings();
+  if (maintenance.active) return { ok: false, reason: "maintenance" };
+
+  const account = (await listAccountsWithEnvelope(ownerId)).find((item) => item.id === accountId);
+  if (!account) return { ok: false, reason: "account-gone" };
+  // Chủ nhân tự tay tắt tài khoản này. Bậc trị sự đè lên ý muốn ấy là một quyết định của tông
+  // môn, không phải của một cái nút — nên chỗ này từ chối và nói rõ để đi hỏi chủ.
+  if (!account.enabled) return { ok: false, reason: "account-disabled" };
+
+  const view = await getEditableConfig(ownerId);
+  if (!Object.values(view.quests).some((quest) => quest.enabled)) {
+    return { ok: false, reason: "no-quests" };
+  }
+
+  const config = await getStoredConfigForSnapshot(ownerId);
+  const snapshot = storedConfigSchema.parse({
+    ...config,
+    gameCookie: account.cookieEnvelope,
+    accountTier: account.accountTier ?? null,
+  });
+
+  const inserted = await db().execute(sql`
+    insert into automation_jobs (user_id, account_id, config_snapshot, runner)
+    values (${ownerId}, ${accountId}, ${JSON.stringify(snapshot)}::jsonb, 'local')
+    on conflict (account_id) where status in ('queued', 'running', 'stopping') do nothing
+    returning id
+  `);
+  const newJobId = inserted.rows?.[0]?.id ? String(inserted.rows[0].id) : null;
+  // Thua cuộc đua: giữa lúc ta kiểm và lúc ta chèn, chủ nhân vừa tự Khai Đàn ở tab của họ.
+  // Đó không phải lỗi, nhưng cũng không phải thành công — nói đúng tên nó.
+  if (!newJobId) return { ok: false, reason: "still-active" };
+
+  await addEvent(
+    newJobId,
+    "warning",
+    `Bậc trị sự「${actorName}」đã khai đàn hộ cho「${account.label}」sau khi đàn trước dừng.`,
+  );
+  const workerOnline = await anyWorkerOnlineFor(ownerId);
+  await addEvent(
+    newJobId,
+    workerOnline ? "info" : "warning",
+    workerOnline
+      ? "Khôi lỗi đang trực — sẽ tiếp nhận trong giây lát."
+      : "Chưa thấy khôi lỗi nào điểm danh — đàn pháp sẽ chờ.",
+  );
+
+  await notifyDashboard({ userId: ownerId, topic: "job" });
+  return { ok: true, accountLabel: account.label };
+}
+
 async function announceStops(rows: Array<Record<string, unknown>>): Promise<void> {
   for (const row of rows) {
     const stoppedNow = String(row.status) === "stopped";
@@ -416,6 +514,9 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
       -- (thường là "8/8, đang chạy nhiệm vụ cuối") còn nguyên trên hàng đợi suốt quãng linh
       -- sứ mở trình duyệt và qua cổng Cloudflare — vài chục giây kể một câu chuyện đã cũ.
       cycle_progress = null,
+      -- Đồng hồ kẹt đi theo tiến độ, luôn luôn. Bỏ sót dòng này thì một đàn vừa nhận vòng mới
+      -- vẫn đeo dấu thời gian của vòng cũ và bị tab Đang Kẹt gọi tên ngay từ giây đầu tiên.
+      cycle_progress_at = null,
       last_heartbeat = now()
     from candidate
     where automation_jobs.id = candidate.id
@@ -494,19 +595,46 @@ export async function heartbeat(
   jobId: string,
   progress?: CycleProgress,
 ): Promise<{ status: JobRow["status"]; workerId: string | null } | null> {
-  const rows = await db()
-    .update(schema.automationJobs)
-    .set(
-      progress === undefined
-        ? { lastHeartbeat: new Date() }
-        : { lastHeartbeat: new Date(), cycleProgress: progress },
-    )
-    .where(eq(schema.automationJobs.id, jobId))
-    .returning({
-      status: schema.automationJobs.status,
-      workerId: schema.automationJobs.workerId,
-    });
-  return rows[0] ?? null;
+  if (progress === undefined) {
+    const rows = await db()
+      .update(schema.automationJobs)
+      .set({ lastHeartbeat: new Date() })
+      .where(eq(schema.automationJobs.id, jobId))
+      .returning({
+        status: schema.automationJobs.status,
+        workerId: schema.automationJobs.workerId,
+      });
+    return rows[0] ?? null;
+  }
+
+  /**
+   * `cycle_progress_at` chỉ nhích khi TIẾN ĐỘ nhích — phép so `is distinct from` nằm ngay
+   * trong câu UPDATE nên không có vòng đọc-rồi-ghi để mà đua, và mọi biểu thức SET đều đọc
+   * hàng CŨ nên thứ tự hai dòng dưới đây không quan trọng.
+   *
+   * So bằng `jsonb` chứ không bằng chuỗi: `is distinct from` trên jsonb là so theo NGỮ NGHĨA,
+   * nên khôi lỗi gửi lại cùng một tiến độ với thứ tự khoá khác sẽ không bị tính là "vừa đổi"
+   * — mà nếu tính nhầm thì đồng hồ kẹt bị đặt lại mỗi 5 giây và không đàn nào bị phát hiện nữa.
+   */
+  const serialised = JSON.stringify(progress);
+  const result = await db().execute(sql`
+    update automation_jobs set
+      last_heartbeat = now(),
+      cycle_progress_at = case
+        when cycle_progress is distinct from ${serialised}::jsonb then now()
+        else cycle_progress_at
+      end,
+      cycle_progress = ${serialised}::jsonb
+    where id = ${jobId}
+    returning status, worker_id
+  `);
+
+  const row = result.rows[0] as { status: string; worker_id: unknown } | undefined;
+  if (!row) return null;
+  return {
+    status: row.status as JobRow["status"],
+    workerId: row.worker_id == null ? null : String(row.worker_id),
+  };
 }
 
 export async function completeJob(
@@ -522,7 +650,7 @@ export async function completeJob(
     // cycleProgress về null cùng lúc: một job bị reaper kết liễu là một job không còn ai
     // chạy nhiệm vụ nào cho nó, và tiến độ cuối cùng nó kịp khai giờ chỉ là một lời nói dối
     // đông lạnh nằm chờ người đọc kế tiếp.
-    .set({ status: outcome, finishedAt: new Date(), cycleProgress: null })
+    .set({ status: outcome, finishedAt: new Date(), cycleProgress: null, cycleProgressAt: null })
     .where(
       and(
         eq(schema.automationJobs.id, jobId),
@@ -636,6 +764,7 @@ export async function completeWorkerCycle(
       -- Vòng đã xong thì không còn nhiệm vụ nào "đang chạy". Job quay về hàng chờ mà còn đeo
       -- tiến độ cũ sẽ hiện trên Hàng Đợi là "đang nghỉ — Mê Cung" suốt cả cooldown.
       cycle_progress = null,
+      cycle_progress_at = null,
       last_heartbeat = now()
     where id = ${jobId}
       and status in ('running', 'stopping')

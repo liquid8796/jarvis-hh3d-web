@@ -960,6 +960,61 @@ body {
   animation: chat-in 0.15s ease-out;
 }
 
+/* Tab của trang Hàng Đợi.
+   Mượn NGỮ PHÁP của .chat-picker-tabs — gạch chân, mist ngả sang gold khi hoạt động — chứ
+   không mượn chính class ấy: bản kia đặt `flex: 1` và cỡ chữ 0.68rem cho một popup hẹp, kéo
+   sang một khối rộng cả trang thì hai cái tab giãn ra thành hai cái băng-rôn. Cùng ngôn ngữ,
+   khác cỡ áo. */
+.queue-tabs {
+  display: flex;
+  gap: 1.25rem;
+  border-bottom: 1px solid rgba(232, 194, 92, 0.16);
+}
+
+.queue-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.15rem 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-mist);
+  /* Gạch chân dựng bằng border trong suốt để tab hoạt động không làm cả hàng cao thêm 2px. */
+  border-bottom: 2px solid transparent;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.queue-tabs button:hover { color: var(--color-parchment); }
+
+.queue-tabs button.active {
+  color: var(--color-gold-300);
+  border-bottom-color: var(--color-gold-400);
+}
+
+/* Vòng focus phải nằm TRONG khối, nếu không nó bị mép bảng cắt mất một nửa — mà một tablist
+   đi bằng phím mũi tên thì vòng focus chính là thứ duy nhất cho biết mình đang ở đâu. */
+.queue-tabs button:focus-visible {
+  outline: 2px solid var(--color-gold-400);
+  outline-offset: -3px;
+  border-radius: 4px;
+}
+
+.queue-tab-count {
+  min-width: 1.35rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(232, 194, 92, 0.14);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* Số của tab Đang Kẹt đổi màu vì nó là một lời báo động, không phải một phép đếm cho vui. */
+.queue-tab-count.is-warn {
+  background: rgba(201, 106, 106, 0.18);
+  color: #f2a0a0;
+}
+
 .chat-picker-tabs {
   display: flex;
   border-bottom: 1px solid rgba(232, 194, 92, 0.16);

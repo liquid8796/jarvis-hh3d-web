@@ -11,6 +11,45 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.59.0 — Hàng Đợi: nút Bắt Đầu, và tab Đang Kẹt
+
+Hai việc bậc trị sự phải làm bằng tay khi một đàn không thông, nay làm được trọn trên một
+trang: **gỡ nó xuống, rồi dựng nó dậy**. Trước lượt này chỉ có nửa đầu — dừng xong thì dòng
+biến mất khỏi bảng, và người vừa dừng phải đi nhờ chính chủ khai lại.
+
+**Nút Bắt Đầu, chỉ sáng sau khi đã dừng hẳn.** Hàng Đợi giữ lại dòng đã tắt thêm 30 phút để có
+chỗ mà bấm; hết 30 phút nó rụng, vì đây là hàng đợi chứ không phải sổ lịch sử. Đàn `stopping`
+KHÔNG có nút — lệnh dừng còn trên đường, khai lại lúc ấy chỉ nhận về một lời từ chối. Bấm vào
+là lập một đàn MỚI chứ không hồi sinh đàn cũ: một job đã kết thúc là một dòng lịch sử, và số
+vòng, mốc giờ, nhật ký của nó phải còn nguyên để sau này còn soi lại vì sao nó kẹt.
+
+Đường khai hộ đi qua **đủ mọi cánh cửa** của Khai Đàn thường — bảo trì, tài khoản còn sống và
+đang bật, có ít nhất một nhiệm vụ được tick. Rút gọn một cửa là đẻ ra một lối khai đàn luật
+lỏng hơn lối chính, và luật lỏng hơn thì sớm muộn cũng thành luật thật. Riêng ca **chủ nhân
+đang TẮT tài khoản** thì từ chối thẳng và nói rõ: đè lên ý muốn của chủ là quyết định của tông
+môn, không phải của một cái nút.
+
+**Tab Đang Kẹt** liệt kê đàn mà khôi lỗi *vẫn còn sống* — nhịp tim đều — nhưng tiến độ không
+nhích suốt hơn 45 phút. Hai chỗ đáng nói:
+
+*Vì sao phải thêm một cột.* `last_heartbeat` nhảy mỗi 5 giây kể cả khi khôi lỗi đứng chôn chân,
+nên nó chứng minh được "máy còn sống" mà KHÔNG chứng minh được "việc còn tiến" — nhìn nhịp tim
+thì một đàn kẹt trông y hệt một đàn khoẻ. Cột mới `cycle_progress_at` chỉ nhích khi
+`cycle_progress` thật sự đổi, so bằng `is distinct from` ngay trong câu UPDATE nên không có
+vòng đọc-rồi-ghi nào để mà đua. Mọi chỗ xoá `cycle_progress` đều phải xoá nó theo, bằng không
+một đàn vừa nhận vòng mới sẽ bị réo tên ngay từ giây đầu.
+
+*Vì sao 45 phút.* Ngưỡng phải dài hơn nhiệm vụ dài nhất chạy đúng luật chứ không phải một số
+tròn cho đẹp: Mê Cung chờ đủ 5 người rồi đánh có thể ngốn ~35 phút mà tiến độ không nhích nấc
+nào — hoàn toàn khoẻ mạnh. Lấy 30 phút là mỗi ván Mê Cung tử tế đều bị réo, và một danh sách
+toàn báo động giả thì người ta thôi đọc nó, tức là mất luôn cái tab. Khôi lỗi MẤT nhịp tim
+cũng không hiện ở đây — ca ấy đã có `reapStaleJobs` dọn tự động trong 3 phút; thứ tab này săn
+là ca ngược lại, nguy hiểm hơn vì không ai dọn hộ.
+
+`job.force_start` là mã quyền RIÊNG chứ không núp dưới `job.force_stop`, dù cùng trao cho Gia
+chủ và Thái thượng trưởng lão: hai việc khác nhau thật, và gộp lại thì cái nhãn「Dừng đàn của
+người khác」trên bảng phân quyền nói dối về thứ nó mở ra.
+
 ## 0.58.10 — deploy được: bỏ `.git` ra khỏi thư mục deploy
 
 Mục 0.58.9 chẩn đúng bệnh nhưng **kê sai thuốc**. Nó bảo đặt email commit thành địa chỉ gắn với

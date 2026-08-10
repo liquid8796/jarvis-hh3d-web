@@ -11,6 +11,19 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.61.1 — `framework: nextjs` trong vercel.json, và trạm gương đầu tiên
+
+Một dòng trong `vercel.json`, và nó là điều kiện sống của mọi trạm gương sau này: project
+tạo bằng `vercel project add` KHÔNG tự nhận diện framework — preset về `Other`, output trỏ
+`public/`, site trả 404 ở mọi đường trong khi build log xanh và liệt kê đủ mọi route. Mất
+một lượt dựng trạm mới lần ra. Trạm chính không dính vì project của nó sinh ra từ lượt deploy
+đầu tiên, nơi Vercel tự dò.
+
+Trạm gương `auto-hh3d-1` đã dựng thật trên một tài khoản Vercel khác hẳn: DB riêng (Neon
+`jarvis-hh3d`, Atlas `atlas-jarvis-chat`), 10 biến bí mật chung khớp trạm chính, schema khớp
+tới từng trigger. Tầng chuyển hướng đo bằng curl trên hai trạm sống — bảng đối chiếu đầy đủ
+ở deploy/mirror/README.md §13.
+
 ## 0.61.0 — sổ gương trạm trên trang Tông Môn, và món nợ migration được trả
 
 Phần 3 của lộ trình gương trạm: tab「Gương Trạm」(chỉ mọc cho người mang `site.switch` —

@@ -1,7 +1,9 @@
 # Gương Trạm — thiết kế hệ thống trạm dự phòng (mirror site)
 
-> Bản thiết kế 10/08/2026. Trạng thái: phần 1–2 của §12 ĐÃ thực thi (0.60.0 — lõi bảng
-> điều phối + middleware); phần 3–5 chưa. Đọc cùng [deploy/oracle/README.md](../oracle/README.md)
+> Bản thiết kế 10/08/2026. Trạng thái: phần 1–3 của §12 ĐÃ thực thi (0.60.0 lõi bảng điều
+> phối + middleware; 0.61.0 sổ gương trên trang admin), và trạm gương đầu tiên
+> `auto-hh3d-1` đã dựng thật trên tài khoản `zhangyu4` — tầng chuyển hướng đo được trên hai
+> trạm sống (§13). Phần 4–5 chưa. Đọc cùng [deploy/oracle/README.md](../oracle/README.md)
 > (VM + Object Storage — hai thứ KHÔNG đổi trong mọi kịch bản) và ghi chú migrate database
 > 10/08/2026 (đổi `jarvis-auto-hh3d` → `jarvis-hh3d`): phần đồng bộ Postgres dưới đây chính là
 > bản sản phẩm hoá của quy trình đã chạy tay hôm ấy.
@@ -185,6 +187,26 @@ MongoDB Atlas `atlas-jarvis-chat` — nên checklist chỉ phân biệt bằng T
 giờ bằng tên database. Vercel CLI đi bằng API token (`--token`, đặt `VERCEL_TOKEN[_<trạm>]`
 trong env), không đi bằng session login — session chỉ ôm được một tài khoản một lúc.
 
+**Quy tắc đặt tên (10/08/2026):** project gương đặt `auto-hh3d-<số tăng dần>` — trạm chính
+là `auto-hh3d`, gương đầu tiên `auto-hh3d-1`. Dùng LUÔN tên ấy làm `SITE_ID` và làm `id`
+trong sổ gương: một cái tên cho cả ba chỗ thì không bao giờ phải tra bảng đối chiếu.
+
+**BA BẪY ĐÃ TRẢ GIÁ khi dựng trạm gương đầu tiên (10/08/2026), đừng vấp lại:**
+
+1. `vercel whoami --token <gương>` chạy TRONG thư mục repo trả `Not authorized` DÙ TOKEN
+   TỐT — CLI đọc `.vercel/project.json` đang link project của tài khoản chính. Đã kết oan
+   một token vì vậy. Kiểm token phải đứng ở thư mục trung lập, hoặc `curl -H "Authorization:
+   Bearer …" https://api.vercel.com/v2/user`.
+2. Project tạo bằng `vercel project add` KHÔNG tự nhận diện framework: preset về `Other`,
+   output trỏ `public/`, và site trả 404 ở MỌI đường dù build log xanh và đủ mọi route. Thuốc
+   là `"framework": "nextjs"` trong `vercel.json` (đã thêm) — nó thắng preset của project, dù
+   dòng "Framework Preset" trong `project inspect` vẫn hiển thị `Other`. Đừng tin dòng ấy;
+   tin phép thử `curl /`.
+3. `vercel project rm` KHÔNG có `--yes`, nó đòi gõ tên để xác nhận — trong môi trường không
+   tương tác thì treo rồi bị giết. Xoá bằng REST: `DELETE
+   https://api.vercel.com/v9/projects/<tên>?slug=<team>`. Xoá project KHÔNG xoá database:
+   hai resource Neon/Atlas chỉ rơi về trạng thái chưa nối, nối lại là xong.
+
 Quy trình: tạo project Vercel (tài khoản nào cũng được) → đặt env theo hai bảng trên →
 deploy từ bản `git archive` (đường đã dùng vì vụ chặn git author — hoặc nối git của chính
 tài khoản ấy) → `DATABASE_URL=<db trạm> node scripts/migrate.mjs` → vào trang admin trạm
@@ -222,3 +244,28 @@ migration? URL trả 200?). Trạm nằm im ở chế độ chuyển hướng ch
    `scripts/mirrorSync/`) + op mới trong `/api/worker` + máy trạng thái + panel tiến độ.
 5. **Diễn tập**: dựng một mirror thật trên tài khoản phụ, chuyển đi — chuyển về, đo đồng hồ
    từng bước, ghi số vào đây thay cho các con số ước lượng.
+
+## 13. Đo thật trên hai trạm sống (10/08/2026)
+
+Trạm gương `auto-hh3d-1` (tài khoản `zhangyu4`, Neon `jarvis-hh3d` + Atlas `atlas-jarvis-chat`,
+`SITE_ID=auto-hh3d-1`) dựng xong và đo bằng curl khi bảng điều phối đang trỏ `main`:
+
+| Đường | Kết quả | Ý nghĩa |
+|---|---|---|
+| `/` | 307 → `auto-hh3d.vercel.app/` | người dùng thường bị đá về trạm hoạt động |
+| `/chat` | 307 → `…/chat` | giữ nguyên path |
+| `/dashboard?tab=2` | 307 → `…/dashboard?tab=2` | giữ nguyên query |
+| `/login` | 200 | miễn trừ — không bị đá đi |
+| `/admin` | 307 → `auto-hh3d-1.vercel.app/login` | miễn trừ có tác dụng (đá về login CỦA CHÍNH NÓ, tức auth guard, không phải middleware) |
+| `POST /api/worker` | 409 + `{"activeUrl":"https://auto-hh3d.vercel.app"}` | khôi lỗi đọc JSON, không đi theo redirect mù |
+| `/api/cron` | 204 | trạm phụ không dọn dẹp song song |
+
+Schema DB gương so với trạm chính: khớp cả 11 bảng / 63 cột / 24 ràng buộc / 23 index /
+**7 trigger** / 4 hàm / 11 enum. Sổ gương ghi được, phong bì `v1.` giải mã lại khớp, trang
+admin hiện host trần chứ không lộ chuỗi kết nối.
+
+Chưa kiểm được từ máy dev: nhánh Mongo của「Kiểm mạch」— máy này không phân giải nổi DNS SRV
+của Atlas (`querySrv ECONNREFUSED`, bệnh đã biết), nên probe dưới máy luôn báo Mongo ✗ trong
+khi PG ✔ 22 migration. Probe THẬT chạy trong server action trên Vercel nên không dính bệnh
+ấy; muốn xác nhận thì bấm「Kiểm mạch」trên trang admin — `npm run shot` chỉ nhận một `--click`
+nên không tự bấm hộ được (mở tab đã tốn cú bấm duy nhất).

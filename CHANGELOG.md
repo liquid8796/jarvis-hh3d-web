@@ -11,6 +11,44 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.67.0 — một cú bấm, mọi trạm cùng một commit
+
+`deploy-all-stations.bat` ở gốc repo: bấm đúp là mọi trạm trong sổ gương nhận cùng một commit.
+Trước bản này việc ấy làm bằng tay, hai lượt gần giống nhau, và「gần giống」là chỗ để quên.
+
+**Hai trạm lệch mã là cái bẫy nằm im.** Trạm gương chỉ chuyển hướng nên không ai thấy nó cũ —
+cho tới đúng ngày nó lên ngôi và trở thành nơi phát lệnh cho lượt sau. Mã cũ ở đó, ngày ấy, là
+mã cũ của cả tông môn.
+
+Chỗ khó không nằm ở việc gọi `vercel` hai lần mà ở **một lỗ hổng dữ liệu**: sổ gương không lưu
+gì về Vercel — mỗi trạm chỉ có `id`, `name`, `url` và hai chuỗi kết nối đã mã hoá. Không
+`projectId`, không `orgId`, không token. Nên phần thiếu được SUY RA thay vì thêm vào sổ: `url`
+của trạm là `https://<project>.vercel.app` theo đúng lệ đặt tên §9, nên nhãn đầu của hostname
+chính là tên project; còn tài khoản nào cầm nó thì hỏi Vercel — token nào nhìn thấy, token ấy là
+chủ. Thêm hai trường vào sổ nghĩa là thêm một migration, một ô nhập, và hai thứ nữa phải giữ cho
+khớp thực tế; cái tên thì đã là một sự thật duy nhất rồi.
+
+Thêm một tài khoản = thêm một biến `VERCEL_TOKEN_<TÊN>` trong `.env.local`. Không sửa mã.
+
+Ba chỗ từ chối thay vì đoán, vì đoán sai ở đây nghĩa là mã của tông môn hạ cánh xuống project của
+người khác: URL không phải `*.vercel.app` (custom domain — §11, chưa tới), project trùng tên ở hai
+tài khoản, và cùng một token khai ở hai biến (nếu không khử trùng thì MỌI project hiện hai lần và
+MỌI trạm bị kết luận là nhập nhằng). `verify:deploy-targets` giữ cả ba, 23 phép.
+
+Bốn quyết định vận hành đáng ghi:
+
+- **Một tệp tar cho mọi trạm** — đóng gói một lần rồi giải nén cho từng trạm, nên「đồng bộ」đúng
+  theo cấu trúc chứ không nhờ hai lượt `git archive` tình cờ giống nhau.
+- **Hỏng một trạm KHÔNG chặn các trạm còn lại**, nhưng bảng tổng kết gọi tên trạm đang lệch mã và
+  mã thoát khác 0. Một gương trạm cấu hình sai không được giữ bản vá lại khỏi trạm đang phục vụ.
+- **Cây làm việc bẩn thì cảnh báo, không chặn** — cây này có nhiều phiên dùng chung nên tệp bẩn
+  của người khác không được quyền giữ một bản vá lại. Đổi lại phải kêu to: thứ lên trạm là HEAD.
+- **Token đi bằng biến môi trường, không phải `--token`** — nó không nằm trong command line để ai
+  mở Task Manager cũng đọc được, và không phải đi qua phép nối chuỗi của `shell: true`.
+
+`shell: true` chỉ bật cho đúng lệnh cần nó (`vercel` là tệp `.cmd` trên Windows): Node nối chuỗi
+đối số thay vì escape, nên một đường dẫn có khoảng trắng sẽ vỡ làm đôi.
+
 ## 0.66.0 — hạn lưu nhật ký đàn lên trang Tông Môn
 
 Van xả `job_events` (0.65.0) chỉ sửa được bằng cách sửa mã và deploy. Nay nó là một núm trong

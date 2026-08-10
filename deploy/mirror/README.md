@@ -244,6 +244,17 @@ tài khoản ấy) → `DATABASE_URL=<db trạm> node scripts/migrate.mjs` → v
 chính, thêm trạm vào sổ, bấm「Kiểm mạch」(probe chỉ-đọc: nối được PG? Mongo? schema đủ 21+
 migration? URL trả 200?). Trạm nằm im ở chế độ chuyển hướng cho tới ngày được chọn.
 
+**Từ khi trạm đã vào sổ, đừng deploy tay nữa** — bấm đúp `deploy-all-stations.bat` ở gốc repo
+(hoặc `npm run deploy:all`, thêm `-- --dry-run` để chỉ xem kế hoạch). Nó đọc sổ gương từ
+database, tra ra project Vercel của từng trạm, rồi phát hành CÙNG MỘT tệp tar cho tất cả.
+
+Nó tra được project mà sổ không hề lưu `projectId`/`orgId`, nhờ đúng lệ đặt tên ở trên: `url`
+của trạm là `https://<project>.vercel.app` nên nhãn đầu của hostname chính là tên project, còn
+chủ nhân thì hỏi Vercel — token nào nhìn thấy project ấy, token ấy là chủ. **Thêm một tài khoản
+= thêm một biến `VERCEL_TOKEN_<TÊN>` trong `.env.local`, không sửa mã.** Và nó TỪ CHỐI thay vì
+đoán ở ba chỗ: URL không phải `*.vercel.app`, project trùng tên ở hai tài khoản, cùng một token
+khai ở hai biến — đoán sai ở đây là phát hành mã của tông môn lên project của người khác.
+
 ## 10. Các đường hỏng đã tính
 
 | Tình huống | Hệ đỡ thế nào |

@@ -11,6 +11,32 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.58.9 — push `master` KHÔNG deploy, và vì sao `vercel --prod` cũng kẹt
+
+[README.md](README.md) viết rằng import repo vào Vercel là "mỗi lần push lên `master` là tự
+deploy". Ở dự án này câu ấy **sai**, và cái giá của nó là một quãng ngồi dò một bản deploy không
+bao giờ tới: push xong, đợi, danh sách production vẫn đứng nguyên ở bản hai giờ trước.
+
+Vercel chặn thẳng mọi bản dựng có commit email không khớp một tài khoản GitHub:
+
+```
+The deployment was blocked because the commit email <…> could not be matched to a GitHub account.
+```
+
+Máy làm việc mang email công ty ở `--global`, nên mọi commit đều đóng dấu địa chỉ ấy.
+
+**Chỗ đắt nhất không phải chuyện git bị chặn — mà là `vercel --prod` cũng chặn theo.** CLI đính
+kèm metadata git của commit đang đứng, nên nó dính đúng luật ấy. Triệu chứng thì lại chẳng giống
+một cú chặn tí nào: deployment **tạo được**, `vercel ls` hiện `UNKNOWN`, thời lượng `?`, và
+`vercel inspect --logs` trả về **không một dòng build nào** — vì bản dựng chưa từng khởi động.
+Nhìn từ ngoài y hệt "build hỏng" hoặc "tải lên dở dang", và tôi đã đoán nhầm cả hai hướng ấy
+trước khi nhìn đúng chỗ. Dấu hiệu để nhận ra lần sau: **UNKNOWN + nhật ký rỗng = lỗi danh tính,
+không phải lỗi mã.**
+
+Thuốc: `git config user.email hanam.tranle.5@gmail.com` cho **riêng** repo này — toàn cục giữ
+email công ty vì máy còn repo khác. Cấu hình chỉ áp cho commit về sau, nên commit đã lỡ tạo bằng
+email cũ phải `--amend` hoặc chồng một commit mới lên.
+
 ## 0.58.8 — chép lại lối vào OCI, và cách cứu khi mất khoá SSH
 
 Ngày 10/08/2026 một phiên làm việc mở ra thì **không vào được gì cả**: `~/.ssh/jarvis_oci_ed25519`

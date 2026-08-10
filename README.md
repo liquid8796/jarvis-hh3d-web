@@ -400,8 +400,27 @@ vercel --prod
 Đổi biến môi trường **không** tự áp vào bản đang chạy — phải deploy lại thì function mới đọc
 được giá trị mới.
 
-Hoặc đơn giản hơn: push lên GitHub rồi Vercel → **Add New Project** → Import repo. Từ đó mỗi
-lần push lên `master` là tự deploy.
+> **`vercel --prod` là đường DUY NHẤT ở dự án này — push lên `master` KHÔNG tự deploy.**
+> Git integration có nối, nhưng Vercel chặn thẳng mọi bản dựng đến từ git với lý do rất cụ thể:
+>
+> ```
+> The deployment was blocked because the commit email <…> could not be
+> matched to a GitHub account.
+> ```
+>
+> **Và nó chặn cả `vercel --prod`**, vì CLI đính kèm metadata git của commit đang đứng — nên
+> deployment tạo được, hiện `UNKNOWN`, rồi nằm im: không có một dòng nhật ký build nào, vì bản
+> dựng chưa từng khởi động. Đừng đi tìm lỗi trong mã lúc ấy; chỗ hỏng nằm ở danh tính commit.
+>
+> Thuốc là đặt email commit thành địa chỉ gắn với tài khoản GitHub:
+>
+> ```bash
+> git config user.email hanam.tranle.5@gmail.com   # đặt cho RIÊNG repo này
+> ```
+>
+> Đặt ở cấp repo chứ không phải `--global`: máy làm việc mang email công ty ở toàn cục và các
+> repo khác vẫn cần nó. Và nhớ rằng cấu hình chỉ áp cho commit **về sau** — commit đã tạo bằng
+> email cũ thì phải `commit --amend` mới đổi được danh tính, hoặc chồng lên nó một commit mới.
 
 ### Bước 4 — Tạo bảng và trưởng môn đầu tiên
 

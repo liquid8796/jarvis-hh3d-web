@@ -1,7 +1,7 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { requireAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
-import { countJobsForDrain } from "@/lib/services/jobs";
+import { countJobsForDrain, jobEventRetentionStats } from "@/lib/services/jobs";
 import { BACKDROP_PREFIX, humanBytes, listObjectsUnder } from "@/lib/services/media";
 import { getAppSettings } from "@/lib/services/settings";
 import { mirrorsForAdmin } from "@/app/actions/mirrors";
@@ -14,6 +14,7 @@ import { ChatPurgePanel } from "./ChatPurgePanel";
 import { ChatSettingsForm } from "./ChatSettingsForm";
 import { TagFrameManager } from "./TagFrameManager";
 import { GameDomainForm } from "./GameDomainForm";
+import { JobEventRetentionForm } from "./JobEventRetentionForm";
 import { MaintenanceForm } from "./MaintenanceForm";
 import { MirrorPanel } from "./MirrorPanel";
 import { MembershipSettingsForm } from "./MembershipSettingsForm";
@@ -42,11 +43,12 @@ export default async function AdminPage({
       ? params.status
       : undefined;
 
-  const [users, pending, settings, drain, backdropStore] = await Promise.all([
+  const [users, pending, settings, drain, jobEventStats, backdropStore] = await Promise.all([
     listUsers({ search: params.q, status }),
     countPending(),
     getAppSettings(),
     countJobsForDrain(),
+    jobEventRetentionStats(),
     // Lưới ảnh nền đọc THẲNG từ tàng khố, không từ một sổ trong app_settings — xem ghi chú
     // tại BACKDROP_PREFIX. Kho đóng thì thẻ tự nói ra, nên chỗ này không cần ném.
     listObjectsUnder(`${BACKDROP_PREFIX}/`),
@@ -150,6 +152,11 @@ export default async function AdminPage({
                 <div className="flex max-w-2xl flex-col gap-6">
                   <GameDomainForm baseUrl={settings.game.baseUrl} />
                   <MaintenanceForm maintenance={settings.maintenance} drain={drain} />
+                  <JobEventRetentionForm
+                    retentionDays={jobEventStats.retentionDays}
+                    total={jobEventStats.total}
+                    expired={jobEventStats.expired}
+                  />
                 </div>
               ),
             },

@@ -22,7 +22,9 @@ import {
   purgeUserAvatars,
   type MediaSweepResult,
 } from "@/lib/services/media";
+import { purgeExpiredJobEvents } from "@/lib/services/jobs";
 import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
+import { JOB_EVENTS_PURGE_INTENT, parseRetentionDays } from "@/lib/validation/retention";
 import { adminCreate, adminDelete, adminUpdate, findById, setStatus } from "@/lib/services/users";
 import { CHAT_PURGE_PHRASE, matchesChatPurgePhrase } from "@/lib/validation/chat";
 import { parseTags } from "@/lib/validation/tags";
@@ -409,6 +411,53 @@ export async function saveChatSettingsAction(
   revalidatePath("/admin");
   return { ok: true, message: `Đã đặt hạn lưu đàm đạo: tin sống ${days} ngày rồi tự tan.` };
 }
+
+/**
+ * Hạn lưu NHẬT KÝ ĐÀN — tab "Bảo Trì" của trang Tông Môn.
+ *
+ * Đứng riêng khỏi `saveChatSettingsAction` dù hình thù giống hệt: hai núm nằm ở hai tab, và
+ * gộp làm một action nghĩa là một cú Lưu bên này ghi đè giá trị bên kia nếu form không mang
+ * đủ cả hai trường. Đọc-sửa-ghi trọn document qua Zod nên phần còn lại của cấu hình an toàn.
+ *
+ * Vì sao núm này đáng có mặt: `job_events` là bảng lớn nhất trong một lượt chuyển trạm, nên
+ * con số ở đây quyết định một lượt bế quan dài bao lâu (deploy/mirror/README.md §11).
+ */
+export async function saveJobEventsSettingsAction(
+  _prev: AdminResult | null,
+  formData: FormData,
+): Promise<AdminResult> {
+  await requireAdmin();
+
+  // Hai nút, MỘT action, phân nhánh theo `intent` — thay vì một action riêng cho nút quét.
+  // Hai action nghĩa là hai nguồn thông báo cho cùng một khung chữ, và khung ấy phải đoán cái
+  // nào mới hơn; gõ Enter trong ô số thì không nút nào gửi `intent`, và mặc định "lưu" là đúng
+  // ý người đang gõ dở một con số.
+  if (formData.get("intent") === JOB_EVENTS_PURGE_INTENT) {
+    const { purged, more } = await purgeExpiredJobEvents();
+    revalidatePath("/admin");
+    if (purged === 0) return { ok: true, message: "Không có dòng nhật ký nào quá hạn — bảng đã sạch." };
+    return {
+      ok: true,
+      message: more
+        ? `Đã xoá ${purged.toLocaleString("vi-VN")} dòng và chạm trần một lượt — bấm tiếp để dọn nốt.`
+        : `Đã xoá ${purged.toLocaleString("vi-VN")} dòng nhật ký quá hạn.`,
+    };
+  }
+
+  const parsed = parseRetentionDays(formData.get("retentionDays"));
+  if (!parsed.ok) return { ok: false, message: parsed.message };
+
+  const settings = await getAppSettings();
+  settings.jobEvents.retentionDays = parsed.days;
+  await saveAppSettings(settings);
+
+  revalidatePath("/admin");
+  return {
+    ok: true,
+    message: `Đã đặt hạn lưu nhật ký đàn: ${parsed.days} ngày. Nhịp quét kế tiếp sẽ dọn phần quá hạn.`,
+  };
+}
+
 
 /**
  * Thanh tẩy sảnh đàm đạo — xoá SẠCH tin trong tàng thư (Mongo) và bytes đính kèm trong tàng

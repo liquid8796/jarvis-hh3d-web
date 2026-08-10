@@ -910,6 +910,8 @@ export async function reapStaleJobs(): Promise<void> {
 
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /** Một lô xoá. Đủ nhỏ để một câu lệnh không giữ khoá lâu, đủ lớn để không phải chạy trăm lượt. */
 export const JOB_EVENT_PURGE_BATCH = 5_000;
 /** Trần lô mỗi lượt quét: 50 nghìn dòng — gấp năm lần nhịp sinh cao nhất đo được (9.674/ngày). */
@@ -936,7 +938,7 @@ const JOB_EVENT_PURGE_MAX_BATCHES = 10;
  */
 export async function purgeExpiredJobEvents(): Promise<{ purged: number; more: boolean }> {
   const { jobEvents } = await getAppSettings();
-  const cutoff = new Date(Date.now() - jobEvents.retentionDays * 24 * 3600 * 1000);
+  const cutoff = new Date(Date.now() - jobEvents.retentionDays * DAY_MS);
 
   let purged = 0;
   for (let batch = 0; batch < JOB_EVENT_PURGE_MAX_BATCHES; batch++) {
@@ -955,6 +957,38 @@ export async function purgeExpiredJobEvents(): Promise<{ purged: number; more: b
     if (n < JOB_EVENT_PURGE_BATCH) return { purged, more: false };
   }
   return { purged, more: true };
+}
+
+/**
+ * Hai con số để trang Tông Môn nói thật về cái núm hạn lưu: nhật ký đang có bao nhiêu dòng, và
+ * bao nhiêu dòng đã quá hạn theo mốc ĐANG LƯU.
+ *
+ * Không có chúng thì trưởng môn gõ một con số vào chỗ trống và không bao giờ biết nó làm gì —
+ * mà đây lại đúng là cái núm quyết định một lượt chuyển trạm dài bao lâu.
+ *
+ * MỘT câu lệnh cho cả hai số: hai lượt `count` là hai lượt quét bảng, và cũng là hai ảnh chụp
+ * ở hai thời điểm khác nhau — `filter` giữ chúng trên cùng một lượt quét, cùng một khoảnh khắc.
+ */
+export async function jobEventRetentionStats(): Promise<{
+  total: number;
+  expired: number;
+  retentionDays: number;
+}> {
+  const { jobEvents } = await getAppSettings();
+  const cutoff = new Date(Date.now() - jobEvents.retentionDays * DAY_MS);
+
+  const rows = await db().execute(sql`
+    select count(*)::int as total,
+           count(*) filter (where at < ${cutoff})::int as expired
+      from job_events
+  `);
+  const row = rows.rows[0] as { total: number; expired: number } | undefined;
+
+  return {
+    total: row?.total ?? 0,
+    expired: row?.expired ?? 0,
+    retentionDays: jobEvents.retentionDays,
+  };
 }
 
 /**

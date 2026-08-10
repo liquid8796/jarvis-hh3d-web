@@ -23,6 +23,12 @@ import { normalizeGameBaseUrl } from "../src/lib/quest-engine/cookies.mjs";
 import { maintenanceViewFor } from "../src/lib/auth/maintenance";
 import { ASSIGNABLE_ROLES, type Role } from "../src/lib/auth/permissions";
 import { appSettingsSchema, getAppSettings, saveAppSettings } from "../src/lib/services/settings";
+import {
+  JOB_EVENT_RETENTION_DEFAULT_DAYS,
+  RETENTION_MAX_DAYS,
+  RETENTION_MIN_DAYS,
+  parseRetentionDays,
+} from "../src/lib/validation/retention";
 import { getMaintenanceFeed } from "../src/lib/services/dashboard";
 import { startJob } from "../src/lib/services/jobs";
 import { register } from "../src/lib/services/users";
@@ -38,6 +44,57 @@ const username = `__maint_${stamp}`;
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);
 };
+
+// ---- 0. Hạn lưu nhật ký đàn: biên tin cậy của núm trên tab Bảo Trì ------------------------
+// Thuần, không chạm database. Đây là cửa DUY NHẤT giữa ô `<input>` và `saveAppSettings` — mà
+// hàm ấy `parse()` chứ không `safeParse()`, nên một giá trị lọt lưới ở đây nổ thành lỗi server
+// trần trụi thay vì một dòng nhắc tử tế.
+{
+  const okDays = (raw: unknown, expected: number) => {
+    const r = parseRetentionDays(raw);
+    assert(r.ok && r.days === expected, `parseRetentionDays(${JSON.stringify(raw)}) phải cho ${expected}`);
+  };
+  const bad = (raw: unknown, why: string) => {
+    const r = parseRetentionDays(raw);
+    assert(!r.ok, `parseRetentionDays(${JSON.stringify(raw)}) phải BỊ TỪ CHỐI — ${why}`);
+  };
+
+  okDays("7", 7);
+  okDays("  14  ", 14); // ô number vẫn gửi lên chuỗi, và người ta vẫn dán kèm khoảng trắng
+  okDays(String(RETENTION_MIN_DAYS), RETENTION_MIN_DAYS);
+  okDays(String(RETENTION_MAX_DAYS), RETENTION_MAX_DAYS);
+
+  bad("", "để trống");
+  bad(null, "form không gửi trường nào");
+  bad(undefined, "trường vắng mặt");
+  bad(String(RETENTION_MIN_DAYS - 1), "dưới biên dưới");
+  bad(String(RETENTION_MAX_DAYS + 1), "trên biên trên");
+  bad("-7", "số âm");
+  bad("7.5", "không nguyên");
+  bad("abc", "không phải số");
+  bad("Infinity", "vô hạn — Number() nuốt nhưng isInteger chặn");
+  bad({}, "không phải chuỗi (FormData có thể trả về File)");
+
+  // Biên của parser và biên của schema PHẢI là một. Lệch nhau nghĩa là có một giá trị qua được
+  // action rồi chết ở `saveAppSettings` — đúng loại lỗi mà việc gom hằng số sinh ra để chặn.
+  assert(
+    appSettingsSchema.parse({ jobEvents: { retentionDays: RETENTION_MAX_DAYS } }).jobEvents.retentionDays ===
+      RETENTION_MAX_DAYS,
+    "schema phải nhận đúng biên trên mà parser nhận",
+  );
+  let threw = false;
+  try {
+    appSettingsSchema.parse({ jobEvents: { retentionDays: RETENTION_MAX_DAYS + 1 } });
+  } catch {
+    threw = true;
+  }
+  assert(threw, "schema phải TỪ CHỐI giá trị vượt biên — nếu không, parser là hàng rào duy nhất");
+  assert(
+    appSettingsSchema.parse({}).jobEvents.retentionDays === JOB_EVENT_RETENTION_DEFAULT_DAYS,
+    "document rỗng (mọi deploy trước bản này) phải nhận hạn lưu mặc định",
+  );
+  console.log(`✔ hạn lưu nhật ký đàn: biên ${RETENTION_MIN_DAYS}–${RETENTION_MAX_DAYS} khớp giữa parser và schema`);
+}
 
 // ---- 1. Schema thuần — không chạm database -----------------------------------------------
 

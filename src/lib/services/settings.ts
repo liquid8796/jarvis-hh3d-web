@@ -1,6 +1,11 @@
 import { cache } from "react";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
+import {
+  JOB_EVENT_RETENTION_DEFAULT_DAYS,
+  RETENTION_MAX_DAYS,
+  RETENTION_MIN_DAYS,
+} from "@/lib/validation/retention";
 import { db, schema } from "@/lib/db/client";
 import { DEFAULT_GAME_BASE_URL, normalizeGameBaseUrl } from "@/lib/quest-engine/cookies.mjs";
 import type { TagFrame } from "@/lib/validation/tags";
@@ -228,8 +233,15 @@ export const appSettingsSchema = z.object({
    * chuyển trạm chậm đi theo — đó là toàn bộ sự đánh đổi, và nó nằm ở đúng một chỗ này.
    */
   jobEvents: z
-    .object({ retentionDays: z.number().int().min(1).max(365).default(7) })
-    .prefault({ retentionDays: 7 }),
+    .object({
+      retentionDays: z
+        .number()
+        .int()
+        .min(RETENTION_MIN_DAYS)
+        .max(RETENTION_MAX_DAYS)
+        .default(JOB_EVENT_RETENTION_DEFAULT_DAYS),
+    })
+    .prefault({ retentionDays: JOB_EVENT_RETENTION_DEFAULT_DAYS }),
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;

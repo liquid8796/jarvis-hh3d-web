@@ -11,6 +11,37 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.66.0 — hạn lưu nhật ký đàn lên trang Tông Môn
+
+Van xả `job_events` (0.65.0) chỉ sửa được bằng cách sửa mã và deploy. Nay nó là một núm trong
+tab **Bảo Trì** — cùng chỗ với những thứ trưởng môn chạm vào khi hệ thống cần dọn dẹp, và hiện
+cho mọi admin chứ không riêng Gia chủ như tab Gương Trạm.
+
+**Núm này KỂ SỐ, không để người ta gõ mù.** Nó hiện nhật ký đang có bao nhiêu dòng và bao nhiêu
+dòng đã quá hạn theo mốc đang lưu. Lý do: `job_events` là bảng lớn nhất trong một lượt chuyển
+trạm, nên con số gõ ở đây quyết định một lượt bế quan dài bao lâu — gõ vào chỗ trống thì không
+ai biết mình vừa quyết định điều gì.
+
+**Nút「Quét ngay」** đứng cạnh vì thiếu nó cái núm trông như hỏng: hạ 30 ngày xuống 7 rồi mà bảng
+vẫn y nguyên tới nhịp cron kế — gói Hobby chỉ chạy MỘT LẦN MỘT NGÀY. Nút dùng mốc ĐANG LƯU chứ
+không phải con số đang gõ dở, và dòng chữ dưới nút nói đúng như vậy.
+
+Hai điều học được khi làm, đáng ghi hơn cả cái núm:
+
+- **Hằng số biên phải ra khỏi `services/settings.ts`.** Form là `"use client"`, mà settings.ts
+  import `db`/drizzle và dựng schema Zod ở cấp module — nhập một hằng số từ đó là gánh cả client
+  database sang bundle trình duyệt. `tsc` không hé một lời. Nay biên hạn lưu sống ở
+  `validation/retention.ts`, tệp KHÔNG import gì cả, đúng khuôn `validation/tags.ts` đã dựng sẵn
+  cho bài học này.
+- **Hai nút, MỘT action, phân nhánh bằng `intent`.** Bản đầu cho nút quét một action riêng và
+  một `useState` riêng, thế là một khung chữ có hai nguồn và phải đoán cái nào mới hơn — mà phép
+  đoán ấy lại dựa vào thứ tự `onSubmit` chạy trước form action, một chi tiết nội bộ của React
+  không đáng để một dòng thông báo phụ thuộc vào.
+
+Biên của parser và biên của schema Zod nay cùng đọc một hằng số, và `verify:maintenance` có phép
+kiểm giữ đúng điều đó — lệch nhau nghĩa là có giá trị qua được action rồi chết ở `saveAppSettings`,
+nơi dùng `parse()` chứ không `safeParse()`.
+
 ## 0.65.0 — vá đường thoát hiểm, và van xả cho nhật ký đàn
 
 **Đường lật bằng dòng lệnh không dọn trạm đích — bẫy đặt đúng vào lúc tệ nhất.** Có hai đường

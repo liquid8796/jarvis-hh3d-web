@@ -11,6 +11,33 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.59.1 — đàn đã khai lại rồi vẫn đeo nút Bắt Đầu
+
+Bậc trị sự bấm Bắt Đầu, đàn mới vào hàng chờ — nhưng dòng cũ vẫn nằm đó với nguyên cái nút,
+và bấm lần nữa chỉ nhận về「đàn này đang chạy rồi」. Một cái nút chỉ để bị từ chối, đúng thứ mà
+chú thích của `canStop` ngay bên cạnh đã dặn là đừng vẽ.
+
+Cái nút chỉ là triệu chứng. Bệnh là **một tài khoản hiện HAI lần**: một dòng đang chạy và một
+dòng đã tắt của cùng tài khoản ấy. `restartable` chỉ hỏi hai câu — đàn đã tắt chưa, tài khoản
+còn bật không — mà quên câu thứ ba, câu duy nhất đổi sau lượt khai hộ: *tài khoản này giờ đã
+có đàn sống chưa*. Đo trên production lúc phát hiện: 2 dòng còn nán lại, cả hai đều đã có đàn
+sống, tức cả hai cái nút đều là nút chết.
+
+Sửa ở chỗ sinh ra chúng — câu truy vấn — chứ không ở chỗ vẽ: dòng đã tắt nào có tài khoản
+đang mang đàn sống thì không lọt vào ảnh chụp nữa. Vá ở tầng vẽ thì cái nút biến mất nhưng
+tài khoản vẫn hiện hai lần, tức chỉ giấu đi một nửa cái sai.
+
+**Một ca thứ hai cùng gốc, chưa ai gặp nhưng tới được:** dừng → khai lại → dừng tiếp trong
+vòng 30 phút để lại HAI dòng đã tắt cho cùng một tài khoản, mỗi dòng một nút làm đúng một
+việc giống nhau. Nay chỉ giữ lần tắt gần nhất của mỗi tài khoản. Nhánh `account_id is null`
+(tài khoản đã bị xoá) phải tách riêng, vì phép so với NULL không bao giờ đúng và sẽ lặng lẽ
+vứt mất dòng ấy khỏi bảng.
+
+**Bẫy đã trả giá khi sửa:** chú thích SQL nằm trong template literal của `sql`, nên một dấu
+backtick gõ vào giữa câu tiếng Việt sẽ KẾT THÚC chuỗi ngay tại đó. TypeScript báo
+`TS1005: ',' expected` ở một cột vô nghĩa giữa câu tiếng Việt và không hề nhắc tới chuỗi —
+mất một lượt build mới thấy. Trong khối SQL, đừng quote tên cột bằng backtick.
+
 ## 0.59.0 — Hàng Đợi: nút Bắt Đầu, và tab Đang Kẹt
 
 Hai việc bậc trị sự phải làm bằng tay khi một đàn không thông, nay làm được trọn trên một

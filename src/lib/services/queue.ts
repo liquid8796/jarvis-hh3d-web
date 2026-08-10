@@ -214,6 +214,28 @@ export async function getQueueSnapshot(viewerId: string): Promise<QueueSnapshot>
        or (
          job.status in ('stopped', 'failed')
          and job.finished_at > now() - ${`${RESTARTABLE_WINDOW_MS} milliseconds`}::interval
+         -- Tài khoản đã có đàn sống thì dòng đã tắt của nó KHÔNG còn việc gì trên bảng nữa.
+         -- Thiếu điều kiện này thì sau một lượt khai hộ, cùng một tài khoản hiện HAI lần —
+         -- một dòng đang chạy và một dòng đã tắt vẫn đeo nút Bắt Đầu, mà bấm vào chỉ nhận
+         -- "đàn này đang chạy rồi". Một cái nút chỉ để bị từ chối thì thà đừng có.
+         and not exists (
+           select 1 from automation_jobs as live
+           where live.account_id = job.account_id
+             and live.status in ('queued', 'running', 'stopping')
+         )
+         -- Và chỉ giữ LẦN TẮT GẦN NHẤT của mỗi tài khoản. Dừng → khai lại → dừng tiếp trong
+         -- vòng 30 phút sẽ đẻ ra nhiều dòng đã tắt cho cùng một tài khoản, mỗi dòng một nút
+         -- làm đúng một việc giống nhau. Nhánh account_id IS NULL (tài khoản đã bị xoá) đi
+         -- lối riêng vì phép so với NULL không bao giờ đúng, và im lặng vứt mất dòng ấy thì
+         -- lịch sử vừa xảy ra biến khỏi bảng mà không ai hiểu vì sao.
+         and (
+           job.account_id is null
+           or job.finished_at = (
+             select max(prev.finished_at) from automation_jobs as prev
+             where prev.account_id = job.account_id
+               and prev.status in ('stopped', 'failed')
+           )
+         )
        )
     -- Dòng còn sống luôn đứng trước dòng đã tắt; TRONG mỗi nhóm thì giữ nguyên thứ tự cũ
     -- (next_run_at, created_at) — thứ tự ấy chính là thứ tự khôi lỗi nhặt việc, và số thứ tự

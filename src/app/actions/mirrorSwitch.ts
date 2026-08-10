@@ -344,10 +344,26 @@ export async function flipSwitchAction(): Promise<SwitchResult> {
 
   try {
     // Tắt bảo trì Ở ĐÍCH (trạm sắp lên thay), qua chính chuỗi kết nối trong sổ.
+    //
+    // Cùng câu lệnh, đặt luôn bản ghi mirrorSwitch CUỐI CÙNG vào đích. Thiếu chỗ này thì ý định
+    // ghi ở settings.ts («đi theo dữ liệu sang trạm mới với phase: done») không thành sự thật:
+    // `app_settings` được chép ở nhịp ĐẦU, nên cái đi theo dữ liệu là ảnh chụp lúc phase còn
+    // `syncing` — trạm mới lên ngôi mang theo một lượt chuyển ma còn dang dở, và ai bấm
+    // 「Chạy tiếp」trên đó sẽ khởi động lại một lượt không có thật (chỉ `canSwitch` chặn giữa nó
+    // và một lượt tự-chép-đè-chính-mình — đừng để hàng rào cuối cùng phải gánh một mình).
     const dest = connect(decryptSecret(entry.pg));
+    const record = {
+      ...state,
+      updatedAt: new Date().toISOString(),
+      note: `Lượt chuyển từ「${site.activeSiteId}」sang「${entry.id}」đã hoàn tất. Bản ghi này là dấu vết của lượt ấy.`,
+    };
     await dest.query(
-      `update app_settings set value = jsonb_set(value, '{maintenance}', $1::jsonb, true)`,
-      [JSON.stringify({ active: false, startedAt: null, expectedEndAt: null, note: "" })],
+      `update app_settings
+          set value = jsonb_set(jsonb_set(value, '{maintenance}', $1::jsonb, true), '{mirrorSwitch}', $2::jsonb, true)`,
+      [
+        JSON.stringify({ active: false, startedAt: null, expectedEndAt: null, note: "" }),
+        JSON.stringify(record),
+      ],
     );
 
     const current = await readControlDoc();

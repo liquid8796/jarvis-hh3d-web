@@ -53,6 +53,53 @@ const HEARTBEAT_COLUMNS: Partial<Record<SyncTable, readonly string[]>> = {
   automation_jobs: ["last_heartbeat"],
 };
 
+/**
+ * Khoá jsonb TỰ THAM CHIẾU — máy chuyển trạm ghi tiến độ của chính nó vào `app_settings`, tức
+ * là vào ĐÚNG một trong những bảng nó đang chép.
+ *
+ * Đo được ngày 10/08/2026 ở lượt diễn tập thứ hai: chép xong 11.458 dòng rồi chết ở
+ * 「Đối chiếu app_settings hỏng: LỆCH NỘI DUNG」. Đổi thứ tự chép KHÔNG cứu được — mỗi nhịp của
+ * chính bước đối chiếu cũng gọi `stamp()` ghi lên nguồn, nên nguồn nhúc nhích ngay trong lúc
+ * đang so. Một phép so bao gồm cả bản ghi tiến độ của chính phép so ấy thì không bao giờ khớp.
+ *
+ * Vì vậy loại đúng khoá ấy ra, cùng lý lẽ với `HEARTBEAT_COLUMNS`: đây là bỏ qua tiếng ồn của
+ * người quan sát, không phải bỏ qua sai sót. Mọi khoá khác trong `value` vẫn bị so từng chữ —
+ * sổ gương, cấu hình sảnh, bảo trì đều nằm trong đó.
+ */
+const VOLATILE_JSON_KEYS: Partial<Record<SyncTable, { column: string; keys: readonly string[] }>> = {
+  app_settings: { column: "value", keys: ["mirrorSwitch"] },
+};
+
+const lit = (s: string) => `'${s.replace(/'/g, "''")}'`;
+
+/**
+ * Biểu thức băm cho một bảng — tách riêng và EXPORT để phép kiểm gọi đúng thứ mà `verifyTable`
+ * chạy thật. Bài học vừa trả giá ở `mongoSync`: một luật bị chép làm hai bản thì bản sao sai
+ * vào đúng ngày nó được dùng lần đầu, và phép kiểm dựng trên bản sao ấy sẽ xanh trong khi đời
+ * thật đỏ. `scripts/verifyMirrorSync.mts` vì thế nhập hàm này chứ không tự viết lại.
+ */
+export function verifyDigestExpr(table: SyncTable): string {
+  const skip = HEARTBEAT_COLUMNS[table] ?? [];
+  // `- 'cột'` trên jsonb bỏ khoá khỏi từng hàng trước khi băm; không cột nào bỏ thì băm thẳng.
+  const strip = skip.map((c) => `- ${lit(c)}`).join(" ");
+  let expr = strip ? `(to_jsonb(t) ${strip})` : "to_jsonb(t)";
+
+  const volatile = VOLATILE_JSON_KEYS[table];
+  if (volatile) {
+    const inner = volatile.keys.map((k) => `- ${lit(k)}`).join(" ");
+    expr = `jsonb_set(${expr}, '{${volatile.column}}', (to_jsonb(t)->${lit(volatile.column)}) ${inner})`;
+  }
+  return expr;
+}
+
+/** Câu chữ kể cho admin biết phép so vừa nhắm mắt ở đâu — đừng để nó thành sự im lặng. */
+function ignoredLabel(table: SyncTable): string {
+  const parts = [...(HEARTBEAT_COLUMNS[table] ?? [])];
+  const volatile = VOLATILE_JSON_KEYS[table];
+  if (volatile) parts.push(...volatile.keys.map((k) => `${volatile.column}.${k}`));
+  return parts.join(", ");
+}
+
 const q = (name: string) => `"${name.replace(/"/g, '""')}"`;
 type Sql = ReturnType<typeof neon>;
 const one = <T>(rows: unknown): T => (Array.isArray(rows) ? rows[0] : (rows as { rows: T[] }).rows[0]) as T;
@@ -185,10 +232,8 @@ export async function verifyTable(src: Sql, dest: Sql, table: SyncTable): Promis
   const [srcRows, destRows] = [await countRows(src, table), await countRows(dest, table)];
   const pk = await primaryKeyColumns(src, table);
   const order = pk.map(q).join(", ");
-  const skip = HEARTBEAT_COLUMNS[table] ?? [];
-  // `- 'cột'` trên jsonb bỏ khoá khỏi từng hàng trước khi băm; không cột nào bỏ thì băm thẳng.
-  const strip = skip.length ? skip.map((c) => `- '${c.replace(/'/g, "''")}'`).join(" ") : "";
-  const expr = strip ? `to_jsonb(t) ${strip}` : `to_jsonb(t)`;
+  const expr = verifyDigestExpr(table);
+  const ignored = ignoredLabel(table);
 
   const digest = async (sql: Sql) =>
     one<{ h: string }>(
@@ -206,6 +251,6 @@ export async function verifyTable(src: Sql, dest: Sql, table: SyncTable): Promis
     srcRows,
     destRows,
     ok: a === b,
-    detail: a === b ? `khớp ${srcRows} dòng${skip.length ? ` (bỏ qua ${skip.join(", ")})` : ""}` : "LỆCH NỘI DUNG",
+    detail: a === b ? `khớp ${srcRows} dòng${ignored ? ` (bỏ qua ${ignored})` : ""}` : "LỆCH NỘI DUNG",
   };
 }

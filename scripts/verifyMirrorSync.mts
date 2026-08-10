@@ -10,6 +10,7 @@
  * phép bỏ qua cột nhịp tim lúc đối chiếu.
  */
 import { neon } from "@neondatabase/serverless";
+import { verifyDigestExpr } from "../src/lib/mirror/pgSync";
 import { MONGO_DEFAULT_DB, resolveMongoDbName } from "../src/lib/mongo/dbName";
 import { loadEnv } from "./loadEnv.mjs";
 
@@ -183,6 +184,47 @@ try {
   ok(
     (await digest(SRC, "owner", ["last_seen"])) !== (await digest(DST, "owner", ["last_seen"])),
     "sửa một giá trị trong jsonb thì đối chiếu PHẢI đỏ — phép kiểm không mù",
+  );
+
+  // ---- khoá jsonb tự tham chiếu trong app_settings ---------------------------------------
+  // Máy chuyển trạm ghi tiến độ vào app_settings, tức vào đúng bảng nó đang chép — lượt diễn
+  // tập thứ hai (10/08/2026) chết ở「Đối chiếu app_settings hỏng: LỆCH NỘI DUNG」vì thế.
+  // Phần này gọi CHÍNH `verifyDigestExpr` mà verifyTable dùng, không dựng lại biểu thức: bài
+  // học vừa trả giá ở mongoSync là phép kiểm xây trên bản sao của một luật thì xanh vô nghĩa.
+  const rawDigest = async (schema: string, expr: string) =>
+    one<{ h: string }>(
+      await sql.query(`select md5(coalesce(json_agg(${expr} order by id)::text,'[]')) as h from ${schema}.app_settings t`),
+    ).h;
+
+  const settingsExpr = verifyDigestExpr("app_settings");
+  ok(settingsExpr.includes("'mirrorSwitch'"), "biểu thức đối chiếu app_settings có loại khoá mirrorSwitch");
+  ok(verifyDigestExpr("users") === "to_jsonb(t)", "bảng không khai gì thì băm thẳng, không phù phép");
+  ok(verifyDigestExpr("workers").includes("- 'last_seen'"), "workers vẫn loại cột nhịp tim như cũ");
+
+  for (const schema of [SRC, DST]) {
+    await sql.query(`create table ${schema}.app_settings (id text primary key, value jsonb not null)`);
+    await sql.query(
+      `insert into ${schema}.app_settings (id, value) values ('global', $1::jsonb)`,
+      [JSON.stringify({ chat: { retentionDays: 14 }, mirrorSwitch: { phase: "idle", copiedRows: 0 } })],
+    );
+  }
+  // Nguồn nhúc nhích ĐÚNG như lúc chạy thật: mỗi nhịp một lần stamp vào mirrorSwitch.
+  await sql.query(`update ${SRC}.app_settings set value = jsonb_set(value, '{mirrorSwitch}', $1::jsonb, true)`, [
+    JSON.stringify({ phase: "verifying", copiedRows: 11458, note: "Đang chép job_events: 10000 dòng." }),
+  ]);
+  ok(
+    (await rawDigest(SRC, "to_jsonb(t)")) !== (await rawDigest(DST, "to_jsonb(t)")),
+    "băm THẲNG thì hai bên lệch — tái hiện đúng lượt diễn tập đã chết",
+  );
+  ok(
+    (await rawDigest(SRC, settingsExpr)) === (await rawDigest(DST, settingsExpr)),
+    "loại mirrorSwitch ra thì khớp — bản vá đứng vững trước chính ca đã gãy",
+  );
+  // Và phép so KHÔNG được mù phần còn lại: đổi một khoá anh em thì phải đỏ.
+  await sql.query(`update ${DST}.app_settings set value = jsonb_set(value, '{chat,retentionDays}', '30')`);
+  ok(
+    (await rawDigest(SRC, settingsExpr)) !== (await rawDigest(DST, settingsExpr)),
+    "đổi một khoá KHÁC trong value thì vẫn đỏ — loại mirrorSwitch không phải bịt mắt cả cột",
   );
 
   console.log(`\nTất cả ${passed} phép kiểm đều thuận.`);

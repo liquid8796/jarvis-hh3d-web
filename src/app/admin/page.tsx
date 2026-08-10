@@ -5,6 +5,7 @@ import { countJobsForDrain } from "@/lib/services/jobs";
 import { BACKDROP_PREFIX, humanBytes, listObjectsUnder } from "@/lib/services/media";
 import { getAppSettings } from "@/lib/services/settings";
 import { mirrorsForAdmin } from "@/app/actions/mirrors";
+import { switchStateForAdmin } from "@/app/actions/mirrorSwitch";
 import { countPending, listUsers } from "@/lib/services/users";
 import type { BackdropChoice } from "@/lib/validation/backdrops";
 import { AdminTabs } from "./AdminTabs";
@@ -159,7 +160,7 @@ export default async function AdminPage({
               ? [{
                   key: "guongTram",
                   label: "Gương Trạm",
-                  pane: <MirrorPanel mirrors={await mirrorsForAdmin()} />,
+                  pane: <MirrorPanel mirrors={await mirrorsForAdmin()} switchState={await switchStateForAdmin()} />,
                 }]
               : []),
           ]}

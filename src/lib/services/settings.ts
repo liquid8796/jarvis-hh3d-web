@@ -180,6 +180,34 @@ export const appSettingsSchema = z.object({
     )
     .catch([])
     .prefault([]),
+
+  /**
+   * Máy trạng thái của lượt chuyển trạm đang diễn ra (deploy/mirror/README.md §6).
+   *
+   * Sống trong app_settings để đóng tab rồi mở lại vẫn đi tiếp được — lượt chuyển do trang
+   * admin lái từng bước, và bước nào cũng có thể là bước cuối trước khi ai đó đóng máy.
+   *
+   * `phase` KHÔNG có "flipping": lượt lật bảng điều phối là một `PutObject` nguyên tử rồi
+   * đọc lại xác nhận, nên nó hoặc xong hoặc chưa — không có khoảnh khắc nào đáng đặt tên ở
+   * giữa. Sau khi lật xong, bản ghi này đi theo dữ liệu sang trạm mới với `phase: "done"`,
+   * và chính nó là dấu vết duy nhất kể lại chuyện vừa xảy ra.
+   */
+  mirrorSwitch: z
+    .object({
+      phase: z.enum(["idle", "draining", "syncing", "verifying", "done", "failed"]).catch("idle"),
+      /** `id` trong sổ gương — trạm ĐÍCH của lượt chuyển. Rỗng khi phase = idle. */
+      targetId: z.string().max(64).catch(""),
+      startedAt: z.string().nullable().catch(null),
+      updatedAt: z.string().nullable().catch(null),
+      /** Câu chữ hiện trên trang admin: đang chép bảng nào, hỏng vì cái gì. */
+      note: z.string().max(1000).catch(""),
+      /** Chỉ số bảng đang chép trong SYNC_TABLE_ORDER, và offset trong bảng ấy. */
+      tableIndex: z.number().int().min(0).catch(0),
+      rowOffset: z.number().int().min(0).catch(0),
+      copiedRows: z.number().int().min(0).catch(0),
+    })
+    .catch({ phase: "idle", targetId: "", startedAt: null, updatedAt: null, note: "", tableIndex: 0, rowOffset: 0, copiedRows: 0 })
+    .prefault({ phase: "idle", targetId: "", startedAt: null, updatedAt: null, note: "", tableIndex: 0, rowOffset: 0, copiedRows: 0 }),
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;

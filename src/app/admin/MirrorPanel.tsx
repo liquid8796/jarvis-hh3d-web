@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { MirrorSwitchPanel } from "./MirrorSwitchPanel";
+import type { SwitchView } from "@/app/actions/mirrorSwitch";
 import {
   deleteMirrorAction,
   probeMirrorAction,
@@ -15,10 +17,12 @@ import {
  * hàng rào thật.
  *
  * Chuỗi kết nối chỉ ĐI LÊN qua form, không bao giờ đi xuống: server phát MirrorView đã che
- * (host trần), và ô sửa để trống nghĩa là "giữ phong bì cũ". Nút chuyển trạm CHƯA có mặt —
- * đó là phần 4 (máy trạng thái + đồng bộ trên VM); panel này chỉ lo cái sổ.
+ * (host trần), và ô sửa để trống nghĩa là "giữ phong bì cũ".
+ *
+ * Bảng điều khiển lượt chuyển đứng TRÊN cái sổ (MirrorSwitchPanel): lúc đang chuyển thì nó
+ * là thứ duy nhất đáng nhìn, còn lúc rảnh nó chỉ cao vài dòng.
  */
-export function MirrorPanel({ mirrors }: { mirrors: MirrorView[] }) {
+export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; switchState: SwitchView }) {
   const [saveState, saveAction, saving] = useActionState<MirrorResult | null, FormData>(saveMirrorAction, null);
   const [probeState, probeAction, probing] = useActionState<MirrorResult | null, FormData>(probeMirrorAction, null);
   const [deleteState, deleteAction, deleting] = useActionState<MirrorResult | null, FormData>(deleteMirrorAction, null);
@@ -34,6 +38,8 @@ export function MirrorPanel({ mirrors }: { mirrors: MirrorView[] }) {
           {notice.message}
         </p>
       )}
+
+      <MirrorSwitchPanel mirrors={mirrors} initial={switchState} />
 
       <section className="card card-hairline p-6">
         <h2 className="h-display mb-2 text-lg font-semibold text-gilded">Sổ gương trạm</h2>

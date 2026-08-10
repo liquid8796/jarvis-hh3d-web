@@ -11,6 +11,30 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.62.0 — máy chuyển trạm: chép, đối chiếu, rồi mới lật bảng
+
+Phần 4 của hệ gương trạm. Nút「Chuyển trạm」trên tab Gương Trạm chạy một máy trạng thái sống
+trong `app_settings.mirrorSwitch`: đóng cửa phát việc → chờ đàn cạn → chép Postgres theo
+trang + Mongo → đối chiếu từng bảng → và CHỈ khi đối chiếu xanh mới hiện nút lật bảng điều
+phối. Hỏng ở bước nào thì trạm hiện tại vẫn đang phục vụ, vì bảng chưa hề đổi.
+
+Đổi một quyết định của bản thiết kế: đồng bộ KHÔNG chạy trên VM qua giao thức khôi lỗi nữa
+mà chạy ngay trong server action, chia lô. Thứ mà "chạy trên VM" định giải quyết — trần thời
+gian của function — giải được rẻ hơn nhiều bằng chia trang, mà lại không phải thêm op vào
+giao thức, không phải cài lại VM, và credential không phải đi thêm một chặng mạng nào. Mỗi
+nhịp là một request ngắn nên thanh tiến độ là tiến độ thật, và trạng thái nằm trong database
+nên đóng tab rồi mở lại vẫn đi tiếp được.
+
+Engine (`src/lib/mirror/`) là bản sản phẩm hoá của quy trình đã chạy tay hôm nay lúc dời
+database: chép bằng `json_populate_recordset` để chính Postgres ép kiểu (jsonb, ba enum,
+`text[]`), JSON đi dưới dạng CHUỖI để `bigint`/`numeric` không qua tay `Number` của JS, chép
+theo thứ tự khoá ngoại, đặt lại sequence, rồi so MD5 nội dung — có bỏ qua hai cột nhịp tim vì
+khôi lỗi vẫn đập nhịp trong lúc chép.
+
+`verify:mirror-sync` dựng hai schema tạm trên database thật rồi xoá, nên không chạm một dòng
+nào của tông môn: 12 phép kiểm phủ jsonb/mảng có dấu phẩy/enum/khoá ngoại/numeric 18 chữ số/
+sequence/nhịp tim — và một phép kiểm "không mù": sửa một giá trị jsonb thì đối chiếu PHẢI đỏ.
+
 ## 0.61.1 — `framework: nextjs` trong vercel.json, và trạm gương đầu tiên
 
 Một dòng trong `vercel.json`, và nó là điều kiện sống của mọi trạm gương sau này: project

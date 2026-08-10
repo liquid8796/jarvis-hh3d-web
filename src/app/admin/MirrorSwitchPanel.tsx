@@ -213,7 +213,9 @@ export function MirrorSwitchPanel({ mirrors, initial }: { mirrors: MirrorView[];
               {running ? "Tạm dừng" : "Chạy tiếp"}
             </button>
           )}
-          {view.phase === "done" && (
+          {/* Đích trùng chính trạm này thì nút vô nghĩa — server cũng chặn, đây chỉ là để
+              người ta khỏi bấm vào một cú bấm không đi tới đâu. */}
+          {view.phase === "done" && !(view.currentSiteId && view.targetId === view.currentSiteId) && (
             <button
               type="button"
               className="btn btn-primary"

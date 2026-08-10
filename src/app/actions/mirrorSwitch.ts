@@ -332,6 +332,17 @@ export async function flipSwitchAction(): Promise<SwitchResult> {
   if (state.phase !== "done") {
     return { ok: false, message: `Chỉ lật được khi đối chiếu đã xanh (phase hiện tại: ${state.phase}).` };
   }
+  // Lật sang CHÍNH MÌNH là vô nghĩa, và nó đã xảy ra thật: ngày 10/08/2026 trạm vừa lên ngôi
+  // thừa hưởng một bản ghi `done` trỏ vào chính nó, nút「Lật」hiện ra, và mỗi cú bấm đẻ một
+  // revision mới trong sổ bảng điều phối (2→3→4→5) mà chẳng đổi gì. Bản ghi thừa hưởng nay là
+  // `idle` nên cửa này gần như không còn ai gõ — nhưng chặn ở server vẫn phải có, vì UI không
+  // phải nơi có thẩm quyền, và một bản ghi cũ từ deploy đời trước vẫn có thể lọt tới đây.
+  if (state.targetId && state.targetId === site.currentSiteId) {
+    return {
+      ok: false,
+      message: `Trạm này CHÍNH LÀ「${state.targetId}」— lật sang chính mình không đổi gì. Bấm「Huỷ lượt chuyển」để dọn bản ghi cũ.`,
+    };
+  }
   const entry = mirrorOf(settings, state.targetId);
 
   const workerToken = (process.env.WORKER_TOKEN ?? "").trim();
@@ -343,19 +354,34 @@ export async function flipSwitchAction(): Promise<SwitchResult> {
   }
 
   try {
-    // Tắt bảo trì Ở ĐÍCH (trạm sắp lên thay), qua chính chuỗi kết nối trong sổ.
+    // Tắt bảo trì Ở ĐÍCH (trạm sắp lên thay), qua chính chuỗi kết nối trong sổ — và cùng câu
+    // lệnh ấy, đặt lại bản ghi mirrorSwitch của đích.
     //
-    // Cùng câu lệnh, đặt luôn bản ghi mirrorSwitch CUỐI CÙNG vào đích. Thiếu chỗ này thì ý định
-    // ghi ở settings.ts («đi theo dữ liệu sang trạm mới với phase: done») không thành sự thật:
-    // `app_settings` được chép ở nhịp ĐẦU, nên cái đi theo dữ liệu là ảnh chụp lúc phase còn
-    // `syncing` — trạm mới lên ngôi mang theo một lượt chuyển ma còn dang dở, và ai bấm
-    // 「Chạy tiếp」trên đó sẽ khởi động lại một lượt không có thật (chỉ `canSwitch` chặn giữa nó
-    // và một lượt tự-chép-đè-chính-mình — đừng để hàng rào cuối cùng phải gánh một mình).
+    // Cả hai đều phải ghi TẠI ĐÂY chứ không trông vào lượt chép: `app_settings` chép ở một nhịp
+    // nào đó rồi thôi, nên cái đi theo dữ liệu là ảnh chụp giữa chừng — trạm mới lên ngôi với
+    // một lượt chuyển ma còn dang dở, và ai bấm「Chạy tiếp」trên đó sẽ khởi động lại một lượt
+    // không có thật (chỉ `canSwitch` chặn giữa nó và một lượt tự-chép-đè-chính-mình — đừng để
+    // hàng rào cuối cùng phải gánh một mình).
     const dest = connect(decryptSecret(entry.pg));
-    const record = {
-      ...state,
+    // Trạm mới thức dậy ở `idle`, KHÔNG phải `done`. Diễn tập 10/08/2026 cho thấy vì sao: bản
+    // ghi chép sang mang phase nào thì trạm mới đội phase ấy, mà `beginSwitchAction` chỉ mở
+    // lượt từ `idle`/`failed` — nên trạm vừa lên ngôi lại không mở nổi lượt kế cho tới khi có
+    // người bấm「Huỷ」. Trái hẳn tinh thần promote: trạm được cất nhắc phải sẵn sàng NGAY.
+    //
+    // Tệ hơn, một phase còn dang dở (`done`, hay `syncing` như bản trước nữa) làm nút「Lật」
+    // hiện ra trên chính trạm đích, trỏ vào chính nó — đó là nguồn gốc của chuỗi revision
+    // 2→3→4→5 trong sổ hôm ấy, mỗi cú bấm một lần lật sang chính mình.
+    //
+    // Lịch sử không mất: nó nằm trong `note`, và dấu vết có thẩm quyền là bảng điều phối.
+    const record: AppSettings["mirrorSwitch"] = {
+      phase: "idle",
+      targetId: "",
+      startedAt: null,
       updatedAt: new Date().toISOString(),
-      note: `Lượt chuyển từ「${site.activeSiteId}」sang「${entry.id}」đã hoàn tất. Bản ghi này là dấu vết của lượt ấy.`,
+      note: `Trạm này vừa được cất nhắc từ「${site.activeSiteId}」lúc ${new Date().toISOString()}. Sẵn sàng cho lượt chuyển kế.`,
+      tableIndex: 0,
+      rowOffset: 0,
+      copiedRows: 0,
     };
     await dest.query(
       `update app_settings

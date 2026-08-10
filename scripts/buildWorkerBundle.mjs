@@ -47,6 +47,10 @@ try {
       'import { profileDirForJob, sweepStaleProfiles } from "../src/lib/quest-engine/browserProfile.mjs";',
       'import { profileDirForJob, sweepStaleProfiles } from "./quest-engine/browserProfile.mjs";',
     ],
+    [
+      'import { createWorkerCall } from "../src/lib/worker/controlFollow.mjs";',
+      'import { createWorkerCall } from "./controlFollow.mjs";',
+    ],
   ];
   let bundledWorker = workerSource;
   for (const [needle, replacement] of importRewrites) {
@@ -61,6 +65,14 @@ try {
   writeFileSync(
     path.join(staging, "worker.mjs"),
     bundledWorker,
+  );
+
+  // 2a. Lời gọi biết đi theo bảng điều phối. Đi cùng gói vì khôi lỗi máy nhà cũng phải theo
+  //     được trạm mới — thiếu nó thì mỗi lượt chuyển trạm bỏ lại toàn bộ đàn ở trạm cũ. Đặt
+  //     phẳng cạnh worker.mjs, đúng lời hứa "giải nén ra là thấy worker.mjs ngay".
+  cpSync(
+    path.join(root, "src", "lib", "worker", "controlFollow.mjs"),
+    path.join(staging, "controlFollow.mjs"),
   );
 
   // 2. Toàn bộ quest-engine — engine + profile.json là MỘT khối, thiếu profile là engine

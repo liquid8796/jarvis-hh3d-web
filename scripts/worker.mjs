@@ -26,6 +26,7 @@ import { fileURLToPath } from "node:url";
 import { mkdir } from "node:fs/promises";
 import { runCycle } from "../src/lib/quest-engine/runCycle.mjs";
 import { profileDirForJob, sweepStaleProfiles } from "../src/lib/quest-engine/browserProfile.mjs";
+import { createWorkerCall } from "../src/lib/worker/controlFollow.mjs";
 
 const WEB_URL = (process.env.WEB_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const TOKEN = process.env.WORKER_TOKEN;
@@ -53,20 +54,11 @@ if (!TOKEN || TOKEN === "change-me") {
   process.exit(1);
 }
 
-/** Mọi thao tác đều là một POST tới cùng một endpoint; ở đây gói lại cho gọn. */
-async function call(op, payload = {}) {
-  const res = await fetch(`${WEB_URL}/api/worker`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
-    body: JSON.stringify({ op, ...payload }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`${op} → HTTP ${res.status} ${await res.text()}`);
-  }
-
-  return res.json();
-}
+// Mọi thao tác đều là một POST tới cùng một endpoint. Hàm gọi nằm ở controlFollow.mjs vì nó
+// mang thêm một trách nhiệm không hiển nhiên: ĐI THEO trạm hoạt động khi bảng điều phối lật.
+// Trạm đã nghỉ trả 409 kèm `activeUrl`; thiếu đoạn ấy thì mỗi lượt chuyển trạm bỏ lại toàn bộ
+// đàn ở trạm cũ — đúng chuyện đã xảy ra ngày 10/08/2026.
+const { call, currentUrl } = createWorkerCall({ webUrl: WEB_URL, token: TOKEN });
 
 const say = (jobId, message, level = "info") =>
   // Engine nói "warn", giao thức nói "warning" — dịch ở đây, một chỗ duy nhất. Không dịch
@@ -185,7 +177,10 @@ async function handle(job) {
   }
 }
 
-console.log(`Khôi lỗi「${WORKER_ID}」đang canh ${WEB_URL} (tối đa ${MAX_JOBS} đàn cùng lúc)`);
+console.log(
+  `Khôi lỗi「${WORKER_ID}」đang canh ${currentUrl()} (tối đa ${MAX_JOBS} đàn cùng lúc). ` +
+    "Trạm nghỉ trả 409 kèm địa chỉ trạm mới thì tự đi theo.",
+);
 
 // Nhiều job cùng lúc, mỗi job một Chromium — để một đạo hữu nuôi nhiều tài khoản thấy cả
 // đội chạy song song thay vì xếp hàng sau lưng nhau. `running` giữ các lượt đang bận; còn

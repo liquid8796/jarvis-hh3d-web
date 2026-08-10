@@ -11,6 +11,42 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.64.0 — khôi lỗi đi theo trạm, và ba vết diễn tập để lại
+
+Diễn tập chuyển trạm đi-và-về đã chạy trọn (số đo ở `deploy/mirror/README.md` §14). Bản này vá
+những gì nó lôi ra.
+
+**Khôi lỗi không đi theo bảng điều phối — lỗ hổng nặng nhất, và nó chưa từng được viết.** §8 của
+thiết kế ghi「VM: thêm vòng đọc bảng điều phối」nhưng phần 4 chỉ làm việc đồng bộ, không làm việc
+đi theo. Hậu quả đo được: web đã sang trạm gương, người dùng vào được, mà `tong-mon-khoiloi` nằm
+im 20 phút — `WEB_URL` là hằng số trong env của nó, gặp 409 thì ném rồi ngủ 5 giây rồi gõ lại
+đúng cửa cũ. Ai có khôi lỗi riêng thì vẫn chạy; ai không có thì không được phục vụ.
+
+Bản thiết kế đầu còn SAI ở cách chữa: đọc bảng thì phải xác minh chữ ký, mà khoá ký là
+`WORKER_TOKEN` của deployment — khôi lỗi máy nhà cầm linh phù cá nhân không có nó. Nên khôi lỗi
+**đi theo 409** thay vì tự đọc bảng: trạm đã nghỉ phát 409 kèm `activeUrl` cho MỌI khôi lỗi, lấy
+từ bảng nó vừa xác minh. Một đường, dùng chung cho cả hai vai, không thêm cấu hình nào.
+
+Chỗ dễ vào sai nhất nằm ở chính con số 409: `/api/worker` cũng trả 409 cho「job is no longer
+active」. Dấu hiệu để đi theo vì thế KHÔNG phải mã trạng thái mà là có một `activeUrl` https hợp
+lệ và khác chỗ đang đứng — đi theo nhầm loại kia là biến một lỗi nghiệp vụ thành một cú đổi trạm.
+Chỉ nhận https vì khôi lỗi gửi token theo mọi request, nên địa chỉ nền quyết định token đi về đâu.
+Thử lại đúng MỘT lần, không ghi nhớ xuống đĩa (khởi động lại là đọc `WEB_URL` rồi lại đi theo).
+`verify:worker-follow`: 23 phép bằng `fetch` giả — không cần mạng, không cần trạm nào phải nghỉ.
+
+**Trạm vừa lên ngôi nay thức dậy ở `phase: idle`.** Bản trước để nó thừa hưởng phase dở dang, nên
+trạm được cất nhắc lại không mở nổi lượt chuyển kế (`beginSwitchAction` chỉ nhận `idle`/`failed`)
+cho tới khi có người bấm「Huỷ」— trái hẳn tinh thần promote. Lịch sử không mất, nó nằm trong `note`;
+dấu vết có thẩm quyền vẫn là bảng điều phối.
+
+**Chặn lượt lật sang chính mình.** Bản ghi `done` trỏ vào chính trạm đang đứng làm nút「Lật」hiện
+ra, và mỗi cú bấm đẻ một revision mới chẳng đổi gì — sổ bảng điều phối hôm ấy nhảy 2→3→4→5 vì thế.
+Chặn ở server (nơi có thẩm quyền), ẩn ở UI (cho khỏi bấm hụt).
+
+Kèm một bẫy im lặng vừa lộ khi soát: hướng dẫn cài đè engine trên VM dò thay đổi bằng một danh
+sách đường dẫn KHÔNG có `src/lib/worker`, nên từ nay ai chỉ sửa tệp ấy sẽ thấy diff trống rồi bỏ
+qua bước cài, và VM chạy mã cũ mà không ai biết. Đã thêm vào danh sách.
+
 ## 0.63.1 — lượt diễn tập đầu tiên gãy: một luật tên database bị chép làm hai bản
 
 Bấm chuyển trạm thật lần đầu. Chép xong **11.458 dòng** Postgres rồi gục ở bước Mongo:

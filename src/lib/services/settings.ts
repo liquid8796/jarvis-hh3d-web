@@ -189,8 +189,14 @@ export const appSettingsSchema = z.object({
    *
    * `phase` KHÔNG có "flipping": lượt lật bảng điều phối là một `PutObject` nguyên tử rồi
    * đọc lại xác nhận, nên nó hoặc xong hoặc chưa — không có khoảnh khắc nào đáng đặt tên ở
-   * giữa. Sau khi lật xong, bản ghi này đi theo dữ liệu sang trạm mới với `phase: "done"`,
-   * và chính nó là dấu vết duy nhất kể lại chuyện vừa xảy ra.
+   * giữa.
+   *
+   * Trạm VỪA ĐƯỢC CẤT NHẮC thức dậy ở `phase: "idle"`, không phải `"done"` — `flipSwitchAction`
+   * ghi thẳng bản ghi ấy vào đích. Bản trước để nó thừa hưởng phase dở dang và đã trả giá trong
+   * lượt diễn tập 10/08/2026: trạm mới lên ngôi mà không mở nổi lượt chuyển kế (vì
+   * `beginSwitchAction` chỉ nhận `idle`/`failed`), lại còn hiện nút「Lật」trỏ vào chính nó. Trạm
+   * CŨ thì giữ `"done"` — với nó, lượt ấy đã xong thật, và đó là dấu vết kể lại chuyện vừa qua.
+   * Dấu vết CÓ THẨM QUYỀN vẫn là bảng điều phối, không phải bản ghi này.
    */
   mirrorSwitch: z
     .object({

@@ -193,8 +193,12 @@ Token đọc từ chính `.env` trên VM nên không phải mang bí mật qua m
 **Chỉ chạy khi patch có đụng engine**, kiểm bằng:
 
 ```bash
-git diff --stat <thẻ-cũ>..HEAD -- scripts/worker.mjs src/lib/quest-engine scripts/buildWorkerBundle.mjs
+git diff --stat <thẻ-cũ>..HEAD -- scripts/worker.mjs src/lib/quest-engine src/lib/worker scripts/buildWorkerBundle.mjs
 ```
+
+Danh sách đường dẫn ấy PHẢI phủ đúng những gì `buildWorkerBundle.mjs` nhét vào gói — `src/lib/worker`
+vào danh sách ngày 10/08/2026 cùng lúc với `controlFollow.mjs`. Thêm tệp vào gói mà quên thêm vào
+đây thì phép dò trả về trống, người ta bỏ qua bước cài, và VM chạy mã cũ trong im lặng.
 
 Trống thì **đừng chạy**: cài đè là restart service, và restart giữa chừng thì giết job đang chạy.
 Số `version` trong `/opt/auto-hh3d/linh-su/package.json` thấp hơn web là **bình thường** — nó

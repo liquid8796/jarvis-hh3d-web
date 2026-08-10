@@ -160,8 +160,21 @@ phát việc đóng trong lúc chuyển (đo 10/08: ~12 phút cả chờ đàn).
 
 ## 8. Khôi lỗi + Object Storage (phần KHÔNG đổi)
 
-- VM: thêm vòng đọc bảng điều phối như §6. `WORKER_TOKEN`/`WORKER_ID` giữ nguyên — bảng
-  `workers` đồng bộ theo nên trạm mới nhận ra khôi lỗi cũ ngay nhịp tim đầu.
+- Khôi lỗi **đi theo `409`, KHÔNG tự đọc bảng** (`src/lib/worker/controlFollow.mjs`). Bản thiết
+  kế đầu ghi「VM: thêm vòng đọc bảng điều phối」và điều đó SAI: khoá xác minh chữ ký chính là
+  `WORKER_TOKEN` của deployment, mà khôi lỗi máy nhà cầm linh phù cá nhân thì không có nó — cả
+  một nhánh khôi lỗi sẽ không đọc nổi bảng. Còn 409 thì trạm đã nghỉ phát cho MỌI khôi lỗi, kèm
+  sẵn `activeUrl` lấy từ bảng nó vừa xác minh. Gặp 409 có `activeUrl` https khác chỗ đang đứng
+  thì đổi địa chỉ nền rồi thử lại **đúng một lần**; không ghi nhớ xuống đĩa, khởi động lại là
+  đọc `WEB_URL` từ env rồi lại đi theo. `WORKER_TOKEN`/`WORKER_ID` giữ nguyên — bảng `workers`
+  đồng bộ theo nên trạm mới nhận ra khôi lỗi cũ ngay nhịp tim đầu.
+  - **Phân biệt hai loại 409**: `/api/worker` cũng trả 409 cho「job is no longer active」. Dấu
+    hiệu để đi theo là CÓ `activeUrl` hợp lệ, không phải mã trạng thái. `verify:worker-follow`
+    giữ chỗ này (23 phép, chạy bằng `fetch` giả — không cần mạng, không cần trạm nào phải nghỉ).
+  - Chỉ nhận `https://`: khôi lỗi gửi token theo mọi request, nên địa chỉ nền quyết định token
+    đi về đâu. Bảng chỉ chứa https nên siết ở đây không bỏ sót ca hợp lệ nào.
+  - Giới hạn còn nguyên: trạm cũ chết HẲN thì không ai phát 409 — xem §11, lời giải là custom
+    domain, không phải thêm mã ở worker.
 - Media: URL công khai `objectstorage.…oraclecloud.com/...` nằm trong tin nhắn đã lưu —
   đổi trạm không làm vỡ một ảnh nào, vì bucket không đổi. Khoá ghi (`OCI_*`) nằm trong env
   của mọi trạm.
@@ -260,8 +273,8 @@ migration? URL trả 200?). Trạm nằm im ở chế độ chuyển hướng ch
 3. **Sổ gương + trang admin** (tab「Gương Trạm」, probe, migration quyền `site.switch`).
 4. **Việc đồng bộ trên VM** (sản phẩm hoá cặp copy/verify 10/08 thành module dùng chung
    `scripts/mirrorSync/`) + op mới trong `/api/worker` + máy trạng thái + panel tiến độ.
-5. **Diễn tập**: dựng một mirror thật trên tài khoản phụ, chuyển đi — chuyển về, đo đồng hồ
-   từng bước, ghi số vào đây thay cho các con số ước lượng.
+5. **Diễn tập** ✔ xong 10/08/2026 — chuyển đi rồi chuyển về trên hai trạm sống. Số đo, ba lỗi
+   nó lôi ra, và hai bài học vận hành nằm ở §14.
 
 ## 13. Đo thật trên hai trạm sống (10/08/2026)
 
@@ -287,3 +300,60 @@ của Atlas (`querySrv ECONNREFUSED`, bệnh đã biết), nên probe dưới m�
 khi PG ✔ 22 migration. Probe THẬT chạy trong server action trên Vercel nên không dính bệnh
 ấy; muốn xác nhận thì bấm「Kiểm mạch」trên trang admin — `npm run shot` chỉ nhận một `--click`
 nên không tự bấm hộ được (mở tab đã tốn cú bấm duy nhất).
+
+## 14. DIỄN TẬP THẬT — đi và về (10/08/2026)
+
+Chuyển `main` → `auto-hh3d-1` rồi từ chính trạm gương chuyển ngược về `main`. Bốn lượt bấm:
+ba lượt đầu gãy và mỗi lượt lôi ra một lỗi thật, lượt thứ tư đi trọn.
+
+### Đồng hồ từng bước
+
+| Bước | Chặng đi | Chặng về |
+|---|---|---|
+| Chờ đàn cạn | 0s (cạn sẵn) | **47s** (2 đàn chạy nốt vòng) |
+| Chép 11 bảng (~11.500 dòng) + Mongo | 23s | 26s |
+| Đối chiếu 11 bảng | 23s | 9s |
+| **Bấm → sẵn sàng lật** | **46s** | **82s** |
+
+**Con số ~12 phút đo ngày 10/08 gần như TOÀN BỘ là chờ đàn cạn, không phải chép.** Việc chép
+và đối chiếu 11.500 dòng tốn dưới 40 giây mỗi chiều. Ai muốn rút ngắn bế quan thì vặn ở chỗ
+hàng đợi, đừng tối ưu bước chép.
+
+Tổng bế quan hôm ấy là 73 phút (16:01 → 17:14), nhưng đó là giá của ba lượt gãy cộng ba bản vá
+giữa chừng — không phải giá của một lượt chuyển.
+
+### Ba lỗi chỉ lộ ra khi chạy thật
+
+Cả ba đều nằm dưới một lớp kiểm tra đang báo xanh, và đó là điểm chung đáng nhớ nhất:
+
+1. **Tên database Mongo** — `mongoSync.ts` chép lại luật thành một bản khắt khe hơn bản thật;
+   chuỗi Atlas không có tên database bao giờ. Xanh 12/12 vì fixture nào cũng có path. (§9 bẫy 4)
+2. **`app_settings` tự tham chiếu** — máy chuyển trạm ghi tiến độ vào đúng bảng nó đang chép,
+   nên đối chiếu không bao giờ khớp. Vá vòng một loại `value.mirrorSwitch` nhưng **bỏ sót cột
+   `updated_at`**, và bỏ sót vì bảng giả trong phép kiểm chỉ có `(id, value)` — lại là bẫy
+   fixture, vấp hai lần trong một buổi. Nay `app_settings` chép CUỐI và loại cả hai thứ.
+3. **Khôi lỗi không đi theo bảng** — §8 chưa từng được thực thi. Web đã sang trạm mới, người
+   dùng vào được, nhưng `tong-mon-khoiloi` im 20 phút vì `WEB_URL` là hằng số. Ai có khôi lỗi
+   riêng thì vẫn chạy; ai không có thì không được phục vụ. Xem §8 cho bản vá.
+
+### Hai điều về vận hành, học bằng cách trả giá
+
+- **Đừng sửa cài đặt gì trong lúc lượt chuyển đang chạy** — kể cả ghi chú bế quan. `app_settings`
+  chép xong là bản sao đứng yên; sửa nguồn sau đó thì đối chiếu đỏ, **và đỏ đúng** (bản sao đã
+  cũ thật). Đặt `app_settings` ở cuối co cửa sổ ấy lại còn thời gian bước đối chiếu, nhưng nó
+  không bao giờ về 0. Muốn đổi lời nhắn cho người dùng thì đổi TRƯỚC khi bấm.
+- **Trạm vừa lên ngôi phải sẵn sàng ngay.** Bản đầu để nó thừa hưởng phase dở dang nên không mở
+  nổi lượt kế, lại hiện nút「Lật」trỏ vào chính nó — revision nhảy 2→3→4→5 vì thế. Nay đích nhận
+  `phase: idle` kèm lời kể, và `flipSwitchAction` chặn thẳng lượt lật sang chính mình.
+
+### Điều diễn tập đã CHỨNG MINH
+
+- Đối chiếu nội dung bắt được sai sót thật, không phải phép đếm dòng trang trí.
+- **`ENCRYPTION_KEY` hai trạm khớp nhau** — chặng về là bằng chứng: trạm gương tự giải mã chuỗi
+  kết nối của `main` từ sổ rồi chép ngược. API Vercel không cho đọc giá trị biến `encrypted`
+  nên không có cách nào kiểm từ ngoài; chỉ chạy thật mới trả lời được.
+- **`WORKER_TOKEN` hai trạm khớp nhau** — kiểm từ ngoài được: token bịa → 401, token trạm chính
+  → 400 (sai định dạng). Xác thực chạy trước kiểm định dạng nên 400 chính là bằng chứng.
+- **Không mất một dòng dữ liệu nào.** Main 11.173 dòng trước khi đi; gương tích lên 11.262 khi
+  cầm bút; chặng về chép ngược đủ, cộng thêm phần sinh sau khi lật về ra đúng 11.302.
+- Mô hình promote đứng vững: trạm được cất nhắc TỰ nó phát lệnh chuyển đi được.

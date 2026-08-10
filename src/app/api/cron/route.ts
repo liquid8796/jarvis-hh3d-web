@@ -1,17 +1,21 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { purgeExpiredChat } from "@/lib/services/chat";
-import { reapStaleJobs } from "@/lib/services/jobs";
+import { purgeExpiredJobEvents, reapStaleJobs } from "@/lib/services/jobs";
 
 /**
  * Người quét dọn — và CHỈ quét dọn.
  *
  * Từ khi mọi lượt chạy đều do một worker sống dai đảm nhiệm (khôi lỗi tông môn trên VM,
  * hoặc khôi lỗi máy nhà của đạo hữu), không còn ai cần được "gõ cửa đánh thức" nữa: worker
- * tự hỏi việc mỗi 5 giây. Route này chỉ còn hai việc vệ sinh — kết liễu job đang chạy mất
- * nhịp tim, và quét tin đàm đạo quá hạn lưu. Cả hai đều được gọi TIỆN ĐƯỜNG từ
- * đường đọc của dashboard rồi, nên cron ngoài giờ là lưới an toàn cho những ngày không ai
- * mở web, không phải mạch sống của hệ thống.
+ * tự hỏi việc mỗi 5 giây. Route này chỉ còn ba việc vệ sinh — kết liễu job đang chạy mất
+ * nhịp tim, quét tin đàm đạo quá hạn lưu, và quét nhật ký đàn quá hạn lưu. Hai việc đầu còn
+ * được gọi TIỆN ĐƯỜNG từ đường đọc của dashboard, nên với chúng cron ngoài giờ là lưới an
+ * toàn cho những ngày không ai mở web, không phải mạch sống của hệ thống.
+ *
+ * Việc thứ ba thì KHÔNG có đường đi kèm nào — nó là xoá hàng loạt, không đáng đặt trên đường
+ * đi nóng của một trang. Với nó, cron LÀ mạch sống: cron không chạy thì `job_events` phình vô
+ * hạn, và mỗi lượt chuyển trạm dài ra theo (deploy/mirror/README.md §11).
  *
  * Gọi từ đâu cũng được, miễn là mang đúng `Authorization: Bearer CRON_SECRET`:
  *   • Vercel Cron — tự gắn header ấy khi project có biến `CRON_SECRET`; gói Hobby chỉ
@@ -46,7 +50,11 @@ export async function GET(request: Request) {
   }
 
   await reapStaleJobs();
-  await purgeExpiredChat();
+  const chat = await purgeExpiredChat();
+  // Nhật ký đàn quá hạn — van xả duy nhất giữ cho lượt chuyển trạm không dài ra theo năm tháng.
+  // Trả số ra ngoài để một lượt curl là biết nó có thật sự dọn được gì không; `more: true` nghĩa
+  // là còn nợ, lượt cron sau dọn tiếp.
+  const events = await purgeExpiredJobEvents();
 
-  return NextResponse.json({ ok: true, swept: true });
+  return NextResponse.json({ ok: true, swept: true, chat: chat.purged, jobEvents: events });
 }

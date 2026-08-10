@@ -214,6 +214,22 @@ export const appSettingsSchema = z.object({
     })
     .catch({ phase: "idle", targetId: "", startedAt: null, updatedAt: null, note: "", tableIndex: 0, rowOffset: 0, copiedRows: 0 })
     .prefault({ phase: "idle", targetId: "", startedAt: null, updatedAt: null, note: "", tableIndex: 0, rowOffset: 0, copiedRows: 0 }),
+
+  /**
+   * Hạn lưu NHẬT KÝ ĐÀN — van xả mà `deploy/mirror/README.md` §11 đã ghi trước là sẽ cần.
+   *
+   * `job_events` chỉ đi một chiều, và nó là bảng LỚN NHẤT trong lượt chuyển trạm: đo 10/08/2026
+   * là 12.038 dòng cho 9 ngày, mà đỉnh tới 9.674 dòng MỘT ngày. Giữ mãi thì sau một tháng là
+   * ~290 nghìn dòng, và bước chép sẽ từ 26 giây phình thành hàng chục phút — tức mỗi lượt
+   * chuyển trạm là một lượt bế quan dài ra theo tuổi của tông môn.
+   *
+   * Mặc định 7 ngày, TRÙNG với hạn lưu sảnh đàm đạo có chủ ý: một khái niệm「hạn lưu」duy nhất
+   * cho cả hệ, không phải hai con số phải nhớ. Nới lên thì nhật ký giữ lâu hơn, đổi lại lượt
+   * chuyển trạm chậm đi theo — đó là toàn bộ sự đánh đổi, và nó nằm ở đúng một chỗ này.
+   */
+  jobEvents: z
+    .object({ retentionDays: z.number().int().min(1).max(365).default(7) })
+    .prefault({ retentionDays: 7 }),
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;

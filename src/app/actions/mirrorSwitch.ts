@@ -24,6 +24,7 @@ import {
   verifyTable,
 } from "@/lib/mirror/pgSync";
 import { syncMongo } from "@/lib/mirror/mongoSync";
+import { resetPromotedStation } from "@/lib/mirror/promote";
 import { canFlip, canSwitch } from "@/lib/mirror/switchGuard";
 
 /**
@@ -347,43 +348,12 @@ export async function flipSwitchAction(): Promise<SwitchResult> {
   }
 
   try {
-    // Tắt bảo trì Ở ĐÍCH (trạm sắp lên thay), qua chính chuỗi kết nối trong sổ — và cùng câu
-    // lệnh ấy, đặt lại bản ghi mirrorSwitch của đích.
-    //
-    // Cả hai đều phải ghi TẠI ĐÂY chứ không trông vào lượt chép: `app_settings` chép ở một nhịp
-    // nào đó rồi thôi, nên cái đi theo dữ liệu là ảnh chụp giữa chừng — trạm mới lên ngôi với
-    // một lượt chuyển ma còn dang dở, và ai bấm「Chạy tiếp」trên đó sẽ khởi động lại một lượt
-    // không có thật (chỉ `canSwitch` chặn giữa nó và một lượt tự-chép-đè-chính-mình — đừng để
-    // hàng rào cuối cùng phải gánh một mình).
-    const dest = connect(decryptSecret(entry.pg));
-    // Trạm mới thức dậy ở `idle`, KHÔNG phải `done`. Diễn tập 10/08/2026 cho thấy vì sao: bản
-    // ghi chép sang mang phase nào thì trạm mới đội phase ấy, mà `beginSwitchAction` chỉ mở
-    // lượt từ `idle`/`failed` — nên trạm vừa lên ngôi lại không mở nổi lượt kế cho tới khi có
-    // người bấm「Huỷ」. Trái hẳn tinh thần promote: trạm được cất nhắc phải sẵn sàng NGAY.
-    //
-    // Tệ hơn, một phase còn dang dở (`done`, hay `syncing` như bản trước nữa) làm nút「Lật」
-    // hiện ra trên chính trạm đích, trỏ vào chính nó — đó là nguồn gốc của chuỗi revision
-    // 2→3→4→5 trong sổ hôm ấy, mỗi cú bấm một lần lật sang chính mình.
-    //
-    // Lịch sử không mất: nó nằm trong `note`, và dấu vết có thẩm quyền là bảng điều phối.
-    const record: AppSettings["mirrorSwitch"] = {
-      phase: "idle",
-      targetId: "",
-      startedAt: null,
-      updatedAt: new Date().toISOString(),
-      note: `Trạm này vừa được cất nhắc từ「${site.activeSiteId}」lúc ${new Date().toISOString()}. Sẵn sàng cho lượt chuyển kế.`,
-      tableIndex: 0,
-      rowOffset: 0,
-      copiedRows: 0,
-    };
-    await dest.query(
-      `update app_settings
-          set value = jsonb_set(jsonb_set(value, '{maintenance}', $1::jsonb, true), '{mirrorSwitch}', $2::jsonb, true)`,
-      [
-        JSON.stringify({ active: false, startedAt: null, expectedEndAt: null, note: "" }),
-        JSON.stringify(record),
-      ],
-    );
+    // Dọn trạm SẮP LÊN THAY: tắt bế quan + đặt mirrorSwitch về idle. Luật nằm ở
+    // mirror/promote.ts vì `mirror:control set` — đường thoát hiểm bằng dòng lệnh — phải để
+    // lại đúng trạng thái ấy; hai đường lật mà dọn khác nhau là một cái bẫy đặt đúng vào lúc
+    // tệ nhất. Ghi TRƯỚC khi lật bảng: lật xong mới dọn thì tông môn sang trạm mới và gặp
+    // ngay bảng bế quan của chính lượt chuyển vừa xong.
+    await resetPromotedStation(connect(decryptSecret(entry.pg)), site.activeSiteId);
 
     const current = await readControlDoc();
     const doc: ControlDoc = signControlDoc(

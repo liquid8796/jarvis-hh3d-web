@@ -62,6 +62,35 @@ if (mode === "set") {
   const current = await readControlDoc();
   const revision = (current?.revision ?? 0) + 1;
 
+  // Dọn trạm sắp lên thay TRƯỚC khi lật — cùng luật với nút「Lật」trên trang admin
+  // (mirror/promote.ts giải thích vì sao phải là một luật chung).
+  //
+  // KHÔNG ĐƯỢC PHÉP CHẶN LƯỢT LẬT. Lệnh này là đường thoát hiểm: nó tồn tại cho đúng cái ngày
+  // trạm chính chết hẳn, mà ngày ấy `DATABASE_URL` dưới máy trỏ vào chính cái xác ấy nên đọc
+  // sổ sẽ hỏng. Hỏng thì kêu to rồi đi tiếp — một trạm lên ngôi mang theo bảng bế quan vẫn hơn
+  // một tông môn không có trạm nào.
+  let cleanup = "";
+  try {
+    const dbUrl = (process.env.DATABASE_URL ?? "").trim();
+    if (!dbUrl) throw new Error("thiếu DATABASE_URL nên không đọc được sổ gương");
+    const { neon } = await import("@neondatabase/serverless");
+    const rows = (await neon(dbUrl)`select value from app_settings where id = 'global'`) as { value: unknown }[];
+    const book = ((rows[0]?.value ?? {}) as { mirrors?: { id: string; pg: string }[] }).mirrors ?? [];
+    const entry = book.find((m) => m.id === site);
+    if (!entry) throw new Error(`sổ gương không có entry「${site}」`);
+    const { decryptSecret } = await import("../src/lib/crypto/secretBox");
+    const { resetPromotedStation } = await import("../src/lib/mirror/promote");
+    await resetPromotedStation(neon(decryptSecret(entry.pg)), current?.activeSiteId || "(không rõ)");
+    cleanup = `✔ đã tắt bế quan + đặt mirrorSwitch về idle ở「${site}」`;
+  } catch (err) {
+    cleanup =
+      `⚠ KHÔNG dọn được「${site}」(${err instanceof Error ? err.message : "lỗi lạ"}).\n` +
+      `  Vẫn lật bảng. Nhưng nếu trạm ấy đang mang bế quan của lượt chuyển trước thì nó lên ngôi\n` +
+      `  trong tình trạng đóng cửa — vào /admin của nó tắt bảo trì, hoặc chạy tay:\n` +
+      `  update app_settings set value = jsonb_set(value,'{maintenance}','{\"active\":false,\"startedAt\":null,\"expectedEndAt\":null,\"note\":\"\"}'::jsonb,true);`;
+  }
+  console.log(`• ${cleanup}`);
+
   const doc: ControlDoc = signControlDoc(
     {
       revision,

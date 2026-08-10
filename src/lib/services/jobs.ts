@@ -910,6 +910,53 @@ export async function reapStaleJobs(): Promise<void> {
 
 }
 
+/** Một lô xoá. Đủ nhỏ để một câu lệnh không giữ khoá lâu, đủ lớn để không phải chạy trăm lượt. */
+export const JOB_EVENT_PURGE_BATCH = 5_000;
+/** Trần lô mỗi lượt quét: 50 nghìn dòng — gấp năm lần nhịp sinh cao nhất đo được (9.674/ngày). */
+const JOB_EVENT_PURGE_MAX_BATCHES = 10;
+
+/**
+ * Quét nhật ký đàn quá hạn lưu — van xả của `deploy/mirror/README.md` §11.
+ *
+ * `job_events` là bảng lớn nhất trong một lượt chuyển trạm và nó chỉ đi một chiều; không có
+ * van này thì mỗi lượt chuyển trạm dài ra theo tuổi của tông môn (xem `settings.ts`, khoá
+ * `jobEvents.retentionDays`, cho cả phép đo lẫn sự đánh đổi).
+ *
+ * XOÁ THEO LÔ chứ không một câu lệnh: một `delete` chạm hàng trăm nghìn dòng trên kết nối
+ * serverless là một câu lệnh dài vô định, và nó chạy trong cùng function 60 giây với hai việc
+ * quét khác. Hết trần lô thì để dành cho lượt sau — `more: true` nói rõ còn nợ, và vì hạn lưu
+ * là một mốc thời gian tuyệt đối nên lượt sau dọn tiếp đúng chỗ vừa dừng.
+ *
+ * KHÔNG chừa job đang chạy: một lượt sống lâu hơn hạn lưu sẽ mất phần nhật ký cũ của chính
+ * nó, và đó đúng là ý nghĩa của「hạn lưu」— dòng nhật ký hết hạn thì hết hạn, bất kể ai sinh
+ * ra nó. Bản thân job không hề hấn gì (khoá ngoại chỉ đi một chiều từ event sang job).
+ *
+ * CHỈ gọi từ cron, khác `reapStaleJobs` vốn đi kèm mọi lượt đọc dashboard: đây là xoá hàng
+ * loạt, không phải thứ đáng đặt trên đường đi nóng của một trang.
+ */
+export async function purgeExpiredJobEvents(): Promise<{ purged: number; more: boolean }> {
+  const { jobEvents } = await getAppSettings();
+  const cutoff = new Date(Date.now() - jobEvents.retentionDays * 24 * 3600 * 1000);
+
+  let purged = 0;
+  for (let batch = 0; batch < JOB_EVENT_PURGE_MAX_BATCHES; batch++) {
+    // `returning id` rồi đếm hàng, thay vì tin vào `rowCount` — trường ấy tuỳ driver, còn số
+    // hàng trả về thì không.
+    const gone = await db().execute(sql`
+      delete from job_events
+       where id in (
+         select id from job_events where at < ${cutoff} order by id limit ${JOB_EVENT_PURGE_BATCH}
+       )
+      returning id
+    `);
+    const n = gone.rows.length;
+    purged += n;
+    // Lô chưa đầy nghĩa là đã vét sạch phần quá hạn — dừng, đừng chạy thêm một câu lệnh rỗng.
+    if (n < JOB_EVENT_PURGE_BATCH) return { purged, more: false };
+  }
+  return { purged, more: true };
+}
+
 /**
  * Toàn cảnh drain cho tab Bảo Trì: bao nhiêu đàn còn chạy nốt vòng (running + stopping),
  * bao nhiêu đàn nằm chờ mà cửa claim sẽ không phát ra. Trưởng môn nhìn số "đang chạy" về 0

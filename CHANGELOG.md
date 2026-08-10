@@ -11,6 +11,40 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.65.0 — vá đường thoát hiểm, và van xả cho nhật ký đàn
+
+**Đường lật bằng dòng lệnh không dọn trạm đích — bẫy đặt đúng vào lúc tệ nhất.** Có hai đường
+lật bảng điều phối: nút trên trang admin, và `mirror:control set`. Đường thứ hai tồn tại cho
+đúng cái ngày trạm chính chết hẳn và không còn trang admin nào để bấm — mà nó chỉ ghi bảng,
+không tắt bế quan, không đặt lại `mirrorSwitch`. Trạm được cất nhắc bằng dòng lệnh vì thế lên
+ngôi mang nguyên trạng thái bế quan của lượt chuyển trước: không phục vụ ai, giữa lúc trạm
+chính vừa chết. Đo được ngay sau diễn tập — trạm gương vẫn mang `maintenance.active = true`
+từ 17:10 và sẽ mang mãi tới lượt promote kế.
+
+Nay cả hai đường gọi chung `resetPromotedStation` (`src/lib/mirror/promote.ts`). Bước dọn ấy
+**không được phép chặn lượt lật**: nếu đọc sổ hỏng (đúng kịch bản trạm chính chết, vì
+`DATABASE_URL` dưới máy trỏ vào chính cái xác ấy) thì kêu to kèm câu SQL chữa tay, rồi vẫn
+lật. Một trạm lên ngôi mang bảng bế quan vẫn hơn một tông môn không có trạm nào.
+
+Phép kiểm cho phần này đi QUA schema Zod thật rồi so lại từng giá trị, không chỉ nhìn hình
+thù: `appSettingsSchema` bọc mọi nhánh bằng `.catch()`, nên một trường lệch tên KHÔNG ném —
+nó âm thầm hoá thành mặc định, và trạm mới lên ngôi với một bản ghi không phải cái ta viết.
+
+**Van xả `job_events`.** §11 của thiết kế ghi trước là sẽ cần; số đo hôm nay nói rõ vì sao:
+12.038 dòng cho 9 ngày, mà đỉnh tới **9.674 dòng một ngày**. Giữ mãi thì sau một tháng là
+~290 nghìn dòng, và bước chép trong lượt chuyển trạm phình từ 26 giây thành hàng chục phút —
+tức mỗi lượt bế quan dài ra theo tuổi của tông môn.
+
+Hạn lưu mặc định **7 ngày**, trùng hạn lưu sảnh đàm đạo có chủ ý: một khái niệm「hạn lưu」duy
+nhất cho cả hệ. Xoá theo lô 5.000, trần 50 nghìn dòng mỗi lượt cron (gấp năm lần nhịp sinh cao
+nhất đo được); hết trần thì để dành lượt sau, và vì hạn lưu là mốc thời gian tuyệt đối nên
+lượt sau dọn tiếp đúng chỗ vừa dừng. Cron trả luôn con số ra ngoài để một lượt curl là biết
+nó có dọn được gì không.
+
+Khác hai việc quét cũ, việc này **chỉ chạy trong cron** — xoá hàng loạt không đáng đặt trên
+đường đi nóng của một trang. Đổi lại, với nó cron LÀ mạch sống chứ không còn là lưới an toàn:
+cron không chạy thì bảng phình vô hạn.
+
 ## 0.64.0 — khôi lỗi đi theo trạm, và ba vết diễn tập để lại
 
 Diễn tập chuyển trạm đi-và-về đã chạy trọn (số đo ở `deploy/mirror/README.md` §14). Bản này vá

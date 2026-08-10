@@ -11,6 +11,8 @@
  */
 import { neon } from "@neondatabase/serverless";
 import { SYNC_TABLE_ORDER, verifyDigestExpr } from "../src/lib/mirror/pgSync";
+import { promotedStationPatch } from "../src/lib/mirror/promote";
+import { appSettingsSchema } from "../src/lib/services/settings";
 import { MONGO_DEFAULT_DB, resolveMongoDbName } from "../src/lib/mongo/dbName";
 import { loadEnv } from "./loadEnv.mjs";
 
@@ -240,6 +242,22 @@ try {
     (await rawDigest(SRC, settingsExpr)) !== (await rawDigest(DST, settingsExpr)),
     "đổi một khoá KHÁC trong value thì vẫn đỏ — loại mirrorSwitch không phải bịt mắt cả cột",
   );
+
+  // ---- bản ghi đặt vào trạm SẮP LÊN THAY --------------------------------------------------
+  // Hỏng lặng lẽ là rủi ro thật ở đây: `appSettingsSchema` bọc mọi nhánh bằng `.catch()`, nên
+  // một trường lệch tên KHÔNG ném — nó âm thầm hoá thành mặc định, và trạm mới lên ngôi với
+  // một bản ghi không phải cái ta viết. Vì vậy phép kiểm cho patch đi QUA schema thật rồi so
+  // lại từng giá trị, chứ không chỉ nhìn hình thù đối tượng.
+  const patch = promotedStationPatch("main", new Date("2026-08-10T17:01:20.000Z"));
+  const parsed = appSettingsSchema.parse({ maintenance: patch.maintenance, mirrorSwitch: patch.mirrorSwitch });
+
+  ok(parsed.maintenance.active === false, "trạm lên ngôi: bế quan TẮT (qua schema thật, không bị .catch() nuốt)");
+  ok(parsed.maintenance.note === "" && parsed.maintenance.expectedEndAt === null, "…và mốc bế quan cũ bị xoá sạch");
+  ok(parsed.mirrorSwitch.phase === "idle", "trạm lên ngôi: phase idle — mở được lượt chuyển kế NGAY");
+  ok(parsed.mirrorSwitch.targetId === "", "…targetId rỗng, nên nút「Lật」không trỏ vào chính mình");
+  ok(parsed.mirrorSwitch.copiedRows === 0 && parsed.mirrorSwitch.tableIndex === 0, "…bộ đếm của lượt cũ về 0");
+  ok(parsed.mirrorSwitch.note.includes("main"), "…nhưng lịch sử còn nguyên trong note: cất nhắc từ đâu");
+  ok(parsed.mirrorSwitch.note.includes("2026-08-10T17:01:20"), "…và lúc nào");
 
   console.log(`\nTất cả ${passed} phép kiểm đều thuận.`);
 } finally {

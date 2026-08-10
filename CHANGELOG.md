@@ -11,6 +11,34 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.63.1 — lượt diễn tập đầu tiên gãy: một luật tên database bị chép làm hai bản
+
+Bấm chuyển trạm thật lần đầu. Chép xong **11.458 dòng** Postgres rồi gục ở bước Mongo:
+「MONGODB_URI thiếu tên database ở cuối đường dẫn」. Chuỗi từ nút Connect của Atlas không mang
+tên database bao giờ — path rỗng ở **cả hai** trạm — nên bước ấy chưa từng có cơ hội chạy đúng.
+
+Ứng dụng thật vẫn sống suốt thời gian ấy, và đó chính là chỗ đáng học: `services/chat.ts` giải
+tên database bằng **ba nấc** (`MONGODB_DB` → path → mặc định `jarvis`), còn `mirror/mongoSync.ts`
+tự chép lại luật ấy thành một bản **chỉ có một nấc**. Bản sao không sai lúc viết; nó sai vào
+đúng ngày được dùng lần đầu, sau khi đã tiêu 12 phút bế quan. Nay chỉ còn MỘT luật ở
+`src/lib/mongo/dbName.ts`, cả hai nơi gọi chung.
+
+Hai lớp gác đều đã xanh ở đúng chỗ sắp gãy — đó mới là phần đáng ghi:
+
+- **`verify:mirror-sync` xanh 12/12 mà đời thật đỏ**, vì fixture nào cũng có path. Phép kiểm
+  phải mang hình dạng chuỗi mà **nhà cung cấp thực sự phát ra**, không phải hình dạng tiện cho
+  người viết test. Nay có phép kiểm mang đúng chuỗi Atlas ấy (19/19).
+- **「Kiểm mạch」báo `Mongo ✔` mà chỉ `ping` cụm** — chưa hề chạm tới tên database. Nay nó in
+  tên đã giải và có/chưa có `chat_messages`, nên cái bẫy này lộ ra trước khi bấm chứ không phải
+  giữa lúc bế quan.
+
+Chặn thêm một kiểu hỏng **chưa từng nổ nhưng lặng lẽ hơn nhiều**: trỏ đúng cụm mà sai tên
+database thì nguồn đọc 0, đích nhận 0, `srcCount === destCount` — đối chiếu xanh mướt và trạm
+gương lên ngôi với sảnh đàm đạo trống trơn. `assertSourceDb` dừng ngay khi `chat_messages` đang
+nằm ở một database KHÁC trên cùng cụm; vắng ở mọi nơi thì không sao (tông môn chưa ai nhắn).
+`MONGODB_DB` cũng vào bảng「env phải giống nhau ở mọi trạm」của thiết kế — nó vốn không nằm ở
+đâu cả, nên việc dùng chung một biến cho cả hai bên là may chứ chưa phải chắc.
+
 ## 0.63.0 — chuyển trạm là PROMOTE, và hai lỗ hổng của bản trước
 
 Đạo hữu chỉ ra đúng chỗ: hệ phải như promote standby thành master — trạm nào đang cầm bút

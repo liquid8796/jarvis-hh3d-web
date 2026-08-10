@@ -4,6 +4,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { countJobsForDrain } from "@/lib/services/jobs";
 import { BACKDROP_PREFIX, humanBytes, listObjectsUnder } from "@/lib/services/media";
 import { getAppSettings } from "@/lib/services/settings";
+import { mirrorsForAdmin } from "@/app/actions/mirrors";
 import { countPending, listUsers } from "@/lib/services/users";
 import type { BackdropChoice } from "@/lib/validation/backdrops";
 import { AdminTabs } from "./AdminTabs";
@@ -13,6 +14,7 @@ import { ChatSettingsForm } from "./ChatSettingsForm";
 import { TagFrameManager } from "./TagFrameManager";
 import { GameDomainForm } from "./GameDomainForm";
 import { MaintenanceForm } from "./MaintenanceForm";
+import { MirrorPanel } from "./MirrorPanel";
 import { MembershipSettingsForm } from "./MembershipSettingsForm";
 import { UserTable } from "./UserTable";
 import { CreateUserPanel } from "./CreateUserPanel";
@@ -150,6 +152,16 @@ export default async function AdminPage({
                 </div>
               ),
             },
+            // Tab Gương Trạm CHỈ mọc cho người mang site.switch (Gia chủ): với người khác
+            // nó không tồn tại chứ không phải "có mà bấm vào bị mắng" — hàng rào thật vẫn
+            // là action phía server, đây chỉ là phép lịch sự của giao diện.
+            ...(hasPermission(viewer, "site.switch")
+              ? [{
+                  key: "guongTram",
+                  label: "Gương Trạm",
+                  pane: <MirrorPanel mirrors={await mirrorsForAdmin()} />,
+                }]
+              : []),
           ]}
         />
       </main>

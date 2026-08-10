@@ -148,6 +148,38 @@ export const appSettingsSchema = z.object({
         .catch(DEFAULT_GAME_BASE_URL),
     })
     .prefault({ baseUrl: DEFAULT_GAME_BASE_URL }),
+
+  /**
+   * Sổ gương trạm — danh mục trạm dự phòng cho hệ chuyển trạm (deploy/mirror/README.md §4).
+   *
+   * `pg`/`mongo` là chuỗi kết nối của trạm BÊN KIA, mã hoá bằng secretBox (khoá
+   * ENCRYPTION_KEY trong env) NGAY TỪ server action — bản rõ không bao giờ chạm document.
+   * Cùng lẽ với cookie game: quyền đọc database này không được đồng nghĩa quyền cầm database
+   * khác. Sổ sống trong app_settings nên tự đi theo mọi lượt đồng bộ — trạm mới nhận nguyên
+   * sổ để ngày sau chuyển tiếp hoặc quay về; điều kiện là mọi trạm chung ENCRYPTION_KEY.
+   *
+   * `.catch([])` theo luật của tệp: một phần tử rác (sửa tay JSONB) làm hỏng phép gán thì
+   * mất SỔ chứ không mất trang admin — và mất sổ thì nhập lại được, còn admin sập thì không
+   * còn chỗ mà nhập.
+   */
+  mirrors: z
+    .array(
+      z.object({
+        /** Trùng SITE_ID của deploy bên kia — khoá định danh, không đổi sau khi tạo. */
+        id: z.string().min(1).max(64),
+        name: z.string().min(1).max(120),
+        url: z.string().url().startsWith("https://"),
+        /** DATABASE_URL của trạm kia, phong bì secretBox `v1.…`. */
+        pg: z.string().min(1),
+        /** MONGODB_URI của trạm kia, phong bì secretBox `v1.…`. */
+        mongo: z.string().min(1),
+        lastProbeAt: z.string().nullable().catch(null),
+        lastProbeOk: z.boolean().nullable().catch(null),
+        lastProbeNote: z.string().max(500).catch(""),
+      }),
+    )
+    .catch([])
+    .prefault([]),
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;

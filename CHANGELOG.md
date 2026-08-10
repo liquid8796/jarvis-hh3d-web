@@ -11,6 +11,19 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.61.0 — sổ gương trạm trên trang Tông Môn, và món nợ migration được trả
+
+Phần 3 của lộ trình gương trạm: tab「Gương Trạm」(chỉ mọc cho người mang `site.switch` —
+Gia chủ) ghi sổ trạm dự phòng: mã trạm (SITE_ID bên kia), URL, hai chuỗi kết nối. Chuỗi
+kết nối mã hoá secretBox ngay trong server action — bản rõ không chạm document, không đi
+xuống client (MirrorView chỉ mang host trần); ô sửa để trống nghĩa là giữ phong bì cũ.
+Lượt lưu tự kiểm mạch: PG đếm sổ migration (nối được nhưng chưa migrate cũng là một câu
+trả lời), Mongo ping 8s; kết quả ghi vào sổ cho ai nhìn cũng thấy.
+
+Migration 0021 seed `site.switch` VÀ trả món nợ 10/08: `job.force_start` đã vào code từ
+đợt Hàng Đợi nhưng thiếu migration — verify:roles đỏ trên production từ đó (code 7 quyền,
+bảng 6). Nay cả hai vào sổ, verify:roles xanh lại.
+
 ## 0.60.0 — bảng điều phối gương trạm và tầng chuyển hướng
 
 Hai phần đầu của lộ trình gương trạm (deploy/mirror/README.md §12). Chưa có gì đổi với người

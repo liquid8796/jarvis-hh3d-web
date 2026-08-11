@@ -11,6 +11,26 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.71.0 — bản desktop nhận cùng thiết kế, và có chốt giữ hai bản không trôi khỏi nhau
+
+Bản 0.70.0 đổi cách Mê Cung hỏi trần ngày ở phía web. Bản này chở nguyên thiết kế ấy sang desktop
+(`1.54.0`) — bên đó trước nay vẫn so chuỗi `"385/385"` ở **hai** chỗ, sai với mọi tài khoản có
+trần khác, và chưa từng nhận cả bản vá 0.69.0.
+
+**Hồ sơ lên schema 53** ở cả hai bên. Bên desktop, bump schema là thay hồ sơ đã lưu ngay lần mở
+đầu tiên — phải bật lại nhiệm vụ và chọn lại tuỳ chọn. Bên này schema chỉ là con số, nhưng hai bản
+sinh đôi phải mang cùng một số, và nay có chốt bắt đúng điều đó.
+
+**Chín chốt smoke mới đọc THẲNG `DefaultQuestProfile.cs` của repo desktop** (qua đường dẫn anh em)
+và so **từng byte** ba đoạn script Mê Cung, cộng số schema, cộng selector cờ đầy trần, cộng việc
+bên ấy không còn `Text = "{{capCheck}}"` nào. Ba đoạn script ấy sống ở hai nơi và là JavaScript
+nằm trong chuỗi: **không trình biên dịch nào bắt được lúc chúng lệch nhau** — chỉ có một đàn chạy
+sai vào một ngày nào đó. Chốt bỏ qua (không đỏ) khi không thấy repo desktop nằm cạnh, vì bộ smoke
+này còn chạy ở nơi chỉ có repo web.
+
+Cả chín chốt đã được chạy ngược lên `DefaultQuestProfile.cs` ở `HEAD` để chắc chúng **đỏ được**:
+9 bắt, 0 chốt vô dụng.
+
 ## 0.70.0 — Mê Cung hỏi MÁY CHỦ còn bao nhiêu huyền tinh, thay vì nạo chữ khỏi trang
 
 Bản ghi 11/08/2026 (`me-cung-20260811-171336`) bắt trọn một lượt đánh, và cái rương cuối lượt

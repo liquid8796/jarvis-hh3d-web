@@ -13,8 +13,9 @@
  * Mỗi ca dưới đây là một chuyện đã xảy ra một lần rồi.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import { createQuestEngine } from "../src/lib/quest-engine/engine.mjs";
@@ -1276,10 +1277,10 @@ async function main() {
   );
   const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
   check(
-    // 52 = cổng ra khỏi phòng Mê Cung (bản ghi 11/08). Bump schema là thay hồ sơ đã lưu bên
+    // 53 = Mê Cung đọc trần ngày từ phản hồi rương (bản ghi 11/08). Bump schema là thay hồ sơ đã lưu bên
     // desktop ngay lần mở đầu tiên — chốt này bắt mỗi cú bump phải là một quyết định có chủ ý.
-    "hồ sơ đang ở schema 52",
-    loadProfileForSchema().schemaVersion === 52,
+    "hồ sơ đang ở schema 53",
+    loadProfileForSchema().schemaVersion === 53,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1483,6 +1484,63 @@ async function main() {
       const env = fakeEnv("Hôm nay đã nhận 385/385 Huyền Tinh");
       runScript(lobbySrc, env, CAP_ON);
       check("sảnh: đã đầy → cắm cờ để stopIf chặn ngay, khỏi mở phòng", capped(env));
+    }
+  }
+
+  console.log("\nBản desktop phải mang ĐÚNG những đoạn script ấy, không phải bản chép tay");
+
+  // Ba đoạn script Mê Cung sống ở HAI nơi: hồ sơ này, và DefaultQuestProfile.cs bên desktop.
+  // Chúng là JavaScript trong chuỗi, nên không có trình biên dịch nào bắt được lúc chúng lệch
+  // nhau — chỉ có đàn chạy sai vào một ngày nào đó. Chốt này so từng byte.
+  //
+  // Bỏ qua khi không thấy repo desktop nằm cạnh: bộ smoke này còn chạy ở nơi chỉ có repo web.
+  {
+    const pcProfile = path.resolve(
+      process.cwd(), "..", "jarvis-hh3d-pc", "src", "JarvisHH3D.Infrastructure", "Quests",
+      "DefaultQuestProfile.cs");
+
+    if (!existsSync(pcProfile)) {
+      console.log(`  … bỏ qua: không thấy ${pcProfile}`);
+    } else {
+      const cs = readFileSync(pcProfile, "utf8");
+      const maze = loadProfileForSchema().quests.find((q) => q.id === "me-cung");
+      const loopStep = maze.steps.find(
+        (s) => s.action === "repeat" && s.until?.selector?.includes("jvz-cap-full"));
+
+      const pairs = [
+        ["MazeChestHookScript", loopStep.steps.find((s) => (s.script || "").includes("__jvzChestHook"))?.script],
+        ["MazeChestReadScript", loopStep.steps.find(
+          (s) => (s.script || "").includes("__jvz_mc_chest") && !(s.script || "").includes("__jvzChestHook"))?.script],
+        ["MazeCapScanScript", maze.steps.find(
+          (s) => s.action === "evaluateJavaScript" && (s.script || "").includes("cap-scan"))?.script],
+      ];
+
+      for (const [name, webScript] of pairs) {
+        // Hằng số một dòng: `private const string <Tên> =` rồi """…""" ở dòng kế.
+        const m = cs.match(new RegExp(`private const string ${name} =\\s*\\r?\\n\\s*"""([\\s\\S]*?)""";`));
+        check(`${name}: có trong DefaultQuestProfile.cs`, m !== null);
+        if (!m || webScript === undefined) continue;
+        check(
+          `${name}: khớp TỪNG BYTE với hồ sơ web`,
+          m[1] === webScript,
+          m[1] === webScript ? "" : `desktop ${m[1].length} ký tự vs web ${webScript.length}`);
+      }
+
+      const schemaInCs = cs.match(/CurrentSchemaVersion = (\d+);/);
+      check(
+        "schema của desktop bằng schema của hồ sơ web",
+        schemaInCs !== null && Number(schemaInCs[1]) === loadProfileForSchema().schemaVersion,
+        `desktop ${schemaInCs?.[1]} vs web ${loadProfileForSchema().schemaVersion}`);
+
+      // Cổng ở sảnh và until của vòng hiệp phải hỏi CÙNG MỘT câu ở cả hai bên.
+      const wanted = "body.jvz-cap-full, .mc-ht-daily-text.jvz-cap-full";
+      check(
+        "desktop dùng đúng selector cờ đầy trần ở cả hai chỗ",
+        (cs.split(`Selector = "${wanted}"`).length - 1) === 2,
+        String(cs.split(`Selector = "${wanted}"`).length - 1));
+      check(
+        "desktop KHÔNG còn so chuỗi 385/385 làm điều kiện",
+        !cs.includes('Text = "{{capCheck}}"'));
     }
   }
 

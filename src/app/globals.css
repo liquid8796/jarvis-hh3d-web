@@ -633,7 +633,13 @@ body {
 }
 
 .chat-row.grouped { margin-top: 2px; }
-.chat-row.own { flex-direction: row-reverse; }
+
+/* MỘT hàng lề cho tất cả — không có `.chat-row.own` nào ở đây, và đó là chủ ý (11/08/2026).
+   Sảnh này đông người chứ không phải hộp tin nhắn hai người: lối「mình bên phải」chia đôi màn
+   hình theo một trục vô nghĩa khi có sáu người đang nói, và bong bóng của chính mình thì mất
+   luôn chân dung lẫn bài vị. Ba luật cũ (`row-reverse`, `align-items: flex-end`, và một màu
+   bong bóng riêng) đã gỡ cùng lượt — gắn lại một cái là sảnh lại lệch. Xem ghi chú tại `own`
+   trong ChatRoom.tsx; biến ấy nay chỉ còn giữ quyền Sửa/Thu hồi. */
 
 /* Vòng kim quang quanh ảnh đại diện — CHỈ trong sảnh: nơi khác (thanh đầu trang, bảng môn
    đồ) vòng tròn là chi tiết phụ, ở đây nó là chân dung trên bài vị. `.invisible` của tin
@@ -680,8 +686,6 @@ body {
   display: flex;
   flex-direction: column;
 }
-
-.chat-row.own .chat-bubble-col { align-items: flex-end; }
 
 .chat-author {
   display: flex;
@@ -761,10 +765,6 @@ body {
   content: "";
   display: block;
   clear: both;
-}
-
-.chat-row.own .chat-bubble {
-  background: rgba(64, 53, 26, 0.6);
 }
 
 .chat-bubble.sticker { background: transparent; border-color: transparent; }

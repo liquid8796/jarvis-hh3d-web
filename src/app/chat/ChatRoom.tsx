@@ -485,33 +485,44 @@ export function ChatRoom({
           lastAuthor = msg.author;
           lastAt = at;
 
+          /**
+           * CHỈ dùng cho quyền Sửa/Thu hồi, KHÔNG dùng cho cách vẽ.
+           *
+           * Sảnh này cố ý dựng tin của mình y hệt tin của người khác — cùng lề trái, cùng chân
+           * dung, cùng tên, cùng màu bong bóng (yêu cầu 11/08/2026). Đây là sảnh đàm đạo đông
+           * người chứ không phải hộp tin nhắn hai người: lối chat-app quen thuộc (mình bên
+           * phải, người khác bên trái) chia đôi màn hình theo một trục vô nghĩa khi có sáu
+           * người nói, và bong bóng của mình thì mất luôn tên lẫn bài vị. Một hàng lề duy nhất
+           * đọc như một biên bản: ai nói, nói gì, theo thứ tự.
+           *
+           * Nên đừng buộc lại cách vẽ vào biến này. Muốn tìm tin của mình thì chân dung và tên
+           * đã ở đó — như của mọi người.
+           */
           const own = msg.userId === me.id;
 
           return (
             <div key={msg.id}>
               {showDay && <div className="chat-day"><span>{fmtDay(msg.createdAt)}</span></div>}
 
-              <div className={`chat-row ${own ? "own" : ""} ${grouped ? "grouped" : ""}`}>
-                {!own && (
-                  <Avatar
-                    name={msg.author}
-                    url={avatars[msg.userId]}
-                    // Đo bằng MẮT trên ảnh chụp thật, không suy từ con số. Từng là 78px; hạ
-                    // còn 62px ngày 09/08/2026 vì đạo hữu thấy cả hàng danh tính quá khổ.
-                    // Phải đi CÙNG LƯỢT với `.chat-tagframe` (92→74px) và `.chat-author`
-                    // (1.2→1.05rem) trong globals.css: chân dung giữ đúng tỉ lệ 0,77 so với
-                    // chiều cao dùng thật của bài vị (74 − 2×13 = 48px), vẫn nhỉnh hơn nó một
-                    // bậc vì đây là mặt người còn bài vị chỉ là danh xưng đi kèm. Đổi lẻ một
-                    // trong ba số là lệch thế cân ấy.
-                    size={62}
-                    // Tin nối tiếp cùng người thì vòng tròn ẨN mà vẫn CHIẾM chỗ, để mọi bong
-                    // bóng của cùng một người thẳng một hàng lề.
-                    className={grouped ? "invisible" : ""}
-                  />
-                )}
+              <div className={`chat-row ${grouped ? "grouped" : ""}`}>
+                <Avatar
+                  name={msg.author}
+                  url={avatars[msg.userId]}
+                  // Đo bằng MẮT trên ảnh chụp thật, không suy từ con số. Từng là 78px; hạ
+                  // còn 62px ngày 09/08/2026 vì đạo hữu thấy cả hàng danh tính quá khổ.
+                  // Phải đi CÙNG LƯỢT với `.chat-tagframe` (92→74px) và `.chat-author`
+                  // (1.2→1.05rem) trong globals.css: chân dung giữ đúng tỉ lệ 0,77 so với
+                  // chiều cao dùng thật của bài vị (74 − 2×13 = 48px), vẫn nhỉnh hơn nó một
+                  // bậc vì đây là mặt người còn bài vị chỉ là danh xưng đi kèm. Đổi lẻ một
+                  // trong ba số là lệch thế cân ấy.
+                  size={62}
+                  // Tin nối tiếp cùng người thì vòng tròn ẨN mà vẫn CHIẾM chỗ, để mọi bong
+                  // bóng của cùng một người thẳng một hàng lề.
+                  className={grouped ? "invisible" : ""}
+                />
 
                 <div className="chat-bubble-col">
-                  {!own && !grouped && (() => {
+                  {!grouped && (() => {
                     // Tag nào có khung thì đeo khung nấy — một người mang hai danh xưng đều
                     // có bài vị thì hiện CẢ HAI. Tag không có khung mới rớt xuống làm huy
                     // hiệu chữ; không tag nào có khung thì đeo khung mặc định (bài vị

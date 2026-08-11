@@ -13,6 +13,18 @@
  *                          có chạy vào trong đọc usage thật. Nó đơn giản là endpoint của HOÁ
  *                          ĐƠN: hobby là 0 đồng nên không có bản ghi chi phí nào để trả.
  *
+ *                          BẰNG CHỨNG DỨT ĐIỂM, để không ai phải tranh luận lại: `vercel usage`
+ *                          của CLI chính chủ (56.4.1) gọi ĐÚNG endpoint này — đọc mã ở
+ *                          `packages/cli/src/commands/usage/index.ts` — và chạy thật với token
+ *                          của trạm gốc thì nó cũng nhận đúng cái 404 ấy:
+ *
+ *                              #3 → GET /v1/billing/charges
+ *                                     ?from=2026-08-01T07:00:00.000Z&to=…&teamId=team_ebLB…
+ *                              Error: Costs not found (404)
+ *
+ *                          Tức 404 không đến từ cách ta dựng request. Muốn tự kiểm lại một
+ *                          phút: `vercel usage --debug` với VERCEL_TOKEN trong env.
+ *
  *   `/v2/usage?type=requests`   200 kèm số liệu thật trên hobby. Đường duy nhất còn mở.
  *
  * ĐÁNG ĐỌC LẠI NGÀY NÀO CÓ TÀI KHOẢN LÊN PRO: schema FOCUS v1.3 của `/v1/billing/charges` mang

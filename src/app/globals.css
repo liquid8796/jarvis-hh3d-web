@@ -1082,6 +1082,30 @@ body {
   border-bottom: 1px solid rgba(232, 194, 92, 0.16);
 }
 
+/* Thanh bao cả hàng đầu bảng: tab bên trái, ô chọn số dòng nép sát mép phải, một nét kẻ chạy
+   suốt bề ngang bên dưới CẢ HAI (11/08/2026 — đạo hữu muốn ô chọn lên góc phải trên bảng).
+
+   Nét kẻ nằm ở ĐÂY chứ không để nguyên trên `.queue-tabs`: khi hàng tab thành một flex item,
+   nó co lại đúng bề rộng chữ và nét kẻ đứt ngang giữa hàng.
+
+   `align-items: flex-end` chứ không `center`: ô chọn cao hơn hàng tab, mà gạch chân của tab
+   đang hoạt động là `border-bottom` của chính cái nút — căn giữa thì gạch ấy lơ lửng cách nét
+   kẻ một quãng và trông như hai thứ rời nhau. Căn đáy thì gạch chân đậu đúng lên nét kẻ (đo
+   được: lệch 1px). */
+.queue-tabbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 1.25rem;
+  border-bottom: 1px solid rgba(232, 194, 92, 0.16);
+}
+
+/* Đứng trong thanh thì thanh giữ nét kẻ, không phải hai nét chồng nhau. Viết dạng "khi nằm
+   trong" thay vì xoá hẳn ở trên, để `.queue-tabs` một mình vẫn đủ nghĩa nếu có nơi khác dùng. */
+.queue-tabbar .queue-tabs {
+  border-bottom: 0;
+}
+
 .queue-tabs button {
   display: inline-flex;
   align-items: center;

@@ -18,7 +18,7 @@ import {
 } from "@/lib/auth/permissions";
 import { MAX_TAGS, MAX_TAG_LENGTH, TAG_PRESETS, parseTags, splitTags } from "@/lib/validation/tags";
 import type { PublicUser } from "@/lib/services/users";
-import { Pager, usePageSize, usePaged } from "@/components/Pager";
+import { PageSizeSelect, Pager, usePageSize, usePaged } from "@/components/Pager";
 
 /**
  * Bảng môn đồ. Ô tìm kiếm ghi vào URL (debounce 300ms) nên kết quả chia sẻ được và F5 vẫn
@@ -146,7 +146,11 @@ export function UserTable({
             đây là câu trả lời cho「tông môn có bao nhiêu người」, thứ người ta liếc một cái ở
             đầu bảng chứ không cuộn xuống chân bảng để tìm. Nó đếm đúng bộ ĐÃ LỌC, nên khi đang
             lọc thì nó nói về kết quả lọc — cùng con số mà thanh điều trang lấy làm tổng. */}
+        {/* Cụm bên PHẢI của hàng công cụ: con số tổng, rồi ô chọn số dòng sát mép ngoài cùng.
+            `ml-auto` nằm trên đứa ĐẦU cụm nên cả hai cùng bị đẩy sang phải như một khối — đặt
+            lên đứa cuối thì con số bị bỏ lại giữa hàng. */}
         <span className="ml-auto text-sm text-[var(--color-mist)]">{users.length} đạo hữu</span>
+        <PageSizeSelect perPage={perPage} onPerPage={setPerPage} unit="đạo hữu" />
       </div>
 
       {notice && (
@@ -255,7 +259,7 @@ export function UserTable({
         </table>
       </div>
 
-      <Pager paged={paged} perPage={perPage} onPerPage={setPerPage} unit="đạo hữu" />
+      <Pager paged={paged} unit="đạo hữu" />
 
       {editing && (
         <EditDialog

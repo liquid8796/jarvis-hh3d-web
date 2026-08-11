@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "re
 import { forceStartJobAction, forceStopJobAction } from "@/app/actions/queue";
 import type { QueueEntry, QueueSnapshot } from "@/lib/services/queue";
 import type { JobStatus } from "@/lib/realtime/dashboardTypes";
-import { Pager, usePageSize, usePaged } from "@/components/Pager";
+import { PageSizeSelect, Pager, usePageSize, usePaged } from "@/components/Pager";
 
 /**
  * Bảng hàng đợi của cả tông môn.
@@ -420,42 +420,53 @@ export function QueueBoard({
         chờ hàng chung, vì khôi lỗi ấy chỉ làm việc ở máy nhà.
       </p>
 
-      <div
-        role="tablist"
-        aria-label="Cách xem hàng đợi"
-        className="queue-tabs mb-4"
-        onKeyDown={onTabKeyDown}
-      >
-        {TABS.map((item, index) => {
-          const active = tab === item.id;
-          // Tab Hàng đợi đếm đàn CÒN SỐNG, không đếm `entries.length`: mảng ấy nay mang thêm
-          // cả dòng đã tắt còn nán lại, nên lấy độ dài của nó là để huy hiệu cãi nhau với
-          // đúng dòng tóm tắt nằm ngay bên trên.
-          const count = item.id === "stuck" ? stuck : running + waiting + sleeping;
-          return (
-            <button
-              key={item.id}
-              ref={(node) => {
-                tabRefs.current[index] = node;
-              }}
-              type="button"
-              role="tab"
-              id={`queue-tab-${item.id}`}
-              aria-selected={active}
-              aria-controls={`queue-panel-${item.id}`}
-              /* Roving tabIndex: chỉ tab đang chọn nằm trong vòng Tab, phần còn lại đi bằng
-                 phím mũi tên — đúng khuôn tablist mà trình đọc màn hình chờ đợi. */
-              tabIndex={active ? 0 : -1}
-              className={active ? "active" : ""}
-              onClick={() => setTab(item.id)}
-            >
-              {item.label}
-              {count > 0 && (
-                <span className={`queue-tab-count ${item.id === "stuck" ? "is-warn" : ""}`}>{count}</span>
-              )}
-            </button>
-          );
-        })}
+      {/* Ô chọn số dòng đứng NGOÀI `role="tablist"`, không phải chuyện thẩm mỹ: một tablist chỉ
+          được chứa tab, nhét thêm thứ khác vào là trình đọc màn hình đếm nhầm số tab và phím
+          mũi tên (roving tabindex ở `onTabKeyDown`) có thể lạc vào một phần tử không phải tab.
+          Nên bọc cả hai bằng một thanh, ai ở phần của nấy. */}
+      <div className="queue-tabbar mb-4">
+        <div
+          role="tablist"
+          aria-label="Cách xem hàng đợi"
+          className="queue-tabs"
+          onKeyDown={onTabKeyDown}
+        >
+          {TABS.map((item, index) => {
+            const active = tab === item.id;
+            // Tab Hàng đợi đếm đàn CÒN SỐNG, không đếm `entries.length`: mảng ấy nay mang thêm
+            // cả dòng đã tắt còn nán lại, nên lấy độ dài của nó là để huy hiệu cãi nhau với
+            // đúng dòng tóm tắt nằm ngay bên trên.
+            const count = item.id === "stuck" ? stuck : running + waiting + sleeping;
+            return (
+              <button
+                key={item.id}
+                ref={(node) => {
+                  tabRefs.current[index] = node;
+                }}
+                type="button"
+                role="tab"
+                id={`queue-tab-${item.id}`}
+                aria-selected={active}
+                aria-controls={`queue-panel-${item.id}`}
+                /* Roving tabIndex: chỉ tab đang chọn nằm trong vòng Tab, phần còn lại đi bằng
+                   phím mũi tên — đúng khuôn tablist mà trình đọc màn hình chờ đợi. */
+                tabIndex={active ? 0 : -1}
+                className={active ? "active" : ""}
+                onClick={() => setTab(item.id)}
+              >
+                {item.label}
+                {count > 0 && (
+                  <span className={`queue-tab-count ${item.id === "stuck" ? "is-warn" : ""}`}>{count}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        {/* `pb-1.5` để ô chọn không đậu hẳn lên nét kẻ — hàng tab căn đáy, mà một ô nhập chạm
+            đúng vào đường kẻ trông như bị dính. */}
+        <span className="ml-auto pb-1.5">
+          <PageSizeSelect perPage={perPage} onPerPage={setPerPage} unit="đàn" />
+        </span>
       </div>
 
       {tab === "queue" && (
@@ -467,7 +478,7 @@ export function QueueBoard({
           ) : (
             <>
               <ul className="space-y-2">{queuePaged.items.map(renderRow)}</ul>
-              <Pager paged={queuePaged} perPage={perPage} onPerPage={setPerPage} unit="đàn" />
+              <Pager paged={queuePaged} unit="đàn" />
             </>
           )}
         </div>
@@ -489,7 +500,7 @@ export function QueueBoard({
           ) : (
             <>
               <ul className="space-y-2">{stuckPaged.items.map(renderRow)}</ul>
-              <Pager paged={stuckPaged} perPage={perPage} onPerPage={setPerPage} unit="đàn" />
+              <Pager paged={stuckPaged} unit="đàn" />
               <p className="mt-4 text-xs leading-relaxed text-[var(--color-mist)]">
                 Cách gỡ: bấm <strong className="text-[var(--color-parchment)]">Dừng</strong> rồi đợi
                 dòng chuyển sang「Đã thu đàn」— khôi lỗi thu ở điểm an toàn nên có thể mất một lúc —

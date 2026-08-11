@@ -126,20 +126,66 @@ export function usePaged<T>(items: readonly T[], perPage: number): Paged<T> {
 }
 
 /**
- * Thanh điều trang. Ô chọn số dòng LUÔN hiện khi còn dòng nào đó, kể cả lúc chỉ có một trang:
- * nếu nó biến mất ở mức 100 thì người vừa chọn 100 không còn đường quay về 10. Còn cụm nút
- * lùi/tới thì chỉ hiện khi thật sự có hơn một trang.
+ * Ô chọn số dòng, đứng RIÊNG để đặt ở góc phải hàng công cụ TRÊN bảng (yêu cầu 11/08/2026).
+ *
+ * Vì sao tách khỏi thanh dưới chứ không chỉ đổi thứ tự: nó không cùng loại với hai thứ kia.
+ * Tóm tắt và nút lùi/tới nói về TRẠNG THÁI của lượt xem hiện tại — có gì để điều thì mới hiện;
+ * còn đây là một TUỲ CHỌN của người xem, sống độc lập với việc bảng đang có bao nhiêu dòng.
+ * Vì thế nó cũng KHÔNG tự ẩn khi danh sách rỗng: một cái nút chỉnh mà lúc ẩn lúc hiện thì
+ * người dùng phải đi tìm, còn một cái nút luôn ở đúng chỗ thì không.
+ *
+ * Ở Hàng Đợi nó còn giải quyết một chuyện thật: hai tab dùng CHUNG một mức, mà trước đây mỗi
+ * tab tự vẽ một ô — cùng một thứ vẽ hai lần. Đặt cạnh hàng tab thì chỉ còn đúng một cái.
+ */
+export function PageSizeSelect({
+  perPage,
+  onPerPage,
+  /** Danh từ đếm được — chỉ dùng cho nhãn trợ năng, vì trên màn hình đã có chữ「Mỗi trang」. */
+  unit,
+}: {
+  perPage: number;
+  onPerPage: (next: number) => void;
+  unit: string;
+}) {
+  return (
+    /* `whitespace-nowrap`: hàng công cụ là flex-wrap, nên khi chỗ hẹp đi thì nhãn bị bóp cho
+       gãy làm hai dòng ("Mỗi" / "trang") trong khi cả hàng vẫn còn thừa chỗ để XUỐNG DÒNG
+       nguyên cụm — thà rơi cả cụm xuống dòng dưới còn hơn vỡ một chữ làm đôi. */
+    <label className="flex items-center gap-2 whitespace-nowrap text-sm text-[var(--color-mist)]">
+      <span>Mỗi trang</span>
+      {/* `max-w-*` chứ KHÔNG `w-auto`: `.input` khai `width: 100%` và nó nằm NGOÀI mọi
+          `@layer`, nên nó thắng mọi utility bề rộng của Tailwind (style không-layer luôn
+          thắng style trong layer, bất kể specificity hay thứ tự). Kẹp trần thì không phải
+          cãi nhau với luật ấy — cùng cách `input max-w-xs` ở bảng môn đồ đang làm. */}
+      <select
+        className="input max-w-[5.5rem] py-1"
+        aria-label={`Số ${unit} mỗi trang`}
+        value={perPage}
+        onChange={(e) => onPerPage(Number(e.target.value))}
+      >
+        {PAGE_SIZES.map((size) => (
+          <option key={size} value={size}>
+            {size}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/**
+ * Thanh DƯỚI bảng: một câu tóm tắt, và cụm lùi/tới khi thật sự có hơn một trang.
+ *
+ * Ô chọn số dòng KHÔNG còn ở đây — nó lên hàng công cụ trên bảng, xem `PageSizeSelect`. Cả
+ * thanh này tự ẩn khi danh sách rỗng, vì lúc ấy không có gì để tóm tắt và cũng không có gì để
+ * điều; câu「không tìm thấy」của chính bảng đã nói đủ.
  */
 export function Pager({
   paged,
-  perPage,
-  onPerPage,
   /** Danh từ đếm được, để câu tóm tắt đọc như tiếng người: "12 trong 26 đạo hữu". */
   unit,
 }: {
   paged: Paged<unknown>;
-  perPage: number;
-  onPerPage: (next: number) => void;
   unit: string;
 }) {
   const { page, pages, total, from, to } = paged;
@@ -150,28 +196,6 @@ export function Pager({
       aria-label={`Điều trang danh sách ${unit}`}
       className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--color-mist)]"
     >
-      {/* `whitespace-nowrap`: thanh này là flex-wrap, nên khi chỗ hẹp đi thì nhãn bị bóp cho
-          gãy làm hai dòng ("Mỗi" / "trang") trong khi cả thanh vẫn còn thừa chỗ để XUỐNG DÒNG
-          nguyên cụm — thà rơi cả cụm xuống dòng dưới còn hơn vỡ một chữ làm đôi. */}
-      <label className="flex items-center gap-2 whitespace-nowrap">
-        <span>Mỗi trang</span>
-        {/* `max-w-*` chứ KHÔNG `w-auto`: `.input` khai `width: 100%` và nó nằm NGOÀI mọi
-            `@layer`, nên nó thắng mọi utility bề rộng của Tailwind (style không-layer luôn
-            thắng style trong layer, bất kể specificity hay thứ tự). Kẹp trần thì không phải
-            cãi nhau với luật ấy — cùng cách `input max-w-xs` ở bảng môn đồ đang làm. */}
-        <select
-          className="input max-w-[5.5rem] py-1"
-          value={perPage}
-          onChange={(e) => onPerPage(Number(e.target.value))}
-        >
-          {PAGE_SIZES.map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-        </select>
-      </label>
-
       {/* `aria-live` để trình đọc màn hình nghe được kết quả của cú bấm — nút "Sau" tự nó không
           nói ra là đã sang trang nào. `polite` chứ không `assertive`: đây là tin báo, không
           phải báo động. */}

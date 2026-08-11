@@ -24,6 +24,7 @@
     "verify:continuous": "tsx scripts/verifyContinuousJob.mts",
     "verify:daily-quota": "tsx scripts/verifyDailyQuota.mts",
     "verify:quiz-reference": "node scripts/verifyQuizReference.mjs",
+    "verify:notices": "tsx scripts/verifyNotices.mts",
     "verify:maze-cap": "node scripts/verifyMazeCapMark.mjs",
     "verify:profile": "tsx scripts/verifyUserProfile.mts",
     "verify:avatar": "tsx scripts/verifyAvatar.mts",

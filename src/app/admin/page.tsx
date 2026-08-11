@@ -19,6 +19,7 @@ import { MaintenanceForm } from "./MaintenanceForm";
 import { MirrorPanel } from "./MirrorPanel";
 import { MembershipSettingsForm } from "./MembershipSettingsForm";
 import { UserTable } from "./UserTable";
+import { BroadcastPanel } from "./BroadcastPanel";
 import { CreateUserPanel } from "./CreateUserPanel";
 
 export const metadata = { title: "Tông Môn" };
@@ -43,8 +44,13 @@ export default async function AdminPage({
       ? params.status
       : undefined;
 
-  const [users, pending, settings, drain, jobEventStats, backdropStore] = await Promise.all([
+  const [users, noticeRecipients, pending, settings, drain, jobEventStats, backdropStore] = await Promise.all([
     listUsers({ search: params.q, status }),
+    // Danh sách cho ô chọn người nhận của tab Thông Báo — KHÔNG mang `params.q`: ô tìm kiếm
+    // của bảng môn đồ là chuyện của bảng môn đồ, còn người phát thông báo thì phải thấy trọn
+    // tên những ai có thể nhận. Chỉ lấy người ĐANG HOẠT ĐỘNG: người chờ duyệt và người bị
+    // đình quyền không vào được trang nào để mà thấy popup.
+    listUsers({ status: "active" }),
     countPending(),
     getAppSettings(),
     countJobsForDrain(),
@@ -160,6 +166,20 @@ export default async function AdminPage({
                 </div>
               ),
             },
+            // Tab Thông Báo mọc theo quyền `notice.broadcast` — cùng phép lịch sự với Gương
+            // Trạm bên dưới: ai không phát được thì không thấy cái tab, thay vì thấy rồi bị
+            // action mắng. Hàng rào thật vẫn ở `broadcastNoticeAction`.
+            ...(hasPermission(viewer, "notice.broadcast")
+              ? [{
+                  key: "thongBao",
+                  label: "Thông Báo",
+                  pane: (
+                    <div className="max-w-2xl">
+                      <BroadcastPanel recipients={noticeRecipients} />
+                    </div>
+                  ),
+                }]
+              : []),
             // Tab Gương Trạm CHỈ mọc cho người mang site.switch (Gia chủ): với người khác
             // nó không tồn tại chứ không phải "có mà bấm vào bị mắng" — hàng rào thật vẫn
             // là action phía server, đây chỉ là phép lịch sự của giao diện.

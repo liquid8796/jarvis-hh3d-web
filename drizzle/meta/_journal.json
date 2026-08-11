@@ -169,6 +169,20 @@
       "when": 1786453986741,
       "tag": "0023_worker_version",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1786457056599,
+      "tag": "0024_thong_bao_tong_mon",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786457732961,
+      "tag": "0025_quyen_phat_thong_bao",
+      "breakpoints": true
     }
   ]
 }

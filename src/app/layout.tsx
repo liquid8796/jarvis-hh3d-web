@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro, Noto_Serif } from "next/font/google";
 import { AppVersion } from "@/components/AppVersion";
+import { NoticePopup } from "@/components/NoticePopup";
 import { BackdropPeek } from "@/components/BackdropPeek";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { getRenderSettings } from "@/lib/services/settings";
@@ -105,6 +106,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             lúc người ta cần biết trạm mình đang gõ cửa mang bản nào. Đứng cuối trong DOM để
             trình đọc màn hình đọc nó sau cùng — nó là chú thích, không phải nội dung. */}
         <AppVersion />
+        {/* Popup thông báo tông môn — đứng ở đây, ngoài cửa bế quan và ngoài mọi trang, vì một
+            lời nhắn「phát lúc này」mà chỉ một trang thấy thì không phải là thông báo. Với khách
+            vãng lai nó tự nằm im (một cú 401 rồi thôi hẳn) — xem components/NoticePopup.tsx. */}
+        <NoticePopup />
       </body>
     </html>
   );

@@ -112,6 +112,17 @@ export const PERMISSIONS = [
   "job.force_stop",
   "job.force_start",
   /**
+   * Phát thông báo hiện thành popup trên màn hình người khác.
+   *
+   * Đứng ở bậc trị sự (cả ba vai) chứ không riêng Gia chủ: đây là việc NÓI, không phải việc
+   * ra tay — nó không dừng đàn ai, không xoá gì, và người nhận luôn có nút đóng. Ai đã mở
+   * được trang Tông Môn thì cũng là người tông môn tin để nhắn cho tông môn.
+   *
+   * Ngày nào muốn siết lại thành「chỉ Gia chủ」thì gỡ nó khỏi `TRI_SU_PERMISSIONS` là xong —
+   * và đó chính là lý do nó có tên riêng thay vì núp dưới `admin.panel`.
+   */
+  "notice.broadcast",
+  /**
    * Sổ gương trạm + lệnh chuyển trạm (deploy/mirror/README.md). CHỈ Gia chủ — sổ cầm chuỗi
    * kết nối database của trạm khác, lệnh chuyển bứng cả tông môn sang tài khoản Vercel khác;
    * hai thứ ấy không có chỗ cho bậc trị sự thường. Không nằm trong THAI_THUONG/TRI_SU là
@@ -129,6 +140,7 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   "chat.purge": "Thanh tẩy sảnh đàm đạo",
   "job.force_stop": "Dừng đàn của người khác",
   "job.force_start": "Khai đàn hộ người khác",
+  "notice.broadcast": "Phát thông báo tông môn",
   "site.switch": "Chuyển gương trạm",
 };
 
@@ -137,7 +149,11 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
  * là một sự thật của hệ thống, nên nó phải là một dòng khai báo, không phải một sự trùng hợp
  * mà ai đó phải nhớ giữ.
  */
-const TRI_SU_PERMISSIONS = ["admin.panel", "member.manage"] as const satisfies readonly Permission[];
+const TRI_SU_PERMISSIONS = [
+  "admin.panel",
+  "member.manage",
+  "notice.broadcast",
+] as const satisfies readonly Permission[];
 
 /**
  * Thái thượng trưởng lão = bậc trị sự CỘNG quyền đụng vào đàn của người khác.

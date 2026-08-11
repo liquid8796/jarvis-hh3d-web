@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   bigserial,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -14,6 +15,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import type { CycleProgress } from "@/lib/realtime/dashboardTypes";
+import type { NoticeAudienceKind } from "@/lib/validation/notices";
 
 /**
  * One database for everything, on purpose.
@@ -437,8 +439,74 @@ export const workers = pgTable(
   (t) => [index("workers_user_idx").on(t.userId, t.lastSeen)],
 );
 
+/**
+ * THÔNG BÁO TÔNG MÔN — lời nhắn bậc trị sự phát ra, hiện thành popup trên mọi trang.
+ *
+ * Phạm vi giữ ở dạng KHAI BÁO (`audience_kind` + danh sách mã), không nở sẵn ra thành từng
+ * dòng người-nhận. Hai lẽ: một lời nhắn cho cả tông môn là MỘT dòng chứ không phải hai mươi
+ * sáu, và câu hỏi「ai nhận」được trả lời lúc ĐỌC nên nó luôn nói theo thang vai hiện tại —
+ * ban thêm một Chưởng môn sáng nay thì thông báo「gửi Chưởng môn」tối qua vẫn tới tay người
+ * ấy. Đổi lại, nở sẵn sẽ đóng băng danh sách đúng lúc phát; hai cách đều có lý, và cách này
+ * rẻ hơn hẳn ở cỡ tông môn hiện tại.
+ *
+ * KHÔNG có cột tiêu đề: một popup chặn đường người đọc thì phải nói được ý trong vài dòng.
+ *
+ * CHƯA nằm trong `SYNC_TABLE_ORDER` (src/lib/mirror/pgSync.ts), và đó là một lựa chọn có ý
+ * thức chứ không phải bỏ sót: một lượt chuyển trạm sẽ để lại thông báo ở trạm cũ, nên sau khi
+ * chuyển thì lời nhắn cũ không hiện nữa — mất mát ấy LÀNH, vì `notice_reads` cũng ở lại cùng
+ * chỗ nên không ai bị popup lại thứ đã đọc. Ngày nào thấy đáng chép thì thêm hai tên vào sổ
+ * ấy, ĐÚNG THỨ TỰ khoá ngoại: `notices` sau `users`, rồi `notice_reads`.
+ */
+export const notices = pgTable(
+  "notices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    body: text("body").notNull(),
+    /** "all" | "roles" | "users" — luật ở validation/notices.ts, và DB có check trùng khớp. */
+    audienceKind: text("audience_kind").$type<NoticeAudienceKind>().notNull(),
+    /** Mã vai hoặc id người, tuỳ `audienceKind`. Rỗng với "all" — xem chú thích ở validation. */
+    audience: jsonb("audience").$type<string[]>().notNull().default([]),
+    /**
+     * Người phát. `set null` chứ không `cascade`: trục xuất một trưởng lão không được phép
+     * xoá luôn thông báo bảo trì họ từng phát — lời nhắn thuộc về tông môn, không thuộc về
+     * người gõ nó.
+     */
+    sentBy: uuid("sent_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("notices_created_idx").on(t.createdAt),
+    /**
+     * Luật về ba kiểu phạm vi được khai ở BA nơi (form, server action, và đây) — cố ý, không
+     * phải thừa: hai nơi trên là hàng rào cho người dùng, còn cái này là hàng rào cho MÃ.
+     * Một đường ghi mới quên validate thì database từ chối, thay vì để một `audience_kind`
+     * lạ nằm im trong bảng cho tới ngày phép đọc gặp nó và không biết trả về gì.
+     */
+    check("notices_audience_kind_check", sql`${t.audienceKind} in ('all', 'roles', 'users')`),
+  ],
+);
+
+/**
+ * Dấu ĐÃ XEM. Có dòng nghĩa là người ấy đã bấm「Đã hiểu」— không có dòng nghĩa là chưa, nên
+ * phép đọc「còn gì chưa xem」là một `not exists`, và nó đúng cả với người vừa nhập môn hôm nay.
+ */
+export const noticeReads = pgTable(
+  "notice_reads",
+  {
+    noticeId: uuid("notice_id")
+      .notNull()
+      .references(() => notices.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seenAt: timestamp("seen_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.noticeId, t.userId] })],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type GameAccountRow = typeof gameAccounts.$inferSelect;
 export type JobRow = typeof automationJobs.$inferSelect;
 export type JobEventRow = typeof jobEvents.$inferSelect;
 export type WorkerRow = typeof workers.$inferSelect;
+export type NoticeRow = typeof notices.$inferSelect;

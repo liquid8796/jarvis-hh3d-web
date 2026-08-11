@@ -42,6 +42,7 @@
  */
 import { readFileSync } from "node:fs";
 import { chromium } from "playwright-core";
+import { type Meter, pushUsageReport } from "./usagePush.mts";
 
 const arg = (name: string): string | undefined => {
   const at = process.argv.indexOf(`--${name}`);
@@ -126,8 +127,6 @@ const VALUE_LINE =
   /^(?:[\d.,]+\s*(?:B|KB|MB|GB|TB|GB-Hrs|GB-hrs)|[\d.,]+[KMB]?|(?:\d+h\s*)?(?:\d+m\s*)?(?:\d+s)?)$/;
 
 const isValue = (line: string): boolean => line !== "" && VALUE_LINE.test(line) && /\d/.test(line);
-
-type Meter = { title: string; used: string; limit: string | null };
 
 /**
  * Cắt chữ đã render thành bảng meter.
@@ -258,17 +257,25 @@ try {
       console.error("Thiếu CRON_SECRET trong env — đó là chìa mở /api/usage-report.");
       process.exit(1);
     }
-    const res = await fetch(`${push.replace(/\/$/, "")}/api/usage-report`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ siteId: site, readAt: new Date().toISOString(), meters }),
+    const sent = await pushUsageReport({
+      origin: push,
+      secret,
+      siteId: site,
+      readAt: new Date().toISOString(),
+      meters,
     });
-    const detail = await res.text();
-    if (!res.ok) {
-      console.error(`Đẩy lên hỏng: HTTP ${res.status} — ${detail.slice(0, 200)}`);
+    // Đi qua trạm nghỉ là chuyện BÌNH THƯỜNG (WEB_URL trỏ trạm cũ sau một lượt chuyển trạm),
+    // nhưng phải nói ra: đó là manh mối duy nhất cho biết địa chỉ trong tay đã lỗi thời.
+    if (sent.hops.length > 1) {
+      console.log(`  ↪ trạm ở ${push} đã nghỉ, đi theo chuyển hướng: ${sent.hops.join(" → ")}`);
+    }
+    if (!sent.ok) {
+      console.error(
+        `Đẩy lên hỏng: ${sent.status != null ? `HTTP ${sent.status} — ` : ""}${sent.detail.slice(0, 200)}`,
+      );
       process.exit(1);
     }
-    console.log(`  ✔ đã đẩy ${meters.length} meter của「${site}」lên ${push}`);
+    console.log(`  ✔ đã đẩy ${meters.length} meter của「${site}」lên ${sent.hops.at(-1)}`);
   } else if (push || site) {
     console.error("`--push` và `--site` phải đi cùng nhau.");
     process.exit(1);

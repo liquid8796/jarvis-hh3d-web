@@ -62,6 +62,10 @@ jobs:
 
       - name: Cào và đẩy từng trạm
         env:
+          # ĐỊA CHỈ NÀY ĐƯỢC PHÉP CŨ. Trạm nghỉ vẫn 307 sang trạm đang hoạt động, và script đẩy
+          # đi theo chuyển hướng ấy có gắn lại chìa (scripts/usagePush.mts). Trước 12/08/2026
+          # thì không: `fetch` đi theo nhưng vứt header `Authorization` vì đổi origin, nên cả
+          # hai trạm cùng báo `401 unauthorized` trong khi bí mật hoàn toàn đúng.
           WEB_URL: ${{ vars.WEB_URL || 'https://auto-hh3d.vercel.app' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           VERCEL_COOKIE_MAIN: ${{ secrets.VERCEL_COOKIE_MAIN }}
@@ -84,10 +88,16 @@ jobs:
           auto-hh3d-3|smart-service|VERCEL_COOKIE_AUTO_HH3D_3"
 
           failed=0
-          echo "$stations" | while IFS='|' read -r site team envname; do
+          # HERESTRING, KHÔNG PIPE. `echo … | while` chạy vòng lặp trong một SUBSHELL, nên
+          # `failed=1` chết theo subshell ấy và `exit $failed` luôn thấy 0: lượt 12/08/2026 đẩy
+          # hỏng cả hai trạm mà bước này vẫn hiện dấu ✅ xanh. Một phép thử nói dối còn tệ hơn
+          # không có phép thử — nó dạy người ta thôi đọc log.
+          while IFS='|' read -r site team envname; do
             site=$(echo "$site" | xargs)
             [ -z "$site" ] && continue
-            if [ -z "$(eval echo \"\$$envname\")" ]; then
+            # Tra gián tiếp thay cho `eval` — và `-` để một trạm mới thêm vào sổ mà quên khai
+            # trong `env:` bên trên chỉ bị BỎ QUA, không cho `set -u` giết cả bước.
+            if [ -z "${!envname-}" ]; then
               echo "— bỏ qua $site: chưa có secret $envname"
               continue
             fi
@@ -95,5 +105,5 @@ jobs:
             npx tsx scripts/vercelUsageFull.mts \
               --cookie-env "$envname" --team "$team" \
               --push "$WEB_URL" --site "$site" || failed=1
-          done
+          done <<< "$stations"
           exit $failed

@@ -52,6 +52,7 @@
     "deploy:all": "tsx scripts/deployAllStations.mts",
     "verify:deploy-targets": "tsx scripts/verifyDeployTargets.mts",
     "verify:vercel-usage": "tsx scripts/verifyVercelUsage.mts",
+    "verify:usage-push": "tsx scripts/verifyUsagePush.mts",
     "usage:full": "tsx scripts/vercelUsageFull.mts",
     "mirror:new": "tsx scripts/newMirrorStation.mts",
     "verify:worker-version": "tsx scripts/verifyWorkerVersion.mts"

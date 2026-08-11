@@ -18,12 +18,16 @@ import {
 } from "@/lib/auth/permissions";
 import { MAX_TAGS, MAX_TAG_LENGTH, TAG_PRESETS, parseTags, splitTags } from "@/lib/validation/tags";
 import type { PublicUser } from "@/lib/services/users";
+import { Pager, usePageSize, usePaged } from "@/components/Pager";
 
 /**
  * Bảng môn đồ. Ô tìm kiếm ghi vào URL (debounce 300ms) nên kết quả chia sẻ được và F5 vẫn
  * giữ; mọi nút hành động gọi thẳng server action rồi để `revalidatePath` vẽ lại — không có
  * bản sao danh sách nào sống trong client để mà lệch pha với server.
  */
+
+/** Khoá riêng của bảng này trong localStorage — hàng đợi có khoá của nó, hai bên không giẫm nhau. */
+const USERS_PAGE_SIZE_KEY = "jarvis:admin-users:per-page";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Chờ duyệt",
@@ -74,6 +78,20 @@ export function UserTable({
   const [editing, setEditing] = useState<PublicUser | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const [perPage, setPerPage] = usePageSize(USERS_PAGE_SIZE_KEY);
+  const paged = usePaged(users, perPage);
+  const { setPage } = paged;
+
+  /**
+   * Đổi bộ lọc thì về trang đầu. Nghe theo `query`/`status` — thứ SERVER đã dùng để cắt danh
+   * sách — chứ không nghe theo `users.length`: một đạo hữu vừa bị trục xuất cũng làm độ dài
+   * đổi, mà lúc ấy người đang đọc trang 3 không có lý do gì bị ném về đầu. (Trang vượt tầm thì
+   * đã có phép kẹp trong `usePaged` lo.)
+   */
+  useEffect(() => {
+    setPage(1);
+  }, [query, status, setPage]);
+
   // Debounce: gõ tới đâu URL đổi tới đó, nhưng không phải mỗi phím một lần điều hướng.
   useEffect(() => {
     if (search === query) return;
@@ -123,7 +141,8 @@ export function UserTable({
           <option value="active">Đã thu nhận</option>
           <option value="disabled">Đình quyền</option>
         </select>
-        <span className="ml-auto text-sm text-[var(--color-mist)]">{users.length} đạo hữu</span>
+        {/* Con số tổng nay do thanh điều trang kể ("1–20 trong 26 đạo hữu"), đầy đủ hơn hẳn một
+            con số trần — nói cả đang xem tới đâu. Để cả hai là một sự thật viết hai lần. */}
       </div>
 
       {notice && (
@@ -154,7 +173,7 @@ export function UserTable({
               </tr>
             )}
 
-            {users.map((u) => (
+            {paged.items.map((u) => (
               <tr key={u.id} className="border-t border-[var(--color-ink-600)]/50 align-middle">
                 {/* `w-[38%]` là thứ làm huy hiệu XUỐNG DÒNG được, không phải `flex-wrap` bên
                     dưới. Bảng này auto-layout (`w-full min-w-[46rem]`) nằm trong một khung
@@ -231,6 +250,8 @@ export function UserTable({
           </tbody>
         </table>
       </div>
+
+      <Pager paged={paged} perPage={perPage} onPerPage={setPerPage} unit="đạo hữu" />
 
       {editing && (
         <EditDialog

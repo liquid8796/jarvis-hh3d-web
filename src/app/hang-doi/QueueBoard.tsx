@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "re
 import { forceStartJobAction, forceStopJobAction } from "@/app/actions/queue";
 import type { QueueEntry, QueueSnapshot } from "@/lib/services/queue";
 import type { JobStatus } from "@/lib/realtime/dashboardTypes";
+import { Pager, usePageSize, usePaged } from "@/components/Pager";
 
 /**
  * Bảng hàng đợi của cả tông môn.
@@ -15,6 +16,9 @@ import type { JobStatus } from "@/lib/realtime/dashboardTypes";
  * Tab bị ẩn thì ngừng hỏi lại: một trang mở quên trong nền không có lý do gì gõ cửa database
  * cả ngày. Kênh SSE vẫn giữ nguyên — nó rẻ, và mở lại tốn hơn là để yên.
  */
+
+/** Khoá riêng của bảng này trong localStorage — sổ môn đồ có khoá của nó, hai bên không giẫm nhau. */
+const QUEUE_PAGE_SIZE_KEY = "jarvis:queue:per-page";
 
 const POLL_LIVE_MS = 30_000;
 const POLL_FALLBACK_MS = 2_000;
@@ -276,6 +280,22 @@ export function QueueBoard({
   const stuckEntries = entries.filter((entry) => entry.stuckFor != null);
 
   /**
+   * MỘT mức số dòng cho cả hai tab, nhưng HAI số trang riêng.
+   *
+   * Chung mức vì đó là một thói quen xem, không phải thuộc tính của từng tab — chọn 50 ở Hàng
+   * đợi rồi sang Đang kẹt thấy 20 là một bất ngờ không ai xin. Riêng số trang vì hai tab dài
+   * ngắn khác hẳn nhau: đang đọc trang 3 của hàng đợi mà nhảy sang tab kẹt (thường chỉ vài
+   * dòng) thì trang 3 ở đó là trang trống.
+   *
+   * Cả hai hook gọi VÔ ĐIỀU KIỆN ở đây chứ không đặt trong nhánh `tab === …`: hook không được
+   * phép nằm sau một cái if, và giữ cả hai sống cũng chính là thứ giữ được số trang của tab
+   * kia khi người dùng liếc qua rồi quay lại.
+   */
+  const [perPage, setPerPage] = usePageSize(QUEUE_PAGE_SIZE_KEY);
+  const queuePaged = usePaged(entries, perPage);
+  const stuckPaged = usePaged(stuckEntries, perPage);
+
+  /**
    * Một dòng, dùng cho CẢ HAI tab.
    *
    * Tab Đang Kẹt là một lát cắt của cùng bộ dữ liệu, không phải một bảng khác — nên nó phải
@@ -445,7 +465,10 @@ export function QueueBoard({
               Cả tông môn đang rảnh — chưa có đàn nào chờ hay chạy.
             </p>
           ) : (
-            <ul className="space-y-2">{entries.map(renderRow)}</ul>
+            <>
+              <ul className="space-y-2">{queuePaged.items.map(renderRow)}</ul>
+              <Pager paged={queuePaged} perPage={perPage} onPerPage={setPerPage} unit="đàn" />
+            </>
           )}
         </div>
       )}
@@ -465,7 +488,8 @@ export function QueueBoard({
             </p>
           ) : (
             <>
-              <ul className="space-y-2">{stuckEntries.map(renderRow)}</ul>
+              <ul className="space-y-2">{stuckPaged.items.map(renderRow)}</ul>
+              <Pager paged={stuckPaged} perPage={perPage} onPerPage={setPerPage} unit="đàn" />
               <p className="mt-4 text-xs leading-relaxed text-[var(--color-mist)]">
                 Cách gỡ: bấm <strong className="text-[var(--color-parchment)]">Dừng</strong> rồi đợi
                 dòng chuyển sang「Đã thu đàn」— khôi lỗi thu ở điểm an toàn nên có thể mất một lúc —

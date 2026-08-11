@@ -139,14 +139,20 @@ export function ControlPanel({
    * Đổi lối giao đàn. Đặt state TRƯỚC rồi mới đợi máy chủ: một cái nút bấm xong đứng im vài
    * nhịp mạng thì người ta bấm lần nữa. Máy chủ từ chối thì trả nút về đúng chỗ cũ — không để
    * lại một lựa chọn chỉ có thật trên màn hình.
+   *
+   * Thành công thì KHÔNG báo một chữ nào: nút vừa sáng lên và dòng ghi chú dưới nhóm nút đã nói
+   * đủ. Dọn luôn lời nhắn cũ (nếu có) để không còn một câu của thao tác trước nằm cạnh một lựa
+   * chọn vừa đổi, trông như thể nó vừa nói về lựa chọn ấy.
    */
   const chooseWorkerPref = (next: WorkerPref) => {
     if (next === workerPref || pending) return;
     const previous = workerPref;
     setWorkerPref(next);
+    setNotice(null);
     startTransition(async () => {
       const result = await setWorkerPrefAction(next);
-      if (!result.ok) setWorkerPref(previous);
+      if (result.ok) return;
+      setWorkerPref(previous);
       setNotice(result.message);
     });
   };

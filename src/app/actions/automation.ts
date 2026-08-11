@@ -343,16 +343,10 @@ export async function setWorkerPrefAction(pref: string): Promise<ActionResult> {
   await setWorkerPref(user.id, parsed.data);
   revalidatePath("/dashboard");
 
-  const tail = "Đàn đang nằm chờ theo ngay; đàn đang chạy dở đi hết vòng này đã.";
-  return {
-    ok: true,
-    message:
-      parsed.data === "sect"
-        ? `Từ giờ đàn của đạo hữu chỉ giao cho khôi lỗi tông môn. ${tail}`
-        : parsed.data === "mine"
-          ? `Từ giờ đàn của đạo hữu chỉ giao cho khôi lỗi máy nhà. ${tail}`
-          : `Từ giờ khôi lỗi nào rảnh trước cũng cầm đàn được. ${tail}`,
-  };
+  // Đổi xong thì KHÔNG có gì để nói: cái nút vừa sáng lên đã trả lời rồi, và dòng ghi chú ngay
+  // dưới nhóm nút vẫn luôn tả đúng lựa chọn đang chọn. Một câu xác nhận nhắc lại điều mắt vừa
+  // thấy chỉ là tiếng ồn — nên chỉ nhánh HỎNG ở trên mới mang lời nhắn.
+  return { ok: true, message: "" };
 }
 
 export async function startAction(): Promise<ActionResult> {

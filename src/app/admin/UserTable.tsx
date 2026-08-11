@@ -141,8 +141,12 @@ export function UserTable({
           <option value="active">Đã thu nhận</option>
           <option value="disabled">Đình quyền</option>
         </select>
-        {/* Con số tổng nay do thanh điều trang kể ("1–20 trong 26 đạo hữu"), đầy đủ hơn hẳn một
-            con số trần — nói cả đang xem tới đâu. Để cả hai là một sự thật viết hai lần. */}
+        {/* Con số tổng ở lại ĐÂY dù thanh điều trang cuối bảng cũng kể ("1–20 trong 26 đạo
+            hữu"), và đó là chủ ý của đạo hữu (11/08/2026 — có bỏ đi một lượt rồi phải trả lại):
+            đây là câu trả lời cho「tông môn có bao nhiêu người」, thứ người ta liếc một cái ở
+            đầu bảng chứ không cuộn xuống chân bảng để tìm. Nó đếm đúng bộ ĐÃ LỌC, nên khi đang
+            lọc thì nó nói về kết quả lọc — cùng con số mà thanh điều trang lấy làm tổng. */}
+        <span className="ml-auto text-sm text-[var(--color-mist)]">{users.length} đạo hữu</span>
       </div>
 
       {notice && (

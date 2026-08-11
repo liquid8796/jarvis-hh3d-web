@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { mirrorUsageAction, type MirrorView } from "@/app/actions/mirrors";
 import {
   formatLimit,
@@ -33,11 +34,18 @@ function toneOf(metric: UsageMetric): string {
   return "text-[var(--color-jade-300)]";
 }
 
-/** Chỉ số đáng lo nhất — thứ được kể trong dòng tóm tắt. */
+/**
+ * Chỉ số đáng lo nhất — thứ được kể trong dòng tóm tắt.
+ *
+ * Chỉ xét những chỉ số ĐÃ ĐỐI CHIẾU KHỚP bảng thật. Một con số thô không có hạn thì không có
+ * tỉ lệ để so, mà kể cả nếu ta bịa cho nó một cái hạn thì dòng tóm tắt sẽ báo động về một cột
+ * không tồn tại — đúng chuyện đã xảy ra ngày 11/08/2026 với「Function Duration 389%」.
+ */
 function worstMetric(metrics: UsageMetric[]): UsageMetric | null {
   let worst: UsageMetric | null = null;
   let worstRatio = -1;
   for (const metric of metrics) {
+    if (!metric.matchesDashboard) continue;
     const ratio = usedRatio(metric);
     if (ratio != null && ratio > worstRatio) {
       worst = metric;
@@ -123,7 +131,20 @@ export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
         )}
       </div>
 
-      {open && usage?.ok && (
+      {/**
+       * CỔNG RA `document.body`, không vẽ tại chỗ.
+       *
+       * `fixed inset-0 z-50` nghe như đủ, và nó KHÔNG đủ: thẻ này nằm sâu trong một dòng của
+       * sổ trạm, mà tổ tiên của dòng ấy có `.card` mang nền mờ + biến đổi — bất kỳ tổ tiên nào
+       * dựng một stacking context là `z-50` chỉ còn tranh chỗ TRONG context ấy, không tranh
+       * được với những `.card` anh em ở ngoài. Triệu chứng đo được 11/08/2026: hộp hiện lên
+       * nhưng nửa dưới bị đúng cái card của trạm kế tiếp đè lên.
+       *
+       * Portal đưa hộp ra thẳng `document.body` nên nó nằm ở gốc cây, cạnh mọi stacking
+       * context khác chứ không nằm trong cái nào. Nâng z-index lên nữa thì vô ích — đó là lý
+       * do phải sửa bằng cấu trúc, không sửa bằng con số.
+       */}
+      {open && usage?.ok && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(6,8,20,0.72)] p-4"
           onClick={(event) => {
@@ -165,18 +186,22 @@ export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
               })}
             </div>
 
-            {/* Hai lời thú nhận, và cả hai đều cần: người đọc một bảng số phải biết nó đo cái
-                gì và số nào là do ta tự khai. */}
+            {/* Ba lời thú nhận. Người đọc một bảng số phải biết nó đo cái gì, số nào là do ta
+                tự khai, và — quan trọng nhất — bảng này CÒN THIẾU gì. */}
             <p className="mt-5 border-t border-[rgba(232,194,92,0.18)] pt-3 text-xs text-[var(--color-mist)]">
-              Số đo là của cả <b>TÀI KHOẢN VERCEL</b> giữ trạm này, không riêng một project — token
-              không hẹp xuống project được ở endpoint này. Theo lệ mỗi trạm một tài khoản riêng thì
-              hai thứ ấy trùng nhau; nuôi thêm project khác trong cùng tài khoản thì con số gộp cả
-              chúng.
+              Chỉ hai dòng đầu đã <b>đối chiếu khớp</b> bảng Usage thật nên mới đeo hạn mức. Phần
+              còn lại là <b>số thô của API</b>: nó không bằng cột nào trên dashboard, đừng đọc thành
+              Fast Data Transfer hay Function Duration.
+            </p>
+            <p className="mt-2 text-xs text-[#f2a0a0]">
+              API <b>không phát ra</b> mấy meter đang thật sự siết một tài khoản Hobby:{" "}
+              <b>Fluid Active CPU</b>, <b>Fluid Provisioned Memory</b>, Fast Origin Transfer, ISR.
+              Muốn xem chúng thì phải mở dashboard — nút dưới đây.
             </p>
             <p className="mt-2 text-xs text-[var(--color-mist)]">
-              Hạn mức là của gói <b>Hobby</b>, chép tay từ bảng Usage trên dashboard — API chỉ phát ra
-              phần đã dùng, không phát ra hạn. Vercel đổi hạn thì bảng này nói sai cho tới khi có
-              người sửa <code>vercelUsage.ts</code>.
+              Số đo là của cả <b>TÀI KHOẢN VERCEL</b> giữ trạm này, không riêng một project — token
+              không hẹp xuống project được ở endpoint này. Hạn mức là của gói <b>Hobby</b>, chép tay
+              từ dashboard vì API chỉ phát ra phần đã dùng.
             </p>
 
             <div className="mt-4 flex gap-2">
@@ -193,7 +218,8 @@ export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
               </a>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

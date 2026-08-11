@@ -58,14 +58,28 @@ const check = (name: string, ok: boolean, detail = "") => {
   const byKey = new Map(foldUsageRows(rows).map((m) => [m.key, m]));
   const used = (key: string) => byKey.get(key)?.used;
 
-  check("cộng byte qua nhiều ngày", used("fastDataTransfer") === 2 * 1024 ** 3, `nhận ${used("fastDataTransfer")}`);
-  check("Edge Requests = hit + miss", used("edgeRequests") === 105, `nhận ${used("edgeRequests")}`);
+  check("cộng byte qua nhiều ngày", used("bandwidthOut") === 2 * 1024 ** 3, `nhận ${used("bandwidthOut")}`);
+  // Bảng thật ghi Edge Requests 303K, API trả monitoring_metric_count = 302.835 — KHÔNG phải
+  // hit+miss (= 329.186, không khớp cột nào). Đóng đinh đúng nguồn ấy, vì đây là chỗ bản đầu
+  // đã đoán theo tên trường rồi sai.
+  check("Edge Requests đọc từ monitoring_metric_count", used("edgeRequests") === 3, `nhận ${used("edgeRequests")}`);
+  check("hit + miss là một chỉ số RIÊNG, không phải Edge Requests", used("cdnLookups") === 105, `nhận ${used("cdnLookups")}`);
   check(
     "Function Invocations gộp cả lỗi/timeout/throttle",
     used("functionInvocations") === 10,
     `nhận ${used("functionInvocations")}`,
   );
-  check("Function Duration gộp cả ba loại giờ", used("functionDuration") === 2, `nhận ${used("functionDuration")}`);
+  check("giờ-GB gộp cả ba loại", used("functionGbHours") === 2, `nhận ${used("functionGbHours")}`);
+  // Luật quan trọng nhất của cả tệp: chỉ chỉ số đã đối chiếu mới được đeo hạn mức. Thiếu chốt
+  // này thì một lần thêm cột ẩu là giao diện lại báo động về một cột không tồn tại.
+  check(
+    "chỉ chỉ số đã đối chiếu mới có hạn mức",
+    byKey
+      .values()
+      .toArray()
+      .every((m) => (m.limit == null) !== m.matchesDashboard),
+    [...byKey.values()].map((m) => `${m.key}:${m.matchesDashboard ? "khớp" : "thô"}/${m.limit ?? "—"}`).join(" "),
+  );
   check(
     "ngày thiếu trường không sinh NaN",
     [...byKey.values()].every((m) => Number.isFinite(m.used)),
@@ -73,11 +87,11 @@ const check = (name: string, ok: boolean, detail = "") => {
   );
   check("mảng RỖNG ra toàn số 0", foldUsageRows([]).every((m) => m.used === 0));
 
-  const duration = byKey.get("functionDuration")!;
-  check("tỉ lệ đọc đúng hạn mức", usedRatio(duration) === 0.02, `nhận ${usedRatio(duration)}`);
-  check("chỉ số không có hạn thì không có tỉ lệ", usedRatio(byKey.get("monitoring")!) === null);
-  check("byte thành chữ theo GB", formatUsed(byKey.get("fastDataTransfer")!) === "2.00 GB", formatUsed(byKey.get("fastDataTransfer")!));
-  check("hạn Function Duration hiện đúng đơn vị", formatLimit(duration) === "100 GB-Hrs", String(formatLimit(duration)));
+  const invocations = byKey.get("functionInvocations")!;
+  check("tỉ lệ đọc đúng hạn mức", usedRatio(invocations) === 10 / 1_000_000, `nhận ${usedRatio(invocations)}`);
+  check("chỉ số thô thì không có tỉ lệ", usedRatio(byKey.get("functionGbHours")!) === null);
+  check("byte thành chữ theo GB", formatUsed(byKey.get("bandwidthOut")!) === "2.00 GB", formatUsed(byKey.get("bandwidthOut")!));
+  check("hạn Function Invocations hiện đúng đơn vị", formatLimit(invocations) === "1M", String(formatLimit(invocations)));
 }
 
 // ---- 2. API thật ------------------------------------------------------------------------

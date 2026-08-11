@@ -42,6 +42,19 @@ export type UsageMetric = {
   unit: "bytes" | "count" | "gbHours";
   /** Chỉ số này gộp từ những trường nào của API — để người soi số biết nó từ đâu ra. */
   from: string;
+  /**
+   * Đã ĐỐI CHIẾU KHỚP với bảng Usage trên dashboard chưa.
+   *
+   * Trường này tồn tại vì một bài học đắt ngày 11/08/2026: bản đầu đoán mapping theo TÊN
+   * TRƯỜNG nghe cho hợp lý, rồi báo động「Function Duration 388,5 GB-Hrs — vượt 389% hạn」
+   * trong khi bảng thật ghi Function Duration = 0. Cái tên `function_execution_*_gb_hours`
+   * nghe y hệt cột ấy nhưng KHÔNG phải nó.
+   *
+   * Nên từ nay: chỉ chỉ số nào đã đặt cạnh bảng thật và khớp con số mới được đeo hạn mức và
+   * được tô cảnh báo. Còn lại là số thô — vẫn hiện ra vì vẫn có ích, nhưng không dám nói nó
+   * là cột nào của Vercel.
+   */
+  matchesDashboard: boolean;
 };
 
 export type VercelUsage =
@@ -73,29 +86,24 @@ const sum = (rows: UsageRow[], ...fields: string[]): number =>
  */
 export function foldUsageRows(rows: UsageRow[]): UsageMetric[] {
   return [
-    {
-      key: "fastDataTransfer",
-      label: "Fast Data Transfer",
-      used: sum(rows, "bandwidth_outgoing_bytes"),
-      limit: 100 * GB,
-      unit: "bytes",
-      from: "bandwidth_outgoing_bytes",
-    },
-    {
-      key: "originTransfer",
-      label: "Dữ liệu vào",
-      used: sum(rows, "bandwidth_incoming_bytes"),
-      limit: null,
-      unit: "bytes",
-      from: "bandwidth_incoming_bytes",
-    },
+    /**
+     * HAI CỘT ĐẦU đã đặt cạnh bảng thật và khớp tới từng nghìn (đo 11/08/2026, tài khoản
+     * namcourse): bảng ghi Edge Requests 303K và Function Invocations 317K, API trả
+     * `monitoring_metric_count` = 302.835 và `function_invocation_*` = 317.023.
+     *
+     * Cái tên `monitoring_metric_count` chẳng gợi gì tới Edge Requests, và đó chính là lý do
+     * phải ĐỐI CHIẾU chứ không được đọc tên trường mà suy: `request_hit_count +
+     * request_miss_count` = 329.186 nghe mới giống「số request」, nhưng bảng thật không có con
+     * số nào bằng nó.
+     */
     {
       key: "edgeRequests",
       label: "Edge Requests",
-      used: sum(rows, "request_hit_count", "request_miss_count"),
+      used: sum(rows, "monitoring_metric_count"),
       limit: 1_000_000,
       unit: "count",
-      from: "request_hit_count + request_miss_count",
+      from: "monitoring_metric_count",
+      matchesDashboard: true,
     },
     {
       key: "functionInvocations",
@@ -110,27 +118,61 @@ export function foldUsageRows(rows: UsageRow[]): UsageMetric[] {
       limit: 1_000_000,
       unit: "count",
       from: "function_invocation_* (successful + error + timeout + throttle)",
+      matchesDashboard: true,
+    },
+
+    /**
+     * PHẦN CÒN LẠI là số thô: có ích để nhìn xu hướng, nhưng KHÔNG khớp cột nào trong bảng
+     * thật, nên không đeo hạn mức và không tô cảnh báo.
+     *
+     *   bandwidth_outgoing_bytes   0,87 GB  ≠  Fast Data Transfer   1,29 GB
+     *   bandwidth_incoming_bytes   344 MB   ≠  Fast Origin Transfer 246 MB
+     *   function_execution_*_gb_hours 388,5 ≠  Function Duration    0 GB-Hrs
+     *
+     * Cột cuối là cái bẫy tệ nhất: dưới Fluid compute, Function Duration của gói Hobby đứng
+     * yên ở 0 và áp lực thật dồn sang `Fluid Active CPU` với `Fluid Provisioned Memory` — hai
+     * meter mà `/v2/usage` KHÔNG phát ra ở bất kỳ `type` nào (đã quét cả 13 loại).
+     */
+    {
+      key: "bandwidthOut",
+      label: "Băng thông ra (số thô)",
+      used: sum(rows, "bandwidth_outgoing_bytes"),
+      limit: null,
+      unit: "bytes",
+      from: "bandwidth_outgoing_bytes — KHÔNG bằng Fast Data Transfer",
+      matchesDashboard: false,
     },
     {
-      key: "functionDuration",
-      label: "Function Duration",
+      key: "bandwidthIn",
+      label: "Băng thông vào (số thô)",
+      used: sum(rows, "bandwidth_incoming_bytes"),
+      limit: null,
+      unit: "bytes",
+      from: "bandwidth_incoming_bytes — KHÔNG bằng Fast Origin Transfer",
+      matchesDashboard: false,
+    },
+    {
+      key: "cdnLookups",
+      label: "Lượt tra CDN (hit + miss)",
+      used: sum(rows, "request_hit_count", "request_miss_count"),
+      limit: null,
+      unit: "count",
+      from: "request_hit_count + request_miss_count",
+      matchesDashboard: false,
+    },
+    {
+      key: "functionGbHours",
+      label: "Giờ-GB thực thi hàm (số thô)",
       used: sum(
         rows,
         "function_execution_successful_gb_hours",
         "function_execution_error_gb_hours",
         "function_execution_timeout_gb_hours",
       ),
-      limit: 100,
-      unit: "gbHours",
-      from: "function_execution_*_gb_hours (successful + error + timeout)",
-    },
-    {
-      key: "monitoring",
-      label: "Monitoring",
-      used: sum(rows, "monitoring_metric_count"),
       limit: null,
-      unit: "count",
-      from: "monitoring_metric_count",
+      unit: "gbHours",
+      from: "function_execution_*_gb_hours — KHÔNG bằng Function Duration (Fluid làm cột ấy đứng ở 0)",
+      matchesDashboard: false,
     },
   ];
 }

@@ -758,6 +758,39 @@ body {
   user-select: none;
 }
 
+/**
+ * Bài vị thứ hai trở đi ÉP SÁT bài vị trước (yêu cầu 11/08/2026).
+ *
+ * 28px nghe như một con số bịa, nên đây là chỗ nó đến từ đâu. Khoảng hở mắt nhìn thấy giữa hai
+ * bài vị KHÔNG phải là khoảng cách CSS: mỗi tấm webp mang một quầng sáng rỗng quanh biển, và
+ * hai cái quầng ấy nằm giữa hai cái biển. Đo bằng cách tải năm tấm thật về, vẽ lên canvas rồi
+ * quét kênh alpha (ngưỡng 96) — quy ra px CSS ở `height: 74px`:
+ *
+ *     Chưởng môn              rộng 234px   quầng 18,1 trái / 21,1 phải
+ *     Đệ tử                   rộng 209px   quầng 17,9 / 17,7
+ *     Thái thượng trưởng lão  rộng 194px   quầng 15,0 / 17,5
+ *     Thánh nữ                rộng 223px   quầng 15,8 / 15,8
+ *     Trưởng lão              rộng 222px   quầng 12,1 / 16,6
+ *
+ * Nên cặp「Thánh nữ + Thái thượng trưởng lão」hở 15,8 + 2 (gap của `.chat-author`) + 8
+ * (`margin-left`) + 15,0 ≈ 40,8px, mà CSS chỉ góp 10 trong số đó. Xoá sạch margin vẫn còn hở
+ * ~31px. Phải KÉO CHỒNG lên đúng phần rỗng ấy: -28px cộng gap 2px = lùi 26px, chừa lại ~5px
+ * giữa hai cái biển. Trên cả năm tấm con số này cho khoảng 4–9px — sát mà không dính.
+ *
+ * Chỉ áp cho bài vị ĐỨNG SAU một bài vị khác: tấm đầu giữ nguyên 8px để không thúc vào tên.
+ * Viên chữ `.chat-tag` cũng không dính vì nó luôn được vẽ SAU mọi bài vị (xem ChatRoom.tsx).
+ *
+ * Ngày nào có người tải lên một bộ khung khác thì phải ĐO LẠI — khung viền sát mép (quầng
+ * mỏng) sẽ chồng thật lên nhau ở -28px. Phép đo là: fetch tấm ảnh, `drawImage` lên canvas,
+ * quét cột đầu/cột cuối có alpha > 96. `getComputedStyle` không nói hộ được điều này.
+ *
+ * Cũng nhờ lùi 26px mỗi cặp mà hàng danh tính NGẮN đi: ba bài vị rộng nhất cộng lại 679px nay
+ * còn 623px, nên ca ba-bài-vị càng khó chạm trần 820px của `.chat-bubble-col` và xuống dòng.
+ */
+.chat-tagframe + .chat-tagframe {
+  margin-left: -28px;
+}
+
 /* Tag trang trí trong sảnh — viên nhỏ cạnh tên, đóng băng theo tin y như chính cái tên. */
 .chat-tag {
   display: inline-block;

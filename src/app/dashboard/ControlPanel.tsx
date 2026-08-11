@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { clearLogAction, startAction, stopAction } from "@/app/actions/automation";
-import { useDashboardJobLive } from "./DashboardLiveProvider";
-import type { DashboardJob, JobStatus } from "@/lib/realtime/dashboardTypes";
+import {
+  clearLogAction,
+  setWorkerPrefAction,
+  startAction,
+  stopAction,
+} from "@/app/actions/automation";
+import { useDashboardJobLive, useDashboardPresenceLive } from "./DashboardLiveProvider";
+import type { WorkerPref } from "@/lib/services/configs";
+import type { DashboardJob, DashboardPresence, JobStatus } from "@/lib/realtime/dashboardTypes";
 
 /**
  * Tế đàn auto — nút start/stop và nhật ký tu luyện, giờ cho CẢ ĐỘI tài khoản.
@@ -39,15 +45,71 @@ function describeStatus(job: DashboardJob): string {
   return STATUS_TEXT[job.status];
 }
 
+/**
+ * Ba lối giao đàn. Nhãn nói theo NGÔI của người đọc ("máy nhà của tôi"), vì đây là câu trả lời
+ * cho câu hỏi "ai chạy auto giúp tôi" — đúng câu mà mục Khôi Lỗi ngay bên dưới đang mở đầu.
+ */
+const RUN_BY_OPTIONS: { value: WorkerPref; label: string; note: string }[] = [
+  {
+    value: "any",
+    label: "Ai rảnh cũng được",
+    note: "Khôi lỗi nào trực trước thì nhận — chạy sớm nhất.",
+  },
+  {
+    value: "sect",
+    label: "Khôi lỗi tông môn",
+    note: "Máy của tông môn luôn trực, máy nhà tắt cũng không sao.",
+  },
+  {
+    value: "mine",
+    label: "Máy nhà của tôi",
+    note: "Chỉ máy đã cài khôi lỗi của đạo hữu chạy; tắt máy là auto nghỉ.",
+  },
+];
+
+/**
+ * Lời nhắc theo LỰA CHỌN và sổ điểm danh NGAY LÚC NÀY — thứ nói trước được chuyện "bấm Khai
+ * Đàn xong rồi nằm chờ mãi". `null` khi lựa chọn ấy có người trực, hoặc khi chưa đọc được sổ
+ * (đừng doạ người ta chỉ vì frame SSE đầu tiên chưa về).
+ */
+function runByWarning(pref: WorkerPref, presence: DashboardPresence | null): string | null {
+  if (presence == null) return null;
+  const mineOnline = presence.mine.some((worker) => worker.online);
+
+  if (pref === "sect") {
+    return presence.sectOnline
+      ? null
+      : "Khôi lỗi tông môn đang vắng — khai đàn lúc này thì đàn sẽ nằm chờ nó trực lại.";
+  }
+  if (pref === "mine") {
+    if (mineOnline) return null;
+    return presence.mine.length === 0
+      ? "Đạo hữu chưa có khôi lỗi máy nhà nào — cài ở mục Khôi Lỗi bên dưới, nếu không đàn sẽ nằm chờ mãi."
+      : "Máy nhà của đạo hữu đang tắt — bật lên thì đàn mới có người cầm.";
+  }
+  return presence.sectOnline || mineOnline
+    ? null
+    : "Chưa có khôi lỗi nào trực — khai đàn lúc này thì đàn sẽ nằm chờ.";
+}
+
 function statusDotClass(job: DashboardJob): string {
   if (ACTIVE.includes(job.status)) return "bg-[var(--color-jade-400)] pulse-jade";
   if (job.status === "failed") return "bg-[#f2a0a0]";
   return "bg-[var(--color-ink-600)]";
 }
 
-export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }) {
+export function ControlPanel({
+  initiallyRunning,
+  initialWorkerPref,
+}: {
+  initiallyRunning: boolean;
+  /** Lựa chọn đang lưu trong ngọc giản — server đọc, đây chỉ vẽ lại. */
+  initialWorkerPref: WorkerPref;
+}) {
   const { jobs, events, connected, refresh, clearEvents } = useDashboardJobLive();
+  const { presence } = useDashboardPresenceLive();
   const [notice, setNotice] = useState<string | null>(null);
+  const [workerPref, setWorkerPref] = useState<WorkerPref>(initialWorkerPref);
   const [pending, startTransition] = useTransition();
 
   const logRef = useRef<HTMLDivElement>(null);
@@ -58,6 +120,7 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
 
   const running = jobs.length > 0 ? jobs.some((job) => ACTIVE.includes(job.status)) : initiallyRunning;
   const showLabels = jobs.length > 1;
+  const warning = runByWarning(workerPref, presence);
 
   useEffect(() => {
     const el = logRef.current;
@@ -69,6 +132,22 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
       const result = await fn();
       setNotice(result.message);
       await refresh();
+    });
+  };
+
+  /**
+   * Đổi lối giao đàn. Đặt state TRƯỚC rồi mới đợi máy chủ: một cái nút bấm xong đứng im vài
+   * nhịp mạng thì người ta bấm lần nữa. Máy chủ từ chối thì trả nút về đúng chỗ cũ — không để
+   * lại một lựa chọn chỉ có thật trên màn hình.
+   */
+  const chooseWorkerPref = (next: WorkerPref) => {
+    if (next === workerPref || pending) return;
+    const previous = workerPref;
+    setWorkerPref(next);
+    startTransition(async () => {
+      const result = await setWorkerPrefAction(next);
+      if (!result.ok) setWorkerPref(previous);
+      setNotice(result.message);
     });
   };
 
@@ -116,6 +195,38 @@ export function ControlPanel({ initiallyRunning }: { initiallyRunning: boolean }
           </button>
         )}
       </div>
+
+      {/* Giao đàn cho ai — đứng NGAY dưới nút Khai Đàn vì nó quyết định cú bấm ấy đi về đâu.
+          Radio thật (ẩn bằng sr-only) chứ không phải ba cái <button>: nhờ vậy phím mũi tên,
+          Space và trình đọc màn hình cư xử đúng như mọi nhóm radio khác mà không phải tự viết
+          lại điều hướng bàn phím — thứ rất dễ viết thiếu một nửa. */}
+      <fieldset className="mb-4" disabled={pending}>
+        <legend className="text-xs font-semibold text-[var(--color-parchment)]">Giao đàn cho</legend>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {RUN_BY_OPTIONS.map((option) => (
+            <label key={option.value} title={option.note}>
+              <input
+                type="radio"
+                name="workerPref"
+                value={option.value}
+                checked={workerPref === option.value}
+                onChange={() => chooseWorkerPref(option.value)}
+                className="peer sr-only"
+              />
+              <span className="inline-block cursor-pointer rounded-lg border border-[var(--color-ink-600)] px-3 py-1.5 text-xs text-[var(--color-mist)] transition-colors peer-checked:border-[var(--color-jade-400)]/50 peer-checked:bg-[var(--color-jade-400)]/15 peer-checked:text-[var(--color-jade-400)] peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--color-gold-300)]/60 peer-disabled:cursor-not-allowed peer-disabled:opacity-50">
+                {option.label}
+              </span>
+            </label>
+          ))}
+        </div>
+        <p className="mt-1.5 text-xs text-[var(--color-mist)]">
+          {RUN_BY_OPTIONS.find((option) => option.value === workerPref)?.note}
+        </p>
+        {/* Cảnh báo「chọn xong sẽ phải chờ」nói TRƯỚC lúc bấm Khai Đàn. Cùng một sự thật cũng
+            được ghi vào nhật ký lúc lập đàn (describeWorkerWait), nhưng ở đó thì người ta đã
+            bấm rồi. */}
+        {warning && <p className="mt-1 text-xs text-[var(--color-gold-300)]">{warning}</p>}
+      </fieldset>
 
       {/* Mỗi tài khoản một dòng trạng thái — bản web của bảng account trên desktop. */}
       {jobs.length === 0 ? (

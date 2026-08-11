@@ -15,6 +15,8 @@ import {
   enforceMazeCapPolicy,
   enforceUnavailableQuestPolicy,
   saveConfig,
+  setWorkerPref,
+  workerPrefSchema,
 } from "@/lib/services/configs";
 import { getAppSettings } from "@/lib/services/settings";
 import {
@@ -320,6 +322,38 @@ export async function deleteAccountAction(formData: FormData): Promise<ActionRes
 // ---------------------------------------------------------------------------
 // Khai Đàn / Thu Đàn / dọn nhật ký
 // ---------------------------------------------------------------------------
+
+/**
+ * Chọn LOẠI khôi lỗi sẽ cầm đàn: tông môn, máy nhà, hay ai rảnh trước cũng được.
+ *
+ * Lựa chọn được cất trong ngọc giản của đạo hữu (một khoá riêng, không đụng phần nhiệm vụ) và
+ * có hiệu lực NGAY cả với những đàn đang nằm chờ — cửa phát việc đọc thẳng bảng cấu hình chứ
+ * không đọc bản đông lạnh trong dòng job. Đàn đang chạy dở thì đi hết vòng này đã.
+ */
+export async function setWorkerPrefAction(pref: string): Promise<ActionResult> {
+  const user = await requireActiveUser();
+
+  // Giá trị tới từ trình duyệt — soát ở biên, không tin cái nút bấm. Một POST dựng tay không
+  // đi qua radio nào cả, và giá trị lạ nằm trong JSONB sẽ làm mệnh đề lọc bên claim hiểu khác đi.
+  const parsed = workerPrefSchema.safeParse(pref);
+  if (!parsed.success) {
+    return { ok: false, message: "Lựa chọn nơi chạy không hợp lệ — chưa đổi gì cả." };
+  }
+
+  await setWorkerPref(user.id, parsed.data);
+  revalidatePath("/dashboard");
+
+  const tail = "Đàn đang nằm chờ theo ngay; đàn đang chạy dở đi hết vòng này đã.";
+  return {
+    ok: true,
+    message:
+      parsed.data === "sect"
+        ? `Từ giờ đàn của đạo hữu chỉ giao cho khôi lỗi tông môn. ${tail}`
+        : parsed.data === "mine"
+          ? `Từ giờ đàn của đạo hữu chỉ giao cho khôi lỗi máy nhà. ${tail}`
+          : `Từ giờ khôi lỗi nào rảnh trước cũng cầm đàn được. ${tail}`,
+  };
+}
 
 export async function startAction(): Promise<ActionResult> {
   const user = await requireActiveUser();

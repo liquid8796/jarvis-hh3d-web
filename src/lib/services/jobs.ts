@@ -1,9 +1,14 @@
-import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, sql, type SQL } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { listAccountsWithEnvelope } from "./accounts";
-import { getEditableConfig, getStoredConfigForSnapshot, storedConfigSchema } from "./configs";
+import {
+  getEditableConfig,
+  getStoredConfigForSnapshot,
+  storedConfigSchema,
+  type WorkerPref,
+} from "./configs";
 import { getAppSettings } from "./settings";
-import { anyWorkerOnlineFor } from "./workers";
+import { workerOnlineFor } from "./workers";
 import type { WorkerScope } from "@/lib/auth/worker";
 import type { DailyQuotaMemory, JobEventRow, JobRow } from "@/lib/db/schema";
 import type { CycleProgress } from "@/lib/realtime/dashboardTypes";
@@ -109,6 +114,41 @@ export type StartOutcome =
   | { ok: false; error: string };
 
 /**
+ * Dòng nhật ký đầu tiên của một đàn vừa lập: ai sắp tới cầm nó, và nếu chưa ai thì làm gì bây giờ.
+ *
+ * Mỗi lựa chọn một câu riêng chứ không phải một câu chung chèn tên loại: người chọn「máy nhà」mà
+ * máy chưa bật cần lời khuyên KHÁC HẲN người đang chờ khôi lỗi tông môn — một bên tự bật máy là
+ * xong, bên kia chỉ có thể đợi hoặc đổi lựa chọn. Một câu chung sẽ đúng ngữ pháp cho cả hai và
+ * vô dụng với cả hai.
+ */
+function describeWorkerWait(
+  pref: WorkerPref,
+  ready: boolean,
+): { level: "info" | "warning"; message: string } {
+  if (ready) {
+    return {
+      level: "info",
+      message:
+        pref === "sect"
+          ? "Khôi lỗi tông môn đang trực — sẽ tiếp nhận trong giây lát."
+          : pref === "mine"
+            ? "Khôi lỗi máy nhà đang trực — sẽ tiếp nhận trong giây lát."
+            : "Khôi lỗi đang trực — sẽ tiếp nhận trong giây lát.",
+    };
+  }
+
+  return {
+    level: "warning",
+    message:
+      pref === "sect"
+        ? "Đàn này chỉ giao cho khôi lỗi tông môn, mà nó đang vắng — đàn sẽ nằm chờ tới khi nó trực lại. Cần chạy ngay thì đổi「Giao đàn cho」sang máy nhà."
+        : pref === "mine"
+          ? "Đàn này chỉ giao cho khôi lỗi máy nhà, mà chưa máy nào của đạo hữu điểm danh — bật máy ấy lên, hoặc đổi「Giao đàn cho」sang tông môn."
+          : "Chưa thấy khôi lỗi nào điểm danh — đàn pháp sẽ chờ. Cài khôi lỗi riêng ở mục Khôi Lỗi nếu chờ quá lâu.",
+  };
+}
+
+/**
  * Khai Đàn = lập một ý định bền cho MỖI tài khoản đang bật; từng job sống dai qua nhiều
  * vòng như trước. Tài khoản đã có đàn chạy thì để yên — bấm Khai Đàn lần nữa chỉ bổ sung
  * những tài khoản còn đứng ngoài (ví dụ vừa bật thêm một tài khoản mới).
@@ -160,7 +200,9 @@ export async function startJob(userId: string): Promise<StartOutcome> {
   // nên để plaintext ở đây là tự tay dựng lại đúng cái lỗ vừa bịt. Giải mã diễn ra đúng
   // một lần, ở /api/worker, khi khôi lỗi đã xác thực.
   const config = await getStoredConfigForSnapshot(userId);
-  const workerOnline = await anyWorkerOnlineFor(userId);
+  // Hỏi đúng LOẠI khôi lỗi đã chọn, không hỏi chung chung: với đàn giao riêng cho máy nhà thì
+  // một khôi lỗi tông môn đang trực không giúp được gì, và ngược lại.
+  const workerOnline = await workerOnlineFor(userId, config.workerPref);
   const startedLabels: string[] = [];
 
   for (const account of idle) {
@@ -201,15 +243,8 @@ export async function startJob(userId: string): Promise<StartOutcome> {
     // Nói thật NGAY LÚC NÀY nếu chẳng có khôi lỗi nào nhận nổi job — trước đây người dùng chỉ
     // biết điều đó sau sáu phút im lặng, khi reaper kết liễu job. Vẫn cho xếp hàng (một linh
     // sứ có thể lên ca ngay sau đây), nhưng cảnh báo nằm sẵn trong nhật ký.
-    if (workerOnline) {
-      await addEvent(jobId, "info", "Khôi lỗi đang trực — sẽ tiếp nhận trong giây lát.");
-    } else {
-      await addEvent(
-        jobId,
-        "warning",
-        "Chưa thấy khôi lỗi nào điểm danh — đàn pháp sẽ chờ. Cài khôi lỗi riêng ở mục Khôi Lỗi nếu chờ quá lâu.",
-      );
-    }
+    const wait = describeWorkerWait(config.workerPref, workerOnline);
+    await addEvent(jobId, wait.level, wait.message);
 
     startedLabels.push(account.label);
   }
@@ -428,14 +463,11 @@ export async function forceStartJob(stoppedJobId: string, actorName: string): Pr
     "warning",
     `Bậc trị sự「${actorName}」đã khai đàn hộ cho「${account.label}」sau khi đàn trước dừng.`,
   );
-  const workerOnline = await anyWorkerOnlineFor(ownerId);
-  await addEvent(
-    newJobId,
-    workerOnline ? "info" : "warning",
-    workerOnline
-      ? "Khôi lỗi đang trực — sẽ tiếp nhận trong giây lát."
-      : "Chưa thấy khôi lỗi nào điểm danh — đàn pháp sẽ chờ.",
-  );
+  // Lựa chọn loại khôi lỗi là của CHỦ ĐÀN, không phải của bậc trị sự đang bấm nút: đàn khai hộ
+  // vẫn đi đúng con đường mà chủ nhân đã chọn cho mình.
+  const ownerWorkerOnline = await workerOnlineFor(ownerId, config.workerPref);
+  const wait = describeWorkerWait(config.workerPref, ownerWorkerOnline);
+  await addEvent(newJobId, wait.level, wait.message);
 
   await notifyDashboard({ userId: ownerId, topic: "job" });
   return { ok: true, accountLabel: account.label };
@@ -546,6 +578,36 @@ async function mergeDailyQuota(jobId: string, day: string, questIds: string[]): 
 // ---------------------------------------------------------------------------
 
 /**
+ * Mệnh đề lọc theo LOẠI khôi lỗi mà CHỦ ĐÀN đã chọn (Tế đàn auto →「Giao đàn cho」): khôi lỗi
+ * tông môn không được nhìn thấy đàn dành riêng cho máy nhà, và ngược lại.
+ *
+ * Đọc thẳng `user_configs` chứ KHÔNG đọc `config_snapshot` của chính dòng job, dù snapshot cũng
+ * mang trường ấy: snapshot chỉ được làm mới ở ranh giới vòng, nên một đàn đang NẰM CHỜ còn đeo
+ * lựa chọn cũ — đổi ý lúc ấy sẽ chỉ có hiệu lực sau khi đúng cái loại vừa bị loại bỏ tới cầm nó
+ * thêm một lần nữa, tức là không bao giờ nếu loại ấy vừa tắt máy. Mà đó chính là ca người ta đổi
+ * lựa chọn để thoát ra.
+ *
+ * `coalesce(…, 'any')` phủ hai ca thật: document đời trước tính năng này, và người chưa từng bấm
+ * Khắc Ngọc Giản lần nào (chưa có dòng nào trong `user_configs`).
+ *
+ * `<>` chứ không phải `in (…)`: một giá trị lạ lọt vào JSONB — chỉ có thể do sửa tay database —
+ * thì đàn vẫn chạy được bằng CẢ HAI loại, thay vì nằm im mà không dòng nhật ký nào giải thích.
+ * Hỏng theo hướng vẫn phục vụ, không hỏng theo hướng câm lặng.
+ *
+ * Export để `verify:worker-pref` soát ĐÚNG mệnh đề đang chạy thật. Không thể kiểm nhánh tông môn
+ * bằng cách gọi `claimNextJob` trên database thật: claim của khôi lỗi tông môn quét hàng chờ của
+ * CẢ tông môn, nên phép thử sẽ giành mất đàn của một người đang dùng — và một đàn bị cầm bởi một
+ * khôi lỗi không có thật thì ba phút sau bị reaper kết liễu thành `failed`.
+ */
+export function workerPrefFilter(scope: WorkerScope): SQL {
+  const forbidden: WorkerPref = scope.kind === "operator" ? "mine" : "sect";
+  return sql` and coalesce((
+          select uc.config->>'workerPref' from user_configs as uc
+          where uc.user_id = automation_jobs.user_id
+        ), 'any') <> ${forbidden}`;
+}
+
+/**
  * Atomically claim the oldest queued job. The single-UPDATE-with-subselect is the whole
  * locking story: two workers racing get two different rows or one row and one null —
  * Postgres decides, nobody double-runs.
@@ -553,16 +615,21 @@ async function mergeDailyQuota(jobId: string, day: string, questIds: string[]): 
  * Scope là hàng rào phân quyền, không phải tuỳ chọn: khôi lỗi tông môn (operator) nhận job
  * của bất kỳ ai; khôi lỗi riêng chỉ nhìn thấy hàng chờ CỦA CHỦ MÌNH — điều kiện nằm ngay
  * trong câu SQL nên không tồn tại đường nào claim chéo, kể cả khi route quên kiểm.
+ *
+ * Hàng rào THỨ HAI, cùng chỗ và cùng lối: `workerPrefFilter` — loại khôi lỗi mà chủ đàn đã chọn.
+ * Hai mệnh đề trả lời hai câu khác nhau: một cái「được phép nhìn của ai」, một cái「chủ nhân muốn
+ * ai cầm」.
  */
 export async function claimNextJob(workerId: string, scope: WorkerScope): Promise<JobRow | null> {
   const scopeFilter =
     scope.kind === "user" ? sql` and user_id = ${scope.userId}` : sql``;
+  const prefFilter = workerPrefFilter(scope);
 
   const claimed = await db().execute(sql`
     with candidate as (
       select id from automation_jobs
       where status = 'queued'
-        and next_run_at <= now()${scopeFilter}
+        and next_run_at <= now()${scopeFilter}${prefFilter}
         -- Tài khoản đã tắt thì đàn của nó không được phát ra nữa — cửa chặn cho khe đua
         -- hiếm giữa "thu đàn của tài khoản" và "hạ cờ enabled" trong toggleAccountAction.
         and (

@@ -3,6 +3,7 @@ import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hashWorkerToken, type WorkerScope } from "@/lib/auth/worker";
 import type { WorkerRow } from "@/lib/db/schema";
+import type { WorkerPref } from "./configs";
 
 /**
  * Sổ điểm danh khôi lỗi + vòng đời linh phù.
@@ -89,18 +90,24 @@ export async function getPresence(userId: string): Promise<WorkerPresence> {
   };
 }
 
-/** Có BẤT KỲ khôi lỗi nào đang trực nhận được job của user này không (riêng hoặc tông môn). */
-export async function anyWorkerOnlineFor(userId: string): Promise<boolean> {
+/**
+ * Có khôi lỗi ĐÚNG LOẠI đạo hữu đã chọn đang trực để nhận đàn của họ không.
+ *
+ * Luật ở đây phải là bản sao đúng của mệnh đề lọc trong `claimNextJob`: `sect` chỉ tính khôi
+ * lỗi tông môn (`user_id is null`), `mine` chỉ tính khôi lỗi của chính chủ, `any` tính cả hai.
+ * Lệch nhau một nhánh là Khai Đàn hứa「sẽ tiếp nhận trong giây lát」rồi đàn nằm chờ vô hạn —
+ * loại lỗi không ai báo, vì cả hai phía đều tin là mình đúng.
+ */
+export async function workerOnlineFor(userId: string, pref: WorkerPref): Promise<boolean> {
   const cutoff = new Date(Date.now() - ONLINE_WINDOW_MS);
+  const mine = sql`${schema.workers.userId} = ${userId}`;
+  const sect = sql`${schema.workers.userId} is null`;
+  const wanted = pref === "sect" ? sect : pref === "mine" ? mine : sql`(${mine} or ${sect})`;
+
   const rows = await db()
     .select({ n: sql<number>`count(*)::int` })
     .from(schema.workers)
-    .where(
-      and(
-        gt(schema.workers.lastSeen, cutoff),
-        sql`(${schema.workers.userId} = ${userId} or ${schema.workers.userId} is null)`,
-      ),
-    );
+    .where(and(gt(schema.workers.lastSeen, cutoff), wanted));
   return (rows[0]?.n ?? 0) > 0;
 }
 

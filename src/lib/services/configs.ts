@@ -63,6 +63,21 @@ export function sanitizeChatMessage(raw: string): string {
 /** Một lời nhắn đã qua làm sạch; 1000 là trần chống phình trước khi cắt còn 200. */
 const chatMessage = z.string().max(1000).default("").transform(sanitizeChatMessage);
 
+/**
+ * Ai được cầm đàn của một đạo hữu.
+ *
+ *   any  — ai rảnh trước thì nhận. Nếp cũ, và là giá trị của MỌI document chưa có trường này.
+ *   sect — chỉ khôi lỗi tông môn (token vận hành, VM luôn trực).
+ *   mine — chỉ khôi lỗi máy nhà của chính đạo hữu (linh phù).
+ *
+ * Đây chỉ là chỗ CẤT lựa chọn. Luật thật nằm trong câu SQL của `claimNextJob`: một khôi lỗi
+ * không đúng loại thậm chí không NHÌN THẤY đàn ấy trong hàng chờ, nên không có đường nào lách
+ * qua bằng cách gọi thẳng API.
+ */
+export const WORKER_PREFS = ["any", "sect", "mine"] as const;
+export const workerPrefSchema = z.enum(WORKER_PREFS);
+export type WorkerPref = z.infer<typeof workerPrefSchema>;
+
 export const configSchema = z.object({
   /**
    * Cookie đăng nhập của TÀI KHOẢN mà lượt chạy phục vụ.
@@ -101,6 +116,13 @@ export const configSchema = z.object({
    * round-trip an toàn), nhưng không còn ai đọc giá trị này.
    */
   runner: z.enum(["sandbox", "local"]).default("local"),
+  /**
+   * Loại khôi lỗi được phép cầm đàn — xem `WORKER_PREFS`. Lựa chọn hiện ở Tế đàn auto, KHÔNG
+   * ở form Ngọc Giản, nên nó không bao giờ đi qua `saveConfigAction`; `saveConfig` vì thế phải
+   * giữ lại giá trị cũ y như `gameCookie`/`accountTier`, nếu không mỗi lần khắc ngọc giản là
+   * lựa chọn này lặng lẽ về `any`.
+   */
+  workerPref: workerPrefSchema.default("any"),
   quests: z
     .object({
       meCung: z
@@ -313,6 +335,10 @@ export async function saveConfig(userId: string, config: UserConfig): Promise<vo
     ...clean,
     gameCookie: previous.gameCookie,
     accountTier: previous.accountTier,
+    // Lựa chọn loại khôi lỗi sống ở Tế đàn auto, không có ô nào của nó trên form này — nên
+    // `clean` luôn mang giá trị mặc định `any`. Ghi thẳng `clean` xuống là mỗi lần Khắc Ngọc
+    // Giản lại âm thầm trả đàn về cho「ai rảnh cũng được」.
+    workerPref: previous.workerPref,
   });
 
   await db()
@@ -322,6 +348,26 @@ export async function saveConfig(userId: string, config: UserConfig): Promise<vo
       target: schema.userConfigs.userId,
       set: { config: document, updatedAt: sql`now()` },
     });
+}
+
+/**
+ * Ghi lựa chọn loại khôi lỗi — chạm ĐÚNG một khoá của document, không đụng phần còn lại.
+ *
+ * `jsonb_set` thay vì đọc-rồi-ghi cả document: nút này nằm ở Tế đàn auto còn Ngọc Giản là một
+ * form khác trên cùng trang, nên hai đường ghi rất dễ chạy chồng nhau — và một lượt đọc-rồi-ghi
+ * ở đây sẽ nuốt trọn ngọc giản người ta vừa khắc. `true` ở cuối là "tạo khoá nếu chưa có", cần
+ * cho mọi document đời trước tính năng này.
+ *
+ * Upsert chứ không update: đạo hữu chưa từng bấm Khắc Ngọc Giản lần nào thì chưa có dòng nào.
+ */
+export async function setWorkerPref(userId: string, pref: WorkerPref): Promise<void> {
+  await db().execute(sql`
+    insert into user_configs (user_id, config, updated_at)
+    values (${userId}, jsonb_build_object('workerPref', ${pref}::text), now())
+    on conflict (user_id) do update set
+      config = jsonb_set(user_configs.config, '{workerPref}', to_jsonb(${pref}::text), true),
+      updated_at = now()
+  `);
 }
 
 /**

@@ -1346,6 +1346,146 @@ async function main() {
     );
   }
 
+  console.log("\nMê Cung đọc trần huyền tinh từ PHẢN HỒI RƯƠNG");
+
+  // Ba đoạn script này là JavaScript nằm trong JSON: không trình biên dịch nào nhìn thấy chúng,
+  // nên một dấu ngoặc lệch sẽ im lặng cho tới lúc đàn chạy thật trên VM. Ở đây chúng được biên
+  // dịch bằng `new Function` rồi GỌI THẬT trên một DOM giả — cùng lối với các fixture khác của
+  // bộ này: phép kiểm phải chạy đúng đoạn mã sẽ chạy, không phải một bản chép lại.
+  {
+    const mazeProfile = loadProfileForSchema();
+    const maze = mazeProfile.quests.find((q) => q.id === "me-cung");
+    const loopStep = maze.steps.find(
+      (s) => s.action === "repeat" && s.until?.selector?.includes("jvz-cap-full"));
+    const hookSrc = loopStep.steps.find((s) => (s.script || "").includes("__jvzChestHook"))?.script;
+    const readSrc = loopStep.steps.find(
+      (s) => (s.script || "").includes("__jvz_mc_chest") && !(s.script || "").includes("__jvzChestHook"))?.script;
+    const lobbySrc = maze.steps.find(
+      (s) => s.action === "evaluateJavaScript" && (s.script || "").includes("cap-scan"))?.script;
+
+    for (const [label, src] of [["tai nghe rương", hookSrc], ["đọc rương", readSrc], ["quét ở sảnh", lobbySrc]]) {
+      let err = null;
+      try { new Function(`return (${src});`); } catch (e) { err = e.message; }
+      check(`${label}: biên dịch được`, src !== undefined && err === null, err ?? "");
+    }
+
+    const fakeEnv = (dailyText) => {
+      const classList = () => {
+        const set = new Set();
+        return { add: (c) => set.add(c), remove: (c) => set.delete(c), has: (c) => set.has(c) };
+      };
+      const body = { classList: classList() };
+      const counter = dailyText === null ? null : { textContent: dailyText, classList: classList() };
+      const store = new Map();
+      return {
+        body,
+        storage: {
+          getItem: (k) => (store.has(k) ? store.get(k) : null),
+          setItem: (k, v) => store.set(k, String(v)),
+          removeItem: (k) => store.delete(k),
+        },
+        doc: {
+          body,
+          querySelectorAll: (sel) => (sel === ".mc-ht-daily-text" && counter ? [counter] : []),
+          querySelector: (sel) => (sel === ".mc-ht-daily-text" ? counter : null),
+        },
+      };
+    };
+    const runScript = (src, env, capCheck, win = {}) =>
+      new Function("document", "sessionStorage", "window", `return (${src.split("{{capCheck}}").join(capCheck)});`)(
+        env.doc, env.storage, win)();
+    const capped = (env) => env.body.classList.has("jvz-cap-full");
+    const CAP_ON = "đủ trần ngày";
+    const CAP_OFF = "«không kiểm tra»";
+
+    // Đúng con số máy chủ trả về trong bản ghi 11/08: rương RỖNG vì đã đầy trần từ trước —
+    // 2 phút đánh cho ra số 0 ở cả sáu ô vật phẩm.
+    {
+      const env = fakeEnv("Hôm nay đã nhận 385/385 Huyền Tinh");
+      env.storage.setItem("__jvz_mc_chest",
+        JSON.stringify({ total: 385, cap: 385, gain: 0, already: true, at: Date.now() }));
+      const said = runScript(readSrc, env, CAP_ON);
+      check("rương báo 385/385 đã đầy → cắm cờ dừng", capped(env));
+      check("…và nói ra là rương rỗng", said.includes("rương rỗng"), said);
+    }
+    {
+      const env = fakeEnv("Hôm nay đã nhận 120/385 Huyền Tinh");
+      env.storage.setItem("__jvz_mc_chest",
+        JSON.stringify({ total: 120, cap: 385, gain: 35, already: false, at: Date.now() }));
+      const said = runScript(readSrc, env, CAP_ON);
+      check("chưa đầy → KHÔNG cắm cờ", !capped(env));
+      check("…và kể đúng phần vừa được cộng", said.includes("(+35)"), said);
+    }
+    {
+      const env = fakeEnv("Hôm nay đã nhận 385/385 Huyền Tinh");
+      env.storage.setItem("__jvz_mc_chest",
+        JSON.stringify({ total: 385, cap: 385, gain: 0, already: true, at: Date.now() }));
+      check("tắt kiểm tra thì đầy trần cũng không dừng",
+        (runScript(readSrc, env, CAP_OFF), !capped(env)));
+    }
+    // Đường lui: hiệp không lĩnh được rương (đội thua ải, tắt tự mở rương) thì mất bản tin,
+    // nhưng KHÔNG được mất luôn cái cổng chặn.
+    {
+      const env = fakeEnv("Hôm nay đã nhận 1.200/1.200 Huyền Tinh");
+      const said = runScript(readSrc, env, CAP_ON);
+      check("không có số rương → lui về đọc trang, vẫn chặn được", capped(env), said);
+      check("…và dấu chấm hàng nghìn không hoá 1.200/1.200 thành 200/1",
+        said.includes("1200/1200"), said);
+    }
+    {
+      const env = fakeEnv(null);
+      runScript(readSrc, env, CAP_ON);
+      check("không rương, không ô chữ → KHÔNG cắm cờ bừa", !capped(env));
+    }
+    {
+      const env = fakeEnv("Hôm nay đã nhận 385/385 Huyền Tinh");
+      env.storage.setItem("__jvz_mc_chest", "{ hỏng");
+      check("sessionStorage hỏng → không ném, vẫn lui về đọc trang",
+        (runScript(readSrc, env, CAP_ON), capped(env)));
+    }
+
+    // Tai nghe: chạy thật với một fetch giả, xem nó có cất đúng số của máy chủ không.
+    {
+      const env = fakeEnv("Hôm nay đã nhận 0/385 Huyền Tinh");
+      const reward = {
+        huyen_tinh: 0, huyen_tinh_daily_total: 385, huyen_tinh_daily_cap: 385, already_got_items: true,
+      };
+      const response = { clone: () => ({ json: async () => ({ success: true, reward }) }) };
+      let passedThrough = 0;
+      const win = { fetch: async (u) => { passedThrough++; return response; } };
+      const said = runScript(hookSrc, env, CAP_ON, win);
+      check("tai nghe gắn được", said.includes("đã gắn"), said);
+
+      await win.fetch("https://hoathinh3d.one/wp-json/me-cung/v1/claim-boss5-chest");
+      await new Promise((r) => setTimeout(r, 10));
+      const stored = JSON.parse(env.storage.getItem("__jvz_mc_chest") || "null");
+      check("bắt được phản hồi rương và cất đúng số",
+        stored?.total === 385 && stored?.cap === 385 && stored?.already === true,
+        JSON.stringify(stored));
+
+      await win.fetch("https://hoathinh3d.one/wp-json/me-cung/v1/attack");
+      check("lời gọi KHÁC vẫn đi qua nguyên vẹn, không bị nuốt", passedThrough === 2, String(passedThrough));
+
+      check("gắn hai lần là no-op", runScript(hookSrc, env, CAP_ON, win) === "");
+    }
+
+    // Sảnh: xoá số của lượt ghé trước, rồi vẫn phải tự quyết được có mở phòng hay không.
+    {
+      const env = fakeEnv("Hôm nay đã nhận 10/385 Huyền Tinh");
+      env.storage.setItem("__jvz_mc_chest",
+        JSON.stringify({ total: 385, cap: 385, gain: 0, already: true, at: 1 }));
+      runScript(lobbySrc, env, CAP_ON);
+      check("sảnh xoá số rương của lượt ghé trước",
+        env.storage.getItem("__jvz_mc_chest") === null);
+      check("sảnh: chưa đầy → cho mở phòng", !capped(env));
+    }
+    {
+      const env = fakeEnv("Hôm nay đã nhận 385/385 Huyền Tinh");
+      runScript(lobbySrc, env, CAP_ON);
+      check("sảnh: đã đầy → cắm cờ để stopIf chặn ngay, khỏi mở phòng", capped(env));
+    }
+  }
+
   console.log("\nHoang Vực phải CHỨNG MINH đòn đánh đã được ghi nhận");
 
   // Sự cố 06/08: nhật ký báo「Hoang Vực: xong」suốt đêm, cứ 7 phút một lần — đúng bằng

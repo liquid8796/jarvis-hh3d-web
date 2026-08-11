@@ -11,6 +11,52 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.70.0 — Mê Cung hỏi MÁY CHỦ còn bao nhiêu huyền tinh, thay vì nạo chữ khỏi trang
+
+Bản ghi 11/08/2026 (`me-cung-20260811-171336`) bắt trọn một lượt đánh, và cái rương cuối lượt
+nói ra tất cả. `POST /wp-json/me-cung/v1/claim-boss5-chest` trả về:
+
+```json
+"huyen_tinh": 0, "huyen_tinh_daily_total": 385,
+"huyen_tinh_daily_cap": 385, "already_got_items": true
+```
+
+Sáu ô vật phẩm — tu vi, tinh thạch, tiên ngọc, xu khoá, huyền tinh, chủ dược — **rơi số 0 cả
+sáu**. Hai phút đánh không được gì, vì trần ngày đã đầy từ trước. Đó chính là cái mà người dùng
+nhìn thấy dưới dạng「đánh xong một lượt là kẹt」: đàn cứ mở hiệp mới để lĩnh những cái rương rỗng
+cho tới khi hết trần 6 hiệp / 35 phút.
+
+**Nay trần ngày đọc từ phản hồi ấy.** Một bước mới ở đầu thân vòng gắn tai nghe vào `fetch` cho
+đúng một địa chỉ (`claim-boss5-chest`), clone thân phản hồi rồi cất `total`/`cap`/`gain`/
+`already_got_items` vào `sessionStorage`. Bước cuối thân vòng đọc lại, kể ra bằng số của máy
+chủ —「Xong lượt đánh — huyền tinh hôm nay 385/385 (rương rỗng — hôm nay đã lấy hết vật phẩm) —
+ĐÃ ĐẦY TRẦN, dừng ở đây」— rồi cắm cờ cho `until`.
+
+**Vì sao `sessionStorage` chứ không phải `window`:** xong một lượt thì **trang tự nạp lại**. Bản
+ghi có đúng hai `pageview`, cái thứ hai lúc `10:23:50`, ngay sau khi rương được lĩnh. Cú nạp ấy
+xoá sạch `window` — và đó là lý do hai lỗi cũ tồn tại mà không ai thấy: bản tin cuối lượt (đọc
+`window.__jvz`) **chưa chạy lần nào** trong 5 hiệp của một đàn thật, còn cờ `__jvzChatFightSent`
+lẽ ra chặn câu chat sau hiệp đầu thì **gửi lại đủ 5 lần**. `sessionStorage` cùng gốc sống qua
+nạp lại; cả hai lỗi tắt theo.
+
+**Vì sao dám vá `fetch` ở đây** trong khi recorder vừa bỏ hẳn lối ấy: recorder có đường tốt hơn
+(bắt ở tầng driver), một bước quest thì chỉ nói được tiếng DOM. Phạm vi cũng hẹp hơn hẳn — đúng
+một địa chỉ, chỉ đọc, thân được `clone()` nên không ai bị mất body, và mọi nhánh đều trả lại
+đúng promise gốc. Site dùng `fetch` cho toàn bộ API (đã kiểm: 9 chỗ `fetch(`, 0 chỗ
+`XMLHttpRequest`).
+
+**Ở sảnh vẫn kiểm như cũ** — và đó là chỗ quyết định có mở phòng hay không, nên nó phải đứng
+riêng: trang vừa nạp thì con số trên ô chữ là của máy chủ. Bước ấy nay còn xoá số rương của lượt
+ghé trước, vì `sessionStorage` sống lâu hơn một lượt ghé và một con số cũ sẽ làm hiệp đầu dừng
+oan.
+
+**Đường lui còn nguyên:** hiệp nào không lĩnh được rương (đội thua ải, tắt tự động mở rương) thì
+mất bản tin nhưng KHÔNG mất cổng chặn — bước ấy lui về đọc ô chữ trên trang như trước.
+
+19 chốt smoke mới, và chúng **chạy thật ba đoạn script ấy** bằng `new Function` trên một DOM giả
+— kể cả tai nghe, với một `fetch` giả, để chắc nó bắt đúng số, không nuốt lời gọi khác, và gắn
+hai lần là no-op. Đây là loại mã không trình biên dịch nào nhìn thấy: nó nằm trong JSON.
+
 ## 0.69.0 — Mê Cung phải RA KHỎI phòng cũ trước, không chỉ bấm giải tán rồi đi tiếp
 
 Bước「chờ sảnh mê cung render」của Mê Cung là `waitForSelector #lobby-overview`, và nó **chưa

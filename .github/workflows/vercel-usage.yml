@@ -1,0 +1,93 @@
+# Cào bảng Usage của từng trạm rồi đẩy lên tab Gương Trạm.
+#
+# VÌ SAO Ở ĐÂY chứ không phải một dịch vụ cron thường: bảng đầy đủ — gồm Fluid Active CPU và
+# Fluid Provisioned Memory, hai meter siết nhất một tài khoản Hobby — chỉ đọc được bằng cách
+# DỰNG trang Usage trong một trình duyệt thật rồi cuộn cho nó render. Đo ngày 11/08/2026:
+# `fetch` thuần chỉ đúng 1/8 lượt, và thiếu đúng mấy cột ấy. Cron dạng「gọi URL」(cron-job.org,
+# EasyCron…) không mở nổi trình duyệt; function trên Vercel cũng không. GitHub Actions thì có
+# sẵn Chromium, có chỗ cất bí mật tử tế, và miễn phí.
+#
+# COOKIE Ở ĐÂU: trong Secrets của repo, KHÔNG trong database của tông môn. Đó là cả lý do
+# thiết kế này đảo chiều — thứ đi trên dây về web chỉ là tên meter và hai con số đã format,
+# không một credential nào. Cookie phiên Vercel mở được `ENCRYPTION_KEY` của trạm, tức mở được
+# phong bì cookie game của mọi đạo hữu; nó không được phép nằm cạnh chính thứ nó mở.
+#
+# NGÂN SÁCH: repo riêng tư nên gói Free có 2.000 phút Actions/tháng. Mỗi lượt ~4–6 phút cho
+# bốn trạm (cài deps + Chromium + cào). Sáu giờ một lần ≈ 700 phút/tháng — vừa vặn. ĐỪNG hạ
+# xuống mỗi giờ: ~3.600 phút/tháng là vượt trần, và vượt trần thì lịch lặng lẽ thôi chạy.
+#
+# CÀI ĐẶT — ba việc, làm một lần:
+#   1. Settings → Secrets and variables → Actions, thêm:
+#        CRON_SECRET             (đúng giá trị đang đặt trên Vercel)
+#        VERCEL_COOKIE_MAIN      (nội dung tệp cookie JSON của tài khoản giữ trạm `main`)
+#        VERCEL_COOKIE_<TRẠM>    (mỗi trạm một cái, tên viết HOA, gạch nối thành gạch dưới)
+#   2. Sửa `stations` bên dưới cho khớp sổ gương trạm.
+#   3. Actions → Vercel usage → Run workflow, để chạy thử ngay thay vì đợi tới giờ.
+#
+# COOKIE HẾT HẠN thì workflow ĐỎ chứ không im lặng — script từ chối in bảng thiếu. Lúc ấy xuất
+# lại tệp cookie từ trình duyệt và cập nhật secret.
+
+name: Vercel usage
+
+on:
+  schedule:
+    # 6 giờ một lần. Giờ UTC; lịch của GitHub có thể trễ vài phút khi hệ thống bận — không sao,
+    # đây là số liệu 30 ngày chứ không phải nhịp tim.
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+# Một lượt cào đang chạy dở thì lượt mới chờ, không chen: hai lượt cùng ghi vào một dòng sổ là
+# lượt sau đè lượt trước với dữ liệu cũ hơn.
+concurrency:
+  group: vercel-usage
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Chỉ Chromium, không tải cả ba engine — Playwright mặc định kéo cả Firefox lẫn WebKit,
+      # tức thêm vài phút mỗi lượt cho hai thứ không ai dùng.
+      - run: npx playwright install --with-deps chromium
+
+      - name: Cào và đẩy từng trạm
+        env:
+          WEB_URL: ${{ vars.WEB_URL || 'https://auto-hh3d.vercel.app' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VERCEL_COOKIE_MAIN: ${{ secrets.VERCEL_COOKIE_MAIN }}
+          VERCEL_COOKIE_AUTO_HH3D_1: ${{ secrets.VERCEL_COOKIE_AUTO_HH3D_1 }}
+          VERCEL_COOKIE_AUTO_HH3D_2: ${{ secrets.VERCEL_COOKIE_AUTO_HH3D_2 }}
+          VERCEL_COOKIE_AUTO_HH3D_3: ${{ secrets.VERCEL_COOKIE_AUTO_HH3D_3 }}
+        run: |
+          set -u
+          # site|team slug|tên biến chứa cookie. Trạm nào chưa có secret thì BỎ QUA, không gãy:
+          # thêm một trạm vào sổ mà chưa kịp dán cookie là chuyện thường.
+          stations="main|jarvis8796|VERCEL_COOKIE_MAIN
+          auto-hh3d-1|zhangyu4|VERCEL_COOKIE_AUTO_HH3D_1
+          auto-hh3d-2|liquid8796|VERCEL_COOKIE_AUTO_HH3D_2
+          auto-hh3d-3|fatrat080796|VERCEL_COOKIE_AUTO_HH3D_3"
+
+          failed=0
+          echo "$stations" | while IFS='|' read -r site team envname; do
+            site=$(echo "$site" | xargs)
+            [ -z "$site" ] && continue
+            if [ -z "$(eval echo \"\$$envname\")" ]; then
+              echo "— bỏ qua $site: chưa có secret $envname"
+              continue
+            fi
+            echo "── $site ($team)"
+            npx tsx scripts/vercelUsageFull.mts \
+              --cookie-env "$envname" --team "$team" \
+              --push "$WEB_URL" --site "$site" || failed=1
+          done
+          exit $failed

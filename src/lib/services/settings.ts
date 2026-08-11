@@ -195,6 +195,37 @@ export const appSettingsSchema = z.object({
          * đồng bộ, và đã là chỗ giữ hai chuỗi kết nối cùng loại nhạy cảm.
          */
         vercelToken: z.string().default(""),
+        /**
+         * BẢNG USAGE ĐẦY ĐỦ do bên ngoài ĐẨY LÊN — không phải thứ web tự đọc được.
+         *
+         * Vì sao phải đẩy: bảng đầy đủ chỉ lấy được bằng cách dựng trang Usage trong một trình
+         * duyệt thật rồi cuộn cho nó render (đo 11/08/2026: `fetch` thuần chỉ đúng 1/8 lượt, và
+         * thiếu đúng mấy cột Fluid). Function trên Vercel không mở nổi Chromium, nên chỗ có
+         * Chromium — GitHub Actions theo lịch — cào rồi POST vào `/api/usage-report`.
+         *
+         * Ở đây KHÔNG có credential nào: cookie phiên ở lại trong secret của GitHub, chỉ có con
+         * số đi qua dây. Đó là toàn bộ lý do thiết kế này đảo chiều thay vì cho web đi lấy.
+         *
+         * Giữ `used`/`limit` dạng CHUỖI đúng như trang hiển thị ("3h 44m", "217.4 GB-Hrs",
+         * "1.29 GB"). Quy về số thì phải đoán đơn vị cho từng meter, mà đơn vị là thứ Vercel
+         * đổi được — còn chuỗi thì hiện lên đúng bằng thứ người ta thấy trên dashboard.
+         */
+        usageReport: z
+          .object({
+            readAt: z.string(),
+            meters: z
+              .array(
+                z.object({
+                  title: z.string().min(1).max(80),
+                  used: z.string().max(40),
+                  limit: z.string().max(40).nullable().default(null),
+                }),
+              )
+              .max(200),
+          })
+          .nullable()
+          .catch(null)
+          .default(null),
         lastProbeAt: z.string().nullable().catch(null),
         lastProbeOk: z.boolean().nullable().catch(null),
         lastProbeNote: z.string().max(500).catch(""),

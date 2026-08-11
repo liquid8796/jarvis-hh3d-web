@@ -186,6 +186,34 @@ export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
               })}
             </div>
 
+            {/**
+             * BẢNG ĐẦY ĐỦ — do GitHub Actions dựng trang Usage bằng Chromium thật rồi đẩy lên.
+             *
+             * Đứng TRƯỚC bảng API vì nó mới là thứ trả lời câu hỏi người ta mở popup ra để hỏi:
+             * Fluid Active CPU còn bao xa thì chạm trần. Bảng API bên trên chỉ có 2 cột đọc
+             * được, nhưng nó là số ĐANG SỐNG (gọi ngay lúc mở), nên vẫn giữ — hai bảng trả lời
+             * hai câu khác nhau, và mốc thời gian dưới đây nói rõ cái nào cũ hơn.
+             */}
+            {mirror.usageReport && (
+              <div className="mt-5 border-t border-[rgba(232,194,92,0.18)] pt-4">
+                <p className="mb-2 text-xs text-[var(--color-mist)]">
+                  Bảng đầy đủ ({mirror.usageReport.meters.length} meter) — cào lúc{" "}
+                  {new Date(mirror.usageReport.readAt).toLocaleString("vi-VN")}
+                </p>
+                <div className="flex flex-col gap-1">
+                  {mirror.usageReport.meters.map((meter) => (
+                    <div key={meter.title} className="flex items-baseline justify-between gap-3 text-xs">
+                      <span>{meter.title}</span>
+                      <span className="whitespace-nowrap font-mono text-[var(--color-parchment)]">
+                        {meter.used}
+                        {meter.limit ? ` / ${meter.limit}` : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Ba lời thú nhận. Người đọc một bảng số phải biết nó đo cái gì, số nào là do ta
                 tự khai, và — quan trọng nhất — bảng này CÒN THIẾU gì. */}
             <p className="mt-5 border-t border-[rgba(232,194,92,0.18)] pt-3 text-xs text-[var(--color-mist)]">

@@ -41,6 +41,11 @@ export type MirrorView = {
    * Giao diện cần nó để biết nên hiện bảng usage hay hiện lời mời dán token.
    */
   hasVercelToken: boolean;
+  /**
+   * Bảng usage ĐẦY ĐỦ do GitHub Actions cào rồi đẩy lên (`/api/usage-report`). `null` = chưa
+   * lượt nào tới. Ở đây KHÔNG có credential nào — chỉ tên meter và hai con số đã format.
+   */
+  usageReport: { readAt: string; meters: { title: string; used: string; limit: string | null }[] } | null;
 };
 
 const MAX_MIRRORS = 8;
@@ -73,6 +78,7 @@ function viewOf(entry: AppSettings["mirrors"][number]): MirrorView {
     lastProbeOk: entry.lastProbeOk,
     lastProbeNote: entry.lastProbeNote,
     hasVercelToken: isEncrypted(entry.vercelToken ?? ""),
+    usageReport: entry.usageReport ?? null,
   };
 }
 
@@ -189,6 +195,9 @@ export async function saveMirrorAction(_prev: MirrorResult | null, formData: For
     pg: encryptSecret(pgPlain),
     mongo: encryptSecret(mongoPlain),
     vercelToken: vercelPlain ? encryptSecret(vercelPlain) : "",
+    // GIỮ bảng usage đã cào: sửa cái tên trạm mà mất luôn số liệu thì lượt cào kế tiếp còn
+    // sáu tiếng nữa mới tới, và suốt quãng ấy popup trống trơn không ai hiểu vì sao.
+    usageReport: existing?.usageReport ?? null,
     lastProbeAt: new Date().toISOString(),
     lastProbeOk: probe.ok,
     lastProbeNote: probe.note,
@@ -297,6 +306,7 @@ export async function registerSelfAction(): Promise<MirrorResult> {
     // Giữ token đã có, đừng xoá: lượt tự khai này chạy lại được nhiều lần (mỗi lần trạm đổi
     // URL), và env của một trạm KHÔNG mang token Vercel của chính nó — chỉ có người dán tay.
     vercelToken: existing?.vercelToken ?? "",
+    usageReport: existing?.usageReport ?? null,
     lastProbeAt: new Date().toISOString(),
     lastProbeOk: true,
     lastProbeNote: "Tự khai từ env của chính trạm — không cần kiểm mạch, nó đang chạy bằng chính hai chuỗi này.",

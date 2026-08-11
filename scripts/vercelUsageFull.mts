@@ -49,18 +49,29 @@ const arg = (name: string): string | undefined => {
 };
 
 const cookieFile = arg("cookie");
+/**
+ * Trên CI thì cookie ĐI BẰNG BIẾN MÔI TRƯỜNG, không bằng tệp: một tệp credential nằm trên đĩa
+ * của runner là một tệp có thể bị một bước sau vô tình `cat` ra log. Biến thì GitHub tự che.
+ */
+const cookieEnv = arg("cookie-env");
 const team = arg("team");
-if (!cookieFile || !team) {
-  console.error('Cách dùng: npm run usage:full -- --cookie "<đường/dẫn/cookie.json>" --team <slug>');
+if ((!cookieFile && !cookieEnv) || !team) {
+  console.error(
+    'Cách dùng: npm run usage:full -- --cookie "<đường/dẫn/cookie.json>" --team <slug>\n' +
+      "          hoặc --cookie-env <TÊN_BIẾN> khi chạy trên CI\n" +
+      "  đẩy lên web:  --push <https://trạm> --site <mã trạm>   (cần CRON_SECRET trong env)",
+  );
   process.exit(1);
 }
 
 type RawCookie = { name: string; value: string; domain?: string; path?: string };
 let raw: { cookies?: RawCookie[] };
 try {
-  raw = JSON.parse(readFileSync(cookieFile, "utf8")) as { cookies?: RawCookie[] };
+  const source = cookieEnv ? process.env[cookieEnv] : readFileSync(cookieFile!, "utf8");
+  if (!source) throw new Error(`biến ${cookieEnv} rỗng hoặc chưa đặt`);
+  raw = JSON.parse(source) as { cookies?: RawCookie[] };
 } catch (err) {
-  console.error(`Không đọc được tệp cookie: ${err instanceof Error ? err.message : "lỗi lạ"}`);
+  console.error(`Không đọc được cookie: ${err instanceof Error ? err.message : "lỗi lạ"}`);
   process.exit(1);
 }
 const cookies = raw.cookies ?? [];
@@ -236,6 +247,30 @@ try {
   }
   if (meters.length === 0) {
     console.error("Render xong nhưng không cắt được meter nào — xem lại parseUsageText.");
+    process.exit(1);
+  }
+
+  const push = arg("push");
+  const site = arg("site");
+  if (push && site) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) {
+      console.error("Thiếu CRON_SECRET trong env — đó là chìa mở /api/usage-report.");
+      process.exit(1);
+    }
+    const res = await fetch(`${push.replace(/\/$/, "")}/api/usage-report`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ siteId: site, readAt: new Date().toISOString(), meters }),
+    });
+    const detail = await res.text();
+    if (!res.ok) {
+      console.error(`Đẩy lên hỏng: HTTP ${res.status} — ${detail.slice(0, 200)}`);
+      process.exit(1);
+    }
+    console.log(`  ✔ đã đẩy ${meters.length} meter của「${site}」lên ${push}`);
+  } else if (push || site) {
+    console.error("`--push` và `--site` phải đi cùng nhau.");
     process.exit(1);
   }
 

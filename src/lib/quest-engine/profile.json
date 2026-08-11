@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 51,
+  "schemaVersion": 52,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -1877,32 +1877,50 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 8000,
-          "note": "c\u00F2n ph\u00F2ng c\u0169 t\u1EEB l\u01B0\u1EE3t tr\u01B0\u1EDBc?",
+          "note": "c\u00F2n k\u1EB9t trong ph\u00F2ng t\u1EEB l\u01B0\u1EE3t tr\u01B0\u1EDBc?",
           "optional": true,
           "condition": {
             "kind": "visible",
-            "selector": "#btn-disband-room"
+            "selector": "#btn-disband-room, #btn-leave-room"
           }
         },
         {
           "action": "click",
           "selector": "#btn-disband-room",
           "timeoutMs": 6000,
-          "note": "gi\u1EA3i t\u00E1n ph\u00F2ng c\u0169",
-          "optional": true
+          "note": "gi\u1EA3i t\u00E1n ph\u00F2ng c\u0169 \u2014 l\u1ED1i c\u1EE7a ch\u1EE7 ph\u00F2ng",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#btn-disband-room"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#btn-leave-room",
+          "timeoutMs": 6000,
+          "note": "r\u1EDDi ph\u00F2ng ng\u01B0\u1EDDi kh\u00E1c \u2014 l\u1ED1i c\u1EE7a th\u00E0nh vi\u00EAn",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#btn-leave-room"
+          }
         },
         {
           "action": "click",
           "selector": "#confirm-overlay .confirm-btn-ok",
           "timeoutMs": 6000,
-          "note": "x\u00E1c nh\u1EADn gi\u1EA3i t\u00E1n ph\u00F2ng c\u0169",
+          "note": "x\u00E1c nh\u1EADn r\u1EDDi/gi\u1EA3i t\u00E1n",
           "optional": true
         },
         {
-          "action": "waitForSelector",
-          "selector": "#lobby-overview",
+          "action": "waitForCondition",
           "timeoutMs": 25000,
-          "note": "ch\u1EDD s\u1EA3nh m\u00EA cung render \u2014 t\u1EDBi \u0111\u00E2y ch\u1EAFc ch\u1EAFn \u0111ang \u1EDF s\u1EA3nh, kh\u00F4ng \u1EDF trong ph\u00F2ng"
+          "note": "ch\u1EDD s\u1EA3nh m\u00EA cung HI\u1EC6N ra \u2014 t\u1EDBi \u0111\u00E2y m\u1EDBi ch\u1EAFc ch\u1EAFn \u0111\u00E3 ra kh\u1ECFi ph\u00F2ng",
+          "condition": {
+            "kind": "visible",
+            "selector": "#lobby-overview"
+          }
         },
         {
           "action": "waitForSelector",
@@ -2873,32 +2891,50 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 8000,
-          "note": "c\u00F2n ph\u00F2ng c\u0169 t\u1EEB l\u01B0\u1EE3t tr\u01B0\u1EDBc?",
+          "note": "c\u00F2n k\u1EB9t trong ph\u00F2ng t\u1EEB l\u01B0\u1EE3t tr\u01B0\u1EDBc?",
           "optional": true,
           "condition": {
             "kind": "visible",
-            "selector": "#btn-disband-room"
+            "selector": "#btn-disband-room, #btn-leave-room"
           }
         },
         {
           "action": "click",
           "selector": "#btn-disband-room",
           "timeoutMs": 6000,
-          "note": "gi\u1EA3i t\u00E1n ph\u00F2ng c\u0169",
-          "optional": true
+          "note": "gi\u1EA3i t\u00E1n ph\u00F2ng c\u0169 \u2014 l\u1ED1i c\u1EE7a ch\u1EE7 ph\u00F2ng",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#btn-disband-room"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#btn-leave-room",
+          "timeoutMs": 6000,
+          "note": "r\u1EDDi ph\u00F2ng ng\u01B0\u1EDDi kh\u00E1c \u2014 l\u1ED1i c\u1EE7a th\u00E0nh vi\u00EAn",
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#btn-leave-room"
+          }
         },
         {
           "action": "click",
           "selector": "#confirm-overlay .confirm-btn-ok",
           "timeoutMs": 6000,
-          "note": "x\u00E1c nh\u1EADn gi\u1EA3i t\u00E1n ph\u00F2ng c\u0169",
+          "note": "x\u00E1c nh\u1EADn r\u1EDDi/gi\u1EA3i t\u00E1n",
           "optional": true
         },
         {
-          "action": "waitForSelector",
-          "selector": "#lobby-overview",
+          "action": "waitForCondition",
           "timeoutMs": 25000,
-          "note": "ch\u1EDD s\u1EA3nh m\u00EA cung render \u2014 t\u1EDBi \u0111\u00E2y ch\u1EAFc ch\u1EAFn \u0111ang \u1EDF s\u1EA3nh, kh\u00F4ng \u1EDF trong ph\u00F2ng"
+          "note": "ch\u1EDD s\u1EA3nh m\u00EA cung HI\u1EC6N ra \u2014 t\u1EDBi \u0111\u00E2y m\u1EDBi ch\u1EAFc ch\u1EAFn \u0111\u00E3 ra kh\u1ECFi ph\u00F2ng",
+          "condition": {
+            "kind": "visible",
+            "selector": "#lobby-overview"
+          }
         },
         {
           "action": "waitForSelector",

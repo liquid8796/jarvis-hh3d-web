@@ -11,6 +11,40 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.69.0 — Mê Cung phải RA KHỎI phòng cũ trước, không chỉ bấm giải tán rồi đi tiếp
+
+Bước「chờ sảnh mê cung render」của Mê Cung là `waitForSelector #lobby-overview`, và nó **chưa
+bao giờ chặn được gì**. Bản ghi 11/08/2026 (`me-cung-bonus-20260811-153934`) chụp DOM ở hai
+thời điểm — lúc đang trong phòng và lúc đã về sảnh — và cả hai đều có đủ `#lobby-overview`,
+`#btn-disband-room`, `#btn-start`, `#btn-leave-room`. Trang **không đổi DOM khi vào phòng**, nó
+bật/tắt class `hidden` (`.hidden{display:none!important}`, lấy từ chính CSS trong bản ghi).
+
+Nên `waitForSelector` qua ngay lập tức trong mọi hoàn cảnh, kể cả khi lượt chạy còn kẹt trong
+phòng của lượt trước; và lời chú thích của chính bước ấy —「tới đây chắc chắn đang ở sảnh, không
+ở trong phòng」— là một lời hứa suông. Lượt chạy đi thẳng xuống bấm「Lập Đội」trên một cái nút
+đang bị khung phòng che.
+
+Nay cổng ấy hỏi **hiển thị** (`waitForCondition` / `visible`), và **không optional**: không ra
+nổi khỏi phòng thì lượt ấy hỏng ồn ào, thay vì lặng lẽ đi tạo phòng chồng lên phòng cũ.
+
+**Site có HAI lối ra khỏi phòng, không phải một.**「Giải Tán」(`#btn-disband-room`) cho chủ
+phòng và「Rời Phòng」(`#btn-leave-room`) cho thành viên — bản ghi có đủ cả hai trong DOM, cái
+không dùng tới thì mang `hidden`. Trước bản này chỉ có lối giải tán, nên một tài khoản lỡ vào
+phòng người khác sẽ kẹt lại **vĩnh viễn**: lượt nào cũng dò không thấy nút giải tán, rồi vẫn đi
+tiếp và hỏng ở chỗ khác. Nay lượt dò soi cả hai, và mỗi cú bấm gác theo hiển thị của đúng nút
+mình nên bấm nên hai lối không dẫm nhau.
+
+**Còn một khe hẹp chưa bịt được, nói thẳng ra đây:** trang vẽ SẢNH TRƯỚC rồi mới hỏi
+`/wp-json/me-cung/v1/user-status` và lật sang khung phòng. Trong khoảnh khắc đầu tiên,「đang ở
+sảnh」là một câu trả lời sai. Lượt dò 8 giây ở đầu chính là cửa sổ chờ site trả lời; site chậm
+hơn ngần ấy thì cổng vẫn qua nhầm. Bịt hẳn thì cần một dấu hiệu「user-status đã về」trên DOM, mà
+bản ghi không cho thấy cái nào.
+
+**Hồ sơ lên schema 52** (bản desktop sẽ thay hồ sơ đã lưu ngay lần mở đầu tiên — phải bật lại
+nhiệm vụ và chọn lại tuỳ chọn). 14 chốt smoke mới, 7 cho mỗi bản sinh đôi VIP/thường; cả 15 chốt
+(kèm chốt schema) đã được chạy ngược lên hồ sơ ở `HEAD` để chắc chúng **đỏ được** — không có
+phép kiểm chết. Bản desktop nhận cùng thay đổi ở 1.52.0.
+
 ## 0.68.0 — nhiệm vụ ngày đã đủ lượt thì thôi mở lại
 
 Chín nhiệm vụ ngày (Điểm Danh, Phúc Lợi Đường, Hoang Vực, Thí Luyện, Tế Lễ, Phúc Lợi VIP, Vòng

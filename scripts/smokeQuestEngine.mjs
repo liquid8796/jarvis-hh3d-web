@@ -1276,12 +1276,75 @@ async function main() {
   );
   const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
   check(
-    // 51 = chat Mê Cung (recording 08/08). Bump schema là thay hồ sơ đã lưu bên desktop
-    // ngay lần mở đầu tiên — chốt này bắt mỗi cú bump phải là một quyết định có chủ ý.
-    "hồ sơ đang ở schema 51",
-    loadProfileForSchema().schemaVersion === 51,
+    // 52 = cổng ra khỏi phòng Mê Cung (bản ghi 11/08). Bump schema là thay hồ sơ đã lưu bên
+    // desktop ngay lần mở đầu tiên — chốt này bắt mỗi cú bump phải là một quyết định có chủ ý.
+    "hồ sơ đang ở schema 52",
+    loadProfileForSchema().schemaVersion === 52,
     String(loadProfileForSchema().schemaVersion),
   );
+
+  console.log("\nMê Cung phải RA KHỎI PHÒNG trước khi mở phòng mới");
+
+  // Bản ghi 11/08/2026 (me-cung-bonus-20260811-153934) chụp DOM ở hai thời điểm và cả hai đều
+  // có đủ #lobby-overview, #btn-disband-room, #btn-start, #btn-leave-room — trang chỉ bật/tắt
+  // class `hidden`. Nên bước cũ `waitForSelector #lobby-overview` QUA NGAY LẬP TỨC kể cả khi
+  // còn kẹt trong phòng, và lượt chạy đi thẳng xuống bấm "Lập Đội" trên một cái nút bị che.
+  // Ba chốt dưới đây giữ đúng chỗ ấy: cổng phải HỎI HIỂN THỊ, phải chặn thật, và phải đứng
+  // trước cú bấm tạo phòng.
+  for (const mazeId of ["me-cung", "me-cung-thuong"]) {
+    const maze = loadProfileForSchema().quests.find((q) => q.id === mazeId);
+    const gateAt = maze.steps.findIndex(
+      (s) => s.condition?.selector === "#lobby-overview" && s.condition?.kind === "visible",
+    );
+    const createAt = maze.steps.findIndex(
+      (s) => s.action === "click" && s.selector === "#lobby-overview .btn-create-room",
+    );
+
+    check(
+      `${mazeId}: cổng vào sảnh hỏi HIỂN THỊ, không phải chỉ có mặt trong DOM`,
+      gateAt >= 0 && maze.steps[gateAt].action === "waitForCondition",
+      maze.steps[gateAt]?.action ?? "(không có cổng nào)",
+    );
+    check(
+      `${mazeId}: cổng ấy KHÔNG optional — không ra nổi khỏi phòng thì phải hỏng ồn ào`,
+      gateAt >= 0 && maze.steps[gateAt].optional !== true,
+      String(maze.steps[gateAt]?.optional),
+    );
+    check(
+      `${mazeId}: cổng đứng TRƯỚC cú bấm "Lập Đội"`,
+      gateAt >= 0 && createAt > gateAt,
+      `cổng@${gateAt} < tạo phòng@${createAt}`,
+    );
+    check(
+      `${mazeId}: KHÔNG còn bước waitForSelector nào trên #lobby-overview`,
+      !maze.steps.some((s) => s.action === "waitForSelector" && s.selector === "#lobby-overview"),
+    );
+
+    // Site phát hai nút ra khỏi phòng: "Giải Tán" cho chủ phòng, "Rời Phòng" cho thành viên.
+    // Chỉ soi nút giải tán thì một tài khoản lỡ vào phòng người khác kẹt lại vĩnh viễn.
+    const detect = maze.steps.find(
+      (s) => s.action === "waitForCondition" && s.condition?.selector?.includes("#btn-disband-room"),
+    );
+    check(
+      `${mazeId}: lượt dò kẹt-trong-phòng soi cả hai lối ra`,
+      detect?.condition?.selector?.includes("#btn-leave-room") === true,
+      detect?.condition?.selector,
+    );
+    const leave = maze.steps.find((s) => s.action === "click" && s.selector === "#btn-leave-room");
+    check(
+      `${mazeId}: có bước rời phòng của thành viên, và nó gác theo hiển thị`,
+      leave?.when?.kind === "visible" && leave?.when?.selector === "#btn-leave-room",
+      JSON.stringify(leave?.when),
+    );
+    const disband = maze.steps.find(
+      (s) => s.action === "click" && s.selector === "#btn-disband-room",
+    );
+    check(
+      `${mazeId}: bước giải tán cũng gác theo hiển thị — hai lối không dẫm nhau`,
+      disband?.when?.kind === "visible" && disband?.when?.selector === "#btn-disband-room",
+      JSON.stringify(disband?.when),
+    );
+  }
 
   console.log("\nHoang Vực phải CHỨNG MINH đòn đánh đã được ghi nhận");
 

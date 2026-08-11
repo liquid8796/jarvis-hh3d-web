@@ -477,9 +477,9 @@ body {
    bằng path. Đã ba lần dựng lại theo bản mẫu và cả ba đều trượt — không nét tay nào chép nổi
    quầng sáng, vân mây và lớp chuyển màu của một tấm ảnh.
 
-   Nay khung CHÍNH LÀ tấm ảnh ấy (`/chat-frame.webp`, 1448×1086, 38KB), còn giao diện thật chỉ
-   là những vùng trong suốt đặt trùng lên. Ba nút tròn, ô nhập và cả dòng chữ mời đều đã nằm
-   trong ảnh: đừng vẽ lại bất cứ cái nào, thêm một icon là đè hai lớp lên nhau.
+   Nay khung CHÍNH LÀ tấm ảnh ấy (`/chat-frame.webp`, 1372×1059, 24KB, CÓ kênh alpha), còn giao
+   diện thật chỉ là những vùng trong suốt đặt trùng lên. Ba nút tròn, ô nhập và cả dòng chữ mời
+   đều đã nằm trong ảnh: đừng vẽ lại bất cứ cái nào, thêm một icon là đè hai lớp lên nhau.
 
    Mọi toạ độ dưới đây là PHẦN TRĂM của ảnh gốc, chép từ bản dựng ở /chat-frame. Khung giữ
    nguyên tỉ lệ 4:3 nên phần trăm bám đúng chỗ ở mọi cỡ màn hình. */
@@ -487,8 +487,9 @@ body {
   position: relative;
   /* Rộng hết mức có thể NHƯNG không cao quá khung nhìn: `calc((100dvh - 190px) * 4/3)` là bề
      rộng lớn nhất mà chiều cao (rộng × 3/4) vẫn còn chỗ cho thanh đầu trang và dòng ký tên. */
-  /* Tỉ lệ của tấm ảnh SAU KHI CẮT rìa nền thừa (1372×1059). Cắt rồi thì mép ảnh gần như
-     trùng nét viền, nên không còn dải nền đặc chìa ra ngoài khung nữa.
+  /* Tỉ lệ của tấm ảnh SAU KHI CẮT rìa nền thừa (1372×1059). Lượt cắt ấy chỉ làm dải nền đặc
+     mỏng đi chứ KHÔNG dứt được nó — xem chú thích ở `.chat-frame-img`, chỗ dứt hẳn là kênh
+     alpha. Tỉ lệ vẫn phải khớp đúng tấm ảnh, vì mọi toạ độ % dưới đây đo trên nó.
      Hệ số 1.15: đạo hữu yêu cầu nới khung thêm 15% ngày 10/08/2026. `min(100%, …)` vẫn kẹp
      bề ngang, nên trên màn hẹp khung thu lại theo bề rộng thay vì tràn ra ngoài. */
   width: min(100%, calc((100dvh - 190px) * 1.15 * 1372 / 1059));
@@ -499,11 +500,22 @@ body {
   container-type: inline-size;
 }
 
-/* Tấm ảnh KHÔNG có kênh trong suốt (3 kênh, đã đo) — mép ngoài của nó là một mảng lam thẫm
-   đặc. Trong bản mẫu điều đó vô hình vì nền trang cũng đúng màu ấy, nhưng ở đây nó nằm trên
-   ảnh nền tiên hiệp nên hiện ra thành một khối chữ nhật cứng. Bo góc cho mép mềm lại và thả
-   một quầng tối xuống dưới để tấm khung "đậu" trên nền thay vì bị dán lên. Chỉ đụng phần rìa
-   thừa — không nét hoa văn nào bị cắt, vì viền vàng nằm sâu hơn thế nhiều. */
+/* Tấm ảnh MANG kênh trong suốt từ 10/08/2026: mọi thứ ngoài viền vàng đã bị khoét rỗng, nên
+   nền tiên hiệp ăn thẳng tới nét vàng và không còn khối chữ nhật nào chìa ra sau khung.
+
+   Hai nấc trước đều chỉ làm nhẹ chứ không dứt: cắt bớt rìa (1448×1086 → 1372×1059) rút dải đặc
+   xuống ~8px ở giữa mỗi cạnh, nhưng ở GÓC thì hoa văn lượn vào trong nên dải ấy vẫn dày 26px
+   theo đường chéo — bo góc không giấu nổi, vì cái cần giấu không phải hình vuông. Phép khoét
+   là LOANG TỪ MÉP (không phải xoá theo màu): ruột khung cũng lam thẫm, xoá theo màu là thủng
+   giữa sảnh. Vòng viền vàng khép kín chặn lượt loang lại — đã đo, và cỡ tệp còn giảm 34%.
+
+   `drop-shadow` chứ KHÔNG `box-shadow`: box-shadow đổ theo HỘP của thẻ, nên với một tấm ảnh
+   đã khoét rỗng nó vẽ lại đúng cái chữ nhật vừa bỏ công xoá đi. `drop-shadow` bám theo hình
+   dáng thật của kênh alpha. Cũng vì thế không còn `border-radius`: không còn góc đặc để bo.
+
+   Con số đổi 24px/70px → 18px/40px không phải gu: bán kính mờ của `drop-shadow` là ĐỘ LỆCH
+   CHUẨN, còn của `box-shadow` là hai lần độ lệch chuẩn — chép nguyên 70px sang là quầng tối
+   rộng gấp đôi. 40 ≈ 70/2 làm tròn lên, và độ dời hạ theo cho cân. */
 .chat-frame-img {
   position: absolute;
   inset: 0;
@@ -511,8 +523,7 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  border-radius: clamp(8px, 1.1cqw, 16px);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  filter: drop-shadow(0 18px 40px rgba(0, 0, 0, 0.55));
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;

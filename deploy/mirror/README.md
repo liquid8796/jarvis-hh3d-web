@@ -244,30 +244,35 @@ tài khoản ấy) → `DATABASE_URL=<db trạm> node scripts/migrate.mjs` → v
 chính, thêm trạm vào sổ, bấm「Kiểm mạch」(probe chỉ-đọc: nối được PG? Mongo? schema đủ 21+
 migration? URL trả 200?). Trạm nằm im ở chế độ chuyển hướng cho tới ngày được chọn.
 
-**Dựng trạm mới bằng LỆNH, không cần bấm dashboard** (đã chạy thật 11/08/2026 khi dựng trạm
-thứ ba `auto-hh3d-2` trên tài khoản `liquid8796` / team `freecoursecademy`):
+### Dựng trạm mới: BẤM ĐÚP `new-mirror-station.bat`
 
-```bash
-# 1. Project — framework nextjs; vercel.json vẫn là thứ thắng preset (bẫy 2 ở trên)
-curl -X POST "https://api.vercel.com/v9/projects?teamId=<TEAM>" -H "Authorization: Bearer <TOKEN>" \
-     -H "Content-Type: application/json" -d '{"name":"auto-hh3d-2","framework":"nextjs"}'
+Nó hỏi hai câu — mã trạm và token của tài khoản Vercel — rồi làm trọn: tạo project, dựng hai
+kho free, chép bí mật chung, đặt `SITE_ID`, chạy migration, ghi vào sổ ở đúng trạm hoạt động.
+Xong thì bấm `deploy-all-stations.bat` và bấm「Kiểm mạch」trên admin. Hết.
 
-# 2. Hai kho FREE, tự nối vào project. Chạy trong thư mục có .vercel/project.json của trạm mới.
-vercel integration add neon          --plan free_v3 --name jarvis-hh3d       --non-interactive --no-env-pull
-vercel integration add mongodbatlas  --plan FREE    --name atlas-jarvis-chat --non-interactive --no-env-pull
-```
+Token gõ ở chế độ ẩn rồi được cất vào `.env.local` dưới cái tên suy từ mã trạm
+(`auto-hh3d-3` → `VERCEL_TOKEN_AUTO_HH3D_3`) — nên `deploy:all` nhặt được ngay, không phải khai
+thêm ở đâu. Muốn xem trước mà chưa tạo gì: `npm run mirror:new -- --site auto-hh3d-3 --dry-run`.
 
-`vercel integration add` CÓ `--non-interactive` và `--plan`, nên không phải bấm dashboard —
-điều mà bản checklist đầu không biết. Hai điều kiện: integration phải **đã được cài trên team**
-(lần đầu cài đòi chấp thuận điều khoản, và việc ấy CỐ Ý bắt buộc có người thật), và tên gói lấy
-bằng `vercel integration add <tên> --help` (`free_v3` cho Neon, `FREE` cho Atlas).
+**Chuẩn bị đúng MỘT thứ bằng tay:** tài khoản Vercel phải có **team**, và team ấy phải **đã cài
+Neon + MongoDB Atlas**. Lần đầu cài một integration đòi chấp thuận điều khoản pháp lý, và Vercel
+CỐ Ý bắt buộc có người thật — không script nào vượt được, và cũng không nên. Script kiểm điều
+kiện ấy TRƯỚC KHI tạo bất cứ thứ gì rồi dừng kèm lệnh cần chạy, thay vì tạo nửa chừng rồi bỏ lại
+rác trên tài khoản.
 
-Hai kho ấy tự tiêm sẵn `DATABASE_URL` và `MONGODB_URI` — tức hai trong ba biến riêng đã xong,
-chỉ còn `SITE_ID` và bộ bí mật chung phải đặt tay. **Tuyệt đối không đặt `MONGODB_DB`.**
+Bốn điều script biết mà người làm tay hay quên — ghi lại ở đây vì chúng cũng đúng cho ai dựng
+tay (đo thật 11/08/2026 khi dựng `auto-hh3d-2` trên tài khoản `liquid8796`/`freecoursecademy`):
 
-**Ghi vào sổ thì phải ghi ở TRẠM ĐANG HOẠT ĐỘNG.** Sổ ở trạm dự phòng chỉ là ảnh chụp từ lượt
-chuyển gần nhất; ghi vào đó là ghi vào thứ sẽ bị đè. Trang admin tự lo điều này (server action
-gác bằng `activeSiteCheck`), nhưng ai thao tác bằng script thì phải tự nhớ.
+1. `vercel integration add` **có** `--non-interactive` và `--plan`, nên không phải bấm dashboard.
+   Tên gói tra bằng `vercel integration add <tên> --help`: `free_v3` cho Neon, `FREE` cho Atlas —
+   đoán là hỏng.
+2. Hai kho tự tiêm sẵn `DATABASE_URL` và `MONGODB_URI`, tức hai trong ba biến riêng đã xong. Chỉ
+   còn `SITE_ID` và bộ bí mật chung phải đặt tay. **Tuyệt đối không đặt `MONGODB_DB`.**
+3. **Ghi vào sổ phải ghi ở TRẠM ĐANG HOẠT ĐỘNG.** Sổ ở trạm dự phòng chỉ là ảnh chụp từ lượt
+   chuyển gần nhất; ghi vào đó là ghi vào thứ sẽ bị đè. Trang admin tự lo (server action gác bằng
+   `activeSiteCheck`), người thao tác bằng script thì phải tự nhớ.
+4. Mã trạm sống ở BA chỗ cùng lúc — `SITE_ID`, tên project, nhãn hostname — nên nó chịu ràng buộc
+   gắt nhất của cả ba: chữ thường, số, gạch ngang, không mở đầu/kết thúc bằng gạch ngang.
 
 **Dấu hiệu trạm mới đã sống đúng: `curl /` trả 307** về trạm hoạt động. Để ra được 307 nó phải
 dựng nổi URL bảng điều phối (`OCI_REGION/NAMESPACE/BUCKET`) VÀ xác minh xong chữ ký HMAC

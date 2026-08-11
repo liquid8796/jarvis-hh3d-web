@@ -91,8 +91,46 @@ export type Resolution =
   | { ok: true; target: ProjectRef }
   | { ok: false; message: string };
 
+const VERCEL_HOST_SUFFIX = ".vercel.app";
+
 /** Chỉ `VERCEL_TOKEN` và `VERCEL_TOKEN_<HẬU TỐ>` — không quét bừa mọi biến bắt đầu bằng VERCEL_. */
 const TOKEN_ENV_PATTERN = /^VERCEL_TOKEN(_[A-Z0-9_]+)?$/;
+
+/**
+ * Mã trạm phải sống được ở BA nơi cùng lúc, nên nó chịu ràng buộc chặt nhất của cả ba: `SITE_ID`
+ * trong env, tên project trên Vercel, và một nhãn hostname trong `https://<mã>.vercel.app`.
+ *
+ * Nhãn hostname là ràng buộc gắt nhất (RFC 1123): chữ thường, số, gạch ngang; không mở đầu hay
+ * kết thúc bằng gạch ngang; tối đa 63 ký tự. Ép ở đây để một mã sai bị chặn TRƯỚC khi kịp tạo
+ * project — chứ không phải lộ ra ở lượt deploy đầu tiên, lúc đã có rác nằm trên tài khoản.
+ */
+export function validateSiteId(raw: string): { ok: true; siteId: string } | { ok: false; message: string } {
+  const siteId = raw.trim();
+  if (!siteId) return { ok: false, message: "Thiếu mã trạm." };
+  if (siteId.length > 63) return { ok: false, message: `Mã trạm dài ${siteId.length} ký tự — nhãn hostname tối đa 63.` };
+  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(siteId)) {
+    return {
+      ok: false,
+      message:
+        `Mã trạm「${siteId}」không hợp lệ. Chỉ chữ thường, số và gạch ngang; ` +
+        "không mở đầu/kết thúc bằng gạch ngang (lệ đặt tên: auto-hh3d-<số>).",
+    };
+  }
+  return { ok: true, siteId };
+}
+
+/** Địa chỉ trạm suy từ mã — nghịch đảo của `projectNameFromUrl`, giữ hai hàm khớp nhau. */
+export function stationUrlFor(siteId: string): string {
+  return `https://${siteId}${VERCEL_HOST_SUFFIX}`;
+}
+
+/**
+ * Tên biến env giữ token của một trạm. Suy từ mã trạm nên không ai phải nghĩ ra tên, và
+ * `discoverTokens` nhặt được ngay vì nó khớp `VERCEL_TOKEN_<HẬU TỐ>`.
+ */
+export function tokenEnvNameFor(siteId: string): string {
+  return `VERCEL_TOKEN_${siteId.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
+}
 
 /**
  * Mọi token Vercel khai trong env, theo thứ tự tất định.
@@ -118,8 +156,6 @@ export function discoverTokens(env: Record<string, string | undefined>): TokenSo
   // `VERCEL_TOKEN` (trạm chính) lên đầu cho dễ đọc nhật ký; còn lại giữ thứ tự chữ cái.
   return found.sort((a, b) => Number(b.envName === "VERCEL_TOKEN") - Number(a.envName === "VERCEL_TOKEN"));
 }
-
-const VERCEL_HOST_SUFFIX = ".vercel.app";
 
 /**
  * Tên project Vercel suy từ `url` của trạm.

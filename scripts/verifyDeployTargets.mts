@@ -5,7 +5,16 @@
  * cú đoán sai không làm hỏng build mà làm mã của tông môn hạ cánh xuống project của người khác,
  * và không có phép kiểm nào ở hạ nguồn bắt được điều đó.
  */
-import { chooseBook, discoverTokens, projectNameFromUrl, resolveTarget, type ProjectRef } from "./deployTargets.mts";
+import {
+  chooseBook,
+  discoverTokens,
+  projectNameFromUrl,
+  resolveTarget,
+  stationUrlFor,
+  tokenEnvNameFor,
+  validateSiteId,
+  type ProjectRef,
+} from "./deployTargets.mts";
 
 let passed = 0;
 function ok(condition: boolean, label: string): void {
@@ -102,6 +111,40 @@ function ok(condition: boolean, label: string): void {
 
   const badUrl = resolveTarget({ id: "la", name: "Lạ", url: "https://tongmon.example.com" }, catalog);
   ok(!badUrl.ok, "trạm dùng custom domain → từ chối ở bước tra, không phát hành nhầm");
+}
+
+// ---- Mã trạm: một cái tên sống ở ba nơi -------------------------------------------------------
+// Ép ở đây để mã sai bị chặn TRƯỚC khi tạo project, chứ không lộ ra ở lượt deploy đầu — lúc ấy
+// đã có rác nằm trên tài khoản người ta.
+{
+  const bad = (raw: string, why: string) => ok(!validateSiteId(raw).ok, `mã「${raw}」phải bị từ chối — ${why}`);
+  const good = (raw: string, want: string) => {
+    const r = validateSiteId(raw);
+    ok(r.ok && r.siteId === want, `mã「${raw}」hợp lệ → ${want}`);
+  };
+
+  good("auto-hh3d-3", "auto-hh3d-3");
+  good("  auto-hh3d-3  ", "auto-hh3d-3");
+  good("a", "a");
+  bad("", "rỗng");
+  bad("Auto-HH3D", "có chữ hoa — hostname không phân biệt hoa thường, nhưng SITE_ID thì có");
+  bad("-auto", "mở đầu bằng gạch ngang");
+  bad("auto-", "kết thúc bằng gạch ngang");
+  bad("auto_hh3d", "gạch dưới không hợp lệ trong nhãn hostname");
+  bad("auto hh3d", "khoảng trắng");
+  bad("auto.hh3d", "dấu chấm — sẽ thành hai nhãn hostname");
+  bad("x".repeat(64), "quá 63 ký tự");
+  ok(validateSiteId("x".repeat(63)).ok, "đúng 63 ký tự vẫn nhận — biên trên, không lệch một");
+
+  ok(stationUrlFor("auto-hh3d-3") === "https://auto-hh3d-3.vercel.app", "mã → địa chỉ trạm");
+  const roundTrip = projectNameFromUrl(stationUrlFor("auto-hh3d-3"));
+  ok(roundTrip.ok && roundTrip.name === "auto-hh3d-3", "địa chỉ dựng ra rồi đọc ngược lại vẫn đúng mã — hai hàm khớp nhau");
+
+  ok(tokenEnvNameFor("auto-hh3d-3") === "VERCEL_TOKEN_AUTO_HH3D_3", "mã → tên biến token");
+  ok(
+    discoverTokens({ [tokenEnvNameFor("auto-hh3d-3")]: "tok" }).length === 1,
+    "…và tên ấy được discoverTokens nhặt ngay, không phải khai thêm ở đâu",
+  );
 }
 
 // ---- Đọc sổ ở đâu ----------------------------------------------------------------------------

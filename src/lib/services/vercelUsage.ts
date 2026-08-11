@@ -48,6 +48,22 @@
  * miễn phí. Chỉ là đọc GIÁ TRỊ thì phải mua Observability Plus. Hai câu ấy khác nhau, và câu
  * đầu là câu tệp này từng nói sai.
  *
+ * CÒN CHÍNH TRANG USAGE THÌ LẤY SỐ Ở ĐÂU? Đã soi tận nơi bằng Network của trình duyệt đang
+ * đăng nhập (11/08/2026): KHÔNG có lượt fetch nào ở phía client mang mấy con số ấy. Lượt gọi
+ * duy nhất dính tới usage là `GET vercel.com/api/v2/usage?cycles=1&teamId=…`, và nó chỉ trả về
+ * MỐC CHU KỲ (`{current:{start,end},previous:{…}}`) — thử lại bằng API token thì cũng 200 với
+ * đúng thân ấy, không thêm gì. Toàn bộ bảng meter nằm SẴN TRONG HTML do server Vercel dựng
+ * (tài liệu 4,15 MB, `Fluid Provisioned Memory`/`Fluid Active CPU`/`Fast Origin Transfer` đều
+ * có mặt trong nguồn trang).
+ *
+ * Nghĩa là: server của Vercel tự đọc kho số liệu của chính nó rồi vẽ thẳng ra HTML, không đi
+ * qua một endpoint công khai nào. Không có gì để chép lại. Đường duy nhất còn lại là bóc HTML
+ * bằng COOKIE PHIÊN của người đăng nhập — và ta KHÔNG làm: đó là cất credential đăng nhập của
+ * một người vào database, thứ không có cách nào làm cho an toàn, chưa kể nó gãy mỗi lần
+ * Vercel đổi markup.
+ *
+ * Nên đừng đi lại đường này. Ba cửa đã gõ hết, và cửa còn mở duy nhất là `/v2/usage` bên dưới.
+ *
  * ĐÁNG ĐỌC LẠI NGÀY NÀO CÓ TÀI KHOẢN LÊN PRO: schema FOCUS v1.3 của `/v1/billing/charges` mang
  * `ConsumedQuantity` + `ConsumedUnit` (số lượng thật kèm đơn vị, hết cảnh đoán mapping),
  * `ServiceName` (tên meter do chính Vercel đặt — gồm cả Fluid Active CPU, thứ v2 không có), và

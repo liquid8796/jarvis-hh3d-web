@@ -52,6 +52,8 @@ export type WorkerPresence = {
   sectOnline: boolean;
   /** Lần điểm danh mới nhất của tông môn, để SSE tự hẹn đúng lúc trạng thái hết hạn. */
   sectLastSeen: Date | null;
+  /** Bản gói của khôi lỗi tông môn điểm danh gần nhất; null = bản trước 0.71.0. */
+  sectVersion: string | null;
 };
 
 export async function getPresence(userId: string): Promise<WorkerPresence> {
@@ -64,20 +66,26 @@ export async function getPresence(userId: string): Promise<WorkerPresence> {
     .orderBy(desc(schema.workers.lastSeen))
     .limit(10);
 
+  // Lấy version TỪ CHÍNH DÒNG sinh ra sectLastSeen, không phải một dòng khác: hai giá trị
+  // phải kể về cùng một tiến trình. Nhiều khôi lỗi tông môn chạy song song thì đây là cái
+  // điểm danh gần nhất — cùng luật với sectOnline, và ghi ra đây để người sau không tưởng
+  // nó là「bản của mọi khôi lỗi tông môn」.
   const sect = await db()
-    .select({ lastSeen: schema.workers.lastSeen })
+    .select({ lastSeen: schema.workers.lastSeen, version: schema.workers.version })
     .from(schema.workers)
     .where(isNull(schema.workers.userId))
     .orderBy(desc(schema.workers.lastSeen))
     .limit(1);
 
   const sectLastSeen = sect[0]?.lastSeen ?? null;
+  const sectVersion = sect[0]?.version ?? null;
 
   return {
     mine,
     mineOnline: mine.some((w) => w.lastSeen > cutoff),
     sectOnline: sectLastSeen != null && sectLastSeen > cutoff,
     sectLastSeen,
+    sectVersion,
   };
 }
 

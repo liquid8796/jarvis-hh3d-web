@@ -56,7 +56,7 @@ export default async function DashboardPage() {
             <ConfigForm config={config} isAdmin={isAdminUser(user)} />
             <div className="flex min-w-0 flex-col gap-6 xl:gap-8">
               <ControlPanel initiallyRunning={activeJobs.length > 0} />
-              <LinhSuPanel hasToken={tokenIssued} />
+              <LinhSuPanel hasToken={tokenIssued} isAdmin={isAdminUser(user)} />
             </div>
           </div>
         </DashboardLiveProvider>

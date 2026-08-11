@@ -56,6 +56,7 @@ export async function getPresenceFeed(userId: string): Promise<DashboardPresence
     sectOnline: presence.sectOnline,
     sectLastSeen: presence.sectLastSeen?.toISOString() ?? null,
     webVersion: pkg.version.trim() || null,
+    sectVersion: presence.sectVersion,
     mine: presence.mine.map((worker) => ({
       id: worker.id,
       lastSeen: worker.lastSeen.toISOString(),

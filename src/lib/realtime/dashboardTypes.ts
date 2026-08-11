@@ -65,6 +65,12 @@ export type DashboardPresence = {
    * sau một lượt chuyển trạm, trạm đang phục vụ có thể mang bản khác hẳn tab đang mở.
    */
   webVersion: string | null;
+  /**
+   * Bản gói của khôi lỗi TÔNG MÔN. Đi trong payload cho mọi người (số bản không phải bí mật —
+   * bản của web đã ghim công khai ở góc màn hình), nhưng chỉ VẼ cho quản trị: người dùng
+   * thường không cài lại được VM, nên nhắc họ chỉ là nhiễu.
+   */
+  sectVersion: string | null;
   /** Dùng ở server để biết chính xác lúc cần chuyển sang "vắng", không cần poll database. */
   sectLastSeen: string | null;
   mine: DashboardWorker[];

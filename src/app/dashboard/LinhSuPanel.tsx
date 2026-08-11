@@ -85,7 +85,14 @@ function CopyBlock({ label, command }: { label: string; command: string }) {
   );
 }
 
-export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }) {
+export function LinhSuPanel({
+  hasToken: initialHasToken,
+  isAdmin,
+}: {
+  hasToken: boolean;
+  /** Người xem có cài đè được khôi lỗi tông môn không — quyết định có hiện số bản của nó. */
+  isAdmin: boolean;
+}) {
   const { presence, refresh } = useDashboardPresenceLive();
   const [hasToken, setHasToken] = useState(initialHasToken);
   const [token, setToken] = useState<string | null>(null);
@@ -189,6 +196,9 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
 
   // Danh sách thật sự vẽ ra: bỏ những tên vừa bấm gỡ, kể cả khi frame mới chưa kịp biết.
   const mine = (presence?.mine ?? []).filter((w) => !forgotten.includes(w.id));
+  // Cùng luật với khôi lỗi máy nhà: chỉ nói chuyện phiên bản khi nó ĐANG TRỰC.
+  const sectVer =
+    presence?.sectOnline ? describeWorkerVersion(presence.sectVersion, presence.webVersion) : null;
   const noWorkerAtAll = presence != null && !presence.sectOnline && !mine.some((w) => w.online);
 
   return (
@@ -216,6 +226,17 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
                 ? "— đang trực, phục vụ mọi đạo hữu"
                 : "— vắng mặt"}
           </span>
+          {/* Số bản của khôi lỗi tông môn CHỈ hiện cho quản trị: người dùng thường không cài lại
+              được VM, nên với họ dòng ấy là một lời giục không có nút bấm. Người vận hành thì
+              ngược lại — đây đúng là chỗ họ biết đã tới lúc chạy setup.sh. */}
+          {isAdmin && sectVer && (
+            <span
+              className={`shrink-0 text-xs ${sectVer.stale ? "text-[var(--color-gold-300)]" : "text-[var(--color-mist)]"}`}
+              title={sectVer.stale ? "Cài đè trên VM: xem deploy/oracle/README.md, mục「Cài đè engine mới」." : undefined}
+            >
+              · {sectVer.label}
+            </span>
+          )}
         </div>
 
         {mine.map((w) => {

@@ -44,6 +44,7 @@ function visibleSignature(payload: DashboardLivePayload): string {
       // lại — và một dòng vẫn báo「bản cũ」sau khi họ vừa làm đúng lời nhắc thì còn tệ hơn không
       // nhắc. Cùng lẽ ấy cho `webVersion`: một lượt chuyển trạm có thể đổi nó mà không đổi gì khác.
       webVersion: payload.presence.webVersion,
+      sectVersion: payload.presence.sectVersion,
       mine: payload.presence.mine.map((worker) => ({
         id: worker.id,
         online: worker.online,

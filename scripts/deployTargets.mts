@@ -21,6 +21,66 @@
 /** Một trạm trong sổ, rút gọn còn phần mà việc phát hành cần. */
 export type StationEntry = { id: string; name: string; url: string };
 
+/** Sổ gương như nó nằm trong `app_settings`; `pg` là phong bì đã mã hoá. */
+export type Book = { mirrors?: (StationEntry & { pg?: string })[] };
+
+export type BookSource = { stations: StationEntry[]; from: string; warning?: string };
+
+/**
+ * Chọn ĐỌC SỔ Ở ĐÂU — thuần, mọi lượt chạm mạng đi qua tham số.
+ *
+ * Sổ có thẩm quyền nằm ở trạm ĐANG HOẠT ĐỘNG, không phải ở chỗ `DATABASE_URL` dưới máy trỏ tới.
+ * Trạm dự phòng chỉ giữ một ẢNH CHỤP sổ từ lượt chuyển gần nhất; mọi thao tác ghi sổ về sau đều
+ * rơi vào trạm hoạt động (server action gác bằng `activeSiteCheck`). Đọc nhầm chỗ thì một trạm
+ * mới thêm vào sẽ VẮNG MẶT khỏi kế hoạch, mà lượt chạy vẫn kết thúc bằng câu「Mọi trạm trong sổ
+ * đã mang cùng một commit」— một lời trấn an sai, đúng loại im lặng mà công cụ này sinh ra để
+ * diệt. Đo được 11/08/2026 ngay khi dựng trạm thứ ba.
+ *
+ * FAIL-OPEN ở mọi nhánh hỏng: thà phát hành theo sổ dưới máy KÈM CẢNH BÁO còn hơn không phát
+ * hành được gì vì bảng điều phối nghẽn. Nhưng mỗi lần lùi bước đều phải kêu — `warning`.
+ */
+export async function chooseBook(deps: {
+  localBook: Book;
+  activeSiteId: string | null;
+  readRemote: (encryptedPg: string) => Promise<Book>;
+}): Promise<BookSource> {
+  const local = deps.localBook.mirrors ?? [];
+  const asStations = (list: Book["mirrors"]) =>
+    (list ?? []).filter((m): m is StationEntry & { pg?: string } => Boolean(m?.id && m?.url));
+
+  if (!deps.activeSiteId) {
+    return {
+      stations: asStations(local),
+      from: "database dưới máy (không rõ trạm hoạt động)",
+      warning: "Không đọc được bảng điều phối — dùng sổ của database dưới máy, sổ này có thể đã cũ.",
+    };
+  }
+
+  const activeEntry = local.find((m) => m.id === deps.activeSiteId);
+  if (!activeEntry?.pg) {
+    return {
+      stations: asStations(local),
+      from: "database dưới máy (thiếu entry trạm hoạt động)",
+      warning:
+        `Sổ dưới máy không có chuỗi kết nối của trạm hoạt động「${deps.activeSiteId}」— dùng sổ dưới máy. ` +
+        "Đây cũng chính là triệu chứng cụt-đường-về: vào admin ghi trạm ấy vào sổ.",
+    };
+  }
+
+  try {
+    const remote = await deps.readRemote(activeEntry.pg);
+    return { stations: asStations(remote.mirrors), from: `trạm hoạt động「${deps.activeSiteId}」` };
+  } catch (err) {
+    return {
+      stations: asStations(local),
+      from: "database dưới máy (trạm hoạt động không nối được)",
+      warning:
+        `Không đọc nổi sổ ở trạm hoạt động「${deps.activeSiteId}」` +
+        `(${err instanceof Error ? err.message.slice(0, 80) : "lỗi lạ"}) — lùi về sổ dưới máy.`,
+    };
+  }
+}
+
 /** Một token đọc được từ env, kèm TÊN BIẾN để còn kể tên trong thông báo (không bao giờ in giá trị). */
 export type TokenSource = { envName: string; token: string };
 

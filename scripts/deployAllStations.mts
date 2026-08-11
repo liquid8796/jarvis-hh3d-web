@@ -29,7 +29,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { neon } from "@neondatabase/serverless";
-import { discoverTokens, resolveTarget, type ProjectRef, type StationEntry } from "./deployTargets.mts";
+import { decryptSecret } from "../src/lib/crypto/secretBox";
+import { readControlDoc } from "../src/lib/control/read";
+import { chooseBook, discoverTokens, resolveTarget, type Book, type ProjectRef, type StationEntry } from "./deployTargets.mts";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -113,17 +115,28 @@ if (tokens.length === 0) {
 const tokenByEnvName = new Map(tokens.map((t) => [t.envName, t.token]));
 console.log(`• Token khai trong env: ${tokens.map((t) => t.envName).join(", ")}`);
 
-// ---- 2. Sổ gương ---------------------------------------------------------------------------
+// ---- 2. Sổ gương — đọc từ TRẠM ĐANG HOẠT ĐỘNG ------------------------------------------------
 
-const sql = neon(process.env.DATABASE_URL);
-const settingsRows = (await sql`select value from app_settings where id = 'global'`) as { value: unknown }[];
-const stations = (((settingsRows[0]?.value ?? {}) as { mirrors?: StationEntry[] }).mirrors ?? []).filter(
-  (m): m is StationEntry => Boolean(m?.id && m?.url),
-);
+const readBook = async (url: string): Promise<Book> => {
+  const rows = (await neon(url)`select value from app_settings where id = 'global'`) as { value: unknown }[];
+  return (rows[0]?.value ?? {}) as Book;
+};
+
+// Toàn bộ luật「đọc sổ ở đâu」nằm ở chooseBook() — hàm thuần, verify:deploy-targets bao từng
+// nhánh. Ở đây chỉ là chỗ nối dây, đúng lối beginSwitchAction làm với canSwitch().
+const doc = await readControlDoc();
+const loaded = await chooseBook({
+  localBook: await readBook(process.env.DATABASE_URL!),
+  activeSiteId: doc?.activeSiteId ?? null,
+  readRemote: (envelope) => readBook(decryptSecret(envelope)),
+});
+if (loaded.warning) console.warn(`  ⚠ ${loaded.warning}`);
+
+const stations = loaded.stations.filter((m): m is StationEntry => Boolean(m?.id && m?.url));
 if (stations.length === 0) {
   die("Sổ gương chưa có trạm nào. Vào trang Tông Môn → tab Gương Trạm ghi trạm vào sổ trước.");
 }
-console.log(`• Sổ gương có ${stations.length} trạm: ${stations.map((s) => s.id).join(", ")}`);
+console.log(`• Sổ gương (${loaded.from}) có ${stations.length} trạm: ${stations.map((s) => s.id).join(", ")}`);
 
 // ---- 3. Danh mục project của từng tài khoản -------------------------------------------------
 

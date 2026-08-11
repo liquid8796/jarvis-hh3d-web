@@ -5,7 +5,7 @@
  * cú đoán sai không làm hỏng build mà làm mã của tông môn hạ cánh xuống project của người khác,
  * và không có phép kiểm nào ở hạ nguồn bắt được điều đó.
  */
-import { discoverTokens, projectNameFromUrl, resolveTarget, type ProjectRef } from "./deployTargets.mts";
+import { chooseBook, discoverTokens, projectNameFromUrl, resolveTarget, type ProjectRef } from "./deployTargets.mts";
 
 let passed = 0;
 function ok(condition: boolean, label: string): void {
@@ -102,6 +102,53 @@ function ok(condition: boolean, label: string): void {
 
   const badUrl = resolveTarget({ id: "la", name: "Lạ", url: "https://tongmon.example.com" }, catalog);
   ok(!badUrl.ok, "trạm dùng custom domain → từ chối ở bước tra, không phát hành nhầm");
+}
+
+// ---- Đọc sổ ở đâu ----------------------------------------------------------------------------
+// Nhánh này quyết định TRẠM NÀO được phát hành. Sai ở đây không làm hỏng build — nó lặng lẽ bỏ
+// sót một trạm rồi vẫn báo「Mọi trạm đã cùng commit」. Đo được 11/08/2026 khi dựng trạm thứ ba:
+// trạm mới ghi vào sổ của trạm ĐANG HOẠT ĐỘNG, còn công cụ thì đọc sổ ở database dưới máy — một
+// ảnh chụp cũ của trạm dự phòng, không hề có trạm mới.
+{
+  const st = (id: string) => ({ id, name: id, url: `https://${id}.vercel.app`, pg: `enc:${id}` });
+  const localBook = { mirrors: [st("main"), st("auto-hh3d-1")] };
+  const remoteBook = { mirrors: [st("main"), st("auto-hh3d-1"), st("auto-hh3d-2")] };
+
+  const fromActive = await chooseBook({
+    localBook,
+    activeSiteId: "auto-hh3d-1",
+    readRemote: async (env) => (env === "enc:auto-hh3d-1" ? remoteBook : { mirrors: [] }),
+  });
+  ok(fromActive.stations.length === 3, "đọc sổ ở TRẠM HOẠT ĐỘNG → thấy đủ trạm mới thêm");
+  ok(fromActive.from.includes("auto-hh3d-1"), "…và nói rõ đã đọc ở đâu");
+  ok(!fromActive.warning, "…đường thuận thì không cảnh báo gì");
+
+  const noDoc = await chooseBook({ localBook, activeSiteId: null, readRemote: async () => remoteBook });
+  ok(noDoc.stations.length === 2 && Boolean(noDoc.warning), "bảng điều phối không đọc được → lùi về sổ dưới máy KÈM cảnh báo");
+
+  const missing = await chooseBook({ localBook, activeSiteId: "auto-hh3d-9", readRemote: async () => remoteBook });
+  ok(missing.stations.length === 2, "sổ dưới máy thiếu entry trạm hoạt động → vẫn phát hành được");
+  ok(Boolean(missing.warning?.includes("cụt-đường-về")), "…và gọi đúng tên triệu chứng cụt-đường-về");
+
+  const broken = await chooseBook({
+    localBook,
+    activeSiteId: "auto-hh3d-1",
+    readRemote: async () => {
+      throw new Error("ECONNREFUSED");
+    },
+  });
+  ok(broken.stations.length === 2, "trạm hoạt động không nối được → KHÔNG chết cả lượt, lùi về sổ dưới máy");
+  ok(Boolean(broken.warning?.includes("ECONNREFUSED")), "…và mang theo nguyên văn lý do để còn gỡ");
+
+  const junk = await chooseBook({
+    localBook: { mirrors: [st("main"), { id: "", name: "", url: "" }, { id: "x", name: "x", url: "" }] as never },
+    activeSiteId: null,
+    readRemote: async () => ({}),
+  });
+  ok(junk.stations.length === 1, "entry thiếu id/url bị loại, không lọt vào kế hoạch phát hành");
+
+  const empty = await chooseBook({ localBook: {}, activeSiteId: null, readRemote: async () => ({}) });
+  ok(empty.stations.length === 0, "sổ rỗng → mảng rỗng, không ném");
 }
 
 console.log(`\nTất cả ${passed} phép kiểm đều thuận.`);

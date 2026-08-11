@@ -978,14 +978,21 @@ body {
    đang đọc trôi mất. Nổi lên thì tin nằm yên. */
 .chat-picker {
   position: absolute;
+  /* PHẢI bật lại, vì cha nó — `.chat-composer` — mang `pointer-events: none` (thanh soạn nay
+     phủ TRỌN khung nên nó buộc phải trong suốt với cú bấm, nếu không thì cả sảnh tin phía sau
+     hết bấm được). Thiếu đúng dòng này, khay vẫn HIỆN RA đầy đủ mà không nhận nổi một cú bấm
+     nào: cú bấm xuyên qua rơi trúng `.chat-scroll` phía sau, luật「bấm ra ngoài thì đóng」đọc
+     đó là bấm ra ngoài nên đóng khay, còn nút emoji thì không bao giờ nhận được click —
+     người dùng thấy đúng một hiện tượng "mở khay, bấm cái gì cũng đóng, và chẳng có gì xảy
+     ra". Cả ba tab (Sticker/Emoji/GIF), thanh cuộn và ô tìm GIF đều chết chung một kiểu.
+     Ba anh em còn lại trong thanh soạn đều đã tự bật lại: `.chat-hotspot`, `.chat-input`,
+     `.chat-trays` — thêm thứ gì bấm được vào thanh soạn thì nhớ dòng này. */
+  pointer-events: auto;
   /* Neo theo mép PHẢI vì nút mở khay đã dời sang phải (đổi chỗ với nút kẹp file). Khay phải
      rơi xuống ngay dưới cái nút bấm ra nó — neo trái trong khi nút nằm phải thì khay như từ
-     đâu hiện ra. */
-  right: 10px;
-  /* Neo theo MÉP TRÊN của thanh soạn, không theo một con số pixel: ô nhập cao dần khi xuống
-     dòng (tới 120px), nên một khoảng cách cố định sẽ để khay trườn lên đè chính nó. */
-  /* Neo vào NÚT tròn trên tấm khung: thanh soạn nay phủ trọn khung nên `100%` của nó
-     không còn là mép trên hàng nút nữa. */
+     đâu hiện ra. Tính theo % của tấm khung, không theo pixel: cả khung co giãn theo màn hình.
+     Neo dọc cũng vậy — vào NÚT tròn vẽ trong ảnh, chứ `100%` của thanh soạn giờ là đáy khung
+     chứ không còn là mép trên hàng nút. */
   bottom: 9.6346%;
   right: 4.6181%;
   z-index: 20;

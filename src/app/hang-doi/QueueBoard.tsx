@@ -489,8 +489,7 @@ export function QueueBoard({
           <p className="mb-4 text-xs leading-relaxed text-[var(--color-mist)]">
             Đàn mà khôi lỗi <strong className="text-[var(--color-parchment)]">vẫn còn sống</strong> —
             nhịp tim đều — nhưng tiến độ không nhích một nấc nào suốt hơn 45 phút. Khôi lỗi mất
-            liên lạc thì đã có phép dọn tự động lo, không hiện ở đây. Ngưỡng 45 phút cố ý dài hơn
-            một ván Mê Cung chạy đúng luật (~35 phút) để đàn khoẻ không bị réo nhầm.
+            liên lạc thì đã có phép dọn tự động lo, không hiện ở đây.
           </p>
 
           {stuckEntries.length === 0 ? (

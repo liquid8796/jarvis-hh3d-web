@@ -1219,16 +1219,49 @@ body {
   pointer-events: auto;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: filter 0.12s ease;
+  transition: backdrop-filter 0.12s ease, box-shadow 0.12s ease;
 }
 
 /* Không phóng to, không đổi nền: nút nằm TRONG ảnh nên mọi phép biến hình đều lộ ra là hai
-   lớp rời nhau. Làm sáng lên là hiệu ứng duy nhất trung thực với một nút vẽ sẵn. */
-.chat-hotspot:hover:not(:disabled) { filter: brightness(1.35); }
+   lớp rời nhau. Làm sáng lên là hiệu ứng duy nhất trung thực với một nút vẽ sẵn.
 
+   `backdrop-filter` chứ KHÔNG `filter`, và đây là toàn bộ chỗ sai của bản trước: `filter` lọc
+   phần TỰ VẼ của chính thẻ, mà thẻ này trong suốt hoàn toàn — không có một pixel nào để làm
+   sáng, nên luật `filter: brightness(1.35)` cũ tuy đọc rất hợp lý nhưng KHÔNG hề hiện ra gì
+   suốt từ ngày viết. `backdrop-filter` lọc thứ nằm SAU thẻ — tức đúng cái nút đã vẽ trong ảnh
+   — và bị cắt theo `border-radius: 50%` của thẻ, nên vòng sáng khớp đúng vòng tròn vẽ sẵn.
+   (Ba hotspot đều VUÔNG tính bằng pixel: 64/60/68px trên tấm 1372×1059, nên 50% ra hình tròn
+   thật chứ không phải bầu dục.)
+
+   Quầng vàng đi kèm có hai việc: nói "bấm được" theo đúng ngôn ngữ của nút Ngắm Tranh, và đỡ
+   cho những trình duyệt chưa có `backdrop-filter` — ở đó vẫn còn một tín hiệu hover. */
+@media (hover: hover) {
+  .chat-hotspot:hover:not(:disabled) {
+    backdrop-filter: brightness(1.45);
+    box-shadow: 0 0 clamp(8px, 1.2cqw, 18px) rgba(232, 194, 92, 0.35);
+  }
+}
+
+/* Bấm xuống thì sáng thêm một nấc — và luật này KHÔNG nằm trong `@media (hover)`, vì màn cảm
+   ứng không có hover mà vẫn cần biết cú chạm đã ăn (`-webkit-tap-highlight-color` ở trên đã
+   tắt lượt nháy mặc định của trình duyệt). */
+.chat-hotspot:active:not(:disabled) {
+  backdrop-filter: brightness(1.7);
+  box-shadow: 0 0 clamp(5px, 0.8cqw, 12px) rgba(232, 194, 92, 0.5);
+}
+
+/* Bàn phím thấy đúng thứ chuột thấy, cộng thêm viền — người đi bằng Tab không được nhận một
+   tín hiệu nghèo hơn. */
 .chat-hotspot:focus-visible {
   outline: max(1px, 0.14cqw) solid var(--color-gold-300);
   outline-offset: min(-2px, -0.15cqw);
+  backdrop-filter: brightness(1.45);
+}
+
+/* Ai đã xin bớt chuyển động thì đổi ngay, không có gì trôi — cùng lệ với peek.css. Hiệu ứng
+   vẫn còn nguyên, chỉ bỏ đoạn chuyển tiếp. */
+@media (prefers-reduced-motion: reduce) {
+  .chat-hotspot { transition: none; }
 }
 
 .chat-hotspot:disabled { cursor: default; }

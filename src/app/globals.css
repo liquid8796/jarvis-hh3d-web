@@ -135,6 +135,35 @@ body {
   background: linear-gradient(180deg, transparent, rgba(6, 11, 26, 0.72) 45%);
 }
 
+/* Dấu bản — ghim ở góc dưới bên trái MÀN HÌNH, không phải cuối trang. Câu hỏi "web đang chạy
+   bản nào" luôn được hỏi giữa lúc đang đứng ở một trang nào đó, thường là giữa một lượt báo
+   lỗi — chứ không phải lúc rảnh rỗi cuộn xuống chân trang tìm.
+
+   `pointer-events: none` vì nó nằm ĐÈ lên một góc trang: một dòng chữ chỉ để đọc không được
+   phép nuốt cú bấm của thứ nằm dưới.
+
+   z-index 6: trên cánh hoa rơi (.petals, z 5) để hoa không che mất, nhưng DƯỚI hộp thoại
+   (z-50) và nút Ngắm Tranh (z 60) — dấu bản không có tư cách nổi lên trên một hộp thoại
+   đang mở.
+
+   Nó là con TRỰC TIẾP của <body>, nên luật làm mờ của Ngắm Tranh (peek.css) tự phủ luôn mà
+   không phải khai thêm gì — đúng ý: lúc ngắm tranh thì mọi thứ đều lùi lại. */
+.app-version {
+  position: fixed;
+  left: 0.75rem;
+  bottom: 0.5rem;
+  /* Trên iPhone, vạch home chiếm đúng dải này. `env()` có sẵn fallback 0px để dòng khai không
+     bao giờ hỏng ở nơi không biết nó, và dòng `bottom` trần phía trên là nấc lùi cuối cùng. */
+  bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  z-index: 6;
+  pointer-events: none;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: var(--color-mist);
+  opacity: 0.55;
+}
+
 /* ---------------------------------------------------------------------------
    Thành phần dùng chung
 --------------------------------------------------------------------------- */

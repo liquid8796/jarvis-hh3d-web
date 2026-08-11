@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro, Noto_Serif } from "next/font/google";
+import { AppVersion } from "@/components/AppVersion";
 import { BackdropPeek } from "@/components/BackdropPeek";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { getRenderSettings } from "@/lib/services/settings";
@@ -100,6 +101,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             tranh ấy. Xem components/MaintenanceGate.tsx cho toàn bộ lý lẽ. */}
         <MaintenanceGate>{children}</MaintenanceGate>
         <footer className="site-footer">© 2026 Nam Cung Bình. All rights reserved.</footer>
+        {/* Dấu bản đứng NGOÀI cửa bế quan, cùng lẽ với tấm nền: lúc web đang bế quan là đúng
+            lúc người ta cần biết trạm mình đang gõ cửa mang bản nào. Đứng cuối trong DOM để
+            trình đọc màn hình đọc nó sau cùng — nó là chú thích, không phải nội dung. */}
+        <AppVersion />
       </body>
     </html>
   );

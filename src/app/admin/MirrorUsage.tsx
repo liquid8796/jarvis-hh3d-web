@@ -214,27 +214,10 @@ export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
               </div>
             )}
 
-            {/* Ba lời thú nhận. Người đọc một bảng số phải biết nó đo cái gì, số nào là do ta
-                tự khai, và — quan trọng nhất — bảng này CÒN THIẾU gì. */}
-            <p className="mt-5 border-t border-[rgba(232,194,92,0.18)] pt-3 text-xs text-[var(--color-mist)]">
-              Chỉ hai dòng đầu đã <b>đối chiếu khớp</b> bảng Usage thật nên mới đeo hạn mức. Phần
-              còn lại là <b>số thô của API</b>: nó không bằng cột nào trên dashboard, đừng đọc thành
-              Fast Data Transfer hay Function Duration.
-            </p>
-            <p className="mt-2 text-xs text-[#f2a0a0]">
-              Mấy meter đang thật sự siết một tài khoản Hobby — <b>Fluid Active CPU</b>,{" "}
-              <b>Fluid Provisioned Memory</b>, Fast Origin Transfer, ISR — <b>có</b> trong{" "}
-              <code>/v2/observability</code>, nhưng đọc giá trị thì Vercel đòi{" "}
-              <b>Observability Plus</b> (gói Pro trở lên). Trên Hobby chỉ xem được ở dashboard —
-              nút dưới đây.
-            </p>
-            <p className="mt-2 text-xs text-[var(--color-mist)]">
-              Số đo là của cả <b>TÀI KHOẢN VERCEL</b> giữ trạm này, không riêng một project — token
-              không hẹp xuống project được ở endpoint này. Hạn mức là của gói <b>Hobby</b>, chép tay
-              từ dashboard vì API chỉ phát ra phần đã dùng.
-            </p>
-
-            <div className="mt-4 flex gap-2">
+            {/* Nét kẻ ngang dời XUỐNG ĐÂY: nó vốn nằm trên đoạn chú thích đứng giữa (đã gỡ
+                11/08/2026 theo yêu cầu), và nó là thứ tách bảng số khỏi hàng nút — bỏ đi cùng
+                đoạn chữ thì hai khối dính vào nhau. */}
+            <div className="mt-5 flex gap-2 border-t border-[rgba(232,194,92,0.18)] pt-3">
               <button type="button" className="btn btn-ghost text-sm" onClick={load}>
                 Đọc lại
               </button>

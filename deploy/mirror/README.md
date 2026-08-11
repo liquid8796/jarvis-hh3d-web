@@ -244,6 +244,35 @@ tài khoản ấy) → `DATABASE_URL=<db trạm> node scripts/migrate.mjs` → v
 chính, thêm trạm vào sổ, bấm「Kiểm mạch」(probe chỉ-đọc: nối được PG? Mongo? schema đủ 21+
 migration? URL trả 200?). Trạm nằm im ở chế độ chuyển hướng cho tới ngày được chọn.
 
+**Dựng trạm mới bằng LỆNH, không cần bấm dashboard** (đã chạy thật 11/08/2026 khi dựng trạm
+thứ ba `auto-hh3d-2` trên tài khoản `liquid8796` / team `freecoursecademy`):
+
+```bash
+# 1. Project — framework nextjs; vercel.json vẫn là thứ thắng preset (bẫy 2 ở trên)
+curl -X POST "https://api.vercel.com/v9/projects?teamId=<TEAM>" -H "Authorization: Bearer <TOKEN>" \
+     -H "Content-Type: application/json" -d '{"name":"auto-hh3d-2","framework":"nextjs"}'
+
+# 2. Hai kho FREE, tự nối vào project. Chạy trong thư mục có .vercel/project.json của trạm mới.
+vercel integration add neon          --plan free_v3 --name jarvis-hh3d       --non-interactive --no-env-pull
+vercel integration add mongodbatlas  --plan FREE    --name atlas-jarvis-chat --non-interactive --no-env-pull
+```
+
+`vercel integration add` CÓ `--non-interactive` và `--plan`, nên không phải bấm dashboard —
+điều mà bản checklist đầu không biết. Hai điều kiện: integration phải **đã được cài trên team**
+(lần đầu cài đòi chấp thuận điều khoản, và việc ấy CỐ Ý bắt buộc có người thật), và tên gói lấy
+bằng `vercel integration add <tên> --help` (`free_v3` cho Neon, `FREE` cho Atlas).
+
+Hai kho ấy tự tiêm sẵn `DATABASE_URL` và `MONGODB_URI` — tức hai trong ba biến riêng đã xong,
+chỉ còn `SITE_ID` và bộ bí mật chung phải đặt tay. **Tuyệt đối không đặt `MONGODB_DB`.**
+
+**Ghi vào sổ thì phải ghi ở TRẠM ĐANG HOẠT ĐỘNG.** Sổ ở trạm dự phòng chỉ là ảnh chụp từ lượt
+chuyển gần nhất; ghi vào đó là ghi vào thứ sẽ bị đè. Trang admin tự lo điều này (server action
+gác bằng `activeSiteCheck`), nhưng ai thao tác bằng script thì phải tự nhớ.
+
+**Dấu hiệu trạm mới đã sống đúng: `curl /` trả 307** về trạm hoạt động. Để ra được 307 nó phải
+dựng nổi URL bảng điều phối (`OCI_REGION/NAMESPACE/BUCKET`) VÀ xác minh xong chữ ký HMAC
+(`WORKER_TOKEN`) — sai bất kỳ cái nào là fail-open thành 200. Một phép thử, ba biến được chứng minh.
+
 **Từ khi trạm đã vào sổ, đừng deploy tay nữa** — bấm đúp `deploy-all-stations.bat` ở gốc repo
 (hoặc `npm run deploy:all`, thêm `-- --dry-run` để chỉ xem kế hoạch). Nó đọc sổ gương từ
 database, tra ra project Vercel của từng trạm, rồi phát hành CÙNG MỘT tệp tar cho tất cả.

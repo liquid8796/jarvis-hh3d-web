@@ -1,39 +1,47 @@
 #!/usr/bin/env node
 /**
- * BẢNG USAGE ĐẦY ĐỦ của một trạm — đọc bằng cookie phiên, CHẠY TẠI MÁY NGƯỜI VẬN HÀNH.
+ * BẢNG USAGE ĐẦY ĐỦ của một trạm — dựng trang bằng trình duyệt thật rồi đọc, CHẠY TẠI MÁY
+ * NGƯỜI VẬN HÀNH.
  *
  *   npm run usage:full -- --cookie "C:/…/cookie_vercel.txt" --team jarvis8796
+ *   npm run usage:full -- --cookie … --team … --json     (in JSON để máy khác đọc)
  *
- * VÌ SAO CÓ TỆP NÀY, và vì sao nó KHÔNG phải một tính năng của web.
+ * ── VÌ SAO PHẢI DỰNG TRÌNH DUYỆT, KHÔNG `fetch` CHO GỌN ──────────────────────────────────
  *
- * Tab Gương Trạm đọc mức dùng qua `/v2/usage` (xem services/vercelUsage.ts) và chỉ lấy được 2
- * cột có hạn mức. Bốn meter siết nhất một tài khoản Hobby — Fluid Active CPU, Fluid Provisioned
- * Memory, Fast Origin Transfer, ISR — thì mọi cửa API đều đóng: `/v1/usage` 400 (Pro only),
- * `/v1/billing/charges` 404 (hobby không có hoá đơn), `/v2/observability/query` 402 (đòi
- * Observability Plus). Đo ngày 11/08/2026, và đo cả bằng CHÍNH cookie phiên của chủ tài khoản —
- * vẫn 402. Tức đó là gác theo GÓI, không phải gác theo credential.
+ * Bản đầu của tệp này `fetch` trang rồi bóc payload RSC. Nó CHẠY ĐƯỢC — một lần. Đo lại 8 lượt
+ * liên tiếp trên cùng một request (11/08/2026):
  *
- * Con đường duy nhất còn lại là bóc payload RSC của chính trang Usage, và nó CHỈ chịu cookie
- * phiên trình duyệt: nhét API token vào đúng chỗ ấy thì Vercel trả 307 sang `/auth-redirect`.
+ *     49, 15, 7, 7, 7, 7, 7, 10 meter        `Fluid Active CPU` có mặt 1/8 lượt
  *
- * NÊN NÓ NẰM Ở ĐÂY, KHÔNG NẰM TRONG WEB. Ba lý do, theo thứ tự nặng dần:
+ * Trang stream và đẩy phần lớn thẻ meter sang render phía client, nên HTML server trả về hầu
+ * như luôn THIẾU — và thiếu đúng mấy cột Fluid, thứ duy nhất đáng đọc. Một phép bóc đúng 1/8
+ * lượt thì tệ hơn không có: nó im lặng trả về một bảng ngắn trông vẫn như thật.
  *
- *   1. Cookie phiên là chìa khoá TOÀN TÀI KHOẢN — cùng thứ quyền mà `vercel env pull` dùng, tức
- *      đọc được `DATABASE_URL`, `ENCRYPTION_KEY`, `WORKER_TOKEN` của trạm. `ENCRYPTION_KEY` là
- *      thứ mở phong bì cookie game của MỌI đạo hữu. Cất nó vào database production là đặt chìa
- *      khoá ngay cạnh cái tủ nó mở.
- *   2. Khác API token, cookie phiên không thu hồi riêng lẻ được và chết khi chủ nhân đăng xuất —
- *      một tính năng dựng trên nó sẽ hỏng vào một ngày không ai đoán trước, không vì lỗi nào.
- *   3. Đây là BÓC HTML. Vercel đổi markup thì phép bóc trả về số sai hoặc rỗng mà không báo gì.
- *      Trên một trang admin, một con số sai được trình bày tự tin còn tệ hơn không có số nào.
+ * Trình duyệt thật thì chờ được client render xong, nên lấy đủ. Cái giá là phải mở Chromium —
+ * và đó CHÍNH LÀ lý do thứ hai (sau chuyện credential) khiến việc này không thể là một tính
+ * năng của web: function trên Vercel không nuôi nổi một phiên Chromium.
  *
- * Chạy tay thì cả ba đều lành: credential ở lại trên máy chủ nhân, hỏng thì thấy ngay tại chỗ,
- * và không ai khác chịu hậu quả.
+ * ── VÌ SAO ĐỌC CHỮ ĐÃ RENDER, KHÔNG ĐỌC DOM/RSC ─────────────────────────────────────────
  *
- * Lấy tệp cookie: mở trang Usage trong trình duyệt đã đăng nhập → tiện ích xuất cookie dạng
- * JSON (đúng định dạng `{"cookies":[{name,value},…]}`) → lưu ra tệp. XOÁ NÓ sau khi dùng xong.
+ * Đọc `innerText` là đọc đúng thứ con người đọc. Nó không phụ thuộc tên class hay hình dạng
+ * payload — hai thứ Vercel đổi lúc nào cũng được mà không báo ai. Hình dạng chữ thì ổn định vì
+ * chính người dùng phải đọc được nó:
+ *
+ *     Fast Data Transfer          ← tên
+ *     1,29 GB                     ← đã dùng
+ *     /                           ← có hạn thì mới có dòng này
+ *     100 GB                      ← hạn
+ *     1 TB                        ← nấc kế (bỏ qua)
+ *
+ * ── CREDENTIAL ───────────────────────────────────────────────────────────────────────────
+ *
+ * Cookie phiên là chìa khoá TOÀN TÀI KHOẢN — cùng quyền `vercel env pull`, tức đọc được
+ * `ENCRYPTION_KEY`, thứ mở phong bì cookie game của MỌI đạo hữu. Nó ở lại máy người vận hành,
+ * đi qua đúng một tham số dòng lệnh, và không bao giờ được ghi vào database. Xuất tệp cookie
+ * lúc cần, xoá ngay sau khi dùng.
  */
 import { readFileSync } from "node:fs";
+import { chromium } from "playwright-core";
 
 const arg = (name: string): string | undefined => {
   const at = process.argv.indexOf(`--${name}`);
@@ -47,138 +55,199 @@ if (!cookieFile || !team) {
   process.exit(1);
 }
 
-type CookieJar = { cookies?: { name: string; value: string }[] };
-let jar: CookieJar;
+type RawCookie = { name: string; value: string; domain?: string; path?: string };
+let raw: { cookies?: RawCookie[] };
 try {
-  jar = JSON.parse(readFileSync(cookieFile, "utf8")) as CookieJar;
+  raw = JSON.parse(readFileSync(cookieFile, "utf8")) as { cookies?: RawCookie[] };
 } catch (err) {
   console.error(`Không đọc được tệp cookie: ${err instanceof Error ? err.message : "lỗi lạ"}`);
   process.exit(1);
 }
-const cookies = jar.cookies ?? [];
+const cookies = raw.cookies ?? [];
 if (!cookies.some((c) => c.name === "authorization")) {
   console.error("Tệp cookie thiếu `authorization` — xuất lại từ trình duyệt ĐANG đăng nhập Vercel.");
   process.exit(1);
 }
 
-const res = await fetch(`https://vercel.com/${team}/~/usage`, {
-  headers: {
-    Cookie: cookies.map((c) => `${c.name}=${c.value}`).join("; "),
-    // Không có UA của trình duyệt thật thì Vercel trả một trang khác — đã đo.
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
-    Accept: "text/html,application/xhtml+xml",
-  },
-  redirect: "manual",
-});
-
-if (res.status !== 200) {
-  console.error(
-    `Vercel trả HTTP ${res.status}${res.status === 307 ? " → cookie đã hết hiệu lực (đăng xuất?), xuất lại tệp mới." : ""}`,
-  );
-  process.exit(1);
-}
-
-const html = await res.text();
+/**
+ * CHỜ TỚI KHI THÔI MỌC, không chờ một cái mốc.
+ *
+ * Bản trước chờ chuỗi「Fluid Active CPU」xuất hiện rồi đọc ngay. Sai hai lần một lúc: chuỗi ấy
+ * có sẵn trong THANH ĐIỀU HƯỚNG bên trái nên phép chờ thoả mãn tức thì, và trang chỉ dựng thẻ
+ * khi cuộn tới nên nửa dưới còn trống. Đo được: 11, 57, 32, 46 meter qua bốn lượt liên tiếp.
+ *
+ * Nên: cuộn hết trang, rồi đếm meter mỗi nhịp cho tới khi con số đứng yên đủ lâu. Đó là mốc
+ * duy nhất không nói dối — nó đo chính thứ ta cần chứ không đo một chuỗi tình cờ.
+ */
+const SETTLE_POLL_MS = 600;
+/** Bấy nhiêu nhịp liên tiếp không mọc thêm thì coi là xong. */
+const SETTLE_STABLE_POLLS = 4;
+const SETTLE_TIMEOUT_MS = 90_000;
 
 /**
- * Bóc từng thẻ meter trong payload RSC. Hình dạng đo được 11/08/2026:
+ * MƯỜI CỘT BẮT BUỘC — định nghĩa của「đã đủ」.
  *
- *   "meterData":{"nextTier":2000000,"limit":200000,"value":0,…},"formatter":"prettyCount",
- *   "units":"$undefined","title":"ISR Writes",…
+ * Chỉ chờ「thôi mọc」thì vẫn hên xui: đo được 56/61/49/40 meter qua bốn lượt, vì phần đuôi
+ * (Queue, Sandbox, AI Gateway — toàn số 0) render lúc có lúc không và nhịp đếm bắt được lúc nó
+ * đang nghỉ. Cột đuôi thiếu thì không ai mất gì; thiếu một trong mười cột dưới đây thì bảng
+ * nói dối về đúng thứ người ta mở nó ra để xem.
  *
- * `meterData` là object PHẲNG (không object con) nên `[^{}]*` đủ; phần giữa nó và `title` thì
- * cho tối đa 200 ký tự để không vớ nhầm `title` của thẻ kế tiếp.
- *
- * GỠ ESCAPE TRƯỚC: payload nằm TRONG một chuỗi JavaScript của trang, nên mọi dấu nháy đã thành
- * `\"`. Bóc thẳng trên HTML thô thì không mẫu nào khớp — đúng chỗ lượt chạy đầu tiên gục.
+ * Đây là toàn bộ meter có HẠN MỨC trên gói Hobby — tức mọi chỗ có thể chạm trần.
  */
-const unescaped = html.replace(/\\"/g, '"');
+const REQUIRED_TITLES = [
+  "Fast Data Transfer",
+  "Fast Origin Transfer",
+  "Edge Requests",
+  "Edge Request CPU Duration",
+  "ISR Reads",
+  "ISR Writes",
+  "Function Invocations",
+  "Function Duration",
+  "Fluid Provisioned Memory",
+  "Fluid Active CPU",
+];
 
 /**
- * KỀ NHAU TUYỆT ĐỐI, không cho phép khoảng đệm. Bản đầu dùng `.{0,200}?` giữa `meterData` và
- * `title` — và nó vớ nhầm: mấy thẻ theo-PROJECT có hình dạng khác, nên phép tìm nhảy sang cái
- * `title` gần nhất là TÊN PROJECT (`auto-hh3d`, `blob-phimverse`), cho ra 22 dòng rác đứng
- * trước 22 dòng thật. Buộc bốn trường phải dính liền thì chỉ thẻ tổng của tài khoản mới khớp.
+ * Một dòng số đo: `1,29 GB`, `303K`, `3h 44m`, `58s`, `0 B`, `217.4 GB-Hrs`, `0`.
+ * Phải khớp CẢ dòng — `Fast Data Transfer` không được lọt vào đây.
  */
-const PATTERN = /"meterData":\{([^{}]*)\},"formatter":"([^"]*)","units":"([^"]*)","title":"([^"]+)"/g;
-const num = (blob: string, key: string): number | null => {
-  const hit = new RegExp(`"${key}":(-?[0-9.]+)`).exec(blob);
-  return hit ? Number(hit[1]) : null;
-};
+const VALUE_LINE =
+  /^(?:[\d.,]+\s*(?:B|KB|MB|GB|TB|GB-Hrs|GB-hrs)|[\d.,]+[KMB]?|(?:\d+h\s*)?(?:\d+m\s*)?(?:\d+s)?)$/;
 
-const rows = [...unescaped.matchAll(PATTERN)].map((m) => ({
-  title: m[4],
-  value: num(m[1], "value"),
-  limit: num(m[1], "limit"),
-  formatter: m[2],
-  units: m[3],
-}));
+const isValue = (line: string): boolean => line !== "" && VALUE_LINE.test(line) && /\d/.test(line);
 
-if (rows.length === 0) {
-  console.error(
-    "Không bóc được meter nào — nhiều khả năng Vercel đã đổi markup. Xem lại PATTERN trong tệp này.",
-  );
-  process.exit(1);
-}
+type Meter = { title: string; used: string; limit: string | null };
 
 /**
- * Đổi số thô thành chữ theo đúng `formatter` mà CHÍNH TRANG khai — không tự đoán đơn vị.
+ * Cắt chữ đã render thành bảng meter.
  *
- * Bốn loại, đối chiếu từng cái với bảng thật (11/08/2026, team jarvis8796):
- *
- *   size               byte THẬP PHÂN (÷1e9), không phải 1024³:  1.292.505.409 → 1,29 GB ✔
- *   prettyCount        đếm thuần:                                       303.331 → 303K
- *   msDetailedTime     mili-giây:                          13.455.860 ms → 3h 44m ✔
- *   computingTimeMbMs  MB·ms → GB-Hrs (÷3,6e9):     782.787.403.776 → 217,4 GB-Hrs ✔
- *
- * Con số 3,6e9 suy ra từ chính hạn mức: 1.296.000.000.000 ứng với 360 GB-Hrs trên dashboard.
- * Tức 1 GB-Hr = 1000 MB × 3.600.000 ms — MB thập phân, khớp với `size` cũng thập phân.
+ * Đi từng dòng, giữ một cái tên đang chờ. Gặp dòng-số đầu tiên sau tên thì đó là「đã dùng」;
+ * gặp `/` thì dòng-số kế là「hạn」; mọi dòng-số sau đó là nấc kế của gói trả tiền — bỏ.
  */
-const MB_MS_PER_GB_HOUR = 3.6e9;
-const show = (value: number | null, formatter: string): string => {
-  if (value == null) return "—";
-  switch (formatter) {
-    case "size":
-      if (value >= 1e9) return `${(value / 1e9).toFixed(2)} GB`;
-      if (value >= 1e6) return `${(value / 1e6).toFixed(1)} MB`;
-      if (value >= 1e3) return `${(value / 1e3).toFixed(1)} KB`;
-      return `${value} B`;
-    case "msDetailedTime": {
-      const totalSeconds = Math.round(value / 1000);
-      const h = Math.floor(totalSeconds / 3600);
-      const m = Math.floor((totalSeconds % 3600) / 60);
-      const s = totalSeconds % 60;
-      if (h > 0) return `${h}h ${m}m`;
-      if (m > 0) return `${m}m ${s}s`;
-      return `${s}s`;
+export function parseUsageText(text: string): Meter[] {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  const meters: Meter[] = [];
+  let title: string | null = null;
+  let used: string | null = null;
+  let limit: string | null = null;
+  let expectLimit = false;
+
+  const flush = () => {
+    if (title && used) meters.push({ title, used, limit });
+    title = null;
+    used = null;
+    limit = null;
+    expectLimit = false;
+  };
+
+  for (const line of lines) {
+    if (line === "/") {
+      expectLimit = true;
+      continue;
     }
-    case "computingTimeMbMs":
-      return `${(value / MB_MS_PER_GB_HOUR).toFixed(1)} GB-Hrs`;
-    default:
-      return value.toLocaleString("vi-VN");
+    if (isValue(line)) {
+      if (!title) continue; // số lạc lõng, không thuộc meter nào
+      if (!used) used = line;
+      else if (expectLimit && !limit) {
+        limit = line;
+        expectLimit = false;
+      }
+      continue; // nấc kế: bỏ
+    }
+    // Dòng chữ = tên meter mới. Chốt cái đang dở trước đã.
+    flush();
+    title = line;
   }
-};
-
-if (process.argv.includes("--debug")) {
-  console.log("\n  formatter/units mà trang tự khai — soi khi con số hiện ra sai đơn vị:");
-  for (const row of rows) {
-    console.log(`    ${row.title.padEnd(34)} formatter=${row.formatter.padEnd(16)} units=${row.units}`);
-  }
+  flush();
+  return meters;
 }
 
-console.log(`\n  Mức dùng đầy đủ — team ${team}  (bóc từ payload trang Usage)\n`);
-for (const row of rows) {
-  const used = show(row.value, row.formatter);
-  const cap = row.limit ? `/ ${show(row.limit, row.formatter)}` : "";
-  const ratio = row.limit && row.limit > 0 && row.value != null ? (row.value / row.limit) * 100 : null;
-  const flag = ratio == null ? "" : ratio >= 100 ? " ⚠ VƯỢT HẠN" : ratio >= 80 ? " ⚠ sắp chạm" : "";
-  console.log(
-    `    ${row.title.padEnd(30)} ${used.padStart(13)} ${cap.padEnd(15)} ` +
-      `${(ratio == null ? "" : `${ratio.toFixed(1)}%`).padStart(6)}${flag}`,
+const browser = await chromium.launch({ headless: true });
+try {
+  const context = await browser.newContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+    viewport: { width: 1440, height: 1200 },
+  });
+  await context.addCookies(
+    cookies.map((c) => ({
+      name: c.name,
+      value: c.value,
+      domain: c.domain ?? ".vercel.com",
+      path: c.path ?? "/",
+    })),
   );
+
+  const page = await context.newPage();
+  const res = await page.goto(`https://vercel.com/${team}/~/usage`, { waitUntil: "domcontentloaded" });
+  if (res && res.status() >= 400) {
+    console.error(`Vercel trả HTTP ${res.status()} — cookie hết hiệu lực? Xuất lại tệp mới.`);
+    process.exit(1);
+  }
+
+  /**
+   * Một lượt chờ-cho-đủ. Trả về bảng đọc được (có thể còn thiếu — người gọi phán xử).
+   *
+   * Tách thành hàm để TẢI LẠI RỒI THỬ LẦN NỮA: đo 4 lượt thì 1 lượt trang khựng giữa chừng và
+   * hết giờ. Một lần render hụt không đáng bắt người ta gõ lại lệnh.
+   */
+  const collect = async (): Promise<Meter[]> => {
+  const deadline = Date.now() + SETTLE_TIMEOUT_MS;
+  let meters: Meter[] = [];
+  let stable = 0;
+
+  while (Date.now() < deadline) {
+    // Cuộn xuống đáy TRƯỚC mỗi nhịp đếm: thẻ chỉ dựng khi lọt vào tầm nhìn, nên đứng yên ở
+    // đầu trang thì đếm bao lâu cũng chỉ ra bấy nhiêu.
+    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)");
+    await page.waitForTimeout(SETTLE_POLL_MS);
+
+    const next = parseUsageText(await page.evaluate("document.body.innerText"));
+    stable = next.length > meters.length ? 0 : stable + 1;
+    if (next.length >= meters.length) meters = next;
+
+    // Hai điều kiện, và điều kiện ĐỦ CỘT đứng trước: thôi mọc mà còn thiếu cột bắt buộc thì
+    // chỉ là trang đang nghỉ giữa hai đợt render, không phải đã xong.
+    const seen = new Set(meters.map((m) => m.title));
+    if (REQUIRED_TITLES.every((t) => seen.has(t)) && stable >= SETTLE_STABLE_POLLS) break;
+  }
+    return meters;
+  };
+
+  const missingOf = (rows: Meter[]): string[] => {
+    const seen = new Set(rows.map((m) => m.title));
+    return REQUIRED_TITLES.filter((t) => !seen.has(t));
+  };
+
+  let meters = await collect();
+  if (missingOf(meters).length > 0) {
+    console.error(`  … lượt đầu còn thiếu ${missingOf(meters).length} cột, tải lại thử lần nữa…`);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    meters = await collect();
+  }
+
+  const missing = missingOf(meters);
+  if (missing.length > 0) {
+    console.error(
+      `Hết ${SETTLE_TIMEOUT_MS / 1000}s mà vẫn thiếu ${missing.length} cột bắt buộc: ${missing.join(", ")}.\n` +
+        "Không in bảng thiếu — một bảng thiếu trông y hệt một bảng đủ.",
+    );
+    process.exit(1);
+  }
+  if (meters.length === 0) {
+    console.error("Render xong nhưng không cắt được meter nào — xem lại parseUsageText.");
+    process.exit(1);
+  }
+
+  if (process.argv.includes("--json")) {
+    console.log(JSON.stringify({ team, readAt: new Date().toISOString(), meters }, null, 2));
+  } else {
+    console.log(`\n  Mức dùng đầy đủ — team ${team}  ·  ${meters.length} meter\n`);
+    for (const m of meters) {
+      console.log(`    ${m.title.padEnd(34)} ${m.used.padStart(14)}${m.limit ? ` / ${m.limit}` : ""}`);
+    }
+    console.log("");
+  }
+} finally {
+  await browser.close();
 }
-console.log(
-  `\n  ${rows.length} meter. Đây là phép BÓC HTML, không phải API — Vercel đổi markup là nó sai\n` +
-    "  hoặc rỗng mà không báo. Đối chiếu bằng mắt với dashboard trước khi tin một con số lạ.\n",
-);

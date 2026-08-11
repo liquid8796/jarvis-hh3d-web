@@ -24,10 +24,16 @@ import { maintenanceViewFor } from "../src/lib/auth/maintenance";
 import { ASSIGNABLE_ROLES, type Role } from "../src/lib/auth/permissions";
 import { appSettingsSchema, getAppSettings, saveAppSettings } from "../src/lib/services/settings";
 import {
+  HOURS_PER_DAY,
   JOB_EVENT_RETENTION_DEFAULT_DAYS,
+  JOB_EVENT_RETENTION_DEFAULT_HOURS,
   RETENTION_MAX_DAYS,
+  RETENTION_MAX_HOURS,
   RETENTION_MIN_DAYS,
-  parseRetentionDays,
+  RETENTION_MIN_HOURS,
+  formatRetention,
+  parseRetentionHours,
+  splitRetention,
 } from "../src/lib/validation/retention";
 import { getMaintenanceFeed } from "../src/lib/services/dashboard";
 import { startJob } from "../src/lib/services/jobs";
@@ -50,50 +56,116 @@ const assert = (condition: unknown, message: string) => {
 // hàm ấy `parse()` chứ không `safeParse()`, nên một giá trị lọt lưới ở đây nổ thành lỗi server
 // trần trụi thay vì một dòng nhắc tử tế.
 {
-  const okDays = (raw: unknown, expected: number) => {
-    const r = parseRetentionDays(raw);
-    assert(r.ok && r.days === expected, `parseRetentionDays(${JSON.stringify(raw)}) phải cho ${expected}`);
+  const ok = (amount: unknown, unit: unknown, expected: number) => {
+    const r = parseRetentionHours(amount, unit);
+    assert(
+      r.ok && r.hours === expected,
+      `parseRetentionHours(${JSON.stringify(amount)}, ${JSON.stringify(unit)}) phải cho ${expected} giờ`,
+    );
   };
-  const bad = (raw: unknown, why: string) => {
-    const r = parseRetentionDays(raw);
-    assert(!r.ok, `parseRetentionDays(${JSON.stringify(raw)}) phải BỊ TỪ CHỐI — ${why}`);
+  const bad = (amount: unknown, unit: unknown, why: string) => {
+    const r = parseRetentionHours(amount, unit);
+    assert(
+      !r.ok,
+      `parseRetentionHours(${JSON.stringify(amount)}, ${JSON.stringify(unit)}) phải BỊ TỪ CHỐI — ${why}`,
+    );
   };
 
-  okDays("7", 7);
-  okDays("  14  ", 14); // ô number vẫn gửi lên chuỗi, và người ta vẫn dán kèm khoảng trắng
-  okDays(String(RETENTION_MIN_DAYS), RETENTION_MIN_DAYS);
-  okDays(String(RETENTION_MAX_DAYS), RETENTION_MAX_DAYS);
+  ok("7", "day", 7 * HOURS_PER_DAY);
+  ok("7", "hour", 7);
+  ok("  14  ", "day", 14 * HOURS_PER_DAY); // ô number vẫn gửi lên chuỗi, và người ta vẫn dán kèm khoảng trắng
+  ok("  36  ", "hour", 36);
+  ok(String(RETENTION_MIN_DAYS), "day", RETENTION_MIN_DAYS * HOURS_PER_DAY);
+  ok(String(RETENTION_MAX_DAYS), "day", RETENTION_MAX_HOURS);
+  ok(String(RETENTION_MIN_HOURS), "hour", RETENTION_MIN_HOURS);
+  ok(String(RETENTION_MAX_HOURS), "hour", RETENTION_MAX_HOURS);
 
-  bad("", "để trống");
-  bad(null, "form không gửi trường nào");
-  bad(undefined, "trường vắng mặt");
-  bad(String(RETENTION_MIN_DAYS - 1), "dưới biên dưới");
-  bad(String(RETENTION_MAX_DAYS + 1), "trên biên trên");
-  bad("-7", "số âm");
-  bad("7.5", "không nguyên");
-  bad("abc", "không phải số");
-  bad("Infinity", "vô hạn — Number() nuốt nhưng isInteger chặn");
-  bad({}, "không phải chuỗi (FormData có thể trả về File)");
+  bad("", "day", "để trống");
+  bad(null, "day", "form không gửi trường nào");
+  bad(undefined, "day", "trường vắng mặt");
+  bad("0", "hour", "không có hạn lưu nào bằng 0 — đó là xoá sạch");
+  bad(String(RETENTION_MIN_DAYS - 1), "day", "dưới biên dưới");
+  bad(String(RETENTION_MAX_DAYS + 1), "day", "trên biên trên của ngày");
+  bad(String(RETENTION_MAX_HOURS + 1), "hour", "trên biên trên của giờ");
+  bad("-7", "day", "số âm");
+  bad("7.5", "hour", "không nguyên");
+  bad("abc", "day", "không phải số");
+  bad("Infinity", "hour", "vô hạn — Number() nuốt nhưng isInteger chặn");
+  bad({}, "day", "không phải chuỗi (FormData có thể trả về File)");
+
+  // Đơn vị: TỪ CHỐI chứ không đoán. Đoán「giờ」cho một con số người ta định là「ngày」là cắt hạn
+  // lưu xuống 1/24, và lượt quét kế tiếp xoá thật.
+  bad("7", null, "form cũ không có ô đơn vị");
+  bad("7", "", "đơn vị rỗng");
+  bad("7", "week", "đơn vị lạ");
+  bad("7", "DAY", "sai chữ hoa — không nhận bừa");
+  ok("1", "  day  ", HOURS_PER_DAY); // đơn vị dính khoảng trắng thì vẫn hiểu
 
   // Biên của parser và biên của schema PHẢI là một. Lệch nhau nghĩa là có một giá trị qua được
   // action rồi chết ở `saveAppSettings` — đúng loại lỗi mà việc gom hằng số sinh ra để chặn.
   assert(
-    appSettingsSchema.parse({ jobEvents: { retentionDays: RETENTION_MAX_DAYS } }).jobEvents.retentionDays ===
-      RETENTION_MAX_DAYS,
+    appSettingsSchema.parse({ jobEvents: { retentionHours: RETENTION_MAX_HOURS } }).jobEvents
+      .retentionHours === RETENTION_MAX_HOURS,
     "schema phải nhận đúng biên trên mà parser nhận",
   );
   let threw = false;
   try {
-    appSettingsSchema.parse({ jobEvents: { retentionDays: RETENTION_MAX_DAYS + 1 } });
+    appSettingsSchema.parse({ jobEvents: { retentionHours: RETENTION_MAX_HOURS + 1 } });
   } catch {
     threw = true;
   }
   assert(threw, "schema phải TỪ CHỐI giá trị vượt biên — nếu không, parser là hàng rào duy nhất");
   assert(
-    appSettingsSchema.parse({}).jobEvents.retentionDays === JOB_EVENT_RETENTION_DEFAULT_DAYS,
+    appSettingsSchema.parse({}).jobEvents.retentionHours === JOB_EVENT_RETENTION_DEFAULT_HOURS,
     "document rỗng (mọi deploy trước bản này) phải nhận hạn lưu mặc định",
   );
-  console.log(`✔ hạn lưu nhật ký đàn: biên ${RETENTION_MIN_DAYS}–${RETENTION_MAX_DAYS} khớp giữa parser và schema`);
+
+  // Document CŨ mang `retentionDays` — mọi document đã ghi trước bản 0.72.0. Rơi về mặc định ở
+  // đây nghĩa là hạn lưu trưởng môn đã đặt biến mất lặng lẽ ngay nhịp deploy.
+  assert(
+    appSettingsSchema.parse({ jobEvents: { retentionDays: 30 } }).jobEvents.retentionHours ===
+      30 * HOURS_PER_DAY,
+    "document cũ phải được đọc thành GIỜ, không được rơi về mặc định",
+  );
+  assert(
+    appSettingsSchema.parse({ jobEvents: { retentionDays: JOB_EVENT_RETENTION_DEFAULT_DAYS } }).jobEvents
+      .retentionHours === JOB_EVENT_RETENTION_DEFAULT_HOURS,
+    "mặc định cũ (7 ngày) và mặc định mới phải là CÙNG một khoảng thời gian",
+  );
+  assert(
+    appSettingsSchema.parse({ jobEvents: { retentionHours: 6, retentionDays: 30 } }).jobEvents
+      .retentionHours === 6,
+    "có cả hai khoá thì khoá GIỜ thắng — đó là thứ lần Lưu gần nhất ghi ra",
+  );
+  let threwLegacy = false;
+  try {
+    appSettingsSchema.parse({ jobEvents: { retentionDays: RETENTION_MAX_DAYS + 1 } });
+  } catch {
+    threwLegacy = true;
+  }
+  assert(threwLegacy, "khoá cũ vượt biên vẫn phải bị từ chối như trước, không được lọt qua nhánh đọc cũ");
+
+  // Vòng đời của một con số trên form: lưu ra giờ → chẻ lại thành (số, đơn vị) để rót vào ô →
+  // người ta bấm Lưu mà không sửa gì → phải ra ĐÚNG con số cũ. Lệch ở đây nghĩa là mở trang
+  // admin rồi bấm Lưu là tự đổi hạn lưu của chính mình.
+  for (const hours of [1, 6, 23, 24, 25, 36, 168, 720, RETENTION_MAX_HOURS]) {
+    const shown = splitRetention(hours);
+    const back = parseRetentionHours(String(shown.amount), shown.unit);
+    assert(
+      back.ok && back.hours === hours,
+      `${hours} giờ chẻ ra「${shown.amount} ${shown.unit}」rồi đọc lại phải về đúng ${hours}`,
+    );
+    assert(shown.amount >= 1 && Number.isInteger(shown.amount), `${hours} giờ phải chẻ ra số nguyên ≥ 1`);
+  }
+
+  assert(formatRetention(168) === "7 ngày", "168 giờ phải kể là「7 ngày」");
+  assert(formatRetention(24) === "1 ngày", "24 giờ phải kể là「1 ngày」");
+  assert(formatRetention(6) === "6 giờ", "6 giờ phải kể là「6 giờ」");
+  assert(formatRetention(36) === "1 ngày 12 giờ", "36 giờ phải kể đủ cả phần lẻ");
+
+  console.log(
+    `✔ hạn lưu nhật ký đàn: biên ${RETENTION_MIN_HOURS}–${RETENTION_MAX_HOURS} giờ khớp giữa parser và schema, document cũ (ngày) đọc được, form đi vòng không trôi số`,
+  );
 }
 
 // ---- 1. Schema thuần — không chạm database -----------------------------------------------

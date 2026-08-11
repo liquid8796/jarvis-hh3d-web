@@ -2,9 +2,12 @@ import { cache } from "react";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
-  JOB_EVENT_RETENTION_DEFAULT_DAYS,
+  HOURS_PER_DAY,
+  JOB_EVENT_RETENTION_DEFAULT_HOURS,
   RETENTION_MAX_DAYS,
+  RETENTION_MAX_HOURS,
   RETENTION_MIN_DAYS,
+  RETENTION_MIN_HOURS,
 } from "@/lib/validation/retention";
 import { db, schema } from "@/lib/db/client";
 import { DEFAULT_GAME_BASE_URL, normalizeGameBaseUrl } from "@/lib/quest-engine/cookies.mjs";
@@ -245,17 +248,33 @@ export const appSettingsSchema = z.object({
    * Mặc định 7 ngày, TRÙNG với hạn lưu sảnh đàm đạo có chủ ý: một khái niệm「hạn lưu」duy nhất
    * cho cả hệ, không phải hai con số phải nhớ. Nới lên thì nhật ký giữ lâu hơn, đổi lại lượt
    * chuyển trạm chậm đi theo — đó là toàn bộ sự đánh đổi, và nó nằm ở đúng một chỗ này.
+   *
+   * ĐƠN VỊ LƯU LÀ GIỜ từ bản 0.72.0 (`retentionHours`) — xem `validation/retention.ts` cho lý
+   * lẽ. `retentionDays` là khoá của MỌI document đã ghi trước bản ấy, nên nhánh này đọc cả hai
+   * và đổi ngày thành giờ. Bỏ nhánh đọc cũ đi thì hạn lưu trưởng môn đã đặt lặng lẽ rơi về mặc
+   * định 7 ngày ngay nhịp deploy — không báo gì, chỉ là một hôm nào đó nhật ký biến mất sớm hơn
+   * người ta tưởng. Ghi thì chỉ ghi `retentionHours`: đọc-sửa-ghi trọn document nên khoá cũ tự
+   * rụng ở lần Lưu đầu tiên, và giữ lại cả hai khoá nghĩa là nuôi một câu hỏi「cái nào thắng」.
    */
   jobEvents: z
     .object({
-      retentionDays: z
+      retentionHours: z
         .number()
         .int()
-        .min(RETENTION_MIN_DAYS)
-        .max(RETENTION_MAX_DAYS)
-        .default(JOB_EVENT_RETENTION_DEFAULT_DAYS),
+        .min(RETENTION_MIN_HOURS)
+        .max(RETENTION_MAX_HOURS)
+        .optional(),
+      /** Chỉ để ĐỌC document cũ. Không nơi nào ghi khoá này nữa. */
+      retentionDays: z.number().int().min(RETENTION_MIN_DAYS).max(RETENTION_MAX_DAYS).optional(),
     })
-    .prefault({ retentionDays: JOB_EVENT_RETENTION_DEFAULT_DAYS }),
+    .prefault({})
+    .transform(({ retentionHours, retentionDays }) => ({
+      retentionHours:
+        retentionHours ??
+        (retentionDays === undefined
+          ? JOB_EVENT_RETENTION_DEFAULT_HOURS
+          : retentionDays * HOURS_PER_DAY),
+    })),
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;

@@ -1089,6 +1089,8 @@ export async function reapStaleJobs(): Promise<void> {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** Hạn lưu nhật ký đàn đếm bằng GIỜ (xem `validation/retention.ts`), nên mốc cũng tính từ giờ. */
+const HOUR_MS = 60 * 60 * 1000;
 
 /** Một lô xoá. Đủ nhỏ để một câu lệnh không giữ khoá lâu, đủ lớn để không phải chạy trăm lượt. */
 export const JOB_EVENT_PURGE_BATCH = 5_000;
@@ -1116,7 +1118,7 @@ const JOB_EVENT_PURGE_MAX_BATCHES = 10;
  */
 export async function purgeExpiredJobEvents(): Promise<{ purged: number; more: boolean }> {
   const { jobEvents } = await getAppSettings();
-  const cutoff = new Date(Date.now() - jobEvents.retentionDays * DAY_MS);
+  const cutoff = new Date(Date.now() - jobEvents.retentionHours * HOUR_MS);
 
   let purged = 0;
   for (let batch = 0; batch < JOB_EVENT_PURGE_MAX_BATCHES; batch++) {
@@ -1150,10 +1152,10 @@ export async function purgeExpiredJobEvents(): Promise<{ purged: number; more: b
 export async function jobEventRetentionStats(): Promise<{
   total: number;
   expired: number;
-  retentionDays: number;
+  retentionHours: number;
 }> {
   const { jobEvents } = await getAppSettings();
-  const cutoff = new Date(Date.now() - jobEvents.retentionDays * DAY_MS);
+  const cutoff = new Date(Date.now() - jobEvents.retentionHours * HOUR_MS);
 
   const rows = await db().execute(sql`
     select count(*)::int as total,
@@ -1165,7 +1167,7 @@ export async function jobEventRetentionStats(): Promise<{
   return {
     total: row?.total ?? 0,
     expired: row?.expired ?? 0,
-    retentionDays: jobEvents.retentionDays,
+    retentionHours: jobEvents.retentionHours,
   };
 }
 

@@ -24,7 +24,11 @@ import {
 } from "@/lib/services/media";
 import { purgeExpiredJobEvents } from "@/lib/services/jobs";
 import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
-import { JOB_EVENTS_PURGE_INTENT, parseRetentionDays } from "@/lib/validation/retention";
+import {
+  JOB_EVENTS_PURGE_INTENT,
+  formatRetention,
+  parseRetentionHours,
+} from "@/lib/validation/retention";
 import { adminCreate, adminDelete, adminUpdate, findById, setStatus } from "@/lib/services/users";
 import { CHAT_PURGE_PHRASE, matchesChatPurgePhrase } from "@/lib/validation/chat";
 import { parseTags } from "@/lib/validation/tags";
@@ -444,17 +448,22 @@ export async function saveJobEventsSettingsAction(
     };
   }
 
-  const parsed = parseRetentionDays(formData.get("retentionDays"));
+  const parsed = parseRetentionHours(
+    formData.get("retentionAmount"),
+    formData.get("retentionUnit"),
+  );
   if (!parsed.ok) return { ok: false, message: parsed.message };
 
   const settings = await getAppSettings();
-  settings.jobEvents.retentionDays = parsed.days;
+  settings.jobEvents.retentionHours = parsed.hours;
   await saveAppSettings(settings);
 
   revalidatePath("/admin");
   return {
     ok: true,
-    message: `Đã đặt hạn lưu nhật ký đàn: ${parsed.days} ngày. Nhịp quét kế tiếp sẽ dọn phần quá hạn.`,
+    // Nhắc「một lần mỗi ngày」ngay trong câu báo, vì từ khi đặt được theo GIỜ thì cái bẫy lớn
+    // nhất là đặt 6 giờ rồi ngồi chờ nó quét mỗi 6 giờ — cron gói Hobby không chạy thế.
+    message: `Đã đặt hạn lưu nhật ký đàn: ${formatRetention(parsed.hours)}. Nhịp quét chạy mỗi ngày một lần sẽ dọn phần quá hạn — muốn dọn liền thì bấm「Quét ngay」.`,
   };
 }
 

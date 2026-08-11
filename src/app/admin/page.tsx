@@ -159,7 +159,7 @@ export default async function AdminPage({
                   <GameDomainForm baseUrl={settings.game.baseUrl} />
                   <MaintenanceForm maintenance={settings.maintenance} drain={drain} />
                   <JobEventRetentionForm
-                    retentionDays={jobEventStats.retentionDays}
+                    retentionHours={jobEventStats.retentionHours}
                     total={jobEventStats.total}
                     expired={jobEventStats.expired}
                   />

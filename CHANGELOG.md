@@ -11,6 +11,44 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.72.0 — hạn lưu nhật ký đàn đặt được theo GIỜ, không chỉ theo ngày
+
+Núm ở tab Bảo Trì trước nay chỉ nhận NGÀY (1–365), mà đơn vị nhỏ nhất là một ngày thì không đặt
+được những mốc ngắn — 12 giờ, 6 giờ — đúng lúc `job_events` phình nhanh. Nay ô số đứng cạnh một
+ô chọn đơn vị: **giờ** hay **ngày**.
+
+**Lưu xuống database bằng GIỜ** (`jobEvents.retentionHours`, 1–8760 — đúng 365 ngày cũ kể lại
+bằng giờ), không lưu kèm một trường đơn vị. Lưu kèm đơn vị nghĩa là mọi chỗ đọc hạn lưu (lượt
+quét, hai con số thống kê, câu thông báo sau khi Lưu) phải tự nhớ nhân lại — và chỗ nào quên là
+xoá sớm gấp 24 lần, thứ không ai thấy cho tới lúc đi tìm một dòng nhật ký không còn ở đó nữa.
+Đơn vị chỉ sống trong cái form.
+
+**Document cũ vẫn đọc được.** Mọi document đã ghi trước bản này mang `retentionDays`, và schema
+đổi nó thành giờ (×24) thay vì rơi về mặc định — đo trên database thật: `{"retentionDays":7}`
+đọc ra đúng 168 giờ. Bỏ nhánh ấy đi thì hạn lưu trưởng môn đã đặt biến mất lặng lẽ ngay nhịp
+deploy. Lần Lưu đầu tiên ghi ra `retentionHours` và khoá cũ tự rụng.
+
+**Ô số KHÔNG tự đổi giá trị khi đổi đơn vị** — đổi hộ là quyết định hộ, mà「7」có thể là 7 ngày
+đang gõ dở lẫn 7 giờ vừa định. Thay vào đó là một dòng「Sẽ giữ: …」chạy theo bàn phím, gọi ĐÚNG
+hàm mà server sẽ kiểm, nên nó không bao giờ hứa một thứ mà cú bấm Lưu lại từ chối.
+
+**Đơn vị vắng mặt thì TỪ CHỐI, không đoán.** Ca thật: một tab admin mở từ bản cũ, form chưa có ô
+đơn vị. Đoán「giờ」cho một con số người ta định là「ngày」là cắt hạn lưu xuống 1/24 và lượt quét
+kế tiếp xoá thật — một cái nút Lưu không được phép có nhánh im lặng nào dẫn tới đó.
+
+**Đặt dưới một ngày thì form nói thẳng cái giới hạn của nó:** cron gói Hobby chạy `0 3 * * *` —
+**một lần mỗi ngày**. Hạn lưu 6 giờ không có nghĩa là quét mỗi 6 giờ; muốn dọn đúng mốc thì bấm
+「Quét ngay」. Không có dòng ấy thì núm mới trông như hỏng, đúng cái bẫy mà nút「Quét ngay」đã
+sinh ra để gỡ ở bản trước.
+
+**Đo trên database thật trước khi phát hành**: đặt 25 giờ (cố ý không tròn ngày, và cắt đôi đống
+dữ liệu) → app đếm 10.183/12.889 dòng quá hạn, một câu SQL độc lập `now() - interval '25 hours'`
+đếm đúng 10.183, lệch 0. Cùng con số ấy nếu bị hiểu thành 25 NGÀY thì ra 0 dòng — nên phép đo này
+đỏ được, không phải một dấu tích cho vui. `verify:maintenance` nay giữ thêm: hai biên theo từng
+đơn vị, đơn vị lạ/vắng, document cũ theo ngày, ca có cả hai khoá, và vòng đời「lưu → chẻ ra rót
+vào form → bấm Lưu mà không sửa gì」phải về đúng con số cũ (mở trang admin rồi bấm Lưu không được
+tự đổi hạn lưu của chính mình).
+
 ## 0.71.0 — bản desktop nhận cùng thiết kế, và có chốt giữ hai bản không trôi khỏi nhau
 
 Bản 0.70.0 đổi cách Mê Cung hỏi trần ngày ở phía web. Bản này chở nguyên thiết kế ấy sang desktop

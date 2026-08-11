@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { MirrorSwitchPanel } from "./MirrorSwitchPanel";
+import { MirrorUsage } from "./MirrorUsage";
 import type { SwitchView } from "@/app/actions/mirrorSwitch";
 import {
   deleteMirrorAction,
@@ -71,6 +72,7 @@ export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; s
                       ? `Kiểm mạch ${new Date(m.lastProbeAt).toLocaleString("vi-VN")}: ${m.lastProbeNote}`
                       : "Chưa kiểm mạch lần nào."}
                   </p>
+                  <MirrorUsage mirror={m} />
                 </div>
                 <form action={probeAction}>
                   <input type="hidden" name="id" value={m.id} />
@@ -135,6 +137,21 @@ export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; s
             </label>
             <input id="mirror-mongo" name="mongo" type="password" className="input w-full font-mono"
               placeholder={editing ? `đang giữ ${editing.mongoHost}` : "mongodb+srv://…"} autoComplete="off" />
+          </div>
+          <div>
+            <label className="label" htmlFor="mirror-vercel">
+              Vercel API token của tài khoản giữ trạm này — để đọc mức dùng 30 ngày
+              {editing && (editing.hasVercelToken ? " (để trống là giữ token cũ)" : " (chưa có)")}
+            </label>
+            <input id="mirror-vercel" name="vercelToken" type="password" className="input w-full font-mono"
+              placeholder={editing?.hasVercelToken ? "đang giữ một token — dán cái mới để thay" : "vercel_…"}
+              autoComplete="off" />
+            {/* Nói ngay chỗ lấy: token này KHÔNG phải thứ ai cũng biết đào ở đâu, và một cái
+                token dán nhầm tài khoản thì bảng usage nói về một trạm khác mà không ai hay. */}
+            <p className="mt-1 text-xs text-[var(--color-mist)]">
+              Lấy ở <code>vercel.com/account/tokens</code> — phải đăng nhập ĐÚNG tài khoản giữ trạm
+              này. Tuỳ chọn: thiếu nó thì trạm vẫn chuyển được, chỉ là không đọc được mức dùng.
+            </p>
           </div>
           <div className="flex gap-3">
             <button type="submit" className="btn btn-primary" disabled={saving}>

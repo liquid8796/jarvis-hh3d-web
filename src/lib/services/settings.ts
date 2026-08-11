@@ -178,6 +178,20 @@ export const appSettingsSchema = z.object({
         pg: z.string().min(1),
         /** MONGODB_URI của trạm kia, phong bì secretBox `v1.…`. */
         mongo: z.string().min(1),
+        /**
+         * Vercel API token của TÀI KHOẢN giữ trạm này, phong bì secretBox — để tab Gương Trạm
+         * đọc được mức dùng 30 ngày (`/v2/usage`).
+         *
+         * `.default("")` chứ không bắt buộc, và đó là phần quan trọng: mọi trạm đã ghi vào sổ
+         * TRƯỚC bản này đều không có trường này, và chúng phải tiếp tục sống bình thường —
+         * chỉ là chưa đọc được usage cho tới khi ai đó dán token vào.
+         *
+         * Vì sao vào SỔ chứ không vào env của deployment: token là của một TÀI KHOẢN VERCEL
+         * KHÁC. Rải nó vào env nghĩa là mỗi trạm phải ôm token của mọi trạm còn lại, và đổi
+         * một cái token là phải deploy lại tất cả. Sổ thì đã mã hoá sẵn, đã đi theo mọi lượt
+         * đồng bộ, và đã là chỗ giữ hai chuỗi kết nối cùng loại nhạy cảm.
+         */
+        vercelToken: z.string().default(""),
         lastProbeAt: z.string().nullable().catch(null),
         lastProbeOk: z.boolean().nullable().catch(null),
         lastProbeNote: z.string().max(500).catch(""),

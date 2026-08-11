@@ -9,6 +9,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { encryptSecret, decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { resolveMongoDbName } from "@/lib/mongo/dbName";
 import { getAppSettings, saveAppSettings, type AppSettings } from "@/lib/services/settings";
+import { fetchVercelUsage, type VercelUsage } from "@/lib/services/vercelUsage";
 
 /**
  * Sổ gương trạm — server action của tab Gương Trạm (deploy/mirror/README.md §4).
@@ -35,6 +36,11 @@ export type MirrorView = {
   lastProbeAt: string | null;
   lastProbeOk: boolean | null;
   lastProbeNote: string;
+  /**
+   * Sổ đã có token Vercel của trạm này chưa — CHỈ có/không, không bao giờ là chính token.
+   * Giao diện cần nó để biết nên hiện bảng usage hay hiện lời mời dán token.
+   */
+  hasVercelToken: boolean;
 };
 
 const MAX_MIRRORS = 8;
@@ -66,6 +72,7 @@ function viewOf(entry: AppSettings["mirrors"][number]): MirrorView {
     lastProbeAt: entry.lastProbeAt,
     lastProbeOk: entry.lastProbeOk,
     lastProbeNote: entry.lastProbeNote,
+    hasVercelToken: isEncrypted(entry.vercelToken ?? ""),
   };
 }
 
@@ -136,6 +143,7 @@ export async function saveMirrorAction(_prev: MirrorResult | null, formData: For
   const url = String(formData.get("url") ?? "").trim().replace(/\/$/, "");
   const pgInput = String(formData.get("pg") ?? "").trim();
   const mongoInput = String(formData.get("mongo") ?? "").trim();
+  const vercelInput = String(formData.get("vercelToken") ?? "").trim();
 
   if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(id)) {
     return { ok: false, message: "Mã trạm: chữ thường/số/gạch nối, 2–64 ký tự — nó sẽ là SITE_ID của deploy bên kia." };
@@ -163,12 +171,24 @@ export async function saveMirrorAction(_prev: MirrorResult | null, formData: For
   // nhưng kết quả ghi thẳng vào sổ cho ai nhìn cũng thấy.
   const probe = await probeConnections(pgPlain, mongoPlain);
 
+  /**
+   * Token Vercel là TUỲ CHỌN, khác hai chuỗi kết nối ở trên: thiếu nó thì trạm vẫn chuyển
+   * được, chỉ là bảng usage im lặng. Ô để trống nghĩa là「giữ phong bì cũ」— cùng luật với
+   * pg/mongo, để admin sửa mỗi cái tên mà không phải lục lại két.
+   */
+  // `isEncrypted` gác trước `decryptSecret`: trạm ghi trước bản này mang chuỗi RỖNG ở trường
+  // ấy, và giải mã một chuỗi rỗng là ném — tức lượt sửa tên một trạm cũ sẽ văng lỗi.
+  const vercelPlain =
+    vercelInput ||
+    (existing && isEncrypted(existing.vercelToken ?? "") ? decryptSecret(existing.vercelToken) : "");
+
   const entry: AppSettings["mirrors"][number] = {
     id,
     name,
     url,
     pg: encryptSecret(pgPlain),
     mongo: encryptSecret(mongoPlain),
+    vercelToken: vercelPlain ? encryptSecret(vercelPlain) : "",
     lastProbeAt: new Date().toISOString(),
     lastProbeOk: probe.ok,
     lastProbeNote: probe.note,
@@ -184,6 +204,29 @@ export async function saveMirrorAction(_prev: MirrorResult | null, formData: For
     ok: probe.ok,
     message: `${existing ? "Đã cập nhật" : "Đã ghi"} trạm「${name}」. Kiểm mạch: ${probe.note}`,
   };
+}
+
+/**
+ * Mức dùng Vercel 30 ngày của MỘT trạm, cho tab Gương Trạm.
+ *
+ * Đọc theo yêu cầu (một cú bấm) chứ không nhét vào lượt render trang: `/v2/usage` là một lượt
+ * đi ra Internet, và trang Tông Môn không được phép chậm đi vì một API của bên thứ ba — nhất
+ * là khi tab này còn giữ nút chuyển trạm, thứ người ta mở ra trong lúc có sự cố.
+ *
+ * Trả về `VercelUsage`, tức mọi ngả hỏng đã thành `{ ok: false, error }` có chữ đọc được.
+ * Không ném lên client trừ khi người gọi không có quyền — cửa quyền thì phải đóng sập.
+ */
+export async function mirrorUsageAction(id: string): Promise<VercelUsage> {
+  await requireSiteSwitch();
+
+  const settings = await getAppSettings();
+  const entry = settings.mirrors.find((m) => m.id === id);
+  if (!entry) return { ok: false, error: `Không có trạm「${id}」trong sổ.` };
+  if (!isEncrypted(entry.vercelToken ?? "")) {
+    return { ok: false, error: "Trạm này chưa có token Vercel — dán vào ô ở form Sửa trạm." };
+  }
+
+  return fetchVercelUsage(decryptSecret(entry.vercelToken));
 }
 
 export async function probeMirrorAction(_prev: MirrorResult | null, formData: FormData): Promise<MirrorResult> {
@@ -251,6 +294,9 @@ export async function registerSelfAction(): Promise<MirrorResult> {
     url,
     pg: encryptSecret(pg),
     mongo: encryptSecret(mongo),
+    // Giữ token đã có, đừng xoá: lượt tự khai này chạy lại được nhiều lần (mỗi lần trạm đổi
+    // URL), và env của một trạm KHÔNG mang token Vercel của chính nó — chỉ có người dán tay.
+    vercelToken: existing?.vercelToken ?? "",
     lastProbeAt: new Date().toISOString(),
     lastProbeOk: true,
     lastProbeNote: "Tự khai từ env của chính trạm — không cần kiểm mạch, nó đang chạy bằng chính hai chuỗi này.",

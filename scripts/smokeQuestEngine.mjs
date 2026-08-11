@@ -31,6 +31,7 @@ import {
 } from "../src/lib/quest-engine/questGate.mjs";
 import { profileDirForJob } from "../src/lib/quest-engine/browserProfile.mjs";
 import {
+  COMPLETION_ENDS_DAY_QUEST_IDS,
   DAILY_QUOTA_QUEST_IDS,
   reachedDailyQuota,
 } from "../src/lib/quest-engine/dailyQuota.mjs";
@@ -2953,6 +2954,35 @@ async function main() {
       check(
         "nhiệm vụ ngoài phạm vi mang dấu vẫn không vào sổ",
         reachedDailyQuota({ id: "me-cung" }, bySite) === false,
+      );
+
+      // ĐƯỜNG THỨ HAI vào sổ: làm trọn cả 5 câu Vấn Đáp trong MỘT phiên thì「xong」đã là hết
+      // ngày. Thiếu nó thì lượt chạy THẬT của ngày là lượt duy nhất không ghi được gì, và đàn
+      // cứ mở lại trang ấy mỗi vòng — đo trên đàn thật 11/08/2026: xong lúc 21:55, 22:12,
+      // 22:31, 22:48, 23:06 cho một nhiệm vụ cả ngày chỉ có 5 câu.
+      const finished = { outcome: "completed", message: "xong" };
+      check(
+        "Vấn Đáp báo xong → vào sổ ngay, không đợi tới vòng sau",
+        reachedDailyQuota({ id: "van-dap" }, finished) === true &&
+          reachedDailyQuota({ id: "van-dap-thuong" }, finished) === true,
+      );
+      // Và KHÔNG lan sang nhiệm vụ nhiều lượt: Bí Cảnh có 5 lượt một ngày, ghi sổ ngay lượt
+      // đầu là tự tay vứt bốn lượt còn lại — im lặng, và mỗi ngày một lần.
+      check(
+        "nhiệm vụ ngày nhiều lượt báo xong thì KHÔNG vào sổ",
+        reachedDailyQuota({ id: "bi-canh-tong-mon" }, finished) === false &&
+          reachedDailyQuota({ id: "diem-danh" }, finished) === false,
+      );
+      // Danh sách thứ hai phải nằm TRỌN trong danh sách thứ nhất: `reachedDailyQuota` gác bằng
+      // `isDailyQuotaQuest` trước, nên một ID lạc vào đây sẽ không bao giờ có tác dụng — một
+      // dòng chết trông y hệt một dòng đang chạy.
+      const outsiders = [...COMPLETION_ENDS_DAY_QUEST_IDS].filter(
+        (id) => !DAILY_QUOTA_QUEST_IDS.has(id),
+      );
+      check(
+        "mọi ID của đường「xong là hết ngày」đều nằm trong sổ nhiệm vụ ngày",
+        outsiders.length === 0,
+        outsiders.join(", ") || "(sạch)",
       );
     }
 

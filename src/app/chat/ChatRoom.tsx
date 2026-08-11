@@ -188,6 +188,23 @@ export function ChatRoom({
    */
   const growAnchorHeight = useRef<number | null>(null);
 
+  /**
+   * Đặt chỗ cuộn TỨC THÌ, không bao giờ để nó trượt mượt.
+   *
+   * `.chat-scroll` mang `scroll-behavior: smooth` — đúng cho một cú bấm「về cuối」của con
+   * người, nhưng SAI cho mọi lượt đặt chỗ của mã. Đo được ngày 11/08/2026: lượt ghim-xuống-đáy
+   * lúc mở sảnh chạy thành một animation BẮT ĐẦU TỪ scrollTop 0, và mỗi nhịp của animation ấy
+   * bắn ra một sự kiện `scroll`. Mấy nhịp đầu mang scrollTop ≈ 0, nên `onScroll` đọc thành
+   *「người ta đang cuộn lên đọc quá khứ」: hạ cờ dính đáy, rồi nới cửa sổ (bản cũ thì bắn hẳn
+   * một `loadOlder()` — một request thừa mỗi lần ai đó mở Phòng Chat).
+   *
+   * Hậu quả thấy được: mở sảnh ra mà không đứng ở tin mới nhất, lệch hẳn hơn nghìn pixel.
+   * `behavior: "instant"` cắt đứt chuyện đó — một lần đặt, một sự kiện, ở đúng chỗ cuối cùng.
+   */
+  const jumpScrollTo = (el: HTMLElement, top: number) => {
+    el.scrollTo({ top, behavior: "instant" });
+  };
+
   const messages = useMemo(
     () =>
       [...store.values()].sort(
@@ -336,7 +353,7 @@ export function ChatRoom({
   // Dính đáy: mỗi khi có tin mới và người xem đang ở đáy, cuộn theo.
   useEffect(() => {
     if (stuck && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      jumpScrollTo(scrollRef.current, scrollRef.current.scrollHeight);
       setUnseen(0);
       // Về tới đáy là thôi cần đống quá khứ vừa đọc — thu cửa sổ lại để sảnh khỏi mang theo
       // vài trăm thẻ tin suốt phiên. An toàn vì mọi thẻ bị gỡ đều nằm PHÍA TRÊN tầm nhìn:
@@ -379,7 +396,7 @@ export function ChatRoom({
     const el = scrollRef.current;
     const before = growAnchorHeight.current;
     if (!el || before == null) return;
-    el.scrollTop += el.scrollHeight - before;
+    jumpScrollTo(el, el.scrollTop + (el.scrollHeight - before));
     growAnchorHeight.current = null;
   }, [windowSize]);
 
@@ -405,9 +422,11 @@ export function ChatRoom({
       // đầu. Cộng dôi vài tin (hai tin trùng mili-giây có thể về hai lần) là vô hại — phép cắt
       // tự kẹp ở đầu mảng.
       setWindowSize((n) => n + data.messages.length);
-      // Giữ nguyên chỗ đang đọc: bù đúng phần chiều cao vừa mọc thêm phía trên.
+      // Giữ nguyên chỗ đang đọc: bù đúng phần chiều cao vừa mọc thêm phía trên. TỨC THÌ —
+      // một phép bù chỗ mà trượt mượt thì chính nó là cú trôi nó sinh ra để chặn (xem
+      // `jumpScrollTo`).
       requestAnimationFrame(() => {
-        if (el) el.scrollTop += el.scrollHeight - prevHeight;
+        if (el) jumpScrollTo(el, el.scrollTop + (el.scrollHeight - prevHeight));
       });
     } finally {
       setLoadingOlder(false);

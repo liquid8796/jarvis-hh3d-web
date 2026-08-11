@@ -8,9 +8,23 @@ export type DashboardSignal = {
 };
 
 /**
- * LISTEN cần một session thật nên không đi qua host `-pooler` dùng cho query một-phát.
- * Giữ nguyên database/path/credentials của DATABASE_URL (dự án này dùng DB `jarvis`, trong
- * khi DATABASE_URL_UNPOOLED do integration sinh mặc định lại trỏ tới `neondb`) và chỉ thay host.
+ * LISTEN cần một session THẬT nên không đi qua host `-pooler` vốn dành cho query một-phát.
+ *
+ * Dựng lại URL từ `DATABASE_URL` thay vì dùng `DATABASE_URL_UNPOOLED` mà integration sinh sẵn.
+ * Lý do vẫn đứng vững dù con số cụ thể đã đổi: `DATABASE_URL` là biến đặt TAY, tức câu trả lời
+ * có thẩm quyền cho「trạm này đọc database nào」— còn đám biến integration tự tiêm là một nguồn
+ * sự thật THỨ HAI, và nó trỏ sang Neon project khác ngay khi kho nối vào project Vercel không
+ * phải kho mà `DATABASE_URL` trỏ tới. Lệch kiểu ấy thì CHỈ kênh realtime sai, mọi thứ khác vẫn
+ * đúng: hỏng đúng một tính năng, và hỏng im lặng.
+ *
+ * `PGHOST_UNPOOLED` vì thế chỉ là đường tắt TUỲ CHỌN, và nó có mặt hay không phụ thuộc tiền tố
+ * chọn lúc nối kho. Đo 11/08/2026 trên hai trạm sống: trạm chính nối kho CÓ tiền tố (`hh3d_`)
+ * nên biến này vắng mặt và host suy ra bằng cách bỏ `-pooler.`; trạm gương nối kho KHÔNG tiền
+ * tố nên biến có sẵn — hai đường cho ra chuỗi trùng khít từng ký tự. Cả hai trạm dùng database
+ * `neondb`; câu「dự án này dùng DB jarvis」ở bản bình chú cũ đã hết đúng từ lần dời database.
+ *
+ * `REALTIME_DATABASE_URL` là cửa ép tay thắng tất cả — để dành cho ngày Neon đổi quy ước
+ * hostname và phép suy `-pooler.` hết đúng.
  */
 export function realtimeDatabaseUrl(): string {
   const explicit = process.env.REALTIME_DATABASE_URL?.trim();

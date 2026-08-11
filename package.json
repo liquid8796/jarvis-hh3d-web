@@ -31,6 +31,7 @@
     "verify:maintenance": "tsx scripts/verifyMaintenanceMode.mts",
     "verify:chat": "tsx scripts/verifyChatStore.mts",
     "verify:chat-purge": "tsx scripts/verifyChatPurge.mts",
+    "verify:chat-window": "tsx scripts/verifyChatWindow.mts",
     "verify:tag-frames": "tsx scripts/verifyTagFrames.mts",
     "verify:backdrops": "tsx scripts/verifyBackdrops.mts",
     "verify:mirror-sync": "tsx scripts/verifyMirrorSync.mts",

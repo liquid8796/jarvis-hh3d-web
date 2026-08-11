@@ -21,6 +21,13 @@ import {
  *
  * Ngưỡng cảnh báo đọc từ chính tỉ lệ đã dùng: quá 100% là ĐỎ (đã vượt hạn miễn phí), quá 80%
  * là VÀNG. Không có ngưỡng thì không có lý do gì để nhìn bảng này.
+ *
+ * PHÂN VAI GIỮA HAI NGUỒN SỐ (12/08/2026): `/v2/usage` chỉ còn nuôi ĐÚNG dòng tóm tắt; **popup
+ * chỉ vẽ bảng đầy đủ do GitHub Actions cào về**. Bản trước xếp cả hai vào popup và đó là một
+ * popup tự cãi nhau: hai bảng, hai mốc thời gian, chung một tên meter mà hai con số lệch — người
+ * đọc phải tự đoán cái nào là thật. Bảng cào LÀ bảng người ta thấy trên vercel.com (54 meter, có
+ * cả Fluid Active CPU), còn API chỉ đọc được vài chỉ số và chỉ hai trong số ấy đối chiếu khớp.
+ * Một câu hỏi thì một câu trả lời.
  */
 
 /** Quá mức này thì tô vàng — còn một phần năm hạn mức là lúc đáng biết, không phải lúc đã muộn. */
@@ -53,22 +60,6 @@ function worstMetric(metrics: UsageMetric[]): UsageMetric | null {
     }
   }
   return worst;
-}
-
-function UsageBar({ metric }: { metric: UsageMetric }) {
-  const ratio = usedRatio(metric);
-  if (ratio == null) return null;
-  return (
-    <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
-      <div
-        className={`h-full rounded-full ${
-          ratio >= 1 ? "bg-[#f2a0a0]" : ratio >= WARN_RATIO ? "bg-[var(--color-gold-400)]" : "bg-[var(--color-jade-300)]"
-        }`}
-        // Kẹp ở 100%: vượt trần thì thanh đầy, con số bên cạnh mới là chỗ kể vượt bao nhiêu.
-        style={{ width: `${Math.min(100, ratio * 100).toFixed(1)}%` }}
-      />
-    </div>
-  );
 }
 
 export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
@@ -122,13 +113,16 @@ export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
             ) : (
               <span className="text-[var(--color-mist)]">chưa có số liệu</span>
             )}
-            <button type="button" className="btn btn-ghost px-2 py-0.5 text-xs" onClick={() => setOpen(true)}>
-              Chi tiết
-            </button>
           </>
         ) : (
           <span className="text-[var(--color-mist)]">Mức dùng: {usage.error}</span>
         )}
+        {/* Nút đứng NGOÀI ba nhánh trên, vì popup không còn đọc gì từ `/v2/usage` nữa. Trước đây
+            nó nằm trong nhánh `usage.ok`, nên đúng lúc API hỏng — lúc người ta cần con số nhất —
+            bảng cào vẫn nằm sẵn trong sổ mà không có đường nào mở ra. */}
+        <button type="button" className="btn btn-ghost px-2 py-0.5 text-xs" onClick={() => setOpen(true)}>
+          Chi tiết
+        </button>
       </div>
 
       {/**
@@ -144,7 +138,7 @@ export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
        * context khác chứ không nằm trong cái nào. Nâng z-index lên nữa thì vô ích — đó là lý
        * do phải sửa bằng cấu trúc, không sửa bằng con số.
        */}
-      {open && usage?.ok && createPortal(
+      {open && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(6,8,20,0.72)] p-4"
           onClick={(event) => {
@@ -153,49 +147,23 @@ export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
           }}
         >
           <div className="card card-hairline max-h-[85vh] w-full max-w-lg overflow-y-auto p-6">
-            <div className="mb-1 flex items-start justify-between gap-4">
+            <div className="mb-3 flex items-start justify-between gap-4">
               <h3 className="h-display text-lg font-semibold text-gilded">Mức dùng Vercel —「{mirror.name}」</h3>
               <button type="button" className="btn btn-ghost px-2 py-0.5 text-sm" onClick={() => setOpen(false)}>
                 ✕
               </button>
             </div>
 
-            <p className="mb-4 text-xs text-[var(--color-mist)]">
-              {usage.windowDays} ngày gần nhất · {usage.daysWithData} ngày có lưu lượng
-              {usage.lastUpdate && ` · Vercel cập nhật ${new Date(usage.lastUpdate).toLocaleString("vi-VN")}`}
-            </p>
-
-            <div className="flex flex-col gap-3">
-              {usage.metrics.map((metric) => {
-                const limit = formatLimit(metric);
-                const ratio = usedRatio(metric);
-                return (
-                  <div key={metric.key}>
-                    <div className="flex items-baseline justify-between gap-3 text-sm">
-                      <span>{metric.label}</span>
-                      <span className={`font-mono text-xs ${toneOf(metric)}`}>
-                        {formatUsed(metric)}
-                        {limit ? ` / ${limit}` : ""}
-                        {ratio != null && ` · ${(ratio * 100).toFixed(ratio >= 1 ? 0 : 1)}%`}
-                      </span>
-                    </div>
-                    <UsageBar metric={metric} />
-                    <p className="mt-0.5 font-mono text-[0.65rem] text-[var(--color-mist)]">{metric.from}</p>
-                  </div>
-                );
-              })}
-            </div>
-
             {/**
-             * BẢNG ĐẦY ĐỦ — do GitHub Actions dựng trang Usage bằng Chromium thật rồi đẩy lên.
+             * BẢNG ĐẦY ĐỦ — do GitHub Actions dựng trang Usage bằng Chromium thật rồi đẩy lên,
+             * và từ 12/08/2026 là thứ DUY NHẤT trong popup này (xem ghi chú đầu tệp).
              *
-             * Đứng TRƯỚC bảng API vì nó mới là thứ trả lời câu hỏi người ta mở popup ra để hỏi:
-             * Fluid Active CPU còn bao xa thì chạm trần. Bảng API bên trên chỉ có 2 cột đọc
-             * được, nhưng nó là số ĐANG SỐNG (gọi ngay lúc mở), nên vẫn giữ — hai bảng trả lời
-             * hai câu khác nhau, và mốc thời gian dưới đây nói rõ cái nào cũ hơn.
+             * Nó là thứ trả lời câu hỏi người ta mở popup ra để hỏi: Fluid Active CPU còn bao xa
+             * thì chạm trần. Mốc「cào lúc」đứng ngay trên bảng vì số ở đây CŨ tới sáu tiếng — bảng
+             * không mang mốc thì người đọc tưởng nó vừa được đọc lúc bấm.
              */}
-            {mirror.usageReport && (
-              <div className="mt-5 border-t border-[rgba(232,194,92,0.18)] pt-4">
+            {mirror.usageReport ? (
+              <>
                 <p className="mb-2 text-xs text-[var(--color-mist)]">
                   Bảng đầy đủ ({mirror.usageReport.meters.length} meter) — cào lúc{" "}
                   {new Date(mirror.usageReport.readAt).toLocaleString("vi-VN")}
@@ -211,16 +179,20 @@ export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
                     </div>
                   ))}
                 </div>
-              </div>
+              </>
+            ) : (
+              /* Trạng thái THẬT, không phải phòng xa: lượt cào bỏ qua trạm nào chưa khai cookie
+                 trong Secrets của repo, và trạm vừa thêm vào sổ thì còn tới sáu tiếng mới có
+                 bảng. Không nói ra thì popup trống trơn trông như hỏng. */
+              <p className="text-xs text-[var(--color-mist)]">
+                Chưa có bảng đầy đủ cho trạm này. Bảng do GitHub Actions dựng trang Usage bằng
+                Chromium rồi đẩy về, sáu giờ một lượt — trạm chưa khai cookie trong Secrets thì
+                lượt cào bỏ qua nó (xem <span className="font-mono">.github/workflows/vercel-usage.yml</span>).
+              </p>
             )}
 
-            {/* Nét kẻ ngang dời XUỐNG ĐÂY: nó vốn nằm trên đoạn chú thích đứng giữa (đã gỡ
-                11/08/2026 theo yêu cầu), và nó là thứ tách bảng số khỏi hàng nút — bỏ đi cùng
-                đoạn chữ thì hai khối dính vào nhau. */}
+            {/* Nét kẻ ngang tách bảng số khỏi hàng nút. */}
             <div className="mt-5 flex gap-2 border-t border-[rgba(232,194,92,0.18)] pt-3">
-              <button type="button" className="btn btn-ghost text-sm" onClick={load}>
-                Đọc lại
-              </button>
               <a
                 className="btn btn-ghost text-sm"
                 href="https://vercel.com/dashboard/usage"

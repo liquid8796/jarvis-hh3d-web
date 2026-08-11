@@ -105,9 +105,14 @@ export const configSchema = z.object({
    */
   gameBaseUrl: z.string().trim().max(200).default(""),
   /**
-   * Chạy các nhiệm vụ của một vòng SONG SONG — mỗi nhiệm vụ một tab riêng trong cùng phiên
-   * đăng nhập. Vòng dài bằng nhiệm vụ chậm nhất thay vì tổng cộng dồn. Tắt để về tuần tự
-   * như bản desktop khi site trở chứng với nhiều tab.
+   * DI SẢN — từ 12/08/2026 mọi vòng đều chạy TUẦN TỰ, không còn nhánh song song để bật/tắt.
+   *
+   * Song song rút ngắn vòng chạy, nhưng đổi lại thứ tự hành sự trở thành thứ tự giành được cổng
+   * điều phối chứ không phải thứ tự trong hồ sơ — và tông môn cần điều ngược lại: Mê Cung (tới
+   * 35 phút, giữ một phòng 5 người) phải chạy CUỐI, Luyện Đan Đường áp chót.
+   *
+   * Trường vẫn nằm trong schema vì document cũ đã mang nó (Zod strip là mất round-trip an
+   * toàn), nhưng không còn ai đọc giá trị này — cùng lẽ với `runner` bên dưới.
    */
   parallelQuests: z.boolean().default(true),
   /**

@@ -49,6 +49,33 @@ dữ liệu) → app đếm 10.183/12.889 dòng quá hạn, một câu SQL độ
 vào form → bấm Lưu mà không sửa gì」phải về đúng con số cũ (mở trang admin rồi bấm Lưu không được
 tự đổi hạn lưu của chính mình).
 
+## 0.75.0 — bỏ chạy song song: một vòng đi đúng thứ tự hồ sơ, Mê Cung luôn cuối cùng
+
+**Mê Cung luôn là nhiệm vụ CUỐI CÙNG, Luyện Đan Đường áp chót.** Đó là yêu cầu, và bỏ chế độ song
+song chính là thứ thực hiện nó: chạy từng nhiệm vụ một thì thứ tự đúng bằng `order` trong hồ sơ —
+`… 95 Hỷ Sự Đường → 100 Khoáng Mạch → 105 Luyện Đan Đường → 110 Mê Cung`. Không thêm cơ chế nào,
+không thêm "pha đuôi" phải giữ đồng bộ: thứ tự ấy là hệ quả trực tiếp của dữ liệu vốn đã đúng.
+
+**Vì sao phải BỎ chứ không phải xếp lại thứ tự khởi chạy.** Khi mọi nhiệm vụ được phóng cùng lúc,
+thứ tự hành sự thật là thứ tự **giành được cổng điều phối**, không phải thứ tự trong hồ sơ. Mê Cung
+có thể giữ cổng ấy tới 35 phút trong lúc chờ đủ phòng 5 người — đó chính là cách những nhiệm vụ một
+phút bị bỏ đói. Xếp lại thứ tự phóng không cứu được, vì cổng là toàn cục và các đàn khác cũng xếp
+hàng trong đó.
+
+Gỡ: nhánh song song trong `runCycle.mjs`, hai trợ thủ đã thành mã chết (`questTabLimit` với biến
+môi trường `WORKER_QUEST_TABS`, và `mapWithLimit` cùng 4 phép kiểm của nó), ô tick「Chạy song song
+các nhiệm vụ」trên Ngọc Giản, và dòng đọc form. Trường `parallelQuests` **giữ lại trong schema**
+theo đúng lệ của `runner` — Zod strip là mất round-trip của document cũ — nhưng không còn ai đọc.
+
+**Cổng điều phối toàn cục VẪN còn và vẫn cần**: tuần tự trong một đàn không có nghĩa là một mình
+trên máy — VM chạy nhiều đàn cùng lúc, nên hai nhiệm vụ trang riêng của HAI đàn khác nhau vẫn có
+thể dẫm chân nhau trên cùng hai nhân. Đó đúng là sự cố mà cổng ấy sinh ra để chặn.
+
+Sáu chốt smoke mới ghim thứ tự cho **cả hai hạng đàn** (VIP và thường) — và chúng đã bắt được một
+cái sai thật ngay lần chạy đầu: bật hết mọi nhiệm vụ rồi xếp chung sẽ ra danh sách nhân đôi, vì mỗi
+nhiệm vụ có cặp sinh đôi VIP/thường; phải lọc theo hạng như đời thật mới đúng. Bản desktop nhận cùng
+thay đổi ở 1.56.0. Tổng 310 thuận.
+
 ## 0.74.0 — Hỷ Sự Đường cho chọn vào tiệc cưới nào, và nói ra nó thấy gì
 
 **Tuỳ chọn mới「Vào tiệc cưới nào」**: *Chưa chúc* (mặc định, đúng hành vi cũ) / *Đã chúc* / *Tất

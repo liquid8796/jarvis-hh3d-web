@@ -18,9 +18,9 @@ import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
-import { createQuestEngine } from "../src/lib/quest-engine/engine.mjs";
+import { createQuestEngine, enabledQuestsInOrder } from "../src/lib/quest-engine/engine.mjs";
 import { createSession } from "../src/lib/quest-engine/session.mjs";
-import { mapWithLimit, parseCookieString, runCycle } from "../src/lib/quest-engine/runCycle.mjs";
+import { parseCookieString, runCycle } from "../src/lib/quest-engine/runCycle.mjs";
 // Nhập thẳng từ module LÁ: `detectWordPressUser` chỉ biết định dạng cookie, không đi qua engine.
 import { detectWordPressUser } from "../src/lib/quest-engine/cookies.mjs";
 import {
@@ -1005,55 +1005,43 @@ async function main() {
     /if \(scope\.kind === "operator"\) \{[\s\S]{0,200}?enforceMazeCapPolicy/.test(workerRouteSrc),
   );
 
-  console.log("\nTrần số tab chạy song song");
+console.log("\nThứ tự hành sự trong MỘT vòng");
 
-  // Cái trần này ra đời từ 18 dòng lỗi thật trên khôi lỗi tông môn ngày 05/08: tám trang
-  // khác nhau cùng dựng trên VM 2 nhân thì các tab thua cuộc đua báo "không thấy selector".
-  // Ba điều phải đúng: không bao giờ vượt trần, không bỏ sót nhiệm vụ nào, và thứ tự kết
-  // quả giữ nguyên (phần tường thuật một vòng phải đọc như bản tuần tự).
+  // Chế độ song song bị gỡ ngày 12/08/2026, và lý do là thứ tự: song song biến thứ tự hành
+  // sự thành thứ tự GIÀNH ĐƯỢC CỔNG, còn tông môn cần Mê Cung chạy CUỐI (tới 35 phút, giữ
+  // một phòng 5 người) và Luyện Đan Đường áp chót. Chạy tuần tự thì thứ tự ấy là hệ quả
+  // trực tiếp của `order` trong hồ sơ — nên chốt ngay trên hồ sơ, chứ không chốt trên một
+  // lượt chạy may rủi.
   {
-    const items = Array.from({ length: 9 }, (_, i) => i);
-    let inFlight = 0;
-    let peak = 0;
-    const order = await mapWithLimit(items, 3, async (item) => {
-      inFlight++;
-      peak = Math.max(peak, inFlight);
-      // Trễ so le để mọi làn không cùng nhịp — đúng cảnh các nhiệm vụ dài ngắn khác nhau.
-      await new Promise((r) => setTimeout(r, item % 3 === 0 ? 18 : 6));
-      inFlight--;
-      return item * 2;
-    });
-    check("không bao giờ mở quá trần 3 tab", peak === 3, `đỉnh ${peak}`);
-    check("chạy đủ 9 nhiệm vụ, không sót", order.length === 9 && order.every((v, i) => v === i * 2));
-    check(
-      "kết quả giữ đúng thứ tự đầu vào dù chạy xen kẽ",
-      JSON.stringify(order) === JSON.stringify(items.map((i) => i * 2)),
-      order.join(","),
-    );
-  }
-  {
-    // Trần lớn hơn số nhiệm vụ, và trần 1 (tức tuần tự) — hai đầu mút của phép kẹp.
-    let peakWide = 0;
-    let liveWide = 0;
-    await mapWithLimit([1, 2], 8, async () => {
-      liveWide++;
-      peakWide = Math.max(peakWide, liveWide);
-      await new Promise((r) => setTimeout(r, 5));
-      liveWide--;
-    });
-    check("trần lớn hơn số nhiệm vụ thì chỉ mở đúng số nhiệm vụ", peakWide === 2, String(peakWide));
+    const { loadProfile } = await import("../src/lib/quest-engine/profile.mjs");
+    const { questsForAccount } = await import("../src/lib/quest-engine/engine.mjs");
+    const base = loadProfile();
 
-    let peakOne = 0;
-    let liveOne = 0;
-    const seq = await mapWithLimit([1, 2, 3], 1, async (n) => {
-      liveOne++;
-      peakOne = Math.max(peakOne, liveOne);
-      await new Promise((r) => setTimeout(r, 3));
-      liveOne--;
-      return n;
-    });
-    check("trần 1 = chạy tuần tự", peakOne === 1 && JSON.stringify(seq) === "[1,2,3]", String(peakOne));
-    check("danh sách rỗng không treo", (await mapWithLimit([], 3, async () => 1)).length === 0);
+    // Bật HẾT rồi lọc theo hạng: chốt này nói về THỨ TỰ, không phải về quest nào đang bật.
+    // Phải lọc theo hạng vì mỗi nhiệm vụ có CẶP SINH ĐÔI VIP/thường — bật cả hai rồi xếp
+    // chung sẽ ra một danh sách nhân đôi mà không đàn nào thật sự chạy.
+    const allOn = { ...base, quests: base.quests.map((q) => ({ ...q, enabled: true })) };
+
+    for (const isVip of [true, false]) {
+      const tier = isVip ? "VIP" : "thường";
+      const names = questsForAccount(allOn, { isVip }).map((q) => q.name);
+
+      check(
+        `đàn ${tier}: Mê Cung là nhiệm vụ CUỐI CÙNG của một vòng`,
+        names[names.length - 1] === "Mê Cung",
+        names.slice(-3).join(" → "),
+      );
+      check(
+        `đàn ${tier}: Luyện Đan Đường là áp chót`,
+        names[names.length - 2] === "Luyện Đan Đường",
+        names.slice(-3).join(" → "),
+      );
+      check(
+        `đàn ${tier}: mỗi nhiệm vụ chỉ xuất hiện MỘT lần (không lẫn cặp sinh đôi)`,
+        names.length === new Set(names).size,
+        names.join(" · "),
+      );
+    }
   }
 
   console.log("\nChe tên trên Hàng Đợi Công Việc");
@@ -2689,7 +2677,7 @@ async function main() {
     const parallelCycle = await runCycle({
       chromium,
       baseUrl,
-      config: { ...progressConfig, parallelQuests: true },
+      config: { ...progressConfig },
       say: () => {},
       reportProgress: (beat) => parallelBeats.push(beat),
       shouldStop: () => false,
@@ -2752,7 +2740,7 @@ async function main() {
     const serialCycle = await runCycle({
       chromium,
       baseUrl,
-      config: { ...progressConfig, parallelQuests: false },
+      config: { ...progressConfig },
       say: () => {},
       reportProgress: (beat) => serialBeats.push(beat),
       shouldStop: () => false,
@@ -2780,7 +2768,7 @@ async function main() {
         muteCycle = await runCycle({
           chromium,
           baseUrl,
-          config: { ...progressConfig, parallelQuests: true },
+          config: { ...progressConfig },
           say: (message, level) => muteLines.push(`${level ?? "info"}: ${message}`),
           reportProgress: (beat) => muteBeats.push(beat),
           shouldStop: () => false,
@@ -2834,7 +2822,7 @@ async function main() {
       runCycle({
         chromium,
         baseUrl: oldDomainBase,
-        config: { ...progressConfig, parallelQuests: true },
+        config: { ...progressConfig },
         say: (message, level) => lines.push(`${level ?? "info"}: ${message}`),
         reportProgress: () => {},
         shouldStop: () => false,
@@ -2895,7 +2883,7 @@ async function main() {
       const lines = [];
       const fromConfig = await runCycle({
         chromium,
-        config: { ...progressConfig, parallelQuests: true, gameBaseUrl: baseUrl },
+        config: { ...progressConfig, gameBaseUrl: baseUrl },
         say: (message, level) => lines.push(`${level ?? "info"}: ${message}`),
         reportProgress: () => {},
         shouldStop: () => false,

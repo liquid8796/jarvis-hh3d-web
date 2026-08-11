@@ -683,19 +683,8 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       </fieldset>
       </div>
 
-      {/* --------------------------------------------------------------- Vận hành */}
-      {/* Dòng mô tả bên dưới đã bỏ, nên nhãn còn đúng một dòng: canh GIỮA thay vì canh đầu,
-          và ô tick thôi phải tự đẩy xuống bằng `mt-0.5` — hai thứ ấy sinh ra để giữ ô tick
-          thẳng hàng với DÒNG ĐẦU của một nhãn nhiều dòng, giờ không còn dòng nào để canh. */}
-      <label className="mb-6 flex cursor-pointer items-center gap-2.5 text-sm text-[var(--color-parchment)]">
-        <input
-          type="checkbox"
-          name="parallelQuests"
-          defaultChecked={config.parallelQuests}
-          className="h-4 w-4 accent-[var(--color-jade-400)]"
-        />
-        <span>Chạy song song các nhiệm vụ</span>
-      </label>
+      {/* Ô tick「Chạy song song các nhiệm vụ」đã gỡ ngày 12/08/2026: mọi vòng nay chạy tuần tự,
+          nên không còn gì để bật/tắt. Xem `parallelQuests` trong services/configs.ts. */}
 
       <div className="flex flex-wrap items-center gap-4">
         <button type="submit" className="btn btn-gold" disabled={pending}>

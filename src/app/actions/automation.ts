@@ -124,7 +124,6 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
   const parsed = configSchema.safeParse({
     // Cookie không đi đường này nữa — tài khoản sống ở bảng riêng với bộ action riêng.
     gameCookie: "",
-    parallelQuests: formData.get("parallelQuests") === "on",
     // Nơi vận hành đang KHOÁ về khôi lỗi máy nhà — ép ở đây chứ không tin form, vì
     // `disabled` chỉ là một thuộc tính HTML và một POST dựng tay chẳng đi qua form lần nào.
     runner: "local",

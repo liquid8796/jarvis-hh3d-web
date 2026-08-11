@@ -80,55 +80,6 @@ function formatDuration(seconds) {
   return `${s}s`;
 }
 
-/**
- * Bao nhiêu tab nhiệm vụ được mở CÙNG LÚC trong một vòng.
- *
- * Vì sao phải có trần, đo được trên khôi lỗi tông môn ngày 05/08: bản đầu của nhịp song song
- * mở MỘT TAB CHO MỖI nhiệm vụ, không giới hạn. Tài khoản thường bật 8 nhiệm vụ, và tám
- * nhiệm vụ ấy là tám TRANG KHÁC NHAU cùng dựng một lúc trên VM 2 nhân — kết quả là 18 dòng
- * lỗi "selector không xuất hiện" rải ngẫu nhiên khắp các nhiệm vụ (Luyện Đan 7 lần, Tế Lễ 4,
- * Vấn Đáp 3, Vòng Quay 3, và một lần trượt cả `.nv-quest` của chính hub). Cùng lúc đó tài
- * khoản VIP chạy 10 nhiệm vụ mà KHÔNG lỗi lần nào — vì 7 trong số đó bấm nút ngay trên hub,
- * tức bảy tab cùng mở một trang đã nằm sẵn trong cache, gần như miễn phí. Không phải hạng
- * tài khoản, không phải trang nào hỏng: chỉ là số trang nặng dựng đồng thời.
- *
- * Ba là con số rút từ chính bằng chứng ấy: VIP sống khoẻ với ~4 trang khác nhau một lúc.
- * Vẫn giữ gần trọn cái lợi của song song — vòng dài bằng đợt chậm nhất chứ không phải tổng
- * cộng dồn. `WORKER_QUEST_TABS` để người vận hành máy khoẻ hơn tự nới; kẹp 1–8 để một dấu
- * phẩy gõ nhầm không mở lại đúng cái bẫy vừa bịt.
- */
-const DEFAULT_QUEST_TABS = 3;
-
-function questTabLimit() {
-  const raw = Number(process.env.WORKER_QUEST_TABS ?? DEFAULT_QUEST_TABS);
-  const wanted = Number.isFinite(raw) ? Math.round(raw) : DEFAULT_QUEST_TABS;
-  return Math.max(1, Math.min(8, wanted));
-}
-
-/**
- * Chạy `worker` trên từng phần tử, tối đa `limit` cái một lúc, và trả kết quả THEO ĐÚNG THỨ
- * TỰ ĐẦU VÀO — phần tường thuật của một vòng phải đọc như bản tuần tự, dù việc chạy xen kẽ.
- *
- * `cursor++` an toàn không cần khoá: JavaScript chạy một luồng, và giữa lúc đọc và lúc tăng
- * không có `await` nào chen vào được.
- */
-export async function mapWithLimit(items, limit, worker) {
-  const results = new Array(items.length);
-  const lanes = Math.max(1, Math.min(Math.round(limit) || 1, items.length));
-  let cursor = 0;
-
-  await Promise.all(
-    Array.from({ length: lanes }, async () => {
-      for (;;) {
-        const index = cursor++;
-        if (index >= items.length) return;
-        results[index] = await worker(items[index], index);
-      }
-    }),
-  );
-
-  return results;
-}
 
 /** Mọi kết quả không-phải-stop đều mang theo lịch vòng kế để server tái xếp đúng nhịp. */
 function scheduledCycleResult(outcome, message, results = []) {
@@ -624,123 +575,18 @@ export async function runCycle(deps) {
       log,
     });
 
-    // Hai nhịp hành sự. SONG SONG (mặc định): mỗi nhiệm vụ một tab riêng trong CÙNG phiên
-    // đăng nhập — vòng dài bằng nhiệm vụ chậm nhất thay vì tổng cộng dồn, đáng giá nhất khi
-    // Mê Cung (~35 phút) đứng chung hàng với các nhiệm vụ một phút. TUẦN TỰ (tắt trong Ngọc
-    // Giản): đúng nhịp bản desktop, cho ngày site trở chứng với nhiều tab. Lượt có ngân sách
-    // lát (budgetMs) luôn đi tuần tự: "hết giờ thì dừng giữa danh sách" chỉ có nghĩa khi
-    // danh sách được đi từng bước một.
-    const runParallel = config?.parallelQuests !== false && quests.length > 1 && deadline === Infinity;
-
-    if (runParallel) {
-      const tabs = Math.min(questTabLimit(), quests.length);
-      await say(`Chạy song song ${quests.length} nhiệm vụ — tối đa ${tabs} tab cùng lúc.`);
-
-      // Kế hoạch CHẠY xếp nhiệm vụ trang riêng ra cuối (phần tường thuật vẫn theo thứ tự
-      // hồ sơ — xem chỗ đọc `settled`). Lý do: trang riêng có thể phải xếp hàng ở cổng toàn
-      // cục sau trang riêng của một đàn khác, và một lane của pool bị waiter chiếm là một
-      // lane không chạy được nhiệm vụ hub nào — tệ nhất là cả ba lane cùng đứng xếp hàng
-      // trong khi đống nhiệm vụ hub phía sau hoàn toàn có thể chạy ngay.
-      const executionPlan = [
-        ...quests.filter((quest) => !isDedicatedPageQuest(profile, quest)),
-        ...quests.filter((quest) => isDedicatedPageQuest(profile, quest)),
-      ];
-
-      let sawAbort = false;
-      const settledByPlan = await mapWithLimit(executionPlan, tabs, async (quest) => {
-        // Thu đàn giữa chừng: nhiệm vụ còn nằm trong hàng đợi của pool thấy cờ này và rút
-        // lui ngay, không mở thêm tab nào nữa.
-        if (shouldStop()) return { quest, aborted: true };
-
-        // Cổng toàn cục TRƯỚC mọi thứ, kể cả trước lúc mở tab: dựng trang đã là tiêu CPU,
-        // và luật nhường đường tính từ byte đầu tiên chứ không từ cú click đầu tiên.
-        const slot = await acquireQuestSlot({
-          dedicated: isDedicatedPageQuest(profile, quest),
-          name: quest.name,
-          shouldStop,
-          onWait: ({ holder }) =>
-            log.debug(
-              `Quest:${quest.name}`,
-              holder
-                ? `nhường tài nguyên cho「${holder}」đang giữ trang riêng — xếp hàng chờ lượt.`
-                : "xếp hàng ở cổng điều phối — một nhiệm vụ trang riêng đang đợi phía trước.",
-            ),
-        });
-        if (slot.aborted) return { quest, aborted: true };
-
-        // Vào tay từ ĐÂY, trước cả lúc mở tab: dựng trang là phần chậm nhất của một nhiệm
-        // vụ ngắn, và một nhiệm vụ đang dựng trang vẫn là một nhiệm vụ đang được làm.
-        let aborted = false;
-        runningNow.set(quest.id, quest.name);
-        publishProgress();
-
-        try {
-          let questPage;
-          try {
-            questPage = await context.newPage();
-          } catch (err) {
-            return { quest, outcome: { outcome: "failed", message: `không mở được tab riêng (${err.message})` } };
-          }
-
-          // Session log mang tên nhiệm vụ: mấy tab cùng kể "Trình duyệt: …" thì không ai
-          // biết dòng nào của ai.
-          const questSession = createSession(questPage, {
-            baseUrl,
-            log: {
-              info: (m) => log.info(`Trình duyệt·${quest.name}`, m),
-              warning: (m) => log.warning(`Trình duyệt·${quest.name}`, m),
-              debug: (m) => log.debug(`Trình duyệt·${quest.name}`, m),
-            },
-          });
-          const questEngine = createQuestEngine({ log, shouldStop, quiz });
-
-          try {
-            return { quest, outcome: await questEngine.run(questSession, profile, quest) };
-          } catch (err) {
-            if (err instanceof QuestAborted) {
-              aborted = true;
-              return { quest, aborted: true };
-            }
-            return { quest, outcome: { outcome: "failed", message: `trắc trở bất ngờ: ${err.message}` } };
-          } finally {
-            // Đóng tab NGAY khi nhiệm vụ xong — đó là điều khiến cái trần tab có nghĩa: chỗ
-            // vừa trống được nhường cho nhiệm vụ kế trong hàng đợi.
-            await questPage.close().catch(() => {});
-          }
-        } finally {
-          // Trả slot cổng toàn cục TRƯỚC hết — đàn khác đang xếp hàng sau slot này.
-          slot.release();
-          // Rời tay dù đi bằng ngả nào — kể cả ngả "không mở được tab riêng" ở trên, vốn
-          // return thẳng và sẽ để tên nhiệm vụ mắc kẹt trong `runningNow` tới hết vòng.
-          // Bị Thu Đàn thì KHÔNG tính là đã làm xong: nó chưa từng chạy tới nơi.
-          runningNow.delete(quest.id);
-          if (!aborted) finished++;
-          publishProgress();
-        }
-      });
-
-      // mapWithLimit trả theo thứ tự executionPlan; tường thuật thì theo thứ tự HỒ SƠ như
-      // mọi khi — người đọc không cần biết kế hoạch chạy đã xếp trang riêng ra cuối.
-      const byQuestId = new Map(settledByPlan.map((entry) => [entry.quest.id, entry]));
-      const settled = quests.map((quest) => byQuestId.get(quest.id));
-
-      for (const entry of settled) {
-        if (entry.aborted) {
-          sawAbort = true;
-          continue;
-        }
-        results.push(entry.outcome);
-        if (reachedDailyQuota(entry.quest, entry.outcome)) cappedToday.push(entry.quest.id);
-        const shape = OUTCOME_TEXT[entry.outcome.outcome] ?? OUTCOME_TEXT.skipped;
-        await say(`${entry.quest.name}: ${shape.say(entry.outcome)}`, shape.level);
-        if (entry.outcome.outcome === "failed") failed++;
-        else done++;
-      }
-
-      if (sawAbort || shouldStop()) {
-        return { outcome: "stopped", message: `Đã thu đàn giữa chừng — xong ${done}/${quests.length}.` };
-      }
-    } else {
+    // MỘT nhịp hành sự: tuần tự, mỗi nhiệm vụ một lượt, theo đúng thứ tự hồ sơ.
+    //
+    // Nhánh song song (mỗi nhiệm vụ một tab) đã bị gỡ ngày 12/08/2026 theo chỉ đạo. Nó rút
+    // ngắn vòng chạy, nhưng đổi lại thứ tự hành sự trở thành thứ tự GIÀNH ĐƯỢC CỔNG chứ không
+    // phải thứ tự trong hồ sơ — và tông môn cần điều ngược lại: Mê Cung (tới 35 phút, giữ một
+    // phòng 5 người) phải là nhiệm vụ CUỐI CÙNG, Luyện Đan Đường áp chót, để chúng không giam
+    // tài nguyên của những nhiệm vụ một phút đứng sau. Chạy tuần tự thì thứ tự ấy là hệ quả
+    // trực tiếp của `order` trong hồ sơ, không cần thêm cơ chế nào canh giữ.
+    //
+    // Cổng điều phối toàn cục VẪN còn và vẫn cần: một VM chạy nhiều đàn cùng lúc, nên hai
+    // nhiệm vụ trang riêng của HAI đàn khác nhau vẫn có thể dẫm chân nhau trên cùng hai nhân.
+    {
       const engine = createQuestEngine({ log, shouldStop, quiz });
 
       for (const quest of quests) {

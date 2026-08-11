@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChatPicker, type PickerTab } from "./ChatPicker";
 import { Avatar } from "@/components/Avatar";
 import { isSafeAttachmentUrl } from "@/lib/validation/chat";
@@ -17,6 +17,12 @@ import type { Gif } from "@/lib/services/gif";
  * việc không bao giờ phải đồng bộ trạng thái từng phần.
  *
  * Cuộn ngược lấy trang cũ hơn qua cursor `before`; các trang cũ đã tải nằm yên trong kho.
+ *
+ * KHO và THỨ ĐƯỢC VẼ là hai chuyện khác nhau. Kho chỉ phình: mỗi trang cũ lật về đều nằm lại
+ * đó, và nhịp poll ở trên hoà nguyên trang mới nhất vào nó. Nếu vẽ thẳng cả kho thì sau khi
+ * đọc ngược năm trang, sảnh dựng 250 thẻ tin và MỖI 2,5 giây React đi so lại từng cái một —
+ * đó mới là thứ làm sảnh giật, không phải mạng. Nên phần vẽ chỉ lấy một CỬA SỔ ở đuôi kho
+ * (`RENDER_WINDOW`), nới ra khi người ta cuộn ngược và co lại khi họ về đáy.
  */
 
 type Attachment = { url: string; name: string; size: number; type: string };
@@ -38,6 +44,36 @@ type Message = {
 
 const POLL_MS = 2500;
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
+
+/**
+ * CỬA SỔ VẼ — bao nhiêu tin ở cuối kho được dựng thành thẻ thật.
+ *
+ * 60 chứ không phải 50 (một trang feed) là có chủ ý: lượt tải đầu về đúng 50 tin, nên cửa sổ
+ * phải RỘNG HƠN một trang để lần vẽ đầu tiên không cắt mất gì và không kích một lượt nới ngay
+ * lúc mở trang. Phần dôi ra cũng là chỗ cho các tin mới đến trong lúc người ta đang đọc.
+ *
+ * Nới thêm 40 mỗi lượt cuộn tới đỉnh — lấy từ KHO, không phải từ mạng: những tin ấy đã nằm sẵn
+ * trong bộ nhớ từ lần lật trang trước, nên nới cửa sổ là việc tức thì. Chỉ khi cửa sổ đã trùm
+ * hết kho mới đi xin trang cũ hơn.
+ */
+const RENDER_WINDOW = 60;
+const RENDER_WINDOW_STEP = 40;
+
+/** Cách đỉnh bao nhiêu thì coi là "người ta muốn đọc ngược" — nới cửa sổ hoặc lật trang cũ. */
+const NEAR_TOP_PX = 80;
+
+/** Hai tin cùng một người cách nhau dưới ngần này thì gộp chung một khoảnh. */
+const GROUP_WINDOW_MS = 5 * 60 * 1000;
+
+/**
+ * `useLayoutEffect` ở trình duyệt, `useEffect` khi dựng phía server.
+ *
+ * Phép bù chỗ cuộn BẮT BUỘC phải xong trước khi trình duyệt vẽ: nới cửa sổ là chèn 40 thẻ vào
+ * PHÍA TRÊN tầm nhìn, để tới `useEffect` thì người đọc thấy đúng một khung hình nội dung nhảy
+ * vọt xuống. Nhưng gọi thẳng `useLayoutEffect` thì React kêu warn ở lượt render phía server —
+ * component client vẫn được dựng ra HTML. Chọn theo môi trường, một lần, ở cấp module.
+ */
+const useBeforePaint = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /** GIF của GIPHY gửi đi dưới dạng đính kèm — bong bóng đã biết vẽ mọi `image/*` thành ảnh. */
 const GIF_MIME = "image/gif";
@@ -133,6 +169,8 @@ export function ChatRoom({
   const [unseen, setUnseen] = useState(0);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [reachedTop, setReachedTop] = useState(false);
+  /** Bao nhiêu tin ở cuối kho đang được dựng thẻ — xem RENDER_WINDOW. */
+  const [windowSize, setWindowSize] = useState(RENDER_WINDOW);
   /** Kho MongoDB chưa được tông chủ tạo — sảnh treo biển thay vì giả vờ trống. */
   const [storeClosed, setStoreClosed] = useState<string | null>(null);
 
@@ -142,6 +180,13 @@ export function ChatRoom({
   const lastTypingSent = useRef(0);
   const stuckRef = useRef(true);
   stuckRef.current = stuck;
+  /**
+   * Chiều cao vùng cuộn đo NGAY TRƯỚC một lượt nới cửa sổ, để bù lại đúng phần vừa mọc thêm
+   * phía trên. Khác `null` cũng là cờ「đang có một lượt nới chưa bù xong」— một cú cuộn nữa
+   * trong khoảnh khắc ấy phải đứng chờ, không thì hai lượt nới chồng nhau và mốc đo thứ hai
+   * đo nhầm cái chiều cao đã mọc rồi.
+   */
+  const growAnchorHeight = useRef<number | null>(null);
 
   const messages = useMemo(
     () =>
@@ -150,6 +195,34 @@ export function ChatRoom({
       ),
     [store],
   );
+
+  /**
+   * Phần kho ĐƯỢC VẼ, kèm hai phán quyết về hình thức của từng tin.
+   *
+   * `showDay` và `grouped` được tính so với tin liền trước TRONG KHO, không phải trong cửa sổ.
+   * Khác biệt ấy quan trọng: tính theo cửa sổ thì tin đầu cửa sổ luôn tự mọc một mốc ngày (vì
+   * nó không có tin nào đứng trước), rồi mốc ấy BIẾN MẤT ngay khi cửa sổ nới ra thêm 40 tin —
+   * một dòng chữ nhấp nháy mỗi lần cuộn. Đọc ngược ra kho thì thứ vẽ ra luôn bằng đúng thứ mà
+   * một lượt vẽ toàn bộ sẽ cho, bất kể cửa sổ đang rộng bao nhiêu.
+   */
+  const visible = useMemo(() => {
+    const start = Math.max(0, messages.length - windowSize);
+    return messages.slice(start).map((msg, offset) => {
+      // `undefined` ở đúng một chỗ: tin cổ nhất của cả kho. Nó luôn được mốc ngày, như cũ.
+      const prev = messages[start + offset - 1];
+      const showDay =
+        !prev || new Date(prev.createdAt).toDateString() !== new Date(msg.createdAt).toDateString();
+      const grouped =
+        !showDay &&
+        prev != null &&
+        prev.author === msg.author &&
+        new Date(msg.createdAt).getTime() - new Date(prev.createdAt).getTime() < GROUP_WINDOW_MS;
+      return { msg, showDay, grouped };
+    });
+  }, [messages, windowSize]);
+
+  /** Cửa sổ đã trùm hết kho chưa — quyết định cuộn lên nữa thì nới cửa sổ hay đi xin trang cũ. */
+  const windowCoversStore = visible.length >= messages.length;
 
   const merge = useCallback((incoming: Message[], incomingAvatars: AvatarMap = {}) => {
     // Bản đồ ảnh vẫn phải được hoà kể cả khi trang tin RỖNG? Không — trang rỗng thì không có
@@ -192,6 +265,17 @@ export function ChatRoom({
         // nút "về cuối" kể.
         if (!stuckRef.current && fresh.length > 0) {
           setUnseen((u) => u + fresh.length);
+          /**
+           * …và NỚI cửa sổ đúng bằng số tin vừa tới. Cửa sổ cắt ở ĐUÔI kho, nên mỗi tin mới
+           * đẩy mép dưới xuống một nấc thì mép trên cũng tụt theo một nấc — tức vài thẻ ở
+           * phía trên tầm nhìn bị gỡ, vùng cuộn thấp xuống, và đoạn người ta đang đọc nhảy
+           * mất chỗ. Cộng thêm ngần ấy là ghim mép trên đứng yên: người đọc quá khứ không hề
+           * hay biết có tin mới nào vừa nối vào đáy.
+           *
+           * Chỉ làm khi KHÔNG dính đáy. Dính đáy thì mép trên tụt là đúng — đó chính là phép
+           * thu cửa sổ, và mắt đang nhìn ở đáy chứ không nhìn lên trên.
+           */
+          setWindowSize((n) => n + fresh.length);
         }
       } catch {
         /* mạng chớp — nhịp sau gặp lại */
@@ -254,6 +338,11 @@ export function ChatRoom({
     if (stuck && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       setUnseen(0);
+      // Về tới đáy là thôi cần đống quá khứ vừa đọc — thu cửa sổ lại để sảnh khỏi mang theo
+      // vài trăm thẻ tin suốt phiên. An toàn vì mọi thẻ bị gỡ đều nằm PHÍA TRÊN tầm nhìn:
+      // vùng cuộn thấp xuống, trình duyệt tự kẹp `scrollTop` và ta vẫn đứng ở đáy. Cuộn ngược
+      // lại thì cửa sổ nở ra từ kho, không tốn một request nào.
+      setWindowSize(RENDER_WINDOW);
     }
   }, [messages, typing, stuck]);
 
@@ -263,10 +352,36 @@ export function ChatRoom({
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
     setStuck(atBottom);
     if (atBottom) setUnseen(0);
-    if (el.scrollTop < 80 && !loadingOlder && !reachedTop && messages.length > 0) {
-      void loadOlder();
+
+    if (el.scrollTop >= NEAR_TOP_PX || messages.length === 0) return;
+
+    // Còn tin ĐÃ NẰM SẴN trong kho mà chưa dựng thẻ thì nới cửa sổ trước — tức thì, không một
+    // request nào. Chỉ khi cửa sổ đã trùm hết kho mới phải đi hỏi server trang cũ hơn.
+    if (!windowCoversStore) {
+      if (growAnchorHeight.current != null) return;
+      growAnchorHeight.current = el.scrollHeight;
+      setWindowSize((n) => Math.min(messages.length, n + RENDER_WINDOW_STEP));
+      return;
     }
+
+    if (!loadingOlder && !reachedTop) void loadOlder();
   };
+
+  /**
+   * Bù chỗ cuộn ngay sau một lượt nới cửa sổ, TRƯỚC khi trình duyệt vẽ.
+   *
+   * Cùng phép tính với `loadOlder` (đo chiều cao trước/sau rồi cộng phần chênh), nhưng khác
+   * thời điểm: `loadOlder` là async nên nó tự bù trong một `requestAnimationFrame` sau khi
+   * `await` xong, còn nới cửa sổ là một lượt đặt state ĐỒNG BỘ — chỗ để bù là ngay sau khi
+   * React gắn thẻ mới vào DOM và trước lượt vẽ kế tiếp.
+   */
+  useBeforePaint(() => {
+    const el = scrollRef.current;
+    const before = growAnchorHeight.current;
+    if (!el || before == null) return;
+    el.scrollTop += el.scrollHeight - before;
+    growAnchorHeight.current = null;
+  }, [windowSize]);
 
   const loadOlder = async () => {
     const oldest = messages[0];
@@ -285,6 +400,11 @@ export function ChatRoom({
       // Trang cũ không phải "tin mới" — ghi danh trước khi merge để nút về-cuối không đếm nhầm.
       for (const m of data.messages) knownIds.current.add(m.id);
       merge(data.messages, data.avatars ?? {});
+      // Nới cửa sổ ĐỦ để trang vừa xin về được vẽ ra. Thiếu dòng này thì lượt lật trang tốn
+      // một request rồi chẳng ai thấy gì: cửa sổ vẫn cắt ở đuôi kho, còn tin mới về thì nằm ở
+      // đầu. Cộng dôi vài tin (hai tin trùng mili-giây có thể về hai lần) là vô hại — phép cắt
+      // tự kẹp ở đầu mảng.
+      setWindowSize((n) => n + data.messages.length);
       // Giữ nguyên chỗ đang đọc: bù đúng phần chiều cao vừa mọc thêm phía trên.
       requestAnimationFrame(() => {
         if (el) el.scrollTop += el.scrollHeight - prevHeight;
@@ -432,9 +552,6 @@ export function ChatRoom({
   };
 
   // ---- Vẽ ------------------------------------------------------------------------------
-  let lastDay = "";
-  let lastAuthor = "";
-  let lastAt = 0;
 
   return (
     <div className="chat-frame">
@@ -461,7 +578,11 @@ export function ChatRoom({
       </header>
 
       <div ref={scrollRef} onScroll={onScroll} className="chat-scroll">
-        {reachedTop && messages.length > 0 && (
+        {/* CHỈ khi cửa sổ đã trùm hết kho. Thiếu vế ấy thì dòng này thành một lời nói dối:
+            server đã hết trang cũ để đưa (`reachedTop`) không có nghĩa là thứ đang hiện ra bắt
+            đầu từ tin cổ nhất — cửa sổ vẫn có thể đang cắt ở giữa kho, và người đọc được bảo
+            rằng phía trên chẳng còn gì trong khi cuộn thêm một nhịp là ra cả trăm tin. */}
+        {reachedTop && windowCoversStore && messages.length > 0 && (
           <p className="chat-top-note">— Khởi nguồn của sảnh —</p>
         )}
         {loadingOlder && <p className="chat-top-note">Đang lật trang cũ…</p>}
@@ -475,16 +596,7 @@ export function ChatRoom({
           <p className="chat-top-note">Sảnh còn tĩnh lặng — hãy là người khai bút.</p>
         )}
 
-        {messages.map((msg) => {
-          const day = new Date(msg.createdAt).toDateString();
-          const showDay = day !== lastDay;
-          lastDay = day;
-
-          const at = new Date(msg.createdAt).getTime();
-          const grouped = !showDay && msg.author === lastAuthor && at - lastAt < 5 * 60 * 1000;
-          lastAuthor = msg.author;
-          lastAt = at;
-
+        {visible.map(({ msg, showDay, grouped }) => {
           /**
            * CHỈ dùng cho quyền Sửa/Thu hồi, KHÔNG dùng cho cách vẽ.
            *

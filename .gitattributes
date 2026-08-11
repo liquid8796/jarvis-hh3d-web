@@ -1,0 +1,11 @@
+# Tệp .bat BẮT BUỘC kết dòng CRLF, và đây không phải chuyện gu.
+#
+# cmd.exe đọc tệp batch theo BYTE OFFSET, không phải theo dòng. Thiếu ký tự \r thì nó vỡ ngay
+# ở khối `if ( … )` nhiều dòng: mỗi dòng bên trong bị đọc thành một lệnh riêng, và người dùng
+# thấy một màn hình đầy「'xyz' is not recognized as an internal or external command」.
+#
+# Trả giá 11/08/2026: new-mirror-station.bat viết ra với LF chạy được vài dòng đầu rồi nổ tung.
+# `core.autocrlf=true` chỉ cứu khi tệp đi qua một lượt checkout — tệp vừa được ghi thẳng xuống
+# đĩa thì không. Dòng dưới đây ép CRLF ở mọi lượt checkout, trên mọi máy, bất kể cấu hình cá nhân.
+*.bat text eol=crlf
+*.cmd text eol=crlf

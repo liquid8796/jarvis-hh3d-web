@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================================
-REM  Phat hanh dong bo — moi tram trong so guong nhan cung mot commit.
+REM  Phat hanh dong bo - moi tram trong so guong nhan cung mot commit.
 REM
 REM  Bam dup tep nay la xong. Viec that nam o scripts/deployAllStations.mts;
 REM  tep .bat nay chi lo phan ma cmd.exe can: dung cho, bang ma, va giu cua so
@@ -27,12 +27,12 @@ set "EXITCODE=%ERRORLEVEL%"
 
 echo.
 if "%EXITCODE%"=="0" (
-  echo [OK] Xong — moi tram da mang cung mot commit.
+  echo [OK] Xong - moi tram da mang cung mot commit.
 ) else (
   echo [!!] Ket thuc voi loi. Doc bang TONG KET o tren: tram nao dang lech ma.
 )
 
-REM Bam dup thi cua so tat ngay khi chay xong, khong kip doc gi — nen dung cho.
+REM Bam dup thi cua so tat ngay khi chay xong, khong kip doc gi - nen dung cho.
 REM Chay trong terminal thi truyen --no-pause de bo qua doan nay.
 echo %* | findstr /i /c:"--no-pause" >nul || pause
 

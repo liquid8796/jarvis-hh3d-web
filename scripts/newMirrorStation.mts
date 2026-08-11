@@ -35,6 +35,15 @@ import { stationUrlFor, tokenEnvNameFor, validateSiteId, type Book } from "./dep
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
+// Tắt riêng DeprecationWarning, không tắt mọi cảnh báo.
+//
+// Node kêu「shell: true … security vulnerabilities」mỗi lượt gọi `vercel`, mà ta BUỘC phải bật
+// shell: trên Windows `vercel` là một tệp .cmd, không có shell thì execFile trả ENOENT. Đối số
+// truyền vào đều là chuỗi cố định của chính script, còn token thì đi bằng biến môi trường —
+// đúng cái mà cảnh báo ấy lo. Để nó in ba lần trong một công cụ bấm-đúp là dọa người dùng về
+// một nguy cơ không có thật; các cảnh báo KHÁC vẫn in như thường.
+process.noDeprecation = true;
+
 
 const repoRoot = path.join(import.meta.dirname, "..");
 const ENV_FILE = path.join(repoRoot, ".env.local");

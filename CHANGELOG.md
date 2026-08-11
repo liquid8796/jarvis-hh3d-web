@@ -49,6 +49,41 @@ dữ liệu) → app đếm 10.183/12.889 dòng quá hạn, một câu SQL độ
 vào form → bấm Lưu mà không sửa gì」phải về đúng con số cũ (mở trang admin rồi bấm Lưu không được
 tự đổi hạn lưu của chính mình).
 
+## 0.74.0 — Hỷ Sự Đường cho chọn vào tiệc cưới nào, và nói ra nó thấy gì
+
+**Tuỳ chọn mới「Vào tiệc cưới nào」**: *Chưa chúc* (mặc định, đúng hành vi cũ) / *Đã chúc* / *Tất
+cả* — ghi chú 6 của bản ghi 11/08/2026 (`custom-20260811-233113`).
+
+**Điều kiện dừng phải đổi theo, và đây mới là chỗ suýt hỏng.** Vòng lặp cũ dừng khi
+`Hidden .not-blessed` — đúng khi chỉ vào phòng chưa chúc, vì chính lời chúc rút cạn điều kiện.
+Nhưng chọn *Đã chúc* thì chúc xong lại **làm TĂNG** số `.blessed`, nên `until` không bao giờ đạt
+và vòng lặp quay lại đúng những phòng cũ suốt 15 vòng / 30 phút. Nay quest giữ **sổ phòng đã ghé
+của một lượt** (trong `sessionStorage` — thứ sống qua cú điều hướng mà flow này làm liên tục) và
+dừng khi không còn phòng nào khớp bộ lọc mà chưa ghé. Phòng được ghi vào sổ **trước** khi điều
+hướng, nên một phòng hỏng giữa chừng cũng không bị chọn lại — vòng lặp luôn tiến.
+
+**Phòng đã chúc không phải "phòng chưa chúc thiếu mất cái nút".** Đo trên bản ghi: site bỏ HẲN
+form — không `#blessing-default-options`, không `.blessing-form` — và thay bằng `.blessing-message`
+("Đạo hữu đã gửi lời chúc phúc cho cặp đôi này!"). Flow cũ chờ form 25 giây rồi hỏng, tức *Đã chúc*
+sẽ hỏng ở **mọi** phòng. Nay bước vào phòng chờ **một trong hai** hình dạng, và chỉ cắm cờ
+`body.jvz-can-bless` khi form có thật; bốn bước gửi lời chúc gác theo cờ ấy. Bước「nút gửi đã biến
+mất」cố ý **không** gác — nó vẫn phải canh cú gửi trượt ở phòng chưa chúc, nơi một lần trượt là mất
+30 Tiên Ngọc.
+
+**Và nó nói ra nó thấy gì.** Mỗi lần mở modal đều kể: tổng số tiệc, bao nhiêu đã chúc, bao nhiêu
+khớp bộ lọc, còn bao nhiêu chưa ghé — thay cho một câu「đã chúc phúc hết」không kèm con số nào.
+
+**KHÔNG lọc theo lì xì.** Ghi chú 6 của bản ghi đòi bỏ qua tiệc đã phát lì xì; chỉ đạo ngày 12/08
+thì ngược lại — cứ vào. Ghi ra đây để người đọc sau không tưởng là sót.
+
+**Fixture của chính bộ smoke này đã SAI và được sửa**: phòng đã chúc của nó vẫn dựng cả form, nên
+nó không bao giờ bắt được cái hỏng ở trên — đúng bài học「phép kiểm phải mang hình dạng nhà cung
+cấp thực sự phát ra」đã trả giá ở Mê Cung. Bốn chốt mới lái trọn nhánh *Đã chúc* qua engine thật:
+vào đủ ba phòng, không gửi thêm lời chúc nào, và vòng lặp DỪNG chứ không quay lại phòng cũ.
+
+Hồ sơ lên **schema 54** ở cả hai bên; bốn đoạn script khớp từng byte giữa hai bản sinh đôi và chốt
+chống-trôi nay canh cả chúng (7 cặp). Bản desktop nhận cùng thay đổi ở 1.55.0. Tổng 310 thuận.
+
 ## 0.71.0 — bản desktop nhận cùng thiết kế, và có chốt giữ hai bản không trôi khỏi nhau
 
 Bản 0.70.0 đổi cách Mê Cung hỏi trần ngày ở phía web. Bản này chở nguyên thiết kế ấy sang desktop

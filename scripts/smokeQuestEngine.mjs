@@ -343,9 +343,14 @@ document.querySelector('.hy-su-btn').addEventListener('click', () => {
 // sau confirm ngoài đời là toast + gỡ nút). Confirm với lời chúc RỖNG bị từ chối — đó chính
 // là lưới bắt kịch bản script chọn-ngẫu-nhiên không điền được gì. Bao lì xì chỉ có ở một
 // phòng, để ghim cả nhánh nhặt lẫn nhánh guard-bỏ-qua.
+// Phòng ĐÃ CHÚC không phải "phòng chưa chúc thiếu mất cái nút": đo trên bản ghi 11/08/2026
+// (custom-20260811-233113, dom/04-load.html) thì site bỏ HẲN form — không #blessing-default-options,
+// không .blessing-form — và thay bằng .blessing-message ("Đạo hữu đã gửi lời chúc phúc cho cặp
+// đôi này!"). Fixture cũ vẫn dựng cả form, nên nó không bao giờ bắt được chuyện một lượt chạy
+// nhắm vào phòng đã chúc sẽ chết ở bước chờ form.
 const hySuRoomPage = (id, alreadyBlessed, withLixi) => `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div class="blessing-section"><h2>Gửi Lời Chúc Phúc</h2>
-<div class="blessing-form">
+${alreadyBlessed ? '<div class="blessing-message"><p>Đạo hữu đã gửi lời chúc phúc cho cặp đôi này! 🌸</p></div>' : `<div class="blessing-form">
 <select id="blessing-default-options" onchange="fillBlessingMessage()">
   <option value="">🌿 Chọn lời chúc mặc định...</option>
   <option value="Thiên duyên vạn kiếp, hội ngộ giữa hồng trần!">🔮 Lời chúc 1</option>
@@ -353,8 +358,8 @@ const hySuRoomPage = (id, alreadyBlessed, withLixi) => `<!doctype html><html lan
   <option value="Một bước nhập đạo, vạn kiếp thành tiên!">🔥 Lời chúc 3</option>
 </select>
 <textarea id="blessing-message"></textarea>
-${alreadyBlessed ? "" : '<button class="blessing-button" onclick="showConfirmModal()">Gửi Chúc Phúc</button>'}
-</div></div>
+<button class="blessing-button" onclick="showConfirmModal()">Gửi Chúc Phúc</button>
+</div>`}</div>
 ${withLixi ? '<div class="lixi-envelope" style="width:40px;height:40px">🧧</div>' : ""}
 <div id="confirm-modal" style="display:none">
   <button class="custom-modal-button cancel">Hủy Bỏ</button>
@@ -1278,10 +1283,10 @@ async function main() {
   );
   const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
   check(
-    // 53 = Mê Cung đọc trần ngày từ phản hồi rương (bản ghi 11/08). Bump schema là thay hồ sơ đã lưu bên
+    // 54 = Hỷ Sự Đường: tuỳ chọn lọc trạng thái chúc + sổ phòng đã ghé (bản ghi 11/08). Bump schema là thay hồ sơ đã lưu bên
     // desktop ngay lần mở đầu tiên — chốt này bắt mỗi cú bump phải là một quyết định có chủ ý.
-    "hồ sơ đang ở schema 53",
-    loadProfileForSchema().schemaVersion === 53,
+    "hồ sơ đang ở schema 54",
+    loadProfileForSchema().schemaVersion === 54,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1508,12 +1513,25 @@ async function main() {
       const loopStep = maze.steps.find(
         (s) => s.action === "repeat" && s.until?.selector?.includes("jvz-cap-full"));
 
+      // Hỷ Sự Đường: bốn đoạn nằm rải cả ở cấp cao lẫn trong thân vòng lặp, nên gom bằng một
+      // lượt duyệt đệ quy thay vì đoán chỉ số.
+      const wedding = loadProfileForSchema().quests.find((q) => q.id.startsWith("hy-su-duong"));
+      const allSteps = (steps) =>
+        steps.flatMap((s) => [s, ...(Array.isArray(s.steps) ? allSteps(s.steps) : [])]);
+      const weddingScript = (needle, not) =>
+        allSteps(wedding.steps).find(
+          (s) => (s.script || "").includes(needle) && (!not || !(s.script || "").includes(not)))?.script;
+
       const pairs = [
         ["MazeChestHookScript", loopStep.steps.find((s) => (s.script || "").includes("__jvzChestHook"))?.script],
         ["MazeChestReadScript", loopStep.steps.find(
           (s) => (s.script || "").includes("__jvz_mc_chest") && !(s.script || "").includes("__jvzChestHook"))?.script],
         ["MazeCapScanScript", maze.steps.find(
           (s) => s.action === "evaluateJavaScript" && (s.script || "").includes("cap-scan"))?.script],
+        ["WeddingResetSeenScript", weddingScript("sổ phòng đã ghé được xoá")],
+        ["WeddingTallyScript", weddingScript("jvz-hy-su-done")],
+        ["WeddingPickRoomScript", weddingScript("location.assign")],
+        ["WeddingRoomStateScript", weddingScript("jvz-can-bless")],
       ];
 
       for (const [name, webScript] of pairs) {
@@ -2079,20 +2097,60 @@ async function main() {
       hySuLixi.join(","),
     );
     check(
-      "tường thuật gọi tên từng cặp đôi được chúc",
-      infos.filter((m) => m.startsWith("Vào chúc phúc:")).length === 3,
-      infos.filter((m) => m.startsWith("Vào chúc phúc:")).join(" / "),
+      "tường thuật gọi tên từng cặp đôi được ghé",
+      infos.filter((m) => m.startsWith("Vào phòng:")).length === 3,
+      infos.filter((m) => m.startsWith("Vào phòng:")).join(" / "),
+    );
+    // "Không có việc thì phải nói ra": mỗi lần mở modal đều kể con số, nên người đọc nhật ký
+    // phân biệt được "danh sách rỗng" với "6 tiệc nhưng đều đã chúc" mà không phải đoán.
+    check(
+      "mỗi lần mở modal đều kể con số: tổng, đã chúc, khớp bộ lọc, còn chưa ghé",
+      infos.filter((m) => m.startsWith("Hỷ Sự Đường:") && m.includes("còn chưa ghé:")).length >= 4,
+      infos.filter((m) => m.startsWith("Hỷ Sự Đường:")).slice(0, 2).join(" / "),
     );
 
     // Ghé lại khi đã chúc hết: modal vẫn mở, danh sách vẫn về, nhưng không còn .not-blessed
     // nào — dừng bằng lời người, không bấm thêm gì.
     const hySuAgain = await run(hySu);
     check(
-      "lần hai dừng ở \"đã chúc phúc hết các tiệc đang mở\"",
-      hySuAgain.outcome === "alreadyDone" && hySuAgain.message === "đã chúc phúc hết các tiệc đang mở",
+      "lần hai dừng ở \"không có phòng nào khớp bộ lọc để ghé\"",
+      hySuAgain.outcome === "alreadyDone" && hySuAgain.message === "không có phòng nào khớp bộ lọc để ghé",
       `${hySuAgain.outcome}: ${hySuAgain.message}`,
     );
     check("và không gửi thêm lời chúc nào", hySuBlessed.size === 3, String(hySuBlessed.size));
+
+    // Tuỳ chọn "đã chúc" (ghi chú 6 của bản ghi 11/08). Ba phòng giờ đều đã chúc, nên bộ lọc
+    // này phải VÀO ĐƯỢC cả ba — và không gửi thêm lời chúc nào, vì site bỏ hẳn form ở phòng đã
+    // chúc. Bản trước bước này chờ #blessing-default-options 25 giây rồi chết ở MỌI phòng.
+    {
+      const blessedOnly = JSON.parse(JSON.stringify(hySu));
+      blessedOnly.options.find((o) => o.key === "blessFilter").selectedValue = ".blessed";
+      const before = infos.length;
+      const visitBlessed = await run(blessedOnly);
+      const entered = infos.slice(before).filter((m) => m.startsWith("Vào phòng:"));
+      check(
+        "lọc \"đã chúc\" → vào được cả ba phòng đã chúc, không chết ở bước chờ form",
+        visitBlessed.outcome === "completed" && entered.length === 3,
+        `${visitBlessed.outcome}: ${visitBlessed.message} — vào ${entered.length} phòng`,
+      );
+      check(
+        "…và KHÔNG gửi thêm lời chúc nào (phòng đã chúc không còn form)",
+        hySuBlessed.size === 3,
+        String(hySuBlessed.size),
+      );
+      check(
+        "…và nói rõ từng phòng là đã chúc rồi",
+        infos.slice(before).filter((m) => m.includes("đã chúc rồi")).length === 3,
+        infos.slice(before).filter((m) => m.includes("đã chúc rồi")).length + " dòng",
+      );
+      // Sổ đã ghé là thứ làm vòng lặp TIẾN ở chế độ này: chúc xong không làm giảm số .blessed,
+      // nên dừng theo trạng thái phòng sẽ quay vòng cho tới khi hết 15 vòng / 30 phút.
+      check(
+        "…và vòng lặp DỪNG, không quay lại phòng cũ",
+        entered.length === new Set(entered).size,
+        entered.join(" / "),
+      );
+    }
 
     // Hết mùa cưới: modal mở ra danh sách RỖNG — phải phân biệt được với "đã chúc hết".
     // (Ca này trả giá 15s chờ optional của danh sách — giữ nguyên timeout thật của hồ sơ.)

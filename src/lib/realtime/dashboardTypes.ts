@@ -51,10 +51,20 @@ export type DashboardWorker = {
   id: string;
   lastSeen: string;
   online: boolean;
+  /** Bản của gói khôi lỗi, do nó tự khai. `null` = bản trước 0.71.0, chưa biết khai. */
+  version: string | null;
 };
 
 export type DashboardPresence = {
   sectOnline: boolean;
+  /**
+   * Bản của TRẠM ĐANG PHỤC VỤ trang này — mốc để đối chiếu với bản của từng khôi lỗi.
+   *
+   * Đi trong payload chứ không đọc ở client: mục Khôi Lỗi là `"use client"`, mà nhập
+   * package.json vào đó là ném cả tệp ấy sang trình duyệt. Và nó phải theo payload thật vì
+   * sau một lượt chuyển trạm, trạm đang phục vụ có thể mang bản khác hẳn tab đang mở.
+   */
+  webVersion: string | null;
   /** Dùng ở server để biết chính xác lúc cần chuyển sang "vắng", không cần poll database. */
   sectLastSeen: string | null;
   mine: DashboardWorker[];

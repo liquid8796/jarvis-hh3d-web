@@ -49,7 +49,8 @@
     "verify:worker-follow": "tsx scripts/verifyWorkerFollow.mts",
     "deploy:all": "tsx scripts/deployAllStations.mts",
     "verify:deploy-targets": "tsx scripts/verifyDeployTargets.mts",
-    "mirror:new": "tsx scripts/newMirrorStation.mts"
+    "mirror:new": "tsx scripts/newMirrorStation.mts",
+    "verify:worker-version": "tsx scripts/verifyWorkerVersion.mts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1106.0",

@@ -22,14 +22,24 @@ export const ONLINE_WINDOW_MS = 30 * 1000;
  * `userId` đóng băng theo scope của TOKEN, không theo lời tự xưng của worker: một linh phù
  * bị đem cắm vào máy khác vẫn chỉ điểm danh được cho chủ linh phù.
  */
-export async function recordWorkerSeen(workerId: string, scope: WorkerScope): Promise<void> {
+export async function recordWorkerSeen(
+  workerId: string,
+  scope: WorkerScope,
+  /**
+   * Bản của gói khôi lỗi, hoặc `null` khi nó không khai (bản trước 0.71.0).
+   *
+   * Ghi ĐÈ kể cả khi `null`, và đó là chủ ý: một tiến trình bị hạ về bản cũ phải quay lại
+   * trạng thái「không rõ」chứ không được đội con số của lần cài trước làm bằng chứng giả.
+   */
+  version: string | null = null,
+): Promise<void> {
   const userId = scope.kind === "user" ? scope.userId : null;
   await db()
     .insert(schema.workers)
-    .values({ id: workerId, userId })
+    .values({ id: workerId, userId, version })
     .onConflictDoUpdate({
       target: schema.workers.id,
-      set: { userId, lastSeen: sql`now()` },
+      set: { userId, version, lastSeen: sql`now()` },
     });
 }
 

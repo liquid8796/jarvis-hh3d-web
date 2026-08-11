@@ -24,9 +24,35 @@
 
 import { fileURLToPath } from "node:url";
 import { mkdir } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { runCycle } from "../src/lib/quest-engine/runCycle.mjs";
 import { profileDirForJob, sweepStaleProfiles } from "../src/lib/quest-engine/browserProfile.mjs";
 import { createWorkerCall } from "../src/lib/worker/controlFollow.mjs";
+
+/**
+ * Bản của GÓI này, khai lên server mỗi lần gõ cửa để mục Khôi Lỗi nói được「có bản mới, cài lại」.
+ *
+ * Hai chỗ phải tìm, vì `worker.mjs` sống ở hai hình hài: trong gói phát hành nó nằm NGANG HÀNG
+ * với `package.json`; trong cây mã nguồn nó nằm ở `scripts/` nên `package.json` ở thư mục cha.
+ * Thử cả hai theo đúng thứ tự ấy — gói phát hành là ca thường gặp.
+ *
+ * Hỏng thì trả `null`, KHÔNG ném: một tiến trình cày nhiệm vụ không được chết vì không đọc nổi
+ * số phiên bản của chính mình. Và `null` không phải sự im lặng vô nghĩa — server hiểu nó là
+ *「khôi lỗi đời cũ」, đúng thứ cần hiện lên cho người dùng.
+ */
+function readOwnVersion() {
+  for (const rel of ["./package.json", "../package.json"]) {
+    try {
+      const raw = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
+      const version = JSON.parse(raw)?.version;
+      if (typeof version === "string" && version.trim()) return version.trim().slice(0, 32);
+    } catch {
+      // Thiếu tệp hay JSON hỏng thì thử chỗ kế; hết chỗ thì chịu.
+    }
+  }
+  return null;
+}
+const VERSION = readOwnVersion();
 
 const WEB_URL = (process.env.WEB_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const TOKEN = process.env.WORKER_TOKEN;
@@ -147,6 +173,7 @@ async function handle(job) {
       const { status } = await call("heartbeat", {
         jobId: job.id,
         ...(progress ? { progress } : {}),
+        ...(VERSION ? { version: VERSION } : {}),
       });
       // Bất kỳ trạng thái nào KHÔNG phải 'running' đều nghĩa là không còn ai chờ lượt này:
       // 'stopping/stopped' là Thu Đàn, còn 'failed/done' là reaper đã kết liễu job (mất
@@ -227,7 +254,7 @@ for (;;) {
 
   if (running.size < MAX_JOBS) {
     try {
-      const { job } = await call("claim", { workerId: WORKER_ID });
+      const { job } = await call("claim", { workerId: WORKER_ID, ...(VERSION ? { version: VERSION } : {}) });
       if (job) {
         claimed = true;
         // handle() tự nuốt mọi lỗi của chính nó (kể cả lỗi báo cáo complete), nên promise

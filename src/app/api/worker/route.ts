@@ -44,6 +44,14 @@ import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
  *   complete  — kết thúc một VÒNG; server tái xếp job, trừ khi người dùng đã Thu Đàn.
  */
 
+/**
+ * Bản của gói khôi lỗi, do chính nó khai. DỮ LIỆU KHÔNG TIN ĐƯỢC: một linh phù cá nhân có thể
+ * bơm chuỗi bất kỳ vào đây, mà con số này đi thẳng lên màn hình mục Khôi Lỗi. Nên siết ngay tại
+ * biên — chỉ chữ số, dấu chấm, gạch ngang và chữ cái (đủ cho semver kiểu 0.71.0 hay 1.2.3-rc1),
+ * tối đa 32 ký tự. Khôi lỗi đời cũ không gửi gì, và VẮNG MẶT chính là dấu hiệu cần hiện lên.
+ */
+const workerVersionSchema = z.string().trim().min(1).max(32).regex(/^[A-Za-z0-9.+-]+$/);
+
 const bodySchema = z.discriminatedUnion("op", [
   // `runner` cũ của worker đời trước vẫn được CHẤP NHẬN nhưng bị bỏ qua — một khôi lỗi chưa
   // cập nhật không nên vỡ chỉ vì server đi trước nó một bản.
@@ -51,6 +59,7 @@ const bodySchema = z.discriminatedUnion("op", [
     op: z.literal("claim"),
     workerId: z.string().min(1).max(64),
     runner: z.string().optional(),
+    version: workerVersionSchema.optional(),
   }),
   z.object({
     op: z.literal("heartbeat"),
@@ -73,6 +82,12 @@ const bodySchema = z.discriminatedUnion("op", [
         total: z.number().int().min(0).max(999),
       })
       .optional(),
+    /**
+     * Khai bản ở CẢ hai op có chủ ý: `claim` là op duy nhất một khôi lỗi NHÀN RỖI vẫn gọi đều,
+     * còn khi nó đã đầy ghế thì nó ngừng claim và chỉ còn nhịp tim. Thiếu một trong hai thì có
+     * một trạng thái sống mà số bản không bao giờ được cập nhật.
+     */
+    version: workerVersionSchema.optional(),
   }),
   z.object({
     op: z.literal("accountTier"),
@@ -139,7 +154,7 @@ export async function POST(request: Request) {
     case "claim": {
       // Điểm danh ở claim — op dày nhịp nhất, và là op duy nhất một khôi lỗi NHÀN RỖI vẫn
       // gọi đều — nên "đang trực" nghĩa là tiến trình còn sống, không phải nó đang bận.
-      await recordWorkerSeen(body.workerId, scope);
+      await recordWorkerSeen(body.workerId, scope, body.version ?? null);
 
       // Bế quan trùng tu: đóng ĐÚNG MỘT cánh cửa này. Bốn op còn lại (heartbeat, event,
       // accountTier, complete) mở nguyên, nên vòng đang chạy dở về đích đàng hoàng, kể xong
@@ -230,7 +245,7 @@ export async function POST(request: Request) {
       // Nhịp tim CŨNG là điểm danh: một khôi lỗi đang bận thì thôi không claim nữa, nên nếu
       // chỉ claim mới ghi sổ thì nó biến mất khỏi sổ đúng lúc làm việc chăm chỉ nhất.
       if (beat.workerId) {
-        await recordWorkerSeen(beat.workerId, scope);
+        await recordWorkerSeen(beat.workerId, scope, body.version ?? null);
       }
 
       // `stopping` là tín hiệu người dùng đã bấm Thu Đàn; worker tự kết thúc ở điểm an toàn.

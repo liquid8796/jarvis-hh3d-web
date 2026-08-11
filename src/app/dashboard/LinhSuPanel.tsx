@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { forgetLinhSuAction, issueLinhPhuAction, revokeLinhPhuAction } from "@/app/actions/linhsu";
+import { describeWorkerVersion } from "@/lib/worker/version";
 import { useDashboardPresenceLive } from "./DashboardLiveProvider";
 
 /**
@@ -217,13 +218,26 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
           </span>
         </div>
 
-        {mine.map((w) => (
+        {mine.map((w) => {
+          // Chỉ nói chuyện phiên bản với khôi lỗi ĐANG TRỰC. Một dòng xám đã tắt máy mà còn bị
+          // giục cài lại thì chỉ thêm nhiễu — số bản của nó là số của lần chạy cuối, không phải
+          // của thứ đang chạy.
+          const ver = w.online ? describeWorkerVersion(w.version, presence?.webVersion) : null;
+          return (
           <div key={w.id} className="flex items-center gap-2">
             <Dot on={w.online} />
             <span className="min-w-0 truncate text-[var(--color-parchment)]">「{w.id}」</span>
             <span className="shrink-0 text-xs text-[var(--color-mist)]">
               {w.online ? "— đang trực" : `— ${timeAgo(w.lastSeen)}`}
             </span>
+            {ver && (
+              <span
+                className={`shrink-0 text-xs ${ver.stale ? "text-[var(--color-gold-300)]" : "text-[var(--color-mist)]"}`}
+                title={ver.stale ? "Tải lại bộ cài ở dưới rồi chạy lại để cập nhật khôi lỗi." : undefined}
+              >
+                · {ver.label}
+              </span>
+            )}
             {/* Nút gỡ CHỈ hiện ở dòng đã vắng: khôi lỗi đang trực mà gỡ thì nó ghi tên lại sau
                 năm giây, và một cái nút không giữ được lời hứa còn tệ hơn không có nút. */}
             {!w.online && (
@@ -239,7 +253,8 @@ export function LinhSuPanel({ hasToken: initialHasToken }: { hasToken: boolean }
               </button>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Cái tên xám nằm đó không tự giải thích được mình là gì. Nói ra, ngay cạnh nó. */}

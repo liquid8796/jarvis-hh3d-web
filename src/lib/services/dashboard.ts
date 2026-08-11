@@ -1,4 +1,5 @@
 import { cache } from "react";
+import pkg from "../../../package.json";
 import { eventsForJobs, getCurrentJobsPerAccount } from "./jobs";
 import { listAccounts } from "./accounts";
 import { getRenderSettings } from "./settings";
@@ -54,10 +55,12 @@ export async function getPresenceFeed(userId: string): Promise<DashboardPresence
   return {
     sectOnline: presence.sectOnline,
     sectLastSeen: presence.sectLastSeen?.toISOString() ?? null,
+    webVersion: pkg.version.trim() || null,
     mine: presence.mine.map((worker) => ({
       id: worker.id,
       lastSeen: worker.lastSeen.toISOString(),
       online: worker.lastSeen.getTime() > cutoff,
+      version: worker.version,
     })),
   };
 }

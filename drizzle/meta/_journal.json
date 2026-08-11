@@ -162,6 +162,13 @@
       "when": 1786389043205,
       "tag": "0022_daily_quota",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1786453986741,
+      "tag": "0023_worker_version",
+      "breakpoints": true
     }
   ]
 }

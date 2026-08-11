@@ -421,6 +421,18 @@ export const workers = pgTable(
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
     firstSeen: timestamp("first_seen", { withTimezone: true }).notNull().defaultNow(),
     lastSeen: timestamp("last_seen", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Bản của GÓI khôi lỗi mà tiến trình này đang chạy, do chính nó khai mỗi lần gõ cửa.
+     *
+     * Nullable, và cái `null` ấy MANG NGHĨA: khôi lỗi đời cũ không biết khai gì, nên vắng số
+     * bản chính là dấu「máy này đang chạy bản trước 0.71.0, cài lại đi」. Đó cũng là lý do
+     * cột này ra đời — trước nó, một khôi lỗi máy nhà chạy mã cũ trông y hệt một khôi lỗi mới
+     * trên dashboard, và ngày chuyển trạm nó lặng lẽ không đi theo được.
+     *
+     * Ghi ĐÈ ở mỗi lượt điểm danh kể cả khi vắng: một tiến trình bị hạ cấp về bản cũ phải trở
+     * lại trạng thái「không rõ」chứ không được giữ con số cũ làm bằng chứng giả.
+     */
+    version: text("version"),
   },
   (t) => [index("workers_user_idx").on(t.userId, t.lastSeen)],
 );

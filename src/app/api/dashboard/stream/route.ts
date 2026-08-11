@@ -40,10 +40,15 @@ function visibleSignature(payload: DashboardLivePayload): string {
     accounts: payload.accounts,
     presence: {
       sectOnline: payload.presence.sectOnline,
+      // Số bản NẰM TRONG chữ ký: nó đổi hiếm, nhưng đúng lúc nó đổi là lúc người dùng vừa cài
+      // lại — và một dòng vẫn báo「bản cũ」sau khi họ vừa làm đúng lời nhắc thì còn tệ hơn không
+      // nhắc. Cùng lẽ ấy cho `webVersion`: một lượt chuyển trạm có thể đổi nó mà không đổi gì khác.
+      webVersion: payload.presence.webVersion,
       mine: payload.presence.mine.map((worker) => ({
         id: worker.id,
         online: worker.online,
         lastSeen: worker.online ? null : worker.lastSeen,
+        version: worker.version,
       })),
     },
   });

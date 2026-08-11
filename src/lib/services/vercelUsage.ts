@@ -27,6 +27,27 @@
  *
  *   `/v2/usage?type=requests`   200 kèm số liệu thật trên hobby. Đường duy nhất còn mở.
  *
+ *   `/v2/observability/schema`  200 MIỄN PHÍ trên hobby — liệt kê 95 metric, và trong đó CÓ ĐỦ
+ *                          những meter mà `/v2/usage` giấu mất:
+ *
+ *                              vercel.request.fdt_out_bytes                Fast Data Transfer
+ *                              vercel.function_invocation.fot_total_bytes  Fast Origin Transfer
+ *                              vercel.function_invocation.function_cpu_time_ms   Active CPU
+ *                              vercel.function_invocation.provisioned_memory_mb  Provisioned Mem
+ *                              vercel.isr_operation.read_units / write_units     ISR
+ *                              vercel.request.route_cpu_duration_ms   Edge Request CPU Duration
+ *
+ *   `/v2/observability/query`  402 payment_required — "Observability Plus is required […] and is
+ *                          available on Pro and Enterprise plans". Hình dạng thân request thì
+ *                          ĐÚNG (lấy từ mã CLI `commands/metrics/query.ts`): scope/metric/
+ *                          aggregation/startTime/endTime + `granularity` là OBJECT dạng
+ *                          `{days|hours|minutes: N}` — chính vì đúng nên nó mới đi qua khâu
+ *                          soát mà đập vào cửa trả tiền; sai hình dạng thì đã 400 invalid_query.
+ *
+ * NÓI CHO ĐÚNG: KHÔNG phải "API không có mấy meter ấy" — API CÓ, và catalogue của nó đọc được
+ * miễn phí. Chỉ là đọc GIÁ TRỊ thì phải mua Observability Plus. Hai câu ấy khác nhau, và câu
+ * đầu là câu tệp này từng nói sai.
+ *
  * ĐÁNG ĐỌC LẠI NGÀY NÀO CÓ TÀI KHOẢN LÊN PRO: schema FOCUS v1.3 của `/v1/billing/charges` mang
  * `ConsumedQuantity` + `ConsumedUnit` (số lượng thật kèm đơn vị, hết cảnh đoán mapping),
  * `ServiceName` (tên meter do chính Vercel đặt — gồm cả Fluid Active CPU, thứ v2 không có), và

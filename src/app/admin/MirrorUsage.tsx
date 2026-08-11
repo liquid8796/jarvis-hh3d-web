@@ -194,9 +194,11 @@ export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
               Fast Data Transfer hay Function Duration.
             </p>
             <p className="mt-2 text-xs text-[#f2a0a0]">
-              API <b>không phát ra</b> mấy meter đang thật sự siết một tài khoản Hobby:{" "}
-              <b>Fluid Active CPU</b>, <b>Fluid Provisioned Memory</b>, Fast Origin Transfer, ISR.
-              Muốn xem chúng thì phải mở dashboard — nút dưới đây.
+              Mấy meter đang thật sự siết một tài khoản Hobby — <b>Fluid Active CPU</b>,{" "}
+              <b>Fluid Provisioned Memory</b>, Fast Origin Transfer, ISR — <b>có</b> trong{" "}
+              <code>/v2/observability</code>, nhưng đọc giá trị thì Vercel đòi{" "}
+              <b>Observability Plus</b> (gói Pro trở lên). Trên Hobby chỉ xem được ở dashboard —
+              nút dưới đây.
             </p>
             <p className="mt-2 text-xs text-[var(--color-mist)]">
               Số đo là của cả <b>TÀI KHOẢN VERCEL</b> giữ trạm này, không riêng một project — token

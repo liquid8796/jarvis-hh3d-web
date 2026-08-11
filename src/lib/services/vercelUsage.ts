@@ -1,14 +1,27 @@
 /**
  * MỨC DÙNG VERCEL của một trạm — đọc qua `/v2/usage`, gấp lại thành vài con số người đọc được.
  *
- * VÌ SAO LÀ `/v2/usage` CHỨ KHÔNG PHẢI `/v1/usage`: đo ngày 11/08/2026 bằng token thật của cả
- * bốn tài khoản — `/v1/usage` (và `/v1/billing/charges`) trả
+ * VÌ SAO LÀ `/v2/usage`. Đo ngày 11/08/2026 bằng token thật của cả bốn tài khoản (đều hobby):
  *
- *     400 plan_upgrade_required — "only available to Teams on the Pro or Enterprise plan"
+ *   `/v1/usage`            400 plan_upgrade_required — "only available to Teams on the Pro or
+ *                          Enterprise plan". Cửa đóng ở cổng.
  *
- * còn `/v2/usage?type=requests` trả 200 kèm số liệu thật trên gói **hobby**. Mọi tài khoản của
- * tông môn đang ở hobby, nên đường kia đóng và đường này mở. Đừng "nâng cấp" sang v1 mà không
- * đo lại: nó sẽ 400 im lặng và bảng usage hoá trắng.
+ *   `/v1/billing/charges`  404 costs_not_found, trên CẢ 16 lượt thử: 4 tài khoản × 4 cửa sổ
+ *                          (30 ngày, tháng 6 và tháng 7 đã chốt, cả một năm). KHÔNG phải lỗi
+ *                          tham số — bỏ trống `from` thì nó trả 400 đòi đúng trường ấy, và
+ *                          một lượt cửa sổ-một-năm trả 500 `usage_data_fetch_failed`, tức nó
+ *                          có chạy vào trong đọc usage thật. Nó đơn giản là endpoint của HOÁ
+ *                          ĐƠN: hobby là 0 đồng nên không có bản ghi chi phí nào để trả.
+ *
+ *   `/v2/usage?type=requests`   200 kèm số liệu thật trên hobby. Đường duy nhất còn mở.
+ *
+ * ĐÁNG ĐỌC LẠI NGÀY NÀO CÓ TÀI KHOẢN LÊN PRO: schema FOCUS v1.3 của `/v1/billing/charges` mang
+ * `ConsumedQuantity` + `ConsumedUnit` (số lượng thật kèm đơn vị, hết cảnh đoán mapping),
+ * `ServiceName` (tên meter do chính Vercel đặt — gồm cả Fluid Active CPU, thứ v2 không có), và
+ * `Tags.ProjectId` (hẹp được xuống từng project). Tức nó xoá được CẢ HAI lời thú nhận mà tệp
+ * này đang phải mang: thiếu meter, và số đo là của cả tài khoản chứ không riêng project.
+ *
+ * Đừng "nâng cấp" sang v1 mà không đo lại — hôm nay nó 404/400 im lặng và bảng usage hoá trắng.
  *
  * PHẠM VI LÀ CẢ TÀI KHOẢN, không phải một project. Token Vercel không hẹp xuống project được ở
  * endpoint này. Với tông môn thì hai thứ ấy trùng nhau — lệ §9 của deploy/mirror/README.md là

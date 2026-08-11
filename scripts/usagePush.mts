@@ -93,16 +93,24 @@ export function looksLikeStationHop(
   }
   if (!location) return { ok: false, why: `HTTP ${status} nhưng không kèm Location` };
 
+  // Đọc chỗ ĐANG ĐỨNG trước, để không còn đường nào trong hàm này ném ra ngoài: một `Location`
+  // tuyệt đối vẫn ghép được dù `from` là rác, nên phép so lược đồ bên dưới mới là chỗ vỡ.
+  let here: URL;
   let next: URL;
   try {
-    next = new URL(location, from);
+    here = new URL(from);
+  } catch {
+    return { ok: false, why: `địa chỉ đang đứng không đọc được: ${from}` };
+  }
+  try {
+    next = new URL(location, here);
   } catch {
     return { ok: false, why: `Location không phải URL đọc được: ${location}` };
   }
   if (next.protocol !== "http:" && next.protocol !== "https:") {
     return { ok: false, why: `Location dùng lược đồ「${next.protocol}」, không phải http(s)` };
   }
-  if (new URL(from).protocol === "https:" && next.protocol === "http:") {
+  if (here.protocol === "https:" && next.protocol === "http:") {
     return { ok: false, why: "Location tụt từ https xuống http — không gắn lại chìa lên dây trần" };
   }
   if (next.pathname !== REPORT_PATH) {
@@ -156,6 +164,13 @@ export async function pushUsageReport(input: {
     }
 
     // 3xx: trạm này đã nghỉ và đang chỉ đường sang trạm sống.
+    //
+    // Xả thân trước đã: undici giữ kết nối lại cho tới khi thân được đọc hết hoặc bị huỷ, mà
+    // thân của một phản hồi chuyển hướng thì không ai cần. Bỏ quên là để một socket treo mỗi
+    // lượt đẩy — bốn trạm × sáu tiếng một lần thì không ai thấy, cho tới ngày có người gọi nó
+    // trong một vòng lặp.
+    await res.body?.cancel().catch(() => {});
+
     const step = looksLikeStationHop(res.status, res.headers.get("location"), target);
     if (!step.ok) {
       return { ok: false, status: res.status, hops, detail: `chuyển hướng không đi theo được — ${step.why}` };

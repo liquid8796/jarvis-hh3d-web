@@ -230,6 +230,9 @@ try {
     check("tụt https → http thì KHÔNG", !hop(307, `http://auto-hh3d-1.vercel.app${REPORT_PATH}`).ok);
     check("lược đồ lạ thì KHÔNG", !hop(307, "javascript:void 0").ok);
     check("Location rác thì KHÔNG", !hop(307, "http://[không-phải-url").ok);
+    // Một Location TUYỆT ĐỐI vẫn ghép được dù chỗ đang đứng là rác, nên nhánh này phải tự
+    // chặn — nếu không, phép so lược đồ bên dưới sẽ ném ra ngoài đúng cái hàm hứa không ném.
+    check("chỗ đang đứng là rác thì KHÔNG, và không ném", !hop(307, live, "khong-phai-mot-url").ok);
     // Trạm dưới máy chạy http; đi tiếp trong cùng hạng http là KHÔNG tụt hạng.
     check("http → http thì vẫn đi", hop(307, `http://127.0.0.1:3001${REPORT_PATH}`, `http://127.0.0.1:3000${REPORT_PATH}`).ok);
   }

@@ -62,11 +62,15 @@ hết 35 phút mà còn đàn dở thì worker tự thoát kèm dòng nói rõ�
 Cái giá phải biết trước: `setup.sh` từ nay có thể đứng im tới 35 phút thay vì xong trong một
 phút, vì bước đầu của nó là `systemctl stop`.
 
-**Chưa có bằng chứng cho chính bản vá `KillMode`.** Nó đã đặt và `systemctl show -p KillMode`
-xác nhận là `mixed`, nhưng chưa lượt restart nào sau đó rơi trúng lúc VM đang giữ đàn — nên hiệu
-lực hiện dựa vào hợp đồng của systemd chứ không phải một phép đo. Thứ ĐÃ đo: `WORKER_MAX_JOBS=3`
-có trong `/proc/<pid>/environ` của tiến trình đang chạy, và chính worker in ra `tối đa 3 đàn cùng
-lúc` lúc lên ca.
+**Bản vá `KillMode` đã đo, và kết quả không tròn — ghi ra thay vì làm tròn.** Lượt restart thứ
+hai rơi trúng lúc VM giữ một đàn đang chạy: **1** dòng „browser has been closed" thay vì 12, đàn
+vẫn kết thúc vòng và không đàn nào chết. Nhưng 1 chưa phải 0, và dòng ấy rơi đúng giây vòng chạy
+kết thúc — có thể là cuộc đua lúc dọn trình duyệt cuối vòng, cũng có thể là một đường còn sót;
+phân biệt được cần thêm vài lượt restart trúng lúc có đàn, chưa làm. Mốc so sánh cho ai soi tiếp:
+3 giờ vận hành bình thường trước đó không có một dòng „has been closed" nào.
+
+Thứ đã đo chắc chắn: `WORKER_MAX_JOBS=3` nằm trong `/proc/<pid>/environ` của tiến trình đang
+chạy, và chính worker in `tối đa 3 đàn cùng lúc` lúc lên ca.
 
 ## 0.81.0 — Tế Lễ bấm vào một hộp thoại đã không còn tồn tại (schema 56)
 

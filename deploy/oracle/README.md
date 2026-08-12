@@ -140,11 +140,15 @@ WORKER_DRAIN_TIMEOUT_MS=2100000  worker tự bỏ cuộc ở phút 35
   dài hơn. Dấu hiệu nhận ra lần sau: nhật ký CÓ câu thu đàn mà VẪN có chùm „browser has been
   closed" đúng giây ấy.
 
-  > **Chưa có bằng chứng cho chính bản vá này.** `KillMode=mixed` đã đặt và `systemctl show
-  > -p KillMode` xác nhận, nhưng chưa lượt restart nào SAU đó rơi trúng lúc VM đang giữ đàn —
-  > nên hiệu lực của nó hiện dựa vào hợp đồng của systemd („SIGTERM chỉ tới tiến trình chính"),
-  > không phải một phép đo. Lượt cài đè kế tiếp là chỗ soi: nhật ký phải CÓ câu thu đàn và
-  > KHÔNG có dòng „browser has been closed" nào.
+  > **Đã đo, và kết quả KHÔNG tròn — ghi ra đây thay vì làm tròn.** Lượt restart thứ hai (đã có
+  > `KillMode=mixed`) rơi trúng lúc VM giữ 1 đàn đang chạy Hỷ Sự Đường: chỉ còn **1** dòng
+  > „browser has been closed" thay vì 12, đàn vẫn kết thúc vòng (`Đi hết một vòng — 3 thuận,
+  > 3 trắc trở`) và không đàn nào chết. Nhưng 1 chưa phải 0, và dòng ấy rơi đúng GIÂY vòng chạy
+  > kết thúc — có thể là một cuộc đua lúc dọn trình duyệt cuối vòng (không liên quan systemd),
+  > cũng có thể là một đường còn sót. Phân biệt được hai khả năng ấy cần thêm vài lượt restart
+  > trúng lúc có đàn; **chưa làm**. Mốc so sánh để ai đó soi tiếp: trong 3 giờ vận hành bình
+  > thường trước đó, `job_events` KHÔNG có một dòng „has been closed" nào — nên dòng lẻ ấy vẫn
+  > thuộc về lượt restart, không phải tiếng ồn nền.
 - **Hai mốc thời gian phải theo thứ tự app-trước-nền-tảng**, cùng lối với bộ 290+50 < 350 < 360
   bên Actions: hết 35 phút mà còn đàn dở thì worker tự thoát kèm dòng nói rõ「còn N đàn chưa
   xong」, thay vì bị `SIGKILL` câm lặng ở phút 40.

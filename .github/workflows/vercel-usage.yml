@@ -33,7 +33,7 @@ on:
   schedule:
     # 6 giờ một lần. Giờ UTC; lịch của GitHub có thể trễ vài phút khi hệ thống bận — không sao,
     # đây là số liệu 30 ngày chứ không phải nhịp tim.
-    - cron: "0 */3 * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 # Một lượt cào đang chạy dở thì lượt mới chờ, không chen: hai lượt cùng ghi vào một dòng sổ là

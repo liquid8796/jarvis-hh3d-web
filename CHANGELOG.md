@@ -49,6 +49,23 @@ dữ liệu) → app đếm 10.183/12.889 dòng quá hạn, một câu SQL độ
 vào form → bấm Lưu mà không sửa gì」phải về đúng con số cũ (mở trang admin rồi bấm Lưu không được
 tự đổi hạn lưu của chính mình).
 
+## 0.76.1 — người dùng vẫn chỉ chọn HẠNG khôi lỗi, không chọn máy
+
+Đổi tên khôi lỗi GitHub thành `github-khoiloi` cho khớp lệ đặt tên của VM (`tong-mon-khoiloi`).
+
+Và ghi lại một điều đáng ghi vì nó ĐÃ đúng sẵn chứ không phải vừa được làm: người dùng **không
+bao giờ chọn một cái máy**. Ô「Giao đàn cho」chỉ có ba lựa chọn theo HẠNG — tông môn / máy nhà /
+ai rảnh cũng được — và `workerPrefFilter` lọc theo `scope.kind` (`operator` hay `user`), không
+theo `worker_id`. Bất kỳ tiến trình nào xác thực bằng `WORKER_TOKEN` toàn cục đều là `operator`,
+nên `tong-mon-khoiloi` và `github-khoiloi` đứng ngang nhau dưới mắt câu claim.
+
+Nhờ vậy việc「phân phối」không cần một tầng nào cả: chọn tông môn thì cả hai cùng đủ tư cách, và
+Postgres quyết ai cầm bằng chính câu UPDATE nguyên tử — máy nào rảnh trước thì nhặt trước. Thêm
+một khôi lỗi tông môn thứ ba ngày mai cũng không phải sửa dòng nào.
+
+Đây là lý do một hàng rào viết theo HẠNG thắng một hàng rào viết theo TÊN: cái sau sẽ bắt ta sửa
+luật mỗi lần thêm máy, và mỗi lần sửa là một dịp để quên.
+
 ## 0.76.0 — khôi lỗi tông môn thứ hai, chạy trên GitHub Actions
 
 Một khôi lỗi tông môn nữa, trên runner của GitHub, chạy song song với khôi lỗi trên VM.
@@ -76,7 +93,7 @@ Ba con số của workflow, mỗi con số một lý do:
 | lịch **4 giờ/lần** trong khi một lượt sống ~4,8 giờ | lượt kế đã nằm chờ sẵn lúc lượt cũ thu đàn, nên khoảng hở gần bằng 0; `concurrency` giữ đúng một chạy + một chờ |
 | **2 ghế** trên runner 4 nhân | đo 10/08 trên VM 4 vCPU: 8 ghế → load 14 và đàn hỏng vì timeout; runner còn ít RAM hơn và chia sẻ I/O |
 
-`WORKER_ID=tong-mon-github`, khác VM (`tong-mon-khoiloi`) — trùng tên thì hai tiến trình ghi đè
+`WORKER_ID=github-khoiloi`, khác VM (`tong-mon-khoiloi`) — trùng tên thì hai tiến trình ghi đè
 nhau trong bảng `workers` và mục Khôi Lỗi nói dối về việc ai đang trực.
 
 Hết hạn chờ mà còn đàn dở thì thoát với mã **khác 0**: chuyện ấy nghĩa là có người sắp mất một

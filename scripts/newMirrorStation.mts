@@ -7,6 +7,12 @@
  *
  * Hoặc bấm đúp `new-mirror-station.bat` — nó hỏi hai câu rồi gọi vào đây.
  *
+ * `--project <tên>` khi tên project Vercel KHÁC mã trạm. Mặc định hai thứ trùng nhau và nên cứ
+ * để vậy; cờ này tồn tại cho đúng một ca có thật là trạm gốc — mã trạm `main`, project và địa
+ * chỉ `auto-hh3d` — thứ dựng bằng tay từ trước khi có lệ đặt tên:
+ *
+ *   MIRROR_TOKEN=<token> npm run mirror:new -- --site main --project auto-hh3d
+ *
  * VÌ SAO CẦN: checklist tay ở deploy/mirror/README.md §9 là mười bước, và ba trong số đó là bẫy
  * đã trả giá thật (11/08/2026, lúc dựng trạm thứ ba):
  *   • tên gói của Neon/Atlas phải TRA bằng `--help`, đoán là hỏng;
@@ -89,16 +95,43 @@ const SHARED_SECRETS = [
 ] as const;
 
 /** Hai integration bắt buộc, và tên gói MIỄN PHÍ của chúng — tra bằng `integration add <tên> --help`. */
+/**
+ * Hai kho mỗi trạm phải có.
+ *
+ * `metadata` là những cặp `KEY=VALUE` mà nhà cung cấp BẮT BUỘC phải có, truyền qua `-m`. Nó
+ * KHÔNG suy ra được từ `--plan`: Atlas nhận `--plan FREE` rồi vẫn chết giữa chừng với
+ *「Missing required metadata: clusterTier」— đo ngày 12/08/2026 (Vercel CLI 56.4.1), sau khi
+ * project đã tạo và kho Neon đã dựng xong, tức đúng cái kiểu hỏng nửa chừng mà cả script này
+ * sinh ra để tránh. Thiếu khoá nào thì chính lời lỗi của CLI nói tên khoá ấy; thêm vào đây.
+ *
+ * Cố ý KHÔNG dùng `--prefix`: prefix đổi tên biến (`--prefix NEON2_` cho ra `NEON2_DATABASE_URL`)
+ * và trạm gốc từng dựng tay với `hh3d_`, khiến `DATABASE_URL` phải đặt tay riêng — thứ về sau
+ * nằm lại dưới dạng sensitive. Tên trần là tên mà mã nguồn đọc.
+ */
 const STORES = [
-  { slug: "neon", plan: "free_v3", name: "jarvis-hh3d", label: "Neon Postgres" },
-  { slug: "mongodbatlas", plan: "FREE", name: "atlas-jarvis-chat", label: "MongoDB Atlas" },
+  { slug: "neon", plan: "free_v3", name: "jarvis-hh3d", label: "Neon Postgres", metadata: [] },
+  {
+    slug: "mongodbatlas",
+    plan: "FREE",
+    name: "atlas-jarvis-chat",
+    label: "MongoDB Atlas",
+    metadata: ["clusterTier=FREE"],
+  },
 ] as const;
 
 const QUICK_MS = 60_000;
 const PROVISION_MS = 10 * 60_000;
 const API_MS = 30_000;
 
-const die = (message: string): never => {
+/**
+ * Chú kiểu nằm trên BIẾN, không phải trên arrow — và đó là điều kiện, không phải gu.
+ *
+ * TypeScript chỉ dùng một hàm「không bao giờ trả về」để thu hẹp kiểu khi nó là khai báo hàm,
+ * hoặc là `const` CÓ chú kiểu tường minh. Viết `const die = (m: string): never => …` thì mọi
+ * `if (!x) die(…)` bên dưới KHÔNG thu hẹp `x`, và cả tệp đầy lỗi「possibly null」giả — 16 lỗi
+ * đúng loại ấy, tất cả tan biến chỉ nhờ dòng này.
+ */
+const die: (message: string) => never = (message) => {
   console.error(`\n✗ ${message}`);
   process.exit(1);
 };
@@ -114,7 +147,34 @@ const dryRun = process.argv.includes("--dry-run");
 const parsed = validateSiteId(arg("site") ?? "");
 if (!parsed.ok) die(`${parsed.message}\n  Ví dụ: npm run mirror:new -- --site auto-hh3d-3`);
 const siteId = parsed.siteId;
-const stationUrl = stationUrlFor(siteId);
+
+/**
+ * TÊN PROJECT VERCEL — mặc định trùng mã trạm, và `--project` là lối thoát cho một ca CÓ THẬT.
+ *
+ * Lệ「một cái tên cho cả ba chỗ」(README §9) ghép mã trạm = tên project = nhãn subdomain, và nó
+ * đúng cho mọi trạm sinh ra từ công cụ này. Nhưng trạm ĐẦU TIÊN thì dựng bằng tay từ trước khi
+ * có lệ ấy: mã trạm là `main`, còn project và địa chỉ là `auto-hh3d`. Không có cờ này thì trạm
+ * duy nhất KHÔNG dựng lại được chính là trạm gốc — phát hiện ngày 12/08/2026, khi cần dựng lại
+ * nó để gột sạch mấy biến env dạng sensitive.
+ *
+ * Ràng buộc phải giữ: **địa chỉ trong sổ luôn là `https://<tên project>.vercel.app`**, vì
+ * `deployAllStations` suy ngược tên project TỪ địa chỉ (`projectNameFromUrl`) chứ không đọc mã
+ * trạm. Nên `stationUrlFor` ở đây nhận tên project, không nhận mã trạm — lệch một chỗ ấy là
+ * lượt phát hành sau đi tìm một project không tồn tại.
+ *
+ * Tên project cũng thành nhãn hostname nên soi bằng ĐÚNG bộ luật của mã trạm.
+ */
+const projectParsed = validateSiteId(arg("project") ?? siteId);
+if (!projectParsed.ok) die(`--project: ${projectParsed.message}`);
+const projectName = projectParsed.siteId;
+
+const stationUrl = stationUrlFor(projectName);
+/**
+ * Tên biến chứa token vẫn suy từ MÃ TRẠM, không từ tên project: token thuộc về TÀI KHOẢN giữ
+ * trạm, và mã trạm là thứ người vận hành gọi tên nó. Với `--site main` thì đó là
+ * `VERCEL_TOKEN_MAIN`, trong khi tài khoản ấy có thể đã có sẵn `VERCEL_TOKEN` cùng giá trị —
+ * `discoverTokens` khử trùng THEO GIÁ TRỊ nên hai biến một token là chuyện đã lường trước.
+ */
 const tokenEnvName = tokenEnvNameFor(siteId);
 
 if (!process.env.DATABASE_URL) die("Thiếu DATABASE_URL — chạy `npm run env:pull` trước.");
@@ -227,8 +287,8 @@ console.log(`• Integration đã cài đủ: ${STORES.map((s) => s.label).join(
 
 // ---- 3. Trùng tên? ------------------------------------------------------------------------------
 
-const existing = await api(`/v9/projects/${siteId}?${teamQuery}`);
-if (existing.ok) die(`Team này đã có project「${siteId}」. Chọn mã khác, hoặc xoá project cũ trước (README §9 bẫy 3).`);
+const existing = await api(`/v9/projects/${projectName}?${teamQuery}`);
+if (existing.ok) die(`Team này đã có project「${projectName}」. Chọn tên khác, hoặc xoá project cũ trước (README §9 bẫy 3).`);
 
 const readBook = async (url: string): Promise<Book> => {
   const rows = (await neon(url)`select value from app_settings where id = 'global'`) as { value: unknown }[];
@@ -256,8 +316,12 @@ console.log(`• Sổ có thẩm quyền: trạm hoạt động「${doc.activeSi
 console.log(`\n── Sẽ dựng ──────────────────────────────────────────`);
 console.log(`  mã trạm   : ${siteId}`);
 console.log(`  địa chỉ   : ${stationUrl}`);
-console.log(`  project   : ${siteId} trên team ${scope}`);
-console.log(`  kho       : ${STORES.map((s) => `${s.name} (${s.label}, gói ${s.plan})`).join(" · ")}`);
+console.log(`  project   : ${projectName} trên team ${scope}`);
+console.log(
+  `  kho       : ${STORES.map(
+    (s) => `${s.name} (${s.label}, gói ${s.plan}${s.metadata.length > 0 ? `, ${s.metadata.join(", ")}` : ""})`,
+  ).join(" · ")}`,
+);
 console.log(`  token env : ${tokenEnvName}`);
 
 if (dryRun) {
@@ -269,32 +333,41 @@ if (dryRun) {
 
 const created = await api(`/v9/projects?${teamQuery}`, {
   method: "POST",
-  body: JSON.stringify({ name: siteId, framework: "nextjs" }),
+  body: JSON.stringify({ name: projectName, framework: "nextjs" }),
 });
 if (!created.ok) die(`Tạo project hỏng (HTTP ${created.status}): ${JSON.stringify(created.body).slice(0, 200)}`);
 const projectId = String(created.body?.id);
-console.log(`\n✔ project ${siteId} · ${projectId}`);
+console.log(`\n✔ project ${projectName} · ${projectId}`);
 
 const stage = mkdtempSync(path.join(tmpdir(), `mirror-${siteId}-`));
 try {
   mkdirSync(path.join(stage, ".vercel"), { recursive: true });
   writeFileSync(
     path.join(stage, ".vercel", "project.json"),
-    JSON.stringify({ projectId, orgId: team.id, projectName: siteId }),
+    JSON.stringify({ projectId, orgId: team.id, projectName }),
   );
 
   for (const store of STORES) {
     console.log(`\n── dựng ${store.label} ────────────────────────────`);
     const res = spawnSync(
       "vercel",
+      // KHÔNG ép `--non-interactive`, và đây là chuyện đã trả giá ngày 12/08/2026: dựng kho
+      // Atlas MỚI trên một team vừa bị xoá hết kho thì Vercel trả「Additional setup required.
+      // Opening browser…」— một bước phải có người thật bấm. Ép cờ ấy là bịt luôn đường bấm,
+      // nên lượt dựng chết ở đúng chỗ mà một người ngồi trước máy giải được trong mười giây.
+      // Bỏ cờ đi thì CLI tự phân biệt: người thật thì mở trình duyệt và chờ, còn agent thì nó
+      // TỰ chuyển sang không-tương-tác (đúng như `--help` của nó khai) và vẫn hỏng thẳng thắn.
+      // Hệ quả phải nhớ: lượt dựng có thể CẦN chạy từ terminal của người vận hành, không phải
+      // từ một tiến trình nền.
       ["integration", "add", store.slug, "--plan", store.plan, "--name", store.name,
-       "--non-interactive", "--no-env-pull", "--scope", scope],
-      { cwd: stage, timeout: PROVISION_MS, env: { ...process.env, VERCEL_TOKEN: token }, shell: true, stdio: ["ignore", "inherit", "inherit"] },
+       ...store.metadata.flatMap((pair) => ["-m", pair]),
+       "--no-env-pull", "--scope", scope],
+      { cwd: stage, timeout: PROVISION_MS, env: { ...process.env, VERCEL_TOKEN: token }, shell: true, stdio: "inherit" },
     );
     if (res.status !== 0) {
       die(
-        `Dựng ${store.label} hỏng (mã ${res.status ?? "bị giết"}). Project「${siteId}」ĐÃ TẠO và đang nằm lại trên tài khoản —\n` +
-          `  xoá bằng: curl -X DELETE "https://api.vercel.com/v9/projects/${siteId}?${teamQuery}" -H "Authorization: Bearer <token>"`,
+        `Dựng ${store.label} hỏng (mã ${res.status ?? "bị giết"}). Project「${projectName}」ĐÃ TẠO và đang nằm lại trên tài khoản —\n` +
+          `  xoá bằng: curl -X DELETE "https://api.vercel.com/v9/projects/${projectName}?${teamQuery}" -H "Authorization: Bearer <token>"`,
       );
     }
   }
@@ -330,8 +403,8 @@ try {
           "  cần dựng lại hay cứu trạm này thì không còn bản sao nào.\n" +
           `  Chữa: Vercel dashboard → team「${scope}」→ Settings → Environment Variables, tắt\n` +
           "  「Sensitive Environment Variables」; xoá mấy biến trên rồi chạy lại lệnh này.\n" +
-          `  (Project ${siteId} đã dựng — xoá bằng:\n` +
-          `   curl -X DELETE "https://api.vercel.com/v9/projects/${siteId}?${teamQuery}" -H "Authorization: Bearer <token>")`,
+          `  (Project ${projectName} đã dựng — xoá bằng:\n` +
+          `   curl -X DELETE "https://api.vercel.com/v9/projects/${projectName}?${teamQuery}" -H "Authorization: Bearer <token>")`,
       );
     }
     console.log(`✔ ${envs.length} biến (${luc}) đều non-sensitive — sau này còn env:pull được`);

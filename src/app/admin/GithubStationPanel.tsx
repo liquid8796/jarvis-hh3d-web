@@ -102,9 +102,9 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
 
         {stations.length === 0 ? (
           <p className="text-sm text-[var(--color-mist)]">
-            Sổ còn trống, nên chưa kho nào được nuôi. Dựng kho bằng{" "}
-            <code>node scripts/newGithubKhoiloi.mjs --owner &lt;tài-khoản&gt;</code> rồi ghi nó vào sổ ở
-            form dưới.
+            Sổ còn trống, nên chưa kho nào được nuôi. Đường ngắn nhất: bấm đúp{" "}
+            <code>new-github-khoiloi.bat</code> ở gốc repo — nhập đúng một PAT, nó tự dựng kho, tự
+            đặt tên, rồi tự ghi vào sổ này. Form dưới dành cho kho đã có sẵn.
           </p>
         ) : (
           <div className="flex flex-col gap-3">

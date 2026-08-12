@@ -11,6 +11,45 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.80.0 — một PAT, một cú bấm đúp: kho mới dựng xong là đã nằm trong sổ
+
+`new-github-khoiloi.bat` + `npm run github:new`. Người dùng dán đúng MỘT thứ — PAT của tài khoản
+GitHub sẽ giữ kho — rồi script tự lo phần còn lại: suy tên tài khoản từ chính token, đặt tên kho
+ngẫu nhiên, đặt `WORKER_ID` theo khuôn `github-khoiloi-<mốc>`, dựng kho, dán secret, bấm chạy, và
+**ghi thẳng kho ấy vào sổ Kho GitHub của trạm đang hoạt động** rồi ngó một lượt để chứng minh PAT
+push được. Trước bản này, hai việc cuối là hai thao tác tay trên trang admin, và ai quên thì kho
+mới cứ thế đếm ngược tới mốc 60 ngày mà không ai nuôi.
+
+**Gọi lại `newGithubKhoiloi.mjs` chứ không chép nó.** Phần dễ sai nhất — danh sách tệp phải chép
+— vừa mới trả giá một lần ở 0.79.2 và nay đã có `assertImportsResolve` canh; một bản sao thứ hai
+là hẹn ngày hai bản trôi khỏi nhau. Tệp mới chỉ thêm ba thứ mà bản `.mjs` không làm được vì nó là
+Node thuần, không chạm database: hỏi danh tính PAT, đặt tên, và ghi sổ.
+
+**Ba phép kiểm đứng TRƯỚC mọi phép tạo**, vì tạo kho xong mới phát hiện hỏng là bỏ lại một kho
+công khai mồ côi phải vào GitHub xoá tay: PAT còn sống và đủ scope (`repo` + `workflow`, đọc từ
+header `x-oauth-scopes`; token fine-grained không khai scope nên nói thẳng là không kiểm hộ
+được), sổ chưa đầy, và `WORKER_ID` chưa ai mang — hỏi thẳng bảng `workers` chứ không chỉ tin vào
+cái mốc giây.
+
+**Hai lỗi tự bắt được khi đọc lại diff, cả hai đều là loại hỏng-mà-không-ai-thấy:**
+
+- **`process.exit()` làm hỏng chính mã thoát.** Đo được: dưới `tsx` trên Windows, `process.exit(0)`
+  sau một lượt `fetch` khiến libuv ném `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` và
+  tiến trình trả về **127 thay vì 0** — tức một lượt chạy hoàn hảo vẫn khiến tệp .bat in „Ket thuc
+  voi loi". Nay mọi ngả kết thúc đi qua `process.exitCode` rồi để tiến trình tự tắt; đo lại: nhánh
+  thành công 0, nhánh hỏng 1, không còn dòng assertion nào. (Cùng bệnh còn ở `mirrorControl.mts`,
+  chưa đụng tới.)
+- **Bản chụp cấu hình cũ ghi đè việc người khác vừa làm.** `saveAppSettings` ghi TRỌN document,
+  mà giữa lượt đọc và lượt ghi là cả phần dựng kho — vài chục giây có `gh` chạy ở giữa. Ghi bằng
+  bản đọc lúc đầu là lặng lẽ lộn ngược mọi thứ trưởng môn vừa sửa trong quãng ấy. Nay đọc lại sổ
+  ngay trước khi ghi, và kiểm lại cả trần lẫn trùng tên trên bản mới.
+
+**Chưa có bằng chứng, nói thẳng:** máy phát triển không có `gh` nên bốn lời gọi `gh` (tạo kho, dán
+secret, bấm chạy) và cả lượt ghi sổ + ngó kho vẫn chưa lượt nào chạy thật. Thứ ĐÃ đo: typecheck
+tường minh (tsconfig của repo loại cả thư mục `scripts`), lượt chạy khô đi trọn đường thật —
+bảng điều phối, tra ra trạm đang phục vụ qua sổ của trạm vừa nghỉ, đọc sổ, ba phép kiểm, dựng thử
+19 tệp — và tệp `.bat` chạy qua `cmd.exe` với cả nhánh lỗi lẫn mã thoát.
+
 ## 0.79.2 — lệnh dựng khôi lỗi GitHub phát ra một kho chết ngay giây đầu
 
 `newGithubKhoiloi.mjs` chép **`worker.mjs` + `quest-engine`**, và chỉ ngần ấy — đúng như bình chú

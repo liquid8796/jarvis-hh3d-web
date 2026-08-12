@@ -208,6 +208,22 @@ PAT nguy hiểm hơn cookie game một bậc: cookie mở một tài khoản gam
 kho đang chạy khôi lỗi. Nên nó lưu bằng `secretBox` (`ENCRYPTION_KEY`) y như cookie, và quyền quản
 là **mã riêng chỉ Gia chủ** — không dùng lại `admin.panel`, cũng không dùng lại `site.switch`.
 
+### Thêm một kho: bấm đúp `new-github-khoiloi.bat`
+
+Nó hỏi đúng MỘT thứ — PAT của tài khoản GitHub sẽ giữ kho — rồi làm trọn: suy tên tài khoản từ
+chính token, đặt tên kho ngẫu nhiên và `WORKER_ID` theo khuôn `github-khoiloi-<mốc thời gian>`,
+dựng kho (gọi lại `newGithubKhoiloi.mjs`), dán secret, bấm chạy lượt đầu, **ghi kho vào sổ ở trạm
+đang hoạt động**, rồi ngó một lượt để chứng minh PAT push được. Xem trước mà chưa tạo gì:
+`npm run github:new -- --dry-run --owner <tài-khoản>`.
+
+Vẫn cần `gh` (chỉ vì lượt đặt secret — sealed-box, xem đầu `newGithubKhoiloi.mjs`), nhưng **không
+cần `gh auth login`**: PAT đi qua biến `GH_TOKEN` của riêng lượt chạy ấy. Cài `gh`:
+`winget install --id GitHub.cli`.
+
+Ba phép kiểm chạy TRƯỚC khi tạo bất cứ thứ gì, vì một kho công khai mồ côi thì phải vào GitHub
+xoá tay: PAT còn sống và đủ scope, sổ chưa đầy (`GITHUB_STATION_LIMIT`), và `WORKER_ID` chưa ai
+mang — hỏi thẳng bảng `workers`, không chỉ tin vào mốc giây trong tên.
+
 ### Vận hành
 
 Tab **Kho GitHub** trong trang Tông Môn. Mỗi dòng hiện đếm ngược tới mốc tắt lịch — xanh là khoẻ,

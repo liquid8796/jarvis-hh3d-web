@@ -108,9 +108,34 @@ function questPhrase(entry: QueueEntry): string | null {
   return progress.running.length > 0 ? progress.running.join(" · ") : "đang chuẩn bị…";
 }
 
+/**
+ * Nhãn khôi lỗi ở đuôi một dòng đàn.
+ *
+ * KHÔNG hỏi quyền ở đây, và cũng không có chỗ nào để hỏi: `workerId` chỉ tới nơi này khi
+ * service đã quyết là người xem được biết (xem `visibleWorkerId` trong queue.ts). Giao diện
+ * chỉ kể lại thứ được đưa — cùng lẽ với `questPhrase` ngay trên.
+ *
+ * Có id thì vẫn giữ chữ「tông môn」đứng trước: một chuỗi id trần trụi không nói được nó là máy
+ * của tông môn hay máy nhà ai đó, mà đó mới là điều dòng này sinh ra để trả lời.
+ */
+function workerLabel(entry: QueueEntry): string {
+  if (entry.workerKind === "sect") {
+    return entry.workerId ? `tông môn · ${entry.workerId}` : "khôi lỗi tông môn";
+  }
+  return entry.workerId ?? "khôi lỗi riêng";
+}
+
+/** "vắng 12 phút" — mốc điểm danh chỉ đi xuống dây khi khôi lỗi đang vắng (xem workers.ts). */
+function awayText(lastSeen: string | null): string {
+  if (lastSeen == null) return "chưa từng điểm danh";
+  const ms = Date.now() - new Date(lastSeen).getTime();
+  return ms < 60_000 ? "vừa vắng" : `vắng ${formatDuration(ms)}`;
+}
+
 const TABS = [
   { id: "queue", label: "Hàng đợi" },
   { id: "stuck", label: "Đang kẹt" },
+  { id: "workers", label: "Khôi lỗi" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -276,8 +301,16 @@ export function QueueBoard({
     };
   }, [refresh, live]);
 
-  const { entries, running, waiting, sleeping, stuck } = snapshot;
+  const { entries, running, waiting, sleeping, stuck, workers } = snapshot;
   const stuckEntries = entries.filter((entry) => entry.stuckFor != null);
+  const workersOnline = workers.filter((worker) => worker.online).length;
+  /**
+   * Sổ khôi lỗi đi CHUNG ảnh chụp hàng đợi (xem `QueueSnapshot.workers`), nên nó tươi đúng
+   * bằng ảnh chụp: mỗi khung SSE, mỗi nhịp hỏi lại. Một khôi lỗi vừa tắt có thể còn hiện
+   *「đang trực」tới hết nhịp ấy — cửa sổ điểm danh vốn đã là 30 giây, nên đây không phải một
+   * độ trễ mới, chỉ là cùng một độ trễ.
+   */
+  const hasOwnWorker = workers.some((worker) => worker.kind === "mine");
 
   /**
    * MỘT mức số dòng cho cả hai tab, nhưng HAI số trang riêng.
@@ -367,7 +400,7 @@ export function QueueBoard({
           <span className="ml-auto flex items-center gap-2">
             {entry.workerKind && (
               <span className="font-mono text-[11px] text-[var(--color-mist)]">
-                {entry.workerId ?? (entry.workerKind === "sect" ? "khôi lỗi tông môn" : "khôi lỗi riêng")}
+                {workerLabel(entry)}
               </span>
             )}
             {canStop(entry) && (
@@ -436,7 +469,14 @@ export function QueueBoard({
             // Tab Hàng đợi đếm đàn CÒN SỐNG, không đếm `entries.length`: mảng ấy nay mang thêm
             // cả dòng đã tắt còn nán lại, nên lấy độ dài của nó là để huy hiệu cãi nhau với
             // đúng dòng tóm tắt nằm ngay bên trên.
-            const count = item.id === "stuck" ? stuck : running + waiting + sleeping;
+            const count =
+              item.id === "stuck" ? stuck : item.id === "workers" ? workersOnline : running + waiting + sleeping;
+            // Tab Khôi lỗi hiện huy hiệu KỂ CẢ khi bằng 0, ngược với hai tab kia: ở đây số 0
+            // chính là tin đáng báo — không còn ai nhặt việc — nên giấu nó đi là giấu đúng cái
+            // cần thấy. Hai tab kia thì 0 nghĩa là「không có gì để xem」, và một huy hiệu「0」
+            // chỉ làm rối thanh tab.
+            const showCount = item.id === "workers" || count > 0;
+            const warn = item.id === "stuck" || (item.id === "workers" && count === 0);
             return (
               <button
                 key={item.id}
@@ -455,8 +495,8 @@ export function QueueBoard({
                 onClick={() => setTab(item.id)}
               >
                 {item.label}
-                {count > 0 && (
-                  <span className={`queue-tab-count ${item.id === "stuck" ? "is-warn" : ""}`}>{count}</span>
+                {showCount && (
+                  <span className={`queue-tab-count ${warn ? "is-warn" : ""}`}>{count}</span>
                 )}
               </button>
             );
@@ -510,6 +550,84 @@ export function QueueBoard({
           )}
         </div>
       )}
+      {/**
+       * Tab KHÔI LỖI — "còn ai nhặt việc không".
+       *
+       * Đứng cạnh hàng đợi vì hai câu hỏi dính vào nhau: một hàng dài mười đàn nghĩa hoàn toàn
+       * khác nhau tuỳ khôi lỗi đang trực hay đã tắt, mà trước bản này trang chỉ trả lời được vế
+       * đầu. Ai đọc「11 đang nghỉ」lúc cả tông môn đứng im thì không có cách nào biết đó là
+       * cooldown hay là không còn ai làm việc.
+       *
+       * Danh sách này đã được service cắt theo vai (xem `getWorkerRoster`): môn đồ thường nhận
+       * MỘT dòng gộp cho khôi lỗi tông môn, bậc trị sự nhận từng tiến trình một. Nên ở đây
+       * không có phép hỏi quyền nào — chỉ vẽ đúng thứ được đưa.
+       */}
+      {tab === "workers" && (
+        <div role="tabpanel" id="queue-panel-workers" aria-labelledby="queue-tab-workers" tabIndex={0}>
+          <p className="mb-4 text-xs leading-relaxed text-[var(--color-mist)]">
+            Ai đang trực để nhặt việc.{" "}
+            <strong className="text-[var(--color-parchment)]">Khôi lỗi tông môn</strong> là của
+            chung — nó nhặt đàn của mọi người theo đúng thứ tự ở tab Hàng đợi, nên nó vắng thì cả
+            hàng đứng im.{" "}
+            <strong className="text-[var(--color-parchment)]">Khôi lỗi riêng</strong> chỉ chạy đàn
+            của chính chủ nó ở máy nhà, nên nó vắng thì chỉ đàn của người ấy nằm chờ. Quá 30 giây
+            không gõ cửa là tính vắng.
+          </p>
+
+          <ul className="space-y-2">
+            {workers.map((worker) => (
+              <li
+                key={`${worker.kind}:${worker.id ?? "gop"}`}
+                className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border p-3 text-sm ${
+                  worker.online
+                    ? "border-[var(--color-jade-400)]/35 bg-[var(--color-jade-400)]/5"
+                    : "border-[var(--color-ink-600)]/60"
+                }`}
+              >
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${
+                    worker.online ? "bg-[var(--color-jade-400)] pulse-jade" : "bg-[var(--color-ink-600)]"
+                  }`}
+                  aria-hidden
+                />
+                <span className="font-semibold text-[var(--color-parchment)]">
+                  {worker.kind === "sect" ? "Khôi lỗi tông môn" : "Khôi lỗi riêng"}
+                </span>
+                {worker.kind === "mine" && <span className="badge badge-active">của bạn</span>}
+                {/* id chỉ tới được đây khi người xem có quyền biết — service đã cắt. */}
+                {worker.id && (
+                  <span className="font-mono text-[11px] text-[var(--color-mist)]">{worker.id}</span>
+                )}
+                <span
+                  className={
+                    worker.online ? "text-[var(--color-jade-300)]" : "text-[var(--color-mist)]"
+                  }
+                >
+                  {worker.online ? "đang trực" : awayText(worker.lastSeen)}
+                </span>
+                {/* Số bản chỉ đi kèm dòng có id: dòng GỘP không kể bản của ai cả, mà `null` ở
+                    đó nghĩa là「không được cho biết」chứ không phải「bản cũ」— hai điều khác hẳn
+                    nhau, và nói nhầm sẽ giục người ta đi cài lại một thứ vốn đang đúng. */}
+                {worker.id && (
+                  <span className="ml-auto font-mono text-[11px] text-[var(--color-mist)]">
+                    {worker.version ? `bản ${worker.version}` : "bản cũ — chưa khai số"}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+
+          {!hasOwnWorker && (
+            <p className="mt-4 text-xs leading-relaxed text-[var(--color-mist)]">
+              Đạo hữu chưa nuôi khôi lỗi riêng nào — đàn của mình đang trông cả vào khôi lỗi tông
+              môn, và với hầu hết mọi người thì đó đúng là cách nhàn nhất. Muốn lượt chạy đi từ máy
+              nhà thì vào trang <strong className="text-[var(--color-parchment)]">Auto</strong>, mục
+              Khôi Lỗi.
+            </p>
+          )}
+        </div>
+      )}
+
       {notice && (
         <p
           role="status"

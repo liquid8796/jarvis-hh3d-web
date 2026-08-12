@@ -1,5 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
+import { hasPermission } from "@/lib/auth/permissions";
+import { getWorkerRoster, type WorkerRosterEntry } from "@/lib/services/workers";
 import type { CycleProgress, JobStatus } from "@/lib/realtime/dashboardTypes";
 
 /**
@@ -11,6 +13,15 @@ import type { CycleProgress, JobStatus } from "@/lib/realtime/dashboardTypes";
  * số vòng đã chạy, tiến độ vòng này — CẢ SỐ ĐẾM LẪN TÊN NHIỆM VỤ ĐANG CHẠY — và khôi lỗi nào
  * đang cầm (chỉ TÔNG MÔN hay RIÊNG, không phải id máy). KHÔNG BAO GIỜ: tên tài khoản game,
  * cookie, cấu hình nhiệm vụ đã lưu, id khôi lỗi riêng. Của chính mình thì thấy đủ.
+ *
+ * <b>ID khôi lỗi, từ 12/08/2026</b> — hai vế, và chỉ hai (xem `visibleWorkerId`):
+ *   • Khôi lỗi TÔNG MÔN: chỉ bậc trị sự (`admin.panel`) thấy đích danh tiến trình nào, ở MỌI
+ *     dòng kể cả dòng của chính họ. Môn đồ thường chỉ đọc được「khôi lỗi tông môn」.
+ *   • Khôi lỗi RIÊNG: chỉ CHỦ nó thấy id, y như trước. Bậc trị sự cũng không — máy ở nhà người
+ *     ta không phải hạ tầng của tông môn.
+ * Trước bản này, dòng của chính mình luôn kèm id, nên môn đồ thường đọc được tên tiến trình
+ * tông môn qua chính đàn của họ. Đó là chi tiết vận hành (máy nào, trạm nào) mà môn đồ không
+ * dùng được vào việc gì, còn tông môn thì hở ra hình dạng hạ tầng của mình.
  *
  * <b>Tên nhiệm vụ đã ĐỔI PHÍA, ngày 08/08/2026, theo yêu cầu của tông chủ.</b> Trước đó chỉ
  * con số "3/8" được qua, với lập luận: nó trả lời đúng câu hỏi trang này sinh ra để trả lời
@@ -47,7 +58,7 @@ export type QueueEntry = {
   status: JobStatus;
   attempts: number;
   nextRunAt: string;
-  /** Khôi lỗi đang cầm job: id đầy đủ cho dòng của mình, chỉ hạng cho dòng người khác. */
+  /** Khôi lỗi đang cầm job. `null` = người xem chỉ được biết LOẠI — luật ở `visibleWorkerId`. */
   workerId: string | null;
   workerKind: "sect" | "personal" | null;
   /**
@@ -86,7 +97,19 @@ export type QueueSnapshot = {
   sleeping: number;
   /** Bao nhiêu đàn đang kẹt — số trên huy hiệu của tab Đang Kẹt. */
   stuck: number;
+  /**
+   * Sổ khôi lỗi cho tab Khôi Lỗi — đi CHUNG ảnh chụp thay vì một endpoint riêng.
+   *
+   * Cùng một câu hỏi thì cùng một nhịp: tab kia hỏi「đàn nào đang chờ」, tab này hỏi「còn ai
+   * nhặt việc không」, và hai câu ấy chỉ có nghĩa khi trả lời cùng một khoảnh khắc — một danh
+   * sách khôi lỗi cũ hơn hàng đợi sẽ vẽ ra cảnh「không ai trực」bên cạnh một đàn đang chạy.
+   * Ăn theo luôn cả đường SSE lẫn nhịp hỏi lại đã có, không phải nuôi thêm đường nào.
+   */
+  workers: WorkerRosterEntry[];
 };
+
+/** Người đang xem hàng đợi — đủ để trả lời「được thấy gì」, không hơn. */
+export type QueueViewer = { id: string; roles: readonly string[] };
 
 /**
  * Che 2/3 tên, giữ lại đầu tên đủ để chủ nhân tự nhận ra mình.
@@ -188,14 +211,41 @@ export function readProgress(raw: unknown): QueueProgress | null {
 }
 
 /**
+ * Ai được thấy ID THẬT của khôi lỗi đang cầm một đàn — luật đầy đủ ở đầu tệp.
+ *
+ * Một hàm thuần đứng riêng thay vì một biểu thức nhét trong `map`: đây là câu quyết định
+ * riêng tư của cả trang, và nó phải đọc được (lẫn thử được) mà không cần dựng database.
+ */
+export function visibleWorkerId(
+  workerId: string | null,
+  kind: "sect" | "personal" | null,
+  mine: boolean,
+  canInspectSect: boolean,
+): string | null {
+  if (workerId == null || kind == null) return null;
+  return kind === "sect" ? (canInspectSect ? workerId : null) : mine ? workerId : null;
+}
+
+/**
  * Ảnh chụp hàng đợi tại thời điểm gọi.
  *
  * Thứ tự truy vấn CỐ Ý trùng với `claimNextJob` (`next_run_at`, rồi `created_at`), nên số
  * thứ tự hiện trên màn hình chính là thứ tự khôi lỗi tông môn sẽ nhặt việc — không phải một
  * cách sắp xếp riêng của giao diện rồi người dùng đoán nhầm là hàng chờ thật.
+ *
+ * Nhận cả NGƯỜI XEM chứ không riêng id của họ: phép cắt riêng tư nay hỏi tới vai (id khôi lỗi
+ * tông môn chỉ dành cho bậc trị sự), và câu hỏi ấy phải được trả lời TRONG service. Truyền
+ * xuống một cờ `canSee…` do nơi gọi tự tính thì ba nơi gọi là ba dịp tính lệch nhau, mà lệch ở
+ * đây nghĩa là một trang rò thứ trang khác giấu.
  */
-export async function getQueueSnapshot(viewerId: string): Promise<QueueSnapshot> {
-  const result = await db().execute(sql`
+export async function getQueueSnapshot(viewer: QueueViewer): Promise<QueueSnapshot> {
+  const viewerId = viewer.id;
+  const canInspectSect = hasPermission(viewer, "admin.panel");
+
+  // Hỏi song song: sổ khôi lỗi không phụ thuộc gì vào bảng đàn, mà đường này chạy ở mỗi lượt
+  // SSE lẫn mỗi nhịp hỏi lại — nối tiếp là cộng thêm một vòng đi-về vào đúng chỗ đông nhịp nhất.
+  const [result, workers] = await Promise.all([
+    db().execute(sql`
     select
       job.id, job.user_id, job.status, job.attempts, job.next_run_at, job.worker_id,
       job.cycle_progress, job.cycle_progress_at, job.last_heartbeat, job.finished_at,
@@ -243,7 +293,9 @@ export async function getQueueSnapshot(viewerId: string): Promise<QueueSnapshot>
     order by
       case when job.status in ('queued', 'running', 'stopping') then 0 else 1 end,
       job.next_run_at, job.created_at
-  `);
+  `),
+    getWorkerRoster(viewerId, canInspectSect),
+  ]);
 
   const rows = (result.rows ?? []) as Array<Record<string, unknown>>;
   const now = Date.now();
@@ -301,7 +353,12 @@ export async function getQueueSnapshot(viewerId: string): Promise<QueueSnapshot>
       status,
       attempts: Number(row.attempts ?? 0),
       nextRunAt: nextRunAt.toISOString(),
-      workerId: mine && row.worker_id != null ? String(row.worker_id) : null,
+      workerId: visibleWorkerId(
+        row.worker_id == null ? null : String(row.worker_id),
+        workerKind,
+        mine,
+        canInspectSect,
+      ),
       workerKind,
       queuePosition: queued ? ++position : null,
       progress: readProgress(row.cycle_progress),
@@ -312,7 +369,7 @@ export async function getQueueSnapshot(viewerId: string): Promise<QueueSnapshot>
     } satisfies QueueEntry;
   });
 
-  return { entries, running, waiting, sleeping, stuck };
+  return { entries, running, waiting, sleeping, stuck, workers };
 }
 
 export { ACTIVE_STATUSES };

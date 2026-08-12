@@ -17,6 +17,14 @@ if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa đặt.");
 
 const sql = neon(process.env.DATABASE_URL);
 const username = `__cycle_test_${Date.now()}`;
+/**
+ * Ba tiến trình giả cho phép kiểm id khôi lỗi. Tên lấy theo `username` nên chúng dùng chung
+ * một nguồn duy nhất, và mang tiền tố `__` để một lần chết giữa chừng còn quét lại được —
+ * dòng của khôi lỗi TÔNG MÔN không có `user_id` nên nó không cascade theo lượt xoá người dùng.
+ */
+const sectWorkerId = `__sect_${username}`;
+const ownWorkerId = `__own_${username}`;
+const theirWorkerId = `__their_${username}`;
 let userId = "";
 let otherUserId = "";
 let jobId = "";
@@ -201,7 +209,7 @@ try {
   // Tìm theo ID CHÍNH XÁC: ảnh chụp là hàng đợi của cả tông môn, nên nó cũng chứa đàn thật
   // của những người dùng thật đang chạy — bắt "dòng đầu tiên không phải của mình" là bắt
   // nhầm một người vô can, và phép thử sẽ xanh/đỏ theo việc hôm đó ai đang khai đàn.
-  const snapshot = await getQueueSnapshot(userId);
+  const snapshot = await getQueueSnapshot({ id: userId, roles: [] });
   const mineRow = snapshot.entries.find((entry) => entry.id === jobId);
   const theirRow = snapshot.entries.find((entry) => entry.id === otherJobId);
 
@@ -211,24 +219,98 @@ try {
     `dòng của mình phải thấy đủ tên nhiệm vụ, nhận ${JSON.stringify(mineRow?.progress)}`,
   );
   assert(theirRow != null && theirRow.mine === false, "ảnh chụp phải thấy được đàn của đạo hữu khác");
+  /**
+   * TÊN NHIỆM VỤ ĐI QUA ĐƯỢC, và đây là một ranh giới đã DỊCH CÓ CHỦ Ý ngày 08/08/2026 theo
+   * yêu cầu của tông chủ (lý lẽ đầy đủ ở đầu `services/queue.ts`).
+   *
+   * Tới 12/08/2026 phép thử này vẫn còn ghim luật CŨ — nó đòi `progress.running === null` cho
+   * dòng người khác, thứ `readProgress` không bao giờ trả về (nó trả mảng), nên chốt đã ĐỎ
+   * suốt từ hôm ấy. Một phép thử đỏ vì chính nó lạc hậu là thứ dạy người ta thôi chạy cả bộ,
+   * nên nó được sửa cho nói đúng luật hôm nay chứ không phải bị gỡ đi.
+   */
   assert(
-    theirRow!.progress?.running === null,
-    `dòng người khác KHÔNG được mang tên nhiệm vụ, nhận ${JSON.stringify(theirRow!.progress)}`,
+    sameProgress(theirRow!.progress, secret),
+    `dòng người khác phải mang đủ tiến độ lẫn tên nhiệm vụ (luật 08/08/2026), nhận ${JSON.stringify(theirRow!.progress)}`,
   );
   assert(
-    theirRow!.progress?.done === 1 && theirRow!.progress?.total === 5,
-    "dòng người khác vẫn phải có con số tiến độ",
+    theirRow!.accountLabel === null,
+    "tên tài khoản game của người khác thì KHÔNG bao giờ đi qua — ranh giới ấy chưa từng dịch",
   );
-  // Phép kiểm cuối cùng và thô nhất: tên nhiệm vụ của người khác không được xuất hiện ở BẤT
-  // KỲ đâu trong payload đi ra trình duyệt, kể cả một trường nào đó bị thêm vào sau này.
+
+  // ---- ID khôi lỗi: tông môn cho bậc trị sự, khôi lỗi riêng cho chủ nó ------------------
+  //
+  // Luật từ 12/08/2026 (xem `visibleWorkerId`): id khôi lỗi TÔNG MÔN chỉ bậc trị sự thấy — kể
+  // cả trên dòng của chính mình — còn id khôi lỗi RIÊNG thì chỉ chủ nó, bậc trị sự cũng không.
+  // Dựng đủ ba tiến trình rồi hỏi ảnh chụp bằng hai con mắt khác nhau.
+  await sql`insert into workers (id, user_id, version) values (${sectWorkerId}, null, '9.9.9-verify')`;
+  await sql`insert into workers (id, user_id, version) values (${ownWorkerId}, ${userId}, '9.9.9-verify')`;
+  await sql`insert into workers (id, user_id, version) values (${theirWorkerId}, ${otherUserId}, '9.9.9-verify')`;
+  await sql`update automation_jobs set worker_id = ${sectWorkerId} where id = ${jobId}`;
+  await sql`update automation_jobs set worker_id = ${theirWorkerId} where id = ${otherJobId}`;
+
+  const asMember = await getQueueSnapshot({ id: userId, roles: [] });
+  const asAdmin = await getQueueSnapshot({ id: userId, roles: ["thai-thuong-truong-lao"] });
+  const memberMine = asMember.entries.find((entry) => entry.id === jobId);
+  const adminMine = asAdmin.entries.find((entry) => entry.id === jobId);
+  const memberTheirs = asMember.entries.find((entry) => entry.id === otherJobId);
+  const adminTheirs = asAdmin.entries.find((entry) => entry.id === otherJobId);
+
+  assert(memberMine?.workerKind === "sect", "đàn do khôi lỗi tông môn cầm phải khai đúng LOẠI cho mọi người");
   assert(
-    !JSON.stringify(snapshot).includes("Luyện Đan Đường"),
-    "tên nhiệm vụ của người khác lọt ra trong ảnh chụp hàng đợi",
+    memberMine?.workerId === null,
+    `môn đồ thường KHÔNG được biết tiến trình tông môn nào, kể cả trên đàn của chính mình — nhận ${memberMine?.workerId}`,
+  );
+  assert(
+    adminMine?.workerId === sectWorkerId,
+    `bậc trị sự phải thấy đích danh khôi lỗi tông môn, nhận ${adminMine?.workerId}`,
+  );
+  assert(
+    adminTheirs?.workerKind === "personal" && adminTheirs?.workerId === null,
+    `id khôi lỗi RIÊNG của người khác không đi qua, kể cả với bậc trị sự — nhận ${adminTheirs?.workerId}`,
+  );
+  assert(memberTheirs?.workerId === null, "môn đồ thường lại càng không thấy khôi lỗi riêng của người khác");
+  // Phép kiểm thô nhất, phủ cả những trường thêm vào sau này: hai chuỗi ấy không được xuất
+  // hiện ở BẤT KỲ đâu trong payload đi ra trình duyệt của người không có quyền.
+  assert(
+    !JSON.stringify(asMember).includes(sectWorkerId),
+    "id khôi lỗi tông môn lọt ra trong ảnh chụp của môn đồ thường",
+  );
+  assert(
+    !JSON.stringify(asAdmin).includes(theirWorkerId),
+    "id khôi lỗi riêng của người khác lọt ra trong ảnh chụp của bậc trị sự",
+  );
+
+  // ---- Sổ khôi lỗi của tab Khôi Lỗi ------------------------------------------------------
+  const memberSect = asMember.workers.filter((worker) => worker.kind === "sect");
+  const adminSect = asAdmin.workers.filter((worker) => worker.kind === "sect");
+  assert(
+    memberSect.length === 1 && memberSect[0].id === null,
+    `môn đồ thường nhận ĐÚNG một dòng gộp cho khôi lỗi tông môn, nhận ${JSON.stringify(memberSect)}`,
+  );
+  assert(
+    memberSect[0].version === null,
+    "dòng gộp không kể số bản của ai — đó cũng là một chi tiết vận hành",
+  );
+  const adminRow = adminSect.find((worker) => worker.id === sectWorkerId);
+  assert(adminRow != null, "bậc trị sự phải thấy từng khôi lỗi tông môn một");
+  assert(adminRow!.version === "9.9.9-verify", `và thấy cả số bản của nó, nhận ${adminRow!.version}`);
+  assert(
+    adminRow!.online === true && adminRow!.lastSeen === null,
+    "khôi lỗi vừa điểm danh phải là ĐANG TRỰC, và mốc điểm danh không đi xuống dây lúc ấy",
+  );
+  assert(
+    asMember.workers.some((worker) => worker.kind === "mine" && worker.id === ownWorkerId),
+    "khôi lỗi riêng của chính mình phải có mặt trong sổ",
+  );
+  assert(
+    !asMember.workers.some((worker) => worker.id === theirWorkerId) &&
+      !asAdmin.workers.some((worker) => worker.id === theirWorkerId),
+    "khôi lỗi riêng của người khác không bao giờ vào sổ này",
   );
 
   console.log(
     "✔ lịch thật, refresh config, khóa hai worker, fallback 5m/30m, mọi đường Thu Đàn, " +
-      "vòng đời tiến độ và ranh giới riêng tư của hàng đợi đều đúng.",
+      "vòng đời tiến độ, ranh giới riêng tư của hàng đợi và phép cắt id khôi lỗi đều đúng.",
   );
 } finally {
   for (const id of [userId, otherUserId]) {
@@ -236,4 +318,7 @@ try {
       await sql`delete from users where id = ${id}`;
     }
   }
+  // Khôi lỗi tông môn giả KHÔNG cascade theo người dùng (nó không thuộc về ai), nên phải quét
+  // tay — bỏ sót là để lại một dòng「tông môn」ma trong sổ điểm danh của trạm thật.
+  await sql`delete from workers where id in (${sectWorkerId}, ${ownWorkerId}, ${theirWorkerId})`;
 }

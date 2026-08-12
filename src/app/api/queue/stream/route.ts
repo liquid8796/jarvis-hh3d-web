@@ -124,7 +124,7 @@ export async function GET(request: Request) {
         const force = forceQueued;
         forceQueued = false;
 
-        const payload = await getQueueSnapshot(user.id);
+        const payload = await getQueueSnapshot(user);
         scheduleDue(payload);
 
         // Ảnh chụp nhỏ (vài chục dòng) nên so nguyên văn là đủ và không có chỗ cho một

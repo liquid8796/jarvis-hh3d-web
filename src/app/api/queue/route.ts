@@ -24,5 +24,5 @@ export async function GET() {
   // nuôi một cron riêng chỉ để làm việc đó.
   await reapStaleJobs();
 
-  return NextResponse.json(await getQueueSnapshot(user.id));
+  return NextResponse.json(await getQueueSnapshot(user));
 }

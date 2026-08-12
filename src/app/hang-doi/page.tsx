@@ -18,7 +18,7 @@ export const metadata = { title: "Hàng Đợi Công Việc" };
  */
 export default async function QueuePage() {
   const user = await requireActiveUser();
-  const snapshot = await getQueueSnapshot(user.id);
+  const snapshot = await getQueueSnapshot(user);
 
   return (
     <>

@@ -90,6 +90,129 @@ export async function getPresence(userId: string): Promise<WorkerPresence> {
   };
 }
 
+/** Trần số dòng cho MỖI nhóm trong sổ điểm danh của trang Hàng Đợi — xem `getWorkerRoster`. */
+const ROSTER_LIMIT = 10;
+
+/**
+ * Một dòng trong tab Khôi Lỗi của trang Hàng Đợi.
+ *
+ * `id` là chỗ ranh giới riêng tư nằm: `null` nghĩa là người xem chỉ được biết LOẠI, không được
+ * biết đây đích xác là tiến trình nào. Cắt ở SERVICE chứ không ở giao diện — cùng lẽ với
+ * `maskUsername` trong queue.ts: thứ không được phép hiện thì không được phép đi xuống dây.
+ */
+export type WorkerRosterEntry = {
+  id: string | null;
+  kind: "sect" | "mine";
+  online: boolean;
+  /**
+   * Điểm danh lần cuối — CHỈ có khi đang vắng, và cái `null` lúc đang trực là chủ ý.
+   *
+   * Khôi lỗi trực thì gõ cửa mỗi 5 giây, nên trường này sẽ đổi ở mọi lượt đọc. Ảnh chụp hàng
+   * đợi lại đi qua SSE với phép so nguyên văn (`next !== signature` trong stream/route.ts) để
+   * quyết định có đẩy khung mới hay không — nhét một con số nhấp nháy vào đó là mọi tín hiệu
+   * đều thành「có đổi」, tức phép so ấy thôi lọc được gì. Đang vắng thì mốc đứng yên, và đó
+   * cũng đúng lúc người ta cần biết「vắng từ bao giờ」.
+   */
+  lastSeen: string | null;
+  /** Bản gói khôi lỗi; `null` = bản trước 0.71.0 hoặc người xem không được biết. */
+  version: string | null;
+};
+
+/**
+ * Sổ khôi lỗi cho tab Khôi Lỗi của trang Hàng Đợi: ai đang trực để nhặt việc.
+ *
+ * Hai nhóm, và chỉ hai: khôi lỗi TÔNG MÔN (của chung, `user_id is null`) và khôi lỗi RIÊNG của
+ * CHÍNH người xem. Khôi lỗi riêng của người khác không bao giờ vào danh sách này — nó là máy ở
+ * nhà họ, và trang này vốn đã che cả tên chủ nhân thì không có lý gì kể tên máy.
+ *
+ * `detailed` (bậc trị sự) quyết định khôi lỗi tông môn được kể thành TỪNG tiến trình hay gộp
+ * làm một dòng「có ai đó đang trực」. Gộp không phải để giấu cho đẹp: id của một khôi lỗi tông
+ * môn là chi tiết vận hành (máy nào, trạm nào), thứ môn đồ không dùng được vào việc gì mà lại
+ * nói ra hạ tầng của tông môn.
+ *
+ * HAI câu truy vấn chứ không một câu `or` rồi cắt 20: một người nuôi mười khôi lỗi riêng sẽ
+ * đẩy khôi lỗi tông môn ra khỏi trần, tức nhóm quan trọng nhất biến mất đúng ở màn hình của
+ * người bận rộn nhất. Mỗi nhóm một trần, không nhóm nào ăn phần của nhóm kia.
+ */
+export async function getWorkerRoster(
+  viewerId: string,
+  detailed: boolean,
+): Promise<WorkerRosterEntry[]> {
+  const cutoff = new Date(Date.now() - ONLINE_WINDOW_MS);
+  const columns = {
+    id: schema.workers.id,
+    lastSeen: schema.workers.lastSeen,
+    version: schema.workers.version,
+  };
+
+  const [sect, mine] = await Promise.all([
+    db()
+      .select(columns)
+      .from(schema.workers)
+      .where(isNull(schema.workers.userId))
+      .orderBy(desc(schema.workers.lastSeen))
+      .limit(ROSTER_LIMIT),
+    db()
+      .select(columns)
+      .from(schema.workers)
+      .where(eq(schema.workers.userId, viewerId))
+      .orderBy(desc(schema.workers.lastSeen))
+      .limit(ROSTER_LIMIT),
+  ]);
+
+  const isOnline = (lastSeen: Date) => lastSeen > cutoff;
+  /** Mốc chỉ đi xuống dây khi ĐANG VẮNG — lý do ở `WorkerRosterEntry.lastSeen`. */
+  const seenIfAway = (online: boolean, lastSeen: Date) => (online ? null : lastSeen.toISOString());
+
+  const detailedSect: WorkerRosterEntry[] = sect.map((row) => {
+    const online = isOnline(row.lastSeen);
+    return {
+      id: row.id,
+      kind: "sect",
+      online,
+      lastSeen: seenIfAway(online, row.lastSeen),
+      version: row.version,
+    };
+  });
+
+  /**
+   * MỘT dòng cho cả nhóm — và LUÔN có dòng ấy, kể cả khi sổ chưa có khôi lỗi tông môn nào:
+   * người xem cần đọc được「tông môn đang vắng」, chứ không phải nhìn một danh sách thiếu nó
+   * rồi tự đoán. `sect` đã xếp theo lần điểm danh mới nhất nên phần tử đầu là mốc gần nhất.
+   */
+  const anySectOnline = detailedSect.some((row) => row.online);
+  const groupedSect: WorkerRosterEntry = {
+    id: null,
+    kind: "sect",
+    online: anySectOnline,
+    lastSeen: anySectOnline ? null : (sect[0]?.lastSeen.toISOString() ?? null),
+    version: null,
+  };
+
+  // `length > 0` chứ không chỉ `detailed`: sổ chưa có khôi lỗi tông môn nào (trạm vừa dựng, hay
+  // vừa chuyển trạm) thì kể từng tiến trình một sẽ ra một danh sách RỖNG — bậc trị sự nhìn tab
+  // không thấy dòng nào và không có cách gì biết là「vắng」hay là「trang hỏng」. Dòng gộp nói
+  // đúng điều đó bằng một câu.
+  const sectRows = detailed && detailedSect.length > 0 ? detailedSect : [groupedSect];
+
+  const mineRows: WorkerRosterEntry[] = mine.map((row) => {
+    const online = isOnline(row.lastSeen);
+    return {
+      id: row.id,
+      kind: "mine",
+      online,
+      lastSeen: seenIfAway(online, row.lastSeen),
+      version: row.version,
+    };
+  });
+
+  // Tông môn đứng trước: đó là khôi lỗi phục vụ mọi người, và với hầu hết đạo hữu thì nó là
+  // dòng DUY NHẤT đáng đọc. Trong mỗi nhóm, ai đang trực đứng trên.
+  const byPresence = (a: WorkerRosterEntry, b: WorkerRosterEntry) =>
+    Number(b.online) - Number(a.online);
+  return [...sectRows.sort(byPresence), ...mineRows.sort(byPresence)];
+}
+
 /**
  * Có khôi lỗi ĐÚNG LOẠI đạo hữu đã chọn đang trực để nhận đàn của họ không.
  *

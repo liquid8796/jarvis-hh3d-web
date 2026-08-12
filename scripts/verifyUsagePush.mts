@@ -294,6 +294,10 @@ try {
   check("tệp cookie hợp lệ → đọc được", good.ok && good.cookies.length === 2);
   check("thiếu `authorization` → từ chối", !readCookieFile(tep([{ name: "x", value: "y" }])).ok);
   check("không phải JSON → từ chối, không ném", !readCookieFile("{").ok);
+  // Windows ghi BOM ở khắp nơi (Notepad, `Set-Content -Encoding utf8`, nhiều tiện ích xuất
+  // cookie). `JSON.parse` chết vì U+FEFF với một câu không ai đoán ra, mà tệp mở bằng editor
+  // thì trông hoàn toàn bình thường — đo được đúng ca ấy 13/08/2026.
+  check("tệp có BOM vẫn đọc được", readCookieFile(`﻿${tep([auth])}`).ok);
   check("thiếu mảng cookies → từ chối", !readCookieFile('{"a":1}').ok);
   // Mục rác bị bỏ nhưng phải ĐẾM ra, vì im lặng vứt cookie là cách êm ái nhất để thiếu mảnh cần.
   const lan = readCookieFile(tep([auth, { name: "x" }, { value: "z" }]));

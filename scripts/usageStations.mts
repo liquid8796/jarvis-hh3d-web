@@ -87,7 +87,11 @@ export function readCookieFile(
 ): { ok: true; cookies: RawCookie[]; boQua: number } | { ok: false; message: string } {
   let raw: { cookies?: unknown };
   try {
-    raw = JSON.parse(text) as { cookies?: unknown };
+    // Cắt BOM trước khi parse. `JSON.parse` coi U+FEFF là ký tự lạ và chết với một câu không ai
+    // đoán ra nguyên nhân — trong khi tệp mở bằng editor thì trông hoàn toàn bình thường. Trên
+    // Windows thì Notepad, `Set-Content -Encoding utf8` của PowerShell và không ít tiện ích xuất
+    // cookie đều ghi BOM; đo được đúng ca ấy ngày 13/08/2026 khi dựng tệp thử bằng PowerShell.
+    raw = JSON.parse(text.replace(/^﻿/, "")) as { cookies?: unknown };
   } catch (err) {
     return { ok: false, message: `không phải JSON đọc được: ${err instanceof Error ? err.message : "lỗi lạ"}` };
   }

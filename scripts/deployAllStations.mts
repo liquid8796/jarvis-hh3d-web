@@ -4,6 +4,8 @@
  *
  *   npm run deploy:all              (hoặc bấm đúp deploy-all-stations.bat)
  *   npm run deploy:all -- --dry-run  chỉ tra và in kế hoạch, KHÔNG phát hành
+ *   npm run deploy:all -- --site auto-hh3d-1   phát hành cho ĐÚNG MỘT trạm
+ *                                              (hoặc bấm đúp deploy-one-station.bat)
  *
  * VÌ SAO CẦN: hai trạm lệch mã là một cái bẫy nằm im cho tới ngày chuyển trạm. Trạm gương chỉ
  * chuyển hướng nên không ai thấy nó cũ, mà đúng lúc nó lên ngôi thì nó CHÍNH LÀ nơi phát lệnh
@@ -48,6 +50,12 @@ process.noDeprecation = true;
 
 const repoRoot = path.join(import.meta.dirname, "..");
 const dryRun = process.argv.includes("--dry-run");
+
+/** Đọc `--tên <giá trị>`. Cùng lối với mirror:new / mirror:remove để ba công cụ gõ như nhau. */
+const arg = (name: string): string | undefined => {
+  const at = process.argv.indexOf(`--${name}`);
+  return at > -1 ? process.argv[at + 1] : undefined;
+};
 
 /** Trần thời gian MỘT lượt deploy. Đo 10/08/2026: ~50 giây/trạm; 15 phút là rộng rãi có chủ ý. */
 const DEPLOY_TIMEOUT_MS = 15 * 60_000;
@@ -180,6 +188,38 @@ function reportBookCoverage(): boolean {
   return false;
 }
 
+/**
+ * `--site <mã trạm>` — phát hành cho ĐÚNG MỘT trạm thay vì cả sổ.
+ *
+ * Vì sao là một cờ ở đây chứ không phải một script riêng: mọi thứ đắt giá của lượt phát hành —
+ * dựng bản `git archive` không mang `.git` (Vercel CHẶN deploy khi email commit không khớp tài
+ * khoản nào), đóng gói MỘT tệp tar, dò lại cửa trạm, bảng tổng kết nói thẳng trạm nào lệch mã —
+ * đều nằm sẵn ở đây. Một script thứ hai sẽ chép lại từng ấy thứ rồi lệch dần, đúng cái bẫy
+ * `vercelCatalog.mts` vừa được tách ra để tránh.
+ *
+ * LỌC SAU KHI ĐÃ HỎI ĐỘ PHỦ CỦA SỔ, và thứ tự ấy là cả ý nghĩa: `activeMissing` phải xét trên
+ * SỔ ĐẦY ĐỦ. Lọc trước rồi mới hỏi thì mọi lượt phát hành cho một trạm gương đều bị kết luận là
+ *「trạm đang phục vụ không có trong kế hoạch」— một lời cảnh báo đúng ngữ pháp mà sai hoàn toàn,
+ * và loại cảnh báo ấy chỉ dạy người ta thôi đọc cảnh báo.
+ */
+const onlySite = arg("site")?.trim();
+// `--site --dry-run` là lỗi gõ thường gặp, và nó KHÔNG được phép rơi về「phát hành cả đội」:
+// người gõ câu ấy đang muốn đúng một trạm, mà im lặng làm cả bốn thì đúng nghĩa ngược ý.
+if (onlySite !== undefined && (onlySite.length === 0 || onlySite.startsWith("--"))) {
+  die("`--site` phải kèm mã trạm ngay sau nó. Ví dụ: --site auto-hh3d-1 --dry-run");
+}
+const chosen = onlySite ? stations.filter((s) => s.id === onlySite) : stations;
+if (onlySite && chosen.length === 0) {
+  die(
+    `Sổ không có trạm「${onlySite}」. Trạm trong sổ: ${stations.map((s) => s.id).join(", ")}.\n` +
+      "  (Mã trạm là `id` trong sổ gương, KHÔNG phải tên project Vercel — trạm gốc mang mã `main`\n" +
+      "   mà sống ở project `auto-hh3d`.)",
+  );
+}
+if (onlySite) {
+  console.log(`• CHỈ phát hành cho「${onlySite}」— ${stations.length - 1} trạm còn lại trong sổ không bị đụng tới.`);
+}
+
 // ---- 3. Danh mục project của từng tài khoản -------------------------------------------------
 
 // Phép liệt kê project dời sang `vercelCatalog.mts` ngày 12/08/2026, khi công cụ XOÁ trạm cần
@@ -200,7 +240,7 @@ type Plan = { station: StationEntry; target: ProjectRef };
 const plans: Plan[] = [];
 const unresolved: { station: StationEntry; message: string }[] = [];
 
-for (const station of stations) {
+for (const station of chosen) {
   const resolved = resolveTarget(station, catalog);
   if (resolved.ok) plans.push({ station, target: resolved.target });
   else unresolved.push({ station, message: resolved.message });
@@ -367,6 +407,17 @@ if (failed.length > 0 || unresolved.length > 0) {
 // trả lời TRƯỚC câu trấn an, không phải cách đó hàng trăm dòng.
 if (reportBookCoverage()) process.exit(1);
 
-console.log("  Mọi trạm trong sổ đã mang cùng một commit.");
+if (onlySite) {
+  // KHÔNG được nói「mọi trạm đã cùng commit」ở đây: lượt này cố ý chỉ đụng một trạm, và câu ấy
+  // đọc như một lời bảo đảm về cả đội. Đúng loại trấn an sai đã sửa hôm 12/08/2026.
+  const conLai = stations.filter((s) => s.id !== onlySite).map((s) => s.id);
+  console.log(`  Trạm「${onlySite}」đã mang commit này.`);
+  if (conLai.length > 0) {
+    console.log(`  ${conLai.length} trạm còn lại KHÔNG được đụng tới lượt này: ${conLai.join(", ")}`);
+    console.log("  — chúng có thể đang mang mã cũ. Muốn cả đội bằng nhau thì chạy deploy-all-stations.bat.");
+  }
+} else {
+  console.log("  Mọi trạm trong sổ đã mang cùng một commit.");
+}
 console.log("\n  Nhắc: bản vá đụng khôi lỗi (scripts/worker.mjs, src/lib/worker, src/lib/quest-engine,");
 console.log("  scripts/buildWorkerBundle.mjs) thì VM còn phải cài đè — xem deploy/oracle/README.md.");

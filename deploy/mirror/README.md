@@ -206,13 +206,26 @@ danh sách biến sau khi ghi và dừng lượt dựng nếu thấy bất kỳ 
 `WEB_URL` thì KHÔNG đặt trên trạm: không mã nào của web đọc nó — chỉ khôi lỗi dùng, mà khôi lỗi
 chạy ngoài Vercel (đo 12/08/2026).
 
-**Lệ đặt tên database (sửa 12/08/2026):** tên kho nay có ĐUÔI NGẪU NHIÊN —
-`jarvis-hh3d-<6 hex>`, `atlas-jarvis-chat-<6 hex>` — sinh một lần mỗi lượt dựng và dùng chung
-cho cả hai kho của lượt ấy. Lệ cũ bắt mọi tài khoản đặt TRÙNG TÊN, và nó gãy đúng lúc cần dựng
-LẠI một trạm: xoá kho cũ rồi dựng kho mới cùng tên trên cùng tài khoản thì trong dashboard
-không cách nào phân biệt cái vừa dựng với cái vừa xoá. Tên thật in ra ở cuối lượt `mirror:new`;
-muốn tra lại thì `npx vercel integration resource ls --scope <team>`. Checklist vẫn phân biệt
-trạm bằng TÀI KHOẢN, không bằng tên database. Vercel CLI đi bằng API token (`--token`, đặt
+**Lệ đặt tên database (sửa 12/08/2026):** tên kho nay là **chuỗi NGẪU NHIÊN HOÀN TOÀN**, 14 ký
+tự `[a-z][a-z0-9]{13}`, mỗi kho một chuỗi riêng — không tiền tố, không mang chữ `jarvis` hay
+`hh3d` (có danh sách cấm và phép thử canh, xem `randomStoreName` trong `scripts/deployTargets.mts`).
+
+Lệ này đã sai hai lần trước khi đúng, ghi lại cả hai để đừng quay về:
+
+1. **Hằng số trùng tên trên mọi tài khoản** (10/08/2026) — gãy đúng lúc cần dựng LẠI một trạm:
+   xoá kho cũ rồi dựng kho mới CÙNG TÊN trên cùng tài khoản thì trong dashboard không phân biệt
+   nổi cái vừa dựng với cái vừa xoá.
+2. **Tiền tố + đuôi ngẫu nhiên** (`jarvis-hh3d-acd9b0`) — hết trùng tên, nhưng cái tên vẫn KHAI
+   ra nó thuộc về ai. Mỗi trạm gương sống trên một tài khoản Vercel riêng, và một cái tên chung
+   là sợi dây nối các tài khoản ấy lại với nhau trong mắt bất kỳ ai nhìn vào.
+
+Muốn biết kho nào của trạm nào thì nhìn **project đang nối** trong dashboard — sợi dây thật, và
+nó vẫn luôn ở đó. Tên hai kho in ra ở cuối lượt `mirror:new`; tra lại bằng
+`npx vercel integration resource ls --scope <team>`. Không có gì hạ nguồn đọc cái tên ấy:
+database Postgres bên trong là `neondb` (Neon đặt), database Mongo là `jarvis`
+(`MONGO_DEFAULT_DB`), ứng dụng chỉ đọc `DATABASE_URL`/`MONGODB_URI`.
+
+Checklist vẫn phân biệt trạm bằng TÀI KHOẢN. Vercel CLI đi bằng API token (`--token`, đặt
 `VERCEL_TOKEN[_<trạm>]` trong env), không đi bằng session login — session chỉ ôm được một tài
 khoản một lúc.
 

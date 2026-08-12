@@ -5,13 +5,17 @@
  * cú đoán sai không làm hỏng build mà làm mã của tông môn hạ cánh xuống project của người khác,
  * và không có phép kiểm nào ở hạ nguồn bắt được điều đó.
  */
+import { randomBytes } from "node:crypto";
 import {
   chooseBook,
   discoverTokens,
+  FORBIDDEN_IN_STORE_NAME,
   projectNameFromUrl,
+  randomStoreName,
   resolveTarget,
   sensitiveEnvKeys,
   stationUrlFor,
+  STORE_NAME_LENGTH,
   tokenEnvNameFor,
   validateSiteId,
   type ProjectRef,
@@ -228,6 +232,39 @@ function ok(condition: boolean, label: string): void {
     sensitiveEnvKeys([{ key: "X", type: "Sensitive" }]).length === 0,
     "so khớp CHÍNH XÁC chuỗi type, không lỏng lẻo hoa thường",
   );
+}
+
+// ---- Tên kho: ngẫu nhiên hoàn toàn, KHÔNG khai nó thuộc về ai ------------------------------
+//
+// Mỗi trạm gương sống trên một tài khoản Vercel riêng, nên một cái tên chung giữa các tài khoản
+// là sợi dây nối chúng lại trong mắt bất kỳ ai nhìn vào. Hai đời trước của chỗ này đều hỏng:
+// hằng số `jarvis-hh3d` (dựng lại là trùng tên với cái vừa xoá), rồi `jarvis-hh3d-<hex>` (hết
+// trùng, nhưng vẫn khai). Đây là chỗ canh cả hai tính chất ấy.
+{
+  const names = Array.from({ length: 500 }, () => randomStoreName(randomBytes));
+
+  ok(names.every((n) => n.length === STORE_NAME_LENGTH), `dài đúng ${STORE_NAME_LENGTH} ký tự`);
+  // Nhãn hợp lệ ở nơi khắt khe nhất (Atlas đòi bắt đầu bằng chữ cái) thì hợp lệ ở mọi nơi.
+  ok(names.every((n) => /^[a-z][a-z0-9]*$/.test(n)), "chỉ [a-z0-9], và ký tự đầu là CHỮ CÁI");
+  ok(
+    names.every((n) => !FORBIDDEN_IN_STORE_NAME.some((w) => n.includes(w))),
+    `không tên nào mang chữ của tông môn (${FORBIDDEN_IN_STORE_NAME.join(", ")})`,
+  );
+  ok(new Set(names).size === names.length, "500 lần sinh không trùng nhau lần nào");
+
+  // Nhánh SINH LẠI khi dính chữ cấm: nguồn ngẫu nhiên giả ép ra "hh3d…" ở lượt đầu rồi mới trả
+  // byte thật. Không ép thì nhánh ấy đời nào cũng không chạy, và một nhánh chưa từng chạy là
+  // một nhánh chưa từng đúng.
+  const forced = "hh3dxxxxxxxxxx";
+  let lan = 0;
+  const nguonGia = (n: number): Uint8Array => {
+    lan++;
+    if (lan === 1) return Uint8Array.from([...forced].map((c) => "abcdefghijklmnopqrstuvwxyz0123456789".indexOf(c)));
+    return randomBytes(n);
+  };
+  const sau = randomStoreName(nguonGia);
+  ok(lan === 2, "lượt sinh dính chữ cấm bị VỨT và sinh lại");
+  ok(!FORBIDDEN_IN_STORE_NAME.some((w) => sau.includes(w)), "…và tên trả về đã sạch chữ cấm");
 }
 
 console.log(`\nTất cả ${passed} phép kiểm đều thuận.`);

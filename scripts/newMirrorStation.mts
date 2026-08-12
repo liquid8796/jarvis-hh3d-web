@@ -39,6 +39,7 @@ import { decryptSecret, encryptSecret } from "../src/lib/crypto/secretBox";
 import { readControlDoc } from "../src/lib/control/read";
 import { resolveMongoDbName } from "../src/lib/mongo/dbName";
 import {
+  randomStoreName,
   sensitiveEnvKeys,
   stationUrlFor,
   tokenEnvNameFor,
@@ -110,34 +111,33 @@ const SHARED_SECRETS = [
  * nằm lại dưới dạng sensitive. Tên trần là tên mà mã nguồn đọc.
  */
 const STORE_SPECS = [
-  { slug: "neon", plan: "free_v3", prefix: "jarvis-hh3d", label: "Neon Postgres", metadata: [] },
-  {
-    slug: "mongodbatlas",
-    plan: "FREE",
-    prefix: "atlas-jarvis-chat",
-    label: "MongoDB Atlas",
-    metadata: ["clusterTier=FREE"],
-  },
+  { slug: "neon", plan: "free_v3", label: "Neon Postgres", metadata: [] },
+  { slug: "mongodbatlas", plan: "FREE", label: "MongoDB Atlas", metadata: ["clusterTier=FREE"] },
 ] as const;
 
 /**
- * ĐUÔI NGẪU NHIÊN cho tên kho — sinh MỘT lần mỗi lượt chạy, dùng chung cho cả hai kho.
+ * TÊN KHO NGẪU NHIÊN HOÀN TOÀN — không mang một chữ nào của tông môn.
  *
- * Trước 12/08/2026 tên là hằng số (`jarvis-hh3d`, `atlas-jarvis-chat`) và lệ cũ còn ghi hẳn vào
- * README là mọi tài khoản đặt TRÙNG TÊN. Nó gãy đúng lúc cần dựng LẠI một trạm: xoá kho cũ rồi
- * dựng kho mới cùng tên trên cùng tài khoản, nên trong dashboard không cách nào phân biệt kho
- * vừa dựng với kho vừa xoá, và mọi lượt thử lại đều đâm vào một cái tên đang có người ở.
+ * Hai đời trước của chỗ này đều sai theo hai kiểu khác nhau:
+ *   • hằng số (`jarvis-hh3d`, `atlas-jarvis-chat`), lệ cũ 10/08/2026 còn bắt mọi tài khoản đặt
+ *     TRÙNG TÊN. Gãy đúng lúc dựng LẠI một trạm: xoá kho cũ rồi dựng kho mới cùng tên trên cùng
+ *     tài khoản thì trong dashboard không phân biệt nổi cái vừa dựng với cái vừa xoá.
+ *   • tiền tố + đuôi ngẫu nhiên (`jarvis-hh3d-acd9b0`). Hết trùng tên, nhưng cái tên vẫn KHAI
+ *     ra nó thuộc về ai — mà mỗi trạm gương sống trên một tài khoản Vercel riêng, và một cái
+ *     tên chung là sợi dây nối các tài khoản ấy lại với nhau trong mắt bất kỳ ai nhìn vào.
  *
- * Dùng chung một đuôi cho cả hai kho là có chủ ý: nhìn dashboard là biết Neon nào đi với Atlas
- * nào của cùng một lượt dựng. Còn mỗi lượt chạy một đuôi khác nhau nên thử lại không bao giờ
- * đụng tên cũ.
+ * Nên: mỗi kho một chuỗi ngẫu nhiên riêng, không tiền tố, không đuôi chung. Muốn biết kho nào
+ * của trạm nào thì nhìn PROJECT ĐANG NỐI trong dashboard — đó mới là sợi dây thật, và nó đã
+ * luôn ở đó. Tên hai kho cũng in ra ở cuối lượt dựng.
  *
- * GIỮ TIỀN TỐ, không random trần: tên kho là thứ người vận hành đọc trong dashboard giữa lúc
- * đang gỡ sự cố. `k3f9a2` không nói được gì; `jarvis-hh3d-k3f9a2` vừa duy nhất vừa tự khai nó
- * là ai. Sáu ký tự hex là 16 triệu khả năng — thừa cho vài chục lượt dựng trong đời một tài khoản.
+ * KHÔNG có gì hạ nguồn đọc cái tên này (đo 12/08/2026): database Postgres bên trong là `neondb`
+ * do Neon đặt, database Mongo là `jarvis` do `MONGO_DEFAULT_DB`, còn ứng dụng chỉ đọc
+ * `DATABASE_URL`/`MONGODB_URI`. Đổi tên kho không chạm vào cái nào trong số đó.
+ *
+ * Phép sinh tên nằm ở `deployTargets.mts` — module THUẦN, để lời hứa「không mang chữ của tông
+ * môn」có chỗ đóng đinh bằng phép thử thay vì chỉ là một bình chú.
  */
-const storeSuffix = randomBytes(3).toString("hex");
-const STORES = STORE_SPECS.map((s) => ({ ...s, name: `${s.prefix}-${storeSuffix}` }));
+const STORES = STORE_SPECS.map((s) => ({ ...s, name: randomStoreName(randomBytes) }));
 
 const QUICK_MS = 60_000;
 const PROVISION_MS = 10 * 60_000;

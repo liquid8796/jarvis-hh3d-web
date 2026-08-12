@@ -257,3 +257,47 @@ export function sensitiveEnvKeys(envs: readonly ProjectEnvVar[]): string[] {
     .map((e) => (e.key ?? "").trim() || "(biến không tên)")
     .sort();
 }
+
+/**
+ * Độ dài tên kho. Đủ dài để không bao giờ đụng nhau, đủ ngắn để đọc trong dashboard.
+ * 26 × 36¹³ ≈ 4,6 × 10²¹ khả năng — nhiều hơn số lượt dựng trạm mà cả đời tông môn cần.
+ */
+export const STORE_NAME_LENGTH = 14;
+
+/**
+ * Chữ CẤM xuất hiện trong tên kho.
+ *
+ * Ngẫu nhiên vẫn có thể tình cờ sinh ra `hh3d` (xác suất cỡ 6 × 10⁻⁶ mỗi lần) — nhỏ, nhưng
+ *「tình cờ」không phải một lời hứa. Yêu cầu ở đây là tên kho KHÔNG khai nó thuộc về ai, và một
+ * yêu cầu tường minh thì phải được canh tường minh.
+ */
+export const FORBIDDEN_IN_STORE_NAME = ["jarvis", "hh3d"] as const;
+
+/**
+ * Một tên kho NGẪU NHIÊN HOÀN TOÀN — không tiền tố, không mang chữ nào của tông môn.
+ *
+ * Mỗi trạm gương sống trên một tài khoản Vercel riêng, nên một cái tên chung là sợi dây nối các
+ * tài khoản ấy lại với nhau trong mắt bất kỳ ai nhìn vào. Muốn biết kho nào của trạm nào thì
+ * nhìn PROJECT ĐANG NỐI trong dashboard — sợi dây thật, và nó vẫn luôn ở đó.
+ *
+ * Ký tự đầu là CHỮ CÁI: Atlas đòi tên cluster bắt đầu bằng chữ, và một cái tên hợp lệ ở nơi
+ * khắt khe nhất thì hợp lệ ở mọi nơi.
+ *
+ * `% ALNUM.length` có lệch phân phối (256 không chia hết cho 36) và điều đó là CÓ CHỦ Ý: đây là
+ * một cái NHÃN cho người đọc, không phải bí mật. Ai sau này định dùng hàm này làm token thì phải
+ * viết lại phần lấy ngẫu nhiên, đừng dùng lại.
+ */
+export function randomStoreName(randomBytes: (n: number) => Uint8Array): string {
+  const ALPHA = "abcdefghijklmnopqrstuvwxyz";
+  const ALNUM = `${ALPHA}0123456789`;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const bytes = randomBytes(STORE_NAME_LENGTH);
+    let name = ALPHA[bytes[0] % ALPHA.length];
+    for (let i = 1; i < STORE_NAME_LENGTH; i++) name += ALNUM[bytes[i] % ALNUM.length];
+    if (!FORBIDDEN_IN_STORE_NAME.some((word) => name.includes(word))) return name;
+  }
+  // Chỉ với tới được nếu ai đó nhét vào danh sách cấm một chuỗi quá ngắn hoặc quá phổ biến.
+  throw new Error(
+    `Sinh 100 lần đều dính chữ cấm (${FORBIDDEN_IN_STORE_NAME.join(", ")}) — xem lại FORBIDDEN_IN_STORE_NAME.`,
+  );
+}

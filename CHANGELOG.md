@@ -11,6 +11,34 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.79.1 — cỗ máy chuyển trạm đã hỏng suốt một tuần mà không ai biết
+
+`assertTablesCovered` ném với BẤT KỲ bảng nào ở đích mà nó không biết tên, và nó được gọi ở dòng
+đầu tiên của `truncateAll`, tức bước đầu tiên của một lượt đồng bộ. `notices` và `notice_reads`
+ra đời 11/08/2026 và **cố ý** không nằm trong `SYNC_TABLE_ORDER` — nhưng không ai nối hai điều ấy
+lại. Đo trên một database đã áp đủ 26 migration ngày 12/08: **13 bảng thật, 11 tên trong sổ.**
+
+Nghĩa là lượt chuyển trạm kế tiếp sẽ chết ngay ở dòng đầu với `đích có thêm: notice_reads,
+notices`. Không ai vấp vì lần diễn tập gần nhất là **10/08 — trước khi hai bảng ấy tồn tại**. Nó
+chỉ lộ ra hôm nay vì có người đi đếm bảng trên database thật cho một việc khác.
+
+Bài học nằm ở **hình dạng**, không ở hai cái tên: một quyết định「cố ý bỏ qua」sống trong bình chú
+thì **cái hàng rào không đọc được nó**. Nay nó là dữ liệu — `UNSYNCED_TABLES` — và hàng rào hỏi
+đúng chỗ. Bảng lạ thật vẫn bị chặn y như cũ; nới hàng rào không được biến nó thành cổng mở toang,
+và có một ca kiểm chứng đứng canh đúng điều đó.
+
+**Vì sao luật này sai được lâu thế: phép kiểm duy nhất canh nó đòi một database thật.**
+`verify:mirror-sync` bắt đầu bằng `if (!process.env.DATABASE_URL) throw`, nên phần lớn thời gian
+nó không chạy. Phần QUYẾT ĐỊNH nay tách ra thành hàm thuần `reviewTableCoverage`, và
+`npm run verify:mirror-tables` đóng đinh nó mà không cần dựng gì — cùng lẽ với `permissions.ts`.
+Ca đầu tiên của script ấy là **đúng cảnh đã hỏng**, viết bằng đúng 13 cái tên đếm được trên
+database thật, không phải một cảnh giả định.
+
+Và nói cho hết một hành vi trước nay chỉ ngầm: `truncateAll` chạy `cascade`, nên hai bảng ấy vẫn
+bị **xoá sạch** ở đích mỗi lượt chuyển (cả hai đều trỏ về `users`) — chúng chỉ không được chép
+lại. Đúng ý muốn của `schema.ts`, nhưng là một hành vi chứ không phải một sự bỏ qua, nên nó phải
+có một dòng. Ngày nào có bảng mới trỏ về `users` mà đích CẦN giữ, `cascade` sẽ lặng lẽ nuốt nó.
+
 ## 0.79.0 — nuôi kho khôi lỗi GitHub, và câu trả lời cho câu hỏi gác cổng
 
 Tab **Kho GitHub** trong trang Tông Môn, cộng một vòng nuôi chạy mỗi ngày trong `/api/cron`: ngó

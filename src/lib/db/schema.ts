@@ -451,11 +451,21 @@ export const workers = pgTable(
  *
  * KHÔNG có cột tiêu đề: một popup chặn đường người đọc thì phải nói được ý trong vài dòng.
  *
- * CHƯA nằm trong `SYNC_TABLE_ORDER` (src/lib/mirror/pgSync.ts), và đó là một lựa chọn có ý
+ * KHÔNG nằm trong `SYNC_TABLE_ORDER` (src/lib/mirror/pgSync.ts), và đó là một lựa chọn có ý
  * thức chứ không phải bỏ sót: một lượt chuyển trạm sẽ để lại thông báo ở trạm cũ, nên sau khi
  * chuyển thì lời nhắn cũ không hiện nữa — mất mát ấy LÀNH, vì `notice_reads` cũng ở lại cùng
  * chỗ nên không ai bị popup lại thứ đã đọc. Ngày nào thấy đáng chép thì thêm hai tên vào sổ
  * ấy, ĐÚNG THỨ TỰ khoá ngoại: `notices` sau `users`, rồi `notice_reads`.
+ *
+ * TỪ 12/08/2026 lựa chọn ấy phải khai ở `UNSYNCED_TABLES`, và bình chú này một mình KHÔNG còn
+ * đủ. Lý do là một lần hỏng việc có thật: `assertTablesCovered` ném với bất kỳ bảng nào nó
+ * không biết, nên chính sự vắng mặt「có ý thức」ở đây đã làm cả cỗ máy chuyển trạm chết ở dòng
+ * đầu tiên suốt từ 11/08 mà không ai hay — lần diễn tập gần nhất diễn ra TRƯỚC khi hai bảng này
+ * ra đời. Một quyết định sống trong bình chú thì cái hàng rào không đọc được nó.
+ *
+ * Và nói cho hết: hai bảng này vẫn bị XOÁ SẠCH ở đích mỗi lượt chuyển, vì `truncateAll` chạy
+ * `cascade` và cả hai đều trỏ về `users`. Chúng chỉ không được CHÉP LẠI. Đúng ý muốn, nhưng là
+ * một hành vi chứ không phải một sự bỏ qua.
  */
 export const notices = pgTable(
   "notices",

@@ -54,6 +54,55 @@ export const SYNC_TABLE_ORDER = [
 
 export type SyncTable = (typeof SYNC_TABLE_ORDER)[number];
 
+/**
+ * Bảng CỐ Ý không chép — khai ra ở đây thay vì để chúng làm `assertTablesCovered` ngã.
+ *
+ * Vì sao danh sách này phải tồn tại, kể lại đúng lần hỏng việc đã sinh ra nó: `notices` và
+ * `notice_reads` ra đời ngày 11/08/2026, và `schema.ts` ghi rõ việc KHÔNG chép chúng là một
+ * lựa chọn có ý thức — lời nhắn thuộc về trạm phát nó, và `notice_reads` đi theo nên không ai
+ * bị popup lại thứ đã đọc. Nhưng `assertTablesCovered` thì ném với BẤT KỲ bảng nào nó không
+ * biết, và không ai nối hai điều ấy lại. Đo ngày 12/08/2026 trên một database đã migrate đủ:
+ * 13 bảng thật, 11 tên trong sổ trên — tức **lượt chuyển trạm kế tiếp sẽ chết ở dòng đầu tiên**
+ * với「đích có thêm: notice_reads, notices」. Lần diễn tập cuối là 10/08, trước khi hai bảng ấy
+ * tồn tại, nên chưa ai vấp.
+ *
+ * Bài học nằm ở HÌNH DẠNG chứ không ở hai cái tên: một lựa chọn「cố ý bỏ qua」sống trong bình
+ * chú thì cái hàng rào không đọc được nó. Nay nó là dữ liệu, và hàng rào hỏi đúng chỗ.
+ *
+ * Thêm tên vào đây KHÔNG làm bảng ấy an toàn: `truncateAll` chạy `cascade`, nên bảng nào có
+ * khoá ngoại trỏ vào nhóm được chép thì vẫn bị dọn sạch — xem ghi chú tại `truncateAll`.
+ */
+export const UNSYNCED_TABLES = ["notices", "notice_reads"] as const;
+
+/**
+ * Phần QUYẾT ĐỊNH của `assertTablesCovered`, tách ra làm hàm thuần.
+ *
+ * Tách vì phép kiểm cũ chỉ chạy được khi có một database thật trong tay (`verify:mirror-sync`
+ * đòi `DATABASE_URL`), mà đây lại đúng là luật đã âm thầm sai suốt một tuần. Thuần thì
+ * `verify:mirror-tables` đóng đinh được nó mà không cần dựng gì — cùng lẽ với `permissions.ts`.
+ *
+ * Trả về lời từ chối, hoặc `null` nếu đích hợp lệ.
+ */
+export function reviewTableCoverage(actual: readonly string[]): string | null {
+  const present = new Set(actual);
+  const allowed = new Set<string>([...SYNC_TABLE_ORDER, ...UNSYNCED_TABLES]);
+
+  const missing = SYNC_TABLE_ORDER.filter((t) => !present.has(t));
+  const extra = [...present].filter((t) => !allowed.has(t));
+  // Bảng cố ý-không-chép mà VẮNG ở đích thì im lặng cho qua: đích chưa migrate tới đó là
+  // chuyện của `missing` phía trên nói, và nói hai lần cùng một tin thì không rõ hơn.
+  if (missing.length === 0 && extra.length === 0) {
+    return null;
+  }
+  return (
+    `Danh sách bảng không khớp schema đích` +
+    (missing.length ? ` · thiếu ở đích: ${missing.join(", ")}` : "") +
+    (extra.length
+      ? ` · đích có thêm: ${extra.join(", ")} (chưa khai trong SYNC_TABLE_ORDER, cũng không trong UNSYNCED_TABLES)`
+      : "")
+  );
+}
+
 /** Một trang mỗi lượt gọi. 1000 là con số đã chạy thật: đủ lớn để ít lượt, đủ nhỏ để payload JSON không quá khổ. */
 export const SYNC_PAGE_SIZE = 1000;
 
@@ -129,8 +178,11 @@ export function connect(url: string): Sql {
 }
 
 /**
- * Bảng ở ĐÍCH phải trùng đúng danh sách ta biết chép. Thừa một bảng nghĩa là schema đích lạ;
- * thiếu một bảng nghĩa là chưa migrate đủ. Cả hai đều phải chặn TRƯỚC khi xoá bất cứ thứ gì.
+ * Bảng ở ĐÍCH phải trùng đúng danh sách ta biết chép, CỘNG những bảng đã khai là cố ý bỏ qua.
+ * Thừa một bảng ngoài cả hai sổ nghĩa là schema đích lạ; thiếu một bảng cần chép nghĩa là chưa
+ * migrate đủ. Cả hai đều phải chặn TRƯỚC khi xoá bất cứ thứ gì.
+ *
+ * Đây chỉ còn là phần ĐI HỎI DATABASE — luật nằm ở `reviewTableCoverage`, và nó thuần.
  */
 export async function assertTablesCovered(sql: Sql): Promise<void> {
   const rows = await sql`
@@ -138,16 +190,9 @@ export async function assertTablesCovered(sql: Sql): Promise<void> {
      where table_schema = 'public' and table_type = 'BASE TABLE'
      order by table_name
   `;
-  const actual = new Set((rows as { table_name: string }[]).map((r) => r.table_name));
-  const known = new Set<string>(SYNC_TABLE_ORDER);
-  const missing = [...known].filter((t) => !actual.has(t));
-  const extra = [...actual].filter((t) => !known.has(t));
-  if (missing.length || extra.length) {
-    throw new Error(
-      `Danh sách bảng không khớp schema đích` +
-        (missing.length ? ` · thiếu ở đích: ${missing.join(", ")}` : "") +
-        (extra.length ? ` · đích có thêm: ${extra.join(", ")} (chưa khai trong SYNC_TABLE_ORDER)` : ""),
-    );
+  const complaint = reviewTableCoverage((rows as { table_name: string }[]).map((r) => r.table_name));
+  if (complaint) {
+    throw new Error(complaint);
   }
 }
 
@@ -169,6 +214,16 @@ export async function primaryKeyColumns(sql: Sql, table: string): Promise<string
 /**
  * Dọn ĐÍCH. Chạy một lần ở đầu lượt đồng bộ: migration tự gieo sẵn roles/permissions, mà ta
  * muốn đích khớp nguồn TỪNG DÒNG chứ không chèn chồng lên phần gieo ấy.
+ *
+ * `cascade` KHÔNG chỉ dọn 11 bảng dưới đây, và điều đó phải nói ra vì nó là hệ quả thật chứ
+ * không phải chi tiết cú pháp: Postgres dọn luôn MỌI bảng có khoá ngoại trỏ vào nhóm này, tức
+ * `notices` và `notice_reads` (cùng trỏ về `users`) bị xoá sạch ở đích rồi KHÔNG được chép lại —
+ * chúng nằm trong `UNSYNCED_TABLES`. Đó đúng là hành vi `schema.ts` đã chọn („lời nhắn thuộc về
+ * trạm phát nó"), nên ở đây là ghi nhận chứ không phải sửa. Nhưng ngày nào có một bảng mới trỏ
+ * về `users` mà đích CẦN giữ, thì `cascade` sẽ lặng lẽ nuốt nó — hãy nhớ dòng này hôm ấy.
+ *
+ * Bỏ `cascade` đi thì không chạy được: Postgres từ chối truncate một bảng đang bị khoá ngoại
+ * tham chiếu, nên lựa chọn duy nhất còn lại là chép cả hai bảng ấy.
  */
 export async function truncateAll(dest: Sql): Promise<void> {
   await assertTablesCovered(dest);

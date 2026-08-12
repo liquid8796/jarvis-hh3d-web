@@ -147,6 +147,42 @@ if (stations.length === 0) {
 }
 console.log(`• Sổ gương (${loaded.from}) có ${stations.length} trạm: ${stations.map((s) => s.id).join(", ")}`);
 
+/**
+ * TRẠM ĐANG PHỤC VỤ CÓ NẰM TRONG SỔ NÀY KHÔNG — câu hỏi mà lượt chạy 12/08/2026 trả lời SAI.
+ *
+ * Hôm ấy sổ dưới máy (của `main`, nghỉ từ 10/08) chỉ còn hai trạm; trạm đang phục vụ là
+ * `auto-hh3d-2` không có trong đó, nên `chooseBook` fail-open lùi về sổ cũ và phát hành cho hai
+ * trạm không ai dùng. Cảnh báo CÓ in — ngay sau `chooseBook`, rồi bốn lượt build Vercel đẩy nó
+ * lên hàng trăm dòng — còn dòng cuối cùng người ta thật sự đọc lại là câu「Mọi trạm trong sổ đã
+ * mang cùng một commit」, in vô điều kiện, kèm mã thoát 0. Một lời trấn an đặt đúng chỗ mắt
+ * người rơi vào.
+ *
+ * Nên: câu hỏi ấy được hỏi ở ĐÂY và trả lời lại ở TỔNG KẾT, ngay cạnh mã thoát.
+ *
+ * `null` khi chưa đọc được bảng điều phối — lúc ấy không ai biết trạm nào đang phục vụ, và đoán
+ * bừa còn tệ hơn im lặng; cảnh báo của `chooseBook` đã nói đúng chuyện đó rồi.
+ */
+const activeSiteId = doc?.activeSiteId ?? null;
+const activeMissing = activeSiteId != null && !stations.some((s) => s.id === activeSiteId);
+
+/** In lời phán về độ phủ của sổ. Trả về `true` nếu lượt chạy này phải coi là HỎNG. */
+function reportBookCoverage(): boolean {
+  if (activeMissing) {
+    console.error(`\n  ✗ TRẠM ĐANG PHỤC VỤ「${activeSiteId}」KHÔNG có trong sổ vừa dùng — nó KHÔNG được phát hành.`);
+    console.error(`    Sổ đọc từ: ${loaded.from}`);
+    console.error("    Thuốc, không phải sửa tệp nào — chạy lại kèm sổ của chính trạm ấy:");
+    console.error('      DATABASE_URL="<chuỗi kết nối của trạm đang phục vụ>" npm run deploy:all');
+    console.error("    Lấy chuỗi ấy bằng cách giải mã `mirrors[].pg` ở một trạm ĐỌC ĐƯỢC (trạm vừa bàn giao");
+    console.error("    là gần nhất), rồi đọc sổ CỦA NÓ — xem deploy/mirror/README.md.");
+    return true;
+  }
+  if (loaded.warning) {
+    console.warn(`\n  ⚠ Sổ dùng cho lượt này có cảnh báo (đọc lại dòng ⚠ ở đầu): ${loaded.from}`);
+    console.warn("    Không biết chắc sổ đã đủ trạm — câu bên dưới chỉ nói về những trạm CÓ trong sổ ấy.");
+  }
+  return false;
+}
+
 // ---- 3. Danh mục project của từng tài khoản -------------------------------------------------
 
 /**
@@ -249,7 +285,10 @@ if (dirty) {
 
 if (dryRun) {
   console.log("\n--dry-run: dừng ở đây, chưa phát hành gì.");
-  process.exit(unresolved.length > 0 ? 1 : 0);
+  // Kế hoạch thiếu trạm đang phục vụ thì ĐỎ ngay ở đây — soi kế hoạch trước khi phát hành đúng
+  // là việc `--dry-run` sinh ra để làm; báo xanh một kế hoạch hụt là bỏ phí đúng lượt chạy ấy.
+  const badBook = reportBookCoverage();
+  process.exit(unresolved.length > 0 || badBook ? 1 : 0);
 }
 if (plans.length === 0) die("Không tra được đích cho trạm nào — không có gì để phát hành.");
 
@@ -361,8 +400,13 @@ if (failed.length > 0 || unresolved.length > 0) {
   console.log(`  LỆCH MÃ : ${lagging.join(", ")} — vẫn đang chạy bản CŨ`);
   console.log("\n  Trạm lệch mã là một cái bẫy nằm im: nó chỉ chuyển hướng nên không ai thấy nó cũ,");
   console.log("  cho tới ngày nó lên ngôi và trở thành nơi phát lệnh. Chữa xong thì chạy lại lệnh này.");
+  reportBookCoverage();
   process.exit(1);
 }
+
+// Mọi trạm TRONG SỔ đã xong — nhưng cái sổ ấy có đủ trạm không lại là câu khác, và nó phải được
+// trả lời TRƯỚC câu trấn an, không phải cách đó hàng trăm dòng.
+if (reportBookCoverage()) process.exit(1);
 
 console.log("  Mọi trạm trong sổ đã mang cùng một commit.");
 console.log("\n  Nhắc: bản vá đụng khôi lỗi (scripts/worker.mjs, src/lib/worker, src/lib/quest-engine,");

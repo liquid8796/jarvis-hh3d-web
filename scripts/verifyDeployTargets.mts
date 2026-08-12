@@ -10,6 +10,7 @@ import {
   discoverTokens,
   projectNameFromUrl,
   resolveTarget,
+  sensitiveEnvKeys,
   stationUrlFor,
   tokenEnvNameFor,
   validateSiteId,
@@ -192,6 +193,41 @@ function ok(condition: boolean, label: string): void {
 
   const empty = await chooseBook({ localBook: {}, activeSiteId: null, readRemote: async () => ({}) });
   ok(empty.stations.length === 0, "sổ rỗng → mảng rỗng, không ném");
+}
+
+// ---- Biến môi trường nào KHÔNG đọc lại được ------------------------------------------------
+//
+// Cả hệ gương trạm đứng trên việc đọc lại được env của một trạm: dựng trạm mới phải `env:pull`
+// để lấy chuỗi kết nối mà integration vừa tiêm, và cứu một trạm cụt đường về cũng đi qua đúng
+// cửa ấy. Một biến `sensitive` không hỏng ngay — nó hỏng vào đúng ngày người ta cần đọc nó, và
+// lúc ấy không còn bản sao nào. Đo 12/08/2026: `auto-hh3d` có 18 biến sensitive, `auto-hh3d-1`
+// có 7 (đúng bộ bí mật dùng chung); hai trạm dựng bằng script hiện tại thì không có cái nào.
+{
+  const envs = [
+    { key: "AUTH_SECRET", type: "sensitive" },
+    { key: "DATABASE_URL", type: "encrypted" },
+    { key: "SITE_ID", type: "plain" },
+    { key: "CRON_SECRET", type: "sensitive" },
+  ];
+  ok(sensitiveEnvKeys(envs).join(",") === "AUTH_SECRET,CRON_SECRET", "chỉ nhặt biến sensitive, và xếp theo tên");
+  ok(
+    sensitiveEnvKeys(envs.filter((e) => e.type !== "sensitive")).length === 0,
+    "toàn encrypted/plain → không có gì để kêu",
+  );
+  ok(sensitiveEnvKeys([]).length === 0, "danh sách rỗng → không ném");
+  // Vercel luôn trả `type`; vắng nghĩa là hình dạng API đã đổi. Đoán bừa "sensitive" ở đó sẽ
+  // chặn MỌI lượt dựng trạm vì một lý do không có thật, nên nhánh này cố ý cho qua.
+  ok(sensitiveEnvKeys([{ key: "X" }]).length === 0, "dòng vắng type KHÔNG bị coi là sensitive");
+  ok(sensitiveEnvKeys([{ type: "sensitive" }])[0] === "(biến không tên)", "biến sensitive vắng tên vẫn được kể ra");
+  ok(
+    sensitiveEnvKeys([{ key: "  ", type: "sensitive" }])[0] === "(biến không tên)",
+    "tên toàn khoảng trắng coi như không có tên",
+  );
+  // "Sensitive" hoa đầu không phải giá trị Vercel dùng; khớp lỏng ở đây là mời một lỗi khác vào.
+  ok(
+    sensitiveEnvKeys([{ key: "X", type: "Sensitive" }]).length === 0,
+    "so khớp CHÍNH XÁC chuỗi type, không lỏng lẻo hoa thường",
+  );
 }
 
 console.log(`\nTất cả ${passed} phép kiểm đều thuận.`);

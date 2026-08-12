@@ -31,7 +31,14 @@ import { neon } from "@neondatabase/serverless";
 import { decryptSecret, encryptSecret } from "../src/lib/crypto/secretBox";
 import { readControlDoc } from "../src/lib/control/read";
 import { resolveMongoDbName } from "../src/lib/mongo/dbName";
-import { stationUrlFor, tokenEnvNameFor, validateSiteId, type Book } from "./deployTargets.mts";
+import {
+  sensitiveEnvKeys,
+  stationUrlFor,
+  tokenEnvNameFor,
+  validateSiteId,
+  type Book,
+  type ProjectEnvVar,
+} from "./deployTargets.mts";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -47,6 +54,25 @@ process.noDeprecation = true;
 
 const repoRoot = path.join(import.meta.dirname, "..");
 const ENV_FILE = path.join(repoRoot, ".env.local");
+
+/**
+ * DẠNG BIẾN MÔI TRƯỜNG trên Vercel — `encrypted`, và TUYỆT ĐỐI KHÔNG `sensitive`.
+ *
+ * Vercel có ba dạng: `plain` (hiện nguyên văn trên dashboard), `encrypted` (mã hoá at-rest
+ * nhưng ĐỌC LẠI ĐƯỢC bằng `vercel env pull` / API), và `sensitive` (chỉ ghi được, không đời nào
+ * đọc lại). Cả `plain` lẫn `encrypted` đều là「non-sensitive」; ta chọn `encrypted`.
+ *
+ * VÌ SAO `sensitive` LÀ CẤM Ở ĐÂY, dù nghe có vẻ an toàn hơn: cả hệ gương trạm đứng trên việc
+ * ĐỌC LẠI được env của một trạm.
+ *   • `newMirrorStation` bước 5 phải `vercel env pull` để lấy chuỗi kết nối mà integration vừa
+ *     tiêm — không đọc được thì không có gì để ghi vào sổ, và trạm ra đời nửa vời.
+ *   • `npm run env:pull` là đường duy nhất mang bí mật của một trạm về máy vận hành khi cần dựng
+ *     lại, xoay khoá, hay cứu một trạm cụt đường về.
+ * Một biến `sensitive` không hỏng ngay: nó hỏng vào ĐÚNG cái ngày người ta cần đọc nó, và lúc ấy
+ * không còn bản sao nào. Đo 12/08/2026: `auto-hh3d` có 18 biến sensitive và `auto-hh3d-1` có 7
+ * (đúng bộ bí mật dùng chung) — cả hai đều dựng trước khi script này chốt dạng biến.
+ */
+const ENV_TYPE = "encrypted";
 
 /** Bí mật DÙNG CHUNG ở mọi trạm — bảng「phải giống nhau」của README §9. */
 const SHARED_SECRETS = [
@@ -273,7 +299,52 @@ try {
     }
   }
 
+  /**
+   * ĐỌC LẠI RỒI MỚI TIN — biến nào của trạm mới cũng phải NON-SENSITIVE.
+   *
+   * Xin `encrypted` là một chuyện; được cấp đúng thứ ấy là chuyện khác. Vercel có công tắc
+   *「Sensitive Environment Variables」ở cấp team ép MỌI biến thành `sensitive` bất kể thân yêu
+   * cầu, và một integration cũng có thể tự tiêm biến của nó ở dạng ấy. Cả hai đường đều trả
+   * HTTP 2xx, nên `r.ok` của `putEnv` KHÔNG chứng minh được gì.
+   *
+   * Bắt ở đây, lúc trạm còn chưa vào sổ, là lúc rẻ nhất: hỏng thì chỉ mất một project trống.
+   * Bắt vào ngày cần `env:pull` để cứu trạm thì đã không còn bản sao nào để đọc.
+   *
+   * Soi TOÀN BỘ biến production chứ không riêng mấy biến ta vừa ghi — biến do integration tiêm
+   * (DATABASE_URL, MONGODB_URI) mới là thứ không thể dựng lại từ máy vận hành.
+   */
+  const assertNoSensitiveEnv = async (luc: string) => {
+    const r = await api(`/v9/projects/${projectId}/env?${teamQuery}`);
+    if (!r.ok) {
+      die(
+        `Không đọc lại nổi danh sách biến của trạm mới (HTTP ${r.status}) — chưa xác nhận được ` +
+          "rằng không biến nào ở dạng sensitive, mà đó là điều kiện để sau này còn `env:pull` được.",
+      );
+    }
+    const envs = (r.body?.envs ?? []) as ProjectEnvVar[];
+    const sensitive = sensitiveEnvKeys(envs);
+    if (sensitive.length > 0) {
+      die(
+        `Trạm mới có ${sensitive.length} biến ở dạng SENSITIVE (${luc}): ${sensitive.join(", ")}.\n` +
+          "  Sensitive nghĩa là KHÔNG BAO GIỜ đọc lại được — `vercel env pull` trả về rỗng, và ngày\n" +
+          "  cần dựng lại hay cứu trạm này thì không còn bản sao nào.\n" +
+          `  Chữa: Vercel dashboard → team「${scope}」→ Settings → Environment Variables, tắt\n` +
+          "  「Sensitive Environment Variables」; xoá mấy biến trên rồi chạy lại lệnh này.\n" +
+          `  (Project ${siteId} đã dựng — xoá bằng:\n` +
+          `   curl -X DELETE "https://api.vercel.com/v9/projects/${siteId}?${teamQuery}" -H "Authorization: Bearer <token>")`,
+      );
+    }
+    console.log(`✔ ${envs.length} biến (${luc}) đều non-sensitive — sau này còn env:pull được`);
+  };
+
   // ---- 5. Đọc lại env integration vừa tiêm ------------------------------------------------------
+  //
+  // Soi DẠNG biến TRƯỚC khi đọc giá trị, và thứ tự ấy là cả ý nghĩa của phép kiểm này: một biến
+  // `sensitive` vẫn có mặt trong danh sách nhưng `env:pull` trả về rỗng, nên nếu để lượt `pick`
+  // bên dưới phán trước thì người dùng nhận đúng một câu SAI —「Kho Neon dựng xong nhưng KHÔNG
+  // tiêm DATABASE_URL」— trong khi integration đã tiêm tử tế, chỉ là tiêm ở dạng không đọc được.
+  await assertNoSensitiveEnv("integration vừa tiêm");
+
   const pulled = spawnSync(
     "vercel",
     ["env", "pull", ".env.check", "--environment=production", "--yes", "--scope", scope],
@@ -299,13 +370,18 @@ try {
   const putEnv = async (key: string, value: string) => {
     const r = await api(`/v10/projects/${projectId}/env?${teamQuery}&upsert=true`, {
       method: "POST",
-      body: JSON.stringify({ key, value, type: "encrypted", target: ["production"] }),
+      body: JSON.stringify({ key, value, type: ENV_TYPE, target: ["production"] }),
     });
     if (!r.ok) die(`Đặt biến ${key} hỏng (HTTP ${r.status}): ${JSON.stringify(r.body).slice(0, 160)}`);
   };
   await putEnv("SITE_ID", siteId);
   for (const key of SHARED_SECRETS) await putEnv(key, process.env[key]!);
   console.log(`✔ đã đặt SITE_ID + ${SHARED_SECRETS.length} bí mật dùng chung (chỉ môi trường production)`);
+
+  // Lượt hai: mấy biến TA vừa ghi có bị ép sang sensitive không. Lượt một ở bước 5 chỉ nói được
+  // về những biến integration tiêm — công tắc cấp team có thể bật giữa hai lượt, và dù không,
+  // xác nhận cái mình vừa ghi vẫn rẻ hơn phát hiện ra nó vào ngày cần đọc.
+  await assertNoSensitiveEnv("sau khi ghi SITE_ID + bí mật dùng chung");
 
   // ---- 7. Dựng bảng ------------------------------------------------------------------------------
   const migrated = spawnSync("node", ["scripts/migrate.mjs"], {

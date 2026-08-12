@@ -223,3 +223,37 @@ export function resolveTarget(station: StationEntry, catalog: readonly ProjectRe
   }
   return { ok: true, target: matches[0] };
 }
+
+/**
+ * Một dòng biến môi trường như Vercel trả về ở `GET /v9/projects/<id>/env`. Chỉ khai hai trường
+ * cần dùng, và cả hai đều KHÔNG bắt buộc — đây là JSON của một API ngoài, không phải kiểu của ta.
+ */
+export type ProjectEnvVar = { key?: string; type?: string };
+
+/**
+ * Vercel có ba dạng biến, và ĐÂY là dạng duy nhất không đọc lại được.
+ *
+ * `plain` hiện nguyên văn, `encrypted` mã hoá at-rest nhưng `vercel env pull` vẫn lấy ra được,
+ * còn `sensitive` thì chỉ ghi được — không API nào, không lệnh nào trả lại giá trị ấy nữa.
+ */
+export const UNREADABLE_ENV_TYPE = "sensitive";
+
+/**
+ * Tên những biến ở dạng KHÔNG ĐỌC LẠI ĐƯỢC, sắp xếp cho thông báo lỗi ổn định.
+ *
+ * Tách khỏi chỗ gọi để có thể ĐÓNG ĐINH bằng phép thử: cả hệ gương trạm đứng trên việc đọc lại
+ * được env của một trạm (dựng trạm mới phải `env:pull` để lấy chuỗi kết nối integration vừa
+ * tiêm; cứu một trạm cụt đường về cũng vậy), nên「biến nào không đọc lại được」là một câu hỏi
+ * đáng có câu trả lời được kiểm, chứ không phải một phép lọc viết vội giữa một hàm dài.
+ *
+ * Chịu được dữ liệu thiếu: một dòng vắng `type` KHÔNG bị coi là sensitive (Vercel luôn trả
+ * trường ấy; vắng nghĩa là hình dạng API đã đổi, và đoán bừa「sensitive」sẽ chặn mọi lượt dựng
+ * trạm vì một lý do không có thật). Dòng vắng `key` vẫn được kể tên, vì nó CÓ ở đó và người đọc
+ * cần biết còn một biến nữa.
+ */
+export function sensitiveEnvKeys(envs: readonly ProjectEnvVar[]): string[] {
+  return envs
+    .filter((e) => e?.type === UNREADABLE_ENV_TYPE)
+    .map((e) => (e.key ?? "").trim() || "(biến không tên)")
+    .sort();
+}

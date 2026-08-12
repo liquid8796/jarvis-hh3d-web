@@ -30,6 +30,7 @@
  * theo cả bộ mã dựng trạm.
  */
 import { execFileSync, spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -108,16 +109,35 @@ const SHARED_SECRETS = [
  * và trạm gốc từng dựng tay với `hh3d_`, khiến `DATABASE_URL` phải đặt tay riêng — thứ về sau
  * nằm lại dưới dạng sensitive. Tên trần là tên mà mã nguồn đọc.
  */
-const STORES = [
-  { slug: "neon", plan: "free_v3", name: "jarvis-hh3d", label: "Neon Postgres", metadata: [] },
+const STORE_SPECS = [
+  { slug: "neon", plan: "free_v3", prefix: "jarvis-hh3d", label: "Neon Postgres", metadata: [] },
   {
     slug: "mongodbatlas",
     plan: "FREE",
-    name: "atlas-jarvis-chat",
+    prefix: "atlas-jarvis-chat",
     label: "MongoDB Atlas",
     metadata: ["clusterTier=FREE"],
   },
 ] as const;
+
+/**
+ * ĐUÔI NGẪU NHIÊN cho tên kho — sinh MỘT lần mỗi lượt chạy, dùng chung cho cả hai kho.
+ *
+ * Trước 12/08/2026 tên là hằng số (`jarvis-hh3d`, `atlas-jarvis-chat`) và lệ cũ còn ghi hẳn vào
+ * README là mọi tài khoản đặt TRÙNG TÊN. Nó gãy đúng lúc cần dựng LẠI một trạm: xoá kho cũ rồi
+ * dựng kho mới cùng tên trên cùng tài khoản, nên trong dashboard không cách nào phân biệt kho
+ * vừa dựng với kho vừa xoá, và mọi lượt thử lại đều đâm vào một cái tên đang có người ở.
+ *
+ * Dùng chung một đuôi cho cả hai kho là có chủ ý: nhìn dashboard là biết Neon nào đi với Atlas
+ * nào của cùng một lượt dựng. Còn mỗi lượt chạy một đuôi khác nhau nên thử lại không bao giờ
+ * đụng tên cũ.
+ *
+ * GIỮ TIỀN TỐ, không random trần: tên kho là thứ người vận hành đọc trong dashboard giữa lúc
+ * đang gỡ sự cố. `k3f9a2` không nói được gì; `jarvis-hh3d-k3f9a2` vừa duy nhất vừa tự khai nó
+ * là ai. Sáu ký tự hex là 16 triệu khả năng — thừa cho vài chục lượt dựng trong đời một tài khoản.
+ */
+const storeSuffix = randomBytes(3).toString("hex");
+const STORES = STORE_SPECS.map((s) => ({ ...s, name: `${s.prefix}-${storeSuffix}` }));
 
 const QUICK_MS = 60_000;
 const PROVISION_MS = 10 * 60_000;
@@ -515,6 +535,12 @@ try {
     console.warn(`\n⚠ Không xoá được ${stage} (${err instanceof Error ? err.message : "lỗi lạ"}) — trong đó CÓ BÍ MẬT, xoá tay giúp.`);
   }
 }
+
+// Tên kho nay mang đuôi ngẫu nhiên, nên phải NÓI RA ở đây: đó là thứ người vận hành cần khi
+// muốn soi hay xoá kho về sau, và dashboard thì có thể có nhiều kho cùng tiền tố.
+console.log(`\n── Hai kho vừa dựng ──────────────────────────────────`);
+for (const store of STORES) console.log(`  ${store.label.padEnd(16)} ${store.name}`);
+console.log(`  Xoá một kho: npx vercel integration resource remove <tên kho> -a -y --scope ${scope}`);
 
 console.log(`\n── Còn hai việc, làm bằng tay ────────────────────────`);
 console.log(`  1. Phát hành: bấm đúp deploy-all-stations.bat (trạm mới nằm trong sổ nên nó tự lo).`);

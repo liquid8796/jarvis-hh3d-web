@@ -193,13 +193,28 @@ Biến **phải GIỐNG nhau** ở mọi trạm — khác một cái là gãy đ
 | `CRON_SECRET`, `GIPHY_API_KEY`, `MONGODB_*` server-side khác | cron/GIF gãy tương ứng |
 
 Biến **riêng từng trạm**: `SITE_ID` (mới — định danh trạm, trùng `id` trong sổ gương),
-`DATABASE_URL` (Neon của trạm ấy, đặt `--sensitive`), `MONGODB_URI` (Atlas của trạm ấy),
-`WEB_URL` nếu có nơi dùng.
+`DATABASE_URL` (Neon của trạm ấy), `MONGODB_URI` (Atlas của trạm ấy).
 
-**Lệ đặt tên (10/08/2026):** mọi tài khoản đặt database TRÙNG TÊN — Neon `jarvis-hh3d`,
-MongoDB Atlas `atlas-jarvis-chat` — nên checklist chỉ phân biệt bằng TÀI KHOẢN, không bao
-giờ bằng tên database. Vercel CLI đi bằng API token (`--token`, đặt `VERCEL_TOKEN[_<trạm>]`
-trong env), không đi bằng session login — session chỉ ôm được một tài khoản một lúc.
+**TUYỆT ĐỐI KHÔNG `--sensitive` (sửa 12/08/2026).** Dòng này trước đây dạy đặt `DATABASE_URL`
+ở dạng `sensitive`, và đó chính là nguồn gốc của 18 biến không đọc lại được ở trạm gốc cùng 7
+biến ở `auto-hh3d-1`. Cả hệ gương trạm đứng trên việc ĐỌC LẠI được env của một trạm: dựng trạm
+mới phải `vercel env pull` để lấy chuỗi kết nối integration vừa tiêm, và cứu một trạm cụt đường
+về cũng đi qua đúng cửa ấy. `sensitive` chỉ ghi được, không đời nào đọc lại — nó không hỏng
+ngay, nó hỏng vào đúng ngày người ta cần đọc. Dùng `encrypted` (mặc định); `mirror:new` ĐỌC LẠI
+danh sách biến sau khi ghi và dừng lượt dựng nếu thấy bất kỳ biến `sensitive` nào.
+
+`WEB_URL` thì KHÔNG đặt trên trạm: không mã nào của web đọc nó — chỉ khôi lỗi dùng, mà khôi lỗi
+chạy ngoài Vercel (đo 12/08/2026).
+
+**Lệ đặt tên database (sửa 12/08/2026):** tên kho nay có ĐUÔI NGẪU NHIÊN —
+`jarvis-hh3d-<6 hex>`, `atlas-jarvis-chat-<6 hex>` — sinh một lần mỗi lượt dựng và dùng chung
+cho cả hai kho của lượt ấy. Lệ cũ bắt mọi tài khoản đặt TRÙNG TÊN, và nó gãy đúng lúc cần dựng
+LẠI một trạm: xoá kho cũ rồi dựng kho mới cùng tên trên cùng tài khoản thì trong dashboard
+không cách nào phân biệt cái vừa dựng với cái vừa xoá. Tên thật in ra ở cuối lượt `mirror:new`;
+muốn tra lại thì `npx vercel integration resource ls --scope <team>`. Checklist vẫn phân biệt
+trạm bằng TÀI KHOẢN, không bằng tên database. Vercel CLI đi bằng API token (`--token`, đặt
+`VERCEL_TOKEN[_<trạm>]` trong env), không đi bằng session login — session chỉ ôm được một tài
+khoản một lúc.
 
 **Quy tắc đặt tên (10/08/2026):** project gương đặt `auto-hh3d-<số tăng dần>` — trạm chính
 là `auto-hh3d`, gương đầu tiên `auto-hh3d-1`. Dùng LUÔN tên ấy làm `SITE_ID` và làm `id`

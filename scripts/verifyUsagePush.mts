@@ -14,8 +14,10 @@
  * một lần, và lần nào cũng nói dối về nguyên nhân. Phép thử số 3 dưới đây đóng đinh chính cái
  * bẫy nền tảng ấy, để nó không bao giờ còn là một phát hiện bất ngờ nữa.
  */
+import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { type Meter, looksLikeStationHop, MAX_STATION_HOPS, pushUsageReport, REPORT_PATH } from "./usagePush.mts";
+import { daysUntilExpiry, parseUsageStations, readCookieFile } from "./usageStations.mts";
 
 const results: string[] = [];
 const check = (name: string, ok: boolean, detail = "") => {
@@ -238,6 +240,86 @@ try {
   }
 } finally {
   await Promise.all(open.map((s) => s.close()));
+}
+
+// ---- 8. Bảng trạm của workflow, và tệp cookie ------------------------------------------------
+//
+// `usage:cookie` ghi cookie vào secret theo bảng này. Đọc hụt một dòng nghĩa là ghi cookie của
+// tài khoản A vào ô của tài khoản B — và triệu chứng KHÔNG phải「sai cookie」mà là「thiếu cột」
+// sau 90 giây chờ, sáu tiếng sau, trong một lượt CI đỏ. Nên bảng phải đọc từ chính workflow, và
+// phép đọc ấy phải có chỗ đóng đinh.
+{
+  const yml = readFileSync(new URL("../.github/workflows/vercel-usage.yml", import.meta.url), "utf8");
+  const that = parseUsageStations(yml);
+  check("đọc được bảng trạm từ chính workflow đang chạy", that.length > 0, `${that.length} trạm`);
+  check(
+    "mỗi dòng đủ ba cột và không cột nào rỗng",
+    that.every((s) => s.siteId && s.team && s.secret),
+    that.map((s) => `${s.siteId}→${s.secret}`).join(" · "),
+  );
+  // Chính chỗ khiến không thể suy tên secret bằng luật: trạm gốc KHÔNG dùng VERCEL_COOKIE_AUTO_HH3D.
+  const goc = that.find((s) => s.siteId === "auto-hh3d");
+  check(
+    "trạm gốc dùng secret KHÁC lệ đặt tên — bằng chứng phải đọc bảng chứ không suy",
+    goc?.secret === "VERCEL_COOKIE_MAIN",
+    String(goc?.secret),
+  );
+
+  const dung = 'stations="a|t1|S_A\n  b|t2|S_B"';
+  check("bóc đúng hai dòng", parseUsageStations(dung).length === 2);
+  const nem = (yaml: string, vi: string) => {
+    try {
+      parseUsageStations(yaml);
+      check(vi, false, "KHÔNG ném");
+    } catch {
+      check(vi, true);
+    }
+  };
+  nem("khong co khoi nao", "workflow đổi hình dạng → ném, không đoán");
+  nem('stations="a|t1|S_A', "thiếu nháy đóng → ném");
+  nem('stations="a|t1"', "dòng thiếu cột → ném, và không lẳng lặng bỏ qua");
+  nem('stations="a||S_A"', "cột rỗng → ném");
+  nem('stations=""', "bảng rỗng → ném");
+  nem('stations="a|t1|S_A\n  a|t2|S_B"', "mã trạm lặp → ném, vì ghi cookie sẽ vào nhầm ô");
+  check(
+    "dòng trống và dòng chú thích bị bỏ qua như vòng lặp trong workflow",
+    parseUsageStations('stations="a|t1|S_A\n\n  # ghi chu\n  b|t2|S_B"').length === 2,
+  );
+}
+
+{
+  const tep = (cookies: unknown) => JSON.stringify({ cookies });
+  const auth = { name: "authorization", value: "v" };
+  const good = readCookieFile(tep([auth, { name: "x", value: "y" }]));
+  check("tệp cookie hợp lệ → đọc được", good.ok && good.cookies.length === 2);
+  check("thiếu `authorization` → từ chối", !readCookieFile(tep([{ name: "x", value: "y" }])).ok);
+  check("không phải JSON → từ chối, không ném", !readCookieFile("{").ok);
+  check("thiếu mảng cookies → từ chối", !readCookieFile('{"a":1}').ok);
+  // Mục rác bị bỏ nhưng phải ĐẾM ra, vì im lặng vứt cookie là cách êm ái nhất để thiếu mảnh cần.
+  const lan = readCookieFile(tep([auth, { name: "x" }, { value: "z" }]));
+  check("mục thiếu name/value bị bỏ và ĐẾM ra", lan.ok && lan.cookies.length === 1 && lan.boQua === 2, lan.ok ? `bỏ ${lan.boQua}` : "");
+
+  const ngay = 86_400_000;
+  const moc = Date.UTC(2026, 7, 13);
+  check(
+    "hạn phiên quy ra ngày còn lại",
+    daysUntilExpiry([{ name: "authorization", value: "v", expirationDate: (moc + 10 * ngay) / 1000 }], moc) === 10,
+  );
+  check(
+    "hạn đã qua → số âm, để chỗ gọi chặn được",
+    (daysUntilExpiry([{ name: "authorization", value: "v", expirationDate: (moc - 3 * ngay) / 1000 }], moc) ?? 0) < 0,
+  );
+  // Cắt về phía 0, không làm tròn xuống: `floor` kể một cookie hết hạn 3 ngày + 1 giây thành
+  // 「4 ngày trước」— đo được lúc chạy thử 13/08/2026.
+  check(
+    "hết hạn 3 ngày 1 giây → kể là 3, không phải 4",
+    daysUntilExpiry([{ name: "authorization", value: "v", expirationDate: (moc - 3 * ngay - 1000) / 1000 }], moc) === -3,
+  );
+  check(
+    "còn 29 ngày 23 giờ → kể là 29, không làm tròn lên",
+    daysUntilExpiry([{ name: "authorization", value: "v", expirationDate: (moc + 30 * ngay - 3_600_000) / 1000 }], moc) === 29,
+  );
+  check("cookie phiên thuần (không khai hạn) → null, không đoán", daysUntilExpiry([auth]) === null);
 }
 
 for (const line of results) console.log(`  ${line}`);

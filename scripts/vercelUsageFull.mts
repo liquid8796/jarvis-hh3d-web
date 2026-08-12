@@ -43,6 +43,7 @@
 import { readFileSync } from "node:fs";
 import { chromium } from "playwright-core";
 import { type Meter, pushUsageReport } from "./usagePush.mts";
+import { readCookieFile } from "./usageStations.mts";
 
 const arg = (name: string): string | undefined => {
   const at = process.argv.indexOf(`--${name}`);
@@ -65,21 +66,22 @@ if ((!cookieFile && !cookieEnv) || !team) {
   process.exit(1);
 }
 
-type RawCookie = { name: string; value: string; domain?: string; path?: string };
-let raw: { cookies?: RawCookie[] };
+// Phép soi tệp cookie dùng CHUNG với `usage:cookie` (công cụ đẩy cookie lên secret) — một luật,
+// một chỗ. Trước 13/08/2026 mỗi bên giữ một bản, và bản nào nới lỏng dần thì bên kia không biết.
+let source: string;
 try {
-  const source = cookieEnv ? process.env[cookieEnv] : readFileSync(cookieFile!, "utf8");
+  source = cookieEnv ? (process.env[cookieEnv] ?? "") : readFileSync(cookieFile!, "utf8");
   if (!source) throw new Error(`biến ${cookieEnv} rỗng hoặc chưa đặt`);
-  raw = JSON.parse(source) as { cookies?: RawCookie[] };
 } catch (err) {
   console.error(`Không đọc được cookie: ${err instanceof Error ? err.message : "lỗi lạ"}`);
   process.exit(1);
 }
-const cookies = raw.cookies ?? [];
-if (!cookies.some((c) => c.name === "authorization")) {
-  console.error("Tệp cookie thiếu `authorization` — xuất lại từ trình duyệt ĐANG đăng nhập Vercel.");
+const doc = readCookieFile(source);
+if (!doc.ok) {
+  console.error(`Cookie không dùng được: ${doc.message}`);
   process.exit(1);
 }
+const cookies = doc.cookies;
 
 /**
  * CHỜ TỚI KHI THÔI MỌC, không chờ một cái mốc.

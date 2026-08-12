@@ -57,6 +57,7 @@
     "verify:vercel-usage": "tsx scripts/verifyVercelUsage.mts",
     "verify:usage-push": "tsx scripts/verifyUsagePush.mts",
     "usage:full": "tsx scripts/vercelUsageFull.mts",
+    "usage:cookie": "tsx scripts/updateUsageCookie.mts",
     "mirror:new": "tsx scripts/newMirrorStation.mts",
     "mirror:remove": "tsx scripts/removeMirrorStation.mts",
     "github:new": "tsx scripts/newGithubStation.mts",

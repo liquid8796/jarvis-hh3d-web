@@ -144,23 +144,45 @@ const FREE_TRIAL_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
 chestImage.onclick=()=>{if(timer.textContent!=='00:00')return;
   setTimeout(()=>{timer.textContent='29:59';timer.dataset.claimed='1'},30)}</script>`;
 
-// Trang tế lễ theo recording 05/08: #te-le-button mở hộp SweetAlert2, xác nhận xong nút
-// đổi thành "Đã Tế Lễ" + disabled (~1.5s sau confirm ngoài đời, rút ngắn trong fixture).
+// Trang tế lễ theo bản ghi 13/08 (te-le-tong-mon-20260813-001731), markup chép từ `dom/*.html`.
+// Ba chỗ CỐ Ý giữ đúng như trang thật, vì cả ba đều đủ sức giấu một lỗi thật:
+//
+//   • Hộp xác nhận là component của CHÍNH SITE (`#hh3d-confirm-layer`), không phải SweetAlert2.
+//     Trang đã gỡ swal2 hẳn — 0 lần xuất hiện trong toàn bộ HTML — nên một fixture còn dựng
+//     `.swal2-confirm` là fixture tự bịa ra một trang không tồn tại, và bộ chạy thử sẽ xanh
+//     mướt trong khi production chờ hết giờ rồi hỏng. Đó đúng là bài học của Luyện Đan 12/08.
+//   • Hộp ấy được DỰNG RA lúc bấm và GỠ KHỎI DOM lúc đóng, không phải ẩn đi — bản chụp trước
+//     và sau cú confirm đều không có phần tử nào tên vậy.
+//   • Nút sau lượt THÀNH CÔNG vẫn mang `data-done="0"`: trang chỉ đổi chữ, `disabled` và class.
+//     Cái tên `data-done` mời người ta gác cửa bằng nó; bản chụp 04-click nói rằng đừng.
+//
+// `data-offered` / `data-cancelled` là NHÂN CHỨNG CỦA FIXTURE, không phải markup của site —
+// chúng chỉ để bài kiểm hỏi "đã đi qua nhánh nào", và hồ sơ không đọc chúng bao giờ.
+//
 // Là HÀM vì site thật nhớ lễ PHÍA SERVER: lần ghé sau, trang render sẵn trạng thái đã tế —
-// đó chính là điều kiện StopIf của flow, và bài "lần hai phải dừng" kiểm đúng nó.
+// đó chính là điều kiện StopIf của flow, và bài "lần hai phải dừng" kiểm đúng nó. Trạng thái
+// render-sẵn ấy mang `data-done="1"` theo đúng CSS của trang (`[data-done="1"]` cũng bị làm
+// xám như `[disabled]`); đó là suy ra từ CSS chứ không phải đo được, và không ảnh hưởng gì —
+// cửa dừng đọc CHỮ, thứ duy nhất đã thấy nói thật ở cả hai trạng thái.
 const freeSacrificePage = (offered) => offered
   ? `<!doctype html><html lang="vi"><meta charset="utf-8">
-<button id="te-le-button" class="btn btn-danger" disabled data-offered="1">Đã Tế Lễ</button>`
+<button id="te-le-button" class="btn group-button" data-done="1" disabled><i class="fas fa-times"></i> Đã Tế Lễ</button>`
   : `<!doctype html><html lang="vi"><meta charset="utf-8">
-<button id="te-le-button" class="btn btn-danger">Tế Lễ</button>
-<div id="modal" style="display:none"><p>Đạo hữu chắc chắn dùng 10 Tinh Thạch tế lễ cho Tông Môn?</p>
-<button class="swal2-confirm">Tế Lễ</button><button class="swal2-cancel">Hủy</button></div>
-<script>const btn=document.getElementById('te-le-button');const modal=document.getElementById('modal');
-btn.onclick=()=>{if(btn.disabled)return;modal.style.display='block'};
-document.querySelector('.swal2-cancel').onclick=()=>{modal.style.display='none';btn.dataset.cancelled='1'};
-document.querySelector('.swal2-confirm').onclick=()=>{modal.style.display='none';
-  fetch('/te-le-offered');
-  setTimeout(()=>{btn.textContent='Đã Tế Lễ';btn.disabled=true;btn.dataset.offered='1'},40)}</script>`;
+<button id="te-le-button" class="btn btn-danger group-button" data-done="0"><i class="fas fa-praying-hands"></i> Tế Lễ</button>
+<script>const btn=document.getElementById('te-le-button');
+const LAYER='<div id="hh3d-confirm-layer" role="alertdialog" aria-modal="true" style="z-index:200000">'
+  +'<div class="hh3d-confirm__backdrop" aria-hidden="true"></div><div class="hh3d-confirm__panel">'
+  +'<div class="hh3d-confirm__head"><h2 class="hh3d-confirm__title" id="hh3d-confirm-title">Xác nhận tế lễ</h2></div>'
+  +'<div class="hh3d-confirm__body"><p class="hh3d-confirm__text" id="hh3d-confirm-text">Đạo hữu chắc chắn dùng 10 Tinh Thạch tế lễ cho Tông Môn?</p></div>'
+  +'<div class="hh3d-confirm__actions"><button type="button" class="hh3d-confirm__btn hh3d-confirm__btn--cancel">Hủy</button>'
+  +'<button type="button" class="hh3d-confirm__btn hh3d-confirm__btn--confirm">Tế Lễ</button></div></div></div>';
+const close=()=>{const l=document.getElementById('hh3d-confirm-layer');if(l)l.remove()};
+btn.onclick=()=>{if(btn.disabled)return;document.body.insertAdjacentHTML('beforeend',LAYER);
+  document.querySelector('.hh3d-confirm__btn--cancel').onclick=()=>{close();btn.dataset.cancelled='1'};
+  document.querySelector('.hh3d-confirm__btn--confirm').onclick=()=>{close();
+    fetch('/te-le-offered');
+    setTimeout(()=>{btn.innerHTML='<i class="fas fa-times"></i> Đã Tế Lễ';btn.disabled=true;
+      btn.className='btn group-button';btn.dataset.offered='1'},40)}}</script>`;
 
 const FREE_WHEEL_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div id="userTurns">2</div><button id="spinButton">Quay Ngay</button>
@@ -1271,13 +1293,14 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   );
   const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
   check(
-    // 55 = cửa chặn sao của Luyện Đan đổi selector `#ldModal` → `#ldModalBody` (bản ghi 12/08).
+    // 56 = Tế Lễ (thường) bỏ `.swal2-confirm` sang hộp xác nhận của chính site
+    // `#hh3d-confirm-layer` — trang đã gỡ hẳn SweetAlert2 (bản ghi 13/08, 0 lần xuất hiện).
     // Bump ở ĐÂY là bắt buộc chứ không phải lịch sự: web đọc lại profile.json mỗi lượt nên nó
     // được vá ngay, còn bản desktop chỉ thay hồ sơ đã lưu khi schema tăng — không bump thì máy
-    // nào đang ở 54 giữ nguyên selector ma và tính năng chết tiếp. Bump schema là thay hồ sơ đã
+    // nào đang ở 55 giữ nguyên selector ma và tính năng chết tiếp. Bump schema là thay hồ sơ đã
     // lưu bên desktop ngay lần mở đầu tiên — chốt này bắt mỗi cú bump phải là quyết định có chủ ý.
-    "hồ sơ đang ở schema 55",
-    loadProfileForSchema().schemaVersion === 55,
+    "hồ sơ đang ở schema 56",
+    loadProfileForSchema().schemaVersion === 56,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1865,12 +1888,16 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
 
     const sacrificeFree = exportedProfile.quests.find((q) => q.id === "te-le-tong-mon-thuong");
     const sacrificeResult = await run(sacrificeFree);
-    check("Tế Lễ bấm nút, xác nhận swal2, chờ nút đổi chữ", sacrificeResult.outcome === "completed", sacrificeResult.outcome);
+    check("Tế Lễ bấm nút, xác nhận ở hộp của site, chờ nút đổi chữ", sacrificeResult.outcome === "completed", sacrificeResult.outcome);
     check(
       "Tế Lễ đi qua confirm (không đụng Hủy) và site ghi nhận lễ",
       (await page.locator("#te-le-button").getAttribute("data-offered")) === "1" &&
         (await page.locator("#te-le-button").getAttribute("data-cancelled")) == null &&
-        (await page.locator("#te-le-button").textContent()) === "Đã Tế Lễ",
+        (await page.locator("#te-le-button").textContent()).trim() === "Đã Tế Lễ",
+    );
+    check(
+      "…và hộp xác nhận đã rời khỏi DOM, đúng như trang thật",
+      (await page.locator("#hh3d-confirm-layer").count()) === 0,
     );
 
     const sacrificeAgain = await run(sacrificeFree);

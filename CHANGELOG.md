@@ -11,6 +11,56 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.81.0 — Tế Lễ bấm vào một hộp thoại đã không còn tồn tại (schema 56)
+
+Tế Lễ Tông Môn (tài khoản thường) hỏng ở bước cuối: script mở hộp xác nhận rồi bấm
+`.swal2-confirm`. **Trang đã gỡ SweetAlert2.** Bản ghi 13/08
+(`te-le-tong-mon-20260813-001731`) chụp `/danh-sach-thanh-vien-tong-mon` với **0 lần** xuất
+hiện chữ `swal2` trong toàn bộ HTML — kể cả phần CSS. Nên bước ấy chỉ có thể chờ hết 10 giây
+rồi hỏng, mọi lượt, kể từ ngày trang đổi. Đây là quest TỐN 10 Tinh Thạch, nên cái hỏng ấy ít
+nhất đã hỏng đúng chiều: nó không nhận vơ là xong.
+
+Hộp bây giờ là component của chính site: `#hh3d-confirm-layer`, nút thuận
+`.hh3d-confirm__btn--confirm`, nút từ chối `.hh3d-confirm__btn--cancel`.
+
+- **Cửa chờ hỏi CHỮ trong hộp, không hỏi「có hộp nào hiện không」.** Lớp ấy là hộp DÙNG CHUNG —
+  một cái layer trang tái sử dụng cho mọi câu hỏi có/không, dựng ra lúc bấm và gỡ khỏi DOM lúc
+  đóng. Cùng trang ấy có `#leaveGroupBtn`「Thoát Khỏi Tông」. Chờ「có hộp」rồi bấm nút thuận là
+  một ngày nào đó tự nguyện rời tông môn, và không có bước nào sau đó bắt được.
+- **Nút thuận được khoanh trong lớp** (`#hh3d-confirm-layer .hh3d-confirm__btn--confirm`) chứ
+  không dùng class trần: trong DOM, **「Hủy」đứng TRƯỚC「Tế Lễ」**, nên một selector rút gọn về
+  `.hh3d-confirm__btn` bấm đúng vào Hủy.
+- **KHÔNG gác bằng `data-done`.** Nút mang thuộc tính ấy và CSS của trang làm xám nút ở
+  `[data-done="1"]`, nên nó trông hệt một cờ trạng thái. Không phải: bản chụp sau một lượt tế
+  lễ THÀNH CÔNG (`dom/04-click.html`) vẫn là `data-done="0"` trên một cái nút đã `disabled` và
+  đã đổi chữ thành「Đã Tế Lễ」. Trang viết chữ và cờ disabled, rồi quên thuộc tính. Chỉ CHỮ là
+  nói thật ở cả hai trạng thái — cửa dừng và cửa nghiệm thu đều đọc chữ, như cũ.
+
+**SCHEMA 55 → 56**, phần bắt buộc chứ không phải lịch sự: web đọc lại `profile.json` mỗi lượt
+nên được vá ngay, còn bản desktop CHỈ thay hồ sơ đã lưu khi schema tăng — không bump thì máy
+nào đang ở 55 giữ nguyên selector ma. Nguồn thật là `DefaultQuestProfile.cs` bên desktop
+(1.57.0); khối quest trong `profile.json` được đối chiếu byte-với-byte với bản xuất từ đó.
+
+**FIXTURE CŨ LÀ ĐỒNG PHẠM.** `smokeQuestEngine.mjs` tự dựng một hộp `.swal2-confirm` không còn
+tồn tại ngoài đời, nên bộ chạy thử xanh mướt suốt thời gian production câm — đúng họ lỗi mà
+Luyện Đan 12/08 vừa dạy. Fixture nay chép markup từ bản ghi: hộp đúng tên, dựng-rồi-gỡ khỏi
+DOM thay vì ẩn đi, và nút sau lượt thành công vẫn mang `data-done="0"` như trang thật.
+
+**KIỂM CHỨNG.** `npm run verify:te-le-confirm` (mới): 23 phép thử trên Chromium thật, dựng
+markup chép nguyên văn từ `dom/01-load.html`, `dom/02-click.html`, `dom/04-click.html`, chạy
+CHÍNH `conditionProbe` mà engine gửi xuống trang, selector và chữ đọc TỪ `profile.json` chứ
+không chép tay. Có cả ca hộp「Thoát Khỏi Tông」dựng trên cùng component: cửa chờ phải ĐÓNG.
+Lật ngược hồ sơ về `.swal2-confirm` thì nó đỏ 8/23 (đã thử, rồi khôi phục nguyên byte).
+`npm run smoke`: 311 thuận, 0 nghịch. `npm run verify:profile` thuận. `npx tsc --noEmit` sạch,
+và script mới được soi tường minh vì `tsconfig` chỉ include `**/*.ts`.
+
+**Chưa đụng tới, nói thẳng:** `hoang-vuc` và `hoang-vuc-thuong` vẫn bấm `.swal2-confirm`.
+Trang của chúng là `/hoang-vuc`, một trang khác, và **không ai có bản ghi mới của nó**. Có thể
+nó cũng đã đổi, có thể chưa. Quét cả loạt theo suy đoán từ một trang khác là đúng cái kiểu
+sửa mù mà bản ghi sinh ra để thay thế — cần một bản ghi `/hoang-vuc` rồi mới động.
+
+---
+
 ## 0.80.0 — một PAT, một cú bấm đúp: kho mới dựng xong là đã nằm trong sổ
 
 `new-github-khoiloi.bat` + `npm run github:new`. Người dùng dán đúng MỘT thứ — PAT của tài khoản

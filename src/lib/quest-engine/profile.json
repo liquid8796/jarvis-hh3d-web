@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 55,
+  "schemaVersion": 56,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -1490,17 +1490,18 @@
         {
           "action": "waitForCondition",
           "timeoutMs": 10000,
-          "note": "h\u1ED9p SweetAlert2 v\u1EDBi n\u00FAt x\u00E1c nh\u1EADn \u0022T\u1EBF L\u1EC5\u0022 v\u00E0 n\u00FAt \u0022H\u1EE7y\u0022 \u2014 b\u1EAFt bu\u1ED9c, v\u00EC recording cho th\u1EA5y h\u1ED9p lu\u00F4n hi\u1EC7n; kh\u00F4ng hi\u1EC7n l\u00E0 trang \u0111\u00E3 \u0111\u1ED5i",
+          "note": "h\u1ED9p x\u00E1c nh\u1EADn c\u1EE7a CH\u00CDNH SITE (\u0110\u1EA1o h\u1EEFu ch\u1EAFc ch\u1EAFn d\u00F9ng 10 Tinh Th\u1EA1ch t\u1EBF l\u1EC5 cho T\u00F4ng M\u00F4n?) \u2014 b\u1EAFt bu\u1ED9c, v\u00EC b\u1EA3n ghi cho th\u1EA5y h\u1ED9p lu\u00F4n hi\u1EC7n; h\u1ECFi CH\u1EEE ch\u1EE9 kh\u00F4ng ch\u1EC9 h\u1ECFi h\u1ED9p, v\u00EC c\u00F9ng l\u1EDBp \u1EA5y h\u1ECFi h\u1ED9 c\u1EA3 \u0022Tho\u00E1t Kh\u1ECFi T\u00F4ng\u0022",
           "condition": {
-            "kind": "visible",
-            "selector": ".swal2-confirm"
+            "kind": "textMatches",
+            "selector": "#hh3d-confirm-layer",
+            "text": "t\u1EBF l\u1EC5"
           }
         },
         {
           "action": "click",
-          "selector": ".swal2-confirm",
+          "selector": "#hh3d-confirm-layer .hh3d-confirm__btn--confirm",
           "timeoutMs": 15000,
-          "note": "n\u00FAt positive \u2014 kh\u00F4ng bao gi\u1EDD \u0111\u1EE5ng .swal2-cancel"
+          "note": "n\u00FAt positive b\u00EAn TRONG l\u1EDBp x\u00E1c nh\u1EADn \u2014 kh\u00F4ng bao gi\u1EDD \u0111\u1EE5ng .hh3d-confirm__btn--cancel"
         },
         {
           "action": "waitForCondition",

@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { hasPermission } from "@/lib/auth/permissions";
-import { getWorkerRoster, type WorkerRosterEntry } from "@/lib/services/workers";
+import { getWorkerRoster, ONLINE_WINDOW_MS, type WorkerRosterEntry } from "@/lib/services/workers";
 import type { CycleProgress, JobStatus } from "@/lib/realtime/dashboardTypes";
 
 /**
@@ -62,10 +62,37 @@ export type QueueEntry = {
   workerId: string | null;
   workerKind: "sect" | "personal" | null;
   /**
-   * Thứ tự trong hàng chờ của khôi lỗi tông môn, tính từ 1. `null` khi job chưa tới giờ
-   * (đang nghỉ theo cooldown) hoặc đang chạy — hai trạng thái ấy không xếp hàng.
+   * Thứ tự trong hàng chờ, tính từ 1. `null` khi job chưa tới giờ (đang nghỉ theo cooldown)
+   * hoặc đang chạy — hai trạng thái ấy không xếp hàng.
+   *
+   * Số này CHỈ có nghĩa cùng với `queuePool`: xem chú thích ở đó.
    */
   queuePosition: number | null;
+  /**
+   * `queuePosition` đếm trong hàng chờ NÀO — và đây là chỗ bản trước nói dối.
+   *
+   * Trước 13/08/2026 chỉ có MỘT bộ đếm chạy suốt mọi dòng đang chờ, nên một đàn mà chủ nó đã
+   * chọn「chỉ máy nhà」vẫn được gán số thứ tự trong hàng của khôi lỗi tông môn — một hàng mà
+   * `workerPrefFilter` cấm tông môn chạm vào. Người xem đọc「thứ 1」rồi tưởng đàn mình sắp tới
+   * lượt, trong khi thứ duy nhất có thể nhận nó là máy ở nhà họ, và máy ấy đang tắt.
+   *
+   *   `sect` — đàn mà khôi lỗi tông môn được phép nhận (`workerPref` là `sect` hoặc `any`).
+   *            Số đếm chung toàn tông môn, đúng thứ tự `claimNextJob` sẽ nhặt.
+   *   `own`  — đàn chỉ giao cho máy nhà. Đếm RIÊNG trong hàng của chính chủ nó, vì nó không
+   *            xếp hàng với ai khác cả.
+   *
+   * Đàn `any` nằm ở bộ đếm `sect` dù máy nhà của chủ cũng có thể nhặt trước: con số ấy là ước
+   * lượng theo đường CHUNG, tức đường chậm hơn — thà nói dài hơn thực tế còn hơn hứa ngắn.
+   */
+  queuePool: "sect" | "own" | null;
+  /**
+   * Có khôi lỗi nào ĐỦ TƯ CÁCH nhận đàn này đang trực không.
+   *
+   * Không phải「có ai đó đang trực」: một đàn giao riêng cho máy nhà thì hai khôi lỗi tông môn
+   * đang trực cũng không giúp được gì. `false` nghĩa là con số thứ tự kia sẽ không nhúc nhích
+   * cho tới khi đúng loại máy ấy lên ca — và giao diện phải nói ra điều đó thay vì đếm suông.
+   */
+  poolHasWorker: boolean;
   /**
    * Vòng này đang làm tới đâu. `null` khi khôi lỗi chưa khai — job đang nghỉ, vòng vừa xong,
    * hoặc khôi lỗi đời cũ chưa biết gửi. Giao diện phải chịu được `null` mà không mất chữ nào.
@@ -226,6 +253,65 @@ export function visibleWorkerId(
   return kind === "sect" ? (canInspectSect ? workerId : null) : mine ? workerId : null;
 }
 
+/** Một dòng đang chờ, rút gọn còn đúng thứ mà phép xếp chỗ cần biết. */
+export type QueueCandidate = {
+  userId: string;
+  /** `workerPref` của CHỦ đàn: `sect` | `mine` | `any`. Giá trị lạ được đọc như `any`. */
+  ownerPref: string;
+  ownerWorkerOnline: boolean;
+  /** Đã tới giờ mà chưa ai nhặt. Dòng đang chạy/đang nghỉ không xếp hàng. */
+  queued: boolean;
+};
+
+export type QueueSlot = {
+  pool: "sect" | "own" | null;
+  position: number | null;
+  poolHasWorker: boolean;
+};
+
+/**
+ * XẾP CHỖ — phần quyết định của ảnh chụp hàng đợi, tách ra làm hàm THUẦN.
+ *
+ * Tách vì đây đúng là chỗ đã nói dối suốt: bản trước chạy MỘT bộ đếm cho mọi dòng, nên một đàn
+ * mà chủ đã chọn「chỉ máy nhà」vẫn nhận số thứ tự trong hàng của khôi lỗi tông môn — hàng mà
+ * `workerPrefFilter` cấm tông môn chạm tới. Lỗi ấy không có cách nào lộ ra bằng mắt: con số vẫn
+ * tăng đều, vẫn đẹp, chỉ là nó đếm một cuộc đua mà đàn ấy không tham gia. Thuần thì
+ * `verify:queue-pools` đóng đinh được từng luật mà không cần dựng database.
+ *
+ * Thứ tự đầu vào PHẢI là thứ tự `claimNextJob` nhặt việc (`next_run_at`, rồi `created_at`) —
+ * hàm này chỉ đánh số, nó không sắp xếp lại gì cả.
+ */
+export function assignQueueSlots(
+  rows: readonly QueueCandidate[],
+  sectOnline: boolean,
+): QueueSlot[] {
+  let sectPosition = 0;
+  const ownPositions = new Map<string, number>();
+
+  return rows.map((row) => {
+    // `any` là ca dễ sai nhất: nó đứng ở hàng CHUNG, nhưng máy nhà của chủ cũng nhặt được —
+    // nên câu「có ai trực không」phải hỏi CẢ HAI, bằng không một đàn `any` bị báo là vô vọng
+    // vào đúng lúc máy nhà của chủ nó đang chạy ngon lành.
+    const pool: "sect" | "own" = row.ownerPref === "mine" ? "own" : "sect";
+    const poolHasWorker =
+      row.ownerPref === "mine"
+        ? row.ownerWorkerOnline
+        : row.ownerPref === "sect"
+          ? sectOnline
+          : sectOnline || row.ownerWorkerOnline;
+
+    if (!row.queued) {
+      return { pool: null, position: null, poolHasWorker };
+    }
+    if (pool === "own") {
+      const next = (ownPositions.get(row.userId) ?? 0) + 1;
+      ownPositions.set(row.userId, next);
+      return { pool, position: next, poolHasWorker };
+    }
+    return { pool, position: ++sectPosition, poolHasWorker };
+  });
+}
+
 /**
  * Ảnh chụp hàng đợi tại thời điểm gọi.
  *
@@ -255,7 +341,21 @@ export async function getQueueSnapshot(viewer: QueueViewer): Promise<QueueSnapsh
       case when job.worker_id is null then null
            when w.id is null then 'personal'
            when w.user_id is null then 'sect'
-           else 'personal' end as worker_kind
+           else 'personal' end as worker_kind,
+      -- Lựa chọn「Giao đàn cho」của CHỦ đàn, không phải của người đang xem. Đọc thẳng
+      -- user_configs cùng lối với workerPrefFilter — hai nơi phải cùng đọc một sự thật, bằng
+      -- không bảng sẽ vẽ một hàng chờ khác với hàng mà cửa phát việc thực sự dùng.
+      -- (Không dùng dấu huyền trong bình chú SQL: cả câu này nằm trong một template literal.)
+      coalesce(
+        (select uc.config->>'workerPref' from user_configs as uc where uc.user_id = job.user_id),
+        'any'
+      ) as owner_pref,
+      -- Chủ đàn có máy nhà nào đang trực không. Cùng cửa sổ 30 giây với sổ điểm danh.
+      exists (
+        select 1 from workers as ow
+        where ow.user_id = job.user_id
+          and ow.last_seen > now() - ${`${ONLINE_WINDOW_MS} milliseconds`}::interval
+      ) as owner_worker_online
     from automation_jobs as job
     join users as usr on usr.id = job.user_id
     left join game_accounts as acc on acc.id = job.account_id
@@ -299,23 +399,42 @@ export async function getQueueSnapshot(viewer: QueueViewer): Promise<QueueSnapsh
 
   const rows = (result.rows ?? []) as Array<Record<string, unknown>>;
   const now = Date.now();
-  let position = 0;
+  /** Khôi lỗi tông môn có đang trực không — hỏi một lần, dùng cho mọi dòng thuộc hàng chung. */
+  const sectOnline = workers.some((worker) => worker.kind === "sect" && worker.online);
+
+  /**
+   * "Đang xếp hàng" = đã tới giờ mà chưa ai nhặt. Tính MỘT LẦN ở đây rồi dùng chung cho cả phép
+   * xếp chỗ lẫn vòng vẽ bên dưới: hai bản của cùng một luật là hai dịp để chúng trôi khỏi nhau,
+   * và nếu trôi thì con số thứ tự sẽ đếm một tập dòng khác với tập được vẽ ra.
+   */
+  const dueQueued = rows.map(
+    (row) => String(row.status) === "queued" && new Date(String(row.next_run_at)).getTime() <= now,
+  );
+  const slots = assignQueueSlots(
+    rows.map((row, index) => ({
+      userId: String(row.user_id),
+      ownerPref: String(row.owner_pref ?? "any"),
+      ownerWorkerOnline: isTrue(row.owner_worker_online),
+      queued: dueQueued[index],
+    })),
+    sectOnline,
+  );
   let running = 0;
   let waiting = 0;
   let sleeping = 0;
   let stuck = 0;
 
-  const entries = rows.map((row) => {
+  const entries = rows.map((row, index) => {
     const status = String(row.status) as JobStatus;
     const nextRunAt = new Date(String(row.next_run_at));
     const mine = String(row.user_id) === viewerId;
     const finished = status === "stopped" || status === "failed";
 
-    // "Đang xếp hàng" = đã tới giờ mà chưa ai nhặt. Job chưa tới giờ đang NGHỈ, job đang
-    // chạy thì đã ra khỏi hàng — gộp cả ba làm một con số sẽ nói dối về độ dài hàng chờ.
-    // Dòng đã tắt KHÔNG được đếm vào bất cứ ô nào: nó không còn ở trong hàng đợi nữa, nó chỉ
-    // đang nán lại trên màn hình.
-    const queued = status === "queued" && nextRunAt.getTime() <= now;
+    // Job chưa tới giờ đang NGHỈ, job đang chạy thì đã ra khỏi hàng — gộp cả ba làm một con số
+    // sẽ nói dối về độ dài hàng chờ. Dòng đã tắt KHÔNG được đếm vào bất cứ ô nào: nó không còn
+    // trong hàng đợi nữa, nó chỉ đang nán lại trên màn hình.
+    const queued = dueQueued[index];
+    const slot = slots[index];
     if (finished) {
       // không đếm
     } else if (queued) waiting++;
@@ -360,7 +479,9 @@ export async function getQueueSnapshot(viewer: QueueViewer): Promise<QueueSnapsh
         canInspectSect,
       ),
       workerKind,
-      queuePosition: queued ? ++position : null,
+      queuePosition: slot.position,
+      queuePool: slot.pool,
+      poolHasWorker: slot.poolHasWorker,
       progress: readProgress(row.cycle_progress),
       stuckFor,
       // `account_enabled` là NULL khi tài khoản đã bị xoá (left join không khớp) — phép đọc

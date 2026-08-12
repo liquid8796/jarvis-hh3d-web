@@ -54,7 +54,24 @@ function describe(entry: QueueEntry): string {
   if (entry.status === "stopping") return "Đang thu đàn";
   if (entry.status === "failed") return "Trắc trở — đã dừng";
   if (entry.status === "stopped") return "Đã thu đàn";
-  if (entry.queuePosition != null) return `Chờ tới lượt · thứ ${entry.queuePosition}`;
+  /**
+   * Số thứ tự phải đi kèm HÀNG CHỜ của nó, và phải im khi hàng ấy không có ai.
+   *
+   * Đàn giao riêng cho máy nhà không đứng chung hàng với ai — nói「thứ 1」cho nó là mời người
+   * đọc tưởng đàn mình sắp tới lượt trong khi thứ duy nhất nhận được nó là máy ở nhà họ. Và
+   * nếu máy ấy đang tắt thì con số kia sẽ đứng yên mãi mãi: đó mới là tin cần hiện, không phải
+   * một cái thứ tự đẹp đẽ.
+   */
+  if (entry.queuePosition != null) {
+    if (entry.queuePool === "own") {
+      return entry.poolHasWorker
+        ? `Chờ máy nhà · thứ ${entry.queuePosition}`
+        : "Chờ máy nhà — chưa máy nào trực";
+    }
+    return entry.poolHasWorker
+      ? `Chờ tới lượt · thứ ${entry.queuePosition}`
+      : `Chờ tới lượt · thứ ${entry.queuePosition} — chưa khôi lỗi nào trực`;
+  }
 
   const at = new Date(entry.nextRunAt);
   return `Đang nghỉ — tới lượt lúc ${at.toLocaleString("vi-VN", {

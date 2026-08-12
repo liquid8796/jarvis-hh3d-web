@@ -11,6 +11,32 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.81.2 — bảng Hàng Đợi đếm một cuộc đua mà đàn ấy không tham gia
+
+Hai dòng của một đạo hữu nằm im 70 phút với chữ「Chờ tới lượt · thứ 1」và「thứ 2」. Con số ấy sai,
+và nó sai theo kiểu tệ nhất: nó trấn an. Chủ đàn đã chọn「Giao đàn cho: máy nhà」, tức
+`workerPrefFilter` CẤM hai khôi lỗi tông môn chạm vào — nên hai đàn ấy không đứng trong hàng nào
+cả, chúng chỉ đang đợi một cái máy đã tắt từ đầu. Bảng thì vẫn đếm chúng như đang nhích dần tới
+lượt, và còn đẩy những đàn THẬT SỰ trong hàng chung xuống thứ 3, thứ 4.
+
+Gốc rễ: `getQueueSnapshot` chạy MỘT bộ đếm cho mọi dòng đang chờ, dù chú thích của chính trường
+ấy đã khai nó là「thứ tự trong hàng chờ của khôi lỗi tông môn」. Trớ trêu hơn: đoạn chữ ngay trên
+bảng đã nói đúng luật từ lâu — *„Ai đã cài khôi lỗi riêng thì không phải chờ hàng chung"* — chỉ
+có con số là chưa nghe theo.
+
+Nay số thứ tự đi kèm HÀNG của nó (`queuePool`): `sect` cho đàn tông môn được phép nhận, `own`
+đếm riêng trong hàng của từng chủ. Và thêm `poolHasWorker` — có khôi lỗi ĐỦ TƯ CÁCH đang trực
+không — nên chỗ ấy nói ra sự thật thay vì đếm suông:「Chờ máy nhà — chưa máy nào trực」.
+
+Ca `any` là chỗ dễ sai nhất và được canh riêng: nó đứng ở hàng chung nhưng máy nhà của chủ cũng
+nhặt được, nên câu「có ai trực không」phải hỏi CẢ HAI phía — bằng không một đàn `any` bị báo là
+vô vọng vào đúng lúc máy nhà của chủ nó đang chạy ngon lành.
+
+Phép xếp chỗ tách thành hàm thuần `assignQueueSlots`, kiểm bởi `verify:queue-pools` (16 khẳng
+định, không cần database) — vì đây là loại lỗi không bao giờ lộ ra bằng mắt: con số vẫn tăng đều,
+vẫn đẹp, chỉ là nó đếm nhầm cuộc đua. Nghiệm thu trên dữ liệu thật: hai dòng ấy nay đọc「Chờ máy
+nhà — chưa máy nào trực」, và hàng tông môn được đánh số lại từ 1 cho đúng người đang đứng trong nó.
+
 ## 0.81.1 — VM nhường 2 ghế cho khôi lỗi GitHub, và lần đầu restart không chém đàn ai
 
 `WORKER_MAX_JOBS` của VM: **5 → 3**. Hai ghế còn lại thuộc về `github-khoiloi` (đang đặt 2 trong

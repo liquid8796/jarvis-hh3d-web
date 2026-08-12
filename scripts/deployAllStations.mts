@@ -32,6 +32,7 @@ import { neon } from "@neondatabase/serverless";
 import { decryptSecret } from "../src/lib/crypto/secretBox";
 import { readControlDoc } from "../src/lib/control/read";
 import { chooseBook, discoverTokens, resolveTarget, type Book, type ProjectRef, type StationEntry } from "./deployTargets.mts";
+import { projectsFor } from "./vercelCatalog.mts";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -52,12 +53,8 @@ const dryRun = process.argv.includes("--dry-run");
 const DEPLOY_TIMEOUT_MS = 15 * 60_000;
 /** Trần cho các lệnh phụ (git, vercel --version) — chúng phải trả lời tức thì hoặc là có chuyện. */
 const QUICK_TIMEOUT_MS = 60_000;
-/** Trần một lượt hỏi API Vercel. */
-const API_TIMEOUT_MS = 30_000;
 /** Trần khi dò lại cửa trạm sau khi phát hành. */
 const PROBE_TIMEOUT_MS = 20_000;
-/** Trần số trang khi liệt kê project — chặn vòng lặp vô hạn nếu con trỏ phân trang hỏng. */
-const MAX_PROJECT_PAGES = 20;
 
 const die = (message: string): never => {
   console.error(`\n✗ ${message}`);
@@ -185,47 +182,9 @@ function reportBookCoverage(): boolean {
 
 // ---- 3. Danh mục project của từng tài khoản -------------------------------------------------
 
-/**
- * Token ở đây được scope sẵn vào team của nó, nên `/v9/projects` (không kèm teamId) đã trả về
- * đúng project của tài khoản ấy, và `accountId` chính là `orgId` mà `.vercel/project.json` cần.
- * Vẫn đi hết phân trang: một tài khoản có thể nuôi nhiều project ngoài tông môn.
- */
-async function projectsFor(source: { envName: string; token: string }): Promise<ProjectRef[]> {
-  const collected: ProjectRef[] = [];
-  let until: number | undefined;
-
-  for (let page = 0; page < MAX_PROJECT_PAGES; page++) {
-    const url = new URL("https://api.vercel.com/v9/projects");
-    url.searchParams.set("limit", "100");
-    if (until !== undefined) url.searchParams.set("until", String(until));
-
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${source.token}` },
-      signal: AbortSignal.timeout(API_TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      // Không chết cả lượt chạy: token hỏng chỉ làm những trạm CỦA NÓ không tra được, và
-      // `resolveTarget` sẽ nói「không tài khoản nào có project ấy」. Dòng này là lời giải thích.
-      console.warn(`  ⚠ ${source.envName}: liệt kê project hỏng — HTTP ${res.status}. Token hết hạn hay bị thu hồi?`);
-      return collected;
-    }
-    const body = (await res.json()) as {
-      projects?: { name?: string; id?: string; accountId?: string }[];
-      pagination?: { next?: number | null };
-    };
-    for (const p of body.projects ?? []) {
-      if (p.name && p.id && p.accountId) {
-        collected.push({ name: p.name, projectId: p.id, orgId: p.accountId, envName: source.envName });
-      }
-    }
-    const next = body.pagination?.next;
-    if (next === null || next === undefined) return collected;
-    until = next;
-  }
-  console.warn(`  ⚠ ${source.envName}: quá ${MAX_PROJECT_PAGES} trang project — dừng liệt kê ở đây.`);
-  return collected;
-}
-
+// Phép liệt kê project dời sang `vercelCatalog.mts` ngày 12/08/2026, khi công cụ XOÁ trạm cần
+// đúng phép ấy. Chép sang tệp thứ hai thì hai công cụ sẽ bất đồng về việc「project này thuộc tài
+// khoản nào」— mà bất đồng ở đúng câu hỏi đó nghĩa là xoá nhầm tài khoản.
 const catalog: ProjectRef[] = [];
 for (const source of tokens) {
   const found = await projectsFor(source);

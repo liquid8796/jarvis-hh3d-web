@@ -15,6 +15,7 @@ import {
   resolveTarget,
   sensitiveEnvKeys,
   stationUrlFor,
+  storesOfProject,
   STORE_REGION,
   STORE_SPECS_SHARED,
   STORE_NAME_LENGTH,
@@ -302,6 +303,46 @@ function ok(condition: boolean, label: string): void {
     new Set(STORE_SPECS_SHARED.map((s) => pairs(s).get(REGION_KEY[s.slug]))).size === 1,
     "hai kho của một trạm nằm CÙNG một region",
   );
+}
+
+// ---- Kho nào của trạm nào: chỗ nguy hiểm nhất của công cụ XOÁ -------------------------------
+//
+// Tên kho là chuỗi ngẫu nhiên, nên sợi dây duy nhất nhận ra kho của một trạm là PROJECT ĐANG
+// NỐI. Chọn sai ở đây là xoá database của người khác — nên mọi nhánh đều có phép thử.
+{
+  const s = (name: string, ...projects: string[]) => ({
+    id: `store_${name}`,
+    name,
+    projectsMetadata: projects.map((p) => ({ name: p })),
+  });
+  const chia = storesOfProject(
+    [
+      s("rieng1", "auto-hh3d-1"),
+      s("rieng2", "auto-hh3d-1"),
+      s("chung", "auto-hh3d-1", "mot-project-khac"),
+      s("cuaNguoiKhac", "mot-project-khac"),
+      s("moCoi"),
+    ],
+    "auto-hh3d-1",
+  );
+  ok(chia.cuaRieng.map((x) => x.name).join(",") === "rieng1,rieng2", "chỉ nhặt kho nối ĐÚNG project ấy và không gì khác");
+  ok(chia.dungChung.map((x) => x.name).join(",") === "chung", "kho dùng chung tách riêng, KHÔNG nằm trong nhóm được xoá");
+  ok(chia.moCoi.map((x) => x.name).join(",") === "moCoi", "kho không nối project nào là mồ côi, cũng không được xoá");
+  ok(!chia.cuaRieng.some((x) => x.name === "cuaNguoiKhac"), "kho của project khác không bao giờ lọt vào");
+
+  ok(storesOfProject([], "auto-hh3d-1").cuaRieng.length === 0, "tài khoản không có kho nào → không ném");
+  // Tên project là so KHỚP TUYỆT ĐỐI: `auto-hh3d-1` không được kéo theo kho của `auto-hh3d-11`,
+  // và cũng không được bị kho của `auto-hh3d` nhận vơ. Lệ đặt tên `auto-hh3d-<số>` khiến hai ca
+  // này nằm sát nhau tới mức một phép `startsWith` cẩu thả sẽ nuốt gọn cả hai.
+  const gan = storesOfProject([s("a", "auto-hh3d-11"), s("b", "auto-hh3d"), s("c", "auto-hh3d-1")], "auto-hh3d-1");
+  ok(gan.cuaRieng.map((x) => x.name).join(",") === "c", "tên project khớp TUYỆT ĐỐI, không tiền tố không hậu tố");
+
+  // Dữ liệu thiếu từ API không được biến một kho của người khác thành kho「của riêng」ta.
+  const rac = storesOfProject(
+    [{ id: "x", name: "thieu-metadata" }, { id: "y", name: "ten-rong", projectsMetadata: [{ name: "  " }] }],
+    "auto-hh3d-1",
+  );
+  ok(rac.cuaRieng.length === 0 && rac.moCoi.length === 2, "kho thiếu/rỗng metadata rơi vào mồ côi, không vào nhóm xoá");
 }
 
 console.log(`\nTất cả ${passed} phép kiểm đều thuận.`);

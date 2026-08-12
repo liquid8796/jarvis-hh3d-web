@@ -57,6 +57,7 @@
     "verify:usage-push": "tsx scripts/verifyUsagePush.mts",
     "usage:full": "tsx scripts/vercelUsageFull.mts",
     "mirror:new": "tsx scripts/newMirrorStation.mts",
+    "mirror:remove": "tsx scripts/removeMirrorStation.mts",
     "github:new": "tsx scripts/newGithubStation.mts",
     "verify:worker-version": "tsx scripts/verifyWorkerVersion.mts",
     "verify:github-stations": "tsx scripts/verifyGithubStations.mts"

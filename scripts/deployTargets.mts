@@ -341,3 +341,43 @@ export const STORE_SPECS_SHARED = [
     metadata: ["clusterTier=FREE", `vercelRegion=${STORE_REGION}`],
   },
 ] as const;
+
+/** Một kho marketplace như Vercel trả về ở `GET /v1/storage/stores`. */
+export type StoreRef = { id?: string; name?: string; projectsMetadata?: { name?: string }[] };
+
+/**
+ * Chia kho của một tài khoản thành ba nhóm theo project đang nối.
+ *
+ * ĐÂY LÀ CHỖ NGUY HIỂM NHẤT CỦA CÔNG CỤ XOÁ. Từ 12/08/2026 tên kho là chuỗi ngẫu nhiên không
+ * mang chữ nào của tông môn, nên KHÔNG còn cách nào nhận ra kho của một trạm bằng tên — sợi dây
+ * duy nhất là project đang nối. Chọn sai ở đây là xoá database của người khác.
+ *
+ *   • `cuaRieng`  — nối ĐÚNG project ấy và không nối gì khác. Chỉ nhóm này được xoá.
+ *   • `dungChung` — nối project ấy VÀ project khác. Xoá là kéo theo thứ không ai xin xoá, nên
+ *                   chỉ báo tên rồi để yên; người vận hành tự gỡ nối trước nếu thật sự muốn.
+ *   • `moCoi`     — không nối project nào. Thường là rác của một lượt dựng chết giữa chừng,
+ *                   nhưng KHÔNG quy được cho trạm nào, nên cũng chỉ báo. Xoá hộ một thứ không
+ *                   quy được chủ là đúng cái kiểu「dọn dẹp」đã xoá nhầm dữ liệu ở khắp nơi.
+ */
+export function storesOfProject(
+  stores: readonly StoreRef[],
+  projectName: string,
+): { cuaRieng: StoreRef[]; dungChung: StoreRef[]; moCoi: StoreRef[] } {
+  const cuaRieng: StoreRef[] = [];
+  const dungChung: StoreRef[] = [];
+  const moCoi: StoreRef[] = [];
+
+  for (const store of stores) {
+    const names = (store?.projectsMetadata ?? [])
+      .map((p) => (p?.name ?? "").trim())
+      .filter((n) => n.length > 0);
+    if (names.length === 0) {
+      moCoi.push(store);
+      continue;
+    }
+    if (!names.includes(projectName)) continue;
+    if (names.some((n) => n !== projectName)) dungChung.push(store);
+    else cuaRieng.push(store);
+  }
+  return { cuaRieng, dungChung, moCoi };
+}

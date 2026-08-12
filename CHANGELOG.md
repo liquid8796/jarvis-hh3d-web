@@ -49,6 +49,28 @@ dữ liệu) → app đếm 10.183/12.889 dòng quá hạn, một câu SQL độ
 vào form → bấm Lưu mà không sửa gì」phải về đúng con số cũ (mở trang admin rồi bấm Lưu không được
 tự đổi hạn lưu của chính mình).
 
+## 0.76.2 — tài liệu cho khôi lỗi thứ hai, viết cho người đọc sau
+
+[deploy/github-actions.md](deploy/github-actions.md) — tệp mới, đứng cạnh `deploy/oracle/README.md`
+như hai tài liệu ngang hàng cho hai khôi lỗi ngang hàng. Kèm một dòng trong sơ đồ kiến trúc ở
+[README.md](README.md), vì trước lượt này nó vẫn kể rằng chỉ có MỘT khôi lỗi tông môn.
+
+Ba điều tệp ấy tồn tại để nói, và cả ba đều là thứ người đọc sau dễ làm ngược:
+
+- **Đừng dựng tầng phân công.** Nó đã có sẵn ở chỗ không ai nghĩ tới: câu UPDATE nguyên tử của
+  `claimNextJob` cộng index `jobs_one_active_per_account`. Viết thêm một bảng chia việc là dựng
+  một luật thứ hai sống lệch luật thật.
+- **Đừng thêm lựa chọn theo tên máy.** `workerPrefFilter` lọc theo `scope.kind`, không theo
+  `worker_id` — nên thêm khôi lỗi thứ ba không phải sửa dòng luật nào. Hàng rào viết theo TÊN
+  thì mỗi lần thêm máy là một dịp để quên.
+- **Đừng vặn lẻ một con số.** 290 + 50 < 350 < 360, và lịch phải DÀY hơn tuổi thọ. Hạ hạn chờ
+  thu xuống dưới ~40 phút là tự tay cắt ngang ván Mê Cung 35 phút — đúng cái việc mà cơ chế rút
+  lui sinh ra để tránh.
+
+Mục 5 ghi thẳng hai đoạn mã **chưa từng chạy trên Linux**: đường SIGTERM (không kiểm được dưới
+Windows vì Node ở đó không hỗ trợ tín hiệu ấy) và nhánh "còn đàn dở khi hết hạn thu". Mục 6 ghi
+ba rủi ro đã được cân nhắc và chấp nhận, để người sau biết đó là quyết định chứ không phải sơ suất.
+
 ## 0.76.1 — người dùng vẫn chỉ chọn HẠNG khôi lỗi, không chọn máy
 
 Đổi tên khôi lỗi GitHub thành `github-khoiloi` cho khớp lệ đặt tên của VM (`tong-mon-khoiloi`).

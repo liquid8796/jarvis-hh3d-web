@@ -12,9 +12,14 @@
 # không một credential nào. Cookie phiên Vercel mở được `ENCRYPTION_KEY` của trạm, tức mở được
 # phong bì cookie game của mọi đạo hữu; nó không được phép nằm cạnh chính thứ nó mở.
 #
-# NGÂN SÁCH: repo riêng tư nên gói Free có 2.000 phút Actions/tháng. Mỗi lượt ~4–6 phút cho
-# bốn trạm (cài deps + Chromium + cào). Sáu giờ một lần ≈ 700 phút/tháng — vừa vặn. ĐỪNG hạ
-# xuống mỗi giờ: ~3.600 phút/tháng là vượt trần, và vượt trần thì lịch lặng lẽ thôi chạy.
+# NGÂN SÁCH: repo này CÔNG KHAI — đo 12/08/2026 qua API GitHub, `"visibility": "public"` — nên
+# Actions trên runner tiêu chuẩn miễn phí KHÔNG GIỚI HẠN phút. Đó là điều duy nhất khiến nhịp
+# nửa giờ khả thi. Mỗi lượt ~4–6 phút cho bốn trạm (cài deps + Chromium + cào), tức nhịp này
+# ngốn ~7.200 phút/tháng.
+#
+# NẾU CÓ NGÀY ĐỔI REPO VỀ RIÊNG TƯ thì phải hạ nhịp trong cùng lượt sửa ấy: gói Free chỉ cho
+# 2.000 phút/tháng, nhịp nửa giờ đốt sạch trong hơn tám ngày — và vượt trần thì lịch LẶNG LẼ
+# thôi chạy, không ai được báo. Mức vừa vặn cho repo riêng tư là sáu giờ một lần (≈700 phút).
 #
 # CÀI ĐẶT — ba việc, làm một lần:
 #   1. Settings → Secrets and variables → Actions, thêm:
@@ -31,8 +36,9 @@ name: Vercel usage
 
 on:
   schedule:
-    # 6 giờ một lần. Giờ UTC; lịch của GitHub có thể trễ vài phút khi hệ thống bận — không sao,
-    # đây là số liệu 30 ngày chứ không phải nhịp tim.
+    # Nửa giờ một lần, đúng phút :00 và :30. Giờ UTC; lịch của GitHub có thể trễ vài phút khi
+    # hệ thống bận, và một lượt bị trễ chờm sang lượt sau thì `concurrency` bên dưới cho nó xếp
+    # hàng chứ không chen — số liệu này là cửa sổ 30 ngày, trễ một nhịp không mất gì.
     - cron: "*/30 * * * *"
   workflow_dispatch:
 

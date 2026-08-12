@@ -376,18 +376,43 @@ try {
 
 // ---- 7. Dò lại hai cửa và tổng kết -----------------------------------------------------------
 
+/**
+ * 200 = trạm đang phục vụ; 307 = trạm dự phòng đang chuyển hướng về trạm hoạt động. Cả hai đều
+ * LÀNH — script không phán trạm nào đáng hoạt động, đó là việc của bảng điều phối.
+ */
+const PROBE_HEALTHY = new Set([200, 307]);
+/**
+ * DÒ LẠI VÀI LƯỢT, vì `vercel --prod` trả về TRƯỚC khi alias production kịp lan.
+ *
+ * Đo ngày 13/08/2026: phát hành cho trạm gốc xong, lượt dò ngay sau đó trả 404 — trong khi dò
+ * lại bằng tay vài giây sau thì 307 đúng như phải thế. Trước đó một hôm cũng chính chỗ này báo
+ * `auto-hh3d-1  200` cho một trạm gương (nó chưa kịp đọc bảng điều phối nên fail-open phục vụ),
+ * làm cả bảng đọc như thể hai trạm cùng lên ngôi.
+ *
+ * Cả hai lần đều là DÒ QUÁ SỚM, và một phép kiểm nói dối ở dòng cuối thì tệ hơn không kiểm: nó
+ * dạy người ta thôi đọc dòng ấy. Nên chờ và hỏi lại vài lượt; chỉ khi hết lượt mà vẫn lạ thì mới
+ * in con số ấy ra như một điều đáng ngờ.
+ */
+const PROBE_TRIES = 4;
+const PROBE_GAP_MS = 4_000;
+
 console.log("\n── Dò lại từng trạm ─────────────────────────────────");
 for (const { station, ok } of outcomes) {
   if (!ok) continue;
-  try {
-    const res = await fetch(station.url, { redirect: "manual", signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
-    // 200 = trạm đang phục vụ; 307 = trạm dự phòng đang chuyển hướng về trạm hoạt động. Cả hai
-    // đều LÀNH — script không phán trạm nào đáng hoạt động, đó là việc của bảng điều phối.
-    const where = res.headers.get("location");
-    console.log(`  ${station.id.padEnd(14)} ${res.status}${where ? ` → ${where}` : ""}`);
-  } catch (err) {
-    console.warn(`  ${station.id.padEnd(14)} không nối được: ${err instanceof Error ? err.message : "lỗi lạ"}`);
+  let last = "";
+  for (let lan = 1; lan <= PROBE_TRIES; lan++) {
+    try {
+      const res = await fetch(station.url, { redirect: "manual", signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+      const where = res.headers.get("location");
+      last = `${res.status}${where ? ` → ${where}` : ""}`;
+      if (PROBE_HEALTHY.has(res.status)) break;
+    } catch (err) {
+      last = `không nối được: ${err instanceof Error ? err.message : "lỗi lạ"}`;
+    }
+    if (lan < PROBE_TRIES) await new Promise((r) => setTimeout(r, PROBE_GAP_MS));
+    else last += `  ⚠ vẫn vậy sau ${PROBE_TRIES} lượt dò — soi lại trạm này`;
   }
+  console.log(`  ${station.id.padEnd(14)} ${last}`);
 }
 
 const failed = outcomes.filter((o) => !o.ok);

@@ -114,6 +114,17 @@ function ok(condition: boolean, label: string): void {
     "…và nêu đích danh hai biến token để người ta biết gỡ cái nào",
   );
 
+  // MỘT project thấy qua HAI token là chuyện BÌNH THƯỜNG, không phải nhập nhằng: `mirror:new`
+  // cất token dưới tên suy từ mã trạm, nên một tài khoản dễ có hai biến token khác chuỗi.
+  // Đo thật 13/08/2026: `VERCEL_TOKEN` và `VERCEL_TOKEN_AUTO_HH3D` cùng trỏ
+  // `prj_eW4Il86IBjG2NIZepeWKXFoZnejT`, mà mọi lượt phát hành cho trạm ấy đều chết.
+  const haiToken = resolveTarget({ id: "main", name: "Trạm gốc", url: "https://auto-hh3d.vercel.app" }, [
+    main,
+    { ...main, envName: "VERCEL_TOKEN_AUTO_HH3D" },
+  ]);
+  ok(haiToken.ok, "CÙNG một project thấy qua hai token → vẫn phát hành được, không kêu nhập nhằng");
+  ok(haiToken.ok && haiToken.target.projectId === "prj_main", "…và chọn đúng project ấy");
+
   const empty = resolveTarget({ id: "main", name: "Trạm chính", url: "https://auto-hh3d.vercel.app" }, []);
   ok(!empty.ok && empty.message.includes("chưa khai token nào"), "danh mục rỗng → lời nhắc khác hẳn, đúng nguyên nhân");
 

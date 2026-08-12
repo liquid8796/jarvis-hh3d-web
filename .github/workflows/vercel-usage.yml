@@ -88,7 +88,10 @@ jobs:
           # Lấy đúng bằng cách hỏi API bằng token của chính trạm ấy:
           #   GET /v2/user → defaultTeamId → GET /v2/teams/<id> → .slug
           # (cũng chính là nhãn đầu trong URL dashboard: vercel.com/<slug>)
-          stations="main|jarvis8796|VERCEL_COOKIE_MAIN
+          # Cột đầu là MÃ TRẠM trong sổ gương — `/api/usage-report` tra đúng chuỗi ấy và trả 404
+          # nếu không có. Trạm gốc đổi mã `main` → `auto-hh3d` ngày 13/08/2026, lúc nó được dựng
+          # lại từ đầu để gột sạch mấy biến env dạng sensitive; tên secret cookie giữ nguyên.
+          stations="auto-hh3d|jarvis8796|VERCEL_COOKIE_MAIN
           auto-hh3d-1|zhangyu4|VERCEL_COOKIE_AUTO_HH3D_1
           auto-hh3d-2|freecoursecademy|VERCEL_COOKIE_AUTO_HH3D_2
           auto-hh3d-3|smart-service|VERCEL_COOKIE_AUTO_HH3D_3"

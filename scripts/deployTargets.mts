@@ -213,12 +213,28 @@ export function resolveTarget(station: StationEntry, catalog: readonly ProjectRe
         " Thiếu token của tài khoản ấy thì thêm một biến VERCEL_TOKEN_<TÊN> vào .env.local.",
     };
   }
-  if (matches.length > 1) {
+  /**
+   * NHẬP NHẰNG LÀ「HAI PROJECT KHÁC NHAU CÙNG TÊN」, KHÔNG PHẢI「một project thấy bằng hai token」.
+   *
+   * Bản đầu từ chối ngay khi `matches.length > 1`, và điều đó SAI theo một kiểu chỉ lộ ra khi
+   * dùng thật: ngày 13/08/2026 `mirror:new --site auto-hh3d` cất thêm `VERCEL_TOKEN_AUTO_HH3D`
+   * bên cạnh `VERCEL_TOKEN` đã có. Hai chuỗi token khác nhau, CÙNG một tài khoản, cùng một
+   * `projectId` — mà mọi lượt phát hành cho trạm ấy đều chết với câu「không đoán chủ nhân」.
+   * `discoverTokens` khử trùng theo GIÁ TRỊ nên nó không cứu được ca này: hai token là hai
+   * chuỗi thật sự khác nhau.
+   *
+   * Nguy hiểm thật sự mà phép từ chối này canh là phát hành lên NHẦM TÀI KHOẢN — và điều đó chỉ
+   * xảy ra khi cùng một cái tên trỏ tới hai project KHÁC NHAU. Nên câu hỏi đúng là đếm
+   * `projectId`, không đếm token.
+   */
+  const distinct = new Map(matches.map((m) => [m.projectId, m]));
+  if (distinct.size > 1) {
     return {
       ok: false,
       message:
-        `Project「${named.name}」thấy được bằng NHIỀU token (${matches.map((m) => m.envName).join(", ")}) — ` +
-        "không đoán chủ nhân. Gỡ token thừa khỏi .env.local rồi chạy lại.",
+        `Tên project「${named.name}」trỏ tới ${distinct.size} project KHÁC NHAU: ` +
+        [...distinct.values()].map((m) => `${m.projectId} (qua ${m.envName})`).join(", ") +
+        " — không đoán được cái nào của tông môn. Gỡ token của tài khoản lạ khỏi .env.local rồi chạy lại.",
     };
   }
   return { ok: true, target: matches[0] };

@@ -11,6 +11,44 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.78.0 — một lệnh dựng thêm một khôi lỗi GitHub ở tài khoản bất kỳ
+
+`node scripts/newGithubKhoiloi.mjs --owner <tài-khoản>` — từ kho trắng tới lượt chạy đầu tiên.
+Mỗi tài khoản GitHub là một quỹ phút Actions riêng, nên thêm một tài khoản là thêm một khôi lỗi
+tông môn nữa mà không tốn đồng nào; việc dựng thì lặp đi lặp lại, và「lặp đi lặp lại」là chỗ để
+quên — quên `--public` thì mất quỹ phút miễn phí, quên đổi `WORKER_ID` thì hai tiến trình ghi đè
+nhau trong bảng `workers`.
+
+**Kho sinh ra KHÔNG phải bản sao của web repo** — chỉ `scripts/worker.mjs`, `src/lib/quest-engine/`,
+một `package.json` ghim đúng `playwright-core` đang dùng, và workflow. Giữ NGUYÊN bố cục thư mục
+là cố ý: `worker.mjs` import `../src/lib/quest-engine/…`, nên chép nguyên hình dạng thì không
+phải viết lại một đường dẫn nào — đúng cái bẫy mà `buildWorkerBundle.mjs` phải chống bằng phép
+rewrite.
+
+**Workflow lấy NGUYÊN bản của web repo rồi chỉ thay hai dòng** (id khôi lỗi, địa chỉ web), và
+phép thay tự kiểm lại kết quả rồi NÉM nếu không khớp. Chép tay một bản thứ hai là hẹn ngày hai
+bản trôi khỏi nhau — mà bộ số 290/50/350/360 thì không được phép lệch.
+
+Dựa vào `gh` thay vì tự gọi API: đặt secret đòi mã hoá sealed-box (X25519 + XSalsa20), thứ Node
+không có sẵn, nên làm tay là kéo `libsodium` vào một app web chỉ để phục vụ một script phát hành.
+Token đi qua STDIN chứ không qua đối số — đối số nằm trong command line mà ai mở Task Manager
+cũng đọc được.
+
+**Hai lỗi do chính lượt chạy khô bắt được**, và cả hai đều thuộc loại hỏng-lặng-lẽ:
+
+- `WEB_URL` đọc từ `.env` ra đúng chuỗi `"[SENSITIVE]"` — biến ấy nằm trong nhóm bị Vercel che.
+  Nướng nó vào workflow là phát ra một khôi lỗi gọi về địa chỉ không tồn tại, hỏng ở một kho
+  KHÁC, sau khi mọi bước ở đây đều báo xanh. Nay kiểm「có phải URL http(s) thật không」rồi mới
+  dùng, kèm `--web-url` cho ca cần địa chỉ khác.
+- Phép kiểm `gh` chặn cả `--dry-run`. Lượt chạy khô sinh ra để soi kế hoạch trên một máy chưa
+  cài `gh`, trong lúc còn đang cân nhắc — chặn nó là lấy mất đúng công dụng của nó. Nay nó đứng
+  sau, lượt chạy thật vẫn hỏng sớm trước khi tạo bất cứ thứ gì.
+
+**Chưa chạy thật lần nào:** máy phát triển không có `gh`, nên mọi bước từ `gh repo create` trở đi
+mới chỉ đúng trên giấy. Lượt dựng đầu tiên nên chạy `--dry-run` trước, rồi soi kỹ ba mốc: kho ra
+đúng CÔNG KHAI, secret hiện trong Settings, và `WORKER_ID` trong workflow của kho mới KHÁC mọi
+khôi lỗi đang chạy.
+
 ## 0.77.0 — Hàng Đợi có tab Khôi Lỗi, và id khôi lỗi tông môn chỉ bậc trị sự thấy
 
 Từ hôm có khôi lỗi tông môn **thứ hai** (0.76.0), trang Hàng Đợi thiếu hẳn một câu trả lời: mọi

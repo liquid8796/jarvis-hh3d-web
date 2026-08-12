@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 54,
+  "schemaVersion": 55,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -2563,6 +2563,13 @@
           }
         },
         {
+          "action": "evaluateJavaScript",
+          "script": "() =\u003E { const b = document.querySelector(\u0027#ldModalBody\u0027); if (!b || b.getBoundingClientRect().width \u003C 1) return \u0027\u0027; const m = (b.innerText || \u0027\u0027).match(/D\u01B0\u1EE3c kh\u00ED\\s*([1-4])\\s*sao/i); return m ? \u0027!Thu \u0111\u01B0\u1EE3c \u0111an \u0027 \u002B m[1] \u002B \u0027 sao\u0027 : \u0027\u0027; }",
+          "timeoutMs": 4000,
+          "note": "k\u1EC3 chuy\u1EC7n: \u0111an thu \u0111\u01B0\u1EE3c m\u1EA5y sao \u2014 \u0111\u1ECDc l\u00FAc b\u1EA3ng th\u01B0\u1EDFng c\u00F2n m\u1EDF",
+          "optional": true
+        },
+        {
           "action": "click",
           "selector": "#ldModalCloseBtn",
           "timeoutMs": 5000,
@@ -2613,7 +2620,7 @@
           "optional": true,
           "when": {
             "kind": "textMatches",
-            "selector": "#ldModal",
+            "selector": "#ldModalBody",
             "text": "{{decompose}}"
           }
         },
@@ -3577,6 +3584,13 @@
           }
         },
         {
+          "action": "evaluateJavaScript",
+          "script": "() =\u003E { const b = document.querySelector(\u0027#ldModalBody\u0027); if (!b || b.getBoundingClientRect().width \u003C 1) return \u0027\u0027; const m = (b.innerText || \u0027\u0027).match(/D\u01B0\u1EE3c kh\u00ED\\s*([1-4])\\s*sao/i); return m ? \u0027!Thu \u0111\u01B0\u1EE3c \u0111an \u0027 \u002B m[1] \u002B \u0027 sao\u0027 : \u0027\u0027; }",
+          "timeoutMs": 4000,
+          "note": "k\u1EC3 chuy\u1EC7n: \u0111an thu \u0111\u01B0\u1EE3c m\u1EA5y sao \u2014 \u0111\u1ECDc l\u00FAc b\u1EA3ng th\u01B0\u1EDFng c\u00F2n m\u1EDF",
+          "optional": true
+        },
+        {
           "action": "click",
           "selector": "#ldModalCloseBtn",
           "timeoutMs": 5000,
@@ -3627,7 +3641,7 @@
           "optional": true,
           "when": {
             "kind": "textMatches",
-            "selector": "#ldModal",
+            "selector": "#ldModalBody",
             "text": "{{decompose}}"
           }
         },

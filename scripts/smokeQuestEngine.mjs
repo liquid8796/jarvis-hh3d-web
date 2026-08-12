@@ -1271,10 +1271,13 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   );
   const { loadProfile: loadProfileForSchema } = await import("../src/lib/quest-engine/profile.mjs");
   check(
-    // 54 = Hỷ Sự Đường: tuỳ chọn lọc trạng thái chúc + sổ phòng đã ghé (bản ghi 11/08). Bump schema là thay hồ sơ đã lưu bên
-    // desktop ngay lần mở đầu tiên — chốt này bắt mỗi cú bump phải là một quyết định có chủ ý.
-    "hồ sơ đang ở schema 54",
-    loadProfileForSchema().schemaVersion === 54,
+    // 55 = cửa chặn sao của Luyện Đan đổi selector `#ldModal` → `#ldModalBody` (bản ghi 12/08).
+    // Bump ở ĐÂY là bắt buộc chứ không phải lịch sự: web đọc lại profile.json mỗi lượt nên nó
+    // được vá ngay, còn bản desktop chỉ thay hồ sơ đã lưu khi schema tăng — không bump thì máy
+    // nào đang ở 54 giữ nguyên selector ma và tính năng chết tiếp. Bump schema là thay hồ sơ đã
+    // lưu bên desktop ngay lần mở đầu tiên — chốt này bắt mỗi cú bump phải là quyết định có chủ ý.
+    "hồ sơ đang ở schema 55",
+    loadProfileForSchema().schemaVersion === 55,
     String(loadProfileForSchema().schemaVersion),
   );
 

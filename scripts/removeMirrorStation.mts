@@ -3,9 +3,10 @@
  * XOÁ MỘT TRẠM GƯƠNG — sổ, project Vercel, và MỌI kho của nó. Nửa đối xứng của `mirror:new`.
  *
  *   npm run mirror:remove -- --site auto-hh3d-1
- *   npm run mirror:remove -- --site main --project auto-hh3d
  *   npm run mirror:remove -- --site auto-hh3d-1 --dry-run   (chỉ in kế hoạch, không xoá gì)
  *   npm run mirror:remove -- --site auto-hh3d-1 --yes       (bỏ câu xác nhận gõ tay)
+ *   npm run mirror:remove -- --site <mã> --project <tên>    (khi trạm ĐÃ gỡ khỏi sổ, và tên
+ *                                                            project khác mã trạm)
  *
  * Hoặc bấm đúp `remove-mirror-station.bat`.
  *

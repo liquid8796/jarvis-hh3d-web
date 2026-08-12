@@ -2,7 +2,7 @@
  * Bảng điều phối gương trạm — công cụ vận hành từ dòng lệnh.
  *
  *   npm run mirror:control -- status                       # đọc + xác minh + in bảng
- *   npm run mirror:control -- set --site main --url https://auto-hh3d.vercel.app
+ *   npm run mirror:control -- set --site auto-hh3d --url https://auto-hh3d.vercel.app
  *
  * `set` là phép LẬT TRẠM khi bảng đã tồn tại — nó chính là bước `flipping` của máy trạng
  * thái §6 (deploy/mirror/README.md) trong lúc trang admin (phase 3) chưa ra đời, và vẫn sẽ

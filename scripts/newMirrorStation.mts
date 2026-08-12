@@ -8,10 +8,16 @@
  * Hoặc bấm đúp `new-mirror-station.bat` — nó hỏi hai câu rồi gọi vào đây.
  *
  * `--project <tên>` khi tên project Vercel KHÁC mã trạm. Mặc định hai thứ trùng nhau và nên cứ
- * để vậy; cờ này tồn tại cho đúng một ca có thật là trạm gốc — mã trạm `main`, project và địa
- * chỉ `auto-hh3d` — thứ dựng bằng tay từ trước khi có lệ đặt tên:
+ * để vậy — lệ「một cái tên cho cả ba chỗ」(README §9) là thứ khiến không ai phải tra bảng đối
+ * chiếu bao giờ:
  *
- *   MIRROR_TOKEN=<token> npm run mirror:new -- --site main --project auto-hh3d
+ *   MIRROR_TOKEN=<token> npm run mirror:new -- --site <mã> --project <tên project>
+ *
+ * Cờ này sinh ra ngày 12/08/2026 cho trạm GỐC, hồi nó mang mã `main` mà sống ở project
+ * `auto-hh3d` — dựng tay từ trước khi có lệ đặt tên, và vì thế là trạm DUY NHẤT không dựng lại
+ * được. Ca ấy nay đã hết: 13/08/2026 trạm gốc được dựng lại thành mã `auto-hh3d`, trùng tên
+ * project, nên hiện KHÔNG trạm nào cần cờ này. Giữ lại vì bài học thì chưa hết hạn — ngày nào
+ * còn một trạm mang tên lệch thì đây là đường về, và không có nó thì đường ấy không tồn tại.
  *
  * VÌ SAO CẦN: checklist tay ở deploy/mirror/README.md §9 là mười bước, và ba trong số đó là bẫy
  * đã trả giá thật (11/08/2026, lúc dựng trạm thứ ba):
@@ -184,9 +190,14 @@ const projectName = projectParsed.siteId;
 const stationUrl = stationUrlFor(projectName);
 /**
  * Tên biến chứa token vẫn suy từ MÃ TRẠM, không từ tên project: token thuộc về TÀI KHOẢN giữ
- * trạm, và mã trạm là thứ người vận hành gọi tên nó. Với `--site main` thì đó là
- * `VERCEL_TOKEN_MAIN`, trong khi tài khoản ấy có thể đã có sẵn `VERCEL_TOKEN` cùng giá trị —
- * `discoverTokens` khử trùng THEO GIÁ TRỊ nên hai biến một token là chuyện đã lường trước.
+ * trạm, và mã trạm là thứ người vận hành gọi tên nó.
+ *
+ * Hệ quả phải biết: một tài khoản dễ có HAI biến token. `--site auto-hh3d` cất
+ * `VERCEL_TOKEN_AUTO_HH3D` bên cạnh `VERCEL_TOKEN` sẵn có, và nếu hai chuỗi ấy khác nhau thì
+ * `discoverTokens` (khử trùng theo GIÁ TRỊ) không gộp được. Đo 13/08/2026: đúng ca ấy khiến mọi
+ * lượt phát hành cho trạm gốc chết với câu「thấy được bằng NHIỀU token — không đoán chủ nhân」.
+ * `resolveTarget` nay đếm `projectId` chứ không đếm token, nên hai biến một tài khoản là chuyện
+ * bình thường — nhưng vẫn nên dọn biến thừa cho khỏi rối.
  */
 const tokenEnvName = tokenEnvNameFor(siteId);
 

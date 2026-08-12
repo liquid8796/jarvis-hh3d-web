@@ -11,6 +11,63 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.81.1 — VM nhường 2 ghế cho khôi lỗi GitHub, và lần đầu restart không chém đàn ai
+
+`WORKER_MAX_JOBS` của VM: **5 → 3**. Hai ghế còn lại thuộc về `github-khoiloi` (đang đặt 2 trong
+workflow), nên tổng mức song song của tông môn nay là **3 + 2 = 5**. Không sửa một dòng mã phân
+công nào, vì không có dòng nào để sửa: ghế CHÍNH LÀ núm chia việc — VM đầy ghế thì câu claim kế
+tiếp rơi vào tay máy còn chỗ. Số nằm ở drop-in systemd trên VM (`override.conf`), không nằm trong
+repo lẫn `setup.sh`; ba chỗ tài liệu ghi con số cũ đã sửa theo, kể cả một dòng bình chú trong
+`setup.sh` vốn còn ghi nhầm `10G` cho một máy đang chạy `18G`.
+
+**Và phần đáng kể hơn con số: từ nay restart KHÔNG cắt ngang đàn đang cày.** `worker.mjs` vốn đã
+nghe `SIGTERM` rồi vào pha rút lui (thôi nhận việc, chờ đàn đi nốt vòng, thoát sạch) — nhưng
+systemd mặc định chỉ chờ **90 giây** rồi `SIGKILL`, mà một ván Mê Cung dài ~35 phút. Nên pha rút
+lui ấy chưa bao giờ dùng được trên VM: mọi lượt `systemctl restart` (và mọi lượt `setup.sh`, vì
+bước đầu của nó là `systemctl stop`) đều chém đứt đàn đang chạy, rồi `reapStaleJobs` kết liễu
+chúng thành `failed` sau 3 phút — người dùng mất trọn một vòng và phải bấm Khai Đàn lại.
+
+Phải sửa BA thứ, không phải hai — và mảnh thứ ba chỉ lộ ra vì lượt sửa đầu **vẫn giết đàn**:
+
+```
+KillMode=mixed                   SIGTERM chỉ tới tiến trình CHÍNH
+WORKER_DRAIN_TIMEOUT_MS=2100000  worker tự bỏ cuộc ở phút 35
+  <  TimeoutStopSec=2400         systemd SIGKILL ở phút 40
+```
+
+**Lượt nới hạn chờ đầu tiên trông y như đã thành công, và nó chỉ đúng một nửa.** Nhật ký in đúng
+câu thiết kế hứa — `Thu đàn: nhận SIGTERM. Thôi nhận việc mới, chờ 3 đàn đang chạy đi nốt vòng.`
+— rồi đứng ở `deactivating` hai phút và thoát sạch. Nhưng đúng GIÂY gửi tín hiệu, database nhận
+**12 dòng** `page.goto/page.reload: Target page, context or browser has been closed` trải khắp
+hai đàn VM đang giữ. Lý do: `KillMode` mặc định là `control-group`, tức `SIGTERM` tới MỌI tiến
+trình trong cgroup — worker ngồi chờ đàn đi nốt vòng trong khi Chromium của chính những đàn ấy
+đã bị giết ngay dưới chân nó.
+
+Thiệt hại thật thì NHẸ HƠN vẻ ngoài, và chỗ này đáng nói vì suýt nữa đã ghi sai vào đây: **không
+đàn nào chết**. Worker vẫn sống nên nó kết thúc hai vòng ấy tử tế và xếp lại hàng
+(`Đi hết một vòng — 4 nhiệm vụ thuận lợi` lúc 01:09), tức mất phần nhiệm vụ còn lại của vòng
+đang chạy chứ không mất cả đàn — `reapStaleJobs` chỉ kết liễu khi nhịp tim TẮT HẲN. Đo lại đúng
+cửa sổ 01:05–01:16: **0 đàn chuyển sang `failed`**. (Bốn đàn chết lúc 00:19 và 00:47 là chuyện
+khác, trước lượt restart 19–47 phút, không phải do nó.)
+
+Bẫy đọc-nhầm-nhân-quả gặp ngay trong lượt truy này, ghi lại vì nó sẽ gặp lại: `job_events` không
+lưu ai LÀM ra dòng ấy, nên join sang `automation_jobs.worker_id` là đọc được chủ HIỆN TẠI của
+đàn, không phải chủ lúc sự việc xảy ra. Cùng một chùm lỗi vì thế trông như thể do hai máy khác
+nhau gây ra cùng một giây — một sự trùng hợp không thể có, và chính nó tố cáo phép suy sai.
+
+Hai mốc thời gian giữ thứ tự app-trước-nền-tảng, cùng lối với bộ 290+50 < 350 < 360 bên Actions:
+hết 35 phút mà còn đàn dở thì worker tự thoát kèm dòng nói rõ「còn N đàn chưa xong」, thay vì bị
+`SIGKILL` câm lặng ở phút 40.
+
+Cái giá phải biết trước: `setup.sh` từ nay có thể đứng im tới 35 phút thay vì xong trong một
+phút, vì bước đầu của nó là `systemctl stop`.
+
+**Chưa có bằng chứng cho chính bản vá `KillMode`.** Nó đã đặt và `systemctl show -p KillMode`
+xác nhận là `mixed`, nhưng chưa lượt restart nào sau đó rơi trúng lúc VM đang giữ đàn — nên hiệu
+lực hiện dựa vào hợp đồng của systemd chứ không phải một phép đo. Thứ ĐÃ đo: `WORKER_MAX_JOBS=3`
+có trong `/proc/<pid>/environ` của tiến trình đang chạy, và chính worker in ra `tối đa 3 đàn cùng
+lúc` lúc lên ca.
+
 ## 0.81.0 — Tế Lễ bấm vào một hộp thoại đã không còn tồn tại (schema 56)
 
 Tế Lễ Tông Môn (tài khoản thường) hỏng ở bước cuối: script mở hộp xác nhận rồi bấm

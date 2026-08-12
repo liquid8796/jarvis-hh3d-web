@@ -6,7 +6,7 @@ Từ 12/08/2026 tông môn có **hai** khôi lỗi hạng tông môn, không ph�
 |---|---|---|
 | Ở đâu | VM Oracle Always Free, 4 vCPU/24GB | Runner của GitHub Actions, 4 nhân/16GB |
 | Sống | 24/7, liền mạch hàng tuần | Từng lượt ~4,8 giờ, lịch 4 giờ/lần nối nhau |
-| Ghế | 5 đàn × 4 tab | 2 đàn × 3 tab |
+| Ghế | 3 đàn × 4 tab | 2 đàn × 3 tab |
 | Tài liệu | [oracle/README.md](oracle/README.md) | tệp này |
 | Vai trò | gánh chính | cộng thêm |
 
@@ -26,6 +26,12 @@ chính câu claim đã có từ trước:
 
 Kết quả là tự cân bằng theo tải THẬT: máy nào rảnh trước thì nhặt trước. Một bảng phân công
 viết tay sẽ vừa thừa, vừa là một luật thứ hai sống lệch luật thật.
+
+**Muốn dịch tải giữa hai máy thì vặn SỐ GHẾ, đó là núm duy nhất.** Ngày 12/08/2026 hạ VM từ 5 ghế
+xuống 3 chính là cách「giao 2 đàn cùng lúc cho khôi lỗi GitHub」— không sửa một dòng mã phân công
+nào, vì không có dòng nào để sửa: VM đầy ghế thì câu claim kế tiếp rơi vào tay máy còn ghế trống.
+Nhớ luôn phép cộng: tổng mức song song của tông môn = tổng số ghế của các máy (nay 3 + 2 = 5), nên
+hạ một bên mà không nâng bên kia là hạ tổng.
 
 ## 2. Người dùng KHÔNG chọn máy, chỉ chọn hạng
 

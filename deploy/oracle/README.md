@@ -104,12 +104,57 @@ tàng khố — không bao giờ đưa cho người dùng (họ có linh phù ri
 | service | `auto-hh3d-linh-su.service` |
 | thư mục | `/opt/auto-hh3d/linh-su` |
 | env | `/opt/auto-hh3d/linh-su/.env` (`WEB_URL`, `WORKER_TOKEN`, `WORKER_ID=tong-mon-khoiloi`) |
-| drop-in | `/etc/systemd/system/auto-hh3d-linh-su.service.d/override.conf` — `MemoryMax=18G`, `WORKER_MAX_JOBS=5`, `WORKER_QUEST_TABS=4`. **Không** có trong `.env` và **không** có trong `setup.sh` (script chỉ viết lại unit chính), nên soi hai chỗ ấy sẽ tưởng nhầm là 4G và 2 đàn. Tệp ấy mang sẵn một khối bình chú dài kèm số đo — đọc nó trước khi vặn. |
+| drop-in | `/etc/systemd/system/auto-hh3d-linh-su.service.d/override.conf` — `MemoryMax=18G`, `WORKER_MAX_JOBS=3`, `WORKER_QUEST_TABS=4`, `TimeoutStopSec=2400`, `WORKER_DRAIN_TIMEOUT_MS=2100000`. **Không** có trong `.env` và **không** có trong `setup.sh` (script chỉ viết lại unit chính), nên soi hai chỗ ấy sẽ tưởng nhầm là 4G và 2 đàn. Tệp ấy mang sẵn một khối bình chú dài kèm số đo — đọc nó trước khi vặn. |
 
-**Mức song song, ba tầng:** 5 đàn cùng lúc (`WORKER_MAX_JOBS`), mỗi đàn tối đa 4 tab nhiệm vụ
+**Mức song song, ba tầng:** 3 đàn cùng lúc (`WORKER_MAX_JOBS`), mỗi đàn tối đa 4 tab nhiệm vụ
 (`WORKER_QUEST_TABS`), nhưng cổng toàn cục trong `questGate.mjs` mới điều tiết thật: 2 nhiệm vụ
-TRANG RIÊNG + 5 HUB = **7 nhiệm vụ** chạy một lúc trên cả tiến trình. Nên 5 ghế không có nghĩa
-20 tab cùng cày — phần dư nằm xếp hàng ở cổng.
+TRANG RIÊNG + 5 HUB = **7 nhiệm vụ** chạy một lúc trên cả tiến trình (hai hằng số ấy KHÔNG suy
+từ số ghế, nên hạ ghế không hạ trần cổng). Nên 3 ghế không có nghĩa 12 tab cùng cày — phần dư
+nằm xếp hàng ở cổng.
+
+> **Vì sao 3 chứ không phải 5 (12/08/2026):** tông môn nay có khôi lỗi thứ hai trên GitHub
+> Actions, và ghế là thứ CHIA việc giữa hai máy — không có tầng phân công nào cả, ai còn ghế
+> trống thì `claimNextJob` phát cho người ấy. Hạ VM về 3 là nhường 2 đàn cùng lúc cho
+> `github-khoiloi` (nó đang đặt `WORKER_MAX_JOBS=2` trong workflow). Tổng mức song song của cả
+> tông môn vì thế là **3 + 2 = 5**, không phải 7 như khi VM một mình ôm 5 ghế — muốn giữ 7 thì
+> phải nâng phía Actions, xem [github-actions.md](../github-actions.md).
+
+**Dừng ÊM, không chém (thêm 12/08/2026).** `worker.mjs` nghe `SIGTERM` rồi vào pha rút lui: thôi
+nhận việc mới, chờ đàn đang chạy đi nốt vòng, rồi thoát sạch. Trước bản này pha ấy **chưa bao giờ
+dùng được trên VM**, và phải sửa BA thứ mới xong — thiếu bất kỳ cái nào là cả cơ chế vẫn vô dụng:
+
+```
+KillMode=mixed                   SIGTERM chỉ tới tiến trình CHÍNH
+WORKER_DRAIN_TIMEOUT_MS=2100000  worker tự bỏ cuộc ở phút 35
+  <  TimeoutStopSec=2400         systemd SIGKILL ở phút 40
+```
+
+- **`KillMode=mixed` là mảnh khó thấy nhất, và là mảnh quyết định.** Mặc định của systemd là
+  `control-group`: `SIGTERM` gửi cho MỌI tiến trình trong cgroup, tức cả Chromium. Worker vẫn in
+  đúng câu「Thu đàn: nhận SIGTERM」rồi ngồi chờ — trong khi trình duyệt của những đàn ấy đã chết
+  ngay dưới chân nó. **Đo thật 13/08/2026:** lượt restart đầu tiên đi theo lối "êm" vẫn sinh 12
+  dòng `page.goto/page.reload: Target page, context or browser has been closed` đúng giây gửi tín
+  hiệu, trải khắp hai đàn VM đang giữ. Thiệt hại dừng ở đó — **không đàn nào chết**, vì worker
+  còn sống nên vẫn kết thúc hai vòng ấy tử tế rồi xếp lại hàng; `reapStaleJobs` chỉ kết liễu khi
+  nhịp tim TẮT HẲN. Mất là mất phần nhiệm vụ còn lại của vòng đang chạy, cộng một lượt cooldown
+  dài hơn. Dấu hiệu nhận ra lần sau: nhật ký CÓ câu thu đàn mà VẪN có chùm „browser has been
+  closed" đúng giây ấy.
+
+  > **Chưa có bằng chứng cho chính bản vá này.** `KillMode=mixed` đã đặt và `systemctl show
+  > -p KillMode` xác nhận, nhưng chưa lượt restart nào SAU đó rơi trúng lúc VM đang giữ đàn —
+  > nên hiệu lực của nó hiện dựa vào hợp đồng của systemd („SIGTERM chỉ tới tiến trình chính"),
+  > không phải một phép đo. Lượt cài đè kế tiếp là chỗ soi: nhật ký phải CÓ câu thu đàn và
+  > KHÔNG có dòng „browser has been closed" nào.
+- **Hai mốc thời gian phải theo thứ tự app-trước-nền-tảng**, cùng lối với bộ 290+50 < 350 < 360
+  bên Actions: hết 35 phút mà còn đàn dở thì worker tự thoát kèm dòng nói rõ「còn N đàn chưa
+  xong」, thay vì bị `SIGKILL` câm lặng ở phút 40.
+
+Hệ quả cần biết, và nó đổi hẳn cảm giác khi vận hành: `systemctl restart` giờ **không trả lệnh về
+ngay** — nó chờ hết pha rút lui. Dùng `--no-block` nếu không muốn ngồi đợi, rồi soi
+`systemctl is-active` (`deactivating` = đang thu đàn). **Điều này áp cho cả `setup.sh`**, vì bước
+đầu của nó là `systemctl stop`: một lượt cài đè lúc VM đang cày nay có thể đứng im tới 35 phút
+thay vì xong trong một phút. Đó là cái giá của việc không chém đàn ai — nhưng biết trước thì
+không hoảng, và ai cần gấp thì `systemctl kill -s SIGKILL` vẫn còn đó (chấp nhận mất vòng).
 
 > **Trần thật của máy thấp hơn trần mã, và CPU mới là thứ chạm trần trước.** `worker.mjs` kẹp
 > `WORKER_MAX_JOBS` trong `[1,8]`, nhưng 8 ghế thì gãy: đo ngày 10/08/2026 với 8 tài khoản cày

@@ -49,6 +49,43 @@ dữ liệu) → app đếm 10.183/12.889 dòng quá hạn, một câu SQL độ
 vào form → bấm Lưu mà không sửa gì」phải về đúng con số cũ (mở trang admin rồi bấm Lưu không được
 tự đổi hạn lưu của chính mình).
 
+## 0.76.0 — khôi lỗi tông môn thứ hai, chạy trên GitHub Actions
+
+Một khôi lỗi tông môn nữa, trên runner của GitHub, chạy song song với khôi lỗi trên VM.
+
+**Không có cơ chế điều phối nào giữa hai bên, và đó là chủ ý.** Postgres đã phân xử sẵn:
+`claimNextJob` là MỘT câu UPDATE nguyên tử nên hai khôi lỗi giành nhau thì nhận hai dòng khác
+nhau hoặc một dòng và một null; cộng index `jobs_one_active_per_account` thì hai đàn cùng một
+tài khoản là bất khả thi về cấu trúc. Dựng thêm một tầng chia việc ở đây chỉ là đẻ ra một luật
+thứ hai sống lệch luật thật.
+
+**Thứ THẬT SỰ đẻ ra lỗi nằm chỗ khác:** `worker.mjs` chạy `for(;;)` vô tận, không có đường
+thoát êm — mà runner bị giết cứng ở mốc 6 giờ. Bị giết giữa một ván Mê Cung 35 phút thì nhịp
+tim tắt và `reapStaleJobs` kết liễu đàn ấy thành `failed` sau 3 phút: mất trọn một vòng của một
+đạo hữu, đều đặn mỗi 6 tiếng. Nên toàn bộ tính năng quy về một pha rút lui.
+
+`WORKER_MAX_LIFETIME_MS` — quá hạn thì THÔI NHẬN VIỆC MỚI, không chết ngay. `WORKER_DRAIN_TIMEOUT_MS`
+— chờ tối đa bấy nhiêu cho đàn đang dở đi nốt vòng. Cả hai **mặc định 0 = vô hạn**, nên khôi lỗi
+trên VM và trên máy nhà giữ nguyên hành vi cũ từng byte; chỉ nơi có đồng hồ treo trên đầu mới đặt.
+
+Ba con số của workflow, mỗi con số một lý do:
+
+| | |
+|---|---|
+| thôi nhận việc ở phút **290**, chờ thu tối đa **50** | 340 < 350 (timeout job) < 360 (trần nền tảng) — hai lớp đệm, mỗi lớp 10 phút |
+| lịch **4 giờ/lần** trong khi một lượt sống ~4,8 giờ | lượt kế đã nằm chờ sẵn lúc lượt cũ thu đàn, nên khoảng hở gần bằng 0; `concurrency` giữ đúng một chạy + một chờ |
+| **2 ghế** trên runner 4 nhân | đo 10/08 trên VM 4 vCPU: 8 ghế → load 14 và đàn hỏng vì timeout; runner còn ít RAM hơn và chia sẻ I/O |
+
+`WORKER_ID=tong-mon-github`, khác VM (`tong-mon-khoiloi`) — trùng tên thì hai tiến trình ghi đè
+nhau trong bảng `workers` và mục Khôi Lỗi nói dối về việc ai đang trực.
+
+Hết hạn chờ mà còn đàn dở thì thoát với mã **khác 0**: chuyện ấy nghĩa là có người sắp mất một
+vòng, và nó đáng hiện đỏ chứ không đáng lặng lẽ trôi qua.
+
+**Đã biết và chấp nhận:** secret nằm trong Secrets của một repo CÔNG KHAI, và nhật ký Actions
+của repo công khai thì ai cũng đọc được, vĩnh viễn — trong khi việc của khôi lỗi là nhận cookie
+game đã giải mã. Tông chủ đã cân nhắc và chốt.
+
 ## 0.75.0 — bỏ chạy song song: một vòng đi đúng thứ tự hồ sơ, Mê Cung luôn cuối cùng
 
 **Mê Cung luôn là nhiệm vụ CUỐI CÙNG, Luyện Đan Đường áp chót.** Đó là yêu cầu, và bỏ chế độ song

@@ -65,6 +65,28 @@ const HEARTBEAT_MS = Math.max(1_000, Number(process.env.WORKER_HEARTBEAT_MS ?? 5
 // Chromium riêng nên trần này là trần RAM: 2 vừa cho máy nhà, VM tông môn có thể nâng qua
 // biến môi trường. Kẹp 1–8 để một dấu phẩy gõ nhầm không mở tám mươi trình duyệt.
 const MAX_JOBS = Math.max(1, Math.min(8, Number(process.env.WORKER_MAX_JOBS ?? 2) || 2));
+/**
+ * TUỔI THỌ một lượt chạy — sống quá mốc này thì THÔI NHẬN VIỆC MỚI, không phải chết ngay.
+ *
+ * `0` = vô hạn, và đó là MẶC ĐỊNH: khôi lỗi trên VM và trên máy nhà phải giữ nguyên hành vi cũ
+ * từng byte, vì chúng chạy liền mạch hàng tuần (đo 09/08/2026: `NRestarts=0`). Chỉ nơi nào có
+ * một cái đồng hồ treo sẵn trên đầu mới cần đặt nó.
+ *
+ * Nơi ấy là GitHub Actions: runner bị giết cứng ở mốc 6 giờ. Bị giết giữa một ván Mê Cung 35
+ * phút thì nhịp tim tắt, và 3 phút sau `reapStaleJobs` kết liễu đàn ấy thành `failed` — mất
+ * trọn một vòng của một đạo hữu, đều đặn mỗi 6 tiếng. Đặt hạn NGẮN HƠN trần của nền tảng rồi
+ * tự rút lui là cách duy nhất để cái mốc ấy không bao giờ chạm vào một đàn đang chạy.
+ */
+const MAX_LIFETIME_MS = Math.max(0, Number(process.env.WORKER_MAX_LIFETIME_MS ?? 0) || 0);
+/**
+ * Chờ tối đa bao lâu cho những đàn đang dở chạy nốt, sau khi đã thôi nhận việc.
+ *
+ * Phải rộng hơn vòng đời của nhiệm vụ dài nhất — Mê Cung có thể ngốn ~35 phút — nhưng vẫn phải
+ * kết thúc, vì nền tảng sẽ giết bất kể ta chờ bao lâu. Hết hạn mà còn đàn đang chạy thì thoát
+ * với mã KHÁC 0: chuyện ấy nghĩa là có người sắp mất một vòng, và nó đáng hiện đỏ chứ không
+ * đáng lặng lẽ trôi qua. `0` = chờ vô hạn (mặc định, đúng cho VM).
+ */
+const DRAIN_TIMEOUT_MS = Math.max(0, Number(process.env.WORKER_DRAIN_TIMEOUT_MS ?? 0) || 0);
 // Hồ sơ Chromium lâu không ai đụng thì dọn — mỗi lần người dùng dán cookie mới là một thư mục
 // hồ sơ mới ra đời và cái cũ thành rác vĩnh viễn. Mười bốn ngày là ngưỡng RỘNG có chủ ý: hồ sơ
 // mang token cf_clearance của Cloudflare, xoá sớm là bắt người ta qua cửa kiểm tra lại từ đầu.
@@ -249,7 +271,59 @@ const running = new Set();
  */
 let nextSweepAt = Date.now();
 
+/**
+ * PHA RÚT LUI — thôi nhận việc mới, chờ đàn đang dở chạy nốt, rồi thoát sạch.
+ *
+ * Vào pha này bằng hai đường: hết hạn tuổi thọ, hoặc nền tảng gõ cửa bằng SIGTERM/SIGINT
+ * (Actions gửi tín hiệu ấy trước khi giết, và một lượt bấm huỷ cũng đi qua đây). Cả hai đều
+ * KHÔNG cắt ngang đàn đang chạy — cắt ngang chính là thứ ta dựng cả cơ chế này để tránh.
+ *
+ * Chỉ chuyển pha một lần: `beginDrain` gọi lần thứ hai là no-op, nếu không thì mỗi tín hiệu
+ * lại đặt lại đồng hồ chờ và hạn drain không bao giờ tới.
+ */
+let draining = false;
+let drainStartedAt = 0;
+const startedAt = Date.now();
+const stopClaimingAt = MAX_LIFETIME_MS > 0 ? startedAt + MAX_LIFETIME_MS : Infinity;
+
+function beginDrain(why) {
+  if (draining) return;
+  draining = true;
+  drainStartedAt = Date.now();
+  console.log(
+    `Thu đàn: ${why}. Thôi nhận việc mới, chờ ${running.size} đàn đang chạy đi nốt vòng.`,
+  );
+}
+
+// `once` chứ không phải `on`: tín hiệu thứ hai để nguyên hành vi mặc định của Node, nên một
+// người sốt ruột bấm huỷ lần nữa vẫn giết được tiến trình mà không phải đi tìm PID.
+process.once("SIGTERM", () => beginDrain("nhận SIGTERM"));
+process.once("SIGINT", () => beginDrain("nhận SIGINT"));
+
 for (;;) {
+  if (!draining && Date.now() >= stopClaimingAt) {
+    beginDrain(`đã chạy đủ ${Math.round(MAX_LIFETIME_MS / 60_000)} phút theo hạn tuổi thọ`);
+  }
+
+  if (draining) {
+    if (running.size === 0) {
+      console.log("Đã thu xong — không còn đàn nào đang chạy, thoát sạch.");
+      break;
+    }
+    if (DRAIN_TIMEOUT_MS > 0 && Date.now() - drainStartedAt >= DRAIN_TIMEOUT_MS) {
+      // Thoát với mã khác 0: còn đàn dở nghĩa là nhịp tim sắp tắt và reaper sẽ kết liễu chúng
+      // sau 3 phút. Có người sắp mất một vòng — chuyện ấy phải hiện ĐỎ.
+      console.error(
+        `Hết hạn chờ thu đàn (${Math.round(DRAIN_TIMEOUT_MS / 60_000)} phút) mà còn ` +
+          `${running.size} đàn chưa xong — thoát, chúng sẽ bị phép dọn kết liễu.`,
+      );
+      process.exitCode = 1;
+      break;
+    }
+    await sleep(POLL_MS);
+    continue;
+  }
+
   let claimed = false;
 
   if (running.size < MAX_JOBS) {

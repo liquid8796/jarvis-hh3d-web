@@ -225,6 +225,16 @@ nó vẫn luôn ở đó. Tên hai kho in ra ở cuối lượt `mirror:new`; tr
 database Postgres bên trong là `neondb` (Neon đặt), database Mongo là `jarvis`
 (`MONGO_DEFAULT_DB`), ứng dụng chỉ đọc `DATABASE_URL`/`MONGODB_URI`.
 
+**REGION: mọi kho đặt `iad1`** (Washington, D.C., US East). Ghim tường minh trong
+`STORE_SPECS_SHARED`, không phó mặc mặc định của nhà cung cấp — region là `ui:read-only` sau khi
+tạo ở CẢ HAI sản phẩm, nên dựng sai chỗ thì chỉ còn đường xoá kho dựng lại, mà xoá kho là xoá
+dữ liệu.
+
+Cẩn thận: **hai sản phẩm dùng hai tên khoá khác nhau cho cùng một thứ** — Neon đọc `region`,
+Atlas đọc `vercelRegion`. Đừng đoán; tra `metadataSchema` mà Vercel trả về ở
+`GET /v1/storage/stores`, và `verify:deploy-targets` đóng đinh cả hai tên lẫn danh sách region
+hợp lệ.
+
 Checklist vẫn phân biệt trạm bằng TÀI KHOẢN. Vercel CLI đi bằng API token (`--token`, đặt
 `VERCEL_TOKEN[_<trạm>]` trong env), không đi bằng session login — session chỉ ôm được một tài
 khoản một lúc.

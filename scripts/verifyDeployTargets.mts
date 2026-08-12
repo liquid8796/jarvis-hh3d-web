@@ -15,6 +15,8 @@ import {
   resolveTarget,
   sensitiveEnvKeys,
   stationUrlFor,
+  STORE_REGION,
+  STORE_SPECS_SHARED,
   STORE_NAME_LENGTH,
   tokenEnvNameFor,
   validateSiteId,
@@ -265,6 +267,41 @@ function ok(condition: boolean, label: string): void {
   const sau = randomStoreName(nguonGia);
   ok(lan === 2, "lượt sinh dính chữ cấm bị VỨT và sinh lại");
   ok(!FORBIDDEN_IN_STORE_NAME.some((w) => sau.includes(w)), "…và tên trả về đã sạch chữ cấm");
+}
+
+// ---- Metadata của hai kho: region phải ghim, và HAI SẢN PHẨM DÙNG HAI TÊN KHOÁ KHÁC NHAU ----
+//
+// Neon đọc `region`, Atlas đọc `vercelRegion`. Đây đúng là chỗ để đoán sai, nên nó được đóng
+// đinh bằng chính `metadataSchema` mà Vercel trả về ở GET /v1/storage/stores (đo 12/08/2026).
+// Region là `ui:read-only` sau khi tạo ở cả hai: dựng sai chỗ thì chỉ còn đường xoá kho dựng lại.
+{
+  const REGION_KEY: Record<string, string> = { neon: "region", mongodbatlas: "vercelRegion" };
+  // Nguyên văn `ui:options` đo được từ API — bắt được cả lỗi gõ nhầm kiểu `iad-1`.
+  const REGION_CHOICES: Record<string, string[]> = {
+    neon: ["cle1", "iad1", "pdx1", "fra1", "lhr1", "syd1", "sin1", "gru1"],
+    mongodbatlas: ["arn1", "bom1", "syd1", "sin1", "sfo1", "pdx1", "lhr1", "kix1", "icn1", "iad1", "hnd1", "hkg1", "gru1", "fra1", "dub1", "cpt1", "cle1", "cdg1"],
+  };
+
+  const pairs = (spec: (typeof STORE_SPECS_SHARED)[number]) =>
+    new Map(spec.metadata.map((m) => [m.slice(0, m.indexOf("=")), m.slice(m.indexOf("=") + 1)]));
+
+  ok(STORE_SPECS_SHARED.length === 2, "đúng hai kho mỗi trạm");
+  for (const spec of STORE_SPECS_SHARED) {
+    const md = pairs(spec);
+    const key = REGION_KEY[spec.slug];
+    ok(md.has(key), `${spec.slug}: khai region bằng đúng khoá「${key}」`);
+    ok(md.get(key) === STORE_REGION, `${spec.slug}: region = ${STORE_REGION}`);
+    ok(REGION_CHOICES[spec.slug].includes(md.get(key) ?? ""), `${spec.slug}: region nằm trong danh sách Vercel nhận`);
+    // Khoá region của sản phẩm KIA không được lọt vào đây — nhầm chéo là kho dựng ở đâu không ai biết.
+    const other = Object.values(REGION_KEY).find((k) => k !== key)!;
+    ok(!md.has(other), `${spec.slug}: KHÔNG mang khoá「${other}」của sản phẩm kia`);
+  }
+  const atlas = STORE_SPECS_SHARED.find((s) => s.slug === "mongodbatlas")!;
+  ok(pairs(atlas).get("clusterTier") === "FREE", "Atlas khai clusterTier=FREE (thiếu là chết nửa chừng)");
+  ok(
+    new Set(STORE_SPECS_SHARED.map((s) => pairs(s).get(REGION_KEY[s.slug]))).size === 1,
+    "hai kho của một trạm nằm CÙNG một region",
+  );
 }
 
 console.log(`\nTất cả ${passed} phép kiểm đều thuận.`);

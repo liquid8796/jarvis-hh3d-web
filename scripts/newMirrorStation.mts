@@ -42,6 +42,8 @@ import {
   randomStoreName,
   sensitiveEnvKeys,
   stationUrlFor,
+  STORE_REGION,
+  STORE_SPECS_SHARED,
   tokenEnvNameFor,
   validateSiteId,
   type Book,
@@ -96,24 +98,15 @@ const SHARED_SECRETS = [
   "OCI_SECRET_ACCESS_KEY",
 ] as const;
 
-/** Hai integration bắt buộc, và tên gói MIỄN PHÍ của chúng — tra bằng `integration add <tên> --help`. */
 /**
- * Hai kho mỗi trạm phải có.
- *
- * `metadata` là những cặp `KEY=VALUE` mà nhà cung cấp BẮT BUỘC phải có, truyền qua `-m`. Nó
- * KHÔNG suy ra được từ `--plan`: Atlas nhận `--plan FREE` rồi vẫn chết giữa chừng với
- *「Missing required metadata: clusterTier」— đo ngày 12/08/2026 (Vercel CLI 56.4.1), sau khi
- * project đã tạo và kho Neon đã dựng xong, tức đúng cái kiểu hỏng nửa chừng mà cả script này
- * sinh ra để tránh. Thiếu khoá nào thì chính lời lỗi của CLI nói tên khoá ấy; thêm vào đây.
+ * Hai kho mỗi trạm phải có — định nghĩa (kèm metadata bắt buộc và region) nằm ở
+ * `deployTargets.mts`, module THUẦN, để `verify:deploy-targets` đóng đinh được.
  *
  * Cố ý KHÔNG dùng `--prefix`: prefix đổi tên biến (`--prefix NEON2_` cho ra `NEON2_DATABASE_URL`)
  * và trạm gốc từng dựng tay với `hh3d_`, khiến `DATABASE_URL` phải đặt tay riêng — thứ về sau
  * nằm lại dưới dạng sensitive. Tên trần là tên mà mã nguồn đọc.
  */
-const STORE_SPECS = [
-  { slug: "neon", plan: "free_v3", label: "Neon Postgres", metadata: [] },
-  { slug: "mongodbatlas", plan: "FREE", label: "MongoDB Atlas", metadata: ["clusterTier=FREE"] },
-] as const;
+const STORE_SPECS = STORE_SPECS_SHARED;
 
 /**
  * TÊN KHO NGẪU NHIÊN HOÀN TOÀN — không mang một chữ nào của tông môn.

@@ -301,3 +301,43 @@ export function randomStoreName(randomBytes: (n: number) => Uint8Array): string 
     `Sinh 100 lần đều dính chữ cấm (${FORBIDDEN_IN_STORE_NAME.join(", ")}) — xem lại FORBIDDEN_IN_STORE_NAME.`,
   );
 }
+
+/**
+ * REGION của MỌI kho — `iad1` (Washington, D.C., US East).
+ *
+ * Ghim tường minh chứ không phó mặc mặc định, vì hai lẽ. Một: region là `ui:read-only` sau khi
+ * tạo ở CẢ HAI sản phẩm — dựng sai chỗ thì chỉ còn đường xoá kho dựng lại, mà xoá kho là xoá
+ * dữ liệu. Hai: bốn kho đang chạy đều ở `iad1` nhưng KHÔNG phải vì ai đó chọn, mà vì mặc định
+ * của nhà cung cấp lúc ấy tình cờ như vậy — một mặc định đổi lúc nào cũng được, và trạm mới nằm
+ * lệch châu lục so với ba trạm cũ là thứ không ai thấy cho tới ngày đồng bộ gương chậm gấp mười.
+ */
+export const STORE_REGION = "iad1";
+
+/**
+ * Hai kho mỗi trạm phải có, kèm metadata BẮT BUỘC của từng nhà cung cấp.
+ *
+ * HAI SẢN PHẨM DÙNG HAI TÊN KHOÁ KHÁC NHAU CHO CÙNG MỘT THỨ: Neon đọc `region`, Atlas đọc
+ * `vercelRegion`. Đây không phải chỗ để đoán — lấy thẳng từ `metadataSchema` mà Vercel trả về
+ * ở `GET /v1/storage/stores` (đo 12/08/2026):
+ *
+ *   neon  → required ["region"],                ui:options [cle1 iad1 pdx1 fra1 lhr1 syd1 sin1 gru1]
+ *   atlas → required ["clusterTier","vercelRegion"], ui:options [arn1 bom1 … iad1 … cdg1]
+ *
+ * Cùng nguồn ấy cho biết `clusterTier` là bắt buộc — thiếu nó thì lượt dựng chết NỬA CHỪNG, sau
+ * khi project đã tạo và kho Neon đã xong (đo cùng ngày, Vercel CLI 56.4.1). Muốn thêm khoá nào
+ * thì tra lại schema, đừng đoán: chính lời lỗi của CLI cũng nói tên khoá còn thiếu.
+ */
+export const STORE_SPECS_SHARED = [
+  {
+    slug: "neon",
+    plan: "free_v3",
+    label: "Neon Postgres",
+    metadata: [`region=${STORE_REGION}`],
+  },
+  {
+    slug: "mongodbatlas",
+    plan: "FREE",
+    label: "MongoDB Atlas",
+    metadata: ["clusterTier=FREE", `vercelRegion=${STORE_REGION}`],
+  },
+] as const;

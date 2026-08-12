@@ -10,6 +10,7 @@ import {
   RETENTION_MIN_HOURS,
 } from "@/lib/validation/retention";
 import { db, schema } from "@/lib/db/client";
+import { DEFAULT_WORKFLOW_FILE } from "@/lib/validation/githubStations";
 import { DEFAULT_GAME_BASE_URL, normalizeGameBaseUrl } from "@/lib/quest-engine/cookies.mjs";
 import type { TagFrame } from "@/lib/validation/tags";
 
@@ -267,6 +268,70 @@ export const appSettingsSchema = z.object({
     })
     .catch({ phase: "idle", targetId: "", startedAt: null, updatedAt: null, note: "", tableIndex: 0, rowOffset: 0, copiedRows: 0 })
     .prefault({ phase: "idle", targetId: "", startedAt: null, updatedAt: null, note: "", tableIndex: 0, rowOffset: 0, copiedRows: 0 }),
+
+  /**
+   * SỔ KHO GITHUB — tài khoản nào đang giữ một khôi lỗi chạy trên GitHub Actions
+   * (deploy/github-actions.md §7).
+   *
+   * Vì sao ở đây chứ không phải một bảng riêng như bản phác ban đầu ghi. Ba lẽ, lẽ thứ hai là
+   * lẽ nặng nhất:
+   *   1. Hình dạng TRÙNG KHÍT sổ gương trạm — một danh sách ngắn do người gõ tay, mỗi dòng giữ
+   *      một bí mật đã đóng phong bì. Đó đúng là thứ tệp này mở đầu bằng câu「mỗi tính năng mới
+   *      thêm một nhánh vào schema này, không thêm bảng」.
+   *   2. `assertTablesCovered` (mirror/pgSync.ts) NÉM khi database đích có một bảng không nằm
+   *      trong `SYNC_TABLE_ORDER`. Một bảng mới mà quên khai ở đó không hỏng lúc migrate, không
+   *      hỏng lúc chạy — nó hỏng giữa một lượt chuyển trạm, tức đúng lúc đang có sự cố. Còn
+   *      `app_settings` thì đã nằm trong sổ ấy từ đầu.
+   *   3. Nhờ (2), sổ này tự ĐI THEO mọi lượt chuyển trạm — trạm mới thức dậy vẫn nuôi tiếp bốn
+   *      kho, không cần ai nhập lại PAT. Điều kiện: mọi trạm chung `ENCRYPTION_KEY`, y như sổ
+   *      gương trạm.
+   *
+   * `pat` là phong bì secretBox, mã hoá NGAY TRONG server action — bản rõ không chạm document,
+   * không xuống client, không vào log. Nó nguy hiểm hơn cookie game một bậc: cookie mở một tài
+   * khoản game, PAT thì PUSH ĐƯỢC MÃ vào kho đang chạy khôi lỗi. Vì thế cửa vào là
+   * `github_station.manage`, mã riêng chỉ Gia chủ.
+   */
+  githubStations: z
+    .array(
+      z.object({
+        owner: z.string().min(1).max(39),
+        repo: z.string().min(1).max(100),
+        /** Tệp workflow trong `.github/workflows/` — cần tên để hỏi trạng thái và bật lại lịch. */
+        workflowFile: z.string().min(1).max(100).catch(DEFAULT_WORKFLOW_FILE).default(DEFAULT_WORKFLOW_FILE),
+        /**
+         * `WORKER_ID` mà workflow của kho này khai. Chỉ để ĐỐI CHIẾU bằng mắt với mục Khôi Lỗi
+         * trên dashboard — sổ này không dùng nó để quyết định gì, nên một giá trị rỗng hay lệch
+         * không làm hỏng vòng nuôi. Có nó vì câu hỏi「kho này nuôi con khôi lỗi nào」là câu
+         * người vận hành hỏi đầu tiên khi một khôi lỗi biến mất khỏi dashboard.
+         */
+        workerId: z.string().max(120).catch("").default(""),
+        /** PAT của tài khoản giữ kho, phong bì secretBox `v1.…`. */
+        pat: z.string().min(1),
+        /** Tắt là đứng ngoài vòng nuôi — dòng và PAT giữ nguyên, chỉ không ai đụng tới kho ấy. */
+        enabled: z.boolean().catch(true).default(true),
+        /**
+         * HAI mốc thời gian, và chúng KHÔNG thay nhau được:
+         *   • `lastPingAt` — lượt ngó gần nhất, mỗi ngày một lần. Trả lời「vòng nuôi còn chạy không」.
+         *   • `lastCommitAt` — lượt GHI gần nhất, ~20 ngày một lần. Trả lời「kho còn cách mốc 60
+         *     ngày bao xa」, và là mốc duy nhất `isCommitDue` đọc.
+         * Gộp chúng làm một là mất đúng con số quan trọng: một vòng ngó thành công mỗi ngày sẽ
+         * đẩy mốc đi hoài, và sổ vĩnh viễn báo「vừa nuôi hôm qua」kể cả khi lượt ghi cuối đã 59
+         * ngày trước.
+         */
+        lastPingAt: z.string().nullable().catch(null).default(null),
+        lastCommitAt: z.string().nullable().catch(null).default(null),
+        lastPingOk: z.boolean().nullable().catch(null).default(null),
+        lastPingNote: z.string().max(500).catch("").default(""),
+        /** `state` GitHub khai ở lượt ngó gần nhất — xem `WorkflowState`. Rỗng = chưa ngó lần nào. */
+        workflowState: z.string().max(40).catch("").default(""),
+      }),
+    )
+    /**
+     * `.catch([])` theo luật của tệp: một phần tử rác làm hỏng phép gán thì mất SỔ chứ không
+     * mất trang admin — mất sổ thì nhập lại được, còn admin sập thì không còn chỗ mà nhập.
+     */
+    .catch([])
+    .prefault([]),
 
   /**
    * Hạn lưu NHẬT KÝ ĐÀN — van xả mà `deploy/mirror/README.md` §11 đã ghi trước là sẽ cần.

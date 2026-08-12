@@ -213,7 +213,29 @@ const PERMISSION_HOLDERS: Record<Permission, readonly Role[]> = {
   // Khai đàn hộ đi cùng bộ với dừng đàn: ai gỡ được đàn kẹt thì phải dựng lại được, bằng
   // không họ chỉ cầm nửa việc. Vẫn là MÃ RIÊNG để bảng phân quyền không nói dối về phạm vi.
   "job.force_start": ["gia-chu", "thai-thuong-truong-lao"],
+  // Việc NÓI, không phải việc ra tay: không dừng đàn ai, không xoá gì, người nhận luôn có nút
+  // đóng. Nên cả ba vai bậc trị sự, y như `admin.panel`.
+  "notice.broadcast": ["gia-chu", "thai-thuong-truong-lao", "chuong-mon"],
+  // Ba mã CHỈ Gia chủ, và cả ba đều vì cùng một lẽ: chúng cầm chìa của thứ nằm NGOÀI tông môn.
+  // Sổ gương trạm cầm chuỗi kết nối database của trạm khác; sổ kho GitHub cầm PAT push được mã
+  // vào kho của bốn tài khoản. Được xem môn đồ không đồng nghĩa được cầm hai thứ ấy.
+  "site.switch": ["gia-chu"],
+  "github_station.manage": ["gia-chu"],
 };
+
+/**
+ * `Record<Permission, …>` lẽ ra bắt được một mã quên khai ngay lúc biên dịch — nhưng
+ * `tsconfig.json` LOẠI cả thư mục `scripts`, nên không có lượt tsc nào ngó tới tệp này. Đó
+ * không phải giả thiết: `notice.broadcast` và `site.switch` đã nằm ngoài bảng trên suốt từ
+ * 11/08/2026, và phép thử này chết bằng một `TypeError` khó đọc ở giữa vòng lặp thay vì nói ra
+ * điều đang thiếu. Vòng dưới đây là hàng rào thật, và nó nói được câu người đọc cần.
+ */
+for (const permission of PERMISSIONS) {
+  assert(
+    PERMISSION_HOLDERS[permission] !== undefined,
+    `quyền ${permission} có trong PERMISSIONS nhưng thiếu ở bảng oracle PERMISSION_HOLDERS — khai vai giữ nó rồi chạy lại`,
+  );
+}
 
 for (const permission of PERMISSIONS) {
   for (const role of ASSIGNABLE_ROLES) {

@@ -120,42 +120,114 @@ Ai định mở rộng lối này — thêm trạm, tăng ghế — nên đọc 
 
 ---
 
-## 7. Nuôi kho cho khỏi bị tắt lịch — thiết kế, CHƯA làm
+## 7. Nuôi kho cho khỏi bị tắt lịch — ĐÃ LÀM (12/08/2026)
 
-GitHub **tắt lịch `schedule`** của một kho sau **60 ngày không có hoạt động commit**. Kho khôi
-lỗi thì gần như không ai đụng vào — nó chỉ chạy — nên cái mốc ấy sẽ tới, và khi tới thì khôi lỗi
-im lặng ngừng lên ca mà không báo ai. Chỗ này ghi lại thiết kế đã bàn ngày 12/08/2026 để phiên
-sau không phải suy lại từ đầu.
+GitHub **tắt lịch `schedule`** của một kho công khai sau **60 ngày không có hoạt động commit**.
+Kho khôi lỗi thì gần như không ai đụng vào — nó chỉ chạy — nên cái mốc ấy sẽ tới, và khi tới thì
+khôi lỗi im lặng ngừng lên ca mà không báo ai.
 
-### Hỏi câu này TRƯỚC khi xây bất cứ thứ gì
+### Câu hỏi gác cổng, và câu trả lời
 
-**Commit tạo bằng `GITHUB_TOKEN` của chính workflow có được tính là「repository activity」cho luật
-60 ngày không?**
+Bản phác trước đặt ra một câu phải hỏi TRƯỚC KHI XÂY: **commit tạo bằng `GITHUB_TOKEN` của chính
+workflow có được tính là「repository activity」không?** Nếu CÓ thì mỗi kho tự nuôi mình bằng ba
+dòng YAML, và cả hệ thống dưới đây biến mất.
 
-Nếu CÓ, thì mỗi kho tự nuôi mình bằng một bước cuối trong workflow — và toàn bộ phần dưới đây
-biến mất: không bảng, không PAT, không tab admin, không job định kỳ. Ba dòng YAML thay cho một
-hệ thống.
+Đã đi tìm ngày 12/08/2026. **Không xây được lối ấy**, vì ba điều:
 
-Chưa ai kiểm. GitHub nói rõ commit bằng `GITHUB_TOKEN` **không kích hoạt workflow mới**, nhưng
-không nói nó có tính là hoạt động kho hay không — hai chuyện khác nhau, và đừng suy cái này ra
-cái kia. Đây là câu hỏi rẻ nhất và đáng hỏi nhất của cả tính năng: trả lời sai theo hướng bi
-quan là xây cả một hệ thống quản lý PAT cho việc mà một bước YAML làm xong.
+- **Tài liệu GitHub không trả lời.** Nguyên văn tất cả những gì họ nói: *"In a public repository,
+  scheduled workflows are automatically disabled when no repository activity has occurred in 60
+  days."* Không định nghĩa「repository activity」, không nhắc `GITHUB_TOKEN` một chữ nào. Điều họ
+  nói rõ về `GITHUB_TOKEN` là chuyện KHÁC — commit bằng nó không kích hoạt workflow mới — và suy
+  từ câu ấy ra câu này là đúng cái bẫy bản phác đã cảnh báo.
+- **Bản cài đặt phổ biến nhất của lối ấy đã bị GitHub GỠ.** `gautamkrishnar/keepalive-workflow` —
+  action nuôi kho được dùng nhiều nhất, đúng cơ chế commit rác định kỳ — nay trả về trang
+  *"repository has been disabled by GitHub Staff due to a terms of service violation"*. Chính tác
+  giả, trong phần bình luận bài viết của mình, đã thừa nhận việc commit tự động **có thể vi phạm
+  điều khoản**; và một người dùng báo lại rằng kho của họ bị tắt sau một năm dùng nó.
+- **Công cụ còn sống thì đi đường khác.** `PhrozenByte/gh-workflow-immortality` không commit gì
+  cả — nó gọi API bật lại workflow, và ghi rõ `GITHUB_TOKEN` **không đủ quyền** cho việc ấy, phải
+  dùng PAT.
 
-### Nếu câu trả lời là KHÔNG
+Vậy nên: đường「kho tự nuôi mình」vừa **không kiểm chứng được**, vừa là đúng cái hình dạng GitHub
+đã ra tay một lần. Hệ thống PAT ở dưới được xây, nhưng xây theo hướng **để lại ít dấu chân nhất
+có thể** — xem `KEEPALIVE_INTERVAL_DAYS`.
 
-**Không cần `git push`.** `PUT /repos/{owner}/{repo}/contents/{path}` **tạo ra một commit thật** —
-không cần binary `git`, không clone, không thư mục tạm. Một lời gọi HTTPS cập nhật
-`.github/heartbeat.txt` (nội dung là mốc thời gian, kèm `sha` của bản cũ) là đủ. Toàn bộ bài toán
-「làm sao push từ một serverless function」tan biến — đây là chỗ dễ đi vòng nhất nếu không biết.
+> Điều này KHÔNG mở rộng rủi ro đã ghi ở §6, nhưng nó xác nhận §6 không phải lo xa: GitHub có
+> thật sự ra tay với những kho làm việc ngoài phạm vi「dựng, kiểm thử, phát hành」.
 
-**Không cần lịch mới.** `vercel.json` đã có cron `0 3 * * *`, và gói Hobby cho đúng một lần mỗi
-ngày — vừa khít nhu cầu. Móc vào `/api/cron` đang có, đừng dựng đường thứ hai.
+### Hình dạng đã làm
 
-**PAT nguy hiểm hơn cookie game.** Nó có quyền push mã. Lưu bằng `secretBox` + `ENCRYPTION_KEY`
-đúng lối phong bì cookie (đã có `decryptSecret`), và quyền quản phải là **mã riêng, chỉ Gia chủ** —
-đừng dùng lại `admin.panel`: được xem môn đồ không đồng nghĩa được cầm chìa push mã vào bốn tài
-khoản.
+| Mảnh | Ở đâu |
+|---|---|
+| Sổ kho | `app_settings.githubStations` (`src/lib/services/settings.ts`) |
+| Luật thuần + hằng số | `src/lib/validation/githubStations.ts` |
+| Vòng nuôi | `src/lib/services/githubStations.ts` |
+| Cửa admin | `src/app/actions/githubStations.ts` + `src/app/admin/GithubStationPanel.tsx` (tab **Kho GitHub**) |
+| Quyền | `github_station.manage` — CHỈ Gia chủ (migration `0026`) |
+| Lịch | `/api/cron`, đi nhờ cron `0 3 * * *` đã có |
+| Kiểm chứng | `npm run verify:github-stations` — 10 nhóm ca, `fetch` giả, không cần database |
 
-Hình dạng bảng: `github_stations(owner, repo, worker_id, pat_envelope, enabled, last_push_at,
-last_error)`. Job duyệt từng dòng, **một kho hỏng không chặn kho còn lại**, và `last_error` hiện
-thẳng trên tab admin — cùng lối với `deployAllStations.mts`.
+**Không cần `git`.** `PUT /repos/{owner}/{repo}/contents/{path}` tạo ra một **commit thật**, nên
+cả việc này gọn trong một Vercel function — không clone, không thư mục tạm. Đây là chỗ dễ đi vòng
+nhất nếu không biết.
+
+**NGÓ mỗi ngày, GHI mỗi ~20 ngày.** Lượt ngó chỉ đọc trạng thái workflow (rẻ, không để lại dấu
+vết), lượt ghi mới là thứ đếm với GitHub. Tách hai nhịp ấy giữ được cả hai điều tốt: biết kho
+hỏng **ngay trong ngày**, mà chỉ ~18 commit rác một năm thay vì 365. 20 ngày cũng để lại **40
+ngày dự phòng** trước mốc 60 — phải trượt liên tiếp hai lượt tới hạn thì lịch mới thật sự tắt.
+
+**Nhánh tự chữa mới là phần đáng tiền.** Nếu lịch ĐÃ bị tắt vì im lặng thì một commit mới **không
+tự bật nó lại** — GitHub đòi một lượt bật tường minh. Nên khi thấy `disabled_inactivity`, vòng
+nuôi gọi `PUT .../workflows/{file}/enable` rồi ghi mốc ngay, bất kể còn hạn. Thiếu nhánh này thì
+hệ thống nuôi được kho khoẻ nhưng bó tay trước đúng cái kho đã ngã.
+
+**Và một điều CỐ Ý KHÔNG LÀM:** kho bị tắt **tay** (`disabled_manually`) thì để nguyên, kể cả khi
+Gia chủ bấm「Nuôi ngay」. Đó là quyết định của một con người; bật lại giùm là cãi lại, mà cãi lặng
+lẽ. Sổ chỉ hiện đỏ và nói ra. Luật này có hai ca riêng trong script kiểm chứng, và chúng **đếm số
+lượt PUT** chứ không chỉ đọc kết quả — "không ghi gì cả" là một hành vi.
+
+### Hai chỗ lệch khỏi bản phác, và vì sao
+
+- **Sổ nằm trong `app_settings`, không phải bảng `github_stations` riêng.** Lý do nặng nhất không
+  phải「đỡ một migration」mà là `assertTablesCovered` (`src/lib/mirror/pgSync.ts`): nó **ném** khi
+  database đích có một bảng không nằm trong `SYNC_TABLE_ORDER`. Một bảng mới mà quên khai ở đó
+  không hỏng lúc migrate, không hỏng lúc chạy — nó hỏng **giữa một lượt chuyển trạm**, tức đúng
+  lúc đang có sự cố. Đổi lại, sổ tự đi theo mọi lượt chuyển trạm (điều kiện: mọi trạm chung
+  `ENCRYPTION_KEY`), y như sổ gương trạm.
+- **Có thêm lượt gọi `enable`** — bản phác chỉ có commit. Xem「nhánh tự chữa」ở trên.
+
+### PAT — cần gì và nguy hiểm ra sao
+
+Scope **`repo` + `workflow`** (classic), hoặc **Contents: read/write + Actions: read/write**
+(fine-grained). Tệp mốc nằm trong `.github/` nhưng NGOÀI `.github/workflows/` nên tự nó không đòi
+`workflow`; nhưng cùng cái PAT ấy còn được `scripts/newGithubKhoiloi.mjs` dùng để đẩy chính
+workflow lên, và **thiếu `workflow` là lỗi hay gặp nhất của cả lối này** — nó chỉ lộ ra ở đúng
+bước cuối cùng.
+
+PAT nguy hiểm hơn cookie game một bậc: cookie mở một tài khoản game, PAT thì **push được mã** vào
+kho đang chạy khôi lỗi. Nên nó lưu bằng `secretBox` (`ENCRYPTION_KEY`) y như cookie, và quyền quản
+là **mã riêng chỉ Gia chủ** — không dùng lại `admin.panel`, cũng không dùng lại `site.switch`.
+
+### Vận hành
+
+Tab **Kho GitHub** trong trang Tông Môn. Mỗi dòng hiện đếm ngược tới mốc tắt lịch — xanh là khoẻ,
+vàng là đã trượt một lượt ghi, đỏ là còn dưới một chu kỳ. Ba nút: **Nuôi ngay** (ép một kho),
+**Chạy vòng nuôi** (diễn tập đúng thứ cron chạy), **Sửa/Xoá**.
+
+Lượt **Ghi vào sổ** tự ngó kho ngay sau khi lưu, nên một PAT dán nhầm chết trước mặt người vừa
+dán chứ không phải trong một lượt cron lúc ba giờ sáng. Với kho mới, lượt ấy ghi luôn một commit
+thật — tức chứng minh trọn đường「PAT này push được mã vào kho này」.
+
+Muốn soi từ dòng lệnh thì gọi thẳng cron; hồi đáp mang câu chữ của từng kho:
+
+```
+curl -H "Authorization: Bearer $CRON_SECRET" https://<trạm>/api/cron
+```
+
+### Chưa có bằng chứng
+
+Toàn bộ đường đi được kiểm bằng `fetch` giả (10 nhóm ca, kể cả hai ca đột biến đã thử: gỡ hàng
+rào `disabled_manually` và lệch biên một ngày — cả hai đều làm script đỏ đúng chỗ). Nhưng **chưa
+lượt nào chạm GitHub thật** tính tới 12/08/2026. Lượt「Ghi vào sổ」đầu tiên là phép thử thật: soi
+xem nó có báo `Đã ghi mốc nuôi kho (<sha>)` hay không, rồi mở kho trên GitHub xem commit ấy có
+mặt.

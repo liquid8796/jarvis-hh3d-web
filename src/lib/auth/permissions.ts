@@ -129,6 +129,17 @@ export const PERMISSIONS = [
    * chủ ý, không phải bỏ sót.
    */
   "site.switch",
+  /**
+   * Sổ kho khôi lỗi GitHub + lệnh nuôi kho (deploy/github-actions.md §7). CHỈ Gia chủ, và mã
+   * này CỐ Ý không núp dưới `site.switch` dù cùng một bậc: hai sổ cầm hai loại chìa khác nhau —
+   * sổ gương trạm cầm chuỗi kết nối database, sổ này cầm PAT GitHub, thứ PUSH ĐƯỢC MÃ vào bốn
+   * tài khoản. Ngày nào muốn giao sổ này cho một người mà không giao cả hệ trạm dự phòng thì
+   * chỗ tách đã có sẵn tên.
+   *
+   * Vì sao không dùng lại `admin.panel`: được xem môn đồ không đồng nghĩa được cầm chìa đẩy mã
+   * lên kho của người khác — một PAT rò ra là kẻ cầm nó sửa được chính `worker.mjs` đang chạy.
+   */
+  "github_station.manage",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -142,6 +153,7 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   "job.force_start": "Khai đàn hộ người khác",
   "notice.broadcast": "Phát thông báo tông môn",
   "site.switch": "Chuyển gương trạm",
+  "github_station.manage": "Quản kho khôi lỗi GitHub",
 };
 
 /**

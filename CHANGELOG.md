@@ -11,6 +11,56 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.79.0 — nuôi kho khôi lỗi GitHub, và câu trả lời cho câu hỏi gác cổng
+
+Tab **Kho GitHub** trong trang Tông Môn, cộng một vòng nuôi chạy mỗi ngày trong `/api/cron`: ngó
+trạng thái lịch của từng kho khôi lỗi, và ghi một dòng mốc vào `.github/heartbeat.txt` mỗi ~20
+ngày. GitHub tắt lịch `schedule` của kho công khai sau **60 ngày không có commit**, và khi tắt thì
+khôi lỗi im lặng ngừng lên ca — không dòng đỏ nào, không ai được báo.
+
+**Câu hỏi mà 0.78.1 dặn phải hỏi TRƯỚC KHI XÂY đã có câu trả lời, và câu trả lời là KHÔNG XÂY
+ĐƯỢC lối rẻ.** Nếu commit bằng `GITHUB_TOKEN` của chính workflow được tính là hoạt động kho thì
+mỗi kho tự nuôi mình bằng ba dòng YAML và cả tính năng này biến mất. Đi tìm ngày 12/08/2026:
+
+- Tài liệu GitHub nói **đúng một câu** về luật ấy — *"scheduled workflows are automatically
+  disabled when no repository activity has occurred in 60 days"* — không định nghĩa「repository
+  activity」, không nhắc `GITHUB_TOKEN` chữ nào.
+- `gautamkrishnar/keepalive-workflow`, bản cài đặt phổ biến nhất của đúng lối ấy, nay là một
+  trang **"disabled by GitHub Staff due to a terms of service violation"**. Chính tác giả từng
+  thừa nhận commit tự động có thể vi phạm điều khoản.
+- Công cụ còn sống (`gh-workflow-immortality`) thì không commit gì cả — nó gọi API bật lại
+  workflow, và ghi rõ `GITHUB_TOKEN` **không đủ quyền**, phải dùng PAT.
+
+Nên hệ thống PAT vẫn được xây, nhưng xây để **để lại ít dấu chân nhất có thể**: **ngó mỗi ngày,
+ghi mỗi ~20 ngày**. Hai nhịp ấy tách nhau là toàn bộ giá trị của con số — biết kho hỏng ngay
+trong ngày, mà chỉ ~18 commit rác một năm thay vì 365, và vẫn còn 40 ngày dự phòng trước mốc 60.
+
+**Nhánh tự chữa mới là phần đáng tiền.** Lịch đã bị tắt vì im lặng thì một commit mới KHÔNG tự bật
+nó lại — GitHub đòi một lượt bật tường minh. Thiếu điều này thì hệ thống nuôi được kho khoẻ nhưng
+bó tay trước đúng cái kho đã ngã, tức vô dụng ở ca duy nhất nó thật sự cần thiết.
+
+**Và một điều cố ý KHÔNG làm:** kho bị tắt **tay** thì để nguyên, kể cả khi Gia chủ bấm「Nuôi
+ngay」. Đó là quyết định của một con người; bật lại giùm là cãi lại, mà cãi lặng lẽ. Hai ca kiểm
+chứng canh luật này **đếm số lượt PUT** chứ không chỉ đọc kết quả — "không ghi gì cả" là một hành
+vi, và một hàm trả về đúng chữ trong lúc lén ghi một commit thì vẫn là hỏng.
+
+Sổ nằm trong `app_settings` chứ không phải một bảng riêng như bản phác ghi, và lý do nặng nhất
+không phải「đỡ một migration」: `assertTablesCovered` NÉM khi database đích có bảng ngoài
+`SYNC_TABLE_ORDER`. Một bảng mới mà quên khai ở đó không hỏng lúc migrate, không hỏng lúc chạy —
+nó hỏng **giữa một lượt chuyển trạm**, đúng lúc đang có sự cố. Đổi lại, sổ tự đi theo mọi lượt
+chuyển trạm.
+
+Quyền là mã RIÊNG `github_station.manage`, chỉ Gia chủ — không dùng lại `admin.panel`, cũng không
+dùng lại `site.switch`. PAT push được mã vào kho đang chạy khôi lỗi; hai sổ cùng bậc nguy hiểm
+nhưng cầm hai loại chìa khác nhau, và ngày muốn giao cái này mà không giao cái kia thì phải có sẵn
+hai cái tên.
+
+**Vá kèm: `npm run verify:permissions` đã ĐỎ từ 11/08/2026 mà không ai biết.** Bảng oracle trong
+script thiếu `notice.broadcast` rồi `site.switch`, nên nó chết bằng một `TypeError` giữa vòng lặp.
+Đáng lẽ `Record<Permission, …>` đã chặn ở khâu biên dịch — nhưng `tsconfig.json` **loại cả thư mục
+`scripts`**, nên không lượt `tsc` nào ngó tới tệp ấy. Nay có một vòng kiểm tường minh nói ra mã
+nào đang thiếu, thay vì một stack trace.
+
 ## 0.78.1 — chép lại thiết kế「nuôi kho khôi lỗi」trước khi nó trôi mất
 
 GitHub tắt lịch `schedule` của một kho sau **60 ngày không có hoạt động commit**. Kho khôi lỗi thì

@@ -4,6 +4,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { countJobsForDrain, jobEventRetentionStats } from "@/lib/services/jobs";
 import { BACKDROP_PREFIX, humanBytes, listObjectsUnder } from "@/lib/services/media";
 import { getAppSettings } from "@/lib/services/settings";
+import { githubStationsForAdmin } from "@/app/actions/githubStations";
 import { mirrorsForAdmin } from "@/app/actions/mirrors";
 import { switchStateForAdmin } from "@/app/actions/mirrorSwitch";
 import { countPending, listUsers } from "@/lib/services/users";
@@ -14,6 +15,7 @@ import { ChatPurgePanel } from "./ChatPurgePanel";
 import { ChatSettingsForm } from "./ChatSettingsForm";
 import { TagFrameManager } from "./TagFrameManager";
 import { GameDomainForm } from "./GameDomainForm";
+import { GithubStationPanel } from "./GithubStationPanel";
 import { JobEventRetentionForm } from "./JobEventRetentionForm";
 import { MaintenanceForm } from "./MaintenanceForm";
 import { MirrorPanel } from "./MirrorPanel";
@@ -188,6 +190,17 @@ export default async function AdminPage({
                   key: "guongTram",
                   label: "Gương Trạm",
                   pane: <MirrorPanel mirrors={await mirrorsForAdmin()} switchState={await switchStateForAdmin()} />,
+                }]
+              : []),
+            // Kho GitHub đứng SAU Gương Trạm và mọc theo một quyền RIÊNG (`github_station.manage`,
+            // cũng chỉ Gia chủ): hai sổ cùng bậc nguy hiểm nhưng cầm hai loại chìa khác nhau —
+            // chuỗi kết nối database ≠ chìa push mã. Ngày muốn giao sổ này mà không giao cả hệ
+            // trạm dự phòng thì không phải sửa gì ở đây.
+            ...(hasPermission(viewer, "github_station.manage")
+              ? [{
+                  key: "khoGithub",
+                  label: "Kho GitHub",
+                  pane: <GithubStationPanel stations={await githubStationsForAdmin()} />,
                 }]
               : []),
           ]}

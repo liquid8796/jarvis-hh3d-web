@@ -1,17 +1,22 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { purgeExpiredChat } from "@/lib/services/chat";
+import { runKeepalive } from "@/lib/services/githubStations";
 import { purgeExpiredJobEvents, reapStaleJobs } from "@/lib/services/jobs";
 
 /**
- * Người quét dọn — và CHỈ quét dọn.
+ * Người quét dọn — cộng đúng MỘT việc không phải quét dọn, thêm vào 12/08/2026.
  *
  * Từ khi mọi lượt chạy đều do một worker sống dai đảm nhiệm (khôi lỗi tông môn trên VM,
  * hoặc khôi lỗi máy nhà của đạo hữu), không còn ai cần được "gõ cửa đánh thức" nữa: worker
- * tự hỏi việc mỗi 5 giây. Route này chỉ còn ba việc vệ sinh — kết liễu job đang chạy mất
+ * tự hỏi việc mỗi 5 giây. Route này giữ ba việc vệ sinh — kết liễu job đang chạy mất
  * nhịp tim, quét tin đàm đạo quá hạn lưu, và quét nhật ký đàn quá hạn lưu. Hai việc đầu còn
  * được gọi TIỆN ĐƯỜNG từ đường đọc của dashboard, nên với chúng cron ngoài giờ là lưới an
  * toàn cho những ngày không ai mở web, không phải mạch sống của hệ thống.
+ *
+ * Việc thứ tư — NUÔI KHO GITHUB (deploy/github-actions.md §7) — đi nhờ đúng cái lịch này thay
+ * vì dựng lịch thứ hai, và đó không phải lười: gói Hobby cho đúng MỘT cron mỗi ngày, nên một
+ * lịch thứ hai là bất khả. May thay nhịp ngày cũng chính là nhịp việc ấy cần.
  *
  * Việc thứ ba thì KHÔNG có đường đi kèm nào — nó là xoá hàng loạt, không đáng đặt trên đường
  * đi nóng của một trang. Với nó, cron LÀ mạch sống: cron không chạy thì `job_events` phình vô
@@ -56,5 +61,27 @@ export async function GET(request: Request) {
   // là còn nợ, lượt cron sau dọn tiếp.
   const events = await purgeExpiredJobEvents();
 
-  return NextResponse.json({ ok: true, swept: true, chat: chat.purged, jobEvents: events });
+  // Nuôi kho GitHub ĐỨNG SAU ba việc quét dọn, và thứ tự ấy là một lựa chọn: quét dọn là mạch
+  // sống (xem đầu tệp), còn nuôi kho có 40 ngày dự phòng nên trượt một lượt cũng không sao. Nếu
+  // ngân sách thời gian của function cạn thì thứ bị cắt phải là thứ chịu được cắt.
+  //
+  // Bọc try/catch vì cùng lý lẽ: sổ hỏng, database chớp, GitHub đổ — không việc nào trong số đó
+  // được phép biến lượt quét dọn vừa chạy XONG thành một hồi đáp 500 trông như chưa chạy gì.
+  let keepalive: unknown;
+  try {
+    const summary = await runKeepalive();
+    keepalive = {
+      checked: summary.checked,
+      committed: summary.committed,
+      failed: summary.failed,
+      skipped: summary.skipped,
+      // Câu chữ của từng kho đi luôn ra hồi đáp: một lượt curl là biết kho nào hỏng, khỏi phải
+      // mở trang admin. Chúng đã được ghi vào sổ rồi, đây chỉ là bản sao cho người đang gõ lệnh.
+      stations: summary.results.map((r) => ({ slug: r.slug, ok: r.ok, note: r.note })),
+    };
+  } catch (err) {
+    keepalive = { error: err instanceof Error ? err.message : "lỗi lạ" };
+  }
+
+  return NextResponse.json({ ok: true, swept: true, chat: chat.purged, jobEvents: events, keepalive });
 }

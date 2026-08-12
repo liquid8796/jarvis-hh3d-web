@@ -117,3 +117,45 @@ Ghi ra để người sau không tưởng là sơ suất — đây là một quy
   của repo」trong chính sách sử dụng của GitHub. Rủi ro không phải hoá đơn mà là tài khoản.
 
 Ai định mở rộng lối này — thêm trạm, tăng ghế — nên đọc lại ba dòng trên trước.
+
+---
+
+## 7. Nuôi kho cho khỏi bị tắt lịch — thiết kế, CHƯA làm
+
+GitHub **tắt lịch `schedule`** của một kho sau **60 ngày không có hoạt động commit**. Kho khôi
+lỗi thì gần như không ai đụng vào — nó chỉ chạy — nên cái mốc ấy sẽ tới, và khi tới thì khôi lỗi
+im lặng ngừng lên ca mà không báo ai. Chỗ này ghi lại thiết kế đã bàn ngày 12/08/2026 để phiên
+sau không phải suy lại từ đầu.
+
+### Hỏi câu này TRƯỚC khi xây bất cứ thứ gì
+
+**Commit tạo bằng `GITHUB_TOKEN` của chính workflow có được tính là「repository activity」cho luật
+60 ngày không?**
+
+Nếu CÓ, thì mỗi kho tự nuôi mình bằng một bước cuối trong workflow — và toàn bộ phần dưới đây
+biến mất: không bảng, không PAT, không tab admin, không job định kỳ. Ba dòng YAML thay cho một
+hệ thống.
+
+Chưa ai kiểm. GitHub nói rõ commit bằng `GITHUB_TOKEN` **không kích hoạt workflow mới**, nhưng
+không nói nó có tính là hoạt động kho hay không — hai chuyện khác nhau, và đừng suy cái này ra
+cái kia. Đây là câu hỏi rẻ nhất và đáng hỏi nhất của cả tính năng: trả lời sai theo hướng bi
+quan là xây cả một hệ thống quản lý PAT cho việc mà một bước YAML làm xong.
+
+### Nếu câu trả lời là KHÔNG
+
+**Không cần `git push`.** `PUT /repos/{owner}/{repo}/contents/{path}` **tạo ra một commit thật** —
+không cần binary `git`, không clone, không thư mục tạm. Một lời gọi HTTPS cập nhật
+`.github/heartbeat.txt` (nội dung là mốc thời gian, kèm `sha` của bản cũ) là đủ. Toàn bộ bài toán
+「làm sao push từ một serverless function」tan biến — đây là chỗ dễ đi vòng nhất nếu không biết.
+
+**Không cần lịch mới.** `vercel.json` đã có cron `0 3 * * *`, và gói Hobby cho đúng một lần mỗi
+ngày — vừa khít nhu cầu. Móc vào `/api/cron` đang có, đừng dựng đường thứ hai.
+
+**PAT nguy hiểm hơn cookie game.** Nó có quyền push mã. Lưu bằng `secretBox` + `ENCRYPTION_KEY`
+đúng lối phong bì cookie (đã có `decryptSecret`), và quyền quản phải là **mã riêng, chỉ Gia chủ** —
+đừng dùng lại `admin.panel`: được xem môn đồ không đồng nghĩa được cầm chìa push mã vào bốn tài
+khoản.
+
+Hình dạng bảng: `github_stations(owner, repo, worker_id, pat_envelope, enabled, last_push_at,
+last_error)`. Job duyệt từng dòng, **một kho hỏng không chặn kho còn lại**, và `last_error` hiện
+thẳng trên tab admin — cùng lối với `deployAllStations.mts`.

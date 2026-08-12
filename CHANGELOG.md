@@ -11,6 +11,30 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.78.1 — chép lại thiết kế「nuôi kho khôi lỗi」trước khi nó trôi mất
+
+GitHub tắt lịch `schedule` của một kho sau **60 ngày không có hoạt động commit**. Kho khôi lỗi thì
+gần như không ai đụng vào — nó chỉ chạy — nên mốc ấy sẽ tới, và khi tới thì khôi lỗi im lặng ngừng
+lên ca mà không báo ai.
+
+Tính năng chưa làm. Nhưng bốn điều đã bàn ra được thì chép vào
+[deploy/github-actions.md](deploy/github-actions.md) mục 7 ngay, vì hai trong số đó **đổi hẳn hình
+dạng thiết kế** và người bắt tay sau sẽ mất công tìm lại:
+
+- **Hỏi TRƯỚC KHI XÂY: commit bằng `GITHUB_TOKEN` có tính là repository activity không?** Nếu có
+  thì mỗi kho tự nuôi mình bằng một bước YAML, và cả hệ thống bảng + PAT + tab admin + job biến
+  mất. GitHub nói rõ commit ấy không kích hoạt workflow mới, nhưng KHÔNG nói nó có tính là hoạt
+  động kho hay không — hai chuyện khác nhau, đừng suy cái này ra cái kia.
+- **Không cần `git push`.** `PUT /repos/{owner}/{repo}/contents/{path}` tạo ra một commit thật,
+  nên job chạy gọn trong một Vercel function — không binary `git`, không clone. Đây là chỗ dễ đi
+  vòng nhất nếu không biết.
+- **Không cần lịch mới**: `vercel.json` đã có cron ngày, và Hobby cho đúng một lần mỗi ngày.
+- **PAT nguy hiểm hơn cookie game** vì nó push được mã: lưu bằng `secretBox`, và quyền quản phải
+  là mã RIÊNG chỉ Gia chủ — được xem môn đồ không đồng nghĩa được cầm chìa push mã vào bốn tài khoản.
+
+Ghi ra vì một thiết kế sống trong khung chat là một thiết kế sắp mất; sống trong repo thì người
+sau đọc được.
+
 ## 0.78.0 — một lệnh dựng thêm một khôi lỗi GitHub ở tài khoản bất kỳ
 
 `node scripts/newGithubKhoiloi.mjs --owner <tài-khoản>` — từ kho trắng tới lượt chạy đầu tiên.

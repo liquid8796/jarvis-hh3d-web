@@ -11,6 +11,33 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.79.2 — lệnh dựng khôi lỗi GitHub phát ra một kho chết ngay giây đầu
+
+`newGithubKhoiloi.mjs` chép **`worker.mjs` + `quest-engine`**, và chỉ ngần ấy — đúng như bình chú
+của chính nó khai: „Worker chỉ cần scripts/worker.mjs, toàn bộ src/lib/quest-engine/, và
+playwright-core". Câu ấy **đã hết đúng** từ commit「khôi lỗi đi theo trạm」, thứ thêm vào
+`worker.mjs` một import thứ ba: `../src/lib/worker/controlFollow.mjs`.
+
+Kho phát ra sẽ chết bằng `ERR_MODULE_NOT_FOUND` ở giây đầu tiên — **trên một máy khác, trong nhật
+ký Actions của một tài khoản khác**, sau khi mọi bước ở máy phát hành đều báo xanh. Chưa ai vấp
+chỉ vì script này chưa từng chạy thật (máy phát triển không có `gh`).
+
+Vá hai lớp, và lớp thứ hai mới là lớp đáng kể:
+
+**`--dry-run` giờ dựng thật rồi mới dừng.** Bản trước thoát ngay sau khi in kế hoạch, nên nó soi
+được đúng mấy con số mà người ta vốn đã tự gõ ra — còn phần duy nhất thật sự có thể sai, danh
+sách tệp phải chép, thì không lượt chạy khô nào chạm tới. Giờ nó chép, thay `WORKER_ID` trong
+workflow, soi đường import, in cây 19 tệp, rồi dọn sạch. Tức **mọi việc không cần `gh` đều đã có
+bằng chứng**; chỉ bốn lời gọi `gh` ở cuối là còn chưa.
+
+**`assertImportsResolve` không đi kèm một cái tên tệp nào.** Nó duyệt cây vừa dựng, rút mọi đường
+`import` tương đối (cả `from "…"` lẫn `import("…")`) và ném nếu có cái nào trỏ vào hư không. Vá
+bằng cách thêm đúng một dòng chép thì lần sau — khi ai đó thêm import thứ tư — sẽ hỏng y hệt; câu
+hỏi phải là câu hỏi tổng quát. Đã thử đột biến: gỡ lượt chép ấy đi thì lượt chạy khô đỏ ngay, kèm
+tên tệp thiếu và chỗ phải sửa.
+
+Không đụng mã ứng dụng, nên không cần deploy.
+
 ## 0.79.1 — cỗ máy chuyển trạm đã hỏng suốt một tuần mà không ai biết
 
 `assertTablesCovered` ném với BẤT KỲ bảng nào ở đích mà nó không biết tên, và nó được gọi ở dòng

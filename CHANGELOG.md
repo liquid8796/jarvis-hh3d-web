@@ -11,43 +11,44 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
-## 0.72.0 — hạn lưu nhật ký đàn đặt được theo GIỜ, không chỉ theo ngày
+## 0.77.0 — Hàng Đợi có tab Khôi Lỗi, và id khôi lỗi tông môn chỉ bậc trị sự thấy
 
-Núm ở tab Bảo Trì trước nay chỉ nhận NGÀY (1–365), mà đơn vị nhỏ nhất là một ngày thì không đặt
-được những mốc ngắn — 12 giờ, 6 giờ — đúng lúc `job_events` phình nhanh. Nay ô số đứng cạnh một
-ô chọn đơn vị: **giờ** hay **ngày**.
+Từ hôm có khôi lỗi tông môn **thứ hai** (0.76.0), trang Hàng Đợi thiếu hẳn một câu trả lời: mọi
+dòng đều ghi「khôi lỗi tông môn」như nhau, nên không ai biết đàn đang nằm trong tay cái nào —
+`tong-mon-khoiloi` trên VM hay `github-khoiloi` trên GitHub Actions. Mà đó đúng là câu đầu tiên
+phải hỏi khi một đàn đứng im.
 
-**Lưu xuống database bằng GIỜ** (`jobEvents.retentionHours`, 1–8760 — đúng 365 ngày cũ kể lại
-bằng giờ), không lưu kèm một trường đơn vị. Lưu kèm đơn vị nghĩa là mọi chỗ đọc hạn lưu (lượt
-quét, hai con số thống kê, câu thông báo sau khi Lưu) phải tự nhớ nhân lại — và chỗ nào quên là
-xoá sớm gấp 24 lần, thứ không ai thấy cho tới lúc đi tìm một dòng nhật ký không còn ở đó nữa.
-Đơn vị chỉ sống trong cái form.
+**Nay mỗi dòng khai đích danh — nhưng chỉ với bậc trị sự** (`admin.panel`). Môn đồ thường vẫn
+đọc「khôi lỗi tông môn」, **kể cả trên đàn của chính họ**, và chỗ ấy là một siết lại chứ không
+phải giữ nguyên: trước bản này dòng của mình luôn kèm id, nên tên tiến trình tông môn vẫn ra tới
+màn hình mọi người qua chính đàn của họ. Đó là chi tiết vận hành — máy nào, trạm nào — mà môn đồ
+không dùng được vào việc gì, còn tông môn thì hở ra hình dạng hạ tầng của mình. Id khôi lỗi
+**RIÊNG** vẫn chỉ chủ nó thấy, bậc trị sự cũng không: máy ở nhà người ta không phải hạ tầng của
+tông môn. Hai vế ấy nay nằm gọn trong một hàm thuần (`visibleWorkerId`) thay vì rải trong một
+biểu thức giữa vòng `map`.
 
-**Document cũ vẫn đọc được.** Mọi document đã ghi trước bản này mang `retentionDays`, và schema
-đổi nó thành giờ (×24) thay vì rơi về mặc định — đo trên database thật: `{"retentionDays":7}`
-đọc ra đúng 168 giờ. Bỏ nhánh ấy đi thì hạn lưu trưởng môn đã đặt biến mất lặng lẽ ngay nhịp
-deploy. Lần Lưu đầu tiên ghi ra `retentionHours` và khoá cũ tự rụng.
+**Tab KHÔI LỖI** trả lời câu còn lại: còn ai đang trực để nhặt việc. Một hàng dài mười đàn mang
+nghĩa hoàn toàn khác nhau tuỳ khôi lỗi đang trực hay đã tắt, mà trước bản này trang chỉ nói được
+vế đầu — ai đọc「11 đang nghỉ」lúc cả tông môn đứng im thì không có cách nào biết đó là cooldown
+hay là không còn ai làm việc. Môn đồ thường thấy MỘT dòng gộp cho khôi lỗi tông môn cộng khôi lỗi
+riêng của chính mình; bậc trị sự thấy TỪNG tiến trình một, kèm số bản. Huy hiệu trên tab hiện kể
+cả khi bằng **0**, ngược với hai tab kia: ở đây số 0 chính là tin đáng báo.
 
-**Ô số KHÔNG tự đổi giá trị khi đổi đơn vị** — đổi hộ là quyết định hộ, mà「7」có thể là 7 ngày
-đang gõ dở lẫn 7 giờ vừa định. Thay vào đó là một dòng「Sẽ giữ: …」chạy theo bàn phím, gọi ĐÚNG
-hàm mà server sẽ kiểm, nên nó không bao giờ hứa một thứ mà cú bấm Lưu lại từ chối.
+**Sổ khôi lỗi đi CHUNG ảnh chụp hàng đợi**, không có endpoint riêng — hai câu hỏi ấy chỉ có nghĩa
+khi trả lời cùng một khoảnh khắc, và một danh sách khôi lỗi cũ hơn hàng đợi sẽ vẽ ra cảnh「không
+ai trực」ngay cạnh một đàn đang chạy. Mốc điểm danh chỉ đi xuống dây khi khôi lỗi ĐANG VẮNG: khôi
+lỗi trực thì gõ cửa mỗi 5 giây, mà ảnh chụp lại đi qua SSE với một phép so nguyên văn để quyết
+định có đẩy khung mới hay không — nhét một con số nhấp nháy vào đó là phép so ấy thôi lọc được gì.
 
-**Đơn vị vắng mặt thì TỪ CHỐI, không đoán.** Ca thật: một tab admin mở từ bản cũ, form chưa có ô
-đơn vị. Đoán「giờ」cho một con số người ta định là「ngày」là cắt hạn lưu xuống 1/24 và lượt quét
-kế tiếp xoá thật — một cái nút Lưu không được phép có nhánh im lặng nào dẫn tới đó.
+**`verify:continuous` đã ĐỎ SẴN từ 08/08/2026** và không ai thấy: nó còn ghim luật cũ「tên nhiệm
+vụ của người khác phải bị cắt」trong khi `queue.ts` đã cố ý đổi phía đúng hôm ấy theo yêu cầu của
+tông chủ. Chốt được sửa cho nói đúng luật hôm nay — chứ không gỡ đi — rồi thêm 14 chốt cho phép
+cắt id: cùng một dữ liệu, hai con mắt, môn đồ không thấy id tông môn (kể cả trên đàn của mình),
+bậc trị sự không thấy id khôi lỗi riêng của người khác, và sổ khôi lỗi không bao giờ mang máy nhà
+của người thứ ba.
 
-**Đặt dưới một ngày thì form nói thẳng cái giới hạn của nó:** cron gói Hobby chạy `0 3 * * *` —
-**một lần mỗi ngày**. Hạn lưu 6 giờ không có nghĩa là quét mỗi 6 giờ; muốn dọn đúng mốc thì bấm
-「Quét ngay」. Không có dòng ấy thì núm mới trông như hỏng, đúng cái bẫy mà nút「Quét ngay」đã
-sinh ra để gỡ ở bản trước.
-
-**Đo trên database thật trước khi phát hành**: đặt 25 giờ (cố ý không tròn ngày, và cắt đôi đống
-dữ liệu) → app đếm 10.183/12.889 dòng quá hạn, một câu SQL độc lập `now() - interval '25 hours'`
-đếm đúng 10.183, lệch 0. Cùng con số ấy nếu bị hiểu thành 25 NGÀY thì ra 0 dòng — nên phép đo này
-đỏ được, không phải một dấu tích cho vui. `verify:maintenance` nay giữ thêm: hai biên theo từng
-đơn vị, đơn vị lạ/vắng, document cũ theo ngày, ca có cả hai khoá, và vòng đời「lưu → chẻ ra rót
-vào form → bấm Lưu mà không sửa gì」phải về đúng con số cũ (mở trang admin rồi bấm Lưu không được
-tự đổi hạn lưu của chính mình).
+**Mục 0.72.0 dời xuống đúng chỗ** trong tệp này: nó nằm trên 0.76.x suốt từ hôm hai phiên cùng
+sửa CHANGELOG một lúc, mà luật của tệp là mới nhất ở trên.
 
 ## 0.76.2 — tài liệu cho khôi lỗi thứ hai, viết cho người đọc sau
 
@@ -186,6 +187,44 @@ vào đủ ba phòng, không gửi thêm lời chúc nào, và vòng lặp DỪN
 
 Hồ sơ lên **schema 54** ở cả hai bên; bốn đoạn script khớp từng byte giữa hai bản sinh đôi và chốt
 chống-trôi nay canh cả chúng (7 cặp). Bản desktop nhận cùng thay đổi ở 1.55.0. Tổng 310 thuận.
+
+## 0.72.0 — hạn lưu nhật ký đàn đặt được theo GIỜ, không chỉ theo ngày
+
+Núm ở tab Bảo Trì trước nay chỉ nhận NGÀY (1–365), mà đơn vị nhỏ nhất là một ngày thì không đặt
+được những mốc ngắn — 12 giờ, 6 giờ — đúng lúc `job_events` phình nhanh. Nay ô số đứng cạnh một
+ô chọn đơn vị: **giờ** hay **ngày**.
+
+**Lưu xuống database bằng GIỜ** (`jobEvents.retentionHours`, 1–8760 — đúng 365 ngày cũ kể lại
+bằng giờ), không lưu kèm một trường đơn vị. Lưu kèm đơn vị nghĩa là mọi chỗ đọc hạn lưu (lượt
+quét, hai con số thống kê, câu thông báo sau khi Lưu) phải tự nhớ nhân lại — và chỗ nào quên là
+xoá sớm gấp 24 lần, thứ không ai thấy cho tới lúc đi tìm một dòng nhật ký không còn ở đó nữa.
+Đơn vị chỉ sống trong cái form.
+
+**Document cũ vẫn đọc được.** Mọi document đã ghi trước bản này mang `retentionDays`, và schema
+đổi nó thành giờ (×24) thay vì rơi về mặc định — đo trên database thật: `{"retentionDays":7}`
+đọc ra đúng 168 giờ. Bỏ nhánh ấy đi thì hạn lưu trưởng môn đã đặt biến mất lặng lẽ ngay nhịp
+deploy. Lần Lưu đầu tiên ghi ra `retentionHours` và khoá cũ tự rụng.
+
+**Ô số KHÔNG tự đổi giá trị khi đổi đơn vị** — đổi hộ là quyết định hộ, mà「7」có thể là 7 ngày
+đang gõ dở lẫn 7 giờ vừa định. Thay vào đó là một dòng「Sẽ giữ: …」chạy theo bàn phím, gọi ĐÚNG
+hàm mà server sẽ kiểm, nên nó không bao giờ hứa một thứ mà cú bấm Lưu lại từ chối.
+
+**Đơn vị vắng mặt thì TỪ CHỐI, không đoán.** Ca thật: một tab admin mở từ bản cũ, form chưa có ô
+đơn vị. Đoán「giờ」cho một con số người ta định là「ngày」là cắt hạn lưu xuống 1/24 và lượt quét
+kế tiếp xoá thật — một cái nút Lưu không được phép có nhánh im lặng nào dẫn tới đó.
+
+**Đặt dưới một ngày thì form nói thẳng cái giới hạn của nó:** cron gói Hobby chạy `0 3 * * *` —
+**một lần mỗi ngày**. Hạn lưu 6 giờ không có nghĩa là quét mỗi 6 giờ; muốn dọn đúng mốc thì bấm
+「Quét ngay」. Không có dòng ấy thì núm mới trông như hỏng, đúng cái bẫy mà nút「Quét ngay」đã
+sinh ra để gỡ ở bản trước.
+
+**Đo trên database thật trước khi phát hành**: đặt 25 giờ (cố ý không tròn ngày, và cắt đôi đống
+dữ liệu) → app đếm 10.183/12.889 dòng quá hạn, một câu SQL độc lập `now() - interval '25 hours'`
+đếm đúng 10.183, lệch 0. Cùng con số ấy nếu bị hiểu thành 25 NGÀY thì ra 0 dòng — nên phép đo này
+đỏ được, không phải một dấu tích cho vui. `verify:maintenance` nay giữ thêm: hai biên theo từng
+đơn vị, đơn vị lạ/vắng, document cũ theo ngày, ca có cả hai khoá, và vòng đời「lưu → chẻ ra rót
+vào form → bấm Lưu mà không sửa gì」phải về đúng con số cũ (mở trang admin rồi bấm Lưu không được
+tự đổi hạn lưu của chính mình).
 
 ## 0.71.0 — bản desktop nhận cùng thiết kế, và có chốt giữ hai bản không trôi khỏi nhau
 

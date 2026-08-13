@@ -201,6 +201,10 @@ try {
   const settingsExpr = verifyDigestExpr("app_settings");
   ok(settingsExpr.includes("'mirrorSwitch'"), "biểu thức đối chiếu app_settings có loại khoá mirrorSwitch");
   ok(settingsExpr.includes("- 'updated_at'"), "…VÀ loại cả cột updated_at — chỗ bản vá đầu bỏ sót");
+  ok(
+    ["usageReport", "lastProbeAt", "lastProbeOk", "lastProbeNote"].every((k) => settingsExpr.includes(`'${k}'`)),
+    "…VÀ loại cả bốn trường tin tức trong mirrors[] — chỗ bản vá THỨ HAI bỏ sót",
+  );
   ok(verifyDigestExpr("users") === "to_jsonb(t)", "bảng không khai gì thì băm thẳng, không phù phép");
   ok(verifyDigestExpr("workers").includes("- 'last_seen'"), "workers vẫn loại cột nhịp tim như cũ");
   ok(
@@ -241,6 +245,134 @@ try {
   ok(
     (await rawDigest(SRC, settingsExpr)) !== (await rawDigest(DST, settingsExpr)),
     "đổi một khoá KHÁC trong value thì vẫn đỏ — loại mirrorSwitch không phải bịt mắt cả cột",
+  );
+
+  // ---- rác tin tức nằm TRONG mảng `mirrors` -----------------------------------------------
+  // Lượt chuyển 13/08/2026 chết ở đây, và mốc giờ chỉ đúng thủ phạm: chép app_settings sang
+  // đích lúc 17:31:44.259Z, máy cào usage ghi vào NGUỒN lúc 17:31:44.582Z rồi 17:31:54.237Z,
+  // lượt chuyển chết lúc 17:31:54.902Z. Sổ giả vì thế phải mang ĐÚNG hình dạng sổ gương thật —
+  // cả trường sổ (pg/mongo/vercelToken) lẫn trường tin tức — chứ không phải một mảng rút gọn:
+  // fixture thiếu hình dạng đã cho lọt bản vá lần trước, ngay trong tệp này.
+  const book = (used: string, probeAt: string | null) =>
+    JSON.stringify({
+      chat: { retentionDays: 14 },
+      mirrorSwitch: { phase: "idle", copiedRows: 0 },
+      mirrors: [
+        {
+          id: "auto-hh3d",
+          name: "Trạm A",
+          url: "https://a.example.com",
+          pg: "v1.aaa",
+          mongo: "v1.bbb",
+          vercelToken: "v1.ccc",
+          usageReport: { readAt: probeAt, meters: [{ title: "Fast Data Transfer", used, limit: "100 GB" }] },
+          lastProbeAt: probeAt,
+          lastProbeOk: true,
+          lastProbeNote: "mạch thông",
+        },
+        // Trạm chưa cào lần nào: bốn trường tin tức đều null/rỗng — phải đi qua được y như trạm đã cào.
+        {
+          id: "auto-hh3d-1",
+          name: "Trạm B",
+          url: "https://b.example.com",
+          pg: "v1.ddd",
+          mongo: "v1.eee",
+          vercelToken: "",
+          usageReport: null,
+          lastProbeAt: null,
+          lastProbeOk: null,
+          lastProbeNote: "",
+        },
+      ],
+    });
+
+  const setBook = async (schema: string, used: string, probeAt: string | null) =>
+    sql.query(`update ${schema}.app_settings set value = $1::jsonb`, [book(used, probeAt)]);
+
+  await setBook(SRC, "632.74 MB", "2026-08-13T17:31:54.237Z");
+  await setBook(DST, "602.74 MB", "2026-08-13T16:27:11.013Z");
+  ok(
+    (await rawDigest(SRC, "to_jsonb(t)")) !== (await rawDigest(DST, "to_jsonb(t)")),
+    "băm thẳng: usageReport + lastProbeAt lệch → đỏ, tái hiện đúng lượt chuyển đã chết 13/08",
+  );
+  ok(
+    (await rawDigest(SRC, settingsExpr)) === (await rawDigest(DST, settingsExpr)),
+    "loại tin tức trong mirrors[] thì khớp — bản vá đứng vững trước chính ca ấy",
+  );
+
+  // Nhưng SỔ thì tuyệt đối không được mù: chuỗi kết nối lệch mà xanh là trạm mới lên ngôi
+  // bằng một cuốn sổ sai, và lúc ấy không còn đường về.
+  await sql.query(`update ${DST}.app_settings set value = jsonb_set(value, '{mirrors,0,pg}', '"v1.CHUOI_KHAC"')`);
+  ok(
+    (await rawDigest(SRC, settingsExpr)) !== (await rawDigest(DST, settingsExpr)),
+    "đổi mirrors[0].pg thì ĐỎ — bỏ qua tin tức không phải bịt mắt cả sổ gương",
+  );
+
+  await setBook(DST, "602.74 MB", "2026-08-13T16:27:11.013Z");
+  await sql.query(
+    `update ${DST}.app_settings
+        set value = jsonb_set(value, '{mirrors}', jsonb_build_array(value->'mirrors'->1, value->'mirrors'->0))`,
+  );
+  ok(
+    (await rawDigest(SRC, settingsExpr)) !== (await rawDigest(DST, settingsExpr)),
+    "đảo thứ tự mirrors[] cũng ĐỎ — `order by ord` giữ nguyên thứ tự sổ",
+  );
+
+  // Hai dòng dị hình: `jsonb_array_elements` NÉM khi gặp thứ không phải mảng, nên nếu thiếu
+  // `jsonb_typeof` canh cửa thì cả bước đối chiếu đổ thành exception thay vì một phán quyết.
+  for (const schema of [SRC, DST]) {
+    await setBook(schema, "1 GB", null);
+    await sql.query(
+      `insert into ${schema}.app_settings (id, value) values ('khong-co-mirrors', '{"chat":{"retentionDays":9}}'::jsonb)`,
+    );
+    await sql.query(
+      `insert into ${schema}.app_settings (id, value) values ('mirrors-khong-phai-mang', '{"mirrors":"chuỗi chứ không phải mảng"}'::jsonb)`,
+    );
+  }
+  ok(
+    (await rawDigest(SRC, settingsExpr)) === (await rawDigest(DST, settingsExpr)),
+    "dòng thiếu `mirrors` và dòng `mirrors` không phải mảng đều đi qua được, không ném",
+  );
+  await sql.query(`update ${DST}.app_settings set value = jsonb_set(value, '{chat,retentionDays}', '99') where id = 'khong-co-mirrors'`);
+  ok(
+    (await rawDigest(SRC, settingsExpr)) !== (await rawDigest(DST, settingsExpr)),
+    "…và những dòng ấy vẫn bị SO nội dung, không phải được tha",
+  );
+
+  // Sổ RỖNG — trạm mới dựng thì `mirrors: []`. Đây là bẫy im lặng nguy nhất của cả bản vá:
+  // `jsonb_agg` trả NULL trên mảng rỗng, mà `jsonb_set(…, NULL)` cho ra NULL, và md5 của hai
+  // NULL thì BẰNG NHAU — tức thiếu `coalesce` là phép so hoá thành cái gật đầu vô điều kiện.
+  // Nên ca này phải kiểm bằng một khoá KHÁC đang lệch: xanh ở đây nghĩa là phép so đã chết.
+  await sql.query(`delete from ${SRC}.app_settings where id <> 'global'`);
+  await sql.query(`delete from ${DST}.app_settings where id <> 'global'`);
+  for (const [schema, days] of [
+    [SRC, 14],
+    [DST, 30],
+  ] as const) {
+    await sql.query(`update ${schema}.app_settings set value = $1::jsonb`, [
+      JSON.stringify({ chat: { retentionDays: days }, mirrors: [] }),
+    ]);
+  }
+  ok(
+    (await rawDigest(SRC, settingsExpr)) !== (await rawDigest(DST, settingsExpr)),
+    "sổ rỗng `mirrors: []` mà khoá khác lệch thì vẫn ĐỎ — `coalesce` giữ biểu thức khỏi hoá NULL",
+  );
+
+  // Phần tử RÁC do sửa tay jsonb: `-` ném khi gặp thứ không phải object, mà phép so đọc jsonb
+  // thô chứ không đi qua `.catch([])` của Zod — nên nó tới thẳng biểu thức này.
+  for (const schema of [SRC, DST]) {
+    await sql.query(`update ${schema}.app_settings set value = $1::jsonb`, [
+      JSON.stringify({ chat: { retentionDays: 14 }, mirrors: ["rác sửa tay", { id: "a", pg: "v1.x", usageReport: null }] }),
+    ]);
+  }
+  ok(
+    (await rawDigest(SRC, settingsExpr)) === (await rawDigest(DST, settingsExpr)),
+    "mảng lẫn phần tử không phải object thì KHÔNG ném, vẫn ra được phán quyết",
+  );
+  await sql.query(`update ${DST}.app_settings set value = jsonb_set(value, '{mirrors,1,pg}', '"v1.KHAC"')`);
+  ok(
+    (await rawDigest(SRC, settingsExpr)) !== (await rawDigest(DST, settingsExpr)),
+    "…và phần tử LÀNH bên cạnh phần tử rác vẫn bị so từng chữ",
   );
 
   // ---- bản ghi đặt vào trạm SẮP LÊN THAY --------------------------------------------------

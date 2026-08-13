@@ -135,8 +135,49 @@ const HEARTBEAT_COLUMNS: Partial<Record<SyncTable, readonly string[]>> = {
  * người quan sát, không phải bỏ qua sai sót. Mọi khoá khác trong `value` vẫn bị so từng chữ —
  * sổ gương, cấu hình sảnh, bảo trì đều nằm trong đó.
  */
-const VOLATILE_JSON_KEYS: Partial<Record<SyncTable, { column: string; keys: readonly string[] }>> = {
-  app_settings: { column: "value", keys: ["mirrorSwitch"] },
+const VOLATILE_JSON_KEYS: Partial<
+  Record<
+    SyncTable,
+    {
+      column: string;
+      keys: readonly string[];
+      /** Khoá rác nằm TRONG từng phần tử của một mảng — `value.mirrors[*].usageReport` chẳng hạn. */
+      arrayItemKeys?: Readonly<Record<string, readonly string[]>>;
+    }
+  >
+> = {
+  app_settings: {
+    column: "value",
+    keys: ["mirrorSwitch"],
+    /**
+     * Bốn trường TIN TỨC VỀ TRẠM, do người NGOÀI máy chuyển trạm ghi — phải loại khỏi phép so
+     * cùng lý lẽ với `mirrorSwitch`, chỉ khác là ở đây người gây ồn không phải người đang đo.
+     *
+     * `usageReport` do một lượt cào trên GitHub Actions POST vào `/api/usage-report`; ba trường
+     * `lastProbe*` do nút「Kiểm mạch」và「Tự khai」trên chính tab Gương Trạm — tức đúng cái tab
+     * mà Gia chủ đang ngồi bấm từng nhịp chuyển trạm.
+     *
+     * ĐO ĐƯỢC ngày 13/08/2026, lượt chuyển sang `auto-hh3d-1` chết ở「Đối chiếu app_settings
+     * hỏng: LỆCH NỘI DUNG」— và mốc giờ chỉ đúng thủ phạm:
+     *
+     *   chép app_settings sang đích   17:31:44.259Z
+     *   usageReport(auto-hh3d)   ghi   17:31:44.582Z   ← 0,3s SAU khi chép
+     *   usageReport(auto-hh3d-1) ghi   17:31:54.237Z   ← 0,7s TRƯỚC khi chết
+     *   lượt chuyển chết               17:31:54.902Z
+     *
+     * Đây KHÔNG phải cuộc đua hiếm với một cron 30 phút: máy cào ghi TỪNG TRẠM MỘT, cách nhau
+     * khoảng mười giây, nên một loạt cào rải ghi suốt gần một phút. Mà `app_settings` là bảng
+     * chép CUỐI và đối chiếu CUỐI, nên cửa sổ chép→đối chiếu rơi đúng vào giữa loạt ấy. Càng
+     * thêm trạm vào sổ thì loạt càng dài và cửa sổ càng chắc bị bắn trúng — tức lỗi này nặng
+     * dần theo thời gian chứ không phải xui một lần.
+     *
+     * CHỈ bốn trường này, không phải cả `mirrors`: `id/name/url/pg/mongo/vercelToken` là SỔ
+     * thật — hai chuỗi kết nối và một chìa API — chúng phải tiếp tục bị so từng chữ, vì chép
+     * thiếu chúng là trạm mới lên ngôi mà không có đường về. Bốn trường bỏ qua đều là số liệu
+     * để NHÌN, và lượt cào kế tiếp tự viết lại chúng trên trạm mới.
+     */
+    arrayItemKeys: { mirrors: ["usageReport", "lastProbeAt", "lastProbeOk", "lastProbeNote"] },
+  },
 };
 
 const lit = (s: string) => `'${s.replace(/'/g, "''")}'`;
@@ -155,8 +196,33 @@ export function verifyDigestExpr(table: SyncTable): string {
 
   const volatile = VOLATILE_JSON_KEYS[table];
   if (volatile) {
-    const inner = volatile.keys.map((k) => `- ${lit(k)}`).join(" ");
-    expr = `jsonb_set(${expr}, '{${volatile.column}}', (to_jsonb(t)->${lit(volatile.column)}) ${inner})`;
+    const col = `(to_jsonb(t)->${lit(volatile.column)})`;
+    const dropped = volatile.keys.map((k) => `- ${lit(k)}`).join(" ");
+    let value = dropped ? `(${col} ${dropped})` : col;
+
+    // Mảng thì phải MỞ RA rồi gộp lại: `-` trên jsonb chỉ bỏ được khoá ở tầng ngoài cùng, mà
+    // rác ở đây nằm trong từng phần tử. `with ordinality` + `order by ord` giữ nguyên thứ tự
+    // sổ — đảo thứ tự cũng là lệch nội dung, và đó là lệch THẬT nên không được để lọt.
+    for (const [arrayKey, itemKeys] of Object.entries(volatile.arrayItemKeys ?? {})) {
+      const arr = `${col}->${lit(arrayKey)}`;
+      const dropItem = itemKeys.map((k) => `- ${lit(k)}`).join(" ");
+      // `jsonb_agg` trả NULL khi mảng rỗng, nên phải có `coalesce` — không thì cả biểu thức
+      // thành NULL và hai bên "khớp" một cách vô nghĩa.
+      // `case` bọc từng phần tử vì `-` NÉM khi phần tử không phải object. Sổ gương khai
+      // `.catch([])` chính vì lường trước có ngày ai đó sửa tay JSONB — mà phép so thì đọc
+      // jsonb THÔ, không đi qua Zod, nên rác ấy tới thẳng đây.
+      const cleaned =
+        `coalesce((select jsonb_agg(case when jsonb_typeof(item) = 'object' then item ${dropItem} else item end order by ord)` +
+        ` from jsonb_array_elements(${arr}) with ordinality as a(item, ord)), '[]'::jsonb)`;
+      // `jsonb_typeof` canh cửa: dòng nào không có `mirrors` (hoặc có mà không phải mảng) thì
+      // `jsonb_array_elements` NÉM. Và `false` ở cuối `jsonb_set` để nó đừng TỰ TẠO khoá cho
+      // những dòng vốn không có — tạo thêm một khoá cũng là đổi nội dung.
+      value =
+        `case when jsonb_typeof(${arr}) = 'array'` +
+        ` then jsonb_set(${value}, array[${lit(arrayKey)}], ${cleaned}, false)` +
+        ` else ${value} end`;
+    }
+    expr = `jsonb_set(${expr}, array[${lit(volatile.column)}], ${value})`;
   }
   return expr;
 }
@@ -165,7 +231,12 @@ export function verifyDigestExpr(table: SyncTable): string {
 function ignoredLabel(table: SyncTable): string {
   const parts = [...(HEARTBEAT_COLUMNS[table] ?? [])];
   const volatile = VOLATILE_JSON_KEYS[table];
-  if (volatile) parts.push(...volatile.keys.map((k) => `${volatile.column}.${k}`));
+  if (volatile) {
+    parts.push(...volatile.keys.map((k) => `${volatile.column}.${k}`));
+    for (const [arrayKey, itemKeys] of Object.entries(volatile.arrayItemKeys ?? {})) {
+      parts.push(...itemKeys.map((k) => `${volatile.column}.${arrayKey}[].${k}`));
+    }
+  }
   return parts.join(", ");
 }
 

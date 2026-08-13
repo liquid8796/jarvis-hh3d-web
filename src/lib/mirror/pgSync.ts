@@ -240,6 +240,70 @@ function ignoredLabel(table: SyncTable): string {
   return parts.join(", ");
 }
 
+/**
+ * Cột của một bảng: tên → kiểu dữ liệu. Dùng cho `reviewColumnDrift`.
+ *
+ * Kiểu đi kèm tên vì hai cột trùng tên khác kiểu cũng đẻ ra đúng cái hỏng mà hàm ấy sinh ra để
+ * bắt: `to_jsonb` in `2` cho `integer` và `"2"` cho `text`, nên đối chiếu đỏ mà không ai hiểu vì sao.
+ */
+export type SchemaMap = Readonly<Record<string, Readonly<Record<string, string>>>>;
+
+/**
+ * SCHEMA HAI BÊN PHẢI TRÙNG NHAU — và phải biết điều đó TRƯỚC khi xoá sạch đích.
+ *
+ * Đo ngày 14/08/2026, sau khi lượt chuyển sang `auto-hh3d-1` chết ở「workers: LỆCH NỘI DUNG」:
+ * trạm nguồn đã áp 28 migration (bảng `workers` có 7 cột), cả BỐN trạm gương còn 27 (5 cột) —
+ * thiếu đúng `last_assigned_at` và `max_jobs` mà migration `0027` vừa thêm sáng hôm ấy.
+ *
+ * Vì sao nó im tới tận bước cuối: `copyTablePage` chép qua `json_populate_recordset`, mà hàm ấy
+ * BỎ QUA mọi khoá JSON không có cột tương ứng ở đích. Nên lượt chép báo xanh, đủ số dòng, rồi
+ * `verifyTable` mới thấy `to_jsonb(t)` hai bên khác hình dạng và tuyên bố「LỆCH NỘI DUNG」— một
+ * câu đúng nhưng không chỉ được ra thủ phạm, sau khi đã truncate đích và chép 11.000 dòng.
+ *
+ * Nên luật này đứng ở chỗ khác hẳn: TRƯỚC lượt truncate, và nó gọi tên đúng cột còn thiếu kèm
+ * việc phải làm. Thuần, để `verify:mirror-tables` đóng đinh được mà không cần database —
+ * cùng lẽ với `reviewTableCoverage`.
+ *
+ * SO NHƯ TẬP HỢP, không so thứ tự: `to_jsonb` sinh ra jsonb, mà jsonb tự chuẩn hoá thứ tự khoá,
+ * nên hai bảng cùng cột khác thứ tự vẫn băm ra một chuỗi. Đừng "sửa" chỗ này thành so thứ tự —
+ * làm vậy là chặn oan một lượt chuyển hoàn toàn lành.
+ */
+export function reviewColumnDrift(src: SchemaMap, dest: SchemaMap): string | null {
+  const complaints: string[] = [];
+
+  for (const table of SYNC_TABLE_ORDER) {
+    const from = src[table] ?? {};
+    const to = dest[table] ?? {};
+    const names = new Set([...Object.keys(from), ...Object.keys(to)]);
+
+    const missing: string[] = [];
+    const extra: string[] = [];
+    const drifted: string[] = [];
+    for (const name of [...names].sort()) {
+      const a = from[name];
+      const b = to[name];
+      if (a != null && b == null) missing.push(name);
+      else if (a == null && b != null) extra.push(name);
+      else if (a !== b) drifted.push(`${name} (nguồn ${a}, đích ${b})`);
+    }
+
+    if (missing.length === 0 && extra.length === 0 && drifted.length === 0) continue;
+    complaints.push(
+      `${table}:` +
+        (missing.length ? ` thiếu ở đích ${missing.join(", ")};` : "") +
+        (extra.length ? ` đích có thêm ${extra.join(", ")};` : "") +
+        (drifted.length ? ` lệch kiểu ${drifted.join(", ")};` : ""),
+    );
+  }
+
+  if (complaints.length === 0) return null;
+  return (
+    `Schema đích lệch schema nguồn — ${complaints.join(" ")} ` +
+    `Chạy migration lên database của trạm đích rồi thử lại. ` +
+    `(Chặn ở đây vì chép xong mới lộ ra thì đích đã bị xoá sạch và cả lượt chuyển mất trắng.)`
+  );
+}
+
 const q = (name: string) => `"${name.replace(/"/g, '""')}"`;
 type Sql = ReturnType<typeof neon>;
 const one = <T>(rows: unknown): T => (Array.isArray(rows) ? rows[0] : (rows as { rows: T[] }).rows[0]) as T;
@@ -262,6 +326,33 @@ export async function assertTablesCovered(sql: Sql): Promise<void> {
      order by table_name
   `;
   const complaint = reviewTableCoverage((rows as { table_name: string }[]).map((r) => r.table_name));
+  if (complaint) {
+    throw new Error(complaint);
+  }
+}
+
+/**
+ * Đọc cột của đúng những bảng SẼ ĐƯỢC CHÉP. Một lượt hỏi cho cả 11 bảng, không hỏi từng bảng —
+ * đây nằm trên đường đi của một server action, và 11 lượt khứ hồi tới Neon là 11 lần chờ mạng.
+ */
+export async function readSchemaMap(sql: Sql): Promise<SchemaMap> {
+  const rows = (await sql`
+    select table_name, column_name, data_type from information_schema.columns
+     where table_schema = 'public' and table_name = any(${[...SYNC_TABLE_ORDER]})
+     order by table_name, column_name
+  `) as { table_name: string; column_name: string; data_type: string }[];
+
+  const map: Record<string, Record<string, string>> = {};
+  for (const row of rows) {
+    (map[row.table_name] ??= {})[row.column_name] = row.data_type;
+  }
+  return map;
+}
+
+/** Phần ĐI HỎI DATABASE của `reviewColumnDrift`. Ném đúng lời từ chối của luật, không gói lại. */
+export async function assertColumnsMatch(src: Sql, dest: Sql): Promise<void> {
+  const [from, to] = await Promise.all([readSchemaMap(src), readSchemaMap(dest)]);
+  const complaint = reviewColumnDrift(from, to);
   if (complaint) {
     throw new Error(complaint);
   }
@@ -296,8 +387,11 @@ export async function primaryKeyColumns(sql: Sql, table: string): Promise<string
  * Bỏ `cascade` đi thì không chạy được: Postgres từ chối truncate một bảng đang bị khoá ngoại
  * tham chiếu, nên lựa chọn duy nhất còn lại là chép cả hai bảng ấy.
  */
-export async function truncateAll(dest: Sql): Promise<void> {
+export async function truncateAll(src: Sql, dest: Sql): Promise<void> {
   await assertTablesCovered(dest);
+  // Hai hàng rào, hai tầng khác nhau, và cả hai đứng TRƯỚC câu truncate: bảng có đủ không, rồi
+  // trong từng bảng cột có khớp không. Cái thứ hai ra đời 14/08/2026 — xem `reviewColumnDrift`.
+  await assertColumnsMatch(src, dest);
   await dest.query(`truncate table ${SYNC_TABLE_ORDER.map(q).join(", ")} restart identity cascade`);
 }
 

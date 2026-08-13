@@ -17,6 +17,7 @@ import { readControlDoc } from "@/lib/control/read";
 import {
   SYNC_PAGE_SIZE,
   SYNC_TABLE_ORDER,
+  assertColumnsMatch,
   connect,
   copyTablePage,
   resetSequences,
@@ -162,6 +163,23 @@ export async function beginSwitchAction(_prev: SwitchResult | null, formData: Fo
   });
   if (!gate.allowed) return { ok: false, message: gate.message };
 
+  /**
+   * SOÁT SCHEMA NGAY Ở CỬA VÀO, trước khi đóng cửa phát việc.
+   *
+   * Bấm nút này là bế quan cả tông môn rồi ngồi chờ đàn cạn — mười lăm phút tới cả tiếng. Phát
+   * hiện trạm đích thiếu một cột SAU quãng ấy (đúng chuyện ngày 14/08/2026) nghĩa là bắt cả tông
+   * môn trả giá cho một thứ hỏi được trong nửa giây, trước khi ai phải chờ gì.
+   *
+   * Không nuốt lỗi: một trạm đích không nối được cũng dừng ở đây, và đó là điều đúng — lượt
+   * chuyển ấy đằng nào cũng chết, chỉ khác là chết trước khi đóng cửa phát việc.
+   */
+  try {
+    await assertColumnsMatch(connect(process.env.DATABASE_URL!), connect(decryptSecret(entry.pg)));
+  } catch (err) {
+    const why = err instanceof Error ? err.message : "lỗi lạ";
+    return { ok: false, message: `Chưa mở được lượt chuyển — ${why.slice(0, 400)}` };
+  }
+
   const now = new Date();
   settings.maintenance = {
     active: true,
@@ -217,8 +235,13 @@ export async function stepSwitchAction(): Promise<SwitchResult> {
         return { ok: true, message: `Còn ${drain.running} đàn đang chạy — chờ thêm.` };
       }
       // Đàn đã cạn: dọn đích MỘT LẦN rồi bước sang chép.
+      const src = connect(process.env.DATABASE_URL!);
       const dest = connect(decryptSecret(entry.pg));
-      await truncateAll(dest);
+      // `truncateAll` soát CẢ HAI hàng rào schema trước khi xoá — bảng đủ chưa, cột khớp chưa.
+      // Phải soát lại ở đây dù `beginSwitchAction` đã soát: giữa hai mốc ấy là cả pha chờ đàn
+      // cạn, đủ dài để ai đó áp một migration lên một bên. Hàng rào phải đứng ở ĐIỂM KHÔNG QUAY
+      // LẠI, không phải chỉ ở cửa vào.
+      await truncateAll(src, dest);
       stamp(settings, {
         phase: "syncing",
         tableIndex: 0,

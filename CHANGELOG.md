@@ -11,6 +11,63 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.83.3 — lượt chuyển trạm chết vì trạm gương thiếu migration, và cái chết ấy không chỉ được ra thủ phạm
+
+Lượt chuyển sang `auto-hh3d-1` dừng ở bước cuối với đúng một câu:「**workers: LỆCH NỘI DUNG — dừng,
+bảng điều phối chưa lật**」. Câu ấy đúng, và nó vô dụng: nội dung lệch ở đâu, vì cái gì, chữa thế
+nào — không có chữ nào.
+
+**Đo ra thủ phạm trong ba mươi giây, bằng một lượt hỏi `information_schema` trên cả năm trạm:**
+
+```
+auto-hh3d-2 (nguồn)   migration=28   workers(7): … last_assigned_at, max_jobs
+auto-hh3d / -1/-3/-4  migration=27   workers(5): thiếu đúng hai cột ấy
+```
+
+Migration `0027` (bộ cân tải luân phiên, sáng cùng ngày) chỉ được áp lên trạm ĐANG PHỤC VỤ. Đây
+đúng là cái bẫy `deploy:all` đã cảnh báo từ 11/08 —「một lượt phát hành có migration là N lần
+migrate」— chỉ là chưa ai có công cụ để làm N lần ấy.
+
+**Vì sao nó im tới tận bước cuối.** `copyTablePage` chép qua `json_populate_recordset`, mà hàm ấy
+**bỏ qua mọi khoá JSON không có cột tương ứng ở đích**. Nên lượt chép báo xanh, đủ số dòng, không
+một lời than — rồi `verifyTable` mới thấy `to_jsonb(t)` hai bên khác hình dạng. Cái sai xảy ra ở
+bước 3 và chỉ kêu ở bước 5, sau khi đã đóng cửa phát việc, chờ đàn cạn, xoá sạch đích và chép xong
+11 bảng.
+
+### Ba việc, và việc thứ hai mới là việc đáng làm
+
+**1. Hàng rào SCHEMA đứng trước lượt truncate** — `reviewColumnDrift` (thuần) so tên + KIỂU của
+từng cột trong 11 bảng được chép, rồi gọi tên đúng thứ còn thiếu:
+
+> `Schema đích lệch schema nguồn — workers: thiếu ở đích last_assigned_at, max_jobs; Chạy migration
+> lên database của trạm đích rồi thử lại.`
+
+So như TẬP HỢP chứ không so thứ tự — `to_jsonb` sinh jsonb, mà jsonb tự chuẩn hoá thứ tự khoá, nên
+chặn theo thứ tự là chặn oan một lượt chuyển hoàn toàn lành. Lệch KIỂU cũng bị bắt: `to_jsonb` in
+`2` cho `integer` và `"2"` cho `text`, tức cùng một kiểu hỏng mà không cột nào thiếu để nhìn ra.
+
+**Hàng rào đứng ở HAI chỗ, và đó không phải thừa.** Ở `beginSwitchAction` (cửa vào) để đừng bế quan
+cả tông môn rồi chờ đàn cạn cho một lượt đằng nào cũng chết; và trong `truncateAll` (điểm không
+quay lại) vì giữa hai mốc ấy là cả pha chờ, đủ dài để ai đó áp một migration lên một bên.
+
+**2. `npm run db:migrate:all`** — áp migration lên MỌI trạm trong sổ, mỗi trạm một lượt gọi chính
+`migrate.mjs` với `DATABASE_URL` riêng. Không chép lại phần migrate vào đây: hai đường migrate là
+hai đường sẽ trôi khỏi nhau, mà thứ trôi ở đây là DDL trên dữ liệu thật. Một trạm hỏng không giữ
+những trạm còn lại ở lại phía sau, nhưng mã thoát cuối cùng vẫn ĐỎ — vì「bốn trên năm」chính là
+trạng thái đã đẻ ra bản vá này. Có `--dry-run`.
+
+**3. Chạy thật, và đo lại:** 5/5 trạm nay ở `migration=28`, `workers` đủ 7 cột. Lượt chuyển trạm
+đã hết chỗ vấp.
+
+### Kiểm chứng
+
+`npm run verify:mirror-tables` — 21 khẳng định (+12), vẫn thuần, không database. Ca chính dựng lại
+ĐÚNG hai bộ cột đo được hôm nay chứ không phải một cảnh giả định, và đóng đinh rằng lời từ chối
+phải gọi tên **cả hai cột**, **tên bảng**, và **việc phải làm**. Ca đột biến đã thử: bỏ nhánh
+「thiếu ở đích」→ script đỏ đúng ở ca cảnh-thật. Ba biên còn lại: đích migrate TRƯỚC nguồn cũng bị
+chặn (và nói đúng chiều), đảo thứ tự cột thì KHÔNG phải lệch, bảng ngoài sổ chép (`notices`) lệch
+bao nhiêu cũng không phải việc của hàng rào này.
+
 ## 0.83.2 — lượt cào bỏ hai cột truyền tải, và LUẬT CHỌN cột đổi nghĩa
 
 Tông chủ chốt bỏ `Fast Origin Transfer` và `Fast Data Transfer` khỏi bảng cào. Mười cột còn **tám**.

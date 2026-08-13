@@ -15,7 +15,7 @@
  * Nên ca đầu tiên dưới đây là ĐÚNG CẢNH ẤY, viết bằng đúng 13 cái tên đã đếm được trên database
  * thật — không phải một cảnh giả định.
  */
-import { SYNC_TABLE_ORDER, UNSYNCED_TABLES, reviewTableCoverage } from "../src/lib/mirror/pgSync";
+import { SYNC_TABLE_ORDER, UNSYNCED_TABLES, reviewColumnDrift, reviewTableCoverage } from "../src/lib/mirror/pgSync";
 
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);
@@ -88,5 +88,92 @@ ok(
   UNSYNCED_TABLES.every((t) => !(SYNC_TABLE_ORDER as readonly string[]).includes(t)),
   "UNSYNCED_TABLES và SYNC_TABLE_ORDER không được có tên chung",
 );
+
+// ---- HÀNG RÀO CỘT (reviewColumnDrift) --------------------------------------------------------
+//
+// Ra đời 14/08/2026 từ một lượt chuyển đã chết thật: nguồn `auto-hh3d-2` đã áp migration 0027
+// (bảng `workers` 7 cột), cả bốn trạm gương còn 27 migration (5 cột). Lượt chép báo XANH — vì
+// `json_populate_recordset` bỏ qua khoá JSON không có cột tương ứng — rồi `verifyTable` mới
+// tuyên bố「LỆCH NỘI DUNG」, sau khi đã truncate đích và chép xong 11 bảng.
+//
+// Nên mọi ca dưới đây đo đúng một câu hỏi: hàng rào có GỌI TÊN được thủ phạm không.
+
+/** Cột `workers` đo được trên trạm NGUỒN ngày 14/08/2026 (28 migration). */
+const WORKERS_SRC = {
+  id: "text",
+  user_id: "uuid",
+  first_seen: "timestamp with time zone",
+  last_seen: "timestamp with time zone",
+  version: "text",
+  last_assigned_at: "timestamp with time zone",
+  max_jobs: "integer",
+};
+/** Và trên cả BỐN trạm gương cùng lúc ấy (27 migration) — thiếu đúng hai cột của 0027. */
+const WORKERS_DEST_CU = {
+  id: "text",
+  user_id: "uuid",
+  first_seen: "timestamp with time zone",
+  last_seen: "timestamp with time zone",
+  version: "text",
+};
+
+const schemaOf = (workers: Record<string, string>) =>
+  Object.fromEntries(
+    SYNC_TABLE_ORDER.map((t) => [t, t === "workers" ? workers : { id: "text" }]),
+  ) as Record<string, Record<string, string>>;
+
+{
+  ok(
+    reviewColumnDrift(schemaOf(WORKERS_SRC), schemaOf(WORKERS_SRC)) === null,
+    "Hai bên cùng schema thì im lặng cho qua",
+  );
+
+  const real = reviewColumnDrift(schemaOf(WORKERS_SRC), schemaOf(WORKERS_DEST_CU));
+  ok(real !== null, "CẢNH THẬT 14/08: đích thiếu hai cột của migration 0027 phải bị chặn");
+  ok(
+    real!.includes("last_assigned_at") && real!.includes("max_jobs"),
+    "…và phải GỌI TÊN đúng hai cột ấy, không chỉ nói『lệch schema』",
+  );
+  ok(real!.includes("workers"), "…kèm tên bảng, vì 11 bảng thì phải biết soi bảng nào");
+  ok(real!.toLowerCase().includes("migration"), "…và nói ra việc phải làm: chạy migration lên đích");
+
+  // Chiều NGƯỢC LẠI cũng phải chặn: đích migrate trước nguồn. Ca này có thật mỗi khi người ta
+  // migrate trạm gương trước rồi mới tới trạm đang phục vụ — và nó cũng đẻ ra LỆCH NỘI DUNG.
+  const nguoc = reviewColumnDrift(schemaOf(WORKERS_DEST_CU), schemaOf(WORKERS_SRC));
+  ok(nguoc !== null && nguoc.includes("đích có thêm"), "Đích migrate TRƯỚC nguồn cũng bị chặn, và nói đúng chiều");
+
+  // Lệch KIỂU: cùng tên, khác kiểu. `to_jsonb` in `2` cho integer và `"2"` cho text, nên đối
+  // chiếu vẫn đỏ — mà không cột nào thiếu để mà nhìn ra.
+  const kieu = reviewColumnDrift(
+    schemaOf(WORKERS_SRC),
+    schemaOf({ ...WORKERS_SRC, max_jobs: "text" }),
+  );
+  ok(
+    kieu !== null && kieu.includes("lệch kiểu") && kieu.includes("max_jobs"),
+    "Cùng tên khác KIỂU cũng là lệch, và phải nói rõ hai kiểu",
+  );
+
+  // THỨ TỰ cột không phải lệch — `to_jsonb` sinh jsonb, mà jsonb tự chuẩn hoá thứ tự khoá. Chặn
+  // theo thứ tự là chặn oan một lượt chuyển hoàn toàn lành.
+  const daoThuTu = Object.fromEntries(Object.entries(WORKERS_SRC).reverse());
+  ok(
+    reviewColumnDrift(schemaOf(WORKERS_SRC), schemaOf(daoThuTu)) === null,
+    "Đảo THỨ TỰ cột thì KHÔNG phải lệch — jsonb tự chuẩn hoá khoá",
+  );
+
+  // Bảng vắng hẳn ở đích: `reviewTableCoverage` mới là hàng rào của ca này, nhưng hàm này cũng
+  // không được NÉM — hai hàng rào chạy nối nhau, cái sau vỡ thì cái trước hết đường nói.
+  const thieuBang = { ...schemaOf(WORKERS_SRC) };
+  delete thieuBang.workers;
+  const vangBang = reviewColumnDrift(schemaOf(WORKERS_SRC), thieuBang);
+  ok(vangBang !== null && vangBang.includes("workers"), "Bảng vắng hẳn ở đích thì kể là thiếu TRỌN cột, không ném");
+
+  // Bảng ngoài sổ chép (notices) lệch bao nhiêu cũng KHÔNG phải việc của hàng rào này.
+  const ngoaiSo = reviewColumnDrift(
+    { ...schemaOf(WORKERS_SRC), notices: { id: "text", body: "text" } },
+    { ...schemaOf(WORKERS_SRC), notices: { id: "text" } },
+  );
+  ok(ngoaiSo === null, "Bảng KHÔNG chép (notices) lệch cột thì bỏ qua — nó đâu có được chép");
+}
 
 console.log(`\n✔ Hàng rào bảng chuyển trạm: ${passed} khẳng định, tất cả đứng vững.`);

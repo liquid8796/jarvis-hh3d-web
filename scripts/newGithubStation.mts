@@ -12,8 +12,9 @@
  *
  *   1. Suy tài khoản GitHub TỪ CHÍNH PAT (`GET /user`) — người dùng chỉ phải dán một thứ, và
  *      không thể gõ nhầm tên tài khoản thành một cái không khớp với token.
- *   2. Đặt tên: kho ngẫu nhiên, `WORKER_ID` theo khuôn `github-khoiloi-<mốc thời gian>`. Mốc ấy
- *      đi vào CẢ HAI cái tên nên nhìn một cái là biết cái kia.
+ *   2. Đặt tên: kho ngẫu nhiên, `WORKER_ID` theo khuôn `khoiloi-tro-<mốc thời gian>`. Mốc ấy
+ *      đi vào CẢ HAI cái tên nên nhìn một cái là biết cái kia. Luật đặt tên — kể cả danh sách từ
+ *      cấm — nằm ở `scripts/khoiloiNaming.mjs`, không ở đây.
  *   3. Ghi kho vừa dựng vào sổ Kho GitHub của TRẠM ĐANG HOẠT ĐỘNG — đúng hình dạng mà
  *      `saveGithubStationAction` ghi, rồi ngó một lượt để chứng minh PAT thật sự push được.
  *
@@ -39,13 +40,15 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { neon } from "@neondatabase/serverless";
 import { readControlDoc } from "../src/lib/control/read";
-import { decryptSecret, encryptSecret } from "../src/lib/crypto/secretBox";
+import { encryptSecret } from "../src/lib/crypto/secretBox";
 import {
   DEFAULT_WORKFLOW_FILE,
   GITHUB_STATION_LIMIT,
   reviewStationIdentity,
   stationSlug,
 } from "../src/lib/validation/githubStations";
+import { resolveActiveStationPg } from "./activeStationPg.mts";
+import { KHOILOI_ID_PREFIX, REPO_NAME_PREFIX, reviewGeneratedName } from "./khoiloiNaming.mjs";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -69,13 +72,6 @@ function die(message: string): never {
   console.error(`\n✖ ${message}\n`);
   throw new Stop(message);
 }
-
-/**
- * Tiền tố tên kho. Nói ra nó là cái gì thay vì cố giấu: một cái tên vô nghĩa không làm kho khó
- * tìm hơn (nhật ký Actions vẫn công khai) mà lại làm chính người vận hành không nhận ra kho của
- * mình giữa danh sách. Hậu tố ngẫu nhiên ở dưới mới là thứ bảo đảm không trùng.
- */
-const REPO_PREFIX = "auto-hh3d-linh-su";
 
 /** Việt Nam là UTC+7 quanh năm — cùng hằng số với `vietnamDayKey` bên services/jobs.ts. */
 const VIETNAM_UTC_OFFSET_MS = 7 * 60 * 60 * 1000;
@@ -106,7 +102,9 @@ async function whoami(token: string): Promise<{ login: string; scopes: string | 
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/vnd.github+json",
-        "User-Agent": "auto-hh3d-new-github-station",
+        // Không mang tên trò lẫn tên công cụ — cùng luật với tên kho, xem `khoiloiNaming.mjs`.
+        // GitHub đòi header này có mặt; nó không đòi header ấy khai ra ta đang làm gì.
+        "User-Agent": "linh-su-station-setup",
       },
       signal: AbortSignal.timeout(20_000),
     });
@@ -121,47 +119,6 @@ async function whoami(token: string): Promise<{ login: string; scopes: string | 
   // Token classic khai scope ở header này; token fine-grained thì KHÔNG có nó (quyền của chúng
   // nằm ở dạng khác, không đọc được qua đây). Vắng ≠ thiếu quyền — xem chỗ dùng ở dưới.
   return { login: body.login, scopes: res.headers.get("x-oauth-scopes") };
-}
-
-type Mirror = { id: string; pg?: string };
-
-const readMirrors = async (url: string): Promise<Mirror[]> => {
-  const rows = (await neon(url)`select value->'mirrors' as mirrors from app_settings where id = 'global'`) as {
-    mirrors: Mirror[] | null;
-  }[];
-  return rows[0]?.mirrors ?? [];
-};
-
-/**
- * Tra chuỗi kết nối của trạm đang hoạt động, và CHỊU ĐƯỢC chuyện sổ dưới máy đã cũ.
- *
- * `newMirrorStation.mts` dừng hẳn khi sổ dưới máy thiếu trạm hoạt động. Ở đây đi thêm một bước,
- * vì cảnh ấy là cảnh THƯỜNG chứ không hiếm: `.env.local` trỏ vào `main` — trạm đã nghỉ từ
- * 10/08/2026 — nên sổ của nó đóng băng đúng ngày ấy và không bao giờ biết những trạm sinh sau.
- * Đo 12/08/2026: sổ dưới máy có 2 trạm, sổ ở trạm hoạt động có 4. Sổ đi theo mọi lượt đồng bộ nên
- * trạm nào còn sống cũng biết đường chỉ tiếp — hỏi lần lượt tới khi ra.
- */
-async function resolveActivePg(activeSiteId: string): Promise<string> {
-  const local = await readMirrors(process.env.DATABASE_URL!);
-  const direct = local.find((m) => m.id === activeSiteId);
-  if (direct?.pg) return decryptSecret(direct.pg);
-
-  for (const station of local) {
-    if (!station.pg) continue;
-    try {
-      const found = (await readMirrors(decryptSecret(station.pg))).find((m) => m.id === activeSiteId);
-      if (found?.pg) {
-        console.log(`• Sổ dưới máy đã cũ — lấy đường tới「${activeSiteId}」qua sổ của「${station.id}」.`);
-        return decryptSecret(found.pg);
-      }
-    } catch {
-      // Trạm không nối được thì hỏi trạm kế. Một trạm chết không được phép chặn cả lượt chạy.
-    }
-  }
-  die(
-    `Không tra ra chuỗi kết nối của trạm đang hoạt động「${activeSiteId}」.\n` +
-      "  Vào trang Tông Môn → Gương Trạm trên trạm ấy, bấm「Ghi trạm này vào sổ」rồi chạy lại.",
-  );
 }
 
 async function main(): Promise<void> {
@@ -231,16 +188,32 @@ async function main(): Promise<void> {
   // ---- 3. Tên kho và tên khôi lỗi ---------------------------------------------------------------
 
   const stamp = vietnamStamp(new Date());
-  const workerId = `github-khoiloi-${stamp}`;
+  const workerId = `${KHOILOI_ID_PREFIX}-${stamp}`;
   // Bốn ký tự ngẫu nhiên: hai lượt chạy trong cùng một giây vẫn ra hai kho khác tên, và tên kho
   // không đoán trước được từ bên ngoài.
-  const repo = arg("repo") ?? `${REPO_PREFIX}-${stamp}-${randomBytes(2).toString("hex")}`;
+  const repo = arg("repo") ?? `${REPO_NAME_PREFIX}-${stamp}-${randomBytes(2).toString("hex")}`;
   const workflowFile = DEFAULT_WORKFLOW_FILE;
   const slug = `${owner}/${repo}`;
 
   // Cùng bộ luật mà form admin dùng — không có luật thứ hai sống song song.
   const complaint = reviewStationIdentity(owner, repo, workflowFile);
   if (complaint) die(`${complaint}\n  (Tài khoản「${owner}」, kho「${repo}」)`);
+
+  /**
+   * Luật TỪ CẤM, và nó KHÔNG nằm trong `reviewStationIdentity` — chỗ tách ấy là cả chủ ý.
+   *
+   * `reviewStationIdentity` gác cả form admin, nơi người ta ghi vào sổ một kho ĐÃ CÓ SẴN. Nhét
+   * luật này vào đó là cấm luôn việc khai báo những kho dựng trước 13/08/2026 — chúng đang mang
+   * đúng cái tên `auto-hh3d-linh-su-…` mà luật mới cấm, và chúng vẫn đang chạy. Luật này chỉ áp
+   * cho tên ta SINH RA, không áp cho tên ta CHẤP NHẬN.
+   */
+  for (const [what, value] of [
+    ["Tên kho", repo],
+    ["WORKER_ID", workerId],
+  ] as const) {
+    const banned = reviewGeneratedName(what, value);
+    if (banned) die(banned);
+  }
 
   // ---- 4. Sổ có thẩm quyền nằm ở TRẠM ĐANG HOẠT ĐỘNG --------------------------------------------
 
@@ -256,7 +229,11 @@ async function main(): Promise<void> {
     );
   }
 
-  const activePg = await resolveActivePg(doc.activeSiteId);
+  const activePg = await resolveActiveStationPg({
+    localDatabaseUrl: process.env.DATABASE_URL!,
+    activeSiteId: doc.activeSiteId,
+    onFallback: (via) => console.log(`• Sổ dưới máy đã cũ — lấy đường tới「${doc.activeSiteId}」qua sổ của「${via}」.`),
+  }).catch((err: unknown) => die(err instanceof Error ? err.message : "Không tra ra trạm đang hoạt động."));
   // Từ dòng này trở đi MỌI thứ đọc/ghi qua `db()` đều rơi vào trạm đang hoạt động. Nhập MUỘN, sau
   // khi biến đã đổi: `db()` đọc `DATABASE_URL` lười rồi NHỚ MÃI (xem db/client.ts), nên thứ tự này
   // là thứ giữ cho sổ không bị ghi nhầm vào trạm đã nghỉ — loại hỏng không để lại dấu vết nào.

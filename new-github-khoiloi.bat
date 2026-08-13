@@ -4,7 +4,7 @@ REM  Dung MOT KHOI LOI GITHUB MOI - tu mot PAT toi mot dong trong so kho.
 REM
 REM  Bam dup tep nay. No hoi dung MOT thu: PAT cua tai khoan GitHub se giu kho.
 REM  Moi thu con lai script tu lo: ten kho (ngau nhien), WORKER_ID theo khuon
-REM  github-khoiloi-<moc thoi gian>, workflow, secret, va ghi vao so cua tram
+REM  khoiloi-tro-<moc thoi gian>, workflow, secret, va ghi vao so cua tram
 REM  DANG HOAT DONG.
 REM
 REM  PAT CAN QUYEN (thieu la hong o tan buoc cuoi):

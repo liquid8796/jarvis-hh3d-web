@@ -62,9 +62,12 @@
     "mirror:new": "tsx scripts/newMirrorStation.mts",
     "mirror:remove": "tsx scripts/removeMirrorStation.mts",
     "github:new": "tsx scripts/newGithubStation.mts",
+    "github:remove": "tsx scripts/removeGithubKhoiloi.mts",
     "verify:job-event-sweep": "tsx scripts/verifyJobEventSweep.mts",
     "verify:worker-version": "tsx scripts/verifyWorkerVersion.mts",
-    "verify:github-stations": "tsx scripts/verifyGithubStations.mts"
+    "verify:github-stations": "tsx scripts/verifyGithubStations.mts",
+    "verify:github-removal": "tsx scripts/verifyGithubKhoiloiRemoval.mts",
+    "verify:khoiloi-naming": "node scripts/verifyKhoiloiNaming.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1106.0",

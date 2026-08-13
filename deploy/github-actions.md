@@ -247,10 +247,30 @@ là **mã riêng chỉ Gia chủ** — không dùng lại `admin.panel`, cũng k
 ### Thêm một kho: bấm đúp `new-github-khoiloi.bat`
 
 Nó hỏi đúng MỘT thứ — PAT của tài khoản GitHub sẽ giữ kho — rồi làm trọn: suy tên tài khoản từ
-chính token, đặt tên kho ngẫu nhiên và `WORKER_ID` theo khuôn `github-khoiloi-<mốc thời gian>`,
+chính token, đặt tên kho ngẫu nhiên và `WORKER_ID` theo khuôn `khoiloi-tro-<mốc thời gian>`,
 dựng kho (gọi lại `newGithubKhoiloi.mjs`), dán secret, bấm chạy lượt đầu, **ghi kho vào sổ ở trạm
 đang hoạt động**, rồi ngó một lượt để chứng minh PAT push được. Xem trước mà chưa tạo gì:
 `npm run github:new -- --dry-run --owner <tài-khoản>`.
+
+#### Luật đặt tên: `scripts/khoiloiNaming.mjs`
+
+Kho dựng ra là CÔNG KHAI, nên mọi cái tên script tự đặt đều bị cấm mang bảy từ: `auto`, `hh3d`,
+`hoathinh3d`, `worker`, `action`, `workflow`, `github`. Ba từ đầu buộc kho vào đúng cái trò nó
+đang cày — một lượt gõ「hh3d」vào ô tìm kiếm của GitHub là ra sạch cả đàn. Bốn từ sau dựng chân
+dung「kho sinh ra để xài quỹ phút Actions」, đúng thứ đã khiến GitHub gỡ `gautamkrishnar/keepalive-workflow`.
+
+Từ 13/08/2026: kho là `linh-su-<mốc>-<4 hex>`, `WORKER_ID` là `khoiloi-tro-<mốc>` (`tro` = ở trọ,
+tức sống nhờ máy người ta — phân biệt với `tong-mon-khoiloi` trên VM tông môn tự nuôi). Tên gói,
+mô tả kho, README và tác giả commit của kho sinh ra cũng đã dọn theo.
+
+Luật này chỉ áp cho tên **script SINH RA**, không áp cho tên **người ta KHAI BÁO** trên form Kho
+GitHub — những kho dựng trước 13/08/2026 vẫn mang tên `auto-hh3d-linh-su-…` và vẫn phải ghi sổ
+được. Vì thế phép kiểm nằm ở `khoiloiNaming.mjs` chứ không nằm trong `reviewStationIdentity`.
+
+Hai thứ luật này **không** với tới, vì chúng không phải tên do script đặt: đường dẫn
+`scripts/worker.mjs` (chép nguyên từ kho web, dùng chung với VM) và `WEB_URL` nướng vào workflow —
+địa chỉ trạm thật, hiện đang là `https://auto-hh3d-2.vercel.app`. Muốn dọn nốt thì phải đổi tên
+tệp dùng chung và đổi tên miền trạm, hai việc lớn hơn hẳn lượt này.
 
 Vẫn cần `gh` (chỉ vì lượt đặt secret — sealed-box, xem đầu `newGithubKhoiloi.mjs`), nhưng **không
 cần `gh auth login`**: PAT đi qua biến `GH_TOKEN` của riêng lượt chạy ấy. Cài `gh`:
@@ -283,3 +303,77 @@ rào `disabled_manually` và lệch biên một ngày — cả hai đều làm s
 lượt nào chạm GitHub thật** tính tới 12/08/2026. Lượt「Ghi vào sổ」đầu tiên là phép thử thật: soi
 xem nó có báo `Đã ghi mốc nuôi kho (<sha>)` hay không, rồi mở kho trên GitHub xem commit ấy có
 mặt.
+
+---
+
+## 8. Xoá một kho: bấm đúp `remove-github-khoiloi.bat` (13/08/2026)
+
+Nửa đối xứng của §7, và nó hỏi đúng MỘT thứ y như lượt dựng: **PAT của tài khoản giữ kho**. Tài
+khoản suy từ chính token, kho khôi lỗi trên đó thì script tự tìm.
+
+```
+npm run github:remove -- --dry-run            soi kế hoạch, không xoá gì
+npm run github:remove -- --repo <tên kho>     chọn khi tài khoản có nhiều kho
+npm run github:remove -- --force              xoá kể cả khi khôi lỗi ấy đang giữ đàn
+```
+
+**Vì sao đáng có một công cụ, thay vì một cú bấm「Delete repository」:** một kho khôi lỗi để lại
+dấu chân ở **ba** nơi, và hai nơi trong đó không nằm trên GitHub.
+
+| Dấu chân | Bỏ lại thì sao |
+|---|---|
+| Kho trên GitHub | thứ duy nhất người ta nhớ |
+| Dòng trong sổ Kho GitHub (trạm đang hoạt động) | vòng nuôi gõ vào một kho đã chết mỗi ngày, tab đỏ mãi; và mỗi dòng ma chiếm một chỗ trong `GITHUB_STATION_LIMIT` |
+| Dòng trong bảng `workers` | `github:new` TỪ CHỐI dựng lại một khôi lỗi trùng id — phép kiểm bên ấy hỏi thẳng bảng này, và một cái xác trả lời y như một người đang trực |
+
+### PAT cần `delete_repo`, và đó là scope §7 KHÔNG đòi
+
+Lượt dựng cần `repo` + `workflow`; lượt xoá cần thêm **`delete_repo`** (classic) hoặc
+**Administration: read/write** (fine-grained). Nghĩa là **cái PAT đã dựng kho gần như chắc chắn
+không xoá được nó**. Phép soát scope vì thế đứng ngay đầu, trước cả lượt đọc sổ — một lượt chạy
+thiếu quyền hỏng trong hai giây thay vì hỏng sau khi đã in cả kế hoạch.
+
+### Ba luật an toàn
+
+1. **Nhận kho bằng BẰNG CHỨNG, không bằng tên.** Tên là thứ ai cũng đặt được. Ba loại bằng chứng,
+   mỗi loại đứng một mình đã đủ: có trong **sổ**; có tệp **workflow** khôi lỗi; hoặc là một kho
+   **rỗng** mang tiền tố quen (đúng thứ `gh repo create --push` chết giữa chừng để lại). Không có
+   bằng chứng nào thì **`--force` cũng không mở được hàng rào này** — một cờ mang hai nghĩa là
+   cách người ta xoá nhầm mà vẫn tin mình đang làm đúng việc mình định làm. Tiền tố tên chỉ để
+   THU HẸP danh sách phải hỏi API, và nó hỏi cả tiền tố CŨ (`ALL_REPO_NAME_PREFIXES`) — bỏ tiền tố
+   cũ đi là làm kho dựng trước lượt đổi tên tàng hình trước chính công cụ dọn của mình.
+2. **Không xoá khi khôi lỗi ấy đang giữ đàn.** Xoá kho là giết runner tức khắc; `reapStaleJobs`
+   kết liễu đàn ấy sau 3 phút bằng dòng「Khôi lỗi mất liên lạc」. Người mất một vòng cày là một đạo
+   hữu nào đó, không phải người đang gõ lệnh — nên cái giá được NÓI RA trước. `--force` qua được,
+   và đó là đúng vai của nó. Không suy ra được `WORKER_ID` thì cũng dừng: không biết id nghĩa là
+   không hỏi được database, tức xoá mù. (Kho **rỗng** miễn hàng rào này — nó chưa từng chạy.)
+3. **Xoá kho TRƯỚC, dọn sổ SAU.** Ngược lại là ca hỏng tệ nhất: gỡ sổ xong mà lượt xoá kho hụt thì
+   kho vẫn chạy, vẫn giành đàn, vẫn cầm `WORKER_TOKEN` — mà không dòng nào ở đâu biết nó tồn tại.
+   Một dòng sổ trỏ vào kho đã chết thì chỉ ồn, chữa bằng một cú bấm. Cùng hình dạng với LUẬT 4 của
+   `mirror:remove`. Lượt xoá còn nghiệm thu bằng một `GET` trả 404 — `204` mới chỉ là lời hứa.
+
+Dòng sổ được **lưu ra tệp trong `%TEMP%`** trước khi gỡ; trong đó có phong bì `pat` đã mã hoá, và
+với một kho lỡ xoá nhầm thì đó là bản duy nhất còn lại của cái chìa ấy.
+
+Kho đã bị xoá tay trên GitHub mà dòng sổ còn nằm đó cũng chạy được — bằng chứng `sổ` vẫn đủ, và
+lượt ấy chỉ còn phần dọn sổ.
+
+### Kiểm chứng
+
+`npm run verify:github-removal` — 50 phép kiểm, thuần, không mạng không database. Hai ca **đột
+biến đã thử**, cả hai làm script đỏ đúng chỗ: cho `--force` mở hàng rào「không bằng chứng」→
+*„không bằng chứng + --force → VẪN từ chối"*; lệch biên `heldJobs > 0` thành `> 1` →
+*„đúng MỘT đàn cũng đủ để chặn"* (ca THƯỜNG NHẤT, vì khôi lỗi GitHub có 2 ghế).
+
+Phép moi `WORKER_ID` đọc **chính** `.github/workflows/linh-su.yml` của repo này, và cố ý không so
+với một giá trị cụ thể — id đổi được, còn thứ phải đúng mãi là「phép moi chạy được trên tệp THẬT」.
+
+### Chưa có bằng chứng
+
+Đã đo thật: ba ngả từ chối sớm (thiếu PAT · PAT lẫn khoảng trắng · PAT rác → GitHub 401), tất cả
+thoát **mã 1** sau một lượt `fetch` — tức kỷ luật `process.exitCode` còn nguyên, không dính cú
+`Assertion failed` mã 127.
+
+**Chưa lượt nào xoá một kho thật.** Mọi thứ sau phép soát scope — soi ứng viên, hỏi đàn đang chạy,
+`DELETE /repos`, gỡ sổ, gỡ dòng điểm danh — mới chỉ đúng trên giấy và trong phép kiểm thuần. Lượt
+dọn kho rác đầu tiên là phép thử thật; chạy `--dry-run` trước, và đọc kỹ bảng「Sẽ XOÁ」.

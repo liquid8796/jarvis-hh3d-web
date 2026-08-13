@@ -195,7 +195,7 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                 id="station-repo"
                 name="repo"
                 className="input w-full font-mono"
-                placeholder="github-khoiloi"
+                placeholder="linh-su"
                 defaultValue={editing?.repo ?? ""}
                 readOnly={editing !== null}
                 required

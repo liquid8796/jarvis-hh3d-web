@@ -37,6 +37,7 @@ import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { KHOILOI_ID_PREFIX, REPO_NAME_PREFIX, reviewGeneratedName } from "./khoiloiNaming.mjs";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -58,14 +59,33 @@ if (!owner) {
   );
   process.exit(1);
 }
-const repoName = arg("repo", "auto-hh3d-linh-su");
+const repoName = arg("repo", REPO_NAME_PREFIX);
 /**
  * WORKER_ID mặc định suy từ tên tài khoản, không phải một chuỗi cố định — trùng id thì hai tiến
  * trình ghi đè nhau trong bảng `workers` và mục Khôi Lỗi nói dối về việc ai đang trực. Suy ra
  * từ một thứ vốn đã duy nhất thì không có gì để quên.
  */
-const workerId = arg("worker-id", `github-${owner.toLowerCase()}`);
+const workerId = arg("worker-id", `${KHOILOI_ID_PREFIX}-${owner.toLowerCase()}`);
 const slug = `${owner}/${repoName}`;
+
+/**
+ * LUẬT TỪ CẤM, đứng trước mọi thứ khác trong tệp này.
+ *
+ * Kiểm ở ĐÂY chứ không chỉ ở `newGithubStation.mts`, dù lượt gọi thường đi qua bên ấy: tệp này là
+ * một cửa vào riêng (`node scripts/newGithubKhoiloi.mjs --owner … --repo …`), và một luật chỉ gác
+ * được cửa nó đứng thì không phải luật. Đây cũng là cửa DUY NHẤT mà `--repo` gõ tay đi qua được
+ * tới lệnh `gh repo create`.
+ */
+for (const [what, value] of [
+  ["Tên kho", repoName],
+  ["WORKER_ID", workerId],
+]) {
+  const banned = reviewGeneratedName(what, value);
+  if (banned) {
+    console.error(`${banned}\n\nKHÔNG tạo gì cả, nên không có kho mồ côi nào phải dọn.`);
+    process.exit(1);
+  }
+}
 
 const token = process.env.WORKER_TOKEN;
 if (!token) {
@@ -294,11 +314,14 @@ try {
     path.join(staging, "package.json"),
     JSON.stringify(
       {
-        name: "auto-hh3d-linh-su",
+        // Tên gói đi theo tên kho: cả hai đều là thứ người lạ đọc được, và cả hai đều nghe luật
+        // ở `khoiloiNaming.mjs`. `name` của npm bắt buộc chữ thường không khoảng trắng — `linh-su`
+        // hợp lệ sẵn, nên không cần phép chuẩn hoá nào ở đây.
+        name: REPO_NAME_PREFIX,
         private: true,
         version: "1.0.0",
         type: "module",
-        description: "Khôi lỗi tông môn — chỉ chạy trên GitHub Actions.",
+        description: "Tiến trình nền của tông môn — chạy theo lịch.",
         scripts: { worker: "node scripts/worker.mjs" },
         dependencies: { "playwright-core": playwrightVersion },
       },
@@ -324,10 +347,13 @@ try {
 
   writeFileSync(
     path.join(staging, "README.md"),
-    `# Khôi lỗi tông môn — ${workerId}\n\n` +
-      `Một tiến trình \`worker.mjs\` nhận việc từ ${webUrl}, chạy trên GitHub Actions.\n` +
-      `Kho này được sinh ra bằng \`scripts/newGithubKhoiloi.mjs\` từ repo web — **đừng sửa tay ở đây**,\n` +
-      `sửa ở repo gốc rồi dựng lại, bằng không hai bản sẽ trôi khỏi nhau.\n`,
+    // README nằm ngay trang đầu của một kho CÔNG KHAI, nên nó là chỗ dễ nói hớ nhất. Giữ đúng
+    // một việc nó phải làm — dặn người mở kho đừng sửa tay — và bỏ mọi thứ chỉ đường về tông môn:
+    // tên script phát hành, và cả cái tên nền tảng đang chạy nó.
+    `# Tông môn — ${workerId}\n\n` +
+      `Một tiến trình nền nhận việc theo lịch từ ${webUrl}.\n` +
+      `Kho này được SINH TỰ ĐỘNG từ kho gốc — **đừng sửa tay ở đây**, sửa ở kho gốc rồi dựng lại,\n` +
+      `bằng không hai bản sẽ trôi khỏi nhau.\n`,
   );
 
   writeFileSync(path.join(staging, ".gitignore"), "node_modules/\n.env\n");
@@ -389,7 +415,10 @@ try {
    */
   run("git", ["init", "-q", "-b", "main"], { cwd: staging });
   run("git", ["add", "-A"], { cwd: staging });
-  run("git", ["-c", "user.name=auto-hh3d", "-c", "user.email=auto-hh3d@users.noreply.github.com",
+  // Tác giả commit hiện trên MỌI dòng lịch sử của kho công khai — cùng luật với tên kho. Phần
+  // `@users.noreply.github.com` thì giữ: đó là tên miền GitHub bắt buộc dùng để một commit không
+  // bị nối vào hộp thư thật của ai, không phải một cái tên ta chọn.
+  run("git", ["-c", "user.name=linh-su", "-c", "user.email=linh-su@users.noreply.github.com",
     "commit", "-q", "-m", `feat: khôi lỗi tông môn ${workerId}`], { cwd: staging });
 
   /**
@@ -428,7 +457,7 @@ try {
 
   console.log(`\n── Tạo kho ${slug}…`);
   run("gh", ["repo", "create", slug, "--public", "--source", ".", "--push",
-    "--description", `Khôi lỗi tông môn ${workerId} — Auto HH3D`], { cwd: staging });
+    "--description", `Tiến trình nền theo lịch — ${workerId}`], { cwd: staging });
 
   console.log("── Dán secret WORKER_TOKEN…");
   // Token đi qua STDIN, không qua đối số: đối số nằm trong command line mà ai mở Task Manager

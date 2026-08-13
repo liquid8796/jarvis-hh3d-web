@@ -23,8 +23,10 @@
  * `deployAllStations.mts` gọi `vercel`.
  *
  * CẦN CÓ TRƯỚC:
- *   1. `gh` đã cài và đã đăng nhập ĐÚNG tài khoản đích: `gh auth login`
- *      (nhiều tài khoản thì `gh auth switch --user <login>` trước khi chạy).
+ *   1. `gh` đã cài, và có ĐÚNG MỘT cái chìa dùng được — hoặc biến `GH_TOKEN` (lối mà
+ *      `newGithubStation.mts` đi: nó dán PAT vào biến ấy rồi gọi xuống đây), hoặc một lượt
+ *      `gh auth login` đúng tài khoản đích (nhiều tài khoản thì `gh auth switch --user <login>`
+ *      trước khi chạy). Một dòng keyring cũ đã hỏng KHÔNG cản — xem `assertGhCanAuthenticate`.
  *   2. `.env` ở gốc repo có `WORKER_TOKEN` — lấy bằng
  *      `vercel env pull .env --environment=production --yes`.
  *      KHÔNG dùng `npm run env:pull`: lệnh ấy kéo môi trường development, nơi biến này không tồn tại.
@@ -209,6 +211,47 @@ function assertGhSupportsPlannedCalls() {
   }
 }
 
+/**
+ * `gh` có xác thực được NGAY BÂY GIỜ không — hỏi bằng ĐÚNG cái chìa mà lượt chạy thật sẽ cầm.
+ *
+ * KHÔNG hỏi `gh auth status`, và đây là một chỗ đã hỏng thật (13/08/2026, 15:31): `auth status`
+ * chấm điểm MỌI tài khoản `gh` từng cất, rồi trả mã 1 nếu BẤT CỨ cái nào hỏng — kể cả một dòng
+ * keyring cũ đã bị thu hồi, thứ đứng hoàn toàn ngoài lượt chạy này. Máy dựng kho hôm ấy đúng cảnh
+ * đó: PAT trong `GH_TOKEN` hoàn toàn tốt — `newGithubStation.mts` vừa suy ra tên tài khoản từ
+ * chính nó bằng `GET /user`, và tên ấy đã in ra trong kế hoạch — nhưng keyring còn một dòng chết
+ * mang cùng tên tài khoản, nên cổng đóng sập trước khi có gì được tạo. Một lượt chạy đúng bị từ
+ * chối vì một thứ không liên quan, và câu chỉ dẫn còn bảo người ta đi `gh auth login` — đúng lối
+ * mà thiết kế này cố ý không dùng.
+ *
+ * `gh api user` hỏi đúng một câu, và là câu duy nhất đáng hỏi: cái chìa `gh` sắp cầm — `GH_TOKEN`,
+ * `GITHUB_TOKEN`, hay dòng keyring đang hoạt động, theo đúng thứ tự ưu tiên của `gh` — có mở được
+ * cửa không. Nó phủ CẢ HAI cửa vào: qua `newGithubStation.mts` (có PAT) lẫn gọi tay (dùng keyring).
+ *
+ * Không kèm cờ nào: mỗi cờ là một thứ có thể không tồn tại trong bản `gh` dưới máy — đúng loại
+ * hỏng mà `assertGhSupportsPlannedCalls` sinh ra để bắt. `quiet` đã nuốt phần thân trả lời rồi.
+ */
+function assertGhCanAuthenticate() {
+  try {
+    run("gh", ["api", "user"], { quiet: true });
+  } catch (err) {
+    // `stderr` là câu của chính `gh` (401, hết hạn, thiếu quyền); vắng nó thì lỗi nằm ở lượt gọi
+    // — `gh` chưa cài sẽ về đây dưới dạng ENOENT trong `message`. Giữ cả hai, đừng nuốt.
+    const detail = String(err?.stderr || err?.message || "").trim();
+    console.error(
+      "`gh` không xác thực được với GitHub.\n" +
+        (detail.length > 0 ? `\n${detail}\n` : "") +
+        "\n  Qua npm run github:new — PAT vừa dán sai, đã bị thu hồi, hoặc không đọc nổi tài khoản.\n" +
+        "  Gọi tay tệp này — đặt biến GH_TOKEN, hoặc `gh auth login` đúng tài khoản đích\n" +
+        "  (nhiều tài khoản: `gh auth switch --user <login>` — nhớ đúng tài khoản sẽ giữ kho này).\n" +
+        "  Chưa cài `gh`: https://cli.github.com  ·  winget install --id GitHub.cli\n" +
+        "\n  Một dòng keyring cũ đã hỏng KHÔNG còn chặn được lượt chạy này — chỉ cái chìa thật sự\n" +
+        "  dùng mới tính. Dọn dòng chết ấy (không bắt buộc): gh auth logout -h github.com -u <login>\n" +
+        "\nKHÔNG tạo gì cả, nên không có kho mồ côi nào phải dọn.",
+    );
+    process.exit(1);
+  }
+}
+
 const playwrightVersion = JSON.parse(
   readFileSync(path.join(repoRoot, "package.json"), "utf8"),
 ).dependencies["playwright-core"];
@@ -267,21 +310,13 @@ function assertImportsResolve(root) {
  * có làm hay không. Chặn nó bằng một điều kiện tiên quyết của bước THỰC THI là lấy mất đúng
  * công dụng của nó. Lượt chạy thật thì vẫn hỏng sớm, ngay đây, trước khi tạo bất cứ thứ gì.
  *
- * Kiểm `auth status` chứ không kiểm `--version`: có `gh` mà chưa đăng nhập là ca hay gặp hơn
+ * Kiểm xác thực chứ không kiểm `--version`: có `gh` mà không có chìa dùng được là ca hay gặp hơn
  * hẳn, và nó hỏng ở tận bước tạo repo — sau khi đã dựng xong thư mục tạm.
  */
 if (!dryRun) {
-  try {
-    run("gh", ["auth", "status"], { quiet: true });
-  } catch {
-    console.error(
-      "`gh` chưa cài hoặc chưa đăng nhập.\n" +
-        "  Cài: https://cli.github.com  ·  Đăng nhập: gh auth login\n" +
-        "  Nhiều tài khoản: gh auth switch --user <login> — nhớ đúng tài khoản sẽ giữ kho này.",
-    );
-    process.exit(1);
-  }
-  // Đứng ngay sau phép hỏi danh tính và TRƯỚC mọi thứ được tạo ra ở bất cứ đâu.
+  // Cả hai đứng TRƯỚC mọi thứ được tạo ra ở bất cứ đâu: chìa có mở được cửa không, rồi `gh` có
+  // hiểu những lời sắp gọi không.
+  assertGhCanAuthenticate();
   assertGhSupportsPlannedCalls();
 }
 

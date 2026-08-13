@@ -11,6 +11,42 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.82.4 — một dòng keyring đã chết phủ quyết được một PAT còn tốt, và chặn cả lượt dựng kho
+
+`npm run github:new` chết ở bước dựng kho (mã 1) với câu「`gh` chưa cài hoặc chưa đăng nhập」kèm lời
+khuyên đi `gh auth login`. Cả ba mệnh đề đều sai: `gh` đã cài (2.97.0), PAT hoàn toàn tốt, và
+`gh auth login` đúng là cái lối mà thiết kế này **cố ý không dùng** — PAT đi qua biến `GH_TOKEN` của
+riêng lượt chạy. Tài liệu (`deploy/github-actions.md`, `new-github-khoiloi.bat`) đã nói đúng điều ấy
+từ đầu; chỉ có mã là bất đồng với chính tài liệu của nó.
+
+Bằng chứng PAT còn tốt nằm ngay trong lượt hỏng ấy, ở dòng người ta lướt qua không đọc: kế hoạch in
+ra kho `tranlehanam2017/linh-su-20260813-153131-8da0`. Tên tài khoản ấy **không ai gõ vào** —
+`newGithubStation.mts` suy nó TỪ CHÍNH PAT bằng `GET /user`. In được dòng đó nghĩa là GitHub vừa trả
+200 cho đúng token ấy, vài giây trước khi cổng đóng sập.
+
+Thủ phạm: **`gh auth status` chấm điểm MỌI tài khoản `gh` từng cất, không riêng cái sắp dùng**, rồi
+trả mã 1 nếu bất cứ dòng nào hỏng. Máy ấy còn một dòng keyring cũ của `tranlehanam2017` mang token
+đã bị thu hồi. Đo tại chỗ ngày 13/08/2026: đặt `GH_TOKEN` rồi hỏi `gh auth status` thì nó liệt kê CẢ
+HAI — dòng `GH_TOKEN` (`Active account: true`) lẫn dòng keyring (`Active account: false`) — và chỉ
+riêng dòng thứ hai hỏng đã đủ kéo mã thoát lên 1. Một cái chìa không ai định dùng phủ quyết được một
+cái chìa tốt.
+
+**Nay cổng hỏi `gh api user`.** Nó hỏi đúng một câu, và là câu duy nhất đáng hỏi: cái chìa `gh` sắp
+cầm — `GH_TOKEN`, `GITHUB_TOKEN`, hay dòng keyring đang hoạt động, theo đúng thứ tự ưu tiên của `gh`
+— có mở được cửa không. Keyring cũ mục nát tới đâu cũng không còn tiếng nói. Cùng một cổng phủ được
+cả hai cửa vào: qua `newGithubStation.mts` (có PAT) lẫn gọi tay tệp ấy (dùng keyring).
+
+Chọn đúng endpoint `user` là có chủ ý: đó **cùng** endpoint mà `newGithubStation.mts` đã gọi để suy
+ra tên tài khoản, nên hai phép kiểm không thể bất đồng — lối đi qua trạm mà qua được `whoami()` thì
+chắc chắn qua được cổng này, và cổng không đẻ thêm một kiểu hỏng mới nào. Không kèm cờ nào cả, vì
+mỗi cờ là một thứ có thể vắng mặt trong bản `gh` dưới máy — đúng loại hỏng mà
+`assertGhSupportsPlannedCalls` sinh ra để bắt.
+
+Câu từ chối cũng đổi: nhả NGUYÊN VĂN lời của `gh` (`Bad credentials (HTTP 401)`, hết hạn, thiếu
+quyền…) rồi mới kể lối sửa theo từng cửa vào, và nói thẳng rằng một dòng keyring chết không còn chặn
+được ai — kèm câu `gh auth logout` để dọn nó, ghi rõ là KHÔNG bắt buộc. Câu cũ trỏ người ta đi
+`gh auth login`, tức đẩy họ đi sửa đúng thứ không hỏng.
+
 ## 0.82.3 — xoá xong một khôi lỗi GitHub thì sổ điểm danh phải SẠCH, không phải「đã gọi DELETE」
 
 `npm run github:remove` ra đời ở bản 0.82.1 để dọn cả ba dấu chân của một kho khôi lỗi. Nó dọn đủ

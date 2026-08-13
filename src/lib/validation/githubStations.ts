@@ -100,6 +100,51 @@ export function stationSlug(station: { owner: string; repo: string }): string {
 }
 
 /**
+ * Trạm này có phải trạm chịu trách nhiệm nuôi sổ không.
+ *
+ * VÌ SAO CẦN, và vì sao nó không hiện ra cho tới 13/08/2026: sổ kho GitHub sống trong
+ * `app_settings`, mà `app_settings` nằm trong `SYNC_TABLE_ORDER` — nên nó **tự đi theo mọi lượt
+ * chuyển trạm**, đúng như đã thiết kế. Cộng thêm ba điều đều đúng và đều vô hại khi đứng riêng:
+ * mọi trạm mang cùng `vercel.json` (cùng cron `0 3 * * *`), `newMirrorStation` rải `CRON_SECRET`
+ * cho mọi trạm, và `runKeepalive` chỉ đọc sổ của database nó đang nối. Ghép lại thì sau lượt
+ * chuyển trạm kế tiếp, TRẠM CŨ vẫn giữ bản sao của sổ và cron của nó vẫn chạy — hai trạm cùng
+ * nuôi một kho, không thấy nhau, vì `lastCommitAt` nằm ở hai database khác nhau.
+ *
+ * Kho vẫn sống — nhiều hoạt động hơn thì mục tiêu vẫn đạt. Nhưng nó đi ngược đúng thứ
+ * `KEEPALIVE_INTERVAL_DAYS` đánh đổi để có: dấu chân nhỏ nhất có thể, vì GitHub đã gỡ
+ * `gautamkrishnar/keepalive-workflow` do chính hành vi commit rác đều đặn. Ca xấu hơn là một trạm
+ * đã nghỉ hẳn mà project Vercel vẫn sống: nó sẽ đẩy commit vào kho của người ta mãi mãi, và
+ * không dòng sổ nào của trạm đang phục vụ hé ra điều đó.
+ *
+ * FAIL-OPEN, và chiều của nó là phần quan trọng nhất ở đây: không đọc được bảng điều phối, hay
+ * trạm chưa khai `SITE_ID` (deploy cũ, máy phát triển) thì **VẪN NUÔI**. Thà thừa một commit còn
+ * hơn để cả hệ thống lặng lẽ thôi nuôi vì một lượt đọc bucket hụt — và im lặng đúng là hình dạng
+ * hỏng mà cả tính năng này sinh ra để chống. Cùng chiều với `activeSiteCheck` bên
+ * `actions/mirrorSwitch.ts`, nơi bảng chưa init cũng coi như trạm này đang hoạt động.
+ *
+ * Chỉ gác đường TỰ ĐỘNG. Nút「Nuôi ngay」và「Chạy vòng nuôi」trên tab admin không đi qua đây: đó
+ * là một con người bấm, và luật của tệp này là không cãi lại quyết định của con người —
+ * cùng lẽ với `disabled_manually`.
+ */
+export type KeepaliveDuty = { feed: boolean; why: string };
+
+export function reviewKeepaliveDuty(siteId: string, activeSiteId: string | null): KeepaliveDuty {
+  const me = siteId.trim();
+  const active = (activeSiteId ?? "").trim();
+
+  if (active.length === 0) {
+    return { feed: true, why: "Chưa đọc được trạm hoạt động từ bảng điều phối — nuôi cho chắc." };
+  }
+  if (me.length === 0) {
+    return { feed: true, why: "Trạm này chưa khai SITE_ID — nuôi cho chắc." };
+  }
+  if (me === active) {
+    return { feed: true, why: `Trạm đang hoạt động (${me}).` };
+  }
+  return { feed: false, why: `Trạm nghỉ (${me}) — để trạm đang hoạt động「${active}」nuôi.` };
+}
+
+/**
  * Kho này đã tới hạn ghi commit chưa.
  *
  * `lastCommitAt` rỗng ⇒ TỚI HẠN, cố ý: sổ không biết kho ấy im lặng bao lâu rồi, và đoán theo

@@ -170,8 +170,8 @@ có thể** — xem `KEEPALIVE_INTERVAL_DAYS`.
 | Vòng nuôi | `src/lib/services/githubStations.ts` |
 | Cửa admin | `src/app/actions/githubStations.ts` + `src/app/admin/GithubStationPanel.tsx` (tab **Kho GitHub**) |
 | Quyền | `github_station.manage` — CHỈ Gia chủ (migration `0026`) |
-| Lịch | `/api/cron`, đi nhờ cron `0 3 * * *` đã có |
-| Kiểm chứng | `npm run verify:github-stations` — 10 nhóm ca, `fetch` giả, không cần database |
+| Lịch | `/api/cron`, đi nhờ cron `0 3 * * *` đã có — **chỉ chạy ở trạm đang hoạt động**, xem dưới |
+| Kiểm chứng | `npm run verify:github-stations` — 11 nhóm ca, `fetch` giả, không cần database |
 
 **Không cần `git`.** `PUT /repos/{owner}/{repo}/contents/{path}` tạo ra một **commit thật**, nên
 cả việc này gọn trong một Vercel function — không clone, không thư mục tạm. Đây là chỗ dễ đi vòng
@@ -201,6 +201,36 @@ lượt PUT** chứ không chỉ đọc kết quả — "không ghi gì cả" l�
   lúc đang có sự cố. Đổi lại, sổ tự đi theo mọi lượt chuyển trạm (điều kiện: mọi trạm chung
   `ENCRYPTION_KEY`), y như sổ gương trạm.
 - **Có thêm lượt gọi `enable`** — bản phác chỉ có commit. Xem「nhánh tự chữa」ở trên.
+
+### Chỉ TRẠM ĐANG HOẠT ĐỘNG mới nuôi (13/08/2026)
+
+Cái giá của「sổ đi theo mọi lượt chuyển trạm」lộ ra ngay sau đó, và nó không hiện ra bằng một
+dòng đỏ nào. Ba điều đều đúng và đều vô hại khi đứng riêng: mọi trạm mang cùng `vercel.json`
+(cùng cron `0 3 * * *`), `newMirrorStation` rải `CRON_SECRET` cho mọi trạm, và `runKeepalive`
+chỉ đọc sổ của database nó đang nối. Ghép lại thì sau lượt chuyển trạm đầu tiên, **trạm cũ vẫn
+giữ bản sao của sổ và cron của nó vẫn chạy** — hai trạm cùng nuôi một kho, không thấy nhau, vì
+`lastCommitAt` nằm ở hai database khác nhau.
+
+Kho vẫn sống; mục tiêu vẫn đạt. Nhưng nó đi ngược đúng thứ `KEEPALIVE_INTERVAL_DAYS` đánh đổi để
+có — dấu chân nhỏ nhất có thể. Ca xấu hơn là một trạm đã nghỉ hẳn mà project Vercel vẫn sống: nó
+đẩy commit vào kho của người ta mãi mãi, và không dòng sổ nào của trạm đang phục vụ hé ra điều đó.
+
+Phép gác là `reviewKeepaliveDuty` (`validation/githubStations.ts`), so `SITE_ID` với
+`activeSiteId` của bảng điều phối — cùng hình dạng với `activeSiteCheck` bên `mirrorSwitch.ts`.
+Ba điều đáng nhớ:
+
+- **Chỉ gác việc thứ tư.** Ba việc quét dọn vẫn chạy ở mọi trạm: chúng chỉ đụng dữ liệu của chính
+  database ấy. Nuôi kho là việc DUY NHẤT ở `/api/cron` đẩy thay đổi ra ngoài, lên một thứ dùng chung.
+- **FAIL-OPEN, và chiều của nó mới là phần khó.** Không đọc được bảng, hay trạm chưa khai
+  `SITE_ID` (deploy cũ, máy phát triển) → **vẫn nuôi**. Thà thừa một commit còn hơn để cả hệ
+  thống lặng lẽ thôi nuôi vì một lượt đọc bucket hụt — mà im lặng đúng là hình dạng hỏng cả §7
+  sinh ra để chống.
+- **Không gác tay người.** Nút「Nuôi ngay」và「Chạy vòng nuôi」không đi qua phép gác này: đó là
+  một con người bấm, cùng lẽ với luật `disabled_manually`.
+
+Hai ca đột biến đã thử, và cả hai làm script kiểm chứng đỏ đúng chỗ: gỡ hàng rào trạm nghỉ →
+*„Trạm nghỉ mà vẫn nuôi thì hai trạm cùng đẩy commit lên một kho"*; lật fail-open thành
+fail-closed → *„Không đọc được bảng điều phối thì vẫn phải nuôi"*.
 
 ### PAT — cần gì và nguy hiểm ra sao
 

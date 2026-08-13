@@ -27,6 +27,7 @@ import {
   MS_PER_DAY,
   isCommitDue,
   parseWorkflowState,
+  reviewKeepaliveDuty,
   reviewStationIdentity,
   stationSlug,
 } from "../src/lib/validation/githubStations";
@@ -257,8 +258,32 @@ async function run() {
     assert(result.note.includes("PAT"), `Câu chữ phải chỉ đúng việc phải làm: ${result.note}`);
   }
 
+  // ───────── Ca 11: AI được phép nuôi — và fail-open phải đúng chiều ─────────
+  //
+  // Luật thuần, không cần GitHub giả. Đáng đóng đinh vì cả hai chiều hỏng đều IM LẶNG: gác lỏng
+  // thì hai trạm cùng đẩy commit vào một kho và chỉ lộ ra ở lịch sử commit của kho ấy; gác chặt
+  // quá thì KHÔNG trạm nào nuôi, và điều đó chỉ lộ ra sau sáu mươi ngày, bằng việc khôi lỗi
+  // ngừng lên ca. Ba ca fail-open ở dưới quan trọng hơn ca chặn.
+  {
+    const active = reviewKeepaliveDuty("auto-hh3d-2", "auto-hh3d-2");
+    assert(active.feed, "Trạm đang hoạt động phải nuôi.");
+
+    const idle = reviewKeepaliveDuty("auto-hh3d-2", "auto-hh3d-3");
+    assert(!idle.feed, "Trạm nghỉ mà vẫn nuôi thì hai trạm cùng đẩy commit lên một kho.");
+    assert(idle.why.includes("auto-hh3d-3"), `Câu chữ phải chỉ ra ai đang giữ việc: ${idle.why}`);
+
+    // FAIL-OPEN — ba ngả, và cả ba phải NUÔI. Thà thừa một commit còn hơn im lặng thôi nuôi.
+    assert(reviewKeepaliveDuty("auto-hh3d-2", null).feed, "Không đọc được bảng điều phối thì vẫn phải nuôi.");
+    assert(reviewKeepaliveDuty("auto-hh3d-2", "").feed, "Bảng chưa init (activeSiteId rỗng) thì vẫn phải nuôi.");
+    assert(reviewKeepaliveDuty("", "auto-hh3d-3").feed, "Trạm chưa khai SITE_ID thì vẫn phải nuôi.");
+
+    // Khoảng trắng thừa là chuyện của biến môi trường dán tay, không phải chuyện của luật.
+    assert(reviewKeepaliveDuty("  auto-hh3d-2  ", "auto-hh3d-2").feed, "SITE_ID có khoảng trắng thừa vẫn là chính nó.");
+    assert(!reviewKeepaliveDuty("auto-hh3d-20", "auto-hh3d-2").feed, "So khớp phải TRỌN chuỗi — 'auto-hh3d-20' không phải 'auto-hh3d-2'.");
+  }
+
   globalThis.fetch = realFetch;
-  console.log("✔ Vòng nuôi kho GitHub: 10 nhóm ca, mọi luật đứng vững.");
+  console.log("✔ Vòng nuôi kho GitHub: 11 nhóm ca, mọi luật đứng vững.");
 }
 
 run().catch((err) => {

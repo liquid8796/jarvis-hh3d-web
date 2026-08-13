@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { authorizeCronRequest } from "@/lib/auth/cronSecret";
+import { readControlDoc } from "@/lib/control/read";
 import { purgeExpiredChat } from "@/lib/services/chat";
 import { runKeepalive } from "@/lib/services/githubStations";
 import { purgeExpiredJobEvents, reapStaleJobs } from "@/lib/services/jobs";
+import { reviewKeepaliveDuty } from "@/lib/validation/githubStations";
 
 /**
  * Người quét dọn — cộng đúng MỘT việc không phải quét dọn, thêm vào 12/08/2026.
@@ -17,6 +19,12 @@ import { purgeExpiredJobEvents, reapStaleJobs } from "@/lib/services/jobs";
  * Việc thứ tư — NUÔI KHO GITHUB (deploy/github-actions.md §7) — đi nhờ đúng cái lịch này thay
  * vì dựng lịch thứ hai, và đó không phải lười: gói Hobby cho đúng MỘT cron mỗi ngày, nên một
  * lịch thứ hai là bất khả. May thay nhịp ngày cũng chính là nhịp việc ấy cần.
+ *
+ * NHƯNG việc thứ tư ấy CHỈ chạy ở trạm đang hoạt động, khác hẳn ba việc trên — vì nó là việc duy
+ * nhất ở đây đụng vào thứ NẰM NGOÀI database của trạm này (một kho trên GitHub, dùng chung cho
+ * mọi trạm). Sổ kho đi theo mọi lượt chuyển trạm, mọi trạm cùng một cron, mọi trạm cùng có
+ * `CRON_SECRET` — nên không có phép gác thì sau lượt chuyển trạm đầu tiên sẽ có hai trạm cùng
+ * nuôi một kho mà không thấy nhau. Luật và toàn bộ lý lẽ nằm ở `reviewKeepaliveDuty`.
  *
  * Việc thứ ba TỪ 13/08/2026 cũng có đường đi kèm, nhưng không phải trên một trang: nó đi nhờ
  * `/api/worker` (`sweepExpiredJobEventsIfDue`). Trước đó nó chỉ có mỗi cron, và đó là một lỗ
@@ -59,20 +67,32 @@ export async function GET(request: Request) {
   //
   // Bọc try/catch vì cùng lý lẽ: sổ hỏng, database chớp, GitHub đổ — không việc nào trong số đó
   // được phép biến lượt quét dọn vừa chạy XONG thành một hồi đáp 500 trông như chưa chạy gì.
+  //
+  // Và CHỈ trạm đang hoạt động mới nuôi — xem `reviewKeepaliveDuty` để biết vì sao, và vì sao
+  // phép gác này chỉ đặt ở đây chứ không đặt trong `runKeepalive`: ba việc quét dọn phía trên
+  // vô hại khi chạy song song ở nhiều trạm (chúng chỉ đụng dữ liệu của chính database ấy), còn
+  // nuôi kho thì đẩy commit lên một kho DÙNG CHUNG. Hai loại việc khác nhau, hai luật khác nhau.
   let keepalive: unknown;
-  try {
-    const summary = await runKeepalive();
-    keepalive = {
-      checked: summary.checked,
-      committed: summary.committed,
-      failed: summary.failed,
-      skipped: summary.skipped,
-      // Câu chữ của từng kho đi luôn ra hồi đáp: một lượt curl là biết kho nào hỏng, khỏi phải
-      // mở trang admin. Chúng đã được ghi vào sổ rồi, đây chỉ là bản sao cho người đang gõ lệnh.
-      stations: summary.results.map((r) => ({ slug: r.slug, ok: r.ok, note: r.note })),
-    };
-  } catch (err) {
-    keepalive = { error: err instanceof Error ? err.message : "lỗi lạ" };
+  const duty = reviewKeepaliveDuty(process.env.SITE_ID ?? "", (await readControlDoc())?.activeSiteId ?? null);
+  if (!duty.feed) {
+    // Nói ra bằng cùng hình dạng với nhánh chạy thật: một lượt curl phải phân biệt được
+    // "đã ngó, không phải việc của trạm này" với "đã chạy và không có kho nào tới hạn".
+    keepalive = { skipped: true, why: duty.why };
+  } else {
+    try {
+      const summary = await runKeepalive();
+      keepalive = {
+        checked: summary.checked,
+        committed: summary.committed,
+        failed: summary.failed,
+        skipped: summary.skipped,
+        // Câu chữ của từng kho đi luôn ra hồi đáp: một lượt curl là biết kho nào hỏng, khỏi phải
+        // mở trang admin. Chúng đã được ghi vào sổ rồi, đây chỉ là bản sao cho người đang gõ lệnh.
+        stations: summary.results.map((r) => ({ slug: r.slug, ok: r.ok, note: r.note })),
+      };
+    } catch (err) {
+      keepalive = { error: err instanceof Error ? err.message : "lỗi lạ" };
+    }
   }
 
   return NextResponse.json({ ok: true, swept: true, chat: chat.purged, jobEvents: events, keepalive });

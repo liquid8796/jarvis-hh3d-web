@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { isAdminUser } from "@/lib/auth/permissions";
 import { z } from "zod";
 import { authorizeWorker } from "@/lib/auth/worker";
@@ -9,6 +9,7 @@ import {
   dailyQuotaPlan,
   heartbeat,
   jobBelongsTo,
+  sweepExpiredJobEventsIfDue,
 } from "@/lib/services/jobs";
 import { recordWorkerSeen } from "@/lib/services/workers";
 import {
@@ -132,6 +133,16 @@ export async function POST(request: Request) {
   if (!scope) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+
+  // Quét nhật ký quá hạn đi nhờ ĐÚNG cánh cửa này — xem `sweepExpiredJobEventsIfDue` cho lý lẽ
+  // chọn chỗ. Đặt sau phép xác thực để một lượt gõ cửa lạ không sai khiến được database, và trong
+  // `after()` để nó chạy SAU khi hồi đáp đã bay đi: khôi lỗi hỏi việc mỗi 5 giây, không nhịp nào
+  // trong số đó được phép chờ một câu xoá hàng loạt. Cửa nhịp bên trong tự lo phần "đã tới lượt
+  // chưa", nên ở đây chỉ là một phép gọi rẻ.
+  //
+  // Nuốt lỗi có chủ ý: đây là việc vệ sinh chạy nhờ, và cron vẫn là lưới sau. Một lượt quét hỏng
+  // không đáng biến giao thức khôi lỗi thành một dòng đỏ trong log của mỗi 5 giây.
+  after(() => sweepExpiredJobEventsIfDue().catch(() => {}));
 
   let raw: unknown;
   try {

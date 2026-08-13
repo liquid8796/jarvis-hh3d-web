@@ -18,9 +18,12 @@ import { purgeExpiredJobEvents, reapStaleJobs } from "@/lib/services/jobs";
  * vì dựng lịch thứ hai, và đó không phải lười: gói Hobby cho đúng MỘT cron mỗi ngày, nên một
  * lịch thứ hai là bất khả. May thay nhịp ngày cũng chính là nhịp việc ấy cần.
  *
- * Việc thứ ba thì KHÔNG có đường đi kèm nào — nó là xoá hàng loạt, không đáng đặt trên đường
- * đi nóng của một trang. Với nó, cron LÀ mạch sống: cron không chạy thì `job_events` phình vô
- * hạn, và mỗi lượt chuyển trạm dài ra theo (deploy/mirror/README.md §11).
+ * Việc thứ ba TỪ 13/08/2026 cũng có đường đi kèm, nhưng không phải trên một trang: nó đi nhờ
+ * `/api/worker` (`sweepExpiredJobEventsIfDue`). Trước đó nó chỉ có mỗi cron, và đó là một lỗ
+ * thật chứ không phải một lựa chọn — hạn lưu đặt được theo GIỜ trong khi lượt quét duy nhất chạy
+ * mỗi NGÀY, nên mọi hạn lưu ngắn hơn 24 giờ đều không được thi hành. Giờ cron trở lại đúng vai
+ * lưới an toàn cho những ngày không khôi lỗi nào lên ca; nó vẫn gánh trần lô ĐẦY (`maxDuration`
+ * 60 giây ở đây), còn lượt đi nhờ kia chỉ dám hai lô.
  *
  * Gọi từ đâu cũng được, miễn là mang đúng `Authorization: Bearer CRON_SECRET`:
  *   • Vercel Cron — tự gắn header ấy khi project có biến `CRON_SECRET`; gói Hobby chỉ

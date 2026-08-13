@@ -3,10 +3,11 @@
 import { useActionState, useState } from "react";
 import { saveJobEventsSettingsAction, type AdminResult } from "@/app/actions/admin";
 import {
-  HOURS_PER_DAY,
   JOB_EVENTS_PURGE_INTENT,
   RETENTION_UNITS,
   formatRetention,
+  formatSweepInterval,
+  jobEventSweepInterval,
   parseRetentionHours,
   retentionUnitSpec,
   splitRetention,
@@ -22,7 +23,9 @@ import {
  * / đã quá hạn) biến cái núm thành một quyết định có căn cứ.
  *
  * Nút「Quét ngay」đứng cạnh vì thiếu nó cái núm trông như hỏng: hạ 30 ngày xuống 7 rồi mà bảng
- * vẫn y nguyên tới nhịp cron kế — gói Hobby chỉ chạy MỘT LẦN MỘT NGÀY.
+ * vẫn y nguyên cho tới nhịp quét kế. Từ 13/08/2026 nhịp ấy bám theo hạn lưu (một phần sáu) thay
+ * vì đứng im ở một lần mỗi ngày, nên khoảng chờ đã ngắn đi rất nhiều — nút vẫn đáng giữ cho hai
+ * ca nó vốn phục vụ: muốn thấy kết quả NGAY, và không có khôi lỗi nào đang trực để chở nhịp quét.
  *
  * HAI NÚT, MỘT ACTION, phân nhánh bằng `intent`. Bản đầu cho nút quét một action riêng và một
  * `useState` riêng, và thế là một khung chữ có hai nguồn: phải đoán cái nào mới hơn, mà phép
@@ -104,13 +107,21 @@ export function JobEventRetentionForm({
         </span>
       </div>
       <p className="mt-2 text-xs text-[var(--color-mist)]">
-        {spec.min}–{spec.max} {spec.label}. Dòng nhật ký cũ hơn mốc này bị quét ở nhịp dọn dẹp kế
-        tiếp. Bản thân các đàn KHÔNG bị đụng tới — chỉ nhật ký của chúng.
+        {spec.min}–{spec.max} {spec.label}. Bản thân các đàn KHÔNG bị đụng tới — chỉ nhật ký của
+        chúng.
       </p>
-      {preview.ok && preview.hours < HOURS_PER_DAY && (
-        <p className="mt-1 text-xs text-[var(--color-gold-300)]">
-          Ngắn hơn một ngày: nhịp quét tự động vẫn chỉ chạy MỘT LẦN MỖI NGÀY, nên nhật ký sẽ sống
-          lâu hơn mốc này cho tới lượt quét kế — bấm「Quét ngay」nếu muốn dọn đúng mốc.
+      {preview.ok && (
+        // Nhịp quét kể theo con số ĐANG GÕ, cùng quy ước với dòng「Sẽ giữ」ngay trên: cả hai nói về
+        // thứ cú bấm Lưu sắp tạo ra. Trước 13/08/2026 chỗ này là một lời xin lỗi in đậm — nhịp tự
+        // động chạy MỘT LẦN MỖI NGÀY nên mọi hạn lưu ngắn hơn ngày đều không được thi hành. Giờ
+        // nhịp bám theo hạn lưu, nên chỗ này kể một con số thật thay vì báo trước một sự thất hứa.
+        <p className="mt-1 text-xs text-[var(--color-mist)]">
+          Dòng nhật ký cũ hơn mốc này bị quét mỗi{" "}
+          <span className="font-mono text-[var(--color-gold-300)]">
+            {formatSweepInterval(jobEventSweepInterval(preview.hours))}
+          </span>{" "}
+          — nhịp quét đi nhờ đường của khôi lỗi, nên nó cần có ít nhất một khôi lỗi đang trực. Không
+          ai trực thì lưới sau là lượt cron mỗi ngày một lần.
         </p>
       )}
 

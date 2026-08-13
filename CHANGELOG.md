@@ -11,6 +11,55 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.81.3 — cái núm hạn lưu đếm bằng giờ, còn lượt quét chạy mỗi ngày
+
+「Hạn Lưu Nhật Ký Đàn」đặt **1 giờ**, rồi trang admin ngồi báo **5.010 dòng đã quá hạn** trên tổng
+5.208 — và không tự xoá dòng nào. Không lỗi, không dòng log đỏ, không gì hỏng. Cái núm chỉ đơn
+giản là chưa bao giờ được thi hành.
+
+Gốc rễ nằm ở khoảng cách giữa hai con số mà không ai đặt cạnh nhau: từ bản 0.72.0 hạn lưu đếm
+bằng **GIỜ**, tối thiểu 1 — trong khi lượt quét TỰ ĐỘNG duy nhất là `/api/cron`, mà gói Hobby cho
+đúng **một lần mỗi ngày**. Nghĩa là 23 trong 24 nấc đầu của cái thang ấy là lời hứa suông. Bằng
+chứng rõ nhất cho việc chỗ này đã được biết mà chưa được sửa: giao diện phải viết hẳn hai đoạn
+xin lỗi (*„nhịp quét tự động vẫn chỉ chạy MỘT LẦN MỖI NGÀY"*) và dựng một nút「Quét ngay」để người
+ta tự tay làm phần máy đáng phải làm. Một cái núm cần chú thích giải thích vì sao nó không chạy
+thì đó không phải chú thích, đó là báo lỗi.
+
+**Lượt quét thứ hai đi nhờ `/api/worker`**, không phải một đường đọc của trang nào. Chỗ này là cả
+lý lẽ của bản vá: `job_events` chỉ phình khi có khôi lỗi chạy, mà khôi lỗi hỏi việc mỗi 5 giây
+suốt ngày đêm dù không một ai mở web. Nên cửa ấy dày nhịp đúng lúc bảng đang lớn, im lặng đúng lúc
+bảng đứng yên, và vì là endpoint của MÁY nên một lượt xoá hàng loạt chạy nhờ ở đó không làm chậm
+trang của ai — đúng nỗi lo đã ghi trong `purgeExpiredJobEvents` từ đầu (*„không đáng đặt trên
+đường đi nóng của một trang"*). Đường đi của khôi lỗi không phải một trang. Chạy trong `after()`
+nên hồi đáp bay đi trước, và trần lô hạ xuống 2 (cron vẫn giữ 10, vì chỉ cron mới khai
+`maxDuration = 60`).
+
+**Nhịp quét bám theo chính hạn lưu**: một phần sáu, kẹp trong [5 phút, 6 giờ]. Chọn TỈ LỆ chứ
+không một con số cố định vì thứ cần ràng buộc là phần vượt hạn tương đối — dòng sống lâu nhất là
+hạn lưu cộng một nhịp, tức không quá ~17% quá mốc, ở mọi nấc từ 1 giờ tới 365 ngày. Trước bản này
+con số ấy là **2.400%** cho hạn lưu 1 giờ. Sàn 5 phút không nấc hợp lệ nào chạm tới (hạn lưu nhỏ
+nhất cho nhịp 10 phút) — nó là hàng rào cho một con số hỏng, vì một `NaN` lọt vào phép so mốc sẽ
+biến cửa nhịp thành vòng quét mỗi 5 giây.
+
+Phép suy nhịp nằm ở `validation/retention.ts`, cùng chỗ với các biên và **không import gì** — bắt
+buộc, vì ba nơi cần chung một nhịp và hai trong số đó KỂ nó ra bằng chữ: form (client) hứa với
+trưởng môn, câu báo sau khi Lưu (server) nhắc lại, và `sweepExpiredJobEventsIfDue` (server) là nơi
+giữ lời. Gõ lại phép chia ở ba chỗ là ba cơ hội để giao diện hứa một nhịp mà máy không chạy. Nay
+form đọc thẳng ra con số thật —「bị quét mỗi **10 phút**」— thay cho đoạn xin lỗi cũ.
+
+Cửa nhịp **đóng TRƯỚC khi chạy chứ không sau khi xong**: lượt quét có thể ném (database chớp), và
+một cửa chỉ đặt lại mốc ở nhánh thành công là cửa mở toang ngay sau lần hỏng đầu tiên — mỗi nhịp
+hỏi việc 5 giây lại một lượt xoá, đúng vào lúc database đang ốm.
+
+Kiểm bởi `verify:job-event-sweep` — thuần số học, không chạm database. Nó không thử vài điểm nhặt
+tay mà quét **cả thang 1–8760 giờ** để đóng đinh đúng tính chất bản cũ vi phạm: *nhịp quét phải
+mịn hơn cái mốc nó thi hành*. Cộng thêm hàng rào con số hỏng (NaN, vô cực, 0, âm — đều phải kẹp về
+phía THƯA nhất) và phép kể bằng chữ (tròn trước rồi mới tách, để không ra「0 giờ 60 phút」).
+
+Cron giữ nguyên, nay đúng vai lưới an toàn: những ngày không khôi lỗi nào lên ca thì `job_events`
+vẫn có người dọn. Nút「Quét ngay」cũng ở lại, cho hai ca nó vốn phục vụ — muốn thấy kết quả NGAY,
+và không có ai đang trực để chở nhịp quét.
+
 ## 0.81.2 — bảng Hàng Đợi đếm một cuộc đua mà đàn ấy không tham gia
 
 Hai dòng của một đạo hữu nằm im 70 phút với chữ「Chờ tới lượt · thứ 1」và「thứ 2」. Con số ấy sai,

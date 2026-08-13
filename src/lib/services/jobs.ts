@@ -9,6 +9,10 @@ import {
 } from "./configs";
 import { getAppSettings } from "./settings";
 import { workerOnlineFor } from "./workers";
+import {
+  JOB_EVENT_SWEEP_MIN_INTERVAL_MS,
+  jobEventSweepInterval,
+} from "@/lib/validation/retention";
 import type { WorkerScope } from "@/lib/auth/worker";
 import type { DailyQuotaMemory, JobEventRow, JobRow } from "@/lib/db/schema";
 import type { CycleProgress } from "@/lib/realtime/dashboardTypes";
@@ -1113,15 +1117,23 @@ const JOB_EVENT_PURGE_MAX_BATCHES = 10;
  * nó, và đó đúng là ý nghĩa của「hạn lưu」— dòng nhật ký hết hạn thì hết hạn, bất kể ai sinh
  * ra nó. Bản thân job không hề hấn gì (khoá ngoại chỉ đi một chiều từ event sang job).
  *
- * CHỈ gọi từ cron, khác `reapStaleJobs` vốn đi kèm mọi lượt đọc dashboard: đây là xoá hàng
- * loạt, không phải thứ đáng đặt trên đường đi nóng của một trang.
+ * TRẦN LÔ LÀ THAM SỐ vì hai người gọi có hai ngân sách thời gian khác nhau: cron khai
+ * `maxDuration = 60` nên nó gánh được trần đầy, còn lượt quét tiện đường trên đường đi của khôi
+ * lỗi thì không khai gì và phải tự biết điều. Cắt giữa chừng luôn an toàn — mỗi lô là một câu
+ * lệnh tự cam kết, nên phần đã xoá là đã xoá, phần còn lại rơi sang lượt sau.
+ *
+ * Trả kèm `retentionHours` — chính con số vừa đọc để tính mốc. Người gọi cần nó để suy ra nhịp
+ * quét kế tiếp, và trả lại ở đây rẻ hơn bắt họ đọc `app_settings` thêm một lượt cho cùng một số.
  */
-export async function purgeExpiredJobEvents(): Promise<{ purged: number; more: boolean }> {
+export async function purgeExpiredJobEvents(
+  maxBatches: number = JOB_EVENT_PURGE_MAX_BATCHES,
+): Promise<{ purged: number; more: boolean; retentionHours: number }> {
   const { jobEvents } = await getAppSettings();
-  const cutoff = new Date(Date.now() - jobEvents.retentionHours * HOUR_MS);
+  const { retentionHours } = jobEvents;
+  const cutoff = new Date(Date.now() - retentionHours * HOUR_MS);
 
   let purged = 0;
-  for (let batch = 0; batch < JOB_EVENT_PURGE_MAX_BATCHES; batch++) {
+  for (let batch = 0; batch < maxBatches; batch++) {
     // `returning id` rồi đếm hàng, thay vì tin vào `rowCount` — trường ấy tuỳ driver, còn số
     // hàng trả về thì không.
     const gone = await db().execute(sql`
@@ -1134,9 +1146,54 @@ export async function purgeExpiredJobEvents(): Promise<{ purged: number; more: b
     const n = gone.rows.length;
     purged += n;
     // Lô chưa đầy nghĩa là đã vét sạch phần quá hạn — dừng, đừng chạy thêm một câu lệnh rỗng.
-    if (n < JOB_EVENT_PURGE_BATCH) return { purged, more: false };
+    if (n < JOB_EVENT_PURGE_BATCH) return { purged, more: false, retentionHours };
   }
-  return { purged, more: true };
+  return { purged, more: true, retentionHours };
+}
+
+/** Trần lô cho lượt tiện đường — thấp hơn cron vì nó chạy nhờ trên một function không khai giờ. */
+const JOB_EVENT_SWEEP_MAX_BATCHES = 2;
+
+/**
+ * Mốc mở cửa và cờ đang-chạy của lượt quét tiện đường.
+ *
+ * PER-INSTANCE và mất khi function nguội — y như `purgeOpportunistically` của sảnh đàm đạo, và
+ * chấp nhận được vì cùng một lý lẽ: quét trùng chỉ tốn một câu xoá rỗng, còn thứ phải tránh là
+ * quét MỖI NHỊP, và một biến trong bộ nhớ đã chặn đủ điều đó.
+ */
+let jobEventSweepDueAt = 0;
+let jobEventSweepInFlight = false;
+
+/**
+ * Quét nhật ký quá hạn NẾU đã tới nhịp — cửa vào của lượt tự động thứ hai, bên cạnh cron.
+ *
+ * Treo ở `/api/worker` chứ không ở một đường đọc của trang, và đó là cả lý lẽ của bản vá này:
+ * `job_events` chỉ phình khi có khôi lỗi chạy, mà khôi lỗi thì hỏi việc mỗi 5 giây suốt ngày đêm
+ * dù không một ai mở web. Nên cửa ấy vừa dày nhịp đúng lúc bảng đang lớn, vừa im lặng đúng lúc
+ * bảng đứng yên — và nó là một endpoint của MÁY, nên một lượt xoá hàng loạt chạy nhờ ở đó không
+ * làm chậm trang của ai. (Đúng nỗi lo đã ghi ở `purgeExpiredJobEvents`: đừng đặt lên đường đi
+ * nóng của một TRANG. Đường đi của khôi lỗi không phải một trang.)
+ *
+ * ĐÓNG CỬA TRƯỚC KHI CHẠY, không phải sau khi xong: lượt này có thể ném (database chớp), và một
+ * cửa chỉ đặt lại mốc ở nhánh thành công là một cửa mở toang ngay sau lần hỏng đầu tiên — mỗi
+ * nhịp hỏi việc 5 giây lại một lượt xoá, đúng vào lúc database đang ốm.
+ */
+export async function sweepExpiredJobEventsIfDue(): Promise<{ ran: boolean; purged: number }> {
+  const now = Date.now();
+  if (jobEventSweepInFlight || now < jobEventSweepDueAt) return { ran: false, purged: 0 };
+
+  jobEventSweepInFlight = true;
+  jobEventSweepDueAt = now + JOB_EVENT_SWEEP_MIN_INTERVAL_MS;
+  try {
+    const { purged, more, retentionHours } = await purgeExpiredJobEvents(JOB_EVENT_SWEEP_MAX_BATCHES);
+    // Còn nợ thì đừng ngủ trọn một nhịp: chạm trần lô nghĩa là bảng đang có nhiều hơn một lượt
+    // dọn nổi, và nhịp sàn là đường ngắn nhất để đuổi kịp mà vẫn không thành vòng quét liên miên.
+    jobEventSweepDueAt =
+      Date.now() + (more ? JOB_EVENT_SWEEP_MIN_INTERVAL_MS : jobEventSweepInterval(retentionHours));
+    return { ran: true, purged };
+  } finally {
+    jobEventSweepInFlight = false;
+  }
 }
 
 /**

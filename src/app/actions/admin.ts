@@ -27,6 +27,8 @@ import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
 import {
   JOB_EVENTS_PURGE_INTENT,
   formatRetention,
+  formatSweepInterval,
+  jobEventSweepInterval,
   parseRetentionHours,
 } from "@/lib/validation/retention";
 import { adminCreate, adminDelete, adminUpdate, findById, setStatus } from "@/lib/services/users";
@@ -461,9 +463,12 @@ export async function saveJobEventsSettingsAction(
   revalidatePath("/admin");
   return {
     ok: true,
-    // Nhắc「một lần mỗi ngày」ngay trong câu báo, vì từ khi đặt được theo GIỜ thì cái bẫy lớn
-    // nhất là đặt 6 giờ rồi ngồi chờ nó quét mỗi 6 giờ — cron gói Hobby không chạy thế.
-    message: `Đã đặt hạn lưu nhật ký đàn: ${formatRetention(parsed.hours)}. Nhịp quét chạy mỗi ngày một lần sẽ dọn phần quá hạn — muốn dọn liền thì bấm「Quét ngay」.`,
+    // Câu báo kể NHỊP THẬT, và kể bằng chính hàm mà lượt quét dùng để tự hẹn giờ — không phải một
+    // phép chia gõ lại ở đây. Trước 13/08/2026 chỗ này nhắc「một lần mỗi ngày」vì đó là sự thật
+    // lúc ấy; giờ nhịp bám theo hạn lưu, nên câu báo phải hỏi lại nó chứ không được nhớ thuộc lòng.
+    // Vẫn nói rõ điều kiện「có khôi lỗi đang trực」— đó là điều kiện duy nhất còn lại, và im lặng
+    // về nó là dựng lại đúng cái bẫy vừa gỡ.
+    message: `Đã đặt hạn lưu nhật ký đàn: ${formatRetention(parsed.hours)}. Nhịp quét tự động dọn phần quá hạn mỗi ${formatSweepInterval(jobEventSweepInterval(parsed.hours))} khi có khôi lỗi đang trực — muốn dọn liền thì bấm「Quét ngay」.`,
   };
 }
 

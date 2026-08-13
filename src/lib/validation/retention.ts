@@ -131,3 +131,46 @@ export function formatRetention(hours: number): string {
   if (rest === 0) return `${days} ngày`;
   return `${days} ngày ${rest} giờ`;
 }
+
+/**
+ * NHỊP QUÉT TỰ ĐỘNG suy ra từ chính hạn lưu — một phần sáu của nó, kẹp trong [5 phút, 6 giờ].
+ *
+ * Ở đây, cùng chỗ với các biên, vì đúng ba nơi cần chung một nhịp và hai trong số đó KỂ nó ra
+ * bằng chữ: form hạn lưu (client) hứa với trưởng môn, câu báo sau khi Lưu (server) nhắc lại lời
+ * hứa ấy, và `sweepExpiredJobEventsIfDue` (server) là nơi thật sự giữ lời. Một hằng số gõ lại ở
+ * ba nơi là ba cơ hội để giao diện hứa một nhịp mà máy không chạy — đúng cái bẫy tệp này sinh ra
+ * để chặn. Nên nó phải sống trong module KHÔNG import gì này, chứ không trong `services/jobs.ts`.
+ *
+ * Vì sao một phần sáu: thứ cần ràng buộc là phần VƯỢT HẠN tương đối. Dòng nhật ký sống lâu nhất
+ * là hạn lưu cộng một nhịp, tức không quá ~17% quá mốc, đúng như thế ở mọi hạn lưu từ 1 giờ tới
+ * 365 ngày. Trần 6 giờ không phá tính chất ấy (từ 36 giờ trở lên, 6 giờ vốn đã nhỏ hơn một phần
+ * sáu) mà chỉ giữ cho hạn lưu 365 ngày không kéo theo một câu xoá rỗng mỗi vài phút suốt năm.
+ *
+ * Sàn 5 phút KHÔNG BAO GIỜ chạm tới với một hạn lưu hợp lệ — hạn lưu nhỏ nhất là 1 giờ, cho nhịp
+ * 10 phút. Nó là hàng rào cho một con số hỏng lọt vào, không phải một nấc người ta gặp được.
+ */
+export const JOB_EVENT_SWEEP_MIN_INTERVAL_MS = 5 * 60 * 1000;
+export const JOB_EVENT_SWEEP_MAX_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const JOB_EVENT_SWEEP_DIVISOR = 6;
+const MS_PER_MINUTE = 60 * 1000;
+const MS_PER_HOUR = 60 * MS_PER_MINUTE;
+
+export function jobEventSweepInterval(retentionHours: number): number {
+  // Hạn lưu đi ra từ Zod (`int().min(1).max(8760)`) nên không thể là NaN — nhưng hàm này export
+  // ra ngoài, và một NaN lọt tới đây làm MỌI phép so mốc thành false, tức quét không nghỉ. Hỏng
+  // về phía "quét thưa nhất" thì mất vài dòng nhật ký chậm; hỏng chiều kia là bào database.
+  if (!Number.isFinite(retentionHours)) return JOB_EVENT_SWEEP_MAX_INTERVAL_MS;
+  const share = (retentionHours * MS_PER_HOUR) / JOB_EVENT_SWEEP_DIVISOR;
+  return Math.min(JOB_EVENT_SWEEP_MAX_INTERVAL_MS, Math.max(JOB_EVENT_SWEEP_MIN_INTERVAL_MS, share));
+}
+
+/** Kể một NHỊP bằng chữ: `600000` →「10 phút」, `14400000` →「4 giờ」, `5400000` →「1 giờ 30 phút」. */
+export function formatSweepInterval(ms: number): string {
+  // Làm tròn tới phút trước khi tách, nếu không `share` lẻ sẽ đẻ ra「0 giờ 60 phút」.
+  const minutes = Math.max(1, Math.round(ms / MS_PER_MINUTE));
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${minutes} phút`;
+  if (rest === 0) return `${hours} giờ`;
+  return `${hours} giờ ${rest} phút`;
+}

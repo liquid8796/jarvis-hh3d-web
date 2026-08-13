@@ -11,6 +11,61 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.83.0 — việc chia cho khôi lỗi theo LUÂN PHIÊN, và đàn đang nghỉ thôi đeo tên máy
+
+Luật cũ: ai hỏi trước lấy trước. Nó đúng suốt quãng tông môn có một-hai khôi lỗi, và sai hẳn từ
+lúc có bảy — đo 13/08/2026: `tong-mon-khoiloi` đang cầm 6 trên 13 đàn, trong khi bốn khôi lỗi trọ
+vừa dựng thì rảnh. Không cái nào làm gì sai cả: cái vừa xong việc là cái hỏi sớm nhất, nên nó vơ
+liền đàn kế tiếp trong nhịp 5 giây trước khi máy khác kịp gõ cửa. **Việc bị xếp theo NHỊP HỎI chứ
+không theo SỨC CHỨA.**
+
+Nay có một tầng phân công thật, `src/lib/services/dispatch.ts`:
+
+- **Luân phiên theo `workers.last_assigned_at`** — ai lâu chưa được giao nhất thì tới lượt. Khôi
+  lỗi vừa lên ca mang `null`, và `null` đứng ĐẦU hàng chứ không phải cuối: thêm một máy vào tông
+  môn là nó có việc ngay từ vòng kế, không phải đợi hết một lượt của những máy đang chạy.
+- **Máy chủ lần đầu biết trần ghế của từng máy.** `workers.max_jobs` do chính tiến trình khai ở
+  mỗi lượt gõ cửa (`WORKER_MAX_JOBS`), cộng một phép đếm ghế đang bận — nên bộ cân tải không giữ
+  lượt cho một máy đã đầy. Ghế bận chỉ đếm đàn còn NHỊP TIM TƯƠI: một tiến trình vừa khởi động
+  lại bỏ rơi các dòng của kiếp trước, và đếm cả chúng thì nó bị coi là đầy ghế suốt ba phút đúng
+  vào lúc rảnh nhất.
+- **Van chống đói 20 giây.** Luân phiên đặt cược rằng khôi lỗi tới lượt sẽ hỏi việc trong vài giây
+  tới. Cược ấy sai ở ca「tiến trình còn thở — nhịp tim của các đàn nó đang chạy vẫn điểm danh đều
+  — nhưng vòng hỏi việc kẹt」, thứ sổ điểm danh không phân biệt nổi. Quá 20 giây (bốn nhịp hỏi bị
+  lỡ) thì ai đủ tư cách cũng nhận được. Van bỏ qua phép tính LƯỢT, không bỏ qua TƯ CÁCH: một đàn
+  「chỉ máy nhà」quá hạn ba ngày vẫn không rơi vào tay khôi lỗi tông môn.
+- **`workerPref` rời khỏi SQL.**「Giao đàn cho」từng là mệnh đề `workerPrefFilter` nhét vào câu
+  claim; nay nó nằm cạnh luật luân phiên trong cùng một hàm thuần — một bản để đọc, một bản để
+  kiểm. Scope (khôi lỗi riêng chỉ thấy đàn của chủ mình) thì Ở LẠI trong SQL, vì nó là hàng rào
+  PHÂN QUYỀN: đàn của người khác mang theo cookie game của người khác, thứ không được phép chỉ
+  dựa vào một phép lọc ở tầng ứng dụng.
+
+**Đàn đang nghỉ cooldown thôi đeo tên khôi lỗi.** `completeWorkerCycle` nhả `worker_id` về `null`
+khi đàn quay lại hàng chờ, và migration `0027` dọn nốt những cái tên cũ. Trước bản này cả 12 dòng
+đang nghỉ trên bảng Hàng Đợi đều đeo tên một khôi lỗi — một sự phân công KHÔNG CÓ THẬT, mà người
+đọc hiểu thành「đàn tôi đã được đặt chỗ trước」. Việc gán nay xảy ra đúng lúc đàn thức dậy và bắt
+đầu chạy, không sớm hơn một giây nào.
+
+**`WORKER_MAX_JOBS = 2` cho MỌI khôi lỗi** — VM, Actions, khôi lỗi trọ. Số ghế từng là núm duy
+nhất để dịch tải giữa hai máy (12/08: hạ VM từ 5 xuống 3 để nhường việc cho Actions); nay bộ cân
+tải làm việc ấy tử tế hơn hẳn, nên con số ghế trở lại đúng nghĩa của nó: trần RAM của một cái máy.
+Trần này còn được gác Ở MÁY CHỦ ngay khi bản web lên, kể cả với khôi lỗi chưa cập nhật — khôi lỗi
+đời cũ không biết khai thì nhận trần chuẩn 2.
+
+Nhân đây soát luôn `WORKER_QUEST_TABS`: **không dòng mã nào đọc biến ấy.** Nó là di sản của thời
+còn chạy song song trong một đàn (nhánh ấy gỡ 12/08 để Mê Cung luôn chạy cuối), nên đặt nó bằng 3
+hay 400 đều không đổi gì. Đã gỡ khỏi tài liệu VM để người sau khỏi vặn một cái núm không nối vào
+đâu.
+
+**Lưới kiểm.** `npm run verify:dispatch` — 35 phép kiểm trên hàm thuần, không cần database. Ba
+lưới cũ chạm database (`verify:continuous`, `verify:daily-quota`, `verify:worker-pref`) phải sửa
+theo, và chỗ sửa ấy lộ ra một khe đã âm thầm tồn tại từ trước: chúng dựng đàn ĐÃ TỚI GIỜ trên
+database production, nơi sáu khôi lỗi thật hỏi việc mỗi 5 giây — nên một đàn kiểm mà chủ nó chưa
+chọn「Giao đàn cho」là đàn hợp lệ trong mắt chúng. Ngày 14/08 đo được đúng cảnh ấy: một khôi lỗi
+thật cầm mất đàn `virgin` giữa hai mục kiểm, và phép thử báo đỏ như thể luật phân công hỏng. Nay
+đàn kiểm dựng ra ở trạng thái CHƯA tới giờ, và chủ chúng chọn「chỉ máy nhà」— cách ly bằng chính
+luật của hệ thống, không bằng một cái cờ riêng cho phép thử.
+
 ## 0.82.8 — lượt cào Usage chỉ còn giữ mười cột có hạn mức, và phép cắt chữ của nó lần đầu được kiểm
 
 Đạo hữu chỉ vào bảng Usage thật và chốt danh sách: mười cột CÓ HẠN MỨC, không hơn. Lượt cào trước

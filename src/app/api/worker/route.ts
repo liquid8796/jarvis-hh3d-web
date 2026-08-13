@@ -61,6 +61,18 @@ const bodySchema = z.discriminatedUnion("op", [
     workerId: z.string().min(1).max(64),
     runner: z.string().optional(),
     version: workerVersionSchema.optional(),
+    /**
+     * Trần ghế (`WORKER_MAX_JOBS`) của chính tiến trình đang hỏi việc — thứ bộ cân tải cần để
+     * biết khôi lỗi nào còn chỗ mà chia việc tới.
+     *
+     * Optional vì khôi lỗi đời cũ không gửi, và với chúng máy chủ dùng trần chuẩn 2. Đó là
+     * hướng đoán AN TOÀN: đoán thiếu chỉ mất một chút thông lượng của một máy, còn đoán thừa
+     * là phát việc vào một tiến trình không còn chỗ nhận.
+     *
+     * Khoảng [1,8] khớp với khoảng `worker.mjs` tự kẹp; `clampMaxJobs` kẹp lần nữa ở tầng
+     * service, vì linh phù cá nhân là token do người dùng cầm.
+     */
+    maxJobs: z.number().int().min(1).max(8).optional(),
   }),
   z.object({
     op: z.literal("heartbeat"),
@@ -165,7 +177,7 @@ export async function POST(request: Request) {
     case "claim": {
       // Điểm danh ở claim — op dày nhịp nhất, và là op duy nhất một khôi lỗi NHÀN RỖI vẫn
       // gọi đều — nên "đang trực" nghĩa là tiến trình còn sống, không phải nó đang bận.
-      await recordWorkerSeen(body.workerId, scope, body.version ?? null);
+      await recordWorkerSeen(body.workerId, scope, body.version ?? null, body.maxJobs ?? null);
 
       // Bế quan trùng tu: đóng ĐÚNG MỘT cánh cửa này. Bốn op còn lại (heartbeat, event,
       // accountTier, complete) mở nguyên, nên vòng đang chạy dở về đích đàng hoàng, kể xong

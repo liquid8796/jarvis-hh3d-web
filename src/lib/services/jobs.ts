@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { listAccountsWithEnvelope } from "./accounts";
 import {
@@ -7,8 +7,9 @@ import {
   storedConfigSchema,
   type WorkerPref,
 } from "./configs";
+import { DEFAULT_MAX_JOBS, DISPATCH_CANDIDATES, pickDispatch } from "./dispatch";
 import { getAppSettings } from "./settings";
-import { workerOnlineFor } from "./workers";
+import { ONLINE_WINDOW_MS, workerOnlineFor } from "./workers";
 import {
   JOB_EVENT_SWEEP_MIN_INTERVAL_MS,
   jobEventSweepInterval,
@@ -582,68 +583,125 @@ async function mergeDailyQuota(jobId: string, day: string, questIds: string[]): 
 // ---------------------------------------------------------------------------
 
 /**
- * Mệnh đề lọc theo LOẠI khôi lỗi mà CHỦ ĐÀN đã chọn (Tế đàn auto →「Giao đàn cho」): khôi lỗi
- * tông môn không được nhìn thấy đàn dành riêng cho máy nhà, và ngược lại.
+ * Nhặt đàn kế tiếp cho khôi lỗi đang gõ cửa — LUÂN PHIÊN, không còn "ai hỏi trước lấy trước".
  *
- * Đọc thẳng `user_configs` chứ KHÔNG đọc `config_snapshot` của chính dòng job, dù snapshot cũng
- * mang trường ấy: snapshot chỉ được làm mới ở ranh giới vòng, nên một đàn đang NẰM CHỜ còn đeo
- * lựa chọn cũ — đổi ý lúc ấy sẽ chỉ có hiệu lực sau khi đúng cái loại vừa bị loại bỏ tới cầm nó
- * thêm một lần nữa, tức là không bao giờ nếu loại ấy vừa tắt máy. Mà đó chính là ca người ta đổi
- * lựa chọn để thoát ra.
+ * Ba nhịp, và ranh giới giữa chúng là có chủ ý:
  *
- * `coalesce(…, 'any')` phủ hai ca thật: document đời trước tính năng này, và người chưa từng bấm
- * Khắc Ngọc Giản lần nào (chưa có dòng nào trong `user_configs`).
+ *   1. ĐỌC hàng chờ đã tới giờ. Không có gì thì về tay không ngay — đây là nhánh chạy ở gần như
+ *      mọi nhịp hỏi việc, nên nó phải rẻ đúng bằng câu truy vấn đời trước: một query.
+ *   2. ĐỌC sổ điểm danh (kèm số ghế đang bận của từng khôi lỗi) rồi để `pickDispatch` phân xử.
+ *      Luật phân công nằm trong một hàm THUẦN, có lưới kiểm chứng riêng — xem services/dispatch.ts.
+ *   3. GHI: câu UPDATE có điều kiện `status = 'queued'`. Phép quyết ở nhịp 2 là tất định nên hai
+ *      khôi lỗi không cùng nhắm một đàn, nhưng ảnh chụp của chúng có thể lệch nhau vài mili giây
+ *      — nên database vẫn là trọng tài cuối, y như bản `for update skip locked` đời trước.
  *
- * `<>` chứ không phải `in (…)`: một giá trị lạ lọt vào JSONB — chỉ có thể do sửa tay database —
- * thì đàn vẫn chạy được bằng CẢ HAI loại, thay vì nằm im mà không dòng nhật ký nào giải thích.
- * Hỏng theo hướng vẫn phục vụ, không hỏng theo hướng câm lặng.
+ * Scope vẫn là hàng rào phân quyền và vẫn nằm TRONG câu SQL: khôi lỗi riêng không được nhìn thấy
+ * đàn của người khác, kể cả khi route quên kiểm và kể cả khi hàm thuần ở trên có sai. Đàn của
+ * người khác mang theo cookie game của người khác — thứ đó không được phép chỉ dựa vào một phép
+ * lọc ở tầng ứng dụng.
  *
- * Export để `verify:worker-pref` soát ĐÚNG mệnh đề đang chạy thật. Không thể kiểm nhánh tông môn
- * bằng cách gọi `claimNextJob` trên database thật: claim của khôi lỗi tông môn quét hàng chờ của
- * CẢ tông môn, nên phép thử sẽ giành mất đàn của một người đang dùng — và một đàn bị cầm bởi một
- * khôi lỗi không có thật thì ba phút sau bị reaper kết liễu thành `failed`.
- */
-export function workerPrefFilter(scope: WorkerScope): SQL {
-  const forbidden: WorkerPref = scope.kind === "operator" ? "mine" : "sect";
-  return sql` and coalesce((
-          select uc.config->>'workerPref' from user_configs as uc
-          where uc.user_id = automation_jobs.user_id
-        ), 'any') <> ${forbidden}`;
-}
-
-/**
- * Atomically claim the oldest queued job. The single-UPDATE-with-subselect is the whole
- * locking story: two workers racing get two different rows or one row and one null —
- * Postgres decides, nobody double-runs.
+ * Còn「Giao đàn cho」(`workerPref`) thì ĐÃ RỜI khỏi SQL và về `mayServe` trong dispatch.ts: nó là
+ * lựa chọn của người dùng chứ không phải hàng rào bảo mật, và giữ nó cạnh luật luân phiên nghĩa
+ * là chỉ còn một bản để đọc, một bản để kiểm.
  *
- * Scope là hàng rào phân quyền, không phải tuỳ chọn: khôi lỗi tông môn (operator) nhận job
- * của bất kỳ ai; khôi lỗi riêng chỉ nhìn thấy hàng chờ CỦA CHỦ MÌNH — điều kiện nằm ngay
- * trong câu SQL nên không tồn tại đường nào claim chéo, kể cả khi route quên kiểm.
- *
- * Hàng rào THỨ HAI, cùng chỗ và cùng lối: `workerPrefFilter` — loại khôi lỗi mà chủ đàn đã chọn.
- * Hai mệnh đề trả lời hai câu khác nhau: một cái「được phép nhìn của ai」, một cái「chủ nhân muốn
- * ai cầm」.
+ * `owner_pref` đọc thẳng `user_configs` chứ KHÔNG đọc `config_snapshot` của dòng job, dù snapshot
+ * cũng mang trường ấy: snapshot chỉ được làm mới ở ranh giới vòng, nên một đàn đang NẰM CHỜ còn
+ * đeo lựa chọn cũ — đổi ý lúc ấy sẽ chỉ có hiệu lực sau khi đúng cái loại vừa bị loại bỏ tới cầm
+ * nó thêm một lần nữa, tức là không bao giờ nếu loại ấy vừa tắt máy. Mà đó chính là ca người ta
+ * đổi lựa chọn để thoát ra.
  */
 export async function claimNextJob(workerId: string, scope: WorkerScope): Promise<JobRow | null> {
-  const scopeFilter =
-    scope.kind === "user" ? sql` and user_id = ${scope.userId}` : sql``;
-  const prefFilter = workerPrefFilter(scope);
+  const scopeFilter = scope.kind === "user" ? sql` and job.user_id = ${scope.userId}` : sql``;
+
+  const dueResult = await db().execute(sql`
+    select
+      job.id, job.user_id, job.next_run_at,
+      coalesce(
+        (select uc.config->>'workerPref' from user_configs as uc where uc.user_id = job.user_id),
+        'any'
+      ) as owner_pref
+    from automation_jobs as job
+    where job.status = 'queued'
+      and job.next_run_at <= now()${scopeFilter}
+      -- Tài khoản đã tắt thì đàn của nó không được phát ra nữa — cửa chặn cho khe đua
+      -- hiếm giữa "thu đàn của tài khoản" và "hạ cờ enabled" trong toggleAccountAction.
+      and (
+        job.account_id is null
+        or exists (
+          select 1 from game_accounts as acc
+          where acc.id = job.account_id and acc.enabled
+        )
+      )
+    order by job.next_run_at, job.created_at
+    limit ${DISPATCH_CANDIDATES}
+  `);
+
+  const dueRows = (dueResult.rows ?? []) as Array<Record<string, unknown>>;
+  if (dueRows.length === 0) {
+    return null;
+  }
+
+  /**
+   * Sổ điểm danh + SỐ GHẾ ĐANG BẬN của từng khôi lỗi.
+   *
+   * Chỉ đếm đàn còn NHỊP TIM TƯƠI, không đếm mọi dòng `running` mang tên nó. Lý do: một tiến
+   * trình vừa khởi động lại bỏ rơi các dòng của kiếp trước, và những dòng ấy còn đeo tên nó cho
+   * tới khi reaper ra tay — ba phút. Đếm cả chúng thì khôi lỗi vừa sống lại bị coi là đầy ghế
+   * suốt ba phút đúng vào lúc nó rảnh nhất. Cùng cửa sổ với reaper, nên hai bên không thể bất
+   * đồng về việc một đàn còn sống hay không.
+   *
+   * `db_now` lấy từ CHÍNH database chứ không phải `Date.now()` của tiến trình web: mọi mốc thời
+   * gian đem so ở đây (`last_seen`, `next_run_at`) đều do đồng hồ database phát, và Vercel với
+   * Neon là hai cái đồng hồ khác nhau. Lệch vài giây là đủ để một khôi lỗi đang trực bị đọc
+   * thành đã vắng.
+   */
+  const rosterResult = await db().execute(sql`
+    select
+      w.id, w.user_id, w.last_seen, w.last_assigned_at, w.max_jobs,
+      (
+        select count(*) from automation_jobs as busy
+        where busy.worker_id = w.id
+          and busy.status in ('running', 'stopping')
+          and busy.last_heartbeat > now() - ${`${STALE_AFTER_MS} milliseconds`}::interval
+      )::int as running,
+      (extract(epoch from now()) * 1000)::bigint as db_now
+    from workers as w
+    where w.last_seen > now() - ${`${ONLINE_WINDOW_MS} milliseconds`}::interval
+  `);
+
+  const rosterRows = (rosterResult.rows ?? []) as Array<Record<string, unknown>>;
+  const now = Number(rosterRows[0]?.db_now ?? Date.now());
+
+  const decision = pickDispatch({
+    askedBy: workerId,
+    now,
+    runners: rosterRows.map((row) => ({
+      id: String(row.id),
+      userId: row.user_id == null ? null : String(row.user_id),
+      lastSeen: new Date(String(row.last_seen)).getTime(),
+      lastAssignedAt:
+        row.last_assigned_at == null ? null : new Date(String(row.last_assigned_at)).getTime(),
+      maxJobs: Number(row.max_jobs) || DEFAULT_MAX_JOBS,
+      running: Number(row.running) || 0,
+    })),
+    jobs: dueRows.map((row) => ({
+      id: String(row.id),
+      userId: String(row.user_id),
+      ownerPref: String(row.owner_pref ?? "any"),
+      dueAt: new Date(String(row.next_run_at)).getTime(),
+    })),
+  });
+
+  if (decision.jobId === null) {
+    return null;
+  }
 
   const claimed = await db().execute(sql`
     with candidate as (
       select id from automation_jobs
-      where status = 'queued'
-        and next_run_at <= now()${scopeFilter}${prefFilter}
-        -- Tài khoản đã tắt thì đàn của nó không được phát ra nữa — cửa chặn cho khe đua
-        -- hiếm giữa "thu đàn của tài khoản" và "hạ cờ enabled" trong toggleAccountAction.
-        and (
-          account_id is null
-          or exists (
-            select 1 from game_accounts as acc
-            where acc.id = automation_jobs.account_id and acc.enabled
-          )
-        )
-      order by next_run_at, created_at
+      where id = ${decision.jobId}
+        and status = 'queued'
+        and next_run_at <= now()
       for update skip locked
       limit 1
     )
@@ -685,6 +743,16 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
   if (!row) {
     return null;
   }
+
+  /**
+   * Quay con quay luân phiên — CHỈ khi đã cầm được đàn thật.
+   *
+   * Đặt sau câu UPDATE chứ không trước: một lượt quyết thua cuộc đua (đàn vừa bị khôi lỗi khác
+   * nhặt mất) mà vẫn đóng dấu thì khôi lỗi này bị đẩy xuống cuối hàng vì một việc nó không hề
+   * nhận được. Không có transaction ở đây (neon-http), nên nếu đúng câu này hỏng thì hậu quả
+   * đúng bằng "một lượt được chia thêm sớm hơn lượt của nó" — nhịp sau tự về đúng chỗ.
+   */
+  await db().execute(sql`update workers set last_assigned_at = now() where id = ${workerId}`);
 
   const attempts = Number(row.attempts ?? 1);
   await addEvent(
@@ -927,6 +995,19 @@ export async function completeWorkerCycle(
       -- tiến độ cũ sẽ hiện trên Hàng Đợi là "đang nghỉ — Mê Cung" suốt cả cooldown.
       cycle_progress = null,
       cycle_progress_at = null,
+      -- NHẢ khôi lỗi ra cùng lúc nhả tiến độ. Một đàn đang nghỉ cooldown KHÔNG thuộc về khôi
+      -- lỗi nào: nó chưa được phân công, và vòng sau bộ cân tải sẽ chọn lại từ đầu theo lượt
+      -- (services/dispatch.ts). Trước bản này worker_id bám lại suốt cả tiếng nghỉ, nên bảng
+      -- Hàng Đợi vẽ ra một sự phân công không có thật — đo 13/08/2026: cả 12 dòng đang nghỉ
+      -- đều đeo tên một khôi lỗi, và người đọc tưởng đàn mình đã được đặt chỗ trước.
+      -- (Không dùng dấu huyền trong bình chú SQL: cả câu này nằm trong một template literal.)
+      --
+      -- Dòng ĐÃ TẮT (stopped) thì giữ nguyên tên: nó là lịch sử, không phải hàng chờ, và
+      -- người vận hành cần đọc được vòng cuối cùng chạy trên máy nào.
+      worker_id = case
+        when status = 'stopping' or ${stopFromWorker} or ${accountRetired} then worker_id
+        else null
+      end,
       last_heartbeat = now()
     where id = ${jobId}
       and status in ('running', 'stopping')

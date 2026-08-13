@@ -104,20 +104,31 @@ tàng khố — không bao giờ đưa cho người dùng (họ có linh phù ri
 | service | `auto-hh3d-linh-su.service` |
 | thư mục | `/opt/auto-hh3d/linh-su` |
 | env | `/opt/auto-hh3d/linh-su/.env` (`WEB_URL`, `WORKER_TOKEN`, `WORKER_ID=tong-mon-khoiloi`) |
-| drop-in | `/etc/systemd/system/auto-hh3d-linh-su.service.d/override.conf` — `MemoryMax=18G`, `WORKER_MAX_JOBS=3`, `WORKER_QUEST_TABS=4`, `TimeoutStopSec=2400`, `WORKER_DRAIN_TIMEOUT_MS=2100000`. **Không** có trong `.env` và **không** có trong `setup.sh` (script chỉ viết lại unit chính), nên soi hai chỗ ấy sẽ tưởng nhầm là 4G và 2 đàn. Tệp ấy mang sẵn một khối bình chú dài kèm số đo — đọc nó trước khi vặn. |
+| drop-in | `/etc/systemd/system/auto-hh3d-linh-su.service.d/override.conf` — `MemoryMax=18G`, `WORKER_MAX_JOBS=2`, `TimeoutStopSec=2400`, `WORKER_DRAIN_TIMEOUT_MS=2100000`. **Không** có trong `.env` và **không** có trong `setup.sh` (script chỉ viết lại unit chính), nên soi hai chỗ ấy sẽ tưởng nhầm là 4G. Tệp ấy mang sẵn một khối bình chú dài kèm số đo — đọc nó trước khi vặn. |
 
-**Mức song song, ba tầng:** 3 đàn cùng lúc (`WORKER_MAX_JOBS`), mỗi đàn tối đa 4 tab nhiệm vụ
-(`WORKER_QUEST_TABS`), nhưng cổng toàn cục trong `questGate.mjs` mới điều tiết thật: 2 nhiệm vụ
-TRANG RIÊNG + 5 HUB = **7 nhiệm vụ** chạy một lúc trên cả tiến trình (hai hằng số ấy KHÔNG suy
-từ số ghế, nên hạ ghế không hạ trần cổng). Nên 3 ghế không có nghĩa 12 tab cùng cày — phần dư
-nằm xếp hàng ở cổng.
+**Mức song song, hai tầng:** 2 đàn cùng lúc (`WORKER_MAX_JOBS`), mỗi đàn chạy nhiệm vụ TUẦN TỰ
+(nhánh song song trong một đàn đã gỡ 12/08/2026 để Mê Cung luôn là nhiệm vụ cuối), nên trần thật
+của cả tiến trình là **2 nhiệm vụ** chạy một lúc. Cổng toàn cục trong `questGate.mjs` (2 trang
+riêng + 5 hub) vẫn còn nhưng ở mức ghế này nó không bao giờ chạm trần — nó là lưới cho ngày ai
+đó nâng ghế lên lại.
 
-> **Vì sao 3 chứ không phải 5 (12/08/2026):** tông môn nay có khôi lỗi thứ hai trên GitHub
-> Actions, và ghế là thứ CHIA việc giữa hai máy — không có tầng phân công nào cả, ai còn ghế
-> trống thì `claimNextJob` phát cho người ấy. Hạ VM về 3 là nhường 2 đàn cùng lúc cho
-> `github-khoiloi` (nó đang đặt `WORKER_MAX_JOBS=2` trong workflow). Tổng mức song song của cả
-> tông môn vì thế là **3 + 2 = 5**, không phải 7 như khi VM một mình ôm 5 ghế — muốn giữ 7 thì
-> phải nâng phía Actions, xem [github-actions.md](../github-actions.md).
+> **`WORKER_QUEST_TABS` KHÔNG tồn tại trong mã (soát 14/08/2026).** Không dòng nào đọc biến ấy —
+> `process.env.WORKER_*` chỉ có TOKEN, ID, POLL_MS, HEARTBEAT_MS, MAX_JOBS, MAX_LIFETIME_MS,
+> DRAIN_TIMEOUT_MS, PROFILE_MAX_AGE_DAYS. Nó là di sản của thời còn chạy song song trong một
+> đàn; đặt nó bằng 3 hay 400 đều không đổi gì. Đã gỡ khỏi bảng trên để người sau khỏi vặn một
+> cái núm không nối vào đâu.
+
+> **Vì sao 2 ghế (14/08/2026):** ghế là thứ CHIA việc giữa các máy, và từ bản này việc được chia
+> theo LUÂN PHIÊN chứ không phải "ai hỏi trước lấy trước" — xem `src/lib/services/dispatch.ts`.
+> Máy chủ giữ trần ghế của từng khôi lỗi trong sổ điểm danh (`workers.max_jobs`, do chính tiến
+> trình khai ở mỗi lượt gõ cửa), nên nó biết ai còn chỗ mà không phải đoán. Hai ghế đều nhau cho
+> mọi khôi lỗi — VM, `github-khoiloi`, các khôi lỗi trọ — là cách nói "không máy nào là máy
+> chính": thêm một máy vào tông môn là thêm đúng 2 suất, và bộ cân tải tự trải việc sang nó ngay
+> từ vòng kế (khôi lỗi chưa từng được giao việc đứng ĐẦU hàng luân phiên).
+>
+> Lịch sử: 12/08/2026 VM ở 3 ghế còn Actions 2 — hồi ấy không có tầng phân công nên số ghế là
+> núm duy nhất để nhường việc giữa hai máy. Nay bộ cân tải làm việc ấy tử tế hơn hẳn, và con số
+> ghế trở lại đúng nghĩa của nó: trần RAM của một cái máy.
 
 **Dừng ÊM, không chém (thêm 12/08/2026).** `worker.mjs` nghe `SIGTERM` rồi vào pha rút lui: thôi
 nhận việc mới, chờ đàn đang chạy đi nốt vòng, rồi thoát sạch. Trước bản này pha ấy **chưa bao giờ

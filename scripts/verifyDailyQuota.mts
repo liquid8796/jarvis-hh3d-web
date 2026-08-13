@@ -24,6 +24,7 @@ import {
   dailyQuotaPlan,
   vietnamDayKey,
 } from "../src/lib/services/jobs";
+import { recordWorkerSeen } from "../src/lib/services/workers";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -59,9 +60,15 @@ let jobId = "";
  * Kéo `next_run_at` về hiện tại trước: `completeWorkerCycle` vừa xếp lịch vài phút nữa, và cửa
  * claim tôn trọng lịch ấy. Không kéo thì mọi lượt giành lại ở đây trả về null và phép thử xanh
  * vì không có gì để kiểm — kiểu hỏng tệ nhất.
+ *
+ * ĐIỂM DANH trước mỗi lượt giành, đúng thứ tự cửa `/api/worker` làm: từ 14/08/2026 bộ cân tải
+ * chỉ chia việc cho khôi lỗi có tên trong sổ và đang trực (services/dispatch.ts). Một khôi lỗi
+ * ma nay về tay không — nên phải đăng ký nó, và phải đăng ký LẠI ở mỗi lượt vì tệp này chạy dài
+ * hơn cửa sổ điểm danh 30 giây.
  */
 const reclaim = async () => {
   await sql`update automation_jobs set next_run_at = now() where id = ${jobId}`;
+  await recordWorkerSeen("khoi-lo-kiem-thu", { kind: "user", userId }, null, 2);
   const job = await claimNextJob("khoi-lo-kiem-thu", { kind: "user", userId });
   assert(job !== null, "không giành lại được đàn thử");
   return job!;
@@ -105,6 +112,20 @@ try {
     returning id
   `) as { id: string }[];
   userId = created[0].id;
+
+  /**
+   * `workerPref: "mine"` là HÀNG RÀO CÁCH LY với đội khôi lỗi THẬT.
+   *
+   * Database này là production: sáu khôi lỗi tông môn hỏi việc mỗi 5 giây, và một đàn kiểm đã
+   * tới giờ mà chủ chưa chọn gì (`any`) là đàn hợp lệ với chúng. Chọn「chỉ máy nhà」thì luật
+   * phân công (services/dispatch.ts) loại chúng ra, và mọi lượt `reclaim` bên dưới đối mặt với
+   * đúng một ứng viên: khôi lỗi giả của tệp này.
+   */
+  await sql`
+    insert into user_configs (user_id, config)
+    values (${userId}, ${JSON.stringify({ workerPref: "mine" })}::jsonb)
+    on conflict (user_id) do update set config = excluded.config
+  `;
 
   const job = (await sql`
     insert into automation_jobs (user_id, status, next_run_at)

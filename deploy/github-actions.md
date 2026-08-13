@@ -15,23 +15,33 @@ chính; bản trên Actions là phần cộng thêm, mất nó thì tông môn c
 
 ---
 
-## 1. Điều dễ hiểu sai nhất: KHÔNG có tầng phân công nào
+## 1. Tầng phân công: CÓ, từ 14/08/2026 — và nó ở đúng MỘT chỗ
 
-Đừng đi tìm nó, và **đừng dựng nó**. Việc chia job giữa hai khôi lỗi do Postgres quyết, bằng
-chính câu claim đã có từ trước:
+> Mục này viết lại. Bản trước nói「KHÔNG có tầng phân công nào, đừng dựng nó」— đúng cho tới ngày
+> tông môn còn hai khôi lỗi. Với bảy cái thì luật「ai hỏi trước lấy trước」xếp việc theo NHỊP HỎI
+> chứ không theo SỨC CHỨA, nên nay đã có một tầng thật. Ghi lại đoạn cũ ở đây để phiên nào đọc
+> phải bản trong lịch sử thì biết luật đã đổi, chứ không phải hai luật cùng sống.
 
-- `claimNextJob` là **MỘT** câu UPDATE nguyên tử — hai khôi lỗi giành nhau thì nhận hai dòng
-  khác nhau, hoặc một dòng và một null. Không ai chạy đôi.
-- Index `jobs_one_active_per_account` chặn hai đàn sống cùng một tài khoản, ở tầng database.
+Tầng ấy là `src/lib/services/dispatch.ts` — **một hàm THUẦN**, `pickDispatch`, có lưới kiểm
+riêng (`npm run verify:dispatch`, 35 phép kiểm). Đừng dựng cái thứ hai ở đâu khác.
 
-Kết quả là tự cân bằng theo tải THẬT: máy nào rảnh trước thì nhặt trước. Một bảng phân công
-viết tay sẽ vừa thừa, vừa là một luật thứ hai sống lệch luật thật.
+- **Vẫn là PULL.** Máy chủ không gọi được vào khôi lỗi (VM sau NAT, runner Actions không có địa
+  chỉ bền). Khôi lỗi vẫn hỏi việc mỗi 5 giây; cái đổi là câu trả lời — nay là「tới lượt ngươi」
+  hoặc「chưa」.
+- **Luân phiên theo `workers.last_assigned_at`**: ai lâu chưa được giao nhất thì tới lượt. Khôi
+  lỗi vừa lên ca (`null`) đứng ĐẦU hàng, nên thêm một máy là nó có việc ngay từ vòng kế.
+- **Máy chủ biết trần ghế của từng máy** (`workers.max_jobs`, do chính tiến trình khai ở mỗi lượt
+  gõ cửa) và đếm ghế đang bận, nên nó không giữ lượt cho một máy đã đầy.
+- **Van chống đói**: đàn tới giờ mà nằm quá 20 giây thì thôi chờ lượt — ai đủ tư cách cũng nhận
+  được. Nó cứu ca「tiến trình còn thở nhưng vòng hỏi việc kẹt」, thứ sổ điểm danh không phát hiện
+  ra.
+- `claimNextJob` **vẫn** kết bằng một câu UPDATE có điều kiện — Postgres vẫn là trọng tài cuối,
+  không ai chạy đôi. Index `jobs_one_active_per_account` vẫn chặn hai đàn sống cùng một tài khoản.
 
-**Muốn dịch tải giữa hai máy thì vặn SỐ GHẾ, đó là núm duy nhất.** Ngày 12/08/2026 hạ VM từ 5 ghế
-xuống 3 chính là cách「giao 2 đàn cùng lúc cho khôi lỗi GitHub」— không sửa một dòng mã phân công
-nào, vì không có dòng nào để sửa: VM đầy ghế thì câu claim kế tiếp rơi vào tay máy còn ghế trống.
-Nhớ luôn phép cộng: tổng mức song song của tông môn = tổng số ghế của các máy (nay 3 + 2 = 5), nên
-hạ một bên mà không nâng bên kia là hạ tổng.
+**Số ghế giờ trở lại đúng nghĩa của nó: trần RAM của một cái máy, không phải núm dịch tải.** Từ
+14/08/2026 mọi khôi lỗi đều `WORKER_MAX_JOBS=2` — VM, Actions, khôi lỗi trọ — và việc được trải
+đều bằng luân phiên. Tổng mức song song của tông môn vẫn là tổng số ghế, nên thêm một máy là thêm
+đúng 2 suất.
 
 ## 2. Người dùng KHÔNG chọn máy, chỉ chọn hạng
 

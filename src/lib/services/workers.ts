@@ -3,6 +3,7 @@ import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hashWorkerToken, type WorkerScope } from "@/lib/auth/worker";
 import type { WorkerRow } from "@/lib/db/schema";
+import { clampMaxJobs, DEFAULT_MAX_JOBS, ONLINE_WINDOW_MS } from "./dispatch";
 import type { WorkerPref } from "./configs";
 
 /**
@@ -12,8 +13,12 @@ import type { WorkerPref } from "./configs";
  * lời sau sáu phút im lặng, khi reaper kết liễu job. Một khôi lỗi được coi là ĐANG TRỰC nếu
  * nó hỏi việc trong vòng ONLINE_WINDOW_MS gần nhất; nhịp hỏi việc là 5 giây, nên cửa sổ
  * 30 giây đủ rộng để một cú vấp mạng không biến "đang trực" thành "vắng mặt".
+ *
+ * Cửa sổ ấy nay ĐỊNH NGHĨA ở `dispatch.ts` — nơi luật phát việc sống — và được tái xuất ở đây
+ * cho dashboard, sổ điểm danh, bảng Hàng Đợi. Một nguồn duy nhất: hai bản của cùng cửa sổ là
+ * hai dịp để dashboard vẽ "đang trực" trong khi cửa phát việc đã gạch tên.
  */
-export const ONLINE_WINDOW_MS = 30 * 1000;
+export { ONLINE_WINDOW_MS };
 
 /**
  * Ghi nhận một lần gõ cửa. Gọi ở op `claim` — op dày nhịp nhất và là op duy nhất một worker
@@ -33,14 +38,39 @@ export async function recordWorkerSeen(
    * trạng thái「không rõ」chứ không được đội con số của lần cài trước làm bằng chứng giả.
    */
   version: string | null = null,
+  /**
+   * Trần ghế (`WORKER_MAX_JOBS`) do chính tiến trình khai — bộ cân tải cần nó để biết khôi lỗi
+   * nào còn chỗ mà chia việc tới.
+   *
+   * `null` ở đây KHÔNG có nghĩa "trần bằng mặc định", mà là "lượt gõ cửa này không khai gì" —
+   * và khi ấy cột giữ NGUYÊN giá trị cũ. Đây là chỗ nó khác `version` một cách có chủ ý: nhịp
+   * tim cũng gọi vào hàm này (op `heartbeat`) mà thân nhịp tim không mang trần ghế, nên ghi đè
+   * bằng mặc định sẽ hạ một khôi lỗi 3 ghế xuống 2 ngay sau lượt claim đầu tiên — lặng lẽ, và
+   * chỉ lộ ra dưới dạng một cái máy tự dưng chạy ít việc hơn nó có thể.
+   *
+   * Hai hướng đoán sai không cân nhau, nên chọn hướng tự lành: giữ số CŨ mà số ấy cao hơn thực
+   * tế thì bộ cân tải chờ hụt nhiều nhất `TURN_GRACE_MS` rồi van chống đói mở; giữ số THẤP hơn
+   * thực tế thì một cái ghế bỏ không vĩnh viễn, không gì cứu.
+   *
+   * KẸP dù có khai: linh phù là token của người dùng nên một khôi lỗi riêng có thể khai bừa.
+   * Khai thừa chỉ hại chính chủ nó (khôi lỗi riêng chỉ nhận đàn của chủ mình), nhưng một con số
+   * vô lý vẫn không được phép chảy vào phép tính ghế của cả tông môn.
+   */
+  maxJobs: number | null = null,
 ): Promise<void> {
   const userId = scope.kind === "user" ? scope.userId : null;
+  const declared = maxJobs == null ? null : clampMaxJobs(maxJobs);
   await db()
     .insert(schema.workers)
-    .values({ id: workerId, userId, version })
+    .values({ id: workerId, userId, version, maxJobs: declared ?? DEFAULT_MAX_JOBS })
     .onConflictDoUpdate({
       target: schema.workers.id,
-      set: { userId, version, lastSeen: sql`now()` },
+      set: {
+        userId,
+        version,
+        lastSeen: sql`now()`,
+        ...(declared == null ? {} : { maxJobs: declared }),
+      },
     });
 }
 

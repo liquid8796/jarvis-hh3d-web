@@ -9,6 +9,7 @@
 import { neon } from "@neondatabase/serverless";
 import { claimNextJob, completeWorkerCycle, heartbeat, requestStop } from "../src/lib/services/jobs";
 import { getQueueSnapshot } from "../src/lib/services/queue";
+import { recordWorkerSeen } from "../src/lib/services/workers";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -62,9 +63,18 @@ try {
   `;
   userId = String(users[0].id);
 
+  /**
+   * `workerPref: "mine"` là HÀNG RÀO CÁCH LY, không phải một thứ đang được kiểm ở đây.
+   *
+   * Tệp này chạy trên database THẬT, nơi sáu khôi lỗi tông môn hỏi việc mỗi 5 giây. Một đàn
+   * kiểm đã tới giờ mà chủ nó chưa chọn gì (tức `any`) là đàn HỢP LỆ trong mắt chúng — và từ
+   * 14/08/2026 bộ cân tải còn xếp chúng đứng TRƯỚC hai khôi lỗi giả của tệp này trong hàng luân
+   * phiên, nên cuộc đua bên dưới thua trắng cả hai suất. Chọn「chỉ máy nhà」thì luật phân công
+   * loại hẳn khôi lỗi tông môn ra, và cuộc đua chỉ còn đúng hai kẻ ta dựng lên.
+   */
   await sql`
     insert into user_configs (user_id, config)
-    values (${userId}, ${JSON.stringify({ marker: "fresh-config" })}::jsonb)
+    values (${userId}, ${JSON.stringify({ marker: "fresh-config", workerPref: "mine" })}::jsonb)
   `;
 
   const jobs = await sql`
@@ -91,7 +101,19 @@ try {
   );
 
   // Chưa tới next_run_at thì không worker nào được nhận. Khi tới giờ, hai worker đua nhau
-  // cũng chỉ đúng một người thắng nhờ FOR UPDATE SKIP LOCKED.
+  // cũng chỉ đúng một người thắng.
+  //
+  // Điểm danh cả ba khôi lỗi giả trước, đúng thứ tự cửa `/api/worker` làm: từ 14/08/2026 bộ cân
+  // tải chỉ chia việc cho khôi lỗi CÓ TÊN trong sổ và đang trực (services/dispatch.ts), nên một
+  // khôi lỗi ma nay luôn về tay không — và phép thử sẽ xanh vì lý do sai.
+  //
+  // Cuộc đua giờ có HAI lớp gác chứ không một: luân phiên chọn sẵn đúng một người tới lượt
+  // (bên kia nhận "waiting-turn"), rồi `FOR UPDATE SKIP LOCKED` vẫn đứng đó làm trọng tài cuối
+  // cho trường hợp hai ảnh chụp sổ lệch nhau vài mili giây. Kết luận cần kiểm không đổi: đúng
+  // một người cầm được job.
+  for (const racer of ["verify-sleeping", "verify-racer-a", "verify-racer-b"]) {
+    await recordWorkerSeen(racer, { kind: "user", userId }, null, 2);
+  }
   const sleeping = await claimNextJob("verify-sleeping", { kind: "user", userId });
   assert(sleeping === null, "job đang nghỉ chưa được claim sớm");
   await sql`update automation_jobs set next_run_at = now() where id = ${jobId}`;
@@ -168,6 +190,9 @@ try {
     set next_run_at = now(), cycle_progress = ${JSON.stringify(beating)}::jsonb
     where id = ${jobId}
   `;
+  // Điểm danh ngay trước lượt claim: khôi lỗi này chưa từng gõ cửa, mà bộ cân tải chỉ chia
+  // việc cho tên có trong sổ VÀ đang trực — cửa sổ 30 giây đã trôi qua từ lâu ở đoạn này.
+  await recordWorkerSeen("verify-progress", { kind: "user", userId }, null, 2);
   const reclaimed = await claimNextJob("verify-progress", { kind: "user", userId });
   assert(reclaimed?.id === jobId, "job phải được claim lại để kiểm phép dọn lúc nhận việc");
   const afterClaim = await sql`select cycle_progress from automation_jobs where id = ${jobId}`;

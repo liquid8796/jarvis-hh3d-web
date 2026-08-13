@@ -435,6 +435,30 @@ export const workers = pgTable(
      * lại trạng thái「không rõ」chứ không được giữ con số cũ làm bằng chứng giả.
      */
     version: text("version"),
+    /**
+     * Lần gần nhất CỬA PHÁT VIỆC trao cho tiến trình này một đàn — con quay của bộ cân tải
+     * luân phiên (xem services/dispatch.ts).
+     *
+     * `null` mang nghĩa「chưa bao giờ được giao」và nó phải đứng ĐẦU hàng luân phiên, không
+     * phải cuối: một khôi lỗi vừa lên ca là chỗ trống nhất trên cả tông môn.
+     *
+     * Khác `lastSeen` ở chỗ nó KHÔNG nhúc nhích theo nhịp hỏi việc — chỉ đổi khi thực sự nhận
+     * được đàn. Nhờ vậy nó đo đúng thứ cần đo (đã được chia bao nhiêu việc), chứ không đo sự
+     * siêng năng gõ cửa.
+     */
+    lastAssignedAt: timestamp("last_assigned_at", { withTimezone: true }),
+    /**
+     * Trần số đàn chạy CÙNG LÚC mà tiến trình này tự khai (`WORKER_MAX_JOBS` của nó).
+     *
+     * Trước bản này chỉ chính khôi lỗi biết con số ấy, nên máy chủ không có cách nào biết một
+     * khôi lỗi đã đầy ghế hay chưa — mà bộ cân tải thì bắt buộc phải biết, bằng không nó trao
+     * việc cho một tiến trình không còn chỗ và đàn ấy nằm im tới khi van chống đói mở.
+     *
+     * Mặc định 2 áp cho cả khôi lỗi đời cũ chưa biết khai: đó là trần chuẩn của tông môn từ
+     * 14/08/2026, và đoán THIẾU thì chỉ mất một chút thông lượng, đoán THỪA thì phát việc vào
+     * hư không.
+     */
+    maxJobs: integer("max_jobs").notNull().default(2),
   },
   (t) => [index("workers_user_idx").on(t.userId, t.lastSeen)],
 );

@@ -24,10 +24,14 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { DEFAULT_WORKFLOW_FILE } from "../src/lib/validation/githubStations";
 import {
+  activeRunIds,
+  activeRuns,
   planKhoiloiTree,
   resolveDeployWorkerId,
+  reviewRestart,
   webUrlFromWorkflow,
   workerIdFromWorkflow,
+  type ActiveRun,
 } from "./githubKhoiloi.mts";
 import {
   OWNED_PREFIXES,
@@ -262,6 +266,79 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
     "README vẽ ra không mang tên kho gốc lẫn tên nền tảng",
     !/jarvis|github|actions/i.test(renderReadme({ workerId: "khoiloi-tro-x", webUrl: "https://a.invalid" })),
   );
+}
+
+// ---- 6. Khởi động lại: hàng rào đắt nhất của cả công cụ -------------------------------------------
+{
+  console.log("\n6. reviewRestart — huỷ lượt Actions là giết runner tức khắc");
+
+  const MOI = "aaaaaaa";
+  const CU = "bbbbbbb";
+  const run = (id: number, headSha: string): ActiveRun => ({ id, headSha, number: id });
+
+  {
+    // Ca đã xảy ra thật 14/08/2026: sau lượt chuyển trạm, runner gõ vào trạm đã xoá, nhận 404 mỗi
+    // 5 giây, giữ 0 đàn. Huỷ nó không mất gì — và chờ 4 giờ thì mất hai ghế suốt bốn giờ.
+    const v = reviewRestart({ runs: [run(1, CU)], headSha: MOI, heldJobs: 0, force: false, workerId: "w" });
+    check("mã cũ + 0 đàn → huỷ rồi phát lượt mới", v.go && v.cancel.length === 1 && v.dispatch);
+  }
+
+  {
+    const v = reviewRestart({ runs: [run(1, CU)], headSha: MOI, heldJobs: 1, force: false, workerId: "w" });
+    check("mã cũ + ĐANG GIỮ ĐÀN → từ chối", !v.go);
+    check(
+      "lời từ chối nói ra cái giá (reapStaleJobs, 3 phút)",
+      !v.go && v.message.includes("reapStaleJobs") && v.message.includes("3 phút"),
+      !v.go ? v.message : "",
+    );
+  }
+
+  {
+    const v = reviewRestart({ runs: [run(1, CU)], headSha: MOI, heldJobs: 2, force: true, workerId: "w" });
+    check("--force qua được hàng rào đàn — đó là đúng vai của nó", v.go && v.cancel.length === 1);
+  }
+
+  {
+    // Lượt đã mang mã mới thì huỷ nó là tự phá việc mình vừa làm.
+    const v = reviewRestart({ runs: [run(1, MOI)], headSha: MOI, heldJobs: 0, force: false, workerId: "w" });
+    check("đã chạy mã mới → không huỷ, không phát thêm", v.go && v.cancel.length === 0 && !v.dispatch);
+  }
+
+  {
+    // Ca thật của kho …233056: một lượt cũ đang chạy, một lượt mới đã nằm chờ. Huỷ cái cũ là đủ —
+    // phát thêm một lượt nữa chỉ tổ đốt quỹ phút cho thứ sẽ bị concurrency đẩy ra.
+    const v = reviewRestart({ runs: [run(1, CU), run(2, MOI)], headSha: MOI, heldJobs: 0, force: false, workerId: "w" });
+    check("có lượt mới nằm chờ → chỉ huỷ cũ, KHÔNG phát thêm", v.go && v.cancel.length === 1 && !v.dispatch);
+  }
+
+  {
+    const v = reviewRestart({ runs: [], headSha: MOI, heldJobs: 0, force: false, workerId: "w" });
+    check("không lượt nào đang sống → phát một lượt mới", v.go && v.cancel.length === 0 && v.dispatch);
+  }
+
+  {
+    // Giữ đàn nhưng KHÔNG có lượt cũ nào để huỷ: không được từ chối, vì chẳng có gì bị giết cả.
+    const v = reviewRestart({ runs: [run(1, MOI)], headSha: MOI, heldJobs: 3, force: false, workerId: "w" });
+    check("giữ đàn mà không có lượt cũ → vẫn đi tiếp, không đụng gì", v.go && v.cancel.length === 0);
+  }
+
+  console.log("\n   activeRuns — đọc thân JSON của GitHub");
+  const body = {
+    workflow_runs: [
+      { id: 11, status: "in_progress", head_sha: CU, run_number: 3 },
+      { id: 12, status: "completed", head_sha: CU, run_number: 2 },
+      { id: 13, status: "queued", head_sha: MOI, run_number: 4 },
+      { id: "rác", status: "in_progress", head_sha: CU },
+      { status: "in_progress", head_sha: CU },
+      null,
+    ],
+  };
+  const parsed = activeRuns(body);
+  check("chỉ lượt CHƯA xong lọt vào", parsed.map((r) => r.id).join(",") === "11,13", parsed.map((r) => r.id).join(","));
+  check("id không phải số bị loại — nếu không sẽ POST /runs/undefined/cancel", parsed.every((r) => typeof r.id === "number"));
+  check("activeRunIds là cùng một sự thật, chỉ bớt cột", activeRunIds(body).join(",") === "11,13");
+  check("thân rác → mảng rỗng, không ném", activeRuns({ workflow_runs: "không phải mảng" }).length === 0);
+  check("thân null → mảng rỗng", activeRuns(null).length === 0);
 }
 
 console.log(`\n✔ ${checks} phép kiểm, tất cả xanh.`);

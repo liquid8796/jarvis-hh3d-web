@@ -55,8 +55,10 @@ import {
   stationSlug,
 } from "../src/lib/validation/githubStations";
 import {
+  activeRuns,
   planKhoiloiTree,
   resolveDeployWorkerId,
+  reviewRestart,
   webUrlFromWorkflow,
   workerIdFromWorkflow,
 } from "./githubKhoiloi.mts";
@@ -88,6 +90,17 @@ const arg = (name: string): string | undefined => {
 };
 const onlyRepo = arg("repo");
 const forcedWebUrl = arg("web-url");
+/**
+ * `--restart`: huỷ lượt Actions đang chạy MÃ CŨ rồi phát một lượt mới, thay vì chờ tới 4 giờ.
+ *
+ * Không bật mặc định, và cũng không phải chuyện lười: huỷ một lượt đang cày là cắt ngang đàn của
+ * một đạo hữu. Nhưng có đúng MỘT cảnh mà huỷ không mất gì cả, và nó là cảnh thường gặp nhất sau
+ * một lượt chuyển trạm — runner đang gõ vào một trạm đã bị xoá, nhận 404 mỗi 5 giây, giữ 0 đàn.
+ * Với nó thì「chờ lượt kế」nghĩa là để một khôi lỗi nằm chết thêm bốn tiếng. Hàng rào đàn-đang-giữ
+ * nằm ở `reviewRestart`, không ở đây.
+ */
+const restart = argv.includes("--restart");
+const force = argv.includes("--force");
 
 const API_ROOT = "https://api.github.com";
 /** Ghim tường minh, cùng lý do với vòng nuôi kho: một API mặc định trôi sang bản sau là hỏng lặng lẽ. */
@@ -370,7 +383,104 @@ type Outcome = {
   slug: string;
   state: "đã đẩy" | "đã đúng bản" | "kế hoạch" | "HỎNG";
   detail: string;
+  /** Lượt khởi động lại đã làm gì — `null` khi không bật `--restart`. */
+  restart?: string;
 };
+
+/**
+ * Đàn mà từng khôi lỗi đang giữ — hỏi MỘT LẦN cho cả vòng, ngay trước khi bắt đầu.
+ *
+ * Một câu hỏi cho mỗi kho thì rẻ hơn về mặt gõ, nhưng nó mở một khe đua dài bằng cả vòng chạy:
+ * kho thứ sáu sẽ đọc một con số của mười phút sau kho thứ nhất. Ảnh chụp một lần thì mọi phán
+ * quyết trong lượt này đứng trên cùng một sự thật — và nếu ảnh ấy đã cũ vài phút thì phán quyết
+ * chỉ sai theo hướng THẬN TRỌNG (từ chối huỷ một khôi lỗi vừa nhả đàn), không sai theo hướng
+ * giết nhầm.
+ */
+const heldByWorker = new Map<string, number>();
+if (restart) {
+  const rows = (await sql`
+    SELECT worker_id, count(*)::int AS n FROM automation_jobs
+    WHERE status IN ('running', 'stopping') AND worker_id IS NOT NULL
+    GROUP BY worker_id
+  `) as Array<{ worker_id: string; n: number }>;
+  for (const row of rows) heldByWorker.set(row.worker_id, Number(row.n) || 0);
+}
+
+/**
+ * Huỷ lượt chạy mang mã cũ rồi phát một lượt mới. Trả về câu kể, hoặc ném `RepoError`.
+ *
+ * Đứng SAU lượt đẩy và dùng chính `headSha` vừa tạo ra, nên nó không bao giờ huỷ nhầm một lượt
+ * chạy đã mang mã mới.
+ */
+async function restartRuns(input: {
+  pat: string;
+  base: string;
+  branch: string;
+  workflowFile: string;
+  workerId: string;
+  headSha: string;
+}): Promise<string> {
+  const { pat, base, branch, workflowFile, workerId, headSha } = input;
+
+  const runsBody = await demand(
+    pat,
+    "GET",
+    `${base}/actions/workflows/${seg(workflowFile)}/runs?per_page=20`,
+    "hỏi danh sách lượt chạy Actions",
+    [200],
+  );
+  const runs = activeRuns(runsBody);
+  const verdict = reviewRestart({
+    runs,
+    headSha,
+    heldJobs: heldByWorker.get(workerId) ?? 0,
+    force,
+    workerId,
+  });
+
+  if (!verdict.go) return `khởi động lại: BỎ QUA — ${verdict.message}`;
+  if (verdict.cancel.length === 0 && !verdict.dispatch) {
+    return "khởi động lại: không cần — đã có lượt chạy mang đúng mã này";
+  }
+
+  // Lượt chạy khô đi được tới TẬN ĐÂY vì mọi thứ trên đều là phép ĐỌC — nên nó soi được cả phán
+  // quyết khởi động lại, chứ không chỉ soi phần đẩy tệp. Chỉ hai lời gọi ghi bên dưới là bị chặn.
+  if (dryRun) {
+    const se: string[] = [];
+    if (verdict.cancel.length > 0) se.push(`huỷ ${verdict.cancel.length} lượt mã cũ`);
+    if (verdict.dispatch) se.push("phát lượt mới");
+    return `khởi động lại (sẽ): ${se.join(", ")}`;
+  }
+
+  for (const run of verdict.cancel) {
+    // 202 = đã nhận lệnh huỷ; 409 = lượt ấy vừa tự kết thúc trong lúc ta đọc — cả hai đều là
+    // "không còn lượt cũ nào chạy nữa", tức đúng thứ ta muốn.
+    const reply = await callGithub(pat, "POST", `${base}/actions/runs/${run.id}/cancel`);
+    if (reply.status !== 202 && reply.status !== 409) {
+      throw new RepoError(explainFailure(reply.status, reply.body, `huỷ lượt chạy #${run.number ?? run.id}`));
+    }
+  }
+
+  let dispatched = false;
+  if (verdict.dispatch) {
+    await demand(
+      pat,
+      "POST",
+      `${base}/actions/workflows/${seg(workflowFile)}/dispatches`,
+      "phát một lượt chạy mới",
+      [204],
+      { ref: branch },
+    );
+    dispatched = true;
+  }
+
+  const parts: string[] = [];
+  if (verdict.cancel.length > 0) {
+    parts.push(`huỷ ${verdict.cancel.length} lượt mã cũ (${verdict.cancel.map((r) => `#${r.number ?? r.id}`).join(", ")})`);
+  }
+  parts.push(dispatched ? "đã phát lượt mới" : "lượt mang mã mới đã nằm chờ sẵn");
+  return `khởi động lại: ${parts.join(", ")}`;
+}
 
 async function deployOne(station: Station): Promise<Outcome> {
   const slug = stationSlug(station);
@@ -501,7 +611,18 @@ async function deployOne(station: Station): Promise<Outcome> {
     const plan = planKhoiloiTree({ payload: localShas, remote, ownedPrefixes: OWNED_PREFIXES });
 
     if (plan.changed.length === 0 && plan.removed.length === 0) {
-      return { slug, state: "đã đúng bản", detail: `${workerId} · ${plan.unchanged} tệp khớp${idNote}` };
+      // Kho đã đúng bản VẪN có thể đang chạy mã cũ: mã trong kho là một chuyện, mã mà lượt Actions
+      // đang chạy đã checkout từ trước lại là chuyện khác. Đây chính là cảnh sau một lượt phát
+      // hành — và là lý do `--restart` phải chạy được cả trên nhánh này.
+      const note = restart
+        ? await restartRuns({ pat, base, branch, workflowFile: station.workflowFile, workerId, headSha: parentSha })
+        : undefined;
+      return {
+        slug,
+        state: "đã đúng bản",
+        detail: `${workerId} · ${plan.unchanged} tệp khớp${idNote}`,
+        restart: note,
+      };
     }
 
     const summary =
@@ -514,7 +635,12 @@ async function deployOne(station: Station): Promise<Outcome> {
     for (const path of plan.changed) console.log(`   ~ ${path}`);
     for (const path of plan.removed) console.log(`   - ${path} (XOÁ)`);
 
-    if (dryRun) return { slug, state: "kế hoạch", detail: summary };
+    if (dryRun) {
+      const note = restart
+        ? await restartRuns({ pat, base, branch, workflowFile: station.workflowFile, workerId, headSha: parentSha })
+        : undefined;
+      return { slug, state: "kế hoạch", detail: summary, restart: note };
+    }
 
     // 5.5 — Tải blob. Sha GitHub trả về phải khớp sha tính dưới máy: hai phép băm độc lập trên
     // cùng một nội dung, nên lệch nhau nghĩa là nội dung đã bị méo trên đường đi (base64 hỏng,
@@ -582,7 +708,13 @@ async function deployOne(station: Station): Promise<Outcome> {
       );
     }
 
-    return { slug, state: "đã đẩy", detail: `${summary} → ${commitSha.slice(0, 7)}` };
+    // Khởi động lại đứng SAU phép nghiệm thu và dùng chính commit vừa tạo làm mốc「mã mới」, nên
+    // nó không bao giờ huỷ nhầm một lượt chạy đã mang bản này.
+    const note = restart
+      ? await restartRuns({ pat, base, branch, workflowFile: station.workflowFile, workerId, headSha: commitSha })
+      : undefined;
+
+    return { slug, state: "đã đẩy", detail: `${summary} → ${commitSha.slice(0, 7)}`, restart: note };
   } catch (err) {
     if (err instanceof RepoError) return { slug, state: "HỎNG", detail: err.message };
     const detail = err instanceof Error ? `${err.name}: ${err.message.slice(0, 200)}` : "không có câu chữ";
@@ -608,15 +740,16 @@ console.log(`  gói     : commit ${headSha}`);
 for (const o of outcomes) {
   const mark = o.state === "HỎNG" ? "✗" : o.state === "đã đúng bản" ? "=" : dryRun ? "·" : "✔";
   console.log(`  ${mark} ${o.slug.padEnd(34)} ${o.state.padEnd(12)} ${o.detail}`);
+  if (o.restart) console.log(`      ↻ ${o.restart}`);
 }
 
 if (dryRun) {
   console.log("\n  --dry-run: KHÔNG đẩy gì cả. Bỏ cờ ấy để phát hành thật.");
-} else if (pushed.length > 0) {
+} else if (pushed.length > 0 && !restart) {
   console.log(
     `\n  ${pushed.length} kho đã nhận gói mới. Lượt chạy Actions ĐANG chạy vẫn dùng mã cũ của nó —\n` +
-      "  bản mới có hiệu lực ở lượt kế, tối đa ~4 giờ (lịch 0 */4 * * *). Huỷ lượt đang chạy để\n" +
-      "  nhanh hơn là cắt ngang đàn đang cày, nên script này cố ý không làm.",
+      "  bản mới có hiệu lực ở lượt kế, tối đa ~4 giờ (lịch 0 */4 * * *). Cần ngay thì thêm\n" +
+      "  --restart: nó huỷ lượt mang mã cũ, nhưng CHỪA khôi lỗi đang giữ đàn.",
   );
 }
 if (already.length > 0 && pushed.length === 0 && !dryRun) {

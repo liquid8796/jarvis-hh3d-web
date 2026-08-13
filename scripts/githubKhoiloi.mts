@@ -202,18 +202,95 @@ export function planKhoiloiTree(input: {
  * số — tất cả cùng bị bỏ qua, vì một `undefined` lọt xuống sẽ thành `POST /actions/runs/undefined/cancel`.
  */
 export function activeRunIds(body: unknown): number[] {
+  return activeRuns(body).map((run) => run.id);
+}
+
+/** Một lượt chạy CÒN SỐNG, kèm đúng thứ lượt khởi động lại cần biết. */
+export type ActiveRun = {
+  id: number;
+  /** Commit mà lượt ấy đã `checkout` — tức MÃ NÓ ĐANG CHẠY, không phải mã trong kho lúc này. */
+  headSha: string;
+  /** Số hiệu hiện trên giao diện Actions, chỉ để kể cho người đọc. */
+  number: number | null;
+};
+
+/**
+ * Như `activeRunIds` nhưng giữ lại `head_sha` — thứ trả lời câu hỏi của lượt KHỞI ĐỘNG LẠI:
+ * «lượt đang chạy này mang mã cũ hay mã vừa đẩy lên?».
+ *
+ * Phải hỏi bằng sha chứ không bằng thời điểm: một lượt chạy khởi động sau lượt phát hành vài giây
+ * vẫn có thể đã `checkout` commit cũ, còn một lượt khởi động từ lâu thì chắc chắn mang mã cũ. Sha
+ * là thứ duy nhất nói đúng, và GitHub khai sẵn nó.
+ *
+ * `activeRunIds` dựng trên chính hàm này để lượt XOÁ và lượt KHỞI ĐỘNG LẠI không bao giờ bất đồng
+ * về việc「lượt chạy nào còn sống」— cùng lẽ với việc `Evidence` chỉ có một bản.
+ */
+export function activeRuns(body: unknown): ActiveRun[] {
   const runs = (body as { workflow_runs?: unknown } | null)?.workflow_runs;
   if (!Array.isArray(runs)) return [];
 
-  const ids: number[] = [];
+  const out: ActiveRun[] = [];
   for (const run of runs) {
-    const id = (run as { id?: unknown } | null)?.id;
-    const status = (run as { status?: unknown } | null)?.status;
-    if (typeof status !== "string" || status === "completed") continue;
-    if (typeof id !== "number" || !Number.isFinite(id)) continue;
-    ids.push(id);
+    const row = run as { id?: unknown; status?: unknown; head_sha?: unknown; run_number?: unknown } | null;
+    if (typeof row?.status !== "string" || row.status === "completed") continue;
+    if (typeof row.id !== "number" || !Number.isFinite(row.id)) continue;
+    out.push({
+      id: row.id,
+      headSha: typeof row.head_sha === "string" ? row.head_sha : "",
+      number: typeof row.run_number === "number" ? row.run_number : null,
+    });
   }
-  return ids;
+  return out;
+}
+
+export type RestartVerdict = { go: true; cancel: ActiveRun[]; dispatch: boolean } | { go: false; message: string };
+
+/**
+ * Có được phép khởi động lại khôi lỗi này không, và phải huỷ những lượt nào.
+ *
+ * BA LUẬT, và luật đầu là luật đắt nhất:
+ *
+ * 1. **Đang giữ đàn thì KHÔNG huỷ** (trừ `--force`). Huỷ một lượt Actions là giết runner tức
+ *    khắc — GitHub cho tiến trình vài giây rồi SIGKILL, không đủ cho một pha thu đàn 50 phút.
+ *    Nhịp tim tắt, `reapStaleJobs` kết liễu đàn ấy thành `failed` sau 3 phút, và người mất một
+ *    vòng cày là một đạo hữu nào đó chứ không phải người đang gõ lệnh. Cùng hàng rào với luật 2
+ *    của `reviewRemoval`.
+ *
+ * 2. **Chỉ huỷ lượt mang mã CŨ.** Lượt đã `checkout` đúng commit vừa đẩy thì huỷ nó là tự phá
+ *    việc mình vừa làm — nó chính là thứ ta muốn có.
+ *
+ * 3. **Không phát lượt mới nếu đã có lượt mang mã mới đang chờ.** GitHub tự xếp lịch, và
+ *    `concurrency` giữ đúng một lượt chạy + một lượt chờ; nhét thêm một lượt dispatch vào đó chỉ
+ *    tổ đốt quỹ phút của người ta cho một lượt sẽ bị đẩy ra khỏi hàng.
+ */
+export function reviewRestart(input: {
+  runs: readonly ActiveRun[];
+  /** Sha mà nhánh mặc định của kho đang trỏ tới — tức mã lượt chạy MỚI sẽ nhận. */
+  headSha: string;
+  /** Số đàn `running`/`stopping` khôi lỗi này đang giữ. */
+  heldJobs: number;
+  force: boolean;
+  workerId: string;
+}): RestartVerdict {
+  const stale = input.runs.filter((run) => run.headSha !== input.headSha);
+  const fresh = input.runs.filter((run) => run.headSha === input.headSha);
+
+  if (stale.length > 0 && input.heldJobs > 0 && !input.force) {
+    return {
+      go: false,
+      message:
+        `đang giữ ${input.heldJobs} đàn — KHÔNG huỷ. Huỷ lượt Actions là giết runner tức khắc, ` +
+        `rồi reapStaleJobs kết liễu ${input.heldJobs === 1 ? "đàn ấy" : "những đàn ấy"} sau 3 phút. ` +
+        `Chờ nó cày xong, hoặc chạy lại với --force nếu chấp nhận cái giá ấy.`,
+    };
+  }
+
+  // Không có gì cũ để huỷ VÀ đã có lượt mang mã mới → đứng yên là đúng.
+  if (stale.length === 0 && fresh.length > 0) {
+    return { go: true, cancel: [], dispatch: false };
+  }
+
+  return { go: true, cancel: stale, dispatch: fresh.length === 0 };
 }
 
 /**

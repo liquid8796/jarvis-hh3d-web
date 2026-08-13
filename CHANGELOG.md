@@ -11,6 +11,39 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.82.5 — vòng canh sổ điểm danh được CHẠY THẬT, không chỉ được lý luận
+
+Bản 0.82.3 dựng vòng canh và đóng đinh LUẬT của nó bằng đồng hồ giả. Nhưng nó đóng đinh đúng cái
+phần vốn đã đúng: `judgeRosterPurge` là một hàm thuần, và hàm thuần hiếm khi là chỗ hỏng. Chỗ chưa
+ai chạy thử là ĐOẠN DÂY nối luật ấy với database — câu SQL, phép ghi sổ `lastBeat`, phép cộng một
+quãng do Postgres đo với một quãng đo bằng `Date.now()`. Một cái luật đúng nối bằng một sợi dây
+sai thì vẫn đẻ ra đúng cái dòng ma của ngày 13/08.
+
+Nay có `npm run verify:roster-purge`: bốn ca, chạy trên database THẬT, với một **runner giả gõ cửa
+bằng chính câu `insert … on conflict do update` của `recordWorkerSeen`**. Không mock cái gì cả —
+chính sự tranh chấp giữa hai lượt ghi mới là thứ phải kiểm. Ca quan trọng nhất dựng lại nguyên cảnh
+13/08, và đo được: **6 lượt xoá, 5 lượt hồi sinh, rồi dòng biến mất thật.** Trước bản 0.82.3, cùng
+kịch bản ấy để lại một dòng ma vĩnh viễn.
+
+Ba ca còn lại khoá ba biên: xác nguội xong ngay ở lượt soi đầu (1,3 giây — không ngồi đợi hết cửa
+sổ); sổ chưa có dòng nào thì VẪN canh trọn cửa sổ (một runner vừa khởi động có thể điểm danh muộn);
+và một máy gõ cửa không bao giờ ngừng thì dừng đúng hạn ngân sách chứ không treo.
+
+**Để có phép kiểm ấy, vòng canh phải rời `removeGithubKhoiloi.mts` sang `rosterPurge.mts`.** Tệp
+kia gọi `main()` ngay khi được nhập, nên mọi thứ sống trong nó là thứ KHÔNG phép kiểm nào với tới
+được: nhập vào để thử một hàm là khởi động luôn một công cụ xoá kho. Đây không phải chia tệp cho
+gọn — đây là cái giá để một đoạn mã trở nên kiểm được, và nó đáng trả ở đúng đoạn mã mà lần trước
+ta chỉ có thể lý luận về nó.
+
+**Đồng hồ rút gọn, và nói thẳng nó KHÔNG kiểm cái gì.** 30 giây yên cộng 3 phút ngân sách, nhân bốn
+ca, là hơn năm phút — một phép kiểm không ai chạy lần thứ hai. `PurgeTiming` truyền vào được để bốn
+ca gói trong mươi giây; còn bốn con số thật thì vẫn do `verify:github-removal` giữ, gồm cả quan hệ
+giữa chúng. Cái cửa ấy mở cho đúng một người dùng, và bình chú ở `PRODUCTION_TIMING` nói rõ thế —
+một tham số「để chỉnh cho vừa ý」là cách một hằng số đã cân nhắc bị mài mòn dần.
+
+Dòng tạm mang tiền tố `__purge_` và bị dọn trong `finally`, kể cả khi một ca ngã giữa chừng — cùng
+lối với `__quota_` của `verify:daily-quota`.
+
 ## 0.82.4 — một dòng keyring đã chết phủ quyết được một PAT còn tốt, và chặn cả lượt dựng kho
 
 `npm run github:new` chết ở bước dựng kho (mã 1) với câu「`gh` chưa cài hoặc chưa đăng nhập」kèm lời

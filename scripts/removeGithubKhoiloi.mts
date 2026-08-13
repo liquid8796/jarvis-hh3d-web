@@ -68,15 +68,13 @@ import {
   chooseTarget,
   describeCandidate,
   describeEvidence,
-  judgeRosterPurge,
   looksLikeKhoiloiRepoName,
   reviewRemoval,
   workerIdFromWorkflow,
-  PURGE_GAP_MS,
-  PURGE_SETTLE_MS,
   type Candidate,
 } from "./githubKhoiloi.mts";
 import { loadEnv } from "./loadEnv.mjs";
+import { purgeRosterRow } from "./rosterPurge.mts";
 
 loadEnv();
 
@@ -96,8 +94,6 @@ const MAX_REPO_PAGES = 5;
  * mỗi ngày (nối ca 4 giờ + một commit nuôi kho), tức trang đầu ôm trọn nửa tháng.
  */
 const RUNS_PAGE_SIZE = 100;
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Lời từ chối của script này — ném chứ không `process.exit` (xem ghi chú đầu tệp), và mang một
@@ -265,113 +261,6 @@ async function cancelActiveRuns(pat: string, login: string, repo: string): Promi
     return;
   }
   console.log(`✔ đã gửi lệnh huỷ cho ${sent}/${ids.length} lượt chạy Actions — runner dừng trong vài giây.`);
-}
-
-/**
- * GỠ DÒNG ĐIỂM DANH, RỒI CANH CHO TỚI KHI NÓ CHỊU NẰM IM. Luật của vòng nằm ở `judgeRosterPurge`
- * (thuần, `verify:github-removal` bao từng nhánh); ở đây chỉ có phần chạm database và đồng hồ.
- *
- * KHÔNG NÉM, DÙ HỎNG THẾ NÀO. Kho và sổ — hai thứ có hậu quả thật — đã xong trước khi tới đây, và
- * một dòng `workers` sót lại chỉ gây đúng hai phiền phức nhỏ: một dòng ma trong tab Khôi Lỗi, và
- * `github:new` từ chối dựng lại một khôi lỗi TRÙNG ID (mà id thì mang mốc thời gian, nên trùng
- * gần như không xảy ra). Nói ra rồi đi tiếp thì đúng hơn là ném ở dòng cuối cùng của một công cụ
- * xoá — người vận hành đọc một stack trace ở đó sẽ tưởng cả lượt dọn đã hỏng.
- *
- * `automation_jobs.worker_id` KHÔNG có khoá ngoại trỏ vào bảng này (cột text trơn), nên xoá ở đây
- * không đụng tới một dòng đàn nào — lịch sử vẫn giữ nguyên tên máy đã cày nó.
- */
-async function purgeRosterRow(activePg: string, workerId: string): Promise<void> {
-  const sql = neon(activePg);
-  const startedAt = Date.now();
-  /** Quãng im do CHÍNH database đo, kèm mốc cục bộ lúc đo. `null` = chưa lượt soi nào thấy dòng. */
-  let lastBeat: { quietMs: number; measuredAt: number } | null = null;
-  let purges = 0;
-  let resurrections = 0;
-
-  console.log(
-    `\n• Gỡ dòng điểm danh「${workerId}」rồi canh tới ${PURGE_SETTLE_MS / 1000} giây im lặng —\n` +
-      "  một runner vừa mất kho còn thoi thóp được một lúc, và nó sẽ tự ghi lại tên nếu ta đi sớm.",
-  );
-
-  for (;;) {
-    let seenQuietMs: number | null;
-    try {
-      /**
-       * ĐO QUÃNG IM BẰNG ĐỒNG HỒ CỦA DATABASE. `last_seen` do `now()` bên ấy đặt, nên đem nó trừ
-       * vào `Date.now()` của máy này là lệch đúng bằng độ lệch hai đồng hồ — một cái laptop chạy
-       * nhanh 40 giây sẽ tuyên bố「đã im 30 giây」cho một dòng vừa gõ cửa xong.
-       *
-       * Trả về GIÂY chứ không phải mili: `::int` chỉ ôm được ~24 ngày nếu tính bằng mili, mà sổ
-       * điểm danh thì giữ dòng vĩnh viễn — một dòng nằm đó ba tháng sẽ làm câu này ném
-       *「integer out of range」ngay giữa lượt dọn.
-       */
-      const rows = (await sql`
-        select round(extract(epoch from (now() - last_seen)))::int as quiet_s
-        from workers where id = ${workerId}
-      `) as { quiet_s: number | null }[];
-      seenQuietMs = rows.length > 0 ? (rows[0]?.quiet_s ?? 0) * 1000 : null;
-    } catch (err) {
-      console.warn(
-        `⚠ Không soi được sổ điểm danh (${err instanceof Error ? err.message.slice(0, 120) : "lỗi lạ"}).\n` +
-          `  Dừng canh. Nếu「${workerId}」còn hiện ở Hàng Đợi → tab Khôi Lỗi thì gỡ tay.`,
-      );
-      return;
-    }
-
-    if (seenQuietMs !== null) {
-      lastBeat = { quietMs: seenQuietMs, measuredAt: Date.now() };
-      if (purges > 0) resurrections += 1;
-    }
-
-    const now = Date.now();
-    // Cộng hai KHOẢNG thời gian thì không cần chung đồng hồ: quãng im database đo được, cộng
-    // quãng đã trôi kể từ lượt đo ấy. Chưa từng thấy dòng nào thì tính từ lúc bắt đầu canh.
-    const quietMs = lastBeat === null ? now - startedAt : lastBeat.quietMs + (now - lastBeat.measuredAt);
-    const verdict = judgeRosterPurge({
-      rowPresent: seenQuietMs !== null,
-      quietMs,
-      spentMs: now - startedAt,
-    });
-
-    if (verdict.kind === "settled") {
-      if (purges === 0) {
-        console.log(`✔ sổ điểm danh không có dòng nào của「${workerId}」— không phải gỡ gì.`);
-      } else if (resurrections === 0) {
-        console.log(`✔ sổ điểm danh sạch —「${workerId}」không mọc lại.`);
-      } else {
-        console.log(
-          `✔ sổ điểm danh sạch — đã phải gỡ ${purges} lần (${resurrections} lượt hồi sinh),` +
-            ` runner tắt hẳn sau ~${Math.round((now - startedAt) / 1000)} giây.`,
-        );
-      }
-      return;
-    }
-
-    if (verdict.kind === "giveup") {
-      console.warn(`\n⚠ ${verdict.message}`);
-      return;
-    }
-
-    if (verdict.kind === "purge") {
-      try {
-        await sql`delete from workers where id = ${workerId}`;
-      } catch (err) {
-        console.warn(
-          `⚠ Không gỡ được「${workerId}」khỏi bảng workers (${err instanceof Error ? err.message.slice(0, 120) : "lỗi lạ"}).\n` +
-            "  Vô hại, trừ một chuyện: github:new sẽ từ chối dựng lại một khôi lỗi trùng id ấy.",
-        );
-        return;
-      }
-      purges += 1;
-      if (purges === 1) console.log(`✔ đã gỡ「${workerId}」khỏi sổ điểm danh`);
-      else console.log(`  ↺ nó vừa tự ghi lại tên — gỡ lần ${purges}, runner còn thoi thóp.`);
-      // Soi lại gần như ngay, nhưng qua một cái sàn — lý do ở `PURGE_GAP_MS`.
-      await sleep(PURGE_GAP_MS);
-      continue;
-    }
-
-    await sleep(verdict.ms);
-  }
 }
 
 async function main(): Promise<void> {
@@ -793,7 +682,7 @@ async function main(): Promise<void> {
    * có gì để canh — bỏ qua, đúng như trước.
    */
   if (target.workerId && (workerRowExists || target.onGithub)) {
-    await purgeRosterRow(activePg, target.workerId);
+    await purgeRosterRow({ activePg, workerId: target.workerId });
   }
 
   console.log(

@@ -160,6 +160,33 @@ export const PURGE_GAP_MS = 250;
  */
 export const PURGE_BUDGET_MS = 180_000;
 
+export type PurgeTiming = {
+  settleMs: number;
+  pollMs: number;
+  gapMs: number;
+  budgetMs: number;
+};
+
+/**
+ * Bốn con số thật, gói lại thành một thứ TRUYỀN VÀO ĐƯỢC — và cái cửa ấy mở ra vì đúng một lý do,
+ * nói thẳng ở đây để không ai tưởng nó là chỗ để chỉnh cho vừa ý.
+ *
+ * Phần chưa được kiểm của vòng canh không phải bốn con số (chúng đã bị `verify:github-removal`
+ * đóng đinh bằng đồng hồ giả) mà là ĐOẠN DÂY nối chúng với database: phép ghi sổ `lastBeat`, phép
+ * cộng hai quãng đo bằng hai đồng hồ, phép xử từng phán quyết. Muốn chạy đoạn dây ấy trên một
+ * database thật thì phải chạy nó cho tới lúc YÊN — mà với 30 giây yên và 3 phút ngân sách thì bốn
+ * ca kiểm là hơn năm phút, tức một phép kiểm không ai chạy lần thứ hai.
+ *
+ * Nên `verify:roster-purge` ép cùng đoạn dây ấy qua một đồng hồ rút gọn. Nó KHÔNG kiểm bốn con số
+ * dưới đây — chỗ ấy đã có phép kiểm riêng — nó kiểm rằng cái vòng dùng chúng đúng cách.
+ */
+export const PRODUCTION_TIMING: PurgeTiming = {
+  settleMs: PURGE_SETTLE_MS,
+  pollMs: PURGE_POLL_MS,
+  gapMs: PURGE_GAP_MS,
+  budgetMs: PURGE_BUDGET_MS,
+};
+
 export type PurgeVerdict =
   /** Sổ đã sạch và chịu nằm im — xong. */
   | { kind: "settled" }
@@ -186,12 +213,15 @@ export function judgeRosterPurge(input: {
   quietMs: number;
   /** Đã canh bao lâu, tính từ lúc vào vòng. */
   spentMs: number;
+  /** Vắng mặt = đồng hồ thật. Chỉ `verify:roster-purge` truyền vào — xem `PRODUCTION_TIMING`. */
+  timing?: PurgeTiming;
 }): PurgeVerdict {
   const { rowPresent, quietMs, spentMs } = input;
+  const { settleMs, pollMs, budgetMs } = input.timing ?? PRODUCTION_TIMING;
 
-  if (!rowPresent && quietMs >= PURGE_SETTLE_MS) return { kind: "settled" };
+  if (!rowPresent && quietMs >= settleMs) return { kind: "settled" };
 
-  if (spentMs >= PURGE_BUDGET_MS) {
+  if (spentMs >= budgetMs) {
     return {
       kind: "giveup",
       message:
@@ -212,7 +242,7 @@ export function judgeRosterPurge(input: {
    * hồi sinh ở giây thứ hai cũng phải đợi hết quãng ấy mới bị phát hiện, và trong quãng đó ngân
    * sách vẫn trôi. Cả hai vế đều dương nên không có đường nào ra số âm.
    */
-  return { kind: "wait", ms: Math.min(PURGE_POLL_MS, PURGE_SETTLE_MS - quietMs) };
+  return { kind: "wait", ms: Math.min(pollMs, settleMs - quietMs) };
 }
 
 export type Choice = { ok: true; target: Candidate } | { ok: false; message: string };

@@ -51,6 +51,7 @@ import {
   STORE_REGION,
   STORE_SPECS_SHARED,
   tokenEnvNameFor,
+  upsertEnvLine,
   validateSiteId,
   type Book,
   type ProjectEnvVar,
@@ -231,10 +232,27 @@ function resolveToken(): string {
     die(`.env.local đã có ${tokenEnvName} với giá trị KHÁC. Sửa hoặc xoá dòng ấy rồi chạy lại — không ghi đè im lặng.`);
   }
   if (!stored && !dryRun) {
-    let text = readFileSync(ENV_FILE, "utf8");
-    if (!text.endsWith("\n")) text += "\n";
-    writeFileSync(ENV_FILE, `${text}${tokenEnvName}=${fresh}\n`);
-    console.log(`• Đã cất token vào .env.local dưới tên ${tokenEnvName}`);
+    /**
+     * `.env.local` có thể CHƯA tồn tại — máy mới, hoặc người vận hành mới chỉ chạy
+     * `vercel env pull .env` (không có `.local`). Bản trước gọi thẳng `readFileSync` nên ca ấy
+     * chết bằng một stack ENOENT trần, ở một script mà phần lớn người dùng khởi động bằng cách
+     * bấm đúp một tệp .bat. Coi như tệp rỗng và tạo mới; mọi lỗi đọc KHÁC vẫn ném nguyên.
+     */
+    let text = "";
+    try {
+      text = readFileSync(ENV_FILE, "utf8");
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    }
+    const next = upsertEnvLine(text, tokenEnvName, fresh);
+    writeFileSync(ENV_FILE, next.text);
+    // `replaced` ở đây chỉ có một nghĩa: đã có sẵn một dòng cùng khoá nhưng GIÁ TRỊ RỖNG (giá trị
+    // khác rỗng đã bị chặn ở nhánh `stored !== fresh` bên trên). Nói ra để người đọc log biết tệp
+    // vừa bị sửa chứ không chỉ được nối thêm.
+    console.log(
+      `• Đã cất token vào .env.local dưới tên ${tokenEnvName}` +
+        (next.replaced ? " (thay một dòng cùng tên đang bỏ trống)" : ""),
+    );
   }
   return fresh;
 }
@@ -519,6 +537,26 @@ try {
       url: stationUrl,
       pg: encryptSecret(pgUrl),
       mongo: encryptSecret(mongoUri),
+      /**
+       * TOKEN CỦA TÀI KHOẢN GIỮ TRẠM NÀY, phong bì secretBox — cùng dạng `pg`/`mongo`, và cùng
+       * dạng mà form Gương Trạm ghi (`actions/mirrors.ts`: `vercelToken ? encryptSecret(…) : ""`).
+       *
+       * Thiếu dòng này cho tới 13/08/2026, và cái giá thì đo được: bốn trong năm trạm không có
+       * token ở đâu cả. Token chỉ nằm trong `.env.local` của MỘT cái máy — máy nào vừa chạy
+       * `mirror:new` cho trạm ấy. Đổi máy, cài lại Windows, hay đơn giản là dựng trạm thứ hai từ
+       * một máy khác, thì trạm cũ thành trạm không còn chìa: `deploy:all` báo「Không tài khoản nào
+       * có project…」và không có đường nào lấy lại ngoài việc vào Vercel tạo token mới.
+       *
+       * Sổ là đúng chỗ cho nó, và schema đã lập luận sẵn (`services/settings.ts`): token thuộc về
+       * một TÀI KHOẢN VERCEL KHÁC, nên rải vào env của deployment nghĩa là mỗi trạm phải ôm token
+       * của mọi trạm còn lại. Sổ thì đã mã hoá, và đã đi theo mọi lượt đồng bộ — nên đây cũng
+       * chính là đường token về tới database của CHÍNH trạm này: qua lượt sync, không phải bằng
+       * một lượt ghi thẳng vào trạm dự phòng (thứ sẽ bị đè ở lượt chuyển trạm kế tiếp).
+       *
+       * Ai đọc: tab Gương Trạm dùng nó gọi `/v2/usage`; `mirrorsForAdmin` chỉ phơi ra
+       * `hasVercelToken` chứ không bao giờ trả giá trị về trình duyệt.
+       */
+      vercelToken: encryptSecret(token),
       lastProbeAt: new Date().toISOString(),
       lastProbeOk: null,
       lastProbeNote: `PG ✔ (${counted[0].n} migration) · ${mongoNote}`,
@@ -530,6 +568,9 @@ try {
   );
   console.log(`✔ đã ghi vào sổ ở trạm hoạt động「${doc.activeSiteId}」— sổ giờ ${mirrors.length} trạm`);
   console.log(`  ${mongoNote}`);
+  // Nói đúng ai đọc được nó, không hứa quá: `deployAllStations` hiện chỉ nhặt token từ env, nên
+  // đường phát hành vẫn dựa vào dòng trong `.env.local` — sổ là bản sao sống sót khi máy này mất.
+  console.log(`  token đã vào sổ (phong bì secretBox) — tab Gương Trạm đọc được usage của trạm này`);
 } finally {
   // Thư mục tạm có .env.check chứa BÍ MẬT PRODUCTION — phải cố xoá, và không được để việc dọn
   // rác giết mất phần tổng kết (EPERM trên Windows, xem deployAllStations.mts).

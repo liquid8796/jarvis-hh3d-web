@@ -133,6 +133,65 @@ export function tokenEnvNameFor(siteId: string): string {
 }
 
 /**
+ * Ghi `KEY=value` vào NỘI DUNG một tệp .env — THAY dòng cũ nếu khoá đã có, chỉ thêm khi chưa có.
+ *
+ * Thuần (nhận chuỗi, trả chuỗi) để `verify:deploy-targets` đóng đinh được mà không chạm đĩa.
+ *
+ * VÌ SAO KHÔNG CHỈ NỐI THÊM MỘT DÒNG, cách mà `newMirrorStation` làm cho tới 13/08/2026: phép
+ * kiểm「đã có token chưa」đọc `process.env[tên]`, mà `loadEnv` đặt biến ấy kể cả khi giá trị
+ * RỖNG. Một dòng `VERCEL_TOKEN_X=` bỏ dở trong `.env.local` vì thế đọc ra chuỗi rỗng — falsy —
+ * nên script kết luận là chưa có rồi nối thêm dòng thứ hai cùng khoá. Và `loadEnv` lấy dòng ĐẦU
+ * (`if (!(key in process.env))`), tức dòng rỗng thắng vĩnh viễn: token nằm ngay trong tệp mà mọi
+ * lượt phát hành vẫn báo「chưa khai token nào」. Không có dòng đỏ nào ở giữa.
+ *
+ * Nên phép này THAY dòng đầu tiên mang khoá ấy — đúng dòng mà `loadEnv` sẽ đọc — và không bao
+ * giờ sinh ra khoá trùng.
+ *
+ * Cách tách khoá phải KHỚP `loadEnv`: bỏ dòng trống và dòng `#`, khoá là phần trước dấu `=` đầu
+ * tiên, đã trim. Lệch một chỗ là hàm này sửa một dòng khác dòng mà `loadEnv` đọc.
+ *
+ * Cắt bằng `"\n"` chứ không phải `/\r?\n/` để giữ NGUYÊN xuống dòng của mọi dòng không đụng tới:
+ * `.env.local` do `vercel env pull` sinh ra, và viết lại cả tệp theo kiểu khác là một khác biệt
+ * ồn ào trong một tệp người ta hay mở ra đọc.
+ */
+export function upsertEnvLine(
+  text: string,
+  key: string,
+  value: string,
+): { text: string; replaced: boolean } {
+  /**
+   * Chặn ở đây vì đây là RANH GIỚI TIN CẬY: tệp sắp bị ghi cũng đang giữ `DATABASE_URL` và
+   * `ENCRYPTION_KEY`. Một giá trị lẫn xuống dòng không làm hàm này ném — nó lặng lẽ chèn một
+   * dòng khai báo giả vào giữa tệp, và thứ hỏng sẽ là một biến khác, ở một lượt chạy khác.
+   * Token Vercel hôm nay không thể chứa ký tự ấy; hàm thì phải đứng vững cả với người gọi sau.
+   */
+  if (key.length === 0 || /[\r\n=]/.test(key)) {
+    throw new Error(`Tên biến env không hợp lệ: ${JSON.stringify(key)}`);
+  }
+  if (/[\r\n]/.test(value)) {
+    throw new Error(`Giá trị của ${key} có ký tự xuống dòng — từ chối ghi, tệp .env sẽ hỏng.`);
+  }
+
+  const lines = text.split("\n");
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const raw = lines[i];
+    const trimmed = raw.trim();
+    if (trimmed.length === 0 || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq < 1) continue;
+    if (trimmed.slice(0, eq).trim() !== key) continue;
+
+    // Giữ lại `\r` của chính dòng ấy nếu tệp đang dùng CRLF.
+    lines[i] = raw.endsWith("\r") ? `${key}=${value}\r` : `${key}=${value}`;
+    return { text: lines.join("\n"), replaced: true };
+  }
+
+  const body = text.length === 0 || text.endsWith("\n") ? text : `${text}\n`;
+  return { text: `${body}${key}=${value}\n`, replaced: false };
+}
+
+/**
  * Mọi token Vercel khai trong env, theo thứ tự tất định.
  *
  * Thêm một tài khoản = thêm một biến `VERCEL_TOKEN_<TÊN>`; không phải sửa mã. Đây là mở rộng

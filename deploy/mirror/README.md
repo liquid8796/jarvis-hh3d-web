@@ -288,9 +288,21 @@ Nó hỏi hai câu — mã trạm và token của tài khoản Vercel — rồi 
 kho free, chép bí mật chung, đặt `SITE_ID`, chạy migration, ghi vào sổ ở đúng trạm hoạt động.
 Xong thì bấm `deploy-all-stations.bat` và bấm「Kiểm mạch」trên admin. Hết.
 
-Token gõ ở chế độ ẩn rồi được cất vào `.env.local` dưới cái tên suy từ mã trạm
-(`auto-hh3d-3` → `VERCEL_TOKEN_AUTO_HH3D_3`) — nên `deploy:all` nhặt được ngay, không phải khai
-thêm ở đâu. Muốn xem trước mà chưa tạo gì: `npm run mirror:new -- --site auto-hh3d-3 --dry-run`.
+Token gõ ở chế độ ẩn rồi được cất vào **hai chỗ**, và cả hai đều cần:
+
+| Chỗ | Dạng | Ai đọc |
+|---|---|---|
+| `.env.local` dưới tên suy từ mã trạm (`auto-hh3d-3` → `VERCEL_TOKEN_AUTO_HH3D_3`) | chữ trần, tệp đã gitignore | `deploy:all` |
+| Sổ gương, trường `vercelToken` của chính trạm ấy | phong bì secretBox | tab Gương Trạm (đọc usage) |
+
+Bản sao trong sổ thêm vào 13/08/2026, và nó chữa một lỗ có thật: trước đó token chỉ nằm ở
+`.env.local` của **một cái máy** — máy nào vừa chạy `mirror:new` cho trạm ấy. Đo được ngày ấy:
+bốn trong năm trạm không có token ở đâu cả, nên `deploy:all` báo「Không tài khoản nào có
+project…」và không có đường lấy lại ngoài việc vào Vercel tạo token mới. Sổ thì đã mã hoá sẵn và
+đi theo mọi lượt đồng bộ — nên nó cũng là đường token về tới database của chính trạm ấy.
+
+Muốn xem trước mà chưa tạo gì: `npm run mirror:new -- --site auto-hh3d-3 --dry-run` (lượt chạy
+khô KHÔNG ghi vào `.env.local`, đã đo bằng cách so mã băm tệp trước/sau).
 
 **Chuẩn bị đúng MỘT thứ bằng tay:** tài khoản Vercel phải có **team**, và team ấy phải **đã cài
 Neon + MongoDB Atlas**. Lần đầu cài một integration đòi chấp thuận điều khoản pháp lý, và Vercel

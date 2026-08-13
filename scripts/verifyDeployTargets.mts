@@ -20,6 +20,7 @@ import {
   STORE_SPECS_SHARED,
   STORE_NAME_LENGTH,
   tokenEnvNameFor,
+  upsertEnvLine,
   validateSiteId,
   type ProjectRef,
 } from "./deployTargets.mts";
@@ -354,6 +355,70 @@ function ok(condition: boolean, label: string): void {
     "auto-hh3d-1",
   );
   ok(rac.cuaRieng.length === 0 && rac.moCoi.length === 2, "kho thiếu/rỗng metadata rơi vào mồ côi, không vào nhóm xoá");
+}
+
+// ───────── upsertEnvLine — ghi token vào .env.local mà KHÔNG sinh khoá trùng ─────────
+//
+// Đáng kiểm vì cả hai kiểu hỏng đều IM LẶNG. Sinh khoá trùng thì `loadEnv` lấy dòng ĐẦU, nên một
+// dòng rỗng bỏ quên sẽ thắng vĩnh viễn và mọi lượt phát hành báo「chưa khai token nào」dù token
+// nằm ngay trong tệp. Sửa nhầm dòng thì ghi đè một bí mật KHÁC — và `.env.local` giữ cả
+// DATABASE_URL lẫn ENCRYPTION_KEY.
+{
+  const KEY = "VERCEL_TOKEN_AUTO_HH3D_3";
+
+  const empty = upsertEnvLine("", KEY, "vcp_1");
+  ok(empty.text === `${KEY}=vcp_1\n` && !empty.replaced, "tệp rỗng → tạo đúng một dòng, kết bằng xuống dòng");
+
+  const noEol = upsertEnvLine("A=1", KEY, "vcp_1");
+  ok(noEol.text === `A=1\n${KEY}=vcp_1\n`, "tệp không kết bằng xuống dòng vẫn không dính hai dòng vào nhau");
+
+  const appended = upsertEnvLine("A=1\nB=2\n", KEY, "vcp_1");
+  ok(appended.text === `A=1\nB=2\n${KEY}=vcp_1\n` && !appended.replaced, "khoá chưa có → nối thêm, giữ nguyên phần trên");
+
+  // ĐÂY LÀ CA SINH RA CẢ HÀM NÀY: một dòng cùng khoá đang bỏ trống.
+  const filled = upsertEnvLine(`A=1\n${KEY}=\nB=2\n`, KEY, "vcp_1");
+  ok(filled.replaced, "dòng cùng khoá đang rỗng phải được NHẬN RA, không phải bỏ qua");
+  ok(filled.text === `A=1\n${KEY}=vcp_1\nB=2\n`, "thay tại chỗ, không đổi thứ tự dòng");
+  ok(filled.text.split("\n").filter((l) => l.startsWith(`${KEY}=`)).length === 1, "KHÔNG BAO GIỜ sinh khoá trùng");
+
+  // `loadEnv` lấy dòng ĐẦU, nên phải sửa đúng dòng ấy — sửa dòng sau là sửa thứ không ai đọc.
+  const dup = upsertEnvLine(`${KEY}=\n${KEY}=cu\n`, KEY, "vcp_1");
+  ok(dup.text === `${KEY}=vcp_1\n${KEY}=cu\n`, "có sẵn khoá trùng thì sửa dòng ĐẦU — đúng dòng loadEnv đọc");
+
+  const crlf = upsertEnvLine(`A=1\r\n${KEY}=\r\nB=2\r\n`, KEY, "vcp_1");
+  ok(crlf.text === `A=1\r\n${KEY}=vcp_1\r\nB=2\r\n`, "tệp CRLF giữ nguyên CRLF ở mọi dòng, kể cả dòng vừa sửa");
+
+  const commented = upsertEnvLine(`# ${KEY}=cu\n`, KEY, "vcp_1");
+  ok(commented.text === `# ${KEY}=cu\n${KEY}=vcp_1\n`, "dòng bị comment KHÔNG phải một khai báo — không sửa vào đó");
+
+  // Lệ đặt tên `auto-hh3d-<số>` khiến hai tên này nằm sát nhau tới mức một phép `startsWith` sẽ nuốt cả hai.
+  const prefix = upsertEnvLine("VERCEL_TOKEN_AUTO_HH3D=vcp_goc\n", "VERCEL_TOKEN_AUTO_HH3D_3", "vcp_3");
+  ok(
+    prefix.text === "VERCEL_TOKEN_AUTO_HH3D=vcp_goc\nVERCEL_TOKEN_AUTO_HH3D_3=vcp_3\n",
+    "khoá khớp TUYỆT ĐỐI: token của trạm gốc không bị token của trạm 3 ghi đè",
+  );
+
+  const spaced = upsertEnvLine(`  ${KEY} = cu \n`, KEY, "vcp_1");
+  ok(spaced.text === `${KEY}=vcp_1\n`, "khoá có khoảng trắng bao quanh vẫn là khoá ấy — khớp cách loadEnv trim");
+
+  // Đường thật: tên biến do `tokenEnvNameFor` sinh ra phải được chính hàm này nhận lại được.
+  const real = tokenEnvNameFor("auto-hh3d-9");
+  ok(upsertEnvLine(upsertEnvLine("", real, "a").text, real, "b").text === `${real}=b\n`, "ghi hai lượt liên tiếp không đẻ dòng thứ hai");
+
+  // Ranh giới tin cậy: tệp sắp ghi cũng giữ DATABASE_URL và ENCRYPTION_KEY, nên một giá trị lẫn
+  // xuống dòng phải NÉM chứ không được chèn lặng lẽ một khai báo giả vào giữa tệp.
+  const nem = (fn: () => unknown): boolean => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  ok(nem(() => upsertEnvLine("A=1\n", KEY, "vcp\nDATABASE_URL=cua-ke-gian")), "giá trị có xuống dòng → ném, không ghi");
+  ok(nem(() => upsertEnvLine("A=1\n", KEY, "vcp\rx")), "giá trị có ký tự CR → ném");
+  ok(nem(() => upsertEnvLine("A=1\n", "", "vcp_1")), "tên biến rỗng → ném");
+  ok(nem(() => upsertEnvLine("A=1\n", "A=B", "vcp_1")), "tên biến lẫn dấu = → ném, bằng không nó khai ra hai khoá");
 }
 
 console.log(`\nTất cả ${passed} phép kiểm đều thuận.`);

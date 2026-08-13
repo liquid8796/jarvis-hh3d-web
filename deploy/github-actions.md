@@ -244,6 +244,15 @@ PAT nguy hiểm hơn cookie game một bậc: cookie mở một tài khoản gam
 kho đang chạy khôi lỗi. Nên nó lưu bằng `secretBox` (`ENCRYPTION_KEY`) y như cookie, và quyền quản
 là **mã riêng chỉ Gia chủ** — không dùng lại `admin.panel`, cũng không dùng lại `site.switch`.
 
+**Đọc lại được PAT đã ghi (13/08/2026).** GitHub không cho xem lại token đã phát, nên sổ này là bản
+duy nhất còn giữ nó — mà cùng cái PAT ấy còn phải dán tay vào Actions secret của kho, vào một lượt
+`github:remove`, hay vào lượt dựng kho thứ hai của cùng tài khoản. Nút **「Hiện PAT để chép」** trong
+form Sửa kho gọi `revealGithubStationPatAction`: gác đúng `github_station.manage`, mở đúng **một**
+slug mỗi lượt, và chỉ chạy khi có người bấm. Thứ KHÔNG đổi là `viewOf` — `StationView` vẫn không
+mang phong bì, nên mở tab admin vẫn không kéo PAT nào xuống trình duyệt. Bản rõ hiện ra **ngoài**
+ô nhập: ô ấy để trống mới đúng nghĩa「giữ PAT cũ」, và đổ token vào đó nghĩa là lượt bấm「Cập nhật
+kho」kế tiếp sẽ đẩy ngược chính bí mật vừa xem lên máy chủ để mã hoá lại mà chẳng được gì.
+
 ### Thêm một kho: bấm đúp `new-github-khoiloi.bat`
 
 Nó hỏi đúng MỘT thứ — PAT của tài khoản GitHub sẽ giữ kho — rồi làm trọn: suy tên tài khoản từ

@@ -11,6 +11,37 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.82.2 — PAT trong sổ đọc lại được, vì GitHub thì không cho đọc lại
+
+Tab Kho GitHub cất PAT trong phong bì `secretBox` và **chưa từng có đường mở nó ra**: ô PAT ở form
+Sửa để trống nghĩa là「giữ cái cũ」, còn cái cũ là chuỗi gì thì không ai xem lại được. Luật ấy đúng
+cho tới lần thứ hai cần chính con số đó — dán tay vào Actions secret của kho, chạy `github:remove`,
+hay dựng thêm một kho nữa cho cùng tài khoản. Mà **GitHub không cho xem lại token đã phát**, nên khi
+sổ cũng không cho xem thì đường duy nhất còn lại là phát PAT mới rồi đi cập nhật lại MỌI chỗ đang
+cầm cái cũ. Đó mới là cái giá thật, và nó đắt hơn hẳn thứ đổi lại.
+
+**Cửa mở là `revealGithubStationPatAction`, và nó hẹp có chủ ý:** gác đúng `github_station.manage`
+như mọi action khác của tab, mở đúng **một** slug mỗi lượt, chỉ chạy khi có người BẤM.
+
+**Thứ KHÔNG đổi mới là chỗ giữ được hàng rào:** `viewOf` vẫn không chép phong bì sang `StationView`.
+Nghĩa là luật thật xưa nay không phải「PAT không bao giờ đi xuống」mà là「vẽ trang admin không kéo
+theo PAT nào」— và luật ấy còn nguyên. Một tab admin để mở cả buổi vẫn không giữ bí mật nào trong
+bộ nhớ trình duyệt; muốn có thì phải có một cú bấm, và cú bấm ấy để lại một lượt gọi ở server.
+
+**Bản rõ hiện ra NGOÀI ô nhập, không đổ vào ô ấy.** Hai lẽ, lẽ thứ hai nặng hơn: ô để trống mới
+đúng nghĩa「giữ PAT cũ」, và một ô đã có chữ nghĩa là cú bấm「Cập nhật kho」kế tiếp sẽ đẩy ngược
+chính cái bí mật vừa xem lên máy chủ để mã hoá lại — một lượt đi thừa của một PAT, chỉ vì admin đã
+ngó nó. Đã đo trên form thật: sau khi hiện, `FormData` của form vẫn mang `pat` rỗng.
+
+**Nút chép nói ra khi nó không chép được.** `navigator.clipboard` không tồn tại ngoài secure
+context, và lượt ghi còn bị từ chối nếu trình duyệt không thấy một cử chỉ người dùng. Bản đầu đi
+theo khuôn `CopyBlock` cũ — `.then()` trần, không có nhánh hỏng — tức một cái nút bấm xong đứng im.
+Ca ấy đã bật ra ngay trong lượt kiểm (`NotAllowedError`), nên nhánh hỏng nói thẳng:「bôi đen dòng
+trên rồi Ctrl+C」.
+
+Hai lời chẩn đoán khi mở phong bì hỏng — sai định dạng và sai `ENCRYPTION_KEY` — chép đúng câu chữ
+của `pingStation`, vì việc phải làm ở cả hai ca đều là「dán lại PAT」chứ không phải một câu về mã hoá.
+
 ## 0.82.1 — sổ gương trạm lật trang, và con số 4 là để nó lật được ngay hôm nay
 
 Sổ trạm dài thêm theo mỗi trạm ghi vào, mà ngay BÊN DƯỚI nó là form「Ghi trạm mới」— tức thứ người

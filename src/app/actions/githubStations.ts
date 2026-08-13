@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
-import { encryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
+import { decryptSecret, encryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { pingStationBySlug, runKeepalive } from "@/lib/services/githubStations";
 import { getAppSettings, saveAppSettings, type AppSettings } from "@/lib/services/settings";
 import {
@@ -22,9 +22,10 @@ import {
  * được mã vào kho đang chạy khôi lỗi của bốn tài khoản. Bậc trị sự vào được trang Tông Môn
  * không có nghĩa là được cầm chìa ấy.
  *
- * PAT sống đúng MỘT khoảnh khắc trong bộ nhớ của action: nhận từ form → encryptSecret → document.
- * Không log, không trả về client — `githubStationsForAdmin()` chỉ phát bản đã che, và ở đây
- * không có chỗ nào ngược chiều.
+ * PAT đi LÊN một chiều: nhận từ form → encryptSecret → document, không log. `viewOf` không chép
+ * phong bì sang `StationView`, nên vẽ trang admin KHÔNG kéo theo PAT nào xuống trình duyệt — đó
+ * mới là luật, chứ không phải「PAT không bao giờ đi xuống」. Chiều ngược lại có đúng một cửa,
+ * `revealGithubStationPatAction`, và nó chỉ mở khi có người bấm: xem ghi chú tại chỗ.
  */
 
 export type StationResult = { ok: boolean; message: string };
@@ -87,6 +88,44 @@ export async function githubStationsForAdmin(): Promise<StationView[]> {
   const settings = await getAppSettings();
   const now = Date.now();
   return settings.githubStations.map((station) => viewOf(station, now));
+}
+
+export type StationPatResult = { ok: true; pat: string } | { ok: false; message: string };
+
+/**
+ * Mở phong bì PAT của MỘT kho — ngoại lệ duy nhất của luật ghi ở đầu tệp, nên nó cố ý hẹp.
+ *
+ * VÌ SAO CÓ: GitHub không cho xem lại một token đã phát. Khi cần dán lại PAT ấy — đặt tay Actions
+ * secret cho kho, chạy `github:remove` cho một kho khác của cùng tài khoản, dựng thêm kho — thì sổ
+ * này là bản duy nhất còn giữ nó. Không mở được nghĩa là mỗi lần cần đến, admin phải phát PAT mới
+ * trên GitHub rồi đi cập nhật lại MỌI chỗ đang cầm cái cũ; cái giá ấy đắt hơn hẳn thứ đổi lại.
+ *
+ * VÌ SAO KHÔNG HẠ HÀNG RÀO: cùng cửa gác `github_station.manage` như mọi action khác, đúng MỘT
+ * slug mỗi lượt, và chỉ chạy khi có người BẤM. Thứ quyết định「mở trang admin có kéo PAT xuống
+ * không」là `viewOf`, và `viewOf` không đổi — nên một tab admin để mở vẫn không giữ PAT nào.
+ *
+ * Hai lời chẩn đoán ở đây trùng khít `pingStation`: phong bì hỏng và sai `ENCRYPTION_KEY` là hai
+ * việc phải làm khác nhau, và cả hai đều kết thúc bằng「dán lại PAT」chứ không phải một câu về mã hoá.
+ */
+export async function revealGithubStationPatAction(slug: string): Promise<StationPatResult> {
+  await requireStationManage();
+  const settings = await getAppSettings();
+  const station = settings.githubStations.find((s) => stationSlug(s) === slug);
+
+  if (!station) {
+    return { ok: false, message: `Không có kho「${slug}」trong sổ — có thể vừa bị xoá ở một tab khác.` };
+  }
+  if (!isEncrypted(station.pat)) {
+    return { ok: false, message: "Phong bì PAT hỏng hoặc trống — dán lại PAT vào ô dưới." };
+  }
+  try {
+    return { ok: true, pat: decryptSecret(station.pat) };
+  } catch {
+    return {
+      ok: false,
+      message: "Không giải mã được PAT — ENCRYPTION_KEY của trạm này khác lúc PAT được ghi. Dán lại PAT.",
+    };
+  }
 }
 
 /**

@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import {
   deleteGithubStationAction,
   pingGithubStationAction,
+  revealGithubStationPatAction,
   runKeepaliveAction,
   saveGithubStationAction,
   type StationResult,
@@ -20,8 +21,9 @@ import {
  * Tab Kho GitHub — sổ tài khoản đang giữ khôi lỗi chạy trên Actions (deploy/github-actions.md §7).
  *
  * Tab CHỈ hiện với người mang `github_station.manage` (page.tsx lọc), nên panel không tự gác
- * nữa — action phía server mới là hàng rào thật. PAT chỉ ĐI LÊN qua form, không bao giờ đi
- * xuống: server phát `StationView` không mang phong bì, và ô sửa để trống nghĩa là「giữ PAT cũ」.
+ * nữa — action phía server mới là hàng rào thật. `StationView` không mang phong bì PAT, nên vẽ
+ * tab này ra không kéo PAT nào xuống trình duyệt; muốn đọc thì phải BẤM (xem `PatVault`), và ô
+ * sửa để trống vẫn nghĩa là「giữ PAT cũ」.
  *
  * Thứ đáng nhìn nhất trên tab này là ĐẾM NGƯỢC của từng kho, nên nó là dòng to nhất mỗi hàng —
  * mọi thứ khác (ghi chú lượt ngó, mốc thời gian) là chữ nhỏ dưới nó. Một tab mà mọi dòng đều
@@ -61,6 +63,112 @@ function workflowStateLabel(state: string): string {
 }
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("vi-VN") : "chưa có");
+
+/** Nút nhỏ trong khối PAT — cùng khuôn với nút「Chép lệnh」của mục Khôi Lỗi, cao hơn cho vừa ngón tay. */
+const CHIP =
+  "shrink-0 rounded-md border border-[var(--color-ink-600)] px-2.5 py-1 text-xs text-[var(--color-mist)] transition-colors hover:border-[rgba(232,194,92,0.5)] hover:text-[var(--color-gold-300)] disabled:opacity-50";
+
+/**
+ * Két PAT của kho ĐANG SỬA: mở phong bì khi admin bấm, không sớm hơn một nhịp nào.
+ *
+ * Vì sao cần cửa này: GitHub không cho xem lại token đã phát, nên sổ là bản duy nhất còn giữ PAT —
+ * xem lý lẽ đầy đủ ở `revealGithubStationPatAction`.
+ *
+ * Bản rõ hiện ra NGOÀI form, không đổ vào ô「dán cái mới để thay」. Hai lẽ: ô ấy để trống mới đúng
+ * nghĩa「giữ PAT cũ」, và một ô đã có chữ nghĩa là bấm「Cập nhật kho」sẽ đẩy ngược chính cái PAT vừa
+ * xem lên máy chủ để mã hoá lại — một lượt đi thừa của một bí mật, chỉ vì admin đã ngó nó.
+ *
+ * `key={slug}` ở chỗ gọi là thứ dọn dẹp: đổi sang kho khác thì component chết, bản rõ chết theo.
+ */
+function PatVault({ slug }: { slug: string }) {
+  const [pat, setPat] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  const reveal = () => {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const result = await revealGithubStationPatAction(slug);
+        if (result.ok) {
+          setPat(result.pat);
+        } else {
+          setError(result.message);
+        }
+      } catch {
+        // Action NÉM khi người bấm không còn quyền (phiên hết hạn giữa chừng). Bắt ở đây để nó
+        // ra một dòng chữ, chứ không phải một promise gãy im lặng dưới console.
+        setError("Không mở được phong bì — tải lại trang rồi thử lại.");
+      }
+    });
+  };
+
+  const copy = () => {
+    if (pat === null) {
+      return;
+    }
+    setError(null);
+    // `navigator.clipboard` KHÔNG có ngoài secure context (một trạm mở bằng http trần), và một
+    // cái nút bấm xong không làm gì cả thì tệ hơn một cái nút nói thẳng là nó không làm được.
+    if (!navigator.clipboard) {
+      setError("Trình duyệt không cho chép tự động ở đây — bôi đen dòng trên rồi Ctrl+C.");
+      return;
+    }
+    void navigator.clipboard.writeText(pat).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      },
+      () => setError("Trình duyệt chặn lượt chép — bôi đen dòng trên rồi Ctrl+C."),
+    );
+  };
+
+  return (
+    <div className="mt-3">
+      {pat === null ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-[var(--color-mist)]">Sổ đang giữ một PAT cho kho này.</span>
+          <button type="button" className={CHIP} onClick={reveal} disabled={pending}>
+            {pending ? "Đang mở phong bì…" : "Hiện PAT để chép"}
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs text-[var(--color-mist)]">PAT đang lưu trong sổ</span>
+            <div className="flex shrink-0 gap-2">
+              <button type="button" className={CHIP} onClick={copy}>
+                {copied ? "Đã chép ✓" : "Chép PAT"}
+              </button>
+              <button
+                type="button"
+                className={CHIP}
+                onClick={() => {
+                  setPat(null);
+                  setCopied(false);
+                  setError(null);
+                }}
+              >
+                Ẩn
+              </button>
+            </div>
+          </div>
+          {/* `break-all`: PAT fine-grained dài ~93 ký tự và không có chỗ ngắt tự nhiên nào — để
+              nguyên là nó đẩy phình cả cột form (cùng bài học với `CopyBlock` bên LinhSuPanel). */}
+          <code className="block rounded-lg border border-[var(--color-ink-600)]/60 bg-[var(--color-ink-900)]/60 p-3 font-mono text-[11px] leading-relaxed break-all text-[var(--color-parchment)]">
+            {pat}
+          </code>
+        </>
+      )}
+      {error && (
+        <p role="status" className="mt-1 text-xs text-[#f2a0a0]">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function GithubStationPanel({ stations }: { stations: StationView[] }) {
   const [saveState, saveAction, saving] = useActionState<StationResult | null, FormData>(saveGithubStationAction, null);
@@ -252,6 +360,7 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
               Lấy ở <code>github.com/settings/tokens</code>, đăng nhập ĐÚNG tài khoản giữ kho.{" "}
               {PAT_SCOPES_NOTE}
             </p>
+            {editing && <PatVault key={editing.slug} slug={editing.slug} />}
           </div>
           <label className="flex items-center gap-2 text-sm" htmlFor="station-enabled">
             <input

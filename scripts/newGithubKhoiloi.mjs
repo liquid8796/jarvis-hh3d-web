@@ -132,6 +132,62 @@ function run(cmd, args, options = {}) {
   });
 }
 
+/**
+ * Ngủ đồng bộ. Cả tệp này chạy tuần tự bằng `execFileSync`; chen `await` vào chỉ để đợi bốn giây
+ * là đổi hình dạng cả script để đổi lấy đúng một chỗ nghỉ.
+ */
+const sleepSync = (ms) => {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+};
+
+/**
+ * Mọi cờ `gh` mà script sắp gọi có THẬT SỰ tồn tại trong bản `gh` dưới máy không.
+ *
+ * Sinh ra từ một lượt hỏng có giá (13/08/2026): bản trước gọi `gh secret set … --body-file -`,
+ * mà `gh secret set` chưa bao giờ có cờ ấy — `--body-file` là của `gh release create`, lạc sang.
+ * Nó chỉ lộ ra ở bước ngay SAU `gh repo create --push`, tức sau khi một kho công khai đã nằm trên
+ * tài khoản người ta. Đó đúng là thứ mà lời thề「MỌI PHÉP KIỂM ĐỨNG TRƯỚC MỌI PHÉP TẠO」của
+ * `newGithubStation.mts` sinh ra để tránh, và nó đã không với tới được vì bốn lời gọi `gh` nằm
+ * ngoài tầm mọi phép kiểm.
+ *
+ * Hỏi thẳng `gh` thay vì ghim một số hiệu bản: cờ đến rồi đi giữa các bản, còn `--help` thì luôn
+ * nói sự thật của đúng cái `gh` sắp chạy. Ranh giới `\b` là BẮT BUỘC — thiếu nó thì `--repo`
+ * khớp nhầm vào `--repos` nằm ngay trên cùng trang help của `gh secret set`.
+ */
+function assertGhSupportsPlannedCalls() {
+  const planned = [
+    { cmd: ["repo", "create"], flags: ["--public", "--source", "--push", "--description"] },
+    { cmd: ["secret", "set"], flags: ["--repo"] },
+    { cmd: ["workflow", "run"], flags: ["--repo"] },
+  ];
+
+  const missing = [];
+  for (const { cmd, flags } of planned) {
+    let help;
+    try {
+      help = run("gh", [...cmd, "--help"], { quiet: true });
+    } catch {
+      missing.push(`  gh ${cmd.join(" ")} — bản gh này không có lệnh ấy`);
+      continue;
+    }
+    for (const flag of flags) {
+      if (!new RegExp(`${flag}\\b`).test(help)) {
+        missing.push(`  gh ${cmd.join(" ")} ${flag}`);
+      }
+    }
+  }
+
+  if (missing.length > 0) {
+    console.error(
+      "`gh` dưới máy không hiểu những thứ script sắp gọi:\n" +
+        missing.join("\n") +
+        "\n\nNâng cấp: winget upgrade --id GitHub.cli — hoặc sửa lời gọi cho khớp.\n" +
+        "KHÔNG tạo gì cả, nên không có kho mồ côi nào phải dọn.",
+    );
+    process.exit(1);
+  }
+}
+
 const playwrightVersion = JSON.parse(
   readFileSync(path.join(repoRoot, "package.json"), "utf8"),
 ).dependencies["playwright-core"];
@@ -204,6 +260,8 @@ if (!dryRun) {
     );
     process.exit(1);
   }
+  // Đứng ngay sau phép hỏi danh tính và TRƯỚC mọi thứ được tạo ra ở bất cứ đâu.
+  assertGhSupportsPlannedCalls();
 }
 
 const staging = mkdtempSync(path.join(tmpdir(), "khoiloi-"));
@@ -336,17 +394,51 @@ try {
   // Token đi qua STDIN, không qua đối số: đối số nằm trong command line mà ai mở Task Manager
   // cũng đọc được. (Vế thứ hai của lời bình cũ — „còn phải đi qua phép nối chuỗi của
   // `shell: true`" — đã hết đúng từ 13/08/2026, xem `run`. Lý do thứ nhất tự nó đã đủ.)
-  execFileSync("gh", ["secret", "set", "WORKER_TOKEN", "--repo", slug, "--body-file", "-"], {
+  //
+  // KHÔNG có `--body-file`: `gh secret set` đọc THẲNG stdin khi vắng `--body` — help của nó nói
+  // „reads from standard input if not specified", và nêu ví dụ `gh secret set MYSECRET < file`.
+  // Bản trước gọi `--body-file -`, một cờ của `gh release create` lạc sang đây; nó chết ở đúng
+  // bước SAU `gh repo create --push`, bỏ lại một kho công khai không secret. Xem
+  // `assertGhSupportsPlannedCalls`, thứ sinh ra từ chính lượt hỏng ấy.
+  execFileSync("gh", ["secret", "set", "WORKER_TOKEN", "--repo", slug], {
     input: token,
     stdio: ["pipe", "inherit", "inherit"],
     timeout: 60_000,
   });
 
   console.log("── Bấm chạy lượt đầu…");
-  run("gh", ["workflow", "run", "linh-su.yml", "--repo", slug], { cwd: staging });
+  /**
+   * Cú bấm này KHÔNG được phép giết cả lượt dựng.
+   *
+   * Tới dòng này kho đã có mã và đã có secret — tức khôi lỗi SẼ lên ca, muộn nhất ở mốc
+   * `schedule` kế (4 giờ một lần). Ném ở đây nghĩa là vứt cả lượt chạy, bỏ lại một kho công khai
+   * ĐANG DÙNG ĐƯỢC và không ghi được dòng sổ nào — trả một cái giá lớn cho một cú bấm cho nhanh.
+   * Nên nó hạ xuống thành cảnh báo, và dòng tổng kết ở dưới nói thật là đã bấm được hay chưa.
+   *
+   * Có thử lại vì GitHub cần một nhịp để đăng ký workflow của kho vừa sinh: gọi ngay sau `--push`
+   * hay trả „could not find any workflows named linh-su.yml".
+   */
+  let dispatched = false;
+  for (let attempt = 1; attempt <= 3 && !dispatched; attempt += 1) {
+    try {
+      run("gh", ["workflow", "run", "linh-su.yml", "--repo", slug], { cwd: staging, quiet: true });
+      dispatched = true;
+    } catch (err) {
+      if (attempt < 3) {
+        sleepSync(4_000);
+        continue;
+      }
+      const why = String(err.stderr || err.message).trim().split("\n")[0];
+      console.warn(
+        `\n⚠ Không bấm chạy được lượt đầu: ${why}\n` +
+          `  Kho và secret ĐÃ XONG, nên đây không phải hỏng — chỉ là chưa chạy ngay.\n` +
+          `  Muốn chạy ngay: https://github.com/${slug}/actions → „Khôi lỗi tông môn (GitHub)" → Run workflow.`,
+      );
+    }
+  }
 
   console.log(
-    `\n✔ Xong. ${workerId} đang lên ca.\n` +
+    `\n✔ Xong. ${workerId} ${dispatched ? "đang lên ca" : "sẽ lên ca ở mốc schedule kế (≤ 4 giờ)"}.\n` +
       `  Theo dõi: https://github.com/${slug}/actions\n` +
       `  Nghiệm thu: mở Hàng Đợi → tab Khôi Lỗi, phải thấy ${workerId} điểm danh trong ~4 phút.\n`,
   );

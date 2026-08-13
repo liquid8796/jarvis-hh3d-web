@@ -157,7 +157,7 @@ export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
             {/**
              * BẢNG CÀO — do GitHub Actions dựng trang Usage bằng Chromium thật rồi đẩy lên, và từ
              * 12/08/2026 là thứ DUY NHẤT trong popup này (xem ghi chú đầu tệp). Từ 13/08/2026 nó
-             * mang ĐÚNG MƯỜI CỘT CÓ HẠN MỨC, không còn là bản chép cả trang: `WANTED_TITLES` trong
+             * mang ĐÚNG TÁM CỘT tông chủ muốn nhìn, không còn là bản chép cả trang: `WANTED_TITLES` trong
              * `scripts/usageMeters.mts` là danh sách ấy. Nên đừng gọi nó là「bảng đầy đủ」nữa —
              * người đọc sẽ đi tìm mấy cột Queue/Sandbox và tưởng chúng vừa mất.
              *

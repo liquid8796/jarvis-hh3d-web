@@ -1,6 +1,6 @@
 # Cào bảng Usage của từng trạm rồi đẩy lên tab Gương Trạm.
 #
-# CÁI GÌ ĐƯỢC LẤY: đúng mười cột CÓ HẠN MỨC — `WANTED_TITLES` trong `scripts/usageMeters.mts`,
+# CÁI GÌ ĐƯỢC LẤY: đúng tám cột — `WANTED_TITLES` trong `scripts/usageMeters.mts`,
 # sửa danh sách thì sửa ở đó, không sửa ở đây. Trước 13/08/2026 lượt cào đẩy trọn ~54 meter của
 # trang, phần lớn là số 0 của Queue/Sandbox/AI Gateway.
 #

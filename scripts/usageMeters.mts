@@ -11,28 +11,33 @@
 import { type Meter } from "./usagePush.mts";
 
 /**
- * MƯỜI CỘT CẦN LẤY — và là TẤT CẢ những gì được đẩy lên sổ (13/08/2026, theo yêu cầu của tông chủ).
+ * TÁM CỘT CẦN LẤY — và là TẤT CẢ những gì được đẩy lên sổ (13/08/2026, theo yêu cầu của tông chủ).
  *
- * Đây đúng là các cột có HẠN MỨC trên gói Hobby, tức mọi chỗ có thể chạm trần; thứ tự chép theo
- * bảng Usage trên dashboard để hai bên đối chiếu được bằng mắt.
+ * ĐỌC KỸ LUẬT CHỌN, vì nó đã ĐỔI: đây KHÔNG còn là「mọi cột có hạn mức」. Bản đầu lấy đúng tiêu chí
+ * ấy nên có mười cột; nay hai cột truyền tải — `Fast Origin Transfer` và `Fast Data Transfer` — bị
+ * bỏ theo yêu cầu của tông chủ dù cả hai ĐỀU có hạn mức. Nên đừng thấy chúng có trần rồi "sửa lại
+ * cho đủ": danh sách này là thứ tông chủ muốn NHÌN, không phải thứ Vercel có tính tiền. Thứ tự vẫn
+ * chép theo bảng Usage trên dashboard để hai bên đối chiếu được bằng mắt.
  *
  * Trước lượt này script đẩy TRỌN bảng (~54 meter, phần lớn là số 0 của Queue/Sandbox/AI Gateway).
  * Ba cái giá của việc ấy: một document JSONB phình ra vì thứ không ai đọc; popup dài tới mức phải
  * cuộn mới thấy cột đáng lo; và phần đuôi render lúc có lúc không, nên nhịp「đợi thôi mọc」bắt
  * phải lúc nó đang nghỉ rồi tưởng đã xong.
  *
- * Ba cột đã BỎ so với bản trước — `ISR Reads`, `ISR Writes`, `Function Duration` — không mất mát:
- * hai cột ISR đứng ở 0 với kiến trúc hiện tại, còn Function Duration thì Fluid làm nó đứng yên ở 0
- * (bình chú dài trong `src/lib/services/vercelUsage.ts` kể vụ「389% hạn」đã trả giá cho điều này).
+ * Ba cột bỏ ở lượt trước — `ISR Reads`, `ISR Writes`, `Function Duration` — không mất mát: hai cột
+ * ISR đứng ở 0 với kiến trúc hiện tại, còn Function Duration thì Fluid làm nó đứng yên ở 0 (bình
+ * chú dài trong `src/lib/services/vercelUsage.ts` kể vụ「389% hạn」đã trả giá cho điều này).
+ *
+ * Bỏ hai cột truyền tải còn được một món hời không cố ý: chúng CHÍNH LÀ cặp đã vắng mặt trong lượt
+ * cào trạm `auto-hh3d-3` (18:08 ngày 13/08/2026, xem `nearMisses`), tức hai cột mọc chậm nhất
+ * trang. Không chờ chúng nữa thì nhịp「đợi thôi mọc」bớt đi đúng hai chỗ hay bắt hụt.
  */
 export const WANTED_TITLES = [
   "Fluid Active CPU",
   "Fluid Provisioned Memory",
   "Function Invocations",
   "Edge Requests",
-  "Fast Origin Transfer",
   "Edge Request CPU Duration",
-  "Fast Data Transfer",
   "Image Optimization - Transformations",
   "Image Optimization - Cache Writes",
   "Image Optimization - Cache Reads",
@@ -121,7 +126,7 @@ export type Selection = {
  * Trong hai dòng cùng tên thì lấy dòng CÓ HẠN MỨC.
  *
  * Tên meter xuất hiện HAI chỗ trên trang: thanh điều hướng bên trái và thẻ số. Thẻ số luôn có
- * dạng「đã dùng / hạn」với cả mười cột này, còn một mục điều hướng thì cùng lắm chỉ vô tình dính
+ * dạng「đã dùng / hạn」với cả tám cột này, còn một mục điều hướng thì cùng lắm chỉ vô tình dính
  * một con số của khối kế bên. Nên「có hạn」là dấu hiệu phân biệt rẻ nhất và đúng nhất; hoà thì lấy
  * dòng đầu. Lấy bừa dòng đầu là có ngày ghi vào sổ một con số của thanh điều hướng, và nó trông
  * y hệt một con số thật.
@@ -132,7 +137,7 @@ function pickBest(a: Meter | undefined, b: Meter): Meter {
   return a;
 }
 
-/** Chọn đúng mười cột cần lấy từ bảng vừa cắt. */
+/** Chọn đúng tám cột cần lấy từ bảng vừa cắt. */
 export function selectWanted(meters: Meter[]): Selection {
   const byTitle = new Map<string, Meter>();
   for (const meter of meters) {
@@ -170,6 +175,10 @@ const SIGNIFICANT = 4;
  * được, mà một cái tên rút gọn kiểu「Data Transfer」thì không chia từ ĐẦU với nó. Một phép gợi ý
  * chỉ chạy đúng lúc cái tên gần như không đổi là một phép gợi ý vô dụng: nó câm ở đúng ca nó sinh
  * ra để phục vụ. Nay `Fast Data Transfer` chia 2 từ với `Data Transfer` nên nó bị nêu tên.
+ *
+ * (Chính `Fast Data Transfer` sau đó đã bị BỎ khỏi `WANTED_TITLES` — nên câu chuyện trên là LỊCH
+ * SỬ, không phải mô tả hiện trạng. Giữ nguyên vì cái luật nó đẻ ra vẫn đang cai quản tám cột còn
+ * lại; đừng đọc nó rồi tưởng danh sách đang thiếu một dòng.)
  *
  * CHỌN NHỚ HƠN CHỌN ĐÚNG, có chủ ý: chia đúng MỘT từ cũng được nêu (`Blob Stored Data` lọt vào vì
  * chữ `data`). Bù lại bằng XẾP HẠNG — chia nhiều từ nhất đứng đầu — và bằng trần 8 dòng. Một cái

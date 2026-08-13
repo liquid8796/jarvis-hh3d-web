@@ -2,7 +2,7 @@
 /**
  * BẢNG USAGE của một trạm — dựng trang bằng trình duyệt thật rồi đọc, CHẠY TẠI MÁY NGƯỜI VẬN HÀNH.
  *
- * Từ 13/08/2026 lượt cào chỉ giữ MƯỜI CỘT CÓ HẠN MỨC (`WANTED_TITLES` trong `usageMeters.mts`),
+ * Từ 13/08/2026 lượt cào chỉ giữ TÁM CỘT tông chủ muốn nhìn (`WANTED_TITLES` trong `usageMeters.mts`),
  * không còn đẩy trọn ~54 meter của trang. Trang vẫn phải dựng đủ như cũ — mấy cột Fluid nằm cuối
  * và chỉ render khi cuộn tới — chỉ có thứ ĐI RA khỏi đây là hẹp lại.
  *
@@ -103,11 +103,11 @@ const SETTLE_STABLE_POLLS = 4;
 const SETTLE_TIMEOUT_MS = 90_000;
 
 /**
- * MƯỜI CỘT — vừa là định nghĩa của「đã đủ」, vừa là TẤT CẢ những gì được đẩy lên sổ.
+ * TÁM CỘT — vừa là định nghĩa của「đã đủ」, vừa là TẤT CẢ những gì được đẩy lên sổ.
  *
  * Chỉ chờ「thôi mọc」thì vẫn hên xui: đo được 56/61/49/40 meter qua bốn lượt, vì phần đuôi
  * (Queue, Sandbox, AI Gateway — toàn số 0) render lúc có lúc không và nhịp đếm bắt được lúc nó
- * đang nghỉ. Nay phần đuôi ấy không còn được đếm nữa: nhịp「thôi mọc」chỉ nhìn mười cột này, nên
+ * đang nghỉ. Nay phần đuôi ấy không còn được đếm nữa: nhịp「thôi mọc」chỉ nhìn tám cột này, nên
  * lượt cào vừa nhanh hơn vừa hết chỗ cho cái hên xui đó.
  *
  * Danh sách và lý do chọn nằm ở `usageMeters.mts` — cùng chỗ với phép cắt chữ và phép chọn cột,
@@ -136,7 +136,7 @@ try {
     process.exit(1);
   }
 
-  /** Một lượt render đã đọc: mười cột đã chọn, kèm TRỌN bảng thô sinh ra chúng. */
+  /** Một lượt render đã đọc: tám cột đã chọn, kèm TRỌN bảng thô sinh ra chúng. */
   type Attempt = { selection: Selection; rows: Meter[] };
 
   /**
@@ -163,7 +163,7 @@ try {
       const rows = parseUsageText(await page.evaluate("document.body.innerText"));
       const selection = selectWanted(rows);
 
-      // ĐẾM THEO MƯỜI CỘT, không theo tổng số meter. Bản trước đếm tổng, nên phần đuôi
+      // ĐẾM THEO TÁM CỘT, không theo tổng số meter. Bản trước đếm tổng, nên phần đuôi
       // (Queue/Sandbox/AI Gateway) mọc thêm một dòng là nhịp「đứng yên」bị đặt lại từ đầu — chờ
       // thêm một vòng vì một con số 0 mà không ai đọc.
       stable = selection.picked.length > best.selection.picked.length ? 0 : stable + 1;

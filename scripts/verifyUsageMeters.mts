@@ -132,7 +132,7 @@ AI Gateway Requests
 {
   const { picked, missing } = selectWanted(parseUsageText(PAGE));
 
-  ok(missing.length === 0, "trang đủ mười cột thì không thiếu gì");
+  ok(missing.length === 0, "trang đủ tám cột thì không thiếu gì");
   ok(picked.length === WANTED_TITLES.length, `chọn đúng ${WANTED_TITLES.length} cột, không hơn`);
   ok(
     picked.map((m) => m.title).join("|") === WANTED_TITLES.join("|"),
@@ -148,7 +148,23 @@ AI Gateway Requests
   );
   ok(
     picked.every((m) => m.limit != null),
-    "cả mười cột đều có hạn mức — đó là lý do chúng được chọn",
+    "cả tám cột đều có hạn mức — nhưng CÓ HẠN không còn là luật chọn, xem WANTED_TITLES",
+  );
+
+  // HAI CỘT TRUYỀN TẢI bỏ theo yêu cầu tông chủ. Trang mẫu VẪN render chúng và `parseUsageText`
+  // vẫn cắt ra được (nhóm trên đọc đúng「624.17 MB / 100 GB」của `Fast Data Transfer`), nên đây là
+  // chỗ đúng để đóng đinh: đọc được mà KHÔNG đẩy đi.
+  ok(
+    !picked.some((m) => ["Fast Origin Transfer", "Fast Data Transfer"].includes(m.title)),
+    "hai cột truyền tải đã bỏ thì không lọt vào bảng đẩy đi, dù trang vẫn render chúng",
+  );
+  ok(
+    !["Fast Origin Transfer", "Fast Data Transfer"].some((t) => missing.includes(t)),
+    "…và cũng KHÔNG bị kể là thiếu — bỏ hẳn chứ không bỏ nửa vời, kẻo lượt cào đỏ vĩnh viễn",
+  );
+  ok(
+    !["Fast Origin Transfer", "Fast Data Transfer"].some((t) => (WANTED_TITLES as readonly string[]).includes(t)),
+    "…và không ai lặng lẽ thêm chúng lại vì thấy chúng có hạn mức",
   );
 
   /**
@@ -205,12 +221,12 @@ AI Gateway Requests
   // là thứ người sửa sau sẽ "dọn" mất mà không biết mình vừa gỡ một phép kiểm.
   const NBSP = String.fromCharCode(0xa0);
   ok(
-    normalizeTitle(`Fast${NBSP}Data${NBSP}Transfer`) === "fast data transfer",
+    normalizeTitle(`Fluid${NBSP}Provisioned${NBSP}Memory`) === "fluid provisioned memory",
     "nbsp cũng được coi là khoảng trắng — HTML render ra nó nhiều hơn người ta tưởng",
   );
   ok(
-    selectWanted([{ title: `Fast${NBSP}Data Transfer`, used: "624.17 MB", limit: "100 GB" }]).picked[0]?.title ===
-      "Fast Data Transfer",
+    selectWanted([{ title: `Fluid${NBSP}Provisioned Memory`, used: "95.9 GB-Hrs", limit: "360 GB-Hrs" }]).picked[0]
+      ?.title === "Fluid Provisioned Memory",
     "…và một cột mang nbsp vẫn khớp, vẫn được ghi bằng tên chuẩn",
   );
 
@@ -250,6 +266,11 @@ AI Gateway Requests
    * `Fast Data Transfer` giữa 51 meter đọc được, mà bản gợi ý ĐẦU TIÊN — chỉ so từ ĐẦU — in ra
    *「không thấy tên nào gần giống」. Một cái tên rút gọn kiểu `Data Transfer` không chia từ đầu với
    * nó, nên phép gợi ý câm ở đúng lần đầu được gọi thật.
+   *
+   * Hai cột ấy nay đã BỎ khỏi `WANTED_TITLES`, nên từ đây xuống chúng chỉ còn là DỮ LIỆU MẪU: cả
+   * ba phép kiểm dưới đều truyền thẳng danh sách「đang thiếu」vào `nearMisses`, không đi qua danh
+   * sách cột thật, nên chúng đo đúng thuật toán xếp hạng chứ không đo cấu hình. Giữ nguyên tên cũ
+   * vì đây là ca ĐÃ XẢY RA — đổi sang một cái tên bịa là vứt mất bằng chứng.
    */
   const shortened = nearMisses(
     [
@@ -286,7 +307,7 @@ AI Gateway Requests
 // ---- Trang trống / rác -----------------------------------------------------------------------
 {
   ok(parseUsageText("").length === 0, "chữ rỗng trả bảng rỗng, không ném");
-  ok(selectWanted([]).missing.length === WANTED_TITLES.length, "bảng rỗng thì thiếu trọn mười cột");
+  ok(selectWanted([]).missing.length === WANTED_TITLES.length, "bảng rỗng thì thiếu trọn tám cột");
   ok(
     parseUsageText("123\n456\n/\n789\n").length === 0,
     "toàn số không có tên thì không đẻ ra meter nào",

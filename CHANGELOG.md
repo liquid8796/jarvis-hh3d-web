@@ -11,6 +11,35 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.83.2 — lượt cào bỏ hai cột truyền tải, và LUẬT CHỌN cột đổi nghĩa
+
+Tông chủ chốt bỏ `Fast Origin Transfer` và `Fast Data Transfer` khỏi bảng cào. Mười cột còn **tám**.
+
+Thứ đáng ghi ở đây không phải hai dòng bị xoá, mà là **luật chọn đã đổi nghĩa**. Bản 0.82.8 chọn
+theo một tiêu chí khách quan — „mọi cột CÓ HẠN MỨC trên gói Hobby, tức mọi chỗ có thể chạm trần" —
+và danh sách mười cột là hệ quả của tiêu chí ấy. Hai cột vừa bỏ thì **đều có hạn mức**. Nên từ bản
+này danh sách không còn suy ra được từ một luật nào nữa: nó là thứ tông chủ muốn NHÌN. Bình chú ở
+`WANTED_TITLES` nói thẳng điều đó, kèm một câu dặn đừng „sửa lại cho đủ" — vì người đọc bản cũ mở
+trang Usage ra, thấy hai cột có trần đứng ngoài danh sách, sẽ tưởng mình vừa bắt được một thiếu sót.
+Một phép kiểm đóng đinh nốt: không ai được lặng lẽ thêm chúng lại.
+
+Kèm theo là một món hời không cố ý, và nó **khép lại câu hỏi bỏ ngỏ của 0.83.1**. Đúng hai cột này
+là cặp đã làm trạm `auto-hh3d-3` đỏ ở lượt 18:04 — và đỏ y hệt ở lượt 17:30 trước đó — tức hai cột
+mọc chậm nhất trang. Mục 0.83.1 kết lại bằng „vì sao chúng vắng mặt thì **chưa biết**, lượt cào kế
+sẽ in ra tên gần giống". Nay không cần biết nữa: nhịp „đợi thôi mọc" không còn chờ chúng, nên bớt
+đúng hai chỗ hay bắt hụt.
+
+Chúng vẫn nằm nguyên trong trang mẫu của phép kiểm, và đó là chủ ý: hai dòng ấy là **hai dòng duy
+nhất** trong trang mẫu có nấc kế của gói trả tiền (`1 TB` đứng ngay sau `100 GB`), nên chúng còn
+gánh phép kiểm „nấc kế không bị nhận nhầm thành hạn mức". Bị loại ở bước CHỌN, không phải bước cắt
+chữ — và phép kiểm mới nói đúng câu đó: đọc được mà không đẩy đi.
+
+Một phép kiểm phải đổi chủ thể vì chuyện này: ca NBSP trước lấy `Fast Data Transfer` làm cột được
+chọn, nay chuyển sang `Fluid Provisioned Memory` — cùng phép thử, khác cột. 45 phép kiểm (+3).
+
+Sổ đã cào trước bản này vẫn giữ đủ mười dòng cho tới lượt cào kế; popup render theo bảng nhận được
+nên không hề gì, chỉ là hai trạm cạnh nhau có thể lệch số dòng trong vài giờ.
+
 ## 0.83.1 — phép gợi ý tên câm ở đúng lần đầu được gọi thật
 
 Lượt cào đầu tiên chạy với bản 0.82.8 (18:04, bấm tay) cho cả hai tin. Tin lành: ba trạm đẩy về

@@ -36,10 +36,15 @@
  * đánh đổi đã được cân nhắc và chấp nhận; xem deploy/github-actions.md mục 6.
  */
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { KHOILOI_ID_PREFIX, REPO_NAME_PREFIX, reviewGeneratedName } from "./khoiloiNaming.mjs";
+import {
+  buildKhoiloiPayload,
+  playwrightVersionOf,
+  uncommittedPayloadPaths,
+} from "./khoiloiPayload.mjs";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -252,9 +257,7 @@ function assertGhCanAuthenticate() {
   }
 }
 
-const playwrightVersion = JSON.parse(
-  readFileSync(path.join(repoRoot, "package.json"), "utf8"),
-).dependencies["playwright-core"];
+const playwrightVersion = playwrightVersionOf(repoRoot);
 
 console.log(
   `Sắp dựng khôi lỗi GitHub:\n` +
@@ -263,45 +266,6 @@ console.log(
     `  web        ${webUrl}\n` +
     `  engine     playwright-core ${playwrightVersion}\n`,
 );
-/**
- * Mọi đường `import` tương đối trong cây vừa dựng có trỏ vào một tệp CÓ THẬT không.
- *
- * Sinh ra vì một lỗi đã nằm sẵn trong script này: danh sách chép thiếu
- * `src/lib/worker/controlFollow.mjs`, nên kho phát ra sẽ chết ngay giây đầu bằng
- * `ERR_MODULE_NOT_FOUND` — ở một máy khác, sau khi mọi bước ở đây đều báo xanh. Không phép kiểm
- * nào bắt được vì `--dry-run` hồi ấy thoát TRƯỚC lúc dựng cây, còn đường thật thì đòi `gh`.
- *
- * Nên phép kiểm này không đi kèm một cái tên tệp: nó hỏi CÂU HỎI TỔNG QUÁT, và sẽ bắt được lần
- * sau, khi ai đó thêm một import thứ tư vào `worker.mjs` mà quên script phát hành này.
- */
-function assertImportsResolve(root) {
-  const missing = [];
-  const walk = (dir) => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-        continue;
-      }
-      if (!/\.(mjs|js)$/.test(entry.name)) continue;
-      const source = readFileSync(full, "utf8");
-      // Bắt cả `from "./x.mjs"` lẫn `import("./x.mjs")` — nhánh động cũng ném y như nhánh tĩnh.
-      for (const match of source.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*)["'](\.[^"']*)["']/g)) {
-        if (!existsSync(path.resolve(path.dirname(full), match[1]))) {
-          missing.push(`  ${path.relative(root, full).replace(/\\/g, "/")} → ${match[1]}`);
-        }
-      }
-    }
-  };
-  walk(root);
-  if (missing.length > 0) {
-    throw new Error(
-      `Kho sắp phát ra THIẾU TỆP — nó sẽ chết bằng ERR_MODULE_NOT_FOUND ngay lượt chạy đầu:\n` +
-        `${missing.join("\n")}\n` +
-        `Thêm tệp còn thiếu vào danh sách chép ở đầu khối staging.`,
-    );
-  }
-}
 
 /**
  * Phép kiểm `gh` đứng SAU lượt chạy khô, không đứng trước.
@@ -322,138 +286,37 @@ if (!dryRun) {
 
 const staging = mkdtempSync(path.join(tmpdir(), "khoiloi-"));
 try {
-  // Giữ nguyên bố cục để đường import của worker.mjs còn đúng.
-  //
-  // Danh sách này TỪNG SAI, và kiểu sai của nó là lý do có `assertImportsResolve` ở dưới: bản
-  // đầu chỉ chép `worker.mjs` + `quest-engine` vì hồi viết script, worker.mjs chỉ cần ngần ấy.
-  // Nhưng commit「khôi lỗi đi theo trạm」đã thêm một import thứ ba —
-  // `../src/lib/worker/controlFollow.mjs` — mà không ai nghĩ tới việc script phát hành phải chép
-  // thêm nó. Kho sinh ra sẽ chết ngay giây đầu bằng `ERR_MODULE_NOT_FOUND`, ở một máy khác, sau
-  // khi mọi bước ở đây đều báo xanh. Chưa ai vấp chỉ vì script này chưa từng chạy thật.
-  mkdirSync(path.join(staging, "scripts"), { recursive: true });
-  cpSync(path.join(repoRoot, "scripts", "worker.mjs"), path.join(staging, "scripts", "worker.mjs"));
-  cpSync(
-    path.join(repoRoot, "src", "lib", "quest-engine"),
-    path.join(staging, "src", "lib", "quest-engine"),
-    { recursive: true },
-  );
-  // CHỈ `controlFollow.mjs`, không chép cả thư mục: `src/lib/worker/` còn có `version.ts`, thứ
-  // Node không chạy được và worker.mjs cũng không cần (nó tự đọc bản qua `readOwnVersion`).
-  mkdirSync(path.join(staging, "src", "lib", "worker"), { recursive: true });
-  cpSync(
-    path.join(repoRoot, "src", "lib", "worker", "controlFollow.mjs"),
-    path.join(staging, "src", "lib", "worker", "controlFollow.mjs"),
-  );
-
-  writeFileSync(
-    path.join(staging, "package.json"),
-    JSON.stringify(
-      {
-        // Tên gói đi theo tên kho: cả hai đều là thứ người lạ đọc được, và cả hai đều nghe luật
-        // ở `khoiloiNaming.mjs`. `name` của npm bắt buộc chữ thường không khoảng trắng — `linh-su`
-        // hợp lệ sẵn, nên không cần phép chuẩn hoá nào ở đây.
-        name: REPO_NAME_PREFIX,
-        private: true,
-        version: "1.0.0",
-        type: "module",
-        description: "Tiến trình nền của tông môn — chạy theo lịch.",
-        scripts: { worker: "node scripts/worker.mjs" },
-        dependencies: { "playwright-core": playwrightVersion },
-      },
-      null,
-      2,
-    ) + "\n",
-  );
-
-  // Workflow lấy NGUYÊN bản mẫu của web repo rồi chỉ thay đúng hai dòng: id khôi lỗi và địa chỉ
-  // web. Chép tay một bản thứ hai là hẹn ngày hai bản trôi khỏi nhau — mà bộ số 290/50/350/360
-  // thì không được phép lệch.
-  //
-  // Bản mẫu nằm ở `deploy/github/`, NGOÀI `.github/workflows/`: kho gốc là kho CÔNG KHAI giữ mã
-  // nguồn và từ 13/08/2026 nó không chạy khôi lỗi nữa (lý do đầy đủ ở `deploy/github-actions.md`
-  // §4). Đường dẫn ấy là một quyết định, không phải một chỗ bày bừa để dọn.
-  //
-  // VÀ: mọi CHÚ THÍCH trong bản mẫu đi nguyên xi sang một kho CÔNG KHAI — cùng loại rò rỉ mà
-  // README sinh ra ở dưới phải né. Nên đừng viết vào đó tên kho gốc, tên script phát hành, hay
-  // tên lệnh kiểm chứng; thứ chỉ người sửa kho gốc cần đọc thì để ở `deploy/github-actions.md`.
-  const templatePath = path.join(repoRoot, "deploy", "github", "linh-su.yml");
-  if (!existsSync(templatePath)) {
-    throw new Error(
-      `Không thấy bản mẫu workflow ở ${templatePath} — nó vừa bị dời hoặc bị xoá.\n` +
-        "ĐỪNG chữa bằng cách chép một bản vào .github/workflows/ của kho gốc: kho ấy công khai, " +
-        "và làm vậy là tự bật khôi lỗi ở đúng nơi giữ mã nguồn. Khôi phục lại đường dẫn trên.",
-    );
-  }
-  const workflow = readFileSync(templatePath, "utf8")
-    .replace(/^(\s*WORKER_ID:\s*).*$/m, `$1${workerId}`)
-    .replace(/\$\{\{ vars\.WEB_URL \|\| '[^']*' \}\}/, `\${{ vars.WEB_URL || '${webUrl}' }}`);
-  if (!workflow.includes(`WORKER_ID: ${workerId}`)) {
-    throw new Error(
-      "Không thay được WORKER_ID trong workflow — hình dạng tệp đã đổi. " +
-        "Sửa phép thay ở đây cho khớp, đừng phát ra một kho mang id trùng VM.",
-    );
-  }
-  mkdirSync(path.join(staging, ".github", "workflows"), { recursive: true });
-  writeFileSync(path.join(staging, ".github", "workflows", "linh-su.yml"), workflow);
-
-  writeFileSync(
-    path.join(staging, "README.md"),
-    // README nằm ngay trang đầu của một kho CÔNG KHAI, nên nó là chỗ dễ nói hớ nhất. Giữ đúng
-    // một việc nó phải làm — dặn người mở kho đừng sửa tay — và bỏ mọi thứ chỉ đường về tông môn:
-    // tên script phát hành, và cả cái tên nền tảng đang chạy nó.
-    `# Tông môn — ${workerId}\n\n` +
-      `Một tiến trình nền nhận việc theo lịch từ ${webUrl}.\n` +
-      `Kho này được SINH TỰ ĐỘNG từ kho gốc — **đừng sửa tay ở đây**, sửa ở kho gốc rồi dựng lại,\n` +
-      `bằng không hai bản sẽ trôi khỏi nhau.\n`,
-  );
-
-  writeFileSync(path.join(staging, ".gitignore"), "node_modules/\n.env\n");
-
   /**
-   * SINH `package-lock.json`. Thiếu nó thì kho phát ra chết ở bước THỨ HAI, trước khi worker kịp
-   * chạy một dòng — và chết hai lần khác nhau, nên bỏ một chỗ là vẫn hỏng ở chỗ kia:
+   * Cây tệp của kho mới do `khoiloiPayload.mjs` dựng — MỘT nguồn sự thật, dùng chung với lượt
+   * PHÁT HÀNH (`deployGithubKhoiloi.mts`). Trước 14/08/2026 danh sách tệp nằm ngay đây, và thế là
+   * đủ vì chỉ có MỘT lối đặt tệp vào một kho khôi lỗi. Nay có hai, và hai bản chép của cùng một
+   * danh sách là hẹn ngày một kho vừa phát hành khác một kho vừa dựng — trong khi cả hai lượt
+   * đều báo xanh.
    *
-   *   • `actions/setup-node@v4` với `cache: npm` →
-   *     „##[error]Dependencies lock file is not found … Supported file patterns:
-   *      package-lock.json,npm-shrinkwrap.json,yarn.lock"
-   *   • `npm ci` → từ chối chạy khi không có lockfile, theo thiết kế của chính nó.
-   *
-   * Đo 13/08/2026 trên kho `…-100055-69a9`: lượt chạy đầu đỏ ở đúng dòng ấy sau 6 giây, dù kho,
-   * secret và dòng sổ đều đã xong xuôi.
-   *
-   * Vá bằng cách SINH LOCKFILE, không phải bằng cách sửa workflow (bỏ `cache: npm`, đổi `npm ci`
-   * thành `npm install`). Hai lẽ: workflow phải giữ NGUYÊN bản của repo web — mỗi phép thay thêm
-   * là thêm một đường cho hai bản trôi khỏi nhau, đúng điều đã thề ở chỗ vá WORKER_ID; và `npm ci`
-   * có lý của nó, kho phát ra phải cài đúng một bản playwright-core mỗi lượt thay vì trôi theo `^`.
-   *
-   * `--package-lock-only` chỉ GIẢI cây phụ thuộc rồi ghi lockfile, không tải `node_modules` —
-   * vài giây, không phải vài phút.
-   *
-   * Đây là lời gọi DUY NHẤT trong tệp còn bật shell, và nó bắt buộc: trên Windows `npm` là một
-   * tệp `.cmd`, mà từ Node 20 (CVE-2024-27980) `spawn` từ chối chạy .cmd nếu không qua shell. An
-   * toàn ở đây vì mọi đối số là chuỗi cố định không khoảng trắng; thứ duy nhất thay đổi giữa các
-   * lượt — `cwd` — đi bằng tuỳ chọn của spawn chứ không nằm trên dòng lệnh.
+   * Bytes lấy từ blob HEAD chứ không từ cây làm việc (lý do đầy đủ ở đầu `khoiloiPayload.mjs`).
+   * Nên việc dở CHƯA COMMIT không lên kho — và điều đó phải được NÓI RA, chứ không để người vừa
+   * gõ xong một bản vá tự đoán vì sao kho mới không có nó.
    */
-  console.log("── Giải cây phụ thuộc (package-lock.json)…");
-  run("npm", ["install", "--package-lock-only", "--no-audit", "--no-fund"], {
-    cwd: staging,
-    quiet: true,
-    shell: true,
-    timeout: 180_000,
-  });
-  if (!existsSync(path.join(staging, "package-lock.json"))) {
-    throw new Error(
-      "npm không sinh ra package-lock.json — kho phát ra sẽ chết ở bước setup-node. Dừng ở đây,\n" +
-        "trên máy này, thay vì bỏ lại một kho công khai không dựng nổi.",
+  const chuaCommit = uncommittedPayloadPaths(repoRoot);
+  if (chuaCommit.length > 0) {
+    console.warn(
+      `⚠ ${chuaCommit.length} tệp trong phạm vi gói đang có thay đổi CHƯA COMMIT. Kho mới sẽ mang ` +
+        "bản đã commit (HEAD), KHÔNG mang những sửa đổi này:\n" +
+        chuaCommit.map((f) => `    ${f}`).join("\n") +
+        "\n",
     );
   }
 
-  /**
-   * Soi cây vừa dựng TRƯỚC khi nó rời khỏi máy này. Đây là hàng rào cuối cùng còn đứng trên
-   * lãnh thổ ta kiểm soát được — sau dòng `gh repo create` thì mọi sai sót đều biểu hiện ở một
-   * kho của người khác, trong nhật ký Actions của một tài khoản khác.
-   */
-  assertImportsResolve(staging);
+  // Lượt giải cây phụ thuộc nằm bên trong `buildKhoiloiPayload`; báo trước vì nó là bước lâu nhất
+  // của cả lượt dựng — npm phải hỏi registry.
+  console.log("── Dựng gói + giải cây phụ thuộc (package-lock.json)…");
+  const payload = buildKhoiloiPayload({ repoRoot, workerId, webUrl });
+
+  for (const [rel, bytes] of payload) {
+    const full = path.join(staging, rel);
+    mkdirSync(path.dirname(full), { recursive: true });
+    writeFileSync(full, bytes);
+  }
 
   /**
    * Lượt commit đầu nằm TRƯỚC cửa `--dry-run`, không sau — và chỗ này đổi vì đúng một lần hỏng.

@@ -99,6 +99,50 @@ export function stationSlug(station: { owner: string; repo: string }): string {
   return `${station.owner}/${station.repo}`;
 }
 
+/** Câu `message` mà GitHub trả kèm mọi lỗi — thứ đáng in ra nhất, nên moi cẩn thận. */
+export function githubMessage(body: unknown): string {
+  if (body && typeof body === "object" && typeof (body as { message?: unknown }).message === "string") {
+    return (body as { message: string }).message.slice(0, 200);
+  }
+  return "";
+}
+
+/**
+ * Đổi một mã lỗi HTTP thành câu người vận hành DÙNG ĐƯỢC.
+ *
+ * Ba mã đầu là ba nguyên nhân khác hẳn nhau mà nhìn thô đều chỉ là「không được」, và đoán nhầm
+ * giữa chúng là đi sửa nhầm chỗ hàng giờ: 401 là token, 403 là quyền/hạn mức, 404 là tên kho —
+ * hoặc, và đây là chỗ bẫy, cũng vẫn là token: GitHub trả 404 thay vì 403 cho kho mà token không
+ * được phép thấy, cố ý, để không lộ ra kho ấy có tồn tại hay không.
+ *
+ * Ở ĐÂY (thuần) chứ không ở `services/githubStations.ts` vì có HAI đường gọi API GitHub bằng PAT
+ * của sổ — vòng nuôi kho, và lượt phát hành `scripts/deployGithubKhoiloi.mts`. Cùng một mã lỗi
+ * phải đọc ra cùng một câu ở cả hai, bằng không người vận hành phải học hai từ điển cho một API.
+ *
+ * `422` là mã của riêng đường phát hành, và nó gộp hai nguyên nhân rất khác nhau — nhánh vừa
+ * nhích dưới chân lượt đẩy, và PAT thiếu scope `workflow` — nên câu chữ phải nói cả hai.
+ */
+export function explainFailure(status: number, body: unknown, what: string): string {
+  const detail = githubMessage(body);
+  const suffix = detail ? ` — ${detail}` : "";
+  if (status === 401) {
+    return `PAT bị từ chối (401) khi ${what}: token hết hạn hoặc đã bị thu hồi${suffix}`;
+  }
+  if (status === 403) {
+    return `Bị chặn (403) khi ${what}: PAT thiếu scope, hoặc đang bị giới hạn tần suất${suffix}`;
+  }
+  if (status === 404) {
+    return `Không thấy (404) khi ${what}: sai tên kho/tệp workflow, hoặc PAT không có quyền nhìn kho này${suffix}`;
+  }
+  if (status === 409) {
+    return `Xung đột (409) khi ${what}: kho rỗng, hoặc tệp mốc vừa bị đổi bởi một lượt khác${suffix}`;
+  }
+  if (status === 422) {
+    return `GitHub từ chối (422) khi ${what}: nhánh vừa nhích dưới chân lượt đẩy, hoặc PAT thiếu scope \`workflow\` để đụng .github/workflows/${suffix}`;
+  }
+  return `GitHub trả ${status} khi ${what}${suffix}`;
+}
+
 /**
  * Trạm này có phải trạm chịu trách nhiệm nuôi sổ không.
  *

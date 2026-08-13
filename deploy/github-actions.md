@@ -424,3 +424,84 @@ thoát **mã 1** sau một lượt `fetch` — tức kỷ luật `process.exitCo
 **Chưa lượt nào xoá một kho thật.** Mọi thứ sau phép soát scope — soi ứng viên, hỏi đàn đang chạy,
 `DELETE /repos`, gỡ sổ, gỡ dòng điểm danh — mới chỉ đúng trên giấy và trong phép kiểm thuần. Lượt
 dọn kho rác đầu tiên là phép thử thật; chạy `--dry-run` trước, và đọc kỹ bảng「Sẽ XOÁ」.
+
+---
+
+## 9. Phát hành bản mới cho MỌI kho: `deploy-github-khoiloi.bat` (14/08/2026)
+
+```
+npm run github:deploy                       mọi kho đang bật trong sổ
+npm run github:deploy -- --dry-run          soi kế hoạch, không đẩy gì
+npm run github:deploy -- --repo <tên kho>   đúng một kho (kể cả dòng đang tắt)
+```
+
+### Vì sao mãi tới nay mới có, và vì sao thiếu nó là một cái bẫy
+
+**Kho khôi lỗi là một bản ĐÔNG LẠNH.** Workflow `checkout` chính kho ấy rồi chạy
+`node scripts/worker.mjs` từ đó — nên mã nằm trong kho là mã sẽ chạy, mãi mãi. Trước bản này chỉ
+có `github:new` (dựng) và `github:remove` (xoá), tức **đường sửa duy nhất là xoá đi dựng lại**.
+
+Và nó không hiện ra ở đâu cả. `package.json` của kho sinh ra luôn khai `version: "1.0.0"`, nên
+`readOwnVersion` khai đúng chuỗi ấy vào sổ điểm danh: bảy kho dựng ở bảy thời điểm khác nhau đều
+hiện `1.0.0` trên dashboard — nhìn thì đều nhau, thực thì mỗi cái một đời mã. Đo 14/08/2026, ngay
+lượt chạy khô đầu tiên: VM khai `0.83.1`, `github-khoiloi` khai `0.82.6`, và **5 trong 6 kho trọ
+đang mang `scripts/worker.mjs` cũ** — trong đó bốn kho còn mang cả workflow trước lượt hạ ghế về 2.
+
+> Ghi lại một câu SAI đã sống khá lâu, để phiên sau đọc phải bản cũ thì biết: *"khôi lỗi GitHub tự
+> cập nhật, trễ ~4 giờ"*. Không. Cái tự lặp lại mỗi 4 giờ là **lượt chạy**, không phải **mã**.
+
+### Hình dạng
+
+| Mảnh | Ở đâu |
+|---|---|
+| Gói (danh sách tệp + nội dung) | `scripts/khoiloiPayload.mjs` — **dùng chung với `github:new`** |
+| Luật thuần (kế hoạch cây, danh tính) | `scripts/githubKhoiloi.mts` |
+| Lượt phát hành | `scripts/deployGithubKhoiloi.mts` |
+| Kiểm chứng | `npm run verify:github-deploy` — 35 phép kiểm, thuần |
+
+**Một nguồn sự thật cho「gói gồm những tệp nào」.** Lượt DỰNG và lượt PHÁT HÀNH đọc chung
+`khoiloiPayload.mjs`; hai bản chép của cùng một danh sách là hẹn ngày một kho vừa phát hành khác
+một kho vừa dựng, mà cả hai lượt đều báo xanh.
+
+**Bytes lấy từ blob `HEAD`, không từ cây làm việc.** Hai lý do, và cả hai đều đã cắn:
+`core.autocrlf` trên Windows làm cây làm việc mang CRLF trong khi blob mang LF — lượt dựng cũ có
+`git add` dọn hộ, còn lượt phát hành đẩy thẳng qua API thì không, nên chép từ cây làm việc là
+**mọi tệp đều「đã đổi」ở mọi lượt**. Và kho này thường có vài phiên cùng làm, nên cây làm việc có
+thể đang mang một nửa tính năng chưa xong — đẩy thứ ấy lên kho CÔNG KHAI của người khác là chuyện
+không rút lại được. Việc dở chưa commit thì script **nói ra** rồi vẫn phát hành đúng HEAD.
+
+**Không cần `git`, không cần `gh`, không clone.** Đẩy bằng Git Data API: tải blob → dựng cây →
+MỘT commit → nhích `refs/heads/<nhánh>` → **đọc lại ref để nghiệm thu**. Chìa duy nhất là chính
+PAT đã nằm trong sổ. Nhánh đọc từ `default_branch` chứ không ghim `main`.
+
+**Chỉ đẩy tệp đã đổi.** SHA blob tính dưới máy (`gitBlobSha`, băm đúng lối git:
+`sha1("blob <len>\0" + nội dung)`), mà cây kho trả sha sẵn — nên phép so không tốn một byte tải
+về, và kho đã đúng bản thì **không commit nào được tạo ra**. Đây không phải chuyện thẩm mỹ: mỗi
+commit là một dấu chân với GitHub, thứ mà cả §7 sinh ra để đếm dè sẻn.
+
+### Ba hàng rào
+
+1. **Không biết `WORKER_ID` thì KHÔNG phát hành kho ấy.** Sổ trước, tệp workflow trong kho sau, và
+   không có nước thứ ba — bản mẫu mang sẵn `WORKER_ID: github-khoiloi`, nên một nhánh「thôi dùng
+   mặc định」là đẩy một kho về trùng id với khôi lỗi khác đang trực. Sổ và kho khai lệch nhau thì
+   script ghi theo SỔ và **nói ra** trên bảng tổng kết.
+2. **Ranh giới XOÁ hẹp.** Chỉ tệp dưới `scripts/` và `src/` mới bị xoá khi gói không còn chúng.
+   `.github/heartbeat.txt` là của vòng nuôi kho (§7) — xoá nó là phá đúng thứ giữ cho lịch khỏi bị
+   tắt, và triệu chứng hiện ra ba tuần sau. Có ca riêng trong script kiểm chứng.
+3. **Cây bị GitHub cắt bớt (`truncated`) thì DỪNG.** Cây cắt dở làm tệp không thấy trông y như tệp
+   chưa có, nên phép XOÁ đọc thiếu. Gói có 20 tệp nên gần như không thể xảy ra — mà "gần như" thì
+   vẫn phải có nhánh, vì hậu quả là xoá nhầm.
+
+### Có hiệu lực khi nào
+
+**Tối đa ~4 giờ.** Lượt chạy Actions đang chạy vẫn dùng mã nó đã `checkout` lúc bắt đầu; bản mới
+lên ở lượt kế. Script **cố ý không huỷ lượt đang chạy**: huỷ là cắt ngang đàn đang cày, nhịp tim
+tắt, `reapStaleJobs` kết liễu chúng thành `failed` sau 3 phút — mất trọn một vòng của một đạo hữu
+nào đó, không phải của người đang gõ lệnh. Cùng luật với hàng rào 2 của §8.
+
+### Lỗi hay gặp nhất
+
+**PAT thiếu scope `workflow`** → GitHub trả **422** ở đúng bước đẩy, và chỉ khi lượt ấy có đụng
+`.github/workflows/`. Một lượt chỉ đổi `scripts/worker.mjs` thì không cần scope ấy — nên cùng một
+PAT có thể phát hành được hôm nay và hỏng ở lượt sau, khi bản mẫu workflow đổi. Dán lại PAT đủ
+scope ở tab Kho GitHub → Sửa kho.

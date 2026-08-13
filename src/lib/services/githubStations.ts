@@ -5,6 +5,7 @@ import {
   KEEPALIVE_INTERVAL_DAYS,
   MS_PER_DAY,
   SCHEDULE_DISABLE_DAYS,
+  explainFailure,
   isCommitDue,
   parseWorkflowState,
   stationSlug,
@@ -97,14 +98,6 @@ class StationError extends Error {}
 
 type GithubReply = { status: number; body: unknown };
 
-/** Câu `message` mà GitHub trả kèm mọi lỗi — thứ đáng in ra nhất, nên moi cẩn thận. */
-function githubMessage(body: unknown): string {
-  if (body && typeof body === "object" && typeof (body as { message?: unknown }).message === "string") {
-    return (body as { message: string }).message.slice(0, 200);
-  }
-  return "";
-}
-
 async function callGithub(
   pat: string,
   method: "GET" | "PUT",
@@ -147,32 +140,6 @@ async function callGithub(
     }
   }
   return { status: response.status, body };
-}
-
-/**
- * Đổi một mã lỗi HTTP thành câu người vận hành DÙNG ĐƯỢC.
- *
- * Ba mã đầu là ba nguyên nhân khác hẳn nhau mà nhìn thô đều chỉ là「không được」, và đoán nhầm
- * giữa chúng là đi sửa nhầm chỗ hàng giờ: 401 là token, 403 là quyền/hạn mức, 404 là tên kho —
- * hoặc, và đây là chỗ bẫy, cũng vẫn là token: GitHub trả 404 thay vì 403 cho kho mà token không
- * được phép thấy, cố ý, để không lộ ra kho ấy có tồn tại hay không.
- */
-function explainFailure(status: number, body: unknown, what: string): string {
-  const detail = githubMessage(body);
-  const suffix = detail ? ` — ${detail}` : "";
-  if (status === 401) {
-    return `PAT bị từ chối (401) khi ${what}: token hết hạn hoặc đã bị thu hồi${suffix}`;
-  }
-  if (status === 403) {
-    return `Bị chặn (403) khi ${what}: PAT thiếu scope, hoặc đang bị giới hạn tần suất${suffix}`;
-  }
-  if (status === 404) {
-    return `Không thấy (404) khi ${what}: sai tên kho/tệp workflow, hoặc PAT không có quyền nhìn kho này${suffix}`;
-  }
-  if (status === 409) {
-    return `Xung đột (409) khi ${what}: kho rỗng, hoặc tệp mốc vừa bị đổi bởi một lượt khác${suffix}`;
-  }
-  return `GitHub trả ${status} khi ${what}${suffix}`;
 }
 
 /** Trạng thái lịch của workflow. Đây cũng là phép thử PAT: hỏng ở đây thì khỏi ghi gì cả. */

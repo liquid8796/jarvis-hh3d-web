@@ -474,4 +474,6 @@ if (onlySite) {
   console.log("  Mọi trạm trong sổ đã mang cùng một commit.");
 }
 console.log("\n  Nhắc: bản vá đụng khôi lỗi (scripts/worker.mjs, src/lib/worker, src/lib/quest-engine,");
-console.log("  scripts/buildWorkerBundle.mjs) thì VM còn phải cài đè — xem deploy/oracle/README.md.");
+console.log("  scripts/buildWorkerBundle.mjs) thì CÒN HAI NƠI nữa phải nhận bản mới — trạm chỉ là một:");
+console.log("    · VM tông môn      — cài đè, xem deploy/oracle/README.md");
+console.log("    · khôi lỗi GitHub  — npm run github:deploy (kho của chúng là bản ĐÔNG LẠNH, không tự cập nhật)");

@@ -1,6 +1,7 @@
 /**
  * Sự thật THUẦN về kho khôi lỗi GitHub — không mạng, không database, dùng chung bởi lượt DỰNG
- * (`newGithubStation.mts`) và lượt XOÁ (`removeGithubKhoiloi.mts`).
+ * (`newGithubStation.mts`), lượt PHÁT HÀNH (`deployGithubKhoiloi.mts`) và lượt XOÁ
+ * (`removeGithubKhoiloi.mts`).
  *
  * VÌ SAO TÁCH RA: hai lượt ấy phải đồng ý với nhau về đúng một câu hỏi — «kho nào là kho khôi
  * lỗi» — và câu trả lời ấy quyết định một lệnh XOÁ. Chép nó ở hai nơi là hẹn ngày lượt xoá nhận
@@ -82,6 +83,111 @@ export function workerIdFromWorkflow(yaml: string): string | null {
   if (!found) return null;
   const value = (found[1] ?? found[2] ?? found[3] ?? "").trim();
   return value.length > 0 ? value : null;
+}
+
+/**
+ * Moi `WEB_URL` mặc định ra khỏi tệp workflow — song sinh với `workerIdFromWorkflow`, và tồn tại
+ * vì lượt PHÁT HÀNH cố ý GIỮ NGUYÊN địa chỉ mỗi kho đang trỏ tới.
+ *
+ * Vì sao giữ nguyên thay vì nướng địa chỉ trạm đang hoạt động vào: khôi lỗi tự đi theo mọi lượt
+ * chuyển trạm lúc chạy (`controlFollow.mjs` — trạm nghỉ trả 409 kèm `activeUrl`), nên giá trị này
+ * chỉ là địa chỉ KHỞI ĐỘNG. Viết đè nó ở mỗi lượt phát hành vừa đổi một tệp không cần đổi — mà
+ * đổi tệp trong `.github/workflows/` là đúng chỗ đòi scope `workflow`, thứ hay thiếu nhất — vừa
+ * ghim các kho vào một trạm gương, trong khi tên miền gốc mới là địa chỉ khởi động ổn định nhất.
+ *
+ * Đọc trong dấu nháy đơn của `${{ vars.WEB_URL || '…' }}`: đó là hình dạng bản mẫu dùng, và cũng
+ * là thứ `renderWorkflow` viết ra. Không khớp thì trả `null` — người gọi phải tự quyết, chứ đừng
+ * đoán bừa một địa chỉ.
+ */
+export function webUrlFromWorkflow(yaml: string): string | null {
+  const found = /vars\.WEB_URL\s*\|\|\s*'([^'\r\n]*)'/.exec(yaml);
+  const value = (found?.[1] ?? "").trim();
+  return value.length > 0 ? value : null;
+}
+
+export type WorkerIdChoice = { ok: true; workerId: string } | { ok: false; message: string };
+
+/**
+ * `WORKER_ID` của kho sắp phát hành — SỔ trước, tệp workflow sau, và KHÔNG có nước thứ ba.
+ *
+ * Đây là hàng rào quan trọng nhất của cả lượt phát hành. Bản mẫu workflow mang sẵn
+ * `WORKER_ID: github-khoiloi`; đoán bừa bằng cách để nguyên bản mẫu nghĩa là đẩy một kho về trùng
+ * id với một khôi lỗi KHÁC đang trực. Hai tiến trình cùng id thì ghi đè nhau trong bảng `workers`,
+ * mục Khôi Lỗi trên dashboard nói dối về việc ai đang trực, và tầng phân công đếm ghế của hai máy
+ * như của một. Thà bỏ qua một kho còn hơn phát hành một va chạm.
+ *
+ * Sổ đứng trước tệp vì sổ là thứ người vận hành sửa được; tệp trong kho chỉ nói kho ấy ĐANG mang
+ * gì. Hai bên lệch nhau thì nói ra — im lặng chọn một bên là cách một lượt phát hành âm thầm đổi
+ * danh tính của một khôi lỗi.
+ */
+export function resolveDeployWorkerId(input: {
+  fromBook: string;
+  fromWorkflow: string | null;
+}): WorkerIdChoice {
+  const book = input.fromBook.trim();
+  const inRepo = (input.fromWorkflow ?? "").trim();
+
+  if (book.length === 0 && inRepo.length === 0) {
+    return {
+      ok: false,
+      message:
+        "Không biết WORKER_ID của kho này: sổ để trống, mà tệp workflow trong kho cũng không khai.\n" +
+        "  Phát hành lúc này là đẩy id mặc định của bản mẫu lên — tức va chạm với một khôi lỗi khác.\n" +
+        "  Điền WORKER_ID cho dòng sổ (tab Kho GitHub → Sửa) rồi chạy lại.",
+    };
+  }
+  return { ok: true, workerId: book.length > 0 ? book : inRepo };
+}
+
+/** Một tệp phải ghi (`sha` mới) hoặc phải xoá, trong cây sắp đẩy lên. */
+export type TreePlan = {
+  /** Có trong gói mà kho chưa có, hoặc nội dung đã khác — phải tải blob lên rồi ghi vào cây. */
+  changed: string[];
+  /** Kho đang có mà gói không còn — phải XOÁ, bằng không kho giữ lại một tệp không ai còn sửa. */
+  removed: string[];
+  /** Giống hệt nhau, không đụng tới. Chỉ để kể cho người đọc. */
+  unchanged: number;
+};
+
+/**
+ * So gói sắp phát hành với cây hiện có của kho — thuần, nên `verify:github-deploy` lái được bằng
+ * hai bản đồ giả.
+ *
+ * PHÉP XOÁ CÓ RANH GIỚI HẸP, và đó là phần dễ sai nhất ở đây: chỉ những tệp nằm dưới
+ * `ownedPrefixes` mới bị xoá. `.github/heartbeat.txt` là của VÒNG NUÔI KHO
+ * (`services/githubStations.ts`), không phải của gói này — xoá nó là phá đúng thứ giữ cho lịch
+ * `schedule` khỏi bị GitHub tắt sau 60 ngày, và triệu chứng sẽ hiện ra ba tuần sau dưới dạng
+ * "khôi lỗi im lặng thôi lên ca". Mọi thứ ngoài ranh giới ấy được giữ nguyên, kể cả rác.
+ *
+ * `changed` so bằng SHA của git (`gitBlobSha`), không so nội dung: cây kho trả về sha sẵn, nên
+ * lượt phát hành không phải tải về một byte nào của bản cũ.
+ */
+export function planKhoiloiTree(input: {
+  /** Gói sắp phát hành: đường dẫn → sha blob tính dưới máy. */
+  payload: ReadonlyMap<string, string>;
+  /** Cây hiện có của kho: đường dẫn → sha blob GitHub khai. */
+  remote: ReadonlyMap<string, string>;
+  ownedPrefixes: readonly string[];
+}): TreePlan {
+  const changed: string[] = [];
+  let unchanged = 0;
+
+  for (const [path, sha] of input.payload) {
+    if (input.remote.get(path) === sha) unchanged++;
+    else changed.push(path);
+  }
+
+  const removed: string[] = [];
+  for (const path of input.remote.keys()) {
+    if (input.payload.has(path)) continue;
+    if (input.ownedPrefixes.some((prefix) => path.startsWith(prefix))) removed.push(path);
+  }
+
+  // Xếp thứ tự để bảng kế hoạch của hai lượt chạy giống nhau đọc ra giống nhau — `Map` giữ thứ tự
+  // chèn, mà thứ tự ấy đến từ `git ls-tree` và từ GitHub, hai nguồn không hứa gì về sắp xếp.
+  changed.sort();
+  removed.sort();
+  return { changed, removed, unchanged };
 }
 
 /**

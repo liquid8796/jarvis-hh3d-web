@@ -67,6 +67,8 @@
     "mirror:remove": "tsx scripts/removeMirrorStation.mts",
     "github:new": "tsx scripts/newGithubStation.mts",
     "github:remove": "tsx scripts/removeGithubKhoiloi.mts",
+    "github:deploy": "tsx scripts/deployGithubKhoiloi.mts",
+    "verify:github-deploy": "tsx scripts/verifyGithubDeploy.mts",
     "verify:job-event-sweep": "tsx scripts/verifyJobEventSweep.mts",
     "verify:worker-version": "tsx scripts/verifyWorkerVersion.mts",
     "verify:github-stations": "tsx scripts/verifyGithubStations.mts",

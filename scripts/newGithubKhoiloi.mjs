@@ -334,7 +334,8 @@ try {
 
   console.log("── Dán secret WORKER_TOKEN…");
   // Token đi qua STDIN, không qua đối số: đối số nằm trong command line mà ai mở Task Manager
-  // cũng đọc được, và trên Windows nó còn phải đi qua phép nối chuỗi của `shell: true`.
+  // cũng đọc được. (Vế thứ hai của lời bình cũ — „còn phải đi qua phép nối chuỗi của
+  // `shell: true`" — đã hết đúng từ 13/08/2026, xem `run`. Lý do thứ nhất tự nó đã đủ.)
   execFileSync("gh", ["secret", "set", "WORKER_TOKEN", "--repo", slug, "--body-file", "-"], {
     input: token,
     stdio: ["pipe", "inherit", "inherit"],

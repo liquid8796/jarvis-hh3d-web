@@ -11,6 +11,56 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.82.7 — kho gốc thôi cày: workflow khôi lỗi rời `.github/workflows/`, thành bản mẫu
+
+`.github/workflows/linh-su.yml` chuyển sang **`deploy/github/linh-su.yml`**. GitHub chỉ chạy thứ
+nằm trong `.github/workflows/`, nên một cú dời thư mục là đủ để kho gốc thôi lên ca — mà bản mẫu
+thì vẫn còn nguyên cho `newGithubKhoiloi.mjs` rải sang những kho nó dựng.
+
+**Vì sao dời, chứ không phải vì sao không thích.** Kho gốc là kho **công khai giữ mã nguồn**, nên
+ba rủi ro đã ghi ở §6 của `deploy/github-actions.md` — `WORKER_TOKEN` (chìa TOÀN CỤC, mở cookie
+của MỌI thành viên) nằm trong Secrets; nhật ký Actions vĩnh viễn ai cũng đọc của một tiến trình
+chuyên cầm cookie game đã giải mã; và một kho「cày game 24/7」ngoài phạm vi chính sách GitHub —
+suốt hai ngày qua đứng trên đúng cái kho giữ toàn bộ mã nguồn tông môn. Ở một kho SINH RA, cái giá
+của cả ba là mất một kho dùng rồi bỏ, dựng lại bằng một cú bấm đúp. Ở đây, cái giá là mất kho gốc.
+
+**Thứ ĐÃ có trước lượt này, và vì sao nó không đủ:** workflow đang ở trạng thái `disabled_manually`
+trên GitHub — có người đã tắt tay. Nhưng một lượt tắt trong giao diện **không để lại dấu vết nào
+trong git**: bản clone nào cũng vẫn mang tệp ấy, một cú fork hay một cú bấm「Enable workflow」là nó
+lên ca lại, và không diff nào cho ai thấy điều đó đã xảy ra. Dời tệp thì ngược lại — ý định nằm
+ngay trong lịch sử, đọc được, xét được.
+
+**Hàng rào này là một tệp KHÔNG có mặt, nên nó phải được canh.** Loại hàng rào ấy không tự giữ
+mình: một cú `git mv` ngược lại, hay một bản chép để「chạy thử một lượt rồi xoá」, dựng lại nó mà
+chẳng ai thấy. `verify:github-removal` nay canh rằng **không workflow nào của kho gốc gọi
+`scripts/worker.mjs`** — canh theo NỘI DUNG chứ không theo tên tệp, vì đổi tên `linh-su.yml` thành
+`khoi-loi.yml` thì kho gốc vẫn cày như thường trong khi một phép kiểm bám vào cái tên vẫn xanh
+nguyên. Hai ca đột biến đã thử, cả hai làm script đỏ đúng chỗ: chép lại đúng `linh-su.yml`
+(*„kho gốc không có .github/workflows/linh-su.yml"*), và chép lại dưới tên khác
+(*„workflow「khoi-loi-doi-ten.yml」của kho gốc không gọi worker.mjs"*). 86 phép kiểm, vẫn thuần.
+
+**Kho SINH RA không đổi một byte.** Chúng vẫn nhận `.github/workflows/linh-su.yml` của riêng
+chúng, vẫn thay đúng hai dòng `WORKER_ID` + `WEB_URL`, và `github:remove` vẫn moi id từ đúng
+đường dẫn ấy qua API. Chỗ duy nhất đổi là **nguồn đọc** bản mẫu — kèm một phép soát `existsSync`
+nói thẳng điều phải nói khi bản mẫu biến mất: *đừng chữa bằng cách chép một bản vào
+`.github/workflows/` của kho gốc*. Không có câu ấy thì lượt sửa gấp tự nhiên nhất chính là lượt
+dựng lại đúng thứ vừa gỡ.
+
+**Một cái bẫy tự đặt ra rồi tự vấp trong chính lượt này, đáng ghi vì nó sẽ còn tái diễn:** bản
+nháp đầu viết hẳn một khối chú thích「tệp này là bản mẫu, nằm ngoài `.github/workflows/` vì kho
+gốc công khai…」lên đầu tệp mẫu. Mà tệp mẫu thì được chép NGUYÊN XI sang một kho công khai — nên
+khối ấy vừa **sai chỗ đến** (ở kho sinh ra, nó đang nằm ĐÚNG trong `.github/workflows/`), vừa khai
+ra tên kho gốc, tên script phát hành và tên lệnh kiểm chứng, đúng loại rò rỉ mà README sinh ra đã
+phải né từ 13/08. Chữa bằng cách viết lại thành một LUẬT đúng ở cả hai nơi —「kho nào giữ mã nguồn
+thì không chạy tệp này」— và đẩy phần chỉ người sửa kho gốc cần đọc sang §4 của tài liệu. Chỗ nối
+giữa bản mẫu và kho công khai nay có một dòng chú thích nói thẳng điều đó, ngay tại điểm chép.
+
+**Hai dấu chân còn lại, cố ý không tự dọn** (cả hai đều là việc trên tài khoản GitHub của đạo
+hữu, và cả hai đều nằm ngoài thứ một commit làm được): secret `WORKER_TOKEN` vẫn nằm trong
+Settings của kho gốc — nên xoá, vì nay không workflow nào ở đó cần tới nó; và dòng `github-khoiloi`
+trong sổ điểm danh sẽ thành một dòng ma trong tab Khôi Lỗi, vì sổ ấy là sổ ĐĂNG KÝ và không ai
+quét dọn dòng của khôi lỗi tông môn (cùng hình dạng với sự cố 13/08, xem 0.82.3).
+
 ## 0.82.6 —「không thấy」không phải「không còn」, và một thư mục công cụ chưa từng được trình biên dịch đọc
 
 Hôm nay xoá ba trạm gương. Với `auto-hh3d-4` — token nằm trong `.env.local` — lượt chạy xoá sạch cả

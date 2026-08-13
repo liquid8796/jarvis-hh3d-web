@@ -19,7 +19,7 @@
  * ai — nó chỉ để lại một dòng ma vĩnh viễn trong tab Khôi Lỗi — nhưng nó đã xảy ra THẬT, và nó
  * thuộc đúng loại không tầng nào ở hạ nguồn bắt được: lượt chạy vẫn in「đã xoá sạch」rồi thoát 0.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import {
   activeRunIds,
@@ -37,6 +37,11 @@ import {
   type Candidate,
 } from "./githubKhoiloi.mts";
 import { ALL_REPO_NAME_PREFIXES, REPO_NAME_PREFIX } from "./khoiloiNaming.mjs";
+
+const repoRoot = path.join(import.meta.dirname, "..");
+/** Bản mẫu workflow — NGOÀI `.github/workflows/` có chủ ý; xem nhóm「Kho gốc không chạy khôi lỗi」. */
+const WORKFLOW_TEMPLATE = path.join(repoRoot, "deploy", "github", "linh-su.yml");
+const WORKFLOW_DIR = path.join(repoRoot, ".github", "workflows");
 
 let passed = 0;
 function ok(condition: boolean, label: string): void {
@@ -83,16 +88,42 @@ const candidate = (over: Partial<Candidate> = {}): Candidate => ({
   ok(workerIdFromWorkflow("") === null, "tệp rỗng trả null");
 
   /**
-   * Đọc CHÍNH tệp workflow mà `newGithubKhoiloi.mjs` rải sang mọi kho nó dựng.
+   * Đọc CHÍNH bản mẫu mà `newGithubKhoiloi.mjs` rải sang mọi kho nó dựng.
    *
    * Cố ý KHÔNG so với một giá trị cụ thể: id ấy đổi được (và vừa đổi ngày 13/08/2026). Thứ phải
    * đúng mãi mãi là「phép moi này chạy được trên tệp THẬT」— một phép thử chỉ dùng chuỗi tự bịa sẽ
    * vẫn xanh nguyên vào đúng ngày ai đó thêm dấu nháy hay đổi mức thụt lề trong tệp kia.
    */
-  const real = readFileSync(path.join(import.meta.dirname, "..", ".github", "workflows", "linh-su.yml"), "utf8");
+  ok(existsSync(WORKFLOW_TEMPLATE), "bản mẫu workflow có mặt ở deploy/github/linh-su.yml");
+  const real = readFileSync(WORKFLOW_TEMPLATE, "utf8");
   const fromReal = workerIdFromWorkflow(real);
-  ok(fromReal !== null && fromReal.length > 0, `moi được WORKER_ID từ workflow thật của repo (${fromReal})`);
+  ok(fromReal !== null && fromReal.length > 0, `moi được WORKER_ID từ bản mẫu thật (${fromReal})`);
   ok(!fromReal!.startsWith("#"), "giá trị moi từ tệp thật không phải một mẩu chú thích");
+}
+
+// ---- Kho gốc KHÔNG chạy khôi lỗi ---------------------------------------------------------------
+//
+// Bản mẫu rời khỏi `.github/workflows/` ngày 13/08/2026. Lý do đầy đủ ở đầu tệp mẫu; gọn lại: kho
+// gốc là kho CÔNG KHAI giữ mã nguồn, nên một workflow khôi lỗi ở đây đặt `WORKER_TOKEN` — chìa
+// TOÀN CỤC — vào Secrets của nó và đổ nhật ký vĩnh viễn của một tiến trình cầm cookie game đã giải
+// mã ra chỗ ai cũng đọc.
+//
+// Hàng rào ấy KHÔNG nằm trong một dòng mã nào — nó là một tệp KHÔNG có mặt. Loại hàng rào đó không
+// tự bảo vệ được: một cú `git mv` ngược lại, hay một bản chép để「chạy thử một lượt rồi xoá」, dựng
+// lại nó mà không ai thấy, và lượt `schedule` kế tiếp cứ thế lên ca.
+//
+// Nên canh theo NỘI DUNG, không theo tên tệp: đổi tên thành `khoi-loi.yml` thì kho gốc vẫn cày như
+// thường, mà một phép kiểm bám vào cái tên vẫn xanh nguyên.
+{
+  ok(!existsSync(path.join(WORKFLOW_DIR, "linh-su.yml")), "kho gốc không có .github/workflows/linh-su.yml");
+
+  const workflows = existsSync(WORKFLOW_DIR)
+    ? readdirSync(WORKFLOW_DIR).filter((name) => /\.ya?ml$/i.test(name))
+    : [];
+  for (const name of workflows) {
+    const body = readFileSync(path.join(WORKFLOW_DIR, name), "utf8");
+    ok(!/scripts[/\\]worker\.mjs/.test(body), `workflow「${name}」của kho gốc không gọi worker.mjs`);
+  }
 }
 
 // ---- Bộ lọc tên -------------------------------------------------------------------------------

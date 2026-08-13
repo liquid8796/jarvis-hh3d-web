@@ -365,10 +365,26 @@ try {
     ) + "\n",
   );
 
-  // Workflow lấy NGUYÊN bản của web repo rồi chỉ thay đúng hai dòng: id khôi lỗi và địa chỉ web.
-  // Chép tay một bản thứ hai là hẹn ngày hai bản trôi khỏi nhau — mà bộ số 290/50/350/360 thì
-  // không được phép lệch.
-  const workflow = readFileSync(path.join(repoRoot, ".github", "workflows", "linh-su.yml"), "utf8")
+  // Workflow lấy NGUYÊN bản mẫu của web repo rồi chỉ thay đúng hai dòng: id khôi lỗi và địa chỉ
+  // web. Chép tay một bản thứ hai là hẹn ngày hai bản trôi khỏi nhau — mà bộ số 290/50/350/360
+  // thì không được phép lệch.
+  //
+  // Bản mẫu nằm ở `deploy/github/`, NGOÀI `.github/workflows/`: kho gốc là kho CÔNG KHAI giữ mã
+  // nguồn và từ 13/08/2026 nó không chạy khôi lỗi nữa (lý do đầy đủ ở `deploy/github-actions.md`
+  // §4). Đường dẫn ấy là một quyết định, không phải một chỗ bày bừa để dọn.
+  //
+  // VÀ: mọi CHÚ THÍCH trong bản mẫu đi nguyên xi sang một kho CÔNG KHAI — cùng loại rò rỉ mà
+  // README sinh ra ở dưới phải né. Nên đừng viết vào đó tên kho gốc, tên script phát hành, hay
+  // tên lệnh kiểm chứng; thứ chỉ người sửa kho gốc cần đọc thì để ở `deploy/github-actions.md`.
+  const templatePath = path.join(repoRoot, "deploy", "github", "linh-su.yml");
+  if (!existsSync(templatePath)) {
+    throw new Error(
+      `Không thấy bản mẫu workflow ở ${templatePath} — nó vừa bị dời hoặc bị xoá.\n` +
+        "ĐỪNG chữa bằng cách chép một bản vào .github/workflows/ của kho gốc: kho ấy công khai, " +
+        "và làm vậy là tự bật khôi lỗi ở đúng nơi giữ mã nguồn. Khôi phục lại đường dẫn trên.",
+    );
+  }
+  const workflow = readFileSync(templatePath, "utf8")
     .replace(/^(\s*WORKER_ID:\s*).*$/m, `$1${workerId}`)
     .replace(/\$\{\{ vars\.WEB_URL \|\| '[^']*' \}\}/, `\${{ vars.WEB_URL || '${webUrl}' }}`);
   if (!workflow.includes(`WORKER_ID: ${workerId}`)) {

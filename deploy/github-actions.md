@@ -4,7 +4,7 @@ Từ 12/08/2026 tông môn có **hai** khôi lỗi hạng tông môn, không ph�
 
 | | `tong-mon-khoiloi` | `github-khoiloi` |
 |---|---|---|
-| Ở đâu | VM Oracle Always Free, 4 vCPU/24GB | Runner của GitHub Actions, 4 nhân/16GB |
+| Ở đâu | VM Oracle Always Free, 4 vCPU/24GB | Runner của GitHub Actions, 4 nhân/16GB — trên TÀI KHOẢN KHÁC, không bao giờ ở kho gốc (§4) |
 | Sống | 24/7, liền mạch hàng tuần | Từng lượt ~4,8 giờ, lịch 4 giờ/lần nối nhau |
 | Ghế | 3 đàn × 4 tab | 2 đàn × 3 tab |
 | Tài liệu | [oracle/README.md](oracle/README.md) | tệp này |
@@ -80,9 +80,33 @@ lịch 4 giờ/lần   <   tuổi thọ ~4,8 giờ   →   lượt kế đã ch�
 Hết hạn chờ mà còn đàn dở thì worker thoát với mã **khác 0** — có người sắp mất một vòng, chuyện
 ấy phải hiện đỏ chứ không đáng lặng lẽ trôi qua.
 
-## 4. Cài đặt — một bước
+## 4. KHO GỐC KHÔNG CHẠY KHÔI LỖI (13/08/2026)
 
-Settings → Secrets and variables → Actions → New repository secret:
+Bản mẫu workflow sống ở **`deploy/github/linh-su.yml`**, tức NGOÀI `.github/workflows/`. Đó là
+chỗ GitHub không bao giờ chạy, và đấy là toàn bộ mục đích.
+
+Kho gốc `liquid8796/jarvis-hh3d-web` là kho **công khai giữ mã nguồn**, nên một workflow khôi lỗi
+đặt ở đó kéo trọn ba rủi ro của §6 vào chính nó: `WORKER_TOKEN` — chìa TOÀN CỤC, mở cookie của
+MỌI thành viên — nằm trong Secrets của nó; nhật ký Actions vĩnh viễn, ai cũng đọc, của một tiến
+trình chuyên cầm cookie game đã giải mã; và một kho「cày game 24/7」mang luôn cả mã nguồn tông môn.
+Ở một kho SINH RA, cái giá của ba thứ ấy là mất một kho dùng rồi bỏ. Ở kho gốc, cái giá là mất
+kho gốc.
+
+Nên khôi lỗi GitHub **chỉ sống trên các tài khoản khác**, trong kho do `github:new` dựng:
+`newGithubKhoiloi.mjs` đọc bản mẫu rồi ghi vào `.github/workflows/linh-su.yml` **của kho ấy**,
+thay đúng hai dòng `WORKER_ID` và `WEB_URL`. Một bản mẫu, nhiều kho — bộ số 290/50/350/360 không
+có cơ hội trôi khỏi nhau.
+
+Hàng rào này là **một tệp KHÔNG có mặt**, mà loại hàng rào ấy không tự giữ được mình: một cú
+`git mv` ngược lại, hay một bản chép để「chạy thử một lượt rồi xoá」, dựng lại nó mà chẳng ai thấy.
+Vì thế `npm run verify:github-removal` canh rằng **không workflow nào của kho gốc gọi
+`scripts/worker.mjs`** — canh theo NỘI DUNG, nên đổi tên tệp không lách được. Hai ca đột biến đã
+thử, cả hai làm script đỏ đúng chỗ: chép lại đúng `linh-su.yml`, và chép lại dưới tên khác.
+
+### Cài đặt một kho dựng bằng TAY — một bước
+
+`github:new` dán secret sẵn bằng `gh secret set`, nên đoạn này chỉ dùng khi dựng tay. Settings →
+Secrets and variables → Actions → New repository secret, **ở kho ấy**:
 
 ```
 WORKER_TOKEN    (đúng giá trị đang đặt trên Vercel)
@@ -92,7 +116,8 @@ Lấy giá trị: `vercel env pull .env --environment=production --yes` rồi đ
 **Không** dùng `npm run env:pull` — lệnh ấy kéo môi trường *development*, nơi `WORKER_TOKEN`,
 `AUTH_SECRET` và `DATABASE_URL` đều không tồn tại.
 
-Chạy thử: Actions → **Khôi lỗi tông môn (GitHub)** → Run workflow.
+Chạy thử: Actions → **Khôi lỗi tông môn (GitHub)** → Run workflow, ở kho sinh ra chứ không phải
+kho gốc.
 
 **Dấu hiệu khoẻ:** mục Khôi Lỗi trên dashboard hiện HAI khôi lỗi tông môn đang trực. Thiếu
 secret thì bước cuối dừng ngay với một dòng đỏ nói rõ, không chạy rỗng.
@@ -123,6 +148,9 @@ Ghi ra để người sau không tưởng là sơ suất — đây là một quy
   của repo」trong chính sách sử dụng của GitHub. Rủi ro không phải hoá đơn mà là tài khoản.
 
 Ai định mở rộng lối này — thêm trạm, tăng ghế — nên đọc lại ba dòng trên trước.
+
+Từ 13/08/2026 ba rủi ro ấy chỉ còn đứng trên các kho **sinh ra**, không còn trên kho gốc: workflow
+đã rời khỏi `.github/workflows/` của kho gốc — xem §4.
 
 ---
 
@@ -374,7 +402,7 @@ biến đã thử**, cả hai làm script đỏ đúng chỗ: cho `--force` mở
 *„không bằng chứng + --force → VẪN từ chối"*; lệch biên `heldJobs > 0` thành `> 1` →
 *„đúng MỘT đàn cũng đủ để chặn"* (ca THƯỜNG NHẤT, vì khôi lỗi GitHub có 2 ghế).
 
-Phép moi `WORKER_ID` đọc **chính** `.github/workflows/linh-su.yml` của repo này, và cố ý không so
+Phép moi `WORKER_ID` đọc **chính** bản mẫu `deploy/github/linh-su.yml` của repo này, và cố ý không so
 với một giá trị cụ thể — id đổi được, còn thứ phải đúng mãi là「phép moi chạy được trên tệp THẬT」.
 
 ### Chưa có bằng chứng

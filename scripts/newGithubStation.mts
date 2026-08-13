@@ -334,7 +334,10 @@ async function main(): Promise<void> {
 
   // `gh` là bắt buộc cho lượt đặt secret (sealed-box X25519+XSalsa20, thứ Node không có sẵn — xem
   // đầu newGithubKhoiloi.mjs). Kiểm ở đây để câu chỉ dẫn nói đúng lối cài của Windows.
-  const ghCheck = spawnSync("gh", ["--version"], { stdio: "ignore", shell: process.platform === "win32" });
+  // KHÔNG shell — phép kiểm phải đi ĐÚNG con đường mà lượt gọi thật sẽ đi (xem `run` trong
+  // newGithubKhoiloi.mjs, nơi shell đã bị gỡ ngày 13/08/2026). Kiểm qua shell rồi gọi thật không
+  // shell là dựng một phép kiểm xanh đứng trước một lượt chạy ENOENT.
+  const ghCheck = spawnSync("gh", ["--version"], { stdio: "ignore" });
   if (ghCheck.error || ghCheck.status !== 0) {
     die(
       "Chưa có `gh` (GitHub CLI) — nó là thứ đặt được secret WORKER_TOKEN cho kho mới.\n" +

@@ -104,13 +104,29 @@ function resolveWebUrl(raw) {
 
 const webUrl = resolveWebUrl(arg("web-url", process.env.WEB_URL));
 
-/** Chạy một lệnh và trả stdout. `gh` trên Windows là .cmd nên cần shell — xem ghi chú ở deployAllStations. */
+/**
+ * Chạy một lệnh và trả stdout. KHÔNG shell — và đây là một chỗ đã hỏng thật, 13/08/2026.
+ *
+ * Bản trước đặt `shell: process.platform === "win32"` cho MỌI lệnh. Với `shell: true` Node
+ * **nối chuỗi** đối số thay vì escape, nên lời nhắn commit vỡ làm sáu: git nhận `feat:` làm lời
+ * nhắn rồi coi năm chữ còn lại là đường dẫn —
+ * `error: pathspec 'khôi' did not match any file(s) known to git`. Lượt dựng kho thật đầu tiên
+ * chết ở đúng dòng ấy. Chính Node cũng kêu điều này qua DEP0190 ở cuối lượt chạy.
+ *
+ * Lời bình cũ biện hộ cho shell bằng câu「`gh` trên Windows là .cmd」— chép nhầm lý lẽ của
+ * `deployAllStations.mts`, nơi câu ấy nói về `vercel` (một .cmd thật, do npm rải). `gh` do winget
+ * cài là `gh.exe`, tệp thực thi thật (đo: `C:\Program Files\GitHub CLI\gh.exe`), nên không lệnh
+ * nào ở đây cần shell. Cùng luật với `run` bên deployAllStations: bật shell là ngoại lệ phải
+ * chứng minh, không phải mặc định.
+ *
+ * Quả mìn thứ hai cùng loại đã tháo cùng lượt này: `--description` của `gh repo create` cũng mang
+ * khoảng trắng và một dấu gạch dài, nên nó sẽ vỡ y hệt ở dòng ngay sau chỗ vừa chết.
+ */
 function run(cmd, args, options = {}) {
   return execFileSync(cmd, args, {
     cwd: options.cwd ?? repoRoot,
     encoding: "utf8",
     stdio: options.quiet ? ["ignore", "pipe", "pipe"] : ["ignore", "pipe", "inherit"],
-    shell: process.platform === "win32",
     timeout: options.timeout ?? 120_000,
     env: options.env ?? process.env,
   });
@@ -265,13 +281,28 @@ try {
   assertImportsResolve(staging);
 
   /**
+   * Lượt commit đầu nằm TRƯỚC cửa `--dry-run`, không sau — và chỗ này đổi vì đúng một lần hỏng.
+   *
+   * Ba lời gọi `git` không cần mạng, không cần `gh`, không đụng tài khoản ai: chúng chạy trọn
+   * trong thư mục tạm sắp bị xoá. Tức chúng thuộc về đúng cái phần mà chạy khô đã hứa sẽ soi —
+   * „mọi việc KHÔNG cần `gh`". Để chúng sau cửa thoát là để nguyên một khoảng mù ngay giữa
+   * đường, và ngày 13/08/2026 lỗi đã nằm đúng trong khoảng mù ấy: lời nhắn commit vỡ vì
+   * `shell: true` (xem `run`), lượt chạy khô báo xanh, lượt chạy thật chết.
+   */
+  run("git", ["init", "-q", "-b", "main"], { cwd: staging });
+  run("git", ["add", "-A"], { cwd: staging });
+  run("git", ["-c", "user.name=auto-hh3d", "-c", "user.email=auto-hh3d@users.noreply.github.com",
+    "commit", "-q", "-m", `feat: khôi lỗi tông môn ${workerId}`], { cwd: staging });
+
+  /**
    * `--dry-run` dừng ở ĐÂY, không dừng ở đầu.
    *
    * Bản trước thoát ngay sau khi in kế hoạch, nên nó soi được đúng mấy con số mà người ta vốn đã
    * gõ ra — còn phần duy nhất thật sự có thể sai, danh sách tệp phải chép, thì không lượt chạy
    * khô nào chạm tới. Và đúng chỗ ấy đã sai thật. Giờ chạy khô làm trọn phần dựng: chép, thay
-   * WORKER_ID trong workflow, rồi soi đường import — tức mọi việc KHÔNG cần `gh`, đúng thứ máy
-   * phát triển kiểm được. Chỉ bốn lời gọi `gh` ở cuối là còn chưa có bằng chứng.
+   * WORKER_ID trong workflow, soi đường import, RỒI COMMIT THẬT vào thư mục tạm — tức mọi việc
+   * KHÔNG cần `gh`, đúng thứ máy phát triển kiểm được. Chỉ bốn lời gọi `gh` là còn chưa có
+   * bằng chứng.
    */
   if (dryRun) {
     const files = [];
@@ -284,19 +315,18 @@ try {
       }
     };
     list(staging);
-    console.log(`--dry-run: đã dựng thử ${files.length} tệp và soi xong đường import.\n`);
+    const subject = run("git", ["log", "-1", "--pretty=%s"], { cwd: staging, quiet: true }).trim();
+    console.log(`--dry-run: đã dựng thử ${files.length} tệp, soi xong đường import, và commit thử.\n`);
     console.log(files.map((f) => `  ${f}`).join("\n"));
+    // In lại lời nhắn ĐỌC TỪ GIT, không in lại chuỗi ta vừa gõ: chỉ bản git đọc ra mới chứng minh
+    // được đối số đi qua nguyên vẹn. Đây chính là phép đo mà lỗi 13/08 đã lọt qua vì thiếu.
+    console.log(`\n  commit  ${subject}`);
     console.log(`\nKhông tạo kho, không đụng GitHub. Bỏ --dry-run để làm thật.`);
     // Dọn TẠI ĐÂY: `process.exit` không chạy khối `finally` ở cuối tệp, nên mỗi lượt chạy khô sẽ
     // để lại một thư mục tạm vài trăm KB nếu tin vào nó.
     rmSync(staging, { recursive: true, force: true });
     process.exit(0);
   }
-
-  run("git", ["init", "-q", "-b", "main"], { cwd: staging });
-  run("git", ["add", "-A"], { cwd: staging });
-  run("git", ["-c", "user.name=auto-hh3d", "-c", "user.email=auto-hh3d@users.noreply.github.com",
-    "commit", "-q", "-m", `feat: khôi lỗi tông môn ${workerId}`], { cwd: staging });
 
   console.log(`\n── Tạo kho ${slug}…`);
   run("gh", ["repo", "create", slug, "--public", "--source", ".", "--push",
@@ -308,7 +338,6 @@ try {
   execFileSync("gh", ["secret", "set", "WORKER_TOKEN", "--repo", slug, "--body-file", "-"], {
     input: token,
     stdio: ["pipe", "inherit", "inherit"],
-    shell: process.platform === "win32",
     timeout: 60_000,
   });
 

@@ -1,0 +1,138 @@
+# ĐỒNG HỒ QUÉT NHẬT KÝ ĐÀN — gõ cửa `/api/cron/sweep` đúng nhịp, không cần ai trực.
+#
+# VÌ SAO Ở ĐÂY chứ không phải một cron của Vercel: gói Hobby cho đúng MỘT cron mỗi ngày. Đó là
+# trần của nền tảng, không phải một lựa chọn — và nó là toàn bộ lý do hạn lưu đếm bằng GIỜ mà
+# suốt một thời gian dài không giờ nào được thi hành. Hạ tầng duy nhất sẵn có cho một nhịp dày
+# hơn ngày là chỗ này: repo CÔNG KHAI nên Actions trên runner tiêu chuẩn miễn phí không giới hạn
+# phút (xem ghi chú ngân sách trong `vercel-usage.yml`), và `CRON_SECRET` đã nằm sẵn trong Secrets
+# từ workflow ấy — nên workflow này KHÔNG cần cài đặt gì thêm.
+#
+# NGÂN SÁCH: một lượt là đúng một lệnh `curl`, không checkout, không `npm ci` — vài giây. Nhịp 10
+# phút tức ~144 lượt/ngày ≈ 7 phút runner mỗi ngày. Đặt cạnh `vercel-usage.yml` (~240 phút/ngày)
+# thì đây là hạt cát. NẾU CÓ NGÀY ĐỔI REPO VỀ RIÊNG TƯ, workflow này vẫn vừa gói Free 2.000
+# phút/tháng (~210 phút) — thứ phải hạ nhịp trong lượt sửa ấy là `vercel-usage.yml`, không phải
+# tệp này.
+#
+# VÌ SAO 10 PHÚT chứ không phải 5 (mức nhỏ nhất GitHub nhận): lịch của GitHub là NỖ LỰC TỐI ĐA,
+# không phải cam kết — lượt bị trễ vài phút là thường, và nhịp 5 phút bị bỏ lượt nhiều hơn hẳn khi
+# hệ thống bận. 10 phút vừa đủ dày để một hạn lưu 1 giờ (mức nhỏ nhất đặt được) chỉ vượt hạn ~17%,
+# vừa đủ thưa để hiếm khi bị bỏ. Trễ một lượt cũng không mất gì: hạn lưu là một mốc thời gian
+# tuyệt đối, nên lượt sau dọn tiếp đúng chỗ vừa dừng.
+#
+# CON SỐ 10 CÒN NẰM Ở MỘT NƠI NỮA — `JOB_EVENT_SWEEP_CLOCK_MINUTES` trong
+# `src/lib/validation/retention.ts`, vì trang admin HỨA con số ấy với trưởng môn. Sửa một bên mà
+# quên bên kia thì giao diện nói dối, nên `npm run verify:job-event-sweep` đọc thẳng tệp này và so.
+# Đổi nhịp = sửa cả hai nơi, rồi chạy phép kiểm ấy.
+
+name: Quét nhật ký đàn
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+# Đúng MỘT lượt quét tại một thời điểm; lượt tới trong lúc ấy nằm CHỜ (GitHub giữ tối đa một lượt
+# chờ, lượt chờ cũ hơn bị huỷ). `cancel-in-progress: false` vì lượt đang chạy có thể đang giữa một
+# câu xoá 50 nghìn dòng — cắt ngang không hỏng gì (mỗi lô tự cam kết) nhưng cũng chẳng được gì.
+# Thực tế một lượt chỉ vài giây, nên hàng chờ này gần như không bao giờ dùng tới.
+concurrency:
+  group: quet-nhat-ky
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  quet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Gõ cửa quét
+        env:
+          WEB_URL: ${{ vars.WEB_URL || 'https://auto-hh3d.vercel.app' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -u
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Thiếu secret CRON_SECRET — cửa quét sẽ trả 401. Thêm ở Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+          SWEEP_PATH="/api/cron/sweep"
+          target="${WEB_URL%/}$SWEEP_PATH"
+
+          # ĐI THEO CHUYỂN HƯỚNG GƯƠNG TRẠM BẰNG TAY, không dùng `curl -L`.
+          #
+          # Trạm nghỉ vẫn 307 sang trạm đang hoạt động, mà mỗi trạm có DATABASE_URL RIÊNG — nên
+          # không đi theo là quét nhầm một database không ai đọc. Nhưng `curl -L` vứt header
+          # `Authorization` khi đổi host (mặc định có chủ ý của curl), còn `--location-trusted`
+          # thì gắn lại chìa cho BẤT KỲ đích nào Location trỏ tới. Cả hai đều sai, nên tự đi và
+          # tự kiểm từng chặng.
+          #
+          # Bốn luật dưới đây là bản shell của `looksLikeStationHop` (scripts/usagePush.mts) —
+          # lý lẽ đầy đủ của từng luật nằm ở đó:
+          #   • chỉ 307/308      — hai mã duy nhất hứa giữ nguyên method;
+          #   • Location là http(s) và KHÔNG tụt từ https xuống http (chìa không đi trên dây trần);
+          #   • giữ nguyên đường — tầng gương trạm chỉ đổi host, đổi path là thứ khác đang trả lời;
+          #   • tối đa MỘT chặng — sổ gương chỉ trỏ một bậc; hai bậc là đang trỏ vòng.
+          hop=0
+          while : ; do
+            # -m 90 chứ không 60: cửa quét khai `maxDuration = 60`, nên cắt dây ở đúng 60 giây là
+            # tự bỏ mất câu trả lời của một lượt vẫn đang chạy hợp lệ — và báo đỏ một việc đã xong.
+            code=$(curl -sS -m 90 -o /tmp/sweep-body -w '%{http_code}' \
+                     -H "Authorization: Bearer $CRON_SECRET" \
+                     -D /tmp/sweep-headers "$target") || {
+              echo "::error::Không gọi được $target"
+              exit 1
+            }
+
+            if [ "$code" != "307" ] && [ "$code" != "308" ]; then
+              break
+            fi
+
+            if [ "$hop" -ge 1 ]; then
+              echo "::error::Quá một chặng chuyển hướng — sổ gương trạm đang trỏ vòng?"
+              exit 1
+            fi
+
+            # `sed` bóc tên header chứ không `cut -d' ' -f2-`: một khoảng trắng thừa sau dấu hai
+            # chấm (hợp lệ theo RFC) sẽ làm `cut` trả về một chuỗi bắt đầu bằng dấu cách.
+            # `tr -d '\r'` bắt buộc: header HTTP kết thúc bằng CRLF, và một CR lọt vào biến sẽ
+            # biến URL thành một chuỗi trông đúng mà curl không gọi được.
+            location=$(grep -i '^location:' /tmp/sweep-headers | tail -1 \
+                       | sed 's/^[Ll]ocation:[[:space:]]*//' | tr -d '\r')
+            # Luật là KHÔNG TỤT HẠNG, không phải「chỉ https」— đúng như bản gốc. Ngoài đời `WEB_URL`
+            # luôn là https nên hai cách viết cho cùng kết quả; khác biệt nằm ở một trạm chạy dưới
+            # máy, và ở chính phép thử của đoạn shell này.
+            case "$target" in
+              https://*) here_https=1 ;;
+              *) here_https=0 ;;
+            esac
+            case "$location" in
+              https://*) ;;
+              http://*)
+                if [ "$here_https" = "1" ]; then
+                  echo "::error::Chuyển hướng tụt từ https xuống http — không gắn lại chìa lên dây trần."
+                  exit 1
+                fi ;;
+              *)
+                echo "::error::Chuyển hướng không có Location dùng được: '${location:-（rỗng）}'"
+                exit 1 ;;
+            esac
+            case "$location" in
+              *"$SWEEP_PATH") ;;
+              *)
+                echo "::error::Chuyển hướng đổi sang đường khác ($location) — không còn là cửa quét."
+                exit 1 ;;
+            esac
+
+            echo "— trạm nghỉ, đi tiếp sang: $location"
+            target="$location"
+            hop=$((hop + 1))
+          done
+
+          body=$(cat /tmp/sweep-body)
+          if [ "$code" != "200" ]; then
+            echo "::error::Cửa quét trả HTTP $code — $body"
+            exit 1
+          fi
+          echo "HTTP $code — $body"

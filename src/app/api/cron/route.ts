@@ -1,5 +1,5 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { authorizeCronRequest } from "@/lib/auth/cronSecret";
 import { purgeExpiredChat } from "@/lib/services/chat";
 import { runKeepalive } from "@/lib/services/githubStations";
 import { purgeExpiredJobEvents, reapStaleJobs } from "@/lib/services/jobs";
@@ -41,19 +41,8 @@ import { purgeExpiredJobEvents, reapStaleJobs } from "@/lib/services/jobs";
  */
 export const maxDuration = 60;
 
-/** So sánh không rò thời gian, và không ném khi hai chuỗi khác độ dài. */
-function secretMatches(presented: string, expected: string): boolean {
-  const a = Buffer.from(presented);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  const header = request.headers.get("authorization") ?? "";
-  const presented = header.startsWith("Bearer ") ? header.slice(7) : "";
-
-  if (!secret || presented.length === 0 || !secretMatches(presented, secret)) {
+  if (!authorizeCronRequest(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

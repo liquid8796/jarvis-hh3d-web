@@ -4,10 +4,10 @@ import { useActionState, useState } from "react";
 import { saveJobEventsSettingsAction, type AdminResult } from "@/app/actions/admin";
 import {
   JOB_EVENTS_PURGE_INTENT,
+  JOB_EVENT_SWEEP_CLOCK_MINUTES,
   RETENTION_UNITS,
   formatRetention,
   formatSweepInterval,
-  jobEventSweepInterval,
   parseRetentionHours,
   retentionUnitSpec,
   splitRetention,
@@ -110,20 +110,18 @@ export function JobEventRetentionForm({
         {spec.min}–{spec.max} {spec.label}. Bản thân các đàn KHÔNG bị đụng tới — chỉ nhật ký của
         chúng.
       </p>
-      {preview.ok && (
-        // Nhịp quét kể theo con số ĐANG GÕ, cùng quy ước với dòng「Sẽ giữ」ngay trên: cả hai nói về
-        // thứ cú bấm Lưu sắp tạo ra. Trước 13/08/2026 chỗ này là một lời xin lỗi in đậm — nhịp tự
-        // động chạy MỘT LẦN MỖI NGÀY nên mọi hạn lưu ngắn hơn ngày đều không được thi hành. Giờ
-        // nhịp bám theo hạn lưu, nên chỗ này kể một con số thật thay vì báo trước một sự thất hứa.
-        <p className="mt-1 text-xs text-[var(--color-mist)]">
-          Dòng nhật ký cũ hơn mốc này bị quét mỗi{" "}
-          <span className="font-mono text-[var(--color-gold-300)]">
-            {formatSweepInterval(jobEventSweepInterval(preview.hours))}
-          </span>{" "}
-          — nhịp quét đi nhờ đường của khôi lỗi, nên nó cần có ít nhất một khôi lỗi đang trực. Không
-          ai trực thì lưới sau là lượt cron mỗi ngày một lần.
-        </p>
-      )}
+      {/* Nhịp quét KHÔNG phụ thuộc con số đang gõ, nên dòng này đứng ngoài mọi nhánh: nó là tính
+          chất của hệ, không phải của thứ sắp lưu. Trước 13/08/2026 chỗ này là một lời xin lỗi in
+          đậm — nhịp tự động chạy MỘT LẦN MỖI NGÀY nên mọi hạn lưu ngắn hơn ngày đều không được thi
+          hành. Con số dưới đây là lời hứa VÔ ĐIỀU KIỆN (đồng hồ ngoài), không phải nhịp tốt nhất
+          trong điều kiện thuận lợi — hứa cái tốt nhất là cách nhanh nhất để lại nói dối. */}
+      <p className="mt-1 text-xs text-[var(--color-mist)]">
+        Dòng nhật ký cũ hơn mốc này bị quét mỗi{" "}
+        <span className="font-mono text-[var(--color-gold-300)]">
+          {formatSweepInterval(JOB_EVENT_SWEEP_CLOCK_MINUTES * 60_000)}
+        </span>{" "}
+        — chạy bằng đồng hồ ngoài, không cần khôi lỗi đang trực và cũng không cần ai mở web.
+      </p>
 
       <div className="mt-4 rounded-lg border border-[rgba(232,194,92,0.28)] px-4 py-3 text-xs">
         <p className="text-[var(--color-mist)]">

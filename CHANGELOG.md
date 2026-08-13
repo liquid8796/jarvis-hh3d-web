@@ -11,6 +11,55 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.82.0 — nhật ký được dọn bằng một cái đồng hồ, không còn bằng may mắn
+
+Câu hỏi đặt ra sau bản 0.81.3: *tại sao lại chỉ quét một ngày một lần?* Trả lời thẳng — **Vercel
+gói Hobby cho đúng MỘT cron mỗi ngày.** Đó là trần của nền tảng, không phải một lựa chọn thiết kế,
+và nó là toàn bộ nguồn gốc của chuyện hạn lưu đếm bằng giờ mà không giờ nào được thi hành.
+
+Bản 0.81.3 gỡ được phần lớn bằng cách cho lượt quét đi nhờ `/api/worker`. Nhưng nó vẫn là một lời
+hứa **có điều kiện**: phải có khôi lỗi đang trực. Điều kiện ấy gần như luôn đúng (VM trực 24/7,
+`github-khoiloi` chạy nối ca 4 giờ một lượt) — mà「gần như luôn đúng」thì vẫn không phải「đúng」, và
+một cái núm hạn lưu không nên đứng trên một chữ「gần như」.
+
+**`/api/cron/sweep` — cửa quét dày nhịp, gõ bởi một đồng hồ ngoài.** Đồng hồ ấy là GitHub Actions
+(`.github/workflows/quet-nhat-ky.yml`), nhịp **10 phút**, không cần ai trực và không cần ai mở web.
+Chỗ này không phải hạ tầng mới: dự án đã dùng Actions làm lịch cho hai việc khác, repo CÔNG KHAI
+nên phút chạy không giới hạn, và `CRON_SECRET` đã nằm sẵn trong Secrets — nên workflow này không
+cần cài đặt gì thêm. Một lượt là đúng một lệnh `curl`, không checkout, không `npm ci`: vài giây,
+~7 phút runner mỗi ngày.
+
+**Cửa mới phải đứng riêng khỏi `/api/cron`, và đây là lý do cứng:** `/api/cron` còn nuôi kho GitHub
+(`runKeepalive`), việc ấy ĐẨY COMMIT lên bốn kho thật và được thiết kế cho nhịp ngày. Gọi
+`/api/cron` mỗi 10 phút là rải ~144 commit mỗi ngày lên kho của người ta. Route mới ghi thẳng điều
+cấm ấy vào chú thích, vì nó là loại sai lầm chỉ lộ ra sau khi đã rải xong.
+
+**Hai cửa cron đi hai đường NGƯỢC NHAU khi trạm nghỉ, và đó là cố ý.** `/api/cron` trả 204 — cron
+riêng của từng trạm không được đua nhau dọn trên hai database khác nhau. `/api/cron/sweep` trả 307
+— nó do một đồng hồ gọi vào đúng một địa chỉ, im lặng ở đây nghĩa là suốt lượt chuyển trạm không ai
+quét nhật ký. Trước bản này sự khác biệt ấy đúng một cách TÌNH CỜ (`decideRequest` so bằng, không
+so tiền tố). Nay `verify:control` khoá cả hai chiều: một lượt「dọn cho gọn」đổi phép so thành
+`startsWith("/api/cron")` sẽ đỏ ngay, thay vì lặng lẽ tắt lượt quét vào đúng ngày chuyển trạm.
+
+**Không dùng `curl -L`.** Trạm nghỉ 307 sang trạm sống, mà `curl -L` VỨT header `Authorization`
+khi đổi host, còn `--location-trusted` thì gắn lại chìa cho bất kỳ đích nào `Location` trỏ tới —
+cả hai đều sai. Workflow tự đi từng chặng và tự kiểm, theo đúng bốn luật của `looksLikeStationHop`
+(chỉ 307/308; không tụt https→http; giữ nguyên đường; tối đa một chặng). Đoạn shell ấy được thử
+THẬT: trích thẳng từ YAML rồi chạy với hai trạm giả, sáu ca — gồm ca quan trọng nhất là *chuyển
+hướng đổi đường thì chìa KHÔNG rời tay*.
+
+Phép gác `Authorization: Bearer CRON_SECRET` gom về `lib/auth/cronSecret.ts`. Tới bản này nó đã bị
+chép tay ở ba nơi giống hệt nhau, mà đây là loại mã không ai soi bằng mắt được: một phép so sai vẫn
+cho đúng kết quả với chìa đúng.
+
+`verify:job-event-sweep` thêm hai phép kiểm ràng YAML với TypeScript: dòng `cron:` phải khớp
+`JOB_EVENT_SWEEP_CLOCK_MINUTES` (con số trang admin HỨA với trưởng môn), và đường workflow gõ phải
+có route thật đứng sau. Đổi nhịp một bên mà quên bên kia thì phép kiểm đỏ, chứ không phải giao diện
+lặng lẽ nói dối — đúng loại lỗi mà cả hai bản vá này sinh ra để chấm dứt.
+
+Giao diện nay hứa nhịp VÔ ĐIỀU KIỆN (10 phút) thay cho nhịp-trong-điều-kiện-thuận-lợi của 0.81.3.
+Hứa cái tốt nhất là cách nhanh nhất để lại nói dối.
+
 ## 0.81.3 — cái núm hạn lưu đếm bằng giờ, còn lượt quét chạy mỗi ngày
 
 「Hạn Lưu Nhật Ký Đàn」đặt **1 giờ**, rồi trang admin ngồi báo **5.010 dòng đã quá hạn** trên tổng

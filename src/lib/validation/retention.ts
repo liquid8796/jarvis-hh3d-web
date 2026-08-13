@@ -164,6 +164,24 @@ export function jobEventSweepInterval(retentionHours: number): number {
   return Math.min(JOB_EVENT_SWEEP_MAX_INTERVAL_MS, Math.max(JOB_EVENT_SWEEP_MIN_INTERVAL_MS, share));
 }
 
+/**
+ * Nhịp của cái ĐỒNG HỒ NGOÀI — lời hứa VÔ ĐIỀU KIỆN về việc nhật ký quá hạn được dọn.
+ *
+ * Ba đường quét, và chỉ đường này là một lời hứa không kèm điều kiện:
+ *   • cron Vercel — MỘT lần mỗi ngày, trần của gói Hobby, không phải lựa chọn;
+ *   • lượt đi nhờ `/api/worker` — bám hạn lưu (một phần sáu), nhưng cần CÓ khôi lỗi đang trực;
+ *   • đồng hồ này — GitHub Actions gõ cửa `/api/cron/sweep` đúng nhịp, không cần ai trực, không
+ *     cần ai mở web. Đây là con số trang admin được phép HỨA với trưởng môn.
+ *
+ * Vì hạn lưu nhỏ nhất là 1 giờ (cho nhịp đi nhờ 10 phút), đồng hồ 10 phút cũng chính là nhịp
+ * hiệu dụng ở MỌI hạn lưu — nên giao diện kể đúng một con số thay vì hai.
+ *
+ * **PHẢI KHỚP với `cron:` trong `.github/workflows/quet-nhat-ky.yml`.** Một hằng số TypeScript và
+ * một dòng YAML không có cách nào tự ràng nhau, nên `verify:job-event-sweep` đọc thẳng tệp YAML ấy
+ * và so — đổi một bên mà quên bên kia thì phép kiểm đỏ, chứ không phải giao diện lặng lẽ nói dối.
+ */
+export const JOB_EVENT_SWEEP_CLOCK_MINUTES = 10;
+
 /** Kể một NHỊP bằng chữ: `600000` →「10 phút」, `14400000` →「4 giờ」, `5400000` →「1 giờ 30 phút」. */
 export function formatSweepInterval(ms: number): string {
   // Làm tròn tới phút trước khi tách, nếu không `share` lẻ sẽ đẻ ra「0 giờ 60 phút」.

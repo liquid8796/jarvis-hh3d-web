@@ -71,6 +71,19 @@ deepStrictEqual(decideRequest({ ...here, pathname: "/api/worker" }), {
 console.log("✔ /api/worker — 409 kèm địa chỉ, không redirect mù"); passed++;
 deepStrictEqual(decideRequest({ ...here, pathname: "/api/cron" }), { kind: "cron-skip" });
 console.log("✔ /api/cron trên trạm phụ — 204"); passed++;
+// `/api/cron/sweep` phải đi ĐƯỜNG NGƯỢC LẠI với `/api/cron`, và khác biệt ấy là cố ý:
+//   • `/api/cron` do cron RIÊNG của từng trạm gọi, nên trạm nghỉ phải tự im (204) — bằng không
+//     hai trạm đua nhau dọn dẹp trên hai database khác nhau.
+//   • `/api/cron/sweep` do MỘT đồng hồ ngoài gọi vào đúng một địa chỉ (`WEB_URL`). Im lặng ở đây
+//     nghĩa là suốt lượt chuyển trạm không ai quét nhật ký cả. Nó cần 307 để cái đồng hồ ấy tìm
+//     được trạm đang sống.
+// Khoá bằng phép kiểm chứ không bằng chú thích: một lượt "dọn cho gọn" đổi dòng trên thành
+// `pathname.startsWith("/api/cron")` sẽ làm đúng điều đó, và không gì khác sẽ đỏ lên.
+deepStrictEqual(decideRequest({ ...here, pathname: "/api/cron/sweep" }), {
+  kind: "redirect",
+  location: "https://auto-hh3d.vercel.app/api/cron/sweep",
+});
+console.log("✔ /api/cron/sweep trên trạm phụ — 307 sang trạm sống, KHÔNG im như /api/cron"); passed++;
 
 
 // ---- Luật phát lệnh chuyển trạm (mô hình promote) ---------------------------------------

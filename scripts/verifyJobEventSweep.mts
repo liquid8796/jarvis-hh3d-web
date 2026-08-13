@@ -14,7 +14,10 @@
  *
  * Thuần số học, không chạm database — chạy được ở mọi máy, và chạy trong một nháy.
  */
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import {
+  JOB_EVENT_SWEEP_CLOCK_MINUTES,
   JOB_EVENT_SWEEP_MAX_INTERVAL_MS,
   JOB_EVENT_SWEEP_MIN_INTERVAL_MS,
   RETENTION_MAX_HOURS,
@@ -117,6 +120,38 @@ for (const hours of EVERY_RETENTION) {
   assert(!text.startsWith("0 "), `hạn lưu ${hours} giờ kể ra một nhịp bắt đầu bằng số 0: "${text}"`);
 }
 console.log("✔ Kể bằng chữ: tròn trước rồi mới tách, không nhịp nào ra「0 giờ 60 phút」.");
+
+// ---- 8. ĐỒNG HỒ NGOÀI: hằng số TypeScript phải khớp dòng cron trong YAML --------------
+//
+// Trang admin HỨA con số `JOB_EVENT_SWEEP_CLOCK_MINUTES` với trưởng môn, nhưng thứ thật sự gõ cửa
+// là dòng `cron:` trong workflow. Hai bên không có cách nào tự ràng nhau — nên chỗ ràng là đây.
+// Không có phép kiểm này thì đổi nhịp một bên là giao diện lặng lẽ nói dối, đúng loại lỗi mà cả
+// bản vá 0.81.3 sinh ra để chấm dứt.
+const repoRoot = path.join(import.meta.dirname, "..");
+const workflowPath = path.join(repoRoot, ".github", "workflows", "quet-nhat-ky.yml");
+assert(existsSync(workflowPath), `không thấy workflow đồng hồ quét: ${workflowPath}`);
+const workflow = readFileSync(workflowPath, "utf8");
+
+const cronLine = workflow.match(/-\s*cron:\s*"([^"]+)"/);
+assert(cronLine, "workflow không có dòng `- cron: \"…\"` nào — đồng hồ đã bị gỡ mất?");
+const expectedCron = `*/${JOB_EVENT_SWEEP_CLOCK_MINUTES} * * * *`;
+assert(
+  cronLine![1] === expectedCron,
+  `lệch nhịp: YAML chạy「${cronLine![1]}」còn giao diện hứa「${expectedCron}」` +
+    `(JOB_EVENT_SWEEP_CLOCK_MINUTES = ${JOB_EVENT_SWEEP_CLOCK_MINUTES}). Sửa cả hai nơi.`,
+);
+console.log(`✔ Đồng hồ ngoài: YAML và hằng số cùng nói「${expectedCron}」.`);
+
+// Đường mà workflow gõ phải có một route thật đứng sau — đổi tên thư mục route mà quên YAML thì
+// mỗi 10 phút một lượt 404, và không ai được báo vì cửa quét vốn im lặng khi thuận.
+const sweepPath = workflow.match(/SWEEP_PATH="([^"]+)"/);
+assert(sweepPath, "workflow không khai `SWEEP_PATH` — không biết nó đang gõ cửa nào");
+const routeFile = path.join(repoRoot, "src", "app", ...sweepPath![1].split("/").filter(Boolean), "route.ts");
+assert(
+  existsSync(routeFile),
+  `workflow gõ cửa「${sweepPath![1]}」nhưng không có route nào ở đó (${routeFile})`,
+);
+console.log(`✔ Cửa quét「${sweepPath![1]}」có route thật đứng sau.`);
 
 console.log("");
 console.log("TẤT CẢ XANH — nhịp quét mịn hơn hạn lưu ở mọi nấc, và hỏng thì hỏng về phía thưa.");

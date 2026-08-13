@@ -107,6 +107,12 @@ export function decideRequest(input: {
   if (doc.activeSiteId === siteId) return { kind: "serve" };
 
   if (pathname === "/api/worker") return { kind: "worker-conflict", activeUrl: doc.activeUrl };
+  // SO BẰNG, KHÔNG SO TIỀN TỐ — `/api/cron/sweep` phải KHÔNG rơi vào đây. Hai cửa cron đi hai
+  // đường ngược nhau vì hai cái đồng hồ khác nhau gọi chúng: `/api/cron` do cron RIÊNG của từng
+  // trạm gọi (trạm nghỉ phải tự im, bằng không hai trạm đua nhau dọn trên hai database), còn
+  // `/api/cron/sweep` do MỘT đồng hồ ngoài gọi vào đúng một địa chỉ — im ở đó là suốt lượt chuyển
+  // trạm không ai quét nhật ký. Nó cần rơi xuống nhánh `redirect` bên dưới. (verify:control khoá
+  // cả hai chiều.)
   if (pathname === "/api/cron") return { kind: "cron-skip" };
   if (EXEMPT_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     return { kind: "serve" };

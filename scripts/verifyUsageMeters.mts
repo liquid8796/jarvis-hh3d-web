@@ -244,6 +244,43 @@ AI Gateway Requests
     nearMisses(parseUsageText(PAGE), []).length === 0,
     "không thiếu gì thì không có tên nào để mà gợi ý",
   );
+
+  /**
+   * CA THẬT, đo trên trạm `auto-hh3d-3` lúc 18:08 ngày 13/08/2026: thiếu `Fast Origin Transfer` và
+   * `Fast Data Transfer` giữa 51 meter đọc được, mà bản gợi ý ĐẦU TIÊN — chỉ so từ ĐẦU — in ra
+   *「không thấy tên nào gần giống」. Một cái tên rút gọn kiểu `Data Transfer` không chia từ đầu với
+   * nó, nên phép gợi ý câm ở đúng lần đầu được gọi thật.
+   */
+  const shortened = nearMisses(
+    [
+      { title: "Data Transfer", used: "1.2 GB", limit: "100 GB" },
+      { title: "Origin Transfer", used: "58 MB", limit: "10 GB" },
+      { title: "Blob Stored Data", used: "0 B", limit: "1 GB" },
+    ],
+    ["Fast Data Transfer", "Fast Origin Transfer"],
+  );
+  ok(shortened[0] === "Data Transfer" || shortened[0] === "Origin Transfer", "tên RÚT GỌN vẫn bị nêu tên");
+  ok(
+    shortened.indexOf("Blob Stored Data") === 2,
+    "…và `Blob Stored Data` (chỉ chung mỗi chữ `data`) bị xếp SAU, không bị giấu đi",
+  );
+
+  // Nhiều từ chung hơn thì đứng trước — người đọc chỉ liếc dòng đầu.
+  const ranked = nearMisses(
+    [
+      { title: "Transfer Something Else", used: "1", limit: null },
+      { title: "Fast Data Transfer Total", used: "1", limit: null },
+    ],
+    ["Fast Data Transfer"],
+  );
+  ok(ranked[0] === "Fast Data Transfer Total", "tên chia NHIỀU từ nhất đứng đầu danh sách gợi ý");
+
+  // Trần 8: một danh sách 30 dòng thì không còn là gợi ý.
+  const flood = nearMisses(
+    Array.from({ length: 30 }, (_, i) => ({ title: `Transfer loai ${i}`, used: "1", limit: null })),
+    ["Fast Data Transfer"],
+  );
+  ok(flood.length === 8, "danh sách gợi ý bị chặn ở 8 dòng, không đổ cả trang ra log");
 }
 
 // ---- Trang trống / rác -----------------------------------------------------------------------

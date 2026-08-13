@@ -152,24 +152,55 @@ export function selectWanted(meters: Meter[]): Selection {
   return { picked, missing };
 }
 
+/** Trần số tên gợi ý. Một danh sách 30 dòng thì không còn là gợi ý, nó là bãi rác. */
+const NEAR_MISS_LIMIT = 8;
+
+/** Từ đủ dài để mang nghĩa. `cpu`, `isr`, `- ` không phân biệt được gì. */
+const SIGNIFICANT = 4;
+
 /**
- * Tên ĐÃ THẤY trông gần giống một cột còn thiếu.
+ * Tên ĐÃ THẤY trông gần giống một cột còn thiếu, tên chia nhiều từ chung nhất đứng trước.
  *
  * Để một lượt đỏ tự khai chuỗi thật của Vercel thay vì bắt người ta mở Chromium lên soi tay: hôm
  * nào họ đổi「Image Optimization - Cache Reads」thành một chữ khác, dòng này in ra đúng cái tên
  * mới, và lượt sửa chỉ còn là chép nó vào `WANTED_TITLES`.
+ *
+ * SO THEO TỪ CHUNG, KHÔNG SO TỪ ĐẦU — bản đầu (13/08/2026) chỉ so từ đầu, và nó im đúng lần đầu
+ * tiên được gọi thật: lượt cào trạm `auto-hh3d-3` thiếu `Fast Data Transfer` giữa 51 meter đọc
+ * được, mà một cái tên rút gọn kiểu「Data Transfer」thì không chia từ ĐẦU với nó. Một phép gợi ý
+ * chỉ chạy đúng lúc cái tên gần như không đổi là một phép gợi ý vô dụng: nó câm ở đúng ca nó sinh
+ * ra để phục vụ. Nay `Fast Data Transfer` chia 2 từ với `Data Transfer` nên nó bị nêu tên.
+ *
+ * CHỌN NHỚ HƠN CHỌN ĐÚNG, có chủ ý: chia đúng MỘT từ cũng được nêu (`Blob Stored Data` lọt vào vì
+ * chữ `data`). Bù lại bằng XẾP HẠNG — chia nhiều từ nhất đứng đầu — và bằng trần 8 dòng. Một cái
+ * tên thừa nằm ở dòng cuối chỉ tốn của người đọc một giây; một cái tên thiếu thì họ phải đi mở
+ * Chromium, và đó chính là việc mà hàm này sinh ra để khỏi phải làm.
  */
 export function nearMisses(meters: Meter[], missing: readonly string[]): string[] {
-  const heads = new Set(
-    missing.map((title) => normalizeTitle(title).split(" ")[0]).filter((word) => word.length >= 4),
-  );
+  const wordsOf = (title: string): string[] =>
+    normalizeTitle(title)
+      .split(/[^a-z0-9]+/)
+      .filter((word) => word.length >= SIGNIFICANT);
+
+  const missingWords = missing.map((title) => new Set(wordsOf(title)));
   const wanted = new Set(WANTED_TITLES.map(normalizeTitle));
-  const out: string[] = [];
+
+  const scored = new Map<string, number>();
   for (const meter of meters) {
-    const key = normalizeTitle(meter.title);
-    if (wanted.has(key)) continue; // đã khớp một cột khác, không phải ứng viên
-    const head = key.split(" ")[0];
-    if (heads.has(head) && !out.includes(meter.title)) out.push(meter.title);
+    if (wanted.has(normalizeTitle(meter.title))) continue; // đã khớp một cột khác, không phải ứng viên
+    const words = wordsOf(meter.title);
+    let best = 0;
+    for (const set of missingWords) {
+      let shared = 0;
+      for (const word of words) if (set.has(word)) shared += 1;
+      if (shared > best) best = shared;
+    }
+    // Giữ điểm CAO NHẤT cho một cái tên xuất hiện nhiều lần (thẻ và thanh điều hướng).
+    if (best > 0 && best > (scored.get(meter.title) ?? 0)) scored.set(meter.title, best);
   }
-  return out;
+
+  return [...scored.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, NEAR_MISS_LIMIT)
+    .map(([title]) => title);
 }

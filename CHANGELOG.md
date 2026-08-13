@@ -11,6 +11,30 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.83.1 — phép gợi ý tên câm ở đúng lần đầu được gọi thật
+
+Lượt cào đầu tiên chạy với bản 0.82.8 (18:04, bấm tay) cho cả hai tin. Tin lành: ba trạm đẩy về
+**đúng 10 meter**, gồm cả ba cột `Image Optimization` — tức danh sách tên chép từ ảnh chụp khớp với
+trang thật, thứ chỉ một lượt chạy thật mới trả lời được. Tin còn lại: trạm `auto-hh3d-3` đỏ vì
+thiếu `Fast Origin Transfer` và `Fast Data Transfer` — **đỏ y hệt ở lượt 17:30, tức TRƯỚC bản vá,
+nên đây là chuyện có sẵn** — và dòng chẩn đoán mới toanh của 0.82.8 in ra: *„Không thấy tên nào gần
+giống trong 51 meter đọc được".*
+
+Nó nói sai, và nó sai ở đúng ca nó sinh ra để phục vụ. `nearMisses` bản đầu so **từ ĐẦU** của tên,
+nên một cái tên rút gọn kiểu `Data Transfer` không được coi là gần giống `Fast Data Transfer`. Một
+phép gợi ý chỉ chạy đúng khi cái tên gần như không đổi thì chẳng gợi ý được gì: cú đổi tên càng
+mạnh, nó càng câm.
+
+Nay so theo **TỪ CHUNG**, xếp hạng theo số từ chia được, chặn ở 8 dòng. Và nó **chọn nhớ hơn chọn
+đúng** một cách có chủ ý: chia đúng một từ cũng được nêu (`Blob Stored Data` lọt vào vì chữ `data`),
+nhưng bị xếp sau. Một cái tên thừa ở dòng cuối tốn của người đọc một giây; một cái tên thiếu thì họ
+phải đi mở Chromium — đúng việc hàm này sinh ra để khỏi phải làm. Phép kiểm đóng đinh cả ba mặt:
+tên rút gọn phải bị nêu, tên chia nhiều từ nhất phải đứng đầu, và cái chia một từ phải nằm SAU chứ
+không bị giấu. 42 phép kiểm (+4).
+
+Còn vì sao hai cột ấy vắng mặt trên trang của `auto-hh3d-3` thì **chưa biết** — lượt cào kế sẽ in
+ra tên gần giống, và đó là lúc trả lời được. Ba trạm còn lại vẫn đủ mười cột.
+
 ## 0.83.0 — việc chia cho khôi lỗi theo LUÂN PHIÊN, và đàn đang nghỉ thôi đeo tên máy
 
 Luật cũ: ai hỏi trước lấy trước. Nó đúng suốt quãng tông môn có một-hai khôi lỗi, và sai hẳn từ

@@ -115,9 +115,9 @@ const webUrl = resolveWebUrl(arg("web-url", process.env.WEB_URL));
  *
  * Lời bình cũ biện hộ cho shell bằng câu「`gh` trên Windows là .cmd」— chép nhầm lý lẽ của
  * `deployAllStations.mts`, nơi câu ấy nói về `vercel` (một .cmd thật, do npm rải). `gh` do winget
- * cài là `gh.exe`, tệp thực thi thật (đo: `C:\Program Files\GitHub CLI\gh.exe`), nên không lệnh
- * nào ở đây cần shell. Cùng luật với `run` bên deployAllStations: bật shell là ngoại lệ phải
- * chứng minh, không phải mặc định.
+ * cài là `gh.exe`, tệp thực thi thật (đo: `C:\Program Files\GitHub CLI\gh.exe`), nên `git` lẫn
+ * `gh` đều đi thẳng. Cùng luật với `run` bên deployAllStations: bật shell là NGOẠI LỆ PHẢI CHỨNG
+ * MINH, không phải mặc định — và ở tệp này đúng một lời gọi được bật, `npm` khi sinh lockfile.
  *
  * Quả mìn thứ hai cùng loại đã tháo cùng lượt này: `--description` của `gh repo create` cũng mang
  * khoảng trắng và một dấu gạch dài, nên nó sẽ vỡ y hệt ở dòng ngay sau chỗ vừa chết.
@@ -127,6 +127,7 @@ function run(cmd, args, options = {}) {
     cwd: options.cwd ?? repoRoot,
     encoding: "utf8",
     stdio: options.quiet ? ["ignore", "pipe", "pipe"] : ["ignore", "pipe", "inherit"],
+    shell: options.shell ?? false,
     timeout: options.timeout ?? 120_000,
     env: options.env ?? process.env,
   });
@@ -330,6 +331,45 @@ try {
   );
 
   writeFileSync(path.join(staging, ".gitignore"), "node_modules/\n.env\n");
+
+  /**
+   * SINH `package-lock.json`. Thiếu nó thì kho phát ra chết ở bước THỨ HAI, trước khi worker kịp
+   * chạy một dòng — và chết hai lần khác nhau, nên bỏ một chỗ là vẫn hỏng ở chỗ kia:
+   *
+   *   • `actions/setup-node@v4` với `cache: npm` →
+   *     „##[error]Dependencies lock file is not found … Supported file patterns:
+   *      package-lock.json,npm-shrinkwrap.json,yarn.lock"
+   *   • `npm ci` → từ chối chạy khi không có lockfile, theo thiết kế của chính nó.
+   *
+   * Đo 13/08/2026 trên kho `…-100055-69a9`: lượt chạy đầu đỏ ở đúng dòng ấy sau 6 giây, dù kho,
+   * secret và dòng sổ đều đã xong xuôi.
+   *
+   * Vá bằng cách SINH LOCKFILE, không phải bằng cách sửa workflow (bỏ `cache: npm`, đổi `npm ci`
+   * thành `npm install`). Hai lẽ: workflow phải giữ NGUYÊN bản của repo web — mỗi phép thay thêm
+   * là thêm một đường cho hai bản trôi khỏi nhau, đúng điều đã thề ở chỗ vá WORKER_ID; và `npm ci`
+   * có lý của nó, kho phát ra phải cài đúng một bản playwright-core mỗi lượt thay vì trôi theo `^`.
+   *
+   * `--package-lock-only` chỉ GIẢI cây phụ thuộc rồi ghi lockfile, không tải `node_modules` —
+   * vài giây, không phải vài phút.
+   *
+   * Đây là lời gọi DUY NHẤT trong tệp còn bật shell, và nó bắt buộc: trên Windows `npm` là một
+   * tệp `.cmd`, mà từ Node 20 (CVE-2024-27980) `spawn` từ chối chạy .cmd nếu không qua shell. An
+   * toàn ở đây vì mọi đối số là chuỗi cố định không khoảng trắng; thứ duy nhất thay đổi giữa các
+   * lượt — `cwd` — đi bằng tuỳ chọn của spawn chứ không nằm trên dòng lệnh.
+   */
+  console.log("── Giải cây phụ thuộc (package-lock.json)…");
+  run("npm", ["install", "--package-lock-only", "--no-audit", "--no-fund"], {
+    cwd: staging,
+    quiet: true,
+    shell: true,
+    timeout: 180_000,
+  });
+  if (!existsSync(path.join(staging, "package-lock.json"))) {
+    throw new Error(
+      "npm không sinh ra package-lock.json — kho phát ra sẽ chết ở bước setup-node. Dừng ở đây,\n" +
+        "trên máy này, thay vì bỏ lại một kho công khai không dựng nổi.",
+    );
+  }
 
   /**
    * Soi cây vừa dựng TRƯỚC khi nó rời khỏi máy này. Đây là hàng rào cuối cùng còn đứng trên

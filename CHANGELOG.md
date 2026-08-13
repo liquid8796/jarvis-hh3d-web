@@ -11,6 +11,35 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.82.1 — sổ gương trạm lật trang, và con số 4 là để nó lật được ngay hôm nay
+
+Sổ trạm dài thêm theo mỗi trạm ghi vào, mà ngay BÊN DƯỚI nó là form「Ghi trạm mới」— tức thứ người
+vận hành xuống tab này để dùng thì nằm sau một danh sách không có trần. Đó là toàn bộ ràng buộc
+thật; sổ lật trang để cái form ấy không bị chôn.
+
+**Mỗi trang 4 trạm, không phải 5.** Sổ hôm nay có ĐÚNG 5 trạm, nên đặt 5 là dựng một thanh lật
+trang không bao giờ hiện ra trên chính dữ liệu thật — một tính năng chỉ đúng trong lý thuyết, và
+không ai phát hiện nó hỏng cho tới lúc trạm thứ sáu ra đời. 4 làm nó lật được ngay lượt mở tab kế.
+
+**Lật trang là chuyện của trình duyệt, KHÔNG đẩy lên URL** như ô tìm kiếm bên bảng Môn Đồ. Cả mảng
+trạm vốn đã nằm sẵn trong tay client (`MirrorSwitchPanel` cần trọn mảng để dựng ô chọn), nên một
+`router.replace` mỗi lượt lật chỉ đổi lấy một vòng dựng lại trang server mà không đọc thêm được gì.
+
+**Trang bị KẸP ngay lúc vẽ, không bằng `useEffect`.** Xoá trạm cuối cùng của trang cuối thì mảng
+`mirrors` co lại ngay ở lượt render kế, mà effect chỉ chạy SAU khi đã vẽ — đường ấy cho người vận
+hành thấy một cái sổ trống rỗng rồi mới kéo về. Kẹp tại chỗ thì không có khung hình nào sai. Giá
+trị đã kẹp còn được ghi ngược lại state: thiếu bước đó thì xoá-rồi-ghi-trạm-mới làm sổ tự nhảy về
+đúng cái trang người ta vừa bị đá ra khỏi.
+
+**Đánh số thẳng, không có「trước/sau」.** Ở cỡ này (vài trạm) một cú bấm là tới bất kỳ trang nào, và
+không nút nào bị tắt lúc đang mang focus — bấm「sau」để tới trang cuối rồi thấy chính nút vừa bấm
+hoá xám là cách chắc chắn nhất để người đi bằng phím mất dấu mình đang đứng đâu.
+
+**Trang không đứng vẫn phải mang viền vàng nhạt.** Bản vẽ đầu để viền trong suốt; trên ảnh chụp
+thật nó đọc ra là một con số chết nằm cạnh「Kiểm mạch / Sửa / Xoá」. Mọi thứ bấm được trên tab này
+đều có viền — đó là quy ước của tab, và một nút phá quy ước ấy thì không ai nhận ra là nút. Chỉ
+lộ ra khi NHÌN, không lộ ra khi đọc mã.
+
 ## 0.82.0 — nhật ký được dọn bằng một cái đồng hồ, không còn bằng may mắn
 
 Câu hỏi đặt ra sau bản 0.81.3: *tại sao lại chỉ quét một ngày một lần?* Trả lời thẳng — **Vercel

@@ -13,6 +13,16 @@ import {
 } from "@/app/actions/mirrors";
 
 /**
+ * Số trạm mỗi trang của sổ. Chọn 4 chứ không phải 5, và lý do rất cụ thể: sổ hôm nay có ĐÚNG 5
+ * trạm, nên đặt 5 là dựng một thanh lật trang không bao giờ hiện ra trên chính dữ liệu thật —
+ * một tính năng chỉ tồn tại trong lý thuyết.
+ *
+ * Ràng buộc thật đứng sau con số: bên dưới sổ là form「Ghi trạm mới」, và đó mới là thứ người
+ * vận hành xuống đây để dùng. Sổ dài vô hạn nằm trên nó là cách chắc chắn nhất để chôn nó.
+ */
+const MIRRORS_PER_PAGE = 4;
+
+/**
  * Tab Gương Trạm — sổ trạm dự phòng (deploy/mirror/README.md §4). Tab CHỈ hiện với người
  * mang `site.switch` (page.tsx lọc), nên panel không tự gác nữa — action phía server mới là
  * hàng rào thật.
@@ -29,8 +39,28 @@ export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; s
   const [deleteState, deleteAction, deleting] = useActionState<MirrorResult | null, FormData>(deleteMirrorAction, null);
   /** id đang sửa — đổ sẵn tên/URL vào form; chuỗi kết nối thì không bao giờ đổ lại. */
   const [editing, setEditing] = useState<MirrorView | null>(null);
+  /**
+   * Trang đang xem. Cố ý KHÔNG đẩy lên URL như ô tìm kiếm ở bảng Môn Đồ: sổ này đã nằm sẵn trọn
+   * vẹn trong tay trình duyệt (MirrorSwitchPanel cần cả mảng), nên một `router.replace` mỗi lượt
+   * lật trang chỉ đổi lấy một vòng dựng lại trang server mà không đọc thêm được gì.
+   */
+  const [pageWanted, setPageWanted] = useState(1);
 
   const notice = [saveState, probeState, deleteState].find((s) => s !== null);
+
+  const totalPages = Math.max(1, Math.ceil(mirrors.length / MIRRORS_PER_PAGE));
+  /**
+   * Kẹp trang NGAY LÚC VẼ, không bằng `useEffect`: xoá trạm cuối cùng của trang cuối thì `mirrors`
+   * co lại ngay ở lượt render kế, mà effect chỉ chạy SAU khi đã vẽ xong — tức người vận hành kịp
+   * thấy một cái sổ trống rỗng rồi mới bị kéo về. Kẹp tại chỗ thì không có khung hình nào sai.
+   */
+  const page = Math.min(pageWanted, totalPages);
+  // Ghi lại luôn giá trị đã kẹp. Thiếu dòng này thì xoá-rồi-ghi-trạm-mới làm sổ tự nhảy về đúng
+  // cái trang mà người ta vừa bị đá ra khỏi — React cho phép sửa state khi vẽ, miễn là có điều kiện.
+  if (pageWanted !== page) setPageWanted(page);
+
+  const firstIndex = (page - 1) * MIRRORS_PER_PAGE;
+  const shown = mirrors.slice(firstIndex, firstIndex + MIRRORS_PER_PAGE);
 
   return (
     <div className="flex flex-col gap-6">
@@ -53,7 +83,7 @@ export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; s
           <p className="text-sm text-[var(--color-mist)]">Sổ còn trống — ghi trạm dự phòng đầu tiên ở form dưới.</p>
         ) : (
           <div className="flex flex-col gap-3">
-            {mirrors.map((m) => (
+            {shown.map((m) => (
               <div key={m.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-[rgba(232,194,92,0.18)] px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold">
@@ -98,6 +128,43 @@ export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; s
               </div>
             ))}
           </div>
+        )}
+
+        {/* Sổ một trang thì thanh lật trang chỉ là tiếng ồn — nó mọc đúng từ trạm thứ NĂM.
+            Đánh số thẳng, không có「trước/sau」: ở cỡ này (vài trạm) một cú bấm là tới bất kỳ
+            trang nào, và không nút nào bị tắt lúc đang mang focus — bấm「sau」để tới trang cuối
+            rồi thấy chính nút vừa bấm hoá xám là cách chắc chắn nhất để người đi bằng phím mất
+            dấu mình đang đứng đâu. */}
+        {totalPages > 1 && (
+          <nav
+            aria-label="Lật trang sổ gương trạm"
+            className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[rgba(232,194,92,0.14)] pt-3"
+          >
+            <p className="text-xs tabular-nums text-[var(--color-mist)]">
+              Trạm {firstIndex + 1}–{firstIndex + shown.length} trong {mirrors.length}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setPageWanted(n)}
+                  aria-label={`Trang ${n}`}
+                  aria-current={n === page ? "page" : undefined}
+                  className={`h-9 min-w-[2.25rem] rounded-lg border px-2 text-sm font-semibold tabular-nums transition-colors ${
+                    n === page
+                      ? "border-[rgba(232,194,92,0.5)] bg-[rgba(232,194,92,0.14)] text-[var(--color-gold-300)]"
+                      // Trang KHÔNG đứng vẫn phải mang viền: mọi thứ bấm được trên tab này đều có
+                      // viền vàng, nên một con số trần nằm cạnh「Kiểm mạch / Sửa / Xoá」đọc ra là
+                      // chữ chết chứ không phải nút. Nhạt hơn hẳn ô đang đứng là đủ để phân cấp.
+                      : "border-[rgba(232,194,92,0.22)] text-[var(--color-mist)] hover:border-[rgba(232,194,92,0.5)] hover:text-[var(--color-gold-300)]"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </nav>
         )}
       </section>
 

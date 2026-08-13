@@ -100,7 +100,7 @@ Restart=always
 RestartSec=10
 # Chromium chết kiểu gì cũng không được kéo cả VM theo.
 #
-# 4G là trần cho một máy cài MỚI. Production đang chạy 18G và WORKER_MAX_JOBS=3, đặt trong
+# 4G là trần cho một máy cài MỚI. Production đang chạy 18G và WORKER_MAX_JOBS=2, đặt trong
 # drop-in /etc/systemd/system/auto-hh3d-linh-su.service.d/override.conf — script này cố ý chỉ
 # viết lại unit chính nên chạy lại lệnh cài KHÔNG hạ trần về 4G, cũng không xoá mất số đàn
 # song song. Đừng đọc dòng dưới rồi tưởng production đang ở 4G; xem bảng trong README.md.

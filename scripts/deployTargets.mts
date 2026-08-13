@@ -21,10 +21,23 @@
 /** Một trạm trong sổ, rút gọn còn phần mà việc phát hành cần. */
 export type StationEntry = { id: string; name: string; url: string };
 
-/** Sổ gương như nó nằm trong `app_settings`; `pg` là phong bì đã mã hoá. */
-export type Book = { mirrors?: (StationEntry & { pg?: string })[] };
+/**
+ * Sổ gương như nó nằm trong `app_settings`; `pg` và `vercelToken` là phong bì đã mã hoá.
+ *
+ * `vercelToken` có mặt từ 13/08/2026 (`mirror:new` cất token của tài khoản giữ trạm vào sổ). Trạm
+ * dựng trước mốc ấy mang chuỗi rỗng, và cái rỗng ấy MANG NGHĨA — xem `tokensFromBook`.
+ */
+export type Book = { mirrors?: (StationEntry & { pg?: string; vercelToken?: string })[] };
 
-export type BookSource = { stations: StationEntry[]; from: string; warning?: string };
+/**
+ * `book` là cuốn sổ THÔ đã được chọn, đi kèm bên cạnh danh sách đã lọc.
+ *
+ * Vì `stations` bị thu về đúng `StationEntry` (`id`/`name`/`url`) nên nó KHÔNG còn `vercelToken` —
+ * mà `tokensFromBook` thì cần đúng trường ấy. Không trả cuốn sổ ra thì nơi gọi phải tự đoán lại
+ * xem sổ nào vừa thắng (dưới máy hay trạm hoạt động), tức chép lại toàn bộ luật của hàm này ở
+ * ngoài, và một bản chép thì lệch vào đúng ngày nó được dùng.
+ */
+export type BookSource = { stations: StationEntry[]; from: string; warning?: string; book: Book };
 
 /**
  * Chọn ĐỌC SỔ Ở ĐÂU — thuần, mọi lượt chạm mạng đi qua tham số.
@@ -53,6 +66,7 @@ export async function chooseBook(deps: {
       stations: asStations(local),
       from: "database dưới máy (không rõ trạm hoạt động)",
       warning: "Không đọc được bảng điều phối — dùng sổ của database dưới máy, sổ này có thể đã cũ.",
+      book: deps.localBook,
     };
   }
 
@@ -64,12 +78,13 @@ export async function chooseBook(deps: {
       warning:
         `Sổ dưới máy không có chuỗi kết nối của trạm hoạt động「${deps.activeSiteId}」— dùng sổ dưới máy. ` +
         "Đây cũng chính là triệu chứng cụt-đường-về: vào admin ghi trạm ấy vào sổ.",
+      book: deps.localBook,
     };
   }
 
   try {
     const remote = await deps.readRemote(activeEntry.pg);
-    return { stations: asStations(remote.mirrors), from: `trạm hoạt động「${deps.activeSiteId}」` };
+    return { stations: asStations(remote.mirrors), from: `trạm hoạt động「${deps.activeSiteId}」`, book: remote };
   } catch (err) {
     return {
       stations: asStations(local),
@@ -77,15 +92,23 @@ export async function chooseBook(deps: {
       warning:
         `Không đọc nổi sổ ở trạm hoạt động「${deps.activeSiteId}」` +
         `(${err instanceof Error ? err.message.slice(0, 80) : "lỗi lạ"}) — lùi về sổ dưới máy.`,
+      book: deps.localBook,
     };
   }
 }
 
-/** Một token đọc được từ env, kèm TÊN BIẾN để còn kể tên trong thông báo (không bao giờ in giá trị). */
-export type TokenSource = { envName: string; token: string };
+/**
+ * Một token Vercel, kèm NHÃN để còn kể tên trong thông báo — không bao giờ in giá trị.
+ *
+ * Nhãn là tên biến env (`VERCEL_TOKEN_AUTO_HH3D_1`) khi token đến từ `.env.local`, và
+ * `sổ「<mã trạm>」` khi nó đến từ sổ gương. Trường này TỪNG tên là `envName`, và cái tên ấy hoá
+ * ra nói dối ngay ngày sổ bắt đầu giữ token: một nhãn `sổ「auto-hh3d-1」` nằm trong một trường
+ * tên `envName` là cách người đọc sau tin rằng cứ có token thì phải có một dòng trong `.env.local`.
+ */
+export type TokenSource = { label: string; token: string };
 
-/** Một project Vercel mà một token nào đó nhìn thấy. */
-export type ProjectRef = { name: string; projectId: string; orgId: string; envName: string };
+/** Một project Vercel mà một token nào đó nhìn thấy; `label` là nhãn của chính token ấy. */
+export type ProjectRef = { name: string; projectId: string; orgId: string; label: string };
 
 export type Resolution =
   | { ok: true; target: ProjectRef }
@@ -210,10 +233,82 @@ export function discoverTokens(env: Record<string, string | undefined>): TokenSo
     const token = (env[envName] ?? "").trim();
     if (!token || seen.has(token)) continue;
     seen.add(token);
-    found.push({ envName, token });
+    found.push({ label: envName, token });
   }
   // `VERCEL_TOKEN` (trạm chính) lên đầu cho dễ đọc nhật ký; còn lại giữ thứ tự chữ cái.
-  return found.sort((a, b) => Number(b.envName === "VERCEL_TOKEN") - Number(a.envName === "VERCEL_TOKEN"));
+  return found.sort((a, b) => Number(b.label === "VERCEL_TOKEN") - Number(a.label === "VERCEL_TOKEN"));
+}
+
+/** Nhãn của một token lấy từ sổ — tự khai nguồn gốc, để không ai đi tìm nó trong `.env.local`. */
+export function bookTokenLabel(siteId: string): string {
+  return `sổ「${siteId}」`;
+}
+
+/**
+ * Token của từng trạm CẤT TRONG SỔ GƯƠNG — đường về khi `.env.local` không có chìa.
+ *
+ * VÌ SAO CẦN, và cái giá của việc thiếu nó đã trả ngày 13/08/2026: `mirror:remove` tra project
+ * bằng token trong env, nên một trạm không có token dưới máy này thì nó KHÔNG NHÌN THẤY project
+ * ấy — rồi kết luận「project không tồn tại」, gỡ dòng sổ, và để lại project cùng database sống
+ * nguyên trên Vercel mà không dòng nào ở đâu còn biết chúng tồn tại. Hai trạm đi theo đường ấy.
+ *
+ * `mirror:new` đã cất token vào sổ từ chính hôm đó; hàm này là bên ĐỌC còn thiếu.
+ *
+ * `decrypt` truyền vào chứ không nhập thẳng `secretBox`: tệp này cố ý không phụ thuộc gì, để
+ * `verify:deploy-targets` chạy được mà không cần `ENCRYPTION_KEY` — thứ mà `decryptSecret` đòi.
+ *
+ * Một phong bì hỏng (khoá đã đổi, chuỗi bị sửa tay) KHÔNG được phép giết cả lượt chạy: nó chỉ làm
+ * MỘT trạm mất chìa, y như trạm chưa từng có token. Ném ở đây là để một dòng sổ mục nát chặn cả
+ * lượt phát hành cho những trạm còn lành.
+ */
+export function tokensFromBook(
+  book: Book,
+  decrypt: (envelope: string) => string,
+): { tokens: TokenSource[]; broken: string[] } {
+  const tokens: TokenSource[] = [];
+  const broken: string[] = [];
+  for (const station of book.mirrors ?? []) {
+    const envelope = (station?.vercelToken ?? "").trim();
+    // Rỗng = trạm dựng trước 13/08/2026, hoặc form Gương Trạm chưa ai dán token vào. Không phải lỗi.
+    if (!envelope || !station.id) continue;
+    let token: string;
+    try {
+      token = decrypt(envelope).trim();
+    } catch {
+      broken.push(station.id);
+      continue;
+    }
+    if (!token) {
+      broken.push(station.id);
+      continue;
+    }
+    tokens.push({ label: bookTokenLabel(station.id), token });
+  }
+  return { tokens, broken };
+}
+
+/**
+ * Gộp nhiều nguồn token, ƯU TIÊN NGUỒN ĐỨNG TRƯỚC và khử trùng theo GIÁ TRỊ.
+ *
+ * Env đứng trước sổ ở mọi nơi gọi, có chủ ý: `.env.local` là thứ người vận hành vừa sửa bằng tay,
+ * còn sổ là bản đã cất từ lượt `mirror:new` nào đó — khi hai bên khác nhau thì cái mới sửa phải
+ * thắng, và nhãn hiện ra trong nhật ký phải là cái tên người ta vừa gõ.
+ *
+ * Khử trùng theo giá trị vì cùng một token gần như chắc chắn nằm ở CẢ HAI chỗ (mirror:new ghi cả
+ * hai), và một token đếm hai lần làm mọi project của nó hiện hai lần trong danh mục — đúng cái
+ * bẫy mà `discoverTokens` đã tránh trong phạm vi env, chỉ là ở tầng cao hơn.
+ */
+export function mergeTokenSources(...lists: readonly (readonly TokenSource[])[]): TokenSource[] {
+  const seen = new Set<string>();
+  const merged: TokenSource[] = [];
+  for (const list of lists) {
+    for (const source of list) {
+      if (!source.token || seen.has(source.token)) continue;
+      seen.add(source.token);
+      merged.push(source);
+    }
+  }
+  return merged;
 }
 
 /**
@@ -263,7 +358,7 @@ export function resolveTarget(station: StationEntry, catalog: readonly ProjectRe
 
   const matches = catalog.filter((p) => p.name === named.name);
   if (matches.length === 0) {
-    const searched = [...new Set(catalog.map((p) => p.envName))];
+    const searched = [...new Set(catalog.map((p) => p.label))];
     return {
       ok: false,
       message:
@@ -292,11 +387,92 @@ export function resolveTarget(station: StationEntry, catalog: readonly ProjectRe
       ok: false,
       message:
         `Tên project「${named.name}」trỏ tới ${distinct.size} project KHÁC NHAU: ` +
-        [...distinct.values()].map((m) => `${m.projectId} (qua ${m.envName})`).join(", ") +
+        [...distinct.values()].map((m) => `${m.projectId} (qua ${m.label})`).join(", ") +
         " — không đoán được cái nào của tông môn. Gỡ token của tài khoản lạ khỏi .env.local rồi chạy lại.",
     };
   }
   return { ok: true, target: matches[0] };
+}
+
+export type MirrorRemovalPlan =
+  | { go: false; message: string }
+  | { go: true; removeBookRow: boolean; removeProject: boolean };
+
+/**
+ * GO / NO-GO cho `mirror:remove`, và hàng rào ở giữa là lý do hàm này ra đời.
+ *
+ * ── CHUYỆN ĐÃ XẢY RA, 13/08/2026 ──────────────────────────────────────────────────────────────
+ *
+ * Ba trạm bị xoá liên tiếp. Với `auto-hh3d-4` — token nằm trong `.env.local` — lượt chạy xoá sạch
+ * cả project lẫn kho. Với `auto-hh3d-1` và `auto-hh3d-3` thì KHÔNG có token nào dưới máy, nên
+ * danh mục project rỗng, `target` vắng mặt, và mọi phần chạm Vercel nằm trong `if (target)` bị bỏ
+ * qua trọn vẹn. Lượt chạy vẫn gỡ dòng sổ, rồi in「đã xoá sạch: sổ, project, và 0 kho」.
+ *
+ * Đo lại lúc 17:20: `auto-hh3d-1` và `auto-hh3d-3` vẫn trả 307 — hai project còn sống, hai
+ * database còn nguyên dữ liệu người dùng, và không dòng nào ở đâu còn biết chúng tồn tại.
+ *
+ * ── LUẬT ─────────────────────────────────────────────────────────────────────────────────────
+ *
+ * KHÔNG NHÌN THẤY PROJECT THÌ KHÔNG ĐƯỢC GỠ DÒNG SỔ. Đây đúng là hình dạng LUẬT 4 của
+ * `removeMirrorStation` nâng lên một tầng: ở đó, project là sợi dây duy nhất nhận ra kho, nên
+ * không xoá project khi kho chưa dọn. Ở đây, DÒNG SỔ là sợi dây duy nhất nhận ra project — nó
+ * giữ `url` (suy ra tên project) và từ 13/08 giữ cả token. Gỡ nó trong lúc mù là biến một lượt
+ * xoá dở thành một project mồ côi vĩnh viễn, tính tiền hằng tháng mà không ai biết nó của cái gì.
+ *
+ * `bookOnly` là lối ra cho ca thật duy nhất mà luật trên chặn oan: project ĐÃ bị xoá tay trên
+ * dashboard, chỉ còn dòng sổ mồ côi. Nó là một LỜI KHAI của người vận hành, nên nó phải bị bác
+ * ngay khi ta nhìn thấy bằng chứng ngược lại — xem nhánh cuối.
+ */
+export function reviewMirrorRemoval(input: {
+  /** Trạm có dòng trong sổ không. */
+  hasEntry: boolean;
+  /** Có tra ra project trên Vercel bằng một token nào đó không. */
+  projectFound: boolean;
+  siteId: string;
+  /** Người vận hành khai「project xoá tay rồi, chỉ dọn sổ」bằng `--book-only`. */
+  bookOnly: boolean;
+}): MirrorRemovalPlan {
+  const { hasEntry, projectFound, siteId, bookOnly } = input;
+
+  if (!hasEntry && !projectFound) {
+    return {
+      go: false,
+      message:
+        `Không thấy project của「${siteId}」ở tài khoản nào, mà sổ cũng không có trạm ấy — không còn gì để xoá.\n` +
+        "  Gõ nhầm mã trạm chăng? Hoặc trạm đã dọn xong từ lượt trước.",
+    };
+  }
+
+  if (hasEntry && !projectFound && !bookOnly) {
+    return {
+      go: false,
+      message:
+        `KHÔNG NHÌN THẤY project của「${siteId}」bằng bất kỳ token nào — mà thiếu chìa thì「không thấy」\n` +
+        "  KHÔNG có nghĩa là「không còn」. Dừng, và CHƯA đụng gì tới sổ.\n" +
+        `  Gỡ dòng sổ lúc này là vứt nốt thứ duy nhất còn nhận ra project ấy (địa chỉ, và token nếu có),\n` +
+        "  để lại một project cùng database chạy mãi mà không ai biết của cái gì. Đã xảy ra thật với\n" +
+        "  auto-hh3d-1 và auto-hh3d-3 ngày 13/08/2026.\n\n" +
+        `  Đường đúng: lấy token của tài khoản giữ trạm ấy (Vercel → Account Settings → Tokens),\n` +
+        `  thêm dòng ${tokenEnvNameFor(siteId)}=<token> vào .env.local, rồi chạy lại.\n` +
+        "  Nếu project THẬT SỰ đã xoá tay rồi và chỉ còn dòng sổ mồ côi: chạy lại kèm --book-only.",
+    };
+  }
+
+  /**
+   * `--book-only` mà project lại đang sờ sờ ra đó: lời khai sai. Nghe theo thì ta tự tay dựng nên
+   * đúng cái project mồ côi mà cả hàng rào trên sinh ra để chặn — và lần này là do CHÍNH công cụ,
+   * trong một lượt chạy mà người vận hành tin là mình đang dọn dẹp.
+   */
+  if (bookOnly && projectFound) {
+    return {
+      go: false,
+      message:
+        `--book-only nghĩa là「project xoá tay rồi, chỉ còn dòng sổ」— nhưng project của「${siteId}」\n` +
+        "  VẪN CÒN và tôi đang nhìn thấy nó. Bỏ cờ ấy đi để xoá cả hai, đúng việc bạn định làm.",
+    };
+  }
+
+  return { go: true, removeBookRow: hasEntry, removeProject: projectFound };
 }
 
 /**

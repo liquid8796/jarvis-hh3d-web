@@ -99,10 +99,10 @@ const tokens = discoverTokens(process.env);
 if (tokens.length === 0) {
   results.push("… bỏ qua nửa API: không có VERCEL_TOKEN* nào trong env");
 } else {
-  const { envName, token } = tokens[0];
+  const { label, token } = tokens[0];
   const usage = await fetchVercelUsage(token);
 
-  check(`/v2/usage còn mở trên gói hobby (${envName})`, usage.ok, usage.ok ? "" : usage.error);
+  check(`/v2/usage còn mở trên gói hobby (${label})`, usage.ok, usage.ok ? "" : usage.error);
   if (usage.ok) {
     check("trả về đủ bộ chỉ số", usage.metrics.length === 6, `nhận ${usage.metrics.length}`);
     check(
@@ -110,7 +110,7 @@ if (tokens.length === 0) {
       usage.metrics.every((m) => Number.isFinite(m.used) && m.used >= 0),
       usage.metrics.map((m) => `${m.key}=${m.used}`).join(" "),
     );
-    console.log(`\n  Mức dùng thật của ${envName} — ${usage.daysWithData} ngày có lưu lượng:`);
+    console.log(`\n  Mức dùng thật của ${label} — ${usage.daysWithData} ngày có lưu lượng:`);
     for (const m of usage.metrics) {
       const limit = formatLimit(m);
       const ratio = usedRatio(m);

@@ -33,7 +33,16 @@ import path from "node:path";
 import { neon } from "@neondatabase/serverless";
 import { decryptSecret } from "../src/lib/crypto/secretBox";
 import { readControlDoc } from "../src/lib/control/read";
-import { chooseBook, discoverTokens, resolveTarget, type Book, type ProjectRef, type StationEntry } from "./deployTargets.mts";
+import {
+  chooseBook,
+  discoverTokens,
+  mergeTokenSources,
+  resolveTarget,
+  tokensFromBook,
+  type Book,
+  type ProjectRef,
+  type StationEntry,
+} from "./deployTargets.mts";
 import { projectsFor } from "./vercelCatalog.mts";
 import { loadEnv } from "./loadEnv.mjs";
 
@@ -121,14 +130,6 @@ try {
   die("Không gọi được `vercel`. Cài bằng `npm i -g vercel` rồi chạy lại.");
 }
 
-const tokens = discoverTokens(process.env);
-if (tokens.length === 0) {
-  die("Không thấy token nào trong env. Cần ít nhất VERCEL_TOKEN (và VERCEL_TOKEN_<TÊN> cho tài khoản khác).");
-}
-/** Tra token theo tên biến — `discoverTokens` đã bảo đảm mọi giá trị ở đây khác rỗng. */
-const tokenByEnvName = new Map(tokens.map((t) => [t.envName, t.token]));
-console.log(`• Token khai trong env: ${tokens.map((t) => t.envName).join(", ")}`);
-
 // ---- 2. Sổ gương — đọc từ TRẠM ĐANG HOẠT ĐỘNG ------------------------------------------------
 
 const readBook = async (url: string): Promise<Book> => {
@@ -151,6 +152,34 @@ if (stations.length === 0) {
   die("Sổ gương chưa có trạm nào. Vào trang Tông Môn → tab Gương Trạm ghi trạm vào sổ trước.");
 }
 console.log(`• Sổ gương (${loaded.from}) có ${stations.length} trạm: ${stations.map((s) => s.id).join(", ")}`);
+
+/**
+ * ---- 2b. Chìa: `.env.local` TRƯỚC, rồi token cất trong sổ ------------------------------------
+ *
+ * Lượt tra chìa đứng SAU lượt đọc sổ, và thứ tự ấy là bắt buộc chứ không phải sắp cho đẹp: chính
+ * cái sổ vừa đọc là nguồn token thứ hai. Trước 13/08/2026 chỗ này chỉ đọc env, nên một trạm mà
+ * máy đang chạy không có dòng `VERCEL_TOKEN_<TÊN>` sẽ rơi khỏi mọi lượt phát hành với câu「Không
+ * tài khoản nào có project ấy」— dù token của nó nằm ngay trong sổ.
+ *
+ * `loaded.stations` đã bị `chooseBook` lọc còn `StationEntry`, tức MẤT trường `vercelToken`. Nên
+ * lượt gom chìa phải hỏi lại chính cuốn sổ thô (`loaded.book`), không hỏi danh sách đã lọc.
+ */
+const fromBook = tokensFromBook(loaded.book, decryptSecret);
+if (fromBook.broken.length > 0) {
+  console.warn(
+    `  ⚠ ${fromBook.broken.length} trạm có token trong sổ nhưng KHÔNG giải nổi phong bì ` +
+      `(${fromBook.broken.join(", ")}) — sai ENCRYPTION_KEY, hay dòng sổ bị sửa tay? Coi như chúng không có chìa.`,
+  );
+}
+const tokens = mergeTokenSources(discoverTokens(process.env), fromBook.tokens);
+if (tokens.length === 0) {
+  die(
+    "Không có chìa nào: env không khai VERCEL_TOKEN/VERCEL_TOKEN_<TÊN>, mà sổ cũng không giữ token của trạm nào.",
+  );
+}
+/** Tra token theo nhãn — `mergeTokenSources` đã bảo đảm mọi giá trị ở đây khác rỗng. */
+const tokenByLabel = new Map(tokens.map((t) => [t.label, t.token]));
+console.log(`• Chìa đang cầm: ${tokens.map((t) => t.label).join(", ")}`);
 
 /**
  * TRẠM ĐANG PHỤC VỤ CÓ NẰM TRONG SỔ NÀY KHÔNG — câu hỏi mà lượt chạy 12/08/2026 trả lời SAI.
@@ -229,7 +258,7 @@ const catalog: ProjectRef[] = [];
 for (const source of tokens) {
   const found = await projectsFor(source);
   catalog.push(...found);
-  console.log(`  ${source.envName} → ${found.length} project`);
+  console.log(`  ${source.label} → ${found.length} project`);
 }
 
 // ---- 4. Tra đích TRƯỚC, phát hành SAU --------------------------------------------------------
@@ -261,7 +290,7 @@ for (const [projectId, ids] of byProject) {
 
 console.log("\n── Kế hoạch phát hành ───────────────────────────────");
 for (const { station, target } of plans) {
-  console.log(`  ✔ ${station.id.padEnd(14)} → project「${target.name}」qua ${target.envName}`);
+  console.log(`  ✔ ${station.id.padEnd(14)} → project「${target.name}」qua ${target.label}`);
 }
 for (const { station, message } of unresolved) {
   console.log(`  ✗ ${station.id.padEnd(14)} → ${message}`);
@@ -319,17 +348,17 @@ try {
     );
 
     // node_modules KHÔNG nằm trong git archive, và cũng không cần: Vercel tự cài từ lockfile.
-    const token = tokenByEnvName.get(target.envName);
+    const token = tokenByLabel.get(target.label);
     if (!token) {
       // Không thể xảy ra (envName sinh ra từ chính bảng token này), nhưng nếu nó xảy ra thì
       // `{...process.env}` bên dưới sẽ lặng lẽ để lại VERCEL_TOKEN của trạm chính — tức phát
       // hành bằng nhầm tài khoản. Chặn thẳng thay vì tin vào một bất biến.
-      console.error(`  ✗ ${station.id}: mất token ${target.envName} giữa chừng — bỏ qua trạm này.`);
-      outcomes.push({ station, ok: false, detail: `mất token ${target.envName}` });
+      console.error(`  ✗ ${station.id}: mất token ${target.label} giữa chừng — bỏ qua trạm này.`);
+      outcomes.push({ station, ok: false, detail: `mất token ${target.label}` });
       continue;
     }
 
-    console.log(`\n── ${station.id} → ${target.name} (${target.envName}) ─────────────`);
+    console.log(`\n── ${station.id} → ${target.name} (${target.label}) ─────────────`);
     const started = Date.now();
     let code: number;
     try {

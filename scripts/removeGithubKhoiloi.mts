@@ -214,8 +214,14 @@ type BookStation = {
  * nghĩa là hoặc không đàn nào đang chạy, hoặc người vận hành đã đọc đúng cái giá ấy và gõ `--force`.
  *
  * Cái giá khi lượt xoá kho ngay sau đây HỤT: khôi lỗi vừa bị tắt mà kho thì còn. Nó nằm im tới
- * lượt `schedule` kế (`cron: "0 */4 * * *"`) rồi tự sống lại — tức thiệt hại bị chặn trên bởi bốn
- * giờ, không phải vĩnh viễn, và đó là lý do bước này được phép đứng trước lượt xoá.
+ * lượt `schedule` kế — bốn giờ một lượt, xem `on.schedule` trong `linh-su.yml` — rồi tự sống lại,
+ * tức thiệt hại bị chặn trên bởi bốn giờ chứ không vĩnh viễn. Đó là lý do bước này được phép đứng
+ * trước lượt xoá.
+ *
+ * ĐỪNG chép một biểu thức cron nhịp-mấy-giờ vào khối chú thích này: dạng viết tắt của nó chứa
+ * đúng cặp ký tự ĐÓNG khối, nên nó cắt đôi tệp ngay tại chỗ. Đã xảy ra ở chính dòng trên —
+ * `github:remove` không phân tích cú pháp nổi suốt từ commit 336517b cho tới lúc
+ * `typecheck:scripts` ra đời và soi thấy. Cần nhắc tới lịch thì trỏ sang `linh-su.yml`.
  */
 async function cancelActiveRuns(pat: string, login: string, repo: string): Promise<void> {
   /** Quyền cho `POST …/cancel` — KHÁC hẳn quyền xoá kho, nên 403 ở đây phải chỉ đúng ô cần tick. */

@@ -11,6 +11,69 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.82.6 —「không thấy」không phải「không còn」, và một thư mục công cụ chưa từng được trình biên dịch đọc
+
+Hôm nay xoá ba trạm gương. Với `auto-hh3d-4` — token nằm trong `.env.local` — lượt chạy xoá sạch cả
+project lẫn kho. Với `auto-hh3d-1` và `auto-hh3d-3` thì máy này KHÔNG có token nào của chúng, nên
+danh mục project rỗng, `target` vắng mặt, và mọi phần chạm Vercel (liệt kê kho, `DELETE /v9/projects`)
+đều nằm trong `if (target)` nên bị bỏ qua trọn vẹn. Lượt gỡ dòng sổ thì KHÔNG nằm trong `if` nào.
+Kết cục, cả hai lượt chạy đều in:
+
+```
+✔ Trạm「auto-hh3d-1」đã xoá sạch: sổ, project, và 0 kho.
+```
+
+Đo lại lúc 17:20 cùng ngày: hai domain vẫn trả **307**. Hai project còn sống, hai database còn
+nguyên dữ liệu người dùng, và không dòng nào ở đâu còn biết chúng tồn tại — vì dòng sổ, thứ duy
+nhất nhận ra chúng, vừa bị chính công cụ dọn dẹp gỡ mất.
+
+**LUẬT 5 — KHÔNG NHÌN THẤY PROJECT THÌ KHÔNG GỠ DÒNG SỔ.** Đây đúng là hình dạng LUẬT 4 của chính
+tệp ấy, nâng lên một tầng: ở đó project là sợi dây duy nhất nhận ra kho, nên cấm xoá project khi kho
+chưa dọn. Ở đây DÒNG SỔ là sợi dây duy nhất nhận ra project — nó giữ địa chỉ (suy ra tên project) và
+từ 13/08 giữ cả token. Thiếu chìa thì「không thấy」KHÔNG có nghĩa là「không còn」, và một công cụ xoá
+không được phép lẫn hai câu ấy. Luật nằm ở `reviewMirrorRemoval`, thuần, `verify:deploy-targets` bao
+đủ sáu ô của bảng (có sổ × thấy project × `--book-only`).
+
+`--book-only` là lối ra cho ca thật duy nhất mà luật trên chặn oan: project đã xoá tay trên
+dashboard, chỉ còn dòng sổ mồ côi. Nó là một LỜI KHAI, nên nó bị bác ngay khi có bằng chứng ngược
+lại — khai `--book-only` mà project đang sờ sờ ra đó thì lượt chạy dừng, chứ không nghe theo rồi tự
+tay dựng nên đúng cái project mồ côi mà cả hàng rào sinh ra để chặn.
+
+**Chìa gom từ HAI nguồn: `.env.local` trước, rồi token cất trong SỔ.** Bản 13/08 đã cho `mirror:new`
+cất token vào sổ, và lý do ghi trong bình chú hôm ấy đọc lại thành một lời tiên tri: *"bốn trong năm
+trạm không có token ở đâu cả"*. Chỉ là bên ĐỌC chưa bao giờ được viết. Nay `tokensFromBook` lấp chỗ
+ấy, cho cả `mirror:remove` lẫn `deploy:all` — nghĩa là một trạm mà máy đang chạy không có dòng
+`VERCEL_TOKEN_<TÊN>` thôi rơi khỏi mọi lượt phát hành. Đo trên dữ liệu thật: `mirror:remove --site
+auto-hh3d --dry-run` nay báo `project: auto-hh3d trên team jarvis8796 (qua sổ「auto-hh3d」)` kèm đủ
+hai kho, thay vì「không tồn tại」.
+
+Phong bì hỏng chỉ làm MỘT trạm mất chìa, không giết cả lượt chạy: một dòng sổ mục nát không được
+phép chặn lượt phát hành cho những trạm còn lành. Và trường `envName` của `TokenSource` đổi tên
+thành `label`, vì cái tên cũ nói dối ngay ngày sổ bắt đầu giữ token — một nhãn `sổ「auto-hh3d-1」`
+nằm trong một trường tên `envName` là cách người sau đi tìm nó trong `.env.local` mà không bao giờ
+thấy. Cùng lượt ấy, phép chọn project trong `mirror:remove` thôi đếm SỐ LƯỢT NHÌN THẤY mà đếm số
+`projectId` KHÁC NHAU — y bài học của `resolveTarget`, và từ nay nó nặng gấp đôi vì một trạm bình
+thường có token ở cả hai nguồn.
+
+**Câu tổng kết kể đúng những gì đã làm**, không đọc thuộc. Chính dòng「đã xoá sạch: sổ, project, và
+0 kho」là thứ làm người vận hành tin hai trạm kia đã xong. Một dòng tổng kết sai còn tệ hơn không có
+dòng nào: nó là thứ người ta đọc THAY cho việc đi kiểm.
+
+**`npm run typecheck:scripts` — và thứ nó tìm thấy ngay lượt đầu.** `tsconfig.json` LOẠI thư mục
+`scripts`, nên `tsc --noEmit` chưa bao giờ đọc một dòng nào trong đó, còn `tsx` thì chỉ LỘT kiểu chứ
+không kiểm. Cả một thư mục công cụ vận hành — gồm những công cụ XOÁ — chưa từng được trình biên dịch
+nhìn qua. Lượt chạy đầu tiên bắt được một lỗi chí mạng: chuỗi `*/` trong một biểu thức cron chép vào
+khối chú thích của `removeGithubKhoiloi.mts` đã **đóng sớm khối chú thích và cắt đôi tệp** — tức
+`npm run github:remove` không phân tích cú pháp nổi kể từ commit `336517b` (bản 0.82.3). Không phép
+kiểm nào bắt được, vì phép kiểm của nó là thuần và nhập tệp KHÁC, còn bản thân công cụ thì cần một
+PAT mới chạy được nên chưa ai gọi.
+
+Lượt soi ấy còn phơi ra 6 lỗi kiểu CÓ SẴN ở bốn tệp khác, hai trong đó có vẻ là khiếm khuyết thật
+(`verifyMaintenanceMode` khai vai `admin` đã bị xoá và thiếu vai `pham-nhan`; `sweepBrowsers` đếm
+vào một trường không có trong `SweepResult`). Chúng nằm ngoài bản vá này và được tách ra một việc
+riêng — nên `typecheck:scripts` hôm nay còn ĐỎ ở bốn tệp ấy, và con số ấy là phát hiện chứ không
+phải khuyết điểm của phép soi.
+
 ## 0.82.5 — vòng canh sổ điểm danh được CHẠY THẬT, không chỉ được lý luận
 
 Bản 0.82.3 dựng vòng canh và đóng đinh LUẬT của nó bằng đồng hồ giả. Nhưng nó đóng đinh đúng cái

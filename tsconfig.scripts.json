@@ -1,0 +1,19 @@
+// `tsconfig.json` LOẠI thư mục `scripts` (đúng: Next không dựng chúng, và một `.mts` nhập nhau
+// bằng đuôi `.mts` sẽ làm bản build của Next đỏ). Hệ quả im lặng của phép loại ấy: `tsc --noEmit`
+// không soi một dòng nào trong `scripts/`, mà `tsx` thì chỉ LỘT kiểu chứ không kiểm — nên cả một
+// thư mục công cụ vận hành, gồm những công cụ XOÁ, chưa bao giờ được trình biên dịch đọc qua.
+//
+// Đo 13/08/2026: một lượt đổi tên trường (`envName` → `label`) chạm sáu tệp mà `npm run typecheck`
+// vẫn xanh nguyên, vì nó đang soi một tập tệp không có tệp nào trong số ấy.
+//
+// Cấu hình này chỉ khác bản gốc ở phạm vi và ở `allowImportingTsExtensions` (scripts nhập nhau
+// bằng đuôi `.mts` thật, đúng lối `tsx` chạy).
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  },
+  "include": ["scripts/**/*.mts", "scripts/**/*.ts"],
+  "exclude": ["node_modules"]
+}

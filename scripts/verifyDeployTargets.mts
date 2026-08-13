@@ -7,12 +7,15 @@
  */
 import { randomBytes } from "node:crypto";
 import {
+  bookTokenLabel,
   chooseBook,
   discoverTokens,
   FORBIDDEN_IN_STORE_NAME,
+  mergeTokenSources,
   projectNameFromUrl,
   randomStoreName,
   resolveTarget,
+  reviewMirrorRemoval,
   sensitiveEnvKeys,
   stationUrlFor,
   storesOfProject,
@@ -20,8 +23,10 @@ import {
   STORE_SPECS_SHARED,
   STORE_NAME_LENGTH,
   tokenEnvNameFor,
+  tokensFromBook,
   upsertEnvLine,
   validateSiteId,
+  type Book,
   type ProjectRef,
 } from "./deployTargets.mts";
 
@@ -46,9 +51,9 @@ function ok(condition: boolean, label: string): void {
     DATABASE_URL: "postgres://…",
   });
   ok(found.length === 2, "chỉ nhặt đúng hai biến token, bỏ qua VERCEL_* khác");
-  ok(found[0].envName === "VERCEL_TOKEN", "VERCEL_TOKEN đứng đầu cho dễ đọc nhật ký");
+  ok(found[0].label === "VERCEL_TOKEN", "VERCEL_TOKEN đứng đầu cho dễ đọc nhật ký");
   ok(
-    !found.some((t) => t.envName === "VERCEL_OIDC_TOKEN"),
+    !found.some((t) => t.label === "VERCEL_OIDC_TOKEN"),
     "VERCEL_OIDC_TOKEN KHÔNG bị nhận nhầm — nó khớp「VERCEL_…TOKEN」nhưng không phải token phát hành",
   );
 
@@ -60,6 +65,107 @@ function ok(condition: boolean, label: string): void {
   // bị kết luận là nhập nhằng — một lỗi cấu hình vô hại hoá thành lượt phát hành bị chặn sạch.
   const duplicated = discoverTokens({ VERCEL_TOKEN: "same", VERCEL_TOKEN_MAIN: "same", VERCEL_TOKEN_B: "khac" });
   ok(duplicated.length === 2, "cùng một token ở hai biến chỉ được tính MỘT lần");
+}
+
+// ---- Token CẤT TRONG SỔ, và phép gộp hai nguồn ------------------------------------------------
+//
+// Thiếu đúng nguồn thứ hai này, ngày 13/08/2026 `mirror:remove` không nhìn thấy project của
+// auto-hh3d-1 và auto-hh3d-3 (máy đang chạy không có dòng token nào của chúng), kết luận「project
+// không tồn tại」, gỡ dòng sổ, rồi để lại hai project cùng database sống nguyên mà không dòng nào
+// ở đâu còn biết chúng tồn tại. Sổ ĐÃ giữ token từ chính hôm ấy — chỉ là chưa ai đọc.
+{
+  /** Phong bì giả: lượt「giải mã」chỉ bóc tiền tố, đủ để phân biệt đã-giải với chưa-giải. */
+  const decrypt = (envelope: string): string => {
+    if (!envelope.startsWith("enc:")) throw new Error("phong bì hỏng");
+    return envelope.slice(4);
+  };
+  const station = (id: string, vercelToken?: string) => ({
+    id,
+    name: `Trạm ${id}`,
+    url: stationUrlFor(id),
+    vercelToken,
+  });
+
+  const book: Book = {
+    mirrors: [station("auto-hh3d-1", "enc:tok-mot"), station("auto-hh3d-3", "enc:tok-ba")],
+  };
+  const { tokens, broken } = tokensFromBook(book, decrypt);
+  ok(tokens.length === 2 && broken.length === 0, "moi được token của cả hai trạm trong sổ");
+  ok(tokens[0].token === "tok-mot", "phong bì được giải, không trả về nguyên văn phong bì");
+  ok(tokens[0].label === bookTokenLabel("auto-hh3d-1"), "nhãn TỰ KHAI là token đến từ sổ");
+  ok(
+    !tokens[0].label.startsWith("VERCEL_TOKEN"),
+    "và KHÔNG đội lốt một tên biến env — không ai được phép đi tìm nó trong .env.local",
+  );
+
+  // Trạm dựng trước 13/08/2026 mang chuỗi rỗng. Đó là cảnh THƯỜNG, không phải hỏng.
+  ok(tokensFromBook({ mirrors: [station("auto-hh3d-2")] }, decrypt).tokens.length === 0, "trạm chưa có token thì bỏ qua");
+  ok(tokensFromBook({ mirrors: [station("x", "  ")] }, decrypt).broken.length === 0, "phong bì toàn khoảng trắng = chưa có, không phải hỏng");
+  ok(tokensFromBook({}, decrypt).tokens.length === 0, "sổ rỗng → không token nào, không ném");
+
+  /**
+   * Một phong bì mục nát KHÔNG được giết cả lượt chạy: nó chỉ làm MỘT trạm mất chìa. Ném ở đây
+   * là để một dòng sổ hỏng chặn cả lượt phát hành cho những trạm còn lành.
+   */
+  const hong = tokensFromBook({ mirrors: [station("auto-hh3d-1", "rac"), station("auto-hh3d-3", "enc:tok-ba")] }, decrypt);
+  ok(hong.tokens.length === 1 && hong.tokens[0].token === "tok-ba", "phong bì hỏng chỉ mất chìa của TRẠM ẤY");
+  ok(hong.broken.join() === "auto-hh3d-1", "và trạm hỏng được kể tên để còn đi chữa");
+  ok(tokensFromBook({ mirrors: [station("rong", "enc:")] }, decrypt).broken.join() === "rong", "giải ra chuỗi rỗng cũng tính là hỏng");
+
+  // ---- Gộp: env TRƯỚC, sổ SAU ----
+  const fromEnv = discoverTokens({ VERCEL_TOKEN_AUTO_HH3D_1: "tok-moi-sua-tay" });
+  const gop = mergeTokenSources(fromEnv, tokens);
+  ok(gop.length === 3, "gộp hai nguồn, không nguồn nào nuốt nguồn nào");
+  ok(gop[0].label === "VERCEL_TOKEN_AUTO_HH3D_1", "env đứng TRƯỚC — cái vừa sửa tay phải thắng");
+
+  /**
+   * Cùng một token nằm ở CẢ env LẪN sổ là cảnh THƯỜNG (`mirror:new` ghi cả hai chỗ). Không khử
+   * trùng thì mọi project của nó hiện hai lần trong danh mục — đúng cái bẫy `discoverTokens` đã
+   * tránh trong phạm vi env, chỉ là ở tầng cao hơn.
+   */
+  const trung = mergeTokenSources(discoverTokens({ VERCEL_TOKEN: "tok-mot" }), tokens);
+  ok(trung.length === 2, "cùng một chuỗi token ở hai nguồn chỉ được tính MỘT lần");
+  ok(trung[0].label === "VERCEL_TOKEN", "và bản được giữ là bản của env, kèm cái tên người ta gõ");
+  ok(mergeTokenSources().length === 0, "gộp không nguồn nào → mảng rỗng, không ném");
+  ok(mergeTokenSources([{ label: "x", token: "" }]).length === 0, "token rỗng bị loại ở tầng gộp");
+}
+
+// ---- HÀNG RÀO 5 của mirror:remove: không thấy project thì không gỡ sổ -------------------------
+//
+// Ô quan trọng nhất là ô「có dòng sổ · KHÔNG thấy project · không --book-only」. Trước 13/08/2026
+// ô ấy ĐI TIẾP, và đó là toàn bộ cơ chế làm mất auto-hh3d-1 với auto-hh3d-3.
+{
+  const xet = (hasEntry: boolean, projectFound: boolean, bookOnly: boolean) =>
+    reviewMirrorRemoval({ hasEntry, projectFound, siteId: "auto-hh3d-1", bookOnly });
+
+  const mu = xet(true, false, false);
+  ok(!mu.go, "CÓ dòng sổ + KHÔNG thấy project → TỪ CHỐI (ô đã làm mất hai trạm)");
+  ok(!mu.go && mu.message.includes("KHÔNG có nghĩa là「không còn」"), "và nói đúng cái sai:「không thấy」≠「không còn」");
+  ok(!mu.go && mu.message.includes(tokenEnvNameFor("auto-hh3d-1")), "kèm ĐÚNG tên biến phải thêm vào .env.local");
+  ok(!mu.go && mu.message.includes("--book-only"), "và chỉ ra lối đi tiếp nếu project thật sự đã xoá tay");
+
+  const khai = xet(true, false, true);
+  ok(khai.go, "--book-only mở được ô ấy — dòng sổ mồ côi vẫn phải dọn được");
+  ok(khai.go && khai.removeBookRow && !khai.removeProject, "và chỉ gỡ sổ, không hứa hẹn gì về project");
+
+  /**
+   * `--book-only` mà project đang sờ sờ ra đó: lời khai sai. Nghe theo thì CHÍNH công cụ dựng nên
+   * đúng cái project mồ côi mà hàng rào trên sinh ra để chặn.
+   */
+  const khaiSai = xet(true, true, true);
+  ok(!khaiSai.go, "--book-only trong khi project VẪN CÒN → từ chối, không tự tay tạo project mồ côi");
+  ok(!khaiSai.go && khaiSai.message.includes("Bỏ cờ ấy đi"), "và bảo thẳng phải bỏ cờ nào");
+
+  const dayDu = xet(true, true, false);
+  ok(dayDu.go && dayDu.removeBookRow && dayDu.removeProject, "đủ cả sổ lẫn project → xoá cả hai");
+
+  // Trạm đã gỡ khỏi sổ từ lượt trước mà project còn — đúng ca sinh ra cờ `--project`.
+  const soTrong = xet(false, true, false);
+  ok(soTrong.go && !soTrong.removeBookRow && soTrong.removeProject, "sổ đã sạch, project còn → chỉ xoá project");
+
+  const changConGi = xet(false, false, false);
+  ok(!changConGi.go, "không sổ, không project → không còn gì để xoá");
+  ok(!changConGi.go && !changConGi.message.includes("--book-only"), "và KHÔNG mời dùng --book-only cho một thứ không tồn tại");
 }
 
 // ---- URL trạm → tên project ------------------------------------------------------------------
@@ -84,14 +190,14 @@ function ok(condition: boolean, label: string): void {
 
 // ---- Ghép trạm với project --------------------------------------------------------------------
 {
-  const main: ProjectRef = { name: "auto-hh3d", projectId: "prj_main", orgId: "team_a", envName: "VERCEL_TOKEN" };
+  const main: ProjectRef = { name: "auto-hh3d", projectId: "prj_main", orgId: "team_a", label: "VERCEL_TOKEN" };
   const guong: ProjectRef = {
     name: "auto-hh3d-1",
     projectId: "prj_guong",
     orgId: "team_b",
-    envName: "VERCEL_TOKEN_MIRROR",
+    label: "VERCEL_TOKEN_MIRROR",
   };
-  const lac: ProjectRef = { name: "mot-project-khac", projectId: "prj_x", orgId: "team_a", envName: "VERCEL_TOKEN" };
+  const lac: ProjectRef = { name: "mot-project-khac", projectId: "prj_x", orgId: "team_a", label: "VERCEL_TOKEN" };
   const catalog = [main, lac, guong];
 
   const hit = resolveTarget({ id: "main", name: "Trạm chính", url: "https://auto-hh3d.vercel.app" }, catalog);
@@ -107,7 +213,7 @@ function ok(condition: boolean, label: string): void {
   //「token nào thấy trước thì thắng」sẽ phát hành lên nhầm tài khoản trong im lặng.
   const doubled = resolveTarget({ id: "main", name: "Trạm chính", url: "https://auto-hh3d.vercel.app" }, [
     main,
-    { ...main, projectId: "prj_trung-ten", orgId: "team_c", envName: "VERCEL_TOKEN_KHAC" },
+    { ...main, projectId: "prj_trung-ten", orgId: "team_c", label: "VERCEL_TOKEN_KHAC" },
   ]);
   ok(!doubled.ok, "project trùng tên ở hai tài khoản → TỪ CHỐI, không chọn bừa");
   ok(
@@ -121,7 +227,7 @@ function ok(condition: boolean, label: string): void {
   // `prj_eW4Il86IBjG2NIZepeWKXFoZnejT`, mà mọi lượt phát hành cho trạm ấy đều chết.
   const haiToken = resolveTarget({ id: "main", name: "Trạm gốc", url: "https://auto-hh3d.vercel.app" }, [
     main,
-    { ...main, envName: "VERCEL_TOKEN_AUTO_HH3D" },
+    { ...main, label: "VERCEL_TOKEN_AUTO_HH3D" },
   ]);
   ok(haiToken.ok, "CÙNG một project thấy qua hai token → vẫn phát hành được, không kêu nhập nhằng");
   ok(haiToken.ok && haiToken.target.projectId === "prj_main", "…và chọn đúng project ấy");

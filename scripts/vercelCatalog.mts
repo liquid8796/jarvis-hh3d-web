@@ -43,7 +43,7 @@ export async function projectsFor(source: TokenSource): Promise<ProjectRef[]> {
       signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });
     if (!res.ok) {
-      console.warn(`  ⚠ ${source.envName}: liệt kê project hỏng — HTTP ${res.status}. Token hết hạn hay bị thu hồi?`);
+      console.warn(`  ⚠ ${source.label}: liệt kê project hỏng — HTTP ${res.status}. Token hết hạn hay bị thu hồi?`);
       return collected;
     }
     const body = (await res.json()) as {
@@ -52,14 +52,14 @@ export async function projectsFor(source: TokenSource): Promise<ProjectRef[]> {
     };
     for (const p of body.projects ?? []) {
       if (p.name && p.id && p.accountId) {
-        collected.push({ name: p.name, projectId: p.id, orgId: p.accountId, envName: source.envName });
+        collected.push({ name: p.name, projectId: p.id, orgId: p.accountId, label: source.label });
       }
     }
     const next = body.pagination?.next;
     if (next === null || next === undefined) return collected;
     until = next;
   }
-  console.warn(`  ⚠ ${source.envName}: quá ${MAX_PROJECT_PAGES} trang project — dừng liệt kê ở đây.`);
+  console.warn(`  ⚠ ${source.label}: quá ${MAX_PROJECT_PAGES} trang project — dừng liệt kê ở đây.`);
   return collected;
 }
 

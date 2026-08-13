@@ -11,6 +11,50 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.82.3 — xoá xong một khôi lỗi GitHub thì sổ điểm danh phải SẠCH, không phải「đã gọi DELETE」
+
+`npm run github:remove` ra đời ở bản 0.82.1 để dọn cả ba dấu chân của một kho khôi lỗi. Nó dọn đủ
+ba — rồi dấu chân thứ ba mọc lại sau lưng nó.
+
+**Xoá kho GitHub KHÔNG giết runner tức khắc.** Đo ngày 13/08/2026 trên
+`github-khoiloi-20260813-105506`: kho đã trả 404, mà tiến trình trên runner còn gõ cửa
+`/api/worker` thêm 52 giây nữa. `recordWorkerSeen` là một câu `insert … on conflict do update` —
+nó không hỏi「tôi còn được phép tồn tại không」, nó chỉ ghi tên. Nên chưa đầy một nhịp gõ cửa
+(5 giây) sau câu `delete from workers`, dòng ấy tự mọc lại, trong khi lượt chạy đã in「đã xoá
+sạch」và thoát 0.
+
+Bằng chứng nằm ở `first_seen` của dòng ấy: **14:39:35**, trong khi chính cái tên khai
+**10:55:06**. Thứ người ta nhìn thấy trong tab Khôi Lỗi không phải dòng cũ sót lại — nó là một
+dòng MỚI, sinh sau lượt xoá. Và nó nằm đó vĩnh viễn: sổ điểm danh là sổ ĐĂNG KÝ, không ai quét
+dọn dòng của khôi lỗi tông môn (`forgetWorker` chỉ gỡ được khôi lỗi RIÊNG, nó lọc theo `userId`).
+
+**Nay bước cuối là một VÒNG CANH, không phải một câu DELETE**: xoá, rồi soi lại cho tới khi không
+dòng nào mọc lên suốt trọn 30 giây. Con số ấy không chọn cho đẹp — điều kiện đúng đắn là「dài hơn
+nhịp gõ cửa」, mà một runner còn sống thì cứ mỗi 5 giây là chèn lại dòng của nó, nên 30 giây im
+lặng loại trừ được mọi nhịp dưới 30 giây. Quãng im do CHÍNH database đo (`now() - last_seen`),
+không đem mốc của nó trừ vào đồng hồ máy đang gõ lệnh: hai đồng hồ lệch bao nhiêu thì kết luận
+sai bấy nhiêu. Đổi lại, một dòng đã chết từ hôm qua vẫn xong ngay ở lượt soi đầu — không ai phải
+ngồi đợi 30 giây cho một cái xác nguội ngắt.
+
+**Và huỷ mọi lượt chạy Actions TRƯỚC khi xoá kho**, để runner chết theo một lệnh dừng chứ không
+chết vì đất dưới chân biến mất. Bước này best-effort, cố ý: thứ BẢO ĐẢM sổ sạch là vòng canh, nên
+hụt quyền hay hụt mạng ở đây chỉ cảnh báo rồi đi tiếp — dừng cả lượt dọn vì không tắt nổi đèn là
+sai vai. Phép lọc「lượt chạy nào còn sống」hỏi `status !== "completed"` chứ không dò một danh sách
+trắng: GitHub đặt thêm trạng thái theo thời gian, và một danh sách thiếu tên sẽ bỏ sót đúng cái
+lượt phải huỷ. Nó KHÔNG mâu thuẫn với `cancel-in-progress: false` trong tệp workflow — luật bên đó
+cấm một lượt chạy mới cắt ngang đàn đang cày, còn lượt huỷ này đứng sau `reviewRemoval` và sau câu
+xác nhận gõ tay.
+
+**Hết 3 phút mà dòng vẫn mọc lại thì DỪNG, và gọi tên thủ phạm thật.** Runner vừa mất kho chỉ sống
+thêm cỡ một phút; thứ còn gõ cửa sau ba phút là một máy KHÁC đang cài trùng `WORKER_ID`, mà với nó
+thì xoá bao nhiêu lần cũng vô nghĩa. Câu cảnh báo cố ý KHÔNG mời chạy lại lệnh này: kho đã xoá và
+dòng sổ đã gỡ, nên lượt sau sẽ bị `reviewRemoval` từ chối vì「không có bằng chứng nào」— hứa một
+lối thoát cụt còn tệ hơn im lặng.
+
+Luật của vòng nằm trong một hàm THUẦN (`judgeRosterPurge`), nên `verify:github-removal` lái được
+nó bằng đồng hồ giả — 82 phép kiểm, mà ca gốc là「vắng NGAY SAU lượt xoá không phải bằng chứng đã
+chết」. Dòng ma do lượt 13/08 để lại đã được gỡ tay.
+
 ## 0.82.2 — PAT trong sổ đọc lại được, vì GitHub thì không cho đọc lại
 
 Tab Kho GitHub cất PAT trong phong bì `secretBox` và **chưa từng có đường mở nó ra**: ô PAT ở form

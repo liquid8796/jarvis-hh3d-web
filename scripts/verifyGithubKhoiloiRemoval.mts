@@ -14,16 +14,26 @@
  *     một dòng「Khôi lỗi mất liên lạc」mà người gõ lệnh không bao giờ nhìn thấy.
  *
  * Nên hai hàng rào ấy được đóng đinh ở đây, lúc chúng còn là hàm.
+ *
+ * Từ 13/08/2026 có thêm một nhóm thứ ba: VÒNG CANH SỔ ĐIỂM DANH. Cái sai ở đó không giết đàn của
+ * ai — nó chỉ để lại một dòng ma vĩnh viễn trong tab Khôi Lỗi — nhưng nó đã xảy ra THẬT, và nó
+ * thuộc đúng loại không tầng nào ở hạ nguồn bắt được: lượt chạy vẫn in「đã xoá sạch」rồi thoát 0.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
+  activeRunIds,
   chooseTarget,
   describeCandidate,
   describeEvidence,
+  judgeRosterPurge,
   looksLikeKhoiloiRepoName,
   reviewRemoval,
   workerIdFromWorkflow,
+  PURGE_BUDGET_MS,
+  PURGE_GAP_MS,
+  PURGE_POLL_MS,
+  PURGE_SETTLE_MS,
   type Candidate,
 } from "./githubKhoiloi.mts";
 import { ALL_REPO_NAME_PREFIXES, REPO_NAME_PREFIX } from "./khoiloiNaming.mjs";
@@ -202,6 +212,125 @@ const candidate = (over: Partial<Candidate> = {}): Candidate => ({
   // Biên: 1 là số nhỏ nhất còn phải chặn. Một phép so `> 1` viết nhầm sẽ lọt đúng ca này, và nó là
   // ca THƯỜNG NHẤT — khôi lỗi GitHub có 2 ghế nên phần lớn thời gian nó giữ một hoặc hai đàn.
   ok(!reviewRemoval({ candidate: candidate(), heldJobs: 1, force: false }).go, "đúng MỘT đàn cũng đủ để chặn");
+}
+
+// ---- Huỷ lượt chạy Actions trước khi xoá kho --------------------------------------------------
+//
+// Bước này là thứ rút ngắn quãng thoi thóp của runner. Nó best-effort, nhưng phép LỌC thì không
+// được sai: bỏ sót một lượt chạy đang sống là để nguyên đúng cái nguyên nhân sinh ra dòng ma.
+{
+  const ids = activeRunIds({
+    workflow_runs: [
+      { id: 1, status: "completed", conclusion: "success" },
+      { id: 2, status: "in_progress" },
+      { id: 3, status: "queued" },
+      { id: 4, status: "waiting" },
+      { id: 5, status: "completed", conclusion: "cancelled" },
+    ],
+  });
+  ok(ids.join(",") === "2,3,4", "chỉ lấy lượt chạy CHƯA xong, đủ cả ba trạng thái sống");
+
+  // Đây là lý do phép lọc là「khác completed」chứ không phải một danh sách trắng: GitHub đặt thêm
+  // trạng thái theo thời gian, và một danh sách trắng thiếu tên sẽ bỏ sót mà không ai thấy.
+  ok(
+    activeRunIds({ workflow_runs: [{ id: 9, status: "mot_trang_thai_github_moi_dat_ra" }] }).length === 1,
+    "một trạng thái sống MỚI của GitHub vẫn bị bắt (lọc theo「chưa xong」, không theo danh sách trắng)",
+  );
+
+  ok(activeRunIds({ workflow_runs: [] }).length === 0, "kho chưa chạy lượt nào → không có gì để huỷ");
+  ok(activeRunIds(null).length === 0, "thân rỗng không làm ngã lượt xoá");
+  ok(activeRunIds({}).length === 0, "thiếu khoá workflow_runs → mảng rỗng");
+  ok(activeRunIds({ workflow_runs: "khong-phai-mang" }).length === 0, "workflow_runs sai kiểu → mảng rỗng");
+  ok(activeRunIds([{ id: 1, status: "queued" }]).length === 0, "thân là mảng trần (sai hình) → mảng rỗng");
+
+  // Một `undefined` lọt xuống đây sẽ thành `POST /actions/runs/undefined/cancel` — một lời gọi
+  // rác mà GitHub trả 404, rồi lượt chạy in ra một cảnh báo chẳng ai hiểu.
+  ok(
+    activeRunIds({
+      workflow_runs: [{ status: "queued" }, null, { id: "7", status: "queued" }, { id: Number.NaN, status: "queued" }, { id: 8, status: "queued" }],
+    }).join(",") === "8",
+    "dòng thiếu id / id sai kiểu / id NaN / null đều bị bỏ qua, không đẻ ra một URL rác",
+  );
+  ok(activeRunIds({ workflow_runs: [{ id: 3, status: 5 }] }).length === 0, "status sai kiểu thì không đoán bừa là đang sống");
+}
+
+// ---- VÒNG CANH SỔ ĐIỂM DANH -------------------------------------------------------------------
+//
+// Đây là phần đã HỎNG THẬT ngày 13/08/2026: kho xoá xong, sổ dọn xong, dòng `workers` xoá xong —
+// rồi runner còn thoi thóp 52 giây tự ghi lại tên mình, để lại đúng cái dòng ma mà công cụ này
+// sinh ra để dọn. Cả nhóm dưới đây là để lượt「dọn cho gọn」nào đó đừng biến vòng canh trở lại
+// thành một câu DELETE.
+{
+  ok(PURGE_POLL_MS < PURGE_SETTLE_MS, "nhịp soi ngắn hơn cửa sổ yên — không thì một lượt hồi sinh lọt qua khe");
+  // Sàn phải DƯƠNG (không thì cặp xoá-soi thành vòng quay nóng) và phải ngắn hơn một nhịp soi
+  // (không thì nó thôi là sàn, nó thành nhịp — và lượt xác nhận sau khi xoá chậm đi vô cớ).
+  ok(PURGE_GAP_MS > 0 && PURGE_GAP_MS < PURGE_POLL_MS, "sàn nghỉ giữa hai lượt chạm database dương và ngắn hơn một nhịp soi");
+  ok(PURGE_SETTLE_MS < PURGE_BUDGET_MS, "ngân sách dài hơn cửa sổ yên — không thì không lượt nào kịp yên trước khi hết giờ");
+  ok(PURGE_SETTLE_MS >= 6 * 5_000, "cửa sổ yên rộng gấp nhiều lần nhịp gõ cửa 5 giây của worker.mjs");
+
+  // CA GỐC. Ngay sau `delete from workers`, dòng đương nhiên vắng — và bản đầu đã đọc cái vắng ấy
+  // thành「xong」rồi đi. Nó không phải bằng chứng runner đã chết; nó chỉ là bằng chứng câu DELETE
+  // vừa chạy.
+  const justDeleted = judgeRosterPurge({ rowPresent: false, quietMs: 0, spentMs: 0 });
+  ok(justDeleted.kind === "wait", "vắng NGAY SAU lượt xoá KHÔNG phải bằng chứng đã chết — phải canh tiếp");
+
+  const back = judgeRosterPurge({ rowPresent: true, quietMs: 2_000, spentMs: 7_000 });
+  ok(back.kind === "purge", "dòng mọc lại thì XOÁ LẠI — đúng cái bản đầu đã bỏ sót");
+
+  const first = judgeRosterPurge({ rowPresent: true, quietMs: 3_000, spentMs: 0 });
+  ok(first.kind === "purge", "lượt soi đầu thấy dòng thì cũng là「xoá」, vòng không cần một lối vào riêng");
+
+  const quiet = judgeRosterPurge({ rowPresent: false, quietMs: PURGE_SETTLE_MS, spentMs: PURGE_SETTLE_MS });
+  ok(quiet.kind === "settled", "im trọn cửa sổ → xong (biên: ĐÚNG bằng cũng tính là đủ)");
+
+  const almost = judgeRosterPurge({ rowPresent: false, quietMs: PURGE_SETTLE_MS - 1, spentMs: 30_000 });
+  ok(almost.kind === "wait", "thiếu một mili giây cũng chưa được gọi là xong");
+  ok(almost.kind === "wait" && almost.ms === 1, "và chỉ chờ đúng phần còn thiếu, không ngủ thừa một nhịp");
+
+  const fresh = judgeRosterPurge({ rowPresent: false, quietMs: 0, spentMs: 1_000 });
+  ok(fresh.kind === "wait" && fresh.ms === PURGE_POLL_MS, "còn xa mốc yên thì chờ một nhịp, không ngủ một mạch hết cửa sổ");
+
+  // Xác nguội: gỡ một dòng đã chết từ hôm qua thì lượt soi đầu tiên đã đủ kết luận. Bắt người vận
+  // hành ngồi đợi 30 giây cho một cái xác nguội ngắt là cái giá không có ai trả cho.
+  const cold = judgeRosterPurge({ rowPresent: false, quietMs: 86_400_000, spentMs: 40 });
+  ok(cold.kind === "settled", "dòng đã im từ lâu → xong ngay, không bắt đợi hết cửa sổ");
+
+  const forever = judgeRosterPurge({ rowPresent: true, quietMs: 1_000, spentMs: PURGE_BUDGET_MS });
+  ok(forever.kind === "giveup", "hết ngân sách mà vẫn mọc lại → dừng canh, xoá thêm cũng vô nghĩa");
+  ok(
+    forever.kind === "giveup" && forever.message.includes("WORKER_ID"),
+    "và gọi tên nghi phạm thật: một máy KHÁC đang cài trùng WORKER_ID",
+  );
+  // Lời khuyên phải ĐI ĐƯỢC. Kho đã xoá và dòng sổ đã gỡ, nên chạy lại chính lệnh này sẽ bị
+  // `reviewRemoval` từ chối vì「không có bằng chứng nào」— hứa một lối thoát cụt là tệ hơn im lặng.
+  ok(
+    forever.kind === "giveup" && forever.message.includes("không phải chạy lại lệnh này"),
+    "và KHÔNG hứa một lối thoát cụt (chạy lại lệnh này thì reviewRemoval sẽ từ chối)",
+  );
+
+  const blownWhileAway = judgeRosterPurge({ rowPresent: false, quietMs: 3_000, spentMs: PURGE_BUDGET_MS });
+  ok(blownWhileAway.kind === "giveup", "hết ngân sách trong lúc nó vừa gõ cửa xong → cũng dừng");
+  ok(
+    blownWhileAway.kind === "giveup" && blownWhileAway.message.includes("vừa soi thì vắng"),
+    "và kể đúng trạng thái lúc dừng, không nói bừa là dòng vẫn còn đó",
+  );
+
+  // Đã yên thì là xong, kể cả khi đồng hồ đã quá giờ: kết một lượt sạch sẽ bằng một lời cảnh báo
+  // là dạy người vận hành bỏ qua cảnh báo.
+  const doneAtBuzzer = judgeRosterPurge({
+    rowPresent: false,
+    quietMs: PURGE_SETTLE_MS,
+    spentMs: PURGE_BUDGET_MS + 5_000,
+  });
+  ok(doneAtBuzzer.kind === "settled", "yên thắng hết-giờ ở đúng cái biên hai luật gặp nhau");
+
+  // `quietMs` gộp một quãng do database đo với một quãng đo bằng đồng hồ cục bộ. Hai đồng hồ lệch
+  // nhau thì con số ấy ra âm được, và một lượt ngủ âm là một vòng lặp quay nóng CPU.
+  const skewed = judgeRosterPurge({ rowPresent: false, quietMs: -60_000, spentMs: 0 });
+  ok(
+    skewed.kind === "wait" && skewed.ms > 0 && skewed.ms <= PURGE_POLL_MS,
+    "quãng im ÂM (đồng hồ lệch) không đẻ ra một lượt ngủ âm",
+  );
 }
 
 // ---- Câu chữ kể cho người đọc -----------------------------------------------------------------

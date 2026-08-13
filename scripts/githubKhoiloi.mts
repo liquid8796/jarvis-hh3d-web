@@ -84,6 +84,137 @@ export function workerIdFromWorkflow(yaml: string): string | null {
   return value.length > 0 ? value : null;
 }
 
+/**
+ * Id của những lượt chạy Actions CÒN SỐNG trong một trang `GET /repos/…/actions/runs`.
+ *
+ * Lọc bằng `status !== "completed"` chứ KHÔNG liệt kê tên từng trạng thái sống (`queued`,
+ * `in_progress`, `waiting`, `pending`, `requested`…): danh sách ấy dài dần theo GitHub, và một
+ * danh sách trắng thiếu tên sẽ lặng lẽ bỏ sót đúng cái lượt chạy phải huỷ — hỏng theo kiểu không
+ * ai thấy, vì lượt xoá vẫn báo xong.「Chưa xong」thì định nghĩa được một lần cho mãi mãi.
+ *
+ * Thân trả về là thứ ĐI QUA MẠNG nên ở đây không tin gì cả: thiếu khoá, sai kiểu, `id` không phải
+ * số — tất cả cùng bị bỏ qua, vì một `undefined` lọt xuống sẽ thành `POST /actions/runs/undefined/cancel`.
+ */
+export function activeRunIds(body: unknown): number[] {
+  const runs = (body as { workflow_runs?: unknown } | null)?.workflow_runs;
+  if (!Array.isArray(runs)) return [];
+
+  const ids: number[] = [];
+  for (const run of runs) {
+    const id = (run as { id?: unknown } | null)?.id;
+    const status = (run as { status?: unknown } | null)?.status;
+    if (typeof status !== "string" || status === "completed") continue;
+    if (typeof id !== "number" || !Number.isFinite(id)) continue;
+    ids.push(id);
+  }
+  return ids;
+}
+
+/**
+ * ── VÒNG CANH SỔ ĐIỂM DANH ────────────────────────────────────────────────────────────────────
+ *
+ * XOÁ KHO KHÔNG GIẾT RUNNER TỨC KHẮC — và bước dọn sổ điểm danh đã tin là có. Đo 13/08/2026 trên
+ * `github-khoiloi-20260813-105506`: kho đã trả 404, mà runner còn gõ cửa `/api/worker` thêm 52
+ * giây nữa. `recordWorkerSeen` là một câu `insert … on conflict do update` — nó không hỏi「tôi
+ * còn được phép tồn tại không」, nó chỉ ghi tên. Nên chưa đầy một nhịp sau câu `delete from
+ * workers`, dòng ấy tự mọc lại. Bằng chứng nằm ở `first_seen` của nó: 14:39:35, trong khi cái tên
+ * khai 10:55:06 — tức dòng người ta nhìn thấy KHÔNG phải dòng cũ sót lại, nó là dòng mới.
+ *
+ * Và cái xác ấy nằm lại VĨNH VIỄN: sổ điểm danh là sổ ĐĂNG KÝ chứ không phải danh sách tiến
+ * trình, không ai quét dọn dòng của khôi lỗi tông môn (`forgetWorker` chỉ gỡ được khôi lỗi RIÊNG,
+ * nó lọc theo `userId`).
+ *
+ * Nên bước cuối không phải một câu DELETE mà là một vòng canh: xoá, rồi soi lại cho tới khi
+ * KHÔNG còn dòng nào mọc lên suốt trọn `PURGE_SETTLE_MS`.
+ */
+
+/**
+ * Im bao lâu thì coi là runner đã tắt hẳn.
+ *
+ * Điều kiện đúng đắn là「DÀI HƠN NHỊP GÕ CỬA」, không phải một con số cho đẹp: một runner còn
+ * sống thì cứ mỗi `WORKER_POLL_MS` (mặc định 5 giây, `scripts/worker.mjs`, không kho nào ghi đè)
+ * là chèn lại dòng của nó, nên 30 giây im lặng loại trừ được mọi nhịp dưới 30 giây — kể cả một
+ * máy bị chỉnh chậm gấp năm. Dòng một khi đã chèn thì NẰM ĐÓ chờ được soi, nên không lượt gõ cửa
+ * nào lọt qua khe giữa hai lượt soi.
+ */
+export const PURGE_SETTLE_MS = 30_000;
+
+/** Nhịp soi lại — bằng đúng nhịp gõ cửa, để một lượt hồi sinh bị bắt trong vòng một nhịp. */
+export const PURGE_POLL_MS = 5_000;
+
+/**
+ * Khoảng nghỉ tối thiểu sau mỗi lượt xoá, trước khi soi lại.
+ *
+ * Vòng canh soi lại NGAY sau khi xoá (không đợi hết nhịp) để chốt sớm ca thường: xoá xong, thấy
+ * vắng, bắt đầu đếm giờ im. Nhưng「ngay」mà không có sàn thì mở ra một vòng quay nóng: nếu vì lý
+ * do nào đó câu DELETE không làm dòng biến mất, cặp xoá-soi ấy sẽ nện database mấy trăm lượt mỗi
+ * giây suốt trọn 3 phút ngân sách. Một phần tư giây chặn đứng cả lớp ấy mà không ai cảm thấy.
+ */
+export const PURGE_GAP_MS = 250;
+
+/**
+ * Trần thời gian canh. Hết ngân sách mà dòng VẪN mọc lại thì thủ phạm không còn là cái runner vừa
+ * mất kho (đo được: 52 giây) — nó là một tiến trình KHÁC đang cài trùng `WORKER_ID`, và với thứ
+ * ấy thì xoá bao nhiêu lần cũng vô nghĩa, nên đúng việc phải làm là kêu lên chứ không phải xoá
+ * tiếp. 3 phút, cùng con số với `reapStaleJobs`.
+ */
+export const PURGE_BUDGET_MS = 180_000;
+
+export type PurgeVerdict =
+  /** Sổ đã sạch và chịu nằm im — xong. */
+  | { kind: "settled" }
+  /** Có dòng đang nằm đó (lượt đầu, hoặc một lượt hồi sinh) — xoá rồi soi lại ngay. */
+  | { kind: "purge" }
+  /** Đang vắng nhưng chưa đủ lâu để tin — ngủ chừng này rồi soi lại. */
+  | { kind: "wait"; ms: number }
+  /** Xoá mãi vẫn mọc lại — dừng canh và nói ra, vì xoá thêm cũng vô nghĩa. */
+  | { kind: "giveup"; message: string };
+
+/**
+ * Bước kế tiếp của vòng canh. Thuần, nên `verify:github-removal` lái được nó bằng đồng hồ giả.
+ *
+ * `quietMs` là quãng im tính từ LẦN GÕ CỬA CUỐI CÙNG đo được, KHÔNG phải quãng đã canh — hai thứ
+ * ấy khác nhau ở đúng ca thường gặp nhất: gỡ một dòng đã chết từ hôm qua thì lượt soi đầu tiên đã
+ * đủ kết luận, không việc gì bắt người vận hành ngồi đợi 30 giây cho một cái xác nguội ngắt.
+ *
+ * `settled` được xét TRƯỚC ngân sách, và thứ tự ấy có chủ ý: đã xong thì là xong, không ai muốn
+ * một lượt chạy sạch sẽ lại kết bằng lời cảnh báo chỉ vì nó chạm đúng giây thứ 180.
+ */
+export function judgeRosterPurge(input: {
+  /** Lượt soi vừa rồi CÓ thấy dòng không. */
+  rowPresent: boolean;
+  quietMs: number;
+  /** Đã canh bao lâu, tính từ lúc vào vòng. */
+  spentMs: number;
+}): PurgeVerdict {
+  const { rowPresent, quietMs, spentMs } = input;
+
+  if (!rowPresent && quietMs >= PURGE_SETTLE_MS) return { kind: "settled" };
+
+  if (spentMs >= PURGE_BUDGET_MS) {
+    return {
+      kind: "giveup",
+      message:
+        `Dòng điểm danh cứ mọc lại — đã canh ${Math.round(spentMs / 1000)} giây mà vẫn có thứ gõ cửa ` +
+        `bằng id ấy (${rowPresent ? "vừa soi vẫn còn" : `vừa soi thì vắng, nhưng nó mới gõ cửa ${Math.round(quietMs / 1000)} giây trước`}).\n` +
+        "  Kho GitHub đã xoá rồi, nên đây KHÔNG còn là runner của nó: gần như chắc chắn một khôi lỗi\n" +
+        "  KHÁC (VM tông môn, hay một máy nhà) đang cài trùng WORKER_ID. Xoá dòng ở đây vô nghĩa —\n" +
+        "  vài giây sau nó lại tự ghi tên vào.\n" +
+        "  Soi ở Hàng Đợi → tab Khôi Lỗi: id ấy còn hiện「đang trực」thì đúng là còn một máy sống,\n" +
+        "  và việc phải làm là đi tắt máy ấy, không phải chạy lại lệnh này.",
+    };
+  }
+
+  if (rowPresent) return { kind: "purge" };
+
+  /**
+   * Chờ vừa đủ tới mốc yên, nhưng KHÔNG quá một nhịp gõ cửa: ngủ một mạch 30 giây thì một lượt
+   * hồi sinh ở giây thứ hai cũng phải đợi hết quãng ấy mới bị phát hiện, và trong quãng đó ngân
+   * sách vẫn trôi. Cả hai vế đều dương nên không có đường nào ra số âm.
+   */
+  return { kind: "wait", ms: Math.min(PURGE_POLL_MS, PURGE_SETTLE_MS - quietMs) };
+}
+
 export type Choice = { ok: true; target: Candidate } | { ok: false; message: string };
 
 /** Vì sao kho này được coi (hay không được coi) là kho khôi lỗi — một vế, không kèm tên kho. */

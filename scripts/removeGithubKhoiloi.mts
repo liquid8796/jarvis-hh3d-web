@@ -20,6 +20,12 @@
  *      đúng id ấy — phép kiểm trùng id bên ấy hỏi thẳng bảng này, và một cái xác thì trả lời y
  *      như một người đang trực.
  *
+ * DẤU CHÂN THỨ BA KHÔNG XOÁ ĐƯỢC BẰNG MỘT CÂU `DELETE`, và bản đầu của công cụ này đã tin là
+ * được. Runner sống dai hơn cái kho của nó (đo 13/08/2026: 52 giây sau khi kho đã 404), nên nó
+ * tự ghi lại tên mình vào sổ ngay sau lượt xoá và để lại đúng cái dòng ma mà công cụ sinh ra để
+ * dọn. Nay bước ấy là một VÒNG CANH, và lượt chạy còn huỷ mọi lượt chạy Actions TRƯỚC khi xoá kho
+ * để quãng thoi thóp ngắn lại. Phép đo và luật của vòng: `judgeRosterPurge` (`githubKhoiloi.mts`).
+ *
  * ── BA LUẬT AN TOÀN ──────────────────────────────────────────────────────────────────────────
  *
  * 1. **NHẬN KHO BẰNG BẰNG CHỨNG, KHÔNG BẰNG TÊN.** Tên là thứ ai cũng đặt được; một kho tên
@@ -58,12 +64,16 @@ import { readControlDoc } from "../src/lib/control/read";
 import { DEFAULT_WORKFLOW_FILE, stationSlug } from "../src/lib/validation/githubStations";
 import { resolveActiveStationPg } from "./activeStationPg.mts";
 import {
+  activeRunIds,
   chooseTarget,
   describeCandidate,
   describeEvidence,
+  judgeRosterPurge,
   looksLikeKhoiloiRepoName,
   reviewRemoval,
   workerIdFromWorkflow,
+  PURGE_GAP_MS,
+  PURGE_SETTLE_MS,
   type Candidate,
 } from "./githubKhoiloi.mts";
 import { loadEnv } from "./loadEnv.mjs";
@@ -78,6 +88,16 @@ const USER_AGENT = "auto-hh3d-remove-github-khoiloi";
 const REQUEST_TIMEOUT_MS = 20_000;
 /** Trần số trang khi liệt kê kho. 5 × 100 kho là quá dư cho một tài khoản chỉ để chạy khôi lỗi. */
 const MAX_REPO_PAGES = 5;
+/**
+ * MỘT trang lượt chạy Actions là đủ, không phân trang.
+ *
+ * `GET /actions/runs` trả mới nhất trước, mà một lượt chạy CÒN SỐNG thì theo định nghĩa là lượt
+ * mới nhất — nó phải cũ hơn 100 lượt khác mới rơi khỏi trang đầu. Kho khôi lỗi sinh cỡ 6-7 lượt
+ * mỗi ngày (nối ca 4 giờ + một commit nuôi kho), tức trang đầu ôm trọn nửa tháng.
+ */
+const RUNS_PAGE_SIZE = 100;
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Lời từ chối của script này — ném chứ không `process.exit` (xem ghi chú đầu tệp), và mang một
@@ -102,7 +122,7 @@ const arg = (name: string): string | undefined => {
 
 type Reply = { status: number; body: unknown };
 
-async function callGithub(pat: string, method: "GET" | "DELETE", apiPath: string): Promise<Reply> {
+async function callGithub(pat: string, method: "GET" | "POST" | "DELETE", apiPath: string): Promise<Reply> {
   let response: Response;
   try {
     response = await fetch(`${API_ROOT}${apiPath}`, {
@@ -147,19 +167,23 @@ async function callGithub(pat: string, method: "GET" | "DELETE", apiPath: string
  * 403 ở tệp này gần như luôn có đúng một nguyên nhân — thiếu `delete_repo` — nên nó được gọi tên
  * thẳng thay vì để người ta đi tìm. Còn 404 là cái bẫy quen: GitHub trả 404 thay cho 403 với kho
  * mà token không được phép NHÌN, cố ý, để không lộ ra kho ấy có tồn tại hay không.
+ *
+ * `missing403` mở ra vì bước huỷ lượt chạy Actions đòi một quyền KHÁC hẳn: chỉ đúng cho lượt xoá
+ * kho thôi thì lời khuyên「thêm delete_repo」sẽ đẩy người vận hành đi tick một ô không liên quan
+ * rồi vẫn nhận đúng cái 403 ấy.
  */
-function explainGithub(status: number, body: unknown, what: string): string {
+function explainGithub(
+  status: number,
+  body: unknown,
+  what: string,
+  missing403 = "scope `delete_repo` (classic), hoặc quyền Administration: read/write (fine-grained)",
+): string {
   const detail =
     body && typeof body === "object" && typeof (body as { message?: unknown }).message === "string"
       ? ` — ${(body as { message: string }).message.slice(0, 200)}`
       : "";
   if (status === 401) return `PAT bị từ chối (401) khi ${what}: token hết hạn hoặc đã bị thu hồi${detail}`;
-  if (status === 403) {
-    return (
-      `Bị chặn (403) khi ${what}: PAT gần như chắc chắn thiếu scope \`delete_repo\`` +
-      ` (classic), hoặc thiếu quyền Administration: read/write (fine-grained)${detail}`
-    );
-  }
+  if (status === 403) return `Bị chặn (403) khi ${what}: PAT gần như chắc chắn thiếu ${missing403}${detail}`;
   if (status === 404) return `Không thấy (404) khi ${what}: sai tên kho, hoặc PAT không có quyền nhìn kho này${detail}`;
   return `GitHub trả ${status} khi ${what}${detail}`;
 }
@@ -171,6 +195,184 @@ type BookStation = {
   workerId?: string;
   pat?: string;
 };
+
+/**
+ * HUỶ MỌI LƯỢT CHẠY ACTIONS CÒN SỐNG, TRƯỚC KHI XOÁ KHO — cho runner chết theo một lệnh dừng,
+ * chứ không chết vì đất dưới chân nó biến mất.
+ *
+ * Vì sao đáng làm: xoá kho không giết runner tức khắc (đo 13/08/2026: còn gõ cửa thêm 52 giây),
+ * và mỗi giây thoi thóp ấy là một dịp nó ghi lại tên mình vào sổ điểm danh. Huỷ trước thì quãng
+ * ấy ngắn lại, nên vòng canh ở cuối phần lớn chỉ còn phải XÁC NHẬN thay vì xoá đi xoá lại.
+ *
+ * BEST-EFFORT, KHÔNG PHẢI HÀNG RÀO. Thứ BẢO ĐẢM sổ sạch là `purgeRosterRow`, không phải bước
+ * này — nên mọi hỏng ở đây (PAT không có quyền trên Actions, mạng chập, GitHub trả mã lạ) chỉ
+ * cảnh báo rồi đi tiếp. Dừng cả lượt dọn vì không tắt nổi đèn là sai vai, nhất là khi lượt xoá
+ * kho ngay sau đó sẽ tắt đèn theo cách thô bạo hơn mà vẫn xong việc.
+ *
+ * KHÔNG CHỜ chúng thật sự dừng: `cancel` là bất đồng bộ, và ngồi chờ ở đây là dựng bản sao thứ
+ * hai của đúng vòng canh đã có ở cuối. Gửi lệnh rồi đi; cái đích («sổ sạch») do vòng kia nghiệm thu.
+ *
+ * KHÔNG mâu thuẫn với `cancel-in-progress: false` trong chính tệp workflow ấy, dù trông rất giống.
+ * Luật bên đó cấm một lượt chạy MỚI huỷ lượt đang cày (cắt ngang đàn của người ta vì một cú push).
+ * Ở đây thì lượt huỷ đứng SAU `reviewRemoval` và sau câu xác nhận gõ tay, nên tới được dòng này
+ * nghĩa là hoặc không đàn nào đang chạy, hoặc người vận hành đã đọc đúng cái giá ấy và gõ `--force`.
+ *
+ * Cái giá khi lượt xoá kho ngay sau đây HỤT: khôi lỗi vừa bị tắt mà kho thì còn. Nó nằm im tới
+ * lượt `schedule` kế (`cron: "0 */4 * * *"`) rồi tự sống lại — tức thiệt hại bị chặn trên bởi bốn
+ * giờ, không phải vĩnh viễn, và đó là lý do bước này được phép đứng trước lượt xoá.
+ */
+async function cancelActiveRuns(pat: string, login: string, repo: string): Promise<void> {
+  /** Quyền cho `POST …/cancel` — KHÁC hẳn quyền xoá kho, nên 403 ở đây phải chỉ đúng ô cần tick. */
+  const CANCEL_PERMISSION = "scope `repo` (classic), hoặc quyền Actions: read/write (fine-grained)";
+  const base = `/repos/${encodeURIComponent(login)}/${encodeURIComponent(repo)}`;
+
+  const listed = await callGithub(pat, "GET", `${base}/actions/runs?per_page=${RUNS_PAGE_SIZE}`);
+  if (listed.status !== 200) {
+    console.warn(
+      `⚠ Không liệt kê được lượt chạy Actions (${explainGithub(listed.status, listed.body, "liệt kê lượt chạy", CANCEL_PERMISSION)}).\n` +
+        "  Bỏ qua bước huỷ — runner vẫn chết cùng lúc xoá kho, chỉ là chậm hơn vài chục giây.",
+    );
+    return;
+  }
+
+  const ids = activeRunIds(listed.body);
+  if (ids.length === 0) {
+    console.log("• Không có lượt chạy Actions nào đang sống — không phải huỷ gì.");
+    return;
+  }
+
+  let sent = 0;
+  for (const id of ids) {
+    const cancelled = await callGithub(pat, "POST", `${base}/actions/runs/${id}/cancel`);
+    // 202 = đã nhận lệnh. 409 = lượt chạy vừa xong, hoặc đang huỷ dở — đích đã đạt, không phải lỗi.
+    if (cancelled.status === 202 || cancelled.status === 409) {
+      sent += 1;
+      continue;
+    }
+    console.warn(
+      `⚠ Không huỷ được lượt chạy #${id} (${explainGithub(cancelled.status, cancelled.body, "huỷ lượt chạy", CANCEL_PERMISSION)}).`,
+    );
+  }
+
+  // Hụt SẠCH thì nói là hụt. Câu「đã gửi lệnh huỷ cho 0/3」kèm lời hứa「runner dừng trong vài giây」
+  // là một lời nói dối đọc thoáng qua trông như thành công, và nó dạy người ta bỏ qua khối cảnh báo
+  // ngay phía trên.
+  if (sent === 0) {
+    console.warn(
+      `⚠ Không huỷ được lượt chạy nào trong ${ids.length} lượt đang sống — runner sẽ chết vì mất kho\n` +
+        "  thay vì chết theo lệnh. Vòng canh sổ điểm danh ở cuối vẫn lo trọn phần dọn, chỉ lâu hơn.",
+    );
+    return;
+  }
+  console.log(`✔ đã gửi lệnh huỷ cho ${sent}/${ids.length} lượt chạy Actions — runner dừng trong vài giây.`);
+}
+
+/**
+ * GỠ DÒNG ĐIỂM DANH, RỒI CANH CHO TỚI KHI NÓ CHỊU NẰM IM. Luật của vòng nằm ở `judgeRosterPurge`
+ * (thuần, `verify:github-removal` bao từng nhánh); ở đây chỉ có phần chạm database và đồng hồ.
+ *
+ * KHÔNG NÉM, DÙ HỎNG THẾ NÀO. Kho và sổ — hai thứ có hậu quả thật — đã xong trước khi tới đây, và
+ * một dòng `workers` sót lại chỉ gây đúng hai phiền phức nhỏ: một dòng ma trong tab Khôi Lỗi, và
+ * `github:new` từ chối dựng lại một khôi lỗi TRÙNG ID (mà id thì mang mốc thời gian, nên trùng
+ * gần như không xảy ra). Nói ra rồi đi tiếp thì đúng hơn là ném ở dòng cuối cùng của một công cụ
+ * xoá — người vận hành đọc một stack trace ở đó sẽ tưởng cả lượt dọn đã hỏng.
+ *
+ * `automation_jobs.worker_id` KHÔNG có khoá ngoại trỏ vào bảng này (cột text trơn), nên xoá ở đây
+ * không đụng tới một dòng đàn nào — lịch sử vẫn giữ nguyên tên máy đã cày nó.
+ */
+async function purgeRosterRow(activePg: string, workerId: string): Promise<void> {
+  const sql = neon(activePg);
+  const startedAt = Date.now();
+  /** Quãng im do CHÍNH database đo, kèm mốc cục bộ lúc đo. `null` = chưa lượt soi nào thấy dòng. */
+  let lastBeat: { quietMs: number; measuredAt: number } | null = null;
+  let purges = 0;
+  let resurrections = 0;
+
+  console.log(
+    `\n• Gỡ dòng điểm danh「${workerId}」rồi canh tới ${PURGE_SETTLE_MS / 1000} giây im lặng —\n` +
+      "  một runner vừa mất kho còn thoi thóp được một lúc, và nó sẽ tự ghi lại tên nếu ta đi sớm.",
+  );
+
+  for (;;) {
+    let seenQuietMs: number | null;
+    try {
+      /**
+       * ĐO QUÃNG IM BẰNG ĐỒNG HỒ CỦA DATABASE. `last_seen` do `now()` bên ấy đặt, nên đem nó trừ
+       * vào `Date.now()` của máy này là lệch đúng bằng độ lệch hai đồng hồ — một cái laptop chạy
+       * nhanh 40 giây sẽ tuyên bố「đã im 30 giây」cho một dòng vừa gõ cửa xong.
+       *
+       * Trả về GIÂY chứ không phải mili: `::int` chỉ ôm được ~24 ngày nếu tính bằng mili, mà sổ
+       * điểm danh thì giữ dòng vĩnh viễn — một dòng nằm đó ba tháng sẽ làm câu này ném
+       *「integer out of range」ngay giữa lượt dọn.
+       */
+      const rows = (await sql`
+        select round(extract(epoch from (now() - last_seen)))::int as quiet_s
+        from workers where id = ${workerId}
+      `) as { quiet_s: number | null }[];
+      seenQuietMs = rows.length > 0 ? (rows[0]?.quiet_s ?? 0) * 1000 : null;
+    } catch (err) {
+      console.warn(
+        `⚠ Không soi được sổ điểm danh (${err instanceof Error ? err.message.slice(0, 120) : "lỗi lạ"}).\n` +
+          `  Dừng canh. Nếu「${workerId}」còn hiện ở Hàng Đợi → tab Khôi Lỗi thì gỡ tay.`,
+      );
+      return;
+    }
+
+    if (seenQuietMs !== null) {
+      lastBeat = { quietMs: seenQuietMs, measuredAt: Date.now() };
+      if (purges > 0) resurrections += 1;
+    }
+
+    const now = Date.now();
+    // Cộng hai KHOẢNG thời gian thì không cần chung đồng hồ: quãng im database đo được, cộng
+    // quãng đã trôi kể từ lượt đo ấy. Chưa từng thấy dòng nào thì tính từ lúc bắt đầu canh.
+    const quietMs = lastBeat === null ? now - startedAt : lastBeat.quietMs + (now - lastBeat.measuredAt);
+    const verdict = judgeRosterPurge({
+      rowPresent: seenQuietMs !== null,
+      quietMs,
+      spentMs: now - startedAt,
+    });
+
+    if (verdict.kind === "settled") {
+      if (purges === 0) {
+        console.log(`✔ sổ điểm danh không có dòng nào của「${workerId}」— không phải gỡ gì.`);
+      } else if (resurrections === 0) {
+        console.log(`✔ sổ điểm danh sạch —「${workerId}」không mọc lại.`);
+      } else {
+        console.log(
+          `✔ sổ điểm danh sạch — đã phải gỡ ${purges} lần (${resurrections} lượt hồi sinh),` +
+            ` runner tắt hẳn sau ~${Math.round((now - startedAt) / 1000)} giây.`,
+        );
+      }
+      return;
+    }
+
+    if (verdict.kind === "giveup") {
+      console.warn(`\n⚠ ${verdict.message}`);
+      return;
+    }
+
+    if (verdict.kind === "purge") {
+      try {
+        await sql`delete from workers where id = ${workerId}`;
+      } catch (err) {
+        console.warn(
+          `⚠ Không gỡ được「${workerId}」khỏi bảng workers (${err instanceof Error ? err.message.slice(0, 120) : "lỗi lạ"}).\n` +
+            "  Vô hại, trừ một chuyện: github:new sẽ từ chối dựng lại một khôi lỗi trùng id ấy.",
+        );
+        return;
+      }
+      purges += 1;
+      if (purges === 1) console.log(`✔ đã gỡ「${workerId}」khỏi sổ điểm danh`);
+      else console.log(`  ↺ nó vừa tự ghi lại tên — gỡ lần ${purges}, runner còn thoi thóp.`);
+      // Soi lại gần như ngay, nhưng qua một cái sàn — lý do ở `PURGE_GAP_MS`.
+      await sleep(PURGE_GAP_MS);
+      continue;
+    }
+
+    await sleep(verdict.ms);
+  }
+}
 
 async function main(): Promise<void> {
   // ---- 1. PAT ------------------------------------------------------------------------------
@@ -527,6 +729,9 @@ async function main(): Promise<void> {
   }
 
   if (target.onGithub) {
+    // Tắt đèn trước khi rút thang: xem đầu `cancelActiveRuns`. Không bao giờ chặn lượt xoá.
+    await cancelActiveRuns(pat, login, target.repo);
+
     const removed = await callGithub(pat, "DELETE", `/repos/${encodeURIComponent(login)}/${encodeURIComponent(target.repo)}`);
     // 404 = ai đó vừa xoá xen vào giữa. Đích đã đạt, đi tiếp phần dọn sổ.
     if (removed.status !== 204 && removed.status !== 404) {
@@ -577,23 +782,18 @@ async function main(): Promise<void> {
   }
 
   /**
-   * Dòng điểm danh. KHÔNG chết cả lượt vì nó: kho và sổ — hai thứ có hậu quả thật — đã xong, và
-   * một dòng `workers` sót lại chỉ gây đúng một phiền phức, là `github:new` từ chối dựng lại một
-   * khôi lỗi trùng id. Nói ra rồi đi tiếp thì đúng hơn là ném ở dòng cuối cùng.
+   * Dòng điểm danh — một VÒNG CANH, không phải một câu DELETE. Lý do đầy đủ ở `judgeRosterPurge`.
    *
-   * `automation_jobs.worker_id` KHÔNG có khoá ngoại trỏ vào bảng này (cột text trơn), nên xoá ở
-   * đây không đụng tới một dòng đàn nào — lịch sử vẫn giữ nguyên tên máy đã cày nó.
+   * Điều kiện vào vòng KHÔNG chỉ là「lúc soi có dòng」: giữa lượt soi ấy và giây phút này là cả
+   * một câu xác nhận gõ tay và một lượt gọi GitHub, thừa thời gian để một runner vừa khởi động
+   * kịp điểm danh lần đầu. Nên hễ ta đã thật sự xoá một cái kho đang sống (`onGithub`) thì vẫn
+   * canh, kể cả khi lúc soi sổ chưa có dòng nào.
+   *
+   * Ngược lại, dòng sổ mồ côi của một kho đã bị xoá tay và chưa từng có dòng điểm danh thì không
+   * có gì để canh — bỏ qua, đúng như trước.
    */
-  if (target.workerId && workerRowExists) {
-    try {
-      await neon(activePg)`delete from workers where id = ${target.workerId}`;
-      console.log(`✔ đã gỡ「${target.workerId}」khỏi sổ điểm danh`);
-    } catch (err) {
-      console.warn(
-        `⚠ Không gỡ được「${target.workerId}」khỏi bảng workers (${err instanceof Error ? err.message.slice(0, 120) : "lỗi lạ"}).\n` +
-          "  Vô hại, trừ một chuyện: github:new sẽ từ chối dựng lại một khôi lỗi trùng id ấy.",
-      );
-    }
+  if (target.workerId && (workerRowExists || target.onGithub)) {
+    await purgeRosterRow(activePg, target.workerId);
   }
 
   console.log(

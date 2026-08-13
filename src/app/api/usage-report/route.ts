@@ -32,8 +32,11 @@ const bodySchema = z.object({
         limit: z.string().trim().max(40).nullable().default(null),
       }),
     )
-    // Trần 200: bảng thật có ~60 dòng. Đây là dữ liệu do một tiến trình NGOÀI đẩy vào một
-    // document JSONB — không có trần thì một lần gõ nhầm là `app_settings` phình vô hạn.
+    // Trần 200 GIỮ NGUYÊN dù từ 13/08/2026 lượt cào chỉ đẩy 10 cột (`WANTED_TITLES` trong
+    // `scripts/usageMeters.mts`). Đây là hàng rào của một TRUST BOUNDARY — nó chặn một tiến trình
+    // ngoài làm phình `app_settings`, chứ không phải chỗ khai số cột mong đợi. Siết nó xuống 10 là
+    // buộc cửa này phải sửa mỗi lần bên kia thêm một cột, và ngày quên sửa thì lượt cào 400 im
+    // lặng — đắt hơn hẳn cái lợi của một con số chặt hơn.
     .min(1)
     .max(200),
 });

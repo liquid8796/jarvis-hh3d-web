@@ -155,8 +155,11 @@ export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
             </div>
 
             {/**
-             * BẢNG ĐẦY ĐỦ — do GitHub Actions dựng trang Usage bằng Chromium thật rồi đẩy lên,
-             * và từ 12/08/2026 là thứ DUY NHẤT trong popup này (xem ghi chú đầu tệp).
+             * BẢNG CÀO — do GitHub Actions dựng trang Usage bằng Chromium thật rồi đẩy lên, và từ
+             * 12/08/2026 là thứ DUY NHẤT trong popup này (xem ghi chú đầu tệp). Từ 13/08/2026 nó
+             * mang ĐÚNG MƯỜI CỘT CÓ HẠN MỨC, không còn là bản chép cả trang: `WANTED_TITLES` trong
+             * `scripts/usageMeters.mts` là danh sách ấy. Nên đừng gọi nó là「bảng đầy đủ」nữa —
+             * người đọc sẽ đi tìm mấy cột Queue/Sandbox và tưởng chúng vừa mất.
              *
              * Nó là thứ trả lời câu hỏi người ta mở popup ra để hỏi: Fluid Active CPU còn bao xa
              * thì chạm trần. Mốc「cào lúc」đứng ngay trên bảng vì số ở đây CŨ tới sáu tiếng — bảng
@@ -165,7 +168,7 @@ export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
             {mirror.usageReport ? (
               <>
                 <p className="mb-2 text-xs text-[var(--color-mist)]">
-                  Bảng đầy đủ ({mirror.usageReport.meters.length} meter) — cào lúc{" "}
+                  {mirror.usageReport.meters.length} cột có hạn mức — cào lúc{" "}
                   {new Date(mirror.usageReport.readAt).toLocaleString("vi-VN")}
                 </p>
                 <div className="flex flex-col gap-1">
@@ -185,7 +188,7 @@ export function MirrorUsage({ mirror }: { mirror: MirrorView }) {
                  trong Secrets của repo, và trạm vừa thêm vào sổ thì còn tới sáu tiếng mới có
                  bảng. Không nói ra thì popup trống trơn trông như hỏng. */
               <p className="text-xs text-[var(--color-mist)]">
-                Chưa có bảng đầy đủ cho trạm này. Bảng do GitHub Actions dựng trang Usage bằng
+                Chưa có bảng cào cho trạm này. Bảng do GitHub Actions dựng trang Usage bằng
                 Chromium rồi đẩy về, sáu giờ một lượt — trạm chưa khai cookie trong Secrets thì
                 lượt cào bỏ qua nó (xem <span className="font-mono">.github/workflows/vercel-usage.yml</span>).
               </p>

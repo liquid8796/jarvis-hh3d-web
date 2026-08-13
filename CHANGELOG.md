@@ -11,6 +11,64 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.82.8 — lượt cào Usage chỉ còn giữ mười cột có hạn mức, và phép cắt chữ của nó lần đầu được kiểm
+
+Đạo hữu chỉ vào bảng Usage thật và chốt danh sách: mười cột CÓ HẠN MỨC, không hơn. Lượt cào trước
+đây đẩy trọn ~54 meter của trang — phần lớn là số 0 của Queue, Sandbox, AI Gateway.
+
+**Danh sách đổi ba chỗ so với `REQUIRED_TITLES` cũ:** bỏ `ISR Reads`, `ISR Writes`,
+`Function Duration`; thêm `Image Optimization - Transformations`, `- Cache Writes`, `- Cache Reads`.
+Ba cột bỏ đi không mất mát gì — hai cột ISR đứng ở 0 với kiến trúc hiện tại, còn Function Duration
+thì Fluid làm nó đứng yên ở 0 (chính cột này đẻ ra vụ báo động「389% hạn」ngày 11/08).
+
+**Cái lợi không nằm ở kích thước, nó nằm ở NHỊP CHỜ.** Vòng「đợi thôi mọc」trước đây đếm TỔNG số
+meter, nên phần đuôi render lúc có lúc không cứ mọc thêm một dòng là nhịp đứng-yên bị đặt lại từ
+đầu — chờ thêm một vòng vì một con số 0 mà không ai đọc. Nay nó chỉ đếm mười cột ấy, tức hết chỗ
+cho cái hên xui từng đo được 56/61/49/40 meter qua bốn lượt liên tiếp.
+
+**Phép cắt chữ rời sang `scripts/usageMeters.mts`, và đó mới là phần đáng kể của bản này.**
+`vercelUsageFull.mts` gọi `chromium.launch()` ngay ở THÂN MODULE, nên nhập nó vào để thử một hàm là
+mở một trình duyệt thật rồi treo ở đó — `parseUsageText` vì thế **chưa từng được kiểm một lần nào**,
+dù nó là chỗ duy nhất quyết định con số nào được ghi vào sổ. Cùng hình dạng bài học đã buộc vòng
+canh sổ điểm danh rời khỏi `removeGithubKhoiloi.mts` ở bản 0.82.5. Nay có `npm run
+verify:usage-meters`: **38 phép kiểm thuần**, không mạng, không cookie, không Chromium, chạy trên
+một trang mẫu dựng theo đúng ảnh chụp bảng thật.
+
+Ba thứ phép kiểm ấy đóng đinh, cả ba đều là ca có thật chứ không phải phòng xa:
+
+- **Nấc kế của gói trả tiền không được nhận nhầm thành hạn mức** (`1 TB` đứng ngay sau `100 GB`).
+- **Tên meter xuất hiện HAI chỗ trên trang** — thanh điều hướng bên trái và thẻ số. Nên khi trùng
+  tên thì lấy dòng CÓ HẠN MỨC, không lấy dòng đầu: một dòng ma của thanh điều hướng ghi vào sổ
+ 「Fluid Active CPU = 3」trông y hệt một con số thật. Đã thử cả hai chiều (dòng ma đứng trước, và
+  đứng sau).
+- **Gạch nối.** Ba cột mới mang một dấu `-` giữa tên, mà glyph ấy thì Vercel đổi lúc nào cũng được:
+  so khớp nay chuẩn hoá en dash / em dash / dấu trừ toán học / khoảng trắng đôi / nbsp / hoa thường
+  về một dạng. Thiếu một cột vì lệch đúng một ký tự nghĩa là mất số liệu vì một chuyện thuần trình
+  bày — mà lượt cào chạy nửa giờ một lần, tức đỏ 48 lần một ngày. Ca ĐỘT BIẾN đi kèm giữ cho phép
+  chuẩn hoá không nới thành đoán mò: `Cache Read` (thiếu chữ `s`) vẫn phải trượt.
+
+Sổ ghi **TÊN CHUẨN** chứ không ghi chữ vừa đọc được, để hai trạm cào cùng một ngày không nói hai
+thứ tiếng khác nhau.
+
+**Và lượt đỏ nay tự khai chuỗi thật.** Thiếu cột thì ngoài danh sách thiếu, script in luôn những
+tên GẦN GIỐNG đã thấy trên trang — ngày Vercel đổi chữ trên một thẻ, đó là dòng biến một lượt đỏ mù
+thành một lượt sửa dài đúng một dòng. Không có tên nào gần giống thì nó nói ra điều khác hẳn: trang
+chưa render xong, hoặc cookie chỉ mở được một phần trang.
+
+Kèm một chỗ sửa nhỏ mà cũ: lượt tải-lại-thử-lần-nữa trước đây **cắm đầu lấy lượt sau**, nên một lượt
+tải lại rơi đúng phút Vercel chậm sẽ báo thiếu nhiều hơn lượt đầu và đẩy người đọc đi tìm một cái
+hỏng không tồn tại. Nay giữ lượt tốt hơn, và bảng thô đi kèm luôn thuộc về đúng lượt đang bị phán xử.
+
+Giao diện thôi gọi nó là「bảng đầy đủ」— gọi vậy sau bản này là nói dối, người đọc sẽ đi tìm mấy cột
+Queue/Sandbox và tưởng chúng vừa mất. Trần 200 dòng ở `/api/usage-report` thì GIỮ NGUYÊN: đó là hàng
+rào của một trust boundary, không phải chỗ khai số cột mong đợi — siết xuống 10 là buộc cửa ấy phải
+sửa mỗi lần bên kia thêm một cột, và ngày quên sửa thì lượt cào 400 im lặng.
+
+**Chưa có bằng chứng:** vòng lặp trong `vercelUsageFull.mts` vẫn cần Chromium + cookie thật nên
+chưa chạy được ở đây; thứ đã đo là 38 phép kiểm thuần, `typecheck:scripts` (không thêm tệp đỏ nào),
+và hai ngả từ chối sớm của chính script vẫn thoát **mã 1**. Bảng đang nằm trong sổ của các trạm vẫn
+là bảng ~54 dòng cho tới lượt cào kế — nhịp nửa giờ nên chậm nhất 30 phút là nó tự thay.
+
 ## 0.82.7 — kho gốc thôi cày: workflow khôi lỗi rời `.github/workflows/`, thành bản mẫu
 
 `.github/workflows/linh-su.yml` chuyển sang **`deploy/github/linh-su.yml`**. GitHub chỉ chạy thứ

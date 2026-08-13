@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /**
- * BẢNG USAGE ĐẦY ĐỦ của một trạm — dựng trang bằng trình duyệt thật rồi đọc, CHẠY TẠI MÁY
- * NGƯỜI VẬN HÀNH.
+ * BẢNG USAGE của một trạm — dựng trang bằng trình duyệt thật rồi đọc, CHẠY TẠI MÁY NGƯỜI VẬN HÀNH.
+ *
+ * Từ 13/08/2026 lượt cào chỉ giữ MƯỜI CỘT CÓ HẠN MỨC (`WANTED_TITLES` trong `usageMeters.mts`),
+ * không còn đẩy trọn ~54 meter của trang. Trang vẫn phải dựng đủ như cũ — mấy cột Fluid nằm cuối
+ * và chỉ render khi cuộn tới — chỉ có thứ ĐI RA khỏi đây là hẹp lại.
  *
  *   npm run usage:full -- --cookie "C:/…/cookie_vercel.txt" --team jarvis8796
  *   npm run usage:full -- --cookie … --team … --json     (in JSON để máy khác đọc)
@@ -42,6 +45,7 @@
  */
 import { readFileSync } from "node:fs";
 import { chromium } from "playwright-core";
+import { nearMisses, parseUsageText, selectWanted, WANTED_TITLES, type Selection } from "./usageMeters.mts";
 import { type Meter, pushUsageReport } from "./usagePush.mts";
 import { readCookieFile } from "./usageStations.mts";
 
@@ -99,81 +103,16 @@ const SETTLE_STABLE_POLLS = 4;
 const SETTLE_TIMEOUT_MS = 90_000;
 
 /**
- * MƯỜI CỘT BẮT BUỘC — định nghĩa của「đã đủ」.
+ * MƯỜI CỘT — vừa là định nghĩa của「đã đủ」, vừa là TẤT CẢ những gì được đẩy lên sổ.
  *
  * Chỉ chờ「thôi mọc」thì vẫn hên xui: đo được 56/61/49/40 meter qua bốn lượt, vì phần đuôi
  * (Queue, Sandbox, AI Gateway — toàn số 0) render lúc có lúc không và nhịp đếm bắt được lúc nó
- * đang nghỉ. Cột đuôi thiếu thì không ai mất gì; thiếu một trong mười cột dưới đây thì bảng
- * nói dối về đúng thứ người ta mở nó ra để xem.
+ * đang nghỉ. Nay phần đuôi ấy không còn được đếm nữa: nhịp「thôi mọc」chỉ nhìn mười cột này, nên
+ * lượt cào vừa nhanh hơn vừa hết chỗ cho cái hên xui đó.
  *
- * Đây là toàn bộ meter có HẠN MỨC trên gói Hobby — tức mọi chỗ có thể chạm trần.
+ * Danh sách và lý do chọn nằm ở `usageMeters.mts` — cùng chỗ với phép cắt chữ và phép chọn cột,
+ * để chúng kiểm được mà không cần Chromium.
  */
-const REQUIRED_TITLES = [
-  "Fast Data Transfer",
-  "Fast Origin Transfer",
-  "Edge Requests",
-  "Edge Request CPU Duration",
-  "ISR Reads",
-  "ISR Writes",
-  "Function Invocations",
-  "Function Duration",
-  "Fluid Provisioned Memory",
-  "Fluid Active CPU",
-];
-
-/**
- * Một dòng số đo: `1,29 GB`, `303K`, `3h 44m`, `58s`, `0 B`, `217.4 GB-Hrs`, `0`.
- * Phải khớp CẢ dòng — `Fast Data Transfer` không được lọt vào đây.
- */
-const VALUE_LINE =
-  /^(?:[\d.,]+\s*(?:B|KB|MB|GB|TB|GB-Hrs|GB-hrs)|[\d.,]+[KMB]?|(?:\d+h\s*)?(?:\d+m\s*)?(?:\d+s)?)$/;
-
-const isValue = (line: string): boolean => line !== "" && VALUE_LINE.test(line) && /\d/.test(line);
-
-/**
- * Cắt chữ đã render thành bảng meter.
- *
- * Đi từng dòng, giữ một cái tên đang chờ. Gặp dòng-số đầu tiên sau tên thì đó là「đã dùng」;
- * gặp `/` thì dòng-số kế là「hạn」; mọi dòng-số sau đó là nấc kế của gói trả tiền — bỏ.
- */
-export function parseUsageText(text: string): Meter[] {
-  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
-  const meters: Meter[] = [];
-  let title: string | null = null;
-  let used: string | null = null;
-  let limit: string | null = null;
-  let expectLimit = false;
-
-  const flush = () => {
-    if (title && used) meters.push({ title, used, limit });
-    title = null;
-    used = null;
-    limit = null;
-    expectLimit = false;
-  };
-
-  for (const line of lines) {
-    if (line === "/") {
-      expectLimit = true;
-      continue;
-    }
-    if (isValue(line)) {
-      if (!title) continue; // số lạc lõng, không thuộc meter nào
-      if (!used) used = line;
-      else if (expectLimit && !limit) {
-        limit = line;
-        expectLimit = false;
-      }
-      continue; // nấc kế: bỏ
-    }
-    // Dòng chữ = tên meter mới. Chốt cái đang dở trước đã.
-    flush();
-    title = line;
-  }
-  flush();
-  return meters;
-}
-
 const browser = await chromium.launch({ headless: true });
 try {
   const context = await browser.newContext({
@@ -197,59 +136,75 @@ try {
     process.exit(1);
   }
 
+  /** Một lượt render đã đọc: mười cột đã chọn, kèm TRỌN bảng thô sinh ra chúng. */
+  type Attempt = { selection: Selection; rows: Meter[] };
+
   /**
-   * Một lượt chờ-cho-đủ. Trả về bảng đọc được (có thể còn thiếu — người gọi phán xử).
+   * Một lượt chờ-cho-đủ. Trả về lượt đọc tốt nhất trong cửa sổ (có thể còn thiếu — người gọi phán xử).
    *
    * Tách thành hàm để TẢI LẠI RỒI THỬ LẦN NỮA: đo 4 lượt thì 1 lượt trang khựng giữa chừng và
    * hết giờ. Một lần render hụt không đáng bắt người ta gõ lại lệnh.
+   *
+   * Trả về CẢ bảng thô đi kèm, không để nó ở một biến ngoài: dòng chẩn đoán lúc thiếu cột phải
+   * nói về đúng lượt đọc đang bị phán xử. Hai thứ ấy rời nhau ra là có ngày in tên「đã thấy」của
+   * một lượt render khác.
    */
-  const collect = async (): Promise<Meter[]> => {
-  const deadline = Date.now() + SETTLE_TIMEOUT_MS;
-  let meters: Meter[] = [];
-  let stable = 0;
+  const collect = async (): Promise<Attempt> => {
+    const deadline = Date.now() + SETTLE_TIMEOUT_MS;
+    let best: Attempt = { selection: { picked: [], missing: [...WANTED_TITLES] }, rows: [] };
+    let stable = 0;
 
-  while (Date.now() < deadline) {
-    // Cuộn xuống đáy TRƯỚC mỗi nhịp đếm: thẻ chỉ dựng khi lọt vào tầm nhìn, nên đứng yên ở
-    // đầu trang thì đếm bao lâu cũng chỉ ra bấy nhiêu.
-    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)");
-    await page.waitForTimeout(SETTLE_POLL_MS);
+    while (Date.now() < deadline) {
+      // Cuộn xuống đáy TRƯỚC mỗi nhịp đếm: thẻ chỉ dựng khi lọt vào tầm nhìn, nên đứng yên ở
+      // đầu trang thì đếm bao lâu cũng chỉ ra bấy nhiêu.
+      await page.evaluate("window.scrollTo(0, document.body.scrollHeight)");
+      await page.waitForTimeout(SETTLE_POLL_MS);
 
-    const next = parseUsageText(await page.evaluate("document.body.innerText"));
-    stable = next.length > meters.length ? 0 : stable + 1;
-    if (next.length >= meters.length) meters = next;
+      const rows = parseUsageText(await page.evaluate("document.body.innerText"));
+      const selection = selectWanted(rows);
 
-    // Hai điều kiện, và điều kiện ĐỦ CỘT đứng trước: thôi mọc mà còn thiếu cột bắt buộc thì
-    // chỉ là trang đang nghỉ giữa hai đợt render, không phải đã xong.
-    const seen = new Set(meters.map((m) => m.title));
-    if (REQUIRED_TITLES.every((t) => seen.has(t)) && stable >= SETTLE_STABLE_POLLS) break;
-  }
-    return meters;
+      // ĐẾM THEO MƯỜI CỘT, không theo tổng số meter. Bản trước đếm tổng, nên phần đuôi
+      // (Queue/Sandbox/AI Gateway) mọc thêm một dòng là nhịp「đứng yên」bị đặt lại từ đầu — chờ
+      // thêm một vòng vì một con số 0 mà không ai đọc.
+      stable = selection.picked.length > best.selection.picked.length ? 0 : stable + 1;
+      if (selection.picked.length >= best.selection.picked.length) best = { selection, rows };
+
+      // Hai điều kiện, và điều kiện ĐỦ CỘT đứng trước: thôi mọc mà còn thiếu cột thì chỉ là
+      // trang đang nghỉ giữa hai đợt render, không phải đã xong.
+      if (best.selection.missing.length === 0 && stable >= SETTLE_STABLE_POLLS) break;
+    }
+    return best;
   };
 
-  const missingOf = (rows: Meter[]): string[] => {
-    const seen = new Set(rows.map((m) => m.title));
-    return REQUIRED_TITLES.filter((t) => !seen.has(t));
-  };
-
-  let meters = await collect();
-  if (missingOf(meters).length > 0) {
-    console.error(`  … lượt đầu còn thiếu ${missingOf(meters).length} cột, tải lại thử lần nữa…`);
+  let attempt = await collect();
+  if (attempt.selection.missing.length > 0) {
+    console.error(`  … lượt đầu còn thiếu ${attempt.selection.missing.length} cột, tải lại thử lần nữa…`);
     await page.reload({ waitUntil: "domcontentloaded" });
-    meters = await collect();
+    const second = await collect();
+    // GIỮ LƯỢT TỐT HƠN, không cắm đầu lấy lượt sau: một lượt tải lại rơi vào đúng phút Vercel
+    // chậm có thể đọc ra ÍT hơn lượt đầu, và khi ấy câu báo lỗi sẽ kể tên những cột thật ra đã
+    // thấy rồi — đẩy người đọc đi tìm một cái hỏng không tồn tại.
+    if (second.selection.missing.length <= attempt.selection.missing.length) attempt = second;
   }
 
-  const missing = missingOf(meters);
-  if (missing.length > 0) {
+  const { selection, rows: seenAll } = attempt;
+  if (selection.missing.length > 0) {
+    // KHAI RA TÊN THẬT ĐÃ THẤY, đừng bắt người ta mở Chromium lên soi tay. Ngày Vercel đổi chữ
+    // trên một thẻ, đây là dòng biến một lượt đỏ mù thành một lượt sửa dài đúng một dòng.
+    const near = nearMisses(seenAll, selection.missing);
     console.error(
-      `Hết ${SETTLE_TIMEOUT_MS / 1000}s mà vẫn thiếu ${missing.length} cột bắt buộc: ${missing.join(", ")}.\n` +
-        "Không in bảng thiếu — một bảng thiếu trông y hệt một bảng đủ.",
+      `Hết ${SETTLE_TIMEOUT_MS / 1000}s mà vẫn thiếu ${selection.missing.length} cột: ${selection.missing.join(", ")}.\n` +
+        "Không in bảng thiếu — một bảng thiếu trông y hệt một bảng đủ.\n" +
+        (near.length > 0
+          ? `Tên gần giống ĐÃ THẤY trên trang: ${near.join(" · ")}\n` +
+            "→ Vercel đổi chữ? Chép tên mới vào WANTED_TITLES (scripts/usageMeters.mts).\n"
+          : `Không thấy tên nào gần giống trong ${seenAll.length} meter đọc được — nhiều khả năng` +
+            " trang chưa render xong, hoặc cookie chỉ mở được một phần trang.\n"),
     );
     process.exit(1);
   }
-  if (meters.length === 0) {
-    console.error("Render xong nhưng không cắt được meter nào — xem lại parseUsageText.");
-    process.exit(1);
-  }
+
+  const meters = selection.picked;
 
   const push = arg("push");
   const site = arg("site");
@@ -286,9 +241,11 @@ try {
   if (process.argv.includes("--json")) {
     console.log(JSON.stringify({ team, readAt: new Date().toISOString(), meters }, null, 2));
   } else {
-    console.log(`\n  Mức dùng đầy đủ — team ${team}  ·  ${meters.length} meter\n`);
+    console.log(`\n  Mức dùng — team ${team}  ·  ${meters.length} cột có hạn mức\n`);
     for (const m of meters) {
-      console.log(`    ${m.title.padEnd(34)} ${m.used.padStart(14)}${m.limit ? ` / ${m.limit}` : ""}`);
+      // 38: đủ cho tên dài nhất trong `WANTED_TITLES` ("Image Optimization - Transformations",
+      // 36 ký tự) cộng một khoảng thở. Hụt một ký tự là cả cột số lệch hàng.
+      console.log(`    ${m.title.padEnd(38)} ${m.used.padStart(14)}${m.limit ? ` / ${m.limit}` : ""}`);
     }
     console.log("");
   }

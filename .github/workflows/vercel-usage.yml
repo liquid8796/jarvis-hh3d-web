@@ -1,6 +1,10 @@
 # Cào bảng Usage của từng trạm rồi đẩy lên tab Gương Trạm.
 #
-# VÌ SAO Ở ĐÂY chứ không phải một dịch vụ cron thường: bảng đầy đủ — gồm Fluid Active CPU và
+# CÁI GÌ ĐƯỢC LẤY: đúng mười cột CÓ HẠN MỨC — `WANTED_TITLES` trong `scripts/usageMeters.mts`,
+# sửa danh sách thì sửa ở đó, không sửa ở đây. Trước 13/08/2026 lượt cào đẩy trọn ~54 meter của
+# trang, phần lớn là số 0 của Queue/Sandbox/AI Gateway.
+#
+# VÌ SAO Ở ĐÂY chứ không phải một dịch vụ cron thường: mấy cột ấy — gồm Fluid Active CPU và
 # Fluid Provisioned Memory, hai meter siết nhất một tài khoản Hobby — chỉ đọc được bằng cách
 # DỰNG trang Usage trong một trình duyệt thật rồi cuộn cho nó render. Đo ngày 11/08/2026:
 # `fetch` thuần chỉ đúng 1/8 lượt, và thiếu đúng mấy cột ấy. Cron dạng「gọi URL」(cron-job.org,

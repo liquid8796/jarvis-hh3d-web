@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
- * Kiểm chứng PHÉP XẾP CHỖ của bảng Hàng Đợi — `assignQueueSlots` trong services/queue.ts.
+ * Kiểm chứng bảng Hàng Đợi ở hai phép THUẦN của services/queue.ts, và chúng đi cùng nhau:
+ * `assignQueueSlots` (đàn này đứng thứ mấy, trong hàng nào) và `orderQueueRows` (dòng này ngồi
+ * chỗ nào trên bảng). Cùng một sự thật —「đàn máy nhà không đứng chung hàng với ai」— nói bằng
+ * hai giọng, nên một lưới chung mới bắt được lúc chúng lệch nhau.
  *
  * Vì sao đáng có lưới riêng: bản trước chạy MỘT bộ đếm cho mọi dòng đang chờ, nên một đàn mà chủ
  * đã chọn「chỉ máy nhà」vẫn nhận số thứ tự trong hàng của khôi lỗi tông môn — cái hàng mà
@@ -13,7 +16,7 @@
  * Hàm THUẦN nên lưới này không cần database, không cần mạng — cùng lẽ với `verify:mirror-tables`
  * và `verify:deploy-targets`.
  */
-import { assignQueueSlots, type QueueCandidate } from "../src/lib/services/queue";
+import { assignQueueSlots, orderQueueRows, type QueueCandidate } from "../src/lib/services/queue";
 
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);
@@ -145,6 +148,97 @@ console.log("Xếp chỗ hàng đợi — số thứ tự phải thuộc về đ
     "hàng chung đánh số 1,2,3,4 theo đúng thứ tự đầu vào",
     slots.map((s) => s.position).join(",") === "1,2,3,4",
     slots.map((s) => s.position).join(","),
+  );
+}
+
+// ---- 7. CHỖ NGỒI trên bảng: đàn máy nhà luôn nằm dưới hàng chung ------------------------------
+// Ca đã trả giá 14/08/2026: hai đàn `mine` của một đạo hữu tới giờ sớm nhất nên chiếm đúng hai
+// dòng đầu bảng —「Chờ máy nhà — chưa máy nào trực」— trong khi cả hàng chung nằm phía dưới. Hai
+// dòng ấy không đi đâu cho tới khi máy ở nhà chủ nó lên ca, mà chúng lại ngồi đúng chỗ người ta
+// nhìn vào để đoán「bao giờ tới lượt mình」.
+{
+  type Row = { id: string; ownerPref: string; status: string };
+  const at = (rows: readonly Row[]) =>
+    orderQueueRows(rows, (row) => ({
+      finished: row.status === "stopped" || row.status === "failed",
+      ownerPref: row.ownerPref,
+    }));
+  const ids = (rows: readonly Row[]) => rows.map((r) => r.id).join(",");
+
+  const sorted = at([
+    { id: "nha-1", ownerPref: "mine", status: "queued" },
+    { id: "nha-2", ownerPref: "mine", status: "queued" },
+    { id: "chung-1", ownerPref: "any", status: "queued" },
+    { id: "tat-1", ownerPref: "sect", status: "stopped" },
+    { id: "chung-2", ownerPref: "sect", status: "running" },
+  ]);
+  check(
+    "đàn máy nhà VÀO TRƯỚC vẫn tụt xuống dưới cả hàng chung",
+    ids(sorted) === "chung-1,chung-2,nha-1,nha-2,tat-1",
+    ids(sorted),
+  );
+  check(
+    "…và thứ tự TRONG mỗi nhóm giữ nguyên như câu SQL trả về",
+    sorted.findIndex((r) => r.id === "nha-1") < sorted.findIndex((r) => r.id === "nha-2") &&
+      sorted.findIndex((r) => r.id === "chung-1") < sorted.findIndex((r) => r.id === "chung-2"),
+    ids(sorted),
+  );
+  check(
+    "đàn đã tắt vẫn nằm dưới cùng — kể cả dưới đàn máy nhà",
+    sorted.at(-1)?.id === "tat-1",
+    ids(sorted),
+  );
+
+  // `sect` và pref lạ đều thuộc hàng CHUNG, nên không dòng nào bị đẩy xuống oan.
+  const mixed = at([
+    { id: "la", ownerPref: "khong-phai-lua-chon", status: "queued" },
+    { id: "nha", ownerPref: "mine", status: "queued" },
+    { id: "sect", ownerPref: "sect", status: "queued" },
+  ]);
+  check("chỉ `mine` mới xuống dưới; `sect` và pref lạ ở lại hàng chung", ids(mixed) === "la,sect,nha", ids(mixed));
+
+  // Mảng rỗng: bảng lúc cả tông môn đang rảnh. Không được ngã, và không được đẻ ra dòng nào.
+  check("mảng rỗng ra mảng rỗng", at([]).length === 0);
+}
+
+// ---- 8. Đổi chỗ KHÔNG được đổi số --------------------------------------------------------------
+// Hai phép này dùng chung một mảng, và đó là chỗ dễ hỏng nhất của bản 14/08: `assignQueueSlots`
+// đếm theo THỨ TỰ đầu vào, nên nếu việc bày bàn làm xáo trộn bên trong một hàng thì số thứ tự sẽ
+// đổi theo — một lỗi chỉ hiện ra ở con số trên màn hình, không có ngoại lệ nào để lần.
+{
+  type Row = QueueCandidate & { id: string; status: string };
+  const rows: Row[] = [
+    { id: "nha-a1", userId: "a", ownerPref: "mine", ownerWorkerOnline: true, queued: true, status: "queued" },
+    { id: "chung-b", userId: "b", ownerPref: "any", ownerWorkerOnline: false, queued: true, status: "queued" },
+    { id: "nha-a2", userId: "a", ownerPref: "mine", ownerWorkerOnline: true, queued: true, status: "queued" },
+    { id: "chung-c", userId: "c", ownerPref: "sect", ownerWorkerOnline: false, queued: true, status: "queued" },
+    { id: "nha-d", userId: "d", ownerPref: "mine", ownerWorkerOnline: false, queued: true, status: "queued" },
+  ];
+  const slotOf = (list: readonly Row[]) => {
+    const slots = assignQueueSlots(list, true);
+    return new Map(list.map((row, index) => [row.id, `${slots[index].pool}#${slots[index].position}`]));
+  };
+
+  const before = slotOf(rows);
+  const after = slotOf(
+    orderQueueRows(rows, (row) => ({
+      finished: row.status === "stopped" || row.status === "failed",
+      ownerPref: row.ownerPref,
+    })),
+  );
+  check(
+    "xếp lại bảng rồi đánh số vẫn ra ĐÚNG từng con số cũ",
+    [...before].every(([id, slot]) => after.get(id) === slot),
+    JSON.stringify({ before: [...before], after: [...after] }),
+  );
+  check(
+    "…cụ thể: hàng chung 1,2 và mỗi chủ máy nhà đếm riêng từ 1",
+    after.get("chung-b") === "sect#1" &&
+      after.get("chung-c") === "sect#2" &&
+      after.get("nha-a1") === "own#1" &&
+      after.get("nha-a2") === "own#2" &&
+      after.get("nha-d") === "own#1",
+    JSON.stringify([...after]),
   );
 }
 

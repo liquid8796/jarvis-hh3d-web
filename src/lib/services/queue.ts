@@ -253,6 +253,76 @@ export function visibleWorkerId(
   return kind === "sect" ? (canInspectSect ? workerId : null) : mine ? workerId : null;
 }
 
+/**
+ * `workerPref` của CHỦ đàn → hàng chờ mà đàn ấy thực sự đứng.
+ *
+ * MỘT bản duy nhất cho cả phép đánh số lẫn phép xếp chỗ trên bảng: hai nơi cùng hỏi「đàn này
+ * thuộc hàng nào」mà tự trả lời riêng thì có ngày một dòng được đánh số theo hàng riêng nhưng
+ * lại vẽ vào chỗ của hàng chung — đúng loại lệch không kêu lên tiếng nào.
+ *
+ * Giá trị lạ đọc như `any` (fail-open, cùng lối `mayServe` bên dispatch.ts): sửa tay database ra
+ * một chuỗi không ai biết thì đàn vẫn được phục vụ ở hàng chung, thay vì nằm im ở một hàng riêng
+ * không máy nào của chủ nó đang trực.
+ */
+const queuePoolOf = (ownerPref: string): "sect" | "own" => (ownerPref === "mine" ? "own" : "sect");
+
+/** Đàn đã tắt hẳn — dòng chỉ còn nán lại trên bảng để có chỗ bấm Bắt Đầu. */
+const isFinishedStatus = (status: string): boolean => status === "stopped" || status === "failed";
+
+/**
+ * Chỗ đứng trên BẢNG, ba bậc — số nhỏ đứng trên. Đây là thứ tự HIỂN THỊ, không phải thứ tự
+ * nhặt việc (thứ tự ấy do câu SQL giữ, xem `getQueueSnapshot`).
+ *
+ *   `sect`     — đàn ở hàng CHUNG: hàng mà khôi lỗi tông môn sẽ nhặt, tức đúng câu hỏi trang
+ *                này sinh ra để trả lời.
+ *   `own`      — đàn giao riêng cho máy nhà. Nó KHÔNG đứng chung hàng với ai, nên nó không
+ *                được phép chiếm chỗ trong hàng chung dù tới giờ sớm hơn.
+ *   `finished` — đàn đã tắt, chỉ nán lại 30 phút để còn chỗ bấm Bắt Đầu.
+ */
+const DISPLAY_RANK = { sect: 0, own: 1, finished: 2 } as const;
+
+/** Một dòng cần khai gì để xếp chỗ trên bảng — ít hơn hẳn thứ phép đánh số cần. */
+export type QueueDisplayKey = {
+  finished: boolean;
+  /** `workerPref` của CHỦ đàn — cùng giá trị `assignQueueSlots` đọc. */
+  ownerPref: string;
+};
+
+/**
+ * XẾP CHỖ TRÊN BẢNG — đàn giao riêng cho máy nhà luôn nằm DƯỚI hàng chung.
+ *
+ * Vì sao cần: đàn `workerPref = mine` không đứng trong hàng của khôi lỗi tông môn — `mayServe`
+ * cấm tông môn chạm vào nó — nhưng nó vẫn có `next_run_at`, nên thứ tự nhặt việc đẩy nó lên
+ * ĐỈNH bảng khi nó tới giờ sớm. Đo 14/08/2026: hai dòng「Chờ máy nhà — chưa máy nào trực」ngồi
+ * hai chỗ đầu tiên, trong khi cả hàng chung — thứ mà bảng này sinh ra để kể — nằm phía dưới,
+ * và hai dòng ấy sẽ không nhúc nhích cho tới khi máy ở nhà chủ nó lên ca. Một cái đỉnh bảng
+ * dành cho những dòng không đi đâu cả.
+ *
+ * Chỉ ĐỔI CHỖ, không đánh số: `assignQueueSlots` vẫn là nơi duy nhất sinh ra số thứ tự, và
+ * phép xếp này giữ nguyên thứ tự tương đối TRONG mỗi bậc — nên hai bộ đếm (hàng chung, và hàng
+ * riêng của từng chủ) đọc được y hệt một dãy như trước, chỉ là dãy ấy nay nằm rời làm hai khúc.
+ *
+ * Hàm THUẦN, nhận một phép đọc khoá thay vì hình dạng cứng: nhờ vậy `verify:queue-pools` đóng
+ * đinh được luật này bằng vài object trần, không cần dựng database.
+ */
+export function orderQueueRows<T>(rows: readonly T[], key: (row: T) => QueueDisplayKey): T[] {
+  return rows
+    .map((row, index) => {
+      const { finished, ownerPref } = key(row);
+      const rank = finished
+        ? DISPLAY_RANK.finished
+        : queuePoolOf(ownerPref) === "own"
+          ? DISPLAY_RANK.own
+          : DISPLAY_RANK.sect;
+      return { row, index, rank };
+    })
+    // Phá hoà bằng chỉ số CŨ, không nhờ vào tính ổn định của `Array#sort`: thứ tự trong mỗi bậc
+    // chính là thứ nuôi hai bộ đếm ở `assignQueueSlots`, nên nó phải đúng theo hợp đồng viết ra
+    // ở đây chứ không theo một chi tiết của máy chạy.
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map((item) => item.row);
+}
+
 /** Một dòng đang chờ, rút gọn còn đúng thứ mà phép xếp chỗ cần biết. */
 export type QueueCandidate = {
   userId: string;
@@ -278,8 +348,11 @@ export type QueueSlot = {
  * tăng đều, vẫn đẹp, chỉ là nó đếm một cuộc đua mà đàn ấy không tham gia. Thuần thì
  * `verify:queue-pools` đóng đinh được từng luật mà không cần dựng database.
  *
- * Thứ tự đầu vào PHẢI là thứ tự `claimNextJob` nhặt việc (`next_run_at`, rồi `created_at`) —
- * hàm này chỉ đánh số, nó không sắp xếp lại gì cả.
+ * Hàm này chỉ ĐÁNH SỐ, không sắp xếp lại gì cả — nên đầu vào phải mang sẵn thứ tự `claimNextJob`
+ * nhặt việc (`next_run_at`, rồi `created_at`). Chính xác thì đòi hỏi ấy chỉ tính TRONG mỗi hàng:
+ * dãy con của hàng chung, và dãy con của từng chủ máy nhà. Hai bộ đếm dưới đây không bao giờ
+ * nhìn sang nhau, nên `orderQueueRows` gom các dòng máy nhà xuống cuối mảng không đổi một con số
+ * nào; đổi thứ tự BÊN TRONG một hàng thì có.
  */
 export function assignQueueSlots(
   rows: readonly QueueCandidate[],
@@ -292,7 +365,7 @@ export function assignQueueSlots(
     // `any` là ca dễ sai nhất: nó đứng ở hàng CHUNG, nhưng máy nhà của chủ cũng nhặt được —
     // nên câu「có ai trực không」phải hỏi CẢ HAI, bằng không một đàn `any` bị báo là vô vọng
     // vào đúng lúc máy nhà của chủ nó đang chạy ngon lành.
-    const pool: "sect" | "own" = row.ownerPref === "mine" ? "own" : "sect";
+    const pool = queuePoolOf(row.ownerPref);
     const poolHasWorker =
       row.ownerPref === "mine"
         ? row.ownerWorkerOnline
@@ -315,9 +388,12 @@ export function assignQueueSlots(
 /**
  * Ảnh chụp hàng đợi tại thời điểm gọi.
  *
- * Thứ tự truy vấn CỐ Ý trùng với `claimNextJob` (`next_run_at`, rồi `created_at`), nên số
- * thứ tự hiện trên màn hình chính là thứ tự khôi lỗi tông môn sẽ nhặt việc — không phải một
- * cách sắp xếp riêng của giao diện rồi người dùng đoán nhầm là hàng chờ thật.
+ * HAI tầng thứ tự, và chúng khác nhau có chủ ý:
+ *   • Câu SQL trả về đúng thứ tự `claimNextJob` nhặt việc (`next_run_at`, rồi `created_at`), nên
+ *     con số thứ tự do `assignQueueSlots` đánh chính là thứ tự khôi lỗi sẽ nhặt — không phải
+ *     một cách sắp xếp riêng của giao diện rồi người dùng đoán nhầm là hàng chờ thật.
+ *   • `orderQueueRows` rồi mới bày mảng ấy ra bảng: đàn máy nhà xuống dưới hàng chung, đàn đã
+ *     tắt xuống cuối. Nó chỉ đổi CHỖ NGỒI, không đổi con số — xem lý do ở chính hàm đó.
  *
  * Nhận cả NGƯỜI XEM chứ không riêng id của họ: phép cắt riêng tư nay hỏi tới vai (id khôi lỗi
  * tông môn chỉ dành cho bậc trị sự), và câu hỏi ấy phải được trả lời TRONG service. Truyền
@@ -387,17 +463,32 @@ export async function getQueueSnapshot(viewer: QueueViewer): Promise<QueueSnapsh
            )
          )
        )
-    -- Dòng còn sống luôn đứng trước dòng đã tắt; TRONG mỗi nhóm thì giữ nguyên thứ tự cũ
-    -- (next_run_at, created_at) — thứ tự ấy chính là thứ tự khôi lỗi nhặt việc, và số thứ tự
-    -- hiện trên màn hình phải tiếp tục nói đúng điều đó.
-    order by
-      case when job.status in ('queued', 'running', 'stopping') then 0 else 1 end,
-      job.next_run_at, job.created_at
+    -- CHỈ thứ tự nhặt việc, đúng như claimNextJob (next_run_at, rồi created_at) — và chỉ nó.
+    -- Cách bày ra màn hình (dòng đã tắt xuống cuối, đàn máy nhà xuống dưới hàng chung) do
+    -- orderQueueRows lo, một chỗ duy nhất, thuần và kiểm chứng được không cần database.
+    -- Trước 14/08/2026 câu này còn mang một mệnh đề「còn sống trước, đã tắt sau」; nó nằm lại đây
+    -- thì luật bày bàn sống ở hai nơi, mà hai nơi ấy đọc pref theo hai lối khác nhau.
+    -- (Vẫn không dấu huyền trong bình chú SQL — xem lời dặn ở mệnh đề owner_pref bên trên.)
+    order by job.next_run_at, job.created_at
   `),
     getWorkerRoster(viewerId, canInspectSect),
   ]);
 
-  const rows = (result.rows ?? []) as Array<Record<string, unknown>>;
+  /**
+   * Bày lên bảng theo thứ tự NGƯỜI ĐỌC cần, ngay tại đây — trước mọi phép tính khác.
+   *
+   * Sắp một lần ở đầu nguồn thì `dueQueued`, `slots` và mảng `entries` bên dưới đều đi theo
+   * cùng một chỉ số; sắp ở cuối là phải khiêng theo ba mảng song song và hẹn ngày một trong ba
+   * quên đổi chỗ. Mọi đường ra đều ăn ảnh chụp này (trang, /api/queue, kênh SSE), nên bảng chỉ
+   * cần vẽ đúng thứ nhận được — không có nhánh xếp lại nào ở phía trình duyệt.
+   */
+  const rows = orderQueueRows(
+    (result.rows ?? []) as Array<Record<string, unknown>>,
+    (row) => ({
+      finished: isFinishedStatus(String(row.status)),
+      ownerPref: String(row.owner_pref ?? "any"),
+    }),
+  );
   const now = Date.now();
   /** Khôi lỗi tông môn có đang trực không — hỏi một lần, dùng cho mọi dòng thuộc hàng chung. */
   const sectOnline = workers.some((worker) => worker.kind === "sect" && worker.online);
@@ -428,7 +519,7 @@ export async function getQueueSnapshot(viewer: QueueViewer): Promise<QueueSnapsh
     const status = String(row.status) as JobStatus;
     const nextRunAt = new Date(String(row.next_run_at));
     const mine = String(row.user_id) === viewerId;
-    const finished = status === "stopped" || status === "failed";
+    const finished = isFinishedStatus(status);
 
     // Job chưa tới giờ đang NGHỈ, job đang chạy thì đã ra khỏi hàng — gộp cả ba làm một con số
     // sẽ nói dối về độ dài hàng chờ. Dòng đã tắt KHÔNG được đếm vào bất cứ ô nào: nó không còn

@@ -463,11 +463,14 @@ export function QueueBoard({
         </span>
       </div>
 
-      {/* Nói thẳng luật của hàng đợi, kẻo người dùng đếm số rồi tự suy ra sai. */}
+      {/* Nói thẳng luật của hàng đợi, kẻo người dùng đếm số rồi tự suy ra sai — kể cả luật XẾP
+          CHỖ: một cái bảng tự dưng đổi thứ tự mà không giải thích thì trông như đang hỏng. */}
       <p className="mb-4 text-xs leading-relaxed text-[var(--color-mist)]">
         Thứ tự khôi lỗi tông môn sẽ nhặt việc: đàn nào tới giờ trước thì đi trước. Đàn đang nghỉ
         chưa xếp hàng — nó chỉ vào hàng khi hết cooldown. Ai đã cài khôi lỗi riêng thì không phải
-        chờ hàng chung, vì khôi lỗi ấy chỉ làm việc ở máy nhà.
+        chờ hàng chung, vì khôi lỗi ấy chỉ làm việc ở máy nhà — nên đàn giao riêng cho máy nhà
+        luôn nằm <strong className="text-[var(--color-parchment)]">dưới hàng chung</strong>, dù
+        tới giờ sớm hơn: nó đứng hàng riêng, không tranh chỗ với ai.
       </p>
 
       {/* Ô chọn số dòng đứng NGOÀI `role="tablist"`, không phải chuyện thẩm mỹ: một tablist chỉ

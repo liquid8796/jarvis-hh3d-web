@@ -184,6 +184,154 @@ btn.onclick=()=>{if(btn.disabled)return;document.body.insertAdjacentHTML('before
     setTimeout(()=>{btn.innerHTML='<i class="fas fa-times"></i> Đã Tế Lễ';btn.disabled=true;
       btn.className='btn group-button';btn.dataset.offered='1'},40)}}</script>`;
 
+// Trang Khoáng Mạch theo bản ghi 14/08 (khoang-mach-20260814-133812). KHÁC mọi fixture trước:
+// trang thật chạy trong IFRAME của hub (?nv_embed=1) nên dom/*.html của bản ghi KHÔNG chứa nó,
+// và body HTML trong network.json bị cắt ở 32KB đầu (toàn <head>). Markup dưới đây vì thế dựng
+// từ hai nguồn chứng cứ còn lại: selector THẬT của 64 cú click trong steps.json (recorder xuyên
+// được iframe) + 83 control từ các lượt quét trạng thái — không có dòng nào bịa từ trí nhớ.
+//
+//   • Trang này CÒN SweetAlert2 — ngược với trang tế lễ. Ba hộp xác nhận đã ghi đều là
+//     `.swal2-container … button.swal2-confirm` (click#47/#236/#246). Đừng "đồng bộ cho gọn"
+//     sang #hh3d-confirm-layer: hai trang, hai họ hộp, và fixture phải theo trang của NÓ.
+//   • Dòng của MÌNH trong sổ mỏ nhận diện bằng cặp class chỉ nó mới có: `button.chua-dat`
+//     (đang đào, disabled) ↔ `button.claim-reward` (chữ「Nhận Thưởng」khi chín, và VẪN class
+//     ấy với chữ「Đã nhận (Xs)」sau khi nhận — nên phép nhận diện phải hỏi thêm CHỮ).
+//   • Dòng mình cố ý nằm TRANG 2 của sổ (bản ghi: sổ 2-3 trang, vị trí dòng mình đổi theo
+//     vai) — bắt flow phải lật trang thật chứ không ăn may trang đầu.
+//   • Trần Tu Vi / Tinh Thạch là SỐ do server render trên trang; đầy cả hai = hết ngày.
+//
+// Nhân chứng của fixture (site không có): data-entered / data-bought / data-seized /
+// data-claimed / data-refused trên <body> — bài kiểm hỏi「đã đi nhánh nào, có cú bấm nào bị
+// server từ chối không」.
+const khoangMachPage = (km) => {
+  const lists = {
+    1: { cls: "class-khoang-vang", names: ["Thiên", "Địa", "Hồng Hoang"] },
+    2: { cls: "class-khoang-bac", names: ["Âm Minh Chi Địa", "Thông Thiên Kiếm Phái", "Bất Diệt Sơn"] },
+    3: { cls: "class-khoang-dong", names: ["Bách Đoạn Sơn", "Thạch Thôn", "Hỏa Quốc"] },
+  };
+  return `<!doctype html><html lang="vi"><meta charset="utf-8">
+<div id="wrapper">
+<div id="mine-stats">⚡ Lượt tấn công: ${km.attacksUsed}/3 · 🔴 Tu Vi: ${km.tuVi}/${km.tuViCap} · 🔵 Tinh Thạch: ${km.tinhThach}/${km.tinhThachCap} · Sát Khí: 0/7</div>
+<div class="mine-buttons">
+  <button class="mine-type-button${km.type === 1 ? " active" : ""}">Thượng</button>
+  <button class="mine-type-button${km.type === 2 ? " active" : ""}">Trung</button>
+  <button class="mine-type-button${km.type === 3 ? " active" : ""}">Hạ (Tân Thủ)</button>
+</div>
+<button id="shopButton">TIỆM</button>
+<div id="shop-container" style="display:none">
+  <div class="shop-item"><div class="shop-item-content">Ẩn Thân Phù<button class="shop-item-button">Mua Ngay</button></div></div>
+  <div class="shop-item"><div class="shop-item-content">Bát Quái Trận Đồ<button class="shop-item-button">Mua Ngay</button></div></div>
+  <div class="shop-item"><div class="shop-item-content">Linh Quang Phù<button class="shop-item-button">Mua Ngay</button></div></div>
+</div>
+<div id="mine-list"></div>
+<div id="user-modal" style="display:none"><div class="modal-content">
+  <div id="bonus-display">Ẩn Thân Phù: 0/5 · Thưởng thêm: - Tu Vi: <span id="tuvi-bonus-percentage">${km.bonus}%</span> - Tinh Thạch: <span id="tinhthach-bonus-percentage">20%</span> - Bát Quái Trận Đồ</div>
+  <div id="user-list"></div>
+  <button id="prev-btn">← Lùi</button> <span id="page-indicator"></span> <button id="next-btn">Tiến →</button>
+  <button id="reload-btn"></button> <button id="close-btn">Đóng</button>
+</div></div>
+</div>
+<script>
+const KM = ${JSON.stringify({ type: km.type, inMine: km.inMine, minedMin: km.minedMin, maxed: km.maxed, claimed: km.claimedJustNow, owner: km.owner, attacksUsed: km.attacksUsed, bonus: km.bonus })};
+const LISTS = ${JSON.stringify(lists)};
+let page = 1;
+const swal = (text, confirmLabel, onYes) => {
+  const c = document.createElement('div');
+  c.className = 'swal2-container swal2-center';
+  c.innerHTML = '<div class="swal2-popup swal2-modal"><h2 class="swal2-title">Xác nhận</h2>'
+    + '<div class="swal2-html-container">' + text + '</div>'
+    + '<div class="swal2-actions"><button type="button" class="swal2-confirm swal2-styled">' + confirmLabel + '</button>'
+    + '<button type="button" class="swal2-cancel swal2-styled">Không</button></div></div>';
+  document.body.append(c);
+  c.querySelector('.swal2-cancel').onclick = () => { c.remove(); document.body.dataset.cancelled = '1'; };
+  c.querySelector('.swal2-confirm').onclick = () => { c.remove(); onYes(); };
+};
+const toast = (text) => { const t = document.createElement('div'); t.className = 'km-toast'; t.textContent = text; document.body.append(t); setTimeout(() => t.remove(), 3000); };
+const mineCard = (name, cls, mine) => {
+  const btn = mine
+    ? '<button class="leave-mine">Rời Khỏi</button>'
+    : '<button class="enter-mine">Vào Ngay</button>';
+  return '<div class="mine ' + cls + '"><div class="mine-image"><img alt="' + name + '"></div>'
+    + '<div class="mine-name">' + name + '</div><div class="group-info"><p><span>Lạc Vân Tông</span></p></div>'
+    + '<div class="mine-info"><span>21/50</span></div>' + btn + '</div>';
+};
+const renderList = () => {
+  const l = LISTS[KM.type];
+  document.getElementById('mine-list').innerHTML = l.names
+    .map((n) => mineCard(n, l.cls, KM.inMine && n === 'Thông Thiên Kiếm Phái' && KM.type === 2))
+    .join('');
+  for (const b of document.querySelectorAll('#mine-list button.enter-mine')) b.onclick = enterMine;
+  for (const img of document.querySelectorAll('#mine-list .mine-image img')) img.onclick = openModal;
+};
+const row = (name, timeText, buttonHtml, crown) =>
+  '<div class="user-row user-row-' + name.replace(/\\W+/g, '').toLowerCase() + '">'
+  + '<div class="avatar-km">' + (crown ? '👑' : '') + '</div>'
+  + '<div class="user-info"><b>' + name + '</b> Lạc Vân Tông <div class="group-info-km"><p>Khai thác: '
+  + timeText + '</p>' + buttonHtml + '</div></div></div>';
+const ownRow = () => {
+  if (KM.claimed) return row('BaoTest', '2 giây', '<button class="claim-reward" disabled>Đã nhận (2s)</button>', KM.owner);
+  if (KM.maxed) return row('BaoTest', 'Đạt tối đa', '<button class="claim-reward">Nhận Thưởng</button>', KM.owner);
+  return row('BaoTest', KM.minedMin + ' phút', '<button class="chua-dat" disabled>Chưa đạt</button>', KM.owner);
+};
+const renderModal = () => {
+  const hostBtn = KM.owner ? '<button disabled>Đồng Môn</button>' : '<button class="doat-mo-btn">Đoạt Mỏ</button>';
+  const pages = KM.owner
+    ? [[ownRow(), row('babe just u', '4 phút', '<button disabled>Đồng Môn</button>', false)],
+       [row('CHIM CHAU PHI', '9 phút', '<button disabled>Đồng Môn</button>', false)]]
+    : [[row('babe just u', '4 phút', hostBtn, true), row('CHIM CHAU PHI', '9 phút', '<button disabled>Đồng Môn</button>', false)],
+       [ownRow(), row('Lam Hy Nguyệt', '1 phút', '<button disabled>Đồng Môn</button>', false)]];
+  if (page > pages.length) page = pages.length;
+  document.getElementById('user-list').innerHTML = pages[page - 1].join('');
+  document.getElementById('page-indicator').textContent = 'Trang ' + page + ' / ' + pages.length;
+  document.getElementById('next-btn').disabled = page >= pages.length;
+  document.getElementById('prev-btn').disabled = page <= 1;
+  const claim = document.querySelector('#user-list button.claim-reward:not([disabled])');
+  if (claim) claim.onclick = () => {
+    if (!KM.maxed) { document.body.dataset.refused = 'claim'; return; }
+    fetch('/km-claim');
+    setTimeout(() => { KM.maxed = false; KM.claimed = true; document.body.dataset.claimed = String((Number(document.body.dataset.claimed) || 0) + 1); renderModal(); }, 40);
+  };
+  const doat = document.querySelector('#user-list button.doat-mo-btn');
+  if (doat) doat.onclick = () => swal('Đạo hữu có chắc chắn muốn đoạt quyền chủ mỏ này không?', 'Xác nhận', () => {
+    if (KM.owner || KM.attacksUsed >= 3) { document.body.dataset.refused = 'seize'; return; }
+    fetch('/km-seize');
+    setTimeout(() => { KM.owner = true; KM.attacksUsed += 1; page = 1; document.body.dataset.seized = '1'; toast('Đã đoạt thành công quyền chủ mỏ.'); renderModal(); }, 40);
+  });
+};
+function enterMine() {
+  const btn = this;
+  if (KM.inMine) { document.body.dataset.refused = 'enter'; return; }
+  btn.classList.add('loading'); btn.disabled = true;
+  swal('Nếu có phần thưởng từ khoáng mạch khác, sẽ tự động nhận trước khi di chuyển.', 'Có, vào ngay', () => {
+    fetch('/km-enter');
+    setTimeout(() => { KM.inMine = true; document.body.dataset.entered = '1'; renderList(); }, 40);
+  });
+}
+function openModal() {
+  document.getElementById('user-modal').style.display = 'block';
+  renderModal();
+}
+for (const [i, b] of [...document.querySelectorAll('.mine-type-button')].entries()) b.onclick = () => {
+  for (const x of document.querySelectorAll('.mine-type-button')) x.classList.remove('active');
+  b.classList.add('active'); KM.type = i + 1;
+  setTimeout(renderList, 30);
+};
+document.getElementById('shopButton').onclick = () => { document.getElementById('shop-container').style.display = 'block'; };
+for (const b of document.querySelectorAll('.shop-item-button')) b.onclick = () => {
+  const name = b.closest('.shop-item').textContent;
+  swal('Đạo hữu có muốn mua ' + name.replace('Mua Ngay', '').trim() + '?', 'Mua Ngay', () => {
+    fetch('/km-buy?item=' + encodeURIComponent(name.includes('Linh Quang') ? 'linh-quang-phu' : 'khac'));
+    setTimeout(() => { document.body.dataset.bought = String((Number(document.body.dataset.bought) || 0) + 1); toast('Đạo hữu đã mua thành công Linh Quang Phù! Thời gian hết hạn còn lại: 01 giờ 00 phút.'); }, 40);
+  });
+};
+document.getElementById('next-btn').onclick = () => { page += 1; renderModal(); };
+document.getElementById('prev-btn').onclick = () => { page -= 1; renderModal(); };
+document.getElementById('reload-btn').onclick = renderModal;
+document.getElementById('close-btn').onclick = () => { document.getElementById('user-modal').style.display = 'none'; };
+renderList();
+</script>`;
+};
+
 const FREE_WHEEL_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div id="userTurns">2</div><button id="spinButton">Quay Ngay</button>
 <div id="prizeSubtitle" style="display:none">Chúc mừng đạo hữu</div>
@@ -1305,8 +1453,13 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // trong im lặng. Mà im lặng chính là khiếm khuyết đang vá: ngày 14/08/2026 một báo cáo
     // 「phân giải n sao trở xuống không hoạt động」phải ghép snapshot của hai database mới trả
     // lời được, chỉ vì nhánh giữ không để lại dấu vết nào trong nhật ký.
-    "hồ sơ đang ở schema 57",
-    loadProfileForSchema().schemaVersion === 57,
+    // 58 = Khoáng Mạch rời kiếp stub: labelMatch phỏng đoán → 45 bước thật dựng từ bản ghi
+    // khoang-mach-20260814-133812, thêm twin thường + 4 option (loại khoáng, tên mỏ, đoạt
+    // mỏ, ngưỡng %). Hai danh sách chặn UnavailableQuests (C#) và UNAVAILABLE_QUEST_KEYS
+    // (web) cùng về rỗng trong cú bump này — quên một trong hai là quest hiện trên form mà
+    // cửa phát việc vẫn ép tắt, hoặc ngược lại.
+    "hồ sơ đang ở schema 58",
+    loadProfileForSchema().schemaVersion === 58,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1554,6 +1707,22 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         ["WeddingRoomStateScript", weddingScript("jvz-can-bless")],
       ];
 
+      // Sáu đoạn script Khoáng Mạch (schema 58) — cùng số phận hai-nơi-một-luật với Mê Cung.
+      // Twin thường dùng CHUNG steps nên chỉ cần so bản VIP.
+      const km = loadProfileForSchema().quests.find((q) => q.id === "khoang-mach");
+      const kmSteps = allSteps(km.steps);
+      const kmScript = (needle, not) =>
+        kmSteps.find(
+          (s) => (s.script || "").includes(needle) && (!not || !(s.script || "").includes(not)))?.script;
+      pairs.push(
+        ["KmCapScanScript", kmScript("jvz-km-done")],
+        ["KmPickMineScript", kmScript("jvz-km-usable")],
+        ["KmSelfScanScript", kmScript("jvz-km-self-seen")],
+        ["KmHostScanScript", kmScript("jvz-km-host-go", "jvz-km-self-seen")],
+        ["KmShopMarkScript", kmScript("jvz-km-buy", "jvz-km-host-go")],
+        ["KmTailScript", kmScript("jvz-km-eta", "jvz-km-self-seen")],
+      );
+
       for (const [name, webScript] of pairs) {
         // Hằng số một dòng: `private const string <Tên> =` rồi """…""" ở dòng kế.
         const m = cs.match(new RegExp(`private const string ${name} =\\s*\\r?\\n\\s*"""([\\s\\S]*?)""";`));
@@ -1662,6 +1831,17 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
 
   // --- kiểm trên trang thật ---------------------------------------------------------
   let teLeOffered = false;
+
+  // Khoáng Mạch — trạng thái server giả, khớp nhịp thật của site: chu kỳ đào CHÍN GIỮA HAI
+  // LƯỢT GHÉ (engine không ngồi chờ 30 phút), nên mỗi GET trang khi đang-ở-trong-mỏ là một
+  // lần tua nhanh tới「Đạt tối đa」. Thưởng lượt 1 = 270 Tu Vi + 100 Tinh Thạch (con số thật
+  // từ d2f1b1d5), lượt 2 chạm trần 300/100 — đúng ghi chú「tối đa 2 lần nhận/ngày」.
+  const kmFresh = () => ({
+    type: 2, inMine: false, minedMin: 12, maxed: false, claimedJustNow: false,
+    owner: false, attacksUsed: 0, bonus: 100, claims: 0,
+    tuVi: 0, tuViCap: 300, tinhThach: 0, tinhThachCap: 100, bought: [],
+  });
+  let kmState = kmFresh();
   /** Trang Điểm Danh trả về trạng thái đã-điểm-danh — bật cho ca sổ đủ lượt ở cuối tệp. */
   let checkInDone = false;
 
@@ -1824,6 +2004,23 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       res.end("ok");
     }
     else if (path === "/hy-su-lixi") { hySuLixi.push(url.searchParams.get("id") ?? ""); res.end("ok"); }
+    else if (path === "/khoang-mach") {
+      // Chín giữa hai lượt ghé: load nào thấy mình ĐÃ ở trong mỏ (tức không phải load của
+      // chính lượt vào) là chu kỳ trước đó đã đủ 30 phút.
+      if (kmState.inMine && !kmState.maxed) kmState.maxed = true;
+      kmState.claimedJustNow = false;
+      res.end(khoangMachPage(kmState));
+    }
+    else if (path === "/km-enter") { kmState.inMine = true; kmState.minedMin = 0; res.end("ok"); }
+    else if (path === "/km-claim") {
+      kmState.maxed = false;
+      kmState.claims += 1;
+      kmState.tuVi = Math.min(kmState.tuVi + 270, kmState.tuViCap);
+      kmState.tinhThach = Math.min(kmState.tinhThach + 100, kmState.tinhThachCap);
+      res.end("ok");
+    }
+    else if (path === "/km-buy") { kmState.bought.push(url.searchParams.get("item") ?? "?"); res.end("ok"); }
+    else if (path === "/km-seize") { kmState.owner = true; kmState.attacksUsed += 1; res.end("ok"); }
     else res.end(PAGE);
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -1921,6 +2118,144 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         !infos.some((m) => /stopIf|repeat|until/.test(m)),
       infos.filter((m) => /stopIf|repeat|until/.test(m)).join(" / ") || "(sạch)",
     );
+
+    console.log("\nKhoáng Mạch — vào mỏ, chờ chín giữa hai lượt ghé, nhận theo trần ngày");
+
+    const kmQuest = exportedProfile.quests.find((q) => q.id === "khoang-mach");
+    const kmBody = (name) => page.getAttribute("body", name);
+
+    kmState = kmFresh();
+    const km1 = await run(kmQuest);
+    check(
+      "lượt 1: vào mỏ qua swal2 rồi thoát onCooldown với đồng hồ THẬT (30′ − 12′ đã đào = 18′)",
+      km1.outcome === "onCooldown" && km1.cooldownSeconds === 18 * 60,
+      `${km1.outcome}: ${km1.cooldownSeconds}s`,
+    );
+    check(
+      "…server ghi nhận đúng một cú vào mỏ, không cú bấm nào bị từ chối, không đụng nút Không",
+      (await kmBody("data-entered")) === "1" &&
+        (await kmBody("data-refused")) == null &&
+        (await kmBody("data-cancelled")) == null &&
+        (await kmBody("data-claimed")) == null,
+      `entered=${await kmBody("data-entered")} refused=${await kmBody("data-refused")}`,
+    );
+
+    const km2 = await run(kmQuest);
+    check(
+      "lượt 2: chu kỳ đã chín → lật sang trang 2 của sổ, Nhận Thưởng → completed, hẹn ~30′",
+      km2.outcome === "completed" && km2.cooldownSeconds === 30 * 60 && kmState.claims === 1,
+      `${km2.outcome}: ${km2.cooldownSeconds}s, claims=${kmState.claims}`,
+    );
+    check(
+      "…và KHÔNG vào mỏ lại lần nữa (đã ở trong thì cụm vào-mỏ phải tự lặn)",
+      (await kmBody("data-entered")) == null && (await kmBody("data-refused")) == null,
+    );
+
+    const km3 = await run(kmQuest);
+    check(
+      "lượt 3: lần nhận thứ hai chạm trần ngày (Tu Vi 300/300, Tinh Thạch 100/100)",
+      km3.outcome === "completed" && kmState.claims === 2 &&
+        kmState.tuVi === kmState.tuViCap && kmState.tinhThach === kmState.tinhThachCap,
+      `claims=${kmState.claims}, tuVi=${kmState.tuVi}/${kmState.tuViCap}`,
+    );
+
+    const km4 = await run(kmQuest);
+    check(
+      "lượt 4: trần đầy → dừng KHÔNG đồng hồ = alreadyDone, và nguồn dừng đủ chuẩn vào sổ ngày",
+      km4.outcome === "alreadyDone" && km4.dailyCapReached === true,
+      `${km4.outcome}, dailyCapReached=${km4.dailyCapReached}`,
+    );
+    check(
+      "…nhật ký kể trần bằng tiếng người",
+      infos.some((m) => m.includes("Trần hôm nay") && m.includes("ĐÃ ĐẦY")),
+    );
+
+    console.log("\nKhoáng Mạch — đoạt mỏ là opt-in, và ngưỡng % là hàng rào thật");
+
+    // Twin VIP với hostMode bật + ngưỡng 100 ≤ bonus 100 của fixture → phải mua đúng MỘT
+    // Linh Quang Phù (tìm theo TÊN giữa ba món trên kệ) rồi đoạt, rồi vẫn nhận thưởng.
+    const kmHostOn = structuredClone(kmQuest);
+    for (const o of kmHostOn.options) {
+      if (o.key === "hostMode") o.selectedValue = o.choices.find((c) => !c.value.includes("«")).value;
+      if (o.key === "hostMinBonus") o.selectedValue = "100";
+    }
+    kmState = kmFresh();
+    kmState.inMine = true;
+    const kmH1 = await run(kmHostOn);
+    check(
+      "đủ ngưỡng: mua đúng Linh Quang Phù → đoạt mỏ → rồi mới nhận thưởng",
+      kmH1.outcome === "completed" &&
+        kmState.bought.join() === "linh-quang-phu" &&
+        kmState.owner === true && kmState.attacksUsed === 1 && kmState.claims === 1,
+      `${kmH1.outcome}; bought=${kmState.bought.join()}; owner=${kmState.owner}; claims=${kmState.claims}`,
+    );
+    check(
+      "…swal đoạt mỏ đi qua nút Xác nhận, không đụng Không",
+      (await kmBody("data-seized")) === "1" && (await kmBody("data-cancelled")) == null,
+    );
+
+    const kmHostHigh = structuredClone(kmHostOn);
+    for (const o of kmHostHigh.options) if (o.key === "hostMinBonus") o.selectedValue = "120";
+    kmState = kmFresh();
+    kmState.inMine = true;
+    const kmH2 = await run(kmHostHigh);
+    check(
+      "dưới ngưỡng (bonus 100% < 120%): KHÔNG mua, KHÔNG đoạt — nhưng vẫn nhận thưởng",
+      kmH2.outcome === "completed" &&
+        kmState.bought.length === 0 && kmState.owner === false && kmState.claims === 1,
+      `${kmH2.outcome}; bought=${kmState.bought.length}; owner=${kmState.owner}`,
+    );
+    check(
+      "…và lý do bỏ qua nằm trong nhật ký, tiếng người",
+      infos.some((m) => m.includes("dưới ngưỡng")),
+    );
+
+    console.log("\nKhoáng Mạch — cấu hình sai tên mỏ phải LỘ, không âm thầm đào mỏ khác");
+
+    const kmWrongName = structuredClone(kmQuest);
+    for (const o of kmWrongName.options) if (o.key === "mineName") o.selectedValue = "Mỏ Không Có Thật";
+    kmState = kmFresh();
+    const kmMiss = await run(kmWrongName);
+    check(
+      "không thấy mỏ cấu hình và không ở trong mỏ nào → quest đỏ, không bấm gì",
+      kmMiss.outcome === "failed" && (await kmBody("data-entered")) == null,
+      kmMiss.outcome,
+    );
+
+    // Twin thường dùng CHUNG script — một lượt đầy đủ để chắc nó không chỉ tồn tại trên giấy.
+    const kmFree = exportedProfile.quests.find((q) => q.id === "khoang-mach-thuong");
+    kmState = kmFresh();
+    const kmF1 = await run(kmFree);
+    check(
+      "twin thường: cùng flow, cùng đồng hồ",
+      kmF1.outcome === "onCooldown" && kmF1.cooldownSeconds === 18 * 60 && (await kmBody("data-entered")) === "1",
+      `${kmF1.outcome}: ${kmF1.cooldownSeconds}s`,
+    );
+
+    // Lớp dịch config → hồ sơ: mỗi twin nhận ĐÚNG bộ tuỳ chọn của tab mình.
+    {
+      const translated = profileForConfig({
+        quests: {
+          khoangMach: { enabled: true, mineType: "1", mineName: "Địa", hostMode: true, hostMinBonus: 120 },
+          khoangMachThuong: { enabled: true, mineType: "3", mineName: "Thạch Thôn", hostMode: false, hostMinBonus: 100 },
+        },
+      });
+      const opt = (quest, key) => quest.options.find((o) => o.key === key)?.selectedValue;
+      const vipT = translated.quests.find((q) => q.id === "khoang-mach");
+      const freeT = translated.quests.find((q) => q.id === "khoang-mach-thuong");
+      check(
+        "twin VIP nhận tab VIP: loại 1, mỏ Địa, đoạt bật, ngưỡng 120",
+        vipT.enabled === true && opt(vipT, "mineType") === "1" && opt(vipT, "mineName") === "Địa" &&
+          !opt(vipT, "hostMode").includes("«") && opt(vipT, "hostMinBonus") === "120",
+        JSON.stringify([opt(vipT, "mineType"), opt(vipT, "mineName"), opt(vipT, "hostMode"), opt(vipT, "hostMinBonus")]),
+      );
+      check(
+        "twin thường nhận tab Thường: loại 3, mỏ Thạch Thôn, đoạt tắt",
+        freeT.enabled === true && opt(freeT, "mineType") === "3" &&
+          opt(freeT, "mineName") === "Thạch Thôn" && opt(freeT, "hostMode").includes("«"),
+        JSON.stringify([opt(freeT, "mineType"), opt(freeT, "mineName"), opt(freeT, "hostMode")]),
+      );
+    }
 
     console.log("\nHoang Vực — cooldown theo hạng tài khoản");
 
@@ -2670,12 +3005,14 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       const classified = loadProfileForSchema();
       const byId = (id) => classified.quests.find((q) => q.id === id);
       check(
-        "phân loại theo hồ sơ: hoang-vuc & diem-danh-thuong = trang riêng; diem-danh & khoang-mach = hub",
+        // khoang-mach đổi phe từ schema 58: stub cũ không có pagePath (= hub), bản thật sống
+        // trên /khoang-mach/?nv_embed=1 — trang riêng, ăn ghế own-page của questGate.
+        "phân loại theo hồ sơ: hoang-vuc & diem-danh-thuong & khoang-mach = trang riêng; diem-danh = hub",
         isDedicatedPageQuest(classified, byId("hoang-vuc")) &&
           isDedicatedPageQuest(classified, byId("diem-danh-thuong")) &&
-          !isDedicatedPageQuest(classified, byId("diem-danh")) &&
-          !isDedicatedPageQuest(classified, byId("khoang-mach")),
-        ["hoang-vuc", "diem-danh-thuong", "diem-danh", "khoang-mach"]
+          isDedicatedPageQuest(classified, byId("khoang-mach")) &&
+          !isDedicatedPageQuest(classified, byId("diem-danh")),
+        ["hoang-vuc", "diem-danh-thuong", "khoang-mach", "diem-danh"]
           .map((id) => `${id}=${isDedicatedPageQuest(classified, byId(id))}`)
           .join(" "),
       );
@@ -2971,15 +3308,18 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
 
       // Và KHÔNG được lan sang những nhiệm vụ mà `alreadyDone` chỉ là một trạng thái thoáng
       // qua: nhớ nhầm Mê Cung là tắt mất nhiệm vụ đáng giá nhất của cả ngày, trong im lặng.
+      // Khoáng Mạch RỜI danh sách đứng-ngoài từ schema 58: trần của nó là trần NGÀY thật
+      // (hai ô x/y do server render, stopIf「đã đầy」không kèm đồng hồ), đúng hình dạng sổ
+      // này sinh ra để nhớ — khác hẳn Mê Cung/Luyện Đan, nơi alreadyDone chỉ thoáng qua.
       const intruders = profileNow.quests
-        .filter((quest) =>
-          ["Mê Cung", "Luyện Đan Đường", "Khoáng Mạch", "Hỷ Sự Đường"].includes(quest.name),
-        )
+        .filter((quest) => ["Mê Cung", "Luyện Đan Đường", "Hỷ Sự Đường"].includes(quest.name))
         .filter((quest) => DAILY_QUOTA_QUEST_IDS.has(quest.id))
         .map((quest) => quest.id);
       check(
-        "Mê Cung · Luyện Đan · Khoáng Mạch · Hỷ Sự Đường đứng ngoài sổ",
-        intruders.length === 0,
+        "Mê Cung · Luyện Đan · Hỷ Sự Đường đứng ngoài sổ; Khoáng Mạch (cả twin) phải Ở TRONG",
+        intruders.length === 0 &&
+          DAILY_QUOTA_QUEST_IDS.has("khoang-mach") &&
+          DAILY_QUOTA_QUEST_IDS.has("khoang-mach-thuong"),
         intruders.join(", ") || "(sạch)",
       );
     }

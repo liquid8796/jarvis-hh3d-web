@@ -42,6 +42,31 @@ const luyenDanQuest = z
   .prefault({});
 
 /**
+ * Khoáng Mạch — MỘT hình thù, HAI bản ghi (`khoangMach` cho hạng VIP, `khoangMachThuong`
+ * cho hạng thường), cùng bài học tách đôi đã trả giá ở luyenDanQuest: hai hạng có quyền đào
+ * hai mỏ khác nhau. Bốn lựa chọn khớp 1-1 với options của hồ sơ quest (dựng từ bản ghi
+ * khoang-mach-20260814-133812):
+ *
+ *   - `mineType`: nút loại khoáng thứ 1/2/3 trên trang (Thượng/Trung/Hạ).
+ *   - `mineName`: tên mỏ, chứa-là-khớp sau khi bỏ dấu; RỖNG = đào tiếp mỏ đang ở.
+ *   - `hostMode` + `hostMinBonus`: đoạt mỏ khi bonus tu vi của mỏ đạt ngưỡng — mỗi cú đoạt
+ *     mua một Linh Quang Phù (tiền thật) nên mặc định TẮT, người bật phải tự đọc giá.
+ */
+const khoangMachQuest = z
+  .object({
+    enabled: z.boolean().default(false),
+    mineType: z.enum(["1", "2", "3"]).default("2"),
+    /**
+     * Đích đến là một LITERAL trong nguồn bước evaluateJavaScript của hồ sơ — cùng ranh
+     * giới tin cậy với chatMessage, nên cùng một phép làm sạch, không chế phép thứ hai.
+     */
+    mineName: z.string().max(1000).default("Thông Thiên Kiếm Phái").transform(sanitizeChatMessage),
+    hostMode: z.boolean().default(false),
+    hostMinBonus: z.number().int().min(0).max(500).default(100),
+  })
+  .prefault({});
+
+/**
  * Làm sạch một lời nhắn chat trước khi nó rời tầng config.
  *
  * Đích đến của chuỗi này là một LITERAL trong nguồn bước `evaluateJavaScript` của hồ sơ
@@ -156,7 +181,7 @@ export const configSchema = z.object({
         })
         .prefault({}),
       /**
-       * Mười một nhiệm vụ "một công tắc" — đồng bộ đủ bộ từ bản desktop. Chúng không có tuỳ
+       * Mười nhiệm vụ "một công tắc" — đồng bộ đủ bộ từ bản desktop. Chúng không có tuỳ
        * chọn nào ngoài bật/tắt, nhưng vẫn là object (chứ không phải boolean trần) để hôm
        * nào một nhiệm vụ mọc thêm lựa chọn thì document cũ không phải đổi hình thù.
        * Key ở đây ↔ tên nhiệm vụ trong hồ sơ do SIMPLE_QUESTS (quest-engine/profile.mjs)
@@ -171,7 +196,6 @@ export const configSchema = z.object({
       phucLoiVip: simpleQuest,
       vongQuay: simpleQuest,
       vanDap: simpleQuest,
-      khoangMach: simpleQuest,
       /**
        * Hỷ Sự Đường — chúc phúc các tiệc cưới đang mở trên /tien-duyen. Chỉ có bản hạng
        * thường (recording 05/08); mỗi lời chúc tốn 30 Tiên Ngọc nên form nói rõ giá.
@@ -181,6 +205,10 @@ export const configSchema = z.object({
       luyenDan: luyenDanQuest,
       /** Bản cho hạng thường — twin `luyen-dan-duong-thuong`. Xem chú thích ở luyenDanQuest. */
       luyenDanThuong: luyenDanQuest,
+      /** Bản cho hạng VIP — twin `khoang-mach` (schema 58). */
+      khoangMach: khoangMachQuest,
+      /** Bản cho hạng thường — twin `khoang-mach-thuong`. Xem chú thích ở khoangMachQuest. */
+      khoangMachThuong: khoangMachQuest,
     })
     .prefault({}),
 });
@@ -224,18 +252,17 @@ export function enforceMazeCapPolicy<T extends UserConfig>(
 /**
  * Nhiệm vụ CHƯA hiệu chỉnh xong — bị ép TẮT ở mọi đường, bất kể cấu hình nói gì.
  *
- * Hiện chỉ có Khoáng Mạch. Hồ sơ quest khai nó `enabled: false` kèm đúng một câu giải thích:
- * *"nhãn chưa hiệu chỉnh nên tắt sẵn"* — `matchTexts` của nó (`thu hoạch`, `nhận thưởng`…)
- * là những chuỗi ĐOÁN, chưa ai đối chiếu với trang thật. Nên bật nó lên KHÔNG phải là "chạy
- * một nhiệm vụ chưa hoàn thiện", mà là thả engine đi bấm vào bất cứ nút nào tình cờ mang chữ
- * ấy trên một trang chưa ai soi. Đó là lý do luật này siết ở tầng dữ liệu chứ không chỉ làm
- * mờ một ô tick: ô tick chặn được ngón tay, không chặn được một POST dựng tay hay một cấu
- * hình CŨ đã bật từ trước rồi nằm im trong database.
+ * RỖNG hôm nay: Khoáng Mạch — cư dân cuối cùng — đã được hiệu chỉnh từ bản ghi
+ * khoang-mach-20260814-133812 và rời danh sách cùng schema 58 (gương với `UnavailableQuests`
+ * bên desktop, cũng vừa về rỗng). Cơ chế thì ở lại: nhiệm vụ nào sau này ship dưới dạng
+ * phỏng đoán chưa đối chiếu sẽ vào ĐÂY, ở tầng dữ liệu chứ không chỉ làm mờ một ô tick —
+ * ô tick chặn được ngón tay, không chặn được một POST dựng tay hay một cấu hình CŨ đã bật
+ * từ trước rồi nằm im trong database.
  *
  * Hàm THUẦN và không đụng bản gốc — trả về chính `config` khi không phải sửa gì, để nơi gọi
  * so tham chiếu mà biết luật có ra tay không (cùng mẹo với `enforceMazeCapPolicy`).
  */
-export const UNAVAILABLE_QUEST_KEYS = ["khoangMach"] as const;
+export const UNAVAILABLE_QUEST_KEYS = [] as const;
 
 export type UnavailableQuestKey = (typeof UNAVAILABLE_QUEST_KEYS)[number];
 

@@ -19,10 +19,11 @@ import { useDashboardAccountLive } from "./DashboardLiveProvider";
  * Cấu hình nhiệm vụ là MỘT bộ chung cho mọi tài khoản (y như bản desktop dùng một
  * quests.json toàn cục): tab VIP áp cho các tài khoản hạng VIP, tab Thường cho các tài
  * khoản hạng thường — mỗi tài khoản chỉ chạy đúng những nhiệm vụ thuộc hạng của nó.
- * Riêng Luyện Đan Đường mang HAI bản tuỳ chọn, mỗi tab một bản (xem LuyenDanFieldset).
+ * Riêng Luyện Đan Đường và Khoáng Mạch mang HAI bản tuỳ chọn, mỗi tab một bản (xem
+ * LuyenDanFieldset / KhoangMachFieldset).
  */
 /**
- * Mười nhiệm vụ chỉ có công tắc — key khớp với configSchema và SIMPLE_QUESTS của engine.
+ * Chín nhiệm vụ chỉ có công tắc — key khớp với configSchema và SIMPLE_QUESTS của engine.
  * Mô tả viết cho người chơi, không phải cho người đọc mã.
  */
 /**
@@ -46,15 +47,8 @@ const SIMPLE_QUESTS: ReadonlyArray<SimpleQuest> = [
     name: "Vấn Đáp",
     hint: "Tra danh sách đáp án cộng đồng. Câu không có trong danh sách sẽ để bạn tự làm.",
   },
-  {
-    key: "khoangMach",
-    name: "Khoáng Mạch",
-    hint: "Thu khoáng theo chu kỳ trong ngày.",
-    unavailable:
-      "Nhiệm vụ này chưa được hoàn thiện. Nhãn nút trên trang Khoáng Mạch chưa được đối " +
-      "chiếu với site thật, nên bật lên là để auto bấm theo phỏng đoán — vì vậy nó tạm khoá. " +
-      "Xong phần hiệu chỉnh sẽ mở lại.",
-  },
+  // Khoáng Mạch KHÔNG còn ở đây: từ schema 58 nó có tuỳ chọn riêng (loại khoáng, tên mỏ,
+  // đoạt mỏ) nên sống trong KhoangMachFieldset — cùng số phận rời-lưới với Luyện Đan Đường.
 ];
 
 const FREE_QUEST_KEYS = new Set([
@@ -172,6 +166,124 @@ function LuyenDanFieldset({
           </select>
           <p className="mt-1 text-xs text-[var(--color-mist)]">
             Đan rơi từ 1–4 sao. Chỉ viên bị phân giải mới hoàn lại dược liệu.
+          </p>
+        </div>
+      </div>
+    </fieldset>
+  );
+}
+
+/**
+ * Khoáng Mạch — cùng khuôn hai-bản-một-fieldset với Luyện Đan Đường ngay trên: tab VIP khắc
+ * `khoangMach`, tab Thường khắc `khoangMachThuong`, tiền tố tên field khớp thẳng key trong
+ * configSchema. Bốn tuỳ chọn dựng từ bản ghi khoang-mach-20260814-133812; riêng cụm đoạt mỏ
+ * nói rõ giá tiền ngay tại chỗ — người bật phải biết mỗi cú đoạt kèm một Linh Quang Phù.
+ */
+function KhoangMachFieldset({
+  prefix,
+  note,
+  accentClass,
+  config,
+  enabled,
+  onToggle,
+}: {
+  prefix: "khoangMach" | "khoangMachThuong";
+  note: string;
+  accentClass: string;
+  config: EditableConfig["quests"]["khoangMach"];
+  enabled: boolean;
+  onToggle: (value: boolean) => void;
+}) {
+  return (
+    <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
+      <legend className="px-2">
+        <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
+          <input
+            type="checkbox"
+            name={`${prefix}Enabled`}
+            defaultChecked={config.enabled}
+            onChange={(e) => onToggle(e.target.checked)}
+            className={`h-4 w-4 ${accentClass}`}
+          />
+          Khoáng Mạch
+        </label>
+      </legend>
+
+      <p className="mb-3 text-xs text-[var(--color-mist)]">{note}</p>
+
+      <div
+        className={`grid gap-4 transition-opacity duration-300 sm:grid-cols-2 ${
+          enabled ? "opacity-100" : "pointer-events-none opacity-40"
+        }`}
+      >
+        <div>
+          <label className="label" htmlFor={`${prefix}MineType`}>
+            Loại khoáng
+          </label>
+          <select
+            id={`${prefix}MineType`}
+            name={`${prefix}MineType`}
+            className="input"
+            defaultValue={config.mineType}
+          >
+            <option value="1">Thượng — Khoáng Vàng</option>
+            <option value="2">Trung — Khoáng Bạc</option>
+            <option value="3">Hạ — Khoáng Đồng (Tân Thủ)</option>
+          </select>
+          <p className="mt-1 text-xs text-[var(--color-mist)]">
+            Vào mỏ rồi đợi chu kỳ 30 phút, nhận Tu Vi + Tinh Thạch — tối đa 2 lần/ngày.
+          </p>
+        </div>
+
+        <div>
+          <label className="label" htmlFor={`${prefix}MineName`}>
+            Tên mỏ
+          </label>
+          <input
+            id={`${prefix}MineName`}
+            name={`${prefix}MineName`}
+            className="input"
+            type="text"
+            maxLength={60}
+            defaultValue={config.mineName}
+            placeholder="vd: Thông Thiên Kiếm Phái"
+          />
+          <p className="mt-1 text-xs text-[var(--color-mist)]">
+            Gõ một phần tên cũng khớp, không cần đủ dấu. Bỏ trống = đào tiếp mỏ đang ở.
+          </p>
+        </div>
+
+        <div>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--color-parchment)]">
+            <input
+              type="checkbox"
+              name={`${prefix}HostMode`}
+              defaultChecked={config.hostMode}
+              className={`h-4 w-4 ${accentClass}`}
+            />
+            Đoạt mỏ (làm chủ)
+          </label>
+          <p className="mt-1 text-xs text-[var(--color-mist)]">
+            Mỗi cú đoạt mua kèm một Linh Quang Phù (+20% tu vi, 1 giờ) — tiền thật, và site
+            chỉ cho 3 lượt tấn công mỗi ngày.
+          </p>
+        </div>
+
+        <div>
+          <label className="label" htmlFor={`${prefix}HostMinBonus`}>
+            Ngưỡng % tu vi để đoạt
+          </label>
+          <input
+            id={`${prefix}HostMinBonus`}
+            name={`${prefix}HostMinBonus`}
+            className="input"
+            type="number"
+            min={0}
+            max={500}
+            defaultValue={config.hostMinBonus}
+          />
+          <p className="mt-1 text-xs text-[var(--color-mist)]">
+            Chỉ đoạt khi bonus tu vi của mỏ đạt mức này trở lên; dưới ngưỡng thì chỉ đào.
           </p>
         </div>
       </div>
@@ -383,6 +495,8 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
   const [capLocked, setCapLocked] = useState(false);
   const [luyenDan, setLuyenDan] = useState(config.quests.luyenDan.enabled);
   const [luyenDanThuong, setLuyenDanThuong] = useState(config.quests.luyenDanThuong.enabled);
+  const [khoangMach, setKhoangMach] = useState(config.quests.khoangMach.enabled);
+  const [khoangMachThuong, setKhoangMachThuong] = useState(config.quests.khoangMachThuong.enabled);
   /** Nhiệm vụ đang khoá mà người dùng vừa bấm vào — `null` là không có popup nào. */
   const [lockedQuest, setLockedQuest] = useState<SimpleQuest | null>(null);
   const [simpleEnabled, setSimpleEnabled] = useState<Record<string, boolean>>(() =>
@@ -391,7 +505,7 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
         quest.key,
         // Nhiệm vụ đang khoá luôn khởi sinh TẮT, kể cả khi cấu hình cũ trong database còn
         // bật: server đã ép tắt ở cửa phát việc, nên vẽ nó đang bật là nói dối người xem về
-        // thứ sắp chạy. Đây cũng là chỗ chặn hidden input `q_khoangMach` được sinh ra.
+        // thứ sắp chạy. (Danh sách khoá hiện rỗng — cơ chế ở lại cho nhiệm vụ tương lai.)
         quest.unavailable === undefined &&
           (config.quests as Record<string, { enabled?: boolean }>)[quest.key]?.enabled === true,
       ]),
@@ -661,6 +775,30 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
           config={config.quests.luyenDanThuong}
           enabled={luyenDanThuong}
           onToggle={setLuyenDanThuong}
+        />
+      </div>
+
+      {/* ------------------------------------------------------------- Khoáng Mạch
+          Cùng khuôn hai-bản-hai-tab với Luyện Đan Đường ngay trên — mỗi tab một tiền tố
+          tên field riêng, không input nào trùng name. */}
+      <div hidden={questTab !== "vip"}>
+        <KhoangMachFieldset
+          prefix="khoangMach"
+          note="Bản riêng cho tài khoản VIP — chỉnh ở đây không đụng tab Thường."
+          accentClass="accent-[var(--color-gold-400)]"
+          config={config.quests.khoangMach}
+          enabled={khoangMach}
+          onToggle={setKhoangMach}
+        />
+      </div>
+      <div hidden={questTab !== "free"}>
+        <KhoangMachFieldset
+          prefix="khoangMachThuong"
+          note="Bản riêng cho tài khoản thường — chỉnh ở đây không đụng tab VIP."
+          accentClass="accent-[var(--color-jade-400)]"
+          config={config.quests.khoangMachThuong}
+          enabled={khoangMachThuong}
+          onToggle={setKhoangMachThuong}
         />
       </div>
 

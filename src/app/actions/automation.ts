@@ -160,8 +160,22 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
       phucLoiVip: simple("phucLoiVip"),
       vongQuay: simple("vongQuay"),
       vanDap: simple("vanDap"),
-      khoangMach: simple("khoangMach"),
       hySuDuong: simple("hySuDuong"),
+      // Hai bản Khoáng Mạch — cùng phép tách tab VIP/Thường như Luyện Đan Đường ngay trên.
+      khoangMach: {
+        enabled: formData.get("khoangMachEnabled") === "on",
+        mineType: String(formData.get("khoangMachMineType") ?? "2"),
+        mineName: String(formData.get("khoangMachMineName") ?? ""),
+        hostMode: formData.get("khoangMachHostMode") === "on",
+        hostMinBonus: Number(formData.get("khoangMachHostMinBonus") ?? 100) || 0,
+      },
+      khoangMachThuong: {
+        enabled: formData.get("khoangMachThuongEnabled") === "on",
+        mineType: String(formData.get("khoangMachThuongMineType") ?? "2"),
+        mineName: String(formData.get("khoangMachThuongMineName") ?? ""),
+        hostMode: formData.get("khoangMachThuongHostMode") === "on",
+        hostMinBonus: Number(formData.get("khoangMachThuongHostMinBonus") ?? 100) || 0,
+      },
     },
   });
 

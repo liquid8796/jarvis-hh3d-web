@@ -587,8 +587,30 @@ console.log(`\n── Hai kho vừa dựng ────────────�
 for (const store of STORES) console.log(`  ${store.label.padEnd(16)} ${store.name}`);
 console.log(`  Xoá một kho: npx vercel integration resource remove <tên kho> -a -y --scope ${scope}`);
 
-console.log(`\n── Còn hai việc, làm bằng tay ────────────────────────`);
+console.log(`\n── Còn ba việc, làm bằng tay ─────────────────────────`);
 console.log(`  1. Phát hành: bấm đúp deploy-all-stations.bat (trạm mới nằm trong sổ nên nó tự lo).`);
 console.log(`  2. Xác nhận: trang Tông Môn → Gương Trạm → bấm「Kiểm mạch」cho「${siteId}」.`);
 console.log(`     Dòng cần đọc: db「jarvis」— khác chữ ấy là có chuyện.`);
+
+/**
+ * VIỆC 3 SINH RA TỪ MỘT LƯỢT HỎNG THẬT (14/08/2026, trạm `auto-hh3d-4`).
+ *
+ * Sổ gương và bảng trạm trong `.github/workflows/vercel-usage.yml` là HAI danh sách rời nhau, và
+ * `mirror:new` chỉ ghi vào cái thứ nhất. Trạm mới vì thế sống đủ đường — deploy được, kiểm mạch
+ * xanh — mà lượt cào usage KHÔNG BAO GIỜ chạm tới nó, lặng lẽ: vòng lặp trong workflow chỉ đi hết
+ * những dòng nó có, nên một trạm vắng mặt không tạo ra dòng log nào. Triệu chứng chỉ lộ ra rất
+ * muộn, ở `npm run usage:cookie`, dưới dạng「Workflow không có trạm ...」— đúng lúc người ta đang
+ * cầm tệp cookie và tưởng mình chỉ còn một bước.
+ *
+ * In sẵn HAI DÒNG để dán, không bắt đi tra lại, vì `scope` ở đây CHÍNH LÀ slug đội — thứ mà bình
+ * chú trong workflow ghi là「đã đoán sai ba trên bốn lần」: nó không suy ra được từ tên tài khoản
+ * (`nampro8796-9036` → `kakak328r2y3h8`). Chỗ duy nhất biết chắc giá trị ấy là đây, ngay sau khi
+ * vừa hỏi API xong.
+ */
+const cookieSecret = `VERCEL_COOKIE_${siteId.toUpperCase().replace(/-/g, "_")}`;
+console.log(`  3. Cho trạm này vào lượt cào usage — nếu bỏ qua, nó vĩnh viễn không có số liệu`);
+console.log(`     mà KHÔNG có lỗi nào báo. Sửa .github/workflows/vercel-usage.yml, thêm hai dòng:`);
+console.log(`       vào khối \`env:\`      ${cookieSecret}: \${{ secrets.${cookieSecret} }}`);
+console.log(`       vào khối \`stations=\` ${siteId}|${scope}|${cookieSecret}`);
+console.log(`     Rồi dán cookie: npm run usage:cookie -- --site ${siteId} --cookie <tệp.json>`);
 console.log(`\n  Dấu hiệu trạm sống đúng sau khi phát hành: curl ${stationUrl}/ trả 307.`);

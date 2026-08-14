@@ -82,13 +82,15 @@ jobs:
           VERCEL_COOKIE_AUTO_HH3D_1: ${{ secrets.VERCEL_COOKIE_AUTO_HH3D_1 }}
           VERCEL_COOKIE_AUTO_HH3D_2: ${{ secrets.VERCEL_COOKIE_AUTO_HH3D_2 }}
           VERCEL_COOKIE_AUTO_HH3D_3: ${{ secrets.VERCEL_COOKIE_AUTO_HH3D_3 }}
+          VERCEL_COOKIE_AUTO_HH3D_4: ${{ secrets.VERCEL_COOKIE_AUTO_HH3D_4 }}
         run: |
           set -u
           # site|team slug|tên biến chứa cookie. Trạm nào chưa có secret thì BỎ QUA, không gãy:
           # thêm một trạm vào sổ mà chưa kịp dán cookie là chuyện thường.
           #
-          # SLUG ĐỘI KHÁC TÊN TÀI KHOẢN — đây là chỗ đã đoán sai hai trên ba lần. Tài khoản
-          # `liquid8796` có slug `freecoursecademy`, `fatrat080796-5139` có slug `smart-service`.
+          # SLUG ĐỘI KHÁC TÊN TÀI KHOẢN — đây là chỗ đã đoán sai ba trên bốn lần. Tài khoản
+          # `liquid8796` có slug `freecoursecademy`, `fatrat080796-5139` có slug `smart-service`,
+          # và `nampro8796-9036` có slug `kakak328r2y3h8` (14/08/2026, trạm `auto-hh3d-4`).
           # Lấy đúng bằng cách hỏi API bằng token của chính trạm ấy:
           #   GET /v2/user → defaultTeamId → GET /v2/teams/<id> → .slug
           # (cũng chính là nhãn đầu trong URL dashboard: vercel.com/<slug>)
@@ -98,7 +100,8 @@ jobs:
           stations="auto-hh3d|jarvis8796|VERCEL_COOKIE_MAIN
           auto-hh3d-1|zhangyu4|VERCEL_COOKIE_AUTO_HH3D_1
           auto-hh3d-2|freecoursecademy|VERCEL_COOKIE_AUTO_HH3D_2
-          auto-hh3d-3|smart-service|VERCEL_COOKIE_AUTO_HH3D_3"
+          auto-hh3d-3|smart-service|VERCEL_COOKIE_AUTO_HH3D_3
+          auto-hh3d-4|kakak328r2y3h8|VERCEL_COOKIE_AUTO_HH3D_4"
 
           failed=0
           # HERESTRING, KHÔNG PIPE. `echo … | while` chạy vòng lặp trong một SUBSHELL, nên

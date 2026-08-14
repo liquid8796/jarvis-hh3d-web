@@ -90,6 +90,26 @@ export function backdropDisplayName(key: string): string {
 }
 
 /**
+ * Tên tệp khi lưu về máy: tên hiển thị CỘNG đuôi thật — `Tống_Ngọc-suM_mVW5XO1nVNi_.png`
+ * → `Tống_Ngọc.png`.
+ *
+ * Vì sao không dùng thẳng `backdropDisplayName`: nó CẮT đuôi file (đúng với việc của nó — vẽ
+ * chữ dưới ô ảnh). Lấy nguyên kết quả ấy làm tên tải về là ném cho đạo hữu một tệp không đuôi,
+ * và Windows thì mở tệp bằng đuôi chứ không bằng nội dung.
+ *
+ * Vì sao không dùng thẳng tên tệp trong key: nó mang hậu tố ngẫu nhiên 16 ký tự, thứ chỉ có
+ * nghĩa với tàng khố. Thư mục Downloads thì cần một cái tên người đọc được.
+ *
+ * Key lạ không có đuôi (object tạo tay trong console OCI) thì trả về tên trần, không bịa đuôi:
+ * đoán sai đuôi còn tệ hơn không có, vì lúc ấy hệ điều hành mở nó bằng nhầm chương trình.
+ */
+export function backdropDownloadName(key: string): string {
+  const fileName = key.slice(key.lastIndexOf("/") + 1);
+  const extension = /\.[A-Za-z0-9]{1,16}$/.exec(fileName)?.[0] ?? "";
+  return `${backdropDisplayName(key)}${extension}`;
+}
+
+/**
  * URL có an toàn để nhét vào một thẻ `<style>` không.
  *
  * Đây là một RANH GIỚI TIN CẬY thật sự, không phải phòng xa: chuỗi này đi từ app_settings —

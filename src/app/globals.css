@@ -332,6 +332,31 @@ body {
   box-shadow: 0 0 30px rgba(76, 201, 154, 0.35);
 }
 
+/* Nút chỉ có ICON — hình vuông, cao BẰNG nút chữ đứng cạnh.
+ *
+ * Phải là một lớp ở ĐÂY chứ không phải mấy lớp Tailwind đặt trên `.btn`: tệp này nằm NGOÀI mọi
+ * `@layer`, mà CSS không phân tầng thì thắng mọi utility của Tailwind (chúng sống trong layer
+ * `utilities`). Nên `px-2` cạnh `btn` là một dòng trông như có tác dụng mà không có — đệm ngang
+ * 1.15rem của `.btn` vẫn thắng, và nút vẫn bè ra.
+ *
+ * `align-self: stretch` chứ không phải một con số chiều cao chép tay, vì chiều cao nút chữ là
+ * (đệm + hộp dòng của font) — thứ đổi theo `font-size`/`line-height` của `.btn`, nên một con số
+ * ở đây sẽ lệch vào ngày ai đó chỉnh `.btn`. ĐÃ ĐO: chỉ `padding: 0.6rem` thì nút icon ra 37px
+ * đứng cạnh nút「Xoá」43px — thấp hơn 6px, đủ nhìn ra lệch hàng. Thêm `stretch` thì cả hai cùng
+ * 43px, đáy trùng khít.
+ *
+ * KHÔNG dùng `aspect-ratio: 1` để ép vuông — đã thử và ĐO: nó không có tác dụng ở đây. Flex
+ * item tính bề rộng (trục chính) theo nội dung TRƯỚC, rồi mới kéo giãn chiều cao (trục chéo),
+ * nên lúc `aspect-ratio` được hỏi tới thì bề rộng đã chốt. Kết quả thật là 37×43 — hơi cao hơn
+ * vuông, và nhìn vẫn đúng là một nút icon. Ghi lại để phiên sau đừng thêm lại dòng ấy rồi tưởng
+ * nó đang làm việc gì đó.
+ *
+ * Đứng một mình (không phải flex item) thì `align-self` vô hại: nút co theo nội dung. */
+.btn-icon {
+  padding: 0.6rem;
+  align-self: stretch;
+}
+
 .input {
   width: 100%;
   border-radius: 10px;

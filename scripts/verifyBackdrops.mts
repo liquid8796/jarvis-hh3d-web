@@ -31,6 +31,7 @@ import {
   RESCUE_BACKDROP_URL,
   backdropCss,
   backdropDisplayName,
+  backdropDownloadName,
   isBackdropPageKey,
   safeBackdropUrl,
 } from "../src/lib/validation/backdrops";
@@ -163,6 +164,27 @@ assert(
 assert(backdropDisplayName("backdrops/nen.png") === "nen", "key không có hậu tố vẫn phải đọc được");
 assert(backdropDisplayName("backdrops/anh la.PNG").length > 0, "key lạ vẫn phải ra một cái tên, không ra rỗng");
 console.log("✔ Tên hiển thị: cắt đúng hậu tố ngẫu nhiên, key lạ vẫn có tên.");
+
+// ---- 4b. Tên tệp khi tải về máy ----------------------------------------------------------
+// Khác tên hiển thị đúng một chỗ và chỗ ấy là tất cả: PHẢI còn đuôi file. Windows mở tệp bằng
+// đuôi, nên một tấm nền tải về không đuôi là một tệp không bấm được.
+assert(
+  backdropDownloadName("backdrops/tu-linh-tien-tu-a1B2c3D4e5F6g7H8.png") === "tu-linh-tien-tu.png",
+  "bỏ hậu tố ngẫu nhiên nhưng GIỮ đuôi file",
+);
+assert(
+  backdropDownloadName("backdrops/Tống_Ngọc-suM_mVW5XO1nVNi_.png") === "Tống_Ngọc.png",
+  "tên có dấu tiếng Việt và gạch dưới đi qua nguyên vẹn",
+);
+assert(backdropDownloadName("backdrops/nen.webp") === "nen.webp", "đuôi nào giữ đuôi ấy, không quy hết về .png");
+assert(backdropDownloadName("backdrops/anh la.PNG") === "anh la.PNG", "đuôi VIẾT HOA cũng là đuôi");
+// Không bịa đuôi khi key không có: đoán sai đuôi thì hệ điều hành mở bằng nhầm chương trình.
+assert(backdropDownloadName("backdrops/khong-duoi") === "khong-duoi", "key không đuôi thì trả tên trần");
+assert(
+  !backdropDownloadName("backdrops/khong-duoi").includes("."),
+  "…và tuyệt đối không tự gắn thêm một dấu chấm",
+);
+console.log("✔ Tên tải về: giữ đuôi thật, bỏ hậu tố ngẫu nhiên, không bịa đuôi cho key lạ.");
 
 // ---- 5. Tàng khố thật -------------------------------------------------------------------
 if (!mediaStoreReady()) {

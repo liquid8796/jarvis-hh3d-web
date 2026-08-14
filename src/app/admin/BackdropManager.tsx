@@ -8,6 +8,7 @@ import {
   type BackdropChoice,
   type BackdropImage,
   backdropDisplayName,
+  backdropDownloadName,
 } from "@/lib/validation/backdrops";
 
 /**
@@ -29,6 +30,13 @@ import {
  * Mọi phép ghi xong đều `router.refresh()`, cùng lý do đã ghi ở TagFrameManager: route handler
  * không tự làm client vẽ lại (khác server action), mà lưới ảnh lẫn bảng gán đều tới từ server.
  */
+/**
+ * Chờ bao lâu rồi mới thu hồi blob URL của một lượt tải. Đủ dài để trình duyệt kịp nhận lượt
+ * tải, đủ ngắn để bộ nhớ không giữ tấm ảnh lâu hơn cần. Một phút là dư cho việc ghi tệp xuống
+ * đĩa, kể cả ảnh nền lớn nhất kho cho phép.
+ */
+const BLOB_REVOKE_DELAY_MS = 60_000;
+
 export function BackdropManager({
   images,
   truncated,
@@ -47,6 +55,16 @@ export function BackdropManager({
   const [name, setName] = useState("");
   const [sending, setSending] = useState(false);
   const [refreshing, startRefresh] = useTransition();
+  /**
+   * Các key ĐANG tải về. Riêng một ô chứ không dùng chung `busy`: tải là phép ĐỌC, nó không
+   * được khoá nút Xoá của cả lưới, và ngược lại một lượt upload đang chạy cũng chẳng có cớ gì
+   * cấm người ta lưu một tấm khác về máy.
+   *
+   * Là TẬP HỢP chứ không phải một key: lưu cả lưới về máy là việc thường, mà hai lượt tải thì
+   * chạy song song — giữ một key thì lượt xong trước xoá luôn dấu「đang tải」của lượt sau, nút
+   * ấy sáng lại giữa chừng và mời người ta bấm thêm một lần nữa.
+   */
+  const [downloading, setDownloading] = useState<ReadonlySet<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
 
   /** Khoá nút tới khi server vẽ lại XONG — giữa hai mốc ấy màn hình vẫn là dữ liệu cũ. */
@@ -89,6 +107,66 @@ export function BackdropManager({
       startRefresh(() => router.refresh());
     } finally {
       setSending(false);
+    }
+  };
+
+  /**
+   * Lưu một tấm về máy.
+   *
+   * PHẢI ĐI VÒNG QUA BLOB, không thể chỉ đặt `<a href={image.url} download>`: ảnh nằm ở
+   * `objectstorage.<vùng>.oraclecloud.com`, tức KHÁC ORIGIN với trang này — mà thuộc tính
+   * `download` bị trình duyệt BỎ QUA với liên kết khác origin (chống việc một trang bất kỳ
+   * rải tệp vào máy người ta dưới tên nó tự đặt). Kết quả của cách viết thẳng ấy là bấm vào
+   * thì ảnh mở ra trong tab mới, không có tệp nào được lưu, và không có lỗi nào để mà đọc.
+   *
+   * Đường vòng này chạy được vì ĐÃ ĐO: OCI trả `access-control-allow-origin: *` kèm `GET`
+   * trong `access-control-allow-methods`, nên `fetch` chéo origin đọc được thân phản hồi.
+   * Blob cùng origin thì `download` mới có hiệu lực.
+   *
+   * Ảnh đi THẲNG từ tàng khố xuống trình duyệt, không vòng qua function — đúng như thẻ `<img>`
+   * ngay trên đang làm. Bắc một cổng proxy cùng origin cũng chữa được lỗi khác-origin, nhưng
+   * nó đẩy mỗi tấm 2MB qua Fast Origin Transfer, tức đốt đúng cái hạn mức tab Gương Trạm sinh
+   * ra để canh.
+   */
+  const download = async (image: BackdropChoice) => {
+    setDownloading((prev) => new Set(prev).add(image.key));
+    setNotice(null);
+    let objectUrl: string | null = null;
+    try {
+      const res = await fetch(image.url);
+      if (!res.ok) {
+        setNotice({ ok: false, message: `Tải「${backdropDisplayName(image.key)}」trượt (HTTP ${res.status}).` });
+        return;
+      }
+      objectUrl = URL.createObjectURL(await res.blob());
+
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = backdropDownloadName(image.key);
+      // Phải NẰM TRONG document rồi mới click: Firefox bỏ qua cú click trên một thẻ mồ côi.
+      document.body.append(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      // Mạng đứt, tàng khố đóng, hoặc CORS bị tắt lại ở phía OCI. Không nuốt: một nút bấm mà
+      // không có gì xảy ra thì người ta bấm tiếp năm lần rồi tưởng hệ hỏng.
+      setNotice({
+        ok: false,
+        message: `Không tải được「${backdropDisplayName(image.key)}」— ${err instanceof Error ? err.message : "lỗi lạ"}.`,
+      });
+    } finally {
+      // Thu hồi SAU một nhịp, không thu hồi ngay: Firefox huỷ luôn lượt tải nếu URL bị gỡ
+      // trong cùng nhịp với cú click. Không thu hồi thì blob nằm lại trong bộ nhớ tab tới
+      // khi đóng trang — với ảnh nền 2MB thì vài lượt tải là thấy.
+      if (objectUrl) {
+        const stale = objectUrl;
+        setTimeout(() => URL.revokeObjectURL(stale), BLOB_REVOKE_DELAY_MS);
+      }
+      setDownloading((prev) => {
+        const next = new Set(prev);
+        next.delete(image.key);
+        return next;
+      });
     }
   };
 
@@ -208,15 +286,50 @@ export function BackdropManager({
                           {used.length > 0 && ` · đang dùng: ${used.join(", ")}`}
                         </span>
                       </span>
-                      <button
-                        type="button"
-                        className="btn btn-danger shrink-0"
-                        disabled={busy || used.length > 0}
-                        title={used.length > 0 ? `Đang dùng cho ${used.join(", ")}` : undefined}
-                        onClick={() => void remove(image)}
-                      >
-                        Xoá
-                      </button>
+                      <span className="flex shrink-0 items-center gap-2">
+                        {/* ICON, không phải chữ — và là chỗ DUY NHẤT trong src dùng `<svg>`
+                            nội tuyến, nên nói rõ vì sao: glyph mũi tên tải xuống của unicode
+                            (⤓ U+2913, ⭳ U+2B73) phủ font kém, và một ô vuông tofu nằm trên
+                            nút phải bấm thì tệ hơn hẳn cả chữ lẫn hình. `currentColor` để nó
+                            ăn theo màu của `.btn-ghost`, kể cả lúc hover. */}
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-icon"
+                          disabled={downloading.has(image.key)}
+                          aria-label={`Tải「${backdropDisplayName(image.key)}」về máy`}
+                          title={
+                            downloading.has(image.key)
+                              ? "Đang tải…"
+                              : `Tải「${backdropDownloadName(image.key)}」về máy`
+                          }
+                          onClick={() => void download(image)}
+                        >
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M12 3v12" />
+                            <path d="m7 11 5 5 5-5" />
+                            <path d="M4 20h16" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-danger"
+                          disabled={busy || used.length > 0}
+                          title={used.length > 0 ? `Đang dùng cho ${used.join(", ")}` : undefined}
+                          onClick={() => void remove(image)}
+                        >
+                          Xoá
+                        </button>
+                      </span>
                     </div>
                   </li>
                 );

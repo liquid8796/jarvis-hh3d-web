@@ -343,13 +343,89 @@ Muốn soi từ dòng lệnh thì gọi thẳng cron; hồi đáp mang câu ch�
 curl -H "Authorization: Bearer $CRON_SECRET" https://<trạm>/api/cron
 ```
 
-### Chưa có bằng chứng
+### Bằng chứng: `npm run verify:keepalive-live` (14/08/2026)
 
-Toàn bộ đường đi được kiểm bằng `fetch` giả (10 nhóm ca, kể cả hai ca đột biến đã thử: gỡ hàng
-rào `disabled_manually` và lệch biên một ngày — cả hai đều làm script đỏ đúng chỗ). Nhưng **chưa
-lượt nào chạm GitHub thật** tính tới 12/08/2026. Lượt「Ghi vào sổ」đầu tiên là phép thử thật: soi
-xem nó có báo `Đã ghi mốc nuôi kho (<sha>)` hay không, rồi mở kho trên GitHub xem commit ấy có
-mặt.
+Luật thì đã có `verify:github-stations` lái qua `fetch` giả (10 nhóm ca, kể cả hai ca đột biến:
+gỡ hàng rào `disabled_manually` và lệch biên một ngày — cả hai làm script đỏ đúng chỗ). Nhưng
+`fetch` giả chỉ chứng minh được「mã phản ứng đúng với câu trả lời ta bịa ra」. Phần còn lại —
+GitHub thật có trả lời như ta đã bịa không — nay có công cụ riêng, và nó **không ghi commit nào**
+(chỉ đọc, cộng một lời gọi `enable` vốn không đổi gì).
+
+Ba giả định đang gánh cả nhánh tự chữa, đo trên 6 kho ngày 14/08/2026:
+
+| Giả định | Kết quả |
+|---|---|
+| `GET …/actions/workflows/{file}` trả `state` đọc được | ✔ 6/6, đều `"active"` |
+| **`PUT …/enable` trên workflow ĐANG BẬT vẫn trả 204** | ✔ 6/6 |
+| `GET …/contents/.github/heartbeat.txt` trả 200 kèm `sha` | ✔ 6/6 |
+
+Giả định giữa là cái đắt nhất và trước đó **chỉ sống trong một dòng bình chú** của
+`enableWorkflow`. Nhánh tự chữa gọi `enable` TRƯỚC khi ghi mốc, nên nếu GitHub trả 409/422 cho
+một workflow đang bật thì hàm ấy ném — ở đúng lượt chạy mà cả tính năng sinh ra để phục vụ. Nay
+nó là một phép đo.
+
+**Còn hai nhánh chưa gặp ngoài đời:** `disabled_inactivity` và `disabled_manually` vẫn chỉ có
+bằng chứng từ `fetch` giả — muốn gặp cái đầu phải đợi một kho im 60 ngày thật. Script tự in ra
+danh sách「chưa gặp」ở cuối mỗi lượt, nên không ai phải nhớ điều này.
+
+Gặp `disabled_inactivity` thì script cố ý **không** tự bật: bật mà không ghi mốc thì kho vẫn đứng
+ở ngày thứ 60. Nó chỉ hiện đỏ và chỉ sang nút「Nuôi ngay」— lối làm CẢ HAI việc.
+
+### Lời báo lỗi nay mang ĐỘ KHẨN
+
+Một lượt nuôi hỏng trước đây chỉ nói được「GitHub trả 401」, mà câu ấy không phân biệt hai cảnh
+cách nhau rất xa: PAT chết trên một kho vừa ghi mốc tuần trước thì còn 53 ngày để sửa; cùng câu
+lỗi ấy trên một kho ghi mốc lần cuối 58 ngày trước nghĩa là còn **hai** ngày — và khi lịch đã tắt
+thì một commit mới không tự bật lại được.
+
+Nên mọi ngả trả lỗi của `pingStation` nay ghép thêm một mệnh đề: *"lượt ghi cuối N ngày trước,
+còn M ngày trước mốc tắt lịch"*, và khi `M ≤ 20` thì câu ấy đổi thành **SỬA NGAY**. Kho chưa từng
+ghi được mốc nào cũng có câu riêng — với kho mới dựng thì đó là lượt thử PAT đầu tiên, với kho cũ
+thì đó là dòng đáng lo nhất trong sổ.
+
+### Dọn sổ điểm danh: `purge-roster.bat` (14/08/2026)
+
+```
+npm run roster:purge                     mọi dòng tông môn im quá 24 giờ
+npm run roster:purge -- --dry-run        soi danh sách, không gỡ gì
+npm run roster:purge -- --older-than 6   đổi ngưỡng im lặng (giờ)
+npm run roster:purge -- --force          gỡ cả dòng có trong sổ Kho GitHub
+```
+
+Sổ điểm danh là sổ **ĐĂNG KÝ**, không phải danh sách tiến trình: `recordWorkerSeen` chỉ biết thêm
+và cập nhật, nên một cái tên vào rồi ở lại vĩnh viễn. `forgetWorker` chỉ gỡ được khôi lỗi RIÊNG
+(nó lọc theo `userId`), nên dòng của khôi lỗi **tông môn** đã chết thì trước đây không cửa nào
+dọn. Đo 14/08/2026: `github-khoiloi` im 11 giờ và `github-khoiloi-20260813-101341` im 20 giờ, cả
+hai vẫn nằm trong tab Khôi Lỗi như thể đang trực.
+
+Bốn hàng rào, xếp từ thứ không nhường tới thứ nhường được (`reviewRosterRow`, thuần, 12 ca kiểm
+trong `verify:github-removal`):
+
+1. **Khôi lỗi RIÊNG thì không đụng** — máy ở nhà người ta, họ đã có nút gỡ riêng.
+2. **Đang giữ đàn thì không gỡ, `--force` KHÔNG mở được** — giữ đàn nghĩa là nó vừa gõ cửa xong.
+3. **Có trong sổ Kho GitHub thì không gỡ** (trừ `--force`) — runner đang giữa hai lượt Actions
+   trông y hệt một cái xác, và gỡ nhầm là mở đường cho `github:new` dựng một khôi lỗi TRÙNG ID.
+4. **Chưa im đủ lâu thì chưa gỡ** — mặc định 24 giờ, rộng hơn hẳn mức cần thiết vì hai cái giá
+   không cân nhau.
+
+Phép gỡ dùng lại `purgeRosterRow` của lượt xoá kho: nó không xoá một phát rồi đi mà **canh cho
+tới khi dòng chịu nằm im** — một runner vừa mất kho còn thoi thóp ~52 giây và sẽ tự ghi lại tên.
+Nhờ vậy nếu phép phân loại lỡ nhắm vào một dòng còn sống thì vòng canh kêu lên, thay vì lặng lẽ
+đánh nhau với nó.
+
+**Chạy được ở BẤT KỲ trạm nào** — đây là điều kiện, không phải tiện nghi. Sổ điểm danh nằm trong
+database của trạm đang hoạt động, mà trạm ấy đổi bất cứ lúc nào. Ba nấc:
+
+1. Bảng điều phối trên OCI cho biết trạm nào đang hoạt động — nó không nằm trong database nào cả,
+   nên còn đọc được kể cả khi mọi chuỗi kết nối dưới máy đã chết.
+2. Sổ gương dưới máy → chuỗi kết nối của trạm ấy (`resolveActiveStationPg`).
+3. Sổ dưới máy cũng chết → **hỏi thẳng Vercel** (`pullStationPgFromVercel`, `vercel env pull`
+   trong một thư mục tạm). Đường này ra đời ngày 14/08/2026, khi một lượt chuyển trạm xoá project
+   cũ và cả `.env` lẫn `.env.local` cùng trả `password authentication failed` — mọi công cụ chết ở
+   dòng đầu, kể cả những công cụ chỉ cần ĐỌC. Cần `VERCEL_TOKEN_<TÊN TRẠM>` trong `.env.local`;
+   chìa Vercel không xoay theo lượt chuyển trạm nên nấc này còn đứng khi mọi nấc khác đã đổ.
+
+Đây cũng là lối mà `verify:keepalive-live` dùng, và là thứ mọi công cụ dòng lệnh cần sổ nên dùng.
 
 ---
 

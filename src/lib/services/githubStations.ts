@@ -229,6 +229,38 @@ function daysUntilDue(lastCommitAt: string, now: Date): number {
 }
 
 /**
+ * ĐỘ KHẨN của một lượt nuôi HỎNG — ghép vào cuối mọi lời báo lỗi.
+ *
+ * Vì sao đáng có: một lượt hỏng chỉ nói được「GitHub trả 401」, mà câu ấy không phân biệt được hai
+ * cảnh cách nhau rất xa. PAT chết hôm qua trên một kho vừa ghi mốc tuần trước thì còn 53 ngày để
+ * sửa; cùng câu lỗi ấy trên một kho ghi mốc lần cuối 58 ngày trước nghĩa là còn HAI ngày trước khi
+ * GitHub tắt lịch, và khi lịch đã tắt thì một commit mới không tự bật lại được — phải có một lượt
+ * bật tường minh.
+ *
+ * Tab admin đã vẽ đếm ngược, nhưng nó vẽ theo `lastCommitAt` của DÒNG SỔ, còn dòng lỗi thì người
+ * ta đọc trước tiên và thường là thứ duy nhất họ đọc. Đặt con số ngay trong câu lỗi biến「đọc thêm
+ * một cột nữa」thành「không phải đọc gì thêm」.
+ */
+function urgencyNote(lastCommitAt: string | null, now: Date): string {
+  if (!lastCommitAt) {
+    return " · CHƯA từng ghi được mốc nào — với kho mới dựng thì đây là lượt thử PAT đầu tiên, còn với kho cũ thì đây là dòng đáng lo nhất trong sổ.";
+  }
+  const last = Date.parse(lastCommitAt);
+  if (Number.isNaN(last)) {
+    return " · mốc ghi cuối không đọc được (sửa tay JSONB?) — coi như chưa từng ghi.";
+  }
+  const days = Math.floor((now.getTime() - last) / MS_PER_DAY);
+  const left = SCHEDULE_DISABLE_DAYS - days;
+  if (left <= 0) {
+    return ` · lượt ghi cuối ${days} ngày trước — ĐÃ QUÁ mốc ${SCHEDULE_DISABLE_DAYS} ngày, lịch có thể đã bị tắt và một commit mới KHÔNG tự bật lại được.`;
+  }
+  if (left <= KEEPALIVE_INTERVAL_DAYS) {
+    return ` · lượt ghi cuối ${days} ngày trước — chỉ còn ${left} ngày trước mốc tắt lịch. SỬA NGAY.`;
+  }
+  return ` · lượt ghi cuối ${days} ngày trước, còn ${left} ngày trước mốc tắt lịch.`;
+}
+
+/**
  * Nuôi MỘT kho. Không đụng database — người gọi ghi sổ, nên hàm này kiểm chứng được bằng một
  * `fetch` giả mà không cần dựng Postgres.
  *
@@ -242,14 +274,14 @@ export async function pingStation(station: Station, now: Date, force: boolean): 
   if (!isEncrypted(station.pat)) {
     // Phong bì hỏng (sửa tay JSONB, hoặc đổi ENCRYPTION_KEY mà quên nhập lại PAT). Chết ở đây
     // với một câu chỉ đúng việc phải làm, đừng để `decryptSecret` ném một câu về mã hoá.
-    return { slug, ok: false, note: "Phong bì PAT hỏng hoặc trống — dán lại PAT ở form Sửa kho.", committed: false, workflowState: "unknown" };
+    return { slug, ok: false, note: `Phong bì PAT hỏng hoặc trống — dán lại PAT ở form Sửa kho.${urgencyNote(station.lastCommitAt, now)}`, committed: false, workflowState: "unknown" };
   }
 
   let pat: string;
   try {
     pat = decryptSecret(station.pat);
   } catch {
-    return { slug, ok: false, note: "Không giải mã được PAT — ENCRYPTION_KEY của trạm này khác lúc PAT được ghi. Dán lại PAT.", committed: false, workflowState: "unknown" };
+    return { slug, ok: false, note: `Không giải mã được PAT — ENCRYPTION_KEY của trạm này khác lúc PAT được ghi. Dán lại PAT.${urgencyNote(station.lastCommitAt, now)}`, committed: false, workflowState: "unknown" };
   }
 
   try {
@@ -259,7 +291,9 @@ export async function pingStation(station: Station, now: Date, force: boolean): 
       return {
         slug,
         ok: false,
-        note: "Lịch đang bị TẮT TAY trên GitHub — sổ cố ý không tự bật lại. Bật ở tab Actions của kho, hoặc tắt dòng này trong sổ nếu đó là chủ ý.",
+        note:
+          "Lịch đang bị TẮT TAY trên GitHub — sổ cố ý không tự bật lại. Bật ở tab Actions của kho, hoặc tắt dòng này trong sổ nếu đó là chủ ý." +
+          urgencyNote(station.lastCommitAt, now),
         committed: false,
         workflowState: state,
       };
@@ -302,7 +336,13 @@ export async function pingStation(station: Station, now: Date, force: boolean): 
     };
   } catch (err) {
     if (err instanceof StationError) {
-      return { slug, ok: false, note: err.message, committed: false, workflowState: "unknown" };
+      return {
+        slug,
+        ok: false,
+        note: `${err.message}${urgencyNote(station.lastCommitAt, now)}`,
+        committed: false,
+        workflowState: "unknown",
+      };
     }
     // Ngả không lường trước cũng thành một dòng đọc được. Hàm này KHÔNG BAO GIỜ ném, và đó là
     // hợp đồng của nó: luật「một kho hỏng không chặn kho còn lại」sẽ mong manh nếu nó phụ thuộc

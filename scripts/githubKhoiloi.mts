@@ -428,6 +428,72 @@ export function judgeRosterPurge(input: {
   return { kind: "wait", ms: Math.min(pollMs, settleMs - quietMs) };
 }
 
+/** Một dòng trong sổ điểm danh, rút gọn còn đúng thứ phép phân loại cần biết. */
+export type RosterRow = {
+  id: string;
+  /** `null` = khôi lỗi TÔNG MÔN (xác thực bằng token toàn cục). Có giá trị = khôi lỗi riêng. */
+  userId: string | null;
+  /** Im lặng bao lâu rồi, đo bằng đồng hồ của database. */
+  quietMs: number;
+  /** Số đàn `running`/`stopping` đang mang tên khôi lỗi này. */
+  heldJobs: number;
+};
+
+export type RosterVerdict = { purge: boolean; why: string };
+
+/**
+ * Dòng điểm danh này có đáng gỡ không — luật của `roster:purge`, thuần.
+ *
+ * VÌ SAO CẦN MỘT CÔNG CỤ: sổ điểm danh là sổ ĐĂNG KÝ chứ không phải danh sách tiến trình
+ * (`recordWorkerSeen` chỉ biết thêm và cập nhật), nên một cái tên vào rồi ở lại VĨNH VIỄN.
+ * `forgetWorker` chỉ gỡ được khôi lỗi RIÊNG — nó lọc theo `userId` — nên dòng của khôi lỗi tông
+ * môn đã chết thì không cửa nào dọn. Đo 14/08/2026: hai dòng như thế, im 4 giờ và 12,7 giờ.
+ *
+ * BỐN HÀNG RÀO, xếp từ thứ không nhường tới thứ nhường được:
+ *
+ * 1. **Khôi lỗi RIÊNG thì không đụng.** Máy ở nhà người ta, và họ đã có nút gỡ của riêng mình ở
+ *    mục Khôi Lỗi. Một công cụ vận hành tông môn không có việc gì ở đó.
+ * 2. **Đang giữ đàn thì không gỡ, và `--force` KHÔNG mở được.** Giữ đàn nghĩa là nó vừa gõ cửa
+ *    xong — dòng ấy không phải xác, nó là một tiến trình đang làm việc. Một cờ mở được hàng rào
+ *    này là một cờ dùng để tự bắn vào chân.
+ * 3. **Có trong sổ Kho GitHub thì không gỡ** (trừ `--force`). Kho còn đó nghĩa là cái id ấy còn
+ *    được dùng; gỡ dòng đi là mở đường cho `github:new` dựng một khôi lỗi TRÙNG ID — hai tiến
+ *    trình cùng tên thì ghi đè nhau trong bảng `workers` và dashboard nói dối về việc ai đang
+ *    trực. Runner đang giữa hai lượt Actions trông y hệt một cái xác, và đây là thứ phân biệt.
+ * 4. **Chưa im đủ lâu thì chưa gỡ.** Một khôi lỗi sống gõ cửa mỗi 5 giây, nên mọi ngưỡng trên vài
+ *    phút đều đủ; ngưỡng mặc định rộng hơn thế nhiều vì cái giá của việc gỡ nhầm (hàng rào 3) lớn
+ *    hơn hẳn cái giá của việc để một dòng ma nằm thêm một ngày.
+ */
+export function reviewRosterRow(input: {
+  row: RosterRow;
+  /** `WORKER_ID` của mọi kho trong sổ Kho GitHub. */
+  bookWorkerIds: ReadonlySet<string>;
+  quietThresholdMs: number;
+  force: boolean;
+}): RosterVerdict {
+  const { row, bookWorkerIds, quietThresholdMs, force } = input;
+
+  if (row.userId !== null) {
+    return { purge: false, why: "khôi lỗi riêng — chủ nó tự gỡ ở mục Khôi Lỗi" };
+  }
+  if (row.heldJobs > 0) {
+    return { purge: false, why: `đang giữ ${row.heldJobs} đàn — nó còn sống` };
+  }
+  if (bookWorkerIds.has(row.id) && !force) {
+    return {
+      purge: false,
+      why: "có trong sổ Kho GitHub — gỡ đi là mở đường cho một khôi lỗi TRÙNG ID (--force nếu chắc)",
+    };
+  }
+  if (row.quietMs < quietThresholdMs) {
+    return {
+      purge: false,
+      why: `mới im ${Math.round(row.quietMs / 60_000)} phút, chưa đủ ${Math.round(quietThresholdMs / 60_000)} phút`,
+    };
+  }
+  return { purge: true, why: `im ${Math.round(row.quietMs / 3_600_000)} giờ, không kho nào trong sổ nhận` };
+}
+
 export type Choice = { ok: true; target: Candidate } | { ok: false; message: string };
 
 /** Vì sao kho này được coi (hay không được coi) là kho khôi lỗi — một vế, không kèm tên kho. */

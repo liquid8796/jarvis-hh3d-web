@@ -29,12 +29,14 @@ import {
   judgeRosterPurge,
   looksLikeKhoiloiRepoName,
   reviewRemoval,
+  reviewRosterRow,
   workerIdFromWorkflow,
   PURGE_BUDGET_MS,
   PURGE_GAP_MS,
   PURGE_POLL_MS,
   PURGE_SETTLE_MS,
   type Candidate,
+  type RosterRow,
 } from "./githubKhoiloi.mts";
 import { ALL_REPO_NAME_PREFIXES, REPO_NAME_PREFIX } from "./khoiloiNaming.mjs";
 
@@ -371,6 +373,53 @@ const candidate = (over: Partial<Candidate> = {}): Candidate => ({
   ok(describeCandidate(gone).startsWith(gone.repo), "dòng kể ứng viên mở đầu bằng tên kho");
   ok(describeCandidate(gone).includes(gone.workerId!), "và kèm worker id để đối chiếu với tab Khôi Lỗi");
   ok(describeEvidence(candidate({ evidence: [] })).includes("KHÔNG có bằng chứng"), "kho không bằng chứng nói thẳng ra");
+}
+
+// ---- Luật DỌN SỔ ĐIỂM DANH (`roster:purge`) ---------------------------------------------------
+//
+// Bốn hàng rào, và hai trong số chúng bảo vệ những thứ rất khác nhau: hàng rào「đang giữ đàn」canh
+// một tiến trình đang làm việc, còn hàng rào「có trong sổ」canh một CÁI TÊN còn được dùng. Runner
+// đang giữa hai lượt Actions trông y hệt một cái xác, nên bỏ hàng rào sau là mở đường cho
+// `github:new` dựng một khôi lỗi trùng id.
+{
+  const NGUONG = 24 * 60 * 60 * 1000;
+  const row = (over: Partial<RosterRow> = {}): RosterRow => ({
+    id: "khoiloi-tro-xyz",
+    userId: null,
+    quietMs: 30 * 60 * 60 * 1000,
+    heldJobs: 0,
+    ...over,
+  });
+  const xet = (r: RosterRow, book: string[] = [], force = false) =>
+    reviewRosterRow({ row: r, bookWorkerIds: new Set(book), quietThresholdMs: NGUONG, force });
+
+  ok(xet(row()).purge, "dòng tông môn im 30 giờ, không kho nào nhận → GỠ");
+  ok(!xet(row({ quietMs: 60_000 })).purge, "mới im 1 phút → giữ");
+  ok(!xet(row({ userId: "u1" })).purge, "khôi lỗi RIÊNG → không đụng, chủ nó tự gỡ");
+  ok(!xet(row({ heldJobs: 1 })).purge, "đang giữ đàn → giữ, dù đã im rất lâu");
+  ok(!xet(row({ heldJobs: 2, quietMs: 400 * 24 * 60 * 60 * 1000 }), [], true).purge,
+    "--force KHÔNG mở được hàng rào đàn — một cờ mở được nó là một cờ để tự bắn vào chân");
+  ok(!xet(row(), ["khoiloi-tro-xyz"]).purge, "có trong sổ Kho GitHub → giữ (runner đang giữa hai lượt Actions)");
+  ok(xet(row(), ["khoiloi-tro-xyz"], true).purge, "--force mở được đúng hàng rào sổ");
+  ok(!xet(row({ quietMs: 60_000 }), ["khoiloi-tro-xyz"], true).purge,
+    "--force vẫn KHÔNG bỏ qua ngưỡng im lặng — hai hàng rào độc lập");
+
+  // Ca thật đã đo 14/08/2026: hai dòng tông môn im 4 giờ và 12,7 giờ, không nằm trong sổ. Với
+  // ngưỡng mặc định 24 giờ thì CẢ HAI đều chưa tới lượt — đó là hành vi đúng, và là lý do có
+  // `--older-than`.
+  ok(!xet(row({ quietMs: 12.7 * 60 * 60 * 1000 })).purge, "im 12,7 giờ vẫn dưới ngưỡng mặc định 24 giờ");
+  ok(
+    reviewRosterRow({
+      row: row({ quietMs: 12.7 * 60 * 60 * 1000 }),
+      bookWorkerIds: new Set(),
+      quietThresholdMs: 6 * 60 * 60 * 1000,
+      force: false,
+    }).purge,
+    "hạ ngưỡng xuống 6 giờ thì chính dòng ấy được gỡ",
+  );
+
+  ok(xet(row()).why.includes("giờ"), "lời phán của ca GỠ nói ra nó đã im bao lâu");
+  ok(xet(row({ heldJobs: 3 })).why.includes("3"), "lời phán của ca GIỮ nói ra đang giữ mấy đàn");
 }
 
 console.log(`\n✔ ${passed} phép kiểm — luật xoá kho khôi lỗi còn nguyên.`);

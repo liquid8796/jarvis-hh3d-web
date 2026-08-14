@@ -225,7 +225,7 @@ const khoangMachPage = (km) => {
 </div>
 <div id="mine-list"></div>
 <div id="user-modal" style="display:none"><div class="modal-content">
-  <div id="bonus-display">Ẩn Thân Phù: 0/5 · Thưởng thêm: - Tu Vi: <span id="tuvi-bonus-percentage">${km.bonus}%</span> - Tinh Thạch: <span id="tinhthach-bonus-percentage">20%</span> - Bát Quái Trận Đồ</div>
+  <div id="bonus-display">Ẩn Thân Phù: 0/5 · Thưởng thêm: - Tu Vi: ${km.hideBonus ? "<span>—</span>" : `<span id="tuvi-bonus-percentage">${km.bonus}%</span>`} - Tinh Thạch: <span id="tinhthach-bonus-percentage">20%</span> - Bát Quái Trận Đồ</div>
   <div id="user-list"></div>
   <button id="prev-btn">← Lùi</button> <span id="page-indicator"></span> <button id="next-btn">Tiến →</button>
   <button id="reload-btn"></button> <button id="close-btn">Đóng</button>
@@ -295,7 +295,13 @@ const renderModal = () => {
   if (doat) doat.onclick = () => swal('Đạo hữu có chắc chắn muốn đoạt quyền chủ mỏ này không?', 'Xác nhận', () => {
     if (KM.owner || KM.attacksUsed >= 3) { document.body.dataset.refused = 'seize'; return; }
     fetch('/km-seize');
-    setTimeout(() => { KM.owner = true; KM.attacksUsed += 1; page = 1; document.body.dataset.seized = '1'; toast('Đã đoạt thành công quyền chủ mỏ.'); renderModal(); }, 40);
+    // Đoạt xong thì bonus tu vi của mỏ TĂNG — bản ghi 14/08: 100% → 120% sau khi mua Linh
+    // Quang Phù + đoạt. Chi tiết này không trang trí: nó là thứ cho phép một lượt đoạt tự mở
+    // luôn cửa ngưỡng-đào mà chính lượt ấy vừa đóng.
+    // (Không dùng dấu backtick trong khối này: cả fixture là một template literal.)
+    setTimeout(() => { KM.owner = true; KM.attacksUsed += 1; KM.bonus += 20; page = 1;
+      const bEl = document.getElementById('tuvi-bonus-percentage'); if (bEl) bEl.textContent = KM.bonus + '%';
+      document.body.dataset.seized = '1'; toast('Đã đoạt thành công quyền chủ mỏ.'); renderModal(); }, 40);
   });
 };
 function enterMine() {
@@ -1458,8 +1464,12 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // mỏ, ngưỡng %). Hai danh sách chặn UnavailableQuests (C#) và UNAVAILABLE_QUEST_KEYS
     // (web) cùng về rỗng trong cú bump này — quên một trong hai là quest hiện trên form mà
     // cửa phát việc vẫn ép tắt, hoặc ngược lại.
-    "hồ sơ đang ở schema 58",
-    loadProfileForSchema().schemaVersion === 58,
+    // 59 = thêm option `minBonus` cho Khoáng Mạch: ngưỡng % bonus tu vi để CHỐT LỜI, tách hẳn
+    // khỏi `hostMinBonus` (ngưỡng tiêu tiền để đoạt). Mặc định 0 = luôn nhận, nên hồ sơ đã lưu
+    // không đổi hành vi — nhưng vẫn phải bump: desktop chỉ thay hồ sơ khi schema tăng, và một
+    // máy đứng ở 58 sẽ không có ô nhập ngưỡng nào để mà đặt.
+    "hồ sơ đang ở schema 59",
+    loadProfileForSchema().schemaVersion === 59,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1839,7 +1849,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   const kmFresh = () => ({
     type: 2, inMine: false, minedMin: 12, maxed: false, claimedJustNow: false,
     owner: false, attacksUsed: 0, bonus: 100, claims: 0,
-    tuVi: 0, tuViCap: 300, tinhThach: 0, tinhThachCap: 100, bought: [],
+    tuVi: 0, tuViCap: 300, tinhThach: 0, tinhThachCap: 100, bought: [], hideBonus: false,
   });
   let kmState = kmFresh();
   /** Trang Điểm Danh trả về trạng thái đã-điểm-danh — bật cho ca sổ đủ lượt ở cuối tệp. */
@@ -2020,7 +2030,9 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       res.end("ok");
     }
     else if (path === "/km-buy") { kmState.bought.push(url.searchParams.get("item") ?? "?"); res.end("ok"); }
-    else if (path === "/km-seize") { kmState.owner = true; kmState.attacksUsed += 1; res.end("ok"); }
+    // Bonus tăng Ở CẢ HAI PHÍA: trang tự cập nhật ô để lượt quét ngay sau đọc được, còn state
+    // máy chủ phải theo cùng — lệch nhau là fixture nói dối ở lần render kế.
+    else if (path === "/km-seize") { kmState.owner = true; kmState.attacksUsed += 1; kmState.bonus += 20; res.end("ok"); }
     else res.end(PAGE);
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -2210,6 +2222,92 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       infos.some((m) => m.includes("dưới ngưỡng")),
     );
 
+    console.log("\nKhoáng Mạch — ngưỡng % để CHỐT LỜI (minBonus), tách khỏi ngưỡng đoạt");
+
+    /** Bản sao quest với một option đặt sẵn — đúng thứ lớp dịch làm lúc chạy thật. */
+    const kmWith = (patch) => {
+      const q = structuredClone(kmQuest);
+      for (const o of q.options) if (patch[o.key] !== undefined) o.selectedValue = patch[o.key];
+      return q;
+    };
+
+    // Dưới ngưỡng: KHÔNG nhận, và phần đã đào phải còn nguyên「Đạt tối đa」cho lượt sau.
+    kmState = kmFresh();
+    kmState.inMine = true;
+    const kmHold = await run(kmWith({ minBonus: "120" }));
+    check(
+      "bonus 100% < ngưỡng 120% → chưa nhận, thoát onCooldown hẹn 10′, thưởng vẫn treo",
+      kmHold.outcome === "onCooldown" && kmHold.cooldownSeconds === 10 * 60 &&
+        kmState.claims === 0 && kmState.maxed === true,
+      `${kmHold.outcome}: ${kmHold.cooldownSeconds}s, claims=${kmState.claims}, maxed=${kmState.maxed}`,
+    );
+    check(
+      "…và nói rõ vì sao chưa nhận, bằng tiếng người",
+      infos.some((m) => m.includes("dưới ngưỡng 120%") && m.includes("chưa nhận")),
+      infos.filter((m) => m.includes("ngưỡng 120%")).join(" / ") || "(không thấy)",
+    );
+    check(
+      "…KHÔNG có cú bấm nhận nào bị server từ chối",
+      (await kmBody("data-refused")) == null && (await kmBody("data-claimed")) == null,
+    );
+
+    // Đúng bằng ngưỡng là ĐẠT — biên >=, không phải >.
+    kmState = kmFresh();
+    kmState.inMine = true;
+    const kmEdge = await run(kmWith({ minBonus: "100" }));
+    check(
+      "bonus 100% = ngưỡng 100% → NHẬN (biên là ≥, không phải >)",
+      kmEdge.outcome === "completed" && kmState.claims === 1,
+      `${kmEdge.outcome}, claims=${kmState.claims}`,
+    );
+
+    // Ngưỡng 0 = luôn nhận: đây là mặc định, và là thứ giữ cho ngọc giản cũ không đổi hành vi.
+    kmState = kmFresh();
+    kmState.inMine = true;
+    kmState.bonus = 5;
+    const kmZero = await run(kmWith({ minBonus: "0" }));
+    check(
+      "ngưỡng 0 → nhận bất kể bonus thấp cỡ nào (mặc định, giữ hành vi hồ sơ cũ)",
+      kmZero.outcome === "completed" && kmState.claims === 1,
+      `${kmZero.outcome}, claims=${kmState.claims}`,
+    );
+
+    // Không đọc được % bonus → VẪN NHẬN, và kêu to. Ngược chiều fail-closed của cửa đoạt: cửa
+    // tiêu tiền hỏng thì đừng tiêu, còn cửa thu hoạch hỏng mà im lặng là mỗi ngày mất trọn phần
+    // thưởng vì một cái id đổi tên.
+    kmState = kmFresh();
+    kmState.inMine = true;
+    kmState.hideBonus = true;
+    const kmBlind = await run(kmWith({ minBonus: "120" }));
+    check(
+      "mất ô % bonus → vẫn nhận (fail-open), không âm thầm bỏ phần thưởng",
+      kmBlind.outcome === "completed" && kmState.claims === 1,
+      `${kmBlind.outcome}, claims=${kmState.claims}`,
+    );
+    check(
+      "…và nhật ký CẢNH BÁO rằng ngưỡng vừa không áp được",
+      infos.some((m) => m.includes("không đọc được % bonus")),
+      infos.filter((m) => m.includes("không đọc được")).join(" / ") || "(không thấy)",
+    );
+
+    // Đoạt mỏ làm bonus TĂNG (100 → 120 theo bản ghi), nên một lượt đoạt có thể tự mở luôn cửa
+    // minBonus mà chính lượt ấy vừa đóng — cụm đoạt chạy TRƯỚC phép nhận, đúng thứ tự này.
+    kmState = kmFresh();
+    kmState.inMine = true;
+    const kmSeizeOpens = await run(
+      kmWith({
+        minBonus: "120",
+        hostMode: kmQuest.options.find((o) => o.key === "hostMode").choices.find((c) => !c.value.includes("«")).value,
+        hostMinBonus: "100",
+      }),
+    );
+    check(
+      "đoạt mỏ nâng bonus 100→120% và MỞ luôn cửa minBonus 120% trong cùng lượt",
+      kmSeizeOpens.outcome === "completed" && kmState.owner === true &&
+        kmState.bonus === 120 && kmState.claims === 1,
+      `${kmSeizeOpens.outcome}, owner=${kmState.owner}, bonus=${kmState.bonus}, claims=${kmState.claims}`,
+    );
+
     console.log("\nKhoáng Mạch — cấu hình sai tên mỏ phải LỘ, không âm thầm đào mỏ khác");
 
     const kmWrongName = structuredClone(kmQuest);
@@ -2236,24 +2334,31 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     {
       const translated = profileForConfig({
         quests: {
-          khoangMach: { enabled: true, mineType: "1", mineName: "Địa", hostMode: true, hostMinBonus: 120 },
-          khoangMachThuong: { enabled: true, mineType: "3", mineName: "Thạch Thôn", hostMode: false, hostMinBonus: 100 },
+          khoangMach: { enabled: true, mineType: "1", mineName: "Địa", minBonus: 80, hostMode: true, hostMinBonus: 120 },
+          khoangMachThuong: { enabled: true, mineType: "3", mineName: "Thạch Thôn", minBonus: 0, hostMode: false, hostMinBonus: 100 },
         },
       });
       const opt = (quest, key) => quest.options.find((o) => o.key === key)?.selectedValue;
       const vipT = translated.quests.find((q) => q.id === "khoang-mach");
       const freeT = translated.quests.find((q) => q.id === "khoang-mach-thuong");
       check(
-        "twin VIP nhận tab VIP: loại 1, mỏ Địa, đoạt bật, ngưỡng 120",
+        "twin VIP nhận tab VIP: loại 1, mỏ Địa, ngưỡng đào 80, đoạt bật, ngưỡng đoạt 120",
         vipT.enabled === true && opt(vipT, "mineType") === "1" && opt(vipT, "mineName") === "Địa" &&
+          opt(vipT, "minBonus") === "80" &&
           !opt(vipT, "hostMode").includes("«") && opt(vipT, "hostMinBonus") === "120",
-        JSON.stringify([opt(vipT, "mineType"), opt(vipT, "mineName"), opt(vipT, "hostMode"), opt(vipT, "hostMinBonus")]),
+        JSON.stringify([opt(vipT, "mineType"), opt(vipT, "mineName"), opt(vipT, "minBonus"), opt(vipT, "hostMode"), opt(vipT, "hostMinBonus")]),
       );
       check(
-        "twin thường nhận tab Thường: loại 3, mỏ Thạch Thôn, đoạt tắt",
+        "twin thường nhận tab Thường: loại 3, mỏ Thạch Thôn, ngưỡng đào 0, đoạt tắt",
         freeT.enabled === true && opt(freeT, "mineType") === "3" &&
-          opt(freeT, "mineName") === "Thạch Thôn" && opt(freeT, "hostMode").includes("«"),
-        JSON.stringify([opt(freeT, "mineType"), opt(freeT, "mineName"), opt(freeT, "hostMode")]),
+          opt(freeT, "mineName") === "Thạch Thôn" && opt(freeT, "minBonus") === "0" &&
+          opt(freeT, "hostMode").includes("«"),
+        JSON.stringify([opt(freeT, "mineType"), opt(freeT, "mineName"), opt(freeT, "minBonus"), opt(freeT, "hostMode")]),
+      );
+      // HAI ngưỡng phải đặt được ĐỘC LẬP — gộp chúng là mất hẳn một quyết định của người dùng.
+      check(
+        "hai ngưỡng độc lập: đào 80 ≠ đoạt 120 trên cùng một quest",
+        opt(vipT, "minBonus") === "80" && opt(vipT, "hostMinBonus") === "120",
       );
     }
 

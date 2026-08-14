@@ -254,6 +254,25 @@ function KhoangMachFieldset({
         </div>
 
         <div>
+          <label className="label" htmlFor={`${prefix}MinBonus`}>
+            Ngưỡng % tu vi để đào
+          </label>
+          <input
+            id={`${prefix}MinBonus`}
+            name={`${prefix}MinBonus`}
+            className="input"
+            type="number"
+            min={0}
+            max={500}
+            defaultValue={config.minBonus}
+          />
+          <p className="mt-1 text-xs text-[var(--color-mist)]">
+            Chỉ nhận thưởng khi bonus tu vi của mỏ đạt mức này trở lên; dưới ngưỡng thì phần đã
+            đào cứ treo, chờ lượt sau mỏ khá hơn. Để 0 = luôn nhận.
+          </p>
+        </div>
+
+        <div>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--color-parchment)]">
             <input
               type="checkbox"

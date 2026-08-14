@@ -61,6 +61,13 @@ const khoangMachQuest = z
      * giới tin cậy với chatMessage, nên cùng một phép làm sạch, không chế phép thứ hai.
      */
     mineName: z.string().max(1000).default("Thông Thiên Kiếm Phái").transform(sanitizeChatMessage),
+    /**
+     * Ngưỡng % bonus tu vi của mỏ để CHỐT LỜI — dưới mức này thì phần đã đào cứ treo ở
+     * 「Đạt tối đa」chờ lượt sau, không nhận. KHÁC `hostMinBonus` (ngưỡng tiêu tiền để đoạt);
+     * 0 = luôn nhận, và đó là mặc định vì mọi ngọc giản đã lưu trước schema 59 không mang
+     * khoá này — mặc định phải là「không đổi gì cả」.
+     */
+    minBonus: z.number().int().min(0).max(500).default(0),
     hostMode: z.boolean().default(false),
     hostMinBonus: z.number().int().min(0).max(500).default(100),
   })

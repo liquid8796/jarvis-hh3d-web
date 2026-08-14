@@ -11,6 +11,33 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.85.0 — Khoáng Mạch: ngưỡng % bonus riêng cho việc CHỐT LỜI (schema 59)
+
+Trước bản này chỉ có một ngưỡng bonus, và nó gác việc **tiêu tiền để đoạt mỏ**. Không có cách
+nào nói「mỏ đang cho ít quá, đừng nhận vội」— nên mọi chu kỳ đào đều bị chốt ngay khi chín, bất
+kể mỏ đang cho 20% hay 120%.
+
+Nay có ô thứ hai:「Ngưỡng % tu vi để đào」. Dưới ngưỡng thì **không mất gì** — phần đã đào treo
+nguyên ở「Đạt tối đa」, lượt ghé thoát `onCooldown` hẹn 10 phút, chờ mỏ khá hơn (đổi chủ, ai đó
+cắm phù). Mặc định `0` = luôn nhận, nên ngọc giản đã lưu không đổi hành vi.
+
+**Hai ngưỡng fail ngược chiều nhau, và đó là chủ ý** — đây là phần đáng giữ lại của bản này:
+
+| ngưỡng | gác việc | đọc hụt % bonus thì |
+|---|---|---|
+| `minBonus` (mới) | chốt lời — có nhận thưởng không | **vẫn nhận**, kêu to trong nhật ký |
+| `hostMinBonus` (cũ) | tiêu tiền — có mua phù + đoạt không | **không đoạt** |
+
+Cửa tiêu tiền hỏng mà im lặng không tiêu là đúng. Cửa thu hoạch hỏng mà im lặng không thu thì
+mỗi ngày mất trọn phần thưởng chỉ vì một cái `id` đổi tên — nên nó nhường đường, và nói rõ rằng
+nó vừa nhường. Ngưỡng này là phép tối ưu, không phải hàng rào an toàn.
+
+Cửa mới nằm **trong** chính script đã quyết định「nhận hay chờ」chứ không thành script thứ hai:
+hai đoạn cùng mô tả một khoảnh khắc là hai lá cờ đua nhau. Và một tương tác đáng biết — cụm
+đoạt chạy **trước** phép nhận, mà đoạt làm bonus tăng (100%→120% theo bản ghi), nên một lượt
+đoạt có thể tự mở luôn cửa mà chính lượt ấy vừa đóng. Smoke 347/347, thêm 9 bài đóng đinh cả
+năm nhánh (dưới ngưỡng treo · biên `≥` chứ không `>` · ngưỡng 0 · mất ô bonus · đoạt mở cửa).
+
 ## 0.84.0 — Khoáng Mạch rời kiếp stub (schema 58): 44 bước thật từ một bản ghi 46 phút, đủ hai hạng tài khoản
 
 Khoáng Mạch nằm trong sổ từ lâu dưới dạng nhãn phỏng đoán bị chặn cứng ba tầng — vì chưa ai

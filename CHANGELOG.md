@@ -11,6 +11,38 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.84.0 — Khoáng Mạch rời kiếp stub (schema 58): 44 bước thật từ một bản ghi 46 phút, đủ hai hạng tài khoản
+
+Khoáng Mạch nằm trong sổ từ lâu dưới dạng nhãn phỏng đoán bị chặn cứng ba tầng — vì chưa ai
+ghi hình trang ấy. Bản ghi `khoang-mach-20260814-133812` (46 phút video, 64 click kèm selector,
+6 action AJAX, 17 ghi chú của người ghi) trả đủ chứng cứ, và có ba chuyện đáng giữ lại giá:
+
+**Trang mỏ sống trong iframe, nên bản ghi KHÔNG có body HTML của nó** — `dom/*.html` chỉ chụp
+trang hub, còn thân trang trong `network.json` bị cắt ở 32KB đầu (toàn `<head>`). Fixture vì
+thế dựng từ hai nguồn còn lại: selector thật của từng cú click (recorder xuyên được iframe) và
+83 control từ các lượt quét trạng thái. Bài học: đừng chờ có `dom/` mới viết được fixture —
+nhưng cũng đừng bịa; hai kho chứng cứ kia đủ và THẬT.
+
+**Fixture bắt được một lỗi thứ tự ngay lượt smoke đầu**: cụm đoạt mỏ đứng sau phép tìm dòng
+mình, mà phép tìm có thể lật sổ sang trang 2 — cụm đoạt tỉnh dậy trước một trang không có nút
+Đoạt Mỏ và lặng lẽ trượt (mua không, đoạt không, vẫn nhận thưởng — nghĩa là hỏng KHÔNG một
+tiếng động trên đàn thật). Dòng-mình-nằm-trang-2 là chi tiết cố ý của fixture, và nó trả công
+ngay: sửa bằng dời cụm host lên trang 1 vừa mở sổ — cũng đúng thứ tự người ghi hình đã làm.
+
+**Chu kỳ 30 phút không giữ browser**: quest thoát `onCooldown` với đồng hồ THẬT (30′ trừ thời
+gian đã đào, ghi vào một node ẩn cho `ReadCooldownSeconds` đọc bằng chính bộ parse của engine),
+khôi lỗi đi làm việc khác rồi ghé lại — đúng ghi chú của người ghi hình. Trần ngày (hai ô
+Tu Vi/Tinh Thạch server render, cạn sau ~2 lần nhận) đi đường `alreadyDone` + sổ trần-ngày.
+
+Đoạt mỏ (mua Linh Quang Phù + Đoạt Mỏ) là opt-in tiêu tiền thật, mặc định tắt, chặn thêm bởi
+ngưỡng % người dùng đặt và trần 3 lượt tấn công/ngày của chính site. Hai điều bản ghi không trả
+lời được — văn bản popup mua (bị cắt) và hành vi mua-lại-khi-phù-còn-hạn — nằm sau `Optional`
+và được nói thẳng trong bình chú, không giả vờ đã biết.
+
+Cấu hình theo khuôn Luyện Đan: hai twin `khoang-mach`/`khoang-mach-thuong`, mỗi tab một bộ
+tuỳ chọn riêng (loại khoáng · tên mỏ gõ tay được, rỗng = đào tiếp mỏ đang ở · đoạt mỏ ·
+ngưỡng %). Smoke 338/338, trong đó 6 script mới vào chốt so-từng-byte C#↔web.
+
 ## 0.83.4 — nhánh GIỮ ĐAN có tiếng nói (schema 57), vì một tính năng câm là một tính năng không kiểm chứng được
 
 Tông chủ báo「phân giải đan n sao trở xuống không hoạt động」. Câu trả lời hoá ra là **engine vẫn

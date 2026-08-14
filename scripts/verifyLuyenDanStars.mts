@@ -163,7 +163,12 @@ try {
   // ---- 2. Hồ sơ ĐANG SHIP gác bằng selector nào? -----------------------------------------
   const gates = gatesOf(profile);
   {
-    check(`đủ ${QUEST_IDS.length} nhiệm vụ luyện đan có cửa chặn sao`, gates.length === QUEST_IDS.length, gates.map((g) => g.questId).join(", "));
+    // ĐẾM THEO NHIỆM VỤ, không đếm số cửa. Từ schema 57 mỗi twin có HAI bước dùng chung cửa ấy
+    // — bước kể chuyện nhánh giữ và lượt đóng hộp ngay sau nó — nên một phép đếm instance sẽ đỏ
+    // với đúng cái nó phải cho qua. Điều luật này canh vẫn nguyên nghĩa: KHÔNG twin nào được
+    // phép mất cửa. (Mọi cửa phải cùng loại và cùng selector — hai phép kiểm ngay dưới.)
+    const covered = new Set(gates.map((g) => g.questId));
+    check(`đủ ${QUEST_IDS.length} nhiệm vụ luyện đan có cửa chặn sao`, covered.size === QUEST_IDS.length, [...covered].join(", "));
     check("mọi cửa đều là textMatches", gates.every((g) => g.kind === "textMatches"), gates.map((g) => g.kind).join(", "));
     check(
       "không cửa nào còn trỏ vào selector ma",
@@ -277,6 +282,84 @@ try {
     // bịa ra còn tệ hơn không có dòng nào.
     const quiet = await run(null);
     check("không có hộp thưởng thì không nói gì", quiet === "", JSON.stringify(quiet));
+  }
+
+  // ---- 8. NHÁNH GIỮ cũng phải có tiếng nói (schema 57) ------------------------------------
+  //
+  // Trước 14/08/2026 nhánh giữ hoàn toàn câm: nhật ký có「Thu được đan N sao」và「Phân giải viên
+  // đan」, nhưng khi cửa GIỮ bật thì không một dòng nào. Hệ quả không phải chuyện thẩm mỹ — nó
+  // làm tính năng này KHÔNG KIỂM CHỨNG ĐƯỢC từ nhật ký: một báo cáo「giữ 4 sao không hoạt động」
+  // phải ghép snapshot của hai database mới trả lời nổi, và câu trả lời hoá ra là engine vẫn
+  // đúng. Nhóm này đóng đinh cái tiếng nói ấy.
+  {
+    const KEEP_NOTE = "kể chuyện: viên đan được GIỮ, không phân giải";
+
+    // Có ở CẢ HAI twin, và đứng ĐÚNG trước lượt đóng hộp — đứng sau thì hộp đã đóng, script đọc
+    // vào khoảng không rồi im, tức lại câm y như cũ.
+    let placed = 0;
+    let sameGate = 0;
+    for (const id of QUEST_IDS) {
+      const steps = (profile.quests.find((q: { id: string }) => q.id === id)?.steps ?? []) as {
+        action: string;
+        note?: string;
+        selector?: string;
+        when?: { kind?: string; selector?: string; text?: string };
+      }[];
+      const at = steps.findIndex((s) => s.note === KEEP_NOTE);
+      const next = at >= 0 ? steps[at + 1] : undefined;
+      if (at >= 0 && next?.action === "click" && next.selector === "#ldModalCloseBtn") placed += 1;
+      // Cùng MỘT cửa với lượt đóng hộp: lệch cửa là kể một đằng làm một nẻo — dòng nhật ký nói
+      // 「đã giữ」trong khi bước dưới vẫn đi phân giải.
+      if (
+        at >= 0 &&
+        JSON.stringify(steps[at].when ?? null) === JSON.stringify(next?.when ?? null) &&
+        steps[at].when?.kind === "textMatches"
+      ) {
+        sameGate += 1;
+      }
+    }
+    check("cả hai twin có bước kể chuyện nhánh GIỮ, ngay trước lượt đóng hộp", placed === 2, `${placed}/2`);
+    check("bước kể chuyện dùng ĐÚNG cửa của lượt đóng hộp — không kể một đằng làm một nẻo", sameGate === 2, `${sameGate}/2`);
+
+    const keepStep = (profile.quests.find((q: { id: string }) => q.id === QUEST_IDS[0])?.steps ?? []).find(
+      (s: { note?: string }) => s.note === KEEP_NOTE,
+    ) as { script?: string } | undefined;
+    const keepSource = keepStep?.script ?? "";
+    check("bước ấy có script để mà chạy", keepSource.length > 0);
+
+    const runKeep = async (stars: number | null): Promise<unknown> => {
+      await page.evaluate(({ html }) => { document.body.innerHTML = html; },
+        { html: stars == null ? "<p>không có hộp nào</p>" : MODAL_HTML.replace("__SAO__", String(stars)) });
+      return page.evaluate(`(() => { const v = (${keepSource}); return typeof v === "function" ? v() : v; })()`);
+    };
+
+    const said: string[] = [];
+    let bad = 0;
+    for (const stars of STARS) {
+      const out = await runKeep(stars);
+      if (out !== `!Giữ lại viên đan ${stars} sao — mức phân giải đã chọn không đụng tới nó`) bad += 1;
+      said.push(String(out).slice(0, 26));
+    }
+    check("nói đúng số sao của viên được giữ, ở cả bốn bậc", bad === 0, said.join(" · "));
+
+    // Dấu `!` là kênh đưa dòng này lên nhật ký người dùng; thiếu nó thì câu chữ vẫn đúng mà
+    // không ai đọc được — đúng cái im lặng đang vá.
+    const one = String(await runKeep(4));
+    check("dòng kể đi kênh `!` (nhật ký người dùng), không phải kênh debug", one.startsWith("!"), one.slice(0, 30));
+
+    // Hộp đã đóng / chưa có hộp: PHẢI im. `conditionProbe` lùi về els[0] khi không phần tử nào
+    // đang hiện, nên cửa `when` một mình không đủ chặn một hộp cũ còn nằm trong DOM — chính vì
+    // thế script tự đo bề rộng.
+    const quietKeep = await runKeep(null);
+    check("không có hộp thì nhánh GIỮ cũng im", quietKeep === "", JSON.stringify(quietKeep));
+
+    await page.evaluate(({ html }) => { document.body.innerHTML = html; }, { html: MODAL_HTML.replace("__SAO__", "4") });
+    await page.evaluate(() => {
+      const el = document.querySelector("#ldItemModal") as HTMLElement | null;
+      if (el) el.style.display = "none";
+    });
+    const hidden = await page.evaluate(`(() => { const v = (${keepSource}); return typeof v === "function" ? v() : v; })()`);
+    check("hộp ĐANG ẨN mà còn markup cũ thì vẫn im — phép đo bề rộng gác chỗ này", hidden === "", JSON.stringify(hidden));
   }
 } finally {
   await browser.close();

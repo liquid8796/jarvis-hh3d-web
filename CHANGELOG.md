@@ -11,6 +11,62 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.83.4 — nhánh GIỮ ĐAN có tiếng nói (schema 57), vì một tính năng câm là một tính năng không kiểm chứng được
+
+Tông chủ báo「phân giải đan n sao trở xuống không hoạt động」. Câu trả lời hoá ra là **engine vẫn
+đúng** — và chuyện đáng ghi là phải mất bao nhiêu công mới nói được điều đó.
+
+**Đường đi tới câu trả lời**, vì nó chính là khiếm khuyết:
+
+| Giờ (14/08) | Việc | Snapshot lượt chạy |
+|---|---|---|
+| 02:48 | thu đan **4 sao** → **phân giải** | `keepStarsFrom = 0` |
+| 03:20 | cấu hình được LƯU: VIP = 4 | — |
+| 03:26 | thu đan 2 sao → phân giải ✔ đúng | `keepStarsFrom = 4` |
+
+Viên 4 sao mất lúc 02:48 chạy dưới cấu hình `0` =「phân giải tất cả」; engine làm đúng thứ nó được
+giao. Nhưng để chứng minh được câu ấy phải: kéo env production của trạm đang phục vụ, nối vào
+database, `join` `job_events` với `automation_jobs.config_snapshot`, rồi đối chiếu với
+`user_configs`. Không một dòng nhật ký nào tự nói ra.
+
+**Vì sao không nói được:** ba kết cục của tính năng này thì hai cái đã có tiếng —「Thu được đan N
+sao」và「Phân giải viên đan」— còn nhánh **GIỮ** thì hoàn toàn câm. Nhìn nhật ký không phân biệt nổi
+「cửa giữ đã bật」với「cửa giữ chưa bao giờ chạy」, mà đó đúng là câu hỏi mọi báo cáo lỗi đặt ra.
+
+**Vá:** một bước kể chuyện đứng NGAY TRƯỚC lượt đóng hộp, dùng CHÍNH cửa `textMatches` của lượt ấy:
+
+> `!Giữ lại viên đan 4 sao — mức phân giải đã chọn không đụng tới nó`
+
+Hai điều khiến nó không phải một dòng log tuỳ tiện:
+
+- **Cùng một cửa với hành động.** Lệch cửa là kể một đằng làm một nẻo — nhật ký nói「đã giữ」trong
+  khi bước dưới vẫn đi phân giải. `verify:luyen-dan-stars` so `when` của hai bước bằng nhau.
+- **Script tự đo bề rộng hộp.** `conditionProbe` lùi về `els[0]` khi không phần tử nào đang hiện,
+  nên một hộp cũ còn nằm trong DOM có thể trả lời thay cho viên đan không ai mở — và một dòng
+  tường thuật NÓI DỐI còn tệ hơn im lặng. Ca đột biến đã thử: vô hiệu phép đo ấy → script đỏ đúng
+  ở ca「hộp đang ẩn」.
+
+`verify:luyen-dan-stars` nay **21 phép thử** (+7), vẫn chạy trên markup chép nguyên văn từ bản ghi
+và vẫn lấy script TỪ `profile.json` chứ không chép tay. Một phép đếm cũ phải sửa theo: nó đếm SỐ
+CỬA và mong đúng 2, trong khi từ nay mỗi twin có hai bước dùng chung một cửa — nay đếm theo NHIỆM
+VỤ, giữ nguyên nghĩa「không twin nào được mất cửa」.
+
+**Schema 56 → 57 ở cả ba chỗ** (`DefaultQuestProfile.cs`, `profile.json`, chốt trong smoke). Bước
+mới không đổi hành vi một byte nào, nhưng vẫn phải bump: desktop chỉ thay hồ sơ đã lưu khi schema
+tăng, và một máy đứng ở 56 sẽ tiếp tục giữ đan trong im lặng — tức vẫn mang đúng khiếm khuyết vừa vá.
+
+Nguồn sửa ở `jarvis-hh3d-pc/…/DefaultQuestProfile.cs` (một khối, sinh ra cả hai twin), rồi vá TAY
+sang `profile.json`: diff 25 dòng thêm + 1 dòng schema, escape đúng kiểu bộ xuất .NET
+(`>`, `'`, mọi ký tự ngoài ASCII), CRLF nguyên vẹn — không xuất đè cả tệp.
+
+**Hai điều đáng biết, không nằm trong mã:**
+
+- **Tab「Tài khoản thường」là một bộ cấu hình RIÊNG.** Đặt mức giữ ở tab VIP không đụng tới nó. Đo
+  14/08: tài khoản `ironstark` của tông chủ là hạng VIP nên dùng bộ VIP; nhưng ai chạy tài khoản
+  hạng `free` mà chỉ chỉnh tab VIP thì vẫn đang phân giải sạch.
+- **Khôi lỗi trọ trên GitHub mang bản sao ĐÔNG LẠNH** của engine, nên bước kể chuyện này không tới
+  chúng cho tới khi kho được dựng lại. VM tông môn thì cài đè là có.
+
 ## 0.83.3 — lượt chuyển trạm chết vì trạm gương thiếu migration, và cái chết ấy không chỉ được ra thủ phạm
 
 Lượt chuyển sang `auto-hh3d-1` dừng ở bước cuối với đúng một câu:「**workers: LỆCH NỘI DUNG — dừng,

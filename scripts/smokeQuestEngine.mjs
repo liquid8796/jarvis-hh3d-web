@@ -1299,8 +1299,14 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // được vá ngay, còn bản desktop chỉ thay hồ sơ đã lưu khi schema tăng — không bump thì máy
     // nào đang ở 55 giữ nguyên selector ma và tính năng chết tiếp. Bump schema là thay hồ sơ đã
     // lưu bên desktop ngay lần mở đầu tiên — chốt này bắt mỗi cú bump phải là quyết định có chủ ý.
-    "hồ sơ đang ở schema 56",
-    loadProfileForSchema().schemaVersion === 56,
+    // 57 = nhánh GIỮ ĐAN của Luyện Đan Đường có tiếng nói. Bước mới không đổi HÀNH VI một chút
+    // nào — cùng cửa `textMatches` với lượt đóng hộp ngay dưới nó — nhưng nó vẫn phải bump:
+    // desktop chỉ thay hồ sơ đã lưu khi schema tăng, và một máy đứng ở 56 sẽ tiếp tục giữ đan
+    // trong im lặng. Mà im lặng chính là khiếm khuyết đang vá: ngày 14/08/2026 một báo cáo
+    // 「phân giải n sao trở xuống không hoạt động」phải ghép snapshot của hai database mới trả
+    // lời được, chỉ vì nhánh giữ không để lại dấu vết nào trong nhật ký.
+    "hồ sơ đang ở schema 57",
+    loadProfileForSchema().schemaVersion === 57,
     String(loadProfileForSchema().schemaVersion),
   );
 

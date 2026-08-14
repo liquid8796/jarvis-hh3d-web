@@ -19,6 +19,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { neon } from "@neondatabase/serverless";
 import { decryptSecret } from "../src/lib/crypto/secretBox";
+import { parseEnvFile } from "./envFile.mts";
 
 type Mirror = { id: string; pg?: string };
 
@@ -95,14 +96,18 @@ export function tokenKeyForSite(siteId: string): string {
 }
 
 /**
- * Kéo `DATABASE_URL` production của một trạm về, qua `vercel env pull` trong một thư mục TẠM.
+ * Kéo TRỌN môi trường production của một trạm về, qua `vercel env pull` trong một thư mục TẠM.
  *
  * Thư mục tạm là bắt buộc, không phải cho gọn: `vercel link` ghi `.vercel/project.json` và
  * `vercel env pull` ghi `.env.local` — hai tệp mà kho này đang dùng thật, và trên cây làm việc
  * này thường có phiên khác đang đọc chúng. Ghi đè chúng để đọc một biến là đổi cấu hình của người
  * khác giữa chừng.
+ *
+ * Trả TRỌN bảng chứ không lọc sẵn: người gọi biết mình cần gì (`pullStationPgFromVercel` cần đúng
+ * một khoá, `syncActiveStationEnv` cần cả họ khoá database). Lọc ở đây là bắt mọi người gọi sau
+ * phải sửa vào chính hàm này mỗi lần cần thêm một biến.
  */
-export function pullStationPgFromVercel(siteId: string): string {
+export function pullStationEnv(siteId: string): Map<string, string> {
   const key = tokenKeyForSite(siteId);
   const token = (process.env[key] ?? "").trim();
   if (token.length === 0) {
@@ -129,14 +134,7 @@ export function pullStationPgFromVercel(siteId: string): string {
     run(["link", "--yes", "--project", siteId, "--token", token]);
     run(["env", "pull", "./env.prod", "--environment=production", "--yes", "--token", token]);
 
-    const line = readFileSync(path.join(dir, "env.prod"), "utf8")
-      .split("\n")
-      .find((row) => row.startsWith("DATABASE_URL="));
-    const value = (line ?? "").slice("DATABASE_URL=".length).trim().replace(/^"|"$/g, "");
-    if (value.length === 0) {
-      throw new Error(`Trạm「${siteId}」không có DATABASE_URL trong môi trường production.`);
-    }
-    return value;
+    return parseEnvFile(readFileSync(path.join(dir, "env.prod"), "utf8"));
   } catch (err) {
     if (err instanceof Error && /ENOENT/.test(err.message)) {
       throw new Error(
@@ -155,6 +153,19 @@ export function pullStationPgFromVercel(siteId: string): string {
       // giá trị trả về vì một lượt dọn hụt.
     }
   }
+}
+
+/**
+ * Đúng `DATABASE_URL` production của một trạm. Lớp mỏng trên `pullStationEnv` — một bản luật kéo
+ * env, không hai: bản sao thứ hai sẽ sai vào đúng ngày nó được dùng lần đầu (bài học đã trả giá ở
+ * `mongoSync`, chép lại trong `pgSync.verifyDigestExpr`).
+ */
+export function pullStationPgFromVercel(siteId: string): string {
+  const value = pullStationEnv(siteId).get("DATABASE_URL") ?? "";
+  if (value.length === 0) {
+    throw new Error(`Trạm「${siteId}」không có DATABASE_URL trong môi trường production.`);
+  }
+  return value;
 }
 
 /**

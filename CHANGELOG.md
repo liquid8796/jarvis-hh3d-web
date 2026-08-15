@@ -11,6 +11,47 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.86.0 — dấu bản thành cửa mở BẢN TIN, và một lưới kiểm ép「bump bản là phải có tin」
+
+Dấu bản ở góc màn hình trước nay là một dòng chữ chết: đúng số, mà số bản thì chẳng nói cho ai
+điều gì. Đạo hữu mở trang lên thấy「v0.85.0」và không có đường nào biết hôm nay cái gì vừa đổi —
+trong khi mỗi ngày có bốn tới sáu lượt phát hành.
+
+Nay nó bấm được, mở ra danh sách những gì vừa đổi, và có một chấm vàng khi bản mới chưa được xem.
+
+**Bản tin là một tệp MÃ, không phải một bảng trong database** (`src/lib/changelog.ts`). Nó tả đúng
+cái commit chở nó, nên đi cùng một lượt phát hành thì không bao giờ lệch: trang đang chạy bản nào
+thì bản tin đúng bản ấy. Cất trong database thì nó thành một thứ sống riêng — sửa được lúc nào
+cũng được, và có ngày tả một tính năng chưa lên, hoặc lên rồi mà chưa ai chép vào. Đổi lại, nó
+KHÔNG sửa được từ giao diện: muốn đổi một dòng tin là phải phát hành lại. Đó là cái giá đã cân
+nhắc, không phải chỗ bỏ sót.
+
+**Hai tệp changelog, hai người đọc, và không được chép qua lại.** `CHANGELOG.md` viết cho người
+sửa mã: dài, sâu, kể tên hàm và lần hỏng việc. Tệp mới viết cho đạo hữu: 1–3 dòng, kể cái người
+ta THẤY. Luật viết đầy đủ — ngắn, tiếng người, không gọi tên thành phần bên dưới, không nghe như
+máy viết — là ý tông chủ, chép trong bản ghi nhớ `changelog-cho-nguoi-dung`.
+
+**`npm run verify:changelog` (99 phép kiểm, thuần) và cái nó bắt được ngay lượt chạy đầu tiên:**
+mục mới nhất phải trùng `package.json`. Chạy lần đầu nó ĐỎ thật — một phiên khác vừa bump lên
+0.85.0 mà chưa có tin. Đó đúng là lý do luật này tồn tại: quên viết tin không để lại dấu vết nào
+khác ngoài một dấu bản khai số mới bên cạnh một bản tin đứng im.
+
+Lưới ấy còn giữ: thứ tự giảm dần so bằng SỐ chứ không bằng chuỗi (`0.9.0` > `0.10.0` theo chuỗi,
+mà sai), ngày không nằm ở tương lai, và hai danh sách chặn — chữ của máy (`database`, `worker`,
+`schema`…) lẫn khuôn sáo máy móc (`chúng tôi rất vui mừng`…). Hai danh sách ấy cố ý NGẮN: chúng
+bắt loại rò rỉ thô — chép thẳng một dòng `CHANGELOG.md` sang — chứ không làm trọng tài văn phong.
+Ca đột biến đã thử, cả hai đỏ đúng chỗ: nhét chữ `database` vào một dòng, và đảo thứ tự hai mục.
+
+**Chấm báo tin đọc `localStorage`, và ba trạng thái của nó mới là phần đáng đọc.** Chuỗi bản =
+đã xem; `null` = chưa từng mở (báo có tin, đúng sự thật); `undefined` = KHÔNG ĐỌC NỔI kho (Safari
+riêng tư, cookie bị chặn) → **im lặng**. Một chấm không bao giờ tắt được vì không ghi nổi trạng
+thái là thứ người ta học cách phớt lờ, và một khi đã phớt lờ thì nó hết tác dụng cho mọi lần sau.
+Mốc「đã xem」ghi NGAY lúc mở chứ không đợi lúc đóng: đọc xong rồi bỏ tab là chuyện thường.
+
+Phần bấm được nằm ở một tệp `"use client"` RIÊNG (`ChangelogTag`), còn `AppVersion` vẫn là server
+component: gắn `"use client"` lên chính nó là ném nguyên `package.json` — gồm danh sách phụ thuộc
+và mọi npm script — sang trình duyệt.
+
 ## 0.85.0 — Khoáng Mạch: ngưỡng % bonus riêng cho việc CHỐT LỜI (schema 59)
 
 Trước bản này chỉ có một ngưỡng bonus, và nó gác việc **tiêu tiền để đoạt mỏ**. Không có cách

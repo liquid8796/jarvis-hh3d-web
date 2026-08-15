@@ -164,6 +164,45 @@ body {
   opacity: 0.55;
 }
 
+/* Dạng BẤM ĐƯỢC của dấu bản — mở bản tin cập nhật (ChangelogTag).
+   `pointer-events` phải bật lại ở nút: khối cha tắt nó để dấu bản không cướp cú bấm của nội
+   dung nằm dưới, và nếu quên dòng này thì cái nút hiện ra đầy đủ mà bấm không ăn — kiểu hỏng
+   không để lại dấu vết nào trong console. */
+.app-version--interactive {
+  opacity: 1;
+}
+
+.app-version__btn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.2rem;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.app-version__btn:hover,
+.app-version__btn:focus-visible {
+  opacity: 1;
+}
+
+/* Chấm báo có tin chưa đọc. Không nhấp nháy, không đổi kích thước: nó nằm cạnh mọi thứ người
+   ta đang làm, cả ngày. */
+.app-version__dot {
+  width: 0.36rem;
+  height: 0.36rem;
+  border-radius: 9999px;
+  background: var(--color-gold-400);
+  box-shadow: 0 0 0 2px rgba(232, 194, 92, 0.18);
+}
+
 /* ---------------------------------------------------------------------------
    Thành phần dùng chung
 --------------------------------------------------------------------------- */

@@ -1,4 +1,5 @@
 import pkg from "../../package.json";
+import { ChangelogTag } from "./ChangelogTag";
 
 /**
  * DẤU BẢN — số phiên bản của chính bản web đang chạy, ghim ở góc dưới bên trái màn hình.
@@ -12,7 +13,9 @@ import pkg from "../../package.json";
  * lúc build, còn lúc chạy trên Vercel là rỗng — trang sẽ im lặng không hiện gì.
  *
  * Đây là Server Component (không `"use client"`), nên `package.json` chỉ nằm lại phía server;
- * thứ đi ra trình duyệt đúng bằng chuỗi số.
+ * thứ đi ra trình duyệt đúng bằng chuỗi số. Đó cũng là lý do phần bấm được nằm ở một tệp
+ * riêng (`ChangelogTag`) thay vì gắn `"use client"` lên chính tệp này: đổi tệp này thành client
+ * là ném nguyên `package.json` — gồm cả danh sách phụ thuộc và mọi npm script — sang trình duyệt.
  */
 export function AppVersion() {
   // Trường `version` là bắt buộc trong package.json nên TypeScript đã chốt nó là string; chỉ
@@ -20,5 +23,5 @@ export function AppVersion() {
   const version = pkg.version.trim();
   if (!version) return null;
 
-  return <p className="app-version">v{version}</p>;
+  return <ChangelogTag version={version} />;
 }

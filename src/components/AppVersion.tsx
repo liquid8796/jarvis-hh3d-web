@@ -31,7 +31,7 @@ export async function AppVersion() {
   if (!version) return null;
 
   const settings = await getRenderSettings();
-  const notes = mergeReleaseNotes(DEFAULT_RELEASE_NOTES, settings.changelog.notes);
+  const notes = mergeReleaseNotes(DEFAULT_RELEASE_NOTES, settings.changelog.notes, settings.changelog.hidden);
 
   return <ChangelogTag version={version} notes={notes} />;
 }

@@ -57,9 +57,11 @@ export function ChangelogPanel({ notes, appVersion }: { notes: readonly ReleaseN
             phát hành.
           </li>
           <li>
-            Sửa lời một mục thì giữ nguyên; còn <strong className="text-[var(--color-parchment)]">xoá</strong> một
-            mục vốn có sẵn trong bản phát hành thì nó sẽ mọc lại — mục của những bản sau vẫn phải
-            tự hiện ra được, và hai điều ấy là một.
+            Gỡ một mục khỏi ô rồi Lưu là <strong className="text-[var(--color-parchment)]">gỡ hẳn</strong> — nó
+            không mọc lại. Muốn lấy lại thì gõ lại số bản ấy vào ô.
+          </li>
+          <li>
+            Mục của những bản phát hành SAU vẫn tự hiện ra, kể cả khi đã có sửa tay ở đây.
           </li>
           <li>Mục cho bản mới nhất nên có mặt: người ta bấm vào số hiệu bản là để tìm đúng nó.</li>
         </ul>

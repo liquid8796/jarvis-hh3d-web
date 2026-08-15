@@ -181,7 +181,7 @@ export default async function AdminPage({
               pane: (
                 <div className="max-w-2xl">
                   <ChangelogPanel
-                    notes={mergeReleaseNotes(DEFAULT_RELEASE_NOTES, settings.changelog.notes)}
+                    notes={mergeReleaseNotes(DEFAULT_RELEASE_NOTES, settings.changelog.notes, settings.changelog.hidden)}
                     appVersion={pkg.version.trim()}
                   />
                 </div>

@@ -23,7 +23,7 @@ import {
   type MediaSweepResult,
 } from "@/lib/services/media";
 import { purgeExpiredJobEvents } from "@/lib/services/jobs";
-import { parseNotesText } from "@/lib/changelog";
+import { DEFAULT_RELEASE_NOTES, hiddenVersionsFor, parseNotesText } from "@/lib/changelog";
 import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
 import {
   JOB_EVENTS_PURGE_INTENT,
@@ -544,10 +544,14 @@ export async function purgeChatAction(
  * danh sách đi kèm mã」. Nhờ vậy nút「về bản gốc」không cần tồn tại — xoá sạch ô rồi Lưu là xong,
  * và người dùng đoán được điều đó mà không phải đọc hướng dẫn.
  *
- * Lưu ý về giới hạn, đã nói thẳng trên giao diện: xoá một mục vốn có trong tệp mã thì lượt dựng
- * trang sau nó mọc lại (`mergeReleaseNotes` lấy mục của tệp mã cho những số bản sổ không có).
- * Đó là cái giá của việc mục tin ở những lượt phát hành SAU vẫn tự hiện ra dù sổ đã có người
- * sửa — và cái giá ấy rẻ hơn hẳn chiều ngược lại.
+ * XOÁ LÀ XOÁ THẬT, và đó là chỗ cần một danh sách thứ hai. Mục nào của danh sách viết sẵn mà
+ * bài vừa gõ không nhắc tới thì được ghi vào `hidden` (`hiddenVersionsFor`) — bằng không lượt
+ * dựng trang sau lại lấy nguyên nó từ tệp mã và nó mọc lại. Phép tính ấy chỉ nhìn những mục
+ * ĐANG CÓ trong tệp mã, nên số bản ra đời ở lượt phát hành sau vẫn tự hiện: hai điều cùng đúng.
+ *
+ * Ô RỖNG là NGOẠI LỆ CÓ CHỦ Ý của luật trên: nó xoá cả phần ghi đè lẫn bia mộ, tức「trả bản tin
+ * về đúng danh sách đi kèm mã」. Đọc ô rỗng theo luật chung sẽ ra「gỡ sạch mọi mục」— một cú bấm
+ * làm trắng bản tin, và không ai gõ Ctrl+A rồi Delete với ý định ấy.
  */
 export async function saveChangelogAction(
   _prev: AdminResult | null,
@@ -561,6 +565,8 @@ export async function saveChangelogAction(
 
   const settings = await getAppSettings();
   settings.changelog.notes = parsed.notes;
+  settings.changelog.hidden =
+    parsed.notes.length === 0 ? [] : hiddenVersionsFor(DEFAULT_RELEASE_NOTES, parsed.notes);
   await saveAppSettings(settings);
 
   revalidatePath("/admin");

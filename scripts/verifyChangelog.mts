@@ -23,6 +23,7 @@ import {
   compareVersion,
   formatNotesText,
   hasUnseenNote,
+  hiddenVersionsFor,
   mergeReleaseNotes,
   parseNotesText,
   reviewNotes,
@@ -298,6 +299,62 @@ const ROBOT_PHRASES = [
     "sổ rỗng → đúng bằng danh sách trong mã",
   );
   ok(compareVersion("0.10.0", "0.9.0") > 0, "so số bản bằng SỐ: 0.10.0 mới hơn 0.9.0");
+}
+
+// ---- BIA MỘ: xoá là xoá thật, mà mục của bản sau vẫn tự hiện ------------------------------
+//
+// Hai điều này kéo ngược nhau, và bia mộ là chỗ chúng cùng đúng. Luật: mục nào của TỆP MÃ mà
+// bài vừa gõ không nhắc tới thì bị chôn; số bản ra đời SAU lượt lưu ấy không nằm trong phép
+// tính nên nó vẫn mọc lên bình thường.
+{
+  const defaults: ReleaseNote[] = [
+    { version: "0.9.0", date: "2026-08-10", lines: ["Mục 0.9.0 của bản phát hành."] },
+    { version: "0.8.0", date: "2026-08-09", lines: ["Mục 0.8.0 của bản phát hành."] },
+  ];
+
+  // Gia chủ gõ lại, BỎ mục 0.8.0 đi.
+  const kept: ReleaseNote[] = [defaults[0]];
+  const hidden = hiddenVersionsFor(defaults, kept);
+  ok(hidden.length === 1 && hidden[0] === "0.8.0", "mục bị gỡ khỏi ô được ghi bia mộ đúng số bản");
+  ok(!hidden.includes("0.9.0"), "…mục còn giữ thì KHÔNG bị chôn");
+
+  const shown = mergeReleaseNotes(defaults, kept, hidden);
+  ok(shown.length === 1 && shown[0].version === "0.9.0", "xoá là XOÁ THẬT — mục đã gỡ không mọc lại");
+
+  // Lượt phát hành SAU thêm 0.10.0 vào tệp mã. Bia mộ cũ không được phép chôn nó.
+  const laterDefaults: ReleaseNote[] = [
+    { version: "0.10.0", date: "2026-08-12", lines: ["Mục mới của lượt phát hành sau."] },
+    ...defaults,
+  ];
+  const afterRelease = mergeReleaseNotes(laterDefaults, kept, hidden);
+  ok(
+    afterRelease.some((n) => n.version === "0.10.0"),
+    "…nhưng mục của lượt phát hành SAU vẫn tự hiện, dù sổ đã có người sửa",
+  );
+  ok(
+    !afterRelease.some((n) => n.version === "0.8.0"),
+    "…và mục đã gỡ vẫn nằm im, không sống lại theo lượt phát hành mới",
+  );
+
+  // LẤY LẠI một mục đã gỡ: gõ lại số bản ấy vào ô. Bia mộ tự rụng vì phép tính chỉ nhìn những
+  // gì đang vắng mặt — không có danh sách tích luỹ nào để đi dọn bằng tay.
+  const restored = hiddenVersionsFor(defaults, defaults);
+  ok(restored.length === 0, "gõ lại số bản đã gỡ → bia mộ tự rụng ở lượt lưu kế");
+  ok(
+    mergeReleaseNotes(defaults, defaults, restored).length === 2,
+    "…và mục ấy trở lại đầy đủ",
+  );
+
+  // Bia mộ KHÔNG được chặn phần ghi đè: nếu chặn thì cách lấy lại ở trên im lặng không ăn.
+  const overrideOverGrave = mergeReleaseNotes(
+    defaults,
+    [{ version: "0.8.0", date: "2026-08-09", lines: ["Lời mới cho mục từng bị gỡ."] }],
+    ["0.8.0"],
+  );
+  ok(
+    overrideOverGrave.some((n) => n.version === "0.8.0"),
+    "ghi đè THẮNG bia mộ — bằng không cách lấy lại một mục sẽ câm",
+  );
 }
 
 

@@ -383,6 +383,17 @@ export const appSettingsSchema = z.object({
         .max(MAX_NOTES)
         .catch([])
         .prefault([]),
+      /**
+       * BIA MỘ — số bản của danh sách viết sẵn đã bị Gia chủ gỡ khỏi bản tin.
+       *
+       * Không gộp vào `notes` được: một mục đã gỡ thì KHÔNG có nội dung để mà lưu, mà vẫn phải
+       * để lại dấu vết — bằng không lượt dựng trang sau lại lấy nguyên mục ấy từ tệp mã và nó
+       * mọc lại. Xem `hiddenVersionsFor`.
+       *
+       * Trần rộng gấp đôi `MAX_NOTES`: danh sách này tích theo lịch sử phát hành chứ không theo
+       * số mục đang hiện, nên nó được phép dài hơn — nhưng vẫn phải có trần, vì đây là biên tin cậy.
+       */
+      hidden: z.array(z.string().trim().min(1).max(24)).max(MAX_NOTES * 2).catch([]).prefault([]),
     })
     .prefault({}),
 

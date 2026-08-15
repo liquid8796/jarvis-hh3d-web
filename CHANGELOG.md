@@ -11,6 +11,35 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.88.0 — xoá một mục bản tin là XOÁ THẬT, mà mục của bản sau vẫn tự hiện
+
+Bản 0.87.0 nói thẳng một giới hạn:「xoá một mục vốn có trong tệp mã thì nó mọc lại」— và giải
+thích rằng đó là cái giá của việc mục ở những lượt phát hành sau vẫn tự hiện. Tông chủ bác:
+xoá phải dính.
+
+**Hai điều ấy kéo ngược nhau, nên chỗ giải không nằm ở luật gộp.** Cho「sổ thắng trọn gói」thì
+xoá dính, đổi lại mọi mục của các lượt phát hành SAU bị chôn sống — đúng cái bẫy 0.87.0 dựng ra
+để tránh. Chỗ giải là một danh sách thứ hai: **`hidden`, những số bản đã bị gỡ**.
+
+Nó được tính lúc LƯU, từ chính những mục ĐANG CÓ trong danh sách viết sẵn (`hiddenVersionsFor`):
+mục nào của tệp mã mà bài vừa gõ không nhắc tới thì coi như đã gỡ. **Số bản ra đời SAU lượt lưu
+ấy không nằm trong phép tính**, nên nó vẫn tự hiện. Hai điều cùng đúng, không phải chọn một.
+
+Ba chi tiết quyết định hình dạng, và cả ba đều có ca riêng trong lưới kiểm:
+
+- **Bia mộ KHÔNG chặn phần ghi đè.** Gõ lại số bản đã gỡ vào ô là cách người ta lấy lại một mục;
+  nếu lúc gộp cũng lọc theo bia mộ thì cách ấy im lặng không ăn — đúng loại hỏng khiến người
+  dùng tưởng ô nhập bị kẹt. Bia mộ cũng tự rụng ở lượt lưu kế, vì phép tính chỉ nhìn thứ đang
+  VẮNG MẶT; không có danh sách tích luỹ nào phải đi dọn tay.
+- **Ô RỖNG là ngoại lệ có chủ ý**: nó xoá cả phần ghi đè lẫn bia mộ, tức「trả bản tin về đúng
+  danh sách đi kèm mã」. Đọc ô rỗng theo luật chung sẽ ra「gỡ sạch mọi mục」— một cú bấm làm trắng
+  bản tin, mà không ai gõ Ctrl+A rồi Delete với ý định ấy.
+- **Trần của `hidden` rộng gấp đôi `MAX_NOTES`**: nó tích theo lịch sử phát hành chứ không theo
+  số mục đang hiện. Vẫn có trần, vì đây là biên tin cậy.
+
+`verify:changelog` lên **175 phép kiểm** (+21). Hai ca đột biến đã thử, cả hai đỏ đúng chỗ: bỏ
+phép lọc bia mộ lúc gộp → mục đã gỡ mọc lại; chôn tất kể cả mục còn giữ → sai ngay ca đầu.
+
 ## 0.87.0 — Gia chủ sửa được bản tin, mà mục của những lượt phát hành SAU vẫn tự hiện
 
 Bản 0.86.0 chốt「bản tin là một tệp mã, cố ý không sửa được từ giao diện」và nói rõ đó là giá đã

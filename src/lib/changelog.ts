@@ -21,8 +21,19 @@
  * `mergeReleaseNotes` gộp chúng theo đúng MỘT luật: **cùng số bản thì sổ thắng, số bản chỉ có
  * trong tệp mã thì lấy nguyên**. Luật ấy chọn vì cái nó CHỐNG: nếu sổ thắng trọn gói thì một
  * lượt sửa tay hôm nay chôn sống mọi mục viết ở những lượt phát hành sau — bản tin đứng im
- * vĩnh viễn mà không ai hiểu vì sao. Đổi lại là một giới hạn phải nói thẳng: **xoá một mục
- * vốn có trong tệp mã thì nó mọc lại** (sửa lời thì được). Giao diện nói rõ điều đó tại chỗ.
+ * vĩnh viễn mà không ai hiểu vì sao.
+ *
+ * ── BIA MỘ: XOÁ LÀ XOÁ THẬT (14/08/2026) ─────────────────────────────────────────────────
+ *
+ * Bản đầu của luật gộp có một giới hạn: xoá một mục vốn có trong tệp mã thì lượt dựng sau nó
+ * mọc lại. Tông chủ bác — xoá phải dính. Nhưng "sổ thắng trọn gói" vẫn là cái bẫy cũ, nên chỗ
+ * giải không nằm ở luật gộp mà ở một danh sách thứ hai: **`hidden`, những số bản đã bị gỡ**.
+ *
+ * Nó được tính lúc LƯU, từ chính những mục ĐANG CÓ trong tệp mã (`hiddenVersionsFor`): mục nào
+ * của tệp mã mà bài Gia chủ vừa gõ không nhắc tới thì coi như đã gỡ. Một số bản RA ĐỜI SAU lượt
+ * lưu ấy không nằm trong phép tính, nên nó vẫn tự hiện — hai điều cùng đúng, không phải chọn một.
+ *
+ * Gỡ nhầm thì gõ lại số bản ấy vào ô là xong: nó thôi vắng mặt, nên bia mộ tự rụng ở lượt lưu kế.
  *
  * KHÔNG import gì cả, và phải giữ như vậy: `ChangelogTag` là component `"use client"`, nên mọi
  * thứ tệp này chạm vào đều đi thẳng vào bundle trình duyệt. Cùng bài học đã viết ở
@@ -54,6 +65,13 @@ export const MAX_LINE_LENGTH = 160;
  * phần Gia chủ sửa trong sổ: ở đó người ta sửa lời, không phát hành.
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
+  {
+    version: "0.88.0",
+    date: "2026-08-14",
+    lines: [
+      "Chỗ soạn bản tin của tông môn chỉnh lại cách gỡ mục; với đạo hữu thì màn hình không đổi gì.",
+    ],
+  },
   {
     version: "0.87.0",
     date: "2026-08-14",
@@ -133,11 +151,33 @@ export function compareVersion(a: string, b: string): number {
 export function mergeReleaseNotes(
   defaults: readonly ReleaseNote[],
   overrides: readonly ReleaseNote[],
+  hidden: readonly string[] = [],
 ): ReleaseNote[] {
+  const buried = new Set(hidden);
   const byVersion = new Map<string, ReleaseNote>();
-  for (const note of defaults) byVersion.set(note.version, note);
+  for (const note of defaults) {
+    if (!buried.has(note.version)) byVersion.set(note.version, note);
+  }
+  // Bia mộ KHÔNG chặn phần ghi đè: gõ lại số bản ấy vào ô là cách người ta lấy lại một mục đã
+  // gỡ, và nếu ở đây cũng lọc thì cái cách ấy im lặng không ăn — đúng loại hỏng khiến người
+  // dùng tưởng ô nhập bị kẹt.
   for (const note of overrides) byVersion.set(note.version, note);
   return [...byVersion.values()].sort((a, b) => compareVersion(b.version, a.version));
+}
+
+/**
+ * Những số bản của TỆP MÃ mà bài vừa gõ không nhắc tới — tức đã bị gỡ.
+ *
+ * Tính từ `defaults` ĐANG CÓ chứ không phải từ một danh sách tích luỹ: số bản ra đời ở những
+ * lượt phát hành SAU không nằm trong phép tính này, nên chúng vẫn tự hiện. Đó là toàn bộ mẹo
+ * để「xoá dính」và「mục mới tự hiện」cùng đúng một lúc.
+ */
+export function hiddenVersionsFor(
+  defaults: readonly ReleaseNote[],
+  kept: readonly ReleaseNote[],
+): string[] {
+  const keptVersions = new Set(kept.map((note) => note.version));
+  return defaults.filter((note) => !keptVersions.has(note.version)).map((note) => note.version);
 }
 
 /**

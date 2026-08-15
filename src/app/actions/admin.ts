@@ -23,6 +23,7 @@ import {
   type MediaSweepResult,
 } from "@/lib/services/media";
 import { purgeExpiredJobEvents } from "@/lib/services/jobs";
+import { parseNotesText } from "@/lib/changelog";
 import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
 import {
   JOB_EVENTS_PURGE_INTENT,
@@ -529,5 +530,49 @@ export async function purgeChatAction(
   return {
     ok: !partial,
     message: `Đã thanh tẩy sảnh đàm đạo: xoá ${wiped.messages} tin. ${describeSweep(sweep)}`,
+  };
+}
+
+/**
+ * SỬA BẢN TIN CẬP NHẬT — phần Gia chủ ghi đè lên danh sách viết sẵn trong `lib/changelog.ts`.
+ *
+ * Ô nhập là MỘT khối chữ, không phải một biểu mẫu lặp: sửa lời, thêm mục, bỏ mục, đổi thứ tự —
+ * bốn việc, một ô. Toàn bộ phép đọc chữ ấy nằm ở `parseNotesText` (thuần, `verify:changelog`
+ * bao từng nhánh); ở đây chỉ là chỗ nối dây, đúng lối mọi action khác trong tệp này.
+ *
+ * Ô RỖNG là một câu trả lời hợp lệ, không phải lỗi: nó nghĩa là「thôi đè, trả bản tin về đúng
+ * danh sách đi kèm mã」. Nhờ vậy nút「về bản gốc」không cần tồn tại — xoá sạch ô rồi Lưu là xong,
+ * và người dùng đoán được điều đó mà không phải đọc hướng dẫn.
+ *
+ * Lưu ý về giới hạn, đã nói thẳng trên giao diện: xoá một mục vốn có trong tệp mã thì lượt dựng
+ * trang sau nó mọc lại (`mergeReleaseNotes` lấy mục của tệp mã cho những số bản sổ không có).
+ * Đó là cái giá của việc mục tin ở những lượt phát hành SAU vẫn tự hiện ra dù sổ đã có người
+ * sửa — và cái giá ấy rẻ hơn hẳn chiều ngược lại.
+ */
+export async function saveChangelogAction(
+  _prev: AdminResult | null,
+  formData: FormData,
+): Promise<AdminResult> {
+  await requireAdmin();
+
+  const text = String(formData.get("notes") ?? "");
+  const parsed = parseNotesText(text);
+  if (!parsed.ok) return { ok: false, message: parsed.message };
+
+  const settings = await getAppSettings();
+  settings.changelog.notes = parsed.notes;
+  await saveAppSettings(settings);
+
+  revalidatePath("/admin");
+  // Bản tin nằm ở layout GỐC nên nó có mặt trên mọi trang; không quét sạch đường dựng thì
+  // trang người dùng đang mở vẫn vẽ bản tin cũ cho tới khi họ tải lại thật sự.
+  revalidatePath("/", "layout");
+
+  if (parsed.notes.length === 0) {
+    return { ok: true, message: "Đã bỏ hết phần sửa tay — bản tin trở lại đúng danh sách đi kèm bản phát hành." };
+  }
+  return {
+    ok: true,
+    message: `Đã lưu bản tin: ${parsed.notes.length} mục, mới nhất là v${parsed.notes[0].version}.`,
   };
 }

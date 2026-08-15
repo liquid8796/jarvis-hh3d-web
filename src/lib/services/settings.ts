@@ -9,6 +9,7 @@ import {
   RETENTION_MIN_DAYS,
   RETENTION_MIN_HOURS,
 } from "@/lib/validation/retention";
+import { MAX_LINES_PER_NOTE, MAX_LINE_LENGTH, MAX_NOTES } from "@/lib/changelog";
 import { db, schema } from "@/lib/db/client";
 import { DEFAULT_WORKFLOW_FILE } from "@/lib/validation/githubStations";
 import { DEFAULT_GAME_BASE_URL, normalizeGameBaseUrl } from "@/lib/quest-engine/cookies.mjs";
@@ -352,6 +353,39 @@ export const appSettingsSchema = z.object({
    * người ta tưởng. Ghi thì chỉ ghi `retentionHours`: đọc-sửa-ghi trọn document nên khoá cũ tự
    * rụng ở lần Lưu đầu tiên, và giữ lại cả hai khoá nghĩa là nuôi một câu hỏi「cái nào thắng」.
    */
+  /**
+   * BẢN TIN CẬP NHẬT do Gia chủ sửa tay — phần ĐÈ LÊN danh sách viết sẵn trong
+   * `src/lib/changelog.ts`, không phải bản thay thế nó.
+   *
+   * Luật gộp nằm ở `mergeReleaseNotes` (thuần): cùng số bản thì sổ này thắng, số bản chỉ có
+   * trong tệp mã thì lấy nguyên. Nhờ vậy một lượt sửa lời hôm nay không chôn sống mục tin của
+   * những lượt phát hành sau — cái bẫy duy nhất của việc cho sửa từ giao diện.
+   *
+   * `.catch([])` theo đúng luật của tệp này: một phần tử rác thì mất phần SỬA TAY chứ không
+   * mất trang. Bản tin còn nguyên danh sách trong tệp mã, và trang admin vẫn mở được để nhập lại.
+   *
+   * Ràng buộc ở ĐÂY lỏng hơn `reviewNotes` (nó đòi mỗi dòng ít nhất 15 ký tự), và đó là chủ ý:
+   * đây là biên TIN CẬY — nó chỉ chặn thứ làm phình document hay sai kiểu. Luật BIÊN TẬP thì
+   * gác ở cửa ghi (`saveChangelogAction` → `parseNotesText` → `reviewNotes`). Siết chặt cả hai
+   * nơi bằng cùng một con số nghĩa là một document cũ hợp lệ hôm qua có thể bị Zod ném sạch
+   * hôm nay chỉ vì luật biên tập đổi — mất bản tin vì một lượt sửa văn phong.
+   */
+  changelog: z
+    .object({
+      notes: z
+        .array(
+          z.object({
+            version: z.string().trim().min(1).max(24),
+            date: z.string().trim().min(1).max(24),
+            lines: z.array(z.string().trim().min(1).max(MAX_LINE_LENGTH)).min(1).max(MAX_LINES_PER_NOTE),
+          }),
+        )
+        .max(MAX_NOTES)
+        .catch([])
+        .prefault([]),
+    })
+    .prefault({}),
+
   jobEvents: z
     .object({
       retentionHours: z

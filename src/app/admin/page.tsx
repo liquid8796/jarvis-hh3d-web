@@ -1,8 +1,10 @@
+import pkg from "../../../package.json";
 import { SiteHeader } from "@/components/SiteHeader";
 import { requireAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
 import { countJobsForDrain, jobEventRetentionStats } from "@/lib/services/jobs";
 import { BACKDROP_PREFIX, humanBytes, listObjectsUnder } from "@/lib/services/media";
+import { DEFAULT_RELEASE_NOTES, mergeReleaseNotes } from "@/lib/changelog";
 import { getAppSettings } from "@/lib/services/settings";
 import { githubStationsForAdmin } from "@/app/actions/githubStations";
 import { mirrorsForAdmin } from "@/app/actions/mirrors";
@@ -11,6 +13,7 @@ import { countPending, listUsers } from "@/lib/services/users";
 import type { BackdropChoice } from "@/lib/validation/backdrops";
 import { AdminTabs } from "./AdminTabs";
 import { BackdropManager } from "./BackdropManager";
+import { ChangelogPanel } from "./ChangelogPanel";
 import { ChatPurgePanel } from "./ChatPurgePanel";
 import { ChatSettingsForm } from "./ChatSettingsForm";
 import { TagFrameManager } from "./TagFrameManager";
@@ -164,6 +167,22 @@ export default async function AdminPage({
                     retentionHours={jobEventStats.retentionHours}
                     total={jobEventStats.total}
                     expired={jobEventStats.expired}
+                  />
+                </div>
+              ),
+            },
+            {
+              key: "banTin",
+              label: "Bản Tin",
+              // KHÔNG gác thêm quyền nào: cửa thật là `requireAdmin()` trong
+              // `saveChangelogAction`, y như mọi form cài đặt khác của trang này. Dựng một tab
+              // chỉ hiện với một quyền mà action lại không đòi quyền ấy là một lời hứa suông —
+              // hai tab bên dưới có hàng rào riêng nên chúng mới phải hỏi `hasPermission`.
+              pane: (
+                <div className="max-w-2xl">
+                  <ChangelogPanel
+                    notes={mergeReleaseNotes(DEFAULT_RELEASE_NOTES, settings.changelog.notes)}
+                    appVersion={pkg.version.trim()}
                   />
                 </div>
               ),

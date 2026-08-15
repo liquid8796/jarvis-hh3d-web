@@ -11,6 +11,47 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.87.0 — Gia chủ sửa được bản tin, mà mục của những lượt phát hành SAU vẫn tự hiện
+
+Bản 0.86.0 chốt「bản tin là một tệp mã, cố ý không sửa được từ giao diện」và nói rõ đó là giá đã
+cân nhắc. Tông chủ bác ngay hôm sau: sửa một dòng chữ không đáng phải chờ một lượt phát hành.
+Nay có tab **Bản Tin** trong trang Tông Môn.
+
+**Cái bẫy của việc cho sửa, và luật chọn để tránh nó.** Cách hiển nhiên nhất là「có sổ thì dùng
+sổ」— và nó hỏng theo kiểu im lặng: một lượt sửa tay hôm nay CHÔN SỐNG mọi mục viết ở những lượt
+phát hành sau, bản tin đứng im vĩnh viễn mà không ai hiểu vì sao. Nên luật là **cùng số bản thì
+sổ thắng, số bản chỉ có trong tệp mã thì lấy nguyên** (`mergeReleaseNotes`, thuần). Cái giá phải
+nói thẳng, và giao diện nói tại chỗ: **xoá một mục vốn có trong tệp mã thì nó mọc lại**. Sửa lời
+thì giữ. Hai điều ấy là một — không có cách nào vừa để mục mới tự hiện vừa cho xoá vĩnh viễn mà
+không đẻ ra một khái niệm thứ ba.
+
+**MỘT Ô CHỮ, không phải biểu mẫu lặp.** Bốn việc người ta cần — sửa lời, thêm mục, bỏ mục, đổi
+thứ tự — trong biểu mẫu lặp là bốn cụm nút và một mớ state; trong một ô chữ thì là gõ. Cú pháp
+giữ đúng thứ người ta vốn viết trong ghi chú (`0.87.0 · 2026-08-14`, rồi mỗi ý một dòng `-`), lỗi
+mang **số dòng**, và ô rỗng là câu trả lời hợp lệ nghĩa là「thôi đè, trả về danh sách gốc」— nhờ
+vậy nút「về bản gốc」không cần tồn tại. Khối **xem trước** ngay dưới ô đọc bằng CHÍNH hàm server
+dùng, nên thứ hiện ra là thứ sẽ được lưu, không phải một phép dựng lại gần đúng.
+
+**Không quyền mới, không migration.** `saveChangelogAction` mở đầu bằng `requireAdmin()` y như
+sáu form cài đặt anh em của nó, và dữ liệu nằm trong `app_settings` — thứ đã đi theo mọi lượt
+chuyển trạm. Tab vì thế KHÔNG gác thêm `hasPermission` nào: dựng một tab chỉ hiện với một quyền
+mà action lại không đòi quyền ấy là một lời hứa suông.
+
+**Một chỗ suýt sai, bắt được lúc soi lại diff: NGÀY CÓ DẤU GẠCH BÊN TRONG.** Mẫu tách đầu mục
+viết gọn thành `[·\-|]` thì với `0.9.0·2026-08-10` (không khoảng trắng) phép khớp tham lam lùi
+tới dấu gạch CUỐI — cắt ngay giữa cái ngày, ra số bản `0.9.0·2026-08` và ngày `10`. Nay `·` và
+`|` nhận mọi dạng, còn `-` thì ĐÒI khoảng trắng hai bên. Hai ca hồi quy đóng đinh chuyện đó, và
+ca đột biến (gộp lại thành một mẫu) làm lưới kiểm đỏ đúng dòng.
+
+`verify:changelog` lên **154 phép kiểm** (+55): mỗi ngả từ chối của `reviewNotes` một ca, phép
+đọc chữ có ca khứ hồi (chữ → danh sách → chữ, không đổi một ký tự), ba dấu phân cách, lỗi kèm số
+dòng, và phép gộp hai nguồn. Hai ca đột biến đã thử: cho sổ thắng trọn gói → đỏ; gộp ba dấu vào
+một mẫu → đỏ.
+
+Ràng buộc ở Zod (`app_settings.changelog`) CỐ Ý lỏng hơn `reviewNotes`: đó là biên tin cậy, chỉ
+chặn thứ làm phình document hay sai kiểu. Luật biên tập gác ở cửa ghi. Siết cả hai nơi bằng cùng
+một con số nghĩa là một document hợp lệ hôm qua bị ném sạch hôm nay chỉ vì luật văn phong đổi.
+
 ## 0.86.0 — dấu bản thành cửa mở BẢN TIN, và một lưới kiểm ép「bump bản là phải có tin」
 
 Dấu bản ở góc màn hình trước nay là một dòng chữ chết: đúng số, mà số bản thì chẳng nói cho ai

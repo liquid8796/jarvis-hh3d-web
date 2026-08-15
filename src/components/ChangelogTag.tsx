@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { CHANGELOG_SEEN_KEY, LATEST_NOTE, RELEASE_NOTES, hasUnseenNote } from "@/lib/changelog";
+import { CHANGELOG_SEEN_KEY, hasUnseenNote, type ReleaseNote } from "@/lib/changelog";
 
 /**
  * DẤU BẢN, nay bấm được: mở ra bản tin cập nhật của những lượt phát hành gần đây.
@@ -20,7 +20,8 @@ import { CHANGELOG_SEEN_KEY, LATEST_NOTE, RELEASE_NOTES, hasUnseenNote } from "@
  * nên đọc sớm là lượt render đầu ở hai bên lệch nhau và React kêu hydration mismatch. Lượt
  * render đầu vì thế luôn「chưa có chấm」rồi chấm mới hiện ra — đúng thứ tự an toàn.
  */
-export function ChangelogTag({ version }: { version: string }) {
+export function ChangelogTag({ version, notes }: { version: string; notes: readonly ReleaseNote[] }) {
+  const latest = notes[0] ?? null;
   const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState<string | null | undefined>(undefined);
 
@@ -45,16 +46,16 @@ export function ChangelogTag({ version }: { version: string }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const unseen = hasUnseenNote(seen, LATEST_NOTE?.version ?? null);
+  const unseen = hasUnseenNote(seen, latest?.version ?? null);
 
   const openPanel = () => {
     setOpen(true);
-    if (!LATEST_NOTE) return;
+    if (!latest) return;
     // Ghi mốc đã đọc NGAY lúc mở, không đợi lúc đóng: người ta đọc xong rồi bỏ tab đó đi là
     // chuyện thường, và khi ấy một cái chấm vẫn còn nguyên nghĩa là tin đã đọc vẫn kêu.
-    setSeen(LATEST_NOTE.version);
+    setSeen(latest.version);
     try {
-      window.localStorage.setItem(CHANGELOG_SEEN_KEY, LATEST_NOTE.version);
+      window.localStorage.setItem(CHANGELOG_SEEN_KEY, latest.version);
     } catch {
       // Kho bị chặn thì chấm cũng đã tắt cho phiên này (state ở trên). Không có gì để cứu, và
       // một tính năng trang trí không được phép làm vỡ trang vì chuyện ấy.
@@ -63,7 +64,7 @@ export function ChangelogTag({ version }: { version: string }) {
 
   // Chưa có tin nào thì dấu bản trở lại đúng thứ nó vốn là: một dòng chữ. Một cái nút bấm vào
   // không ra gì còn tệ hơn không có nút.
-  if (RELEASE_NOTES.length === 0) {
+  if (notes.length === 0) {
     return <p className="app-version">v{version}</p>;
   }
 
@@ -114,7 +115,7 @@ export function ChangelogTag({ version }: { version: string }) {
               </div>
 
               <div className="flex flex-col gap-5">
-                {RELEASE_NOTES.map((note) => (
+                {notes.map((note) => (
                   <section key={note.version}>
                     <p className="mb-1 flex items-baseline gap-2 text-xs text-[var(--color-mist)]">
                       <span className="font-mono text-[var(--color-gold-300)]">v{note.version}</span>

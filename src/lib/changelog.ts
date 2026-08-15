@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "0.97.0",
+    date: "2026-08-15",
+    lines: [
+      "Khoáng Mạch: Linh Quang Phù nay chỉ mua SAU khi đoạt được mỏ. Không đoạt, hoặc đoạt không thành, thì không mua lá nào.",
+      "Trước đây phù được mua ngay khi mỏ đào xong, kể cả những lượt không đoạt — mà phù chỉ sống một giờ và sinh ra để cộng thêm cho mỏ vừa đoạt được.",
+    ],
+  },
+  {
     version: "0.96.0",
     date: "2026-08-15",
     lines: [

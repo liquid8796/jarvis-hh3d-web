@@ -1515,8 +1515,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // sách thay vì đẩy /hong-nhan xuống cuối, trần vòng 15 → 40 (bản ghi đếm 8 tiệc mở cùng
     // lúc, chạm trần là bỏ sót trong im lặng), và cờ jvz-hy-su-all-failed để "trượt sạch" vẫn
     // là một lượt hỏng thật chứ không phải một lượt báo xong.
-    "hồ sơ đang ở schema 62",
-    loadProfileForSchema().schemaVersion === 62,
+    "hồ sơ đang ở schema 63",
+    loadProfileForSchema().schemaVersion === 63,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1778,6 +1778,9 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         ["KmSelfScanScript", kmScript("jvz-km-self-seen", "rescan:")],
         ["KmHostGateScript", kmScript("jvz-km-buy-go")],
         ["KmHostScanScript", kmScript("jvz-km-host-go", "jvz-km-buy-go")],
+        // Tìm theo phép CẮM cờ chứ không theo tên cờ: cổng cũng nhắc `jvz-km-buy-now` (nó gỡ cờ
+        // ở dòng đầu), nên một `needle` trần sẽ bắt nhầm cổng — cổng đứng trước trong danh sách bước.
+        ["KmHostWonScript", kmScript("classList.add('jvz-km-buy-now')")],
         ["KmShopMarkScript", kmScript("jvz-km-buy", "jvz-km-buy-go")],
         ["KmRescanResetScript", kmScript("rescan:")],
         ["KmTailScript", kmScript("jvz-km-eta", "jvz-km-self-seen")],
@@ -2216,16 +2219,19 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
 
     const km2 = await run(kmQuest);
     check(
-      "lượt 2: chín → mua đúng 1 Linh Quang Phù (suất ngày, buyPhu mặc định) rồi mới Nhận Thưởng",
+      // Luật đổi 15/08/2026: phù chỉ mua SAU một cú đoạt THÀNH. Cấu hình mặc định tắt đoạt, nên
+      // lượt này chín và nhận thưởng bình thường mà không tiêu một đồng nào — chính là cảnh đạo
+      // hữu báo (17:10 mua một lá trong đúng một lượt「không đoạt: bonus dưới ngưỡng」).
+      "lượt 2: chín → Nhận Thưởng, và KHÔNG mua phù vì lượt này không đoạt mỏ",
       km2.outcome === "completed" && km2.cooldownSeconds === 30 * 60 &&
-        kmState.claims === 1 && kmState.bought.join() === "linh-quang-phu",
+        kmState.claims === 1 && kmState.bought.length === 0,
       `${km2.outcome}: claims=${kmState.claims}, bought=${kmState.bought.join()}`,
     );
 
     const km3 = await run(kmQuest);
     check(
-      "lượt 3: nhận lần HAI (tinh thạch đầy 200/200, tu vi mới 540/600) — và KHÔNG mua phù lần nữa",
-      km3.outcome === "completed" && kmState.claims === 2 && kmState.bought.length === 1 &&
+      "lượt 3: nhận lần HAI (tinh thạch đầy 200/200, tu vi mới 540/600) — vẫn không mua phù",
+      km3.outcome === "completed" && kmState.claims === 2 && kmState.bought.length === 0 &&
         kmState.tinhThach === kmState.tinhThachCap && kmState.tuVi < kmState.tuViCap,
       `claims=${kmState.claims}, tuVi=${kmState.tuVi}/${kmState.tuViCap}, bought=${kmState.bought.length}`,
     );
@@ -2384,17 +2390,45 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       `${kmSeizeOpens.outcome}, owner=${kmState.owner}, bonus=${kmState.bonus}, claims=${kmState.claims}`,
     );
 
-    // Mua phù trong lúc minBonus treo: vẫn được (phù là thuốc nâng bonus), nhưng fixture KHÔNG
-    // mô hình bonus-tăng-khi-mua — chưa bản ghi nào đo được nó hiện lên #tuvi-bonus-percentage
-    // hay không — nên cú chốt vẫn treo, chỉ ví tiền và sổ suất là đổi.
+    // ĐOẠT THÀNH thì bấy giờ mới mua — nhánh THUẬN của luật 15/08/2026. Cùng cảnh với ca ngay
+    // trên, chỉ khác: phù bật. Không có ca này thì mọi khẳng định「không mua」bên dưới đều có thể
+    // xanh vì một lý do tầm thường (cụm mua hỏng hẳn), chứ không phải vì luật chạy đúng.
+    kmState = kmFresh();
+    kmState.inMine = true;
+    await kmClearDay();
+    const kmSeizeBuys = await run(
+      kmWith({ minBonus: "120", hostMode: kmOn("hostMode"), hostMinBonus: "100" }),
+    );
+    check(
+      "đoạt THÀNH → bấy giờ mới mua đúng MỘT lá phù, rồi mới chốt lời",
+      kmSeizeBuys.outcome === "completed" && kmState.owner === true &&
+        kmState.bought.join() === "linh-quang-phu" && kmState.claims === 1,
+      `${kmSeizeBuys.outcome}, owner=${kmState.owner}, bought=${kmState.bought.join()}, claims=${kmState.claims}`,
+    );
+
+    // Đã là chủ mỏ → không có nút Đoạt Mỏ để bấm, nên KHÔNG có cú đoạt nào thành trong lượt này.
+    // Cửa mua phải đóng: đây là ca「định đoạt mà không đoạt được」, khác hẳn ca「không định đoạt」.
+    kmState = kmFresh();
+    kmState.inMine = true;
+    kmState.owner = true;
+    await kmClearDay();
+    const kmOwnerNoBuy = await run(kmWith({ hostMode: kmOn("hostMode"), hostMinBonus: "100" }));
+    check(
+      "đã là chủ mỏ (không còn gì để đoạt) → KHÔNG mua phù, nhưng vẫn chốt lời bình thường",
+      kmState.bought.length === 0 && kmState.claims === 1 && kmOwnerNoBuy.outcome === "completed",
+      `${kmOwnerNoBuy.outcome}; bought=${kmState.bought.length}; claims=${kmState.claims}`,
+    );
+
+    // minBonus treo cú chốt, và lượt này KHÔNG đoạt → không mua gì cả. Bản trước mua ở đây, và
+    // đó chính là「mua quá sớm」: phù sống 1 giờ, tiêu vào một lượt còn chưa chốt lời nổi.
     kmState = kmFresh();
     kmState.inMine = true;
     await kmClearDay();
     const kmBuyHold = await run(kmWith({ minBonus: "120" }));
     check(
-      "chín + minBonus treo + buyPhu bật: phù vẫn được mua (suất ngày), cú chốt tiếp tục treo",
+      "chín + minBonus treo + buyPhu bật nhưng KHÔNG đoạt: không mua gì, cú chốt tiếp tục treo",
       kmBuyHold.outcome === "onCooldown" && kmBuyHold.cooldownSeconds === 10 * 60 &&
-        kmState.bought.length === 1 && kmState.claims === 0,
+        kmState.bought.length === 0 && kmState.claims === 0,
       `${kmBuyHold.outcome}; bought=${kmState.bought.length}; claims=${kmState.claims}`,
     );
 

@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "0.96.0",
+    date: "2026-08-15",
+    lines: [
+      "Khoáng Mạch: Linh Quang Phù nay chỉ mua đúng MỘT lá mỗi ngày cho mỗi đàn — trước đây đàn chuyển sang máy khác giữa chừng là mua thêm một lá nữa.",
+    ],
+  },
+  {
     version: "0.95.0",
     date: "2026-08-15",
     lines: [

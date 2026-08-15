@@ -1515,8 +1515,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // sách thay vì đẩy /hong-nhan xuống cuối, trần vòng 15 → 40 (bản ghi đếm 8 tiệc mở cùng
     // lúc, chạm trần là bỏ sót trong im lặng), và cờ jvz-hy-su-all-failed để "trượt sạch" vẫn
     // là một lượt hỏng thật chứ không phải một lượt báo xong.
-    "hồ sơ đang ở schema 61",
-    loadProfileForSchema().schemaVersion === 61,
+    "hồ sơ đang ở schema 62",
+    loadProfileForSchema().schemaVersion === 62,
     String(loadProfileForSchema().schemaVersion),
   );
 

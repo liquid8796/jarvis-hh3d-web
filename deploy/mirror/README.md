@@ -282,6 +282,46 @@ tài khoản ấy) → `DATABASE_URL=<db trạm> node scripts/migrate.mjs` → v
 chính, thêm trạm vào sổ, bấm「Kiểm mạch」(probe chỉ-đọc: nối được PG? Mongo? schema đủ 21+
 migration? URL trả 200?). Trạm nằm im ở chế độ chuyển hướng cho tới ngày được chọn.
 
+### Dựng lại DATABASE của một trạm (giữ nguyên web): `reset-mirror-db.bat` (14/08/2026)
+
+```
+npm run mirror:reset-db -- --site auto-hh3d-3 --dry-run     soi kế hoạch
+npm run mirror:reset-db -- --site auto-hh3d-3               làm thật
+npm run mirror:reset-db -- --site auto-hh3d-3 --store neon  chỉ dựng lại Postgres
+```
+
+**Vì sao không phải `mirror:remove` rồi `mirror:new`:** cặp ấy xoá luôn cả project web — mất tên
+miền, mất env, mất mọi deployment — và lượt dựng lại có khi phải đi qua bước「Additional setup
+required」cần người thật bấm. Khi thứ hỏng chỉ là DATABASE (schema lệch, migration thiếu, dữ liệu
+rác) thì phá cả cái nhà để thay một cái bể nước là đắt và rủi ro thừa. Lệnh này thay đúng cái bể:
+xoá kho marketplace cũ, dựng kho mới, chạy migration, ghi chuỗi kết nối mới vào sổ. **Project web
+không bị đụng một dòng nào.**
+
+Ba hàng rào:
+
+1. **KHÔNG BAO GIỜ đụng trạm ĐANG PHỤC VỤ**, và không cờ nào mở được. Xoá database ấy là xoá môn
+   đồ, tài khoản game, đàn đang chạy — và xoá luôn *chính cuốn sổ* giữ chuỗi kết nối lẫn token của
+   mọi trạm còn lại, tức công cụ tự phá mất thứ nó cần để ghi kết quả về.
+2. **Kho dùng chung với project khác thì không xoá** — sợi dây duy nhất nhận ra kho của một trạm
+   là project đang nối (tên kho là chuỗi ngẫu nhiên, cố ý), nên kho nối hai project là kho không
+   quy được về ai.
+3. **Gõ lại mã trạm để xác nhận** (`--yes` để bỏ qua).
+
+**XOÁ TRƯỚC, DỰNG SAU — chiều bắt buộc.** Ngược lại nghe an toàn hơn nhưng không chạy được: hai
+kho Neon cùng nối một project thì cả hai cùng tiêm `DATABASE_URL` và không ai hứa trạm đọc được
+cái nào. Cái giá là một khoảng trạm không có database — chấp nhận được vì hàng rào 1 đã bảo đảm
+trạm ấy không phục vụ ai — và lượt chạy in sẵn lệnh chữa nếu bước dựng lại hỏng giữa chừng.
+
+Phép kiểm đáng tiền nhất: **chuỗi kết nối mới phải KHÁC chuỗi cũ.** Ca nó bắt là
+`integration resource remove` báo thành công nhưng biến `DATABASE_URL` cũ vẫn nằm lại trong env
+của project, nên kho mới không đè được — khi ấy mọi bước sau vẫn xanh (migrate chạy trên database
+CŨ, sổ ghi chuỗi CŨ) và người vận hành tin mình vừa dựng lại một database mà thật ra không có gì
+đổi.
+
+**Sau lượt này trạm RỖNG** — có bảng, không có dữ liệu — nên còn hai việc, thiếu việc nào thì trạm
+vẫn chưa dùng được: phát hành lại (Vercel nướng env vào deployment lúc build, nên deployment đang
+chạy vẫn cầm chuỗi kết nối vừa bị xoá), và đồng bộ dữ liệu từ trạm đang phục vụ.
+
 ### Dựng trạm mới: BẤM ĐÚP `new-mirror-station.bat`
 
 Nó hỏi hai câu — mã trạm và token của tài khoản Vercel — rồi làm trọn: tạo project, dựng hai

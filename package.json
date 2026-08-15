@@ -68,6 +68,7 @@
     "usage:cookie": "tsx scripts/updateUsageCookie.mts",
     "mirror:new": "tsx scripts/newMirrorStation.mts",
     "mirror:remove": "tsx scripts/removeMirrorStation.mts",
+    "mirror:reset-db": "tsx scripts/resetMirrorDb.mts",
     "github:new": "tsx scripts/newGithubStation.mts",
     "github:remove": "tsx scripts/removeGithubKhoiloi.mts",
     "github:deploy": "tsx scripts/deployGithubKhoiloi.mts",

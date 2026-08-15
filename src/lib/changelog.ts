@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "0.91.1",
+    date: "2026-08-15",
+    lines: [
+      "Khoáng Mạch: ô mua Linh Quang Phù và ô ngưỡng đoạt nay nằm gọn trong khối「Đoạt mỏ」, và mờ đi khi không đoạt.",
+      "Không bật đoạt mỏ thì khôi lỗi cũng thôi mua phù. Ngưỡng đã chọn vẫn giữ nguyên, bật lại là thấy đúng con số cũ.",
+    ],
+  },
+  {
     version: "0.91.0",
     date: "2026-08-15",
     lines: [

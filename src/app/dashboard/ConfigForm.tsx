@@ -194,6 +194,20 @@ function KhoangMachFieldset({
   enabled: boolean;
   onToggle: (value: boolean) => void;
 }) {
+  /**
+   * Ô「Đoạt mỏ」là công tắc của cả cụm bên dưới nó, nên nó phải sống trong state chứ không
+   * thể nằm im ở `defaultChecked` như những ô còn lại: hai tuỳ chọn kia phải sáng/tắt ngay
+   * lúc bấm, không đợi tới lượt lưu. State nằm TRONG component nên hai bản VIP/Thường mỗi
+   * bản một cái, y như `enabled` của mỗi fieldset.
+   */
+  const [hostMode, setHostMode] = useState(config.hostMode);
+  /**
+   * Mờ cụm con CHỈ khi khung cha đang sáng. Cả fieldset đã mang `opacity-40` lúc nhiệm vụ
+   * tắt, mà hai lớp opacity lồng nhau thì NHÂN với nhau — 0.16 đọc như một lỗi vẽ chứ không
+   * như một ô đang tắt. Phần khoá thao tác thì không cần điều kiện: cha đã `pointer-events-none`.
+   */
+  const subDimmed = enabled && !hostMode;
+
   return (
     <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
       <legend className="px-2">
@@ -232,7 +246,7 @@ function KhoangMachFieldset({
           </select>
           <p className="mt-1 text-xs text-[var(--color-mist)]">
             Vào mỏ, đợi từng chu kỳ 30 phút rồi nhận Tu Vi + Tinh Thạch — đào tới khi đầy giới
-            hạn ngày (giới hạn đổi mỗi ngày, khôi lỗi tự đọc trên trang).
+            hạn ngày.
           </p>
         </div>
 
@@ -273,28 +287,16 @@ function KhoangMachFieldset({
           </p>
         </div>
 
-        <div>
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--color-parchment)]">
-            <input
-              type="checkbox"
-              name={`${prefix}BuyPhu`}
-              defaultChecked={config.buyPhu}
-              className={`h-4 w-4 ${accentClass}`}
-            />
-            Mua Linh Quang Phù (tối đa 1 lá/ngày)
-          </label>
-          <p className="mt-1 text-xs text-[var(--color-mist)]">
-            +20% tu vi trong 1 giờ, mua ngay trước lúc nhận thưởng — tiền thật, nên mỗi ngày
-            khôi lỗi chỉ mua đúng một lá.
-          </p>
-        </div>
-
-        <div>
+        {/* Cụm ĐOẠT MỎ — công tắc và hai thứ chỉ có nghĩa khi công tắc ấy bật, gói chung một
+            khung để không ai phải đoán cái nào thuộc về cái nào. Chiếm trọn hàng vì nó cao gần
+            gấp ba một ô thường; để nó nằm nửa hàng thì ô bên cạnh bị kéo giãn theo. */}
+        <div className="rounded-lg border border-[var(--color-ink-600)]/60 p-3 sm:col-span-2">
           <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--color-parchment)]">
             <input
               type="checkbox"
               name={`${prefix}HostMode`}
               defaultChecked={config.hostMode}
+              onChange={(e) => setHostMode(e.target.checked)}
               className={`h-4 w-4 ${accentClass}`}
             />
             Đoạt mỏ (làm chủ)
@@ -303,24 +305,59 @@ function KhoangMachFieldset({
             Chỉ đoạt khi khai thác đã đạt tối đa và bonus mỏ đủ ngưỡng dưới đây — site cho 3
             lượt tấn công mỗi ngày.
           </p>
-        </div>
 
-        <div>
-          <label className="label" htmlFor={`${prefix}HostMinBonus`}>
-            Ngưỡng % tu vi để đoạt
-          </label>
-          <input
-            id={`${prefix}HostMinBonus`}
-            name={`${prefix}HostMinBonus`}
-            className="input"
-            type="number"
-            min={0}
-            max={500}
-            defaultValue={config.hostMinBonus}
-          />
-          <p className="mt-1 text-xs text-[var(--color-mist)]">
-            Chỉ đoạt khi bonus tu vi của mỏ đạt mức này trở lên; dưới ngưỡng thì chỉ đào.
-          </p>
+          <div className={`mt-3 grid gap-4 sm:grid-cols-2 ${subDimmed ? "opacity-40" : ""}`}>
+            {/* Ô phù khoá bằng `disabled` THẬT, và đó là điều khác nhau giữa hai ô dưới đây.
+                Một checkbox `disabled` không đi cùng form, mà action đọc「vắng mặt」thành
+                `false` — nên tắt Đoạt mỏ rồi lưu là khôi lỗi thật sự thôi mua phù, đúng như
+                màn hình đang nói. Đây là tiền thật mỗi ngày, nên vế an toàn phải là vế mặc
+                định của một ô đang mờ. */}
+            <div>
+              <label
+                className={`flex items-center gap-2 text-sm text-[var(--color-parchment)] ${
+                  hostMode ? "cursor-pointer" : "cursor-not-allowed"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  name={`${prefix}BuyPhu`}
+                  defaultChecked={config.buyPhu}
+                  disabled={!hostMode}
+                  className={`h-4 w-4 ${accentClass}`}
+                />
+                Mua Linh Quang Phù (tối đa 1 lá/ngày)
+              </label>
+              <p className="mt-1 text-xs text-[var(--color-mist)]">
+                +20% tu vi trong 1 giờ, mua ngay trước lúc nhận thưởng — tiền thật, nên mỗi ngày
+                khôi lỗi chỉ mua đúng một lá.
+              </p>
+            </div>
+
+            {/* Ngưỡng thì `readOnly`, KHÔNG `disabled`: một ô số vắng mặt sẽ được action đọc
+                thành 100 (mặc định của nó), nên `disabled` ở đây là âm thầm ghi đè con số đạo
+                hữu đã chọn mỗi lượt lưu. `readOnly` vẫn gửi giá trị đi, nên tắt rồi bật lại
+                Đoạt mỏ là thấy đúng ngưỡng cũ. Engine cũng chỉ đọc số này bên trong nhánh đoạt,
+                nên để nguyên nó không làm gì cả. */}
+            <div>
+              <label className="label" htmlFor={`${prefix}HostMinBonus`}>
+                Ngưỡng % tu vi để đoạt
+              </label>
+              <input
+                id={`${prefix}HostMinBonus`}
+                name={`${prefix}HostMinBonus`}
+                className="input"
+                type="number"
+                min={0}
+                max={500}
+                defaultValue={config.hostMinBonus}
+                readOnly={!hostMode}
+                aria-disabled={!hostMode}
+              />
+              <p className="mt-1 text-xs text-[var(--color-mist)]">
+                Chỉ đoạt khi bonus tu vi của mỏ đạt mức này trở lên; dưới ngưỡng thì chỉ đào.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </fieldset>

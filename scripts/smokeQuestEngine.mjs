@@ -33,6 +33,8 @@ import { profileDirForJob } from "../src/lib/quest-engine/browserProfile.mjs";
 import {
   COMPLETION_ENDS_DAY_QUEST_IDS,
   DAILY_QUOTA_QUEST_IDS,
+  PEER_GATED_QUEST_IDS,
+  peersDoneForQuota,
   reachedDailyQuota,
 } from "../src/lib/quest-engine/dailyQuota.mjs";
 import { computeNextDelaySeconds, parseCooldownSeconds } from "../src/lib/quest-engine/cooldown.mjs";
@@ -3448,6 +3450,18 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         strayIds.join(", ") || "(sạch)",
       );
 
+      // Cùng phép đối chiếu ấy cho danh sách「lượt cuối mở sau cùng」— nó cũng khoá theo ID, nên
+      // cũng lặng lẽ hết tác dụng nếu hồ sơ đổi ID. Cả twin VIP lẫn thường đều phải có mặt: trần
+      // lượt là của TÀI KHOẢN, và bản thường quay trên trang riêng chứ không qua hub.
+      const gatedStrays = [...PEER_GATED_QUEST_IDS].filter((id) => !idsInProfile.has(id));
+      check(
+        "cả hai bản Vòng Quay Phúc Vận đều còn trong hồ sơ và trong danh sách chờ-nhiệm-vụ-khác",
+        gatedStrays.length === 0 &&
+          PEER_GATED_QUEST_IDS.has("vong-quay-phuc-van") &&
+          PEER_GATED_QUEST_IDS.has("vong-quay-phuc-van-thuong"),
+        gatedStrays.join(", ") || `(${PEER_GATED_QUEST_IDS.size} ID)`,
+      );
+
       // Chiều ngược: chín cái tên được yêu cầu, quy về ID. Cặp twin VIP/thường trùng tên nhau
       // và trần lượt là của TÀI KHOẢN, nên cả hai bản đều phải có mặt.
       const dailyNames = [
@@ -3569,6 +3583,78 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         "mọi ID của đường「xong là hết ngày」đều nằm trong sổ nhiệm vụ ngày",
         outsiders.length === 0,
         outsiders.join(", ") || "(sạch)",
+      );
+
+      // ─── LƯỢT CUỐI MỞ SAU CÙNG: Vòng Quay Phúc Vận ────────────────────────────────────
+      //
+      // Cả cụm này canh đúng một cái bẫy đã ĐO được trên trạm đang phục vụ ngày 15/08/2026:
+      // 20:41「hết lượt quay hôm nay」→ 20:44 vào sổ → 20:51「Bỏ qua … Vòng Quay Phúc Vận」.
+      // Site cho 4 lượt/ngày và khoá lượt thứ 4 tới khi xong hết nhiệm vụ ngày, nên lượt ghé
+      // DUY NHẤT lấy được vòng ấy chính là lượt mà sổ vừa cấm. Không dòng nhật ký nào đỏ.
+      const wheelStop = { outcome: "alreadyDone", dailyCapReached: true, message: "hết lượt quay hôm nay" };
+
+      check(
+        "vòng quay báo hết lượt khi nhiệm vụ ngày khác còn dở → KHÔNG vào sổ",
+        reachedDailyQuota({ id: "vong-quay-phuc-van" }, wheelStop, { peersDone: false }) === false &&
+          reachedDailyQuota({ id: "vong-quay-phuc-van-thuong" }, wheelStop, { peersDone: false }) === false,
+      );
+      check(
+        "…và quên truyền cờ thì ngả về đúng phía an toàn ấy",
+        reachedDailyQuota({ id: "vong-quay-phuc-van" }, wheelStop) === false,
+      );
+      check(
+        "xong hết nhiệm vụ ngày khác rồi mà VẪN hết lượt → bấy giờ mới vào sổ",
+        reachedDailyQuota({ id: "vong-quay-phuc-van" }, wheelStop, { peersDone: true }) === true &&
+          reachedDailyQuota({ id: "vong-quay-phuc-van-thuong" }, wheelStop, { peersDone: true }) === true,
+      );
+      // Cổng thứ ba chỉ mở cho đúng hai ID ấy. Nếu nó rò ra nhiệm vụ ngày thường thì mọi thứ
+      // trong sổ đều phải đợi nhau, và cái giá là mở lại chín trang mỗi vòng như thời chưa có sổ.
+      check(
+        "cờ ấy KHÔNG đụng tới nhiệm vụ ngày thường",
+        reachedDailyQuota({ id: "diem-danh" }, wheelStop, { peersDone: false }) === true,
+      );
+      // Và lời khai vẫn phải đến TỪ TRANG GAME: peersDone không cứu nổi một lượt dừng do chính
+      // khôi lỗi bó tay (Vấn Đáp chưa biết đáp án).
+      check(
+        "peersDone không biến lượt dừng của CHÍNH TA thành đủ lượt",
+        reachedDailyQuota(
+          { id: "vong-quay-phuc-van" },
+          { outcome: "alreadyDone", dailyCapReached: false },
+          { peersDone: true },
+        ) === false,
+      );
+
+      const wheel = { id: "vong-quay-phuc-van" };
+      const peer = { id: "phuc-loi-duong" };
+      const notDaily = { id: "me-cung" };
+      check(
+        "peersDoneForQuota: còn một nhiệm vụ ngày chưa vào sổ → CHƯA xong",
+        peersDoneForQuota(wheel, [wheel, peer, notDaily], []) === false,
+      );
+      check(
+        "…cái ấy vào sổ ngay trong vòng này → xong",
+        peersDoneForQuota(wheel, [wheel, peer, notDaily], ["phuc-loi-duong"]) === true,
+      );
+      check(
+        "nhiệm vụ ngoài sổ ngày (Mê Cung) không giữ vòng quay lại",
+        peersDoneForQuota(wheel, [wheel, notDaily], []) === true,
+      );
+      check(
+        "chính nó không tự tính là bạn đồng hành của mình",
+        peersDoneForQuota(wheel, [wheel], []) === true && peersDoneForQuota(wheel, [], []) === true,
+      );
+      // Kế hoạch của vòng SAU đã bị `splitPlanForToday` cắt hết những cái vào sổ từ vòng trước —
+      // đây là hình dạng thật của cái vòng ghé cuối cùng, cái lấy được vòng quay thứ 4.
+      check(
+        "vòng sau, kế hoạch chỉ còn vòng quay + việc ngoài sổ → xong",
+        peersDoneForQuota(wheel, [wheel, notDaily, { id: "luyen-dan-duong" }], []) === true,
+      );
+
+      const gatedOutsiders = [...PEER_GATED_QUEST_IDS].filter((id) => !DAILY_QUOTA_QUEST_IDS.has(id));
+      check(
+        "mọi ID chờ-nhiệm-vụ-khác đều nằm trong sổ nhiệm vụ ngày",
+        gatedOutsiders.length === 0,
+        gatedOutsiders.join(", ") || "(sạch)",
       );
     }
 

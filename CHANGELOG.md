@@ -11,6 +11,36 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.94.0 — Vòng Quay Phúc Vận lấy được vòng quay thứ tư
+
+Tông chủ báo: mỗi ngày chỉ quay 3 vòng trong khi trần là 4. Script quest KHÔNG sai — cả hai bản
+(VIP trên hub, thường trên `/vong-quay-phuc-van`) đều đã bấm tới 4 lượt trong một lượt ghé, và
+`profile.json` không phải sửa một dòng nào. Chỗ sai là **sổ đủ lượt hôm nay** của runner web.
+
+Site khoá lượt thứ 4 cho tới khi xong hết nhiệm vụ ngày. Trước lúc ấy vòng quay báo「hết lượt
+quay hôm nay」bằng một `stopIf` — và `engine.mjs` gắn `dailyCapReached` cho MỌI `stopIf`, nên
+`runCycle` ghi `vong-quay-phuc-van` vào sổ và cả ngày không mở lại trang ấy nữa. Đúng cái lượt
+ghé có thể lấy vòng thứ 4 — lượt sau khi mọi nhiệm vụ khác đã xong — là lượt bị sổ cấm.
+
+Đo trên trạm đang phục vụ ngày 15/08/2026, trọn chuỗi trên năm đàn: `20:41 hết lượt quay hôm
+nay` → `20:44 Đã đủ lượt hôm nay … Vòng Quay Phúc Vận` → `20:51–20:54 Bỏ qua … Vòng Quay Phúc
+Vận`. Mất im lặng: mọi dòng nhật ký đều xanh, vì theo chỗ đứng của runner thì nó đã làm đúng.
+
+Thuốc là một cổng THỨ BA trong `dailyQuota.mjs`, hẹp đúng bằng chỗ hỏng: `PEER_GATED_QUEST_IDS`
+— những nhiệm vụ mà「hết lượt」chỉ trả lời cho HIỆN TẠI chứ không cho cả ngày. Lời khai của
+chúng chỉ vào sổ khi `peersDoneForQuota` xác nhận mọi nhiệm vụ ngày KHÁC trong kế hoạch đã vào
+sổ; lúc ấy điều kiện mở lượt cuối đã thoả, nên「vẫn hết lượt」mới thật là hết. Cờ mặc định là
+`false` — phía an toàn: quên truyền thì cùng lắm mở thừa một trang, ngả nhầm chiều kia là mất
+hẳn một vòng quay mỗi ngày.
+
+Giá phải trả, đã cân: một hai lượt ghé thừa vào cuối ngày, và `nothingLeftToday` (nhánh không
+mở trình duyệt) tới muộn hơn chừng ấy. Nếu một nhiệm vụ ngày hỏng cả ngày thì vòng quay ở trạng
+thái chờ cả ngày — đúng như vậy, vì lượt cuối kia có thể mở ra ngay khi nhiệm vụ ấy chạy được.
+
+**Bản desktop không cần sửa gì**: `AccountRunner` không có sổ, nó ghi log rồi quay lại ở vòng
+sau — đúng như XML doc của `LotteryWheel` đã dự tính («a later visit's business»). Cái bẫy sinh
+ra từ chỗ bản web thêm sổ mà không hỏi lại giả định ấy.
+
 ## 0.93.0 — gỡ khối dặn dò dưới ô soạn bản tin
 
 Tông chủ yêu cầu gỡ bốn gạch đầu dòng nằm dưới ô soạn bản tin (tab Bản Tin, trang Tông Môn).

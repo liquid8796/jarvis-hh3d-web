@@ -211,7 +211,15 @@ const khoangMachPage = (km) => {
   };
   return `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div id="wrapper">
-<div id="mine-stats">⚡ Lượt tấn công: ${km.attacksUsed}/3 · 🔴 Tu Vi: ${km.tuVi}/${km.tuViCap} · 🔵 Tinh Thạch: ${km.tinhThach}/${km.tinhThachCap} · Sát Khí: 0/7</div>
+${km.hideStats
+    ? `<div id="mine-stats-plain">Lượt tấn công: ${km.attacksUsed} / 3 · Tu Vi: ${km.tuVi} / ${km.tuViCap} · Tinh Thạch: ${km.tinhThach} / ${km.tinhThachCap}</div>`
+    : `<div class="stats-container">
+  <div class="stat-item stat-attack"><i class="fas fa-bolt"></i> Lượt tấn công: ${km.attacksUsed} / 3</div>
+  <div class="stat-item stat-tuvi"><i class="fas fa-fist-raised"></i> Tu Vi: ${km.tuVi} / ${km.tuViCap}</div>
+  <div class="stat-item stat-tinhthach"><img alt="Tinh Thạch"> Tinh Thạch: ${km.tinhThach} / ${km.tinhThachCap}</div>
+  <div class="stat-item stat-defeat"><i class="fas fa-skull-crossbones"></i> Đã bị sát hại: 5 lần</div>
+  <div class="stat-item stat-satkhi"><i class="fas fa-fire"></i> Sát Khí: 0 / 7</div>
+</div>`}
 <div class="mine-buttons">
   <button class="mine-type-button${km.type === 1 ? " active" : ""}">Thượng</button>
   <button class="mine-type-button${km.type === 2 ? " active" : ""}">Trung</button>
@@ -222,6 +230,9 @@ const khoangMachPage = (km) => {
   <div class="shop-item"><div class="shop-item-content">Ẩn Thân Phù<button class="shop-item-button">Mua Ngay</button></div></div>
   <div class="shop-item"><div class="shop-item-content">Bát Quái Trận Đồ<button class="shop-item-button">Mua Ngay</button></div></div>
   <div class="shop-item"><div class="shop-item-content">Linh Quang Phù<button class="shop-item-button">Mua Ngay</button></div></div>
+  <div class="shop-item"><div class="shop-item-content">Hộ Thân Phù<button class="shop-item-button">Mua Ngay</button></div></div>
+  <div class="shop-item"><div class="shop-item-content">Linh Thạch Túi<button class="shop-item-button">Mua Ngay</button></div></div>
+  <div class="shop-item"><div class="shop-item-content">Trận Kỳ<button class="shop-item-button">Mua Ngay</button></div></div>
 </div>
 <div id="mine-list"></div>
 <div id="user-modal" style="display:none"><div class="modal-content">
@@ -314,6 +325,8 @@ function enterMine() {
   });
 }
 function openModal() {
+  /* Mở lại sổ là về TRANG 1 — bản ghi 14/08: click#239 mở lại, #page-indicator đọc「Trang 1 / 3」(click#242). */
+  page = 1;
   document.getElementById('user-modal').style.display = 'block';
   renderModal();
 }
@@ -1468,8 +1481,14 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // khỏi `hostMinBonus` (ngưỡng tiêu tiền để đoạt). Mặc định 0 = luôn nhận, nên hồ sơ đã lưu
     // không đổi hành vi — nhưng vẫn phải bump: desktop chỉ thay hồ sơ khi schema tăng, và một
     // máy đứng ở 58 sẽ không có ô nhập ngưỡng nào để mà đặt.
-    "hồ sơ đang ở schema 59",
-    loadProfileForSchema().schemaVersion === 59,
+    // 60 = Khoáng Mạch theo bản ghi 15/08 (khoang-mach-20260815-153847, tên miền mới .so):
+    // (a) option `buyPhu` — mua Linh Quang Phù thành lựa chọn riêng, TỐI ĐA 1 lá/ngày, suất
+    // ngày ghi ở cổng quyết định; (b) mua/đoạt CHỈ chạy khi khai thác đã Đạt tối đa (cờ
+    // jvz-km-ripe, quét dòng mình TRƯỚC mọi hành động); (c) trần ngày đọc từ .stats-container
+    // (.stat-tuvi/.stat-tinhthach — selector đích danh thay cho quét chữ toàn body), và mọi
+    // dấu vết「tối đa 2 lần/ngày」bị gỡ: trần 15/08 là 600/200, tức BA lần nhận.
+    "hồ sơ đang ở schema 60",
+    loadProfileForSchema().schemaVersion === 60,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1727,9 +1746,11 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       pairs.push(
         ["KmCapScanScript", kmScript("jvz-km-done")],
         ["KmPickMineScript", kmScript("jvz-km-usable")],
-        ["KmSelfScanScript", kmScript("jvz-km-self-seen")],
-        ["KmHostScanScript", kmScript("jvz-km-host-go", "jvz-km-self-seen")],
-        ["KmShopMarkScript", kmScript("jvz-km-buy", "jvz-km-host-go")],
+        ["KmSelfScanScript", kmScript("jvz-km-self-seen", "rescan:")],
+        ["KmHostGateScript", kmScript("jvz-km-buy-go")],
+        ["KmHostScanScript", kmScript("jvz-km-host-go", "jvz-km-buy-go")],
+        ["KmShopMarkScript", kmScript("jvz-km-buy", "jvz-km-buy-go")],
+        ["KmRescanResetScript", kmScript("rescan:")],
         ["KmTailScript", kmScript("jvz-km-eta", "jvz-km-self-seen")],
       );
 
@@ -1849,7 +1870,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   const kmFresh = () => ({
     type: 2, inMine: false, minedMin: 12, maxed: false, claimedJustNow: false,
     owner: false, attacksUsed: 0, bonus: 100, claims: 0,
-    tuVi: 0, tuViCap: 300, tinhThach: 0, tinhThachCap: 100, bought: [], hideBonus: false,
+    tuVi: 0, tuViCap: 600, tinhThach: 0, tinhThachCap: 200, bought: [], hideBonus: false, hideStats: false,
   });
   let kmState = kmFresh();
   /** Trang Điểm Danh trả về trạng thái đã-điểm-danh — bật cho ca sổ đủ lượt ở cuối tệp. */
@@ -2131,12 +2152,23 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       infos.filter((m) => /stopIf|repeat|until/.test(m)).join(" / ") || "(sạch)",
     );
 
-    console.log("\nKhoáng Mạch — vào mỏ, chờ chín giữa hai lượt ghé, nhận theo trần ngày");
+    console.log("\nKhoáng Mạch — vào mỏ, chờ chín, đào tới khi ĐẦY TRẦN NGÀY (không phải N lần)");
 
     const kmQuest = exportedProfile.quests.find((q) => q.id === "khoang-mach");
     const kmBody = (name) => page.getAttribute("body", name);
+    /** Trả lại suất-mua-phù của「ngày」— localStorage sống theo origin fixture, chung cả bộ smoke. */
+    const kmClearDay = () => page.evaluate(() => { try { localStorage.removeItem("__jvz_km_phu"); } catch (e) {} });
+    /** Bản sao quest với option đặt sẵn — đúng thứ lớp dịch làm lúc chạy thật. */
+    const kmWith = (patch) => {
+      const q = structuredClone(kmQuest);
+      for (const o of q.options) if (patch[o.key] !== undefined) o.selectedValue = patch[o.key];
+      return q;
+    };
+    const kmOn = (key) => kmQuest.options.find((o) => o.key === key).choices.find((c) => !c.value.includes("«")).value;
+    const kmOff = (key) => kmQuest.options.find((o) => o.key === key).choices.find((c) => c.value.includes("«")).value;
 
     kmState = kmFresh();
+    await kmClearDay();
     const km1 = await run(kmQuest);
     check(
       "lượt 1: vào mỏ qua swal2 rồi thoát onCooldown với đồng hồ THẬT (30′ − 12′ đã đào = 18′)",
@@ -2144,141 +2176,158 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       `${km1.outcome}: ${km1.cooldownSeconds}s`,
     );
     check(
-      "…server ghi nhận đúng một cú vào mỏ, không cú bấm nào bị từ chối, không đụng nút Không",
-      (await kmBody("data-entered")) === "1" &&
-        (await kmBody("data-refused")) == null &&
-        (await kmBody("data-cancelled")) == null &&
-        (await kmBody("data-claimed")) == null,
-      `entered=${await kmBody("data-entered")} refused=${await kmBody("data-refused")}`,
+      "…CHƯA CHÍN thì đứng yên tuyệt đối — buyPhu mặc định bật mà vẫn không mua (check tối đa trước, quyết định sau)",
+      (await kmBody("data-entered")) === "1" && kmState.bought.length === 0 &&
+        (await kmBody("data-seized")) == null && (await kmBody("data-refused")) == null,
+      `entered=${await kmBody("data-entered")} bought=${kmState.bought.length}`,
     );
 
     const km2 = await run(kmQuest);
     check(
-      "lượt 2: chu kỳ đã chín → lật sang trang 2 của sổ, Nhận Thưởng → completed, hẹn ~30′",
-      km2.outcome === "completed" && km2.cooldownSeconds === 30 * 60 && kmState.claims === 1,
-      `${km2.outcome}: ${km2.cooldownSeconds}s, claims=${kmState.claims}`,
-    );
-    check(
-      "…và KHÔNG vào mỏ lại lần nữa (đã ở trong thì cụm vào-mỏ phải tự lặn)",
-      (await kmBody("data-entered")) == null && (await kmBody("data-refused")) == null,
+      "lượt 2: chín → mua đúng 1 Linh Quang Phù (suất ngày, buyPhu mặc định) rồi mới Nhận Thưởng",
+      km2.outcome === "completed" && km2.cooldownSeconds === 30 * 60 &&
+        kmState.claims === 1 && kmState.bought.join() === "linh-quang-phu",
+      `${km2.outcome}: claims=${kmState.claims}, bought=${kmState.bought.join()}`,
     );
 
     const km3 = await run(kmQuest);
     check(
-      "lượt 3: lần nhận thứ hai chạm trần ngày (Tu Vi 300/300, Tinh Thạch 100/100)",
-      km3.outcome === "completed" && kmState.claims === 2 &&
+      "lượt 3: nhận lần HAI (tinh thạch đầy 200/200, tu vi mới 540/600) — và KHÔNG mua phù lần nữa",
+      km3.outcome === "completed" && kmState.claims === 2 && kmState.bought.length === 1 &&
+        kmState.tinhThach === kmState.tinhThachCap && kmState.tuVi < kmState.tuViCap,
+      `claims=${kmState.claims}, tuVi=${kmState.tuVi}/${kmState.tuViCap}, bought=${kmState.bought.length}`,
+    );
+
+    const km3b = await run(kmQuest);
+    check(
+      "lượt 4: nhận lần BA — MỘT trần đầy chưa phải hết ngày, đào tới khi CẢ HAI đầy (600 tu vi = ba lần nhận)",
+      km3b.outcome === "completed" && kmState.claims === 3 &&
         kmState.tuVi === kmState.tuViCap && kmState.tinhThach === kmState.tinhThachCap,
       `claims=${kmState.claims}, tuVi=${kmState.tuVi}/${kmState.tuViCap}`,
     );
 
     const km4 = await run(kmQuest);
     check(
-      "lượt 4: trần đầy → dừng KHÔNG đồng hồ = alreadyDone, và nguồn dừng đủ chuẩn vào sổ ngày",
-      km4.outcome === "alreadyDone" && km4.dailyCapReached === true,
+      "lượt 5: hai trần cùng đầy → alreadyDone + dấu đủ-lượt-ngày",
+      km4.outcome === "alreadyDone" && km4.dailyCapReached === true && kmState.claims === 3,
       `${km4.outcome}, dailyCapReached=${km4.dailyCapReached}`,
     );
     check(
-      "…nhật ký kể trần bằng tiếng người",
-      infos.some((m) => m.includes("Trần hôm nay") && m.includes("ĐÃ ĐẦY")),
+      "…trần đọc từ Ô CHỈ SỐ (.stat-tuvi/.stat-tinhthach của bản ghi 15/08), kể bằng tiếng người",
+      infos.some((m) => m.includes("Trần hôm nay") && m.includes("ô chỉ số") && m.includes("ĐÃ ĐẦY")),
     );
 
-    console.log("\nKhoáng Mạch — đoạt mỏ là opt-in, và ngưỡng % là hàng rào thật");
+    // Markup trôi (site đổi tên miền hai lần trong hai ngày): mất .stats-container thì đường
+    // lui quét chữ toàn trang vẫn phải đọc ra trần — mù trần là đào vô tận không ai hay.
+    kmState = kmFresh();
+    kmState.hideStats = true;
+    kmState.tuVi = kmState.tuViCap;
+    kmState.tinhThach = kmState.tinhThachCap;
+    const kmDrift = await run(kmQuest);
+    check(
+      "mất .stats-container → đường lui quét chữ vẫn đọc được trần và khoá ngày",
+      kmDrift.outcome === "alreadyDone" && kmDrift.dailyCapReached === true &&
+        infos.some((m) => m.includes("quét chữ toàn trang")),
+      kmDrift.outcome,
+    );
 
-    // Twin VIP với hostMode bật + ngưỡng 100 ≤ bonus 100 của fixture → phải mua đúng MỘT
-    // Linh Quang Phù (tìm theo TÊN giữa ba món trên kệ) rồi đoạt, rồi vẫn nhận thưởng.
-    const kmHostOn = structuredClone(kmQuest);
-    for (const o of kmHostOn.options) {
-      if (o.key === "hostMode") o.selectedValue = o.choices.find((c) => !c.value.includes("«")).value;
-      if (o.key === "hostMinBonus") o.selectedValue = "100";
-    }
+    console.log("\nKhoáng Mạch — mua phù & đoạt mỏ: CHỈ khi đã chín, hai công tắc rời, suất 1 lá/ngày");
+
+    // hostMode + buyPhu cùng bật mà CHƯA CHÍN → không đóng/mở sổ, không mua, không đoạt.
+    kmState = kmFresh();
+    await kmClearDay();
+    const kmNotRipe = await run(kmWith({ hostMode: kmOn("hostMode"), hostMinBonus: "100" }));
+    check(
+      "chưa chín + hostMode & buyPhu cùng bật → vẫn đứng yên: không mua, không đoạt, chỉ đọc đồng hồ",
+      kmNotRipe.outcome === "onCooldown" && kmState.bought.length === 0 &&
+        (await kmBody("data-seized")) == null && (await kmBody("data-refused")) == null,
+      `${kmNotRipe.outcome}; bought=${kmState.bought.length}`,
+    );
+
+    // Chín + đủ ngưỡng: mua 1 phù → đoạt → nhận, đúng thứ tự công thức 14/08.
     kmState = kmFresh();
     kmState.inMine = true;
-    const kmH1 = await run(kmHostOn);
+    await kmClearDay();
+    const kmH1 = await run(kmWith({ hostMode: kmOn("hostMode"), hostMinBonus: "100" }));
     check(
-      "đủ ngưỡng: mua đúng Linh Quang Phù → đoạt mỏ → rồi mới nhận thưởng",
-      kmH1.outcome === "completed" &&
-        kmState.bought.join() === "linh-quang-phu" &&
+      "chín + đủ ngưỡng: mua đúng Linh Quang Phù giữa 6 món trên kệ → đoạt mỏ → nhận thưởng",
+      kmH1.outcome === "completed" && kmState.bought.join() === "linh-quang-phu" &&
         kmState.owner === true && kmState.attacksUsed === 1 && kmState.claims === 1,
       `${kmH1.outcome}; bought=${kmState.bought.join()}; owner=${kmState.owner}; claims=${kmState.claims}`,
     );
     check(
-      "…swal đoạt mỏ đi qua nút Xác nhận, không đụng Không",
+      "…swal đoạt đi qua nút Xác nhận, không đụng Không",
       (await kmBody("data-seized")) === "1" && (await kmBody("data-cancelled")) == null,
     );
 
-    const kmHostHigh = structuredClone(kmHostOn);
-    for (const o of kmHostHigh.options) if (o.key === "hostMinBonus") o.selectedValue = "120";
+    // CÙNG «ngày» smoke, chín lần nữa (KHÔNG xoá sổ suất): phải nhớ đã mua.
     kmState = kmFresh();
     kmState.inMine = true;
-    const kmH2 = await run(kmHostHigh);
+    const kmSecond = await run(kmWith({ hostMode: kmOn("hostMode"), hostMinBonus: "100" }));
     check(
-      "dưới ngưỡng (bonus 100% < 120%): KHÔNG mua, KHÔNG đoạt — nhưng vẫn nhận thưởng",
-      kmH2.outcome === "completed" &&
-        kmState.bought.length === 0 && kmState.owner === false && kmState.claims === 1,
-      `${kmH2.outcome}; bought=${kmState.bought.length}; owner=${kmState.owner}`,
+      "chín lần nữa trong cùng ngày: suất phù ĐÃ TIÊU → đoạt tiếp nhưng tuyệt không mua thêm",
+      kmSecond.outcome === "completed" && kmState.bought.length === 0 && kmState.owner === true,
+      `bought=${kmState.bought.length}; owner=${kmState.owner}`,
     );
+    check("…và nhật ký nói rõ vì sao không mua", infos.some((m) => m.includes("đã dùng suất")));
+
+    // buyPhu «không mua»: đoạt vẫn chạy, ví tiền đứng yên — hai công tắc thật sự rời nhau.
+    kmState = kmFresh();
+    kmState.inMine = true;
+    await kmClearDay();
+    const kmNoBuy = await run(kmWith({ hostMode: kmOn("hostMode"), hostMinBonus: "100", buyPhu: kmOff("buyPhu") }));
     check(
-      "…và lý do bỏ qua nằm trong nhật ký, tiếng người",
-      infos.some((m) => m.includes("dưới ngưỡng")),
+      "buyPhu «không mua»: đoạt mỏ vẫn trọn vẹn, không một cú mua nào",
+      kmNoBuy.outcome === "completed" && kmState.bought.length === 0 &&
+        kmState.owner === true && kmState.claims === 1,
+      `bought=${kmState.bought.length}; owner=${kmState.owner}`,
     );
 
     console.log("\nKhoáng Mạch — ngưỡng % để CHỐT LỜI (minBonus), tách khỏi ngưỡng đoạt");
 
-    /** Bản sao quest với một option đặt sẵn — đúng thứ lớp dịch làm lúc chạy thật. */
-    const kmWith = (patch) => {
-      const q = structuredClone(kmQuest);
-      for (const o of q.options) if (patch[o.key] !== undefined) o.selectedValue = patch[o.key];
-      return q;
-    };
-
-    // Dưới ngưỡng: KHÔNG nhận, và phần đã đào phải còn nguyên「Đạt tối đa」cho lượt sau.
+    // Các bài ngưỡng giữ THUẦN về ngưỡng: tắt mua phù để ví tiền không lẫn vào phép đo.
     kmState = kmFresh();
     kmState.inMine = true;
-    const kmHold = await run(kmWith({ minBonus: "120" }));
+    await kmClearDay();
+    const kmHold = await run(kmWith({ minBonus: "120", buyPhu: kmOff("buyPhu") }));
     check(
       "bonus 100% < ngưỡng 120% → chưa nhận, thoát onCooldown hẹn 10′, thưởng vẫn treo",
       kmHold.outcome === "onCooldown" && kmHold.cooldownSeconds === 10 * 60 &&
-        kmState.claims === 0 && kmState.maxed === true,
-      `${kmHold.outcome}: ${kmHold.cooldownSeconds}s, claims=${kmState.claims}, maxed=${kmState.maxed}`,
+        kmState.claims === 0 && kmState.maxed === true && kmState.bought.length === 0,
+      `${kmHold.outcome}: ${kmHold.cooldownSeconds}s, claims=${kmState.claims}`,
     );
     check(
       "…và nói rõ vì sao chưa nhận, bằng tiếng người",
       infos.some((m) => m.includes("dưới ngưỡng 120%") && m.includes("chưa nhận")),
-      infos.filter((m) => m.includes("ngưỡng 120%")).join(" / ") || "(không thấy)",
     );
     check(
       "…KHÔNG có cú bấm nhận nào bị server từ chối",
       (await kmBody("data-refused")) == null && (await kmBody("data-claimed")) == null,
     );
 
-    // Đúng bằng ngưỡng là ĐẠT — biên >=, không phải >.
     kmState = kmFresh();
     kmState.inMine = true;
-    const kmEdge = await run(kmWith({ minBonus: "100" }));
+    const kmEdge = await run(kmWith({ minBonus: "100", buyPhu: kmOff("buyPhu") }));
     check(
       "bonus 100% = ngưỡng 100% → NHẬN (biên là ≥, không phải >)",
       kmEdge.outcome === "completed" && kmState.claims === 1,
       `${kmEdge.outcome}, claims=${kmState.claims}`,
     );
 
-    // Ngưỡng 0 = luôn nhận: đây là mặc định, và là thứ giữ cho ngọc giản cũ không đổi hành vi.
     kmState = kmFresh();
     kmState.inMine = true;
     kmState.bonus = 5;
-    const kmZero = await run(kmWith({ minBonus: "0" }));
+    const kmZero = await run(kmWith({ minBonus: "0", buyPhu: kmOff("buyPhu") }));
     check(
       "ngưỡng 0 → nhận bất kể bonus thấp cỡ nào (mặc định, giữ hành vi hồ sơ cũ)",
       kmZero.outcome === "completed" && kmState.claims === 1,
       `${kmZero.outcome}, claims=${kmState.claims}`,
     );
 
-    // Không đọc được % bonus → VẪN NHẬN, và kêu to. Ngược chiều fail-closed của cửa đoạt: cửa
-    // tiêu tiền hỏng thì đừng tiêu, còn cửa thu hoạch hỏng mà im lặng là mỗi ngày mất trọn phần
-    // thưởng vì một cái id đổi tên.
     kmState = kmFresh();
     kmState.inMine = true;
     kmState.hideBonus = true;
-    const kmBlind = await run(kmWith({ minBonus: "120" }));
+    const kmBlind = await run(kmWith({ minBonus: "120", buyPhu: kmOff("buyPhu") }));
     check(
       "mất ô % bonus → vẫn nhận (fail-open), không âm thầm bỏ phần thưởng",
       kmBlind.outcome === "completed" && kmState.claims === 1,
@@ -2287,25 +2336,34 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     check(
       "…và nhật ký CẢNH BÁO rằng ngưỡng vừa không áp được",
       infos.some((m) => m.includes("không đọc được % bonus")),
-      infos.filter((m) => m.includes("không đọc được")).join(" / ") || "(không thấy)",
     );
 
-    // Đoạt mỏ làm bonus TĂNG (100 → 120 theo bản ghi), nên một lượt đoạt có thể tự mở luôn cửa
-    // minBonus mà chính lượt ấy vừa đóng — cụm đoạt chạy TRƯỚC phép nhận, đúng thứ tự này.
+    // Cờ RIPE tách khỏi cờ MAX là để cảnh này sống: minBonus đang treo cú chốt, nhưng ĐOẠT thì
+    // được phép (đã chín!) — đoạt nâng bonus 100→120 và mở cửa chốt trong CÙNG lượt.
     kmState = kmFresh();
     kmState.inMine = true;
     const kmSeizeOpens = await run(
-      kmWith({
-        minBonus: "120",
-        hostMode: kmQuest.options.find((o) => o.key === "hostMode").choices.find((c) => !c.value.includes("«")).value,
-        hostMinBonus: "100",
-      }),
+      kmWith({ minBonus: "120", hostMode: kmOn("hostMode"), hostMinBonus: "100", buyPhu: kmOff("buyPhu") }),
     );
     check(
-      "đoạt mỏ nâng bonus 100→120% và MỞ luôn cửa minBonus 120% trong cùng lượt",
+      "minBonus treo cú chốt nhưng KHÔNG treo cú đoạt: đoạt nâng bonus 100→120% và mở cửa chốt cùng lượt",
       kmSeizeOpens.outcome === "completed" && kmState.owner === true &&
         kmState.bonus === 120 && kmState.claims === 1,
       `${kmSeizeOpens.outcome}, owner=${kmState.owner}, bonus=${kmState.bonus}, claims=${kmState.claims}`,
+    );
+
+    // Mua phù trong lúc minBonus treo: vẫn được (phù là thuốc nâng bonus), nhưng fixture KHÔNG
+    // mô hình bonus-tăng-khi-mua — chưa bản ghi nào đo được nó hiện lên #tuvi-bonus-percentage
+    // hay không — nên cú chốt vẫn treo, chỉ ví tiền và sổ suất là đổi.
+    kmState = kmFresh();
+    kmState.inMine = true;
+    await kmClearDay();
+    const kmBuyHold = await run(kmWith({ minBonus: "120" }));
+    check(
+      "chín + minBonus treo + buyPhu bật: phù vẫn được mua (suất ngày), cú chốt tiếp tục treo",
+      kmBuyHold.outcome === "onCooldown" && kmBuyHold.cooldownSeconds === 10 * 60 &&
+        kmState.bought.length === 1 && kmState.claims === 0,
+      `${kmBuyHold.outcome}; bought=${kmState.bought.length}; claims=${kmState.claims}`,
     );
 
     console.log("\nKhoáng Mạch — cấu hình sai tên mỏ phải LỘ, không âm thầm đào mỏ khác");
@@ -2313,6 +2371,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     const kmWrongName = structuredClone(kmQuest);
     for (const o of kmWrongName.options) if (o.key === "mineName") o.selectedValue = "Mỏ Không Có Thật";
     kmState = kmFresh();
+    await kmClearDay();
     const kmMiss = await run(kmWrongName);
     check(
       "không thấy mỏ cấu hình và không ở trong mỏ nào → quest đỏ, không bấm gì",
@@ -2330,30 +2389,30 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       `${kmF1.outcome}: ${kmF1.cooldownSeconds}s`,
     );
 
-    // Lớp dịch config → hồ sơ: mỗi twin nhận ĐÚNG bộ tuỳ chọn của tab mình.
+    // Lớp dịch config → hồ sơ: mỗi twin nhận ĐÚNG bộ tuỳ chọn của tab mình, đủ sáu khoá.
     {
       const translated = profileForConfig({
         quests: {
-          khoangMach: { enabled: true, mineType: "1", mineName: "Địa", minBonus: 80, hostMode: true, hostMinBonus: 120 },
-          khoangMachThuong: { enabled: true, mineType: "3", mineName: "Thạch Thôn", minBonus: 0, hostMode: false, hostMinBonus: 100 },
+          khoangMach: { enabled: true, mineType: "1", mineName: "Địa", minBonus: 80, buyPhu: true, hostMode: true, hostMinBonus: 120 },
+          khoangMachThuong: { enabled: true, mineType: "3", mineName: "Thạch Thôn", minBonus: 0, buyPhu: false, hostMode: false, hostMinBonus: 100 },
         },
       });
       const opt = (quest, key) => quest.options.find((o) => o.key === key)?.selectedValue;
       const vipT = translated.quests.find((q) => q.id === "khoang-mach");
       const freeT = translated.quests.find((q) => q.id === "khoang-mach-thuong");
       check(
-        "twin VIP nhận tab VIP: loại 1, mỏ Địa, ngưỡng đào 80, đoạt bật, ngưỡng đoạt 120",
+        "twin VIP nhận tab VIP: loại 1, mỏ Địa, ngưỡng đào 80, MUA phù, đoạt bật ngưỡng 120",
         vipT.enabled === true && opt(vipT, "mineType") === "1" && opt(vipT, "mineName") === "Địa" &&
-          opt(vipT, "minBonus") === "80" &&
+          opt(vipT, "minBonus") === "80" && !opt(vipT, "buyPhu").includes("«") &&
           !opt(vipT, "hostMode").includes("«") && opt(vipT, "hostMinBonus") === "120",
-        JSON.stringify([opt(vipT, "mineType"), opt(vipT, "mineName"), opt(vipT, "minBonus"), opt(vipT, "hostMode"), opt(vipT, "hostMinBonus")]),
+        JSON.stringify([opt(vipT, "mineType"), opt(vipT, "mineName"), opt(vipT, "minBonus"), opt(vipT, "buyPhu"), opt(vipT, "hostMode"), opt(vipT, "hostMinBonus")]),
       );
       check(
-        "twin thường nhận tab Thường: loại 3, mỏ Thạch Thôn, ngưỡng đào 0, đoạt tắt",
+        "twin thường nhận tab Thường: loại 3, mỏ Thạch Thôn, KHÔNG mua phù, không đoạt",
         freeT.enabled === true && opt(freeT, "mineType") === "3" &&
           opt(freeT, "mineName") === "Thạch Thôn" && opt(freeT, "minBonus") === "0" &&
-          opt(freeT, "hostMode").includes("«"),
-        JSON.stringify([opt(freeT, "mineType"), opt(freeT, "mineName"), opt(freeT, "minBonus"), opt(freeT, "hostMode")]),
+          opt(freeT, "buyPhu").includes("«") && opt(freeT, "hostMode").includes("«"),
+        JSON.stringify([opt(freeT, "mineType"), opt(freeT, "mineName"), opt(freeT, "buyPhu"), opt(freeT, "hostMode")]),
       );
       // HAI ngưỡng phải đặt được ĐỘC LẬP — gộp chúng là mất hẳn một quyết định của người dùng.
       check(

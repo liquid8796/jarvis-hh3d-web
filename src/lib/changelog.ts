@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "0.89.0",
+    date: "2026-08-15",
+    lines: [
+      "Khoáng Mạch: thêm ô chọn có mua Linh Quang Phù hay không — nếu bật, mỗi ngày chỉ mua đúng một lá.",
+      "Khôi lỗi chỉ mua phù hay đoạt mỏ khi khai thác đã đạt tối đa, và đào tới khi đầy giới hạn ngày.",
+    ],
+  },
+  {
     version: "0.88.0",
     date: "2026-08-14",
     lines: [

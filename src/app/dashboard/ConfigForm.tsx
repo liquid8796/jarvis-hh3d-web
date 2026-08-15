@@ -231,7 +231,8 @@ function KhoangMachFieldset({
             <option value="3">Hạ — Khoáng Đồng (Tân Thủ)</option>
           </select>
           <p className="mt-1 text-xs text-[var(--color-mist)]">
-            Vào mỏ rồi đợi chu kỳ 30 phút, nhận Tu Vi + Tinh Thạch — tối đa 2 lần/ngày.
+            Vào mỏ, đợi từng chu kỳ 30 phút rồi nhận Tu Vi + Tinh Thạch — đào tới khi đầy giới
+            hạn ngày (giới hạn đổi mỗi ngày, khôi lỗi tự đọc trên trang).
           </p>
         </div>
 
@@ -276,6 +277,22 @@ function KhoangMachFieldset({
           <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--color-parchment)]">
             <input
               type="checkbox"
+              name={`${prefix}BuyPhu`}
+              defaultChecked={config.buyPhu}
+              className={`h-4 w-4 ${accentClass}`}
+            />
+            Mua Linh Quang Phù (tối đa 1 lá/ngày)
+          </label>
+          <p className="mt-1 text-xs text-[var(--color-mist)]">
+            +20% tu vi trong 1 giờ, mua ngay trước lúc nhận thưởng — tiền thật, nên mỗi ngày
+            khôi lỗi chỉ mua đúng một lá.
+          </p>
+        </div>
+
+        <div>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--color-parchment)]">
+            <input
+              type="checkbox"
               name={`${prefix}HostMode`}
               defaultChecked={config.hostMode}
               className={`h-4 w-4 ${accentClass}`}
@@ -283,8 +300,8 @@ function KhoangMachFieldset({
             Đoạt mỏ (làm chủ)
           </label>
           <p className="mt-1 text-xs text-[var(--color-mist)]">
-            Mỗi cú đoạt mua kèm một Linh Quang Phù (+20% tu vi, 1 giờ) — tiền thật, và site
-            chỉ cho 3 lượt tấn công mỗi ngày.
+            Chỉ đoạt khi khai thác đã đạt tối đa và bonus mỏ đủ ngưỡng dưới đây — site cho 3
+            lượt tấn công mỗi ngày.
           </p>
         </div>
 

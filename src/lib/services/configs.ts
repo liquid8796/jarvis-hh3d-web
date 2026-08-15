@@ -68,6 +68,13 @@ const khoangMachQuest = z
      * khoá này — mặc định phải là「không đổi gì cả」.
      */
     minBonus: z.number().int().min(0).max(500).default(0),
+    /**
+     * Mua Linh Quang Phù (+20% tu vi, 1 giờ) ngay trước cú chốt lời — TỐI ĐA 1 lá/ngày, suất
+     * ngày do engine giữ. Mặc định true giữ đúng hành vi schema 59 (thời hostMode bật là mua
+     * kèm); cái mới của schema 60 là suất 1/ngày và quyền tắt hẳn. Tách khỏi `hostMode`: phù
+     * phục vụ cú CHỐT LỜI, không riêng gì đoạt.
+     */
+    buyPhu: z.boolean().default(true),
     hostMode: z.boolean().default(false),
     hostMinBonus: z.number().int().min(0).max(500).default(100),
   })

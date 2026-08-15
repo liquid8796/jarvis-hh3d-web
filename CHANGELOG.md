@@ -11,6 +11,37 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.89.0 — Khoáng Mạch (schema 60): chín rồi mới hành động, phù 1 lá/ngày, và lời chia tay con số「2 lần」
+
+Bản ghi thứ hai (`khoang-mach-20260815-153847`, 15/08) ngắn mà nặng ký, ba điều nó dạy:
+
+**Trần ngày là thứ duy nhất đáng tin.** Hôm 14/08 trần là 300 Tu Vi + 100 Tinh Thạch — vừa vặn
+hai lần nhận, và con số「tối đa 2 lần/ngày」lọt vào doc từ đó. Hôm 15/08 trần là **600/200** —
+ba lần nhận. Ghi chú người ghi hình:「giới hạn này thay đổi mỗi ngày」. Engine vốn đã dừng theo
+trần (không theo đếm lần), nên phần sửa là gỡ con số 2 khỏi mọi doc/hint, và trỏ phép đọc trần
+vào selector đích danh mới lộ ra (`.stats-container` với `.stat-tuvi`/`.stat-tinhthach`) thay
+cho quét chữ toàn body — giữ đường quét-chữ làm lối lui vì site đã dời tên miền hai lần trong
+hai ngày (`.one` → `.so`).
+
+**Chín rồi mới hành động** (yêu cầu 15/08). Trước đây cụm đoạt chạy mỗi lượt ghé đủ ngưỡng, bất
+kể chu kỳ đào tới đâu. Nay mọi lượt mở khoáng mạch đều quét dòng mình TRƯỚC; chưa「Đạt tối đa」
+thì không mua, không đoạt, không nhận — chỉ đọc đồng hồ rồi nhường browser. Cờ「chín」(`ripe`)
+tách khỏi cờ「đáng nhận」(`max`, do ngưỡng chốt lời quyết) có chủ ý: mua phù và đoạt mỏ chính là
+thuốc NÂNG bonus, chúng phải được phép chạy đúng lúc ngưỡng chốt lời đang treo — đoạt xong bonus
+100%→120% là cửa chốt tự mở trong cùng lượt, và bộ smoke có một bài đóng đinh đúng cảnh ấy.
+
+**Phù thành lựa chọn riêng, một lá mỗi ngày.** `buyPhu` tách khỏi `hostMode` (phù phục vụ cú
+chốt lời, không riêng gì đoạt); suất ngày ghi vào sổ trình duyệt NGAY LÚC QUYẾT chứ không đợi
+toast xác nhận — một lượt mua trượt vì hết tiền cũng tiêu suất, đổi lại không bao giờ mua đúp.
+Hai giới hạn nói thẳng trong doc: đổi hồ sơ trình duyệt là sổ về trắng (trần cứng còn lại là 3
+lượt tấn công/ngày của site), và「ngày」theo đồng hồ máy, có thể lệch múi giờ reset của game.
+
+Fixture lượt này lại bắt được một lỗi thật trước khi nó kịp sống: sổ mỏ mở lại phải về TRANG 1
+(bằng chứng: click#239→#242 của bản ghi 14/08 đọc「Trang 1/3」), fixture bản đầu giữ nguyên trang
+cũ và cả năm bài đoạt đỏ với `owner=false` — đúng cái chết mà flow thật sẽ chết nếu viết sai
+chiều ngược lại. Smoke 355 bài xanh; probes.json của bản ghi 15/08 còn cho một món quà: chính
+engine đã chạy trên site thật ở tên miền mới, selector schema-59 sống nguyên.
+
 ## 0.88.0 — xoá một mục bản tin là XOÁ THẬT, mà mục của bản sau vẫn tự hiện
 
 Bản 0.87.0 nói thẳng một giới hạn:「xoá một mục vốn có trong tệp mã thì nó mọc lại」— và giải

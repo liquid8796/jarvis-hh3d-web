@@ -11,6 +11,33 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.90.0 — khôi lỗi trọ thôi khai「1.0.0」, và lưới chặn lockfile lệch bản
+
+Tông chủ phát hiện: mọi khôi lỗi trọ trên bảng Khôi Lỗi đều đứng im ở `1.0.0`. Không phải chúng
+cũ — mà `renderPackageJson` ghi CỨNG chuỗi ấy vào `package.json` của kho sinh ra, còn
+`readOwnVersion` của worker thì đọc đúng tệp đó rồi khai lên sổ điểm danh.
+
+Hệ quả không chỉ là một con số xấu: **cột「lệch bản」của dashboard mù hẳn với nhóm máy này.** Bảy
+kho dựng ở bảy thời điểm, mang bảy đời mã khác nhau, đều hiện một con số — nên câu hỏi「máy nào
+đang chạy mã nào」không có chỗ nào trả lời được. Chính vì thế lượt truy vụ Luyện Đan hôm 14/08 đã
+phải đi vòng qua GitHub API đọc `profile.json` của từng kho.
+
+Nay `package.json` của gói mang **số bản của kho gốc lúc phát hành**, nên mỗi lượt `github:deploy`
+tự cập nhật con số ấy. Không có thói quen nào phải nhớ: nó là một dòng trong bộ dựng gói.
+
+**Cái bẫy đi kèm, và lưới chặn nó.** `npm ci` ĐỐI CHIẾU `package.json` với `package-lock.json` rồi
+từ chối chạy khi hai bên lệch — và nó từ chối trên runner, tức mọi khôi lỗi chết cùng một lúc ở
+một chỗ không ai đang nhìn. Từ khi số bản thôi là hằng số, cửa lệch ấy mở ra thật: lượt phát hành
+sinh lockfile TRƯỚC rồi mới dựng gói, nên chỉ cần hai chỗ đọc số bản khác nhau một nhịp là hỏng.
+
+Vá bằng hai việc, không phải một: (1) cả hai chỗ nay gọi CÙNG một hàm `renderPackageJsonFor`, nên
+không còn hai bộ tham số để mà trôi; (2) `buildKhoiloiPayload` đối chiếu số bản trong lockfile với
+số bản vừa đóng dấu, lệch thì NÉM kèm cả hai con số và nói thẳng hậu quả. Lockfile không khai số
+bản (bản cũ, tệp lạ) thì im lặng cho qua — đây là lưới bắt lệch, không phải phép soát định dạng.
+
+`verify:github-deploy` lên **56 phép kiểm** (+8). Hai ca đột biến đã thử, cả hai đỏ đúng chỗ: quay
+lại hằng số `1.0.0`; và gỡ lưới lockfile lệch bản.
+
 ## 0.89.0 — Khoáng Mạch (schema 60): chín rồi mới hành động, phù 1 lá/ngày, và lời chia tay con số「2 lần」
 
 Bản ghi thứ hai (`khoang-mach-20260815-153847`, 15/08) ngắn mà nặng ký, ba điều nó dạy:

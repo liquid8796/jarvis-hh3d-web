@@ -69,9 +69,8 @@ import {
   buildKhoiloiPayload,
   generateLockfile,
   gitBlobSha,
-  playwrightVersionOf,
   readCommittedFile,
-  renderPackageJson,
+  renderPackageJsonFor,
   renderReadme,
   renderWorkflow,
   uncommittedPayloadPaths,
@@ -276,7 +275,7 @@ console.log("\n── Giải cây phụ thuộc một lần cho mọi kho…");
  * Lockfile giải MỘT LẦN rồi dùng lại: nó chỉ phụ thuộc bản `playwright-core`, giống hệt nhau ở
  * mọi kho, mà mỗi lượt gọi npm là vài giây.
  */
-const lockfile = generateLockfile(renderPackageJson({ playwrightVersion: playwrightVersionOf(repoRoot) }));
+const lockfile = generateLockfile(renderPackageJsonFor(repoRoot));
 
 /**
  * Gói NỀN dựng một lần với một `workerId` giả. Hai tệp mang danh tính riêng của từng kho —

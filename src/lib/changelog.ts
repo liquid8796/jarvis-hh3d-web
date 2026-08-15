@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "0.90.0",
+    date: "2026-08-15",
+    lines: [
+      "Các khôi lỗi trọ nay khai đúng số bản đang chạy trên bảng Khôi Lỗi, thay vì cùng hiện một con số cũ.",
+    ],
+  },
+  {
     version: "0.89.0",
     date: "2026-08-15",
     lines: [

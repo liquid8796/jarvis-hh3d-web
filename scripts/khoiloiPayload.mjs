@@ -190,7 +190,22 @@ export function renderReadme({ workerId, webUrl }) {
   );
 }
 
-export function renderPackageJson({ playwrightVersion }) {
+/**
+ * `version` ĐÓNG DẤU SỐ BẢN CỦA KHO GỐC, không phải một hằng số.
+ *
+ * Trước 15/08/2026 chỗ này ghi cứng `"1.0.0"`, và cái giá của nó lộ ra ở đúng nơi người ta đi
+ * tìm sự thật: `readOwnVersion` của worker đọc chính tệp này rồi khai vào sổ điểm danh, nên mọi
+ * khôi lỗi trọ — dựng ở bảy thời điểm khác nhau, mang bảy đời mã khác nhau — đều hiện `1.0.0`
+ * trên bảng Khôi Lỗi. Nhìn thì đều tăm tắp; thực thì không ai biết máy nào đang chạy mã nào, và
+ * cột「lệch bản」của dashboard mất sạch ý nghĩa với riêng nhóm máy này.
+ *
+ * Nay mỗi lượt `github:deploy` đẩy kèm một `package.json` mang số bản của kho gốc lúc ấy — tức
+ * số bản trong sổ điểm danh trở thành câu trả lời thật cho「máy này đang chạy bản nào」.
+ */
+export function renderPackageJson({ playwrightVersion, version }) {
+  if (typeof version !== "string" || version.trim().length === 0) {
+    throw new Error("Thiếu số bản cho gói khôi lỗi — xem `webVersionOf`.");
+  }
   return (
     JSON.stringify(
       {
@@ -198,7 +213,7 @@ export function renderPackageJson({ playwrightVersion }) {
         // ở `khoiloiNaming.mjs`.
         name: REPO_NAME_PREFIX,
         private: true,
-        version: "1.0.0",
+        version: version.trim(),
         type: "module",
         description: "Tiến trình nền của tông môn — chạy theo lịch.",
         scripts: { worker: "node scripts/worker.mjs" },
@@ -208,6 +223,30 @@ export function renderPackageJson({ playwrightVersion }) {
       2,
     ) + "\n"
   );
+}
+
+/** Số bản của kho gốc — thứ được đóng dấu vào gói và khai lên sổ điểm danh. */
+export function webVersionOf(repoRoot) {
+  const version = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
+  if (typeof version !== "string" || version.trim().length === 0) {
+    throw new Error("package.json của kho gốc không khai `version` — không đóng dấu gói được.");
+  }
+  return version.trim();
+}
+
+/**
+ * `package.json` của gói, dựng từ ĐÚNG một chỗ đọc.
+ *
+ * Tồn tại vì lượt phát hành sinh lockfile TỪ chuỗi này rồi mới gọi `buildKhoiloiPayload` (nơi
+ * chuỗi ấy được dựng lại lần thứ hai). Hai chỗ tự ghép tham số là hai chỗ sẽ trôi khỏi nhau, mà
+ * kiểu trôi ở đây câm và chí mạng: `npm ci` từ chối chạy khi lockfile không khớp `package.json`,
+ * và nó từ chối trên RUNNER — tức mọi khôi lỗi chết cùng lúc, ở một chỗ không ai đang nhìn.
+ */
+export function renderPackageJsonFor(repoRoot) {
+  return renderPackageJson({
+    playwrightVersion: playwrightVersionOf(repoRoot),
+    version: webVersionOf(repoRoot),
+  });
 }
 
 /** Bản `playwright-core` mà kho gốc đang ghim — kho khôi lỗi phải cài đúng bản ấy. */
@@ -324,12 +363,40 @@ export function buildKhoiloiPayload({ repoRoot, workerId, webUrl, lockfile }) {
     for (const relPath of paths) files.set(relPath, readCommittedFile(repoRoot, relPath));
   }
 
-  const packageJson = renderPackageJson({ playwrightVersion: playwrightVersionOf(repoRoot) });
+  const packageJson = renderPackageJsonFor(repoRoot);
   const template = readCommittedFile(repoRoot, WORKFLOW_TEMPLATE_PATH).toString("utf8");
 
   files.set(WORKFLOW_TARGET_PATH, Buffer.from(renderWorkflow({ template, workerId, webUrl }), "utf8"));
   files.set("package.json", Buffer.from(packageJson, "utf8"));
-  files.set("package-lock.json", lockfile ?? generateLockfile(packageJson));
+
+  /**
+   * LOCKFILE PHẢI KHAI CÙNG SỐ BẢN với `package.json`, và đây là chỗ duy nhất kiểm được.
+   *
+   * `npm ci` đối chiếu hai tệp rồi TỪ CHỐI CHẠY khi chúng lệch — mà nó từ chối trên runner của
+   * GitHub, tức mọi khôi lỗi trọ chết cùng một lúc ở một chỗ không ai đang nhìn. Từ khi số bản
+   * thôi là hằng số (15/08/2026), cửa lệch ấy mở ra thật: lượt phát hành sinh lockfile TRƯỚC rồi
+   * mới dựng gói, nên chỉ cần hai chỗ ấy đọc số bản khác nhau một nhịp là hỏng.
+   *
+   * Đọc `packages[""]` (lockfile v2/v3) và lùi về `version` ở gốc cho bản cũ. Không đọc được số
+   * bản thì IM LẶNG cho qua — đây là lưới bắt lệch, không phải phép soát định dạng lockfile.
+   */
+  const lock = lockfile ?? generateLockfile(packageJson);
+  const stamped = JSON.parse(packageJson).version;
+  let lockVersion;
+  try {
+    const parsed = JSON.parse(lock.toString("utf8"));
+    lockVersion = parsed.packages?.[""]?.version ?? parsed.version;
+  } catch {
+    lockVersion = undefined;
+  }
+  if (typeof lockVersion === "string" && lockVersion !== stamped) {
+    throw new Error(
+      `Lockfile khai bản ${lockVersion} còn package.json khai ${stamped} — \`npm ci\` sẽ từ chối ` +
+        "chạy trên runner. Sinh lại lockfile từ đúng chuỗi package.json của lượt này " +
+        "(`renderPackageJsonFor`).",
+    );
+  }
+  files.set("package-lock.json", lock);
   files.set("README.md", Buffer.from(renderReadme({ workerId, webUrl }), "utf8"));
   files.set(".gitignore", Buffer.from("node_modules/\n.env\n", "utf8"));
 

@@ -38,10 +38,14 @@ import {
   WORKFLOW_TARGET_PATH,
   WORKFLOW_TEMPLATE_PATH,
   assertImportsResolve,
+  buildKhoiloiPayload,
   gitBlobSha,
   readCommittedFile,
+  renderPackageJson,
+  renderPackageJsonFor,
   renderReadme,
   renderWorkflow,
+  webVersionOf,
 } from "./khoiloiPayload.mjs";
 
 const repoRoot = path.join(import.meta.dirname, "..");
@@ -339,6 +343,65 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
   check("activeRunIds là cùng một sự thật, chỉ bớt cột", activeRunIds(body).join(",") === "11,13");
   check("thân rác → mảng rỗng, không ném", activeRuns({ workflow_runs: "không phải mảng" }).length === 0);
   check("thân null → mảng rỗng", activeRuns(null).length === 0);
+}
+
+// ---- SỐ BẢN ĐÓNG DẤU VÀO GÓI ---------------------------------------------------------------
+//
+// Trước 15/08/2026 `package.json` của kho sinh ra ghi cứng "1.0.0", nên MỌI khôi lỗi trọ khai
+// đúng chuỗi ấy vào sổ điểm danh — bảy máy, bảy đời mã, một con số. Cột "lệch bản" của dashboard
+// vì thế mù với riêng nhóm máy này, và tông chủ là người phát hiện ra (`stuck mãi ở 1.0.0`).
+{
+  const webVersion = webVersionOf(repoRoot);
+  check(`đọc được số bản kho gốc (${webVersion})`, /^\d+\.\d+\.\d+$/.test(webVersion));
+
+  const rendered = JSON.parse(renderPackageJsonFor(repoRoot));
+  check("package.json của gói mang ĐÚNG số bản kho gốc", rendered.version === webVersion);
+  check("…không còn là hằng số 1.0.0", rendered.version !== "1.0.0" || webVersion === "1.0.0");
+
+  // Thiếu số bản thì NÉM, không lặng lẽ ghi một chuỗi rỗng: một gói khai version rỗng làm
+  // `readOwnVersion` trả null, tức sổ điểm danh hiện "không rõ" — tệ hơn cả 1.0.0.
+  let threw = false;
+  try {
+    renderPackageJson({ playwrightVersion: "^1.0.0", version: "" });
+  } catch {
+    threw = true;
+  }
+  check("số bản rỗng → ném, không đẻ ra một gói khai bản rỗng", threw);
+
+  // LOCKFILE LỆCH SỐ BẢN: `npm ci` từ chối chạy, và nó từ chối trên runner — mọi khôi lỗi chết
+  // cùng lúc ở một chỗ không ai đang nhìn. Đây là lưới duy nhất bắt được trước khi đẩy.
+  let lockGuard = "";
+  try {
+    buildKhoiloiPayload({
+      repoRoot,
+      workerId: "khoiloi-tro-kiem-thu",
+      webUrl: "https://vi-du.test",
+      lockfile: Buffer.from(JSON.stringify({ name: "x", version: "0.0.1", packages: { "": { version: "0.0.1" } } })),
+    });
+  } catch (err) {
+    lockGuard = err instanceof Error ? err.message : String(err);
+  }
+  check("lockfile lệch số bản → ném, kèm CẢ HAI con số", lockGuard.includes("0.0.1") && lockGuard.includes(webVersion));
+  check("…và nói ra hậu quả thật: npm ci sẽ từ chối chạy trên runner", lockGuard.includes("npm ci"));
+
+  // Lockfile ĐÚNG bản thì đi qua, và gói mang đúng số bản ấy.
+  const good = buildKhoiloiPayload({
+    repoRoot,
+    workerId: "khoiloi-tro-kiem-thu",
+    webUrl: "https://vi-du.test",
+    lockfile: Buffer.from(JSON.stringify({ name: "x", version: webVersion, packages: { "": { version: webVersion } } })),
+  });
+  check("gói dựng xong mang đúng số bản kho gốc", JSON.parse(good.get("package.json").toString("utf8")).version === webVersion);
+
+  // Lockfile KHÔNG đọc được số bản (bản cũ, hay tệp lạ) thì im lặng cho qua — đây là lưới bắt
+  // lệch, không phải phép soát định dạng lockfile.
+  const quiet = buildKhoiloiPayload({
+    repoRoot,
+    workerId: "khoiloi-tro-kiem-thu",
+    webUrl: "https://vi-du.test",
+    lockfile: Buffer.from("{}"),
+  });
+  check("lockfile không khai số bản → không chặn lượt dựng", quiet.has("package-lock.json"));
 }
 
 console.log(`\n✔ ${checks} phép kiểm, tất cả xanh.`);

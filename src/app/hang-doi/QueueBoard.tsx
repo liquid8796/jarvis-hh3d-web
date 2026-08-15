@@ -127,16 +127,15 @@ function questPhrase(entry: QueueEntry): string | null {
 }
 
 /**
- * Nhãn AI ĐANG ĐẢM NHẬN ở đuôi một dòng đàn — có mặt ở MỌI dòng còn sống, không riêng dòng
- * đang chạy.
+ * TÊN KHÔI LỖI đang cầm một dòng đàn — hiện ở đuôi dòng, và CHỈ khi có máy thật đang cầm.
  *
- * Trước 15/08/2026 nhãn này chỉ hiện khi đã có khôi lỗi cầm đàn, nên mười dòng「Đang nghỉ」—
- * trạng thái thường gặp nhất của bảng — không nói gì về việc ai sẽ chạy chúng. Tông chủ nêu:
- * mỗi dòng cần thấy loại khôi lỗi đảm nhận nó.
+ * Im ở dòng đang nghỉ theo cooldown, dòng đang xếp hàng, và dòng đã tắt: ba ca ấy chưa (hoặc
+ * không còn) có tên nào để nói. Cột trạng thái đã kể phần chờ đợi rồi —「Đang nghỉ — tới lượt
+ * lúc …」,「Chờ máy nhà · thứ 2」— nên nói lại ở đây là một chỗ thừa mang hình dạng lời hứa.
  *
- * Luật nằm ở `validation/queueAssign.ts` (thuần, `verify:queue-pools` bao từng nhánh), không
- * nằm ở đây: nó phải phân biệt được SỰ KIỆN (máy đang cầm) với DỰ ĐỊNH (hạng máy đủ tư cách),
- * và đó đúng là chỗ bản 0.83.0 từng sai khi cho dòng đang nghỉ đeo tên một cái máy cụ thể.
+ * Bản 0.91.0 từng cho dòng chưa ai cầm một nhãn dự đoán suy từ「Giao đàn cho」; tông chủ bác
+ * ngay trong ngày. Luật hiện hành nằm ở `validation/queueAssign.ts` (thuần, `verify:queue-pools`
+ * bao từng nhánh).
  *
  * KHÔNG hỏi quyền ở đây: `workerId` chỉ tới nơi này khi service đã quyết là người xem được
  * biết (xem `visibleWorkerId` trong queue.ts). Giao diện chỉ kể lại thứ được đưa.
@@ -145,7 +144,6 @@ function assignmentOf(entry: QueueEntry) {
   return describeAssignment({
     workerKind: entry.workerKind,
     workerId: entry.workerId,
-    ownerPref: entry.ownerPref,
     finished: entry.status === "stopped" || entry.status === "failed",
   });
 }
@@ -427,11 +425,7 @@ export function QueueBoard({
             {assignment && (
               <span
                 title={assignment.title}
-                className={`font-mono text-[11px] ${
-                  assignment.planned
-                    ? "text-[var(--color-mist)] opacity-70"
-                    : "text-[var(--color-mist)]"
-                }`}
+                className="font-mono text-[11px] text-[var(--color-mist)]"
               >
                 {assignment.label}
               </span>

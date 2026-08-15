@@ -1,94 +1,63 @@
 /**
- * AI ĐANG ĐẢM NHẬN DÒNG NÀY — luật thuần, dùng cho nhãn ở đuôi mỗi dòng bảng Hàng Đợi.
+ * TÊN KHÔI LỖI ĐANG CẦM MỘT DÒNG — luật thuần, dùng cho nhãn ở đuôi mỗi dòng bảng Hàng Đợi.
  *
  * Tệp này KHÔNG import gì cả và phải giữ như vậy: `QueueBoard` là component `"use client"`, nên
  * mọi thứ nó chạm vào đều đi thẳng vào bundle trình duyệt. Đó cũng là lý do luật này không nằm
  * trong `services/queue.ts` — tệp ấy kéo theo cả client database. Cùng bài học đã viết ở
  * `validation/retention.ts` và `worker/version.ts`.
  *
- * ── HAI SỰ THẬT KHÁC HẲN NHAU, VÀ ĐÓ LÀ TOÀN BỘ CÁI KHÓ ──────────────────────────────────
+ * ── CHỈ NÓI KHI CÓ MÁY THẬT ĐANG CẦM ────────────────────────────────────────────────────
  *
- * Một dòng ĐANG CHẠY có một khôi lỗi thật đang cầm nó: tên máy ấy là một sự kiện.
- * Một dòng ĐANG NGHỈ thì chưa ai cầm — thứ duy nhất biết được là HẠNG máy nào đủ tư cách nhận,
- * suy từ lựa chọn「Giao đàn cho」của chủ đàn. Đó là một DỰ ĐỊNH.
+ * Nhãn này trả lời đúng MỘT câu: "khôi lỗi nào đang chạy đàn này". Nó im ở mọi dòng chưa có ai
+ * cầm — đang nghỉ theo cooldown, đang xếp hàng, hay đã tắt.
  *
- * Trộn hai thứ ấy vào một câu chữ là đúng cái sai bản 0.83.0 phải đi vá: hồi đó dòng đang nghỉ
- * vẫn đeo tên máy sẽ chạy nó, và người đọc kết luận rằng đàn đã được đặt chỗ trước — trong khi
- * cái tên ấy chỉ là phỏng đoán. Nên ở đây chúng mang hai hình dạng khác nhau, và `planned` là
- * cờ để giao diện vẽ chúng khác nhau: dự định thì nhạt hơn và luôn mở đầu bằng chữ「chờ」.
+ * Bản 0.91.0 từng cho dòng chưa ai cầm một nhãn dự đoán (`chờ tông môn`, `chờ máy nào rảnh`,
+ * suy từ lựa chọn「Giao đàn cho」). Tông chủ bác ngay: chỗ ấy cần TÊN khôi lỗi, mà một dòng
+ * chưa ai nhận thì chưa có tên nào để mà nói — và bảng đã có cột trạng thái kể chuyện chờ đợi
+ * rồi (`Chờ máy nhà · thứ 2`, `Đang nghỉ — tới lượt lúc …`). Hai chỗ cùng kể một chuyện là một
+ * chỗ thừa, và cái thừa ấy còn mang hình dạng của một lời hứa.
+ *
+ * Đây cũng đúng bài học bản 0.83.0: dòng đang nghỉ KHÔNG được đeo tên máy, vì cái tên ấy chỉ là
+ * phỏng đoán. Nay thì nó không đeo gì cả.
  */
 
 /** Hạng của khôi lỗi đang cầm đàn. `personal` = máy nhà của một đạo hữu. */
 export type WorkerClass = "sect" | "personal";
 
-/** Lựa chọn「Giao đàn cho」của chủ đàn, sau khi đã gạn. */
-export type OwnerPref = "sect" | "mine" | "any";
-
-/**
- * Gạn `workerPref` thô từ database về ba giá trị biết trước.
- *
- * FAIL-OPEN: chuỗi lạ đọc như `any` — cùng lối `queuePoolOf` bên services/queue.ts và `mayServe`
- * bên dispatch.ts. Sửa tay database ra một giá trị không ai biết thì đàn vẫn được kể là ở hàng
- * chung; đọc theo chiều ngược lại là nhốt nó vào một hàng riêng không máy nào của chủ nó trực.
- */
-export function normalizeOwnerPref(raw: string | null | undefined): OwnerPref {
-  return raw === "mine" ? "mine" : raw === "sect" ? "sect" : "any";
-}
-
 export type AssignmentView = {
-  /** Nhãn ngắn ở đuôi dòng. */
+  /** Nhãn ở đuôi dòng — luôn mở đầu bằng「khôi lỗi …」để một chuỗi id không đứng trơ trọi. */
   label: string;
   /** Câu đầy đủ cho `title` — chỗ duy nhất còn nói dài được. */
   title: string;
-  /** `true` khi đây mới là DỰ ĐỊNH: chưa máy nào cầm đàn này. */
-  planned: boolean;
 };
 
 /**
- * Trả `null` khi dòng không còn ai đảm nhận NỮA — đàn đã tắt, dòng chỉ nán lại để có chỗ bấm
- * Bắt Đầu. Gán cho nó một câu「chờ …」là hứa một lượt chạy sẽ không bao giờ tới.
+ * Trả `null` khi KHÔNG có khôi lỗi nào đang cầm dòng này — và đó là phần lớn các dòng trên
+ * bảng. Ba ca im lặng, ba lý do khác nhau:
+ *
+ *   đang nghỉ / xếp hàng → chưa ai nhận, chưa có tên nào để nói.
+ *   đã tắt               → dòng chỉ nán lại để có chỗ bấm Bắt Đầu; cột `worker_id` có thể còn
+ *                          sót tên của lượt chạy vừa rồi, mà nói ra là kể một việc đã xong như
+ *                          thể đang diễn ra.
  */
 export function describeAssignment(input: {
   /** Hạng của máy đang cầm; `null` = chưa ai cầm. */
   workerKind: WorkerClass | null;
   /** Tên máy, nếu người xem được phép biết (luật ở `visibleWorkerId`). */
   workerId: string | null;
-  /** `workerPref` của CHỦ đàn: `sect` | `mine` | `any`. Giá trị lạ đọc như `any`. */
-  ownerPref: string;
   /** Đàn đã tắt hẳn (`stopped` / `failed`). */
   finished: boolean;
 }): AssignmentView | null {
-  if (input.finished) return null;
+  if (input.finished || input.workerKind === null) return null;
 
-  if (input.workerKind === "sect") {
-    return {
-      label: input.workerId ? `tông môn · ${input.workerId}` : "tông môn",
-      title: "Khôi lỗi tông môn đang chạy đàn này.",
-      planned: false,
-    };
-  }
-  if (input.workerKind === "personal") {
-    return {
-      label: input.workerId ?? "máy nhà",
-      title: "Một khôi lỗi riêng (máy nhà) đang chạy đàn này.",
-      planned: false,
-    };
-  }
-
-  // Chưa ai cầm: nói HẠNG nào đủ tư cách, theo lựa chọn của chủ đàn.
-  //
-  // Giá trị lạ đọc như `any` — fail-open, cùng lối `queuePoolOf` bên services/queue.ts và
-  // `mayServe` bên dispatch.ts: sửa tay database ra một chuỗi không ai biết thì đàn vẫn được kể
-  // là ở hàng chung, thay vì mang một nhãn hẹp hơn sự thật.
-  if (input.ownerPref === "mine") {
-    return { label: "chờ máy nhà", title: "Đàn này chỉ giao cho khôi lỗi riêng của chủ nó.", planned: true };
-  }
-  if (input.ownerPref === "sect") {
-    return { label: "chờ tông môn", title: "Đàn này chỉ giao cho khôi lỗi tông môn.", planned: true };
-  }
+  const name = input.workerKind === "sect" ? "khôi lỗi tông môn" : "khôi lỗi máy nhà";
   return {
-    label: "chờ máy nào rảnh",
-    title: "Đàn này giao cho khôi lỗi tông môn hay máy nhà đều được — máy nào rảnh trước thì nhận.",
-    planned: true,
+    // Tên máy đứng SAU tên hạng, không thay nó: một chuỗi id trần trụi không nói được nó là máy
+    // của tông môn hay máy nhà ai đó, mà đó mới là điều dòng này sinh ra để trả lời.
+    label: input.workerId ? `${name} · ${input.workerId}` : name,
+    title:
+      input.workerKind === "sect"
+        ? "Khôi lỗi tông môn đang chạy đàn này."
+        : "Khôi lỗi máy nhà đang chạy đàn này.",
   };
 }

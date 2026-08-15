@@ -1,5 +1,4 @@
 import { sql } from "drizzle-orm";
-import { normalizeOwnerPref } from "@/lib/validation/queueAssign";
 import { db } from "@/lib/db/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { getWorkerRoster, ONLINE_WINDOW_MS, type WorkerRosterEntry } from "@/lib/services/workers";
@@ -62,14 +61,6 @@ export type QueueEntry = {
   /** Khôi lỗi đang cầm job. `null` = người xem chỉ được biết LOẠI — luật ở `visibleWorkerId`. */
   workerId: string | null;
   workerKind: "sect" | "personal" | null;
-  /**
-   * `workerPref` của CHỦ đàn — hạng máy nào đủ tư cách nhận đàn này khi chưa ai cầm.
-   *
-   * Đi cùng `workerKind` chứ không thay nó: một bên là SỰ KIỆN (ai đang cầm), một bên là DỰ
-   * ĐỊNH (ai sẽ được phép cầm). Luật đọc hai thứ ấy thành một nhãn nằm ở
-   * `validation/queueAssign.ts` — thuần, nên client dùng được mà không kéo theo database.
-   */
-  ownerPref: "sect" | "mine" | "any";
   /**
    * Thứ tự trong hàng chờ, tính từ 1. `null` khi job chưa tới giờ (đang nghỉ theo cooldown)
    * hoặc đang chạy — hai trạng thái ấy không xếp hàng.
@@ -579,7 +570,6 @@ export async function getQueueSnapshot(viewer: QueueViewer): Promise<QueueSnapsh
         canInspectSect,
       ),
       workerKind,
-      ownerPref: normalizeOwnerPref(row.owner_pref == null ? null : String(row.owner_pref)),
       queuePosition: slot.position,
       queuePool: slot.pool,
       poolHasWorker: slot.poolHasWorker,

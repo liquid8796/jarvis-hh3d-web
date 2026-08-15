@@ -11,6 +11,34 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.92.0 — nhãn khôi lỗi trở lại đúng nghĩa: chỉ nói khi CÓ máy đang cầm
+
+Bản 0.91.0 hiểu sai ý tông chủ. Câu「hiển thị loại khôi lỗi đang đảm nhận」được đọc thành「nói cho
+mọi dòng, kể cả dòng chưa ai nhận」, nên dòng đang nghỉ mang một nhãn DỰ ĐOÁN suy từ「Giao đàn
+cho」: `chờ tông môn`, `chờ máy nào rảnh`. Tông chủ bác ngay trong ngày — chỗ ấy cần **tên khôi
+lỗi**, mà một dòng chưa ai nhận thì chưa có tên nào để mà nói.
+
+Nay luật gọn lại còn một câu: **có máy đang cầm thì nói tên, không thì im.**
+
+| dòng | nhãn |
+|---|---|
+| đang chạy, tông môn | `khôi lỗi tông môn` (+ tên máy khi người xem được biết) |
+| đang chạy, máy nhà | `khôi lỗi máy nhà` (+ tên máy) |
+| đang nghỉ · đang xếp hàng · đã tắt | *(không nhãn)* |
+
+Tên hạng đứng TRƯỚC tên máy chứ không bị nó thay: một chuỗi id trần trụi không nói được đó là máy
+của tông môn hay máy nhà ai đó, mà đấy mới là điều cái nhãn này sinh ra để trả lời.
+
+Cột trạng thái vốn đã kể phần chờ đợi —「Đang nghỉ — tới lượt lúc …」,「Chờ máy nhà · thứ 2」— nên
+nhãn dự đoán ở đuôi dòng vừa thừa vừa mang hình dạng một lời hứa. Đây cũng đúng bài học 0.83.0:
+dòng đang nghỉ KHÔNG được đeo tên máy vì cái tên ấy chỉ là phỏng đoán. Nay nó không đeo gì cả.
+
+Gỡ luôn `ownerPref` khỏi `QueueEntry` và `normalizeOwnerPref` khỏi lớp thuần — cả hai sinh ra chỉ
+để nuôi nhãn dự đoán, giữ lại là nuôi mã chết.
+
+`verify:queue-pools` còn **31 khẳng định** (0.91.0 phình lên 40 vì mấy ca dự đoán). Hai ca đột
+biến đã thử, cả hai đỏ đúng chỗ: cho dòng chưa ai cầm cũng ra nhãn; và để id trần trụi thay tên hạng.
+
 ## 0.91.0 — mỗi dòng Hàng Đợi nói ra AI ĐANG ĐẢM NHẬN nó
 
 Tông chủ nêu: bảng Hàng Đợi cần hiện loại khôi lỗi đảm nhận từng dòng. Đo trước khi sửa — chụp

@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "0.91.0",
+    date: "2026-08-15",
+    lines: [
+      "Bảng Hàng Đợi nay ghi rõ ở từng dòng: máy nào đang chạy đàn ấy, hoặc nó đang chờ loại máy nào.",
+    ],
+  },
+  {
     version: "0.90.0",
     date: "2026-08-15",
     lines: [

@@ -17,6 +17,7 @@
  * và `verify:deploy-targets`.
  */
 import { assignQueueSlots, orderQueueRows, type QueueCandidate } from "../src/lib/services/queue";
+import { describeAssignment, normalizeOwnerPref } from "../src/lib/validation/queueAssign";
 
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);
@@ -242,4 +243,46 @@ console.log("Xếp chỗ hàng đợi — số thứ tự phải thuộc về đ
   );
 }
 
+// ---- AI ĐANG ĐẢM NHẬN MỘT DÒNG (describeAssignment) ----------------------------------------
+//
+// Nhãn này đứng ở đuôi MỌI dòng còn sống, nên nó là câu trả lời người ta đọc nhiều nhất trên
+// bảng. Cái sai của nó không kêu: một dòng đang nghỉ mà đeo nhãn như thể đã có máy cầm thì
+// người đọc tưởng đàn đã được đặt chỗ — đúng cái bản 0.83.0 phải đi vá.
+{
+  const held = (workerKind: "sect" | "personal", workerId: string | null) =>
+    describeAssignment({ workerKind, workerId, ownerPref: "any", finished: false });
+  const waiting = (ownerPref: string) =>
+    describeAssignment({ workerKind: null, workerId: null, ownerPref, finished: false });
+
+  // ĐANG CẦM — sự kiện. Không bao giờ mang cờ `planned`.
+  check("tông môn kèm tên máy khi được phép biết", held("sect", "tong-mon-khoiloi")?.label === "tông môn · tong-mon-khoiloi");
+  check("giấu tên máy thì vẫn nói được HẠNG", held("sect", null)?.label === "tông môn");
+  check("máy nhà có tên thì hiện tên", held("personal", "may-nha-cua-ai-do")?.label === "may-nha-cua-ai-do");
+  check("máy nhà của người khác: chỉ hiện hạng", held("personal", null)?.label === "máy nhà");
+  check("đang cầm KHÔNG phải dự định", held("sect", null)?.planned === false);
+  check("…cả hai hạng đều vậy", held("personal", null)?.planned === false);
+
+  // CHƯA AI CẦM — dự định, suy từ lựa chọn của chủ đàn.
+  check("đàn chỉ giao tông môn", waiting("sect")?.label === "chờ tông môn");
+  check("đàn chỉ giao máy nhà", waiting("mine")?.label === "chờ máy nhà");
+  check("đàn ai rảnh cũng được", waiting("any")?.label === "chờ máy nào rảnh");
+  check("chưa ai cầm thì phải mang cờ dự định", waiting("mine")?.planned === true);
+  check("…và luôn mở đầu bằng chữ『chờ』", waiting("sect")!.label.startsWith("chờ"));
+
+  // FAIL-OPEN: chuỗi lạ đọc như `any` — cùng lối `queuePoolOf` và `mayServe`. Đọc theo chiều
+  // ngược lại là nhốt đàn vào một hàng riêng không máy nào của chủ nó trực.
+  check("giá trị lạ đọc như『ai rảnh cũng được』", waiting("khong-ai-biet")?.label === "chờ máy nào rảnh");
+  check("thiếu hẳn lựa chọn cũng vậy", normalizeOwnerPref(null) === "any");
+  check("hai giá trị biết trước giữ nguyên", normalizeOwnerPref("mine") === "mine" && normalizeOwnerPref("sect") === "sect");
+
+  // ĐÀN ĐÃ TẮT — không ai đảm nhận NỮA. Gán cho nó một câu『chờ …』là hứa một lượt chạy sẽ
+  // không bao giờ tới; dòng ấy chỉ đang nán lại để có chỗ bấm Bắt Đầu.
+  check("dòng đã tắt: KHÔNG nhãn nào cả", describeAssignment({ workerKind: null, workerId: null, ownerPref: "sect", finished: true }) === null);
+  check("…kể cả khi cột worker của nó còn sót tên một cái máy", describeAssignment({ workerKind: "sect", workerId: "x", ownerPref: "any", finished: true }) === null);
+
+  // Mỗi nhãn phải có câu đầy đủ đi kèm: chỗ duy nhất còn nói dài được là `title`.
+  check("mọi nhãn đều kèm một câu đầy đủ cho title", [held("sect", null), held("personal", null), waiting("sect"), waiting("mine"), waiting("any")].every(
+      (view) => (view?.title.length ?? 0) > 20,
+    ));
+}
 console.log(`\n✔ Xếp chỗ hàng đợi: ${checks} khẳng định, tất cả đứng vững.`);

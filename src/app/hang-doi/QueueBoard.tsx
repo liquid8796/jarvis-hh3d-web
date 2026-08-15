@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "re
 import { forceStartJobAction, forceStopJobAction } from "@/app/actions/queue";
 import type { QueueEntry, QueueSnapshot } from "@/lib/services/queue";
 import type { JobStatus } from "@/lib/realtime/dashboardTypes";
+import { describeAssignment } from "@/lib/validation/queueAssign";
 import { PageSizeSelect, Pager, usePageSize, usePaged } from "@/components/Pager";
 
 /**
@@ -126,20 +127,27 @@ function questPhrase(entry: QueueEntry): string | null {
 }
 
 /**
- * Nhãn khôi lỗi ở đuôi một dòng đàn.
+ * Nhãn AI ĐANG ĐẢM NHẬN ở đuôi một dòng đàn — có mặt ở MỌI dòng còn sống, không riêng dòng
+ * đang chạy.
  *
- * KHÔNG hỏi quyền ở đây, và cũng không có chỗ nào để hỏi: `workerId` chỉ tới nơi này khi
- * service đã quyết là người xem được biết (xem `visibleWorkerId` trong queue.ts). Giao diện
- * chỉ kể lại thứ được đưa — cùng lẽ với `questPhrase` ngay trên.
+ * Trước 15/08/2026 nhãn này chỉ hiện khi đã có khôi lỗi cầm đàn, nên mười dòng「Đang nghỉ」—
+ * trạng thái thường gặp nhất của bảng — không nói gì về việc ai sẽ chạy chúng. Tông chủ nêu:
+ * mỗi dòng cần thấy loại khôi lỗi đảm nhận nó.
  *
- * Có id thì vẫn giữ chữ「tông môn」đứng trước: một chuỗi id trần trụi không nói được nó là máy
- * của tông môn hay máy nhà ai đó, mà đó mới là điều dòng này sinh ra để trả lời.
+ * Luật nằm ở `validation/queueAssign.ts` (thuần, `verify:queue-pools` bao từng nhánh), không
+ * nằm ở đây: nó phải phân biệt được SỰ KIỆN (máy đang cầm) với DỰ ĐỊNH (hạng máy đủ tư cách),
+ * và đó đúng là chỗ bản 0.83.0 từng sai khi cho dòng đang nghỉ đeo tên một cái máy cụ thể.
+ *
+ * KHÔNG hỏi quyền ở đây: `workerId` chỉ tới nơi này khi service đã quyết là người xem được
+ * biết (xem `visibleWorkerId` trong queue.ts). Giao diện chỉ kể lại thứ được đưa.
  */
-function workerLabel(entry: QueueEntry): string {
-  if (entry.workerKind === "sect") {
-    return entry.workerId ? `tông môn · ${entry.workerId}` : "khôi lỗi tông môn";
-  }
-  return entry.workerId ?? "khôi lỗi riêng";
+function assignmentOf(entry: QueueEntry) {
+  return describeAssignment({
+    workerKind: entry.workerKind,
+    workerId: entry.workerId,
+    ownerPref: entry.ownerPref,
+    finished: entry.status === "stopped" || entry.status === "failed",
+  });
 }
 
 /** "vắng 12 phút" — mốc điểm danh chỉ đi xuống dây khi khôi lỗi đang vắng (xem workers.ts). */
@@ -354,6 +362,7 @@ export function QueueBoard({
    */
   const renderRow = (entry: QueueEntry) => {
     const quests = questPhrase(entry);
+    const assignment = assignmentOf(entry);
     const progress = entry.progress;
     const busy = pending !== null;
 
@@ -413,11 +422,18 @@ export function QueueBoard({
         {/* Cụm đuôi dòng gom làm MỘT và tự đẩy sang phải. Trước đây nhãn khôi lỗi tự mang
             `ml-auto`, nhưng dòng đang xếp hàng thì chưa có khôi lỗi nào — nút Dừng sẽ dính vào
             giữa dòng. Gom lại thì mọi ca đều thẳng mép phải. */}
-        {(entry.workerKind || canStop(entry) || canStart(entry)) && (
+        {(assignment || canStop(entry) || canStart(entry)) && (
           <span className="ml-auto flex items-center gap-2">
-            {entry.workerKind && (
-              <span className="font-mono text-[11px] text-[var(--color-mist)]">
-                {workerLabel(entry)}
+            {assignment && (
+              <span
+                title={assignment.title}
+                className={`font-mono text-[11px] ${
+                  assignment.planned
+                    ? "text-[var(--color-mist)] opacity-70"
+                    : "text-[var(--color-mist)]"
+                }`}
+              >
+                {assignment.label}
               </span>
             )}
             {canStop(entry) && (
@@ -637,8 +653,7 @@ export function QueueBoard({
           {!hasOwnWorker && (
             <p className="mt-4 text-xs leading-relaxed text-[var(--color-mist)]">
               Đạo hữu chưa nuôi khôi lỗi riêng nào — đàn của mình đang trông cả vào khôi lỗi tông
-              môn, và với hầu hết mọi người thì đó đúng là cách nhàn nhất. Muốn lượt chạy đi từ máy
-              nhà thì vào trang <strong className="text-[var(--color-parchment)]">Auto</strong>, mục
+              môn. Muốn lượt chạy đi từ máy nhà thì vào trang <strong className="text-[var(--color-parchment)]">Auto</strong>, mục
               Khôi Lỗi.
             </p>
           )}

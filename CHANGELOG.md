@@ -11,6 +11,47 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.91.0 — mỗi dòng Hàng Đợi nói ra AI ĐANG ĐẢM NHẬN nó
+
+Tông chủ nêu: bảng Hàng Đợi cần hiện loại khôi lỗi đảm nhận từng dòng. Đo trước khi sửa — chụp
+bảng trên trạm đang phục vụ — thì thấy đúng chỗ hụt: `0 đang chạy · 0 chờ tới lượt · 10 đang
+nghỉ`, và **mười dòng ấy không mang nhãn nào cả**. Nhãn cũ chỉ hiện khi đã có máy CẦM đàn, mà
+「đang nghỉ」lại là trạng thái thường gặp nhất của bảng.
+
+**Hai sự thật khác hẳn nhau, và đó là toàn bộ cái khó.** Dòng đang chạy có một cái máy thật đang
+cầm nó — đó là SỰ KIỆN. Dòng đang nghỉ thì chưa ai cầm; thứ duy nhất biết được là HẠNG máy nào đủ
+tư cách nhận, suy từ lựa chọn「Giao đàn cho」của chủ đàn — đó là DỰ ĐỊNH. Trộn hai thứ ấy vào một
+câu chữ chính là cái sai bản 0.83.0 đã phải đi vá (dòng đang nghỉ đeo tên máy sẽ chạy nó, người
+đọc tưởng đàn đã được đặt chỗ trước).
+
+Nên chúng mang hai hình dạng khác nhau, và cờ `planned` là thứ giao diện dùng để vẽ khác nhau:
+
+| dòng | nhãn | dáng |
+|---|---|---|
+| đang chạy, tông môn | `tông môn · <tên máy>` (hoặc `tông môn` khi người xem không được biết tên) | đậm |
+| đang chạy, máy nhà | `<tên máy>` hoặc `máy nhà` | đậm |
+| chưa ai cầm | `chờ tông môn` · `chờ máy nhà` · `chờ máy nào rảnh` | nhạt hơn, luôn mở đầu bằng「chờ」|
+| đã tắt | *(không nhãn)* | — |
+
+Dòng ĐÃ TẮT không mang nhãn nào: nó chỉ nán lại 30 phút để có chỗ bấm Bắt Đầu, nên một câu
+「chờ …」ở đó là hứa một lượt chạy sẽ không bao giờ tới.
+
+Luật nằm ở `validation/queueAssign.ts` — **thuần và không import gì**, vì `QueueBoard` là
+`"use client"`: đặt nó trong `services/queue.ts` là kéo cả client database vào bundle trình duyệt
+(bài học đã chép ở `validation/retention.ts` và `worker/version.ts`). `QueueEntry` vì thế mang
+thêm `ownerPref`, đi CÙNG `workerKind` chứ không thay nó — một bên là ai đang cầm, một bên là ai
+được phép cầm.
+
+Giá trị `workerPref` lạ đọc như `any` (fail-open), cùng lối `queuePoolOf` và `mayServe`: sửa tay
+database ra một chuỗi không ai biết thì đàn vẫn được kể là ở hàng chung, thay vì mang một nhãn hẹp
+hơn sự thật.
+
+`verify:queue-pools` lên **40 khẳng định** (+14). Hai ca đột biến đã thử, cả hai đỏ đúng chỗ: bỏ
+nhánh「dòng đã tắt」; và bỏ fail-open cho giá trị lạ.
+
+Kèm một câu chữ tông chủ yêu cầu gỡ khỏi thẻ Khôi Lỗi:「và với hầu hết mọi người thì đó đúng là
+cách nhàn nhất」.
+
 ## 0.90.0 — khôi lỗi trọ thôi khai「1.0.0」, và lưới chặn lockfile lệch bản
 
 Tông chủ phát hiện: mọi khôi lỗi trọ trên bảng Khôi Lỗi đều đứng im ở `1.0.0`. Không phải chúng

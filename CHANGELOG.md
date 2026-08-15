@@ -11,6 +11,64 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.95.0 — Hỷ Sự Đường: một phòng hỏng thôi giết những phòng chưa ai ghé
+
+Tông chủ báo「quest chúc còn sót các phòng cưới」kèm bản ghi `hy-su-duong-20260815-205221`, và
+ghi chú tự tay viết trong lúc quay: *"cần check kỹ toàn bộ danh sách tiệc cưới nhé, phòng nào có
+Trạng thái: Chưa chúc thì vào chúc ngay bất kể có Trạng thái lì xì: Đã phát lì xì hay chưa"*.
+
+**Lì xì chưa bao giờ là bộ lọc** — đọc lại `show_all_wedding` trong `network.json` thì 8 phòng
+đều `has_blessed: false`, và bộ lọc chỉ hỏi `.wedding-now-blessing-status`. Nên chỗ sót nằm ở
+nơi khác, và nó nằm ngay trong bộ chạy thử của chính repo này, chép nguyên văn một sự cố
+07/08:「Hỷ Sự Đường: repeat vòng 3: Trang chưa dựng xong sau 25s」.
+
+Đó mới là cơ chế: `executeSteps` trả lỗi ở bước bắt buộc đầu tiên, `repeat` bọc lại thành
+`repeat vòng N: …` rồi **kết liễu cả nhiệm vụ**. Thân vòng có ba bước bắt buộc nằm trong phòng
+(chờ form 25s, chờ hộp xác nhận 8s, chờ nút gửi biến mất 15s), nên **bất kỳ phòng nào lạ cũng
+cắt cụt phần đuôi danh sách** — hai phòng đầu chúc xong, phòng thứ ba vấp, phần còn lại không ai
+ghé. Người dùng thấy đúng một thứ: "còn sót phòng".
+
+Cái vá là **cách ly lỗi theo từng phòng**, không đụng gì tới `engine.mjs`:
+
+- Mọi bước TRONG phòng thành `optional` (vẫn chờ đủ số giây cũ, chỉ thôi kết liễu script).
+- Thêm một bước **phán xử** bắt buộc — nó chỉ đọc DOM rồi ghi sổ nên không bao giờ hỏng vì
+  trang: nút gửi mất = `ok`, còn nguyên = `fail` kèm lý do, phòng vốn đã chúc = `skip`.
+- Sổ kết cục `__jvz_hy_su_log` đi cùng `__jvz_hy_su_seen`, và bước đếm cuối mỗi vòng kể ra
+  「chúc được N, TRƯỢT M」**gọi đích danh từng phòng trượt**.
+
+Lời hứa cũ「gửi trượt phải kêu to, không nhận vơ là xong」được giữ, chỉ đổi chỗ đứng: trước đây
+nó to bằng cách giết luôn các phòng chưa ghé. Nay nó to bằng tên phòng trong lời kể, cộng cờ
+`jvz-hy-su-all-failed` — ghé phòng nào cũng trượt thì vẫn là một lượt **hỏng thật**, vì đó là
+"trang đã đổi", không phải "hôm nay không có gì để chúc".
+
+Ba thứ đi kèm, mỗi thứ tự nó là một đường sót phòng:
+
+- **Trần vòng lặp 15 → 40.** Chạm trần thì `repeat` kết thúc ÊM (không phải lỗi), quest báo xong,
+  phòng thứ 16 trở đi biến mất không dấu vết. Trần cũ đặt theo con số 6 tiệc của tháng trước;
+  bản ghi 15/08 đếm 8. Trần thật của lượt chạy vẫn là `maxSeconds`.
+- **Duyệt đúng thứ tự danh sách.** Bản cũ đẩy mọi phòng Hồng Nhan (`/hong-nhan`) xuống cuối vì
+  chỉ phòng Đạo Lữ có bản ghi hình. Tông chủ chốt 15/08: vào cả, không phân biệt thứ tự — nay
+  làm được, vì một trang lạ chỉ mất chính phòng ấy.
+- **Lời kể tự chứng minh chuyện lì xì.** Mỗi lần mở modal kể thêm số phòng `.li-xi-sent`, và
+  dòng「Vào phòng」đánh dấu phòng nào đã phát lì xì — để lần sau không ai phải quay một bản ghi
+  mới chỉ để hỏi lại câu ấy.
+
+Fixture của bộ chạy thử được chép lại từ `dom/02-click.html` của bản ghi: thêm
+`<p class="wedding-now-li-xi-status">` (bản dựng tay trước đây thiếu hẳn, nên không phép thử nào
+chạm được tới câu hỏi của tông chủ) và badge loại phòng. Ba ca mới: phòng lạ nằm GIỮA danh sách
+→ phòng đứng sau nó vẫn được chúc; phòng「Đã phát lì xì」vẫn được vào; ghé đâu cũng trượt → nhiệm
+vụ hỏng thật.
+
+`schemaVersion` 60 → 61 ở cả ba chỗ (C#, `profile.json`, chốt trong `smokeQuestEngine.mjs`) —
+desktop chỉ thay hồ sơ đã lưu khi schema tăng.
+
+**Bản desktop sửa cùng lượt**: `DefaultQuestProfile.cs` là nguồn, `profile.json` ghép từ bản xuất
+của chính nó. Đo được lúc ghép: khối `hy-su-duong-thuong` trong `profile.json` trùng bản xuất từ
+HEAD ở MỌI trường chạy được, chỉ lệch chữ `note` — tức web đã trôi khỏi nguồn ở phần chú thích
+từ trước; lượt này ghép cả note nên hai bên khớp lại.
+
+---
+
 ## 0.94.0 — Vòng Quay Phúc Vận lấy được vòng quay thứ tư
 
 Tông chủ báo: mỗi ngày chỉ quay 3 vòng trong khi trần là 4. Script quest KHÔNG sai — cả hai bản

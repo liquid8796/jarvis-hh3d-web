@@ -504,14 +504,25 @@ document.addEventListener('click', async (e) => {
 // sách tiệc nạp ASYNC (~80ms — đủ chậm để bắt lỗi phán "hết phòng chưa chúc" trên một danh
 // sách chưa kịp về), mỗi hàng mang trạng thái chúc riêng và link "Vào Chúc Ngay" target=_blank
 // — đúng cái link mà flow KHÔNG được click.
+// Hàng của modal chép NGUYÊN VĂN từ bản ghi 15/08/2026 (hy-su-duong-20260815-205221,
+// dom/02-click.html) — kể cả cái mà bản dựng tay trước đây bỏ mất: <p.wedding-now-li-xi-status>
+// đứng TRƯỚC <p.wedding-now-blessing-status>. Đúng cặp span ấy (`li-xi-sent`/`li-xi-not-sent`)
+// là thứ ghi chú của người ghi hình chỉ vào — "phòng nào Chưa chúc thì vào chúc ngay bất kể có
+// Đã phát lì xì hay chưa" — nên fixture thiếu nó thì không phép thử nào chứng minh được điều đó.
+// Badge loại phòng cũng là thật: tên cặp đôi trong lời kể mang cả "💕 Đạo Lữ" ở đầu.
 const hySuHallPage = (rooms, blessed) => {
   const rows = rooms
     .map((room) => {
       const done = blessed.has(room.id);
-      const href = room.type === "hong-nhan" ? `/hong-nhan/?id=${room.id}` : `/phong-cuoi?id=${room.id}`;
-      return `<div class="wedding-now-item${room.type === "hong-nhan" ? " type-hong-nhan" : ""}">
+      const hongNhan = room.type === "hong-nhan";
+      const href = hongNhan ? `/hong-nhan/?id=${room.id}` : `/phong-cuoi?id=${room.id}`;
+      const badge = hongNhan
+        ? '<span class="wedding-now-type-badge">💕 Hồng Nhan</span>'
+        : '<span class="wedding-now-type-badge dao-lu">💕 Đạo Lữ</span>';
+      return `<div class="wedding-now-item${hongNhan ? " type-hong-nhan" : ""}">
         <div class="wedding-now-info">
-          <p class="wedding-now-couple"><strong>${room.couple}</strong></p>
+          <p class="wedding-now-couple">${badge} <strong>${room.couple}</strong></p>
+          <p class="wedding-now-li-xi-status">Trạng thái lì xì: <span class="${room.lixiSent ? "li-xi-sent" : "li-xi-not-sent"}">${room.lixiSent ? "Đã phát lì xì" : "Chưa phát lì xì"}</span></p>
           <p class="wedding-now-blessing-status">Trạng thái: <span class="${done ? "blessed" : "not-blessed"}">${done ? "Đã chúc" : "Chưa chúc"}</span></p>
         </div>
         <div class="wedding-now-action"><a href="${href}" class="wedding-now-btn" target="_blank">Vào Chúc Ngay</a></div>
@@ -539,6 +550,14 @@ document.querySelector('.hy-su-btn').addEventListener('click', () => {
 // không .blessing-form — và thay bằng .blessing-message ("Đạo hữu đã gửi lời chúc phúc cho cặp
 // đôi này!"). Fixture cũ vẫn dựng cả form, nên nó không bao giờ bắt được chuyện một lượt chạy
 // nhắm vào phòng đã chúc sẽ chết ở bước chờ form.
+// Trang phòng "lạ": tải được, render xong, nhưng KHÔNG có form chúc lẫn dấu đã chúc. Đây là
+// hình dạng mà một trang đổi markup — hoặc một loại phòng chưa từng được ghi hình — sẽ hiện ra,
+// và tới 15/08/2026 nó là thứ giết cả lượt chạy ở đúng phòng gặp nó, bỏ mặc các phòng phía sau
+// (sự cố có thật: "Hỷ Sự Đường: repeat vòng 3: Trang chưa dựng xong sau 25s").
+const hySuBrokenRoomPage = (id) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+<div class="blessing-section"><h2>Gửi Lời Chúc Phúc</h2>
+<p>Phòng cưới #${id} đang bảo trì.</p></div>`;
+
 const hySuRoomPage = (id, alreadyBlessed, withLixi) => `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div class="blessing-section"><h2>Gửi Lời Chúc Phúc</h2>
 ${alreadyBlessed ? '<div class="blessing-message"><p>Đạo hữu đã gửi lời chúc phúc cho cặp đôi này! 🌸</p></div>' : `<div class="blessing-form">
@@ -1489,8 +1508,15 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // jvz-km-ripe, quét dòng mình TRƯỚC mọi hành động); (c) trần ngày đọc từ .stats-container
     // (.stat-tuvi/.stat-tinhthach — selector đích danh thay cho quét chữ toàn body), và mọi
     // dấu vết「tối đa 2 lần/ngày」bị gỡ: trần 15/08 là 600/200, tức BA lần nhận.
-    "hồ sơ đang ở schema 60",
-    loadProfileForSchema().schemaVersion === 60,
+    // 61 = Hỷ Sự Đường thôi bỏ sót phòng (bản ghi hy-su-duong-20260815-205221): mỗi phòng tự
+    // chịu kết cục của mình — mọi bước TRONG phòng thành tuỳ chọn, thêm bước phán xử ghi
+    // ok/skip/fail vào sổ, nên một phòng lạ không còn giết những phòng chưa ai ghé (sự cố có
+    // thật: "repeat vòng 3: Trang chưa dựng xong sau 25s"). Kèm theo: duyệt ĐÚNG thứ tự danh
+    // sách thay vì đẩy /hong-nhan xuống cuối, trần vòng 15 → 40 (bản ghi đếm 8 tiệc mở cùng
+    // lúc, chạm trần là bỏ sót trong im lặng), và cờ jvz-hy-su-all-failed để "trượt sạch" vẫn
+    // là một lượt hỏng thật chứ không phải một lượt báo xong.
+    "hồ sơ đang ở schema 61",
+    loadProfileForSchema().schemaVersion === 61,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1732,10 +1758,11 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
           (s) => (s.script || "").includes("__jvz_mc_chest") && !(s.script || "").includes("__jvzChestHook"))?.script],
         ["MazeCapScanScript", maze.steps.find(
           (s) => s.action === "evaluateJavaScript" && (s.script || "").includes("cap-scan"))?.script],
-        ["WeddingResetSeenScript", weddingScript("sổ phòng đã ghé được xoá")],
+        ["WeddingResetSeenScript", weddingScript("sổ kết cục được xoá")],
         ["WeddingTallyScript", weddingScript("jvz-hy-su-done")],
         ["WeddingPickRoomScript", weddingScript("location.assign")],
         ["WeddingRoomStateScript", weddingScript("jvz-can-bless")],
+        ["WeddingVerdictScript", weddingScript("GỬI TRƯỢT")],
       ];
 
       // Sáu đoạn script Khoáng Mạch (schema 58) — cùng số phận hai-nơi-một-luật với Mê Cung.
@@ -1922,15 +1949,18 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     "</body>";
 
   // Hỷ Sự Đường nhớ trạng thái PHÍA SERVER như site thật: chúc rồi thì lần mở modal sau
-  // phải thấy "Đã chúc". Phòng hồng-nhan cố ý đứng ĐẦU danh sách — flow phải chúc hai
-  // phòng /phong-cuoi (dạng trang đã có recording) trước rồi mới tới nó.
+  // phải thấy "Đã chúc". Phòng hồng-nhan cố ý đứng ĐẦU danh sách: từ 15/08/2026 flow đi ĐÚNG
+  // THỨ TỰ danh sách (tông chủ chốt), nên nó phải được ghé TRƯỚC hai phòng /phong-cuoi.
+  // `lixiSent` của phòng 2533 là phòng "Đã phát lì xì" trong bản ghi 15/08 — phòng mà ghi chú
+  // của người ghi hình dặn thẳng là VẪN phải vào chúc.
   const hySuRooms = [
     { id: "230", type: "hong-nhan", couple: "Trái Tim Mỹ Nhân 💕 Trái Tim Bao Dung" },
     { id: "2534", type: "dao-lu", couple: "ミ★Ôɴԍтʀùмнн3ᴅ★彡 & 𝙐𝙮ê𝙣𝙉𝙝𝙞" },
-    { id: "2533", type: "dao-lu", couple: "1 Trái tim 1 Ngừi iu & Trái Tim Bất Chấp" },
+    { id: "2533", type: "dao-lu", couple: "1 Trái tim 1 Ngừi iu & Trái Tim Bất Chấp", lixiSent: true },
   ];
   const hySuBlessed = new Map(); // id → lời chúc đã gửi, theo thứ tự vào phòng
   const hySuLixi = [];
+  const hySuBrokenRooms = new Set(); // id → trang phòng trả về hình dạng lạ (không form, không dấu đã chúc)
   let bossBroken = false;
   let bossStateMs = 0;
   let bossCooling = false;
@@ -2030,7 +2060,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     else if (path === "/tien-duyen") res.end(hySuHallPage(hySuRooms, hySuBlessed));
     else if (path === "/phong-cuoi" || path === "/hong-nhan") {
       const id = url.searchParams.get("id") ?? "";
-      res.end(hySuRoomPage(id, hySuBlessed.has(id), id === "2534"));
+      res.end(hySuBrokenRooms.has(id) ? hySuBrokenRoomPage(id) : hySuRoomPage(id, hySuBlessed.has(id), id === "2534"));
     }
     else if (path === "/hy-su-blessed") {
       hySuBlessed.set(url.searchParams.get("id") ?? "", url.searchParams.get("msg") ?? "");
@@ -2607,9 +2637,21 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     const hySuFirst = await run(hySu);
     check("chúc hết các phòng rồi hoàn tất", hySuFirst.outcome === "completed", `${hySuFirst.outcome}: ${hySuFirst.message}`);
     check(
-      "cả ba phòng đều được chúc, /phong-cuoi (đã có recording) đi trước /hong-nhan (chưa)",
-      JSON.stringify([...hySuBlessed.keys()]) === JSON.stringify(["2534", "2533", "230"]),
+      "cả ba phòng đều được chúc, ĐÚNG THỨ TỰ danh sách (hồng-nhan đứng đầu thì đi đầu)",
+      JSON.stringify([...hySuBlessed.keys()]) === JSON.stringify(["230", "2534", "2533"]),
       [...hySuBlessed.keys()].join(","),
+    );
+    // Ghi chú của người ghi hình 15/08: "phòng nào có Trạng thái: Chưa chúc thì vào chúc ngay
+    // bất kể có Trạng thái lì xì: Đã phát lì xì hay chưa". Phòng 2533 mang đúng cái nhãn ấy.
+    check(
+      "phòng ĐÃ PHÁT LÌ XÌ vẫn được vào chúc, không bị bộ lọc gạt ra",
+      hySuBlessed.has("2533"),
+      [...hySuBlessed.keys()].join(","),
+    );
+    check(
+      "…và lời kể nói ra số phòng đã phát lì xì, để lượt chạy tự chứng minh điều đó",
+      infos.some((m) => m.startsWith("Hỷ Sự Đường:") && m.includes("1 đã phát lì xì")),
+      infos.filter((m) => m.startsWith("Hỷ Sự Đường:")).slice(-1)[0] ?? "(không có dòng nào)",
     );
     check(
       "lời chúc gửi đi là một lựa chọn THẬT của select — chọn ngẫu nhiên không rơi vào ô trống",
@@ -2675,6 +2717,53 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         entered.length === new Set(entered).size,
         entered.join(" / "),
       );
+    }
+
+    // ——— Cái vá của 15/08/2026: một phòng hỏng KHÔNG được giết những phòng chưa ai ghé.
+    //
+    // Đây là hình dạng tông chủ báo ("quest chúc còn sót các phòng cưới") và là hình dạng bộ
+    // chạy thử này đã ghi nguyên văn ở mục "Trang chưa dựng xong": engine kết liễu cả script
+    // ngay khi một bước bắt buộc trong thân repeat hỏng, nên phòng thứ hai vấp là phòng thứ ba
+    // không ai ghé. Phòng ở GIỮA danh sách được chọn làm phòng hỏng: nó chứng minh cả hai vế —
+    // phòng trước nó vẫn xong, phòng SAU nó vẫn được ghé.
+    {
+      hySuBlessed.clear();
+      hySuBrokenRooms.add("2534");
+      const before = infos.length;
+      const partial = await run(hySu);
+      const said = infos.slice(before);
+      check(
+        "một phòng lạ giữa danh sách → lượt vẫn xong, KHÔNG chết ở đó",
+        partial.outcome === "completed",
+        `${partial.outcome}: ${partial.message}`,
+      );
+      check(
+        "…và hai phòng còn lại (cả phòng ĐỨNG SAU phòng hỏng) vẫn được chúc",
+        JSON.stringify([...hySuBlessed.keys()]) === JSON.stringify(["230", "2533"]),
+        [...hySuBlessed.keys()].join(","),
+      );
+      check(
+        "…và phòng hỏng được gọi ĐÍCH DANH trong lời kể cuối lượt, không lặng lẽ biến mất",
+        said.some((m) => m.includes("TRƯỢT 1") && m.includes("𝙐𝙮ê𝙣𝙉𝙝𝙞")),
+        said.filter((m) => m.startsWith("Hỷ Sự Đường:")).slice(-1)[0] ?? "(không có dòng nào)",
+      );
+      hySuBrokenRooms.clear();
+    }
+
+    // …nhưng "mỗi phòng tự chịu lỗi" KHÔNG được biến "cả trang đã đổi" thành một lượt báo xong.
+    // Ghé phòng nào cũng trượt = hỏng thật, và phải hỏng to.
+    {
+      hySuBlessed.clear();
+      for (const room of hySuRooms) hySuBrokenRooms.add(room.id);
+      const allBad = await run(hySu);
+      check(
+        "ghé phòng nào cũng trượt → nhiệm vụ HỎNG, không nhận vơ là xong",
+        allBad.outcome === "failed",
+        `${allBad.outcome}: ${allBad.message}`,
+      );
+      check("…và không gửi được lời chúc nào", hySuBlessed.size === 0, String(hySuBlessed.size));
+      hySuBrokenRooms.clear();
+      hySuBlessed.clear();
     }
 
     // Hết mùa cưới: modal mở ra danh sách RỖNG — phải phân biệt được với "đã chúc hết".

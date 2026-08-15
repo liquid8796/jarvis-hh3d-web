@@ -11,6 +11,19 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 0.93.0 — gỡ khối dặn dò dưới ô soạn bản tin
+
+Tông chủ yêu cầu gỡ bốn gạch đầu dòng nằm dưới ô soạn bản tin (tab Bản Tin, trang Tông Môn).
+
+Ba điều chúng từng nói vẫn ĐÚNG y nguyên — hành vi không đổi một dòng nào — nên chúng dời vào
+bình chú đầu `ChangelogPanel.tsx`, chỗ người sửa mã đọc: ô rỗng = trả về danh sách gốc; gỡ một
+mục là gỡ hẳn, gõ lại số bản là lấy lại; mục của bản phát hành sau vẫn tự hiện. Xoá thẳng mà
+không chép lại chỗ nào là để người sau phải suy ra ba luật ấy từ hai hàm `mergeReleaseNotes` và
+`hiddenVersionsFor`.
+
+Dòng cảnh báo「Chưa có mục nào cho v0.93.0」thì GIỮ: nó không phải lời dặn chung chung mà là một
+phép đo trên đúng bài đang gõ, và nó chỉ hiện khi có chuyện.
+
 ## 0.92.0 — nhãn khôi lỗi trở lại đúng nghĩa: chỉ nói khi CÓ máy đang cầm
 
 Bản 0.91.0 hiểu sai ý tông chủ. Câu「hiển thị loại khôi lỗi đang đảm nhận」được đọc thành「nói cho

@@ -15,6 +15,16 @@ import { MAX_LINES_PER_NOTE, MAX_LINE_LENGTH, formatNotesText, parseNotesText, t
  * XEM TRƯỚC ngay dưới ô: bản tin là chữ người lạ đọc, mà người gõ thì không thấy nó cho tới khi
  * bấm Lưu rồi mở dấu bản lên xem. Khối xem trước đọc bằng CHÍNH `parseNotesText` mà server dùng,
  * nên thứ hiện ra ở đây là thứ sẽ được lưu — không phải một phép dựng lại gần đúng.
+ *
+ * KHÔNG CÒN KHỐI BỐN GẠCH ĐẦU DÒNG dặn dò bên dưới ô (gỡ 15/08/2026 theo yêu cầu của tông chủ).
+ * Ba điều chúng từng nói vẫn ĐÚNG y nguyên, chỉ là thôi bày ra màn hình — ai cần thì đọc ở đây:
+ *
+ *   • Xoá sạch ô rồi Lưu = bỏ hết phần sửa tay, bản tin trở lại danh sách đi kèm bản phát hành.
+ *   • Gỡ một mục rồi Lưu là gỡ HẲN; muốn lấy lại thì gõ lại số bản ấy vào ô (`hiddenVersionsFor`).
+ *   • Mục của những bản phát hành SAU vẫn tự hiện, kể cả khi đã có sửa tay (`mergeReleaseNotes`).
+ *
+ * Dòng cảnh báo「chưa có mục nào cho bản đang chạy」thì GIỮ: nó không phải lời dặn chung chung mà
+ * là một phép đo trên đúng bài đang gõ, và nó chỉ hiện khi có chuyện.
  */
 export function ChangelogPanel({ notes, appVersion }: { notes: readonly ReleaseNote[]; appVersion: string }) {
   const [state, action, pending] = useActionState<AdminResult | null, FormData>(saveChangelogAction, null);
@@ -49,22 +59,6 @@ export function ChangelogPanel({ notes, appVersion }: { notes: readonly ReleaseN
           Tối đa {MAX_LINES_PER_NOTE} dòng mỗi mục, mỗi dòng dưới {MAX_LINE_LENGTH} ký tự. Thứ tự
           tự xếp lại theo số bản khi lưu, khỏi phải tự sắp.
         </p>
-
-        {/* Ba điều dễ hiểu sai, nói tại chỗ thay vì để người ta tự phát hiện bằng cách mất công. */}
-        <ul className="mt-3 flex list-disc flex-col gap-1 pl-4 text-xs text-[var(--color-mist)]">
-          <li>
-            Xoá sạch ô rồi Lưu = bỏ hết phần sửa tay, bản tin trở lại đúng danh sách đi kèm bản
-            phát hành.
-          </li>
-          <li>
-            Gỡ một mục khỏi ô rồi Lưu là <strong className="text-[var(--color-parchment)]">gỡ hẳn</strong> — nó
-            không mọc lại. Muốn lấy lại thì gõ lại số bản ấy vào ô.
-          </li>
-          <li>
-            Mục của những bản phát hành SAU vẫn tự hiện ra, kể cả khi đã có sửa tay ở đây.
-          </li>
-          <li>Mục cho bản mới nhất nên có mặt: người ta bấm vào số hiệu bản là để tìm đúng nó.</li>
-        </ul>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button type="submit" className="btn btn-gold" disabled={pending || !parsed.ok}>

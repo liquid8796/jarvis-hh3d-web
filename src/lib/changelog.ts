@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "0.93.0",
+    date: "2026-08-15",
+    lines: [
+      "Chỗ soạn bản tin của tông môn bớt phần dặn dò; với đạo hữu thì màn hình không đổi gì.",
+    ],
+  },
+  {
     version: "0.92.0",
     date: "2026-08-15",
     lines: [

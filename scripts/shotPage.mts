@@ -17,7 +17,7 @@
  * dùng cố tình ngắn. Xem cảnh báo ở đầu scripts/devSession.mts về việc AUTH_SECRET dưới máy
  * chính là secret của production.
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { SignJWT } from "jose";
 import { chromium } from "playwright-core";
 import { mkdirSync } from "node:fs";
@@ -113,7 +113,7 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Vai đọc từ `user_roles` như guard đọc, không từ cột gương — cùng lý do đã ghi ở devSession.
-const sql = neon(process.env.DATABASE_URL);
+const sql = sqlTag(process.env.DATABASE_URL);
 const rows = await sql`
   select u.id, u.username, u.display_name,
          coalesce((select array_agg(ur.role_code order by r.sort_order)

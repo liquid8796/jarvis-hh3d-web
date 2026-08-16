@@ -38,7 +38,7 @@
 import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { readControlDoc } from "../src/lib/control/read";
 import { encryptSecret } from "../src/lib/crypto/secretBox";
 import {
@@ -259,7 +259,7 @@ async function main(): Promise<void> {
    * SÁT: hai tiến trình gộp làm một dòng, số bản nhảy qua lại, và `automation_jobs.worker_id`
    * thôi chỉ ra được máy nào đang giữ đàn — đúng phép soát người ta dựa vào để chọn lúc restart.
    */
-  const clash = (await neon(activePg)`select 1 from workers where id = ${workerId} limit 1`) as unknown[];
+  const clash = (await sqlTag(activePg)`select 1 from workers where id = ${workerId} limit 1`) as unknown[];
   if (clash.length > 0) {
     die(`Đã có khôi lỗi mang id「${workerId}」trong sổ điểm danh. Đợi một giây rồi chạy lại.`);
   }

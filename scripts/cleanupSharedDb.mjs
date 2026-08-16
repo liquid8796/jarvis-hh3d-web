@@ -11,7 +11,7 @@
  *
  *   DATABASE_URL="<chuỗi tới neondb>" DELETE_YES=1 node scripts/cleanupSharedDb.mjs
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -22,7 +22,7 @@ if (!url) {
   process.exit(1);
 }
 
-const sql = neon(url);
+const sql = sqlTag(url);
 const dbName = (await sql`select current_database() as db`)[0].db;
 
 // Bảng của Jarvis, và bảng làm CHỨNG CỨ rằng đây đúng là database dùng chung.

@@ -20,6 +20,7 @@ import path from "node:path";
 import { neon } from "@neondatabase/serverless";
 import { decryptSecret } from "../src/lib/crypto/secretBox";
 import { parseEnvFile } from "./envFile.mts";
+import { isLoopbackDatabaseUrl } from "./pgTag.mjs";
 
 type Mirror = { id: string; pg?: string };
 
@@ -44,6 +45,12 @@ export async function resolveActiveStationPg(input: {
   onFallback?: (viaSiteId: string) => void;
 }): Promise<string> {
   const { localDatabaseUrl, activeSiteId } = input;
+
+  // Từ 16/08/2026 backend + database sống trên VM: DATABASE_URL loopback NGHĨA LÀ database
+  // thật đứng ngay cạnh — không còn「trạm hoạt động」nào để đi tra, và đi tra là quay về đúng
+  // Neon cũ đã đông cứng (sổ gương di cư theo dữ liệu vẫn chép các trạm ngày xưa). Ngắn mạch
+  // ở ĐÂY chứ không ở từng CLI: một luật, một chỗ — bài học của mongoSync.
+  if (isLoopbackDatabaseUrl(localDatabaseUrl)) return localDatabaseUrl;
 
   const local = await readMirrors(localDatabaseUrl);
   const direct = local.find((m) => m.id === activeSiteId);

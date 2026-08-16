@@ -59,7 +59,7 @@ import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { readControlDoc } from "../src/lib/control/read";
 import { DEFAULT_WORKFLOW_FILE, stationSlug } from "../src/lib/validation/githubStations";
 import { resolveActiveStationPg } from "./activeStationPg.mts";
@@ -389,7 +389,7 @@ async function main(): Promise<void> {
    * phép có một lỗi không ai hiểu.
    */
   const readBook = async (): Promise<BookStation[]> => {
-    const rows = (await neon(activePg)`select value->'githubStations' as stations from app_settings where id = 'global'`) as {
+    const rows = (await sqlTag(activePg)`select value->'githubStations' as stations from app_settings where id = 'global'`) as {
       stations: unknown;
     }[];
     const raw = rows[0]?.stations;
@@ -528,13 +528,13 @@ async function main(): Promise<void> {
   let lastSeen: string | null = null;
   let workerRowExists = false;
   if (target.workerId) {
-    const held = (await neon(activePg)`
+    const held = (await sqlTag(activePg)`
       select count(*)::int as n from automation_jobs
       where worker_id = ${target.workerId} and status in ('running', 'stopping')
     `) as { n: number }[];
     heldJobs = held[0]?.n ?? 0;
 
-    const seen = (await neon(activePg)`select last_seen from workers where id = ${target.workerId}`) as {
+    const seen = (await sqlTag(activePg)`select last_seen from workers where id = ${target.workerId}`) as {
       last_seen: string | Date | null;
     }[];
     workerRowExists = seen.length > 0;
@@ -661,7 +661,7 @@ async function main(): Promise<void> {
     if (remaining.length === fresh.length) {
       console.warn(`⚠ Dòng sổ「${slug}」đã biến mất trong lúc chạy — có phiên khác vừa gỡ. Không ghi đè.`);
     } else {
-      await neon(activePg).query(
+      await sqlTag(activePg).query(
         `update app_settings set value = jsonb_set(value, '{githubStations}', $1::jsonb, true), updated_at = now() where id = 'global'`,
         [JSON.stringify(remaining)],
       );

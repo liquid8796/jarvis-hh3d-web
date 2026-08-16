@@ -4,7 +4,7 @@
  * nếu tài khoản đã tồn tại thì script KHÔNG đổi mật khẩu — một lệnh seed lỡ tay không được
  * phép reset chìa khoá của hệ thống đang chạy.
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import bcrypt from "bcryptjs";
 import { loadEnv } from "./loadEnv.mjs";
 
@@ -27,7 +27,7 @@ if (!password || password.length < 8) {
   process.exit(1);
 }
 
-const sql = neon(url);
+const sql = sqlTag(url);
 
 const existing = await sql`select id from users where username = ${username} limit 1`;
 if (existing.length > 0) {

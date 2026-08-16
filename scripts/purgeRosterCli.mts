@@ -30,7 +30,7 @@
  * ghi lại tên. Nhờ vậy, nếu phép phân loại ở đây có lỡ nhắm vào một dòng CÒN SỐNG thì vòng canh
  * phát hiện ra và kêu lên, thay vì lặng lẽ đánh nhau với nó.
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { readControlDoc } from "../src/lib/control/read";
 import { reviewRosterRow, type RosterRow } from "./githubKhoiloi.mts";
 import { pullStationPgFromVercel, resolveActiveStationPg } from "./activeStationPg.mts";
@@ -130,7 +130,7 @@ console.log(`  ngưỡng im lặng: ${quietHours} giờ${force ? "   ·   --forc
 
 // ---- 2. Ảnh chụp: dòng điểm danh, đàn đang giữ, và sổ Kho GitHub -------------------------------
 
-const sql = neon(activePg);
+const sql = sqlTag(activePg);
 
 /**
  * BA phép đọc trong MỘT lượt, và cả ba phải kể về cùng một khoảnh khắc: một dòng vừa nhận đàn

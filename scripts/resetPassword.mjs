@@ -15,7 +15,7 @@
  * án này), và mật khẩu đi qua biến môi trường chứ không qua tham số dòng lệnh — tham số sẽ
  * nằm lại trong lịch sử shell và trong bảng tiến trình.
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import bcrypt from "bcryptjs";
 import { loadEnv } from "./loadEnv.mjs";
 
@@ -49,7 +49,7 @@ if (!url) {
   process.exit(1);
 }
 
-const sql = neon(url);
+const sql = sqlTag(url);
 
 // In database ra TRƯỚC khi ghi. Dự án này có hai database trên cùng một host và đã một lần
 // migrate nhầm chỗ; một dòng xác nhận rẻ hơn nhiều so với việc đổi mật khẩu ở database mà

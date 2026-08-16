@@ -21,7 +21,7 @@
  *   npx tsx scripts/devSession.mts                 # đạo hiệu trong ADMIN_USERNAME, mặc định "admin"
  *   npx tsx scripts/devSession.mts --user someone  # đóng vai người khác
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { SignJWT } from "jose";
 import { loadEnv } from "./loadEnv.mjs";
 
@@ -40,7 +40,7 @@ if (!process.env.AUTH_SECRET || process.env.AUTH_SECRET === "change-me") {
   throw new Error("Thiếu AUTH_SECRET — không ký được phiên nào.");
 }
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = sqlTag(process.env.DATABASE_URL);
 // Vai đọc từ `user_roles` chứ không từ cột gương `users.roles` — phiên đóng vai phải nhìn
 // đúng thứ mà guard nhìn, nếu không thì một lượt kiểm giao diện đang kiểm nhầm hệ thống.
 const rows = await sql`

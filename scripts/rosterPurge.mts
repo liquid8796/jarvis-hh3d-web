@@ -12,7 +12,7 @@
  * chỉ đọc kết quả. Dòng「↺ nó vừa tự ghi lại tên」là thứ duy nhất kể cho người vận hành biết vòng
  * canh vừa cứu họ khỏi một dòng ma — nó im lặng thì tính năng này trở lại thành vô hình.
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { judgeRosterPurge, PRODUCTION_TIMING, type PurgeTiming } from "./githubKhoiloi.mts";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -55,7 +55,7 @@ export async function purgeRosterRow(input: {
   const log = input.log ?? ((line: string) => console.log(line));
   const warn = input.warn ?? ((line: string) => console.warn(line));
 
-  const sql = neon(activePg);
+  const sql = sqlTag(activePg);
   const startedAt = Date.now();
   /** Quãng im do CHÍNH database đo, kèm mốc cục bộ lúc đo. `null` = chưa lượt soi nào thấy dòng. */
   let lastBeat: { quietMs: number; measuredAt: number } | null = null;

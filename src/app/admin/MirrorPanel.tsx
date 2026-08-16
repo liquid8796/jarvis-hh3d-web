@@ -4,13 +4,7 @@ import { useActionState, useState } from "react";
 import { MirrorSwitchPanel } from "./MirrorSwitchPanel";
 import { MirrorUsage } from "./MirrorUsage";
 import type { SwitchView } from "@/app/actions/mirrorSwitch";
-import {
-  deleteMirrorAction,
-  probeMirrorAction,
-  saveMirrorAction,
-  type MirrorResult,
-  type MirrorView,
-} from "@/app/actions/mirrors";
+import { deleteMirrorAction, saveMirrorAction, type MirrorResult, type MirrorView } from "@/app/actions/mirrors";
 
 /**
  * Số trạm mỗi trang của sổ. Chọn 4 chứ không phải 5, và lý do rất cụ thể: sổ hôm nay có ĐÚNG 5
@@ -27,17 +21,17 @@ const MIRRORS_PER_PAGE = 4;
  * mang `site.switch` (page.tsx lọc), nên panel không tự gác nữa — action phía server mới là
  * hàng rào thật.
  *
- * Chuỗi kết nối chỉ ĐI LÊN qua form, không bao giờ đi xuống: server phát MirrorView đã che
- * (host trần), và ô sửa để trống nghĩa là "giữ phong bì cũ".
+ * Bí mật chỉ ĐI LÊN qua form, không bao giờ đi xuống: server phát `MirrorView` không mang
+ * phong bì nào, và ô sửa để trống nghĩa là "giữ token cũ". Từ 16/08/2026 bí mật ấy còn đúng
+ * một thứ — token Vercel; hai chuỗi kết nối database đã rụng cùng kho riêng của trạm.
  *
  * Bảng điều khiển lượt chuyển đứng TRÊN cái sổ (MirrorSwitchPanel): lúc đang chuyển thì nó
  * là thứ duy nhất đáng nhìn, còn lúc rảnh nó chỉ cao vài dòng.
  */
 export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; switchState: SwitchView }) {
   const [saveState, saveAction, saving] = useActionState<MirrorResult | null, FormData>(saveMirrorAction, null);
-  const [probeState, probeAction, probing] = useActionState<MirrorResult | null, FormData>(probeMirrorAction, null);
   const [deleteState, deleteAction, deleting] = useActionState<MirrorResult | null, FormData>(deleteMirrorAction, null);
-  /** id đang sửa — đổ sẵn tên/URL vào form; chuỗi kết nối thì không bao giờ đổ lại. */
+  /** id đang sửa — đổ sẵn tên/URL vào form; token Vercel thì không bao giờ đổ lại. */
   const [editing, setEditing] = useState<MirrorView | null>(null);
   /**
    * Trang đang xem. Cố ý KHÔNG đẩy lên URL như ô tìm kiếm ở bảng Môn Đồ: sổ này đã nằm sẵn trọn
@@ -46,7 +40,7 @@ export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; s
    */
   const [pageWanted, setPageWanted] = useState(1);
 
-  const notice = [saveState, probeState, deleteState].find((s) => s !== null);
+  const notice = [saveState, deleteState].find((s) => s !== null);
 
   const totalPages = Math.max(1, Math.ceil(mirrors.length / MIRRORS_PER_PAGE));
   /**
@@ -100,22 +94,11 @@ export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; s
                       </span>
                     )}
                   </p>
-                  <p className="truncate text-xs text-[var(--color-mist)]">
-                    {m.url} · PG {m.pgHost} · Mongo {m.mongoHost}
-                  </p>
-                  <p className={`text-xs ${m.lastProbeOk ? "text-[var(--color-jade-300)]" : m.lastProbeOk === false ? "text-[#f2a0a0]" : "text-[var(--color-mist)]"}`}>
-                    {m.lastProbeAt
-                      ? `Kiểm mạch ${new Date(m.lastProbeAt).toLocaleString("vi-VN")}: ${m.lastProbeNote}`
-                      : "Chưa kiểm mạch lần nào."}
-                  </p>
+                  {/* Còn đúng URL. Hai host database và dòng「Kiểm mạch」đã rụng 16/08/2026 cùng
+                      kho riêng của trạm — xem `saveMirrorAction`. */}
+                  <p className="truncate text-xs text-[var(--color-mist)]">{m.url}</p>
                   <MirrorUsage mirror={m} />
                 </div>
-                <form action={probeAction}>
-                  <input type="hidden" name="id" value={m.id} />
-                  <button type="submit" className="btn btn-ghost text-sm" disabled={probing}>
-                    {probing ? "Đang kiểm…" : "Kiểm mạch"}
-                  </button>
-                </form>
                 <button type="button" className="btn btn-ghost text-sm" onClick={() => setEditing(m)}>
                   Sửa
                 </button>
@@ -123,7 +106,7 @@ export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; s
                   action={deleteAction}
                   onSubmit={(e) => {
                     // Xoá là mất phong bì credential — một cú bấm nhầm không được phép đủ.
-                    if (!confirm(`Xoá trạm「${m.name}」khỏi sổ? Chuỗi kết nối đã mã hoá sẽ mất theo.`)) e.preventDefault();
+                    if (!confirm(`Xoá trạm「${m.name}」khỏi sổ? Token Vercel đã mã hoá mất theo, và bảng hạn mức của trạm này sẽ câm.`)) e.preventDefault();
                   }}
                 >
                   <input type="hidden" name="id" value={m.id} />
@@ -161,7 +144,7 @@ export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; s
                     n === page
                       ? "border-[rgba(232,194,92,0.5)] bg-[rgba(232,194,92,0.14)] text-[var(--color-gold-300)]"
                       // Trang KHÔNG đứng vẫn phải mang viền: mọi thứ bấm được trên tab này đều có
-                      // viền vàng, nên một con số trần nằm cạnh「Kiểm mạch / Sửa / Xoá」đọc ra là
+                      // viền vàng, nên một con số trần nằm cạnh「Sửa / Xoá」đọc ra là
                       // chữ chết chứ không phải nút. Nhạt hơn hẳn ô đang đứng là đủ để phân cấp.
                       : "border-[rgba(232,194,92,0.22)] text-[var(--color-mist)] hover:border-[rgba(232,194,92,0.5)] hover:text-[var(--color-gold-300)]"
                   }`}
@@ -197,20 +180,9 @@ export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; s
             <input id="mirror-url" name="url" type="url" className="input w-full font-mono"
               placeholder="https://<project>.vercel.app" defaultValue={editing?.url ?? ""} required />
           </div>
-          <div>
-            <label className="label" htmlFor="mirror-pg">
-              DATABASE_URL (Neon jarvis-hh3d của trạm kia){editing && " — để trống là giữ phong bì cũ"}
-            </label>
-            <input id="mirror-pg" name="pg" type="password" className="input w-full font-mono"
-              placeholder={editing ? `đang giữ ${editing.pgHost}` : "postgresql://…"} autoComplete="off" />
-          </div>
-          <div>
-            <label className="label" htmlFor="mirror-mongo">
-              MONGODB_URI (Atlas atlas-jarvis-chat của trạm kia){editing && " — để trống là giữ phong bì cũ"}
-            </label>
-            <input id="mirror-mongo" name="mongo" type="password" className="input w-full font-mono"
-              placeholder={editing ? `đang giữ ${editing.mongoHost}` : "mongodb+srv://…"} autoComplete="off" />
-          </div>
+          {/* HAI Ô DATABASE_URL/MONGODB_URI ĐÃ GỠ 16/08/2026. Trạm nay là vỏ chuyển tiếp về
+              backend trên VM; kho riêng của nó không ai đọc, nên hỏi chuỗi kết nối là bắt người
+              ta lục credential của một database không dùng. Chi tiết ở `saveMirrorAction`. */}
           <div>
             <label className="label" htmlFor="mirror-vercel">
               Vercel API token của tài khoản giữ trạm này — để đọc mức dùng 30 ngày
@@ -223,12 +195,12 @@ export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; s
                 token dán nhầm tài khoản thì bảng usage nói về một trạm khác mà không ai hay. */}
             <p className="mt-1 text-xs text-[var(--color-mist)]">
               Lấy ở <code>vercel.com/account/tokens</code> — phải đăng nhập ĐÚNG tài khoản giữ trạm
-              này. Tuỳ chọn: thiếu nó thì trạm vẫn chuyển được, chỉ là không đọc được mức dùng.
+              này. Tuỳ chọn: thiếu nó thì vỏ trạm vẫn chạy tốt, chỉ là không đọc được mức dùng.
             </p>
           </div>
           <div className="flex gap-3">
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? "Đang ghi + kiểm mạch…" : editing ? "Cập nhật trạm" : "Ghi vào sổ"}
+              {saving ? "Đang ghi…" : editing ? "Cập nhật trạm" : "Ghi vào sổ"}
             </button>
             {editing && (
               <button type="button" className="btn btn-ghost" onClick={() => setEditing(null)}>

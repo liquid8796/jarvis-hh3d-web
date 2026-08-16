@@ -2,41 +2,42 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { MongoClient } from "mongodb";
-import { neon } from "@neondatabase/serverless";
 import { requireAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
 import { encryptSecret, decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { backendIsStation } from "@/lib/mirror/switchGuard";
-import { resolveMongoDbName } from "@/lib/mongo/dbName";
 import { getAppSettings, saveAppSettings, type AppSettings } from "@/lib/services/settings";
 import { fetchVercelUsage, type VercelUsage } from "@/lib/services/vercelUsage";
 
 /**
  * Sổ gương trạm — server action của tab Gương Trạm (deploy/mirror/README.md §4).
  *
- * Mọi cửa đều gác bằng `site.switch` chứ không chỉ `admin.panel`: sổ này cầm chuỗi kết nối
- * database của trạm KHÁC, và bậc trị sự thường vào được trang Tông Môn không có nghĩa là
- * được cầm chìa khoá của cả hệ trạm dự phòng. Chỉ Gia chủ (xem permissions.ts).
+ * Mọi cửa đều gác bằng `site.switch` chứ không chỉ `admin.panel`: sổ này cầm token Vercel của
+ * những TÀI KHOẢN KHÁC, và bậc trị sự thường vào được trang Tông Môn không có nghĩa là được
+ * cầm chìa khoá của cả năm tài khoản giữ trạm. Chỉ Gia chủ (xem permissions.ts).
  *
- * Bản rõ của pg/mongo sống đúng MỘT khoảnh khắc trong bộ nhớ của action: nhận từ form →
- * probe (nếu là lượt lưu) → encryptSecret → document. Không log, không trả về client —
- * `mirrorsForAdmin()` chỉ phát bản đã che.
+ * Bản rõ của token sống đúng MỘT khoảnh khắc trong bộ nhớ của action: nhận từ form →
+ * encryptSecret → document. Không log, không trả về client — `mirrorsForAdmin()` chỉ phát cờ
+ * có/không.
+ *
+ * Hai chuỗi kết nối database rụng khỏi sổ ngày 16/08/2026; phong bì cũ còn nằm trong
+ * `app_settings` nhưng không cửa nào ở đây đọc hay ghi chúng nữa.
  */
 
 export type MirrorResult = { ok: boolean; message: string };
 
-/** Hình chiếu an toàn cho client: KHÔNG mang phong bì mã hoá, chỉ mang dấu vết đủ nhận diện. */
+/**
+ * Hình chiếu an toàn cho client: KHÔNG mang phong bì mã hoá, chỉ mang dấu vết đủ nhận diện.
+ *
+ * ĐÃ RỤNG 16/08/2026: `pgHost`/`mongoHost` và ba trường kiểm mạch. Chúng kể về kho riêng của
+ * từng trạm — thứ mà cuộc dời backend về VM đã cho nghỉ. Giữ lại là bày ra một trạng thái đúng
+ * (PG ✔, 27 migration) về một database KHÔNG AI ĐỌC, tức mời người vận hành tin vào một sức
+ * khoẻ không liên quan gì tới sức khoẻ của hệ.
+ */
 export type MirrorView = {
   id: string;
   name: string;
   url: string;
-  /** host của DATABASE_URL/MONGODB_URI — đủ để admin nhận ra nhập nhầm, không đủ để kết nối. */
-  pgHost: string;
-  mongoHost: string;
-  lastProbeAt: string | null;
-  lastProbeOk: boolean | null;
-  lastProbeNote: string;
   /**
    * Sổ đã có token Vercel của trạm này chưa — CHỈ có/không, không bao giờ là chính token.
    * Giao diện cần nó để biết nên hiện bảng usage hay hiện lời mời dán token.
@@ -59,25 +60,11 @@ async function requireSiteSwitch() {
   return user;
 }
 
-function hostOf(connectionString: string): string {
-  try {
-    // mongodb+srv:// không phải scheme mà new URL nào cũng chịu — đổi vỏ http là đọc được host.
-    return new URL(connectionString.replace(/^mongodb(\+srv)?:/, "http:")).hostname;
-  } catch {
-    return "(không đọc được host)";
-  }
-}
-
 function viewOf(entry: AppSettings["mirrors"][number]): MirrorView {
   return {
     id: entry.id,
     name: entry.name,
     url: entry.url,
-    pgHost: isEncrypted(entry.pg) ? hostOf(decryptSecret(entry.pg)) : "(phong bì hỏng)",
-    mongoHost: isEncrypted(entry.mongo) ? hostOf(decryptSecret(entry.mongo)) : "(phong bì hỏng)",
-    lastProbeAt: entry.lastProbeAt,
-    lastProbeOk: entry.lastProbeOk,
-    lastProbeNote: entry.lastProbeNote,
     hasVercelToken: isEncrypted(entry.vercelToken ?? ""),
     usageReport: entry.usageReport ?? null,
   };
@@ -91,56 +78,18 @@ export async function mirrorsForAdmin(): Promise<MirrorView[]> {
 }
 
 /**
- * Probe CHỈ-ĐỌC một cặp kết nối: Postgres đếm sổ migration, Mongo ping. Trả lời chung một
- * câu chữ để ghi vào `lastProbeNote` — admin cần biết "hỏng ở đâu", không cần stack trace.
- */
-async function probeConnections(pg: string, mongo: string): Promise<{ ok: boolean; note: string }> {
-  const notes: string[] = [];
-  let ok = true;
-
-  try {
-    const sql = neon(pg);
-    const rows = await sql`
-      select count(*)::int as n from information_schema.tables
-       where table_schema = 'drizzle' and table_name = '__drizzle_migrations'
-    `;
-    if (rows[0].n === 0) {
-      notes.push("PG nối được nhưng CHƯA có sổ migration — chạy scripts/migrate.mjs lên trạm ấy trước");
-      ok = false;
-    } else {
-      const applied = await sql`select count(*)::int as n from drizzle.__drizzle_migrations`;
-      notes.push(`PG ✔ (${applied[0].n} migration)`);
-    }
-  } catch (err) {
-    notes.push(`PG ✗: ${err instanceof Error ? err.message.slice(0, 120) : "lỗi lạ"}`);
-    ok = false;
-  }
-
-  // serverSelectionTimeoutMS thấp có chủ ý: đây là một cú bấm trên trang admin, không phải
-  // một phiên làm việc — 8 giây không trả lời thì câu trả lời chính là "không nối được".
-  const client = new MongoClient(mongo, { serverSelectionTimeoutMS: 8_000 });
-  try {
-    await client.connect();
-    await client.db().command({ ping: 1 });
-    // Nói luôn TÊN DATABASE đã giải, đừng chỉ ping cụm. Lượt chuyển trạm đầu tiên gãy đúng ở
-    // khâu tên database trong khi kiểm mạch vẫn báo「Mongo ✔」— vì ping chưa hề chạm tới nó.
-    // Vắng `chat_messages` KHÔNG phải lỗi (trạm gương mới thì chưa có gì), nhưng phải hiện ra.
-    const dbName = resolveMongoDbName(mongo, process.env.MONGODB_DB);
-    const seeded = await client.db(dbName).listCollections({ name: "chat_messages" }).hasNext();
-    notes.push(`Mongo ✔ (db「${dbName}」, chat_messages ${seeded ? "có" : "chưa có"})`);
-  } catch (err) {
-    notes.push(`Mongo ✗: ${err instanceof Error ? err.message.slice(0, 120) : "lỗi lạ"}`);
-    ok = false;
-  } finally {
-    await client.close().catch(() => {});
-  }
-
-  return { ok, note: notes.join(" · ") };
-}
-
-/**
- * Thêm/sửa một trạm. Lượt SỬA không bắt nhập lại chuỗi kết nối: ô để trống nghĩa là "giữ
- * phong bì cũ" — admin đổi mỗi cái tên không phải lục lại credential từ két.
+ * Thêm/sửa một trạm trong sổ: mã, tên, URL, và token Vercel của tài khoản giữ nó.
+ *
+ * ── KHÔNG CÒN HỎI CHUỖI KẾT NỐI (16/08/2026) ──────────────────────────────────────────────
+ *
+ * Sổ này từng là danh mục các BẢN SAO ĐẦY ĐỦ — mỗi trạm một Neon, một Atlas, và lượt lưu nào
+ * cũng kiểm mạch cả hai trước khi ghi. Từ ngày backend về VM, một trạm chỉ còn là vỏ chuyển
+ * tiếp; kho riêng của nó không ai đọc. Hỏi tiếp hai chuỗi ấy là bắt người vận hành đi lục
+ * credential của một database không dùng, rồi cất nó vào sổ để không ai đọc lần nữa.
+ *
+ * PHONG BÌ CŨ ĐƯỢC GIỮ NGUYÊN qua mọi lượt sửa: gỡ khỏi form không phải là xoá dữ liệu. Ngày
+ * nào muốn dọn hẳn thì đó là một lượt chạy riêng, cố ý — không phải tác dụng phụ của một cú
+ * bấm「Lưu」khi ai đó chỉ định đổi cái tên.
  */
 export async function saveMirrorAction(_prev: MirrorResult | null, formData: FormData): Promise<MirrorResult> {
   await requireSiteSwitch();
@@ -148,8 +97,6 @@ export async function saveMirrorAction(_prev: MirrorResult | null, formData: For
   const id = String(formData.get("id") ?? "").trim().toLowerCase();
   const name = String(formData.get("name") ?? "").trim();
   const url = String(formData.get("url") ?? "").trim().replace(/\/$/, "");
-  const pgInput = String(formData.get("pg") ?? "").trim();
-  const mongoInput = String(formData.get("mongo") ?? "").trim();
   const vercelInput = String(formData.get("vercelToken") ?? "").trim();
 
   if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(id)) {
@@ -164,24 +111,10 @@ export async function saveMirrorAction(_prev: MirrorResult | null, formData: For
   if (!existing && settings.mirrors.length >= MAX_MIRRORS) {
     return { ok: false, message: `Sổ đầy (${MAX_MIRRORS} trạm) — dọn trạm chết trước khi thêm.` };
   }
-  if (!existing && (!pgInput || !mongoInput)) {
-    return { ok: false, message: "Trạm mới cần đủ cả hai chuỗi kết nối Postgres và MongoDB." };
-  }
-
-  const pgPlain = pgInput || (existing ? decryptSecret(existing.pg) : "");
-  const mongoPlain = mongoInput || (existing ? decryptSecret(existing.mongo) : "");
-  if (!/^postgres(ql)?:\/\//.test(pgPlain)) return { ok: false, message: "Chuỗi Postgres phải bắt đầu bằng postgresql://." };
-  if (!/^mongodb(\+srv)?:\/\//.test(mongoPlain)) return { ok: false, message: "Chuỗi Mongo phải bắt đầu bằng mongodb:// hoặc mongodb+srv://." };
-
-  // Probe NGAY trong lượt lưu — một chuỗi gõ nhầm phải chết ở đây, không phải ở phút thứ ba
-  // của một lượt chuyển trạm thật. Probe hỏng vẫn LƯU (có thể trạm kia chưa dựng xong DB),
-  // nhưng kết quả ghi thẳng vào sổ cho ai nhìn cũng thấy.
-  const probe = await probeConnections(pgPlain, mongoPlain);
-
   /**
-   * Token Vercel là TUỲ CHỌN, khác hai chuỗi kết nối ở trên: thiếu nó thì trạm vẫn chuyển
-   * được, chỉ là bảng usage im lặng. Ô để trống nghĩa là「giữ phong bì cũ」— cùng luật với
-   * pg/mongo, để admin sửa mỗi cái tên mà không phải lục lại két.
+   * Token Vercel là TUỲ CHỌN: thiếu nó thì trạm vẫn là một vỏ chạy tốt, chỉ là bảng hạn mức
+   * im lặng. Ô để trống nghĩa là「giữ phong bì cũ」, để admin sửa mỗi cái tên mà không phải
+   * lục lại két — nay nó là chuỗi bí mật DUY NHẤT còn lại trong sổ.
    */
   // `isEncrypted` gác trước `decryptSecret`: trạm ghi trước bản này mang chuỗi RỖNG ở trường
   // ấy, và giải mã một chuỗi rỗng là ném — tức lượt sửa tên một trạm cũ sẽ văng lỗi.
@@ -193,15 +126,18 @@ export async function saveMirrorAction(_prev: MirrorResult | null, formData: For
     id,
     name,
     url,
-    pg: encryptSecret(pgPlain),
-    mongo: encryptSecret(mongoPlain),
+    // Phong bì kho cũ đi qua nguyên vẹn, trạm mới thì rỗng — xem khối bình chú đầu hàm.
+    pg: existing?.pg ?? "",
+    mongo: existing?.mongo ?? "",
     vercelToken: vercelPlain ? encryptSecret(vercelPlain) : "",
     // GIỮ bảng usage đã cào: sửa cái tên trạm mà mất luôn số liệu thì lượt cào kế tiếp còn
     // sáu tiếng nữa mới tới, và suốt quãng ấy popup trống trơn không ai hiểu vì sao.
     usageReport: existing?.usageReport ?? null,
-    lastProbeAt: new Date().toISOString(),
-    lastProbeOk: probe.ok,
-    lastProbeNote: probe.note,
+    // Ba trường kiểm mạch đi theo phép kiểm mạch: giữ giá trị cũ để không viết đè một sự thật
+    // lịch sử bằng một giá trị bịa, nhưng không còn ai đọc chúng.
+    lastProbeAt: existing?.lastProbeAt ?? null,
+    lastProbeOk: existing?.lastProbeOk ?? null,
+    lastProbeNote: existing?.lastProbeNote ?? "",
   };
 
   settings.mirrors = existing
@@ -210,10 +146,7 @@ export async function saveMirrorAction(_prev: MirrorResult | null, formData: For
   await saveAppSettings(settings);
   revalidatePath("/admin");
 
-  return {
-    ok: probe.ok,
-    message: `${existing ? "Đã cập nhật" : "Đã ghi"} trạm「${name}」. Kiểm mạch: ${probe.note}`,
-  };
+  return { ok: true, message: `${existing ? "Đã cập nhật" : "Đã ghi"} trạm「${name}」.` };
 }
 
 /**
@@ -239,21 +172,14 @@ export async function mirrorUsageAction(id: string): Promise<VercelUsage> {
   return fetchVercelUsage(decryptSecret(entry.vercelToken));
 }
 
-export async function probeMirrorAction(_prev: MirrorResult | null, formData: FormData): Promise<MirrorResult> {
-  await requireSiteSwitch();
-  const id = String(formData.get("id") ?? "").trim();
-  const settings = await getAppSettings();
-  const entry = settings.mirrors.find((m) => m.id === id);
-  if (!entry) return { ok: false, message: `Không có trạm「${id}」trong sổ.` };
-
-  const probe = await probeConnections(decryptSecret(entry.pg), decryptSecret(entry.mongo));
-  entry.lastProbeAt = new Date().toISOString();
-  entry.lastProbeOk = probe.ok;
-  entry.lastProbeNote = probe.note;
-  await saveAppSettings(settings);
-  revalidatePath("/admin");
-  return { ok: probe.ok, message: `Kiểm mạch「${entry.name}」: ${probe.note}` };
-}
+/*
+ * `probeMirrorAction` đã gỡ 16/08/2026 cùng nút「Kiểm mạch」.
+ *
+ * Nó nối tới Postgres và Mongo của một trạm rồi báo「PG ✔ (27 migration) · Mongo ✔」. Câu ấy
+ * vẫn ĐÚNG sau cuộc dời backend — và đó chính là lý do phải gỡ chứ không phải lý do để giữ:
+ * một dấu tích xanh về sức khoẻ của một database không ai đọc là thứ nguy hiểm hơn hẳn một ô
+ * trống, vì nó trả lời câu hỏi「hệ có ổn không」bằng dữ liệu của một hệ khác.
+ */
 
 export async function deleteMirrorAction(_prev: MirrorResult | null, formData: FormData): Promise<MirrorResult> {
   await requireSiteSwitch();
@@ -276,8 +202,9 @@ export async function deleteMirrorAction(_prev: MirrorResult | null, formData: F
  * tên A — và không còn ai để pick mà quay về. Hệ phải đối xứng: sổ là danh mục MỌI trạm, kể
  * cả trạm đang cầm bút.
  *
- * Chuỗi kết nối lấy từ env của chính trạm này, URL lấy từ header `host` của chính request —
- * cả hai đều là sự thật tại chỗ, không phải thứ admin phải chép tay từ dashboard sang.
+ * URL lấy từ header `host` của chính request — sự thật tại chỗ, không phải thứ admin phải chép
+ * tay từ dashboard sang. (Bản trước còn lấy cả DATABASE_URL/MONGODB_URI từ env; từ 16/08/2026
+ * sổ không giữ chuỗi kết nối nữa — xem khối bình chú ở `saveMirrorAction`.)
  */
 export async function registerSelfAction(): Promise<MirrorResult> {
   await requireSiteSwitch();
@@ -295,12 +222,6 @@ export async function registerSelfAction(): Promise<MirrorResult> {
         "đều đã hết đích.",
     };
   }
-  const pg = (process.env.DATABASE_URL ?? "").trim();
-  const mongo = (process.env.MONGODB_URI ?? "").trim();
-  if (!pg || !mongo) {
-    return { ok: false, message: "Trạm này thiếu DATABASE_URL hoặc MONGODB_URI — không tự khai được." };
-  }
-
   const host = (await headers()).get("host");
   if (!host) return { ok: false, message: "Không đọc được host của chính trang này." };
   const url = `https://${host}`;
@@ -311,15 +232,15 @@ export async function registerSelfAction(): Promise<MirrorResult> {
     id: siteId,
     name: existing?.name ?? `Trạm ${siteId}`,
     url,
-    pg: encryptSecret(pg),
-    mongo: encryptSecret(mongo),
+    pg: existing?.pg ?? "",
+    mongo: existing?.mongo ?? "",
     // Giữ token đã có, đừng xoá: lượt tự khai này chạy lại được nhiều lần (mỗi lần trạm đổi
     // URL), và env của một trạm KHÔNG mang token Vercel của chính nó — chỉ có người dán tay.
     vercelToken: existing?.vercelToken ?? "",
     usageReport: existing?.usageReport ?? null,
-    lastProbeAt: new Date().toISOString(),
-    lastProbeOk: true,
-    lastProbeNote: "Tự khai từ env của chính trạm — không cần kiểm mạch, nó đang chạy bằng chính hai chuỗi này.",
+    lastProbeAt: existing?.lastProbeAt ?? null,
+    lastProbeOk: existing?.lastProbeOk ?? null,
+    lastProbeNote: existing?.lastProbeNote ?? "",
   };
   settings.mirrors = existing
     ? settings.mirrors.map((m) => (m.id === siteId ? entry : m))

@@ -179,10 +179,23 @@ export const appSettingsSchema = z.object({
         id: z.string().min(1).max(64),
         name: z.string().min(1).max(120),
         url: z.string().url().startsWith("https://"),
-        /** DATABASE_URL của trạm kia, phong bì secretBox `v1.…`. */
-        pg: z.string().min(1),
-        /** MONGODB_URI của trạm kia, phong bì secretBox `v1.…`. */
-        mongo: z.string().min(1),
+        /**
+         * ── HAI TRƯỜNG THỪA KẾ (16/08/2026) ────────────────────────────────────────────────
+         *
+         * DATABASE_URL / MONGODB_URI của trạm kia, phong bì secretBox `v1.…`. Tab Gương Trạm
+         * KHÔNG còn hỏi, không còn hiện, không còn kiểm mạch chúng: các trạm nay là vỏ chuyển
+         * tiếp về backend trên VM, và kho riêng của từng trạm không ai đọc nữa.
+         *
+         * `.default("")` chứ không `.min(1)`, và đây là chỗ dễ trả giá nhất của cả lượt gỡ:
+         * `min(1)` đứng đây thì một trạm ghi mới (không còn chuỗi kết nối) sẽ làm CẢ MẢNG
+         * `mirrors` trượt phép gán, rơi vào `.catch([])` bên dưới — tức mất trắng sổ, gồm cả
+         * những trạm cũ đang lành. Một trường không ai điền phải là một trường được phép rỗng.
+         *
+         * Giá trị CŨ vẫn nằm nguyên trong sổ: gỡ khỏi giao diện không phải là xoá dữ liệu, và
+         * xoá phong bì credential là một quyết định riêng, cố ý, của người vận hành.
+         */
+        pg: z.string().default(""),
+        mongo: z.string().default(""),
         /**
          * Vercel API token của TÀI KHOẢN giữ trạm này, phong bì secretBox — để tab Gương Trạm
          * đọc được mức dùng 30 ngày (`/v2/usage`).

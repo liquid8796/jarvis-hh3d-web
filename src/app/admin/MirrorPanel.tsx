@@ -74,9 +74,15 @@ export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; s
 
       <section className="card card-hairline p-6">
         <h2 className="h-display mb-2 text-lg font-semibold text-gilded">Sổ gương trạm</h2>
+        {/* Câu này ĐỨNG NGAY DƯỚI thẻ「lượt chuyển trạm đã hết việc」ở trên, nên nó không được
+            phép kể một kiến trúc khác. Bản cũ khai「mỗi trạm database riêng」— đúng tới 15/08,
+            và từ 16/08 thì hai câu trên cùng một màn hình cãi nhau. Chuỗi kết nối trong sổ vẫn
+            còn (mỗi trạm vẫn có Neon/Atlas mang tên nó), chỉ là app KHÔNG đọc chúng nữa — nói
+            đúng chỗ ấy chứ đừng xoá trắng, vì người vận hành còn nhìn thấy chúng ở từng dòng. */}
         <p className="mb-5 text-xs text-[var(--color-mist)]">
-          Mỗi trạm một tài khoản Vercel riêng, database riêng (Neon <code>jarvis-hh3d</code>, Atlas{" "}
-          <code>atlas-jarvis-chat</code>) — chỉ VM khôi lỗi và tàng khố OCI là của chung.
+          Mỗi trạm một tài khoản Vercel riêng. Từ 16/08/2026 các trạm chỉ còn là vỏ chuyển tiếp về
+          backend trên VM — database thật nằm cạnh backend, còn chuỗi Neon/Atlas dưới đây là kho cũ
+          của từng trạm, giữ lại để tra chứ app không đọc nữa.
         </p>
 
         {mirrors.length === 0 ? (

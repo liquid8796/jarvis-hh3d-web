@@ -85,7 +85,8 @@
     "verify:github-removal": "tsx scripts/verifyGithubKhoiloiRemoval.mts",
     "verify:roster-purge": "tsx scripts/verifyRosterPurge.mts",
     "verify:khoiloi-naming": "node scripts/verifyKhoiloiNaming.mjs",
-    "verify:bat-eol": "node scripts/verifyBatchEol.mjs"
+    "verify:bat-eol": "node scripts/verifyBatchEol.mjs",
+    "verify:app-db": "tsx scripts/verifyAppDatabase.mts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1106.0",

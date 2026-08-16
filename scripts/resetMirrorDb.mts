@@ -63,7 +63,7 @@ import {
   type ProjectEnvVar,
   type StoreRef,
 } from "./deployTargets.mts";
-import { resolveActiveStationPgAnywhere } from "./activeStationPg.mts";
+import { appDatabaseUrl } from "./activeStationPg.mts";
 import { buildCatalog } from "./vercelCatalog.mts";
 import { loadEnv } from "./loadEnv.mjs";
 
@@ -153,20 +153,34 @@ async function main(): Promise<void> {
   }
 
   /**
-   * Tra sổ thật qua NẤC THANG chịu được sổ dưới máy đã chết.
+   * ── CÔNG CỤ NÀY ĐÃ MẤT PHẦN LỚN LÝ DO TỒN TẠI (16/08/2026) ─────────────────────────────────
    *
-   * Không dùng thẳng `resolveActiveStationPg` như `mirror:remove`: công cụ này được gọi đúng vào lúc
-   * database của một trạm đang hỏng, và ngày 14/08/2026 đã cho thấy「hỏng」có thể lan tới cả chuỗi
-   * kết nối dưới máy — một lượt chuyển trạm xoá project cũ, `.env` lẫn `.env.local` cùng trả
-   * `password authentication failed`, và mọi công cụ chết ở dòng đầu. Một công cụ SỬA CHỮA mà đòi hệ
-   * thống phải lành mới chạy được thì vô dụng ở đúng ngày cần nó.
+   * Nó sinh ra khi mỗi trạm là một bản sao đầy đủ: có project Vercel, có Neon riêng, có Atlas
+   * riêng, và「dựng lại database của một trạm」là một việc có nghĩa. Cuộc dời backend về VM lấy
+   * mất cái nghĩa ấy — app + Postgres + Mongo nay cùng nằm trên VM, năm vỏ Vercel chỉ còn rewrite
+   * về một origin, và kho marketplace của từng trạm KHÔNG còn ai đọc.
+   *
+   * Nên lượt chạy này vẫn dựng lại được kho, nhưng thứ nó dựng lại là một database mà app không
+   * dùng. Nói ra ngay đây, chứ đừng để ai tốn một giờ mới nhận ra.
    */
-  const activeUrl = await resolveActiveStationPgAnywhere({
-    localDatabaseUrl: process.env.DATABASE_URL,
-    activeSiteId: doc.activeSiteId,
-    onFallback: (site) => console.log(`  (sổ dưới máy đã cũ — tra được qua sổ của trạm「${site}」)`),
-    onVercelFallback: (why) => console.log(`  (sổ dưới máy không dùng được: ${why} — hỏi thẳng Vercel)`),
-  });
+  console.warn(
+    "\n⚠ TỪ 16/08/2026 KHO CỦA TRẠM KHÔNG CÒN LÀ DATABASE CỦA APP.\n" +
+      "  App + Postgres + Mongo cùng nằm trên VM; năm vỏ Vercel chỉ rewrite về đó. Dựng lại kho\n" +
+      "  marketplace của một trạm nay KHÔNG chạm tới dữ liệu thật — nó chỉ thay một database mà\n" +
+      "  không ai đọc. Muốn đụng database thật thì: npm run vm -- <lệnh>\n",
+  );
+
+  /**
+   * Sổ gương vẫn nằm trong database của APP, nên phần đọc/ghi sổ phải đứng ở đó — không phải ở
+   * Neon của trạm nào cả.
+   */
+  const activeUrl = ((): string => {
+    try {
+      return appDatabaseUrl();
+    } catch (err) {
+      return die(err instanceof Error ? err.message : "Không tra ra database của app.");
+    }
+  })();
   const book = await readBook(activeUrl);
   const mirrors = book.mirrors ?? [];
   const entry = mirrors.find((m) => m.id === siteId);

@@ -62,7 +62,7 @@ import { createInterface } from "node:readline/promises";
 import { sqlTag } from "./pgTag.mjs";
 import { readControlDoc } from "../src/lib/control/read";
 import { DEFAULT_WORKFLOW_FILE, stationSlug } from "../src/lib/validation/githubStations";
-import { resolveActiveStationPg } from "./activeStationPg.mts";
+import { appDatabaseUrl } from "./activeStationPg.mts";
 import {
   activeRunIds,
   chooseTarget,
@@ -370,11 +370,15 @@ async function main(): Promise<void> {
     );
   }
 
-  const activePg = await resolveActiveStationPg({
-    localDatabaseUrl: process.env.DATABASE_URL,
-    activeSiteId: doc.activeSiteId,
-    onFallback: (via) => console.log(`• Sổ dưới máy đã cũ — lấy đường tới「${doc.activeSiteId}」qua sổ của「${via}」.`),
-  }).catch((err: unknown) => die(err instanceof Error ? err.message : "Không tra ra trạm đang hoạt động."));
+  // Database mà APP dùng — từ 16/08/2026 là Postgres trên VM, không phải Neon của một trạm.
+  // Ghi sổ vào một bản đóng băng thì mọi bước sau vẫn báo xanh mà không ai đọc được kết quả.
+  const activePg = ((): string => {
+    try {
+      return appDatabaseUrl();
+    } catch (err) {
+      return die(err instanceof Error ? err.message : "Không tra ra database của app.");
+    }
+  })();
 
   /**
    * Đọc sổ ở dạng jsonb THÔ, không qua `getAppSettings`.

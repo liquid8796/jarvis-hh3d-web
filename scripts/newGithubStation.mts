@@ -47,7 +47,7 @@ import {
   reviewStationIdentity,
   stationSlug,
 } from "../src/lib/validation/githubStations";
-import { resolveActiveStationPg } from "./activeStationPg.mts";
+import { appDatabaseUrl } from "./activeStationPg.mts";
 import { KHOILOI_ID_PREFIX, REPO_NAME_PREFIX, reviewGeneratedName } from "./khoiloiNaming.mjs";
 import { loadEnv } from "./loadEnv.mjs";
 
@@ -229,11 +229,15 @@ async function main(): Promise<void> {
     );
   }
 
-  const activePg = await resolveActiveStationPg({
-    localDatabaseUrl: process.env.DATABASE_URL!,
-    activeSiteId: doc.activeSiteId,
-    onFallback: (via) => console.log(`• Sổ dưới máy đã cũ — lấy đường tới「${doc.activeSiteId}」qua sổ của「${via}」.`),
-  }).catch((err: unknown) => die(err instanceof Error ? err.message : "Không tra ra trạm đang hoạt động."));
+  // Database mà APP dùng — từ 16/08/2026 là Postgres trên VM, không phải Neon của một trạm.
+  // Ghi sổ vào một bản đóng băng thì mọi bước sau vẫn báo xanh mà không ai đọc được kết quả.
+  const activePg = ((): string => {
+    try {
+      return appDatabaseUrl();
+    } catch (err) {
+      return die(err instanceof Error ? err.message : "Không tra ra database của app.");
+    }
+  })();
   // Từ dòng này trở đi MỌI thứ đọc/ghi qua `db()` đều rơi vào trạm đang hoạt động. Nhập MUỘN, sau
   // khi biến đã đổi: `db()` đọc `DATABASE_URL` lười rồi NHỚ MÃI (xem db/client.ts), nên thứ tự này
   // là thứ giữ cho sổ không bị ghi nhầm vào trạm đã nghỉ — loại hỏng không để lại dấu vết nào.

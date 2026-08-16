@@ -13,17 +13,17 @@
  * dọn. Đo 14/08/2026: `github-khoiloi` im 4 giờ và `github-khoiloi-20260813-101341` im 12,7 giờ,
  * cả hai vẫn nằm trong tab Khôi Lỗi như thể đang trực.
  *
- * ── CHẠY ĐƯỢC Ở BẤT KỲ TRẠM NÀO, VÀ ĐÓ LÀ ĐIỀU KIỆN CHỨ KHÔNG PHẢI TIỆN NGHI ─────────────────
+ * ── PHẢI CHẠY TRÊN VM (16/08/2026) ────────────────────────────────────────────────────────────
  *
- * Sổ điểm danh nằm trong database của trạm ĐANG HOẠT ĐỘNG, mà trạm ấy đổi bất cứ lúc nào. Nên
- * công cụ này không đọc `DATABASE_URL` dưới máy như một sự thật — nó đi ba nấc:
+ * Bản trước leo ba nấc thang để tìm「database của trạm đang hoạt động」— bảng điều phối, rồi sổ
+ * gương, rồi hỏi thẳng Vercel. Cuộc dời backend về VM xoá sổ chính CÂU HỎI ấy: mỗi trạm không
+ * còn database riêng, và những Neon cũ vẫn nối được nhưng đã đóng băng từ giây cắt chuyển. Leo
+ * thang bây giờ chỉ dẫn tới một bản sao sai — dọn sổ điểm danh của một database bỏ hoang, rồi
+ * báo xanh.
  *
- *   1. Bảng điều phối trên OCI cho biết trạm nào đang hoạt động (`readControlDoc`). Bảng ấy không
- *      nằm trong database nào cả, nên nó còn đọc được kể cả khi mọi database dưới máy đã chết.
- *   2. Sổ gương dưới máy → chuỗi kết nối của trạm ấy (`resolveActiveStationPg`).
- *   3. Sổ dưới máy cũng chết thì hỏi thẳng Vercel (`pullStationPgFromVercel`) — đường đã phải đi
- *      bằng tay ngày 14/08/2026, khi một lượt chuyển trạm xoá project cũ và cả `.env` lẫn
- *      `.env.local` cùng trả `password authentication failed`.
+ * Nên nay chỉ còn một câu hỏi (`appDatabaseUrl`) và một lời từ chối chỉ đúng lệnh phải gõ lại:
+ *
+ *     npm run vm -- npm run roster:purge -- --dry-run
  *
  * Phép GỠ thì dùng lại `purgeRosterRow` của lượt xoá kho: nó không xoá một phát rồi đi, nó canh
  * cho tới khi dòng chịu nằm im — vì một runner vừa mất kho còn thoi thóp thêm ~52 giây và sẽ tự
@@ -31,9 +31,8 @@
  * phát hiện ra và kêu lên, thay vì lặng lẽ đánh nhau với nó.
  */
 import { sqlTag } from "./pgTag.mjs";
-import { readControlDoc } from "../src/lib/control/read";
 import { reviewRosterRow, type RosterRow } from "./githubKhoiloi.mts";
-import { pullStationPgFromVercel, resolveActiveStationPg } from "./activeStationPg.mts";
+import { appDatabaseUrl } from "./activeStationPg.mts";
 import { purgeRosterRow } from "./rosterPurge.mts";
 import { loadEnv } from "./loadEnv.mjs";
 
@@ -77,53 +76,17 @@ function die(message: string): never {
   process.exit(1);
 }
 
-// ---- 1. Tìm database của trạm ĐANG HOẠT ĐỘNG --------------------------------------------------
-
-/** Ba nấc thang, xếp từ rẻ tới đắt. Xem khối bình chú ở đầu tệp cho lý do từng nấc. */
-async function findActivePg(): Promise<{ pg: string; via: string }> {
-  const localDatabaseUrl = process.env.DATABASE_URL ?? "";
-  const doc = await readControlDoc();
-  const activeSiteId = doc?.activeSiteId ?? null;
-
-  if (!activeSiteId) {
-    /**
-     * Bảng điều phối chưa init, hoặc thiếu env OCI. FAIL-OPEN về sổ dưới máy — cùng chiều với
-     * `reviewKeepaliveDuty`: thà làm việc trên một database có thể đã cũ còn hơn từ chối làm gì
-     * cả. Cái giá ở đây rất nhỏ: gỡ nhầm một dòng ma ở một trạm đã nghỉ thì chẳng ai mất gì.
-     */
-    if (localDatabaseUrl.length === 0) {
-      die(
-        "Không đọc được bảng điều phối (thiếu env OCI?), mà DATABASE_URL dưới máy cũng trống —\n" +
-          "  không biết phải dọn sổ của trạm nào. Chạy `npm run env:pull` rồi thử lại.",
-      );
-    }
-    return {
-      pg: localDatabaseUrl,
-      via: "DATABASE_URL dưới máy (bảng điều phối không nói được trạm nào đang hoạt động)",
-    };
-  }
-
+// ---- 1. Database mà APP đang dùng ------------------------------------------------------------
+//
+// Xem khối bình chú đầu tệp: chỉ còn một câu hỏi, và một lời từ chối chỉ đúng lệnh phải gõ lại.
+const activePg = ((): string => {
   try {
-    const pg = await resolveActiveStationPg({
-      localDatabaseUrl,
-      activeSiteId,
-      onFallback: (site) => console.log(`  (sổ dưới máy đã cũ — tra được qua sổ của trạm「${site}」)`),
-    });
-    return { pg, via: `trạm「${activeSiteId}」, tra qua sổ gương` };
+    return appDatabaseUrl();
   } catch (err) {
-    console.log(
-      `  (sổ dưới máy không dùng được: ${err instanceof Error ? err.message.split("\n")[0] : "lỗi lạ"})\n` +
-        `  (hỏi thẳng Vercel cho trạm「${activeSiteId}」…)`,
-    );
-    try {
-      return { pg: pullStationPgFromVercel(activeSiteId), via: `trạm「${activeSiteId}」, kéo qua Vercel CLI` };
-    } catch (fallbackErr) {
-      die(fallbackErr instanceof Error ? fallbackErr.message : "Không tra ra chuỗi kết nối của trạm hoạt động.");
-    }
+    return die(err instanceof Error ? err.message : "Không tra ra database của app.");
   }
-}
-
-const { pg: activePg, via } = await findActivePg();
+})();
+const via = "database của app (Postgres trên VM)";
 
 console.log(`Dọn sổ điểm danh — ${via}`);
 console.log(`  ngưỡng im lặng: ${quietHours} giờ${force ? "   ·   --force: gỡ cả dòng có trong sổ Kho GitHub" : ""}`);

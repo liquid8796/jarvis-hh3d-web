@@ -25,7 +25,6 @@
  */
 import { sqlTag } from "./pgTag.mjs";
 import { decryptSecret, isEncrypted } from "../src/lib/crypto/secretBox";
-import { readControlDoc } from "../src/lib/control/read";
 import {
   explainFailure,
   parseWorkflowState,
@@ -33,7 +32,7 @@ import {
   HEARTBEAT_PATH,
   type WorkflowState,
 } from "../src/lib/validation/githubStations";
-import { pullStationPgFromVercel, resolveActiveStationPg } from "./activeStationPg.mts";
+import { appDatabaseUrl } from "./activeStationPg.mts";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -43,26 +42,21 @@ const API_VERSION = "2022-11-28";
 const USER_AGENT = "auto-hh3d-keepalive-probe";
 const REQUEST_TIMEOUT_MS = 15_000;
 
-const die = (message: string): never => {
+const die: (message: string) => never = (message) => {
   console.error(`\n✗ ${message}`);
   process.exit(1);
 };
 
 // ---- Database của trạm đang hoạt động ---------------------------------------------------------
 
-const localDatabaseUrl = process.env.DATABASE_URL ?? "";
-const doc = await readControlDoc();
-const activeSiteId = doc?.activeSiteId ?? null;
-
-let activePg = localDatabaseUrl;
-if (activeSiteId) {
-  try {
-    activePg = await resolveActiveStationPg({ localDatabaseUrl, activeSiteId });
-  } catch {
-    activePg = pullStationPgFromVercel(activeSiteId);
-  }
+// Sổ Kho GitHub nằm trong database mà APP dùng — từ 16/08/2026 là Postgres trên VM, không
+// phải Neon của một trạm. Đứng sai chỗ thì lượt đo này soi một bản sao đóng băng rồi báo xanh.
+let activePg: string;
+try {
+  activePg = appDatabaseUrl();
+} catch (err) {
+  die(err instanceof Error ? err.message : "Không tra ra database của app.");
 }
-if (activePg.length === 0) die("Không biết phải đọc sổ Kho GitHub ở database nào.");
 
 const sql = sqlTag(activePg);
 const rows = (await sql`SELECT value -> 'githubStations' AS stations FROM app_settings WHERE id = 'global'`) as Array<{
@@ -75,7 +69,7 @@ if (stations.length === 0) {
   process.exit(0);
 }
 
-console.log(`Đo nhánh tự chữa trên GitHub THẬT — ${stations.length} kho${activeSiteId ? ` (trạm「${activeSiteId}」)` : ""}\n`);
+console.log(`Đo nhánh tự chữa trên GitHub THẬT — ${stations.length} kho (sổ đọc từ database của app)\n`);
 
 // ---- Lời gọi -----------------------------------------------------------------------------------
 

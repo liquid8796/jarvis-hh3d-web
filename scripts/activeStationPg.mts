@@ -1,97 +1,134 @@
 /**
- * TRA CHUỖI KẾT NỐI CỦA TRẠM ĐANG HOẠT ĐỘNG, chịu được chuyện sổ dưới máy đã cũ.
+ * DATABASE MÀ APP ĐANG DÙNG — một câu hỏi, một câu trả lời, cho mọi script vận hành.
  *
- * VÌ SAO LÀ MỘT MÔ-ĐUN RIÊNG: sổ có thẩm quyền nằm ở trạm ĐANG HOẠT ĐỘNG, không phải ở chỗ
- * `DATABASE_URL` dưới máy trỏ tới — mà `.env.local` thì trỏ cứng vào `main`, trạm đã nghỉ từ
- * 10/08/2026. Mọi script ghi sổ đều phải đi qua đúng phép tra này, và một bản chép thứ hai là
- * hẹn ngày một script ghi vào trạm đã nghỉ: một lượt hỏng KHÔNG để lại dấu vết nào — nó nối
- * được, đọc ra dữ liệu thật, chỉ là dữ liệu của một trạm không ai dùng nữa.
+ * ── TỆP NÀY TỪNG TRẢ LỜI MỘT CÂU HỎI KHÁC ─────────────────────────────────────────────────────
  *
- * `newMirrorStation.mts` dừng hẳn khi sổ dưới máy thiếu trạm hoạt động. Ở đây đi thêm một bước,
- * vì cảnh ấy là cảnh THƯỜNG chứ không hiếm: sổ của `main` đóng băng đúng ngày nó nghỉ và không
- * bao giờ biết những trạm sinh sau. Đo 12/08/2026: sổ dưới máy có 2 trạm, sổ ở trạm hoạt động có
- * 4. Sổ đi theo mọi lượt đồng bộ nên trạm nào còn sống cũng biết đường chỉ tiếp — hỏi lần lượt
- * tới khi ra.
+ * Tới 15/08/2026 nó tên là「tra chuỗi kết nối của TRẠM ĐANG HOẠT ĐỘNG」và leo ba nấc thang để
+ * tìm: sổ gương dưới máy, rồi sổ gương của từng trạm còn đọc được, rồi hỏi thẳng Vercel. Cả ba
+ * nấc dựng trên một giả định: mỗi trạm có database RIÊNG, nên biết trạm nào đang phục vụ là biết
+ * hỏi database nào.
+ *
+ * Cuộc dời backend về VM (16/08/2026) xoá sổ chính giả định ấy. Nay chỉ còn MỘT database — Postgres
+ * trên `jarvis-oci-01` — và năm trạm Vercel chỉ là vỏ proxy, không giữ dữ liệu gì. Những Neon cũ
+ * thì vẫn nối được, vẫn trả về hàng thật; chúng chỉ đông cứng từ đúng giây cắt chuyển.
+ *
+ * Đó là lý do ba nấc thang phải đi hẳn chứ không được để lại làm「đường lui」: leo thang bây giờ
+ * KHÔNG hỏng, nó dẫn tới một bản sao sai rồi báo xanh. Một script dọn sổ điểm danh sẽ dọn sổ của
+ * một database bỏ hoang; một lượt đo nhánh tự chữa sẽ soi sổ Kho GitHub của tháng trước. Không có
+ * lỗi nào để đọc — đúng kiểu hỏng tệ nhất, và là kiểu mà chính tệp này đã cảnh báo suốt một tuần.
+ *
+ * ── NÊN NAY CHỈ CÒN MỘT LUẬT ──────────────────────────────────────────────────────────────────
+ *
+ * `DATABASE_URL` loopback ⇒ database thật đứng ngay cạnh ⇒ trả về nó.
+ * Không loopback ⇒ đang đứng ở máy nhà ⇒ TỪ CHỐI, kèm đúng lệnh phải gõ lại.
+ *
+ * Từ chối chứ không tự đi vòng, vì máy nhà không có đường nào tới Postgres của VM (nó chỉ nghe
+ * trên 127.0.0.1) — mọi「đường vòng」đều là đường tới một database khác. Và lời từ chối phải chỉ
+ * đúng lệnh: người đọc nó đang ở giữa một việc khác, câu「chạy trên VM ấy」bắt họ đi tra `npm run
+ * vm` nhận đối số kiểu gì.
+ *
+ * ── PHẦN CÒN LẠI CỦA TỆP TRẢ LỜI MỘT CÂU HỎI VẪN CÒN NGHĨA ────────────────────────────────────
+ *
+ * `pullStationEnv` không liên quan tới database của app: nó kéo môi trường production của một
+ * PROJECT VERCEL về, và project Vercel thì vẫn còn (vỏ proxy vẫn cần cấu hình, vẫn có biến). Nó ở
+ * lại nguyên vẹn, chỉ chuyển xuống dưới cho khỏi lẫn với luật ở trên.
  */
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { neon } from "@neondatabase/serverless";
-import { decryptSecret } from "../src/lib/crypto/secretBox";
 import { parseEnvFile } from "./envFile.mts";
 import { isLoopbackDatabaseUrl } from "./pgTag.mjs";
 
-type Mirror = { id: string; pg?: string };
+/** Nơi kho được bung ra trên VM — cùng đường dẫn mà `jarvis-web.service` chạy. */
+export const VM_APP_DIR = "/opt/jarvis/app";
 
-async function readMirrors(url: string): Promise<Mirror[]> {
-  const rows = (await neon(url)`select value->'mirrors' as mirrors from app_settings where id = 'global'`) as {
-    mirrors: Mirror[] | null;
-  }[];
-  return rows[0]?.mirrors ?? [];
+/**
+ * Lỗi RIÊNG cho ca「đứng sai máy」, để người gọi phân biệt được với mọi hỏng hóc khác.
+ *
+ * Vì sao đáng một lớp riêng thay vì `Error` trần: mọi script gọi `appDatabaseUrl` đều bọc nó
+ * trong `try/catch` rồi đổi thành lời từ chối của mình, và cái chúng cần biết là「có nên in
+ * stack không」. Đứng sai máy thì stack vô nghĩa — thông điệp ĐÃ là toàn bộ thông tin.
+ */
+export class KhongPhaiDatabaseCuaApp extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "KhongPhaiDatabaseCuaApp";
+  }
 }
 
 /**
- * Chuỗi kết nối Postgres của `activeSiteId`, tra qua sổ dưới máy rồi qua sổ của từng trạm còn
- * đọc được. NÉM khi hết đường — người gọi bắt rồi đổi thành lời từ chối của riêng nó (mỗi script
- * có một lớp `Stop`/`DungLai` riêng, và ném ở đây thì không script nào phải nhập của script kia).
+ * Dựng lại ĐÚNG lệnh vừa gõ, nhưng chạy trên VM.
  *
- * `onFallback` để người gọi kể lại đường vòng đã đi. Im lặng đi vòng cũng ra kết quả đúng, nhưng
- * nó giấu mất dấu hiệu「sổ dưới máy đã cũ」— thứ đáng biết trước khi nó gây chuyện ở một lượt khác.
+ * `npm_lifecycle_event` là tên script npm đang chạy (`roster:purge`, `verify:keepalive-live`…),
+ * npm đặt sẵn vào môi trường của tiến trình con. Có nó thì lời từ chối chỉ được đúng lệnh; không
+ * có nó (chạy `tsx` thẳng tay) thì nói thật là không biết, chứ đừng đoán một lệnh sai.
+ *
+ * HAI dấu `--`, và đó không phải lỗi đánh máy: dấu đầu tách đối số của `npm run vm`, dấu sau tách
+ * đối số của script bên trong. Thiếu dấu sau thì `--dry-run` bị chính npm nuốt mất.
+ *
+ * Hàm THUẦN (không đọc `process`) để `verify:app-db` đo được — xem `scripts/verifyAppDatabase.mts`.
  */
-export async function resolveActiveStationPg(input: {
-  localDatabaseUrl: string;
-  activeSiteId: string;
-  onFallback?: (viaSiteId: string) => void;
-}): Promise<string> {
-  const { localDatabaseUrl, activeSiteId } = input;
+export function vmRerunCommand(script: string | undefined, args: readonly string[] = []): string {
+  const clean = (script ?? "").trim();
+  if (clean.length === 0) return `npm run vm -- <lệnh vừa gõ, chạy trong ${VM_APP_DIR}>`;
+  const tail = args.length > 0 ? ` -- ${args.join(" ")}` : "";
+  return `npm run vm -- npm run ${clean}${tail}`;
+}
 
-  // Từ 16/08/2026 backend + database sống trên VM: DATABASE_URL loopback NGHĨA LÀ database
-  // thật đứng ngay cạnh — không còn「trạm hoạt động」nào để đi tra, và đi tra là quay về đúng
-  // Neon cũ đã đông cứng (sổ gương di cư theo dữ liệu vẫn chép các trạm ngày xưa). Ngắn mạch
-  // ở ĐÂY chứ không ở từng CLI: một luật, một chỗ — bài học của mongoSync.
-  if (isLoopbackDatabaseUrl(localDatabaseUrl)) return localDatabaseUrl;
-
-  const local = await readMirrors(localDatabaseUrl);
-  const direct = local.find((m) => m.id === activeSiteId);
-  if (direct?.pg) return decryptSecret(direct.pg);
-
-  for (const station of local) {
-    if (!station.pg) continue;
+/**
+ * Lời từ chối khi `DATABASE_URL` không trỏ vào database của app.
+ *
+ * In cả HOST đang trỏ tới, cắt bỏ phần còn lại của chuỗi: người đọc cần biết「nó đang trỏ đi
+ * đâu」để nhận ra đây là Neon cũ hay là một trạm nào đó, mà chuỗi kết nối đầy đủ thì chứa mật
+ * khẩu — thứ không được rơi vào log của bất kỳ lượt chạy nào.
+ *
+ * Hàm THUẦN. Xem `vmRerunCommand` về hai dấu `--`.
+ */
+export function offVmRefusal(url: string | undefined, script: string | undefined, args: readonly string[] = []): string {
+  let host = "(DATABASE_URL trống)";
+  if (typeof url === "string" && url.trim().length > 0) {
     try {
-      const found = (await readMirrors(decryptSecret(station.pg))).find((m) => m.id === activeSiteId);
-      if (found?.pg) {
-        input.onFallback?.(station.id);
-        return decryptSecret(found.pg);
-      }
+      host = new URL(url).hostname;
     } catch {
-      // Trạm không nối được thì hỏi trạm kế. Một trạm chết không được phép chặn cả lượt chạy.
+      host = "(DATABASE_URL không đọc được thành URL)";
     }
   }
-
-  throw new Error(
-    `Không tra ra chuỗi kết nối của trạm đang hoạt động「${activeSiteId}」.\n` +
-      "  Vào trang Tông Môn → Gương Trạm trên trạm ấy, bấm「Ghi trạm này vào sổ」rồi chạy lại.",
+  return (
+    `Lệnh này đụng vào database của app, mà DATABASE_URL dưới máy đang trỏ tới「${host}」.\n\n` +
+    "  Từ 16/08/2026 database của app là Postgres trên VM, chỉ nghe trên 127.0.0.1 — không có\n" +
+    "  đường nào tới nó từ máy nhà. Những Neon cũ thì vẫn nối được nhưng đã đông cứng từ giây\n" +
+    "  cắt chuyển: chạy tiếp ở đây sẽ đọc ra dữ liệu thật của một database không ai dùng nữa,\n" +
+    "  rồi báo xanh.\n\n" +
+    "  Chạy lại trên VM:\n\n" +
+    `      ${vmRerunCommand(script, args)}\n`
   );
 }
 
 /**
- * ── NẤC THANG THỨ HAI: HỎI THẲNG VERCEL ──────────────────────────────────────────────────────
+ * Chuỗi kết nối tới database mà APP đang dùng, hoặc NÉM nếu đang đứng sai máy.
  *
- * `resolveActiveStationPg` ở trên đứng trên một giả định: chuỗi kết nối dưới máy còn MỞ ĐƯỢC một
- * database nào đó. Ngày 14/08/2026 giả định ấy gãy: một lượt chuyển trạm xoá hẳn project của trạm
- * cũ, và cả `.env` lẫn `.env.local` cùng trả `password authentication failed` — nên phép tra không
- * có nổi bậc thang đầu tiên để đứng lên. Công cụ nào cũng chết ở dòng đầu, kể cả những công cụ chỉ
- * cần ĐỌC.
+ * Nhận `env`/`argv` qua đối số (mặc định là của tiến trình) để lượt kiểm dựng được cả hai cảnh
+ * mà không phải bịa `process.env` toàn cục — thứ sẽ rò sang mọi phép đo sau nó.
+ */
+export function appDatabaseUrl(
+  env: NodeJS.ProcessEnv = process.env,
+  argv: readonly string[] = process.argv.slice(2),
+): string {
+  const url = env.DATABASE_URL;
+  if (typeof url === "string" && isLoopbackDatabaseUrl(url)) return url;
+  throw new KhongPhaiDatabaseCuaApp(offVmRefusal(url, env.npm_lifecycle_event, argv));
+}
+
+/**
+ * ── KÉO MÔI TRƯỜNG CỦA MỘT PROJECT VERCEL ────────────────────────────────────────────────────
  *
- * Đường vòng đã phải đi bằng tay hôm ấy, nay viết thành mã: bảng điều phối cho biết trạm nào đang
- * hoạt động (nó nằm trên OCI, không phụ thuộc database), tên trạm suy ra tên project Vercel, và
- * `VERCEL_TOKEN_<TÊN>` trong `.env.local` mở được project ấy. Chìa Vercel KHÔNG xoay theo lượt
- * chuyển trạm, nên nấc này còn đứng khi mọi nấc khác đã đổ.
+ * Phần dưới đây KHÔNG trả lời câu hỏi「database của app ở đâu」(xem khối đầu tệp). Nó trả lời
+ * một câu khác vẫn còn nghĩa: biến production của một project Vercel là gì.
  *
- * Vì sao phải qua CLI mà không gọi API: `DATABASE_URL` nằm trong nhóm「sensitive」của Vercel, và
- * `GET /v10/projects/{id}/env?decrypt=true` trả về đúng phong bì đã mã hoá chứ không trả giá trị
- * (đo 14/08/2026). `vercel env pull` thì giải được — nó là đường duy nhất còn lại.
+ * Vì sao phải qua CLI mà không gọi API: giá trị trong nhóm「sensitive」của Vercel không đọc được
+ * qua `GET /v10/projects/{id}/env?decrypt=true` — API trả về đúng phong bì đã mã hoá chứ không
+ * trả giá trị (đo 14/08/2026). `vercel env pull` thì giải được.
  */
 
 /** Trần cho một lời gọi `vercel`. Link + pull đều là việc vài giây; lâu hơn thế là có chuyện. */
@@ -110,9 +147,9 @@ export function tokenKeyForSite(siteId: string): string {
  * này thường có phiên khác đang đọc chúng. Ghi đè chúng để đọc một biến là đổi cấu hình của người
  * khác giữa chừng.
  *
- * Trả TRỌN bảng chứ không lọc sẵn: người gọi biết mình cần gì (`pullStationPgFromVercel` cần đúng
- * một khoá, `syncActiveStationEnv` cần cả họ khoá database). Lọc ở đây là bắt mọi người gọi sau
- * phải sửa vào chính hàm này mỗi lần cần thêm một biến.
+ * Trả TRỌN bảng chứ không lọc sẵn: người gọi biết mình cần gì (`syncActiveStationEnv` cần cả họ
+ * khoá database). Lọc ở đây là bắt mọi người gọi sau phải sửa vào chính hàm này mỗi lần cần thêm
+ * một biến.
  */
 export function pullStationEnv(siteId: string): Map<string, string> {
   const key = tokenKeyForSite(siteId);
@@ -159,39 +196,5 @@ export function pullStationEnv(siteId: string): Map<string, string> {
       // Không xoá được thì nói ở nơi gọi cũng chẳng giúp gì; điều quan trọng là không nuốt mất
       // giá trị trả về vì một lượt dọn hụt.
     }
-  }
-}
-
-/**
- * Đúng `DATABASE_URL` production của một trạm. Lớp mỏng trên `pullStationEnv` — một bản luật kéo
- * env, không hai: bản sao thứ hai sẽ sai vào đúng ngày nó được dùng lần đầu (bài học đã trả giá ở
- * `mongoSync`, chép lại trong `pgSync.verifyDigestExpr`).
- */
-export function pullStationPgFromVercel(siteId: string): string {
-  const value = pullStationEnv(siteId).get("DATABASE_URL") ?? "";
-  if (value.length === 0) {
-    throw new Error(`Trạm「${siteId}」không có DATABASE_URL trong môi trường production.`);
-  }
-  return value;
-}
-
-/**
- * Chuỗi kết nối của trạm đang hoạt động, ĐI ĐƯỢC KỂ CẢ KHI SỔ DƯỚI MÁY ĐÃ CHẾT.
- *
- * Hai nấc, và thứ tự có lý do: nấc sổ rẻ hơn hẳn (một lượt truy vấn, không gọi tiến trình con) và
- * đúng trong ca thường; nấc Vercel là lối thoát hiểm, tốn hai lượt gọi CLI.
- */
-export async function resolveActiveStationPgAnywhere(input: {
-  localDatabaseUrl: string;
-  activeSiteId: string;
-  onFallback?: (viaSiteId: string) => void;
-  onVercelFallback?: (why: string) => void;
-}): Promise<string> {
-  try {
-    return await resolveActiveStationPg(input);
-  } catch (err) {
-    const why = err instanceof Error ? err.message.split("\n")[0] : "lỗi lạ";
-    input.onVercelFallback?.(why);
-    return pullStationPgFromVercel(input.activeSiteId);
   }
 }

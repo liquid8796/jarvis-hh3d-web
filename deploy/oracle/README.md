@@ -91,16 +91,41 @@ dán `~/.oci/jarvis_api_key_public.pem`.
 
 ---
 
-## 2. Khôi lỗi tông môn — worker trên VM
-
-Tiến trình `worker.mjs` chạy 24/7 trên VM Always Free, thay hoàn toàn Vercel Sandbox từ v0.11.
-Nó cầm `WORKER_TOKEN` toàn cục nên nhận job của **mọi** thành viên; giữ token đó như giữ chìa
-tàng khố — không bao giờ đưa cho người dùng (họ có linh phù riêng, phát ở mục Khôi Lỗi).
+## 2. VM OCI — máy chung của tông môn
 
 | Thông số | Giá trị |
 |---|---|
-| IP | `144.24.177.55` |
-| SSH | `ssh -i ~/.ssh/jarvis_oci_ed25519 ubuntu@144.24.177.55` |
+| tên | `jarvis-oci-01` (hostname `jarvis01`) |
+| IP | **`92.5.130.32`** — public IP **RESERVED**, thuộc về tài khoản chứ không thuộc về máy |
+| SSH | `ssh -i ~/.ssh/jarvis_oci_ed25519 ubuntu@92.5.130.32` |
+| shape | `VM.Standard.A1.Flex` — 4 OCPU / 24 GB / 4 Gbps |
+| đĩa | boot volume **100 GB**, VPU 10 |
+| OS | Ubuntu 24.04 LTS aarch64 |
+| vị trí | `eu-frankfurt-1`, AD-1, FAULT-DOMAIN-2 |
+| vai trò | **chưa giao** — xem ghi chú ngay dưới |
+
+> **16/08/2026 — máy này THÔI làm khôi lỗi tông môn.** Tông chủ cho dựng lại máy từ đầu (đĩa
+> 50 GB → 100 GB) và giao vai khác, sẽ nói sau. Mục 2 bên dưới giữ lại nguyên vẹn phần mô tả
+> khôi lỗi vì **nó vẫn đúng cho 6 khôi lỗi GitHub** (cùng `worker.mjs`, cùng `WORKER_TOKEN`,
+> cùng luật phân công) và vì đó là công thức dựng lại nếu có ngày cần một khôi lỗi trên VM nữa.
+> Đọc nó như tài liệu về WORKER, đừng đọc như mô tả máy này đang làm gì.
+>
+> Ba hệ quả đã kiểm, không phải suy đoán:
+> - **Đàn không kẹt.** `services/dispatch.ts` có cửa `ONLINE_WINDOW_MS`, khôi lỗi im lặng tự
+>   rơi khỏi vòng phân công; lúc xoá máy không đàn nào đang chạy.
+> - **`tong-mon-khoiloi` còn một dòng cũ trong sổ điểm danh** — vô hại, gỡ bằng `npm run roster:purge`.
+> - **IP CŨ `144.24.177.55` MẤT VĨNH VIỄN.** Nó là ephemeral, và OCI không cho chuyển ephemeral
+>   thành reserved — xoá máy là trả địa chỉ về pool. Địa chỉ mới đặt RESERVED chính vì vậy: lần
+>   sau dựng lại máy thì gắn lại đúng IP ấy, không phải sửa tài liệu và `~/.ssh` thêm lần nào.
+
+### Khôi lỗi — cách worker chạy (nay là 6 kho GitHub; VM từng chạy tới 16/08/2026)
+
+Tiến trình `worker.mjs` chạy 24/7, thay hoàn toàn Vercel Sandbox từ v0.11.
+Nó cầm `WORKER_TOKEN` toàn cục nên nhận job của **mọi** thành viên; giữ token đó như giữ chìa
+tàng khố — không bao giờ đưa cho người dùng (họ có linh phù riêng, phát ở mục Khôi Lỗi).
+
+| Thông số | Giá trị (khi chạy trên VM) |
+|---|---|
 | service | `auto-hh3d-linh-su.service` |
 | thư mục | `/opt/auto-hh3d/linh-su` |
 | env | `/opt/auto-hh3d/linh-su/.env` (`WEB_URL`, `WORKER_TOKEN`, `WORKER_ID=tong-mon-khoiloi`) |
@@ -238,13 +263,18 @@ bật được, plugin nó chưa từng nhắc tới thì không.
 Cuối cùng xoá bastion rồi **SSH thẳng vào IP công khai** để nghiệm thu: lúc ấy mọi dòng tạm đã
 biến mất, vào được nghĩa là dòng vĩnh viễn thật sự đứng một mình.
 
-### Cài đè engine mới (phát hành)
+### Cài đè engine mới (phát hành) — KHÔNG còn áp dụng cho VM
+
+> **Từ 16/08/2026 bước này ĐÃ BỎ khỏi lệ phát hành.** VM không còn chạy khôi lỗi, nên một bản vá
+> engine nay chỉ phải tới HAI nơi: các trạm Vercel (`npm run deploy:all`) và 6 kho GitHub đông
+> lạnh (`npm run github:deploy`). Đừng đi tìm một VM để cài đè — không có cái nào cả, và IP dưới
+> đây đã chết. Giữ lại công thức vì nó là đường dựng khôi lỗi VM nếu có ngày cần lại.
 
 Chạy **sau khi Vercel đã `READY`** — `setup.sh` tải gói từ `WEB_URL/linh-su/goi-linh-su.tgz`,
 mà gói ấy được đóng lại ở mỗi lần deploy. Deploy trước, cài sau; ngược lại là cài phải gói cũ.
 
 ```bash
-ssh -i ~/.ssh/jarvis_oci_ed25519 ubuntu@144.24.177.55 \
+ssh -i ~/.ssh/jarvis_oci_ed25519 ubuntu@<IP của VM chạy khôi lỗi> \
   'sudo bash -c "set -a; . /opt/auto-hh3d/linh-su/.env; set +a; bash /home/ubuntu/setup.sh"'
 ```
 
@@ -288,15 +318,65 @@ systemctl restart auto-hh3d-linh-su    # khởi động lại
 | Shape | **VM.Standard.A1.Flex** (Ampere ARM) | Always Free cho tới 4 OCPU + 24GB RAM cho A1 — dư sức nuôi Chromium. Hai con `VM.Standard.E2.1.Micro` (x86, 1GB) cũng free nhưng 1GB thì Chromium chết ngạt. |
 | OS | **Ubuntu 24.04 LTS (aarch64)** | Distro được Playwright hỗ trợ chính thức: `playwright install-deps` biết đúng danh sách gói hệ thống; Chromium có bản linux-arm64. Oracle Linux thì phải tự mò danh sách thư viện. |
 | Kích cỡ | **4 OCPU / 24GB** | Trọn hạn Always Free của A1. Bảng này từng ghi 2/12 với lý do "xin nhỏ cho dễ được cấp" — đo lại ngày 10/08/2026 thì máy thật là 4 OCPU / 24GB (`shape-config` của OCI và `nproc`/`free` trên máy nói cùng một điều). Con số ấy là căn cứ của trần hub trong engine, nên chép sai ở đây là tính sai ở đó. |
+| Đĩa | **100 GB** boot volume, VPU 10 | Hạn Always Free là **200 GB tổng** cho mọi block+boot volume, nên 100 GB vẫn còn chừa một nửa. Nâng từ 50 GB ngày 16/08/2026 lúc dựng lại máy: bản cũ dùng 17/50 GB mà riêng 13 hồ sơ trình duyệt đã ăn 12 GB — tức trần cũ chỉ còn cách đầy đúng một lần đông việc. Ubuntu cloud image tự `growpart` khi khởi động lần đầu nên không phải nới phân vùng bằng tay (đo: `sda1` = 99 G, `df` = 96 G khả dụng). |
+| IP | **RESERVED** | Từ 16/08/2026. Trước đó là ephemeral, và bài học đắt: xoá máy là mất địa chỉ vĩnh viễn (OCI không cho chuyển ephemeral → reserved), kéo theo phải sửa tài liệu, `~/.ssh` và cả bản ghi nhớ. Reserved thì địa chỉ thuộc về tài khoản, dựng lại máy là gắn lại. |
 | Mạng | Chỉ mở SSH (22) | Worker chỉ gọi RA (HTTPS tới web + game). Không cổng nào cần mở vào. |
 
-### Dựng lại VM từ đầu (một lần)
+### Dựng lại VM từ đầu
 
-1. **Compute → Instances → Create instance**: image **Canonical Ubuntu 24.04 aarch64**, shape
-   **Ampere VM.Standard.A1.Flex** 2 OCPU/12GB, VCN mặc định, **Assign public IPv4**, dán SSH
-   public key. *Báo "Out of capacity" thì thử giờ khác, giảm về 1 OCPU/6GB, hoặc đổi AD.*
-2. Chờ **Running**, ghi lại public IP. Security list mặc định đã chỉ mở 22 — đúng ý.
-3. `scp` [setup.sh](setup.sh) lên VM rồi:
+Làm bằng CLI, không bấm GUI — chạy thật ngày 16/08/2026 và đây là bản chép lại đúng lượt ấy.
+Bảng cũ ở đây từng dạy bấm GUI với **2 OCPU/12GB**; con số đó sai so với máy thật (4/24) và đã
+gỡ. Đặt `$C` = OCID compartment (chính là OCID tenancy — xem mục 1).
+
+**Bước 0 — ĐO SỨC CHỨA TRƯỚC KHI XOÁ.** A1 Free Tier hay hết chỗ, mà xoá rồi mới biết là mất
+máy hàng giờ. Có API trả lời trước, không tốn gì:
+
+```bash
+echo '[{"instanceShape":"VM.Standard.A1.Flex","faultDomain":null,"instanceShapeConfig":{"ocpus":4.0,"memoryInGBs":24.0}}]' > cap.json
+for ad in AD-1 AD-2 AD-3; do
+  oci compute compute-capacity-report create --profile jarvis --compartment-id "$C" \
+    --availability-domain "mbwY:EU-FRANKFURT-1-$ad" --shape-availabilities file://cap.json \
+    --query 'data."shape-availabilities"[0]."availability-status"' --raw-output
+done   # AVAILABLE ở ít nhất một AD thì mới đi tiếp
+```
+
+**Bước 1 — xoá máy cũ.** `--preserve-boot-volume false`, không thì boot volume mồ côi vẫn ăn
+hạn 200 GB mà không dòng nào nhận ra nó. `--wait-for-state` ở đây nhận trạng thái **work
+request** (`SUCCEEDED`), không phải `TERMINATED` — gõ nhầm là CLI từ chối:
+
+```bash
+oci compute instance terminate --profile jarvis --instance-id "$OLD" \
+  --preserve-boot-volume false --force --wait-for-state SUCCEEDED
+```
+
+**Bước 2 — dựng máy mới.** `--assign-public-ip false` là CỐ Ý: một VNIC chỉ đeo được một IP
+công khai, nên xin ephemeral trước rồi mới muốn reserved là phải gỡ ra gắn vào.
+
+```bash
+oci compute instance launch --profile jarvis --compartment-id "$C" \
+  --availability-domain "mbwY:EU-FRANKFURT-1-AD-1" --fault-domain FAULT-DOMAIN-2 \
+  --display-name jarvis-oci-01 --hostname-label jarvis01 \
+  --shape VM.Standard.A1.Flex --shape-config '{"ocpus":4,"memoryInGBs":24}' \
+  --image-id "<Canonical-Ubuntu-24.04-aarch64 mới nhất>" \
+  --boot-volume-size-in-gbs 100 --subnet-id "<subnet cũ>" \
+  --assign-public-ip false --metadata '{"ssh_authorized_keys":"<khoá công khai>"}' \
+  --wait-for-state RUNNING
+```
+
+**Bước 3 — gắn IP reserved** (địa chỉ thuộc về tài khoản, dựng lại máy là gắn lại):
+
+```bash
+PIP=$(oci network private-ip list --profile jarvis --vnic-id "$VNIC" --query 'data[0].id' --raw-output)
+oci network public-ip create --profile jarvis --compartment-id "$C" \
+  --lifetime RESERVED --private-ip-id "$PIP" --display-name jarvis-oci-01-ip \
+  --wait-for-state ASSIGNED
+```
+
+**Bước 4 — nghiệm thu.** Security list mặc định đã chỉ mở 22 — đúng ý. Ubuntu cloud image tự
+`growpart` nên `df -h /` phải ra ~96 G ngay lần khởi động đầu; ra 48 G nghĩa là partition chưa
+nới và phải xem lại.
+
+**Chỉ khi muốn máy này làm khôi lỗi** — `scp` [setup.sh](setup.sh) lên VM rồi:
 
 ```bash
 WEB_URL='https://auto-hh3d.vercel.app' WORKER_TOKEN='<WORKER_TOKEN trên Vercel>' \

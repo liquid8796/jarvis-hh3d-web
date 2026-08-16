@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.0.0",
+    date: "2026-08-16",
+    lines: [
+      "Cả hệ thống dọn về nhà mới — chạy nhanh và ổn định hơn, không còn phụ thuộc nhiều bên.",
+      "Địa chỉ trang, tài khoản, đàn và mọi dữ liệu giữ nguyên; đạo hữu không phải làm gì cả.",
+    ],
+  },
+  {
     version: "0.98.0",
     date: "2026-08-16",
     lines: [

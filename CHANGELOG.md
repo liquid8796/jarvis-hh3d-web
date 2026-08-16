@@ -11,6 +11,48 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.0.0 — Backend rời Vercel về VM OCI; Vercel chỉ còn là cửa trước
+
+Tông chủ quyết 16/08/2026. Kiến trúc mới, một câu: **app Next.js + PostgreSQL 17 + MongoDB
+8.0 chạy trọn trên `jarvis-oci-01` (https://92.5.130.32.sslip.io, Caddy + TLS Let's Encrypt);
+5 trạm Vercel thành VỎ PROXY** — một tấm rewrite chuyển nguyên request về VM và trả nguyên
+câu trả lời, người dùng giữ đúng URL cũ, cookie phiên vẫn same-origin. Khôi lỗi GitHub gọi
+THẲNG VM, không qua proxy.
+
+Vì sao vỏ proxy chứ không tách hai codebase: các trang dashboard/admin đọc database ngay
+trong lúc render (server components + server actions) — tách UI khỏi data là viết lại ~10
+tệp action cùng mọi trang đọc-DB thành REST, nhiều tuần và fork codebase vĩnh viễn. Vỏ proxy
+đạt cùng mục tiêu vận hành (backend + data trên máy của mình) với diff nhỏ hơn hàng chục lần,
+và còn giữ được cookie same-origin — gọi thẳng VM từ trình duyệt là rơi vào third-party
+cookie, Safari chặn.
+
+- **Driver: neon-http → pg.** neon-http nói giao thức fetch riêng của Neon, Postgres thường
+  không trả lời được; pg nói giao thức chuẩn nên phủ cả localhost lẫn Neon. Từ nay có
+  transaction thật. LISTEN của realtime sang pg.Client (vốn là cha đẻ của bản Neon fork);
+  NOTIFY đi qua pool của db().
+- **Dữ liệu**: pg_dump từ Neon của trạm phục vụ cuối (auto-hh3d-4) → Postgres 17 local
+  (users=33, workers=8, jobs=357); mongodump Atlas → mongod local, db `jarvis`
+  (chat_messages=0 — Atlas nguồn cũng 0, sweep đã dọn từ trước; cấu trúc + index về đủ).
+  DNS SRV hỏng dưới máy nhà thành vô nghĩa: Mongo nay là localhost của VM.
+- **Phát hành**: `deploy:all` nay = `deploy:backend` (git archive HEAD → build trên VM →
+  lật symlink release, nghỉ ~2s); `deploy:proxy` lật vỏ trạm qua API v13 files-inline —
+  không CLI, không git metadata, hết bệnh BLOCKED git-author. Lệ cũ của các phiên
+  («sau patch chạy deploy:all») giữ nguyên nghĩa: phát hành bản vá.
+- **Cron**: Vercel Cron (03:00 UTC gọi /api/cron) thay bằng systemd timer cùng giờ trên VM,
+  CRON_SECRET đọc từ .env của app — đã chạy thử một lượt thật, exit 0.
+- **Ops đụng DB dời hẳn lên VM**: Postgres/Mongo chỉ nghe 127.0.0.1 (cố ý — không mở cổng
+  DB ra internet), nên roster:purge / github:deploy / db:migrate / verify:* chạy qua
+  `npm run vm -- <lệnh>`. Chạy chúng ở máy nhà từ nay là đọc database CŨ đã đông cứng.
+- **.bat**: 11 tệp cũ vào `backup/` — toàn bộ họ mirror/station (kiến trúc gương trạm nghỉ
+  việc cùng Neon) và các tệp DB-side nay phải chạy trên VM. Thay bằng `deploy-backend.bat`.
+- Ba cái giá đã trả trong chính lượt dựng: `ln -sfn` vào thư mục có thật tạo symlink BÊN
+  TRONG nó (app khởi động trong thư mục rỗng); `npx next build` nhảy qua hook prebuild nên
+  gói khôi lỗi 404 (public/ chỉ được quét lúc khởi động); API list env chỉ trả blob mã hoá
+  — CLI `vercel env pull` là đường giải mã duy nhất còn tin được.
+
+Hệ gương trạm (mirror/*, sổ gương, bảng điều phối, sync) là ĐỒ THỪA KẾ từ hôm nay: mã còn
+trong cây, UI admin còn hiện, nhưng không còn gì để điều phối. Gỡ dần ở các bản sau.
+
 ## 0.95.0 — Hỷ Sự Đường: một phòng hỏng thôi giết những phòng chưa ai ghé
 
 Tông chủ báo「quest chúc còn sót các phòng cưới」kèm bản ghi `hy-su-duong-20260815-205221`, và

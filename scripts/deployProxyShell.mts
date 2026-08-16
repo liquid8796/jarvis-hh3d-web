@@ -57,15 +57,16 @@ async function discover(): Promise<Target[]> {
 
   const targets: Target[] = [];
   for (const { tokenName, token } of tokens) {
-    const teams = (await api(token, "/v2/teams?limit=20")) as { teams?: { id: string }[] };
-    for (const teamId of [null, ...(teams.teams ?? []).map((t) => t.id)]) {
-      const q = teamId ? `?teamId=${teamId}&limit=100` : "?limit=100";
-      const list = (await api(token, `/v9/projects${q}`)) as { projects?: { id: string; name: string }[] };
-      for (const p of list.projects ?? []) {
-        if (!p.name.startsWith("auto-hh3d")) continue;
-        if (targets.some((t) => t.name === p.name)) continue; // chìa nào tới trước giữ trạm ấy
-        targets.push({ token, tokenName, teamId, projectId: p.id, name: p.name });
-      }
+    // Token của hệ trạm được scope sẵn vào tài khoản của nó: LIST không cần teamId, và
+    // teamId cho các call đích danh CHÍNH LÀ accountId của project — bài học đã trả ở
+    // vercelCatalog.mts, đừng đi đường /v2/teams (token scoped trả 403 ở đó).
+    const list = (await api(token, "/v9/projects?limit=100")) as {
+      projects?: { id: string; name: string; accountId?: string }[];
+    };
+    for (const p of list.projects ?? []) {
+      if (!p.name.startsWith("auto-hh3d")) continue;
+      if (targets.some((t) => t.name === p.name)) continue; // chìa nào tới trước giữ trạm ấy
+      targets.push({ token, tokenName, teamId: p.accountId ?? null, projectId: p.id, name: p.name });
     }
   }
   return targets.sort((a, b) => a.name.localeCompare(b.name));

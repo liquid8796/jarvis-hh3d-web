@@ -103,7 +103,9 @@ sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname = '$PG_DB'" 
   || sudo -u postgres createdb -O "$PG_USER" "$PG_DB"
 
 id -u "$APP_USER" >/dev/null 2>&1 || useradd --system --create-home --shell /usr/sbin/nologin "$APP_USER"
-install -d -o "$APP_USER" -g "$APP_USER" "$APP_DIR"
+# KHÔNG dựng sẵn $APP_DIR: nó là SYMLINK do deployBackend lật vào release — dựng sẵn một
+# thư mục thật ở đó làm `ln -sfn` tạo symlink bên trong thay vì thay thế (đã trả giá 16/08).
+install -d -o "$APP_USER" -g "$APP_USER" /opt/jarvis/releases
 
 log "[8/8] systemd + Caddyfile"
 cat > /etc/systemd/system/jarvis-web.service <<'UNIT'

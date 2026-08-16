@@ -81,8 +81,16 @@ try {
       "sudo ln -sfn /opt/jarvis/shared/.env $REL/.env",
       "sudo chown -R jarvis:jarvis $REL",
       "cd $REL && sudo -u jarvis npm ci --no-audit --no-fund 2>&1 | tail -2",
-      "cd $REL && sudo -u jarvis npx next build 2>&1 | tail -12",
-      // 3. Lật symlink rồi restart — điểm duy nhất chạm vào bản đang phục vụ
+      // `npm run build` chứ KHÔNG phải `npx next build`: hook prebuild đóng gói khôi lỗi
+      // (public/linh-su/goi-linh-su.tgz) — gọi thẳng next là gói ấy vắng mặt và mọi lượt
+      // cài khôi lỗi tải về 404. Đã trả giá ngay lượt phát hành đầu tiên.
+      "cd $REL && sudo -u jarvis npm run build 2>&1 | tail -12",
+      // 3. Lật symlink rồi restart — điểm duy nhất chạm vào bản đang phục vụ.
+      //    Gác trước khi lật: /opt/jarvis/app mà là THƯ MỤC thật thì `ln -sfn` sẽ tạo
+      //    symlink BÊN TRONG nó chứ không thay nó — app khởi động trong thư mục rỗng,
+      //    npx tự tải một bản next lạ và chết với「no production build」. Đã trả giá
+      //    ngay lượt phát hành đầu (setup-backend.sh từng dựng sẵn thư mục ấy).
+      "[ -L /opt/jarvis/app ] || sudo rm -rf /opt/jarvis/app",
       "sudo ln -sfn $REL /opt/jarvis/app",
       "sudo systemctl restart jarvis-web",
       // 4. Canh cửa: service phải sống VÀ cổng 3000 phải trả lời trong 60s

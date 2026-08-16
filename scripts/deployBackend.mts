@@ -47,17 +47,43 @@ const die = (message: string): never => {
   process.exit(1);
 };
 
-/** Chạy một script bash trên VM, gửi qua STDIN — khỏi phải trốn dấu nháy qua hai tầng shell. */
-const remote = (script: string, quiet = false) =>
-  spawnSync("ssh", ["-i", SSH_KEY, "-o", "BatchMode=yes", "-o", "ConnectTimeout=25", `${VM_USER}@${VM_HOST}`, "bash -s"], {
-    input: script,
-    encoding: "utf8",
-    stdio: ["pipe", quiet ? "pipe" : "inherit", "inherit"],
-  });
+/**
+ * `ssh` dùng mã thoát 255 cho lỗi TẦNG VẬN CHUYỂN của chính nó — phân biệt được với mã thoát
+ * của lệnh phía xa (lệnh phía xa gần như không bao giờ trả 255). Phân biệt ấy là bắt buộc ở
+ * đây: một cú đứt đường truyền và một lượt build hỏng đòi hai phản ứng ngược nhau.
+ */
+const SSH_TRANSPORT_FAILURE = 255;
+/** Đo 16/08/2026: đường tới VM đứt ở banner exchange dăm lần mỗi giờ, và lượt thử lại luôn qua. */
+const SSH_ATTEMPTS = 4;
+const SSH_RETRY_MS = 6_000;
+
+const sleep = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+/**
+ * Chạy một script bash trên VM, gửi qua STDIN — khỏi phải trốn dấu nháy qua hai tầng shell.
+ *
+ * Thử lại CHỈ khi ssh hỏng ở tầng vận chuyển. Lệnh phía xa hỏng thì trả về ngay: chạy lại một
+ * lượt `npm ci` đã chết nửa chừng là nhân đôi cái hỏng, không phải chữa nó.
+ */
+const remote = (script: string, quiet = false) => {
+  for (let attempt = 1; ; attempt++) {
+    const run = spawnSync(
+      "ssh",
+      ["-i", SSH_KEY, "-o", "BatchMode=yes", "-o", "ConnectTimeout=25", `${VM_USER}@${VM_HOST}`, "bash -s"],
+      { input: script, encoding: "utf8", stdio: ["pipe", quiet ? "pipe" : "inherit", "inherit"] },
+    );
+    if (run.status !== SSH_TRANSPORT_FAILURE || attempt >= SSH_ATTEMPTS) return run;
+    console.error(`  ⚠ đường tới VM đứt (ssh 255) — thử lại lượt ${attempt + 1}/${SSH_ATTEMPTS}…`);
+    sleep(SSH_RETRY_MS);
+  }
+};
 
 const remoteOrDie = (script: string, what: string) => {
   const run = remote(script);
-  if (run.status !== 0) die(`${what} — ssh thoát ${run.status}. Đọc dòng lỗi ngay trên.`);
+  if (run.status === SSH_TRANSPORT_FAILURE) {
+    die(`Không nối được tới VM sau ${SSH_ATTEMPTS} lượt thử (ssh 255) — mạng nhà, hoặc VPN đang bật.`);
+  }
+  if (run.status !== 0) die(`${what} — lệnh trên VM thoát ${run.status}. Đọc dòng lỗi ngay trên.`);
   return run;
 };
 
@@ -80,6 +106,11 @@ function readState(): State {
     ].join("\n"),
     true,
   );
+  // Hai nguyên nhân, hai lời khác hẳn nhau: đổ oan cho「nền chưa dựng」khi thật ra chỉ đứt mạng
+  // là đẩy người đọc đi chạy lại cả một script dựng nền chẳng để làm gì (đã suýt xảy ra 16/08).
+  if (probe.status === SSH_TRANSPORT_FAILURE) {
+    die(`Không nối được tới VM sau ${SSH_ATTEMPTS} lượt thử (ssh 255) — mạng nhà, hoặc VPN đang bật. Chưa đụng gì tới máy.`);
+  }
   if (probe.status !== 0) die("Không đọc được trạng thái trên VM — nền blue/green đã dựng chưa? (setup-backend.sh)");
 
   const kv = new Map(
@@ -127,13 +158,17 @@ function switchTo(port: number, expectVersion: string): void {
 
 // ---- Đường lùi bản --------------------------------------------------------------------------
 
+// `--rollback` và `--switch` là MỘT thao tác: trỏ Caddy sang chỗ chạy kia. Hai tên vì hai
+// hoàn cảnh, và cả hai đều có thật — lùi về bản cũ, hoặc hoàn tất một lượt phát hành đã dựng
+// xong nhưng đứt mạng đúng lúc chuyển (xảy ra 16/08/2026: bản mới nằm khoẻ ở chỗ rảnh, bản cũ
+// vẫn phục vụ, chỉ thiếu mỗi cú đổi dòng). Một tên duy nhất sẽ nói dối một trong hai cảnh.
 const argv = process.argv.slice(2);
-if (argv.includes("--rollback")) {
+if (argv.includes("--rollback") || argv.includes("--switch")) {
   const state = readState();
   if (state.idleUnit !== "active") {
-    die(`Chỗ chạy kia (cổng ${state.idle}) đang「${state.idleUnit}」, không lùi vào đó được.`);
+    die(`Chỗ chạy kia (cổng ${state.idle}) đang「${state.idleUnit}」, không chuyển sang đó được.`);
   }
-  console.log(`• Lùi bản: cổng ${state.active} (${state.versionActive}) → cổng ${state.idle} (${state.versionIdle})`);
+  console.log(`• Chuyển: cổng ${state.active} (${state.versionActive}) → cổng ${state.idle} (${state.versionIdle})`);
   switchTo(state.idle, state.versionIdle);
   process.exit(0);
 }

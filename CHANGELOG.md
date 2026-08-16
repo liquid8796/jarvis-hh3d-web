@@ -11,6 +11,40 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.2.1 — Khoáng Mạch nghe lời xác nhận đoạt mỏ ở NGẢ MẠNG (schema hồ sơ 65)
+
+Tông chủ báo 17/08/2026 kèm ảnh nhật ký: trong game đã đoạt được mỏ, mà auto khai
+「Đoạt mỏ KHÔNG thành (trang không nói câu xác nhận nào) — lượt này KHÔNG mua phù」. Dòng ngay
+sau đó tự tố cáo lời khai ấy: bonus tu vi của mỏ nhảy `100%` → `55%` lúc `00:35:21`, rồi
+`00:35:34` dòng mình đổi sang「đang khai thác — chưa đạt tối đa」, tức chu kỳ đào vừa reset. Cú
+đoạt THÀNH, chỉ có phép kiểm là mù.
+
+**Chỗ hỏng: bằng chứng bị đi tìm sai chỗ.** Bản ghi 14/08 đọc câu「Đã đoạt thành công quyền chủ
+mỏ.」trong `network.json` — tức trong THÂN TRẢ LỜI AJAX — rồi `KmHostWonScript` lại đi tìm nó
+trong DOM bằng `fold(body.textContent)`. Hai chỗ ấy không phải một, và trang không có nghĩa vụ
+nào phải vẽ câu ấy ra. Không đổ được cho「toast sống ngắn」như ghi chú cũ đoán: cái chờ 8 giây ở
+trên nó đã chạy bằng MutationObserver trong trang (`conditionWaitSource`), nên một toast dù chỉ
+sống 200ms cũng bị bắt. Tám giây trắng nghĩa là chữ ấy chưa bao giờ vào DOM.
+
+**Bản vá: một bước gài tai nghe TRƯỚC cú bấm Xác nhận** (`KmWinWatchScript`). Nó bọc `fetch` và
+`XMLHttpRequest`, cộng một `MutationObserver` đọc `textContent` của node MỚI CHÈN, rồi cắm cờ
+`jvz-km-won` khi nghe thấy câu xác nhận ở BẤT KỲ ngả nào. Ba chi tiết không cắt được:
+
+- **Mở lớp escape trước khi so.** PHP `json_encode` mặc định bẻ mọi ký tự ngoài ASCII, nên câu
+  tiếng Việt về tới nơi có thể không còn một chữ tiếng Việt nào.
+- **Bước chờ đổi `When` sang `body.jvz-km-host-go`.** Nó vốn hỏi `.jvz-km-doat` — chính cái nút
+  vừa bấm — mà cú AJAX vẽ lại sổ và cuốn nút ấy đi, nên cái chờ sẽ bị bỏ qua ĐÚNG ở ca thành công.
+- **Câu「không thành」nay kéo theo 120 ký tự đầu của thứ trang vừa trả lời.** Không có bản ghi cho
+  ngày ấy, nên đây là cách rẻ nhất để lượt hỏng kế tiếp tự khai thay vì bắt người đi mò.
+
+**Và phép đọc DOM cũ bị GỠ HẲN, không giữ lại cho chắc.** `body.textContent` gộp cả mã nguồn của
+mọi thẻ `<script>` trong trang (đó là chỗ nó khác `innerText`), nên chỉ cần JS của site mang một
+literal là cửa tiêu tiền mở suốt ngày. Không phải giả thiết: chính fixture của bộ chạy thử đã
+xanh nhầm y như vậy — nó gọi `toast('Đã đoạt thành công…')` ngay trong script của trang, nên ca
+「đoạt thành」đậu kể cả khi không toast nào được vẽ. Fixture nay giữ câu ấy trong một `data-*`
+(textContent không đọc tới), trả lời AJAX theo ba đường `net` / `dom` / `khac`, và ca「trang trả
+lời câu lạ」là ca đã bắt được lỗi này.
+
 ## 1.2.0 — Mê Cung thôi nghỉ một giờ giữa hai đợt đánh (schema hồ sơ 64)
 
 Tông chủ báo 16/08/2026: đánh xong một đợt là đàn dừng, đợi một giờ, không ghé lại tìm phòng.

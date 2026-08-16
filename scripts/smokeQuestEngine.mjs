@@ -237,6 +237,11 @@ ${km.hideStats
   <div class="shop-item"><div class="shop-item-content">Trận Kỳ<button class="shop-item-button">Mua Ngay</button></div></div>
 </div>
 <div id="mine-list"></div>
+<!-- Lời xác nhận nằm trong một THUỘC TÍNH, không phải trong mã script: body.textContent gộp cả
+     mã nguồn của mọi <script> trong trang, nên một literal 'Đã đoạt thành công…' trong script sẽ
+     làm phép đọc DOM xanh ở MỌI ca — fixture đời trước đã xanh nhầm đúng kiểu ấy, và ca「trang
+     nói câu lạ」là chỗ nó lộ ra. data-* thì textContent không đọc tới. -->
+<div id="km-won-text" data-text="Đã đoạt thành công quyền chủ mỏ." style="display:none"></div>
 <div id="user-modal" style="display:none"><div class="modal-content">
   <div id="bonus-display">Ẩn Thân Phù: 0/5 · Thưởng thêm: - Tu Vi: ${km.hideBonus ? "<span>—</span>" : `<span id="tuvi-bonus-percentage">${km.bonus}%</span>`} - Tinh Thạch: <span id="tinhthach-bonus-percentage">20%</span> - Bát Quái Trận Đồ</div>
   <div id="user-list"></div>
@@ -245,7 +250,7 @@ ${km.hideStats
 </div></div>
 </div>
 <script>
-const KM = ${JSON.stringify({ type: km.type, inMine: km.inMine, minedMin: km.minedMin, maxed: km.maxed, claimed: km.claimedJustNow, owner: km.owner, attacksUsed: km.attacksUsed, bonus: km.bonus })};
+const KM = ${JSON.stringify({ type: km.type, inMine: km.inMine, minedMin: km.minedMin, maxed: km.maxed, claimed: km.claimedJustNow, owner: km.owner, attacksUsed: km.attacksUsed, bonus: km.bonus, says: km.seizeSays ?? "net" })};
 const LISTS = ${JSON.stringify(lists)};
 let page = 1;
 const swal = (text, confirmLabel, onYes) => {
@@ -307,14 +312,19 @@ const renderModal = () => {
   const doat = document.querySelector('#user-list button.doat-mo-btn');
   if (doat) doat.onclick = () => swal('Đạo hữu có chắc chắn muốn đoạt quyền chủ mỏ này không?', 'Xác nhận', () => {
     if (KM.owner || KM.attacksUsed >= 3) { document.body.dataset.refused = 'seize'; return; }
-    fetch('/km-seize');
+    fetch('/km-seize?says=' + KM.says);
     // Đoạt xong thì bonus tu vi của mỏ TĂNG — bản ghi 14/08: 100% → 120% sau khi mua Linh
     // Quang Phù + đoạt. Chi tiết này không trang trí: nó là thứ cho phép một lượt đoạt tự mở
     // luôn cửa ngưỡng-đào mà chính lượt ấy vừa đóng.
     // (Không dùng dấu backtick trong khối này: cả fixture là một template literal.)
     setTimeout(() => { KM.owner = true; KM.attacksUsed += 1; KM.bonus += 20; page = 1;
       const bEl = document.getElementById('tuvi-bonus-percentage'); if (bEl) bEl.textContent = KM.bonus + '%';
-      document.body.dataset.seized = '1'; toast('Đã đoạt thành công quyền chủ mỏ.'); renderModal(); }, 40);
+      document.body.dataset.seized = '1';
+      /* Chỉ đường 'dom' mới vẽ lời xác nhận ra trang. Đường 'net' (production) im lặng —
+         và chính sự im lặng ấy là thứ bài kiểm này phải giữ. Chữ lấy từ data-* chứ không
+         viết thẳng vào đây: xem chú thích ở #km-won-text. */
+      if (KM.says === 'dom') toast(document.getElementById('km-won-text').dataset.text);
+      renderModal(); }, 40);
   });
 };
 function enterMine() {
@@ -1522,8 +1532,18 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // StopIf phía trên nên không chạm bước này và vẫn giữ một giờ. (b) trần vòng ngoài 6 → 18:
     // một lượt 5 ải dài từ ~2 tới ~11 phút, nên trần 6 luôn nổ TRƯỚC trần 35 phút và vứt đi một
     // phòng 5 người còn sống — mà dựng lại phòng ấy mới là phần đắt.
-    "hồ sơ đang ở schema 64",
-    loadProfileForSchema().schemaVersion === 64,
+    // 65 = Khoáng Mạch nghe lời xác nhận đoạt mỏ Ở NGẢ MẠNG (đàn thật 17/08/2026): cú đoạt
+    // THÀNH trong game — bonus mỏ đổi 100% → 55%, chu kỳ đào reset — mà tám giây chờ chữ
+    //「đoạt thành công」trên `body` trắng trơn, nên lượt ấy tự khai「KHÔNG thành」và bỏ luôn lá
+    // phù. Câu ấy vốn là THÂN TRẢ LỜI AJAX (đúng như network.json của bản ghi 14/08 ghi), thứ
+    // không có nghĩa vụ nào phải vào DOM. Nay một bước gài tai nghe (fetch + XHR + node mới
+    // chèn) đứng TRƯỚC cú bấm Xác nhận và cắm cờ `jvz-km-won`; cờ ấy ngang hàng với phép đọc
+    // DOM cũ. Kèm hai chỗ nhỏ mà thiếu là hỏng cả bản vá: bước chờ đổi `When` sang
+    // `body.jvz-km-host-go` (cú AJAX vẽ lại sổ và cuốn mất `.jvz-km-doat` — cái chờ sẽ bị bỏ
+    // qua đúng ở ca thành công), và câu「không thành」nay kéo theo 120 ký tự đầu của thứ trang
+    // vừa trả lời, để lần sau site đổi lời văn thì nhật ký tự khai thay vì than câm.
+    "hồ sơ đang ở schema 65",
+    loadProfileForSchema().schemaVersion === 65,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1962,9 +1982,16 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   // LƯỢT GHÉ (engine không ngồi chờ 30 phút), nên mỗi GET trang khi đang-ở-trong-mỏ là một
   // lần tua nhanh tới「Đạt tối đa」. Thưởng lượt 1 = 270 Tu Vi + 100 Tinh Thạch (con số thật
   // từ d2f1b1d5), lượt 2 chạm trần 300/100 — đúng ghi chú「tối đa 2 lần nhận/ngày」.
+  // `seizeSays` — trang nói lời xác nhận đoạt mỏ Ở ĐÂU. Mặc định `net`, vì đó là thứ đàn thật
+  // gặp ngày 17/08/2026: cú đoạt THÀNH trong game mà tám giây chờ chữ trên DOM trắng trơn —
+  // câu「Đã đoạt thành công quyền chủ mỏ.」chỉ có trong THÂN TRẢ LỜI AJAX (đúng như network.json
+  // của bản ghi 14/08 đã ghi, và fixture đời đầu đã đọc nhầm thành một toast).
+  //   net  — chỉ AJAX, không vẽ gì ra DOM (production)
+  //   dom  — vẽ toast, AJAX chỉ "ok" (đường cũ, phải còn sống)
+  //   khac — AJAX trả một câu LẠ: đoạt vẫn thành nhưng engine không có quyền đoán
   const kmFresh = () => ({
     type: 2, inMine: false, minedMin: 12, maxed: false, claimedJustNow: false,
-    owner: false, attacksUsed: 0, bonus: 100, claims: 0,
+    owner: false, attacksUsed: 0, bonus: 100, claims: 0, seizeSays: "net",
     tuVi: 0, tuViCap: 600, tinhThach: 0, tinhThachCap: 200, bought: [], hideBonus: false, hideStats: false,
   });
   let kmState = kmFresh();
@@ -2151,7 +2178,18 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     else if (path === "/km-buy") { kmState.bought.push(url.searchParams.get("item") ?? "?"); res.end("ok"); }
     // Bonus tăng Ở CẢ HAI PHÍA: trang tự cập nhật ô để lượt quét ngay sau đọc được, còn state
     // máy chủ phải theo cùng — lệch nhau là fixture nói dối ở lần render kế.
-    else if (path === "/km-seize") { kmState.owner = true; kmState.attacksUsed += 1; kmState.bonus += 20; res.end("ok"); }
+    else if (path === "/km-seize") {
+      kmState.owner = true; kmState.attacksUsed += 1; kmState.bonus += 20;
+      // Lời xác nhận đi bằng THÂN TRẢ LỜI, và đi dưới dạng PHP `json_encode` mặc định xuất ra:
+      // tiếng Việt bị bẻ thành \uXXXX. Đây không phải chi tiết trang trí — tai nghe phải mở
+      // được lớp mã hoá ấy mới đọc ra câu xác nhận, và fixture là chỗ duy nhất chứng minh nó mở được.
+      const nhuPhp = (o) =>
+        JSON.stringify(o).replace(/[^\x00-\x7F]/g, (c) => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"));
+      const says = url.searchParams.get("says") ?? "net";
+      if (says === "dom") res.end("ok");
+      else if (says === "khac") res.end(nhuPhp({ success: true, message: "Ngươi nay là chủ nhân của khoáng mạch." }));
+      else res.end(nhuPhp({ success: true, message: "Đã đoạt thành công quyền chủ mỏ." }));
+    }
     else res.end(PAGE);
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -2467,6 +2505,44 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       kmSeizeBuys.outcome === "completed" && kmState.owner === true &&
         kmState.bought.join() === "linh-quang-phu" && kmState.claims === 1,
       `${kmSeizeBuys.outcome}, owner=${kmState.owner}, bought=${kmState.bought.join()}, claims=${kmState.claims}`,
+    );
+
+    // Đường CŨ phải còn sống: có trang vẽ lời xác nhận ra DOM thật (và bản ghi 14/08 đọc câu ấy
+    // ở tầng mạng, không loại trừ khả năng một ngày nào đó site vẽ nó ra). Ở ca này AJAX chỉ
+    // trả "ok", nên nếu phép đọc DOM bị bản vá làm chết thì đúng ca này đỏ.
+    kmState = kmFresh();
+    kmState.inMine = true;
+    kmState.seizeSays = "dom";
+    await kmClearDay();
+    const kmSeizeDom = await run(
+      kmWith({ minBonus: "120", hostMode: kmOn("hostMode"), hostMinBonus: "100" }),
+    );
+    check(
+      "trang VẼ lời xác nhận ra DOM (AJAX câm) → vẫn tính là đoạt THÀNH, vẫn mua đúng một lá",
+      kmSeizeDom.outcome === "completed" && kmState.owner === true &&
+        kmState.bought.join() === "linh-quang-phu" && kmState.claims === 1,
+      `${kmSeizeDom.outcome}, owner=${kmState.owner}, bought=${kmState.bought.join()}, claims=${kmState.claims}`,
+    );
+
+    // Site đổi lời văn: đoạt VẪN thành (owner lật), nhưng không ngả nào nói câu ta biết. Phía an
+    // toàn giữ nguyên — KHÔNG mua — còn cái mới là nhật ký phải KỂ RA trang vừa nói gì, để lượt
+    // hỏng kế tiếp không phải đi mò như lượt 17/08/2026.
+    kmState = kmFresh();
+    kmState.inMine = true;
+    kmState.seizeSays = "khac";
+    await kmClearDay();
+    const kmSeizeOdd = await run(
+      kmWith({ minBonus: "120", hostMode: kmOn("hostMode"), hostMinBonus: "100" }),
+    );
+    check(
+      "trang trả lời một câu LẠ → KHÔNG mua phù (giữ phía an toàn)",
+      kmState.bought.length === 0 && kmSeizeOdd.outcome === "completed",
+      `${kmSeizeOdd.outcome}, bought=${kmState.bought.join()}`,
+    );
+    check(
+      "…và nhật ký chép lại NGUYÊN VĂN thứ trang vừa trả lời, thay vì than câm",
+      infos.some((m) => m.includes("trang trả lời:") && m.includes("Ngươi nay là chủ nhân")),
+      infos.filter((m) => m.includes("KHÔNG thành")).join(" / ") || "(không có dòng nào)",
     );
 
     // Đã là chủ mỏ → không có nút Đoạt Mỏ để bấm, nên KHÔNG có cú đoạt nào thành trong lượt này.

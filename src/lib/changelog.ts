@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.2.1",
+    date: "2026-08-17",
+    lines: [
+      "Khoáng Mạch: đoạt được mỏ trong game thì auto cũng ghi nhận là được — trước đây có lúc nó báo nhầm là hụt, rồi bỏ luôn lá Linh Quang Phù đáng mua.",
+      "Nếu trang trả lời một câu lạ, nhật ký chép lại nguyên văn câu ấy để còn biết đường sửa.",
+    ],
+  },
+  {
     version: "1.2.0",
     date: "2026-08-16",
     lines: [

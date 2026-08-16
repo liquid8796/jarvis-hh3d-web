@@ -1515,8 +1515,15 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // sách thay vì đẩy /hong-nhan xuống cuối, trần vòng 15 → 40 (bản ghi đếm 8 tiệc mở cùng
     // lúc, chạm trần là bỏ sót trong im lặng), và cờ jvz-hy-su-all-failed để "trượt sạch" vẫn
     // là một lượt hỏng thật chứ không phải một lượt báo xong.
-    "hồ sơ đang ở schema 63",
-    loadProfileForSchema().schemaVersion === 63,
+    // 64 = Mê Cung thôi nghỉ một giờ giữa hai đợt đánh (đàn 9f646e8a, 16/08/2026): (a) bước
+    // cuối là `readCooldownSeconds` script `() => 60`, vì mê cung KHÔNG có đồng hồ của máy chủ
+    // — hết vòng nghĩa là còn việc ngay bây giờ, mà thiếu bước ấy thì `completed` rơi về
+    // FallbackCooldownSeconds = 3600 và runner ngủ trọn tiếng; ngả「đã đủ huyền tinh」dừng ở
+    // StopIf phía trên nên không chạm bước này và vẫn giữ một giờ. (b) trần vòng ngoài 6 → 18:
+    // một lượt 5 ải dài từ ~2 tới ~11 phút, nên trần 6 luôn nổ TRƯỚC trần 35 phút và vứt đi một
+    // phòng 5 người còn sống — mà dựng lại phòng ấy mới là phần đắt.
+    "hồ sơ đang ở schema 64",
+    loadProfileForSchema().schemaVersion === 64,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1580,6 +1587,62 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       `${mazeId}: bước giải tán cũng gác theo hiển thị — hai lối không dẫm nhau`,
       disband?.when?.kind === "visible" && disband?.when?.selector === "#btn-disband-room",
       JSON.stringify(disband?.when),
+    );
+
+    // ── Ghé lại sau một phút, không phải sau một giờ (schema 64) ───────────────────────
+    //
+    // Mê cung không có đồng hồ của máy chủ: hết vòng nghĩa là CÒN việc ngay bây giờ. Thiếu
+    // bước cuối này thì `completed` rơi về fallbackCooldownSeconds = 3600 và đàn ngủ trọn
+    // tiếng giữa hai đợt đánh — đúng chuyện tông chủ báo ngày 16/08/2026.
+    const resume = maze.steps[maze.steps.length - 1];
+    check(
+      `${mazeId}: bước CUỐI script là bước tự khai đồng hồ ghé lại`,
+      resume?.action === "readCooldownSeconds" && typeof resume?.script === "string",
+      `${resume?.action} / script ${typeof resume?.script}`,
+    );
+    // Biên dịch và GỌI THẬT, cùng lối với các script khác của bộ này: một đoạn JS nằm trong
+    // JSON thì không trình biên dịch nào soi hộ.
+    let resumeSeconds = null;
+    try {
+      resumeSeconds = new Function(`return (${resume.script});`)()();
+    } catch (err) {
+      resumeSeconds = `KHÔNG BIÊN DỊCH ĐƯỢC: ${err.message}`;
+    }
+    check(
+      `${mazeId}: nó trả một con số đủ nhanh để đánh tiếp, và trên sàn 30s của bộ lập lịch`,
+      typeof resumeSeconds === "number" && resumeSeconds >= 30 && resumeSeconds <= 300,
+      String(resumeSeconds),
+    );
+    // Thứ tự là cả tính đúng đắn: phải trả phòng TRƯỚC khi hứa quay lại, và cổng「đã đủ huyền
+    // tinh」phải đứng trước để ngả ấy dừng ở stopIf mà không bao giờ chạm bước này — đó là
+    // cách một giờ được giữ nguyên cho ngày đã xong.
+    const disbandAt = maze.steps.findIndex(
+      (s, i) => s.action === "click" && s.selector === "#btn-disband-room" && i > gateAt,
+    );
+    const capStopAt = maze.steps.findIndex(
+      (s) => s.action === "stopIf" && s.condition?.selector?.includes("jvz-cap-full"),
+    );
+    check(
+      `${mazeId}: bước ghé lại đứng SAU cú giải tán phòng cuối script`,
+      disbandAt >= 0 && disbandAt < maze.steps.length - 1,
+      `giải tán@${disbandAt} < ghé lại@${maze.steps.length - 1}`,
+    );
+    check(
+      `${mazeId}: cổng「đã đủ huyền tinh」đứng TRƯỚC — ngả ấy dừng ở stopIf, giữ nguyên trần một giờ`,
+      capStopAt >= 0 && capStopAt < maze.steps.length - 1,
+      `cổng@${capStopAt}`,
+    );
+
+    // Trần vòng KHÔNG được là thứ chặn trước: một lượt 5 ải dài ~2–11 phút, nên trần 6 cũ luôn
+    // nổ trước trần 35 phút và vứt đi một phòng 5 người còn sống (đàn 9f646e8a, 16/08/2026 —
+    // sáu lượt xong lúc 14:31:39 · 14:34:02 · 14:40:47 · 14:42:58 · 14:56:22 · 15:07:38).
+    const rounds = maze.steps.find(
+      (s) => s.action === "repeat" && s.until?.selector?.includes("jvz-cap-full"),
+    );
+    check(
+      `${mazeId}: trần vòng ngoài rộng hơn số lượt mà 35 phút chứa nổi — thời gian mới là hạn mức`,
+      rounds?.maxIterations >= Math.ceil(rounds?.maxSeconds / 120),
+      `${rounds?.maxIterations} vòng / ${rounds?.maxSeconds}s`,
     );
   }
 
@@ -3799,6 +3862,62 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         "mọi ID chờ-nhiệm-vụ-khác đều nằm trong sổ nhiệm vụ ngày",
         gatedOutsiders.length === 0,
         gatedOutsiders.join(", ") || "(sạch)",
+      );
+    }
+
+    console.log("\nĐồng hồ ghé lại: một stopIf phải CHẶN được bước đọc đồng hồ đứng sau nó");
+
+    // Đây là giả định CHỊU LỰC của bước「ghé lại sau 60s」cuối script Mê Cung (schema 64). Mê
+    // cung không có đồng hồ của máy chủ, nên bước ấy tự khai một con số nhỏ để runner quay lại
+    // đánh tiếp thay vì ngủ trọn tiếng theo fallbackCooldownSeconds. Nhưng ngả「đã đủ huyền
+    // tinh hôm nay」thì MUỐN trọn tiếng ấy — và nó được miễn phí đúng nhờ một điều: `stopIf`
+    // khớp là cắt luôn phần đuôi của danh sách bước, nên bước đọc đồng hồ không bao giờ chạy.
+    //
+    // Không có hai ca dưới đây thì ngày ai đó sửa `executeSteps` cho chạy tiếp sau stopIf, Mê
+    // Cung sẽ lặng lẽ hoá thành một vòng gõ cửa mỗi phút suốt cả ngày đã đủ huyền tinh — xanh
+    // hết, không dòng nào đỏ.
+    {
+      const stopThenClock = await run(
+        questOf([
+          { action: "navigate", text: "/", timeoutMs: 15000 },
+          {
+            action: "stopIf",
+            text: "hết lượt hôm nay",
+            condition: { kind: "textMatches", selector: "#btn-disabled", text: "Đã nhận" },
+          },
+          { action: "readCooldownSeconds", script: "() => 60", timeoutMs: 4000 },
+        ]),
+      );
+      check(
+        "stopIf khớp → bước đọc đồng hồ đứng sau KHÔNG chạy, giữ nguyên trần fallback",
+        stopThenClock.outcome === "alreadyDone" && stopThenClock.cooldownSeconds === 3600,
+        `${stopThenClock.outcome} / ${stopThenClock.cooldownSeconds}s`,
+      );
+
+      const clockOnly = await run(
+        questOf([
+          { action: "navigate", text: "/", timeoutMs: 15000 },
+          { action: "readCooldownSeconds", script: "() => 60", timeoutMs: 4000 },
+        ]),
+      );
+      check(
+        "chạy trọn script → con số của bước ấy THẮNG fallback",
+        clockOnly.outcome === "completed" && clockOnly.cooldownSeconds === 60,
+        `${clockOnly.outcome} / ${clockOnly.cooldownSeconds}s`,
+      );
+
+      // Và script hỏng thì phải rơi về hành vi cũ, không phải làm hỏng lượt chạy: `evaluate`
+      // nuốt lỗi của chính nó rồi trả undefined, nên cooldown ở nguyên null.
+      const clockBroken = await run(
+        questOf([
+          { action: "navigate", text: "/", timeoutMs: 15000 },
+          { action: "readCooldownSeconds", script: "() => { throw new Error('vỡ'); }", timeoutMs: 4000 },
+        ]),
+      );
+      check(
+        "script đọc đồng hồ vỡ → vẫn completed, và rơi về trần fallback",
+        clockBroken.outcome === "completed" && clockBroken.cooldownSeconds === 3600,
+        `${clockBroken.outcome} / ${clockBroken.cooldownSeconds}s`,
       );
     }
 

@@ -11,6 +11,42 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.2.0 — Mê Cung thôi nghỉ một giờ giữa hai đợt đánh (schema hồ sơ 64)
+
+Tông chủ báo 16/08/2026: đánh xong một đợt là đàn dừng, đợi một giờ, không ghé lại tìm phòng.
+Nhật ký của đàn `9f646e8a` cho đủ hình dạng — sáu lượt「Xong lượt đánh」lúc `14:31:39 · 14:34:02
+· 14:40:47 · 14:42:58 · 14:56:22 · 15:07:38` (UTC), rồi `15:07:57` quest kết thúc và vòng chạy
+khai「Tự chạy vòng 4 sau khoảng 1 giờ」.
+
+**Hai chỗ hỏng, độc lập nhau.**
+
+*Một: trần vòng ngoài là 6, mà 6 là hình dạng sai.* Một lượt 5 ải dài từ ~2 tới ~11 phút, nên
+với một đội nhanh thì trần 6 vòng luôn nổ TRƯỚC trần 35 phút — engine kiểm `maxIterations` rồi
+mới kiểm deadline, cái nào chặt hơn thắng trong im lặng. Cái giá là giải tán một phòng 5 người
+còn sống khi ngân sách thời gian còn quá nửa, mà dựng lại phòng ấy mới là phần đắt: phút chờ
+người lạ. Nay trần là 18 — đúng số lượt mà 35 phút chứa nổi ở nhịp nhanh nhất từng đo — nên nó
+lui về đúng vai một lưới chặn vòng lặp điên, còn hạn mức thật là thời gian.
+
+*Hai: hết vòng thì rơi về trần một giờ.* Mê cung KHÔNG có đồng hồ của máy chủ, nên `completed`
+không mang theo `cooldownSeconds` nào và engine lấy `FallbackCooldownSeconds = 3600`. Nhưng
+「hết vòng」ở đây nghĩa là *còn việc ngay bây giờ* — chỉ là script thôi giữ trình duyệt. Nay bước
+CUỐI của script là `readCooldownSeconds` với `script: () => 60`: tự khai một phút.
+
+**Vì sao một giờ vẫn còn nguyên cho ngày đã xong, mà không cần thêm điều kiện nào.** Ngả「đã đủ
+huyền tinh hôm nay」dừng ở `StopIf` gần đầu script, và `executeSteps` cắt hẳn phần đuôi khi
+`state.stopReason` được cắm (`if (state.stopReason) break;`). Bước đọc đồng hồ nằm ở cuối nên
+ngả ấy không bao giờ chạm tới nó: kết cục vẫn là `alreadyDone` + trần một giờ, không đổi một
+dòng nào. Đây là giả định chịu lực của cả bản vá, nên nó có phép thử riêng trong `npm run smoke`
+— kèm ca script vỡ (evaluate nuốt lỗi, trả `undefined`, cooldown ở nguyên `null` → rơi về đúng
+hành vi cũ, không bao giờ là một lượt hỏng).
+
+**60 giây, không phải sàn 30 giây.** Thứ chờ sau một lượt khởi động lại là dựng phòng 5 người,
+tính bằng phút — bớt xuống dưới một phút không mua được gì, mà mỗi vòng thức là cả kế hoạch
+thức: bộ lập lịch lấy đồng hồ SỚM NHẤT trong mọi nhiệm vụ của vòng.
+
+Hồ sơ quest sửa ở nguồn thật (`DefaultQuestProfile.cs`) rồi vá tay sang `profile.json`, cả hai
+bản sinh đôi `me-cung`/`me-cung-thuong`, kèm bump schema 63 → 64 ở cả ba chốt.
+
 ## 1.0.0 — Backend rời Vercel về VM OCI; Vercel chỉ còn là cửa trước
 
 Tông chủ quyết 16/08/2026. Kiến trúc mới, một câu: **app Next.js + PostgreSQL 17 + MongoDB

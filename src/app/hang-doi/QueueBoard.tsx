@@ -596,9 +596,9 @@ export function QueueBoard({
             <strong className="text-[var(--color-parchment)]">Khôi lỗi tông môn</strong> là của
             chung — nó nhặt đàn của mọi người theo đúng thứ tự ở tab Hàng đợi, nên nó vắng thì cả
             hàng đứng im.{" "}
-            <strong className="text-[var(--color-parchment)]">Khôi lỗi riêng</strong> chỉ chạy đàn
-            của chính chủ nó ở máy nhà, nên nó vắng thì chỉ đàn của người ấy nằm chờ. Quá 30 giây
-            không gõ cửa là tính vắng.
+            <strong className="text-[var(--color-parchment)]">Khôi lỗi riêng</strong> chỉ chạy ở
+            máy nhà, không cần xếp hàng chờ ở hàng đợi. Quá 30 giây không gửi tín hiệu cho server
+            thì tính là vắng mặt.
           </p>
 
           <ul className="space-y-2">

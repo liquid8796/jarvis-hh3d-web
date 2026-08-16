@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.1.2",
+    date: "2026-08-16",
+    lines: [
+      "Tab Khôi Lỗi nói lại cho đúng: khôi lỗi riêng chạy thẳng ở máy nhà, không phải xếp hàng chờ ở hàng đợi.",
+    ],
+  },
+  {
     version: "1.1.1",
     date: "2026-08-16",
     lines: [

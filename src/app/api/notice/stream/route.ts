@@ -1,4 +1,4 @@
-import type { Notification } from "@neondatabase/serverless";
+import type { Notification } from "pg";
 import type { NextRequest } from "next/server";
 import { currentUser } from "@/lib/auth/guards";
 import { createNoticeListener, NOTICE_CHANNEL } from "@/lib/realtime/noticeChannel";

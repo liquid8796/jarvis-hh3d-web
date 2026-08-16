@@ -6,9 +6,9 @@
  * trường. Neon-http là driver duy nhất ở đây (giống hệt runtime), nên không có chuyện
  * "migrate bằng đường này, chạy bằng đường khác" rồi lệch nhau về SSL hay pooling.
  */
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
-import { migrate } from "drizzle-orm/neon-http/migrator";
+import pg from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { loadEnv } from "./loadEnv.mjs";
 
 // Nạp TRƯỚC khi kiểm tra. Thứ tự ngược lại khiến script luôn báo "chưa đặt" dù .env có đủ —
@@ -46,7 +46,14 @@ try {
 }
 console.log(`• Áp migration lên ${target}`);
 
-const db = drizzle(neon(process.env.DATABASE_URL));
+// pg thay neon-http (16/08/2026, backend về VM): nói được với CẢ Postgres local lẫn Neon —
+// vẫn đúng một driver cho migrate và runtime, chỉ là driver ấy nay phủ được cả hai nơi.
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+const db = drizzle(pool);
 
-await migrate(db, { migrationsFolder: "./drizzle" });
-console.log("✔ Migration đã áp xong.");
+try {
+  await migrate(db, { migrationsFolder: "./drizzle" });
+  console.log("✔ Migration đã áp xong.");
+} finally {
+  await pool.end();
+}

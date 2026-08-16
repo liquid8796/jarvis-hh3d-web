@@ -1,4 +1,5 @@
-import { Client, neon } from "@neondatabase/serverless";
+import { Client } from "pg";
+import { db } from "@/lib/db/client";
 import { realtimeDatabaseUrl } from "@/lib/realtime/dashboardChannel";
 
 /**
@@ -23,11 +24,9 @@ export function createNoticeListener(): Client {
 /** Gõ cửa mọi trang đang mở. Không ném: một lời nhắn đã LƯU rồi thì nó không được mất chỉ vì
  *  tiếng gõ cửa không kêu — trang sẽ thấy nó ở lượt tải sau. */
 export async function pingNoticeChannel(): Promise<void> {
-  const raw = process.env.DATABASE_URL;
-  if (!raw) return;
+  if (!process.env.DATABASE_URL) return;
   try {
-    const sql = neon(raw);
-    await sql.query("select pg_notify($1, $2)", [NOTICE_CHANNEL, ""]);
+    await db().$client.query("select pg_notify($1, $2)", [NOTICE_CHANNEL, ""]);
   } catch (error) {
     console.error("notice: không gõ cửa được kênh realtime", error);
   }

@@ -1,4 +1,5 @@
-import { Client, neon } from "@neondatabase/serverless";
+import { Client } from "pg";
+import { db } from "@/lib/db/client";
 
 export const DASHBOARD_CHANNEL = "jarvis_dashboard";
 
@@ -59,10 +60,9 @@ export function parseDashboardSignal(payload: string | undefined): DashboardSign
   }
 }
 
-/** Tín hiệu hiếm do app tự phát; thay đổi thường ngày được trigger DB phát trong cùng transaction. */
+/** Tín hiệu hiếm do app tự phát; thay đổi thường ngày được trigger DB phát trong cùng transaction.
+ *  Đi qua pool của db() thay vì mở kết nối riêng: NOTIFY là câu lệnh một nhịp, mượn pool là đủ. */
 export async function notifyDashboard(signal: DashboardSignal): Promise<void> {
-  const raw = process.env.DATABASE_URL;
-  if (!raw) return;
-  const sql = neon(raw);
-  await sql.query("select pg_notify($1, $2)", [DASHBOARD_CHANNEL, JSON.stringify(signal)]);
+  if (!process.env.DATABASE_URL) return;
+  await db().$client.query("select pg_notify($1, $2)", [DASHBOARD_CHANNEL, JSON.stringify(signal)]);
 }

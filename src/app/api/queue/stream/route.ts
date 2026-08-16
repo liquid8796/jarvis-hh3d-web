@@ -1,4 +1,4 @@
-import type { Notification } from "@neondatabase/serverless";
+import type { Notification } from "pg";
 import { currentUser } from "@/lib/auth/guards";
 import {
   createDashboardListener,

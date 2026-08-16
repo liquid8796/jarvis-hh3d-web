@@ -27,8 +27,16 @@ export const config = {
 };
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
+  const siteId = process.env.SITE_ID?.trim() || undefined;
+
+  // Backend trên VM không mang SITE_ID: nó LÀ nơi phục vụ, không phải một trạm trong vòng
+  // xoay — khỏi đọc bảng điều phối cho từng request chỉ để nghe câu "serve" biết trước.
+  if (!siteId) {
+    return NextResponse.next();
+  }
+
   const decision = decideRequest({
-    siteId: process.env.SITE_ID?.trim() || undefined,
+    siteId,
     doc: await readControlDoc(),
     pathname: request.nextUrl.pathname,
     search: request.nextUrl.search,

@@ -2,30 +2,24 @@
 REM ============================================================================
 REM  Dung MOT KHOI LOI GITHUB MOI - tu mot PAT toi mot dong trong so kho.
 REM
+REM  CHAY TREN VM: so Kho GitHub nam trong Postgres cua backend (chi nghe
+REM  127.0.0.1 tren jarvis-oci-01), va `gh` - thu dat secret WORKER_TOKEN cho
+REM  kho moi - da duoc cai san o do. `gh` doc PAT qua bien GH_TOKEN nen khong
+REM  can `gh auth login`; may nha khong con phai cai gi ca.
+REM
 REM  Bam dup tep nay. No hoi dung MOT thu: PAT cua tai khoan GitHub se giu kho.
-REM  Moi thu con lai script tu lo: ten kho (ngau nhien), WORKER_ID theo khuon
-REM  khoiloi-tro-<moc thoi gian>, workflow, secret, va ghi vao so cua tram
-REM  DANG HOAT DONG.
 REM
 REM  PAT CAN QUYEN (thieu la hong o tan buoc cuoi):
 REM    - Classic     : scope repo + workflow
 REM    - Fine-grained: Contents read/write + Actions read/write
 REM
-REM  CAN CO TRUOC (script kiem va noi ro neu thieu):
-REM    - gh (GitHub CLI): winget install --id GitHub.cli
-REM      KHONG can `gh auth login` - PAT di qua bien GH_TOKEN cua rieng luot chay.
-REM    - .env co WORKER_TOKEN:
-REM      vercel env pull .env --environment=production --yes
-REM
 REM  HAI LUAT CUA TEP NAY, dung sua pham:
-REM    1. Ket dong phai la CRLF. cmd.exe doc theo byte offset nen thieu \r la vo
+REM    1. Ket dong phai la CRLF. cmd.exe doc theo byte offset nen thieu  la vo
 REM       ngay o khoi `if ( ... )` nhieu dong. .gitattributes dang ep dieu nay.
-REM    2. Chi dung ky tu ASCII. Mot dau gach dai hay mot chu co dau la nhieu byte
-REM       trong UTF-8; sau `chcp 65001` bo doc cua cmd lech cho va bam nat ca tep.
-REM       Chu tieng Viet co dau chi duoc phep nam trong dau ra cua Node.
+REM    2. Chi dung ky tu ASCII. Mot chu co dau la nhieu byte trong UTF-8; sau
+REM       `chcp 65001` bo doc cua cmd lech cho va bam nat ca tep.
 REM ============================================================================
 setlocal
-
 chcp 65001 >nul
 cd /d "%~dp0"
 
@@ -35,17 +29,16 @@ echo.
 echo   Kho tao ra la CONG KHAI, va nhat ky Actions cua no ai cung doc duoc.
 echo   Doc deploy/github-actions.md muc 6 truoc khi dung lan dau.
 echo.
-
-REM GITHUB_PAT dat san tu ngoai thi bo qua buoc hoi - dung cho luot chay lai
-REM va cho viec kiem thu.
+REM GITHUB_PAT dat san tu ngoai thi bo qua buoc hoi - dung cho luot chay lai.
 if defined GITHUB_PAT goto :run
 
-echo   PAT cua tai khoan GitHub se giu kho nay.
-echo   (Ky tu se KHONG hien khi go.)
+echo   PAT cua tai khoan GitHub. (Ky tu se KHONG hien khi go.)
 echo.
 
-REM Doc PAT o che do an: Read-Host -AsSecureString roi doi nguoc lai. Lam vay de
-REM token khong nam lai trong lich su console cua ai do dung chung may.
+REM Doc PAT o che do an roi doi nguoc lai, de token khong nam lai trong lich su
+REM console. No di sang VM bang co --env cua npm run vm: gia tri duoc gui qua
+REM STDIN cua mot luot ssh rieng va ghi vao tep 0600, KHONG bao gio nam tren
+REM dong lenh - vi `sudo` ghi tron dong lenh vao /var/log/auth.log.
 for /f "usebackq delims=" %%p in (`powershell -NoProfile -Command "$s = Read-Host -AsSecureString '  PAT'; [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))"`) do set "GITHUB_PAT=%%p"
 
 if not defined GITHUB_PAT (
@@ -55,10 +48,8 @@ if not defined GITHUB_PAT (
 
 :run
 echo.
-call npm run github:new -- %*
+call npm run vm -- --env GITHUB_PAT -- npm run github:new -- %*
 set "EXITCODE=%ERRORLEVEL%"
-
-REM Xoa PAT khoi bien moi truong cua cua so nay ngay khi xong.
 set "GITHUB_PAT="
 
 echo.

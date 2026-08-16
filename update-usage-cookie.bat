@@ -1,6 +1,17 @@
 @echo off
 REM ============================================================================
-REM  CAP NHAT COOKIE PHIEN VERCEL cua mot tram len secret cua workflow Vercel usage.
+REM  CAP NHAT COOKIE PHIEN VERCEL cua mot tram len secret cua workflow usage.
+REM
+REM  TEP DUY NHAT TRONG NHOM NAY VAN CHAY O MAY NHA, va co ly do:
+REM    - No khong dung toi database, nen khong can len VM.
+REM    - No can `gh auth status`, tuc mot luot `gh auth login` qua trinh duyet.
+REM      Tren VM khong co trinh duyet de lam viec ay (gh o do chay bang GH_TOKEN,
+REM      la duong khac han).
+REM    - Tep cookie duoc xuat tu chinh trinh duyet dang dang nhap Vercel o may nay.
+REM
+REM  VAN CON NGHIA SAU 16/08/2026: cac tram Vercel nay chi la vo proxy, nhung MOI
+REM  request cua nguoi dung van di qua chung, nen bang thong Vercel van bi tieu -
+REM  do la thu workflow usage dem.
 REM
 REM  Bam dup tep nay. No hoi hai cau: ma tram, va duong dan tep cookie.
 REM  KEO-THA tep cookie vao cua so console la ra duong dan - khong phai go tay.
@@ -14,32 +25,25 @@ REM
 REM  Doi so deu chuyen thang cho script:
 REM     update-usage-cookie.bat --dry-run    chi in ke hoach, khong ghi secret
 REM     update-usage-cookie.bat --list       in bang tram roi thoi
-REM     update-usage-cookie.bat --no-pause   khong dung cho o cuoi
 REM
-REM  Go sai ma tram thi script in ra BANG TRAM that roi dung - chua ghi gi.
+REM  Bang tram doc tu .github/workflows/vercel-usage.yml - workflow la nguon co
+REM  tham quyen, khong phai so nao khac. Go sai ma tram thi script in ra bang
+REM  that roi dung - chua ghi gi.
 REM
-REM  HAI LUAT CUA TEP NAY, dung sua pham (giong ba tep .bat kia):
-REM    1. Ket dong phai la CRLF. cmd.exe doc theo byte offset nen thieu \r la vo
-REM       ngay o khoi nhieu dong. .gitattributes dang ep dieu nay.
-REM    2. Chi dung ky tu ASCII. Mot chu co dau la nhieu byte trong UTF-8; sau
-REM       `chcp 65001` bo doc cua cmd lech cho va bam nat ca tep. Chu tieng Viet
-REM       chi duoc phep nam trong dau ra cua Node.
+REM  HAI LUAT CUA TEP NAY, dung sua pham:
+REM    1. Ket dong phai la CRLF.  2. Chi dung ky tu ASCII.
 REM ============================================================================
 setlocal
-
 chcp 65001 >nul
 cd /d "%~dp0"
 
-REM --list thi khong hoi gi ca, in bang roi thoi.
 echo %* | findstr /i /c:"--list" >nul && goto :chi_liet_ke
 
-REM Nhan --dry-run TRUOC khi chay, de con noi dung su that o dong cuoi.
 set "DRYRUN="
 echo %* | findstr /i /c:"--dry-run" >nul && set "DRYRUN=1"
 
-REM Da truyen san --site va --cookie thi KHONG hoi gi ca - chay thang. Cung loi
-REM `if defined MIRROR_TOKEN goto :run` cua new-mirror-station.bat: mot cong cu
-REM bam-dup van phai goi duoc tu mot script khac ma khong ai ngoi go.
+REM Da truyen san --site va --cookie thi KHONG hoi gi ca - chay thang, de mot
+REM cong cu bam-dup van goi duoc tu mot script khac ma khong ai ngoi go.
 set "CO_SITE="
 echo %* | findstr /i /c:"--site" >nul && set "CO_SITE=1"
 set "CO_COOKIE="
@@ -49,7 +53,7 @@ if defined CO_SITE if defined CO_COOKIE goto :chay_thang
 echo.
 echo   === Cap nhat cookie cho mot tram ===
 echo.
-echo   Ma tram la `id` trong so guong (vd: auto-hh3d, auto-hh3d-1).
+echo   Ma tram la cot dau trong bang cua workflow (vd: auto-hh3d, auto-hh3d-1).
 echo   Chua nho thi bo trong roi Enter - script se in ra bang tram that.
 echo.
 
@@ -68,8 +72,6 @@ if not defined COOKIE (
 )
 
 echo.
-REM `call` la bat buoc: npm la mot tep .cmd, thieu `call` thi batch nay ket thuc
-REM ngay tai day va moi dong ben duoi khong bao gio chay.
 call npm run usage:cookie -- --site "%SITE%" --cookie "%COOKIE%" %*
 set "EXITCODE=%ERRORLEVEL%"
 goto :ket_qua
@@ -81,9 +83,6 @@ call npm run usage:cookie -- %*
 set "EXITCODE=%ERRORLEVEL%"
 
 :ket_qua
-
-REM Nhanh goto PHANG, khong long if(...)else(...): cmd.exe doc ca khoi ngoac mot
-REM lan truoc khi chay, nen mot dau ) lot vao chuoi echo la vo ca khoi.
 echo.
 if not "%EXITCODE%"=="0" goto :loi
 if defined DRYRUN goto :chi_xem

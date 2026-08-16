@@ -26,7 +26,10 @@ log() { printf '\n== %s ==\n' "$*"; }
 
 log "[1/8] apt nền"
 apt-get update -y
-apt-get install -y ca-certificates curl gnupg rsync unzip
+# `gh` là thứ đặt secret WORKER_TOKEN cho kho khôi lỗi mới (github:new) — nó đọc PAT qua biến
+# GH_TOKEN nên KHÔNG cần `gh auth login`, chạy headless được. Bản trong apt của Ubuntu 24.04 là
+# đủ; thêm repo riêng của GitHub chỉ để lấy bản mới hơn là nợ bảo trì không đổi lại được gì.
+apt-get install -y ca-certificates curl gnupg rsync unzip gh
 
 log "[2/8] Node 24"
 if ! command -v node >/dev/null 2>&1 || [[ "$(node -v)" != v24* ]]; then

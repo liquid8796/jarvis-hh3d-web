@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.1.1",
+    date: "2026-08-16",
+    lines: [
+      "Vòng Quay Phúc Vận trên tài khoản thường nay cũng quay đủ 4 lượt mỗi ngày, ngang tài khoản VIP.",
+      "Trang vòng quay của bản thường không phân biệt được「đã quay đủ」với「lượt cuối chưa mở」, nên trước đây đàn thường dừng ở 3 lượt rồi nghỉ tới hôm sau.",
+    ],
+  },
+  {
     version: "1.1.0",
     date: "2026-08-16",
     lines: [

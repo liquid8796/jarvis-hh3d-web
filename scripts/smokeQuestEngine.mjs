@@ -3574,15 +3574,19 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       );
 
       // Cùng phép đối chiếu ấy cho danh sách「lượt cuối mở sau cùng」— nó cũng khoá theo ID, nên
-      // cũng lặng lẽ hết tác dụng nếu hồ sơ đổi ID. Cả twin VIP lẫn thường đều phải có mặt: trần
-      // lượt là của TÀI KHOẢN, và bản thường quay trên trang riêng chứ không qua hub.
+      // cũng lặng lẽ hết tác dụng nếu hồ sơ đổi ID. CHỈ bản VIP có mặt, từ 15/08/2026: bản thường
+      // đã rời cả sổ ngày lẫn cổng này vì trang riêng của nó không phân biệt được「đủ 4」với
+      //「lượt 4 đang khoá」— xem khối ghi chú trong dailyQuota.mjs.
       const gatedStrays = [...PEER_GATED_QUEST_IDS].filter((id) => !idsInProfile.has(id));
       check(
-        "cả hai bản Vòng Quay Phúc Vận đều còn trong hồ sơ và trong danh sách chờ-nhiệm-vụ-khác",
-        gatedStrays.length === 0 &&
-          PEER_GATED_QUEST_IDS.has("vong-quay-phuc-van") &&
-          PEER_GATED_QUEST_IDS.has("vong-quay-phuc-van-thuong"),
+        "Vòng Quay bản VIP còn trong hồ sơ và trong danh sách chờ-nhiệm-vụ-khác",
+        gatedStrays.length === 0 && PEER_GATED_QUEST_IDS.has("vong-quay-phuc-van"),
         gatedStrays.join(", ") || `(${PEER_GATED_QUEST_IDS.size} ID)`,
+      );
+      check(
+        "…và bản THƯỜNG đứng ngoài cả hai danh sách — một lượt「Hết lượt」của nó không được khoá cả ngày",
+        !PEER_GATED_QUEST_IDS.has("vong-quay-phuc-van-thuong") &&
+          !DAILY_QUOTA_QUEST_IDS.has("vong-quay-phuc-van-thuong"),
       );
 
       // Chiều ngược: chín cái tên được yêu cầu, quy về ID. Cặp twin VIP/thường trùng tên nhau
@@ -3598,13 +3602,24 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         "Vấn Đáp",
         "Bí Cảnh Tông Môn",
       ];
+      // MỘT ngoại lệ, và nó phải được gọi tên chứ không lặng lẽ lọt qua: bản THƯỜNG của Vòng
+      // Quay đứng ngoài sổ từ 15/08/2026 (trang riêng của nó không phân biệt được「đủ 4」với
+      //「lượt 4 đang khoá」— xem dailyQuota.mjs). Viết thẳng ID vào đây thay vì nới điều kiện,
+      // để ngày ai đó bỏ sót một twin khác thì lưới vẫn đỏ.
+      const OUTSIDE_BY_DESIGN = new Set(["vong-quay-phuc-van-thuong"]);
       const missing = profileNow.quests
         .filter((quest) => dailyNames.includes(quest.name) && !DAILY_QUOTA_QUEST_IDS.has(quest.id))
-        .map((quest) => quest.id);
+        .map((quest) => quest.id)
+        .filter((id) => !OUTSIDE_BY_DESIGN.has(id));
       check(
-        "cả chín nhiệm vụ ngày đều có trong sổ, kể cả twin VIP/thường",
+        "cả chín nhiệm vụ ngày đều có trong sổ, kể cả twin VIP/thường (trừ đúng một ngoại lệ đã khai)",
         missing.length === 0,
         missing.join(", ") || "(đủ)",
+      );
+      check(
+        "…và ngoại lệ ấy là THẬT: bản thường của Vòng Quay có trong hồ sơ nhưng ngoài sổ",
+        profileNow.quests.some((q) => q.id === "vong-quay-phuc-van-thuong") &&
+          !DAILY_QUOTA_QUEST_IDS.has("vong-quay-phuc-van-thuong"),
       );
 
       // Và KHÔNG được lan sang những nhiệm vụ mà `alreadyDone` chỉ là một trạng thái thoáng
@@ -3721,14 +3736,20 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         reachedDailyQuota({ id: "vong-quay-phuc-van" }, wheelStop, { peersDone: false }) === false &&
           reachedDailyQuota({ id: "vong-quay-phuc-van-thuong" }, wheelStop, { peersDone: false }) === false,
       );
+      // Bản THƯỜNG: KHÔNG có ngả nào vào sổ, kể cả ngả mà bản VIP đi được. Trang riêng của nó
+      // đọc「Hết lượt」y hệt nhau ở hai cảnh「đủ 4」và「lượt 4 đang khoá」, nên một lời khai như thế
+      // không đủ tư cách khoá cả ngày. Đây là ca tông chủ báo 15/08: thường chỉ quay được 3.
+      check(
+        "bản THƯỜNG không bao giờ vào sổ — kể cả khi mọi nhiệm vụ ngày khác đã xong",
+        reachedDailyQuota({ id: "vong-quay-phuc-van-thuong" }, wheelStop, { peersDone: true }) === false,
+      );
       check(
         "…và quên truyền cờ thì ngả về đúng phía an toàn ấy",
         reachedDailyQuota({ id: "vong-quay-phuc-van" }, wheelStop) === false,
       );
       check(
         "xong hết nhiệm vụ ngày khác rồi mà VẪN hết lượt → bấy giờ mới vào sổ",
-        reachedDailyQuota({ id: "vong-quay-phuc-van" }, wheelStop, { peersDone: true }) === true &&
-          reachedDailyQuota({ id: "vong-quay-phuc-van-thuong" }, wheelStop, { peersDone: true }) === true,
+        reachedDailyQuota({ id: "vong-quay-phuc-van" }, wheelStop, { peersDone: true }) === true,
       );
       // Cổng thứ ba chỉ mở cho đúng hai ID ấy. Nếu nó rò ra nhiệm vụ ngày thường thì mọi thứ
       // trong sổ đều phải đợi nhau, và cái giá là mở lại chín trang mỗi vòng như thời chưa có sổ.

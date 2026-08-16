@@ -293,6 +293,22 @@ kho」kế tiếp sẽ đẩy ngược chính bí mật vừa xem lên máy ch�
 
 ### Thêm một kho: bấm đúp `new-github-khoiloi.bat`
 
+> **16/08/2026 — bốn công cụ trong tài liệu này nay CHẠY TRÊN VM.** Sổ Kho GitHub nằm trong
+> Postgres của backend, mà Postgres ấy chỉ nghe `127.0.0.1` trên `jarvis-oci-01`. Nên
+> `github:new`, `github:remove`, `github:deploy` và `roster:purge` đều đi qua
+> `npm run vm -- npm run <lệnh>`, chạy trong `/opt/jarvis/ops-repo`. **Cách dùng của người
+> bấm đúp KHÔNG đổi** — chính các tệp `.bat` đã gói việc ấy lại.
+>
+> Hai hệ quả đáng nhớ:
+> - **`gh` nay nằm trên VM, không phải máy nhà.** Câu「cài `gh` bằng winget」ở các bản trước
+>   đã hết đúng cho `github:new`; nó chỉ còn đúng cho `update-usage-cookie` (tệp duy nhất
+>   không đụng database nên vẫn chạy ở máy nhà, và cần một lượt `gh auth login` qua trình duyệt).
+> - **PAT không bao giờ nằm trên dòng lệnh.** `.bat` hỏi kín ở máy nhà rồi chuyển qua cờ
+>   `--env` của `npm run vm`: giá trị đi bằng STDIN của một lượt ssh riêng vào một tệp `0600`
+>   trên tmpfs, và bị xoá kể cả khi lệnh hỏng. Lý do: `sudo` ghi TRỌN dòng lệnh vào
+>   `/var/log/auth.log`, nên `sudo -u jarvis env GITHUB_PAT=…` là chép một PAT có quyền
+>   `repo`+`workflow`+`delete_repo` vào một tệp log dạng chữ.
+
 Nó hỏi đúng MỘT thứ — PAT của tài khoản GitHub sẽ giữ kho — rồi làm trọn: suy tên tài khoản từ
 chính token, đặt tên kho ngẫu nhiên và `WORKER_ID` theo khuôn `khoiloi-tro-<mốc thời gian>`,
 dựng kho (gọi lại `newGithubKhoiloi.mjs`), dán secret, bấm chạy lượt đầu, **ghi kho vào sổ ở trạm

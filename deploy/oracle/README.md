@@ -112,13 +112,53 @@ Cùng ngày dựng lại máy, tông chủ quyết: **backend + database rời h
 
 | Mảnh | Ở đâu |
 |---|---|
-| app | systemd `jarvis-web` — `/opt/jarvis/app` (symlink → `/opt/jarvis/releases/<sha>`) |
+| app | **hai chỗ chạy**: systemd `jarvis-web@3000` + `jarvis-web@3001`, mỗi chỗ có `/opt/jarvis/slot-<cổng>` (symlink → `/opt/jarvis/releases/<sha>`) |
+| bản đang phục vụ | `/etc/caddy/upstream.conf` — MỘT dòng, nguồn sự thật duy nhất; đổi nó rồi `caddy reload` là chuyển bản |
 | env | `/opt/jarvis/shared/.env` (jarvis-only 600; mỗi release symlink `.env` về đây) |
 | TLS | Caddy, `https://92.5.130.32.sslip.io` (Let's Encrypt HTTP-01 qua sslip.io) |
 | Postgres 17 | localhost:5432, db/role `jarvis`, mật khẩu `/etc/jarvis/pg-password` (root-only) |
 | MongoDB 8.0 | localhost:27017, db `jarvis` (tên theo nấc mặc định của `dbName.ts`) |
 | cron | systemd `jarvis-cron.timer` 03:00 UTC → `/api/cron` với `CRON_SECRET` — thay Vercel Cron |
 | media | vẫn Object Storage `jarvis-media` (mục 3) — không đổi |
+
+### Phát hành blue/green — vì sao hai chỗ chạy
+
+`next start` **phớt lờ SIGTERM**. Đo 16/08/2026 từ journal của chính máy này: mỗi
+`systemctl restart` là systemd chờ đủ `TimeoutStopSec` 90 giây rồi `final-sigterm timed out.
+Killing` — lượt phát hành vừa dài thêm một phút rưỡi, vừa kết bằng một cú SIGKILL chém đứt mọi
+request đang bay.
+
+Nay app chạy ở hai cổng và Caddy trỏ vào **đúng một**. Một lượt `npm run deploy:all` đi:
+
+1. Cổng số hiệu: HEAD phải mang `version` khác bản đang chạy (xem mục dưới).
+2. Dựng release mới vào chỗ **đang rảnh**, khởi động, chờ `/api/maintenance` trả 200 — chỗ ấy
+   không nhận traffic nên chờ bao lâu cũng không ai thấy.
+3. Ghi một dòng vào `upstream.conf` + `caddy reload` (êm, kết nối đang mở chạy nốt).
+4. Nghiệm thu qua **đúng đường người dùng đi** (`/login` phải 200), rồi dọn release cũ.
+
+Chỗ chạy cũ **để nguyên, không tắt** — 230MB đổi lấy một cú lùi bản tức thì:
+
+```bash
+npm run deploy:backend -- --rollback   # về bản đang nằm ở chỗ chạy kia
+npm run deploy:backend -- --switch     # cùng thao tác, tên cho cảnh「dựng xong mà đứt lúc chuyển」
+```
+
+**Cố ý KHÔNG cho Caddy cân tải cả hai**: giữa lượt phát hành hai chỗ mang hai bản mã khác nhau,
+mà trang Next xin chunk JS theo hash của bản dựng ra nó — chia tải là trình duyệt xin chunk bản
+A rồi rơi vào bản B và nhận 404.
+
+Đo lượt phát hành đầu tiên (16/08/2026), ping mỗi giây xuyên suốt: **378/378 lượt trả 200**, kể
+cả trong một lượt phát hành ĐỨT GIỮA CHỪNG ở bước chuyển — bản mới nằm khoẻ ở chỗ rảnh, bản cũ
+vẫn phục vụ, không ai bị ảnh hưởng.
+
+### Mỗi lượt phát hành phải nhích số hiệu
+
+`verify:changelog` chỉ đỏ khi **bump mà quên viết tin** — nó không nói gì khi commit mà quên
+bump. Lưới một chiều ấy để số hiệu đóng băng ở `1.0.0` suốt chín commit, và vì `AppVersion.tsx`
+đọc thẳng `package.json` nên màn hình đứng im theo. `deploy:backend` nay đóng chiều còn lại:
+**từ chối phát hành một số hiệu đang chạy**. Số đọc từ `HEAD:package.json`, không phải cây làm
+việc — lượt phát hành chở `git archive HEAD`, nên bump chưa commit là chưa tính. Lượt phát hành
+lại thật sự cần thì thêm `--same-version`.
 
 Phát hành: `npm run deploy:all` (= `deploy:backend`) từ máy nhà. Ops đụng DB (`roster:purge`,
 `github:deploy`, `db:migrate`, `verify:*`): `npm run vm -- <lệnh>` — DB chỉ nghe 127.0.0.1,

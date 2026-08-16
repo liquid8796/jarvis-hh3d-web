@@ -73,10 +73,13 @@ export function MirrorPanel({ mirrors, switchState }: { mirrors: MirrorView[]; s
             và từ 16/08 thì hai câu trên cùng một màn hình cãi nhau. Chuỗi kết nối trong sổ vẫn
             còn (mỗi trạm vẫn có Neon/Atlas mang tên nó), chỉ là app KHÔNG đọc chúng nữa — nói
             đúng chỗ ấy chứ đừng xoá trắng, vì người vận hành còn nhìn thấy chúng ở từng dòng. */}
+        {/* Bản trước của câu này nói「chuỗi Neon/Atlas DƯỚI ĐÂY」— đúng lúc nó được viết, sai
+            ngay lượt sau, khi hai host database rời khỏi từng dòng sổ. Một câu mô tả trỏ vào thứ
+            không còn trên màn hình thì tệ hơn là không có câu nào: người đọc đi tìm. */}
         <p className="mb-5 text-xs text-[var(--color-mist)]">
-          Mỗi trạm một tài khoản Vercel riêng. Từ 16/08/2026 các trạm chỉ còn là vỏ chuyển tiếp về
-          backend trên VM — database thật nằm cạnh backend, còn chuỗi Neon/Atlas dưới đây là kho cũ
-          của từng trạm, giữ lại để tra chứ app không đọc nữa.
+          Mỗi trạm một tài khoản Vercel riêng, và sổ này giữ đúng hai thứ còn dùng: URL của vỏ, và
+          chìa để đọc mức dùng 30 ngày. Từ 16/08/2026 các trạm chỉ còn chuyển tiếp request về
+          backend trên VM — kho riêng của từng trạm không ai đọc nữa nên sổ thôi hỏi tới.
         </p>
 
         {mirrors.length === 0 ? (

@@ -40,8 +40,8 @@ import path from "node:path";
 import { parseEnvFile } from "./envFile.mts";
 import { isLoopbackDatabaseUrl } from "./pgTag.mjs";
 
-/** Nơi kho được bung ra trên VM — cùng đường dẫn mà `jarvis-web.service` chạy. */
-export const VM_APP_DIR = "/opt/jarvis/app";
+/** Nơi `npm run vm` cd vào — bản clone vận hành, KHÁC với slot-3000/3001 mà app chạy. */
+export const VM_APP_DIR = "/opt/jarvis/ops-repo";
 
 /**
  * Lỗi RIÊNG cho ca「đứng sai máy」, để người gọi phân biệt được với mọi hỏng hóc khác.

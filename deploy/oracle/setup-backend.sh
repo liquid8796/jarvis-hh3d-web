@@ -110,46 +110,73 @@ id -u "$APP_USER" >/dev/null 2>&1 || useradd --system --create-home --shell /usr
 # thư mục thật ở đó làm `ln -sfn` tạo symlink bên trong thay vì thay thế (đã trả giá 16/08).
 install -d -o "$APP_USER" -g "$APP_USER" /opt/jarvis/releases
 
-log "[8/8] systemd + Caddyfile"
-cat > /etc/systemd/system/jarvis-web.service <<'UNIT'
+log "[8/8] systemd (hai chỗ chạy) + Caddyfile"
+
+# BLUE/GREEN: hai bản app ở cổng 3000 và 3001, Caddy trỏ vào ĐÚNG MỘT bản mỗi lúc.
+#
+# Vì sao không phải một bản như trước: `next start` PHỚT LỜ SIGTERM, nên `systemctl restart`
+# đứng chờ hết `TimeoutStopSec` rồi mới SIGKILL — đo 16/08/2026 trên chính máy này: 90 giây
+# mỗi lượt phát hành, kết bằng một cú chém đứt mọi request đang bay. Có hai chỗ chạy thì lượt
+# phát hành dựng bản mới ở chỗ ĐANG RẢNH rồi mới chuyển Caddy sang, nên người dùng không thấy
+# một giây gián đoạn nào.
+#
+# Vì sao KHÔNG cho Caddy cân tải cả hai cùng lúc: trong lúc phát hành hai chỗ mang hai bản mã
+# khác nhau, mà trang Next tham chiếu chunk JS theo hash của chính bản dựng ấy — chia tải nghĩa
+# là trình duyệt xin chunk của bản A rồi rơi vào bản B và nhận 404. Một-bản-một-lúc là điều kiện
+# đúng, không phải chuyện đơn giản hoá.
+#
+# `%i` của unit mẫu là SỐ CỔNG, và cũng là tên thư mục — một con số, một chỗ khai.
+cat > /etc/systemd/system/jarvis-web@.service <<'UNIT'
 [Unit]
-Description=Jarvis HH3D - backend Next.js
+Description=Jarvis HH3D - backend Next.js (cong %i)
 After=network-online.target postgresql.service mongod.service
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=jarvis
-WorkingDirectory=/opt/jarvis/app
-# next start tự đọc .env trong WorkingDirectory; EnvironmentFile để systemctl show cũng thấy
-ExecStart=/usr/bin/npx next start -p 3000
+WorkingDirectory=/opt/jarvis/slot-%i
+ExecStart=/usr/bin/npx next start -p %i
 Restart=always
 RestartSec=3
-# 24GB máy — chừa chỗ cho Postgres + Mongo + đệm hệ thống
-MemoryMax=16G
+# `next start` không chịu SIGTERM (đã đo). Traffic đã được Caddy rút đi TRƯỚC khi dừng, nên
+# chém sau 20 giây là an toàn — và giữ mặc định 90 giây chỉ tổ kéo dài mỗi lượt phát hành.
+TimeoutStopSec=20
+# 24GB máy, hai chỗ chạy: mỗi bên 8G vẫn còn dư rộng cho Postgres + Mongo + đệm hệ thống.
+MemoryMax=8G
 NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target
 UNIT
 
+install -d -o "$APP_USER" -g "$APP_USER" /opt/jarvis/releases
+
+# MỘT DÒNG này là nguồn sự thật duy nhất cho「bản nào đang phục vụ」: lượt phát hành ghi lại nó
+# rồi `caddy reload`. Đặt ngoài Caddyfile để đổi bản không phải viết lại cả tệp cấu hình.
+if [ ! -f /etc/caddy/upstream.conf ]; then
+  echo "reverse_proxy 127.0.0.1:3000" > /etc/caddy/upstream.conf
+fi
+
 # sslip.io là đường TLS chính (Let's Encrypt HTTP-01 qua cổng 80); khối IP trần
 # thử thêm chứng chỉ IP shortlived — hỏng cũng không kéo khối kia theo.
 cat > /etc/caddy/Caddyfile <<'CADDY'
 92.5.130.32.sslip.io {
-	reverse_proxy 127.0.0.1:3000
+	import /etc/caddy/upstream.conf
 	encode zstd gzip
 }
 
 92.5.130.32 {
-	reverse_proxy 127.0.0.1:3000
+	import /etc/caddy/upstream.conf
 	encode zstd gzip
 }
 CADDY
 
 systemctl daemon-reload
 systemctl enable caddy
-systemctl restart caddy
+# RELOAD chứ không restart khi Caddy đang chạy: restart cắt mọi kết nối đang mở, mà script này
+# còn được chạy lại trên một máy ĐANG PHỤC VỤ (nó idempotent, đó là chủ ý). Reload thì êm.
+systemctl reload caddy 2>/dev/null || systemctl restart caddy
 
 log "XONG — nền đã dựng"
 echo "  Postgres : $(pg_lsclusters --no-header | head -1)"

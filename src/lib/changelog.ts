@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.1.0",
+    date: "2026-08-16",
+    lines: [
+      "Từ bản này, mỗi lượt cập nhật không còn làm gián đoạn: đang xem hay đang thao tác cũng không bị ngắt giữa chừng.",
+      "Sửa lỗi lời nhắn của tông môn bật lại nhiều lần dù đã bấm「Đã hiểu」.",
+      "Đăng nhập bằng địa chỉ cũ đã vào lại được bình thường.",
+    ],
+  },
+  {
     version: "1.0.0",
     date: "2026-08-16",
     lines: [

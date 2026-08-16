@@ -1,24 +1,33 @@
 #!/usr/bin/env node
 /**
- * PHÁT HÀNH BACKEND LÊN VM OCI — thay vai của deploy:all từ 16/08/2026.
+ * PHÁT HÀNH BACKEND LÊN VM OCI — blue/green, không một giây gián đoạn.
  *
- *   npm run deploy:backend                 phát hành HEAD lên jarvis-oci-01
- *   npm run deploy:backend -- --restart    chỉ khởi động lại service, không chở mã
+ *   npm run deploy:all                       phát hành HEAD
+ *   npm run deploy:backend -- --rollback     lùi về bản đang nằm ở chỗ chạy kia
+ *   npm run deploy:backend -- --same-version phát hành lại đúng số hiệu đang chạy
  *
- * Vì sao dựng cây từ `git archive HEAD` chứ không rsync cây làm việc: một-tới-bốn phiên
- * Claude dùng chung thư mục này (xem bản ghi hai-phien-chung-mot-cay-lam-viec), nên cây
- * làm việc LUÔN có thể đang mang tệp dở của phiên khác. HEAD là thứ duy nhất đã được ai
- * đó quyết định phát hành — cùng lý do với deployAllStations cũ.
+ * ── VÌ SAO HAI CHỖ CHẠY ───────────────────────────────────────────────────────────────────
  *
- * Bố cục trên VM (setup-backend.sh dựng sẵn nền):
+ * `next start` PHỚT LỜ SIGTERM. Đo 16/08/2026 trên chính máy này: mỗi `systemctl restart` là
+ * systemd chờ đủ `TimeoutStopSec` (90 giây mặc định) rồi SIGKILL — nên lượt phát hành cũ vừa
+ * dài thêm một phút rưỡi, vừa kết bằng một cú chém đứt mọi request đang bay.
  *
- *   /opt/jarvis/releases/<sha>/   mỗi lượt một thư mục, build xong mới được trỏ vào
- *   /opt/jarvis/app               symlink → release đang phục vụ (systemd đi qua đây)
- *   /opt/jarvis/shared/.env       env sống NGOÀI mọi release; mỗi release symlink .env về đây
+ * Nay app chạy ở HAI chỗ (`jarvis-web@3000`, `jarvis-web@3001`) và Caddy trỏ vào ĐÚNG MỘT chỗ.
+ * Lượt phát hành dựng bản mới ở chỗ đang RẢNH, chờ nó khoẻ, rồi mới đổi một dòng upstream và
+ * `caddy reload` — reload của Caddy là êm, kết nối đang mở chạy nốt. Chỗ cũ được để NGUYÊN,
+ * không tắt: 230MB đổi lấy một cú lùi bản tức thì (`--rollback` chỉ là đổi ngược dòng ấy).
  *
- * Build xong TRƯỚC rồi mới lật symlink + restart — thời gian nghỉ của backend là một cú
- * restart service (~2s), không phải cả lượt npm ci + next build. Release cũ giữ lại một
- * bản: lật hỏng thì `ln -sfn` ngược lại là xong, không phải build lại từ đầu.
+ * Cố ý KHÔNG cho Caddy cân tải cả hai: giữa lượt phát hành hai chỗ mang hai bản mã khác nhau,
+ * mà trang Next xin chunk JS theo hash của chính bản dựng ra nó — chia tải nghĩa là trình duyệt
+ * xin chunk của bản A rồi rơi vào bản B và nhận 404.
+ *
+ * ── VÌ SAO CÓ CỔNG SỐ HIỆU BẢN ────────────────────────────────────────────────────────────
+ *
+ * `verify:changelog` chỉ đỏ khi BUMP MÀ QUÊN VIẾT TIN — nó không nói gì khi người ta commit mà
+ * quên bump. Lưới một chiều ấy để số hiệu đóng băng ở `1.0.0` suốt chín commit (tông chủ báo
+ * 16/08/2026:「web vẫn stuck tại v1.0.0」). `AppVersion.tsx` đọc thẳng `package.json`, nên số
+ * hiệu chỉ nhúc nhích khi có người sửa tệp ấy. Cổng dưới đây đóng chiều còn lại: **không phát
+ * hành được một số hiệu đã đang chạy**. Có `--same-version` cho lượt phát hành lại thật sự cần.
  */
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -29,48 +38,149 @@ const VM_HOST = "92.5.130.32";
 const VM_USER = "ubuntu";
 const SSH_KEY = path.join(process.env.USERPROFILE ?? process.env.HOME ?? "~", ".ssh", "jarvis_oci_ed25519");
 const BACKEND_URL = "https://92.5.130.32.sslip.io";
+/** Đường rẻ nhất chứng minh một chỗ chạy đã SẴN SÀNG: nó chạm database, không chỉ mở cổng. */
+const HEALTH_PATH = "/api/maintenance";
+const PORTS = [3000, 3001] as const;
 
-const args = new Set(process.argv.slice(2));
-const restartOnly = args.has("--restart");
-
-const ssh = (script: string) => {
-  const run = spawnSync(
-    "ssh",
-    ["-i", SSH_KEY, "-o", "BatchMode=yes", "-o", "ConnectTimeout=25", `${VM_USER}@${VM_HOST}`, script],
-    { stdio: ["ignore", "inherit", "inherit"] },
-  );
-  if (run.status !== 0) {
-    throw new Error(`SSH thoát ${run.status} — đọc dòng lỗi ngay trên.`);
-  }
+const die = (message: string): never => {
+  console.error(`\n✗ ${message}`);
+  process.exit(1);
 };
 
-if (restartOnly) {
-  console.log("• Chỉ khởi động lại jarvis-web…");
-  ssh("sudo systemctl restart jarvis-web && systemctl is-active jarvis-web");
+/** Chạy một script bash trên VM, gửi qua STDIN — khỏi phải trốn dấu nháy qua hai tầng shell. */
+const remote = (script: string, quiet = false) =>
+  spawnSync("ssh", ["-i", SSH_KEY, "-o", "BatchMode=yes", "-o", "ConnectTimeout=25", `${VM_USER}@${VM_HOST}`, "bash -s"], {
+    input: script,
+    encoding: "utf8",
+    stdio: ["pipe", quiet ? "pipe" : "inherit", "inherit"],
+  });
+
+const remoteOrDie = (script: string, what: string) => {
+  const run = remote(script);
+  if (run.status !== 0) die(`${what} — ssh thoát ${run.status}. Đọc dòng lỗi ngay trên.`);
+  return run;
+};
+
+// ---- Trạng thái hiện tại trên VM ---------------------------------------------------------
+
+type State = { active: number; idle: number; versionActive: string; versionIdle: string; idleUnit: string };
+
+function readState(): State {
+  const probe = remote(
+    [
+      "set -e",
+      "port=$(grep -oE '127[.]0[.]0[.]1:[0-9]+' /etc/caddy/upstream.conf | cut -d: -f2)",
+      'if [ "$port" = 3000 ]; then other=3001; else other=3000; fi',
+      'ver() { node -p "require(\'/opt/jarvis/slot-$1/package.json\').version" 2>/dev/null || echo "?"; }',
+      'echo "active=$port"',
+      'echo "idle=$other"',
+      'echo "versionActive=$(ver "$port")"',
+      'echo "versionIdle=$(ver "$other")"',
+      'echo "idleUnit=$(systemctl is-active jarvis-web@$other || true)"',
+    ].join("\n"),
+    true,
+  );
+  if (probe.status !== 0) die("Không đọc được trạng thái trên VM — nền blue/green đã dựng chưa? (setup-backend.sh)");
+
+  const kv = new Map(
+    (probe.stdout ?? "")
+      .split("\n")
+      .map((line) => line.trim().split("="))
+      .filter((parts): parts is [string, string] => parts.length === 2),
+  );
+  const active = Number(kv.get("active"));
+  const idle = Number(kv.get("idle"));
+  if (!PORTS.includes(active as (typeof PORTS)[number]) || !PORTS.includes(idle as (typeof PORTS)[number])) {
+    die(`/etc/caddy/upstream.conf không trỏ vào cổng nào hợp lệ (đọc ra「${kv.get("active") ?? ""}」).`);
+  }
+  return {
+    active,
+    idle,
+    versionActive: kv.get("versionActive") ?? "?",
+    versionIdle: kv.get("versionIdle") ?? "?",
+    idleUnit: kv.get("idleUnit") ?? "unknown",
+  };
+}
+
+/** Đổi upstream của Caddy rồi reload, và tự nghiệm thu qua ĐÚNG đường người dùng đi. */
+function switchTo(port: number, expectVersion: string): void {
+  remoteOrDie(
+    [
+      "set -e",
+      `echo "reverse_proxy 127.0.0.1:${port}" | sudo tee /etc/caddy/upstream.conf >/dev/null`,
+      "sudo systemctl reload caddy",
+    ].join("\n"),
+    "Không đổi được upstream của Caddy",
+  );
+
+  const probe = spawnSync("curl", ["-s", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "30", `${BACKEND_URL}/login`], {
+    encoding: "utf8",
+  });
+  if (probe.stdout?.trim() !== "200") {
+    die(
+      `Đã chuyển sang cổng ${port} nhưng ${BACKEND_URL}/login trả「${probe.stdout?.trim() || "không gì cả"}」.\n` +
+        `  Lùi lại ngay: npm run deploy:backend -- --rollback`,
+    );
+  }
+  console.log(`✔ ${BACKEND_URL} đang phục vụ từ cổng ${port} — bản ${expectVersion}.`);
+}
+
+// ---- Đường lùi bản --------------------------------------------------------------------------
+
+const argv = process.argv.slice(2);
+if (argv.includes("--rollback")) {
+  const state = readState();
+  if (state.idleUnit !== "active") {
+    die(`Chỗ chạy kia (cổng ${state.idle}) đang「${state.idleUnit}」, không lùi vào đó được.`);
+  }
+  console.log(`• Lùi bản: cổng ${state.active} (${state.versionActive}) → cổng ${state.idle} (${state.versionIdle})`);
+  switchTo(state.idle, state.versionIdle);
   process.exit(0);
 }
 
+// ---- Cổng số hiệu bản -----------------------------------------------------------------------
+
+// Đọc từ HEAD chứ không phải cây làm việc: lượt phát hành chở `git archive HEAD`, nên một cú
+// bump chưa commit sẽ KHÔNG lên máy — mà cổng thì phải gác đúng thứ sắp được chở đi.
+const headPkg = JSON.parse(execFileSync("git", ["show", "HEAD:package.json"], { encoding: "utf8" })) as {
+  version?: string;
+};
+const version = (headPkg.version ?? "").trim();
+if (version.length === 0) die("HEAD:package.json không có `version`.");
+
+const state = readState();
+if (version === state.versionActive && !argv.includes("--same-version")) {
+  die(
+    `Bản đang chạy đã là ${version} — phát hành lại cũng không đổi gì trên màn hình.\n\n` +
+      `  Mỗi lượt phát hành phải nhích số hiệu (tông chủ chốt 16/08/2026). Hai việc:\n` +
+      `    1. package.json  → bump "version"\n` +
+      `    2. src/lib/changelog.ts → thêm một mục cho đúng số ấy (npm run verify:changelog để soát)\n` +
+      `  rồi commit — cổng này đọc HEAD, nên bump chưa commit là chưa tính.\n\n` +
+      `  Thật sự muốn phát hành lại cùng số hiệu: thêm --same-version`,
+  );
+}
+
+// ---- Dựng bản mới ở chỗ đang RẢNH -----------------------------------------------------------
+
 const sha = execFileSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim();
 const subject = execFileSync("git", ["log", "-1", "--format=%s"], { encoding: "utf8" }).trim();
-console.log(`• Phát hành commit ${sha} — ${subject}`);
-console.log(`  đích: ${VM_USER}@${VM_HOST} → ${BACKEND_URL}`);
+console.log(`• Phát hành ${version} (${sha}) — ${subject}`);
+console.log(`  đang phục vụ: cổng ${state.active} bản ${state.versionActive} → dựng vào cổng ${state.idle}`);
 
-// 1. Đóng gói HEAD. `git archive` bung theo .gitattributes nên .sh giữ LF — đúng thứ VM cần.
 const tmp = mkdtempSync(path.join(tmpdir(), "deploy-backend-"));
 const tarball = path.join(tmp, "app.tar.gz");
 try {
+  // `git archive` bung theo .gitattributes nên .sh giữ LF — đúng thứ VM cần.
   execFileSync("git", ["archive", "--format=tar.gz", "-o", tarball, "HEAD"], { stdio: "inherit" });
 
   console.log("• Chở gói lên VM…");
   const scp = spawnSync("scp", ["-q", "-i", SSH_KEY, tarball, `${VM_USER}@${VM_HOST}:/tmp/jarvis-app.tar.gz`], {
     stdio: ["ignore", "inherit", "inherit"],
   });
-  if (scp.status !== 0) throw new Error(`scp thoát ${scp.status}`);
+  if (scp.status !== 0) die(`scp thoát ${scp.status}`);
 
-  // 2. Toàn bộ phần trên VM là MỘT script sh -e: chết ở đâu là dừng ở đó, release đang phục
-  //    vụ không bị đụng tới cho đến dòng lật symlink.
-  console.log("• Dựng release trên VM (npm ci + next build — vài phút)…");
-  ssh(
+  console.log(`• Dựng release + khởi động cổng ${state.idle} (npm ci + next build — vài phút)…`);
+  remoteOrDie(
     [
       "set -e",
       `REL=/opt/jarvis/releases/${sha}-$(date +%H%M%S)`,
@@ -80,37 +190,47 @@ try {
       // .env của release là symlink về shared — env sống lâu hơn mọi release
       "sudo ln -sfn /opt/jarvis/shared/.env $REL/.env",
       "sudo chown -R jarvis:jarvis $REL",
+      // `npm run build` chứ KHÔNG `npx next build`: hook prebuild đóng gói khôi lỗi
+      // (public/linh-su/goi-linh-su.tgz) — gọi thẳng next là gói ấy vắng mặt và mọi lượt cài
+      // khôi lỗi tải về 404. Đã trả giá 16/08/2026.
       "cd $REL && sudo -u jarvis npm ci --no-audit --no-fund 2>&1 | tail -2",
-      // `npm run build` chứ KHÔNG phải `npx next build`: hook prebuild đóng gói khôi lỗi
-      // (public/linh-su/goi-linh-su.tgz) — gọi thẳng next là gói ấy vắng mặt và mọi lượt
-      // cài khôi lỗi tải về 404. Đã trả giá ngay lượt phát hành đầu tiên.
       "cd $REL && sudo -u jarvis npm run build 2>&1 | tail -12",
-      // 3. Lật symlink rồi restart — điểm duy nhất chạm vào bản đang phục vụ.
-      //    Gác trước khi lật: /opt/jarvis/app mà là THƯ MỤC thật thì `ln -sfn` sẽ tạo
-      //    symlink BÊN TRONG nó chứ không thay nó — app khởi động trong thư mục rỗng,
-      //    npx tự tải một bản next lạ và chết với「no production build」. Đã trả giá
-      //    ngay lượt phát hành đầu (setup-backend.sh từng dựng sẵn thư mục ấy).
-      "[ -L /opt/jarvis/app ] || sudo rm -rf /opt/jarvis/app",
-      "sudo ln -sfn $REL /opt/jarvis/app",
-      "sudo systemctl restart jarvis-web",
-      // 4. Canh cửa: service phải sống VÀ cổng 3000 phải trả lời trong 60s
-      "for i in $(seq 1 30); do sleep 2; code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/ || true); [ \"$code\" != 000 ] && break; done",
-      "echo \"jarvis-web: $(systemctl is-active jarvis-web) — HTTP nội bộ: $code\"",
-      "[ \"$code\" != 000 ] || (echo '✗ App không trả lời sau 60s — journalctl -u jarvis-web -n 50' && sudo journalctl -u jarvis-web -n 30 --no-pager && exit 1)",
-      // 5. Dọn release cũ, giữ lại 2 bản gần nhất để còn đường lùi
-      "cd /opt/jarvis/releases && ls -1t | tail -n +3 | xargs -r sudo rm -rf",
-    ].join(" && "),
+      // Chỗ rảnh trỏ vào release mới. `[ -L ]` gác vì `ln -sfn` vào một THƯ MỤC thật sẽ tạo
+      // symlink BÊN TRONG nó thay vì thay thế — app khởi động trong thư mục rỗng.
+      `[ -L /opt/jarvis/slot-${state.idle} ] || sudo rm -rf /opt/jarvis/slot-${state.idle}`,
+      `sudo ln -sfn $REL /opt/jarvis/slot-${state.idle}`,
+      `sudo systemctl enable --now jarvis-web@${state.idle} >/dev/null 2>&1 || true`,
+      `sudo systemctl restart jarvis-web@${state.idle}`,
+      // Chỗ rảnh KHÔNG nhận traffic, nên chờ ở đây không ai thấy gián đoạn.
+      `for i in $(seq 1 45); do sleep 2; code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${state.idle}${HEALTH_PATH} || true); [ "$code" = 200 ] && break; done`,
+      `echo "cổng ${state.idle}: $(systemctl is-active jarvis-web@${state.idle}) — ${HEALTH_PATH} trả $code"`,
+      `[ "$code" = 200 ] || (sudo journalctl -u jarvis-web@${state.idle} -n 30 --no-pager && exit 1)`,
+    ].join("\n"),
+    `Dựng bản mới ở cổng ${state.idle} không xong — bản ${state.versionActive} ở cổng ${state.active} VẪN đang phục vụ, chưa ai bị ảnh hưởng`,
   );
 
-  // 6. Bằng chứng từ NGOÀI: đi đúng đường người dùng sẽ đi (Caddy + TLS)
-  const probe = spawnSync("curl", ["-s", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "30", `${BACKEND_URL}/login`], {
-    encoding: "utf8",
-  });
-  const code = probe.stdout?.trim();
-  if (code !== "200") {
-    throw new Error(`✗ ${BACKEND_URL}/login trả ${code || "không gì cả"} — backend chưa phục vụ được từ ngoài.`);
-  }
-  console.log(`✔ ${BACKEND_URL} đang phục vụ (login trả 200) — commit ${sha} đã sống.`);
+  // ---- Chuyển traffic: một dòng + một lượt reload êm --------------------------------------
+  console.log(`• Chuyển Caddy sang cổng ${state.idle}…`);
+  switchTo(state.idle, version);
+
+  // ---- Dọn release cũ, GIỮ hai bản đang được hai chỗ chạy trỏ tới -------------------------
+  remoteOrDie(
+    [
+      "set -e",
+      "K1=$(readlink -f /opt/jarvis/slot-3000 2>/dev/null || true)",
+      "K2=$(readlink -f /opt/jarvis/slot-3001 2>/dev/null || true)",
+      "cd /opt/jarvis/releases",
+      "for d in $(ls -1t | tail -n +4); do",
+      '  full="/opt/jarvis/releases/$d"',
+      '  [ "$full" = "$K1" ] && continue',
+      '  [ "$full" = "$K2" ] && continue',
+      '  sudo rm -rf "$full"',
+      "done",
+    ].join("\n"),
+    "Dọn release cũ hỏng (bản mới VẪN đang phục vụ)",
+  );
+
+  console.log(`  Lùi bản tức thì nếu cần: npm run deploy:backend -- --rollback  (về ${state.versionActive})`);
 } finally {
   rmSync(tmp, { recursive: true, force: true });
 }

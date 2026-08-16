@@ -73,6 +73,16 @@ async function discover(): Promise<Target[]> {
 }
 
 async function deployShell(t: Target): Promise<string> {
+  // Cài đặt PROJECT thắng projectSettings của deployment — đã đo: project còn khai
+  // framework=nextjs thì hai tệp tĩnh cũng bị đè ra `next build` và chết với「Couldn't
+  // find any pages or app directory」. Các project này từ nay vĩnh viễn là vỏ tĩnh, nên
+  // sửa thẳng cài đặt project là TRẠNG THÁI THẬT chứ không phải mẹo lách.
+  const q0 = t.teamId ? `?teamId=${t.teamId}` : "";
+  await api(t.token, `/v9/projects/${t.projectId}${q0}`, {
+    method: "PATCH",
+    body: JSON.stringify({ framework: null, buildCommand: null, installCommand: null, outputDirectory: null }),
+  });
+
   const files = SHELL_FILES.map((file) => ({
     file,
     data: readFileSync(path.join(SHELL_DIR, file)).toString("base64"),

@@ -102,13 +102,32 @@ dán `~/.oci/jarvis_api_key_public.pem`.
 | đĩa | boot volume **100 GB**, VPU 10 |
 | OS | Ubuntu 24.04 LTS aarch64 |
 | vị trí | `eu-frankfurt-1`, AD-1, FAULT-DOMAIN-2 |
-| vai trò | **chưa giao** — xem ghi chú ngay dưới |
+| vai trò | **BACKEND CHÍNH THỨC của tông môn** (từ 16/08/2026 — xem mục 2b) |
 
-> **16/08/2026 — máy này THÔI làm khôi lỗi tông môn.** Tông chủ cho dựng lại máy từ đầu (đĩa
-> 50 GB → 100 GB) và giao vai khác, sẽ nói sau. Mục 2 bên dưới giữ lại nguyên vẹn phần mô tả
-> khôi lỗi vì **nó vẫn đúng cho 6 khôi lỗi GitHub** (cùng `worker.mjs`, cùng `WORKER_TOKEN`,
-> cùng luật phân công) và vì đó là công thức dựng lại nếu có ngày cần một khôi lỗi trên VM nữa.
-> Đọc nó như tài liệu về WORKER, đừng đọc như mô tả máy này đang làm gì.
+## 2b. Backend trên VM — kiến trúc từ 16/08/2026
+
+Cùng ngày dựng lại máy, tông chủ quyết: **backend + database rời hẳn Vercel/Neon/Atlas về
+đây.** App Next.js (UI + API) chạy trọn trên VM sau Caddy; 5 trạm Vercel chỉ còn là vỏ proxy
+(xem `deploy/vercel-proxy/README.md`); khôi lỗi GitHub gọi thẳng VM.
+
+| Mảnh | Ở đâu |
+|---|---|
+| app | systemd `jarvis-web` — `/opt/jarvis/app` (symlink → `/opt/jarvis/releases/<sha>`) |
+| env | `/opt/jarvis/shared/.env` (jarvis-only 600; mỗi release symlink `.env` về đây) |
+| TLS | Caddy, `https://92.5.130.32.sslip.io` (Let's Encrypt HTTP-01 qua sslip.io) |
+| Postgres 17 | localhost:5432, db/role `jarvis`, mật khẩu `/etc/jarvis/pg-password` (root-only) |
+| MongoDB 8.0 | localhost:27017, db `jarvis` (tên theo nấc mặc định của `dbName.ts`) |
+| cron | systemd `jarvis-cron.timer` 03:00 UTC → `/api/cron` với `CRON_SECRET` — thay Vercel Cron |
+| media | vẫn Object Storage `jarvis-media` (mục 3) — không đổi |
+
+Phát hành: `npm run deploy:all` (= `deploy:backend`) từ máy nhà. Ops đụng DB (`roster:purge`,
+`github:deploy`, `db:migrate`, `verify:*`): `npm run vm -- <lệnh>` — DB chỉ nghe 127.0.0.1,
+cố ý không mở cổng ra internet, nên các script ấy phải ĐỨNG TRÊN VM. Dựng lại nền từ đầu:
+`setup-backend.sh` (idempotent) rồi `deploy:backend`.
+
+> Mục 2 cũ bên dưới giữ lại nguyên vẹn phần mô tả khôi lỗi vì **nó vẫn đúng cho 6 khôi lỗi
+> GitHub** (cùng `worker.mjs`, cùng `WORKER_TOKEN`, cùng luật phân công) và vì đó là công
+> thức dựng lại nếu có ngày cần một khôi lỗi trên VM nữa. Đọc nó như tài liệu về WORKER.
 >
 > Ba hệ quả đã kiểm, không phải suy đoán:
 > - **Đàn không kẹt.** `services/dispatch.ts` có cửa `ONLINE_WINDOW_MS`, khôi lỗi im lặng tự

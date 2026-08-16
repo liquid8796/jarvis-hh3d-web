@@ -46,7 +46,7 @@
  */
 import { execFileSync } from "node:child_process";
 import path from "node:path";
-import { neon } from "@neondatabase/serverless";
+import pg from "pg";
 import { decryptSecret, isEncrypted } from "../src/lib/crypto/secretBox";
 import {
   DEFAULT_WORKFLOW_FILE,
@@ -175,7 +175,15 @@ type Station = {
   enabled: boolean;
 };
 
-const sql = neon(databaseUrl);
+// pg thay neon-http (16/08/2026 — DB nay là Postgres local trên VM; neon() gặp 127.0.0.1
+// là chế ra https://api.0.0.1/sql rồi chết). Adapter giữ nguyên bề mặt tagged-template mà
+// hai chỗ gọi bên dưới đang dùng; allowExitOnIdle để script vẫn tự thoát như trước.
+const pool = new pg.Pool({ connectionString: databaseUrl, max: 1, allowExitOnIdle: true });
+const sql = async (strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown[]> => {
+  const text = strings.reduce((acc, part, i) => `${acc}$${i}${part}`);
+  const result = await pool.query(text, values as unknown[]);
+  return result.rows;
+};
 
 const settingsRows = (await sql`
   SELECT value -> 'githubStations' AS stations FROM app_settings WHERE id = 'global'

@@ -9,3 +9,9 @@
 # đĩa thì không. Dòng dưới đây ép CRLF ở mọi lượt checkout, trên mọi máy, bất kể cấu hình cá nhân.
 *.bat text eol=crlf
 *.cmd text eol=crlf
+
+# Chiều NGƯỢC LẠI của cùng bài học: .sh chạy trên Linux, mà `core.autocrlf=true` trên Windows
+# sẽ bung CRLF vào MỌI tệp text lúc checkout — bash gặp \r là chết với「$'\r': command not
+# found」ngay dòng đầu, hoặc tệ hơn: chết ở giữa, sau khi đã làm nửa việc. Các tệp .sh hiện
+# đang LF thuần chỉ vì chúng chưa từng đi qua một lượt checkout mới nào kể từ khi thêm vào.
+*.sh text eol=lf

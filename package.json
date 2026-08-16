@@ -61,6 +61,8 @@
     "verify:realtime:sse": "tsx scripts/verifyRealtimeSse.mts",
     "verify:worker-follow": "tsx scripts/verifyWorkerFollow.mts",
     "deploy:all": "tsx scripts/deployAllStations.mts",
+    "deploy:backend": "tsx scripts/deployBackend.mts",
+    "deploy:proxy": "tsx scripts/deployProxyShell.mts",
     "verify:deploy-targets": "tsx scripts/verifyDeployTargets.mts",
     "verify:vercel-usage": "tsx scripts/verifyVercelUsage.mts",
     "verify:usage-push": "tsx scripts/verifyUsagePush.mts",

@@ -110,9 +110,13 @@ const sourceLine = forwarded.size > 0 ? `set -a; . ${SECRET_FILE}; set +a; ` : "
 // bảng tổng kết vẫn xanh. Đo 16/08/2026. Khoá deploy cũng nằm ở /home/jarvis/.ssh.
 const pull =
   `git pull --ff-only -q || echo "⚠ git pull hỏng — chạy trên commit $(git rev-parse --short HEAD) đang có sẵn" >&2; `;
+// Trích dẫn TỪNG đối số: `ssh` ghép các đối số của nó bằng dấu cách rồi giao cho shell phía xa
+// phân tích lại, nên `cmd.join(" ")` trần làm bay hết dấu nháy của người gọi — một đối số có
+// khoảng trắng vỡ thành hai, và một dấu nháy lạc có thể ghép sang cả câu lệnh khác.
+const shellQuote = (arg: string) => `'${arg.replaceAll("'", `'\\''`)}'`;
 const remote = [
   `cd ${OPS_REPO}`,
-  `sudo -u jarvis bash -c '${pull}${sourceLine}exec "$@"' _ ${cmd.join(" ")}`,
+  `sudo -u jarvis bash -c '${pull}${sourceLine}exec "$@"' _ ${cmd.map(shellQuote).join(" ")}`,
 ].join(" && ");
 
 const tty = process.stdin.isTTY ? ["-t"] : [];

@@ -21,7 +21,7 @@
  * treo dưới hai tài khoản tạm mang tiền tố `__pref_`, và `finally` quét theo tiền tố ấy nên một
  * lần chạy chết giữa chừng trước đây cũng được dọn nốt.
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { pickDispatch } from "../src/lib/services/dispatch";
 import { claimNextJob } from "../src/lib/services/jobs";
 import {
@@ -37,7 +37,7 @@ import { loadEnv } from "./loadEnv.mjs";
 loadEnv();
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa đặt.");
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = sqlTag(process.env.DATABASE_URL);
 
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);

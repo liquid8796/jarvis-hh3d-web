@@ -17,7 +17,7 @@
  * đều treo dưới một tài khoản tạm mang tiền tố `__quota_`, và `finally` dọn theo tiền tố ấy nên
  * một lần chạy hỏng trước đây cũng được quét nốt.
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import {
   claimNextJob,
   completeWorkerCycle,
@@ -30,7 +30,7 @@ import { loadEnv } from "./loadEnv.mjs";
 loadEnv();
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa đặt.");
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = sqlTag(process.env.DATABASE_URL);
 
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);

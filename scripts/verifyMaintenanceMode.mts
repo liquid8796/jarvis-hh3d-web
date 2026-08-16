@@ -17,7 +17,7 @@
  * xác nhận — khôi phục hụt là loại thất bại phải hét lên: hậu quả của nó là cả tông môn
  * đứng im trong một phiên bảo trì không ai khai.
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 // @ts-expect-error — module JS thuần của quest-engine, không có d.ts.
 import { normalizeGameBaseUrl } from "../src/lib/quest-engine/cookies.mjs";
 import { maintenanceViewFor } from "../src/lib/auth/maintenance";
@@ -43,7 +43,7 @@ import { loadEnv } from "./loadEnv.mjs";
 loadEnv();
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa đặt.");
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = sqlTag(process.env.DATABASE_URL);
 const stamp = Date.now();
 const username = `__maint_${stamp}`;
 

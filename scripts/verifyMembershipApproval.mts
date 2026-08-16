@@ -8,7 +8,7 @@
  * bước đó là loại thất bại phải hét lên, không phải ghi một dòng log rồi thôi: hậu quả của nó
  * là cổng tông môn nằm sai chiều mà không ai biết.
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { appSettingsSchema, getAppSettings, saveAppSettings } from "../src/lib/services/settings";
 import { findById, register } from "../src/lib/services/users";
 import { loadEnv } from "./loadEnv.mjs";
@@ -16,7 +16,7 @@ import { loadEnv } from "./loadEnv.mjs";
 loadEnv();
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa đặt.");
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = sqlTag(process.env.DATABASE_URL);
 const stamp = Date.now();
 const gatedUsername = `__gate_on_${stamp}`;
 const openUsername = `__gate_off_${stamp}`;

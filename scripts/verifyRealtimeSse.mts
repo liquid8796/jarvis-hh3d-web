@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** End-to-end: session cookie → Next route SSE → Neon NOTIFY → frame tới browser client. */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { SignJWT } from "jose";
 import type { DashboardLivePayload } from "../src/lib/realtime/dashboardTypes";
 import { addEvent, clearVisibleJobEvents } from "../src/lib/services/jobs";
@@ -15,7 +15,7 @@ if (!process.env.DATABASE_URL || !process.env.AUTH_SECRET) {
 }
 
 const baseUrl = (process.env.REALTIME_VERIFY_URL ?? "http://127.0.0.1:3017").replace(/\/$/, "");
-const sql = neon(process.env.DATABASE_URL);
+const sql = sqlTag(process.env.DATABASE_URL);
 const username = `__sse_test_${Date.now()}`;
 const marker = `[verify-sse] ${crypto.randomUUID()}`;
 const abort = new AbortController();

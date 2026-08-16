@@ -20,7 +20,7 @@
  * Chạm database THẬT nhưng CHỈ ĐỌC: một câu select lấy id/vai của tài khoản đóng vai, để ký
  * phiên y như `dev:session` và `shot`. Không ghi gì cả.
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { SignJWT } from "jose";
 import { chromium } from "playwright-core";
 import { loadEnv } from "./loadEnv.mjs";
@@ -51,7 +51,7 @@ if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa đặt — ch
 if (!process.env.AUTH_SECRET) throw new Error("AUTH_SECRET chưa đặt — chạy `npm run env:pull`.");
 
 const username = (argAfter("user") ?? process.env.ADMIN_USERNAME ?? "admin").toLowerCase();
-const rows = await neon(process.env.DATABASE_URL)`
+const rows = await sqlTag(process.env.DATABASE_URL)`
   select u.id, u.username,
          coalesce((select array_agg(ur.role_code) from user_roles ur where ur.user_id = u.id), '{}') as roles
     from users u where u.username = ${username} limit 1

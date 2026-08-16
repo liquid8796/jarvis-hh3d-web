@@ -6,7 +6,7 @@
  * and deletes that user (therefore the job/events via cascade) in finally. No real user's job
  * or configuration is read or changed.
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { claimNextJob, completeWorkerCycle, heartbeat, requestStop } from "../src/lib/services/jobs";
 import { getQueueSnapshot } from "../src/lib/services/queue";
 import { recordWorkerSeen } from "../src/lib/services/workers";
@@ -16,7 +16,7 @@ loadEnv();
 
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa đặt.");
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = sqlTag(process.env.DATABASE_URL);
 const username = `__cycle_test_${Date.now()}`;
 /**
  * Ba tiến trình giả cho phép kiểm id khôi lỗi. Tên lấy theo `username` nên chúng dùng chung

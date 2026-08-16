@@ -3,8 +3,9 @@
  * Kiểm chứng chuỗi thật Neon HTTP write → trigger → LISTEN → snapshot dashboard.
  * Dùng user cô lập và xoá cascade trong finally, không đọc/chạm job của người dùng thật.
  */
-import type { Notification } from "@neondatabase/serverless";
-import { Client, neon } from "@neondatabase/serverless";
+import type { Notification } from "pg";
+import { Client } from "pg";
+import { sqlTag } from "./pgTag.mjs";
 import {
   DASHBOARD_CHANNEL,
   parseDashboardSignal,
@@ -18,7 +19,7 @@ import { loadEnv } from "./loadEnv.mjs";
 loadEnv();
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa đặt.");
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = sqlTag(process.env.DATABASE_URL);
 const listener = new Client({ connectionString: realtimeDatabaseUrl() });
 const username = `__realtime_test_${Date.now()}`;
 const workerId = `verify-live-${Date.now()}`;

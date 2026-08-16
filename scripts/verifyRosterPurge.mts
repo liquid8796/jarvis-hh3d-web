@@ -27,7 +27,7 @@
  * fetch (mà `neon` thì đi bằng fetch) làm libuv ném trên Windows. Mọi ngả kết thúc qua `exitCode`,
  * và ngả nào cũng phải đi qua bước dọn.
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { type PurgeTiming } from "./githubKhoiloi.mts";
 import { loadEnv } from "./loadEnv.mjs";
 import { purgeRosterRow } from "./rosterPurge.mts";
@@ -62,7 +62,7 @@ function ok(condition: boolean, label: string): void {
 
 const url = (process.env.DATABASE_URL ?? "").trim();
 if (!url) throw new Error("Thiếu DATABASE_URL — chạy `npm run env:pull` hoặc soi .env.local.");
-const sql = neon(url);
+const sql = sqlTag(url);
 
 /**
  * Đúng hình dạng câu ghi của `recordWorkerSeen`: `insert … on conflict do update`. Chính câu ấy là

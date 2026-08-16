@@ -23,7 +23,7 @@
  * KHO ĐANG TẮT TAY (`disabled_manually`) thì KHÔNG đụng vào: bật lại giùm là cãi lại một quyết
  * định của con người, và luật ấy đứng ở cả vòng nuôi lẫn ở đây.
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { decryptSecret, isEncrypted } from "../src/lib/crypto/secretBox";
 import { readControlDoc } from "../src/lib/control/read";
 import {
@@ -64,7 +64,7 @@ if (activeSiteId) {
 }
 if (activePg.length === 0) die("Không biết phải đọc sổ Kho GitHub ở database nào.");
 
-const sql = neon(activePg);
+const sql = sqlTag(activePg);
 const rows = (await sql`SELECT value -> 'githubStations' AS stations FROM app_settings WHERE id = 'global'`) as Array<{
   stations: unknown;
 }>;

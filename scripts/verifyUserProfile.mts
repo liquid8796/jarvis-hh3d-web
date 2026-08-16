@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /** Integration check for nullable legacy email, required new email and self-service edits. */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { findById, register, updateProfile } from "../src/lib/services/users";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa đặt.");
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = sqlTag(process.env.DATABASE_URL);
 const stamp = Date.now();
 const legacyUsername = `__profile_old_${stamp}`;
 const username = `__profile_${stamp}`;

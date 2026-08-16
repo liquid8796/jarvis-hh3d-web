@@ -24,7 +24,7 @@
  * hỏng trước đây cũng được quét nốt.
  */
 import { randomUUID } from "node:crypto";
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import {
   ASSIGNABLE_ROLES,
   PERMISSIONS,
@@ -47,7 +47,7 @@ import { loadEnv } from "./loadEnv.mjs";
 loadEnv();
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa đặt.");
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = sqlTag(process.env.DATABASE_URL);
 
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);

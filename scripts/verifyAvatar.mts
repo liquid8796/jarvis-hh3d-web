@@ -10,7 +10,7 @@
  *
  * Chạy: npm run verify:avatar
  */
-import { neon } from "@neondatabase/serverless";
+import { sqlTag } from "./pgTag.mjs";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -27,7 +27,7 @@ const OCI_KEYS = ["OCI_REGION", "OCI_NAMESPACE", "OCI_BUCKET", "OCI_ACCESS_KEY_I
 const hasOci = OCI_KEYS.every((key) => (process.env[key] ?? "").trim().length > 0);
 
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa đặt — chạy `npm run env:pull` trước.");
-const sql = neon(process.env.DATABASE_URL);
+const sql = sqlTag(process.env.DATABASE_URL);
 
 /** Ảnh PNG 1×1 thật, để phần vòng đời trên kho gửi đi một tấm ảnh hợp lệ chứ không phải bytes bừa. */
 const PNG_1X1 = new Uint8Array(

@@ -47,6 +47,11 @@ const SIMPLE_QUESTS: ReadonlyArray<SimpleQuest> = [
     name: "Vấn Đáp",
     hint: "Tra danh sách đáp án cộng đồng. Câu không có trong danh sách sẽ để bạn tự làm.",
   },
+  {
+    key: "phanThuongHoatDong",
+    name: "Phần Thưởng Hoạt Động",
+    hint: "Mở hai rương mốc 75% và 100% trên trang nhiệm vụ ngày, sau khi các nhiệm vụ ngày khác đã cộng đủ tiến độ.",
+  },
   // Khoáng Mạch KHÔNG còn ở đây: từ schema 58 nó có tuỳ chọn riêng (loại khoáng, tên mỏ,
   // đoạt mỏ) nên sống trong KhoangMachFieldset — cùng số phận rời-lưới với Luyện Đan Đường.
 ];
@@ -59,6 +64,10 @@ const FREE_QUEST_KEYS = new Set([
   "vongQuay",
   "teLe",
   "vanDap",
+  // Hai rương nằm ở THÂN trang nhiệm vụ ngày, không phải một nút quick-click của hạng VIP,
+  // nên twin thường chạy đúng script ấy (hồ sơ schema 66). Hub bản thường mà không có mục
+  // này thì lượt chạy nói ra rồi hẹn giờ — không đỏ, không tự khoá cả ngày.
+  "phanThuongHoatDong",
 ]);
 
 /**

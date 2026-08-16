@@ -11,6 +11,43 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.0 — Phần Thưởng Hoạt Động: hai rương mốc 75%/100% trên hub (schema hồ sơ 66)
+
+Nhiệm vụ mới, hai twin VIP/thường, dựng từ bản ghi `phan-thuong-hoat-dong-20260817-022120`
+(6 click, 2 lượt AJAX, video 91 giây) — tông chủ dặn kèm trong bản ghi:「mỗi ngày luôn check 2
+rương phần thưởng này nhé, sẽ xuất hiện bất ngờ」.
+
+**Trang khai ba trạng thái bằng CLASS, nên script hỏi đúng ba class ấy** — `.nv-rcard.locked`
+(chưa tới mốc) · `.unlocked` (còn `button.nv-claim-btn`) · `.claimed` (nút bị GỠ, thay bằng
+`.nv-claimed-txt`「Đã nhận」). Không dò chữ, không đếm vị trí. Nút mờ (`:disabled` — CSS của
+trang có hẳn luật cho nó) bị loại khỏi phép chọn: bấm vào là ngồi chờ một hộp không bao giờ mở.
+
+**Hộp thưởng là hộp DÙNG CHUNG, phân biệt bằng class chứ không bằng tiêu đề.** Video cho thấy
+hai rương ra hai tiêu đề khác nhau —「Nhận Thưởng Thành Công!」(mốc 75%) và「Hoàn Thành Xuất
+Sắc!」(mốc 100%) — nên một phép kiểm đi so tiêu đề sẽ khai rương thứ hai là hỏng. Thứ phân biệt
+mừng/dữ là `.nv-err`/`.nv-warn` trên `#nv-modal-overlay`, và rương bị từ chối được đánh dấu để
+vòng lặp KHÔNG bấm lại vào cánh cửa vừa đóng sập.
+
+**Ba nhịp ghé lại, ba ý khác nhau, và chỉ MỘT ngả vào sổ ngày.** Cả hai thẻ `.claimed` →
+`alreadyDone` (mai ghé lại). Còn rương khoá → 30 phút. Không thấy mục này trên trang → 60 phút.
+Hai ngả sau cố ý KHÔNG phải `alreadyDone`: mốc mở ra theo tiến độ các nhiệm vụ khác trong ngày,
+và một mục vắng mặt có thể chỉ là trang dựng thiếu — nhớ nhầm thành「hết ngày」là khoá mất đúng
+cái rương sắp mở. Cùng bài học đã trả giá ở Vòng Quay bản thường.
+
+**Order 99, không phải 120.** Bộ chạy thử bắt được: đặt 120 là chen sau Mê Cung, phá luật「Mê
+Cung chạy cuối」(nó giữ trình duyệt tới 35 phút với một phòng 5 người). Mà vòng tiến độ chỉ đếm
+BỐN nhiệm vụ ngày (Điểm Danh · Hoang Vực · Phúc Lợi Đường · Vấn Đáp — mọi thứ trong「Hoạt Động
+Khác」không cộng vào %), nên 99 là chỗ sớm nhất mà cả hai rương đã có thể mở.
+
+**Twin thường dùng NGUYÊN script của bản VIP**: mục rương nằm ở thân trang hub, không phải một
+nút quick-click, nên không selector nào phụ thuộc hạng. Bản ghi là tài khoản VIP, nên khả năng
+「hub bản thường không có mục này」được xử bằng một lượt hẹn giờ có lời giải thích chứ không
+phải một quest đỏ.
+
+Fixture của bộ chạy thử chép từ `dom/01-load.html` (thẻ mở), `dom/06-click.html` (thẻ đã nhận)
+và `dom/03-click.html` (hộp thưởng); chữ trong `.nv-locked-txt` là chỗ DUY NHẤT không có trong
+bản ghi — hôm ấy cả hai rương đều đã mở — và script không đọc chữ ấy.
+
 ## 1.2.1 — Khoáng Mạch nghe lời xác nhận đoạt mỏ ở NGẢ MẠNG (schema hồ sơ 65)
 
 Tông chủ báo 17/08/2026 kèm ảnh nhật ký: trong game đã đoạt được mỏ, mà auto khai

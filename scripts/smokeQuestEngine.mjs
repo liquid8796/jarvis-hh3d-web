@@ -122,9 +122,88 @@ const FREE_CHECKIN_DONE_PAGE = `<!doctype html><html lang="vi"><meta charset="ut
 // Chữ "Thí Luyện" hiện THÀNH VĂN BẢN chứ không chỉ nằm trong href: vipProbe đọc innerText và
 // trả null chừng nào chưa thấy tên một nhiệm vụ nào — null nghĩa là "hub chưa render xong",
 // nên một hub thiếu chữ khiến runCycle poll đủ 20 giây rồi mới bỏ cuộc.
-const FREE_HUB_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
-<div class="nv-quest"><a class="btn-go" onclick="location.href='/phuc-loi-duong'">Làm Ngay ›</a></div>
+const FREE_HUB_ROWS = `<div class="nv-quest"><a class="btn-go" onclick="location.href='/phuc-loi-duong'">Làm Ngay ›</a></div>
 <div class="nv-quest"><span>Thí Luyện Tông Môn</span><a class="btn-go" href="/thi-luyen-tong-mon-hh3d/?nv_embed=1">Làm Ngay ›</a></div>`;
+
+/**
+ * Hub nhiệm vụ ngày, kèm mục「Phần Thưởng Hoạt Động」— dựng NGUYÊN VĂN từ bản ghi
+ * phan-thuong-hoat-dong-20260817-022120: thẻ mở lấy từ `dom/01-load.html`, thẻ đã nhận từ
+ * `dom/06-click.html`, hộp thưởng từ `dom/03-click.html`. Ba điều fixture này cố ý giữ:
+ *
+ *   • **Hai rương cho HAI tiêu đề hộp khác nhau** —「Nhận Thưởng Thành Công!」(mốc 75%) và
+ *     「Hoàn Thành Xuất Sắc!」(mốc 100%), đọc được ở video 00:56 và 01:04. Đây là thứ chặn một
+ *     phép kiểm đi so tiêu đề: rương thứ hai sẽ bị khai là hỏng.
+ *   • **Trang dùng CHUNG một hộp cho cả tin mừng lẫn tin dữ**, phân biệt bằng class `.nv-err`
+ *     (CSS của trang khai đủ `.nv-err`/`.nv-warn`) — nên fixture bật/tắt được bằng `refuse`.
+ *   • **Nút đi qua「Đang xử lý...」rồi mới bị GỠ**, và thẻ đổi sang `.claimed` ngay lúc AJAX về
+ *     (bản ghi: nút biến mất ở cùng nhịp hộp hiện ra, chứ không đợi bấm Đóng).
+ *
+ * Chữ trong `.nv-locked-txt` là chỗ DUY NHẤT không có trong bản ghi — hôm ấy cả hai rương đều
+ * đã mở. Class thì có thật (CSS của trang), và script không đọc chữ ấy, chỉ đọc class.
+ */
+const hubPage = (pt) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+<style>
+  #nv-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6)}
+  #nv-modal-overlay.nv-open{display:block}
+  #nv-modal-box{width:320px;margin:80px auto;background:#161a24;padding:20px}
+</style>
+${FREE_HUB_ROWS}
+<div class="nv-overview"><div class="nv-ring-wrap"><div class="nv-ring-label${pt.ring === "100%" ? " full" : ""}">${pt.ring}</div></div></div>
+${pt.section
+    ? `<p class="nv-sec">Phần Thưởng Hoạt Động</p>
+<div class="nv-rewards">${pt.cards
+        .map((card, i) => {
+          const inner = `<div class="nv-rcard-pct">${card.pct}</div>`
+            + `<img id="chest-pt-${i + 1}" class="nv-chest" alt="Rương ${i + 1}">`
+            + `<div class="nv-rcard-items">${card.lines.map((l) => `${l[0]} ${l[1].replace("+", "")} ${l[2]}`).join("<br>")}</div>`;
+          if (card.state === "claimed") {
+            return `<div class="nv-rcard claimed" id="rc${i + 1}">${inner}<div class="nv-claimed-txt">Đã nhận</div></div>`;
+          }
+          if (card.state === "locked") {
+            return `<div class="nv-rcard locked" id="rc${i + 1}">${inner}<div class="nv-locked-txt">Chưa đạt mốc</div></div>`;
+          }
+          return `<div class="nv-rcard unlocked" id="rc${i + 1}">${inner}<button class="nv-claim-btn" id="btn${i + 1}">Nhận Thưởng</button></div>`;
+        })
+        .join("")}</div>`
+    : ""}
+<div id="nv-modal-overlay" class=""><div id="nv-modal-box"><div id="nv-modal-bar"></div><div id="nv-modal-inner">
+  <div id="nv-modal-icon">🎁</div><h3 id="nv-modal-title"></h3><div id="nv-modal-body"></div>
+  <button id="nv-modal-btn">Đóng</button>
+</div></div></div>
+<script>
+const PT = ${JSON.stringify({ cards: pt.cards, refuse: pt.refuse })};
+const overlay = document.getElementById('nv-modal-overlay');
+const openModal = (kind, title, lines) => {
+  overlay.className = 'nv-open' + (kind ? ' ' + kind : '');
+  document.getElementById('nv-modal-title').textContent = title;
+  document.getElementById('nv-modal-body').innerHTML = '<div class="nv-reward-lines">' + lines.map((l) =>
+    '<div class="nv-reward-line nv-rl-gold"><span class="nv-rl-icon">' + l[0] + '</span>'
+    + '<span class="nv-rl-text"><span class="nv-rl-val">' + l[1] + '</span>' + l[2] + '</span></div>').join('') + '</div>';
+};
+document.getElementById('nv-modal-btn').onclick = () => { overlay.className = ''; document.body.dataset.closed = String((Number(document.body.dataset.closed) || 0) + 1); };
+for (const [i, card] of PT.cards.entries()) {
+  const btn = document.getElementById('btn' + (i + 1));
+  if (!btn) continue;
+  btn.onclick = () => {
+    btn.disabled = true; btn.textContent = 'Đang xử lý...';
+    fetch('/pt-claim?stage=' + (i + 1));
+    setTimeout(() => {
+      if (PT.refuse) {
+        btn.disabled = false; btn.textContent = 'Nhận Thưởng';
+        openModal('nv-err', 'Chưa đủ điều kiện nhận rương này', []);
+        return;
+      }
+      const rc = document.getElementById('rc' + (i + 1));
+      rc.className = 'nv-rcard claimed';
+      btn.remove();
+      const done = document.createElement('div');
+      done.className = 'nv-claimed-txt'; done.textContent = 'Đã nhận';
+      rc.appendChild(done);
+      openModal('', card.title, card.lines);
+    }, 60);
+  };
+}
+</script>`;
 
 const FREE_WELFARE_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div id="countdown-timer">00:00</div>
@@ -1542,8 +1621,16 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // `body.jvz-km-host-go` (cú AJAX vẽ lại sổ và cuốn mất `.jvz-km-doat` — cái chờ sẽ bị bỏ
     // qua đúng ở ca thành công), và câu「không thành」nay kéo theo 120 ký tự đầu của thứ trang
     // vừa trả lời, để lần sau site đổi lời văn thì nhật ký tự khai thay vì than câm.
-    "hồ sơ đang ở schema 65",
-    loadProfileForSchema().schemaVersion === 65,
+    // 66 = thêm nhiệm vụ Phần Thưởng Hoạt Động, hai twin VIP/thường dùng chung một script
+    // (bản ghi phan-thuong-hoat-dong-20260817-022120). Hai rương mốc 75%/100% nằm ở THÂN
+    // trang nhiệm vụ ngày, không phải nút quick-click, nên không có selector nào phụ thuộc
+    // hạng. Order 99: sau BỐN nhiệm vụ đếm tiến độ (Vấn Đáp là cái cuối, order 90) nhưng
+    // trước Khoáng Mạch/Luyện Đan/Mê Cung — mọi thứ trong「Hoạt Động Khác」không cộng vào %,
+    // nên xếp nó sau Mê Cung chỉ tổ bắt hai cú bấm xếp hàng sau 35 phút. Ngả duy nhất
+    // vào sổ ngày là「cả hai thẻ đều .claimed」; còn khoá thì 30 phút, không thấy mục thì 60
+    // phút — hai cảnh ấy mà nhớ thành「hết ngày」là khoá mất đúng cái rương sắp mở.
+    "hồ sơ đang ở schema 66",
+    loadProfileForSchema().schemaVersion === 66,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -1995,6 +2082,31 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     tuVi: 0, tuViCap: 600, tinhThach: 0, tinhThachCap: 200, bought: [], hideBonus: false, hideStats: false,
   });
   let kmState = kmFresh();
+
+  // Phần Thưởng Hoạt Động — hai rương mốc 75%/100% trên hub. Món thưởng chép từ bản ghi
+  // 17/08 (thẻ liệt kê 30 Cống Hiến, nhưng AJAX trả về +51 — fixture theo AJAX, vì đó là con
+  // số người chơi thật sự nhận và cũng là thứ hộp thưởng in ra).
+  const ptFresh = () => ({
+    ring: "100%",
+    section: true,
+    refuse: false,
+    claims: [],
+    cards: [
+      {
+        pct: "Mốc 75%",
+        state: "unlocked",
+        title: "Nhận Thưởng Thành Công!",
+        lines: [["✨", "+100", "Tu Vi"], ["💎", "+60", "Tiên Ngọc"], ["📜", "+2", "Lượt Khắc Trận Văn"], ["☯️", "+10", "Thiên Cơ Lệnh"]],
+      },
+      {
+        pct: "Mốc 100%",
+        state: "unlocked",
+        title: "Hoàn Thành Xuất Sắc!",
+        lines: [["🏅", "+51", "Cống Hiến Tông Môn"], ["🎡", "+1", "Lượt Vòng Quay Phúc Vận"], ["📜", "+1", "Lượt Khắc Trận Văn"], ["☯️", "+1", "Thiên Cơ Lệnh"]],
+      },
+    ],
+  });
+  let ptState = ptFresh();
   /** Trang Điểm Danh trả về trạng thái đã-điểm-danh — bật cho ca sổ đủ lượt ở cuối tệp. */
   let checkInDone = false;
 
@@ -2119,7 +2231,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       return void res.end(flakyPage(flakyVisits >= flakyAppearsOnVisit));
     }
     if (path === "/diem-danh") res.end(checkInDone ? FREE_CHECKIN_DONE_PAGE : FREE_CHECKIN_PAGE);
-    else if (path === "/nhiem-vu-hang-ngay") res.end(FREE_HUB_PAGE);
+    else if (path === "/nhiem-vu-hang-ngay") res.end(hubPage(ptState));
+    else if (path === "/pt-claim") { ptState.claims.push(url.searchParams.get("stage") ?? "?"); res.end("ok"); }
     else if (path === "/phuc-loi-duong") res.end(FREE_WELFARE_PAGE);
     else if (path === "/vong-quay-phuc-van") res.end(FREE_WHEEL_PAGE);
     else if (path === "/thi-luyen-tong-mon-hh3d") res.end(FREE_TRIAL_PAGE);
@@ -2569,6 +2682,110 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       kmBuyHold.outcome === "onCooldown" && kmBuyHold.cooldownSeconds === 10 * 60 &&
         kmState.bought.length === 0 && kmState.claims === 0,
       `${kmBuyHold.outcome}; bought=${kmState.bought.length}; claims=${kmState.claims}`,
+    );
+
+    console.log("\nPhần Thưởng Hoạt Động — hai rương mốc 75%/100% trên hub (bản ghi 17/08)");
+
+    const ptQuest = exportedProfile.quests.find((q) => q.id === "phan-thuong-hoat-dong");
+    const ptFree = exportedProfile.quests.find((q) => q.id === "phan-thuong-hoat-dong-thuong");
+    const ptBody = (attr) => page.locator("body").getAttribute(attr);
+
+    // Cảnh của chính bản ghi: cả hai rương đang mở. Một lượt ghé phải ăn TRỌN cả hai — mỗi
+    // rương một cú bấm, một hộp, một cú Đóng — rồi hẹn giờ dài, KHÔNG phải alreadyDone: lượt
+    // này vừa làm việc, và cái sổ ngày chỉ được đóng bởi lượt ghé sau nó.
+    ptState = ptFresh();
+    const pt2 = await run(ptQuest);
+    check(
+      "hai rương đang mở → nhận CẢ HAI trong một lượt, đóng đủ hai hộp",
+      pt2.outcome === "completed" && ptState.claims.join() === "1,2" && (await ptBody("data-closed")) === "2",
+      `${pt2.outcome}; claims=${ptState.claims.join()}; closed=${await ptBody("data-closed")}`,
+    );
+    // `completed` chứ không `onCooldown`, và đó là ranh giới của đuôi script (giống Khoáng
+    // Mạch): lượt NÀO có nhận rương thì cắm cờ jvz-pt-acted và đi thẳng qua stopIf cuối. Chỉ
+    // lượt tay trắng mới thành onCooldown. Sổ ngày thì cả hai đều không đóng.
+    check(
+      "…hẹn 4 giờ (đã hết rương), chưa vào sổ ngày vì lượt này CÓ làm việc",
+      pt2.cooldownSeconds === 4 * 3600 && pt2.outcome !== "alreadyDone" && pt2.dailyCapReached !== true,
+      `${pt2.outcome}: ${pt2.cooldownSeconds}s`,
+    );
+    // Hai tiêu đề hộp KHÁC NHAU (video 00:56 / 01:04). Một phép kiểm đi so tiêu đề sẽ khai
+    // rương thứ hai là hỏng — đây là ca giữ cho nó không bao giờ được viết như vậy.
+    check(
+      "…nhật ký kể đúng món của TỪNG rương, kể cả rương có tiêu đề khác hẳn",
+      infos.some((m) => m.includes("Nhận Thưởng Thành Công!") && m.includes("+100 Tu Vi")) &&
+        infos.some((m) => m.includes("Hoàn Thành Xuất Sắc!") && m.includes("+51 Cống Hiến Tông Môn")),
+      infos.filter((m) => m.includes("Thiên Cơ Lệnh")).join(" / ") || "(không có dòng nào)",
+    );
+
+    // Ghé lại khi cả hai đã nhận: ĐÂY mới là ngả vào sổ ngày — alreadyDone + dailyCapReached,
+    // và tuyệt đối không bấm gì.
+    ptState = ptFresh();
+    for (const c of ptState.cards) c.state = "claimed";
+    const ptDone = await run(ptQuest);
+    check(
+      "cả hai rương đã nhận → alreadyDone, không bấm cú nào",
+      ptDone.outcome === "alreadyDone" && ptDone.dailyCapReached === true && ptState.claims.length === 0,
+      `${ptDone.outcome}; capReached=${ptDone.dailyCapReached}; claims=${ptState.claims.length}`,
+    );
+
+    // Rương 100% chưa tới mốc: nhận cái đang mở rồi hẹn 30 phút — KHÔNG được nhớ là "hết ngày",
+    // vì mốc sau còn mở ra khi các nhiệm vụ khác chạy tiếp (lời dặn của tông chủ 17/08).
+    ptState = ptFresh();
+    ptState.cards[1].state = "locked";
+    ptState.ring = "75%";
+    const ptLocked = await run(ptQuest);
+    check(
+      "một rương còn khoá → nhận rương đang mở, hẹn 30 phút, KHÔNG vào sổ ngày",
+      ptLocked.outcome === "completed" && ptLocked.cooldownSeconds === 30 * 60 &&
+        ptState.claims.join() === "1" && ptLocked.dailyCapReached !== true,
+      `${ptLocked.outcome}: ${ptLocked.cooldownSeconds}s; claims=${ptState.claims.join()}`,
+    );
+    check(
+      "…và nói rõ đang ở mốc nào, còn thiếu rương nào",
+      infos.some((m) => m.includes("Hoạt động mới 75%") && m.includes("Mốc 100%")),
+      infos.filter((m) => m.includes("chưa mở")).join(" / ") || "(không có dòng nào)",
+    );
+
+    // Hub KHÔNG có mục này (nỗi lo của hạng thường: bản ghi là tài khoản VIP). Phải là một lượt
+    // hẹn giờ có lời giải thích, không phải quest đỏ, và tuyệt đối không phải alreadyDone —
+    // một mục vắng mặt có thể chỉ là trang dựng thiếu, mà alreadyDone là khoá cả ngày.
+    ptState = ptFresh();
+    ptState.section = false;
+    const ptNone = await run(ptQuest);
+    check(
+      "hub không có mục Phần Thưởng Hoạt Động → hẹn 60 phút, không đỏ, không khoá cả ngày",
+      ptNone.outcome === "onCooldown" && ptNone.cooldownSeconds === 60 * 60 && ptNone.dailyCapReached !== true,
+      `${ptNone.outcome}: ${ptNone.cooldownSeconds}s`,
+    );
+    check(
+      "…và nói thẳng là không thấy mục ấy trên trang",
+      infos.some((m) => m.includes("Không thấy mục Phần Thưởng Hoạt Động")),
+    );
+
+    // Trang TỪ CHỐI (hộp .nv-err): đúng MỘT cú bấm cho mỗi rương, không bấm lại vào cánh cửa
+    // vừa đóng sập. Không có dấu jvz-pt-refused thì vòng lặp bấm đủ bốn lần.
+    ptState = ptFresh();
+    ptState.refuse = true;
+    const ptRefuse = await run(ptQuest);
+    check(
+      "trang trả hộp lỗi → mỗi rương thử ĐÚNG MỘT lần rồi thôi (không bấm lại), hẹn 30 phút",
+      ptState.claims.join() === "1,2" && ptRefuse.outcome === "onCooldown" &&
+        ptRefuse.cooldownSeconds === 30 * 60,
+      `${ptRefuse.outcome}: ${ptRefuse.cooldownSeconds}s; claims=${ptState.claims.join()}`,
+    );
+    check(
+      "…và nhật ký nói rõ trang đã từ chối, kèm câu của trang",
+      infos.some((m) => m.includes("TỪ CHỐI") && m.includes("Chưa đủ điều kiện")),
+      infos.filter((m) => m.includes("TỪ CHỐI")).join(" / ") || "(không có dòng nào)",
+    );
+
+    // Twin thường dùng CHUNG script — chạy trọn một lượt để nó không chỉ tồn tại trên giấy.
+    ptState = ptFresh();
+    const ptF = await run(ptFree);
+    check(
+      "twin thường: cùng flow, cùng nhận đủ hai rương",
+      ptF.outcome === "completed" && ptState.claims.join() === "1,2",
+      `${ptF.outcome}; claims=${ptState.claims.join()}`,
     );
 
     console.log("\nKhoáng Mạch — cấu hình sai tên mỏ phải LỘ, không âm thầm đào mỏ khác");

@@ -215,6 +215,12 @@ export const configSchema = z.object({
        * thường (recording 05/08); mỗi lời chúc tốn 30 Tiên Ngọc nên form nói rõ giá.
        */
       hySuDuong: simpleQuest,
+      /**
+       * Phần Thưởng Hoạt Động — hai rương mốc 75%/100% trên trang nhiệm vụ ngày (schema 66,
+       * bản ghi phan-thuong-hoat-dong-20260817-022120). MỘT công tắc cho cả hai hạng: hai
+       * twin dùng chung một script và chung một tên trong hồ sơ, y như Điểm Danh hay Hoang Vực.
+       */
+      phanThuongHoatDong: simpleQuest,
       /** Bản cho hạng VIP — twin `luyen-dan-duong` của hồ sơ. */
       luyenDan: luyenDanQuest,
       /** Bản cho hạng thường — twin `luyen-dan-duong-thuong`. Xem chú thích ở luyenDanQuest. */

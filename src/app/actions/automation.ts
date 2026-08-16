@@ -161,6 +161,7 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
       vongQuay: simple("vongQuay"),
       vanDap: simple("vanDap"),
       hySuDuong: simple("hySuDuong"),
+      phanThuongHoatDong: simple("phanThuongHoatDong"),
       // Hai bản Khoáng Mạch — cùng phép tách tab VIP/Thường như Luyện Đan Đường ngay trên.
       khoangMach: {
         enabled: formData.get("khoangMachEnabled") === "on",

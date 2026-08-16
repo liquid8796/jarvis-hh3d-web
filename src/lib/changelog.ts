@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.0",
+    date: "2026-08-17",
+    lines: [
+      "Thêm nhiệm vụ Phần Thưởng Hoạt Động: tự mở hai rương mốc 75% và 100% trên trang nhiệm vụ ngày, có cho cả tài khoản thường lẫn VIP.",
+      "Rương chưa tới mốc thì ghé lại sau nửa giờ; nhận hết cả hai rồi thì nghỉ tới hôm sau.",
+      "Nhiệm vụ chạy sau các nhiệm vụ ngày khác, vì chính chúng là thứ đẩy tiến độ lên đủ mốc.",
+    ],
+  },
+  {
     version: "1.2.1",
     date: "2026-08-17",
     lines: [

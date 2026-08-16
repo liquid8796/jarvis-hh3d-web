@@ -6,6 +6,31 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
 
   /**
+   * Server Actions đi qua vỏ proxy Vercel PHẢI được khai host ở đây — không phải tuỳ chọn.
+   *
+   * Từ 16/08/2026 trình duyệt đứng ở `auto-hh3d*.vercel.app` còn app đứng sau Caddy trên VM,
+   * nên lớp chống CSRF của Next so `origin` (vercel.app) với `x-forwarded-host` (sslip.io)
+   * và huỷ MỌI action với「Invalid Server Actions request」— đo 16/08/2026: đăng nhập chết
+   * trắng trang, journal ghi đúng câu ấy. GET không sao (không có lớp so này), nên mọi phép
+   * probe chỉ đọc trang đều xanh trong khi form nào cũng hỏng.
+   *
+   * Danh sách ĐÍCH DANH chứ không phải `*.vercel.app`: wildcard là mở cửa CSRF cho mọi
+   * deployment vercel.app trên đời đổi lấy việc đỡ một dòng khi thêm trạm.
+   */
+  experimental: {
+    serverActions: {
+      allowedOrigins: [
+        "auto-hh3d.vercel.app",
+        "auto-hh3d-1.vercel.app",
+        "auto-hh3d-2.vercel.app",
+        "auto-hh3d-3.vercel.app",
+        "auto-hh3d-4.vercel.app",
+        "92.5.130.32.sslip.io",
+      ],
+    },
+  },
+
+  /**
    * Hai script cài khôi lỗi PHẢI được khai là UTF-8 — không phải chuyện thẩm mỹ.
    *
    * Next phục vụ tệp trong public/ với `application/octet-stream`, KHÔNG kèm charset. Mà

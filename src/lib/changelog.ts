@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "0.98.0",
+    date: "2026-08-16",
+    lines: [
+      "Thông báo tông môn nay gửi được cho cả người CHƯA đăng nhập — chọn「Khách chưa đăng nhập」khi phát.",
+      "Lời nhắn ấy hiện với bất kỳ ai mở trang, và tắt hẳn sau khi họ bấm「Đã hiểu」.",
+      "Khác thông báo cho môn đồ: nó hiện ở lần tải trang kế tiếp, không bật lên tức thì.",
+    ],
+  },
+  {
     version: "0.97.0",
     date: "2026-08-15",
     lines: [

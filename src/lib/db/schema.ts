@@ -516,7 +516,7 @@ export const notices = pgTable(
      * Một đường ghi mới quên validate thì database từ chối, thay vì để một `audience_kind`
      * lạ nằm im trong bảng cho tới ngày phép đọc gặp nó và không biết trả về gì.
      */
-    check("notices_audience_kind_check", sql`${t.audienceKind} in ('all', 'roles', 'users')`),
+    check("notices_audience_kind_check", sql`${t.audienceKind} in ('all', 'roles', 'users', 'guests')`),
   ],
 );
 

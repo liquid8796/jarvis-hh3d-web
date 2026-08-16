@@ -54,6 +54,9 @@ export function BroadcastPanel({ recipients }: { recipients: PublicUser[] }) {
    * sau khi bấm.
    */
   const willReach = useMemo(() => {
+    // `null` = KHÔNG ĐẾM ĐƯỢC, khác hẳn 0 = đếm rồi và không có ai. Khách vãng lai không có
+    // dòng nào trong sổ để mà đếm — xem `countRecipients` phía server, nơi luật này là gốc.
+    if (audienceKind === "guests") return null;
     if (audienceKind === "all") return recipients.length;
     if (audienceKind === "users") return userIds.length;
     return recipients.filter((user) => user.roles.some((role) => roles.includes(role as Role))).length;
@@ -81,6 +84,8 @@ export function BroadcastPanel({ recipients }: { recipients: PublicUser[] }) {
   }, [state]);
 
   const tooLong = body.length > NOTICE_MAX_LENGTH;
+  // `willReach === 0` khoá nút để không ai phát vào một nhóm rỗng. `null` KHÔNG bị khoá: nó
+  // nghĩa là「không đếm được」, mà không đếm được thì không có cớ gì để cấm phát.
   const blocked = pending || body.trim().length === 0 || tooLong || willReach === 0;
 
   return (
@@ -88,9 +93,17 @@ export function BroadcastPanel({ recipients }: { recipients: PublicUser[] }) {
       action={action}
       className="card card-hairline p-6"
       onSubmit={(event) => {
-        // Hỏi lại đúng MỘT ca: gửi cho cả tông môn. Hai phạm vi kia đã là một lượt chọn có ý
-        // thức (tick từng vai, tick từng người), còn「cả tông môn」thì chỉ cách một cú bấm.
-        if (audienceKind === "all" && !window.confirm(`Phát thông báo này tới TẤT CẢ ${recipients.length} đạo hữu đang hoạt động?`)) {
+        // Hỏi lại ở HAI ca, và cả hai vì cùng một lẽ: chúng là phạm vi RỘNG chỉ cách một cú bấm,
+        // trong khi hai phạm vi kia đã đòi một lượt chọn có ý thức (tick từng vai, tick từng
+        // người).「Khách chưa đăng nhập」còn rộng hơn cả tông môn — nó hiện cho bất kỳ ai mở
+        // trang, kể cả người chưa từng là môn đồ — nên câu hỏi phải nói đúng điều ấy.
+        const hoi =
+          audienceKind === "all"
+            ? `Phát thông báo này tới TẤT CẢ ${recipients.length} đạo hữu đang hoạt động?`
+            : audienceKind === "guests"
+              ? "Phát cho KHÁCH CHƯA ĐĂNG NHẬP? Lời nhắn sẽ hiện với bất kỳ ai mở trang, kể cả người lạ."
+              : null;
+        if (hoi !== null && !window.confirm(hoi)) {
           event.preventDefault();
         }
       }}
@@ -204,9 +217,11 @@ export function BroadcastPanel({ recipients }: { recipients: PublicUser[] }) {
           {pending ? "Đang phát…" : "Phát thông báo"}
         </button>
         <span className="text-xs text-[var(--color-mist)]">
-          {willReach === 0
-            ? "Chưa chọn ai — nút Phát đang khoá."
-            : `Sẽ tới ${willReach} đạo hữu đang hoạt động.`}
+          {willReach === null
+            ? `Khách vãng lai — không đếm được bao nhiêu người. Popup hiện ở lần tải trang kế tiếp của họ, KHÔNG tức thì.`
+            : willReach === 0
+              ? "Chưa chọn ai — nút Phát đang khoá."
+              : `Sẽ tới ${willReach} đạo hữu đang hoạt động.`}
         </span>
       </div>
 

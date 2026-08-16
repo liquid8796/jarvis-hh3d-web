@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { pingNoticeChannel } from "@/lib/realtime/noticeChannel";
-import { NOTICE_WINDOW_DAYS, type NoticeInput } from "@/lib/validation/notices";
+import { audienceIsBroad, NOTICE_WINDOW_DAYS, type NoticeInput } from "@/lib/validation/notices";
 
 /**
  * Thông báo tông môn: phát ra, đọc phần chưa xem, đánh dấu đã xem.
@@ -76,16 +76,67 @@ export async function unseenNotices(userId: string): Promise<NoticeForUser[]> {
 }
 
 /**
+ * Những lời nhắn dành cho KHÁCH CHƯA ĐĂNG NHẬP mà cái trình duyệt này chưa bấm「Đã hiểu」.
+ *
+ * Chỉ HAI điều kiện, và không cái nào giống `unseenNotices`:
+ *   • `audience_kind = 'guests'` — tập rời hẳn với ba kiểu của thành viên, nên không lời nhắn
+ *     nào lọt qua lại giữa hai đường đọc;
+ *   • trong hạn `NOTICE_WINDOW_DAYS`.
+ *
+ * KHÔNG có mệnh đề「phát sau khi người này nhập môn」: khách không có ngày nhập môn. Hệ quả là
+ * một người mở trang lần đầu vẫn thấy mọi lời nhắn cho khách còn trong hạn — đúng ý, vì lời nhắn
+ * cho khách vốn là thứ dán ở cửa chứ không phải thư riêng.
+ *
+ * VÀ KHÔNG CÓ MỆNH ĐỀ「ĐÃ XEM」Ở ĐÂY, có chủ ý: phép lọc ấy làm ở nơi gọi, trên bộ nhớ. Hai lẽ,
+ * lẽ sau mới là lẽ nặng:
+ *   • Danh sách này được ĐỆM dùng chung cho mọi khách (xem `api/notice/route.ts`), nên nó phải
+ *     là bản CHƯA trừ — đệm bản đã lọc là đưa câu trả lời của trình duyệt này cho trình duyệt
+ *     khác.
+ *   • Truyền một mảng uuid vào SQL đòi một phép ép kiểu mảng, và mảng RỖNG (ca thường gặp nhất:
+ *     khách mới toanh) là chỗ các driver hành xử khác nhau. Câu truy vấn trả tối đa 20 dòng, nên
+ *     lọc bằng một `Set` ở ngoài vừa rẻ hơn vừa không có gì để hỏng.
+ */
+export async function guestNotices(): Promise<NoticeForUser[]> {
+  const rows = await db().execute<{
+    id: string;
+    body: string;
+    created_at: string;
+    sender: string | null;
+  }>(sql`
+    select n.id, n.body, n.created_at, u.display_name as sender
+      from notices n
+      left join users u on u.id = n.sent_by
+     where n.audience_kind = 'guests'
+       and n.created_at > now() - make_interval(days => ${NOTICE_WINDOW_DAYS})
+     order by n.created_at asc
+     limit 20
+  `);
+
+  return rows.rows.map((row) => ({
+    id: row.id,
+    body: row.body,
+    createdAt: new Date(row.created_at).toISOString(),
+    sender: row.sender,
+  }));
+}
+
+/**
  * Đếm người sẽ nhận. Chỉ đếm người ĐANG hoạt động: người chờ duyệt và người bị đình quyền
  * không vào được trang nào, nên đếm họ vào là hứa hão với người phát.
  *
- * Ba nhánh viết rời chứ không gộp một câu đa hình: mỗi nhánh đọc ra đúng một câu tiếng Việt,
+ * Bốn nhánh viết rời chứ không gộp một câu đa hình: mỗi nhánh đọc ra đúng một câu tiếng Việt,
  * và không có nhánh nào phải mang theo tham số của nhánh khác.
+ *
+ * `guests` trả `null`, KHÔNG phải `0`, và đó là khác biệt mang nghĩa: `0` là「đã đếm, và không
+ * có ai」— thứ nơi gọi dùng để cảnh báo「chưa ai nhận được」. Số khách vãng lai thì không đếm
+ * được, không phải bằng không. Trả `0` ở đây là biến một lượt phát đúng thành một lời báo hỏng.
  */
 export async function countRecipients(
   audienceKind: NoticeInput["audienceKind"],
   audience: readonly string[],
-): Promise<number> {
+): Promise<number | null> {
+  if (audienceKind === "guests") return null;
+
   if (audienceKind === "all") {
     const rows = await db()
       .select({ id: schema.users.id })
@@ -135,7 +186,7 @@ const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 export async function broadcastNotice(
   input: NoticeInput,
   sentBy: string,
-): Promise<{ id: string; recipients: number }> {
+): Promise<{ id: string; recipients: number | null }> {
   const recipients = await countRecipients(input.audienceKind, input.audience);
 
   const [row] = await db()
@@ -143,7 +194,7 @@ export async function broadcastNotice(
     .values({
       body: input.body,
       audienceKind: input.audienceKind,
-      audience: input.audienceKind === "all" ? [] : [...input.audience],
+      audience: audienceIsBroad(input.audienceKind) ? [] : [...input.audience],
       sentBy,
     })
     .returning({ id: schema.notices.id });

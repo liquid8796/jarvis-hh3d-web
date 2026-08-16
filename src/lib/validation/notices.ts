@@ -9,15 +9,35 @@ import { ASSIGNABLE_ROLES } from "@/lib/auth/permissions";
  * thứ ngoài Internet chạm tới được), và bảng trong database (cột `audience_kind` có check).
  */
 
-/** Ai nhận: cả tông môn, những người mang một trong các vai đã chọn, hoặc đúng những người đã chỉ. */
-export const NOTICE_AUDIENCE_KINDS = ["all", "roles", "users"] as const;
+/**
+ * Ai nhận: cả tông môn, những người mang một trong các vai đã chọn, đúng những người đã chỉ,
+ * hoặc KHÁCH CHƯA ĐĂNG NHẬP.
+ *
+ * `guests` khác hẳn ba kiểu kia ở một điểm quyết định mọi thứ phía dưới: người nhận KHÔNG CÓ
+ * dòng nào trong `users`. Nên nó không đếm được, không ghi được dấu「đã xem」vào `notice_reads`
+ * (cột `user_id` là NOT NULL kèm khoá ngoại), và không dùng chung một câu truy vấn với ba kiểu
+ * kia. Ba hệ quả ấy được xử ở đúng ba chỗ — `countRecipients`, `guestSeen.ts`, `guestNotices` —
+ * chứ không nhét vào một nhánh chung rồi để mỗi nơi tự nhớ.
+ *
+ * Và một điều PHẢI đúng mãi: `unseenNotices` (đường của người đã đăng nhập) liệt kê tường minh
+ * ba kiểu `all`/`users`/`roles`, nên một lời nhắn `guests` KHÔNG BAO GIỜ lọt sang màn hình
+ * thành viên. Đó là phép loại trừ theo DANH SÁCH TRẮNG, không phải theo phép trừ — thêm kiểu
+ * thứ năm sau này cũng vẫn an toàn mà không ai phải nhớ sửa chỗ ấy.
+ */
+export const NOTICE_AUDIENCE_KINDS = ["all", "roles", "users", "guests"] as const;
 export type NoticeAudienceKind = (typeof NOTICE_AUDIENCE_KINDS)[number];
 
 export const NOTICE_AUDIENCE_LABEL: Record<NoticeAudienceKind, string> = {
   all: "Cả tông môn",
   roles: "Theo vai",
   users: "Chọn từng người",
+  guests: "Khách chưa đăng nhập",
 };
+
+/** Kiểu phạm vi KHÔNG kèm danh sách người nhận — `audience` phải rỗng. */
+export function audienceIsBroad(kind: NoticeAudienceKind): boolean {
+  return kind === "all" || kind === "guests";
+}
 
 /**
  * Trần độ dài. 1000 ký tự là một lời nhắn dài — đủ cho một thông báo bảo trì có đầu có đuôi,
@@ -56,7 +76,7 @@ export const noticeInputSchema = z
     audience: z.array(z.string().trim().min(1)).max(500).default([]),
   })
   .superRefine((value, ctx) => {
-    if (value.audienceKind === "all") return;
+    if (audienceIsBroad(value.audienceKind)) return;
     if (value.audience.length === 0) {
       ctx.addIssue({
         code: "custom",

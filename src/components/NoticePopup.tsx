@@ -7,17 +7,21 @@ import { acknowledgeNoticeAction } from "@/app/actions/notices";
  * Popup THÔNG BÁO TÔNG MÔN — hiện ngay lúc bậc trị sự phát, trên bất kỳ trang nào người dùng
  * đang đứng.
  *
- * Gắn ở layout gốc, tức nó có mặt cả ở trang đăng nhập nơi chẳng có ai để mà nhắn. Cách nó
- * biết mà nằm im: hỏi `/api/notice` một lần: 401 thì thôi hẳn, không mở kênh, không hỏi lại.
- * Chọn đường này thay vì để layout (server) tự đọc phiên rồi truyền xuống một cờ, vì lượt đọc
- * ấy tốn thêm MỘT lượt hỏi database cho MỌI trang — kể cả những trang không cần biết người
- * xem là ai. Cái giá đổi lại: khách vãng lai tốn đúng một request 401 mỗi lần tải trang.
+ * Gắn ở layout gốc, tức nó có mặt trên MỌI trang — kể cả trang đăng nhập, nơi người xem có thể
+ * là khách vãng lai. Từ 16/08/2026 khách cũng nhận được lời nhắn (phạm vi「khách chưa đăng
+ * nhập」), nên chỗ này không còn nằm im với họ nữa.
  *
  * Hai nguồn tin, cố ý:
  *   • một lượt `fetch` lúc mở trang — đường CHẮC CHẮN, vớt lại lời nhắn phát lúc mình offline;
  *   • rồi `EventSource` — đường NHANH, cho đúng cái "ngay tại thời điểm phát".
  * Kênh chết thì tính năng chỉ mất độ tức thì. Trình duyệt tự nối lại EventSource (`retry` do
  * server gửi), nên ở đây không có vòng thử lại tự viết nào cả.
+ *
+ * NHƯNG KÊNH NHANH CHỈ DÀNH CHO THÀNH VIÊN, và server là nơi phán điều đó — cờ `live` trong hồi
+ * đáp của `/api/notice`. Lý do nằm ở phía server: mỗi kênh SSE giữ một session Postgres cho
+ * `LISTEN`, mà số tab của khách thì không có trần nào (mỗi bot, mỗi người lạ là một kết nối).
+ * Đọc cờ từ server thay vì tự đoán ở đây là để luật ấy có ĐÚNG MỘT chỗ — client không được phép
+ * tự quyết mình có đáng một kết nối database hay không.
  */
 
 /** Hàng đợi lời nhắn: hiện từng cái một, cũ nhất trước — đúng thứ tự server trả về. */
@@ -42,13 +46,14 @@ export function NoticePopup() {
     });
   }, []);
 
+  /** `true` khi server nói người xem này ĐƯỢC mở kênh nhanh — xem khối bình chú đầu tệp. */
   const load = useCallback(async (): Promise<boolean> => {
     try {
       const response = await fetch("/api/notice", { cache: "no-store" });
       if (!response.ok) return false;
-      const data = (await response.json()) as { notices?: Notice[] };
+      const data = (await response.json()) as { notices?: Notice[]; live?: boolean };
       merge(Array.isArray(data.notices) ? data.notices : []);
-      return true;
+      return data.live === true;
     } catch {
       // Mạng chớp: im lặng: kênh SSE hoặc lượt tải trang sau sẽ bù. Một popup báo "không tải
       // được thông báo" là tự biến mình thành cái phiền toái mà nó sinh ra để tránh.
@@ -61,8 +66,9 @@ export function NoticePopup() {
     let source: EventSource | null = null;
 
     void load().then((allowed) => {
-      // 401 = khách vãng lai. Không mở kênh, và cũng không thử lại: trang đăng nhập không có
-      // lý do gì giữ một kết nối SSE.
+      // Không được mở kênh = khách vãng lai (hoặc lượt hỏi vừa hỏng). Lời nhắn vẫn tới tay họ
+      // qua chính lượt `fetch` vừa rồi và qua lượt hỏi mỗi khi quay lại tab — chỉ là không tức
+      // thì. Đây là chỗ giữ cho số kết nối `LISTEN` có trần bằng số thành viên.
       if (!alive || !allowed) return;
 
       source = new EventSource("/api/notice/stream");

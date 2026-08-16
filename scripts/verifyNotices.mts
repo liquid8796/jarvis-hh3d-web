@@ -19,9 +19,16 @@ import { loadEnv } from "./loadEnv.mjs";
 import {
   broadcastNotice,
   countRecipients,
+  guestNotices,
   markNoticeSeen,
   unseenNotices,
 } from "../src/lib/services/notices";
+import {
+  addGuestSeen,
+  parseGuestSeen,
+  serializeGuestSeen,
+  GUEST_SEEN_MAX,
+} from "../src/lib/validation/guestSeen";
 
 loadEnv();
 
@@ -152,6 +159,65 @@ async function main() {
     beforeAlice === aliceNow.length - aliceExpected.size && beforeBob === bobNow.length - bobExpected.size,
     `alice ${beforeAlice}→${aliceNow.length}, bob ${beforeBob}→${bobNow.length}`,
   );
+
+  // ---- 7. Phạm vi KHÁCH CHƯA ĐĂNG NHẬP ----------------------------------------------------
+  //
+  // Hai chiều rò rỉ, và cả hai đều im lặng khi hỏng: lời nhắn cho khách lọt vào popup của thành
+  // viên, hoặc lời nhắn nội bộ của tông môn lọt ra cho người lạ đọc. Chiều sau mới là chiều
+  // đắt — nó là một lượt rò rỉ ra ngoài Internet, không phải một cái popup thừa.
+  const toGuests = await broadcastNotice(
+    { body: `${TAG} gửi khách`, audienceKind: "guests", audience: [] },
+    alice.id,
+  );
+
+  check(
+    "đếm người cho phạm vi khách trả null, KHÔNG phải 0",
+    toGuests.recipients === null && (await countRecipients("guests", [])) === null,
+    `nhận ${JSON.stringify(toGuests.recipients)}`,
+  );
+
+  const forGuests = await guestNotices();
+  check("khách thấy lời nhắn dành cho khách", forGuests.some((n) => n.id === toGuests.id));
+
+  // Chiều 1: thành viên KHÔNG thấy lời nhắn của khách.
+  const aliceAfterGuest = await unseenNotices(alice.id);
+  const bobAfterGuest = await unseenNotices(bob.id);
+  check(
+    "lời nhắn cho khách KHÔNG lọt vào popup của thành viên",
+    !aliceAfterGuest.some((n) => n.id === toGuests.id) && !bobAfterGuest.some((n) => n.id === toGuests.id),
+  );
+
+  // Chiều 2: người lạ KHÔNG đọc được lời nhắn nội bộ — kể cả cái gửi「cả tông môn」.
+  check(
+    "khách KHÔNG đọc được lời nhắn của tông môn (kể cả phạm vi「cả tông môn」)",
+    !forGuests.some((n) => n.id === toAll.id) &&
+      !forGuests.some((n) => n.id === byRole.id) &&
+      !forGuests.some((n) => n.id === direct.id),
+  );
+
+  // ---- 8. Dấu「đã xem」của khách: thuần, và là thứ thay cho notice_reads -------------------
+  {
+    const A = "11111111-1111-4111-8111-111111111111";
+    const B = "22222222-2222-4222-8222-222222222222";
+
+    check("cookie rỗng → chưa xem gì", parseGuestSeen("").length === 0 && parseGuestSeen(undefined).length === 0);
+    check("đọc lại đúng thứ đã ghi", parseGuestSeen(serializeGuestSeen([A, B])).join(",") === `${A},${B}`);
+    check("mới nhất đứng đầu", addGuestSeen([A], B).join(",") === `${B},${A}`);
+    check("bấm lại cùng một lời nhắn không đẻ thêm dòng", addGuestSeen([A], A).length === 1);
+
+    // Cookie là thứ ngoài Internet gõ vào được, và mấy id này đi thẳng vào một cột uuid.
+    check("chuỗi rác trong cookie bị vứt, không ném", parseGuestSeen("khong-phai-uuid,,;drop table").length === 0);
+    check("id rác không vào được danh sách", addGuestSeen([A], "'; drop table notices; --").join(",") === A);
+
+    const qua = Array.from({ length: GUEST_SEEN_MAX + 5 }, (_, i) =>
+      `${String(i).padStart(8, "0")}-0000-4000-8000-000000000000`,
+    );
+    check("danh sách bị cắt về đúng trần", parseGuestSeen(qua.join(",")).length === GUEST_SEEN_MAX);
+    check(
+      "và phép thêm cũng cắt, giữ cái mới nhất",
+      addGuestSeen(qua, B).length === GUEST_SEEN_MAX && addGuestSeen(qua, B)[0] === B,
+    );
+  }
 }
 
 async function cleanup() {

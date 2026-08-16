@@ -7,6 +7,7 @@ import { neon } from "@neondatabase/serverless";
 import { requireAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
 import { encryptSecret, decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
+import { backendIsStation } from "@/lib/mirror/switchGuard";
 import { resolveMongoDbName } from "@/lib/mongo/dbName";
 import { getAppSettings, saveAppSettings, type AppSettings } from "@/lib/services/settings";
 import { fetchVercelUsage, type VercelUsage } from "@/lib/services/vercelUsage";
@@ -282,8 +283,17 @@ export async function registerSelfAction(): Promise<MirrorResult> {
   await requireSiteSwitch();
 
   const siteId = (process.env.SITE_ID ?? "").trim();
-  if (!siteId) {
-    return { ok: false, message: "Trạm này chưa khai SITE_ID — đặt biến ấy trên Vercel rồi deploy lại đã." };
+  if (!backendIsStation(siteId)) {
+    // Lời khuyên cũ ở đây là「đặt SITE_ID trên Vercel rồi deploy lại」— đúng khi mỗi trạm là một
+    // bản đầy đủ, NGUY HIỂM từ 16/08/2026: xem khối bình chú của `backendIsStation`. Nơi này tự
+    // khai vào sổ cũng không có nghĩa gì, vì sổ là danh mục các TRẠM, còn nó là backend.
+    return {
+      ok: false,
+      message:
+        "Nơi này là backend trên VM, không phải một trạm — không có gì để tự khai vào sổ. " +
+        "ĐỪNG đặt SITE_ID cho nó: việc ấy lên đạn lại lượt chuyển trạm và tầng chuyển hướng, cả hai " +
+        "đều đã hết đích.",
+    };
   }
   const pg = (process.env.DATABASE_URL ?? "").trim();
   const mongo = (process.env.MONGODB_URI ?? "").trim();

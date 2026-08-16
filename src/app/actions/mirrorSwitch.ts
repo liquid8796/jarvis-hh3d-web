@@ -26,7 +26,7 @@ import {
 } from "@/lib/mirror/pgSync";
 import { syncMongo } from "@/lib/mirror/mongoSync";
 import { resetPromotedStation } from "@/lib/mirror/promote";
-import { canFlip, canSwitch } from "@/lib/mirror/switchGuard";
+import { backendIsStation, canFlip, canSwitch } from "@/lib/mirror/switchGuard";
 
 /**
  * Máy trạng thái chuyển trạm — deploy/mirror/README.md §6.
@@ -57,8 +57,16 @@ export type SwitchView = {
   tableIndex: number;
   tableCount: number;
   drain: { running: number; queued: number };
-  /** SITE_ID của chính trạm đang phục vụ trang này. Rỗng nếu deploy chưa khai. */
+  /** SITE_ID của chính trạm đang phục vụ trang này. Rỗng khi đây là backend trên VM. */
   currentSiteId: string;
+  /**
+   * Nơi phục vụ trang này CÓ PHẢI một trạm trong vòng xoay không — xem `backendIsStation`.
+   *
+   * SERVER phán, client không tự đoán: cùng một luật với cờ `live` của popup thông báo. Giao
+   * diện đọc cờ này TRƯỚC `isActiveSite`, vì hai câu hỏi khác nhau và câu「trạm này không phải
+   * trạm đang hoạt động」chỉ có nghĩa khi nơi đây THẬT SỰ là một trạm.
+   */
+  backendIsStation: boolean;
   /** Trạm này CÓ PHẢI trạm đang hoạt động không — chỉ nó mới được phát lệnh chuyển. */
   isActiveSite: boolean;
   /** Sổ đã có entry cho chính trạm này chưa. Thiếu là cụt đường về sau khi chuyển đi. */
@@ -92,12 +100,25 @@ async function persist(settings: AppSettings): Promise<void> {
  *
  * Bảng chưa init (doc = null) thì coi như trạm này đang hoạt động: lúc ấy chưa có khái niệm
  * "trạm khác", và fail-open là luật nền của cả tầng điều phối.
+ *
+ * NHƯNG FAIL-OPEN ẤY CHỈ ÁP CHO MỘT TRẠM THẬT. Backend trên VM không mang SITE_ID, và nếu bảng
+ * điều phối có ngày không đọc được (bucket nghẽn, chìa xoay) thì nhánh `!doc` sẽ phát ra
+ * `isActive: true` — mở khoá nút「Bắt đầu chuyển」ngay trên chính nơi mà lượt chuyển sẽ chép
+ * database SỐNG đè lên một Neon đã nghỉ. `backendIsStation` đứng trước, nên một lượt đọc bảng
+ * hỏng không bao giờ trở thành một cú bấm mất dữ liệu.
  */
-async function activeSiteCheck(): Promise<{ currentSiteId: string; isActive: boolean; activeSiteId: string }> {
+async function activeSiteCheck(): Promise<{
+  currentSiteId: string;
+  isStation: boolean;
+  isActive: boolean;
+  activeSiteId: string;
+}> {
   const currentSiteId = (process.env.SITE_ID ?? "").trim();
+  const isStation = backendIsStation(currentSiteId);
+  if (!isStation) return { currentSiteId, isStation, isActive: false, activeSiteId: "" };
   const doc = await readControlDoc();
-  if (!doc) return { currentSiteId, isActive: true, activeSiteId: "" };
-  return { currentSiteId, isActive: doc.activeSiteId === currentSiteId, activeSiteId: doc.activeSiteId };
+  if (!doc) return { currentSiteId, isStation, isActive: true, activeSiteId: "" };
+  return { currentSiteId, isStation, isActive: doc.activeSiteId === currentSiteId, activeSiteId: doc.activeSiteId };
 }
 
 function mirrorOf(settings: AppSettings, id: string) {
@@ -123,6 +144,7 @@ export async function switchStateForAdmin(): Promise<SwitchView> {
     tableCount: SYNC_TABLE_ORDER.length,
     drain: await countJobsForDrain(),
     currentSiteId: site.currentSiteId,
+    backendIsStation: site.isStation,
     isActiveSite: site.isActive,
     selfInBook: site.currentSiteId !== "" && settings.mirrors.some((m) => m.id === site.currentSiteId),
   };
@@ -213,6 +235,18 @@ export async function stepSwitchAction(): Promise<SwitchResult> {
   // Kiểm lại MỖI NHỊP, không chỉ lúc mở lượt: mỗi nhịp là một request riêng, và giữa hai nhịp
   // thì bảng điều phối có thể đã bị lật bởi một lượt khác (hoặc bằng CLI).
   const site = await activeSiteCheck();
+  // Hai lời từ chối cho hai cảnh, chứ không gộp vào một câu: đây là NHỊP CHÉP, nơi một câu kể
+  // sai dẫn thẳng tới thao tác sai. Backend trên VM mà nghe「trạm này không còn hoạt động (giờ
+  // là「」)」thì người vận hành sẽ đi tìm một trạm không tồn tại; nghe đúng thì họ bấm「Huỷ lượt
+  // chuyển」— việc thật duy nhất còn lại.
+  if (!site.isStation) {
+    return {
+      ok: false,
+      message:
+        "Nơi này là backend trên VM, không phải một trạm — không có lượt chuyển nào để chạy tiếp. " +
+        "Bấm「Huỷ lượt chuyển」để dọn bản ghi cũ và mở cửa tông môn lại.",
+    };
+  }
   if (!site.isActive) {
     return { ok: false, message: `Trạm này không còn là trạm hoạt động (giờ là「${site.activeSiteId}」) — dừng lượt chuyển.` };
   }

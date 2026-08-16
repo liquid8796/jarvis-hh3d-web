@@ -35,6 +35,14 @@ export function MirrorSwitchPanel({ mirrors, initial }: { mirrors: MirrorView[];
   const [confirmText, setConfirmText] = useState("");
 
   const busy = view.phase === "draining" || view.phase === "syncing" || view.phase === "verifying";
+  /**
+   * Không có lượt chuyển nào đang dở — chỗ để MỞ một lượt mới.
+   *
+   * Tách tên ra vì nó gác hai khối loại trừ nhau ở cuối tệp (form mở lượt / hàng nút điều khiển
+   * lượt đang chạy). Viết lại điều kiện ở cả hai nơi là hẹn ngày chúng lệch nhau rồi cùng hiện
+   * hoặc cùng biến mất.
+   */
+  const ranh = view.phase === "idle" || view.phase === "failed";
 
   // Vòng lặp nhịp. Chạy khi người bấm「Chạy tiếp」và tự dừng ở done/failed — hoặc khi phase
   // rời khỏi nhóm đang-làm-việc, phòng trường hợp một nhịp đưa thẳng tới kết thúc.
@@ -121,12 +129,32 @@ export function MirrorSwitchPanel({ mirrors, initial }: { mirrors: MirrorView[];
         )}
       </div>
 
-      {!view.isActiveSite && (
+      {/* THỨ TỰ HAI NHÁNH NÀY LÀ PHẦN QUAN TRỌNG, không phải chi tiết trình bày.
+
+          Câu「trạm này KHÔNG phải trạm đang hoạt động」chỉ đúng khi nơi đây THẬT SỰ là một trạm.
+          Đọc nhầm thứ tự thì backend trên VM — nơi duy nhất còn phục vụ — bị chính trang này
+          buộc tội là một trạm đã nghỉ, kèm lời khuyên「hãy sang trạm đang phục vụ mà thao tác」,
+          tức bảo người ta đi tới đúng chỗ họ đang đứng. Đó là bản đã sống trên production từ
+          16/08/2026 tới khi được vá. */}
+      {!view.backendIsStation ? (
+        <div className="mb-4 rounded-lg border border-[rgba(232,194,92,0.35)] px-4 py-3 text-sm">
+          <p className="text-[var(--color-gold-300)]">Lượt chuyển trạm đã hết việc từ 16/08/2026.</p>
+          <p className="mt-1 text-xs text-[var(--color-mist)]">
+            Nơi bạn đang đứng là backend trên VM: cả năm trạm Vercel chỉ chuyển tiếp request về đây, và
+            database nằm ngay cạnh nó. Không còn「trạm đang hoạt động」nào để chuyển đi, cũng không còn
+            bảng nào để lật — nên bảng điều khiển này chỉ giữ lại phần dọn dẹp một lượt chuyển cũ.
+          </p>
+          <p className="mt-1 text-xs text-[var(--color-mist)]">
+            Sổ gương bên dưới thì VẪN DÙNG: nó là danh mục năm tài khoản Vercel giữ các vỏ, và bảng
+            hạn mức đọc chìa từ chính sổ ấy.
+          </p>
+        </div>
+      ) : !view.isActiveSite ? (
         <p className="mb-4 rounded-lg border border-[rgba(255,120,120,0.45)] px-4 py-2 text-sm text-[#f2a0a0]">
-          Trạm này ({view.currentSiteId || "chưa khai SITE_ID"}) KHÔNG phải trạm đang hoạt động. Lệnh chuyển
-          phải phát từ trạm đang phục vụ — phát từ đây sẽ chép một database đã nghỉ đè lên trạm đích.
+          Trạm này ({view.currentSiteId}) KHÔNG phải trạm đang hoạt động. Lệnh chuyển phải phát từ trạm
+          đang phục vụ — phát từ đây sẽ chép một database đã nghỉ đè lên trạm đích.
         </p>
-      )}
+      ) : null}
 
       {view.isActiveSite && !view.selfInBook && view.currentSiteId && (
         <div className="mb-4 rounded-lg border border-[rgba(232,194,92,0.45)] px-4 py-3 text-sm">
@@ -155,7 +183,10 @@ export function MirrorSwitchPanel({ mirrors, initial }: { mirrors: MirrorView[];
         </div>
       )}
 
-      {view.phase === "idle" || view.phase === "failed" ? (
+      {/* Backend không phải một trạm thì KHÔNG dựng form: một cái form không bao giờ bấm được
+          chỉ mời người ta điền vào rồi thất vọng, mà tệ hơn là nó gợi ý rằng vẫn còn một lượt
+          chuyển đáng phát nếu gỡ được cái chặn. Phần dọn lượt chuyển dở bên dưới vẫn ở lại. */}
+      {ranh && view.backendIsStation && (
         <form
           className="flex flex-col gap-3"
           action={async (fd) => {
@@ -206,7 +237,9 @@ export function MirrorSwitchPanel({ mirrors, initial }: { mirrors: MirrorView[];
             Bấm là tông môn bế quan ngay. Đàn đang chạy vẫn đi hết vòng, đàn trong hàng chờ đứng lại.
           </p>
         </form>
-      ) : (
+      )}
+
+      {!ranh && (
         <div className="flex flex-wrap gap-3">
           {busy && (
             <button type="button" className="btn btn-primary" onClick={() => setRunning((r) => !r)}>
@@ -214,8 +247,9 @@ export function MirrorSwitchPanel({ mirrors, initial }: { mirrors: MirrorView[];
             </button>
           )}
           {/* Đích trùng chính trạm này thì nút vô nghĩa — server cũng chặn, đây chỉ là để
-              người ta khỏi bấm vào một cú bấm không đi tới đâu. */}
-          {view.phase === "done" && !(view.currentSiteId && view.targetId === view.currentSiteId) && (
+              người ta khỏi bấm vào một cú bấm không đi tới đâu. Cùng lý do với `backendIsStation`:
+              trên VM thì không có bảng nào để lật, chỉ còn「Huỷ lượt chuyển」là việc thật. */}
+          {view.backendIsStation && view.phase === "done" && !(view.currentSiteId && view.targetId === view.currentSiteId) && (
             <button
               type="button"
               className="btn btn-primary"

@@ -12,9 +12,32 @@
  * đặc biệt — chỉ có "trạm đang hoạt động".
  */
 
+/**
+ * NƠI CHẠY ĐOẠN MÃ NÀY CÓ PHẢI MỘT TRẠM TRONG VÒNG XOAY KHÔNG.
+ *
+ * `SITE_ID` vắng mặt từng có nghĩa「một deploy Vercel quên khai biến env」— một sự cố cấu hình,
+ * tạm thời, đáng nhắc người vận hành đi đặt cho đủ. Từ 16/08/2026 nó mang nghĩa KHÁC HẲN và
+ * lâu dài: đây là backend trên VM, thứ mà cả năm vỏ Vercel proxy về. Nó không phải một trạm
+ * trong vòng xoay — nó LÀ nơi phục vụ.
+ *
+ * Hai nghĩa ấy đòi hai cách cư xử ngược nhau, nên phép hỏi phải có TÊN chứ không nằm rải rác
+ * dưới dạng `!process.env.SITE_ID`. Ba nơi đang đọc cùng dấu hiệu này — tầng chuyển hướng
+ * (middleware), luật phát lệnh chuyển, và bảng điều khiển ở trang Tông Môn — và chúng phải
+ * cùng đọc ra một câu trả lời.
+ *
+ * ĐỪNG「CHỮA」BẰNG CÁCH ĐẶT SITE_ID CHO VM. Nó không mở khoá gì cả, nó lên đạn hai cỗ máy đã
+ * hết việc: lượt chuyển sẽ bế quan cả tông môn rồi chép database SỐNG đè lên một Neon đã nghỉ,
+ * còn tầng chuyển hướng — nếu giá trị đặt vào không trùng khít `activeSiteId` — sẽ 307 sang URL
+ * của trạm hoạt động, mà URL ấy proxy thẳng về lại đây: vòng lặp chuyển hướng trên mọi đường
+ * không được miễn trừ.
+ */
+export function backendIsStation(siteId: string | null | undefined): boolean {
+  return (siteId ?? "").trim().length > 0;
+}
+
 export type SwitchGate =
   | { allowed: true }
-  | { allowed: false; reason: "no-site-id" | "not-active" | "same-site" | "unknown-target"; message: string };
+  | { allowed: false; reason: "not-a-station" | "not-active" | "same-site" | "unknown-target"; message: string };
 
 export function canSwitch(input: {
   /** SITE_ID của trạm đang chạy đoạn mã này. */
@@ -27,11 +50,14 @@ export function canSwitch(input: {
 }): SwitchGate {
   const { currentSiteId, activeSiteId, targetId, knownIds } = input;
 
-  if (!currentSiteId) {
+  if (!backendIsStation(currentSiteId)) {
     return {
       allowed: false,
-      reason: "no-site-id",
-      message: "Trạm này chưa khai SITE_ID — không xác định được nó là ai để phát lệnh chuyển.",
+      reason: "not-a-station",
+      message:
+        "Nơi này không phải một trạm trong vòng xoay — nó LÀ backend đang phục vụ cả năm trạm. " +
+        "Lượt chuyển trạm chép database sang một trạm khác rồi lật bảng điều phối, mà từ 16/08/2026 " +
+        "cả hai việc ấy đều không còn đích để đi.",
     };
   }
 
@@ -63,7 +89,7 @@ export function canSwitch(input: {
 
 export type FlipGate =
   | { allowed: true }
-  | { allowed: false; reason: "no-site-id" | "not-active" | "not-ready" | "same-site"; message: string };
+  | { allowed: false; reason: "not-a-station" | "not-active" | "not-ready" | "same-site"; message: string };
 
 /**
  * Luật "được lật bảng điều phối hay chưa" — anh em của `canSwitch`, tách ra cùng một lý do.
@@ -87,11 +113,13 @@ export function canFlip(input: {
 }): FlipGate {
   const { currentSiteId, activeSiteId, targetId, phase } = input;
 
-  if (!currentSiteId) {
+  if (!backendIsStation(currentSiteId)) {
     return {
       allowed: false,
-      reason: "no-site-id",
-      message: "Trạm này chưa khai SITE_ID — không xác định được nó là ai để lật bảng.",
+      reason: "not-a-station",
+      message:
+        "Nơi này không phải một trạm trong vòng xoay — không có bảng nào để lật. Bảng điều phối " +
+        "chỉ đạo diễn chuyện「trạm nào phục vụ」, mà nay mọi trạm đều proxy về đúng một backend.",
     };
   }
 

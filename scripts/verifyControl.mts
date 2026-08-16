@@ -9,7 +9,7 @@
 import { deepStrictEqual, strictEqual } from "node:assert";
 import { decideRequest, signControlDoc, parseControlDoc, verifyControlDoc, type ControlDoc } from "../src/lib/control/doc";
 import { readControlDoc, resetControlCacheForVerify } from "../src/lib/control/read";
-import { canFlip, canSwitch } from "../src/lib/mirror/switchGuard";
+import { backendIsStation, canFlip, canSwitch } from "../src/lib/mirror/switchGuard";
 
 const TOKEN = "worker-token-danh-cho-kiem-chung";
 let passed = 0;
@@ -104,9 +104,32 @@ const same = gate("main", "main", "main");
 ok(!same.allowed && same.reason === "same-site", "chuyển sang chính mình — chặn (nếu lọt, bước dọn đích xoá sạch nguồn)");
 const unknown = gate("main", "main", "khong-co-trong-so");
 ok(!unknown.allowed && unknown.reason === "unknown-target", "đích không có trong sổ — chặn");
-const noId = gate("", null, "main");
-ok(!noId.allowed && noId.reason === "no-site-id", "chưa khai SITE_ID — chặn");
 ok(gate("main", null, "auto-hh3d-1").allowed, "bảng chưa init — coi trạm đang chạy là trạm hoạt động (fail-open)");
+
+/**
+ * ── BACKEND KHÔNG PHẢI MỘT TRẠM (từ 16/08/2026) ─────────────────────────────────────────────
+ *
+ * Cùng một `currentSiteId` rỗng, nhưng NGHĨA đã đổi: xưa là「một deploy Vercel quên khai env」,
+ * nay là「đây là backend trên VM」. Ba phép kiểm dưới đây khoá chỗ khác nhau ấy — và nhánh
+ * fail-open là nhánh đắt nhất: bảng điều phối không đọc được KHÔNG được phép mở khoá lượt
+ * chuyển ngay trên chính nơi giữ database sống.
+ */
+ok(!backendIsStation(""), "SITE_ID rỗng → không phải một trạm");
+ok(!backendIsStation("   "), "SITE_ID toàn khoảng trắng cũng vậy — env dán tay hay dính đuôi");
+ok(!backendIsStation(undefined) && !backendIsStation(null), "thiếu hẳn biến cũng vậy");
+ok(backendIsStation("auto-hh3d-4"), "SITE_ID có thật → là một trạm");
+
+const notStation = gate("", null, "main");
+ok(!notStation.allowed && notStation.reason === "not-a-station", "backend trên VM phát lệnh chuyển — CHẶN, kể cả khi bảng chưa init (fail-open KHÔNG áp ở đây)");
+ok(
+  !notStation.allowed && !/chưa khai|đặt biến/.test(notStation.message),
+  "…và lời kể KHÔNG xui người ta đi đặt SITE_ID — làm thế là lên đạn lại hai cỗ máy đã hết việc",
+);
+const notStationActive = gate("", "main", "auto-hh3d-1");
+ok(
+  !notStationActive.allowed && notStationActive.reason === "not-a-station",
+  "bảng có ghi trạm khác cũng vẫn là not-a-station, KHÔNG phải not-active — hai lời kể cho hai cảnh khác nhau",
+);
 
 // ---- Luật LẬT bảng (anh em của canSwitch, hậu quả khác nên lời kể khác) -------------------
 const flip = (currentSiteId: string, activeSiteId: string | null, targetId: string, phase = "done") =>
@@ -127,8 +150,12 @@ for (const phase of ["idle", "draining", "syncing", "verifying", "failed"]) {
 const flipStale = flip("main", "auto-hh3d-1", "auto-hh3d-2");
 ok(!flipStale.allowed && flipStale.reason === "not-active", "trạm đã nghỉ lật hộ — chặn");
 ok(!flipStale.allowed && !flipStale.message.includes("chép"), "…và lời kể KHÔNG nói chuyện chép đè — lật không chép gì cả");
-const flipNoId = flip("", null, "auto-hh3d-1");
-ok(!flipNoId.allowed && flipNoId.reason === "no-site-id", "chưa khai SITE_ID — chặn lật");
+const flipNotStation = flip("", null, "auto-hh3d-1");
+ok(!flipNotStation.allowed && flipNotStation.reason === "not-a-station", "backend trên VM lật bảng — chặn");
+ok(
+  !flipNotStation.allowed && !flipNotStation.message.includes("chép"),
+  "…và lời kể KHÔNG nói chuyện chép đè — lật không chép gì cả, cùng luật với nhánh not-active",
+);
 const flipEmptyTarget = flip("main", "main", "");
 ok(flipEmptyTarget.allowed, "targetId rỗng KHÔNG bị bắt nhầm thành same-site (chuỗi rỗng khớp chuỗi rỗng)");
 

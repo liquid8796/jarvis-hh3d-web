@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { decideRequest } from "@/lib/control/doc";
 import { readControlDoc } from "@/lib/control/read";
+import { backendIsStation } from "@/lib/mirror/switchGuard";
 
 /**
  * Tầng chuyển hướng gương trạm — mảnh RUNTIME đầu tiên của deploy/mirror/README.md (§5).
@@ -31,7 +32,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   // Backend trên VM không mang SITE_ID: nó LÀ nơi phục vụ, không phải một trạm trong vòng
   // xoay — khỏi đọc bảng điều phối cho từng request chỉ để nghe câu "serve" biết trước.
-  if (!siteId) {
+  //
+  // Dùng chung phép hỏi với luật phát lệnh chuyển và bảng điều khiển ở trang Tông Môn: ba nơi
+  // đọc cùng một dấu hiệu, nên chúng phải đọc ra cùng một câu trả lời. Bản chép thứ hai sẽ
+  // lệch vào đúng ngày ai đó đổi cách nhận biết.
+  if (!backendIsStation(siteId)) {
     return NextResponse.next();
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { acknowledgeNoticeAction } from "@/app/actions/notices";
 
 /**
@@ -32,6 +32,30 @@ export function NoticePopup() {
   const [live, setLive] = useState(false);
 
   /**
+   * Những lời nhắn NGƯỜI NÀY ĐÃ BẤM「Đã hiểu」trong lượt xem trang này.
+   *
+   * ── VÌ SAO CẦN, VÀ NÓ CHỮA MỘT VÒNG LẶP CÓ THẬT ────────────────────────────────────────────
+   *
+   * Dấu「đã xem」bền vững nằm ở server (`notice_reads` cho thành viên, cookie cho khách). Bản
+   * trước tin trọn vào đó, và bình chú của chính nó hứa: "lượt ghi hỏng thì lời nhắn quay lại ở
+   * LẦN TẢI TRANG SAU". Lời hứa ấy SAI, và cái sai đo được ngày 16/08/2026: đọc xong lời nhắn
+   * cuối thì `dismiss` gọi `load()` để vớt phần tồn đọng — nên một lượt ghi hỏng làm lời nhắn
+   * quay lại sau ĐÚNG MỘT NHỊP, rồi bấm lại, lại hỏng, lại hiện. Người dùng không có đường
+   * thoát khỏi cái popup ngoài việc đóng tab.
+   *
+   * Hôm ấy nguyên nhân gốc là mọi Server Action chết sau vỏ proxy Vercel mới
+   * (`Invalid Server Actions request` — đã chữa bằng `allowedOrigins` trong `next.config.ts`).
+   * Nhưng nguyên nhân gốc nào rồi cũng có ngày quay lại dưới hình dạng khác: mạng chớp, server
+   * 500, phiên hết hạn giữa chừng. Cái phải sửa ở ĐÂY là biên độ — một lượt ghi hỏng được phép
+   * làm lời nhắn quay lại ở lần tải trang sau, KHÔNG được phép biến thành một vòng lặp.
+   *
+   * `useRef` chứ không phải state: nó không vẽ lại gì cả, và `merge` phải đọc được giá trị MỚI
+   * NHẤT ngay trong cùng một nhịp mà `dismiss` vừa ghi vào — một `useState` sẽ cho `merge` đọc
+   * phải bản chụp cũ của chính nhịp ấy.
+   */
+  const daBam = useRef<Set<string>>(new Set());
+
+  /**
    * Hoà danh sách mới vào hàng đợi, GIỮ NGUYÊN cái đang hiện.
    *
    * Không thay thẳng bằng mảng mới: người dùng có thể đang đọc dở lời nhắn đầu, mà một frame
@@ -41,7 +65,7 @@ export function NoticePopup() {
   const merge = useCallback((incoming: Notice[]) => {
     setQueue((current) => {
       const seen = new Set(current.map((notice) => notice.id));
-      const added = incoming.filter((notice) => !seen.has(notice.id));
+      const added = incoming.filter((notice) => !seen.has(notice.id) && !daBam.current.has(notice.id));
       return added.length > 0 ? [...current, ...added] : current;
     });
   }, []);
@@ -107,14 +131,21 @@ export function NoticePopup() {
 
   const dismiss = useCallback(async () => {
     if (!current) return;
-    // Đóng NGAY rồi mới ghi: người bấm "đã hiểu" không có lý do gì phải ngồi đợi một round-trip,
-    // và nếu lượt ghi hỏng thì lời nhắn quay lại ở lần tải trang sau — đúng hành vi mong muốn
-    // (chưa xác nhận được thì coi như chưa đọc).
+    // Đóng NGAY rồi mới ghi: người bấm "đã hiểu" không có lý do gì phải ngồi đợi một round-trip.
+    //
+    // Ghi vào `daBam` TRƯỚC khi gọi server, và đó là thứ tự có chủ ý: lượt `load()` ở cuối hàm
+    // này (cùng kênh SSE, cùng lượt hỏi khi quay lại tab) chạy được TRƯỚC khi server trả lời,
+    // nên nếu chờ tới lúc thành công mới ghi dấu thì vẫn còn khe cho lời nhắn quay lại. Dấu này
+    // chỉ sống trong lượt xem trang hiện tại — bản bền vững vẫn là việc của server.
+    daBam.current.add(current.id);
     const remaining = queue.length - 1;
     setQueue((rest) => rest.slice(1));
     try {
       await acknowledgeNoticeAction(current.id);
     } catch (error) {
+      // Hỏng thì lời nhắn quay lại ở LẦN TẢI TRANG SAU (dấu phiên này mất theo trang), đúng
+      // hành vi mong muốn: chưa xác nhận được thì coi như chưa đọc. Thứ nó KHÔNG được phép làm
+      // là quay lại ngay trong lượt xem này — xem khối bình chú ở `daBam`.
       console.error("notice: không ghi được dấu đã xem", error);
     }
     // Đọc hết hàng đợi thì hỏi lại một lượt. Server trả tối đa 20 lời nhắn một lần, và nó chỉ

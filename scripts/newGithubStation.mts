@@ -44,6 +44,7 @@ import { encryptSecret } from "../src/lib/crypto/secretBox";
 import {
   DEFAULT_WORKFLOW_FILE,
   GITHUB_STATION_LIMIT,
+  explainFailure,
   reviewStationIdentity,
   stationSlug,
 } from "../src/lib/validation/githubStations";
@@ -77,6 +78,16 @@ function die(message: string): never {
 const VIETNAM_UTC_OFFSET_MS = 7 * 60 * 60 * 1000;
 
 /**
+ * Số lần hỏi danh tính, và quãng nghỉ giữa hai lần — chỉ dùng cho mạng ném và 5xx.
+ *
+ * Ba lần × 2 giây là đủ để đi qua một nhịp 5xx của GitHub mà vẫn không bắt người đang đứng trước
+ * dấu nhắc chờ quá lâu. Trần xấu nhất: 3 × 20 giây (trần mỗi lượt gọi) + 2 × 2 giây nghỉ = 64
+ * giây — và đó là ca mọi lượt đều treo tới hết giờ, chứ 5xx thì trả lời tức thì.
+ */
+const IDENTITY_ATTEMPTS = 3;
+const IDENTITY_BACKOFF_MS = 2_000;
+
+/**
  * Mốc thời gian trong tên: `YYYYMMDD-HHmmss` theo giờ Việt Nam.
  *
  * Giây có mặt trong mốc là CÓ CHỦ Ý, không phải cho đẹp: `WORKER_ID` là khoá chính của bảng
@@ -96,23 +107,48 @@ function vietnamStamp(at: Date): string {
  * cứ thứ gì được tạo ra ở bất cứ đâu.
  */
 async function whoami(token: string): Promise<{ login: string; scopes: string | null }> {
-  let res: Response;
-  try {
-    res = await fetch("https://api.github.com/user", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        // Không mang tên trò lẫn tên công cụ — cùng luật với tên kho, xem `khoiloiNaming.mjs`.
-        // GitHub đòi header này có mặt; nó không đòi header ấy khai ra ta đang làm gì.
-        "User-Agent": "linh-su-station-setup",
-      },
-      signal: AbortSignal.timeout(20_000),
-    });
-  } catch (err) {
-    die(`Không gọi được api.github.com (${err instanceof Error ? err.message : "lỗi lạ"}). Mạng có chặn không?`);
+  let res: Response | null = null;
+  let lastError = "";
+
+  // MỘT NHỊP HỎNG THOÁNG QUA KHÔNG ĐƯỢC PHÉP VỨT CẢ CHUỖI PAT VỪA GÕ TAY.
+  //
+  // Công cụ này TƯƠNG TÁC: `.bat` hỏi PAT ở dấu nhắc, ký tự không hiện, và người ta chép-dán
+  // từng đoạn. Bản trước gọi đúng một lần rồi chết — nên 17/08/2026 một cú 503 năm phút của
+  // GitHub đủ để bắt tông chủ gõ lại từ đầu, và vì câu lỗi đổ cho PAT, đi tạo hẳn một chìa mới.
+  // Chỉ thử lại đúng hai ngả ĐÁNG thử: mạng ném, và 5xx. 4xx thì thử lại bao nhiêu cũng vậy —
+  // một PAT sai không tự đúng lên.
+  for (let attempt = 1; attempt <= IDENTITY_ATTEMPTS; attempt++) {
+    try {
+      res = await fetch("https://api.github.com/user", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          // Không mang tên trò lẫn tên công cụ — cùng luật với tên kho, xem `khoiloiNaming.mjs`.
+          // GitHub đòi header này có mặt; nó không đòi header ấy khai ra ta đang làm gì.
+          "User-Agent": "linh-su-station-setup",
+        },
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (res.status < 500) break;
+      lastError = `HTTP ${res.status}`;
+    } catch (err) {
+      res = null;
+      lastError = err instanceof Error ? err.message : "lỗi lạ";
+    }
+
+    if (attempt < IDENTITY_ATTEMPTS) {
+      console.error(`  … ${lastError} — thử lại lần ${attempt + 1}/${IDENTITY_ATTEMPTS} sau ${IDENTITY_BACKOFF_MS / 1000}s`);
+      await new Promise((wake) => setTimeout(wake, IDENTITY_BACKOFF_MS));
+    }
   }
-  if (res.status === 401) die("PAT sai hoặc đã bị thu hồi — GitHub trả 401. Tạo lại token rồi chạy lại.");
-  if (!res.ok) die(`GitHub từ chối lượt hỏi danh tính (HTTP ${res.status}). Kiểm lại PAT.`);
+
+  if (!res) {
+    die(`Không gọi được api.github.com sau ${IDENTITY_ATTEMPTS} lần (${lastError}). Mạng có chặn không?`);
+  }
+  // Phán xử bằng CHUNG một bộ từ điển với vòng nuôi kho và lượt phát hành (`explainFailure`), chứ
+  // không tự chế câu ở đây. Bản cũ tự chế, và nó gộp MỌI mã lỗi không-401 thành「Kiểm lại PAT」—
+  // kể cả 5xx, thứ hoàn toàn không phải chuyện của PAT.
+  if (!res.ok) die(explainFailure(res.status, await res.json().catch(() => null), "hỏi danh tính"));
 
   const body = (await res.json()) as { login?: string };
   if (!body.login) die("GitHub trả lời không có tên tài khoản — không rõ PAT này thuộc về ai, dừng cho chắc.");

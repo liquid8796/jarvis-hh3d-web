@@ -11,6 +11,45 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.2 — `github:new`: 5xx của GitHub thôi bị đổ cho PAT, và thôi vứt chuỗi vừa gõ tay
+
+Lượt chạy `new-github-khoiloi.bat` chết với:
+
+```
+✖ GitHub từ chối lượt hỏi danh tính (HTTP 503). Kiểm lại PAT.
+```
+
+**503 không phải lỗi xác thực.** PAT sai thì GitHub trả 401, thiếu quyền thì 403 — đo lại ngay
+sau đó: `GET /user` không chìa trả đúng `401 Requires authentication`, và `/`, `/rate_limit`,
+trang trạng thái đều 200. Cái 503 là một nhịp hỏng thoáng qua bên GitHub.
+
+Cái giá của câu chữ sai ấy đã trả bằng tiền thật: tông chủ đọc「Kiểm lại PAT」nên tạo một PAT
+mới — chìa TOÀN TÀI KHOẢN — cho một sự cố không hề thuộc về chìa.
+
+**Hai chỗ hỏng, cả hai đều trong `whoami` của `newGithubStation.mts`.**
+
+*Một: nó tự chế câu lỗi.* Repo đã có `explainFailure` — bộ từ điển dùng chung cho vòng nuôi kho
+và lượt phát hành, và bình chú của chính nó ghi「cùng một mã lỗi phải đọc ra cùng một câu ở cả
+hai, bằng không người vận hành phải học hai từ điển cho một API」. `whoami` đứng ngoài từ điển ấy
+với đúng hai dòng, và dòng thứ hai gộp MỌI mã không-401 thành「Kiểm lại PAT」. Nay nó gọi
+`explainFailure`, nên còn được thêm câu nguyên văn của GitHub («Bad credentials») mà bản cũ vứt.
+
+*Hai: gọi đúng một lần rồi chết.* Đây là công cụ TƯƠNG TÁC — `.bat` hỏi PAT ở dấu nhắc, ký tự
+không hiện — nên một cú 503 năm phút bắt gõ lại từ đầu cả chuỗi. Nay thử lại **3 lần, nghỉ 2
+giây**, và chỉ cho hai ngả đáng thử: mạng ném, và 5xx. 4xx thì không thử lại — một PAT sai không
+tự đúng lên. Trần xấu nhất 64 giây.
+
+`explainFailure` cũng mọc thêm nhánh 5xx nói THẲNG「lỗi phía HỌ, KHÔNG phải PAT của bạn — chờ
+một lát rồi chạy lại」, và nhánh ấy chảy sang cả sáu chỗ gọi.
+
+Hàm này có sáu chỗ gọi mà tới hôm nay vẫn chưa có phép thử nào; nhóm ca thứ 12 của
+`verify:github-stations` đóng đinh luật: **4xx mới được nhắc tới PAT, 5xx thì không** — kèm ca
+ngược chiều bắt 401/403/404/409/422 không được mang câu trấn an của 5xx.
+
+Đo đầu-cuối bằng một chìa giả: `✖ PAT bị từ chối (401) khi hỏi danh tính: token hết hạn hoặc đã
+bị thu hồi — Bad credentials`. Vòng thử-lại thì mới chỉ được soát bằng mắt, chưa có ca chạy —
+`whoami` không xuất khẩu và tệp chạy `main()` ngay lúc nạp.
+
 ## 1.3.1 — Workflow「Vercel usage」: phiên chết nay kêu sau 6 giây thay vì 18 phút
 
 Tông chủ báo workflow đang đỏ. Lượt 145 và 146 (17/08/2026) hỏng; lượt 144 và trước đó xanh.

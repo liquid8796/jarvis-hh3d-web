@@ -140,6 +140,13 @@ export function explainFailure(status: number, body: unknown, what: string): str
   if (status === 422) {
     return `GitHub từ chối (422) khi ${what}: nhánh vừa nhích dưới chân lượt đẩy, hoặc PAT thiếu scope \`workflow\` để đụng .github/workflows/${suffix}`;
   }
+  // 5xx LÀ LỖI CỦA HỌ, VÀ PHẢI NÓI THẲNG RA THẾ — bằng không người vận hành đi thay một chìa còn
+  // tốt. Đã xảy ra ngày 17/08/2026: `github:new` chết với「GitHub từ chối lượt hỏi danh tính (HTTP
+  // 503). Kiểm lại PAT.」, tông chủ tạo PAT mới và dán nó qua khung chat — một chìa toàn tài khoản
+  // bị đốt cho một sự cố năm phút bên GitHub. PAT hỏng thì API trả 401, không bao giờ trả 503.
+  if (status >= 500) {
+    return `GitHub đang trục trặc (${status}) khi ${what} — lỗi phía HỌ, KHÔNG phải PAT của bạn. Chờ một lát rồi chạy lại${suffix}`;
+  }
   return `GitHub trả ${status} khi ${what}${suffix}`;
 }
 

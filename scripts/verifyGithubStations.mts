@@ -25,6 +25,7 @@ import {
   HEARTBEAT_PATH,
   KEEPALIVE_INTERVAL_DAYS,
   MS_PER_DAY,
+  explainFailure,
   isCommitDue,
   parseWorkflowState,
   reviewKeepaliveDuty,
@@ -282,8 +283,49 @@ async function run() {
     assert(!reviewKeepaliveDuty("auto-hh3d-20", "auto-hh3d-2").feed, "So khớp phải TRỌN chuỗi — 'auto-hh3d-20' không phải 'auto-hh3d-2'.");
   }
 
+  // ---- 12. explainFailure: mã lỗi nào đổ cho PAT, mã lỗi nào KHÔNG -------------------------
+  //
+  // Sáu chỗ gọi, và tới 17/08/2026 vẫn chưa có ca nào. Cái giá của lỗ hổng ấy đã trả bằng tiền
+  // thật: `github:new` chết vì một cú **503** của GitHub và in ra「Kiểm lại PAT」(câu tự chế của
+  // riêng nó, không đi qua hàm này), nên tông chủ tạo một PAT mới — chìa toàn tài khoản — cho
+  // một sự cố hoàn toàn không thuộc về chìa. Luật đóng đinh ở đây: **4xx mới được nhắc tới PAT,
+  // 5xx thì phải nói thẳng là lỗi của GitHub.**
+  {
+    const doiChoPat = (s: number) => explainFailure(s, null, "hỏi danh tính");
+
+    assert(doiChoPat(401).includes("401") && /PAT/.test(doiChoPat(401)), "401 phải gọi tên PAT.");
+    assert(/scope|tần suất/.test(doiChoPat(403)), "403 phải nói tới quyền hoặc hạn mức.");
+    assert(/tên kho|quyền nhìn/.test(doiChoPat(404)), "404 phải nói tới tên kho.");
+
+    for (const status of [500, 502, 503, 504]) {
+      const noi = explainFailure(status, null, "hỏi danh tính");
+      assert(noi.includes(String(status)), `${status} phải hiện trong câu lỗi.`);
+      assert(
+        /KHÔNG phải PAT/.test(noi),
+        `${status} phải nói THẲNG là không phải PAT — bằng không người ta đi thay một chìa còn tốt (đã xảy ra 17/08/2026): ${noi}`,
+      );
+      assert(/chạy lại|Chờ/.test(noi), `${status} phải chỉ ra việc cần làm là chờ rồi chạy lại: ${noi}`);
+    }
+
+    // Và 4xx thì TUYỆT ĐỐI không được mang câu của 5xx — hai lời khuyên ngược nhau.
+    for (const status of [401, 403, 404, 409, 422]) {
+      assert(
+        !/KHÔNG phải PAT/.test(explainFailure(status, null, "x")),
+        `${status} không được mang câu trấn an của 5xx.`,
+      );
+    }
+
+    // Thân lỗi của GitHub được chở theo khi có, và không làm hàm ném khi thân rác.
+    assert(
+      explainFailure(503, { message: "Server Error" }, "hỏi danh tính").includes("Server Error"),
+      "Câu của GitHub phải được chở theo.",
+    );
+    assert(explainFailure(503, "không-phải-json", "x").length > 0, "Thân rác không được làm hàm ném.");
+    assert(explainFailure(418, null, "x").includes("418"), "Mã lạ vẫn phải hiện nguyên số.");
+  }
+
   globalThis.fetch = realFetch;
-  console.log("✔ Vòng nuôi kho GitHub: 11 nhóm ca, mọi luật đứng vững.");
+  console.log("✔ Vòng nuôi kho GitHub: 12 nhóm ca, mọi luật đứng vững.");
 }
 
 run().catch((err) => {

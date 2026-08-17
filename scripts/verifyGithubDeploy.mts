@@ -23,7 +23,7 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { DEFAULT_WORKFLOW_FILE } from "../src/lib/validation/githubStations";
-import { looksTransient } from "./githubTransient.mjs";
+import { looksTransient, shouldRetryCreate } from "./githubTransient.mjs";
 import {
   activeRunIds,
   activeRuns,
@@ -444,6 +444,21 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
   // Cái bẫy gần nhất của một regex viết vội: "HTTP 404" chứa "40", "HTTP 4295" không phải 429.
   check("ranh giới số: 4295 không phải 429", !looksTransient("HTTP 4295: chuyện lạ"));
   check("ranh giới số: 5001 không phải 500", !looksTransient("HTTP 5001: chuyện lạ"));
+
+  // shouldRetryCreate — cùng câu hỏi ấy nhưng cho `gh repo create`, nơi「thử lại」có thể đẻ ra
+  // một kho thứ hai. Sinh ra từ log 17/08/2026 lượt hai: 503 ở /graphql, kho CHƯA kịp sinh
+  // (API trả 404), nên gọi lại là đúng — nhưng chỉ khi biết chắc nó chưa sinh.
+  const nac = "HTTP 503: No server is currently available";
+  check("chưa có kho + nấc → gọi lại", shouldRetryCreate({ why: nac, existence: "no" }));
+  check("chưa có kho + 4xx → KHÔNG gọi lại", !shouldRetryCreate({ why: "HTTP 422: name already exists", existence: "no" }));
+  check(
+    "ĐÃ có kho → KHÔNG gọi lại, dù câu lỗi trông rất thoáng qua",
+    !shouldRetryCreate({ why: nac, existence: "yes" }),
+  );
+  check(
+    "không hỏi được GitHub → KHÔNG gọi lại (hai kho trong một lượt là cái giá lớn hơn một lượt hỏng)",
+    !shouldRetryCreate({ why: nac, existence: "unknown" }),
+  );
 }
 
 console.log(`\n✔ ${checks} phép kiểm, tất cả xanh.`);

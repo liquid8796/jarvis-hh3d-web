@@ -40,7 +40,7 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomSoftwareName, reviewGeneratedName } from "./khoiloiNaming.mjs";
-import { looksTransient } from "./githubTransient.mjs";
+import { looksTransient, shouldRetryCreate } from "./githubTransient.mjs";
 import {
   buildKhoiloiPayload,
   playwrightVersionOf,
@@ -194,6 +194,7 @@ const GH_BACKOFF_MS = 2_000;
  * TỰ IN nó ra, và in ở MỌI lượt hỏng, để người đọc không mất một dòng nào so với trước.
  */
 function runWithRetry(label, cmd, args, options = {}) {
+  const decide = options.shouldRetry ?? ((why) => looksTransient(why));
   for (let attempt = 1; ; attempt += 1) {
     try {
       return execFileSync(cmd, args, {
@@ -207,12 +208,35 @@ function runWithRetry(label, cmd, args, options = {}) {
     } catch (err) {
       const why = [err.stderr, err.stdout, err.message].map((p) => String(p ?? "").trim()).filter(Boolean).join("\n");
       if (why) console.error(why);
-      if (attempt >= GH_ATTEMPTS || !looksTransient(why)) throw err;
+      if (attempt >= GH_ATTEMPTS || !decide(why)) throw err;
       console.error(
         `  … ${label}: GitHub đang nấc, thử lại lần ${attempt + 1}/${GH_ATTEMPTS} sau ${GH_BACKOFF_MS / 1000}s`,
       );
       sleepSync(GH_BACKOFF_MS);
     }
+  }
+}
+
+/**
+ * Kho ấy đã nằm trên GitHub chưa: `"yes"` · `"no"` · `"unknown"`.
+ *
+ * Ba trạng thái chứ không phải hai, và trạng thái thứ ba là lý do tồn tại của hàm này: giữa một
+ * cơn sự cố của GitHub thì chính LỜI HỎI cũng có thể trả 5xx, mà đọc「hỏi không được」thành
+ *「chưa có」là cách người ta tạo ra hai kho trong một lượt chạy. `gh repo view` thoát khác 0 ở cả
+ * hai ca ấy, nên phải đọc CHỮ mới phân biệt được.
+ */
+function probeRepoExistence(slug) {
+  try {
+    execFileSync("gh", ["repo", "view", slug, "--json", "name"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 30_000,
+    });
+    return "yes";
+  } catch (err) {
+    const why = [err.stderr, err.stdout, err.message].map((p) => String(p ?? "").trim()).filter(Boolean).join("\n");
+    if (/could not resolve to a repository|not found|404/i.test(why)) return "no";
+    return looksTransient(why) ? "unknown" : "no";
   }
 }
 
@@ -418,8 +442,39 @@ try {
   }
 
   console.log(`\n── Tạo kho ${slug}…`);
-  run("gh", ["repo", "create", slug, "--public", "--source", ".", "--push",
-    "--description", `Tiến trình nền theo lịch — ${workerId}`], { cwd: staging });
+  /**
+   * Thử lại CÓ ĐIỀU KIỆN — và điều kiện ấy là một sự thật ngoài đời, không phải một câu chữ.
+   *
+   * Log 17/08/2026 (lượt thứ hai trong ngày): `gh repo create` trúng
+   * `HTTP 503 … (https://api.github.com/graphql)` giữa một cơn「Partial System Outage」của
+   * GitHub, và cả lượt dựng chết ở dòng đầu tiên chạm mạng. Lần ấy kho CHƯA kịp sinh ra (đo:
+   * API trả 404), nên gọi lại là xong — nhưng một cú 5xx rơi SAU cú tạo thì gọi lại chỉ nhận
+   *「name already exists」và che mất sự thật là ta vừa để lại một kho rỗng. Nên trước mỗi lượt
+   * gọi lại, hỏi thẳng GitHub xem kho đã có chưa; xem `shouldRetryCreate`.
+   */
+  try {
+    runWithRetry("tạo kho", "gh", ["repo", "create", slug, "--public", "--source", ".", "--push",
+      "--description", `Tiến trình nền theo lịch — ${workerId}`], {
+      cwd: staging,
+      shouldRetry: (why) => shouldRetryCreate({ why, existence: probeRepoExistence(slug) }),
+    });
+  } catch (err) {
+    // Cùng lối dọn với bước dán secret ngay dưới: kho nào lượt chạy NÀY tạo ra thì lượt chạy này
+    // dọn. Khác một chỗ — ở đây phải hỏi trước, vì cú hỏng có thể xảy ra khi chưa có gì để dọn.
+    if (probeRepoExistence(slug) === "yes") {
+      console.error(`\n✖ Tạo kho hỏng giữa chừng — ${slug} đã sinh ra nhưng chưa xong. Dọn lại…`);
+      try {
+        runWithRetry("xoá kho dở", "gh", ["repo", "delete", slug, "--yes"], { timeout: 60_000 });
+        console.error("  đã xoá. Chạy lại lệnh dựng là xong (tên kho lượt sau sẽ khác, không va vào đâu).");
+      } catch {
+        console.error(
+          `  KHÔNG xoá được ${slug} (PAT thiếu quyền delete_repo?) — vào xoá tay rồi hãy chạy lại:\n` +
+            `    https://github.com/${slug}/settings`,
+        );
+      }
+    }
+    throw err;
+  }
 
   console.log("── Dán secret WORKER_TOKEN…");
   // Token đi qua STDIN, không qua đối số: đối số nằm trong command line mà ai mở Task Manager

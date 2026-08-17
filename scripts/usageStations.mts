@@ -127,6 +127,61 @@ export function readCookieFile(
   return { ok: true, cookies, boQua };
 }
 
+/** Trang mà trình duyệt THẬT SỰ dừng lại sau khi điều hướng tới bảng Usage. */
+export type UsageLanding =
+  | { kind: "usage" }
+  | { kind: "signedOut"; url: string }
+  | { kind: "elsewhere"; url: string };
+
+/**
+ * Chặng đầu tiên của đường dẫn khi Vercel đá một khách CHƯA đăng nhập.
+ *
+ * `auth-redirect` là cái đo được 17/08/2026 — `GET /<slug>/~/usage` không cookie trả **307 →
+ * `/auth-redirect/<slug>/~/usage`**, cho MỌI slug, kể cả slug không tồn tại. Ba chặng còn lại là
+ * những cửa đăng nhập quen thuộc của họ, để một lượt đổi đường không lọt qua lưới trong im lặng.
+ */
+const AUTH_SEGMENTS = ["auth-redirect", "login", "signin", "sso"];
+
+/**
+ * PHIÊN CHẾT KHÔNG BÁO BẰNG MÃ LỖI — nó báo bằng một cú CHUYỂN HƯỚNG, và đó là cả lý do hàm này
+ * tồn tại.
+ *
+ * Script cào từng chỉ có một phép gác: `res.status() >= 400`. Phép ấy KHÔNG BAO GIỜ chạy được cho
+ * cookie hết hạn, vì 307 thì Playwright đi theo và dừng ở một trang đăng nhập **HTTP 200**. Hệ
+ * quả đo được ngày 17/08/2026 (workflow「Vercel usage」lượt 145–146): mỗi trạm cào trang đăng
+ * nhập, thiếu cả tám cột, tải lại, thiếu tiếp, rồi chết sau 180 giây — năm trạm thành 1007s và
+ * 1088s, gấp mười lần một lượt khoẻ (~100s), sát trần 20 phút của job. Và câu chẩn đoán cuối
+ * cùng lại đoán giữa ba nguyên nhân không liên quan («trang chưa render xong, hoặc cookie chỉ mở
+ * được một phần trang»), nên nhìn log cũng không biết phải sửa gì.
+ *
+ * SO ĐƯỜNG DẪN CHỨ KHÔNG DÒ CHỮ「login」, và phân biệt hai ngả hỏng thay vì gộp:
+ *
+ *   · `signedOut` — đường dẫn rơi vào một chặng xác thực. Chắc chắn là phiên, sửa bằng cookie mới.
+ *   · `elsewhere` — dừng ở một chỗ khác hẳn. Nhiều khả năng Vercel DỜI trang Usage; gọi nó là
+ *     「hết phiên」sẽ đẩy người ta đi làm mới cookie cả buổi cho một cái hỏng không nằm ở đó.
+ *
+ * Trả về nguyên văn URL đích ở cả hai ngả: đó chính là dữ kiện mà lượt hỏng 17/08 thiếu.
+ */
+export function reviewUsageLanding(finalUrl: string, team: string): UsageLanding {
+  let path: string;
+  try {
+    path = new URL(finalUrl).pathname;
+  } catch {
+    // `about:blank` cũng lọt vào đây ở vài lượt điều hướng hỏng — không phải usage, và cũng
+    // không phải cửa đăng nhập, nên nó là `elsewhere` đúng nghĩa.
+    return { kind: "elsewhere", url: finalUrl };
+  }
+
+  // Cắt gạch chéo đuôi để `/x/~/usage/` không bị kể là một trang khác; giữ `/` cho gốc.
+  const landed = path.toLowerCase().replace(/\/+$/, "") || "/";
+  if (landed === `/${team.toLowerCase()}/~/usage`) return { kind: "usage" };
+
+  const firstSegment = landed.split("/")[1] ?? "";
+  return AUTH_SEGMENTS.includes(firstSegment)
+    ? { kind: "signedOut", url: finalUrl }
+    : { kind: "elsewhere", url: finalUrl };
+}
+
 /**
  * Hạn của cookie `authorization`, tính bằng ngày kể từ bây giờ — `null` khi tệp không khai hạn.
  *

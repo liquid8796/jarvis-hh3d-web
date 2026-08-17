@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.1",
+    date: "2026-08-17",
+    lines: [
+      "Bảng mức dùng của các trạm sẽ báo rõ khi nó ngừng cập nhật được, thay vì lặng lẽ giữ số cũ.",
+      "Với đạo hữu thì màn hình không đổi gì; đây là chỗ sửa cho người trông nom hệ thống.",
+    ],
+  },
+  {
     version: "1.3.0",
     date: "2026-08-17",
     lines: [

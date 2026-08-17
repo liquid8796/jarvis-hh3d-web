@@ -47,7 +47,7 @@ import { readFileSync } from "node:fs";
 import { chromium } from "playwright-core";
 import { nearMisses, parseUsageText, selectWanted, WANTED_TITLES, type Selection } from "./usageMeters.mts";
 import { type Meter, pushUsageReport } from "./usagePush.mts";
-import { readCookieFile } from "./usageStations.mts";
+import { daysUntilExpiry, readCookieFile, reviewUsageLanding } from "./usageStations.mts";
 
 const arg = (name: string): string | undefined => {
   const at = process.argv.indexOf(`--${name}`);
@@ -136,6 +136,40 @@ try {
     process.exit(1);
   }
 
+  /**
+   * DỪNG TRƯỚC KHI CÀO nếu ta không còn đứng trên bảng Usage.
+   *
+   * Phép gác `>= 400` ngay trên KHÔNG bắt được phiên chết: Vercel trả 307 sang
+   * `/auth-redirect/…`, Playwright đi theo, và trang đăng nhập là một HTTP 200 hoàn toàn hợp lệ.
+   * Thiếu chỗ này thì `collect()` cào trang đăng nhập, thiếu cả tám cột, tải lại, thiếu tiếp —
+   * 180 giây mỗi trạm để rồi in ra một câu đoán mò. Đo 17/08/2026: năm trạm × như vậy = 1007s và
+   * 1088s, trong khi một lượt khoẻ chỉ tốn ~100s.
+   *
+   * Nói CẢ hạn cookie trong cùng một dòng: nó biến「chắc là cookie?」thành một con số đọc là
+   * biết, và `daysUntilExpiry` vốn đã có sẵn — chỉ là script này chưa từng hỏi tới.
+   */
+  const landing = reviewUsageLanding(page.url(), team);
+  if (landing.kind !== "usage") {
+    const days = daysUntilExpiry(cookies);
+    const hanCookie =
+      days === null
+        ? "tệp cookie không khai hạn"
+        : days < 0
+          ? `cookie đã QUÁ HẠN ${-days} ngày`
+          : `cookie còn ${days} ngày`;
+    const oCookie = cookieEnv ? `secret ${cookieEnv}` : `tệp ${cookieFile}`;
+    console.error(
+      landing.kind === "signedOut"
+        ? `Phiên Vercel của đội「${team}」đã hết: trang đá về ${landing.url}\n` +
+          `  ${hanCookie} — xuất lại cookie rồi cập nhật ${oCookie}.\n` +
+          "  (Cookie hết hiệu lực KHÔNG trả mã lỗi, nó trả 307 sang cửa đăng nhập.)"
+        : `Không dừng lại ở bảng Usage của đội「${team}」mà ở ${landing.url}\n` +
+          `  ${hanCookie}, và đích đến KHÔNG phải cửa đăng nhập — nhiều khả năng Vercel đã dời\n` +
+          "  trang Usage. Sửa đường dẫn trong scripts/vercelUsageFull.mts, đừng làm mới cookie.",
+    );
+    process.exit(1);
+  }
+
   /** Một lượt render đã đọc: tám cột đã chọn, kèm TRỌN bảng thô sinh ra chúng. */
   type Attempt = { selection: Selection; rows: Meter[] };
 
@@ -192,9 +226,14 @@ try {
     // KHAI RA TÊN THẬT ĐÃ THẤY, đừng bắt người ta mở Chromium lên soi tay. Ngày Vercel đổi chữ
     // trên một thẻ, đây là dòng biến một lượt đỏ mù thành một lượt sửa dài đúng một dòng.
     const near = nearMisses(seenAll, selection.missing);
+    // KHAI LUÔN TRANG ĐANG ĐỨNG. Phép gác trước lúc cào chỉ bắt được cú chuyển hướng của MÁY
+    // CHỦ; một lượt đá về cửa đăng nhập bằng JS xảy ra SAU `domcontentloaded` thì lúc ấy URL vẫn
+    // còn đúng, và đường duy nhất còn lại để nhận ra nó là dòng này.
+    const ketThuc = reviewUsageLanding(page.url(), team);
     console.error(
       `Hết ${SETTLE_TIMEOUT_MS / 1000}s mà vẫn thiếu ${selection.missing.length} cột: ${selection.missing.join(", ")}.\n` +
         "Không in bảng thiếu — một bảng thiếu trông y hệt một bảng đủ.\n" +
+        `Dừng ở: ${page.url()}${ketThuc.kind === "signedOut" ? "  ← CỬA ĐĂNG NHẬP, phiên đã hết" : ""}\n` +
         (near.length > 0
           ? `Tên gần giống ĐÃ THẤY trên trang: ${near.join(" · ")}\n` +
             "→ Vercel đổi chữ? Chép tên mới vào WANTED_TITLES (scripts/usageMeters.mts).\n"

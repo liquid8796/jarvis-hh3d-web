@@ -11,6 +11,57 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.1 — Workflow「Vercel usage」: phiên chết nay kêu sau 6 giây thay vì 18 phút
+
+Tông chủ báo workflow đang đỏ. Lượt 145 và 146 (17/08/2026) hỏng; lượt 144 và trước đó xanh.
+Hai lượt đỏ **kéo dài 1007s và 1088s**, trong khi một lượt khoẻ chỉ tốn ~100s — gấp mười lần, và
+sát trần `timeout-minutes: 20` của job. Không trạm nào đẩy được số liệu: cả năm dòng trong sổ
+gương đứng im ở `12:56Z`, đúng lượt 144.
+
+**Cái hỏng nằm ở phép gác, không ở hai commit đứng cạnh nó.** Script cào chỉ có một lưới chống
+phiên chết:
+
+```ts
+if (res && res.status() >= 400) { … "cookie hết hiệu lực" … }
+```
+
+Lưới ấy **không bao giờ chạy được**. Đo trực tiếp 17/08: `GET https://vercel.com/<slug>/~/usage`
+không cookie trả **307 → `/auth-redirect/<slug>/~/usage`**, rồi tiếp tới `/login`. Playwright đi
+theo chuyển hướng và dừng ở một trang đăng nhập **HTTP 200 hoàn toàn hợp lệ**. Nên thay vì kêu,
+lượt chạy đem trang đăng nhập ra cào: thiếu cả tám cột → tải lại → chờ thêm 90 giây → thiếu tiếp
+→ chết sau 180 giây mỗi trạm. Đầu tệp workflow hứa「COOKIE HẾT HẠN thì workflow ĐỎ chứ không im
+lặng」; lời hứa ấy đúng về mã thoát và sai về mọi thứ còn lại.
+
+Tệ nhất là câu chẩn đoán cuối: nó đoán giữa ba nguyên nhân không liên quan — chưa render xong,
+cookie mở được một phần, hay Vercel đổi chữ — nên đọc log xong vẫn không biết phải sửa gì. Đó
+chính là lý do lượt hỏng này phải lần ra bằng cách đo thời lượng chạy chứ không đọc được thẳng.
+
+**Thuốc: `reviewUsageLanding` (thuần, trong `usageStations.mts`)** — so ĐƯỜNG DẪN nơi trình duyệt
+thật sự dừng lại với `/<team>/~/usage`, rồi chia hai ngả hỏng thay vì gộp:
+
+| ngả | nghĩa | việc phải làm |
+|---|---|---|
+| `signedOut` | rơi vào `auth-redirect` · `login` · `signin` · `sso` | xuất lại cookie, cập nhật secret |
+| `elsewhere` | dừng ở chỗ khác hẳn | Vercel dời trang — sửa đường dẫn, ĐỪNG đụng cookie |
+
+Gộp hai ngả lại là đẩy người ta đi làm mới cookie cả buổi cho một cái hỏng không nằm ở đó, nên
+chúng tách. Dòng lỗi kể nguyên văn URL đích, kèm hạn cookie còn lại (`daysUntilExpiry` vốn có
+sẵn và đã được kiểm kỹ — chỉ là script cào chưa từng hỏi tới nó).
+
+Còn một lỗ hẹp: phép gác chạy ngay sau `domcontentloaded`, nên một cú đá về cửa đăng nhập bằng
+JS xảy ra SAU đó vẫn lọt. Bịt bằng cách cho chính lời chẩn đoán「thiếu cột」khai luôn trang đang
+đứng — đường duy nhất còn lại để nhận ra ngả ấy.
+
+**Đo trên Vercel thật, cookie giả, đội `jarvis8796`: dừng sau 6 giây**, mã thoát 1, và dòng lỗi
+gọi đúng tên cả nguyên nhân lẫn secret phải làm mới. Năm trạm ≈ 30 giây thay cho 1088 giây.
+
+Mười hai phép thử mới trong `verify:usage-push` (61 phép, tất cả thuận): trang đúng · query/hash
+· gạch chéo đuôi · slug viết hoa · ba cửa đăng nhập · trang bị dời · đội khác · `about:blank` ·
+chuỗi rỗng.
+
+**Bản vá này KHÔNG làm workflow xanh lại** — nó làm cho lượt đỏ kế tiếp nói ra nguyên nhân trong
+sáu giây. Nếu đó là cookie hết hạn thì việc làm mới là của tông chủ (`npm run usage:cookie`).
+
 ## 1.3.0 — Phần Thưởng Hoạt Động: hai rương mốc 75%/100% trên hub (schema hồ sơ 66)
 
 Nhiệm vụ mới, hai twin VIP/thường, dựng từ bản ghi `phan-thuong-hoat-dong-20260817-022120`

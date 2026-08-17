@@ -17,7 +17,7 @@
 import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { type Meter, looksLikeStationHop, MAX_STATION_HOPS, pushUsageReport, REPORT_PATH } from "./usagePush.mts";
-import { daysUntilExpiry, parseUsageStations, readCookieFile } from "./usageStations.mts";
+import { daysUntilExpiry, parseUsageStations, readCookieFile, reviewUsageLanding } from "./usageStations.mts";
 
 const results: string[] = [];
 const check = (name: string, ok: boolean, detail = "") => {
@@ -324,6 +324,44 @@ try {
     daysUntilExpiry([{ name: "authorization", value: "v", expirationDate: (moc + 30 * ngay - 3_600_000) / 1000 }], moc) === 29,
   );
   check("cookie phiên thuần (không khai hạn) → null, không đoán", daysUntilExpiry([auth]) === null);
+}
+
+// ── Trang đích sau khi điều hướng ────────────────────────────────────────────────────────────
+//
+// Cụm này canh đúng cái đã làm workflow「Vercel usage」đỏ hai lượt liền ngày 17/08/2026 mà không
+// ai đọc log ra được: phiên chết KHÔNG trả mã lỗi, nó trả 307 sang `/auth-redirect/…` và
+// Playwright dừng ở một trang đăng nhập HTTP 200. Phép gác `>= 400` của script cào vì thế không
+// bao giờ chạy, và lượt hỏng tốn 180 giây mỗi trạm thay vì một giây.
+{
+  const tren = (url: string, team = "jarvis8796") => reviewUsageLanding(url, team);
+
+  check(
+    "đứng đúng bảng Usage → đi tiếp",
+    tren("https://vercel.com/jarvis8796/~/usage").kind === "usage",
+  );
+  check(
+    "query/hash không làm nó tưởng đã lạc",
+    tren("https://vercel.com/jarvis8796/~/usage?from=nav#fluid").kind === "usage",
+  );
+  check("gạch chéo đuôi cũng vậy", tren("https://vercel.com/jarvis8796/~/usage/").kind === "usage");
+  check(
+    "slug viết hoa vẫn nhận ra",
+    tren("https://vercel.com/JARVIS8796/~/usage", "jarvis8796").kind === "usage",
+  );
+
+  // Đây là ngả THẬT của cookie hết hạn — đo bằng một lượt GET không cookie ngày 17/08/2026.
+  const daVe = tren("https://vercel.com/auth-redirect/jarvis8796/~/usage");
+  check("307 về auth-redirect → hết phiên, và kể lại URL", daVe.kind === "signedOut" && daVe.url.includes("auth-redirect"), daVe.kind);
+  check("cửa /login cũng là hết phiên", tren("https://vercel.com/login?next=%2Fjarvis8796").kind === "signedOut");
+  check("cửa /signin cũng vậy", tren("https://vercel.com/signin").kind === "signedOut");
+
+  // VÀ KHÔNG ĐƯỢC GỘP HAI NGẢ HỎNG: gọi một trang bị DỜI là「hết phiên」sẽ đẩy người ta đi làm
+  // mới cookie cả buổi cho một cái hỏng không nằm ở đó.
+  const doiCho = tren("https://vercel.com/jarvis8796/~/settings/usage");
+  check("trang bị dời → 'elsewhere', KHÔNG phải hết phiên", doiCho.kind === "elsewhere", doiCho.kind);
+  check("đội khác → cũng không phải hết phiên", tren("https://vercel.com/mot-doi-khac/~/usage").kind === "elsewhere");
+  check("URL hỏng không làm nó ném", tren("about:blank").kind === "elsewhere");
+  check("chuỗi rỗng cũng không ném", tren("").kind === "elsewhere");
 }
 
 for (const line of results) console.log(`  ${line}`);

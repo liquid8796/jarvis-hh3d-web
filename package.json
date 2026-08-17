@@ -76,6 +76,7 @@
     "github:new": "tsx scripts/newGithubStation.mts",
     "github:remove": "tsx scripts/removeGithubKhoiloi.mts",
     "github:deploy": "tsx scripts/deployGithubKhoiloi.mts",
+    "github:rename": "tsx scripts/renameGithubKhoiloi.mts",
     "verify:github-deploy": "tsx scripts/verifyGithubDeploy.mts",
     "roster:purge": "tsx scripts/purgeRosterCli.mts",
     "verify:keepalive-live": "tsx scripts/verifyKeepaliveLive.mts",

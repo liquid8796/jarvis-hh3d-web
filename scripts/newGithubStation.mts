@@ -194,15 +194,12 @@ async function main(): Promise<void> {
    * kho nào, không phải tra sổ. Hai chuỗi ngẫu nhiên rời nhau thì giấu được nhiều hơn đúng một
    * chút, mà đổi lại mỗi lần cần lần ngược đều phải mở sổ ra dò.
    *
-   * Soát TRÙNG với sổ trước khi lấy: bốn hex làm trùng lặp hiếm, không làm nó bất khả, mà `id`
-   * lại là khoá chính của bảng `workers` — hai khôi lỗi cùng id là hai tiến trình ghi đè nhau.
+   * Phép soát TRÙNG KHÔNG đứng ở đây, và chỗ ấy là một lỗi đã suýt đi vào production: sổ chỉ được
+   * nạp ở bước ghi (`getAppSettings` cuối tệp), nên đọc nó tại đây là chạm vào một `const` chưa
+   * khởi tạo — `tsc` không bắt vì hai chỗ khác tầng hàm, còn lượt chạy thật thì chết ngay dòng
+   * đầu. Phép soát vì thế nằm ở bước ghi, nơi sổ đã có thật.
    */
-  const taken = new Set(
-    (settings.githubStations ?? []).flatMap((s) => [s.repo.toLowerCase(), s.workerId.toLowerCase()]),
-  );
-  let generated = randomSoftwareName();
-  for (let attempt = 0; taken.has(generated) && attempt < 20; attempt++) generated = randomSoftwareName();
-  if (taken.has(generated)) die("Rút hai chục lần vẫn trùng tên đã có trong sổ — chuyện này không nên xảy ra.");
+  const generated = randomSoftwareName();
 
   const workerId = generated;
   const repo = arg("repo") ?? generated;
@@ -358,6 +355,19 @@ async function main(): Promise<void> {
   const fresh = await getAppSettings();
   if (fresh.githubStations.some((s) => stationSlug(s) === slug)) {
     die(`Sổ vừa có thêm kho「${slug}」trong lúc dựng — có phiên khác đang làm cùng việc. Không ghi đè.`);
+  }
+  /**
+   * `workerId` là KHOÁ CHÍNH của bảng `workers`: hai khôi lỗi cùng id là hai tiến trình ghi đè
+   * nhau trong sổ điểm danh, và mục Khôi Lỗi nói dối về việc ai đang trực. Tên rút ngẫu nhiên
+   * (360 cặp từ × 65536 hex) nên trùng là chuyện hiếm tới mức không đáng vòng lặp rút lại — nhưng
+   * hiếm không phải là không, và chỗ này là nơi DUY NHẤT biết được sự thật ấy.
+   */
+  if (fresh.githubStations.some((s) => s.workerId.toLowerCase() === workerId.toLowerCase())) {
+    die(
+      `WORKER_ID「${workerId}」vừa trùng một dòng đã có trong sổ — rút trúng cùng một cái tên.
+` +
+        "  Chạy lại lệnh là xong: lượt sau rút một tên khác.",
+    );
   }
   if (fresh.githubStations.length >= GITHUB_STATION_LIMIT) {
     die(

@@ -40,6 +40,7 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomSoftwareName, reviewGeneratedName } from "./khoiloiNaming.mjs";
+import { looksTransient } from "./githubTransient.mjs";
 import {
   buildKhoiloiPayload,
   playwrightVersionOf,
@@ -173,6 +174,47 @@ function run(cmd, args, options = {}) {
 const sleepSync = (ms) => {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 };
+
+/** Song sinh với `IDENTITY_ATTEMPTS`/`IDENTITY_BACKOFF_MS` của `newGithubStation.mts`. */
+const GH_ATTEMPTS = 3;
+const GH_BACKOFF_MS = 2_000;
+
+/**
+ * Gọi `gh` và THỬ LẠI khi GitHub chỉ đang nấc — dành cho những bước mà một cú hỏng để lại rác
+ * ngoài đời thật.
+ *
+ * VÌ SAO CÓ NÓ (đo 17/08/2026, log của tông chủ): `gh secret set` trúng một cú
+ * `HTTP 503: No server is currently available…` và cả lượt dựng chết — bỏ lại một kho CÔNG KHAI
+ * đã có mã, đã push, mà KHÔNG có secret, tức một khôi lỗi không bao giờ xác thực nổi. Bước ngay
+ * dưới (`gh workflow run`) đã có vòng thử lại từ trước; bước dán secret thì không, dù nó mới là
+ * bước mà một cú hỏng phải trả giá đắt nhất.
+ *
+ * Bắt stderr về (`pipe`) thay vì để nó chảy thẳng ra màn hình: không có văn bản thì không phân
+ * loại được thoáng-qua với hỏng-thật — đúng chỗ log hôm ấy chỉ còn `stderr: null`. Bù lại, phải
+ * TỰ IN nó ra, và in ở MỌI lượt hỏng, để người đọc không mất một dòng nào so với trước.
+ */
+function runWithRetry(label, cmd, args, options = {}) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return execFileSync(cmd, args, {
+        cwd: options.cwd ?? repoRoot,
+        encoding: "utf8",
+        input: options.input,
+        stdio: [options.input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
+        timeout: options.timeout ?? 60_000,
+        env: options.env ?? process.env,
+      });
+    } catch (err) {
+      const why = [err.stderr, err.stdout, err.message].map((p) => String(p ?? "").trim()).filter(Boolean).join("\n");
+      if (why) console.error(why);
+      if (attempt >= GH_ATTEMPTS || !looksTransient(why)) throw err;
+      console.error(
+        `  … ${label}: GitHub đang nấc, thử lại lần ${attempt + 1}/${GH_ATTEMPTS} sau ${GH_BACKOFF_MS / 1000}s`,
+      );
+      sleepSync(GH_BACKOFF_MS);
+    }
+  }
+}
 
 /**
  * Mọi cờ `gh` mà script sắp gọi có THẬT SỰ tồn tại trong bản `gh` dưới máy không.
@@ -389,11 +431,34 @@ try {
   // Bản trước gọi `--body-file -`, một cờ của `gh release create` lạc sang đây; nó chết ở đúng
   // bước SAU `gh repo create --push`, bỏ lại một kho công khai không secret. Xem
   // `assertGhSupportsPlannedCalls`, thứ sinh ra từ chính lượt hỏng ấy.
-  execFileSync("gh", ["secret", "set", "WORKER_TOKEN", "--repo", slug], {
-    input: token,
-    stdio: ["pipe", "inherit", "inherit"],
-    timeout: 60_000,
-  });
+  //
+  // Và nó đi qua `runWithRetry`: một cú 503 của GitHub ở ĐÚNG bước này để lại thứ tệ nhất mà
+  // script có thể để lại — một kho công khai đã push, không secret. Xem `runWithRetry`.
+  try {
+    runWithRetry("dán secret", "gh", ["secret", "set", "WORKER_TOKEN", "--repo", slug], {
+      input: token,
+      timeout: 60_000,
+    });
+  } catch (err) {
+    // HẾT ĐƯỜNG THỬ LẠI THÌ DỌN, đừng để lại xác. Kho này do CHÍNH lượt chạy này tạo ra vài giây
+    // trước, chưa có secret, chưa vào sổ, chưa từng chạy một lượt Actions nào — không có thứ gì
+    // của ai khác trong đó để mà tiếc. Đây là ngoại lệ hẹp của luật「xoá kho phải có bằng chứng」
+    // (`reviewRemoval`): bằng chứng ở đây là mạnh nhất có thể — ta vừa tự tay tạo nó.
+    console.error(`\n✖ Dán secret hỏng sau ${GH_ATTEMPTS} lần — dọn lại kho vừa tạo…`);
+    try {
+      runWithRetry("xoá kho dở", "gh", ["repo", "delete", slug, "--yes"], { timeout: 60_000 });
+      console.error(`  đã xoá ${slug}. Không còn kho không-secret nào nằm lại. Chạy lại lệnh dựng là xong.`);
+    } catch {
+      // Thiếu scope `delete_repo` là ca thường gặp nhất ở đây, và nó KHÔNG phải lỗi của người
+      // dùng: chìa dựng kho không bắt buộc phải mở được cửa xoá. Nói thẳng việc phải làm tay.
+      console.error(
+        `  KHÔNG xoá được ${slug} (PAT thiếu quyền delete_repo?) — vào xoá tay rồi hãy chạy lại:\n` +
+          `    https://github.com/${slug}/settings\n` +
+          "  Để nguyên là để lại một kho công khai không bao giờ trực được ca nào.",
+      );
+    }
+    throw err;
+  }
 
   console.log("── Bấm chạy lượt đầu…");
   /**

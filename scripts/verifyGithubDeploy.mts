@@ -23,6 +23,7 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { DEFAULT_WORKFLOW_FILE } from "../src/lib/validation/githubStations";
+import { looksTransient } from "./githubTransient.mjs";
 import {
   activeRunIds,
   activeRuns,
@@ -402,6 +403,47 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
     lockfile: Buffer.from("{}"),
   });
   check("lockfile không khai số bản → không chặn lượt dựng", quiet.has("package-lock.json"));
+}
+
+// ---- looksTransient: nhịp nấc của GitHub, và ranh giới không được nhích -------------------
+// Sinh ra từ log 17/08/2026: `gh secret set` trúng một cú 503 và cả lượt DỰNG chết, bỏ lại một
+// kho công khai đã push mà không có secret. Hàm này quyết định thử lại hay dọn rác, nên hai
+// chiều đều phải đóng đinh — nhận hụt thì mất một kho, nhận thừa thì cái kho hỏng dở nằm lại
+// lâu thêm trong lúc script thử lại một câu trả lời đã biết.
+{
+  console.log("\nlooksTransient — 5xx và mạng đứt thì thử lại, 4xx thì KHÔNG");
+
+  const transient = [
+    "failed to fetch public key: HTTP 503: No server is currently available to service your request. Sorry about that. Please try resubmitting your request",
+    "HTTP 502: Bad gateway",
+    "HTTP 500",
+    "HTTP 429: too many requests",
+    "You have exceeded a secondary rate limit",
+    "dial tcp: lookup api.github.com: EAI_AGAIN",
+    "read tcp 10.0.0.1:443: ECONNRESET",
+    "Post \"https://api.github.com/…\": net/http: TLS handshake timeout",
+  ];
+  for (const text of transient) {
+    check(`thoáng qua: ${text.slice(0, 46)}…`, looksTransient(text));
+  }
+
+  const permanent = [
+    "HTTP 401: Bad credentials",
+    "HTTP 403: Resource not accessible by personal access token",
+    "HTTP 404: Not Found",
+    "HTTP 422: Validation Failed (name already exists on this account)",
+    "unknown flag: --body-file",
+    "",
+    null,
+    undefined,
+  ];
+  for (const text of permanent) {
+    check(`KHÔNG thử lại: ${JSON.stringify(text)?.slice(0, 46) ?? "(rỗng)"}`, !looksTransient(text));
+  }
+
+  // Cái bẫy gần nhất của một regex viết vội: "HTTP 404" chứa "40", "HTTP 4295" không phải 429.
+  check("ranh giới số: 4295 không phải 429", !looksTransient("HTTP 4295: chuyện lạ"));
+  check("ranh giới số: 5001 không phải 500", !looksTransient("HTTP 5001: chuyện lạ"));
 }
 
 console.log(`\n✔ ${checks} phép kiểm, tất cả xanh.`);

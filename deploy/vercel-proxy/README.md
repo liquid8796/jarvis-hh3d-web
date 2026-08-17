@@ -1,7 +1,7 @@
 # Vỏ proxy Vercel — thứ DUY NHẤT còn deploy lên các trạm từ 16/08/2026
 
 Backend (app Next.js + Postgres + MongoDB) sống trọn trên VM OCI `jarvis-oci-01`
-(`https://92.5.130.32.sslip.io`). Mỗi trạm Vercel nay chỉ là **một tấm rewrite**: mọi
+(`https://158.180.59.36.sslip.io`). Mỗi trạm Vercel nay chỉ là **một tấm rewrite**: mọi
 request tới `auto-hh3d*.vercel.app` được Vercel chuyển nguyên vẹn (method, body, cookie)
 về backend, và trả nguyên vẹn câu trả lời. Người dùng giữ đúng URL cũ; cookie phiên vẫn
 same-origin vì trình duyệt chưa bao giờ thấy địa chỉ VM.

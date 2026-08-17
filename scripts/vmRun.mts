@@ -33,7 +33,7 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 
-const VM_HOST = "92.5.130.32";
+const VM_HOST = "158.180.59.36";
 const VM_USER = "ubuntu";
 const SSH_KEY = path.join(process.env.USERPROFILE ?? process.env.HOME ?? "~", ".ssh", "jarvis_oci_ed25519");
 /** Bản clone vận hành — bản DUY NHẤT trên VM có `.git`. */

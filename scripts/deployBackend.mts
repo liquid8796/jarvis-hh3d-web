@@ -34,10 +34,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-const VM_HOST = "92.5.130.32";
+const VM_HOST = "158.180.59.36";
 const VM_USER = "ubuntu";
 const SSH_KEY = path.join(process.env.USERPROFILE ?? process.env.HOME ?? "~", ".ssh", "jarvis_oci_ed25519");
-const BACKEND_URL = "https://92.5.130.32.sslip.io";
+const BACKEND_URL = "https://158.180.59.36.sslip.io";
 /** Đường rẻ nhất chứng minh một chỗ chạy đã SẴN SÀNG: nó chạm database, không chỉ mở cổng. */
 const HEALTH_PATH = "/api/maintenance";
 const PORTS = [3000, 3001] as const;

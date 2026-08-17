@@ -26,7 +26,7 @@ import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
 
-const BACKEND_URL = "https://92.5.130.32.sslip.io";
+const BACKEND_URL = "https://158.180.59.36.sslip.io";
 const SHELL_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "deploy", "vercel-proxy");
 const SHELL_FILES = ["vercel.json", "__proxy.txt"];
 

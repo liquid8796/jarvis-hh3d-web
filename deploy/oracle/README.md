@@ -96,8 +96,8 @@ dán `~/.oci/jarvis_api_key_public.pem`.
 | Thông số | Giá trị |
 |---|---|
 | tên | `jarvis-oci-01` (hostname `jarvis01`) |
-| IP | **`92.5.130.32`** — public IP **RESERVED**, thuộc về tài khoản chứ không thuộc về máy |
-| SSH | `ssh -i ~/.ssh/jarvis_oci_ed25519 ubuntu@92.5.130.32` |
+| IP | **`158.180.59.36`** — public IP **RESERVED**, thuộc về tài khoản chứ không thuộc về máy |
+| SSH | `ssh -i ~/.ssh/jarvis_oci_ed25519 ubuntu@158.180.59.36` |
 | shape | `VM.Standard.A1.Flex` — 4 OCPU / 24 GB / 4 Gbps |
 | đĩa | boot volume **100 GB**, VPU 10 |
 | OS | Ubuntu 24.04 LTS aarch64 |
@@ -115,7 +115,7 @@ Cùng ngày dựng lại máy, tông chủ quyết: **backend + database rời h
 | app | **hai chỗ chạy**: systemd `jarvis-web@3000` + `jarvis-web@3001`, mỗi chỗ có `/opt/jarvis/slot-<cổng>` (symlink → `/opt/jarvis/releases/<sha>`) |
 | bản đang phục vụ | `/etc/caddy/upstream.conf` — MỘT dòng, nguồn sự thật duy nhất; đổi nó rồi `caddy reload` là chuyển bản |
 | env | `/opt/jarvis/shared/.env` (jarvis-only 600; mỗi release symlink `.env` về đây) |
-| TLS | Caddy, `https://92.5.130.32.sslip.io` (Let's Encrypt HTTP-01 qua sslip.io) |
+| TLS | Caddy, `https://158.180.59.36.sslip.io` (Let's Encrypt HTTP-01 qua sslip.io) |
 | Postgres 17 | localhost:5432, db/role `jarvis`, mật khẩu `/etc/jarvis/pg-password` (root-only) |
 | MongoDB 8.0 | localhost:27017, db `jarvis` (tên theo nấc mặc định của `dbName.ts`) |
 | cron | systemd `jarvis-cron.timer` 03:00 UTC → `/api/cron` với `CRON_SECRET` — thay Vercel Cron |

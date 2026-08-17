@@ -161,12 +161,12 @@ fi
 # sslip.io là đường TLS chính (Let's Encrypt HTTP-01 qua cổng 80); khối IP trần
 # thử thêm chứng chỉ IP shortlived — hỏng cũng không kéo khối kia theo.
 cat > /etc/caddy/Caddyfile <<'CADDY'
-92.5.130.32.sslip.io {
+158.180.59.36.sslip.io {
 	import /etc/caddy/upstream.conf
 	encode zstd gzip
 }
 
-92.5.130.32 {
+158.180.59.36 {
 	import /etc/caddy/upstream.conf
 	encode zstd gzip
 }

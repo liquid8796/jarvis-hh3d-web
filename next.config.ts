@@ -25,7 +25,7 @@ const nextConfig: NextConfig = {
         "auto-hh3d-2.vercel.app",
         "auto-hh3d-3.vercel.app",
         "auto-hh3d-4.vercel.app",
-        "92.5.130.32.sslip.io",
+        "158.180.59.36.sslip.io",
       ],
     },
   },

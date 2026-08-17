@@ -66,6 +66,22 @@ const NEAR_TOP_PX = 80;
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
 /**
+ * Đường kính chân dung trong sảnh, và cũng là bề rộng LÀN mà tin nối tiếp phải chừa ra
+ * (`.chat-avatar-gap`) — một con số cho cả hai, vì hai lane lệch nhau một pixel là cả cột bong
+ * bóng của một người gãy hàng lề.
+ *
+ * Đo bằng MẮT trên ảnh chụp thật, không suy từ con số. Từng là 78px; hạ còn 62px ngày
+ * 09/08/2026 vì đạo hữu thấy cả hàng danh tính quá khổ. Phải đi CÙNG LƯỢT với `.chat-tagframe`
+ * (92→74px) và `.chat-author` (1.2→1.05rem) trong globals.css: chân dung giữ đúng tỉ lệ 0,77 so
+ * với chiều cao dùng thật của bài vị (74 − 2×13 = 48px), vẫn nhỉnh hơn nó một bậc vì đây là mặt
+ * người còn bài vị chỉ là danh xưng đi kèm. Đổi lẻ một trong ba số là lệch thế cân ấy.
+ *
+ * Lượt thu nhỏ 17/08/2026 KHÔNG đụng tới ba số đó — nó chỉ lấy lại đệm, khe và chiều cao chết
+ * của làn chân dung, tức những chỗ không có gì để đọc.
+ */
+const AVATAR_SIZE = 62;
+
+/**
  * `useLayoutEffect` ở trình duyệt, `useEffect` khi dựng phía server.
  *
  * Phép bù chỗ cuộn BẮT BUỘC phải xong trước khi trình duyệt vẽ: nới cửa sổ là chèn 40 thẻ vào
@@ -636,21 +652,16 @@ export function ChatRoom({
               {showDay && <div className="chat-day"><span>{fmtDay(msg.createdAt)}</span></div>}
 
               <div className={`chat-row ${grouped ? "grouped" : ""}`}>
-                <Avatar
-                  name={msg.author}
-                  url={avatars[msg.userId]}
-                  // Đo bằng MẮT trên ảnh chụp thật, không suy từ con số. Từng là 78px; hạ
-                  // còn 62px ngày 09/08/2026 vì đạo hữu thấy cả hàng danh tính quá khổ.
-                  // Phải đi CÙNG LƯỢT với `.chat-tagframe` (92→74px) và `.chat-author`
-                  // (1.2→1.05rem) trong globals.css: chân dung giữ đúng tỉ lệ 0,77 so với
-                  // chiều cao dùng thật của bài vị (74 − 2×13 = 48px), vẫn nhỉnh hơn nó một
-                  // bậc vì đây là mặt người còn bài vị chỉ là danh xưng đi kèm. Đổi lẻ một
-                  // trong ba số là lệch thế cân ấy.
-                  size={62}
-                  // Tin nối tiếp cùng người thì vòng tròn ẨN mà vẫn CHIẾM chỗ, để mọi bong
-                  // bóng của cùng một người thẳng một hàng lề.
-                  className={grouped ? "invisible" : ""}
-                />
+                {grouped ? (
+                  // Tin nối tiếp cùng người: chừa đúng LÀN của chân dung để mọi bong bóng của
+                  // một người thẳng một hàng lề — và chỉ có thế. Trước 17/08/2026 chỗ này là
+                  // chính vòng tròn ấy đeo lớp `.invisible`: ẩn mà vẫn chiếm 62px chiều cao,
+                  // tức mỗi tin nối tiếp gánh ~24px trống không ai đọc được. Xem
+                  // `.chat-avatar-gap` trong globals.css.
+                  <span className="chat-avatar-gap" style={{ width: AVATAR_SIZE }} aria-hidden="true" />
+                ) : (
+                  <Avatar name={msg.author} url={avatars[msg.userId]} size={AVATAR_SIZE} />
+                )}
 
                 <div className="chat-bubble-col">
                   {!grouped && (() => {

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.3",
+    date: "2026-08-17",
+    lines: [
+      "Phòng Chat: mỗi lời nói nay chiếm ít chỗ hơn — bong bóng bớt độn, khoảng hở giữa hai người nói liền nhau hẹp lại.",
+      "Những tin nối tiếp của cùng một người thôi chừa một khoảng trống cao bằng ảnh đại diện, nên một màn hình chứa được nhiều lượt trò chuyện hơn hẳn.",
+      "Cỡ chữ, ảnh đại diện và bài vị giữ nguyên — chỉ những chỗ trống không có gì để đọc bị thu lại.",
+    ],
+  },
+  {
     version: "1.3.2",
     date: "2026-08-17",
     lines: [

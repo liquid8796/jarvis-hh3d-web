@@ -11,6 +11,48 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.3 — Phòng Chat: mỗi khoảnh tin thu lại, và 24px trống của tin nối tiếp bị dẹp
+
+Yêu cầu 17/08/2026: *"giảm kích thước mỗi container chứa message chat của từng user"*. Lượt
+11/08 đã hạ một nấc (khe hàng 24→14px, đệm bong bóng 12/18/11 → 8/16), nên lượt này bắt đầu
+bằng phép cộng xem chiều cao thật sự đi đâu — chứ không hạ tiếp cho có:
+
+| | tin ĐẦU của một người | tin NỐI TIẾP |
+|---|---|---|
+| `margin-top` của `.chat-row` | 14 | 2 |
+| hàng danh tính (bài vị 74 − 26 margin âm, + 2 khe) | 50 | — |
+| bong bóng (8+8 đệm + 24 dòng + 2 viền) | 42 | 42 |
+| **chân dung `flex: none`** | 62 (không phải trần) | **62 — CHÍNH LÀ trần** |
+| **tổng** | **106px** | **64px** |
+
+**Chỗ lãng phí lớn nhất không nằm ở đệm, mà ở làn chân dung của tin nối tiếp.** Vòng tròn ấy
+đeo lớp `.invisible` (Tailwind: `visibility: hidden`) — ẩn đi nhưng vẫn là một flex item cao
+62px, trong khi bong bóng một dòng chỉ cao 42px. Chú thích cũ trong `ChatRoom.tsx` nói rõ ý đồ
+chỉ là *"để mọi bong bóng của cùng một người thẳng một hàng lề"* — tức bề NGANG. 24px trống
+kia là tác dụng phụ chưa ai đo, và nó gánh trên MỌI tin nối tiếp của MỌI người.
+
+Nay tin nối tiếp vẽ một `<span class="chat-avatar-gap">` rộng đúng `AVATAR_SIZE`, cao **0**.
+`height: 0` phải viết tường minh: `align-items` mặc định là `stretch`, một flex item không khai
+chiều cao sẽ bị kéo cao bằng cả hàng — đúng cái bẫy vừa gỡ. Bề rộng do TSX đặt, dùng chung hằng
+`AVATAR_SIZE` với chính vòng tròn, vì hai làn lệch nhau một pixel là cả cột bong bóng gãy lề.
+
+Các con số còn lại, toàn bộ là chỗ **không có gì để đọc**:
+
+- `.chat-row` khe hàng 14 → 10px
+- `.chat-author` khe tên↔bong-bóng 2 → 1px
+- `.chat-bubble` đệm `8px 16px` → `6px 14px`, bo góc 14 → 12px, khoảng dòng 1.5 → 1.45
+- `.chat-quote` (bong bóng lồng trong bong bóng, nên đệm cộng dồn) `4px 8px`/mb 6 → `3px 8px`/mb 5
+- `.chat-meta` `6px 0 0 12px` → `4px 0 0 10px`, theo đệm vừa thít lại
+
+**Ba số KHÔNG đụng tới: chân dung 62px, bài vị `.chat-tagframe` 74px, tên 1.05rem.** Chúng là
+một thế cân đã đo bằng bàn thử bốn cỡ ngày 09/08 (ở 66px chữ khắc trên bài vị bắt đầu bết), và
+hạ chúng là hạ thứ người ta phải ĐỌC. Cùng lẽ ấy, cỡ chữ tin nhắn giữ nguyên 1rem.
+
+Cộng lại theo đúng bảng trên: **tin đầu 106 → 96px (−9%), tin nối tiếp 64 → 39px (−39%)** —
+và đã soát lại bằng ảnh chụp production trước/sau, vì một phép cộng CSS không nói hộ được
+「trông có chật không」. Khe hàng hạ được xuống 10px mà không mất phép phân nhịp là nhờ chính điều đó: hai
+loại hàng nay chênh nhau gấp hai lần rưỡi, mắt bắt được nhịp mà không cần khoảng trống.
+
 ## 1.3.2 — `github:new`: 5xx của GitHub thôi bị đổ cho PAT, và thôi vứt chuỗi vừa gõ tay
 
 Lượt chạy `new-github-khoiloi.bat` chết với:

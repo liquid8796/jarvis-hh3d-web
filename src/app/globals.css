@@ -694,12 +694,14 @@ body {
      bề rộng câu chữ, mà mắt không nhận ra chúng đã đi đâu. */
   gap: 16px;
   /* Bản thiết kế vốn thở rộng (24px): mỗi người một khoảnh, không phải một dòng log nén chặt.
-     Hạ còn 14px ngày 11/08/2026 theo yêu cầu「giảm chiều cao mỗi người」— vẫn còn là một
-     khoảnh riêng, chỉ thôi rộng rãi.
-     Đừng hạ tiếp mà không nhìn ảnh chụp: khe này là thứ DUY NHẤT còn tách hai người nói liền
-     nhau, vì tin nối tiếp của CÙNG một người đã có `.chat-row.grouped` (2px) làm dấu. Hai con
-     số xích lại quá gần là mất luôn phép phân nhịp ấy. */
-  margin-top: 14px;
+     24 → 14px ngày 11/08/2026, rồi 14 → 10px ngày 17/08/2026, cả hai lần đều theo yêu cầu
+    「giảm kích thước mỗi khoảnh」.
+     Khe này là thứ DUY NHẤT còn tách hai người nói liền nhau, nên trước nay nó là chỗ cấm hạ
+     mù. Lượt 17/08 hạ được vì phép phân nhịp đã MẠNH THÊM ở chỗ khác chứ không yếu đi: tin nối
+     tiếp nay cao ~39px còn tin mở lời của một người mới cao ~96px (chân dung của tin nối tiếp
+     hết chiếm 62px — xem `.chat-avatar-gap`), tức hai loại hàng chênh nhau gấp đôi rưỡi, mắt
+     bắt được nhịp mà không cần tới khoảng trống. Hạ tiếp thì phải chụp lại mà nhìn. */
+  margin-top: 10px;
   animation: chat-in 0.22s ease-out;
 }
 
@@ -712,9 +714,27 @@ body {
    bong bóng riêng) đã gỡ cùng lượt — gắn lại một cái là sảnh lại lệch. Xem ghi chú tại `own`
    trong ChatRoom.tsx; biến ấy nay chỉ còn giữ quyền Sửa/Thu hồi. */
 
+/**
+ * Chỗ ĐỨNG của chân dung ở tin nối tiếp — rộng đúng bằng vòng tròn, cao BẰNG KHÔNG.
+ *
+ * Trước 17/08/2026 chỗ này là chính vòng tròn ấy mang thêm lớp `.invisible`: ẩn đi mà vẫn
+ * chiếm trọn 62px chiều cao. Ý đồ viết trong ChatRoom.tsx chỉ là「giữ hàng lề」— tức bề NGANG;
+ * 62px chiều cao là tác dụng phụ, và nó là thứ ĐANG QUYẾT ĐỊNH chiều cao mọi tin nối tiếp:
+ * bong bóng một dòng chỉ cao ~38px, nhưng `.chat-row` là flex nên hàng vẫn cao 62px, thừa ra
+ * 24px trống mà không ai đọc được gì trong đó.
+ *
+ * Bề rộng do ChatRoom.tsx đặt qua style (cùng hằng `AVATAR_SIZE` với vòng tròn thật), nên ở đây
+ * chỉ còn hai luật không đổi theo cỡ. `height: 0` phải viết TƯỜNG MINH: `align-items` mặc định
+ * là `stretch`, và một flex item không khai chiều cao sẽ bị kéo cao bằng cả hàng — đúng cái
+ * bẫy vừa gỡ.
+ */
+.chat-avatar-gap {
+  flex: none;
+  height: 0;
+}
+
 /* Vòng kim quang quanh ảnh đại diện — CHỈ trong sảnh: nơi khác (thanh đầu trang, bảng môn
-   đồ) vòng tròn là chi tiết phụ, ở đây nó là chân dung trên bài vị. `.invisible` của tin
-   nối tiếp vẫn ẩn được vì box-shadow đi theo element. */
+   đồ) vòng tròn là chi tiết phụ, ở đây nó là chân dung trên bài vị. */
 .chat-row .avatar {
   box-shadow:
     0 0 0 2px rgba(232, 194, 92, 0.55),
@@ -784,10 +804,10 @@ body {
   font-size: 1.05rem;
   font-weight: 600;
   color: var(--color-parchment);
-  /* Khe tên↔bong-bóng: 6px → 2px ngày 11/08/2026 cùng lượt hạ chiều cao. Chỉ là khoảng trống;
-     bản thân dòng tên KHÔNG bị đụng tới — xem chú thích ở `.chat-tagframe` để biết vì sao
-     chiều cao của nó là chỗ không được hạ mù. */
-  margin: 0 0 2px 4px;
+  /* Khe tên↔bong-bóng: 6px → 2px (11/08/2026) → 1px (17/08/2026), cùng hai lượt hạ chiều cao.
+     Chỉ là khoảng trống; bản thân dòng tên KHÔNG bị đụng tới — xem chú thích ở `.chat-tagframe`
+     để biết vì sao chiều cao của nó là chỗ không được hạ mù. */
+  margin: 0 0 1px 4px;
 }
 
 .chat-crown { color: var(--color-gold-300); font-style: normal; margin-left: 4px; }
@@ -874,15 +894,21 @@ body {
    vừa phải. Cấu trúc đến từ chênh sáng, không phải từ nét kẻ. */
 .chat-bubble {
   position: relative;
-  /* 12px 18px 11px → 8px 16px 8px ngày 11/08/2026: bảy pixel chiều cao và bốn pixel bề ngang
-     mỗi tin, đúng hai hướng đạo hữu xin. Đệm dọc là chỗ rẻ nhất để lấy lại chiều cao — nó
-     không đụng tới cỡ chữ, cỡ chân dung hay bài vị, tức không phá thế cân nào đã đo. */
-  padding: 8px 16px;
-  border-radius: 14px;
+  /* 12px 18px 11px → 8px 16px 8px (11/08/2026) → 6px 14px (17/08/2026). Đệm là chỗ rẻ nhất để
+     lấy lại kích thước — nó không đụng tới cỡ chữ, cỡ chân dung hay bài vị, tức không phá thế
+     cân nào đã đo bằng ảnh chụp.
+     Sàn của nó là chỗ chữ bắt đầu dính vào mép bo góc: ở bán kính 12px, đệm dọc dưới ~4px thì
+     dòng chữ chạm vào cung tròn ở hai đầu. 6px còn chừa được hai pixel. */
+  padding: 6px 14px;
+  /* 14 → 12px cùng lượt: bán kính phải co theo đệm, không thì một bong bóng một dòng trông như
+     viên thuốc — cung tròn ăn gần hết chiều cao khối. */
+  border-radius: 12px;
   background: rgba(41, 42, 78, 0.55);
   border: 1px solid transparent;
   font-size: 1rem;
-  line-height: 1.5;
+  /* 1.5 → 1.45: cỡ chữ giữ nguyên 1rem (đây là chỗ để ĐỌC), chỉ khoảng dòng thít lại — mỗi
+     dòng thứ hai trở đi rẻ đi 0,8px mà mắt không nhận ra. */
+  line-height: 1.45;
 }
 
 /* Clearfix cho mốc giờ float bên dưới — thiếu nó thì giờ tràn ra ngoài đáy bong bóng. */
@@ -905,8 +931,11 @@ body {
   border-left: 2px solid var(--color-gold-400);
   background: rgba(232, 194, 92, 0.07);
   border-radius: 6px;
-  padding: 4px 8px;
-  margin-bottom: 6px;
+  /* 4px 8px / 6px → 3px 8px / 5px ngày 17/08/2026: khối trích dẫn là một bong bóng LỒNG trong
+     bong bóng, nên đệm của nó cộng dồn với đệm ngoài — tin có trả lời vì thế là hàng cao nhất
+     sảnh. Bề ngang giữ nguyên 8px để vạch vàng bên trái không thúc vào chữ. */
+  padding: 3px 8px;
+  margin-bottom: 5px;
   font-size: 0.78rem;
   color: var(--color-mist);
 }
@@ -947,7 +976,10 @@ body {
   float: right;
   font-size: 0.68rem;
   color: rgba(143, 137, 179, 0.9);
-  margin: 6px 0 0 12px;
+  /* 6px 0 0 12px → 4px 0 0 10px ngày 17/08/2026, theo đệm bong bóng vừa thít lại. Khoảng cách
+     mắt thấy giữa giờ và mép bong bóng là margin NÀY cộng đệm bên kia, nên giữ nguyên số cũ
+     trong một bong bóng chật hơn là để mốc giờ trôi xa câu chữ. */
+  margin: 4px 0 0 10px;
   white-space: nowrap;
 }
 

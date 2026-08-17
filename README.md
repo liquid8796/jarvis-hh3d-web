@@ -58,7 +58,8 @@ Mọi khôi lỗi đều là **một tiến trình `worker.mjs` sống dai** —
 - **Khôi lỗi tông môn** — worker do người vận hành nuôi, cầm `WORKER_TOKEN` toàn cục, nhận job
   của mọi thành viên. Từ 12/08/2026 có **HAI** cái cùng hạng: `tong-mon-khoiloi` trên một VM
   Oracle Cloud Always Free (xem [deploy/oracle/README.md](deploy/oracle/README.md), gánh chính)
-  và một cái trên GitHub Actions của **tài khoản khác** (`khoiloi-tro-…`; kho gốc KHÔNG chạy khôi
+  và những cái trên GitHub Actions của **tài khoản khác** (tên ngẫu nhiên kiểu `cobalt-relay-4f2a`
+  — xem luật đặt tên ở [deploy/github-actions.md](deploy/github-actions.md); kho gốc KHÔNG chạy khôi
   lỗi — xem [deploy/github-actions.md](deploy/github-actions.md) §4, cộng thêm). **Không có tầng phân công nào giữa chúng và đừng dựng**: `claimNextJob` là một
   UPDATE nguyên tử nên máy nào rảnh trước thì nhặt trước, còn người dùng chỉ chọn HẠNG khôi lỗi
   chứ không bao giờ chọn máy. Một VM chạy liên tục phục vụ được cả Mê Cung (phiên browser

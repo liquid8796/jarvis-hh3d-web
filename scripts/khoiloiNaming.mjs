@@ -39,45 +39,112 @@ export const FORBIDDEN_NAME_WORDS = Object.freeze([
   "action",
   "workflow",
   "github",
+  // Nhóm thứ BA, thêm 17/08/2026 theo yêu cầu của tông chủ: những chữ của CHÍNH TA. `linh-su` và
+  // `khoiloi` không nói gì với người lạ về trò chơi, nhưng chúng nối các kho lại với nhau — thấy
+  // một cái là dò ra cả đàn, và nối luôn kho GitHub với id trên dashboard. Viết cả hai lối gạch
+  // nối lẫn liền vì tên kho dùng gạch nối còn WORKER_ID thì không nhất thiết.
+  "khoiloi",
+  "khoi-loi",
+  "linhsu",
+  "linh-su",
 ]);
 
 /**
- * Tiền tố tên kho mà lượt dựng đặt. Tên đầy đủ là `<tiền tố>-<mốc thời gian>-<4 ký tự hex>`.
+ * HAI RỔ TỪ ghép thành một cái tên nghe như một thư viện mã nguồn mở bất kỳ.
  *
- * Bản trước là `auto-hh3d-linh-su`, và lời bình cũ ở đó biện hộ cho nó bằng câu「nói ra nó là cái
- * gì thay vì cố giấu: một cái tên vô nghĩa không làm kho khó tìm hơn」. Lý lẽ ấy ĐÃ BỊ BÁC ngày
- * 13/08/2026, và chỗ nó sai là chữ「vô nghĩa」: không ai đòi một cái tên vô nghĩa. `linh-su` vẫn
- * nói đủ cho người vận hành nhận ra kho của mình giữa danh sách — nó chỉ thôi nói cho một ô tìm
- * kiếm biết kho này thuộc về trò gì. Hai việc ấy khác nhau, và lời bình cũ gộp chúng làm một.
+ * Vì sao đổi hẳn sang tên ngẫu nhiên (17/08/2026): một tiền tố cố định là một cái móc. Dù
+ * `linh-su` không nói gì về trò chơi, nó vẫn khiến TÁM kho trên tám tài khoản khác nhau nhận ra
+ * nhau bằng mắt thường — mà cái đàn ấy mới là thứ đáng giấu, không phải từng cái một. Tên ngẫu
+ * nhiên thì mỗi kho đứng một mình.
+ *
+ * Không có mốc thời gian trong tên, và đó cũng là chủ ý: `…-20260813-233056-6143` là chữ ký của
+ * một cỗ máy sinh tên. Một kho tên `cobalt-relay-4f2a` thì không.
+ *
+ * Chọn từ TRUNG TÍNH: vật liệu, màu, địa hình ghép với danh từ hạ tầng. Tránh mọi thứ nghe như
+ * bot/farm/mining, và tất nhiên tránh danh sách cấm ở trên — `verify:khoiloi-naming` soi từng từ
+ * một trong hai rổ, nên thêm một từ hớ vào đây là lưới đỏ ngay dưới máy.
  */
-export const REPO_NAME_PREFIX = "linh-su";
+export const NAME_HEADS = Object.freeze([
+  "amber", "basalt", "cedar", "cinder", "cobalt", "dune", "ember", "flint",
+  "garnet", "harbor", "indigo", "jade", "kelp", "lumen", "marble", "onyx",
+  "quartz", "slate", "tundra", "vellum",
+]);
+
+/** Nửa sau: danh từ hạ tầng, thứ hay thấy trong tên thư viện thật. */
+export const NAME_TAILS = Object.freeze([
+  "atlas", "bridge", "cache", "compass", "forge", "ledger", "lens", "loom",
+  "mesh", "orbit", "pier", "prism", "relay", "render", "scope", "shuttle",
+  "spindle", "vault",
+]);
 
 /**
- * Tiền tố `WORKER_ID`. Tên đầy đủ là `<tiền tố>-<mốc thời gian>` (hoặc `<tiền tố>-<tài khoản>` khi
- * gọi thẳng `newGithubKhoiloi.mjs` không truyền `--worker-id`).
+ * Một cái tên mới: `<đầu>-<đuôi>-<4 hex>`.
  *
- * `tro` là「ở trọ」: khôi lỗi này sống nhờ trên máy của người ta và bị đuổi lúc nào cũng được —
- * khác hẳn `tong-mon-khoiloi` trên VM, thứ tông môn tự nuôi. Phân biệt được hai loại NGAY TRÊN
- * DASHBOARD là công dụng thật của tiền tố, và nó phải sống sót qua lượt đổi tên này: bản trước
- * dùng `github-khoiloi-…`, tức nói đúng điều ấy bằng một từ nằm trong danh sách cấm.
+ * Đuôi hex KHÔNG phải để trang trí — nó là thứ giữ cho hai lượt dựng cùng rơi vào một cặp từ (360
+ * cặp, nên trùng là chuyện thường) vẫn ra hai cái tên khác nhau. Người gọi vẫn phải soát trùng
+ * với sổ: hex chỉ làm trùng lặp HIẾM, không làm nó bất khả.
+ *
+ * `pick` tiêm vào được để lưới kiểm chứng chạy tất định; mặc định là ngẫu nhiên thật.
+ *
+ * @param {(n: number) => number} [pick] trả về một số nguyên trong [0, n)
  */
-export const KHOILOI_ID_PREFIX = "khoiloi-tro";
+export function randomSoftwareName(pick = (n) => Math.floor(Math.random() * n)) {
+  const head = NAME_HEADS[pick(NAME_HEADS.length)];
+  const tail = NAME_TAILS[pick(NAME_TAILS.length)];
+  const hex = Array.from({ length: 4 }, () => "0123456789abcdef"[pick(16)]).join("");
+  return `${head}-${tail}-${hex}`;
+}
 
 /**
- * Những tiền tố tên kho mà các bản TRƯỚC từng đặt.
+ * HÌNH DẠNG của một cái tên do ta sinh ra — thứ thay chỗ cho「bắt đầu bằng tiền tố」sau lượt đổi
+ * sang tên ngẫu nhiên.
  *
- * Có mặt ở đây vì lượt XOÁ dùng tiền tố làm bộ lọc rẻ để khoanh vùng ứng viên trên một tài khoản.
- * Bỏ tiền tố cũ đi là làm những kho đã dựng trước 13/08/2026 tàng hình trước chính công cụ dọn của
- * mình — mà đúng cảnh cần dọn nhất, kho rỗng dựng dở (`gh repo create --push` chết giữa chừng),
- * lại là cảnh KHÔNG có dòng nào trong sổ để bắt bằng đường khác.
+ * Lượt XOÁ cần một bộ lọc rẻ để khoanh vùng ứng viên trên một tài khoản, và trước đây nó lọc bằng
+ * tiền tố. Tên ngẫu nhiên không còn tiền tố nào, nên nếu bỏ trắng chỗ này thì **kho dựng dở** —
+ * cảnh cần dọn nhất, và cũng là cảnh KHÔNG có dòng nào trong sổ để bắt bằng đường khác — sẽ tàng
+ * hình trước chính công cụ dọn của mình.
+ *
+ * Nên bộ lọc chuyển từ TỪ sang HÌNH: hai từ thường và bốn ký tự hex. Nó đủ hẹp để chỉ còn vài ứng
+ * viên trên một tài khoản, và đủ tầm thường để không nói gì với người lạ. Vẫn KHÔNG phải giấy
+ * phép xoá — `Evidence` mới là, y như trước.
+ */
+/**
+ * `name` trong `package.json` của kho khôi lỗi — MỘT chuỗi dùng chung cho mọi kho, và đó là ràng
+ * buộc kỹ thuật chứ không phải lười.
+ *
+ * Lockfile được dựng ĐÚNG MỘT LẦN rồi đẩy cho mọi kho (`generateLockfile(renderPackageJsonFor(…))`
+ * bên `deployGithubKhoiloi.mts`), mà lockfile thì mang tên gói bên trong — nên `name` đổi theo
+ * từng kho là phải chạy `npm install` một lần cho mỗi kho.
+ *
+ * Nói thẳng cái giá: đây là một sợi dây MỀM nối các kho lại với nhau — mở `package.json` ra là
+ * thấy chúng cùng một chữ. Nó yếu hơn hẳn một tiền tố trong TÊN KHO (thứ nhìn thấy từ ô tìm kiếm,
+ * không phải mở tệp mới thấy), nên lượt 17/08/2026 chấp nhận giữ nó và đổi chữ sang một cái tên
+ * không nói gì: bản trước dùng chính tiền tố tên kho.
+ */
+export const PACKAGE_NAME = "scheduled-tasks";
+
+export const GENERATED_NAME_SHAPE = /^[a-z]+-[a-z]+-[0-9a-f]{4}$/;
+
+/**
+ * Những tiền tố tên kho mà các bản TRƯỚC từng đặt — **không còn tiền tố nào đang hành nghề**.
+ *
+ * Từ 17/08/2026 tên kho do `randomSoftwareName()` sinh ra, không mang tiền tố nào cả, nên danh
+ * sách này thuần tuý là SỬ LIỆU: lượt XOÁ dùng nó (cùng với `GENERATED_NAME_SHAPE`) làm bộ lọc rẻ
+ * để khoanh vùng ứng viên trên một tài khoản. Bỏ một tiền tố cũ đi là làm những kho dựng trước đó
+ * tàng hình trước chính công cụ dọn của mình — mà đúng cảnh cần dọn nhất, kho rỗng dựng dở
+ * (`gh repo create --push` chết giữa chừng), lại là cảnh KHÔNG có dòng nào trong sổ để bắt bằng
+ * đường khác.
  *
  * Nới bộ lọc thì an toàn theo đúng thiết kế: tiền tố chưa bao giờ là giấy phép xoá, `Evidence` mới
  * là — xem `reviewRemoval` bên `githubKhoiloi.mts`.
+ *
+ * `linh-su` vào danh sách này ngày 17/08/2026, cùng lượt nó bị đưa vào `FORBIDDEN_NAME_WORDS`:
+ * một cái tên vừa bị cấm sinh ra thì vẫn phải bị nhìn thấy lúc dọn.
  */
-export const LEGACY_REPO_NAME_PREFIXES = Object.freeze(["auto-hh3d-linh-su"]);
+export const LEGACY_REPO_NAME_PREFIXES = Object.freeze(["auto-hh3d-linh-su", "linh-su"]);
 
-/** Mọi tiền tố tên kho từng dùng, mới trước cũ sau. Dùng cho bộ lọc của lượt xoá. */
-export const ALL_REPO_NAME_PREFIXES = Object.freeze([REPO_NAME_PREFIX, ...LEGACY_REPO_NAME_PREFIXES]);
+/** Mọi tiền tố tên kho từng dùng. Dùng cho bộ lọc của lượt xoá, cùng `GENERATED_NAME_SHAPE`. */
+export const ALL_REPO_NAME_PREFIXES = LEGACY_REPO_NAME_PREFIXES;
 
 /** Những từ cấm có mặt trong `value` — mảng rỗng nghĩa là sạch. */
 export function forbiddenWordsIn(value) {

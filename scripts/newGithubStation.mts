@@ -48,7 +48,7 @@ import {
   stationSlug,
 } from "../src/lib/validation/githubStations";
 import { appDatabaseUrl } from "./activeStationPg.mts";
-import { KHOILOI_ID_PREFIX, REPO_NAME_PREFIX, reviewGeneratedName } from "./khoiloiNaming.mjs";
+import { randomSoftwareName, reviewGeneratedName } from "./khoiloiNaming.mjs";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -187,11 +187,25 @@ async function main(): Promise<void> {
 
   // ---- 3. Tên kho và tên khôi lỗi ---------------------------------------------------------------
 
-  const stamp = vietnamStamp(new Date());
-  const workerId = `${KHOILOI_ID_PREFIX}-${stamp}`;
-  // Bốn ký tự ngẫu nhiên: hai lượt chạy trong cùng một giây vẫn ra hai kho khác tên, và tên kho
-  // không đoán trước được từ bên ngoài.
-  const repo = arg("repo") ?? `${REPO_NAME_PREFIX}-${stamp}-${randomBytes(2).toString("hex")}`;
+  /**
+   * MỘT cái tên ngẫu nhiên, dùng cho CẢ tên kho lẫn `WORKER_ID` (17/08/2026).
+   *
+   * Dùng chung một tên là có chủ ý: người vận hành nhìn một id trên dashboard là biết ngay nó ở
+   * kho nào, không phải tra sổ. Hai chuỗi ngẫu nhiên rời nhau thì giấu được nhiều hơn đúng một
+   * chút, mà đổi lại mỗi lần cần lần ngược đều phải mở sổ ra dò.
+   *
+   * Soát TRÙNG với sổ trước khi lấy: bốn hex làm trùng lặp hiếm, không làm nó bất khả, mà `id`
+   * lại là khoá chính của bảng `workers` — hai khôi lỗi cùng id là hai tiến trình ghi đè nhau.
+   */
+  const taken = new Set(
+    (settings.githubStations ?? []).flatMap((s) => [s.repo.toLowerCase(), s.workerId.toLowerCase()]),
+  );
+  let generated = randomSoftwareName();
+  for (let attempt = 0; taken.has(generated) && attempt < 20; attempt++) generated = randomSoftwareName();
+  if (taken.has(generated)) die("Rút hai chục lần vẫn trùng tên đã có trong sổ — chuyện này không nên xảy ra.");
+
+  const workerId = generated;
+  const repo = arg("repo") ?? generated;
   const workflowFile = DEFAULT_WORKFLOW_FILE;
   const slug = `${owner}/${repo}`;
 

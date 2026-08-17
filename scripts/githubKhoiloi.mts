@@ -12,7 +12,7 @@
  * `newGithubKhoiloi.mjs` chạy bằng `node` trần nên không nhập nổi TypeScript. Tệp này chỉ ĐỌC
  * danh sách tiền tố từ bên ấy.
  */
-import { ALL_REPO_NAME_PREFIXES } from "./khoiloiNaming.mjs";
+import { ALL_REPO_NAME_PREFIXES, GENERATED_NAME_SHAPE } from "./khoiloiNaming.mjs";
 
 /**
  * BẰNG CHỨNG một kho là kho khôi lỗi. Ba thứ, và mỗi thứ đứng một mình đã đủ:
@@ -63,7 +63,9 @@ export type Candidate = {
  */
 export function looksLikeKhoiloiRepoName(repo: string): boolean {
   const lower = repo.toLowerCase();
-  return ALL_REPO_NAME_PREFIXES.some((prefix) => lower.startsWith(prefix));
+  // Từ 17/08/2026 tên kho là ngẫu nhiên, không còn tiền tố nào để bắt — nên bộ lọc hỏi HÌNH DẠNG
+  // (`<từ>-<từ>-<4 hex>`) trước, rồi mới hỏi các tiền tố ĐỜI CŨ cho những kho dựng trước lượt đổi.
+  return GENERATED_NAME_SHAPE.test(lower) || ALL_REPO_NAME_PREFIXES.some((prefix) => lower.startsWith(prefix));
 }
 
 /**

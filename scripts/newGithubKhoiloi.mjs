@@ -39,7 +39,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { KHOILOI_ID_PREFIX, REPO_NAME_PREFIX, reviewGeneratedName } from "./khoiloiNaming.mjs";
+import { randomSoftwareName, reviewGeneratedName } from "./khoiloiNaming.mjs";
 import {
   buildKhoiloiPayload,
   playwrightVersionOf,
@@ -66,13 +66,19 @@ if (!owner) {
   );
   process.exit(1);
 }
-const repoName = arg("repo", REPO_NAME_PREFIX);
+/**
+ * Không truyền `--repo` thì tự rút một cái tên ngẫu nhiên, và `--worker-id` mặc định lấy ĐÚNG cái
+ * tên ấy — xem `randomSoftwareName`. Bản trước lấy tên tài khoản làm id ("…-<owner>"), tức dán
+ * tên người ta lên một thứ công khai mà chẳng được gì thêm về mặt duy nhất.
+ */
+const generatedName = randomSoftwareName();
+const repoName = arg("repo", generatedName);
 /**
  * WORKER_ID mặc định suy từ tên tài khoản, không phải một chuỗi cố định — trùng id thì hai tiến
  * trình ghi đè nhau trong bảng `workers` và mục Khôi Lỗi nói dối về việc ai đang trực. Suy ra
  * từ một thứ vốn đã duy nhất thì không có gì để quên.
  */
-const workerId = arg("worker-id", `${KHOILOI_ID_PREFIX}-${owner.toLowerCase()}`);
+const workerId = arg("worker-id", repoName === generatedName ? generatedName : repoName);
 const slug = `${owner}/${repoName}`;
 
 /**

@@ -38,7 +38,7 @@ import {
   type Candidate,
   type RosterRow,
 } from "./githubKhoiloi.mts";
-import { ALL_REPO_NAME_PREFIXES, REPO_NAME_PREFIX } from "./khoiloiNaming.mjs";
+import { ALL_REPO_NAME_PREFIXES } from "./khoiloiNaming.mjs";
 
 const repoRoot = path.join(import.meta.dirname, "..");
 /** Bản mẫu workflow — NGOÀI `.github/workflows/` có chủ ý; xem nhóm「Kho gốc không chạy khôi lỗi」. */
@@ -56,7 +56,7 @@ function ok(condition: boolean, label: string): void {
 }
 
 const candidate = (over: Partial<Candidate> = {}): Candidate => ({
-  repo: `${REPO_NAME_PREFIX}-20260813-101112-ab12`,
+  repo: "cobalt-relay-ab12",
   evidence: ["so"],
   workerId: "khoiloi-tro-20260813-101112",
   onGithub: true,
@@ -130,14 +130,14 @@ const candidate = (over: Partial<Candidate> = {}): Candidate => ({
 
 // ---- Bộ lọc tên -------------------------------------------------------------------------------
 {
-  ok(looksLikeKhoiloiRepoName(`${REPO_NAME_PREFIX}-20260813-101112-ab12`), "tên theo tiền tố hiện hành khớp");
-  ok(looksLikeKhoiloiRepoName(`${REPO_NAME_PREFIX.toUpperCase()}-XYZ`), "so khớp KHÔNG phân biệt hoa thường");
+  ok(looksLikeKhoiloiRepoName("cobalt-relay-ab12"), "tên tự sinh đời mới (hai từ + 4 hex) khớp bộ lọc");
+  ok(looksLikeKhoiloiRepoName("LINH-SU-XYZ"), "so khớp KHÔNG phân biệt hoa thường");
   ok(!looksLikeKhoiloiRepoName("mot-kho-cua-nguoi-khac"), "tên lạ không lọt vào danh sách ứng viên");
 
   // Đây là lý do `ALL_REPO_NAME_PREFIXES` tồn tại: bỏ tiền tố cũ thì mọi kho dựng trước lượt đổi
   // tên tàng hình trước chính công cụ dọn của mình — và cảnh cần dọn nhất (kho rỗng dựng dở) lại
   // là cảnh KHÔNG có dòng nào trong sổ để bắt bằng đường khác.
-  ok(ALL_REPO_NAME_PREFIXES.length >= 2, "danh sách tiền tố có cả tiền tố cũ, không chỉ tiền tố hiện hành");
+  ok(ALL_REPO_NAME_PREFIXES.length >= 2, "danh sách tiền tố giữ đủ mọi đời tên cũ (auto-hh3d-linh-su, linh-su)");
   for (const prefix of ALL_REPO_NAME_PREFIXES) {
     ok(looksLikeKhoiloiRepoName(`${prefix}-gi-do`), `tiền tố「${prefix}」vẫn khoanh được vùng`);
   }

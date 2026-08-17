@@ -16,10 +16,13 @@ import { randomBytes } from "node:crypto";
 import {
   ALL_REPO_NAME_PREFIXES,
   FORBIDDEN_NAME_WORDS,
-  KHOILOI_ID_PREFIX,
+  GENERATED_NAME_SHAPE,
   LEGACY_REPO_NAME_PREFIXES,
-  REPO_NAME_PREFIX,
+  NAME_HEADS,
+  NAME_TAILS,
+  PACKAGE_NAME,
   forbiddenWordsIn,
+  randomSoftwareName,
   reviewGeneratedName,
 } from "./khoiloiNaming.mjs";
 
@@ -61,35 +64,73 @@ assert(
 
 // ---- 2. Tên sạch thì đi qua ---------------------------------------------------------------------
 
-assert(reviewGeneratedName("Tên kho", "linh-su-20260813-124522-1354") === null, "tên kho thật đi qua được");
-assert(reviewGeneratedName("WORKER_ID", "khoiloi-tro-20260813-124522") === null, "WORKER_ID thật đi qua được");
-assert(reviewGeneratedName("WORKER_ID", "tong-mon-khoiloi") === null, "id của khôi lỗi trên VM vẫn hợp luật");
+assert(reviewGeneratedName("Tên kho", "cobalt-relay-4f2a") === null, "tên kho thật đi qua được");
+assert(
+  reviewGeneratedName("Tên kho", "linh-su-20260813-124522-1354") !== null,
+  "tên kho ĐỜI CŨ nay bị luật mới từ chối — đúng ý lượt 17/08/2026",
+);
+/**
+ * Từ 17/08/2026 luật CŨNG từ chối `tong-mon-khoiloi` — id của khôi lỗi trên VM. Ghi ra đây chứ
+ * không nới luật, vì nó vô hại theo đúng nghĩa hẹp: id ấy được đặt trong `/opt/jarvis/shared/.env`
+ * của VM, không đi qua `newGithubStation.mts` hay `newGithubKhoiloi.mjs` — hai chỗ DUY NHẤT gọi
+ * `reviewGeneratedName`. Và lý do của lệnh cấm cũng không áp cho nó: nó không nằm trong một kho
+ * công khai nào, nên chẳng có ô tìm kiếm nào đọc được.
+ *
+ * Ca này giữ cho ai đó về sau đừng "sửa cho xanh" bằng cách gọi luật ở một chỗ thứ ba.
+ */
+assert(
+  reviewGeneratedName("WORKER_ID", "tong-mon-khoiloi") !== null,
+  "luật mới từ chối cả `tong-mon-khoiloi` — id ấy đặt ở .env của VM, không đi qua đường sinh tên này",
+);
 
 // ---- 3. HẰNG SỐ CỦA TA CÓ TUÂN LUẬT CỦA TA KHÔNG ------------------------------------------------
 
+/**
+ * Ca nặng nhất của cả tệp, và nay nặng hơn trước: tên không còn dựng từ MỘT tiền tố mà rút từ HAI
+ * RỔ TỪ. Một từ hớ lọt vào rổ thì chỉ hiện ra ở đúng lượt dựng nào rút trúng nó — tức có thể im
+ * hàng tháng. Nên soi TỪNG TỪ, cả hai rổ.
+ */
+for (const word of [...NAME_HEADS, ...NAME_TAILS]) {
+  assert(
+    reviewGeneratedName("Từ trong rổ", word) === null,
+    `từ「${word}」trong rổ tên tự nó hợp luật`,
+  );
+}
 assert(
-  reviewGeneratedName("REPO_NAME_PREFIX", REPO_NAME_PREFIX) === null,
-  `tiền tố tên kho hiện hành「${REPO_NAME_PREFIX}」tự nó hợp luật`,
+  NAME_HEADS.length >= 10 && NAME_TAILS.length >= 10,
+  `hai rổ đủ rộng để tên không lặp lại trông thấy (${NAME_HEADS.length} × ${NAME_TAILS.length} cặp)`,
 );
 assert(
-  reviewGeneratedName("KHOILOI_ID_PREFIX", KHOILOI_ID_PREFIX) === null,
-  `tiền tố WORKER_ID hiện hành「${KHOILOI_ID_PREFIX}」tự nó hợp luật`,
+  reviewGeneratedName("PACKAGE_NAME", PACKAGE_NAME) === null,
+  `tên gói trong package.json「${PACKAGE_NAME}」tự nó hợp luật`,
 );
 
 /**
- * Dựng ĐÚNG hai cái tên mà hai script sinh ra, bằng đúng công thức của chúng — chứ không kiểm mỗi
- * tiền tố. Hậu tố mới là chỗ có thể lén mang từ cấm vào: 4 ký tự hex thì không, nhưng công thức
- * có thể bị đổi, và ca này sẽ đỏ ngay lúc ấy.
+ * Dựng tên bằng ĐÚNG hàm mà hai script gọi, nhiều lượt, chứ không kiểm mỗi hằng số. Bốn trăm lượt
+ * là đủ để mọi cặp từ đều có cơ hội xuất hiện vài lần.
  */
-const stamp = "20260813-124522";
+for (let i = 0; i < 400; i++) {
+  const name = randomSoftwareName();
+  if (reviewGeneratedName("Tên tự sinh", name) !== null) {
+    throw new Error(`tên tự sinh「${name}」mang từ cấm`);
+  }
+  if (!GENERATED_NAME_SHAPE.test(name)) {
+    throw new Error(`tên tự sinh「${name}」không khớp hình dạng mà lượt xoá đi tìm`);
+  }
+}
+count += 1;
+console.log("✔ 400 tên tự sinh đều hợp luật VÀ khớp hình dạng bộ lọc của lượt xoá");
+
+/** `pick` tiêm vào được, nên lưới chạy tất định — và ca này chứng minh điều đó. */
 assert(
-  reviewGeneratedName("Tên kho", `${REPO_NAME_PREFIX}-${stamp}-${randomBytes(2).toString("hex")}`) === null,
-  "tên kho dựng theo đúng công thức của newGithubStation.mts hợp luật",
+  randomSoftwareName(() => 0) === `${NAME_HEADS[0]}-${NAME_TAILS[0]}-0000`,
+  "bộ sinh nhận phép rút tiêm vào, nên lưới kiểm chạy được tất định",
 );
-assert(
-  reviewGeneratedName("WORKER_ID", `${KHOILOI_ID_PREFIX}-${stamp}`) === null,
-  "WORKER_ID dựng theo đúng công thức của newGithubStation.mts hợp luật",
-);
+
+/** Hình dạng phải TỪ CHỐI những cái tên không phải của ta, bằng không bộ lọc xoá là một cái lưới thủng. */
+for (const stranger of ["my-cool-project", "cobalt-relay", "cobalt-relay-4f2ag", "cobaltrelay4f2a", "Cobalt-Relay-4F2A"]) {
+  assert(!GENERATED_NAME_SHAPE.test(stranger), `hình dạng từ chối「${stranger}」`);
+}
 
 // ---- 4. Tiền tố CŨ phải còn trong danh sách của lượt xoá ----------------------------------------
 
@@ -104,13 +145,17 @@ assert(
   "tiền tố cũ `auto-hh3d-linh-su` còn nguyên trong danh sách, để lượt xoá còn thấy kho dựng trước 13/08/2026",
 );
 assert(
-  ALL_REPO_NAME_PREFIXES[0] === REPO_NAME_PREFIX &&
-    ALL_REPO_NAME_PREFIXES.length === LEGACY_REPO_NAME_PREFIXES.length + 1,
-  "danh sách tiền tố của lượt xoá = tiền tố hiện hành + mọi tiền tố cũ",
+  LEGACY_REPO_NAME_PREFIXES.includes("linh-su"),
+  "tiền tố `linh-su` (đời 13/08–17/08) còn trong danh sách, để lượt xoá còn thấy kho dựng thời ấy",
 );
 assert(
-  forbiddenWordsIn(LEGACY_REPO_NAME_PREFIXES[0]).length > 0,
-  "tiền tố cũ ĐÚNG LÀ thứ luật mới cấm — đó là lý do luật chỉ áp cho tên SINH RA, không áp cho tên KHAI BÁO",
+  ALL_REPO_NAME_PREFIXES === LEGACY_REPO_NAME_PREFIXES,
+  "không còn tiền tố nào ĐANG hành nghề — danh sách của lượt xoá thuần tuý là sử liệu",
 );
+assert(
+  LEGACY_REPO_NAME_PREFIXES.every((prefix) => forbiddenWordsIn(prefix).length > 0),
+  "MỌI tiền tố đời cũ đều là thứ luật mới cấm — đó là lý do luật chỉ áp cho tên SINH RA",
+);
+
 
 console.log(`\n✔ ${count} phép kiểm — luật đặt tên kho khôi lỗi còn nguyên.`);

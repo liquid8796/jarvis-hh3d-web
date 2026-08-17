@@ -310,25 +310,41 @@ kho」kế tiếp sẽ đẩy ngược chính bí mật vừa xem lên máy ch�
 >   `repo`+`workflow`+`delete_repo` vào một tệp log dạng chữ.
 
 Nó hỏi đúng MỘT thứ — PAT của tài khoản GitHub sẽ giữ kho — rồi làm trọn: suy tên tài khoản từ
-chính token, đặt tên kho ngẫu nhiên và `WORKER_ID` theo khuôn `khoiloi-tro-<mốc thời gian>`,
+chính token, rút MỘT cái tên ngẫu nhiên dùng cho cả tên kho lẫn `WORKER_ID`,
 dựng kho (gọi lại `newGithubKhoiloi.mjs`), dán secret, bấm chạy lượt đầu, **ghi kho vào sổ ở trạm
 đang hoạt động**, rồi ngó một lượt để chứng minh PAT push được. Xem trước mà chưa tạo gì:
 `npm run github:new -- --dry-run --owner <tài-khoản>`.
 
 #### Luật đặt tên: `scripts/khoiloiNaming.mjs`
 
-Kho dựng ra là CÔNG KHAI, nên mọi cái tên script tự đặt đều bị cấm mang bảy từ: `auto`, `hh3d`,
-`hoathinh3d`, `worker`, `action`, `workflow`, `github`. Ba từ đầu buộc kho vào đúng cái trò nó
-đang cày — một lượt gõ「hh3d」vào ô tìm kiếm của GitHub là ra sạch cả đàn. Bốn từ sau dựng chân
-dung「kho sinh ra để xài quỹ phút Actions」, đúng thứ đã khiến GitHub gỡ `gautamkrishnar/keepalive-workflow`.
+Kho dựng ra là CÔNG KHAI, nên mọi cái tên script tự đặt đều bị cấm mang **mười một từ**: `auto`,
+`hh3d`, `hoathinh3d`, `worker`, `action`, `workflow`, `github`, `khoiloi`, `khoi-loi`, `linhsu`,
+`linh-su`. Ba từ đầu buộc kho vào đúng cái trò nó đang cày — một lượt gõ「hh3d」vào ô tìm kiếm của
+GitHub là ra sạch cả đàn. Bốn từ giữa dựng chân dung「kho sinh ra để xài quỹ phút Actions」, đúng
+thứ đã khiến GitHub gỡ `gautamkrishnar/keepalive-workflow`. Bốn từ cuối (thêm 17/08/2026) là chữ
+của CHÍNH TA: chúng không nói gì với người lạ, nhưng chúng nối các kho lại với nhau.
 
-Từ 13/08/2026: kho là `linh-su-<mốc>-<4 hex>`, `WORKER_ID` là `khoiloi-tro-<mốc>` (`tro` = ở trọ,
-tức sống nhờ máy người ta — phân biệt với `tong-mon-khoiloi` trên VM tông môn tự nuôi). Tên gói,
-mô tả kho, README và tác giả commit của kho sinh ra cũng đã dọn theo.
+**Từ 17/08/2026 không còn tiền tố nào cả.** `randomSoftwareName()` rút hai từ trung tính cộng bốn
+ký tự hex — `cobalt-relay-4f2a`, `tundra-orbit-1944` — và MỘT cái tên ấy dùng cho cả tên kho lẫn
+`WORKER_ID`, để nhìn một id trên dashboard là biết ngay nó ở kho nào mà không phải tra sổ. Không
+có mốc thời gian trong tên: `…-20260813-233056-6143` là chữ ký của một cỗ máy sinh tên, còn
+`cobalt-relay-4f2a` thì không.
+
+Cái giá đã cân nhắc: mất phép「nhìn tiền tố biết là máy ở trọ」trên dashboard, và lượt XOÁ mất bộ
+lọc theo tiền tố. Bù lại, `looksLikeKhoiloiRepoName` nay hỏi **hình dạng** (`GENERATED_NAME_SHAPE`:
+hai từ thường + 4 hex) rồi mới hỏi các tiền tố ĐỜI CŨ — đủ hẹp để khoanh vùng ứng viên, đủ tầm
+thường để không nói gì với người lạ. Tiền tố chưa bao giờ là giấy phép xoá; `Evidence` mới là.
+
+Hai sợi dây MỀM còn lại, biết mà chấp nhận: `name` trong `package.json` của mọi kho đều là
+`scheduled-tasks` (lockfile dựng một lần rồi dùng chung, nên tên gói phải giống nhau), và tệp
+workflow vẫn tên `linh-su.yml` ở mọi kho. Cả hai chỉ lộ khi người ta MỞ TỆP ra đọc, khác hẳn tên
+kho vốn hiện ngay trên ô tìm kiếm.
 
 Luật này chỉ áp cho tên **script SINH RA**, không áp cho tên **người ta KHAI BÁO** trên form Kho
-GitHub — những kho dựng trước 13/08/2026 vẫn mang tên `auto-hh3d-linh-su-…` và vẫn phải ghi sổ
-được. Vì thế phép kiểm nằm ở `khoiloiNaming.mjs` chứ không nằm trong `reviewStationIdentity`.
+GitHub — những kho dựng trước lượt đổi vẫn mang tên `auto-hh3d-linh-su-…` hoặc `linh-su-…` và vẫn
+phải ghi sổ được. Vì thế phép kiểm nằm ở `khoiloiNaming.mjs` chứ không nằm trong
+`reviewStationIdentity`. Cùng lẽ ấy, luật mới cũng từ chối `tong-mon-khoiloi` (id khôi lỗi trên
+VM) — vô hại, vì id ấy đặt trong `.env` của VM chứ không đi qua đường sinh tên này.
 
 Hai thứ luật này **không** với tới, vì chúng không phải tên do script đặt: đường dẫn
 `scripts/worker.mjs` (chép nguyên từ kho web, dùng chung với VM) và `WEB_URL` nướng vào workflow —

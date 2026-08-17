@@ -37,7 +37,7 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { REPO_NAME_PREFIX } from "./khoiloiNaming.mjs";
+import { PACKAGE_NAME } from "./khoiloiNaming.mjs";
 
 /**
  * Những gì được chép NGUYÊN từ kho gốc sang kho khôi lỗi, giữ nguyên bố cục thư mục.
@@ -181,12 +181,23 @@ export function renderWorkflow({ template, workerId, webUrl }) {
  * README nằm ngay trang đầu của một kho CÔNG KHAI, nên nó là chỗ dễ nói hớ nhất. Giữ đúng một
  * việc nó phải làm — dặn người mở kho đừng sửa tay — và bỏ mọi thứ chỉ đường về tông môn.
  */
+/**
+ * README của kho CÔNG KHAI — tệp đầu tiên người lạ đọc, nên nó nói ít nhất có thể.
+ *
+ * Bản trước mở đầu bằng「# Tông môn — <workerId>」và viết trọn bằng tiếng Việt. Hai điều ấy cùng
+ * làm một việc: nối kho này với những kho khác qua một chữ dùng chung, và nói cho người đọc biết
+ * nó thuộc về một nhóm. Từ 17/08/2026 tiêu đề chỉ còn chính cái tên ngẫu nhiên của kho, lời văn
+ * là tiếng Anh trung tính — đúng giọng một kho công cụ bất kỳ.
+ *
+ * Vẫn giữ câu「đừng sửa tay ở đây」: nó phục vụ người vận hành, và không nói gì thêm về trò gì.
+ */
 export function renderReadme({ workerId, webUrl }) {
   return (
-    `# Tông môn — ${workerId}\n\n` +
-    `Một tiến trình nền nhận việc theo lịch từ ${webUrl}.\n` +
-    `Kho này được SINH TỰ ĐỘNG từ kho gốc — **đừng sửa tay ở đây**, sửa ở kho gốc rồi dựng lại,\n` +
-    `bằng không hai bản sẽ trôi khỏi nhau.\n`
+    `# ${workerId}\n\n` +
+    `Scheduled background task runner.\n\n` +
+    `Generated from an upstream template — do not edit here. Edit upstream and redeploy, or the\n` +
+    `two copies will drift apart.\n\n` +
+    `Endpoint: ${webUrl}\n`
   );
 }
 
@@ -209,9 +220,8 @@ export function renderPackageJson({ playwrightVersion, version }) {
   return (
     JSON.stringify(
       {
-        // Tên gói đi theo tên kho: cả hai đều là thứ người lạ đọc được, và cả hai đều nghe luật
-        // ở `khoiloiNaming.mjs`.
-        name: REPO_NAME_PREFIX,
+        // Một chuỗi trung tính, dùng chung cho mọi kho vì lockfile dùng chung — xem PACKAGE_NAME.
+        name: PACKAGE_NAME,
         private: true,
         version: version.trim(),
         type: "module",

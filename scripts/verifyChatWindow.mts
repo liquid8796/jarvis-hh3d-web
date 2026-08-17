@@ -47,6 +47,15 @@ const STEP = 40;
 /** Cách đáy dưới ngần này thì coi là đang dính đáy — cùng ngưỡng với `onScroll`. */
 const AT_BOTTOM_PX = 60;
 
+/**
+ * Bề rộng làn chân dung — phải khớp `AVATAR_SIZE` trong ChatRoom.tsx.
+ *
+ * Con số này ở đây KHÔNG phải để soi cỡ ảnh đại diện (chuyện của mắt, xem `npm run shot`), mà
+ * để canh cái làn `.chat-avatar-gap` của tin nối tiếp vẫn còn đủ bề ngang: mất nó là cả cột
+ * bong bóng của một người gãy hàng lề, và `tsc` mù trước chuyện ấy.
+ */
+const AVATAR_LANE = 62;
+
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa đặt — chạy `npm run env:pull`.");
 if (!process.env.AUTH_SECRET) throw new Error("AUTH_SECRET chưa đặt — chạy `npm run env:pull`.");
 
@@ -171,6 +180,43 @@ try {
   check(`kho ${NEWEST_PAGE} tin → chỉ dựng ${WINDOW} thẻ`, first.rows === WINDOW, `dựng ${first.rows} thẻ`);
   check("mở ra là đứng ở tin mới nhất", first.toBottom < AT_BOTTOM_PX, `còn ${first.toBottom}px tới đáy`);
   check("chưa trùm hết kho thì KHÔNG nói「Khởi nguồn」", !first.khoiNguon);
+
+  /**
+   * CHIỀU CAO CHẾT của tin nối tiếp — phép thử canh đúng cái bẫy đã gỡ ngày 17/08/2026.
+   *
+   * Trước đó tin nối tiếp vẫn dựng vòng tròn chân dung, chỉ đeo thêm `.invisible`
+   * (`visibility: hidden`): ẩn với mắt, nhưng vẫn là một flex item cao 62px, nên MỌI tin nối
+   * tiếp cao 62px trong khi bong bóng của nó chỉ ~38px. Không phép đo nào của repo bắt được:
+   * `tsc` không biết gì về chiều cao, và ảnh chụp thì trông "hơi thưa" chứ không trông SAI.
+   *
+   * Nay làn ấy là `.chat-avatar-gap` cao 0, nên hàng phải cao ĐÚNG bằng cột bong bóng. Ai lỡ
+   * trả `.invisible` về chỗ cũ sẽ thấy hàng vọt lên 62px và phép thử này đỏ.
+   */
+  const groupedBox = (await page.evaluate(`(() => {
+    const row = document.querySelector(".chat-row.grouped");
+    if (!row) return null;
+    const gap = row.querySelector(".chat-avatar-gap");
+    const box = (el) => (el ? Math.round(el.getBoundingClientRect().height) : -1);
+    return {
+      row: box(row),
+      col: box(row.querySelector(".chat-bubble-col")),
+      laneWidth: gap ? Math.round(gap.getBoundingClientRect().width) : -1,
+      laneHeight: box(gap),
+    };
+  })()`)) as { row: number; col: number; laneWidth: number; laneHeight: number } | null;
+
+  check(
+    "tin nối tiếp cao ĐÚNG bằng bong bóng, không bị làn chân dung đội lên",
+    groupedBox !== null && groupedBox.row === groupedBox.col && groupedBox.row < AVATAR_LANE,
+    groupedBox === null
+      ? "không có tin nối tiếp nào trong cửa sổ để đo"
+      : `hàng ${groupedBox.row}px · bong bóng ${groupedBox.col}px · trần cũ ${AVATAR_LANE}px`,
+  );
+  check(
+    "…mà làn chân dung vẫn chừa đủ bề ngang cho hàng lề",
+    groupedBox !== null && groupedBox.laneWidth === AVATAR_LANE && groupedBox.laneHeight === 0,
+    groupedBox === null ? "" : `làn ${groupedBox.laneWidth}×${groupedBox.laneHeight}px`,
+  );
 
   await scrollTo("top");
   const grown1 = await probe();

@@ -636,10 +636,14 @@ document.addEventListener('click', async (e) => {
 // là thứ ghi chú của người ghi hình chỉ vào — "phòng nào Chưa chúc thì vào chúc ngay bất kể có
 // Đã phát lì xì hay chưa" — nên fixture thiếu nó thì không phép thử nào chứng minh được điều đó.
 // Badge loại phòng cũng là thật: tên cặp đôi trong lời kể mang cả "💕 Đạo Lữ" ở đầu.
-const hySuHallPage = (rooms, blessed) => {
+const hySuHallPage = (rooms, blessed, gifts) => {
   const rows = rooms
     .map((room) => {
-      const done = blessed.has(room.id);
+      const done = blessed.has(room.id) || room.preBlessed === true;
+      // Hồng bao đọc từ SỔ SỐNG chứ không phải từ hằng số của phòng: khai xong thì máy chủ thật
+      // lật has_li_xi về false ngay lượt mở modal sau (thân trả lời show_all_wedding của bản ghi).
+      // Fixture treo mãi dòng ấy sẽ dạy lượt chạy quay lại một phòng không còn gì để khai.
+      const gift = gifts.has(room.id);
       const hongNhan = room.type === "hong-nhan";
       const href = hongNhan ? `/hong-nhan/?id=${room.id}` : `/phong-cuoi?id=${room.id}`;
       const badge = hongNhan
@@ -649,9 +653,10 @@ const hySuHallPage = (rooms, blessed) => {
         <div class="wedding-now-info">
           <p class="wedding-now-couple">${badge} <strong>${room.couple}</strong></p>
           <p class="wedding-now-li-xi-status">Trạng thái lì xì: <span class="${room.lixiSent ? "li-xi-sent" : "li-xi-not-sent"}">${room.lixiSent ? "Đã phát lì xì" : "Chưa phát lì xì"}</span></p>
+          ${gift ? '<p class="wedding-now-li-xi-available">🧧 Có lì xì chưa mở!</p>' : ""}
           <p class="wedding-now-blessing-status">Trạng thái: <span class="${done ? "blessed" : "not-blessed"}">${done ? "Đã chúc" : "Chưa chúc"}</span></p>
         </div>
-        <div class="wedding-now-action"><a href="${href}" class="wedding-now-btn" target="_blank">Vào Chúc Ngay</a></div>
+        <div class="wedding-now-action"><a href="${href}" class="wedding-now-btn${gift ? " has-gift-btn" : ""}" target="_blank">${gift ? "🧧 " : ""}Vào Chúc Ngay</a></div>
       </div>`;
     })
     .join("");
@@ -669,8 +674,10 @@ document.querySelector('.hy-su-btn').addEventListener('click', () => {
 // Phòng cưới theo recording: form chúc phúc render sẵn, select mặc định tự điền textarea qua
 // onchange, "Gửi Chúc Phúc" mở hộp xác nhận, và server NHẬN là nút gửi bị gỡ khỏi DOM (~40ms
 // sau confirm ngoài đời là toast + gỡ nút). Confirm với lời chúc RỖNG bị từ chối — đó chính
-// là lưới bắt kịch bản script chọn-ngẫu-nhiên không điền được gì. Bao lì xì chỉ có ở một
-// phòng, để ghim cả nhánh nhặt lẫn nhánh guard-bỏ-qua.
+// là lưới bắt kịch bản script chọn-ngẫu-nhiên không điền được gì.
+// (Bao `.lixi-envelope` từng dựng ở đây đã GỠ 18/08/2026: markup ấy không tồn tại ngoài đời —
+// bên Đạo Lữ nó chỉ là CSS trong thẻ style, bên Hồng Nhan grep ra 0. Khay hồng bao THẬT nằm
+// ở hySuHongNhanPage bên trên.)
 // Phòng ĐÃ CHÚC không phải "phòng chưa chúc thiếu mất cái nút": đo trên bản ghi 11/08/2026
 // (custom-20260811-233113, dom/04-load.html) thì site bỏ HẲN form — không #blessing-default-options,
 // không .blessing-form — và thay bằng .blessing-message ("Đạo hữu đã gửi lời chúc phúc cho cặp
@@ -684,7 +691,70 @@ const hySuBrokenRoomPage = (id) => `<!doctype html><html lang="vi"><meta charset
 <div class="blessing-section"><h2>Gửi Lời Chúc Phúc</h2>
 <p>Phòng cưới #${id} đang bảo trì.</p></div>`;
 
-const hySuRoomPage = (id, alreadyBlessed, withLixi) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+// Trang phòng HỒNG NHAN mang KHAY HỒNG BAO — chép từ bản ghi hy-su-duong-20260818-094945
+// (dom/08-load.html cho khay và dấu đã chúc, dom/10-click.html cho hình dạng sau khi khai).
+// Bốn thứ PHẢI giữ nguyên, vì chính chúng là cái bẫy:
+//
+//   1. Khay là `position:fixed; inset:0; z-index:10002` và khi `.active` thì
+//      `pointer-events:all` — nó CHE KÍN trang, kể cả form chúc. Đây là lý do cụm hồng bao
+//      phải chạy TRƯỚC cụm chúc chứ không phải nối vào đuôi.
+//   2. Khay KHÔNG có `.active` lúc trang vẽ xong; site gắn sau (đo được ~1,2 giây). Fixture
+//      giữ đúng nhịp ấy để bước chờ `Visible #hnLiXiModal` có việc thật để làm.
+//   3. `#hnOpenBtn`/`#hnCloseBtn` NẰM SẴN trong DOM kể cả khi khay chưa mở, và chúng có kích
+//      thước thật — nên `conditionProbe` (chỉ đọc chính phần tử) sẽ bảo là 'visible'. Phòng
+//      KHÔNG có hồng bao ở đây cũng dựng đủ khay-chưa-mở, cố ý dựng ca KHÓ HƠN đời thật (bản
+//      ghi chỉ có phòng CÓ hồng bao), vì một fixture dễ hơn đời thật thì xanh mà vô nghĩa.
+//   4. Sau khi khai: nút khai `display:none`, `#hnRewardWrap` thêm `.show`, `#hnRewardName`
+//      và `#hnRewardAmount` đổi từ hai gạch '—' thành 'Tiên Ngọc' / '49'.
+const hySuHongNhanPage = (id, hasGift) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+<style>
+.hndx-overlay { position: fixed; inset: 0; z-index: 10002; display: flex; align-items: center; justify-content: center; background: rgba(10,4,10,0.88); opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }
+.hndx-overlay.active { opacity: 1; pointer-events: all; }
+.hndx-overlay.closing { opacity: 0; pointer-events: none; }
+.hndx-box { position: relative; width: 380px; padding: 36px 28px 28px; text-align: center; }
+.hndx-close { position: absolute; top: 12px; right: 14px; width: 28px; height: 28px; }
+.hndx-open-btn { display: inline-flex; padding: 11px 28px; }
+.hndx-reward-wrap { display: none; margin-top: 16px; }
+.hndx-reward-wrap.show { display: block; }
+</style>
+<a href="/tien-duyen/" class="back-btn">← Quay Lại</a>
+<div class="hndx-overlay" id="hnLiXiModal"><div class="hndx-box">
+  <button class="hndx-close" id="hnCloseBtn" aria-label="Đóng">×</button>
+  <div class="hndx-title">Phong Tặng Đại Điển</div>
+  <button class="hndx-open-btn" id="hnOpenBtn"><span>🧧</span> Khai Phong Lì Xì</button>
+  <div class="hndx-reward-wrap" id="hnRewardWrap"><div class="hndx-reward-card" id="hnRewardCard">
+    <div class="hndx-reward-name" id="hnRewardName">—</div>
+    <div class="hndx-reward-amount" id="hnRewardAmount">—</div>
+  </div></div>
+</div></div>
+<div class="hn-container">
+  <div class="hn-progress-wrap"><span class="hn-progress-count" id="hn-count">5535/999 Lời Chúc</span></div>
+  <div class="hn-bless-section"><h2 class="hn-bless-title">✦ Gửi Lời Chúc Phúc ✦</h2>
+    <div class="hn-already-blessed">🌸 Đạo hữu đã gửi lời chúc phúc cho Đại Điển này rồi!</div>
+  </div>
+</div>
+<script>
+const tray = document.getElementById('hnLiXiModal');
+${hasGift ? `setTimeout(() => tray.classList.add('active'), 1200);` : ""}
+document.getElementById('hnOpenBtn').onclick = () => {
+  const btn = document.getElementById('hnOpenBtn');
+  btn.disabled = true;
+  fetch('/hy-su-lixi?id=${id}').then((r) => r.json()).then((d) => {
+    setTimeout(() => {
+      btn.style.display = 'none';
+      document.getElementById('hnRewardName').textContent = d.name;
+      document.getElementById('hnRewardAmount').textContent = String(d.amount);
+      document.getElementById('hnRewardWrap').classList.add('show');
+    }, 150);
+  });
+};
+document.getElementById('hnCloseBtn').onclick = () => {
+  tray.classList.add('closing');
+  fetch('/hy-su-tray-closed?id=${id}');
+  setTimeout(() => tray.remove(), 60);
+};
+</script>`;
+const hySuRoomPage = (id, alreadyBlessed) => `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div class="blessing-section"><h2>Gửi Lời Chúc Phúc</h2>
 ${alreadyBlessed ? '<div class="blessing-message"><p>Đạo hữu đã gửi lời chúc phúc cho cặp đôi này! 🌸</p></div>' : `<div class="blessing-form">
 <select id="blessing-default-options" onchange="fillBlessingMessage()">
@@ -696,7 +766,6 @@ ${alreadyBlessed ? '<div class="blessing-message"><p>Đạo hữu đã gửi l�
 <textarea id="blessing-message"></textarea>
 <button class="blessing-button" onclick="showConfirmModal()">Gửi Chúc Phúc</button>
 </div>`}</div>
-${withLixi ? '<div class="lixi-envelope" style="width:40px;height:40px">🧧</div>' : ""}
 <div id="confirm-modal" style="display:none">
   <button class="custom-modal-button cancel">Hủy Bỏ</button>
   <button class="custom-modal-button confirm">Xác Nhận</button>
@@ -713,8 +782,7 @@ document.querySelector('.custom-modal-button.confirm').onclick=()=>{
     setTimeout(()=>{const b=document.querySelector('.blessing-button');if(b)b.remove()},40);
   });
 };
-const lx=document.querySelector('.lixi-envelope');
-if(lx)lx.onclick=()=>{fetch('/hy-su-lixi?id=${id}');lx.remove()};
+
 </script>`;
 
 // ---------------------------------------------------------------------------------------
@@ -1684,7 +1752,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // thưởng không ai lĩnh, 5 lượt đánh của boss mới mất trắng. Nay lĩnh xong thì tự navigate
     // lại để đọc boss mới, rồi đi tiếp đúng cụm khiêu chiến cũ.
     "hồ sơ đang ở schema 68",
-    loadProfileForSchema().schemaVersion === 68,
+    loadProfileForSchema().schemaVersion === 69,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -2216,9 +2284,15 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     { id: "230", type: "hong-nhan", couple: "Trái Tim Mỹ Nhân 💕 Trái Tim Bao Dung" },
     { id: "2534", type: "dao-lu", couple: "ミ★Ôɴԍтʀùмнн3ᴅ★彡 & 𝙐𝙮ê𝙣𝙉𝙝𝙞" },
     { id: "2533", type: "dao-lu", couple: "1 Trái tim 1 Ngừi iu & Trái Tim Bất Chấp", lixiSent: true },
+    // Phòng của bản ghi 18/08/2026: ĐÃ CHÚC từ trước và ĐANG GIỮ một hồng bao chưa khai. Bộ lọc
+    // mặc định là ".not-blessed" nên bản quest cũ KHÔNG BAO GIỜ ghé nó — hồng bao hết hạn theo
+    // tiệc (5 giờ) mà không ai biết. Đây là ca chính của lượt vá này.
+    { id: "251", type: "hong-nhan", couple: "白鹿 ღ Lý Thanh Nguyệt 💕 小遥 | Tuyết Băng Vân", lixiSent: true, gift: true, preBlessed: true },
   ];
   const hySuBlessed = new Map(); // id → lời chúc đã gửi, theo thứ tự vào phòng
-  const hySuLixi = [];
+  const hySuLixi = []; // id phòng đã KHAI được hồng bao, theo thứ tự
+  const hySuTrayClosed = []; // id phòng đã ĐÓNG khay lại — khay còn mở là form chúc bị che
+  const hySuGifts = new Set(hySuRooms.filter((r) => r.gift).map((r) => r.id));
   const hySuBrokenRooms = new Set(); // id → trang phòng trả về hình dạng lạ (không form, không dấu đã chúc)
   let bossBroken = false;
   let bossStateMs = 0;
@@ -2322,16 +2396,26 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       }
       res.end(furnaceJson());
     }
-    else if (path === "/tien-duyen") res.end(hySuHallPage(hySuRooms, hySuBlessed));
+    else if (path === "/tien-duyen") res.end(hySuHallPage(hySuRooms, hySuBlessed, hySuGifts));
     else if (path === "/phong-cuoi" || path === "/hong-nhan") {
       const id = url.searchParams.get("id") ?? "";
-      res.end(hySuBrokenRooms.has(id) ? hySuBrokenRoomPage(id) : hySuRoomPage(id, hySuBlessed.has(id), id === "2534"));
+      const room = hySuRooms.find((r) => r.id === id);
+      if (hySuBrokenRooms.has(id)) res.end(hySuBrokenRoomPage(id));
+      else if (room?.preBlessed) res.end(hySuHongNhanPage(id, hySuGifts.has(id)));
+      else res.end(hySuRoomPage(id, hySuBlessed.has(id)));
     }
+    else if (path === "/hy-su-lixi") {
+      // Máy chủ chỉ trả thưởng MỘT lần cho mỗi phòng, đúng như hh3d_receive_li_xi ngoài đời;
+      // lượt hai vào lại cũng không đẻ thêm hồng bao nào.
+      const id = url.searchParams.get("id") ?? "";
+      if (hySuGifts.delete(id)) hySuLixi.push(id);
+      res.end(JSON.stringify({ type: "tien_ngoc", name: "Tiên Ngọc", amount: 49 }));
+    }
+    else if (path === "/hy-su-tray-closed") { hySuTrayClosed.push(url.searchParams.get("id") ?? ""); res.end("ok"); }
     else if (path === "/hy-su-blessed") {
       hySuBlessed.set(url.searchParams.get("id") ?? "", url.searchParams.get("msg") ?? "");
       res.end("ok");
     }
-    else if (path === "/hy-su-lixi") { hySuLixi.push(url.searchParams.get("id") ?? ""); res.end("ok"); }
     else if (path === "/khoang-mach") {
       // Chín giữa hai lượt ghé: load nào thấy mình ĐÃ ở trong mỏ (tức không phải load của
       // chính lượt vào) là chu kỳ trước đó đã đủ 30 phút.
@@ -3175,7 +3259,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     );
     check(
       "…và lời kể nói ra số phòng đã phát lì xì, để lượt chạy tự chứng minh điều đó",
-      infos.some((m) => m.startsWith("Hỷ Sự Đường:") && m.includes("1 đã phát lì xì")),
+      infos.some((m) => m.startsWith("Hỷ Sự Đường:") && m.includes("2 đã phát lì xì")),
       infos.filter((m) => m.startsWith("Hỷ Sự Đường:")).slice(-1)[0] ?? "(không có dòng nào)",
     );
     check(
@@ -3183,14 +3267,43 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       [...hySuBlessed.values()].every((msg) => msg.trim().length > 0),
       [...hySuBlessed.values()].join(" / "),
     );
+    // ĐÂY LÀ CA CHÍNH của bản vá 18/08/2026. Phòng 251 mang trạng thái "Đã chúc" nên bộ lọc
+    // mặc định `.not-blessed` gạt nó ra; nó chỉ vào được bộ ứng viên nhờ dòng
+    // `.wedding-now-li-xi-available`. Bản quest trước lượt vá này để hồng bao ấy hết hạn theo
+    // tiệc mà không ai biết — nên phép thử này ĐỎ trên hồ sơ cũ, và đó là điều làm nó đáng có.
     check(
-      "bao lì xì được nhặt đúng ở phòng đang phát, phòng không phát thì guard bỏ qua êm",
-      JSON.stringify(hySuLixi) === JSON.stringify(["2534"]),
-      hySuLixi.join(","),
+      "phòng ĐÃ CHÚC mà còn hồng bao vẫn được ghé, và hồng bao được khai",
+      JSON.stringify(hySuLixi) === JSON.stringify(["251"]),
+      hySuLixi.join(",") || "(không khai được cái nào)",
     );
     check(
-      "tường thuật gọi tên từng cặp đôi được ghé",
-      infos.filter((m) => m.startsWith("Vào phòng:")).length === 3,
+      "…và lời kể đếm ra số phòng còn hồng bao chưa khai, ngay từ lần mở modal đầu",
+      infos.some((m) => m.startsWith("Hỷ Sự Đường:") && m.includes("1 còn hồng bao chưa khai")),
+      infos.filter((m) => m.startsWith("Hỷ Sự Đường:"))[0] ?? "(không có dòng nào)",
+    );
+    check(
+      "…và lời kể gọi đúng tên món nhận được",
+      infos.some((m) => m === "Khai phong lì xì: 49 Tiên Ngọc"),
+      infos.filter((m) => m.includes("lì xì")).slice(-2).join(" / ") || "(không có dòng nào)",
+    );
+    // Khay che kín trang (`position:fixed; inset:0; pointer-events:all`), nên bỏ quên bước đóng
+    // là để lại một tấm chắn trước form chúc của chính phòng ấy.
+    check(
+      "khay hồng bao được ĐÓNG lại sau khi khai",
+      JSON.stringify(hySuTrayClosed) === JSON.stringify(["251"]),
+      hySuTrayClosed.join(",") || "(không đóng khay nào)",
+    );
+    // Ba phòng kia không có hồng bao: khay dựng sẵn nhưng không bao giờ `.active`. Nếu phép quét
+    // hỏi thẳng #hnOpenBtn (conditionProbe chỉ đọc chính phần tử, không leo cha) thì cả ba sẽ
+    // báo "có hồng bao" rồi đẻ ra ba dòng TRƯỢT — con số dưới đây là thứ bắt được chuyện đó.
+    check(
+      "phòng không có hồng bao thì không đòi khai, và không kêu trượt oan",
+      infos.filter((m) => m.startsWith("KHAI HỒNG BAO TRƯỢT")).length === 0,
+      infos.filter((m) => m.startsWith("KHAI HỒNG BAO TRƯỢT")).join(" / "),
+    );
+    check(
+      "tường thuật gọi tên từng cặp đôi được ghé (ba phòng để chúc + một phòng để khai hồng bao)",
+      infos.filter((m) => m.startsWith("Vào phòng:")).length === 4,
       infos.filter((m) => m.startsWith("Vào phòng:")).join(" / "),
     );
     // "Không có việc thì phải nói ra": mỗi lần mở modal đều kể con số, nên người đọc nhật ký
@@ -3221,8 +3334,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       const visitBlessed = await run(blessedOnly);
       const entered = infos.slice(before).filter((m) => m.startsWith("Vào phòng:"));
       check(
-        "lọc \"đã chúc\" → vào được cả ba phòng đã chúc, không chết ở bước chờ form",
-        visitBlessed.outcome === "completed" && entered.length === 3,
+        "lọc \"đã chúc\" → vào được cả bốn phòng đã chúc, không chết ở bước chờ form",
+        visitBlessed.outcome === "completed" && entered.length === 4,
         `${visitBlessed.outcome}: ${visitBlessed.message} — vào ${entered.length} phòng`,
       );
       check(
@@ -3232,7 +3345,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       );
       check(
         "…và nói rõ từng phòng là đã chúc rồi",
-        infos.slice(before).filter((m) => m.includes("đã chúc rồi")).length === 3,
+        infos.slice(before).filter((m) => m.includes("đã chúc rồi")).length === 4,
         infos.slice(before).filter((m) => m.includes("đã chúc rồi")).length + " dòng",
       );
       // Sổ đã ghé là thứ làm vòng lặp TIẾN ở chế độ này: chúc xong không làm giảm số .blessed,

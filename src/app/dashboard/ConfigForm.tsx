@@ -83,7 +83,9 @@ const FREE_ONLY_QUESTS: ReadonlyArray<SimpleQuest> = [
   {
     key: "hySuDuong",
     name: "Hỷ Sự Đường",
-    hint: "Chúc phúc các tiệc cưới đang mở bên Tiên Duyên — mỗi lời chúc tốn 30 Tiên Ngọc, nhận 120 Tu Vi.",
+    hint:
+      "Chúc phúc các tiệc cưới đang mở bên Tiên Duyên — mỗi lời chúc tốn 30 Tiên Ngọc, nhận 120 Tu Vi. " +
+      "Tiệc nào còn lì xì chưa mở thì luôn được ghé để bóc, bất kể bộ lọc chọn gì.",
   },
 ];
 

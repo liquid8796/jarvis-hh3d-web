@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.6",
+    date: "2026-08-18",
+    lines: [
+      "Hỷ Sự Đường: tiệc nào còn lì xì chưa mở thì nay tự ghé vào bóc, kể cả tiệc đã chúc rồi.",
+      "Trước đây chỉ tiệc chưa chúc mới được ghé, nên lì xì cứ nằm đó tới lúc tiệc tan là mất trắng.",
+      "Bóc lì xì xong mới gửi lời chúc, vì bao lì xì hiện lên là che kín cả trang.",
+    ],
+  },
+  {
     version: "1.3.5",
     date: "2026-08-18",
     lines: [

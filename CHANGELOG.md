@@ -11,6 +11,61 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.6 — Hỷ Sự Đường khai hồng bao, kể cả ở tiệc đã chúc (schema hồ sơ 69)
+
+Bản ghi `hy-su-duong-20260818-094945`, và một ghi chú của tông chủ nằm ngay trong `steps.json`:
+「nếu thấy phòng cưới hồng nhan nào có `trạng thái: đã chúc` và `Trạng thái lì xì: Đã phát lì xì`
+thì bấm vào chúc ngay để nhận lì xì nhé」.
+
+**Ba lỗ hổng, và cái đầu tiên là một khoản mất tiền im lặng.**
+
+1. **Phòng chỉ-còn-hồng-bao không bao giờ được ghé.** Hàng ấy mang
+   `.wedding-now-li-xi-available`(「🧧 Có lì xì chưa mở!」) nhưng trạng thái chúc là `.blessed`,
+   mà bộ lọc mặc định là `.not-blessed` — nên hồng bao nằm đó tới lúc tiệc tan (bản ghi:「Thời
+   gian còn lại: 5 giờ」) rồi mất hẳn. Không một dòng nhật ký nào đỏ, vì theo bộ lọc thì lượt
+   chạy đã làm đúng việc của nó. Bộ ứng viên nay là HỢP của hai tập: khớp bộ lọc, HOẶC còn hồng
+   bao chưa khai. Bộ lọc giữ nguyên nghĩa cũ cho phần chúc; hồng bao thì không hỏi ý ai, vì nó
+   không tốn gì và mất là mất hẳn.
+2. **Khay hồng bao che kín form chúc.** `#hnLiXiModal` tự mở ~1,2 giây sau khi trang phòng vẽ
+   xong, `position:fixed; inset:0; z-index:10002`, và khi `.active` thì `pointer-events:all`.
+   Một phòng vừa chưa chúc vừa có hồng bao sẽ nuốt trọn cú bấm「Gửi Chúc Phúc」. Nên cụm hồng
+   bao chen vào GIỮA bước chờ phòng và bước đọc trạng thái chúc, và bước đóng khay chạy kể cả
+   khi khai trượt.
+3. **`.lixi-envelope` là một phép đoán, và nay đo được là sai ở cả hai loại phòng.** Bên Đạo Lữ
+   nó chỉ là CSS trong thẻ `<style>` (đo 11/08), bên Hồng Nhan `grep dom/08-load.html` ra 0. Đã
+   gỡ khỏi cả hồ sơ lẫn fixture. Cái có thật là `#hnOpenBtn` trong khay; bấm nó là một POST
+   `hh3d_receive_li_xi` trả về đúng món thưởng (bản ghi đo được 49 Tiên Ngọc).
+
+**Phép hỏi hiển thị trong khay phải LEO NGƯỢC lên cha.** `conditionProbe` của engine chỉ đọc
+chính phần tử, mà `#hnOpenBtn`/`#hnCloseBtn` vẫn có kích thước thật khi khay đang
+`opacity:0; pointer-events:none` — hỏi thẳng cái nút thì một phòng KHÔNG có hồng bao cũng trả
+lời「có」, rồi đẻ ra một dòng TRƯỢT oan cho mỗi phòng. Nên `WeddingLiXiScanScript` tự leo cây
+cha, và hai cờ nó cắm (`jvz-hy-su-lixi` / `jvz-hy-su-lixi-box`) mới là thứ các bước dưới hỏi.
+Bước chờ thì hỏi thẳng `Visible #hnLiXiModal` được, vì `opacity` nằm trên chính cái khay.
+
+**Khai trượt KHÔNG giết lượt** — khác hẳn lời chúc. Một lời chúc tiêu 30 Tiên Ngọc nên trượt
+phải kêu to tới mức hỏng cả nhiệm vụ khi mọi phòng đều trượt (`jvz-hy-su-all-failed`); hồng bao
+không tốn gì và còn nguyên bên máy chủ cho lượt sau, nên nó chỉ kêu trong lời kể.
+
+**Và một chuyện đáng ghi hơn cả bản vá: nguồn C# đang THIẾU một bản vá web đã ship.** Lượt xuất
+hồ sơ đầu tiên của hôm nay cắt mất nửa Hồng Nhan của ba selector —
+`#hn-select, .hn-already-blessed` ở bước chờ phòng, `#hn-bless-btn` ở nút gửi,
+`#hn-confirm-modal .hn-modal-btn.confirm` ở hộp xác nhận — cùng ba script đọc chúng. Không phải
+công cụ xuất sai: `git log -S "hn-bless-btn"` bên kho PC ra RỖNG, bên web ra `29e4fd1`. Bản vá
+hai-loại-phòng ấy chưa từng về tới nguồn. Ghép thẳng bản xuất là một bước lùi ngay giữa lượt vá
+đang nói về chính phòng Hồng Nhan — và bộ chạy thử đã bắt được nó: ba ca đỏ với
+「trang phòng không có form chúc lẫn dấu đã chúc」. Lượt này chép ngược nội dung ĐANG CHẠY từ
+`HEAD:profile.json` về `DefaultQuestProfile.cs` trước, rồi mới xuất lại.
+
+Bài học cho lưới ghép: **「quest nào lệch」là chưa đủ, phải soi「lệch CHỖ NÀO」** — với chính
+quest mình đang sửa thì mọi khác biệt đều dễ bị đọc thành「việc của mình」.
+
+Fixture chép từ bản ghi: hàng modal có dòng「Có lì xì chưa mở!」và nút `.has-gift-btn`; trang
+phòng Hồng Nhan có khay thật, gắn `.active` sau 1,2 giây đúng nhịp đo được, và khay dựng sẵn
+**kể cả ở phòng không có hồng bao** — cố ý khó hơn đời thật, vì đó là ca duy nhất bắt được lỗi
+「hỏi thẳng cái nút」ở trên.
+
+---
 ## 1.3.5 — Hoang Vực lĩnh phần thưởng treo TRƯỚC khi khiêu chiến (schema hồ sơ 68)
 
 Bản ghi `hoang-vuc-20260818-013720`, kèm hai lời dặn của tông chủ nằm ngay trong `steps.json`:

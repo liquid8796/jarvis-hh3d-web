@@ -11,6 +11,38 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.5 — Hoang Vực lĩnh phần thưởng treo TRƯỚC khi khiêu chiến (schema hồ sơ 68)
+
+Bản ghi `hoang-vuc-20260818-013720`, kèm hai lời dặn của tông chủ nằm ngay trong `steps.json`:
+「lúc vào page của hoang vực nếu ko thấy nút khiêu chiến thay vào đó là nút nhận thưởng thì sẽ
+nhận thưởng thay vì khiêu chiến nhé」→「sau đó tiến hành flow khiêu chiến như bình thường」.
+
+**Đây không phải một tính năng thêm — nó là một cái bẫy đang mở.** Khi boss đời trước bị hạ mà
+thưởng mốc sát thương chưa lĩnh, trang vẽ khối boss KHÁC HẲN: ảnh xám `…-die.png`, HP `0.00%`,
+và chỗ `#battle-button` là `#reward-button`「Nhận thưởng」. Cùng lúc biến mất luôn
+`#change-element-button`, `.remaining-attacks`, `#countdown-timer` — `probes.json` của chính bản
+ghi đo đủ cả bốn ("no match"). Kịch bản cũ rơi thẳng vào lưới cuối「nút KHIÊU CHIẾN không có
+trên trang」— một `StopIf` KHÔNG kèm đồng hồ, tức `alreadyDone` — mà `hoang-vuc` nằm trong
+`DAILY_QUOTA_QUEST_IDS`, nên lượt ấy **khoá cả ngày**: phần thưởng nằm đó không ai lĩnh, và 5
+lượt đánh của boss mới mất trắng theo. Im lặng hoàn toàn, mọi dòng nhật ký đều xanh.
+
+**Bản vá**: một cụm 7 bước chèn ngay sau cổng render, trước mọi cửa sổ chờ.
+
+- `HvRewardScanScript` hỏi CHÍNH cái nút, không suy từ ảnh boss xám hay HP 0% — ảnh là trang trí
+  của trạng thái ấy, nút mới là thứ bấm được; trang đổi ảnh die thì phép đọc theo ảnh chết lặng.
+- `HvRewardTellScript` kể món vừa lĩnh, đọc từ `.reward-item`/`.amount` của hộp `Thành công!`
+  (bản ghi: 1800 Tu Vi · 390 Tinh Thạch · 120 Tinh Huyết · 300 Tiên Ngọc — khớp từng số với thân
+  trả lời AJAX `claim_chest`).
+- Lĩnh xong thì **tự `Navigate` lại** thay vì đợi lượt tải lại của site: trang thật CÓ tự tải lại
+  khi hộp đóng, nhưng đặt nhịp sau vào tay một thứ mình không điều khiển là chỗ để hỏng.
+- Bước chờ hộp và bước đóng hộp đều `optional`/có `when`: cú bấm đã đi rồi thì phần thưởng đã vào
+  túi, một cái hộp hụt không được phép giết cả lượt.
+
+Bộ chạy thử có **ca đối chứng giữ vĩnh viễn**: bỏ cụm lĩnh thưởng ra khỏi kịch bản thì trên CÙNG
+fixture ấy phải khai `alreadyDone` + `dailyCapReached` và không lĩnh gì — fixture nào để kịch bản
+cũ đi qua êm là fixture đang nói dối. Fixture chép từ `dom/01-load.html` (khối thưởng treo) và
+cắt sạch bốn thứ mà `probes.json` đo là vắng mặt.
+
 ## 1.3.4 — Bí Cảnh Tông Môn có bản THƯỜNG: một đòn mỗi lượt ghé, trên trang riêng (schema 67)
 
 Yêu cầu 18/08/2026, kèm bản ghi `bi-canh-tong-mon-20260818-013136` quay trên một tài khoản

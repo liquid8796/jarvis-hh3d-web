@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.5",
+    date: "2026-08-18",
+    lines: [
+      "Hoang Vực: boss bị hạ mà phần thưởng còn treo thì auto lĩnh thưởng trước, rồi mới đánh boss mới trong cùng lượt ghé.",
+      "Trước đây gặp cảnh ấy nó tưởng đã hết lượt và nghỉ hết ngày — mất cả phần thưởng lẫn 5 lượt đánh của boss mới.",
+    ],
+  },
+  {
     version: "1.3.4",
     date: "2026-08-18",
     lines: [

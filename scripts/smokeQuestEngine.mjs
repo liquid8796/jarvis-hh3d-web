@@ -462,6 +462,21 @@ const bossControls = (turnsLeft) =>
   `<div class="remaining-attacks">Lượt đánh còn lại: <span id="luot">${turnsLeft}</span></div>`;
 
 /**
+ * Khối boss ở trạng thái「boss đã bị hạ, thưởng còn treo」— chép từ `dom/01-load.html` của bản
+ * ghi hoang-vuc-20260818-013720.
+ *
+ * Điều PHẢI giữ nguyên, vì nó chính là cái bẫy: chỗ nút KHIÊU CHIẾN là `#reward-button`, và
+ * KHÔNG có `#battle-button`, KHÔNG có `#change-element-button`, KHÔNG có `.remaining-attacks`.
+ * probes.json của bản ghi đo đủ cả bốn ("no match") — nên một fixture tử tế phải cắt sạch chúng
+ * đi, bằng không ca thử sẽ đi qua nhánh cũ mà vẫn xanh.
+ */
+const bossRewardControls = () =>
+  '<img id="boss-image" class="boss-image grayscale" alt="Boss">' +
+  '<div class="boss-hp"><div class="hp-bar"><div class="hp-bar-inner dead" style="width: 0%;"></div></div>' +
+  '<div class="hp-text" id="hp-text">0.00%</div></div>' +
+  '<button class="reward-button" id="reward-button"><i class="fas fa-gift"></i> Nhận thưởng</button>';
+
+/**
  * Trang boss, dựng theo đúng những gì đo được trên trang thật ngày 06/08:
  * `#countdown-timer` ẩn bằng display:none khi chưa đánh, `#battle-button` cũng ẩn bằng
  * display:none ngay khi đòn được ghi nhận (nên phép kiểm `hidden` không bị lớp phủ đánh lừa).
@@ -475,10 +490,10 @@ const bossControls = (turnsLeft) =>
  * @param state   "ready" (còn lượt) · "cooldown" (nút còn trong DOM nhưng display:none) ·
  *   "spent" (hết lượt hôm nay — site XOÁ HẲN nút khỏi DOM)
  */
-const bossPage = (broken, { stateMs = 0, cooling = false, turnsLeft = 5 } = {}) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+const bossPage = (broken, { stateMs = 0, cooling = false, turnsLeft = 5, reward = false } = {}) => `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div id="boss-info">
-  <div>Huyết Trư Địa Quỷ 61.55%</div>
-  <div id="boss-slot">${bossControls(turnsLeft)}</div>
+  <div>${reward ? "Hỗn Thiên Ma Vương" : "Huyết Trư Địa Quỷ 61.55%"}</div>
+  <div id="boss-slot">${reward ? bossRewardControls() : bossControls(turnsLeft)}</div>
 </div>
 <div id="countdown-timer" style="display:none"></div>
 <div id="boss-damage-screen" style="display:none">
@@ -501,7 +516,29 @@ ${
 }
 document.addEventListener('click', (e) => {
   const t = e.target;
-  if (t.id === 'battle-button') {
+  if (t.id === 'reward-button') {
+    fetch('/hv-claim');
+    setTimeout(() => {
+      const box = document.createElement('div');
+      box.className = 'reward-notification success';
+      box.innerHTML = '<div class="reward-content">'
+        + '<button type="button" class="reward-close" aria-label="Đóng"><i class="fas fa-times"></i></button>'
+        + '<div class="reward-message"><h3 class="title-reward">Thành công!</h3>'
+        + '<div class="reward-list">'
+        + '<div class="reward-item"><i></i> <span class="amount">1800</span> Tu Vi </div>'
+        + '<div class="reward-item"><img alt="Tinh Thạch"> <span class="amount">390</span> Tinh Thạch </div>'
+        + '<div class="reward-item"><img alt="Tinh Huyết"> <span class="amount">120</span> Tinh Huyết </div>'
+        + '<div class="reward-item"><img alt="Tiên Ngọc"> <span class="amount">300</span> Tiên Ngọc </div>'
+        + '</div></div></div>';
+      document.body.append(box);
+      document.body.dataset.claimed = '1';
+    }, 120);
+  } else if (t.closest && t.closest('.reward-close')) {
+    /* Trang thật TỰ TẢI LẠI khi hộp đóng — giữ đúng nhịp ấy, vì nó là thứ trả lại
+       #battle-button cho cụm khiêu chiến bên dưới. */
+    document.querySelector('.reward-notification').remove();
+    setTimeout(() => location.reload(), 60);
+  } else   if (t.id === 'battle-button') {
     setTimeout(() => { $('#boss-damage-screen').style.display = 'block'; }, 300);
   } else if (t.classList.contains('attack-button')) {${
     broken
@@ -1638,8 +1675,16 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // "Hết lượt hôm nay". Nhân chứng sau cú Tấn Công hỏi CHỮ (":|hết lượt") chứ không hỏi
     // `disabled`: nút KHÔNG được vẽ cũng thoả disabled, đúng cái bẫy đã làm Hoang Vực báo xong
     // cho một trận chưa từng đánh.
-    "hồ sơ đang ở schema 67",
-    loadProfileForSchema().schemaVersion === 67,
+    // 68 = Hoang Vực lĩnh phần thưởng treo TRƯỚC khi khiêu chiến (bản ghi
+    // hoang-vuc-20260818-013720). Boss đời trước bị hạ mà thưởng mốc sát thương chưa lĩnh thì
+    // trang thay #battle-button bằng #reward-button, và bỏ luôn #change-element-button,
+    // .remaining-attacks, #countdown-timer — probes.json của bản ghi đo đủ cả bốn. Kịch bản cũ
+    // rơi vào lưới cuối「nút KHIÊU CHIẾN không có trên trang」— một StopIf KHÔNG đồng hồ, tức
+    // alreadyDone — mà hoang-vuc nằm trong DAILY_QUOTA_QUEST_IDS nên lượt ấy KHOÁ CẢ NGÀY:
+    // thưởng không ai lĩnh, 5 lượt đánh của boss mới mất trắng. Nay lĩnh xong thì tự navigate
+    // lại để đọc boss mới, rồi đi tiếp đúng cụm khiêu chiến cũ.
+    "hồ sơ đang ở schema 68",
+    loadProfileForSchema().schemaVersion === 68,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -2179,6 +2224,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   let bossStateMs = 0;
   let bossCooling = false;
   let bossTurnsLeft = 5;
+  let bossReward = false;
+  const hvClaims = [];
 
   // Lò luyện đan phía "server", đúng luật đo trong luyen-dan.min.js (06/08): lửa tụt theo
   // thời gian thật, cú Điều Hòa nào cũng được NHẬN nhưng chỉ được ĐẾM khi (lần đầu ≤ 68%)
@@ -2247,8 +2294,11 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     else if (path === "/thi-luyen-tong-mon-hh3d") res.end(FREE_TRIAL_PAGE);
     else if (path === "/danh-sach-thanh-vien-tong-mon") res.end(freeSacrificePage(teLeOffered));
     else if (path === "/te-le-offered") { teLeOffered = true; res.end("ok"); }
+    // Lĩnh thưởng Hoang Vực: server ghi nhận VÀ đổi trạng thái — lượt tải lại kế tiếp phải là
+    // trang boss bình thường, bằng không fixture nói dối ở đúng chỗ quan trọng nhất.
+    else if (path === "/hv-claim") { hvClaims.push(new Date().toISOString()); bossReward = false; res.end("ok"); }
     else if (path === "/hoang-vuc")
-      res.end(bossPage(bossBroken, { stateMs: bossStateMs, cooling: bossCooling, turnsLeft: bossTurnsLeft }));
+      res.end(bossPage(bossBroken, { stateMs: bossStateMs, cooling: bossCooling, turnsLeft: bossTurnsLeft, reward: bossReward }));
     else if (path === "/luyen-dan-duong") res.end(furnacePage({ waveMs: 900 }));
     else if (path === "/ld-state") {
       tickFurnace();
@@ -2875,6 +2925,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       bossStateMs = 0;
       bossCooling = false;
       bossTurnsLeft = 5;
+      bossReward = false;
+      hvClaims.length = 0;
       await page.goto(`${baseUrl}/hoang-vuc`, { waitUntil: "domcontentloaded" });
     };
 
@@ -2963,6 +3015,80 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       "cú bấm rơi vào hư không → HỎNG, không nhận vơ là xong",
       bossMiss.outcome === "failed" && String(bossMiss.message ?? "").includes("#battle-button"),
       `${bossMiss.outcome}: ${bossMiss.message}`,
+    );
+    await resetBoss();
+
+    console.log("\nHoang Vực — phần thưởng treo phải LĨNH TRƯỚC, rồi mới khiêu chiến");
+
+    // Bản ghi hoang-vuc-20260818-013720 + lời dặn của tông chủ trong chính bản ghi ấy:「nếu ko
+    // thấy nút khiêu chiến thay vào đó là nút nhận thưởng thì sẽ nhận thưởng thay vì khiêu
+    // chiến」rồi「sau đó tiến hành flow khiêu chiến như bình thường」.
+    await resetBoss();
+    bossReward = true;
+    await page.goto(`${baseUrl}/hoang-vuc`, { waitUntil: "domcontentloaded" });
+    const bossReward1 = await run(bossQuest);
+    check(
+      "boss đã bị hạ + thưởng còn treo → LĨNH thưởng, rồi đánh tiếp trong CÙNG lượt ghé",
+      hvClaims.length === 1 && (await page.getAttribute("body", "data-attacked")) === "1" &&
+        bossReward1.outcome === "completed",
+      `${bossReward1.outcome}; claims=${hvClaims.length}; attacked=${await page.getAttribute("body", "data-attacked")}`,
+    );
+    // ĐÂY LÀ CÁI BẪY THẬT, và là lý do bản vá này tồn tại: kịch bản cũ rơi vào lưới cuối
+    //「nút KHIÊU CHIẾN không có trên trang」— một StopIf KHÔNG đồng hồ, tức alreadyDone. Mà
+    // hoang-vuc nằm trong DAILY_QUOTA_QUEST_IDS, nên lượt ấy KHOÁ CẢ NGÀY: thưởng nằm đó không
+    // ai lĩnh, và 5 lượt đánh của boss mới mất trắng theo.
+    check(
+      "…và TUYỆT ĐỐI không được khai là「hết lượt hôm nay」— cảnh này không phải hết ngày",
+      bossReward1.outcome !== "alreadyDone" && bossReward1.dailyCapReached !== true,
+      `${bossReward1.outcome}; capReached=${bossReward1.dailyCapReached}`,
+    );
+    check(
+      "…nhật ký kể đúng những món vừa lĩnh, đọc từ chính hộp của trang",
+      infos.some((m) => m.includes("Đã lĩnh thưởng Hoang Vực") && m.includes("1800 Tu Vi") && m.includes("390 Tinh Thạch")),
+      infos.filter((m) => m.includes("lĩnh thưởng")).join(" / ") || "(không có dòng nào)",
+    );
+
+    // ĐỐI CHỨNG, giữ vĩnh viễn: bỏ cụm lĩnh thưởng ra khỏi kịch bản thì trên CÙNG fixture ấy
+    // phải rơi đúng vào cái bẫy cũ. Fixture nào để kịch bản cũ đi qua êm là fixture nói dối.
+    await resetBoss();
+    bossReward = true;
+    await page.goto(`${baseUrl}/hoang-vuc`, { waitUntil: "domcontentloaded" });
+    const noClaim = structuredClone(bossQuest);
+    noClaim.steps = noClaim.steps.filter(
+      (st) => !String(st.script ?? "").includes("jvz-hv-reward") &&
+        !String(st.selector ?? "").includes("jvz-hv-reward") &&
+        !String(st.selector ?? "").includes("reward-notification") &&
+        !(st.when?.selector === "body.jvz-hv-reward-go"),
+    );
+    const hvNoClaim = await run(noClaim);
+    check(
+      "kịch bản CŨ trên cùng cảnh ấy: khoá cả ngày và không lĩnh gì — đúng cái bẫy vừa vá",
+      hvNoClaim.outcome === "alreadyDone" && hvNoClaim.dailyCapReached === true && hvClaims.length === 0,
+      `${hvNoClaim.outcome}; capReached=${hvNoClaim.dailyCapReached}; claims=${hvClaims.length}`,
+    );
+
+    // Không có thưởng treo thì cụm này phải LẶN hoàn toàn — không một cú bấm thừa, không một
+    // lượt tải lại thừa. Ca giữ cho bản vá không đánh thuế lên 99% lượt ghé bình thường.
+    await resetBoss();
+    const bossPlain = await run(bossQuest);
+    check(
+      "không có thưởng treo → cụm lĩnh thưởng lặn sạch, flow khiêu chiến chạy y như cũ",
+      hvClaims.length === 0 && bossPlain.outcome === "completed" &&
+        (await page.getAttribute("body", "data-attacked")) === "1" &&
+        (await page.getAttribute("body", "data-claimed")) == null,
+      `${bossPlain.outcome}; claims=${hvClaims.length}`,
+    );
+
+    // Twin thường dùng CHUNG kịch bản — chạy trọn một lượt để nó không chỉ đúng trên giấy.
+    await resetBoss();
+    bossReward = true;
+    await page.goto(`${baseUrl}/hoang-vuc`, { waitUntil: "domcontentloaded" });
+    const bossFree = await run(exportedProfile.quests.find((q) => q.id === "hoang-vuc-thuong"));
+    check(
+      "twin thường: cùng nhánh lĩnh thưởng, cùng đánh tiếp",
+      hvClaims.length === 1 && bossFree.outcome === "completed" &&
+        (await page.getAttribute("body", "data-attacked")) === "1",
+      `${bossFree.outcome}; claims=${hvClaims.length}`,
     );
     await resetBoss();
 

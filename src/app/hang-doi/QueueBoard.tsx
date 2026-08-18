@@ -585,9 +585,10 @@ export function QueueBoard({
        * đầu. Ai đọc「11 đang nghỉ」lúc cả tông môn đứng im thì không có cách nào biết đó là
        * cooldown hay là không còn ai làm việc.
        *
-       * Danh sách này đã được service cắt theo vai (xem `getWorkerRoster`): môn đồ thường nhận
-       * MỘT dòng gộp cho khôi lỗi tông môn, bậc trị sự nhận từng tiến trình một. Nên ở đây
-       * không có phép hỏi quyền nào — chỉ vẽ đúng thứ được đưa.
+       * Từ 19/08/2026 MỌI đạo hữu nhận từng tiến trình tông môn một, kèm id và số bản (xem
+       * `getWorkerRoster`); dòng GỘP chỉ còn xuất hiện khi sổ chưa có khôi lỗi tông môn nào.
+       * Khôi lỗi RIÊNG thì vẫn chỉ của chính người xem. Ở đây không có phép hỏi quyền nào —
+       * service đã cắt xong, giao diện chỉ vẽ đúng thứ được đưa.
        */}
       {tab === "workers" && (
         <div role="tabpanel" id="queue-panel-workers" aria-labelledby="queue-tab-workers" tabIndex={0}>
@@ -621,7 +622,7 @@ export function QueueBoard({
                   {worker.kind === "sect" ? "Khôi lỗi tông môn" : "Khôi lỗi riêng"}
                 </span>
                 {worker.kind === "mine" && <span className="badge badge-active">của bạn</span>}
-                {/* id chỉ tới được đây khi người xem có quyền biết — service đã cắt. */}
+                {/* Vắng id chỉ còn một nghĩa: đây là dòng gộp của một sổ tông môn rỗng. */}
                 {worker.id && (
                   <span className="font-mono text-[11px] text-[var(--color-mist)]">{worker.id}</span>
                 )}

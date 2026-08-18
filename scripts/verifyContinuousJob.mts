@@ -234,7 +234,7 @@ try {
   // Tìm theo ID CHÍNH XÁC: ảnh chụp là hàng đợi của cả tông môn, nên nó cũng chứa đàn thật
   // của những người dùng thật đang chạy — bắt "dòng đầu tiên không phải của mình" là bắt
   // nhầm một người vô can, và phép thử sẽ xanh/đỏ theo việc hôm đó ai đang khai đàn.
-  const snapshot = await getQueueSnapshot({ id: userId, roles: [] });
+  const snapshot = await getQueueSnapshot({ id: userId });
   const mineRow = snapshot.entries.find((entry) => entry.id === jobId);
   const theirRow = snapshot.entries.find((entry) => entry.id === otherJobId);
 
@@ -262,19 +262,20 @@ try {
     "tên tài khoản game của người khác thì KHÔNG bao giờ đi qua — ranh giới ấy chưa từng dịch",
   );
 
-  // ---- ID khôi lỗi: tông môn cho bậc trị sự, khôi lỗi riêng cho chủ nó ------------------
+  // ---- ID khôi lỗi: tông môn cho MỌI người, khôi lỗi riêng cho chủ nó -------------------
   //
-  // Luật từ 12/08/2026 (xem `visibleWorkerId`): id khôi lỗi TÔNG MÔN chỉ bậc trị sự thấy — kể
-  // cả trên dòng của chính mình — còn id khôi lỗi RIÊNG thì chỉ chủ nó, bậc trị sự cũng không.
-  // Dựng đủ ba tiến trình rồi hỏi ảnh chụp bằng hai con mắt khác nhau.
+  // Luật hiện hành (xem `visibleWorkerId`): id khôi lỗi TÔNG MÔN mở cho mọi đạo hữu từ
+  // 19/08/2026 — trước đó là đặc quyền của bậc trị sự — còn id khôi lỗi RIÊNG thì vẫn chỉ chủ
+  // nó, bậc trị sự cũng không. Vế thứ hai mới là vế phải canh, nên nó được kiểm bằng cả một
+  // phép quét thô trên nguyên payload. Dựng đủ ba tiến trình rồi hỏi bằng hai con mắt.
   await sql`insert into workers (id, user_id, version) values (${sectWorkerId}, null, '9.9.9-verify')`;
   await sql`insert into workers (id, user_id, version) values (${ownWorkerId}, ${userId}, '9.9.9-verify')`;
   await sql`insert into workers (id, user_id, version) values (${theirWorkerId}, ${otherUserId}, '9.9.9-verify')`;
   await sql`update automation_jobs set worker_id = ${sectWorkerId} where id = ${jobId}`;
   await sql`update automation_jobs set worker_id = ${theirWorkerId} where id = ${otherJobId}`;
 
-  const asMember = await getQueueSnapshot({ id: userId, roles: [] });
-  const asAdmin = await getQueueSnapshot({ id: userId, roles: ["thai-thuong-truong-lao"] });
+  const asMember = await getQueueSnapshot({ id: userId });
+  const asAdmin = await getQueueSnapshot({ id: userId });
   const memberMine = asMember.entries.find((entry) => entry.id === jobId);
   const adminMine = asAdmin.entries.find((entry) => entry.id === jobId);
   const memberTheirs = asMember.entries.find((entry) => entry.id === otherJobId);
@@ -282,23 +283,24 @@ try {
 
   assert(memberMine?.workerKind === "sect", "đàn do khôi lỗi tông môn cầm phải khai đúng LOẠI cho mọi người");
   assert(
-    memberMine?.workerId === null,
-    `môn đồ thường KHÔNG được biết tiến trình tông môn nào, kể cả trên đàn của chính mình — nhận ${memberMine?.workerId}`,
+    memberMine?.workerId === sectWorkerId,
+    `môn đồ thường phải thấy đích danh tiến trình tông môn đang cầm đàn — nhận ${memberMine?.workerId}`,
   );
   assert(
     adminMine?.workerId === sectWorkerId,
-    `bậc trị sự phải thấy đích danh khôi lỗi tông môn, nhận ${adminMine?.workerId}`,
+    `bậc trị sự cũng thấy đúng cái đó, không hơn không kém, nhận ${adminMine?.workerId}`,
   );
   assert(
     adminTheirs?.workerKind === "personal" && adminTheirs?.workerId === null,
     `id khôi lỗi RIÊNG của người khác không đi qua, kể cả với bậc trị sự — nhận ${adminTheirs?.workerId}`,
   );
-  assert(memberTheirs?.workerId === null, "môn đồ thường lại càng không thấy khôi lỗi riêng của người khác");
-  // Phép kiểm thô nhất, phủ cả những trường thêm vào sau này: hai chuỗi ấy không được xuất
-  // hiện ở BẤT KỲ đâu trong payload đi ra trình duyệt của người không có quyền.
+  assert(memberTheirs?.workerId === null, "khôi lỗi riêng của người khác thì không ai thấy id");
+  // Phép kiểm thô nhất, phủ cả những trường thêm vào sau này: id máy nhà của NGƯỜI KHÁC không
+  // được xuất hiện ở BẤT KỲ đâu trong payload đi ra trình duyệt — với cả hai con mắt. Đây là vế
+  // KHÔNG dịch của cú mở ngày 19/08, nên nó phải được canh bằng phép quét thô nhất có thể.
   assert(
-    !JSON.stringify(asMember).includes(sectWorkerId),
-    "id khôi lỗi tông môn lọt ra trong ảnh chụp của môn đồ thường",
+    !JSON.stringify(asMember).includes(theirWorkerId),
+    "id khôi lỗi riêng của người khác lọt ra trong ảnh chụp của môn đồ thường",
   );
   assert(
     !JSON.stringify(asAdmin).includes(theirWorkerId),
@@ -308,16 +310,21 @@ try {
   // ---- Sổ khôi lỗi của tab Khôi Lỗi ------------------------------------------------------
   const memberSect = asMember.workers.filter((worker) => worker.kind === "sect");
   const adminSect = asAdmin.workers.filter((worker) => worker.kind === "sect");
+  const memberRow = memberSect.find((worker) => worker.id === sectWorkerId);
   assert(
-    memberSect.length === 1 && memberSect[0].id === null,
-    `môn đồ thường nhận ĐÚNG một dòng gộp cho khôi lỗi tông môn, nhận ${JSON.stringify(memberSect)}`,
+    memberRow != null,
+    `môn đồ thường phải thấy TỪNG khôi lỗi tông môn một, nhận ${JSON.stringify(memberSect)}`,
   );
   assert(
-    memberSect[0].version === null,
-    "dòng gộp không kể số bản của ai — đó cũng là một chi tiết vận hành",
+    memberRow!.version === "9.9.9-verify",
+    `và thấy cả số bản của nó, nhận ${memberRow!.version}`,
+  );
+  assert(
+    !memberSect.some((worker) => worker.id === null),
+    "sổ tông môn đã có tiến trình thì KHÔNG được kèm dòng gộp — dòng ấy chỉ dành cho sổ rỗng",
   );
   const adminRow = adminSect.find((worker) => worker.id === sectWorkerId);
-  assert(adminRow != null, "bậc trị sự phải thấy từng khôi lỗi tông môn một");
+  assert(adminRow != null, "bậc trị sự thấy đúng danh sách ấy");
   assert(adminRow!.version === "9.9.9-verify", `và thấy cả số bản của nó, nhận ${adminRow!.version}`);
   assert(
     adminRow!.online === true && adminRow!.lastSeen === null,

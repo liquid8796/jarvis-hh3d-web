@@ -1,6 +1,5 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { hasPermission } from "@/lib/auth/permissions";
 import { getWorkerRoster, ONLINE_WINDOW_MS, type WorkerRosterEntry } from "@/lib/services/workers";
 import type { CycleProgress, JobStatus } from "@/lib/realtime/dashboardTypes";
 
@@ -14,14 +13,23 @@ import type { CycleProgress, JobStatus } from "@/lib/realtime/dashboardTypes";
  * đang cầm (chỉ TÔNG MÔN hay RIÊNG, không phải id máy). KHÔNG BAO GIỜ: tên tài khoản game,
  * cookie, cấu hình nhiệm vụ đã lưu, id khôi lỗi riêng. Của chính mình thì thấy đủ.
  *
- * <b>ID khôi lỗi, từ 12/08/2026</b> — hai vế, và chỉ hai (xem `visibleWorkerId`):
- *   • Khôi lỗi TÔNG MÔN: chỉ bậc trị sự (`admin.panel`) thấy đích danh tiến trình nào, ở MỌI
- *     dòng kể cả dòng của chính họ. Môn đồ thường chỉ đọc được「khôi lỗi tông môn」.
- *   • Khôi lỗi RIÊNG: chỉ CHỦ nó thấy id, y như trước. Bậc trị sự cũng không — máy ở nhà người
- *     ta không phải hạ tầng của tông môn.
- * Trước bản này, dòng của chính mình luôn kèm id, nên môn đồ thường đọc được tên tiến trình
- * tông môn qua chính đàn của họ. Đó là chi tiết vận hành (máy nào, trạm nào) mà môn đồ không
- * dùng được vào việc gì, còn tông môn thì hở ra hình dạng hạ tầng của mình.
+ * <b>ID khôi lỗi</b> — hai vế, và chỉ hai (xem `visibleWorkerId`):
+ *   • Khôi lỗi TÔNG MÔN: MỌI đạo hữu thấy đích danh tiến trình nào, ở mọi dòng. Ranh giới này
+ *     đã DỊCH ngày 19/08/2026 theo yêu cầu của tông chủ, cùng lượt với tab Khôi Lỗi (xem
+ *     `getWorkerRoster`). Từ 12/08 tới 19/08 nó là đặc quyền của bậc trị sự (`admin.panel`),
+ *     với lập luận: id một khôi lỗi tông môn là chi tiết vận hành (máy nào, trạm nào) mà môn đồ
+ *     không dùng được vào việc gì, còn tông môn thì hở ra hình dạng hạ tầng của mình. Lập luận
+ *     ấy bị bác vì cái khác: đây là hạ tầng CỦA CHUNG, cả tông môn đang xếp hàng chờ nó, nên
+ *     biết「đàn của tôi đang nằm trong tay tiến trình nào」là một phần của câu hỏi trang này
+ *     sinh ra để trả lời. Ghi lại để người sau biết đây là ranh giới được dịch có chủ ý, không
+ *     phải một chỗ rò rỉ — y như cú đổi phía của tên nhiệm vụ bên dưới.
+ *   • Khôi lỗi RIÊNG: chỉ CHỦ nó thấy id, không đổi một chữ. Bậc trị sự cũng không — máy ở nhà
+ *     người ta không phải hạ tầng của tông môn. Đây là vế KHÔNG dịch, và nó là lý do
+ *     `visibleWorkerId` vẫn phải là một hàm hai nhánh chứ không phải một phép trả về thẳng.
+ *
+ * <b>Và THẤY không phải là ĐƯỢC CHẠM.</b> Nút Dừng/Khai hộ vẫn nằm sau `job.force_stop` /
+ * `job.force_start` (vai Thái thượng trưởng lão trở lên), gác ở `forceStopJobAction` chứ không
+ * ở giao diện. Cú dịch trên chỉ mở phần ĐỌC.
  *
  * <b>Tên nhiệm vụ đã ĐỔI PHÍA, ngày 08/08/2026, theo yêu cầu của tông chủ.</b> Trước đó chỉ
  * con số "3/8" được qua, với lập luận: nó trả lời đúng câu hỏi trang này sinh ra để trả lời
@@ -135,8 +143,14 @@ export type QueueSnapshot = {
   workers: WorkerRosterEntry[];
 };
 
-/** Người đang xem hàng đợi — đủ để trả lời「được thấy gì」, không hơn. */
-export type QueueViewer = { id: string; roles: readonly string[] };
+/**
+ * Người đang xem hàng đợi — đủ để trả lời「được thấy gì」, không hơn.
+ *
+ * Chỉ còn `id` từ 19/08/2026: sau khi vế tông môn mở cho mọi người, thứ duy nhất còn cắt theo
+ * người xem là「dòng này của chính tôi không」. Vai không còn quyết định gì trong tệp này, và một
+ * trường không ai đọc là một lời hứa suông về việc có phép gác.
+ */
+export type QueueViewer = { id: string };
 
 /**
  * Che 2/3 tên, giữ lại đầu tên đủ để chủ nhân tự nhận ra mình.
@@ -242,15 +256,18 @@ export function readProgress(raw: unknown): QueueProgress | null {
  *
  * Một hàm thuần đứng riêng thay vì một biểu thức nhét trong `map`: đây là câu quyết định
  * riêng tư của cả trang, và nó phải đọc được (lẫn thử được) mà không cần dựng database.
+ *
+ * Từ 19/08/2026 vế TÔNG MÔN mở cho mọi người, nên hàm không còn hỏi quyền nữa — nhưng nó vẫn
+ * còn hai nhánh, và cái nhánh còn lại mới là phần đáng giữ: id khôi lỗi RIÊNG chỉ về tay CHỦ nó.
+ * `verify:queue-pools` đóng đinh cả bốn tổ hợp.
  */
 export function visibleWorkerId(
   workerId: string | null,
   kind: "sect" | "personal" | null,
   mine: boolean,
-  canInspectSect: boolean,
 ): string | null {
   if (workerId == null || kind == null) return null;
-  return kind === "sect" ? (canInspectSect ? workerId : null) : mine ? workerId : null;
+  return kind === "sect" ? workerId : mine ? workerId : null;
 }
 
 /**
@@ -402,7 +419,6 @@ export function assignQueueSlots(
  */
 export async function getQueueSnapshot(viewer: QueueViewer): Promise<QueueSnapshot> {
   const viewerId = viewer.id;
-  const canInspectSect = hasPermission(viewer, "admin.panel");
 
   // Hỏi song song: sổ khôi lỗi không phụ thuộc gì vào bảng đàn, mà đường này chạy ở mỗi lượt
   // SSE lẫn mỗi nhịp hỏi lại — nối tiếp là cộng thêm một vòng đi-về vào đúng chỗ đông nhịp nhất.
@@ -471,7 +487,7 @@ export async function getQueueSnapshot(viewer: QueueViewer): Promise<QueueSnapsh
     -- (Vẫn không dấu huyền trong bình chú SQL — xem lời dặn ở mệnh đề owner_pref bên trên.)
     order by job.next_run_at, job.created_at
   `),
-    getWorkerRoster(viewerId, canInspectSect),
+    getWorkerRoster(viewerId),
   ]);
 
   /**
@@ -563,12 +579,7 @@ export async function getQueueSnapshot(viewer: QueueViewer): Promise<QueueSnapsh
       status,
       attempts: Number(row.attempts ?? 0),
       nextRunAt: nextRunAt.toISOString(),
-      workerId: visibleWorkerId(
-        row.worker_id == null ? null : String(row.worker_id),
-        workerKind,
-        mine,
-        canInspectSect,
-      ),
+      workerId: visibleWorkerId(row.worker_id == null ? null : String(row.worker_id), workerKind, mine),
       workerKind,
       queuePosition: slot.position,
       queuePool: slot.pool,

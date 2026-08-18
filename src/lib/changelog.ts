@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.8",
+    date: "2026-08-19",
+    lines: [
+      "Trang Hàng Đợi: tab Khôi lỗi nay kể từng máy đang trực một — tên máy, đang trực hay vắng bao lâu, và bản đang chạy — thay vì gộp thành một dòng.",
+      "Ở tab Hàng đợi, mỗi đàn đang chạy hiện luôn tên máy đang cầm nó, nên đạo hữu biết đàn mình nằm trong tay máy nào.",
+      "Máy nhà của người khác vẫn được giấu tên như trước, và nút dừng đàn vẫn chỉ dành cho người được giao quyền.",
+    ],
+  },
+  {
     version: "1.3.7",
     date: "2026-08-19",
     lines: [

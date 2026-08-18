@@ -16,7 +16,12 @@
  * Hàm THUẦN nên lưới này không cần database, không cần mạng — cùng lẽ với `verify:mirror-tables`
  * và `verify:deploy-targets`.
  */
-import { assignQueueSlots, orderQueueRows, type QueueCandidate } from "../src/lib/services/queue";
+import {
+  assignQueueSlots,
+  orderQueueRows,
+  visibleWorkerId,
+  type QueueCandidate,
+} from "../src/lib/services/queue";
 import { describeAssignment } from "../src/lib/validation/queueAssign";
 
 const assert = (condition: unknown, message: string) => {
@@ -241,6 +246,28 @@ console.log("Xếp chỗ hàng đợi — số thứ tự phải thuộc về đ
       after.get("nha-d") === "own#1",
     JSON.stringify([...after]),
   );
+}
+
+// ---- AI ĐƯỢC THẤY ID KHÔI LỖI (visibleWorkerId) --------------------------------------------
+//
+// Luật hiện hành, sau cú dịch ranh giới ngày 19/08/2026: id khôi lỗi TÔNG MÔN mở cho mọi đạo
+// hữu, còn id khôi lỗi RIÊNG thì chỉ về tay CHỦ nó. Bốn tổ hợp, và cái đáng canh nhất là ô
+// dưới-phải: máy nhà của người khác không bao giờ đi xuống dây, kể cả cho bậc trị sự (phép
+// kiểm ấy nằm ở `verify:continuous`, nơi có ảnh chụp thật để quét thô).
+{
+  check("tông môn · dòng của mình → hiện id", visibleWorkerId("w-sect", "sect", true) === "w-sect");
+  check("tông môn · dòng của người khác → VẪN hiện id (ranh giới đã dịch)", visibleWorkerId("w-sect", "sect", false) === "w-sect");
+  check("máy nhà · dòng của mình → hiện id", visibleWorkerId("w-mine", "personal", true) === "w-mine");
+  check(
+    "máy nhà · dòng của người khác → im",
+    visibleWorkerId("w-theirs", "personal", false) === null,
+    "đây là vế KHÔNG dịch của cú mở 19/08",
+  );
+
+  // Chưa ai cầm: không có gì để nói, và hai cột phải cùng im — một `kind` rỗng đi kèm một id
+  // sót lại là hình dạng của dòng vừa tắt.
+  check("chưa ai cầm → im", visibleWorkerId(null, "sect", true) === null);
+  check("có id mà không rõ hạng → im", visibleWorkerId("w-la", null, true) === null);
 }
 
 // ---- TÊN KHÔI LỖI ĐANG CẦM MỘT DÒNG (describeAssignment) ----------------------------------

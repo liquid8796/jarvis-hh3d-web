@@ -11,6 +11,46 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.8 — Tab Khôi lỗi mở cho mọi đạo hữu, và tên máy hiện ở tab Hàng đợi
+
+Tông chủ ra lệnh 19/08/2026: môn đồ thường từ nay thấy danh sách khôi lỗi **giống hệt** bậc trị
+sự, và tab Hàng đợi hiện luôn tên máy đang cầm mỗi đàn — nhưng **không** được thấy nút Dừng.
+
+**Đây là một ranh giới được DỊCH có chủ ý, không phải một chỗ rò rỉ**, nên nó được ghi lại đúng
+lối mà cú đổi phía của tên nhiệm vụ ngày 08/08 đã ghi. Luật cũ (12/08–19/08): id khôi lỗi tông
+môn chỉ bậc trị sự thấy, môn đồ thường nhận MỘT dòng gộp「có ai đó đang trực」, với lập luận rằng
+id một tiến trình tông môn là chi tiết vận hành (máy nào, trạm nào) mà môn đồ không dùng được vào
+việc gì, còn tông môn thì hở ra hình dạng hạ tầng của mình. Lập luận ấy bị bác vì một lẽ khác:
+đây là hạ tầng **của chung**, cả tông môn đang xếp hàng chờ nó, nên「đàn của tôi đang nằm trong
+tay tiến trình nào」là một phần của chính câu hỏi trang này sinh ra để trả lời.
+
+**Cái KHÔNG dịch, và đó mới là phần phải canh:**
+
+- **Khôi lỗi RIÊNG của người khác** vẫn không bao giờ đi xuống dây — không id trong sổ, không id
+  trên dòng đàn, kể cả với bậc trị sự. Máy ở nhà người ta không phải hạ tầng của tông môn.
+- **Nút Dừng / Khai hộ** vẫn nằm sau `job.force_stop` / `job.force_start` (Thái thượng trưởng lão
+  trở lên), gác ở `forceStopJobAction` chứ không ở giao diện. `verify:permissions` đóng đinh ma
+  trận ấy: `de-tu` và `chuong-mon` KHÔNG có. **Thấy không phải là được chạm.**
+
+**Không dòng giao diện nào phải sửa** — và đó là bằng chứng cho một quyết định cũ đã đúng: cả
+`QueueBoard` lẫn `describeAssignment` vốn không hỏi quyền, chúng chỉ vẽ thứ service đưa. Nên cú
+dịch này gọn trong hai chỗ: bỏ tham số `detailed` của `getWorkerRoster`, và bỏ `canInspectSect`
+khỏi `visibleWorkerId`. `hasPermission` rời khỏi `services/queue.ts` hoàn toàn, và `QueueViewer`
+teo lại còn `{ id }` — một trường không ai đọc là một lời hứa suông về việc có phép gác.
+
+Dòng GỘP (`id: null`) không bị xoá: nó còn đúng một việc — nói「tông môn đang vắng」khi sổ chưa có
+khôi lỗi nào (trạm vừa dựng, hay vừa chuyển trạm), để người xem không phải đoán giữa「vắng」và
+「trang hỏng」. Trần `ROSTER_LIMIT = 10` mỗi nhóm giữ nguyên, tức môn đồ thường nhận đúng cùng
+một danh sách bị cắt như bậc trị sự — "giống hệt" nghĩa là giống cả chỗ ấy.
+
+Lưới: `verify:queue-pools` thêm 6 khẳng định thuần cho `visibleWorkerId` (bốn tổ hợp, cộng hai ca
+「chưa ai cầm」), 37 khẳng định tất cả xanh. `verify:continuous` viết lại năm khẳng định vốn đóng
+đinh luật CŨ, và giữ nguyên phép quét thô trên nguyên payload cho vế không dịch — nay quét id máy
+nhà của người khác bằng **cả hai** con mắt, chứ trước chỉ quét một. Chạy trên database thật của VM:
+xanh.
+
+---
+
 ## 1.3.7 — Sổ Kho GitHub bỏ trần 8, và vòng nuôi thôi lặp theo thứ tự sổ
 
 Tông chủ gõ `new-github-khoiloi.bat` và bị chặn bằng *"Sổ đầy (8 kho) — dọn kho chết trên tab Kho

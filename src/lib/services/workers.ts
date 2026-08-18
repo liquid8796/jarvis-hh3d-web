@@ -144,7 +144,11 @@ export type WorkerRosterEntry = {
    * cũng đúng lúc người ta cần biết「vắng từ bao giờ」.
    */
   lastSeen: string | null;
-  /** Bản gói khôi lỗi; `null` = bản trước 0.71.0 hoặc người xem không được biết. */
+  /**
+   * Bản gói khôi lỗi; `null` = khôi lỗi chạy bản trước 0.71.0 (chưa biết khai số), hoặc đây là
+   * DÒNG GỘP của một sổ tông môn rỗng — dòng ấy không đại diện cho tiến trình nào nên không có
+   * số bản nào để kể. Từ 19/08/2026 không còn nghĩa「người xem không được biết」.
+   */
   version: string | null;
 };
 
@@ -155,19 +159,23 @@ export type WorkerRosterEntry = {
  * CHÍNH người xem. Khôi lỗi riêng của người khác không bao giờ vào danh sách này — nó là máy ở
  * nhà họ, và trang này vốn đã che cả tên chủ nhân thì không có lý gì kể tên máy.
  *
- * `detailed` (bậc trị sự) quyết định khôi lỗi tông môn được kể thành TỪNG tiến trình hay gộp
- * làm một dòng「có ai đó đang trực」. Gộp không phải để giấu cho đẹp: id của một khôi lỗi tông
- * môn là chi tiết vận hành (máy nào, trạm nào), thứ môn đồ không dùng được vào việc gì mà lại
- * nói ra hạ tầng của tông môn.
+ * <b>Từ 19/08/2026, MỌI đạo hữu đọc được từng tiến trình tông môn một</b> — id, đang trực hay
+ * vắng, và số bản. Trước đó chỉ bậc trị sự (`admin.panel`) thấy, còn môn đồ thường nhận MỘT dòng
+ * gộp「có ai đó đang trực」, với lập luận: id của một khôi lỗi tông môn là chi tiết vận hành (máy
+ * nào, trạm nào) mà môn đồ không dùng được vào việc gì, còn tông môn thì hở ra hình dạng hạ tầng
+ * của mình. Tông chủ bác lập luận ấy: đây là hạ tầng CỦA CHUNG, ai cũng đang trông vào nó, nên
+ * ai cũng được thấy nó gồm những gì. Ghi lại để người sau biết đây là một ranh giới được DỊCH có
+ * chủ ý, không phải một chỗ rò rỉ — cùng lối với cú đổi phía của tên nhiệm vụ ngày 08/08.
+ *
+ * Cái KHÔNG dịch: khôi lỗi RIÊNG của người khác vẫn không bao giờ vào danh sách này (máy ở nhà
+ * họ không phải hạ tầng của tông môn), và nút Dừng vẫn nằm sau `job.force_stop`. Thấy không phải
+ * là được chạm.
  *
  * HAI câu truy vấn chứ không một câu `or` rồi cắt 20: một người nuôi mười khôi lỗi riêng sẽ
  * đẩy khôi lỗi tông môn ra khỏi trần, tức nhóm quan trọng nhất biến mất đúng ở màn hình của
  * người bận rộn nhất. Mỗi nhóm một trần, không nhóm nào ăn phần của nhóm kia.
  */
-export async function getWorkerRoster(
-  viewerId: string,
-  detailed: boolean,
-): Promise<WorkerRosterEntry[]> {
+export async function getWorkerRoster(viewerId: string): Promise<WorkerRosterEntry[]> {
   const cutoff = new Date(Date.now() - ONLINE_WINDOW_MS);
   const columns = {
     id: schema.workers.id,
@@ -206,9 +214,13 @@ export async function getWorkerRoster(
   });
 
   /**
-   * MỘT dòng cho cả nhóm — và LUÔN có dòng ấy, kể cả khi sổ chưa có khôi lỗi tông môn nào:
-   * người xem cần đọc được「tông môn đang vắng」, chứ không phải nhìn một danh sách thiếu nó
-   * rồi tự đoán. `sect` đã xếp theo lần điểm danh mới nhất nên phần tử đầu là mốc gần nhất.
+   * DÒNG GỘP — nay chỉ còn MỘT việc: nói「tông môn đang vắng」khi sổ chưa có khôi lỗi tông môn
+   * nào (trạm vừa dựng, hay vừa chuyển trạm). Người xem cần đọc được điều đó thành một câu chứ
+   * không phải nhìn một danh sách rỗng rồi tự đoán「vắng」hay「trang hỏng」.
+   *
+   * Trước 19/08/2026 nó còn là bản gộp dành cho môn đồ thường; nay mọi người đọc từng tiến
+   * trình một nên nhánh ấy đã đi. `sect` xếp theo lần điểm danh mới nhất nên phần tử đầu là mốc
+   * gần nhất.
    */
   const anySectOnline = detailedSect.some((row) => row.online);
   const groupedSect: WorkerRosterEntry = {
@@ -219,11 +231,10 @@ export async function getWorkerRoster(
     version: null,
   };
 
-  // `length > 0` chứ không chỉ `detailed`: sổ chưa có khôi lỗi tông môn nào (trạm vừa dựng, hay
-  // vừa chuyển trạm) thì kể từng tiến trình một sẽ ra một danh sách RỖNG — bậc trị sự nhìn tab
-  // không thấy dòng nào và không có cách gì biết là「vắng」hay là「trang hỏng」. Dòng gộp nói
-  // đúng điều đó bằng một câu.
-  const sectRows = detailed && detailedSect.length > 0 ? detailedSect : [groupedSect];
+  // Sổ rỗng thì kể từng tiến trình một sẽ ra một danh sách RỖNG — người xem nhìn tab không thấy
+  // dòng nào và không có cách gì biết là「vắng」hay là「trang hỏng」. Dòng gộp nói đúng điều ấy
+  // bằng một câu, và đó là ca DUY NHẤT nó còn xuất hiện.
+  const sectRows = detailedSect.length > 0 ? detailedSect : [groupedSect];
 
   const mineRows: WorkerRosterEntry[] = mine.map((row) => {
     const online = isOnline(row.lastSeen);

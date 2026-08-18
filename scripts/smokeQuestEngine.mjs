@@ -122,8 +122,21 @@ const FREE_CHECKIN_DONE_PAGE = `<!doctype html><html lang="vi"><meta charset="ut
 // Chữ "Thí Luyện" hiện THÀNH VĂN BẢN chứ không chỉ nằm trong href: vipProbe đọc innerText và
 // trả null chừng nào chưa thấy tên một nhiệm vụ nào — null nghĩa là "hub chưa render xong",
 // nên một hub thiếu chữ khiến runCycle poll đủ 20 giây rồi mới bỏ cuộc.
-const FREE_HUB_ROWS = `<div class="nv-quest"><a class="btn-go" onclick="location.href='/phuc-loi-duong'">Làm Ngay ›</a></div>
-<div class="nv-quest"><span>Thí Luyện Tông Môn</span><a class="btn-go" href="/thi-luyen-tong-mon-hh3d/?nv_embed=1">Làm Ngay ›</a></div>`;
+/**
+ * Hàng quest trên hub của tài khoản THƯỜNG.
+ *
+ * Hàng Bí Cảnh chép NGUYÊN VĂN từ `dom/01-load.html` của bản ghi
+ * bi-canh-tong-mon-20260818-013136 — kể cả cái `onclick="nvOpenHistory(…);return false;"` khiến
+ * href không bao giờ được đi tới, vì flow không bấm vào nó, chỉ ĐỌC sự có mặt của nó. Và khi hết
+ * lượt, hàng đổi sang đúng hình dạng mà bản ghi chụp được ở hàng Tế Lễ đã xong: `.nv-quest done`
+ * với `<span class="btn-done-label">`, KHÔNG còn thẻ `a.btn-go` nào.
+ */
+const freeHubRows = (biCanhSpent) => `<div class="nv-quest"><a class="btn-go" onclick="location.href='/phuc-loi-duong'">Làm Ngay ›</a></div>
+<div class="nv-quest"><span>Thí Luyện Tông Môn</span><a class="btn-go" href="/thi-luyen-tong-mon-hh3d/?nv_embed=1">Làm Ngay ›</a></div>
+${biCanhSpent
+    ? `<div class="nv-quest done "><div class="nv-qb"><h4>Bí Cảnh Tông Môn</h4><div class="nv-prog-row"><span class="nv-prog-txt">5/5</span></div></div><div class="nv-quest-action"><span class="btn-done-label">Xong</span></div></div>`
+    : `<div class="nv-quest "><div class="nv-qb"><h4>Bí Cảnh Tông Môn</h4><div class="nv-prog-row"><span class="nv-prog-txt">0/5</span></div></div><div class="nv-quest-action"><a href="/bi-canh-tong-mon/" class="btn-go" onclick="nvOpenHistory('/bi-canh-tong-mon/','⚔ Bí Cảnh Tông Môn');return false;">Đến Đánh ›</a></div></div>`}
+<nav id="menu-menu"><li><a href="/bi-canh-tong-mon"><span>Bí Cảnh</span></a></li></nav>`;
 
 /**
  * Hub nhiệm vụ ngày, kèm mục「Phần Thưởng Hoạt Động」— dựng NGUYÊN VĂN từ bản ghi
@@ -147,7 +160,7 @@ const hubPage = (pt) => `<!doctype html><html lang="vi"><meta charset="utf-8">
   #nv-modal-overlay.nv-open{display:block}
   #nv-modal-box{width:320px;margin:80px auto;background:#161a24;padding:20px}
 </style>
-${FREE_HUB_ROWS}
+${freeHubRows(pt.biCanhSpent === true)}
 <div class="nv-overview"><div class="nv-ring-wrap"><div class="nv-ring-label${pt.ring === "100%" ? " full" : ""}">${pt.ring}</div></div></div>
 ${pt.section
     ? `<p class="nv-sec">Phần Thưởng Hoạt Động</p>
@@ -215,6 +228,98 @@ const FREE_WELFARE_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
   if(countdown.textContent!=='00:00')return;
   setTimeout(()=>{countdown.textContent='30:00';countdown.dataset.claimed=String(i+1)},30)
 });const countdown=document.getElementById('countdown-timer')</script>`;
+
+/**
+ * Trang Bí Cảnh Tông Môn, dựng theo bản ghi bi-canh-tong-mon-20260818-013136.
+ *
+ * BỐN điều của trang thật mà fixture này cố ý giữ, vì bỏ cái nào là mở đường cho một lỗi thật
+ * đi lọt:
+ *
+ *   • **Vỏ trang KHÔNG có nút nào cả.** Thân HTML server giao (14KB) chỉ có khung + một khối
+ *     JSON; `boss-system.js` vẽ toàn bộ điều khiển sau đó. Một fixture giao sẵn nút là fixture
+ *     xoá mất chính cái cửa sổ mà bước `waitForSelector` sinh ra để chờ.
+ *   • **Trạng thái cooldown tới MUỘN HƠN nút**, qua `POST /wp-json/tong-mon/v1/check-attack-cooldown`
+ *     (bản ghi: `{"can_attack":true,"cooldown_interval":420}`). Nên trong khoảng giữa, nút đã
+ *     hiện với chữ "KHIÊU CHIẾN" mà sự thật chưa về — đúng cái bẫy đã cắn Hoang Vực.
+ *   • **Chữ trên nút bị CSS viết hoa** (`text-transform`), nên `innerText` trả "CÒN 6:57" chứ
+ *     không phải "Còn 6:57" như JS của trang ghi vào. Fixture giữ nguyên cả hai vế để phép so
+ *     chữ phải đi qua đúng lớp gấp dấu mà engine dùng.
+ *   • **Nút KHIÊU CHIẾN đổi chữ trong khi modal VẪN ĐANG MỞ** (bấm 18:32:08 → "CÒN 6:57" lúc
+ *     18:32:10,6). Nhân chứng của flow đứng ở đó, nên fixture phải giữ đúng thứ tự ấy.
+ *
+ * Nhân chứng của FIXTURE (site không có): `data-attacked` / `data-refused` trên body.
+ *
+ * @param broken  nút Tấn Công nhận cú bấm rồi KHÔNG làm gì — ca "cú bấm rơi vào hư không"
+ * @param state   "ready" · "cooldown" (còn lượt, chưa tới giờ) · "spent" (hết 5 lượt hôm nay)
+ * @param lastTurn  chỉ còn ĐÚNG MỘT lượt: đánh xong thì nút nhảy sang "Hết lượt hôm nay" chứ
+ *   không phải đồng hồ — nửa còn lại của điều kiện nhân chứng `":|hết lượt"`
+ * @param paintMs  bao lâu thì boss-system.js vẽ xong khối điều khiển
+ * @param stateMs  bao lâu thì câu trả lời cooldown về (luôn SAU paintMs)
+ */
+const biCanhPage = ({ broken = false, state = "ready", lastTurn = false, paintMs = 120, stateMs = 400 } = {}) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+<style>#challenge-boss-btn{text-transform:uppercase}</style>
+<a href="javascript:void(0)" class="fixed-back-btn"><span>Trở Lại</span></a>
+<div class="boss-game-container">
+  <div class="game-title"><h1>Bí Cảnh Tông Môn</h1></div>
+  <div class="boss-info"><div id="boss-slot"></div></div>
+</div>
+<div id="attack-modal" style="display:none">
+  <button id="attack-boss-btn">Tấn Công</button><button id="back-button">Trở lại</button>
+</div>
+<script>
+const STATE = ${JSON.stringify(state)};
+const BROKEN = ${JSON.stringify(broken)};
+// 1. boss-system.js vẽ khối điều khiển — LUÔN mở, luôn "KHIÊU CHIẾN", vì lúc này nó chưa hỏi ai.
+setTimeout(() => {
+  document.getElementById('boss-slot').innerHTML =
+    '<div id="boss-timer-text">88:28:39</div>'
+    + '<div class="boss-hp-section"><div class="hp-percentage">69.84%</div></div>'
+    + '<button id="challenge-boss-btn" class="challenge-btn">KHIÊU CHIẾN</button>'
+    + '<div class="attack-info-display"><span>Lượt đánh còn lại: <span class="attack-count">'
+    + (STATE === 'spent' ? '0' : ${JSON.stringify(lastTurn ? "1" : "5")}) + '</span></span></div>';
+}, ${paintMs});
+// 2. …rồi /check-attack-cooldown trả lời, và câu trả lời chỉ biết LẤY ĐI lời mời.
+const setCooldownText = (mmss) => {
+  const btn = document.getElementById('challenge-boss-btn');
+  btn.disabled = true; btn.classList.add('disabled');
+  btn.innerHTML = '<i class="fas fa-hourglass-half"></i> Còn ' + mmss;
+};
+setTimeout(() => {
+  const btn = document.getElementById('challenge-boss-btn');
+  if (!btn) return;
+  fetch('/btm-cooldown');
+  if (STATE === 'cooldown') setCooldownText('6:52');
+  else if (STATE === 'spent') {
+    btn.disabled = true; btn.classList.add('disabled');
+    btn.innerHTML = '<i class="fas fa-ban"></i> Hết lượt hôm nay';
+  }
+}, ${stateMs});
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  if (t.id === 'challenge-boss-btn') {
+    if (t.disabled) { document.body.dataset.refused = '1'; return; }
+    setTimeout(() => { document.getElementById('attack-modal').style.display = 'block'; }, 150);
+  } else if (t.id === 'attack-boss-btn') {
+    if (BROKEN) return; // site nuốt cú bấm: không POST, không đổi gì
+    fetch('/btm-attack');
+    t.disabled = true;
+    document.body.dataset.attacked = String(+(document.body.dataset.attacked || 0) + 1);
+    const left = document.querySelector('.attack-count');
+    const remaining = Math.max(0, +left.textContent - 1);
+    left.textContent = String(remaining);
+    // Nút KHIÊU CHIẾN đổi chữ SAU đó một nhịp, và modal vẫn đang mở — đúng nhịp bản ghi.
+    setTimeout(() => {
+      if (remaining === 0) {
+        const btn = document.getElementById('challenge-boss-btn');
+        btn.disabled = true; btn.classList.add('disabled');
+        btn.innerHTML = '<i class="fas fa-ban"></i> Hết lượt hôm nay';
+      } else setCooldownText('6:57');
+    }, 250);
+  } else if (t.id === 'back-button') {
+    document.getElementById('attack-modal').style.display = 'none';
+  }
+});
+</script>`;
 
 // Trang thí luyện theo recording 05/08: một rương (#chestImage) + đồng hồ chung
 // #countdown-timer; mở rương lúc 00:00 là đồng hồ nhảy 29:59 trong ~2s.
@@ -2187,6 +2292,16 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   // --- kiểm trên trang thật ---------------------------------------------------------
   let teLeOffered = false;
 
+  // Bí Cảnh Tông Môn (bản thường) — trạng thái của trang boss và của hàng trên hub, đặt riêng
+  // từng ca. `btmHits` đếm số lượt trang boss được tải: nó là bằng chứng cho phép thử「dừng ở
+  // hub thì KHÔNG mở trang boss」, thứ không đọc được từ kết cục của lượt chạy.
+  let btmState = "ready";
+  let btmBroken = false;
+  let btmLastTurn = false;
+  let btmHubSpent = false;
+  let btmHits = 0;
+  const btmAttacks = [];
+
   // Khoáng Mạch — trạng thái server giả, khớp nhịp thật của site: chu kỳ đào CHÍN GIỮA HAI
   // LƯỢT GHÉ (engine không ngồi chờ 30 phút), nên mỗi GET trang khi đang-ở-trong-mỏ là một
   // lần tua nhanh tới「Đạt tối đa」. Thưởng lượt 1 = 270 Tu Vi + 100 Tinh Thạch (con số thật
@@ -2361,7 +2476,13 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       return void res.end(flakyPage(flakyVisits >= flakyAppearsOnVisit));
     }
     if (path === "/diem-danh") res.end(checkInDone ? FREE_CHECKIN_DONE_PAGE : FREE_CHECKIN_PAGE);
-    else if (path === "/nhiem-vu-hang-ngay") res.end(hubPage(ptState));
+    else if (path === "/nhiem-vu-hang-ngay") res.end(hubPage({ ...ptState, biCanhSpent: btmHubSpent }));
+    else if (path === "/bi-canh-tong-mon") {
+      btmHits += 1;
+      res.end(biCanhPage({ broken: btmBroken, state: btmState, lastTurn: btmLastTurn }));
+    }
+    else if (path === "/btm-cooldown") res.end("ok");
+    else if (path === "/btm-attack") { btmAttacks.push(new Date().toISOString()); res.end("ok"); }
     else if (path === "/pt-claim") { ptState.claims.push(url.searchParams.get("stage") ?? "?"); res.end("ok"); }
     else if (path === "/phuc-loi-duong") res.end(FREE_WELFARE_PAGE);
     else if (path === "/vong-quay-phuc-van") res.end(FREE_WHEEL_PAGE);
@@ -2533,6 +2654,140 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       "Tế Lễ lần hai dừng ở \"đã tế lễ hôm nay\", không bấm gì thêm",
       sacrificeAgain.outcome === "alreadyDone" || sacrificeAgain.outcome === "onCooldown",
       sacrificeAgain.outcome,
+    );
+
+    console.log("\nBí Cảnh Tông Môn — bản thường (bản ghi 18/08)");
+
+    const biCanhFree = exportedProfile.quests.find((q) => q.id === "bi-canh-tong-mon-thuong");
+    const resetBiCanh = async (over = {}) => {
+      btmState = over.state ?? "ready";
+      btmBroken = over.broken === true;
+      btmLastTurn = over.lastTurn === true;
+      btmHubSpent = over.hubSpent === true;
+      btmAttacks.length = 0;
+      btmHits = 0;
+      await page.goto(`${baseUrl}/nhiem-vu-hang-ngay`, { waitUntil: "domcontentloaded" });
+    };
+
+    // ---- Cổng hub: hết lượt thì thậm chí KHÔNG mở trang boss -------------------------------
+    // Không chỉ là chuyện tiết kiệm một lượt tải. Trang boss chỉ nói được "hết lượt" SAU khi
+    // /check-attack-cooldown trả lời, tức sau cả cửa sổ đệm; hàng trên hub thì server render
+    // sẵn. Đọc hub trước là đổi một cửa sổ chờ lấy một câu trả lời có ngay từ byte đầu.
+    await resetBiCanh({ hubSpent: true });
+    const btmDone = await run(biCanhFree);
+    check(
+      "hàng hub đã \"Xong\" → dừng ở hub, KHÔNG mở trang boss lần nào",
+      btmDone.outcome === "alreadyDone" && btmHits === 0,
+      `${btmDone.outcome} · trang boss được tải ${btmHits} lần`,
+    );
+
+    // ---- Ca thường: đánh một đòn, đọc lại đồng hồ ------------------------------------------
+    await resetBiCanh();
+    const btmOk = await run(biCanhFree);
+    check(
+      "còn lượt → khiêu chiến, tấn công, rồi đọc đồng hồ 6:57 trên chính nút ấy",
+      btmOk.outcome === "completed" && btmOk.cooldownSeconds === 6 * 60 + 57,
+      `${btmOk.outcome}: ${btmOk.cooldownSeconds}`,
+    );
+    check(
+      "…và đòn ấy có thật: site nhận đúng MỘT lượt tấn công, không cú bấm nào bị từ chối",
+      btmAttacks.length === 1 &&
+        (await page.getAttribute("body", "data-attacked")) === "1" &&
+        (await page.getAttribute("body", "data-refused")) == null,
+      `POST=${btmAttacks.length} · refused=${await page.getAttribute("body", "data-refused")}`,
+    );
+
+    // ---- Đang cooldown: chờ sự thật rồi dừng, không lao vào bấm ----------------------------
+    await resetBiCanh({ state: "cooldown" });
+    const btmCooling = await run(biCanhFree);
+    check(
+      "đang cooldown → dừng kèm đúng 6:52 đọc từ nút",
+      btmCooling.outcome === "onCooldown" && btmCooling.cooldownSeconds === 6 * 60 + 52,
+      `${btmCooling.outcome}: ${btmCooling.cooldownSeconds}`,
+    );
+    check(
+      "…và tuyệt đối không bấm vào cái nút đang khoá",
+      btmAttacks.length === 0 && (await page.getAttribute("body", "data-refused")) == null,
+      `POST=${btmAttacks.length} · refused=${await page.getAttribute("body", "data-refused")}`,
+    );
+
+    // ---- Hết lượt hôm nay (hub chưa kịp biết) ----------------------------------------------
+    // Ca này có thật: hàng hub chỉ đổi sang "Xong" khi trang hub được dựng lại, nên một lượt ghé
+    // giữa chừng vẫn thấy nút "Đến Đánh". Lời khai đúng phải là "hết ngày", không phải "chờ".
+    await resetBiCanh({ state: "spent" });
+    const btmSpent = await run(biCanhFree);
+    check(
+      "nút nói \"Hết lượt hôm nay\" → alreadyDone, không phải onCooldown",
+      btmSpent.outcome === "alreadyDone" && btmAttacks.length === 0,
+      `${btmSpent.outcome} · POST=${btmAttacks.length}`,
+    );
+
+    // ---- Đòn CUỐI của ngày: nhân chứng đi ngả chữ "hết lượt", không có đồng hồ nào ----------
+    // Nửa `|hết lượt` của điều kiện nhân chứng chỉ được thử ở đây. Thiếu ca này thì một điều
+    // kiện chỉ có ":" vẫn xanh mướt suốt và chỉ hỏng đúng vào lượt thứ năm mỗi ngày.
+    await resetBiCanh({ lastTurn: true });
+    const btmLast = await run(biCanhFree);
+    check(
+      "lượt thứ năm: nút nhảy thẳng sang \"Hết lượt hôm nay\" mà lượt vẫn tính là XONG",
+      btmLast.outcome === "completed" && btmAttacks.length === 1,
+      `${btmLast.outcome} · POST=${btmAttacks.length}`,
+    );
+
+    // ---- Cú bấm rơi vào hư không: phải HỎNG, và đối chứng phải chứng minh lưới có răng ------
+    await resetBiCanh({ broken: true });
+    const btmBrokenRun = await run(biCanhFree);
+    check(
+      "site nuốt cú bấm Tấn Công → lượt chạy HỎNG, không nhận vơ là xong",
+      btmBrokenRun.outcome === "failed" && btmAttacks.length === 0,
+      `${btmBrokenRun.outcome} · POST=${btmAttacks.length}`,
+    );
+
+    // ĐỐI CHỨNG, giữ vĩnh viễn: gỡ đúng bước nhân chứng ra khỏi flow thì CHÍNH ca trên phải
+    // báo "xong". Fixture nào để bản không-nhân-chứng vẫn hỏng là fixture đang nói dối, và
+    // phép thử ngay trên hoá ra chẳng chứng minh gì (bài học Hoang Vực 06/08).
+    const btmNoWitness = structuredClone(biCanhFree);
+    const witnessAt = btmNoWitness.steps.findIndex(
+      (s, i) =>
+        s.action === "waitForCondition" &&
+        s.optional !== true &&
+        s.condition?.selector === "#challenge-boss-btn" &&
+        i > btmNoWitness.steps.findIndex((x) => x.action === "click" && x.selector === "#attack-boss-btn"),
+    );
+    check("flow có ĐÚNG một bước nhân chứng bắt buộc sau cú Tấn Công", witnessAt > 0, String(witnessAt));
+    btmNoWitness.steps.splice(witnessAt, 1);
+    await resetBiCanh({ broken: true });
+    const btmBlind = await run(btmNoWitness);
+    check(
+      "flow KHÔNG nhân chứng trên cùng ca hỏng: báo \"xong\" cho một trận chưa từng đánh",
+      btmBlind.outcome === "completed" && btmAttacks.length === 0,
+      `${btmBlind.outcome} · POST=${btmAttacks.length}`,
+    );
+
+    // ---- Hình dạng của flow, những chỗ một lần sửa ẩu là mất im lặng ------------------------
+    check(
+      "trang boss đi đường EMBED — /bi-canh-tong-mon/ trần trả 503 trong bản ghi",
+      biCanhFree.pagePath === "/bi-canh-tong-mon/?nv_embed=1",
+      biCanhFree.pagePath,
+    );
+    check(
+      "nhịp ghé lại dự phòng = 420s, đúng cooldown_interval site trả về",
+      biCanhFree.fallbackCooldownSeconds === 420,
+      String(biCanhFree.fallbackCooldownSeconds),
+    );
+    check(
+      "cổng hub đứng TRƯỚC cú điều hướng sang trang boss",
+      biCanhFree.steps.findIndex((s) => s.action === "stopIf") <
+        biCanhFree.steps.findIndex((s) => s.action === "navigate" && s.text?.includes("bi-canh")),
+    );
+    check(
+      "nhân chứng hỏi CHỮ trên nút, không hỏi `disabled` (nút không được vẽ cũng là disabled)",
+      biCanhFree.steps[witnessAt].condition?.kind === "textMatches" &&
+        biCanhFree.steps[witnessAt].condition?.text === ":|hết lượt",
+      JSON.stringify(biCanhFree.steps[witnessAt].condition),
+    );
+    check(
+      "bi-canh-tong-mon-thuong nằm trong sổ trần-ngày (5 lượt là trần NGÀY)",
+      DAILY_QUOTA_QUEST_IDS.has("bi-canh-tong-mon-thuong"),
     );
 
     // Nhật ký người dùng nói tiếng người (ảnh 05/08): lý do dừng hiện TRẦN, còn "stopIf",

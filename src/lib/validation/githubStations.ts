@@ -7,12 +7,21 @@
  */
 
 /**
- * Trần số kho trong sổ. Bằng đúng trần của sổ gương trạm, và cùng lý do: đây là một danh sách
- * do người gõ tay, không phải một bảng dữ liệu — quá tám dòng thì thứ cần sửa là cách làm việc,
- * không phải con số này. Trần cũng là hàng rào cho vòng nuôi kho: mỗi kho là 2–3 lượt HTTPS,
- * và cả vòng phải lọt trong `maxDuration` của một function.
+ * KHÔNG CÒN TRẦN SỐ KHO — gỡ ngày 18/08/2026 theo yêu cầu của tông chủ, và đây là chỗ ghi lại
+ * cái giá đã trả để gỡ được nó cho an toàn.
+ *
+ * Trần cũ là 8, đứng trên hai lý lẽ. Lý lẽ thứ nhất ("danh sách do người gõ tay, quá tám dòng thì
+ * thứ cần sửa là cách làm việc") là một lời khuyên, không phải một hàng rào kỹ thuật — và nó là
+ * lựa chọn của người vận hành, không phải của mã. Lý lẽ thứ hai thì THẬT: vòng nuôi chạy tuần tự
+ * và tự cắt khi hết ngân sách, nên một sổ dài hơn ngân sách sẽ bỏ lại phần đuôi.
+ *
+ * Cái thay thế nó là `keepaliveOrder` bên dưới: cú cắt nay luôn rơi vào những kho CÒN NHIỀU HẠN
+ * NHẤT, và mọi kho đều tới lượt đứng đầu. Gỡ trần mà không có nó là đổi một câu chối từ ồn ào
+ * ("Sổ đầy") lấy một cái chết lặng lẽ sáu mươi ngày sau.
+ *
+ * `appSettingsSchema` KHÔNG có `.max()` trên mảng này (soát 18/08/2026), nên một dòng thứ chín
+ * không bao giờ làm hỏng phép gán settings — đó là lý do gỡ trần không cần một lượt migrate nào.
  */
-export const GITHUB_STATION_LIMIT = 8;
 
 /** Tệp mốc nuôi kho. Trong `.github/` nhưng KHÔNG trong `.github/workflows/` — xem `PAT_SCOPES_NOTE`. */
 export const HEARTBEAT_PATH = ".github/heartbeat.txt";
@@ -203,6 +212,54 @@ export function reviewKeepaliveDuty(siteId: string, activeSiteId: string | null)
  * nữa. Nó cũng là điều đáng làm ngay: lượt ghi đầu tiên chính là phép thử PAT có thật sự push
  * được không, trả lời ngay lúc admin vừa bấm Lưu chứ không phải ba tuần sau.
  */
+/**
+ * Thứ tự nuôi kho trong MỘT lượt vòng: kho gần vách 60 ngày nhất đi trước.
+ *
+ * `runKeepalive` chạy TUẦN TỰ và tự cắt khi hết `LOOP_BUDGET_MS`, nên THỨ TỰ LẶP quyết định ai
+ * bị bỏ lại. Lặp theo thứ tự sổ — tức thứ tự người ta thêm vào — thì cú cắt rơi vào đúng cái đuôi
+ * ấy ở MỌI lượt chạy: mấy kho cuối không bao giờ tới lượt, im lặng suốt sáu mươi ngày rồi bị
+ * GitHub tắt lịch, và `skipped` trong bảng tổng kết vẫn chỉ nói "còn n kho chưa tới lượt" chứ
+ * không nói "vẫn là n kho ấy".
+ *
+ * Ba nấc so, mỗi nấc trả lời một câu:
+ *
+ *   1. `lastCommitAt` — mốc DUY NHẤT vách 60 ngày đọc (xem `isCommitDue`). Đây là nấc quyết định.
+ *   2. `lastPingAt` — cho sổ mới toanh, khi mọi mốc ghi đều rỗng: vẫn phải có một trật tự luân
+ *      phiên, bằng không nấc 3 sẽ ghim cứng thứ tự theo tên.
+ *   3. Tên kho — để hai dòng cùng mốc không đổi chỗ giữa hai lượt chạy. So bằng `<`/`>` chứ không
+ *      `localeCompare`: thứ tự phải là của dữ liệu, không phải của ICU trên máy đang chạy.
+ *
+ * Mốc rỗng hoặc không đọc được ⇒ đi ĐẦU, cùng lẽ với `isCommitDue`: "không biết" phải xử như "đã
+ * lâu lắm". Một mốc rác vì thế được nuôi ở lượt kế và tự lành ngay sau lượt ghi sổ.
+ *
+ * Trả về MẢNG MỚI, không sắp lại sổ trong database: sổ là danh sách của con người, thứ tự trong
+ * tab admin phải giữ đúng thứ tự người ta đã thêm.
+ */
+export function keepaliveOrder<
+  T extends { owner: string; repo: string; lastCommitAt: string | null; lastPingAt: string | null },
+>(stations: readonly T[]): T[] {
+  const stamp = (raw: string | null): number => {
+    if (!raw) {
+      return 0;
+    }
+    const at = Date.parse(raw);
+    return Number.isNaN(at) ? 0 : at;
+  };
+  return [...stations].sort((a, b) => {
+    const byCommit = stamp(a.lastCommitAt) - stamp(b.lastCommitAt);
+    if (byCommit !== 0) {
+      return byCommit;
+    }
+    const byPing = stamp(a.lastPingAt) - stamp(b.lastPingAt);
+    if (byPing !== 0) {
+      return byPing;
+    }
+    const left = stationSlug(a);
+    const right = stationSlug(b);
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
+}
+
 export function isCommitDue(lastCommitAt: string | null, now: Date): boolean {
   if (!lastCommitAt) {
     return true;

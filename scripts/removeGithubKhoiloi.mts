@@ -14,8 +14,9 @@
  *
  *   1. Kho trên GitHub — thứ duy nhất người ta nhớ.
  *   2. Dòng trong sổ Kho GitHub của TRẠM ĐANG HOẠT ĐỘNG. Bỏ lại thì vòng nuôi kho gõ vào một kho
- *      đã chết mỗi ngày và tab Kho GitHub đỏ mãi mãi; tệ hơn, sổ chỉ chứa được
- *      `GITHUB_STATION_LIMIT` dòng nên mỗi dòng ma là một chỗ ngồi bị chiếm.
+ *      đã chết mỗi ngày và tab Kho GitHub đỏ mãi mãi; tệ hơn, một dòng ma vẫn được xếp lượt
+ *      như kho sống — `keepaliveOrder` đưa mốc rỗng lên ĐẦU — nên nó ăn ngân sách của kho còn
+ *      thật. (Trước 18/08/2026 câu này còn thêm「sổ chỉ chứa được 8 dòng」; cái trần ấy đã gỡ.)
  *   3. Dòng trong bảng `workers`. Bỏ lại thì `github:new` TỪ CHỐI dựng lại một khôi lỗi mang
  *      đúng id ấy — phép kiểm trùng id bên ấy hỏi thẳng bảng này, và một cái xác thì trả lời y
  *      như một người đang trực.

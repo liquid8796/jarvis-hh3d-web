@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.7",
+    date: "2026-08-19",
+    lines: [
+      "Sổ Kho GitHub thôi chặn ở 8 kho: nay thêm bao nhiêu khôi lỗi cũng được, không còn câu「Sổ đầy」chặn ở cửa.",
+      "Vòng nuôi kho đổi cách xếp lượt: kho lâu chưa được ghi nhất luôn đi trước, nên sổ dài cũng không có kho nào bị bỏ quên.",
+      "Với đạo hữu thì màn hình không đổi gì; đây là chỗ sửa cho người trông nom hệ thống.",
+    ],
+  },
+  {
     version: "1.3.6",
     date: "2026-08-18",
     lines: [

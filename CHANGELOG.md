@@ -11,6 +11,54 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.7 — Sổ Kho GitHub bỏ trần 8, và vòng nuôi thôi lặp theo thứ tự sổ
+
+Tông chủ gõ `new-github-khoiloi.bat` và bị chặn bằng *"Sổ đầy (8 kho) — dọn kho chết trên tab Kho
+GitHub trước"*, rồi ra lệnh gỡ trần. Soát trước khi gỡ cho thấy trần ấy đứng trên hai lý lẽ rất
+khác nhau, và chỉ một trong hai là thật.
+
+**Lý lẽ mềm** — *"danh sách do người gõ tay, quá tám dòng thì thứ cần sửa là cách làm việc"* — là
+một lời khuyên về cách vận hành, tức lựa chọn của tông chủ chứ không phải của mã. Gỡ.
+
+**Lý lẽ thật** — `runKeepalive` chạy TUẦN TỰ và tự cắt ở `LOOP_BUDGET_MS` (40 giây) — thì không
+gỡ được bằng cách xoá một hằng số, vì nó không nằm ở con số 8 mà nằm ở **THỨ TỰ LẶP**: vòng nuôi
+đi theo đúng thứ tự sổ, tức thứ tự người ta thêm vào. Sổ ngắn hơn ngân sách thì vô hại; sổ dài
+hơn thì **cú cắt rơi vào đúng cái đuôi ấy ở mọi lượt chạy** — mấy kho cuối không bao giờ tới lượt,
+im lặng 60 ngày rồi bị GitHub tắt lịch, đúng cái chết mà cả hệ nuôi kho sinh ra để ngăn. Và
+`skipped` trong bảng tổng kết vẫn chỉ nói "còn n kho chưa tới lượt", không nói "vẫn là n kho ấy".
+Gỡ trần mà không thay hàng rào là **đổi một câu chối từ ồn ào lấy một cái chết lặng lẽ**.
+
+Nên trần đi cùng một luật mới, `keepaliveOrder` (thuần, `validation/githubStations.ts`): xếp theo
+`lastCommitAt` cũ nhất trước — rỗng hoặc không đọc được thì coi như cũ nhất, cùng lẽ với
+`isCommitDue` — rồi `lastPingAt` cho sổ mới toanh, rồi tên kho để thứ tự không nhấp nhổm giữa hai
+lượt chạy. Hệ quả: cú cắt luôn bỏ lại kho CÒN NHIỀU HẠN nhất, và mọi kho đều tới lượt đứng đầu.
+Sổ dài hơn ngân sách từ nay chỉ có nghĩa *"phải vài lượt cron mới phủ hết"*.
+
+**Ngân sách 40 giây giữ nguyên, có đo mới nói.** Nhật ký `jarvis-cron` lúc 03:00:24→25 UTC ngày
+18/08: 8 kho khoẻ **cộng** ba việc quét dọn xong trong dưới một giây — ~0,12s một kho, tức 40 giây
+đủ cho hàng trăm kho ở đường sung sức. Trần chỉ có tiếng nói vào ngày GitHub treo (mỗi kho tối đa
+3 × 10s), và đó đúng là ngày nên dừng sớm để lượt mai tiếp — nay an toàn vì thứ tự đã công bằng.
+Đường gọi thật (`curl -m 300` từ `jarvis-cron.timer`) cho tới 300 giây, nhưng nâng lên chẳng mua
+được gì mà lại lệch với `maxDuration = 60` đang khai ở `/api/cron`.
+
+**Không cần migrate.** `appSettingsSchema` không có `.max()` trên mảng `githubStations` (đã soát),
+nên một dòng thứ chín chưa bao giờ có thể làm hỏng phép gán settings. Và `recordPing` tìm kho
+theo **slug** chứ không theo chỉ số, nên đổi thứ tự lặp không thể ghi lệch dòng.
+
+Bốn chỗ gỡ: cửa chặn trong `saveGithubStationAction`, hai cửa trong `github:new` (một trước khi
+tạo, một sau khi tạo để bắt cảnh sổ vừa đầy giữa lúc dựng), và hằng `GITHUB_STATION_LIMIT`. Lý lẽ
+cũ trong `github:remove` ("mỗi dòng ma là một chỗ ngồi bị chiếm") cũng chết theo, nhưng dòng ma
+vẫn đáng dọn vì lý do MỚI: `keepaliveOrder` xếp mốc rỗng lên đầu, nên nó ăn ngân sách trước cả kho
+còn thật.
+
+`verify:github-stations` thêm một nhóm ca cho luật thứ tự, gồm **ca đói hai lượt** (ngân sách đủ
+hai kho, sổ có năm: kho bị bỏ lại lượt trước phải được nuôi lượt sau) và **một ca đối chứng** giữ
+vĩnh viễn: cùng cảnh ấy với cách lặp CŨ phải nuôi lại đúng hai kho đầu và không bao giờ với tới
+kho cuối. Thiếu ca đối chứng thì mấy assert kia có thể xanh chỉ vì cảnh dựng quá dễ — cùng kỷ luật
+với ca "gỡ bước nhân chứng" của Bí Cảnh. 13 nhóm ca, tất cả xanh.
+
+---
+
 ## 1.3.6 — Hỷ Sự Đường khai hồng bao, kể cả ở tiệc đã chúc (schema hồ sơ 69)
 
 Bản ghi `hy-su-duong-20260818-094945`, và một ghi chú của tông chủ nằm ngay trong `steps.json`:

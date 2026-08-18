@@ -7,6 +7,7 @@ import {
   SCHEDULE_DISABLE_DAYS,
   explainFailure,
   isCommitDue,
+  keepaliveOrder,
   parseWorkflowState,
   stationSlug,
   type WorkflowState,
@@ -64,14 +65,21 @@ const REQUEST_TIMEOUT_MS = 10_000;
 /**
  * Trần cho CẢ VÒNG. 40 giây, và con số ấy suy ra từ hai thứ chứ không phải chọn cho tròn:
  *
- *   • Vòng chạy TUẦN TỰ (xem `runKeepalive`), nên tám kho cùng chậm là 8 × 3 lời gọi × 10 giây =
- *     240 giây — xa trần của function tới mức phải có ai đó cắt.
+ *   • Vòng chạy TUẦN TỰ (xem `runKeepalive`), nên một sổ toàn kho chậm là n × 3 lời gọi × 10 giây
+ *     — lớn tuỳ ý theo số kho, tới mức phải có ai đó cắt.
  *   • `maxDuration` của /api/cron là 60 giây, và vòng nuôi KHÔNG được tiêu cả 60: nó chạy SAU ba
  *     việc quét dọn trong cùng một lượt gọi. 40 chừa lại 20 giây cho chúng.
  *
  * Cắt ở đây là cắt có trật tự — mỗi kho đã ghi sổ ngay sau khi xong, và tổng kết nói rõ còn mấy
  * kho chưa tới lượt. Để function bị nền tảng giết ngang thì không ai biết nó đã đi tới đâu. Kho
  * bị bỏ lại vẫn còn 40 ngày dự phòng nên lượt cron ngày mai lo tiếp là dư sức.
+ *
+ * ĐO THẬT 18/08/2026 (nhật ký `jarvis-cron` lúc 03:00:24→25 UTC): 8 kho khoẻ CỘNG ba việc quét
+ * dọn xong trong dưới MỘT giây — tức ~0,12 giây một kho ở đường sung sức, nên 40 giây đủ cho hàng
+ * trăm kho. Trần này chỉ có tiếng nói vào ngày GitHub treo, và đó đúng là ngày nên dừng sớm rồi
+ * để lượt mai tiếp — nay an toàn vì `keepaliveOrder` bảo đảm cú cắt rơi vào kho CÒN NHIỀU HẠN
+ * nhất. Vì thế con số giữ nguyên 40 dù đường gọi thật (`curl -m 300` từ `jarvis-cron.timer` trên
+ * VM) cho tới 300 giây: nâng lên chẳng mua được gì, mà lại lệch với `maxDuration` đang khai.
  */
 const LOOP_BUDGET_MS = 40_000;
 
@@ -400,7 +408,10 @@ export type KeepaliveSummary = {
  */
 export async function runKeepalive(options: { force?: boolean } = {}): Promise<KeepaliveSummary> {
   const settings = await getAppSettings();
-  const due = settings.githubStations.filter((s) => s.enabled);
+  // Thứ tự lặp là thứ tự ƯU TIÊN, không phải thứ tự sổ — xem `keepaliveOrder`. Từ lượt gỡ trần
+  // số kho (18/08/2026) đây là thứ giữ cho một sổ dài hơn ngân sách không bỏ rơi mãi mãi đúng
+  // mấy kho cuối danh sách.
+  const due = keepaliveOrder(settings.githubStations.filter((s) => s.enabled));
   const startedAt = Date.now();
   const results: StationPing[] = [];
   let skipped = 0;

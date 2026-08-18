@@ -43,7 +43,6 @@ import { readControlDoc } from "../src/lib/control/read";
 import { encryptSecret } from "../src/lib/crypto/secretBox";
 import {
   DEFAULT_WORKFLOW_FILE,
-  GITHUB_STATION_LIMIT,
   explainFailure,
   reviewStationIdentity,
   stationSlug,
@@ -296,13 +295,6 @@ async function main(): Promise<void> {
   if (settings.githubStations.some((s) => stationSlug(s) === slug)) {
     die(`Sổ đã có kho「${slug}」— trùng tên gần như không thể, kiểm xem có phải vừa chạy hai lượt.`);
   }
-  if (settings.githubStations.length >= GITHUB_STATION_LIMIT) {
-    die(
-      `Sổ đầy (${GITHUB_STATION_LIMIT} kho) — dọn kho chết trên tab Kho GitHub trước.\n` +
-        "  Kiểm TRƯỚC khi tạo để không bỏ lại một kho công khai mồ côi trên GitHub.",
-    );
-  }
-
   /**
    * Id khôi lỗi này đã có ai mang chưa — hỏi thẳng bảng `workers`, đừng chỉ tin vào cái mốc giây.
    *
@@ -322,7 +314,7 @@ async function main(): Promise<void> {
       `  kho        ${slug} (CÔNG KHAI)\n` +
       `  worker id  ${workerId}\n` +
       `  workflow   ${workflowFile}\n` +
-      `  ghi vào sổ ở trạm「${doc.activeSiteId}」(đang có ${settings.githubStations.length}/${GITHUB_STATION_LIMIT} kho)\n`,
+      `  ghi vào sổ ở trạm「${doc.activeSiteId}」(đang có ${settings.githubStations.length} kho)\n`,
   );
 
   const inner = ["scripts/newGithubKhoiloi.mjs", "--owner", owner, "--repo", repo, "--worker-id", workerId];
@@ -405,13 +397,6 @@ async function main(): Promise<void> {
         "  Chạy lại lệnh là xong: lượt sau rút một tên khác.",
     );
   }
-  if (fresh.githubStations.length >= GITHUB_STATION_LIMIT) {
-    die(
-      `Sổ vừa đầy (${GITHUB_STATION_LIMIT} kho) trong lúc dựng — kho「${slug}」ĐÃ TẠO trên GitHub nhưng\n` +
-        "  không vào được sổ. Dọn một dòng ở tab Kho GitHub rồi ghi tay kho này vào.",
-    );
-  }
-
   /**
    * Hình dạng dòng sổ chép ĐÚNG bản mà `saveGithubStationAction` ghi — kể cả bốn trường dấu vết để
    * trống. Lệch một trường thì `appSettingsSchema` sẽ lặng lẽ điền mặc định và dòng do script sinh

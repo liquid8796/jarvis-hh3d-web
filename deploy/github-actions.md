@@ -355,9 +355,16 @@ Vẫn cần `gh` (chỉ vì lượt đặt secret — sealed-box, xem đầu `ne
 cần `gh auth login`**: PAT đi qua biến `GH_TOKEN` của riêng lượt chạy ấy. Cài `gh`:
 `winget install --id GitHub.cli`.
 
-Ba phép kiểm chạy TRƯỚC khi tạo bất cứ thứ gì, vì một kho công khai mồ côi thì phải vào GitHub
-xoá tay: PAT còn sống và đủ scope, sổ chưa đầy (`GITHUB_STATION_LIMIT`), và `WORKER_ID` chưa ai
-mang — hỏi thẳng bảng `workers`, không chỉ tin vào mốc giây trong tên.
+Hai phép kiểm chạy TRƯỚC khi tạo bất cứ thứ gì, vì một kho công khai mồ côi thì phải vào GitHub
+xoá tay: PAT còn sống và đủ scope, và `WORKER_ID` chưa ai mang — hỏi thẳng bảng `workers`, không
+chỉ tin vào mốc giây trong tên.
+
+**Sổ KHÔNG còn trần số kho** (gỡ 18/08/2026; trước đó là 8, hằng `GITHUB_STATION_LIMIT`). Cái giữ
+chỗ của nó là `keepaliveOrder`: vòng nuôi lặp theo NHU CẦU — kho có `lastCommitAt` cũ nhất (rỗng
+hoặc rác thì coi như cũ nhất) đi trước — nên khi ngân sách 40 giây hết, thứ bị bỏ lại luôn là kho
+CÒN NHIỀU HẠN nhất, và mọi kho đều tới lượt đứng đầu. Sổ dài hơn ngân sách vì thế chỉ có nghĩa
+"phải vài lượt cron mới phủ hết", không còn nghĩa "mấy kho cuối chết đói". Đo 18/08: 8 kho khoẻ
+xong trong dưới một giây, tức ~0,12s một kho, nên 40 giây đủ cho hàng trăm kho ở đường sung sức.
 
 ### Vận hành
 
@@ -478,7 +485,7 @@ dấu chân ở **ba** nơi, và hai nơi trong đó không nằm trên GitHub.
 | Dấu chân | Bỏ lại thì sao |
 |---|---|
 | Kho trên GitHub | thứ duy nhất người ta nhớ |
-| Dòng trong sổ Kho GitHub (trạm đang hoạt động) | vòng nuôi gõ vào một kho đã chết mỗi ngày, tab đỏ mãi; và mỗi dòng ma chiếm một chỗ trong `GITHUB_STATION_LIMIT` |
+| Dòng trong sổ Kho GitHub (trạm đang hoạt động) | vòng nuôi gõ vào một kho đã chết mỗi ngày, tab đỏ mãi; và vì `keepaliveOrder` xếp mốc rỗng lên ĐẦU, dòng ma còn ăn ngân sách trước cả kho còn thật |
 | Dòng trong bảng `workers` | `github:new` TỪ CHỐI dựng lại một khôi lỗi trùng id — phép kiểm bên ấy hỏi thẳng bảng này, và một cái xác trả lời y như một người đang trực |
 
 ### PAT cần `delete_repo`, và đó là scope §7 KHÔNG đòi

@@ -8,7 +8,6 @@ import { pingStationBySlug, runKeepalive } from "@/lib/services/githubStations";
 import { getAppSettings, saveAppSettings, type AppSettings } from "@/lib/services/settings";
 import {
   DEFAULT_WORKFLOW_FILE,
-  GITHUB_STATION_LIMIT,
   MS_PER_DAY,
   SCHEDULE_DISABLE_DAYS,
   reviewStationIdentity,
@@ -168,9 +167,6 @@ export async function saveGithubStationAction(
   const slug = `${owner}/${repo}`;
   const existing = settings.githubStations.find((s) => stationSlug(s) === slug);
 
-  if (!existing && settings.githubStations.length >= GITHUB_STATION_LIMIT) {
-    return { ok: false, message: `Sổ đầy (${GITHUB_STATION_LIMIT} kho) — dọn kho chết trước khi thêm.` };
-  }
   if (!existing && patInput.length === 0) {
     return { ok: false, message: "Kho mới cần một PAT — không có chìa thì không nuôi được." };
   }

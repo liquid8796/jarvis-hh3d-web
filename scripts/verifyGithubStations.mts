@@ -27,6 +27,7 @@ import {
   MS_PER_DAY,
   explainFailure,
   isCommitDue,
+  keepaliveOrder,
   parseWorkflowState,
   reviewKeepaliveDuty,
   reviewStationIdentity,
@@ -113,6 +114,90 @@ async function run() {
   assert(!isCommitDue(daysAgo(KEEPALIVE_INTERVAL_DAYS - 1), NOW), "Còn một ngày nữa mới tới hạn mà đã ghi.");
   assert(isCommitDue(daysAgo(KEEPALIVE_INTERVAL_DAYS), NOW), "Đúng ngày tới hạn phải ghi — biên này lệch một ngày là trôi dần.");
   assert(isCommitDue(daysAgo(KEEPALIVE_INTERVAL_DAYS + 40), NOW), "Quá hạn lâu rồi mà vẫn bảo còn hạn.");
+
+  // ───────── Luật THỨ TỰ NUÔI: ai được ngân sách trước ─────────
+  //
+  // Nhóm ca này ra đời cùng lượt gỡ trần 8 kho (18/08/2026). Trước đó vòng nuôi lặp theo thứ tự
+  // sổ, và điều ấy vô hại CHỈ vì sổ không bao giờ dài hơn ngân sách. Bỏ trần đi thì thứ tự lặp
+  // trở thành thứ quyết định kho nào bị bỏ lại — và ở cách cũ, mỗi lượt lại đúng những kho ấy.
+  {
+    const row = (over: Record<string, unknown>) => ({
+      owner: OWNER,
+      repo: REPO,
+      lastCommitAt: null as string | null,
+      lastPingAt: null as string | null,
+      ...over,
+    });
+    const order = (list: ReturnType<typeof row>[]) => keepaliveOrder(list).map((x) => x.repo);
+
+    assert(keepaliveOrder([]).length === 0, "Sổ rỗng phải ra danh sách rỗng, không được ném.");
+
+    const seen = order([
+      row({ repo: "moi-ghi-hom-qua", lastCommitAt: daysAgo(1) }),
+      row({ repo: "chua-tung-ghi" }),
+      row({ repo: "ghi-19-ngay-truoc", lastCommitAt: daysAgo(19) }),
+      row({ repo: "moc-rac", lastCommitAt: "hôm-nào-đó" }),
+    ]);
+    assert(
+      seen.indexOf("chua-tung-ghi") < seen.indexOf("ghi-19-ngay-truoc"),
+      "Kho chưa từng ghi phải đứng trước kho ghi 19 ngày trước — không biết thì xử như đã lâu lắm.",
+    );
+    assert(
+      seen.indexOf("moc-rac") < seen.indexOf("ghi-19-ngay-truoc"),
+      "Mốc không đọc được phải đi ĐẦU, cùng lẽ với isCommitDue.",
+    );
+    assert(seen[seen.length - 1] === "moi-ghi-hom-qua", "Kho vừa ghi hôm qua phải xuống cuối — nó còn nhiều hạn nhất.");
+
+    // Hoà mốc GHI thì mốc NGÓ phân xử; hoà cả hai thì tên kho, để thứ tự không nhấp nhổm giữa
+    // hai lượt chạy (bảng tổng kết của tab admin đọc theo thứ tự này).
+    assert(
+      order([
+        row({ repo: "ngo-hom-nay", lastCommitAt: daysAgo(5), lastPingAt: daysAgo(0) }),
+        row({ repo: "ngo-ba-ngay-truoc", lastCommitAt: daysAgo(5), lastPingAt: daysAgo(3) }),
+      ])[0] === "ngo-ba-ngay-truoc",
+      "Cùng mốc ghi thì kho lâu chưa được ngó phải đi trước.",
+    );
+    assert(
+      order([row({ repo: "b-kho" }), row({ repo: "a-kho" })]).join(",") === "a-kho,b-kho",
+      "Hoà cả hai mốc thì xếp theo tên — hai lượt chạy phải cho cùng một thứ tự.",
+    );
+
+    // KHÔNG được sắp lại sổ gốc: thứ tự trong tab admin là thứ tự người ta đã thêm.
+    const book = [row({ repo: "z-kho", lastCommitAt: daysAgo(1) }), row({ repo: "a-kho", lastCommitAt: daysAgo(9) })];
+    const before = book.map((x) => x.repo).join(",");
+    keepaliveOrder(book);
+    assert(book.map((x) => x.repo).join(",") === before, "keepaliveOrder không được sắp lại mảng đưa vào.");
+
+    // ── Ca nặng nhất: ĐÓI. Ngân sách chỉ đủ hai kho một lượt, sổ có năm.
+    // Chạy hai lượt và đòi: kho bị bỏ lại lượt trước được nuôi ở lượt sau. Đây đúng là điều cách
+    // lặp cũ (theo thứ tự sổ) không bao giờ làm được — nó nuôi lại đúng hai kho đầu, mãi mãi.
+    let starving = [1, 2, 3, 4, 5].map((n) => row({ repo: "kho-" + n, lastCommitAt: daysAgo(30 + n) }));
+    const round1 = keepaliveOrder(starving).slice(0, 2).map((x) => x.repo);
+    starving = starving.map((x) => (round1.includes(x.repo) ? { ...x, lastCommitAt: daysAgo(0) } : x));
+    const round2 = keepaliveOrder(starving).slice(0, 2).map((x) => x.repo);
+    assert(
+      round1.every((repo) => !round2.includes(repo)),
+      "Lượt hai nuôi lại đúng những kho vừa nuôi (" + round2.join(",") + ") — đuôi sổ sẽ chết đói.",
+    );
+    assert(new Set([...round1, ...round2]).size === 4, "Hai lượt phải phủ bốn kho khác nhau.");
+    assert(!round2.includes("kho-1") && !round1.includes("kho-1"), "Kho mới nhất (kho-1) phải là cái cuối cùng tới lượt.");
+    // ĐỐI CHỨNG, giữ vĩnh viễn: cùng cảnh ấy với cách lặp CŨ (nguyên thứ tự sổ) phải chết đói.
+    // Không có ca này thì mấy assert trên có thể xanh chỉ vì cảnh dựng quá dễ, và cái luật vừa
+    // thêm chẳng chứng minh được gì — cùng lẽ với ca「gỡ bước nhân chứng」của Bí Cảnh.
+    let oldWay = [1, 2, 3, 4, 5].map((n) => row({ repo: "kho-" + n, lastCommitAt: daysAgo(30 + n) }));
+    const oldRound1 = oldWay.slice(0, 2).map((x) => x.repo);
+    oldWay = oldWay.map((x) => (oldRound1.includes(x.repo) ? { ...x, lastCommitAt: daysAgo(0) } : x));
+    const oldRound2 = oldWay.slice(0, 2).map((x) => x.repo);
+    assert(
+      oldRound1.join(",") === oldRound2.join(","),
+      "Cách lặp cũ lẽ ra phải nuôi lại đúng hai kho đầu — fixture dựng sai thì ca trên không chứng minh gì.",
+    );
+    assert(
+      !oldRound2.includes("kho-5"),
+      "Cách lặp cũ lẽ ra không bao giờ với tới kho cuối sổ — đó chính là cái chết lặng lẽ vừa vá.",
+    );
+
+  }
 
   // ───────── Luật hình dạng: cái gì được vào sổ ─────────
   assert(reviewStationIdentity(OWNER, REPO, DEFAULT_WORKFLOW_FILE) === null, "Một kho hợp lệ bị từ chối.");
@@ -325,7 +410,7 @@ async function run() {
   }
 
   globalThis.fetch = realFetch;
-  console.log("✔ Vòng nuôi kho GitHub: 12 nhóm ca, mọi luật đứng vững.");
+  console.log("✔ Vòng nuôi kho GitHub: 13 nhóm ca, mọi luật đứng vững.");
 }
 
 run().catch((err) => {

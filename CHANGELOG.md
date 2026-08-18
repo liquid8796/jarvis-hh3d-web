@@ -11,6 +11,46 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.4 — Bí Cảnh Tông Môn có bản THƯỜNG: một đòn mỗi lượt ghé, trên trang riêng (schema 67)
+
+Yêu cầu 18/08/2026, kèm bản ghi `bi-canh-tong-mon-20260818-013136` quay trên một tài khoản
+thường thật — thân trả lời của `attack-boss` tự khai `"user_role":"de_tu"`.
+
+**Vì sao phải là một nhiệm vụ riêng chứ không phải một nhánh `if` trong bản VIP.** Bản VIP bấm
+`#nv-btm-attack-btn`, một nút quick-click mà hub CHỈ vẽ cho hạng VIP. Sổ probe của bản ghi là
+bằng chứng gọn nhất: mọi lượt lấy mẫu đều `no match` cho selector ấy, trên một tài khoản hoàn
+toàn đánh được. Hàng của hạng thường chỉ có một link `Đến Đánh ›` mở trang riêng — đúng hình
+dạng đã gặp ở Điểm Danh, Phúc Lợi và Vòng Quay.
+
+**Bốn chỗ bản ghi dạy, và cả bốn đều nằm trong script:**
+
+- **Trang đi đường EMBED** (`/bi-canh-tong-mon/?nv_embed=1`). URL trần trả **503** ngay trong
+  `network.json` của bản ghi, còn bản `?nv_embed=1` trả 200 — cùng hình dạng đã trả giá ở
+  Khoáng Mạch, và cũng là URL mà chính hub mở trong khung nhúng của nó.
+- **Vỏ trang KHÔNG có nút nào.** 14KB HTML chỉ chở một khối JSON và `boss-system.js`; mọi nút
+  trong script này do JS vẽ ra sau. Nên cổng render là chính nút KHIÊU CHIẾN — ngược hẳn luật
+  của các script hub, nơi chờ nút của quest là cái bẫy.
+- **Cả ba lời khai của trang nằm trên MỘT nút.** `updateChallengeButton()` viết đúng ba trạng
+  thái vào `#challenge-boss-btn`: "KHIÊU CHIẾN" (đánh được), "Còn M:SS" (đang trong cooldown),
+  "Hết lượt hôm nay" (hết ngày). Đồng hồ đọc từ chính nút ấy, nên lượt dừng giữa cooldown mang
+  theo thời gian thật (412s) thay vì im lặng.
+- **Nhịp ghé lại 420s** — đúng `cooldown_interval` mà `/check-attack-cooldown` trả về.
+
+**Nhân chứng sau cú Tấn Công hỏi CHỮ, không hỏi `disabled`.** Một nút KHÔNG được vẽ ra cũng
+thoả `disabled` (phép hỏi ấy là ∀), nên một trang đổi hình dạng sẽ đọc ra y hệt một đòn đánh
+thành công — đúng cái bẫy đã làm Hoang Vực báo "xong" cho một trận chưa từng đánh suốt một đêm.
+Điều kiện là `":|hết lượt"`: đòn ăn thì nút đếm ngược, còn đòn thứ năm của ngày thì nhảy thẳng
+sang "Hết lượt hôm nay". Bản ghi đo cú lật ấy ~2,5s sau khi bấm, lúc modal vẫn còn mở.
+
+**Công tắc:** khoá `biCanh` có sẵn từ trước (bản VIP) nên không phải thêm khoá mới; nó chỉ được
+đưa vào `FREE_QUEST_KEYS` để ô tick hiện ở thẻ Thường, và `bi-canh-tong-mon-thuong` vào sổ
+trần-ngày (5 lượt là trần NGÀY, và trang phân biệt được "hết ngày" với "đang chờ").
+
+Nguồn thật vẫn là `DefaultQuestProfile.cs` bên bản desktop (commit `6cccf47`); khối quest ở đây
+được cắt từ bản xuất của chính nó, 25 quest cũ giữ nguyên từng byte.
+
+---
+
 ## 1.3.3 — Phòng Chat: mỗi khoảnh tin thu lại, và 24px trống của tin nối tiếp bị dẹp
 
 Yêu cầu 17/08/2026: *"giảm kích thước mỗi container chứa message chat của từng user"*. Lượt

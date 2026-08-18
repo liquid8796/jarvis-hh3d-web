@@ -61,6 +61,10 @@ const FREE_QUEST_KEYS = new Set([
   "hoangVuc",
   "phucLoiDuong",
   "thiLuyen",
+  // Từ schema 67: hạng thường có đường riêng — hub bản thường chỉ có link "Đến Đánh ›" mở
+  // trang /bi-canh-tong-mon/?nv_embed=1, nơi nút KHIÊU CHIẾN sống (bản ghi 18/08/2026). Trước
+  // đó khoá này CHỈ có ở tab VIP vì hồ sơ không có twin nào để chạy.
+  "biCanh",
   "vongQuay",
   "teLe",
   "vanDap",
@@ -378,8 +382,9 @@ function KhoangMachFieldset({
  *
  * Ô tổng chỉ đụng ĐÚNG những nhiệm vụ của lưới đang hiện. Điều đó quan trọng vì hai lưới
  * dùng CHUNG một state và chỉ giao nhau một phần: một ô tổng quét cả bảng sẽ lặng lẽ bật
- * Bí Cảnh và Phúc Lợi VIP cho người chỉ định bật đủ nhiệm vụ của tài khoản thường — và
- * ngược lại, bật cả Hỷ Sự Đường (thứ chỉ tab Thường có) từ tab VIP.
+ * Phúc Lợi VIP cho người chỉ định bật đủ nhiệm vụ của tài khoản thường — và ngược lại, bật
+ * cả Hỷ Sự Đường (thứ chỉ tab Thường có) từ tab VIP. (Bí Cảnh từng đứng cùng Phúc Lợi VIP
+ * trong câu này; từ schema 67 nó có twin hạng thường nên đã vào lưới của cả hai tab.)
  *
  * Ba trạng thái, không phải hai: bật hết → tick, tắt hết → trống, bật một phần →
  * `indeterminate` (gạch ngang). React không có prop cho trạng thái ấy nên phải đặt thẳng

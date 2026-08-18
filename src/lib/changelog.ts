@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.4",
+    date: "2026-08-18",
+    lines: [
+      "Tài khoản thường nay đánh được Bí Cảnh Tông Môn: mỗi lượt ghé một đòn, chờ đủ bảy phút rồi tự quay lại, tối đa năm lượt mỗi ngày.",
+      "Bật nó ở mục Nhiệm vụ ngày của thẻ Thường — trước đây ô này chỉ hiện cho tài khoản VIP vì chưa có đường đi cho hạng thường.",
+      "Đánh hết lượt trong ngày thì nghỉ hẳn tới hôm sau, không quay lại gõ cửa vô ích.",
+    ],
+  },
+  {
     version: "1.3.3",
     date: "2026-08-17",
     lines: [

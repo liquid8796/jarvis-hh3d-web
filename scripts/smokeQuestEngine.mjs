@@ -1629,8 +1629,17 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // nên xếp nó sau Mê Cung chỉ tổ bắt hai cú bấm xếp hàng sau 35 phút. Ngả duy nhất
     // vào sổ ngày là「cả hai thẻ đều .claimed」; còn khoá thì 30 phút, không thấy mục thì 60
     // phút — hai cảnh ấy mà nhớ thành「hết ngày」là khoá mất đúng cái rương sắp mở.
-    "hồ sơ đang ở schema 66",
-    loadProfileForSchema().schemaVersion === 66,
+    // 67 = Bí Cảnh Tông Môn có bản THƯỜNG (bản ghi bi-canh-tong-mon-20260818-013136, quay trên
+    // tài khoản thường thật). Bản VIP bấm nút quick-click #nv-btm-attack-btn mà hub CHỈ vẽ cho
+    // hạng VIP — sổ probe của bản ghi khai「no match」ở mọi lượt lấy mẫu trên một tài khoản đánh
+    // được — nên bản thường là một quest riêng đi trang /bi-canh-tong-mon/?nv_embed=1 (URL trần
+    // trả 503, đúng hình dạng Khoáng Mạch). Vỏ trang không có nút nào, boss-system.js vẽ tất cả,
+    // và cả ba lời khai nằm trên CÙNG nút #challenge-boss-btn: "KHIÊU CHIẾN" / "Còn M:SS" /
+    // "Hết lượt hôm nay". Nhân chứng sau cú Tấn Công hỏi CHỮ (":|hết lượt") chứ không hỏi
+    // `disabled`: nút KHÔNG được vẽ cũng thoả disabled, đúng cái bẫy đã làm Hoang Vực báo xong
+    // cho một trận chưa từng đánh.
+    "hồ sơ đang ở schema 67",
+    loadProfileForSchema().schemaVersion === 67,
     String(loadProfileForSchema().schemaVersion),
   );
 

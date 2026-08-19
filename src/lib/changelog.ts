@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.17",
+    date: "2026-08-19",
+    lines: [
+      "Trong lúc tông môn bế quan trùng tu, bậc trị sự vẫn khai đàn và chạy auto được như thường.",
+      "Đàn của môn đồ khác vẫn nằm chờ tới lúc mở cửa lại, không đổi gì so với trước.",
+    ],
+  },
+  {
     version: "1.3.16",
     date: "2026-08-19",
     lines: [

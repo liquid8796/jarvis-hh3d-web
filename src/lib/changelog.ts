@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.9",
+    date: "2026-08-19",
+    lines: [
+      "Hỷ Sự Đường: nay khai được cả hồng bao ở phòng cưới Đạo Lữ, không chỉ phòng Hồng Nhan như trước.",
+      "Phòng nào đang treo dòng「Có lì xì chưa mở」là auto ghé khai, kể cả tiệc đã chúc từ trước.",
+    ],
+  },
+  {
     version: "1.3.8",
     date: "2026-08-19",
     lines: [

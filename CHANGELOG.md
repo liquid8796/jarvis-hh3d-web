@@ -11,6 +11,36 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.9 — Hỷ Sự Đường khai hồng bao ở CẢ phòng Đạo Lữ (schema hồ sơ 70)
+
+Bản ghi `hy-su-duong-20260819-110345`, kèm lời dặn của tông chủ nằm ngay trong `steps.json`:
+「check phòng cưới loại đạo lữ nào mà có Trạng thái lì xì: Đã phát lì xì nhé, sau đó bấm vào chúc
+ngay để vào phòng đó nhận lì xì」→「sau khi vào phòng bấm mở lì xì」.
+
+Cụm hồng bao của schema 69 chỉ biết bộ id **`#hn*`** của phòng Hồng Nhan. Phòng **Đạo Lữ**
+(`/phong-cuoi`) dùng bộ id TRẦN — `#liXiModal` · `#openButton` · `#closeButton`, thiệp thưởng là
+`#rewardReveal > #rewardItem` với `.lixi-reward-name` / `.lixi-reward-amount`. Nên flow vào tới
+phòng, đứng nhìn cái khay, rồi đi ra: hồng bao hết hạn theo tiệc mà mọi dòng nhật ký vẫn xanh.
+
+**Mọi thứ khác trùng khít giữa hai họ phòng** — khay mở sẵn che kín trang, nút khai nhận
+`display:none` ngay khi máy chủ nhận, thiệp lật ra tên + số lượng, và CÙNG một endpoint
+(`POST /wp-json/hh3d/v1/action`, `action=hh3d_receive_li_xi`, `wedding_room_id`; bản ghi đo được
+41 Tiên Ngọc). Nên bản vá là một phép **hợp selector**, không phải một nhánh thứ hai: thêm một họ
+id nữa sau này chỉ tốn một dấu phẩy.
+
+Cửa vào không phải đụng một dòng: nó vẫn là lời hứa của danh sách
+(`.wedding-now-li-xi-available`「🧧 Có lì xì chưa mở!」), và bản ghi cho thấy dòng ấy nằm trên mục
+Đạo Lữ y hệt mục Hồng Nhan.
+
+Sửa kèm một ghi chú SAI trong nguồn: điều 3 của khối tài liệu Hỷ Sự khai `.lixi-envelope` 「chỉ là CSS bên Đạo Lữ」— probes của bản ghi này đo được nó là một `<div>` 81×81 có thật trong
+khay. Nó vẫn không phải cái để bấm, nhưng lý do thì khác hẳn, và lượt đo 11/08 sai vì rơi vào một
+phòng không có hồng bao nên khay chưa được dựng.
+
+Fixture nay dựng khay Đạo Lữ chép từ `dom/10-load.html` + `dom/12-click.html`, giữ đúng ba chỗ
+khác biệt (bộ id trần · khay `.active` ngay từ lúc trang vẽ xong, không có nhịp 1,2 giây · có
+`.lixi-envelope` thật), và định tuyến phòng trong fixture nay chọn theo HỌ PHÒNG thay vì theo
+`preBlessed`.
+
 ## 1.3.8 — Tab Khôi lỗi mở cho mọi đạo hữu, và tên máy hiện ở tab Hàng đợi
 
 Tông chủ ra lệnh 19/08/2026: môn đồ thường từ nay thấy danh sách khôi lỗi **giống hệt** bậc trị

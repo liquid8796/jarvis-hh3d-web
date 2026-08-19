@@ -859,7 +859,66 @@ document.getElementById('hnCloseBtn').onclick = () => {
   setTimeout(() => tray.remove(), 60);
 };
 </script>`;
-const hySuRoomPage = (id, alreadyBlessed) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+// Khay lì xì bản ĐẠO LỮ — chép từ `dom/10-load.html` của bản ghi hy-su-duong-20260819-110345
+// (và `dom/12-click.html` cho hình dạng sau khi khai). Ba chỗ PHẢI khác bản Hồng Nhan, vì
+// chính chúng là thứ bản vá phải nuốt được:
+//
+//   1. Bộ id TRẦN: #liXiModal · #openButton · #closeButton, thiệp là #rewardReveal >
+//      #rewardItem với .lixi-reward-name / .lixi-reward-amount. Không có tiền tố `hn`.
+//   2. Khay `.active` NGAY từ lúc trang vẽ xong — khác Hồng Nhan (site gắn sau ~1,2 giây).
+//      Giữ đúng nhịp ấy: một fixture cho cả hai họ cùng nhịp sẽ giấu mất chuyện đó.
+//   3. `.lixi-envelope` CÓ thật ở đây (81×81, probes đo được), khác bên Hồng Nhan. Nó chỉ là
+//      hình cái phong bao, không phải nút — để trong fixture đúng như đời thật, để bất kỳ ai
+//      định neo vào nó lần nữa sẽ thấy ngay là neo vào một thứ không bấm được.
+const hySuRoomPage = (id, alreadyBlessed, hasGift) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+${hasGift ? `
+<style>
+.lixi-modal { position: fixed; inset: 0; z-index: 10002; display: none; align-items: center; justify-content: center; background: rgba(20,0,8,0.9); }
+.lixi-modal.active { display: flex; }
+.lixi-modal-content { position: relative; width: 320px; padding: 30px; text-align: center; }
+.lixi-close-button { position: absolute; top: 10px; right: 12px; width: 26px; height: 26px; }
+.lixi-envelope { width: 81px; height: 81px; margin: 0 auto; }
+.lixi-open-button { display: inline-flex; padding: 10px 26px; }
+.lixi-reward-reveal { display: none; margin-top: 14px; }
+.lixi-reward-reveal.show { display: block; }
+</style>
+<div class="lixi-modal active" id="liXiModal">
+  <div class="lixi-sparkles" id="sparkles"></div>
+  <button class="lixi-close-button" id="closeButton">×</button>
+  <div class="lixi-modal-content">
+    <div class="lixi-envelope"></div>
+    <h2>Chúc Mừng!</h2>
+    <p>Đạo hữu là vị khách may mắn nhận được lì xì từ chủ tiệc cưới. Hãy mở để xem điều bất ngờ!</p>
+    <button class="lixi-open-button" id="openButton">Mở Lì Xì</button>
+    <div class="lixi-reward-reveal" id="rewardReveal">
+      <div class="lixi-reward-chest" id="rewardChest"><div class="lixi-chest-lid" id="chestLid"></div></div>
+      <div class="lixi-reward-item" id="rewardItem"></div>
+    </div>
+  </div>
+</div>
+<script>
+const dlTray = document.getElementById('liXiModal');
+document.getElementById('openButton').onclick = () => {
+  const btn = document.getElementById('openButton');
+  btn.disabled = true;
+  fetch('/hy-su-lixi?id=${id}').then((r) => r.json()).then((d) => {
+    setTimeout(() => {
+      btn.style.display = 'none';
+      document.getElementById('rewardItem').innerHTML =
+        '<div class="lixi-reward-name">' + d.name + '</div>' +
+        '<div class="lixi-reward-amount">' + d.amount + '</div>' +
+        '<div class="lixi-reward-text">Chúc mừng đạo hữu đã nhận được phần thưởng!</div>';
+      document.getElementById('rewardItem').classList.add('show');
+      document.getElementById('rewardReveal').classList.add('show');
+    }, 150);
+  });
+};
+document.getElementById('closeButton').onclick = () => {
+  fetch('/hy-su-tray-closed?id=${id}');
+  setTimeout(() => dlTray.remove(), 60);
+};
+</script>
+` : ""}
 <div class="blessing-section"><h2>Gửi Lời Chúc Phúc</h2>
 ${alreadyBlessed ? '<div class="blessing-message"><p>Đạo hữu đã gửi lời chúc phúc cho cặp đôi này! 🌸</p></div>' : `<div class="blessing-form">
 <select id="blessing-default-options" onchange="fillBlessingMessage()">
@@ -1856,8 +1915,14 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // alreadyDone — mà hoang-vuc nằm trong DAILY_QUOTA_QUEST_IDS nên lượt ấy KHOÁ CẢ NGÀY:
     // thưởng không ai lĩnh, 5 lượt đánh của boss mới mất trắng. Nay lĩnh xong thì tự navigate
     // lại để đọc boss mới, rồi đi tiếp đúng cụm khiêu chiến cũ.
-    "hồ sơ đang ở schema 68",
-    loadProfileForSchema().schemaVersion === 69,
+    // 70 = Hỷ Sự Đường khai được hồng bao ở CẢ phòng Đạo Lữ (bản ghi
+    // hy-su-duong-20260819-110345). Cụm hồng bao của schema 69 chỉ biết bộ id #hn* của Hồng
+    // Nhan; phòng Đạo Lữ dùng bộ id trần #liXiModal · #openButton · #closeButton và thiệp
+    // #rewardReveal > #rewardItem, nên flow vào tới nơi rồi đứng nhìn cái khay. Cùng endpoint,
+    // cùng hình dạng, chỉ khác tên — nên bản vá là một phép HỢP SELECTOR, không phải nhánh mới.
+    // (Nhãn dòng dưới trước đây ghi 68 trong khi phép so hỏi 69 — sửa luôn cho khớp.)
+    "hồ sơ đang ở schema 70",
+    loadProfileForSchema().schemaVersion === 70,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -2402,7 +2467,11 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // Phòng của bản ghi 18/08/2026: ĐÃ CHÚC từ trước và ĐANG GIỮ một hồng bao chưa khai. Bộ lọc
     // mặc định là ".not-blessed" nên bản quest cũ KHÔNG BAO GIỜ ghé nó — hồng bao hết hạn theo
     // tiệc (5 giờ) mà không ai biết. Đây là ca chính của lượt vá này.
+    // Phòng của bản ghi 19/08/2026: ĐẠO LỮ, đã chúc, và đang giữ một hồng bao chưa khai.
+    // Trước lượt vá này cụm hồng bao chỉ biết bộ id #hn* của Hồng Nhan, nên phòng như thế
+    // này vào tới nơi rồi đứng nhìn cái khay mà không khai được gì.
     { id: "251", type: "hong-nhan", couple: "白鹿 ღ Lý Thanh Nguyệt 💕 小遥 | Tuyết Băng Vân", lixiSent: true, gift: true, preBlessed: true },
+    { id: "2595", type: "dao-lu", couple: "亗ᴸᴴ | ᑎǤưᑌ ᛕᗩ & 亗ᴸᴴ | ᑎǤưᑌ ੮ỷ", lixiSent: true, gift: true, preBlessed: true },
   ];
   const hySuBlessed = new Map(); // id → lời chúc đã gửi, theo thứ tự vào phòng
   const hySuLixi = []; // id phòng đã KHAI được hồng bao, theo thứ tự
@@ -2522,8 +2591,10 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       const id = url.searchParams.get("id") ?? "";
       const room = hySuRooms.find((r) => r.id === id);
       if (hySuBrokenRooms.has(id)) res.end(hySuBrokenRoomPage(id));
-      else if (room?.preBlessed) res.end(hySuHongNhanPage(id, hySuGifts.has(id)));
-      else res.end(hySuRoomPage(id, hySuBlessed.has(id)));
+      // Trang Hồng Nhan là bản ĐÃ CHÚC + khay #hn*, nên chỉ phòng hong-nhan preBlessed mới
+      // đi lối ấy; mọi phòng còn lại đi trang /phong-cuoi, và nay trang ấy tự dựng khay Đạo Lữ.
+      else if (room?.type === "hong-nhan" && room?.preBlessed) res.end(hySuHongNhanPage(id, hySuGifts.has(id)));
+      else res.end(hySuRoomPage(id, hySuBlessed.has(id) || !!room?.preBlessed, hySuGifts.has(id)));
     }
     else if (path === "/hy-su-lixi") {
       // Máy chủ chỉ trả thưởng MỘT lần cho mỗi phòng, đúng như hh3d_receive_li_xi ngoài đời;
@@ -3514,7 +3585,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     );
     check(
       "…và lời kể nói ra số phòng đã phát lì xì, để lượt chạy tự chứng minh điều đó",
-      infos.some((m) => m.startsWith("Hỷ Sự Đường:") && m.includes("2 đã phát lì xì")),
+      infos.some((m) => m.startsWith("Hỷ Sự Đường:") && m.includes("3 đã phát lì xì")),
       infos.filter((m) => m.startsWith("Hỷ Sự Đường:")).slice(-1)[0] ?? "(không có dòng nào)",
     );
     check(
@@ -3528,12 +3599,12 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // tiệc mà không ai biết — nên phép thử này ĐỎ trên hồ sơ cũ, và đó là điều làm nó đáng có.
     check(
       "phòng ĐÃ CHÚC mà còn hồng bao vẫn được ghé, và hồng bao được khai",
-      JSON.stringify(hySuLixi) === JSON.stringify(["251"]),
+      JSON.stringify(hySuLixi) === JSON.stringify(["251", "2595"]),
       hySuLixi.join(",") || "(không khai được cái nào)",
     );
     check(
       "…và lời kể đếm ra số phòng còn hồng bao chưa khai, ngay từ lần mở modal đầu",
-      infos.some((m) => m.startsWith("Hỷ Sự Đường:") && m.includes("1 còn hồng bao chưa khai")),
+      infos.some((m) => m.startsWith("Hỷ Sự Đường:") && m.includes("2 còn hồng bao chưa khai")),
       infos.filter((m) => m.startsWith("Hỷ Sự Đường:"))[0] ?? "(không có dòng nào)",
     );
     check(
@@ -3545,8 +3616,22 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // là để lại một tấm chắn trước form chúc của chính phòng ấy.
     check(
       "khay hồng bao được ĐÓNG lại sau khi khai",
-      JSON.stringify(hySuTrayClosed) === JSON.stringify(["251"]),
+      JSON.stringify(hySuTrayClosed) === JSON.stringify(["251", "2595"]),
       hySuTrayClosed.join(",") || "(không đóng khay nào)",
+    );
+    // CA CHÍNH của lượt vá 19/08/2026: phòng 2595 là ĐẠO LỮ — khay của nó mang bộ id trần
+    // (#liXiModal · #openButton · #closeButton) chứ không phải #hn*. Trước lượt vá, cụm hồng
+    // bao chỉ biết bộ #hn*, nên flow vào tới phòng rồi đứng nhìn cái khay: hồng bao hết hạn theo
+    // tiệc mà nhật ký vẫn xanh. Phép thử này ĐỎ trên hồ sơ cũ, và đó là điều làm nó đáng có.
+    check(
+      "phòng ĐẠO LỮ có hồng bao: khai được bằng bộ id trần, không phải bộ #hn*",
+      hySuLixi.includes("2595") && hySuTrayClosed.includes("2595"),
+      `lixi=${hySuLixi.join(",")}; tray=${hySuTrayClosed.join(",")}`,
+    );
+    check(
+      "…và lời kể gọi đúng món của phòng ấy, đọc từ thiệp .lixi-reward-* chứ không phải #hnReward*",
+      infos.filter((m) => m.startsWith("Khai phong lì xì:")).length === 2,
+      infos.filter((m) => m.startsWith("Khai phong lì xì:")).join(" / ") || "(không có dòng nào)",
     );
     // Ba phòng kia không có hồng bao: khay dựng sẵn nhưng không bao giờ `.active`. Nếu phép quét
     // hỏi thẳng #hnOpenBtn (conditionProbe chỉ đọc chính phần tử, không leo cha) thì cả ba sẽ
@@ -3557,8 +3642,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       infos.filter((m) => m.startsWith("KHAI HỒNG BAO TRƯỢT")).join(" / "),
     );
     check(
-      "tường thuật gọi tên từng cặp đôi được ghé (ba phòng để chúc + một phòng để khai hồng bao)",
-      infos.filter((m) => m.startsWith("Vào phòng:")).length === 4,
+      "tường thuật gọi tên từng cặp đôi được ghé (ba phòng để chúc + hai phòng để khai hồng bao)",
+      infos.filter((m) => m.startsWith("Vào phòng:")).length === 5,
       infos.filter((m) => m.startsWith("Vào phòng:")).join(" / "),
     );
     // "Không có việc thì phải nói ra": mỗi lần mở modal đều kể con số, nên người đọc nhật ký
@@ -3589,8 +3674,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       const visitBlessed = await run(blessedOnly);
       const entered = infos.slice(before).filter((m) => m.startsWith("Vào phòng:"));
       check(
-        "lọc \"đã chúc\" → vào được cả bốn phòng đã chúc, không chết ở bước chờ form",
-        visitBlessed.outcome === "completed" && entered.length === 4,
+        "lọc \"đã chúc\" → vào được cả năm phòng đã chúc, không chết ở bước chờ form",
+        visitBlessed.outcome === "completed" && entered.length === 5,
         `${visitBlessed.outcome}: ${visitBlessed.message} — vào ${entered.length} phòng`,
       );
       check(
@@ -3600,7 +3685,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       );
       check(
         "…và nói rõ từng phòng là đã chúc rồi",
-        infos.slice(before).filter((m) => m.includes("đã chúc rồi")).length === 4,
+        infos.slice(before).filter((m) => m.includes("đã chúc rồi")).length === 5,
         infos.slice(before).filter((m) => m.includes("đã chúc rồi")).length + " dòng",
       );
       // Sổ đã ghé là thứ làm vòng lặp TIẾN ở chế độ này: chúc xong không làm giảm số .blessed,

@@ -248,6 +248,25 @@ const GRANTS: ReadonlyMap<string, ReadonlySet<Permission>> = new Map(
 );
 
 /**
+ * Quyền định nghĩa「bậc trị sự」. Có tên riêng vì nó được hỏi ở HAI dạng — một phép hỏi trên
+ * mảng vai đã đọc sẵn (`isAdminUser`), và một danh sách mã vai để lọc dưới SQL
+ * (`ADMIN_ROLE_CODES`) — và hai dạng ấy mà rời nhau thì trang nói một đằng, database làm một nẻo.
+ */
+const ADMIN_PANEL = "admin.panel" satisfies Permission;
+
+/**
+ * Mã vai nào mở được trang Tông Môn — DẪN XUẤT từ chính ma trận quyền, không phải chép tay.
+ *
+ * Sinh ra cho một chỗ mà `isAdminUser` không với tới được: lọc「đàn này có phải của bậc trị sự
+ * không」NGAY TRONG câu SQL phát việc. Chép tay bộ mã vào một chuỗi SQL là dựng một bản sao thứ
+ * hai của bảng quyền — thứ sẽ đứng im đúng vào ngày ai đó thêm một vai trị sự mới, và hậu quả
+ * là một vai được vào trang Tông Môn nhưng đàn của họ không bao giờ được phát trong lúc bế quan.
+ */
+export const ADMIN_ROLE_CODES: readonly string[] = ASSIGNABLE_ROLES.filter(
+  (role) => GRANTS.get(role)?.has(ADMIN_PANEL) === true,
+);
+
+/**
  * Cùng lẽ với `GRANTS`: dựng một lần lúc nạp module, rồi tra bằng `Set`.
  *
  * Là `Set<string>` chứ không tra thẳng `ROLE_SHIELDS_BEARER` bằng một phép ép kiểu: mảng vai
@@ -287,7 +306,7 @@ export function isOwner(user: RoleBearer): boolean {
 
 /** "Có quyền trị sự" — cửa `requireAdmin`. Cả ba vai đều mở được. */
 export function isAdminUser(user: RoleBearer): boolean {
-  return hasPermission(user, "admin.panel");
+  return hasPermission(user, ADMIN_PANEL);
 }
 
 /**

@@ -55,3 +55,30 @@ export function maintenanceViewFor(
   if (viewer === null) return "banner";
   return isAdminUser(viewer) ? "banner" : "wall";
 }
+
+/**
+ * Trong lúc bế quan trùng tu thì ĐÀN CỦA AI còn được chạy.
+ *
+ * Từ 18/08/2026 bậc trị sự chạy auto được xuyên suốt lúc bế quan. Lý do cùng họ với việc họ đi
+ * qua được bảng chắn: bế quan là để SỬA, mà muốn biết bản vừa vá có chạy không thì phải chạy thử
+ * một đàn thật — trên trang đóng, với đúng người đang trực. Bắt họ mở cửa cho cả tông môn chỉ để
+ * thử một vòng là biến mỗi lượt kiểm thành một lượt phát hành.
+ *
+ * ── HỎI VỀ CHỦ CỦA ĐÀN, KHÔNG PHẢI NGƯỜI BẤM ─────────────────────────────────────────────────
+ *
+ * `owner` là chủ nhân của đàn sắp chạy, và đó là một lựa chọn có hậu quả. Trang Hàng Đợi cho
+ * bậc trị sự「khai đàn hộ」một đàn của NGƯỜI KHÁC; gác theo người bấm thì cú bấm ấy lọt, đàn được
+ * lập dưới tên một môn đồ thường, rồi phép phát việc — vốn hỏi về chủ — không bao giờ phát nó ra.
+ * Kết quả là một dòng `queued` nằm im tới lúc mở cửa, kèm một lời báo thành công. Đúng loại hỏng
+ * mà tệp này sinh ra để chặn: không lỗi nào để đọc, chỉ có một việc không bao giờ xảy ra.
+ *
+ * `owner === null` là「không tra ra chủ」— phiên trỏ vào một dòng users đã bị xoá, hoặc một đàn mồ
+ * côi. Ngả về phía ĐÓNG, cùng lối với `maintenanceViewFor` coi mọi vai lạ là môn đồ thường.
+ */
+export function maintenanceAllowsAutomation(
+  maintenance: { active: boolean },
+  owner: { roles: string[] } | null,
+): boolean {
+  if (!maintenance.active) return true;
+  return owner !== null && isAdminUser(owner);
+}

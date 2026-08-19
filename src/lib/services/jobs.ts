@@ -9,6 +9,9 @@ import {
 } from "./configs";
 import { DEFAULT_MAX_JOBS, DISPATCH_CANDIDATES, pickDispatch } from "./dispatch";
 import { getAppSettings } from "./settings";
+import { findById } from "./users";
+import { maintenanceAllowsAutomation } from "@/lib/auth/maintenance";
+import { ADMIN_ROLE_CODES } from "@/lib/auth/permissions";
 import { ONLINE_WINDOW_MS, workerOnlineFor } from "./workers";
 import {
   JOB_EVENT_SWEEP_MIN_INTERVAL_MS,
@@ -162,8 +165,11 @@ export async function startJob(userId: string): Promise<StartOutcome> {
   // Bế quan trùng tu: kiểm TRƯỚC MỌI THỨ, và ở tầng service chứ không ở action — mọi đường
   // gọi tương lai (API mới, cron, một action khác) đều phải đập vào cùng cánh cửa này.
   // Popup trên Auto đã báo trước, nhưng một tab mở từ hôm qua vẫn bấm được nút cũ.
+  //
+  // Bậc trị sự đi qua được (18/08/2026) — xem `maintenanceAllowsAutomation`. Phép hỏi nhận VAI
+  // CỦA CHỦ ĐÀN, mà ở đây chủ đàn chính là người bấm, nên một lượt tra `findById` là đủ.
   const { maintenance } = await getAppSettings();
-  if (maintenance.active) {
+  if (maintenance.active && !maintenanceAllowsAutomation(maintenance, await findById(userId))) {
     return {
       ok: false,
       error: "Tông môn đang bế quan trùng tu — Khai Đàn tạm khoá tới khi mở cửa lại. Đàn đang chạy dở sẽ tự hoàn thành vòng rồi nghỉ.",
@@ -431,8 +437,13 @@ export async function forceStartJob(stoppedJobId: string, actorName: string): Pr
   const ownerId = String(job.user_id);
   const accountId = String(job.account_id);
 
+  // Hỏi vai của CHỦ ĐÀN (`ownerId`), không phải của bậc trị sự đang bấm — xem khối bình chú ở
+  // `maintenanceAllowsAutomation`. Khai hộ một môn đồ thường trong lúc bế quan sẽ lập ra một đàn
+  // mà phép phát việc không bao giờ phát, nên nó phải bị từ chối ngay tại đây.
   const { maintenance } = await getAppSettings();
-  if (maintenance.active) return { ok: false, reason: "maintenance" };
+  if (maintenance.active && !maintenanceAllowsAutomation(maintenance, await findById(ownerId))) {
+    return { ok: false, reason: "maintenance" };
+  }
 
   const account = (await listAccountsWithEnvelope(ownerId)).find((item) => item.id === accountId);
   if (!account) return { ok: false, reason: "account-gone" };
@@ -613,6 +624,34 @@ async function mergeDailyQuota(jobId: string, day: string, questIds: string[]): 
 export async function claimNextJob(workerId: string, scope: WorkerScope): Promise<JobRow | null> {
   const scopeFilter = scope.kind === "user" ? sql` and job.user_id = ${scope.userId}` : sql``;
 
+  /**
+   * BẾ QUAN TRÙNG TU: thôi phát việc, TRỪ đàn của bậc trị sự (18/08/2026).
+   *
+   * Cửa này nằm ở đây chứ không ở `/api/worker` — nơi nó từng đứng dưới dạng một cú chặn thẳng
+   * thừng cho MỌI đàn — vì cùng một lẽ với `startJob`: mọi đường gọi tương lai phải đập vào cùng
+   * một cánh cửa, và một cửa đặt trong route thì cửa ấy chỉ gác đúng route đó.
+   *
+   * Lọc bằng SQL chứ không lọc sau khi đọc: `DISPATCH_CANDIDATES` cắt danh sách ứng viên NGAY
+   * TRONG câu truy vấn, nên lọc ở tầng TypeScript sẽ để cả nhóm ứng viên bị chiếm bởi đàn của môn
+   * đồ thường rồi trả về rỗng — trong khi đàn của trị sự nằm ngay sau lằn cắt. Vẫn phát được,
+   * nhưng chỉ khi may.
+   *
+   * `in (…)` với tham số ràng buộc, danh sách mã lấy từ `ADMIN_ROLE_CODES` — dẫn xuất từ chính
+   * bảng quyền. `user_roles` có khoá chính `(user_id, role_code)` nên phép `exists` này đi bằng
+   * tiền tố khoá chính, không thêm chỉ mục nào.
+   */
+  const { maintenance } = await getAppSettings();
+  const maintenanceFilter = maintenance.active
+    ? sql` and exists (
+        select 1 from ${schema.userRoles} as ur
+        where ur.user_id = job.user_id
+          and ur.role_code in (${sql.join(
+            ADMIN_ROLE_CODES.map((code) => sql`${code}`),
+            sql`, `,
+          )})
+      )`
+    : sql``;
+
   const dueResult = await db().execute(sql`
     select
       job.id, job.user_id, job.next_run_at, job.last_worker_id,
@@ -622,7 +661,7 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
       ) as owner_pref
     from automation_jobs as job
     where job.status = 'queued'
-      and job.next_run_at <= now()${scopeFilter}
+      and job.next_run_at <= now()${scopeFilter}${maintenanceFilter}
       -- Tài khoản đã tắt thì đàn của nó không được phát ra nữa — cửa chặn cho khe đua
       -- hiếm giữa "thu đàn của tài khoản" và "hạ cờ enabled" trong toggleAccountAction.
       and (

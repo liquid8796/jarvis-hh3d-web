@@ -179,22 +179,27 @@ export async function POST(request: Request) {
       // gọi đều — nên "đang trực" nghĩa là tiến trình còn sống, không phải nó đang bận.
       await recordWorkerSeen(body.workerId, scope, body.version ?? null, body.maxJobs ?? null);
 
-      // Bế quan trùng tu: đóng ĐÚNG MỘT cánh cửa này. Bốn op còn lại (heartbeat, event,
-      // accountTier, complete) mở nguyên, nên vòng đang chạy dở về đích đàng hoàng, kể xong
-      // câu chuyện của nó, rồi completeWorkerCycle tái xếp job vào hàng — nơi claim sẽ không
-      // phát ra nữa. Đó chính là "cho job dang dở hoàn thành rồi mới dừng": không cần dừng
-      // ai cả, chỉ cần thôi phát việc mới. Trùng tu xong, mọi đàn tự chạy tiếp, không ai
-      // phải bấm lại Khai Đàn. Điểm danh vẫn ghi ở trên — khôi lỗi đang trực chứ không chết,
-      // sổ trực mà báo "vắng" trong lúc trùng tu là dashboard tự bịa thêm một sự cố.
-      const settings = await getAppSettings();
-      if (settings.maintenance.active) {
-        return NextResponse.json({ job: null });
-      }
-
+      // Bế quan trùng tu: đóng ĐÚNG MỘT cánh cửa, và cánh cửa ấy nằm TRONG `claimNextJob`
+      // (từ 18/08/2026 — trước đó nó là một cú chặn thẳng thừng ngay tại đây). Bốn op còn lại
+      // (heartbeat, event, accountTier, complete) mở nguyên, nên vòng đang chạy dở về đích đàng
+      // hoàng, kể xong câu chuyện của nó, rồi completeWorkerCycle tái xếp job vào hàng — nơi
+      // claim sẽ không phát ra nữa. Đó chính là "cho job dang dở hoàn thành rồi mới dừng":
+      // không cần dừng ai cả, chỉ cần thôi phát việc mới. Trùng tu xong, mọi đàn tự chạy tiếp,
+      // không ai phải bấm lại Khai Đàn. Điểm danh vẫn ghi ở trên — khôi lỗi đang trực chứ không
+      // chết, sổ trực mà báo "vắng" trong lúc trùng tu là dashboard tự bịa thêm một sự cố.
+      //
+      // VÌ SAO DỜI XUỐNG: cú chặn ở đây không phân biệt được đàn của ai, mà từ 18/08 đàn của bậc
+      // trị sự vẫn phải chạy trong lúc bế quan (họ cần một vòng THẬT để nghiệm bản vừa vá). Phép
+      // phân biệt ấy phải nằm trong câu truy vấn phát việc, cạnh `DISPATCH_CANDIDATES` — xem khối
+      // bình chú ở `claimNextJob`. Giữ lại một cú chặn ở đây nữa là dựng hai cửa cho một luật.
       const job = await claimNextJob(body.workerId, scope);
       if (!job) {
         return NextResponse.json({ job: null });
       }
+
+      // Đọc SAU cú thoát sớm, không phải trước: chỉ hồi đáp CÓ job mới cần `game.baseUrl`, mà
+      // lượt không có job nào là lượt thường gặp nhất — mọi khôi lỗi nhàn rỗi đều gõ cửa đều đặn.
+      const settings = await getAppSettings();
 
       // ĐÂY là điểm duy nhất cookie rời khỏi phong bì. Nó xảy ra sau khi khôi lỗi đã chứng
       // minh danh tính (token tông môn hoặc linh phù của đúng chủ job), và đi tiếp trên

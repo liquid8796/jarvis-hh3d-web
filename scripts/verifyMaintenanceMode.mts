@@ -18,10 +18,9 @@
  * đứng im trong một phiên bảo trì không ai khai.
  */
 import { sqlTag } from "./pgTag.mjs";
-// @ts-expect-error — module JS thuần của quest-engine, không có d.ts.
 import { normalizeGameBaseUrl } from "../src/lib/quest-engine/cookies.mjs";
-import { maintenanceViewFor } from "../src/lib/auth/maintenance";
-import { ASSIGNABLE_ROLES, type Role } from "../src/lib/auth/permissions";
+import { maintenanceAllowsAutomation, maintenanceViewFor } from "../src/lib/auth/maintenance";
+import { ADMIN_ROLE_CODES, ASSIGNABLE_ROLES, type Role } from "../src/lib/auth/permissions";
 import { appSettingsSchema, getAppSettings, saveAppSettings } from "../src/lib/services/settings";
 import {
   HOURS_PER_DAY,
@@ -46,6 +45,10 @@ if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa đặt.");
 const sql = sqlTag(process.env.DATABASE_URL);
 const stamp = Date.now();
 const username = `__maint_${stamp}`;
+/** Người thứ hai, mang vai trị sự — để đo cửa auto mở cho ĐÚNG một phía. */
+const adminUsername = `__maint_admin_${stamp}`;
+/** Vai dùng để phong: lấy từ chính bộ mã mà SQL phát việc lọc, không gõ tay một mã thứ hai. */
+const ADMIN_ROLE_FOR_TEST = ADMIN_ROLE_CODES[0];
 
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);
@@ -211,8 +214,9 @@ const ROLE_PASSES_MAINTENANCE: Record<Role, boolean> = {
   "gia-chu": true,
   "thai-thuong-truong-lao": true,
   "chuong-mon": true,
-  admin: true,
   "de-tu": false,
+  /** Phàm nhân đang chờ duyệt — chưa nhập môn thì chưa mở được cửa nào, kể cả cửa bế quan. */
+  "pham-nhan": false,
 };
 
 for (const role of ASSIGNABLE_ROLES) {
@@ -235,7 +239,53 @@ assert(
 // hết phiên quay lại với công tắc ấy.
 assert(maintenanceViewFor(ON, null) === "banner", "khách chưa đăng nhập phải vào được cửa đăng nhập");
 
-console.log("✔ Cửa bế quan: môn đồ VÀ đệ tử gặp bảng chắn; bốn vai trị sự và khách chưa đăng nhập đi qua được.");
+console.log("✔ Cửa bế quan: môn đồ VÀ đệ tử gặp bảng chắn; ba vai trị sự và khách chưa đăng nhập đi qua được.");
+
+// ---- Ai còn CHẠY AUTO được trong lúc bế quan (18/08/2026) ---------------------------------
+//
+// Luật đi kèm cửa trên, và đi kèm vì cùng một lẽ: bế quan là để SỬA, mà nghiệm một bản vá thì
+// phải chạy một đàn THẬT. Ba cửa trong mã hỏi cùng hàm này — Khai Đàn, khai đàn hộ, và phép
+// phát việc cho khôi lỗi — nên một phép kiểm ở đây bao được cả ba.
+
+for (const owner of [null, MEMBER, { roles: ["chuong-mon"] }, { roles: ["gia-chu"] }]) {
+  assert(maintenanceAllowsAutomation(OFF, owner) === true, "cửa mở thì đàn của ai cũng chạy được");
+}
+
+assert(maintenanceAllowsAutomation(ON, MEMBER) === false, "môn đồ thường KHÔNG chạy auto trong lúc bế quan");
+assert(maintenanceAllowsAutomation(ON, { roles: ["de-tu"] }) === false, "đệ tử là danh xưng môn đồ — cũng không chạy");
+assert(maintenanceAllowsAutomation(ON, { roles: ["choi-choi"] }) === false, "một vai lạ KHÔNG mở được cửa auto");
+
+/**
+ * `null` = không tra ra chủ đàn (phiên trỏ vào một dòng users đã xoá, hoặc đàn mồ côi). Phải ngả
+ * về phía ĐÓNG: mở cho một danh tính không đọc được là mở cho tất cả, vì "không đọc được" là thứ
+ * dễ dựng nhất trong mọi cảnh hỏng.
+ */
+assert(maintenanceAllowsAutomation(ON, null) === false, "không tra ra chủ đàn thì KHÔNG chạy — ngả về phía đóng");
+
+for (const role of ASSIGNABLE_ROLES) {
+  assert(
+    maintenanceAllowsAutomation(ON, { roles: [role] }) === ROLE_PASSES_MAINTENANCE[role],
+    `vai ${role}: quyền chạy auto lúc bế quan phải TRÙNG với quyền đi qua bảng chắn`,
+  );
+}
+assert(
+  maintenanceAllowsAutomation(ON, { roles: ["de-tu", "chuong-mon"] }) === true,
+  "đeo thêm danh xưng đệ tử KHÔNG lấy mất quyền chạy auto của một Trưởng môn",
+);
+
+/**
+ * Danh sách mã vai mà câu SQL phát việc dùng để lọc phải TRÙNG KHÍT với phép hỏi trên mảng vai.
+ * Đây là chỗ duy nhất hai bên gặp nhau: lệch một mã thì trang cho vào mà database không phát
+ * việc — một cái hỏng không có lỗi nào để đọc, chỉ có một đàn nằm im.
+ */
+const expectedAdminCodes = ASSIGNABLE_ROLES.filter((role) => ROLE_PASSES_MAINTENANCE[role]);
+assert(
+  [...ADMIN_ROLE_CODES].sort().join(",") === [...expectedAdminCodes].sort().join(","),
+  `ADMIN_ROLE_CODES phải đúng bộ vai trị sự — nhận: [${ADMIN_ROLE_CODES.join(", ")}], mong: [${expectedAdminCodes.join(", ")}]`,
+);
+assert(ADMIN_ROLE_CODES.length > 0, "bộ mã vai trị sự RỖNG sẽ khoá auto của cả tông môn trong lúc bế quan");
+
+console.log(`✔ Chạy auto lúc bế quan: chỉ ${ADMIN_ROLE_CODES.length} vai trị sự, và SQL lọc đúng bộ mã ấy.`);
 
 // ---- Tên miền game: chuẩn hoá và phòng thân ----------------------------------------------
 
@@ -306,6 +356,47 @@ try {
   assert(!blocked.ok, "Khai Đàn phải bị từ chối trong lúc bảo trì");
   assert(!blocked.ok && blocked.error.includes("bế quan"), `lỗi phải nói rõ lý do bế quan, nhận: "${!blocked.ok ? blocked.error : ""}"`);
 
+  /**
+   * ── BẬC TRỊ SỰ VẪN KHAI ĐÀN ĐƯỢC (18/08/2026) ───────────────────────────────────────────
+   *
+   * Đo bằng NGƯỜI THẬT mang vai thật, không bằng một đối tượng bịa: `startJob` tra vai qua
+   * `findById`, nên một phép kiểm không đi qua database sẽ không chứng minh được gì về đúng
+   * đoạn dây ấy — mà đoạn dây mới là chỗ hỏng được.
+   *
+   * Nhân chứng là LỜI TỪ CHỐI, không phải một lượt khai đàn thành công: người thử này không có
+   * tài khoản game nào, nên cửa sau nó chặn lại với câu「chưa có tài khoản」. Đúng cái ta cần —
+   * nó chứng minh cửa BẢO TRÌ đã mở, mà không phải dựng cả một tài khoản game giả cùng cookie.
+   */
+  const createdAdmin = await register({
+    username: adminUsername,
+    displayName: "Maintenance verifier (trị sự)",
+    email: `maint-admin+${stamp}@example.com`,
+    password: "verification-password",
+  });
+  if (!createdAdmin.ok) throw new Error(createdAdmin.error);
+  const adminId = createdAdmin.user.id;
+  await sql`insert into user_roles (user_id, role_code) values (${adminId}, ${ADMIN_ROLE_FOR_TEST})
+            on conflict (user_id, role_code) do nothing`;
+
+  const adminTry = await startJob(adminId);
+  assert(
+    !(!adminTry.ok && adminTry.error.includes("bế quan")),
+    `bậc trị sự (${ADMIN_ROLE_FOR_TEST}) PHẢI qua được cửa bế quan, nhận: "${!adminTry.ok ? adminTry.error : "ok"}"`,
+  );
+  assert(
+    !adminTry.ok && adminTry.error.includes("tài khoản"),
+    `…và dừng ở cửa KẾ TIẾP (chưa có tài khoản game), nhận: "${!adminTry.ok ? adminTry.error : "ok"}"`,
+  );
+
+  // Gỡ vai rồi thử lại: cùng một con người, chỉ khác vai — nên nếu lượt này vẫn lọt thì cửa
+  // không đọc vai chút nào, nó chỉ đang mở cho bất kỳ ai.
+  await sql`delete from user_roles where user_id = ${adminId}`;
+  const demoted = await startJob(adminId);
+  assert(
+    !demoted.ok && demoted.error.includes("bế quan"),
+    `gỡ vai xong thì chính người ấy phải bị chặn lại, nhận: "${!demoted.ok ? demoted.error : "ok"}"`,
+  );
+
   // --- Gia hạn: startedAt đứng yên, expectedEndAt dời ---
   const extend = await getAppSettings();
   extend.maintenance = {
@@ -346,7 +437,9 @@ try {
 
   console.log("✔ Tên miền lưu được, đọc lại đúng, và không làm suy suyển cấu hình hàng xóm.");
 } finally {
-  await sql`delete from users where username = ${username}`.catch(
+  // Cả HAI người thử. `user_roles.user_id` mang `on delete cascade`, nên xoá người là vai đi
+  // theo — không còn dòng vai mồ côi nào trỏ vào một user đã biến mất.
+  await sql`delete from users where username in (${username}, ${adminUsername})`.catch(
     (error) => console.error("! Không dọn được tài khoản thử:", error),
   );
 

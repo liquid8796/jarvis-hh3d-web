@@ -11,6 +11,70 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.14 — Chromium thôi tự khai「HeadlessChrome」với Cloudflare
+
+Tông chủ: *"fix lỗi chromium ở các khôi lỗi đang bị CF đánh captcha"*. Sổ `job_events` hôm nay có
+đúng cảnh ấy — ba lượt chạy chết ở dòng「Màn kiểm tra (Cloudflare) của trang game không tự qua」—
+và chỗ rò nằm ở nửa mà `userAgent` **không với tới được**.
+
+**Đè `userAgent` chỉ sửa được một nửa danh tính.** Nó rewrite header `User-Agent` và
+`navigator.userAgent`. Bộ **client hints** — `Sec-CH-UA`, `Sec-CH-UA-Full-Version-List`,
+`navigator.userAgentData` — do CHÍNH BINARY tự khai và không đi theo phép đè ấy. Đo trên VM ngày
+19/08/2026, đúng cấu hình khôi lỗi đang chạy:
+
+```
+user-agent : … Chrome/151.0.0.0 Safari/537.36            ← thứ ta đè
+sec-ch-ua  : "Not=A?Brand";v="99", "HeadlessChrome";v="151", "Chromium";v="151"
+```
+
+Hai dòng nói hai chuyện khác nhau, và dòng thứ hai còn tự xưng là trình duyệt không đầu.
+Cloudflare đối chiếu đúng cặp ấy. Chú thích cũ trong `runCycle.mjs` đã lo về chính phép đối chiếu
+này và ghim số hiệu「151」cho khớp — nhưng nó chỉ khớp được phần SỐ, còn phần THƯƠNG HIỆU thì vẫn
+là lời tự thú, nằm nguyên đó từ đầu.
+
+**Chữa bằng CDP** `Emulation.setUserAgentOverride`, cửa duy nhất Chromium mở cho client hints. Ba
+luật giữ nó khỏi thành một dấu vân tay tự chế:
+
+1. **Mọi con số đọc từ chính binary** (`Browser.getVersion`) — hết ghim tay. Cái ghim「151」từng là
+   một quả bom hẹn giờ: nâng playwright là nó lệch mà không ai thấy. Nay UA, client hints và
+   binary không thể lệch nhau nữa vì cả ba lấy từ một nguồn.
+2. **Chỉ thay đúng chữ「HeadlessChrome」thành「Google Chrome」**, giữ nguyên brand GREASE và
+   「Chromium」của chính bản dựng ấy. Bịa cả danh sách là dựng một dấu vân tay không tồn tại ngoài
+   đời — dễ nhận ra hơn cả cái nó định giấu.
+3. **Hỏng thì KÊU rồi đi tiếp.** Không có phép đè, lượt chạy vẫn chạy (và trước hôm nay nó vẫn
+   chạy như thế) — chỉ dễ ăn captcha hơn. Ném ở đây là đổi một cái bất lợi lấy một lượt chết hẳn.
+
+Phiên CDP cố ý **không** `detach()`: phép đè sống theo phiên, gỡ phiên là trả trang về lời tự thú
+cũ. Nó tự tan khi trang đóng.
+
+**Đo được, trước và sau** (`verify:browser-fingerprint`, máy chủ nội bộ, không chạm mạng — vì
+`127.0.0.1` là secure context nên client hints vẫn được gửi đủ):
+
+```
+sau : "Not=A?Brand";v="99", "Google Chrome";v="151", "Chromium";v="151"
+      user-agent … Chrome/151.0.0.0 …    ← UA · hints · binary cùng một số hiệu
+```
+
+12 phép kiểm, gồm cả ca「UA, client hints và binary phải cùng số hiệu」— thứ sẽ đỏ ở lượt nâng
+playwright sau này, đúng chỗ cái ghim cũ từng trôi lặng lẽ.
+
+**Bản PC nhận cùng bản vá** (`jarvis-hh3d-pc@fa5276f`), và ở đó vết thương còn sâu hơn: UA ghim
+`Chrome/131` trong khi Microsoft.Playwright 1.61.0 ship **Chromium 149.0.7827.55** — lệch 18 đời.
+Đo trên chính bản Chromium ấy bằng đúng khối mã đã port: `sec-ch-ua` nay khai
+`"Google Chrome";v="149"` khớp UA `Chrome/149.0.0.0`. Bản desktop còn áp phép đè cho **cả tab do
+site mở lẫn tab worker tự mở** — phép đè là của từng target, một tab bỏ sót là một tab đi khai
+HeadlessChrome trong khi tab chính thì không.
+
+**Điều KHÔNG hứa:** đây là gỡ một tín hiệu bot **chắc chắn** đang tự phát ra, không phải một lời
+hứa hết captcha. Danh tiếng IP (khôi lỗi GitHub chạy trên dải IP trung tâm dữ liệu) là một yếu tố
+lớn hơn và nằm ngoài tầm mã nguồn. Đo thử ngay lúc vá từ IP của VM thì trang **không** dựng màn
+kiểm tra cho cả bản cũ lẫn bản mới, nên lượt vá này **chưa tái hiện được** cảnh captcha để chứng
+minh kết cục — thứ chứng minh được là tín hiệu đã tắt. Một dấu hiệu ủng hộ: máy nhà của một đạo hữu
+(IP dân cư, không phải trung tâm dữ liệu) cũng ăn màn kiểm tra hôm nay, tức dấu vân tay có phần của
+nó trong đó.
+
+---
+
 ## 1.3.13 — Hỷ Sự Đường có bản VIP (schema hồ sơ 71)
 
 Tông chủ chốt: chép flow Hỷ Sự Đường từ hạng thường sang cho hạng VIP. Và chép ở đây nghĩa là

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.14",
+    date: "2026-08-19",
+    lines: [
+      "Khôi lỗi thôi tự khai với Cloudflare rằng nó là trình duyệt tự động — trước đây nó nói một đằng ở chỗ này, một nẻo ở chỗ kia.",
+      "Nhờ vậy màn kiểm tra「Just a moment」sẽ dựng lên ít hơn, tức bớt những vòng chạy phải bỏ dở vì không qua nổi cổng.",
+      "Bản chạy trên máy nhà cũng được sửa y hệt; hai bên nay khai cùng một danh tính.",
+    ],
+  },
+  {
     version: "1.3.13",
     date: "2026-08-19",
     lines: [

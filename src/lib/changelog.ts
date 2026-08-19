@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.20",
+    date: "2026-08-20",
+    lines: [
+      "Máy chạy tự động nay tự bấm ô kiểm tra của trang khi bị chặn ở cổng, và ghi lại là đã bấm mấy lần.",
+      "Nhờ vậy đọc Hoạt động là biết ngay: chưa từng thử, hay thử rồi mà trang vẫn không cho qua.",
+    ],
+  },
+  {
     version: "1.3.19",
     date: "2026-08-20",
     lines: [

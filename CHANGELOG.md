@@ -11,6 +11,43 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.20 — Bật cú bấm Turnstile cho khôi lỗi tông môn, và bắt nó NÓI RA
+
+Tông chủ báo「vẫn dính」. Bản vá 1.3.19 chạy đúng thiết kế — vòng dừng sau ~25 giây thay vì 16
+phút và gọi đúng tên Cloudflare — nhưng nó chữa *lãng phí*, không chữa *bị chặn*. Lượt này đo
+tiếp và tìm ra hai điều.
+
+**1. Cú bấm Turnstile dựng ở 1.3.18 CHƯA TỪNG CHẠY.** Nó ship mặc định TẮT, và
+`deploy/github/linh-su.yml` không hề đặt `WORKER_SOLVE_TURNSTILE` — nên bốn khôi lỗi tông môn
+chưa một lần thử bấm. Cân nhắc hồi 1.3.18 (tắt mặc định vì「một cú bấm sai chỗ trên hạ tầng CHUNG
+có thể làm Cloudflare nghi hơn」) nay đã đổi: đo 20/08/2026 thì **cả bốn khôi lỗi đều bị chặn,
+`việc xong = 0` suốt ba giờ**. Không còn gì để mất. Bật ở WORKFLOW chứ không đổi mặc định trong
+mã — máy nhà vẫn tự quyết.
+
+**2. Bật một thứ KHÔNG ĐO ĐƯỢC thì bằng không.** Cú bấm chỉ ghi `log.debug`, mà `log.debug` đi
+vào console của runner chứ **không** vào `job_events` — bật lên rồi cũng không ai biết nó có bấm
+hay không, càng không biết bấm xong có qua không. Nên lượt này:
+
+- cú bấm ĐẦU TIÊN của mỗi lượt ghé cổng nói đúng **một** dòng lên Hoạt động (vòng poll chạy mỗi
+  2 giây — nói mỗi nhịp là rác);
+- lời báo cuối kể **đã bấm mấy lần**: phân biệt「chưa từng thử」với「thử rồi mà vẫn không qua」—
+  hai kết luận dẫn tới hai việc phải làm hoàn toàn khác nhau. Không bật cờ thì câu chữ y như cũ.
+
+**Điều thứ ba, không sửa bằng mã được, nhưng là gốc của「vẫn dính」:** đo sổ điểm danh thì cả ba
+máy nhà (`desktop-9jg1gme` 1.2.0, `pc-photo` 1.3.0, `desktop-br33ug2` 1.3.0) đều mang linh phù
+**CÁ NHÂN** — chúng chỉ nhận đàn của chính chủ. Nên mọi đàn của thành viên khác **chỉ** khôi lỗi
+tông môn phục vụ được, mà khôi lỗi tông môn thì nằm trọn trên IP trung tâm dữ liệu của GitHub
+Actions — thứ Cloudflare chặn. Ba máy IP dân dụng đứng không suốt ba giờ trong lúc bốn máy
+datacenter đâm đầu vào tường.
+
+Đường ra không nằm ở mã: chạy **một worker mang `WORKER_TOKEN` tông môn trên máy nhà** là có ngay
+IP dân dụng phục vụ mọi đàn (token quyết định vai trò — xem đầu `scripts/worker.mjs`). Cái giá
+phải cân: token ấy là chìa toàn cục, đặt lên máy nhà là một quyết định của tông chủ, không phải
+của tôi. Và ba máy ấy còn đang chạy bản quá cũ (1.2.0/1.3.0) — thiếu cả bản vá client hints
+(1.3.14) lẫn phép dừng sớm (1.3.19).
+
+---
+
 ## 1.3.19 — Bị chặn ở cổng thì DỪNG NGAY, thay vì mười ba nhiệm vụ cùng đâm vào một bức tường
 
 Tông chủ báo「vẫn lỗi」kèm ảnh, và đoán là cần nâng chờ trang từ 25s lên. Đo trước khi sửa, và số

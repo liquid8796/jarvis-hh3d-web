@@ -1,0 +1,153 @@
+#!/usr/bin/env node
+/**
+ * Lưới cho phép DỪNG SỚM khi trang game dựng màn kiểm tra (Cloudflare) giữa vòng.
+ *
+ * Ca thật đo được 20/08/2026 trên đàn `3ea5ccf0` (khôi lỗi ember-cache-56a7, tài khoản Nhã Vy):
+ * cùng một đàn, cùng một máy, xen kẽ hai loại vòng —
+ *
+ *   05:10  vòng KHOẺ:   mỗi nhiệm vụ ~9 giây, không một lượt treo nào
+ *   14:18  vòng CHẶN:   mọi trang câm, mỗi lượt đúng 25s, 3 lượt mỗi nhiệm vụ
+ *   14:51  vòng CHẶN:   engine gọi ĐÍCH DANH「màn kiểm tra (Cloudflare)」
+ *
+ * Hai loại vòng chặn ấy là CÙNG một sự kiện: chỉ khác ở chỗ cổng đầu vòng có bắt được màn kiểm
+ * tra trên trang chủ hay không. Khi không bắt được, mười ba nhiệm vụ lần lượt tự chứng minh lại
+ * đúng một điều — hết ~16 phút, và giữ ghế khôi lỗi suốt chừng ấy.
+ *
+ * Lưới này chốt: gặp màn kiểm tra thì DỪNG NGAY sau lượt đầu, không thử lại 3 lượt, và nói ra
+ * đúng tên nguyên nhân. Chạy engine THẬT trên Chromium THẬT trước một trang challenge dựng theo
+ * đúng dấu hiệu `readinessProbe` đọc.
+ */
+import { createServer, type Server } from "node:http";
+import { chromium, type Browser } from "playwright-core";
+import { createQuestEngine, CycleBlocked } from "../src/lib/quest-engine/engine.mjs";
+import { createSession } from "../src/lib/quest-engine/session.mjs";
+
+let passed = 0;
+const failures: string[] = [];
+function check(name: string, cond: boolean, detail = "") {
+  if (cond) {
+    passed++;
+    console.log(`  ✓ ${name}`);
+  } else {
+    failures.push(`${name}${detail ? ` — ${detail}` : ""}`);
+    console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ""}`);
+  }
+}
+
+/** Màn "Just a moment" của Cloudflare — đúng hai dấu hiệu readinessProbe đọc: chữ + iframe. */
+const CHALLENGE_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Just a moment...</title></head>
+<body><h1>Checking your browser before accessing the site.</h1>
+<iframe src="https://challenges.cloudflare.com/cdn-cgi/challenge-platform/x/y" style="width:300px;height:65px"></iframe>
+</body></html>`;
+
+/** Trang game bình thường nhưng CHẬM: marker chỉ hiện sau 1,2s — đủ để phân biệt với trang chặn. */
+const SLOW_PAGE = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Nhiệm vụ</title></head>
+<body><div id="wpadminbar"></div><div id="cham"></div>
+<script>setTimeout(() => { const d = document.createElement('div'); d.className = 'nv-quest'; d.textContent = 'Điểm Danh'; document.body.appendChild(d); }, 1200);</script>
+</body></html>`;
+
+/** Trang game hỏng thật: không màn kiểm tra, cũng không bao giờ có marker. */
+const BROKEN_PAGE = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Nhiệm vụ</title></head>
+<body><div id="wpadminbar"></div><p>Trang đang bảo trì.</p></body></html>`;
+
+const questWaiting = (path: string) => ({
+  id: "thu",
+  name: "Thử",
+  enabled: true,
+  kind: "customSteps",
+  requiresVip: false,
+  pagePath: path,
+  steps: [
+    { action: "navigate", text: path, timeoutMs: 15000 },
+    // 3 giây thay vì 25: lưới đo HÀNH VI (dừng sớm hay thử lại), không đo con số.
+    { action: "waitForSelector", selector: ".nv-quest", timeoutMs: 3000 },
+  ],
+});
+
+async function main() {
+  let mode: "challenge" | "slow" | "broken" = "challenge";
+  let hits = 0;
+  const server: Server = createServer((_req, res) => {
+    hits++;
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(mode === "challenge" ? CHALLENGE_PAGE : mode === "slow" ? SLOW_PAGE : BROKEN_PAGE);
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const addr = server.address();
+  if (addr == null || typeof addr === "string") throw new Error("không mở được cổng fixture");
+  const base = `http://127.0.0.1:${addr.port}`;
+
+  let browser: Browser | null = null;
+  try {
+    browser = await chromium.launch({ headless: true });
+    const page = await browser.newContext().then((c) => c.newPage());
+    const logged: string[] = [];
+    const session = createSession(page, {
+      baseUrl: base,
+      minActionDelayMs: 1,
+      maxActionDelayMs: 2,
+      log: { info: (m: string) => logged.push(m), warning: (m: string) => logged.push(m), debug: () => {} },
+    });
+    // Đúng ba kênh engine dùng (info/warning/debug) — thêm `error` là khai một cửa không có thật.
+    const engine = createQuestEngine({
+      log: { info: () => {}, warning: () => {}, debug: () => {} },
+    });
+    const profile = { schemaVersion: 1, quests: [] };
+
+    console.log("Màn kiểm tra giữa vòng — phải DỪNG SỚM");
+    mode = "challenge";
+    hits = 0;
+    let thrown: unknown = null;
+    const t0 = Date.now();
+    try {
+      await engine.run(session, profile, questWaiting("/hub"));
+    } catch (err) {
+      thrown = err;
+    }
+    const elapsed = Date.now() - t0;
+    check("ném CycleBlocked chứ không trả về failed", thrown instanceof CycleBlocked, String(thrown));
+    if (thrown instanceof CycleBlocked) {
+      check(
+        "…lời báo gọi ĐÚNG TÊN nguyên nhân (Cloudflare), không đổ cho selector",
+        thrown.message.includes("Cloudflare") && !thrown.message.includes(".nv-quest"),
+        thrown.message,
+      );
+    }
+    // navigate + 1 lượt chờ. Nếu vẫn thử lại 3 lượt thì phải có 3 lần tải trang.
+    check("chỉ tải trang MỘT lượt, không thử lại 3 lượt", hits === 1, `${hits} lượt tải`);
+    check("…nên dừng trong ~1 lượt chờ, không phải 3", elapsed < 3000 * 2.5, `${elapsed}ms`);
+
+    console.log("\nTrang game CHẬM — không được nhầm là bị chặn");
+    mode = "slow";
+    hits = 0;
+    const slow = await engine.run(session, profile, questWaiting("/hub"));
+    check("trang chậm 1,2s vẫn chạy xong bình thường", slow.outcome !== "failed", `${slow.outcome}: ${slow.message ?? ""}`);
+    check("…và chỉ cần một lượt tải", hits === 1, `${hits} lượt tải`);
+
+    console.log("\nTrang hỏng THẬT (không màn kiểm tra) — giữ nguyên nết cũ: thử lại rồi mới chịu thua");
+    mode = "broken";
+    hits = 0;
+    let brokenThrew: unknown = null;
+    let broken: { outcome?: string; message?: string } = {};
+    try {
+      broken = await engine.run(session, profile, questWaiting("/hub"));
+    } catch (err) {
+      brokenThrew = err;
+    }
+    check("KHÔNG ném CycleBlocked khi chỉ là trang hỏng", brokenThrew === null, String(brokenThrew));
+    check("vẫn kết luận failed như trước", broken.outcome === "failed", `${broken.outcome}`);
+    check("…và vẫn thử đủ 3 lượt (nết cũ không đổi)", hits === 3, `${hits} lượt tải`);
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+    await new Promise<void>((r) => server.close(() => r()));
+  }
+
+  console.log(`\n${passed} thuận, ${failures.length} nghịch.`);
+  for (const f of failures) console.log(`  ✗ ${f}`);
+  if (failures.length > 0) process.exitCode = 1;
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});

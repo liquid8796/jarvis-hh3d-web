@@ -11,6 +11,52 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.19 — Bị chặn ở cổng thì DỪNG NGAY, thay vì mười ba nhiệm vụ cùng đâm vào một bức tường
+
+Tông chủ báo「vẫn lỗi」kèm ảnh, và đoán là cần nâng chờ trang từ 25s lên. Đo trước khi sửa, và số
+liệu **bác giả thuyết ấy** — đây là chỗ đáng ghi nhất của lượt này.
+
+**Bằng chứng, cùng MỘT đàn (`3ea5ccf0`), cùng một khôi lỗi, cùng một tài khoản:**
+
+| giờ | cảnh |
+|---|---|
+| 05:10 | vòng KHOẺ — mỗi nhiệm vụ **~9 giây**, không một lượt treo |
+| 14:18 | vòng CHẶN — mọi trang câm, mỗi lượt **đúng 25s**, 3 lượt mỗi nhiệm vụ |
+| 14:51 | vòng CHẶN — engine gọi **đích danh**「màn kiểm tra (Cloudflare)」|
+| 15:23 | lại câm | 
+| 15:56 | lại đích danh Cloudflare |
+
+Hai loại vòng chặn ấy **là cùng một sự kiện**, chỉ khác ở chỗ cổng đầu vòng có bắt được màn kiểm
+tra trên TRANG CHỦ hay không. Khi không bắt được, cổng báo「phiên đăng nhập còn hiệu lực」rồi thả
+cả vòng vào mười ba nhiệm vụ, mỗi nhiệm vụ tự chứng minh lại đúng một điều.
+
+Nên **25s không phải chỗ thắt**: một vòng khoẻ chỉ cần ~9 giây cho cả navigate + render + đọc,
+tức 25s đã rộng gấp ba. Còn khi bị chặn thì trang KHÔNG BAO GIỜ dựng — nâng lên 60s chỉ biến một
+vòng chết 16 phút thành một vòng chết 39 phút, và giữ ghế khôi lỗi suốt chừng ấy.
+
+**Bản vá.** `CycleBlocked` (engine.mjs) — một kiểu lỗi nói về CẢ VÒNG, cùng lối `QuestAborted`.
+Khi một bước `waitForSelector` gục, trước khi tốn lượt thử lại thứ hai, engine **hỏi lại xem đó
+có còn là trang game không** (`readinessProbe`, phép đọc sẵn có). Gặp màn kiểm tra thì ném
+`CycleBlocked`; `runCycle` bắt, nói đúng tên nguyên nhân, nhả ghế và hẹn vòng sau theo nhịp
+thường.
+
+Ba điều cố ý giữ nguyên: (1) probe **chỉ chạy trên đường hỏng** — đường khoẻ không tốn một mili
+giây nào; (2) probe hỏng hoặc trả `undefined` thì coi như không có màn kiểm tra — một phép chẩn
+đoán không bao giờ được tự nó giết một vòng chạy; (3) trang hỏng THẬT (không màn kiểm tra) vẫn
+thử đủ 3 lượt như cũ.
+
+**Một cái bẫy do chính lưới bắt được:** bản đầu ném `CycleBlocked` từ trong `runCustomSteps`,
+nhưng `engine.run` có một `catch` gói mọi lỗi thành outcome `failed` — chỉ `QuestAborted` được
+xuyên qua. Thế là lệnh dừng bị nuốt thành một dòng nhật ký, và mười hai nhiệm vụ sau vẫn lần lượt
+đâm vào đúng bức tường ấy. Lưới đỏ ngay ca đầu; đã cho `CycleBlocked` xuyên qua cùng lối.
+
+Lưới mới: `npm run verify:challenge-abort` — 9 phép kiểm trên engine THẬT + Chromium THẬT, ba
+fixture: trang challenge (phải dừng sau ĐÚNG một lượt tải, và lời báo phải gọi tên Cloudflare chứ
+không đổ cho `.nv-quest`), trang CHẬM 1,2s (không được nhầm là bị chặn), và trang hỏng thật (vẫn
+thử đủ 3 lượt — nết cũ không đổi).
+
+---
+
 ## 1.3.18 — Tự bấm ô Turnstile khi vấp màn Cloudflare (cách 2, tắt mặc định)
 
 Tông chủ chọn「cách 2」sau khi cân nhắc: chín khôi lỗi đều SỐNG, đúng bản mới, mà vòng nào cũng

@@ -255,6 +255,13 @@ export function activeRuns(body: unknown): ActiveRun[] {
   return out;
 }
 
+/**
+ * Trạng thái GitHub dùng cho một lượt ĐÃ có runner cầm. Chỉ những lượt này mới bị cắt bởi
+ * `reviewRevive` và bởi cửa `evenIfCurrent` của `reviewRestart`: một lượt còn xếp hàng chưa hại
+ * ai, và nó chính là thứ sắp mở một runner mới.
+ */
+const RUNNING_STATUS = "in_progress";
+
 export type RestartVerdict = { go: true; cancel: ActiveRun[]; dispatch: boolean } | { go: false; message: string };
 
 /**
@@ -268,8 +275,18 @@ export type RestartVerdict = { go: true; cancel: ActiveRun[]; dispatch: boolean 
  *    vòng cày là một đạo hữu nào đó chứ không phải người đang gõ lệnh. Cùng hàng rào với luật 2
  *    của `reviewRemoval`.
  *
- * 2. **Chỉ huỷ lượt mang mã CŨ.** Lượt đã `checkout` đúng commit vừa đẩy thì huỷ nó là tự phá
- *    việc mình vừa làm — nó chính là thứ ta muốn có.
+ * 2. **Chỉ huỷ lượt mang mã CŨ** — trừ khi người gọi nói `evenIfCurrent`. Lượt đã `checkout`
+ *    đúng commit vừa đẩy thì huỷ nó là tự phá việc mình vừa làm, nên mặc định nó được chừa.
+ *    Nhưng có một cảnh mà「đúng mã」không còn nghĩa là「đang làm được việc」: runner còn thở,
+ *    còn gõ cửa, chạy đúng bản mới nhất — mà vòng nào cũng gãy, ví dụ khi trang game dựng màn
+ *    kiểm tra Cloudflare và cái IP trung tâm dữ liệu ấy không qua nổi. Lúc đó thứ cần không
+ *    phải mã mới mà là một RUNNER mới (máy khác, IP khác). `reviewRevive` không với tới cảnh
+ *    này vì nó hỏi sổ điểm danh, mà khôi lỗi ấy vẫn điểm danh đều.
+ *
+ *    Cửa mở ấy chỉ cắt lượt ĐANG CHẠY, không cắt lượt đang xếp hàng: `cancel-in-progress:
+ *    false` giữ đúng một-chạy-một-chờ, nên cắt cái đang chạy là lượt chờ vào ca ngay — đã có
+ *    runner mới rồi, phát thêm chỉ tổ dựng hàng đợi hai lượt (cùng lẽ với luật 3 và với cảnh
+ *    thứ tư của `reviewRevive`).
  *
  * 3. **Không phát lượt mới nếu đã có lượt mang mã mới đang chờ.** GitHub tự xếp lịch, và
  *    `concurrency` giữ đúng một lượt chạy + một lượt chờ; nhét thêm một lượt dispatch vào đó chỉ
@@ -283,11 +300,20 @@ export function reviewRestart(input: {
   heldJobs: number;
   force: boolean;
   workerId: string;
+  /**
+   * Cắt cả lượt đang chạy ĐÚNG mã hiện tại — dùng khi thứ cần là một runner mới chứ không phải
+   * một bản mã mới. Không đụng tới hàng rào đàn-đang-giữ: cái giá của một cú cắt không rẻ đi
+   * chỉ vì lượt ấy đang chạy đúng bản.
+   */
+  evenIfCurrent?: boolean;
 }): RestartVerdict {
   const stale = input.runs.filter((run) => run.headSha !== input.headSha);
   const fresh = input.runs.filter((run) => run.headSha === input.headSha);
+  // Lượt đúng mã bị cắt: chỉ cái ĐANG CHẠY. Lượt đang xếp hàng chính là runner mới sắp vào ca.
+  const currentCut = input.evenIfCurrent === true ? fresh.filter((run) => run.status === RUNNING_STATUS) : [];
+  const cancel = [...stale, ...currentCut];
 
-  if (stale.length > 0 && input.heldJobs > 0 && !input.force) {
+  if (cancel.length > 0 && input.heldJobs > 0 && !input.force) {
     return {
       go: false,
       message:
@@ -297,12 +323,15 @@ export function reviewRestart(input: {
     };
   }
 
-  // Không có gì cũ để huỷ VÀ đã có lượt mang mã mới → đứng yên là đúng.
-  if (stale.length === 0 && fresh.length > 0) {
+  // Không có gì để huỷ VÀ đã có lượt mang mã mới → đứng yên là đúng. Ở chế độ `evenIfCurrent`,
+  // cảnh này là「chỉ còn một lượt đang xếp hàng」: nó sắp mở một runner mới, không cần cắt gì.
+  if (cancel.length === 0 && fresh.length > 0) {
     return { go: true, cancel: [], dispatch: false };
   }
 
-  return { go: true, cancel: stale, dispatch: fresh.length === 0 };
+  // Phát lượt mới trừ khi còn một lượt mang mã mới KHÔNG bị cắt — nó sẽ vào ca thay ta.
+  const keptFresh = fresh.length - currentCut.length;
+  return { go: true, cancel, dispatch: keptFresh === 0 };
 }
 
 /**
@@ -359,11 +388,6 @@ export function reviewRestart(input: {
  */
 export const REVIVE_AWAY_MS = 10 * 60 * 1000;
 
-/**
- * Trạng thái GitHub dùng cho một lượt ĐÃ có runner cầm. Chỉ những lượt này mới bị cắt: một lượt
- * còn xếp hàng chưa hại ai, và nó chính là thứ sắp hồi sinh khôi lỗi.
- */
-const RUNNING_STATUS = "in_progress";
 
 export type ReviveVerdict =
   | { go: false; message: string }

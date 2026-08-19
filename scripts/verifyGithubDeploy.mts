@@ -330,6 +330,75 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
     const v = reviewRestart({ runs: [run(1, MOI)], headSha: MOI, heldJobs: 3, force: false, workerId: "w" });
     check("giữ đàn mà không có lượt cũ → vẫn đi tiếp, không đụng gì", v.go && v.cancel.length === 0);
   }
+  // ---- Cửa `evenIfCurrent`: khởi động lại BẤT CHẤP kho đã đúng bản ------------------------
+  // Cảnh sinh ra nó (19/08/2026): runner còn thở, còn điểm danh, chạy đúng bản mới nhất — mà
+  // vòng nào cũng gãy vì trang game dựng màn kiểm tra Cloudflare trước cái IP trung tâm dữ
+  // liệu ấy. `reviewRevive` không với tới (nó hỏi sổ điểm danh, mà khôi lỗi vẫn điểm danh đều),
+  // còn `--restart` thường thì chừa đúng lượt ấy. Thứ cần là một RUNNER khác, không phải mã khác.
+  const queued = (id: number, headSha: string): ActiveRun => ({ id, headSha, number: id, status: "queued" });
+
+  {
+    const v = reviewRestart({
+      runs: [run(1, MOI)], headSha: MOI, heldJobs: 0, force: false, workerId: "w", evenIfCurrent: true,
+    });
+    check("bất chấp mã: lượt đang chạy ĐÚNG bản vẫn bị cắt, và phát lượt mới", v.go && v.cancel.length === 1 && v.dispatch);
+  }
+
+  {
+    // Đã có lượt xếp hàng thì cắt cái đang chạy là đủ: `cancel-in-progress: false` giữ một-chạy-
+    // một-chờ, nên lượt chờ vào ca ngay. Phát thêm ở đây là dựng hàng đợi hai lượt cho một khôi
+    // lỗi — đúng cái bẫy luật 3 và cảnh thứ tư của reviewRevive đã dựng hàng rào.
+    const v = reviewRestart({
+      runs: [run(1, MOI), queued(2, MOI)], headSha: MOI, heldJobs: 0, force: false, workerId: "w", evenIfCurrent: true,
+    });
+    check("bất chấp mã: có lượt xếp hàng → chỉ cắt cái đang chạy, KHÔNG phát thêm", v.go && v.cancel.length === 1 && v.cancel[0].id === 1 && !v.dispatch);
+  }
+
+  {
+    // Chỉ có một lượt đang xếp hàng: nó CHÍNH LÀ runner mới sắp vào ca. Cắt nó rồi phát lại một
+    // lượt y hệt là tự làm chậm mình.
+    const v = reviewRestart({
+      runs: [queued(1, MOI)], headSha: MOI, heldJobs: 0, force: false, workerId: "w", evenIfCurrent: true,
+    });
+    check("bất chấp mã: chỉ có lượt đang xếp hàng → đứng yên", v.go && v.cancel.length === 0 && !v.dispatch);
+  }
+
+  {
+    // Hàng rào đàn-đang-giữ KHÔNG được nới theo: cái giá của một cú cắt không rẻ đi chỉ vì lượt
+    // ấy đang chạy đúng bản. Đây là ca dễ bị bỏ sót nhất khi thêm một cờ mới.
+    const v = reviewRestart({
+      runs: [run(1, MOI)], headSha: MOI, heldJobs: 2, force: false, workerId: "w", evenIfCurrent: true,
+    });
+    check("bất chấp mã + ĐANG GIỮ ĐÀN, không --force → vẫn từ chối", !v.go);
+  }
+
+  {
+    const v = reviewRestart({
+      runs: [run(1, MOI)], headSha: MOI, heldJobs: 2, force: true, workerId: "w", evenIfCurrent: true,
+    });
+    check("…thêm --force thì qua, đúng vai của --force", v.go && v.cancel.length === 1);
+  }
+
+  {
+    const v = reviewRestart({
+      runs: [run(1, CU), run(2, MOI)], headSha: MOI, heldJobs: 0, force: false, workerId: "w", evenIfCurrent: true,
+    });
+    check("bất chấp mã: cắt CẢ lượt mã cũ lẫn lượt đúng bản đang chạy", v.go && v.cancel.length === 2 && v.dispatch);
+  }
+
+  {
+    // ĐỐI CHỨNG, giữ vĩnh viễn: cùng đầu vào mà TẮT cờ thì phán quyết phải y như trước khi có cờ.
+    // Một cờ mới lặng lẽ đổi hành vi mặc định là cách tệ nhất để thêm tính năng.
+    const tat = reviewRestart({ runs: [run(1, MOI)], headSha: MOI, heldJobs: 0, force: false, workerId: "w" });
+    const tatTuongMinh = reviewRestart({
+      runs: [run(1, MOI)], headSha: MOI, heldJobs: 0, force: false, workerId: "w", evenIfCurrent: false,
+    });
+    check(
+      "tắt cờ → đứng yên y như cũ, và vắng mặt cũng bằng đúng false",
+      tat.go && tat.cancel.length === 0 && !tat.dispatch &&
+        JSON.stringify(tat) === JSON.stringify(tatTuongMinh),
+    );
+  }
 
   console.log("\n   activeRuns — đọc thân JSON của GitHub");
   const body = {

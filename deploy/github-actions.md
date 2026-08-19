@@ -597,6 +597,31 @@ npm run github:deploy -- --dry-run          soi kế hoạch, không đẩy gì
 npm run github:deploy -- --repo <tên kho>   đúng một kho (kể cả dòng đang tắt)
 ```
 
+### Ba cờ của lượt KHỞI ĐỘNG LẠI
+
+Đẩy mã lên kho xong thì lượt Actions **đang chạy** vẫn giữ mã cũ tới lượt kế (~4 giờ). Ba cờ dưới
+đây rút ngắn khoảng ấy, và mỗi cờ mở đúng một hàng rào — luật đầy đủ ở `reviewRestart`.
+
+| Cờ | Mở cái gì | Cái giá |
+|---|---|---|
+| `--restart` | huỷ lượt đang chạy **mã CŨ**, phát lượt mới | không có — lượt ấy đằng nào cũng sắp bị thay |
+| `--force` | huỷ cả khi khôi lỗi **đang giữ đàn** | đàn ấy hỏng sau ~3 phút (`reapStaleJobs`), và là đàn của đạo hữu khác |
+| `--even-if-current` | cắt cả lượt đang chạy **ĐÚNG mã hiện tại** | mất phần việc lượt ấy đang làm dở |
+
+`--even-if-current` sinh ra cho cảnh「đúng mã mà vẫn vô dụng」: runner còn thở, còn điểm danh, chạy
+đúng bản mới nhất — mà vòng nào cũng gãy. Ca thật 19/08/2026: trang game dựng màn kiểm tra
+Cloudflare, chín khôi lỗi đều sống mà mọi vòng đều `0 thuận`. Thứ cần lúc đó là một **runner** khác
+(máy khác, IP khác), không phải một bản mã khác. `github:revive` không với tới vì nó hỏi sổ điểm
+danh, mà những khôi lỗi ấy vẫn điểm danh đều.
+
+Nó **không** nới hàng rào đàn-đang-giữ (vẫn cần `--force`), và **không** cắt lượt đang XẾP HÀNG —
+lượt ấy chính là runner mới sắp vào ca; `cancel-in-progress: false` giữ đúng một-chạy-một-chờ nên
+cắt cái đang chạy là đủ. Đi một mình không kèm `--restart` thì script thoát mã 2 kèm lời giải
+thích, chứ không im lặng không làm gì.
+
+Cửa bấm đúp: `force-github-khoiloi.bat` (đã truyền sẵn `--restart --force`), thêm
+`--even-if-current` để bật mode bất chấp.
+
 ### Vì sao mãi tới nay mới có, và vì sao thiếu nó là một cái bẫy
 
 **Kho khôi lỗi là một bản ĐÔNG LẠNH.** Workflow `checkout` chính kho ấy rồi chạy

@@ -17,11 +17,30 @@ REM  Actions mang SHA khac SHA hien tai cua kho (reviewRestart trong
 REM  scripts/githubKhoiloi.mts), nen `--force` khong cat nham mot dan nao dang
 REM  chay tren dung ban moi.
 REM
+REM  ---- MODE THU HAI: --even-if-current (BAT CHAP CO BAN MOI HAY KHONG) ------
+REM
+REM  Mac dinh, mot kho da chay dung ban moi thi khong bi dung toi - dong tong ket
+REM  ghi "khoi dong lai: khong can". Co --even-if-current mo dung cai chua ay:
+REM  cat CA luot dang chay dung ban, roi phat luot moi.
+REM
+REM  DUNG KHI NAO: khi runner con tho, con diem danh, chay dung ban moi nhat MA
+REM  VONG NAO CUNG GAY - vi du trang game dung man kiem tra Cloudflare va cai IP
+REM  trung tam du lieu ay khong qua noi (do 19/08/2026: 9 khoi loi song, moi vong
+REM  deu 0 thuan). Luc do thu can la mot RUNNER khac (may khac, IP khac), khong
+REM  phai mot ban ma khac. `github:revive` khong voi toi canh nay vi no hoi so
+REM  diem danh, ma khoi loi ay van diem danh deu.
+REM
+REM  KHONG NOI HANG RAO DAN-DANG-GIU: van phai them --force neu chap nhan cat
+REM  ngang dan nguoi khac. Script nay von da truyen --force san.
+REM
+REM  Luot dang XEP HANG thi khong bi cat: no chinh la runner moi sap vao ca.
+REM
 REM  CACH DUNG:
-REM     force-github-khoiloi.bat                    moi kho dang chay ma cu
-REM     force-github-khoiloi.bat --repo <ten kho>   dung mot kho
-REM     force-github-khoiloi.bat --yes              khong hoi lai (cho lich chay)
-REM     force-github-khoiloi.bat --no-pause         khong dung o cuoi
+REM     force-github-khoiloi.bat                     moi kho dang chay ma cu
+REM     force-github-khoiloi.bat --even-if-current   ke ca kho da dung ban
+REM     force-github-khoiloi.bat --repo <ten kho>    dung mot kho
+REM     force-github-khoiloi.bat --yes               khong hoi lai (cho lich chay)
+REM     force-github-khoiloi.bat --no-pause          khong dung o cuoi
 REM
 REM  Ten kho lay o bang TONG KET cua deploy-github-khoiloi.bat, vi du
 REM  linh-su-20260813-233056-6143 la kho cua khoiloi-tro-20260813-233056.
@@ -33,6 +52,9 @@ setlocal
 chcp 65001 >nul
 cd /d "%~dp0"
 
+set "BATCHAP="
+echo %* | findstr /i /c:"--even-if-current" >nul && set "BATCHAP=1"
+
 echo [1/2] Xem truoc - buoc nay chi DOC, khong huy gi ca...
 echo.
 call npm run vm -- npm run github:deploy -- --dry-run --restart --force %*
@@ -43,8 +65,12 @@ echo.
 echo ============================================================================
 echo  Doc bang TONG KET o tren:
 echo    "khoi dong lai (se): huy N luot ma cu"  = kho NAY sap bi cat va phat lai
-echo    "khoi dong lai: khong can"              = kho NAY da chay dung ban moi
+if defined BATCHAP echo    "... cat N luot dang chay DUNG ban"     = kho NAY dang chay dung ban ma van bi cat
+if not defined BATCHAP echo    "khoi dong lai: khong can"              = kho NAY da chay dung ban moi
+if defined BATCHAP echo    "khoi dong lai: khong can"              = kho NAY chi con luot dang xep hang
 echo  Dan dang chay tren nhung kho bi cat se hong va phai khai lai.
+if defined BATCHAP echo.
+if defined BATCHAP echo  MODE BAT CHAP DANG BAT: kho da dung ban CUNG bi cat va phat lai.
 echo ============================================================================
 echo.
 

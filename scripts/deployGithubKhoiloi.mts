@@ -100,6 +100,27 @@ const forcedWebUrl = arg("web-url");
  */
 const restart = argv.includes("--restart");
 const force = argv.includes("--force");
+/**
+ * `--even-if-current`: khởi động lại BẤT CHẤP kho đã đúng bản hay chưa.
+ *
+ * Mặc định `--restart` chừa mọi lượt đang chạy đúng mã hiện tại — huỷ chúng là tự phá việc mình
+ * vừa làm. Cờ này mở đúng cái chừa ấy, cho cảnh「đúng mã mà vẫn vô dụng」: runner còn thở, còn
+ * điểm danh, chạy đúng bản mới nhất, mà vòng nào cũng gãy — ví dụ trang game dựng màn kiểm tra
+ * Cloudflare và cái IP trung tâm dữ liệu ấy không qua nổi. Thứ cần lúc đó là một RUNNER khác,
+ * không phải một bản mã khác.
+ *
+ * KHÔNG nới hàng rào đàn-đang-giữ: vẫn phải thêm `--force` nếu chấp nhận cắt ngang đàn người
+ * khác. Luật đầy đủ ở `reviewRestart`.
+ */
+const evenIfCurrent = argv.includes("--even-if-current");
+
+// Cửa ở BIÊN, không nhét xuống dưới: một cờ chỉ có nghĩa trong lượt khởi động lại mà lại đi
+// một mình thì người gõ đang tưởng mình vừa ra một lệnh — im lặng không làm gì là cách tệ nhất
+// để trả lời.
+if (evenIfCurrent && !restart) {
+  console.error("--even-if-current chỉ có nghĩa cùng --restart (nó nới đúng một luật của lượt khởi động lại).");
+  process.exit(2);
+}
 
 const API_ROOT = "https://api.github.com";
 /** Ghim tường minh, cùng lý do với vòng nuôi kho: một API mặc định trôi sang bản sau là hỏng lặng lẽ. */
@@ -437,18 +458,29 @@ async function restartRuns(input: {
     heldJobs: heldByWorker.get(workerId) ?? 0,
     force,
     workerId,
+    evenIfCurrent,
   });
 
   if (!verdict.go) return `khởi động lại: BỎ QUA — ${verdict.message}`;
   if (verdict.cancel.length === 0 && !verdict.dispatch) {
-    return "khởi động lại: không cần — đã có lượt chạy mang đúng mã này";
+    return evenIfCurrent
+      ? "khởi động lại: không cần — đã có lượt đang xếp hàng, nó sẽ mở runner mới"
+      : "khởi động lại: không cần — đã có lượt chạy mang đúng mã này";
   }
+
+  // Gọi ĐÚNG TÊN thứ bị cắt. Trước `--even-if-current` mọi cú cắt đều là「lượt mã cũ」, nay có
+  // thể là một lượt đang chạy đúng bản — đọc nhật ký mà thấy sai tên thì lần sau không ai tin
+  // dòng nào nữa.
+  const oldCode = verdict.cancel.filter((run) => run.headSha !== headSha);
+  const current = verdict.cancel.filter((run) => run.headSha === headSha);
+  const runList = (runs: typeof verdict.cancel) => runs.map((r) => `#${r.number ?? r.id}`).join(", ");
 
   // Lượt chạy khô đi được tới TẬN ĐÂY vì mọi thứ trên đều là phép ĐỌC — nên nó soi được cả phán
   // quyết khởi động lại, chứ không chỉ soi phần đẩy tệp. Chỉ hai lời gọi ghi bên dưới là bị chặn.
   if (dryRun) {
     const se: string[] = [];
-    if (verdict.cancel.length > 0) se.push(`huỷ ${verdict.cancel.length} lượt mã cũ`);
+    if (oldCode.length > 0) se.push(`huỷ ${oldCode.length} lượt mã cũ`);
+    if (current.length > 0) se.push(`cắt ${current.length} lượt đang chạy ĐÚNG bản`);
     if (verdict.dispatch) se.push("phát lượt mới");
     return `khởi động lại (sẽ): ${se.join(", ")}`;
   }
@@ -476,9 +508,8 @@ async function restartRuns(input: {
   }
 
   const parts: string[] = [];
-  if (verdict.cancel.length > 0) {
-    parts.push(`huỷ ${verdict.cancel.length} lượt mã cũ (${verdict.cancel.map((r) => `#${r.number ?? r.id}`).join(", ")})`);
-  }
+  if (oldCode.length > 0) parts.push(`huỷ ${oldCode.length} lượt mã cũ (${runList(oldCode)})`);
+  if (current.length > 0) parts.push(`cắt ${current.length} lượt đang chạy ĐÚNG bản (${runList(current)})`);
   parts.push(dispatched ? "đã phát lượt mới" : "lượt mang mã mới đã nằm chờ sẵn");
   return `khởi động lại: ${parts.join(", ")}`;
 }

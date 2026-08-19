@@ -12,6 +12,11 @@ REM  Doi so deu chuyen thang cho script:
 REM     deploy-github-khoiloi.bat --dry-run          chi in ke hoach, khong day gi
 REM     deploy-github-khoiloi.bat --repo <ten kho>   dung mot kho
 REM     deploy-github-khoiloi.bat --restart          huy luot mang ma cu, phat luot moi
+REM
+REM  Con mot mode nua, cho khi kho DA dung ban ma runner van vo dung (vi du bi
+REM  Cloudflare chan): --even-if-current cat ca luot dang chay dung ban de lay mot
+REM  runner moi. Cua bam dup cua no la force-github-khoiloi.bat; xem section 9 cua
+REM  deploy/github-actions.md.
 REM ============================================================================
 setlocal
 chcp 65001 >nul

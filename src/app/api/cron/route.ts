@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { authorizeCronRequest } from "@/lib/auth/cronSecret";
 import { readControlDoc } from "@/lib/control/read";
 import { purgeExpiredChat } from "@/lib/services/chat";
-import { runKeepalive } from "@/lib/services/githubStations";
+import { runCompanionNurture, runKeepalive } from "@/lib/services/githubStations";
 import { purgeExpiredJobEvents, reapStaleJobs } from "@/lib/services/jobs";
-import { reviewKeepaliveDuty } from "@/lib/validation/githubStations";
+import { reviewCompanionNurtureDuty, reviewKeepaliveDuty } from "@/lib/validation/githubStations";
 
 /**
  * Người quét dọn — cộng đúng MỘT việc không phải quét dọn, thêm vào 12/08/2026.
@@ -24,7 +24,8 @@ import { reviewKeepaliveDuty } from "@/lib/validation/githubStations";
  * nhất ở đây đụng vào thứ NẰM NGOÀI database của trạm này (một kho trên GitHub, dùng chung cho
  * mọi trạm). Sổ kho đi theo mọi lượt chuyển trạm, mọi trạm cùng một cron, mọi trạm cùng có
  * `CRON_SECRET` — nên không có phép gác thì sau lượt chuyển trạm đầu tiên sẽ có hai trạm cùng
- * nuôi một kho mà không thấy nhau. Luật và toàn bộ lý lẽ nằm ở `reviewKeepaliveDuty`.
+ * nuôi một kho mà không thấy nhau. Kho chính fail-open khi control doc chớp; repo phụ mang quota
+ * admin nên fail-closed. Hai luật nằm ở `reviewKeepaliveDuty`/`reviewCompanionNurtureDuty`.
  *
  * Việc thứ ba TỪ 13/08/2026 cũng có đường đi kèm, nhưng không phải trên một trang: nó đi nhờ
  * `/api/worker` (`sweepExpiredJobEventsIfDue`). Trước đó nó chỉ có mỗi cron, và đó là một lỗ
@@ -50,6 +51,9 @@ import { reviewKeepaliveDuty } from "@/lib/validation/githubStations";
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
+  // Budget tính từ ĐẦU request, không phải từ lúc housekeeping đã xong. Nếu ba lượt dọn mất
+  // 20 giây thì phần GitHub chỉ còn 25 giây thật, không được tự tưởng mình vẫn còn nguyên 45.
+  const routeStartedAt = Date.now();
   if (!authorizeCronRequest(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
@@ -68,19 +72,22 @@ export async function GET(request: Request) {
   // Bọc try/catch vì cùng lý lẽ: sổ hỏng, database chớp, GitHub đổ — không việc nào trong số đó
   // được phép biến lượt quét dọn vừa chạy XONG thành một hồi đáp 500 trông như chưa chạy gì.
   //
-  // Và CHỈ trạm đang hoạt động mới nuôi — xem `reviewKeepaliveDuty` để biết vì sao, và vì sao
-  // phép gác này chỉ đặt ở đây chứ không đặt trong `runKeepalive`: ba việc quét dọn phía trên
-  // vô hại khi chạy song song ở nhiều trạm (chúng chỉ đụng dữ liệu của chính database ấy), còn
-  // nuôi kho thì đẩy commit lên một kho DÙNG CHUNG. Hai loại việc khác nhau, hai luật khác nhau.
+  // Duty chỉ đặt ở route TỰ ĐỘNG, không nằm trong service mà nút admin gọi. Ba việc quét dọn phía
+  // trên chỉ đụng database riêng nên vô hại khi nhiều trạm chạy; GitHub là tài nguyên dùng chung.
   let keepalive: unknown;
-  const duty = reviewKeepaliveDuty(process.env.SITE_ID ?? "", (await readControlDoc())?.activeSiteId ?? null);
-  if (!duty.feed) {
+  let companionNurture: unknown;
+  const activeSiteId = (await readControlDoc())?.activeSiteId ?? null;
+  const siteId = process.env.SITE_ID ?? "";
+  const keepaliveDuty = reviewKeepaliveDuty(siteId, activeSiteId);
+  const companionDuty = reviewCompanionNurtureDuty(siteId, activeSiteId);
+
+  if (!keepaliveDuty.feed) {
     // Nói ra bằng cùng hình dạng với nhánh chạy thật: một lượt curl phải phân biệt được
     // "đã ngó, không phải việc của trạm này" với "đã chạy và không có kho nào tới hạn".
-    keepalive = { skipped: true, why: duty.why };
+    keepalive = { skipped: true, why: keepaliveDuty.why };
   } else {
     try {
-      const summary = await runKeepalive();
+      const summary = await runKeepalive({ deadlineAt: routeStartedAt + 10_000 });
       keepalive = {
         checked: summary.checked,
         committed: summary.committed,
@@ -95,5 +102,41 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, swept: true, chat: chat.purged, jobEvents: events, keepalive });
+  // KHÁC kho chính: repo phụ fail-closed. Khi control doc/SITE_ID không xác định, một trạm stale
+  // có thể còn quota 5 trong khi active station vừa đặt 0; thừa commit lúc này là phá cấu hình.
+  if (!companionDuty.feed) {
+    companionNurture = { skipped: true, why: companionDuty.why };
+  } else {
+    // Báo RIÊNG: workflow kho chính và source kho phụ là hai lời hứa khác nhau. Một ledger lỗi
+    // không được biến status khôi lỗi thành đỏ, cũng không được chặn các repo phụ còn lại.
+    try {
+      const summary = await runCompanionNurture({ deadlineAt: routeStartedAt + 45_000 });
+      companionNurture = {
+        checked: summary.checked,
+        pushed: summary.pushed,
+        completed: summary.completed,
+        failed: summary.failed,
+        skipped: summary.skipped,
+        repos: summary.results.map((result) => ({
+          slug: result.slug,
+          ok: result.ok,
+          pushed: result.pushed,
+          ordinal: result.ordinal,
+          target: result.target,
+          note: result.note,
+        })),
+      };
+    } catch (err) {
+      companionNurture = { error: err instanceof Error ? err.message : "lỗi lạ" };
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    swept: true,
+    chat: chat.purged,
+    jobEvents: events,
+    keepalive,
+    companionNurture,
+  });
 }

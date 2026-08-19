@@ -12,7 +12,6 @@
  * Bộ ca ấy nằm ở nhóm 3, và nó là thứ duy nhất bắt được kiểu hỏng thật sự dễ xảy ra: ai đó sửa
  * `REPO_NAME_PREFIX` thành một cái tên nghe hay mà quên mất danh sách cấm.
  */
-import { randomBytes } from "node:crypto";
 import {
   ALL_REPO_NAME_PREFIXES,
   FORBIDDEN_NAME_WORDS,
@@ -22,6 +21,7 @@ import {
   NAME_TAILS,
   PACKAGE_NAME,
   forbiddenWordsIn,
+  randomDistinctSoftwareNames,
   randomSoftwareName,
   reviewGeneratedName,
 } from "./khoiloiNaming.mjs";
@@ -162,12 +162,27 @@ console.log("✔ 400 tên tự sinh đều hợp luật VÀ khớp hình dạng 
 
 /** `pick` tiêm vào được, nên lưới chạy tất định — và ca này chứng minh điều đó. */
 assert(
-  randomSoftwareName(() => 0) === `${NAME_HEADS[0]}-${NAME_TAILS[0]}-0000`,
+  randomSoftwareName(() => 0) === `${NAME_HEADS[0]}-${NAME_TAILS[0]}-0000000000000000`,
   "bộ sinh nhận phép rút tiêm vào, nên lưới kiểm chạy được tất định",
+);
+assert(
+  randomSoftwareName().match(/-[0-9a-f]{16}$/) !== null,
+  "tên đời mới mang đủ 16 hex (64 bit), không lùi về đuôi 4 hex đời cũ",
+);
+
+let collisionDraws = 0;
+const afterCollision = randomDistinctSoftwareNames(
+  1,
+  [`${NAME_HEADS[0]}-${NAME_TAILS[0]}-0000000000000000`],
+  (n) => Math.min(Math.floor(collisionDraws++ / 18), n - 1),
+);
+assert(
+  afterCollision[0] === `${NAME_HEADS[1]}-${NAME_TAILS[1]}-1111111111111111`,
+  "bộ sinh bundle rút lại khi đụng tên loại trừ, nên hai repo trong một bundle luôn khác nhau",
 );
 
 /** Hình dạng phải TỪ CHỐI những cái tên không phải của ta, bằng không bộ lọc xoá là một cái lưới thủng. */
-for (const stranger of ["my-cool-project", "cobalt-relay", "cobalt-relay-4f2ag", "cobaltrelay4f2a", "Cobalt-Relay-4F2A"]) {
+for (const stranger of ["my-cool-project", "cobalt-relay", "cobalt-relay-4f2ag", "cobalt-relay-0123456789abcde", "cobalt-relay-0123456789abcdef0", "cobaltrelay4f2a", "Cobalt-Relay-4F2A"]) {
   assert(!GENERATED_NAME_SHAPE.test(stranger), `hình dạng từ chối「${stranger}」`);
 }
 

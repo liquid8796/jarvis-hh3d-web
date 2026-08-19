@@ -4,10 +4,13 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
 import { decryptSecret, encryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
-import { pingStationBySlug, runKeepalive } from "@/lib/services/githubStations";
+import { pingStationBySlug, runCompanionNurture, runKeepalive } from "@/lib/services/githubStations";
 import { getAppSettings, saveAppSettings, type AppSettings } from "@/lib/services/settings";
 import {
+  DEFAULT_DAILY_PUSHES,
   DEFAULT_WORKFLOW_FILE,
+  MAX_DAILY_PUSHES,
+  MIN_DAILY_PUSHES,
   MS_PER_DAY,
   SCHEDULE_DISABLE_DAYS,
   reviewStationIdentity,
@@ -43,6 +46,17 @@ export type StationView = {
   lastPingOk: boolean | null;
   lastPingNote: string;
   workflowState: string;
+  /** Hai kho phần mềm cùng owner/PAT; chỉ mang dấu vết vận hành, không mang thêm bí mật. */
+  companionRepos: Array<{
+    repo: string;
+    lastNurtureDay: string | null;
+    pushesToday: number;
+    lastPushAt: string | null;
+    lastPushOk: boolean | null;
+    lastPushNote: string;
+  }>;
+  /** Số commit nuôi cần đẩy lên MỖI kho phụ mỗi ngày; 0 là admin tạm dừng. */
+  dailyPushes: number;
   /**
    * Còn bao nhiêu ngày trước mốc tắt lịch, tính từ lượt GHI cuối. `null` = chưa ghi lần nào nên
    * không biết — và「không biết」phải hiện ra đúng như thế, đừng vẽ một con số 60 an tâm giả.
@@ -75,6 +89,15 @@ function viewOf(station: AppSettings["githubStations"][number], now: number): St
     lastPingOk: station.lastPingOk,
     lastPingNote: station.lastPingNote,
     workflowState: station.workflowState,
+    companionRepos: station.companionRepos.map((companion) => ({
+      repo: companion.repo,
+      lastNurtureDay: companion.lastNurtureDay,
+      pushesToday: companion.pushesToday,
+      lastPushAt: companion.lastPushAt,
+      lastPushOk: companion.lastPushOk,
+      lastPushNote: companion.lastPushNote,
+    })),
+    dailyPushes: station.dailyPushes,
     daysToDisable: Number.isNaN(lastCommit)
       ? null
       : Math.max(0, Math.floor(SCHEDULE_DISABLE_DAYS - (now - lastCommit) / MS_PER_DAY)),
@@ -167,6 +190,76 @@ export async function saveGithubStationAction(
   const slug = `${owner}/${repo}`;
   const existing = settings.githubStations.find((s) => stationSlug(s) === slug);
 
+  // Client cũ không gửi trường này: giữ giá trị đang lưu (hoặc mặc định cho kho mới) thay vì
+  // vô tình tạm dừng cả hai kho phụ trong một lượt sửa PAT/WORKER_ID không liên quan.
+  const dailyPushesInput = formData.get("dailyPushes");
+  let dailyPushes = existing?.dailyPushes ?? DEFAULT_DAILY_PUSHES;
+  if (dailyPushesInput !== null) {
+    const raw = String(dailyPushesInput).trim();
+    if (!/^\d+$/.test(raw)) {
+      return {
+        ok: false,
+        message: `Số lượt đẩy mỗi ngày phải là số nguyên từ ${MIN_DAILY_PUSHES} đến ${MAX_DAILY_PUSHES}.`,
+      };
+    }
+    dailyPushes = Number(raw);
+    if (!Number.isSafeInteger(dailyPushes) || dailyPushes < MIN_DAILY_PUSHES || dailyPushes > MAX_DAILY_PUSHES) {
+      return {
+        ok: false,
+        message: `Số lượt đẩy mỗi ngày phải nằm trong khoảng ${MIN_DAILY_PUSHES}–${MAX_DAILY_PUSHES}; chọn 0 để tạm dừng.`,
+      };
+    }
+  }
+
+  const hasCompanionFields = formData.has("companionRepo1") || formData.has("companionRepo2");
+  const submittedCompanionNames = hasCompanionFields
+    ? ["companionRepo1", "companionRepo2"].map((field) => String(formData.get(field) ?? "").trim())
+    : (existing?.companionRepos.map((companion) => companion.repo) ?? []);
+  const submittedFilledCompanionNames = submittedCompanionNames.filter((name) => name.length > 0);
+
+  // Hai kho đi thành một cặp: nhận một tên rồi âm thầm bỏ kho còn lại sẽ làm scheduler chạy
+  // một nửa công việc mà giao diện vẫn trông như đã cấu hình xong.
+  if (submittedFilledCompanionNames.length === 1) {
+    return { ok: false, message: "Cần đủ tên của cả hai kho phần mềm phụ, hoặc để trống cả hai cho kho khôi lỗi cũ." };
+  }
+  if (!existing && submittedFilledCompanionNames.length !== 2) {
+    return { ok: false, message: "Kho khôi lỗi mới cần đúng hai kho phần mềm phụ để nuôi hằng ngày." };
+  }
+
+  const storedCompanions = existing?.companionRepos ?? [];
+  if (storedCompanions.length > 0 && hasCompanionFields) {
+    const storedNames = new Set(storedCompanions.map((companion) => companion.repo.toLowerCase()));
+    const submittedNames = new Set(submittedFilledCompanionNames.map((name) => name.toLowerCase()));
+    const isSamePair =
+      submittedFilledCompanionNames.length === storedCompanions.length &&
+      submittedNames.size === storedNames.size &&
+      [...storedNames].every((name) => submittedNames.has(name));
+    if (!isSamePair) {
+      return {
+        ok: false,
+        message: "Cặp kho phụ là danh tính đã khoá; không thể đổi tên hoặc xoá qua form sửa kho.",
+      };
+    }
+  }
+
+  // Tên gửi lên chỉ là bằng chứng request vẫn trỏ đúng cặp cũ. Luôn dùng bản canonical đang lưu
+  // để một request đổi hoa/thường (hoặc đảo hai ô) không đổi danh tính repo hay tách trace khỏi repo.
+  // Station đời cũ có mảng rỗng là ngoại lệ duy nhất: nó được bổ sung đúng hai repo trong một lượt.
+  const filledCompanionNames =
+    storedCompanions.length > 0
+      ? storedCompanions.map((companion) => companion.repo)
+      : submittedFilledCompanionNames;
+  for (const [index, companionRepo] of filledCompanionNames.entries()) {
+    const companionComplaint = reviewStationIdentity(owner, companionRepo, DEFAULT_WORKFLOW_FILE);
+    if (companionComplaint) {
+      return { ok: false, message: `Kho phần mềm phụ ${index + 1}: ${companionComplaint}` };
+    }
+  }
+  const distinctRepos = new Set([repo, ...filledCompanionNames].map((name) => name.toLowerCase()));
+  if (distinctRepos.size !== 1 + filledCompanionNames.length) {
+    return { ok: false, message: "Kho khôi lỗi và hai kho phần mềm phụ phải có ba tên khác nhau." };
+  }
+
   if (!existing && patInput.length === 0) {
     return { ok: false, message: "Kho mới cần một PAT — không có chìa thì không nuôi được." };
   }
@@ -196,6 +289,18 @@ export async function saveGithubStationAction(
     lastPingOk: existing?.lastPingOk ?? null,
     lastPingNote: existing?.lastPingNote ?? "",
     workflowState: existing?.workflowState ?? "",
+    dailyPushes,
+    companionRepos:
+      storedCompanions.length > 0
+        ? storedCompanions.map((companion) => ({ ...companion }))
+        : filledCompanionNames.map((companionRepo) => ({
+            repo: companionRepo,
+            lastNurtureDay: null,
+            pushesToday: 0,
+            lastPushAt: null,
+            lastPushOk: null,
+            lastPushNote: "",
+          })),
   };
 
   settings.githubStations = existing
@@ -229,7 +334,9 @@ export async function deleteGithubStationAction(
   revalidatePath("/admin");
   return {
     ok: true,
-    message: `Đã xoá kho「${slug}」khỏi sổ. Kho trên GitHub không bị đụng tới — chỉ là từ nay không ai nuôi nó nữa.`,
+    message:
+      `Đã xoá station「${slug}」khỏi sổ. Repo khôi lỗi và cặp repo software trên GitHub đều ` +
+      "được giữ nguyên; từ nay vòng tự động không nuôi repo nào trong bundle ấy nữa.",
   };
 }
 
@@ -249,27 +356,46 @@ export async function pingGithubStationAction(
 }
 
 /**
- * Nút「Chạy vòng nuôi」— chính xác thứ /api/cron chạy mỗi ngày, chỉ khác là do người bấm.
+ * Nút「Chạy vòng nuôi」— cùng HAI vòng kho chính + repo phụ mà /api/cron chạy mỗi ngày, chỉ
+ * khác là do người bấm nên không qua cửa gác trạm đang hoạt động.
  *
  * `force: false` có chủ ý: đây là nút để DIỄN TẬP lượt cron và xem nó nói gì, không phải để ép
  * bốn kho cùng nhận một commit. Muốn ép một kho thì đã có nút「Nuôi ngay」của riêng dòng ấy.
+ * Hai deadline chép đúng phần ngân sách GitHub của cron: tránh ghép hai vòng 40 giây thành một
+ * server action 80 giây. Repo bị partial/skipped phải chạy lại trong CÙNG ngày nếu muốn đủ quota;
+ * ngày mai mở quota mới chứ không bù số commit còn thiếu của hôm nay.
  */
 export async function runKeepaliveAction(
   _prev: StationResult | null,
   _formData: FormData,
 ): Promise<StationResult> {
   await requireStationManage();
-  const summary = await runKeepalive();
+  const startedAt = Date.now();
+  const summary = await runKeepalive({ deadlineAt: startedAt + 10_000 });
+  const companionSummary = await runCompanionNurture({ deadlineAt: startedAt + 45_000 });
   revalidatePath("/admin");
 
-  if (summary.checked === 0) {
-    return { ok: true, message: "Không có kho nào đang bật trong sổ — vòng nuôi không có việc gì để làm." };
-  }
-  const parts = [
-    `Đã ngó ${summary.checked} kho`,
-    `ghi mốc ${summary.committed}`,
+  const primaryParts = [
+    summary.checked === 0 ? "Kho chính: không có kho đang bật để ngó" : `Kho chính: đã ngó ${summary.checked} kho`,
+    summary.checked > 0 ? `ghi mốc ${summary.committed}` : null,
     summary.failed > 0 ? `HỎNG ${summary.failed}` : null,
     summary.skipped > 0 ? `bỏ lại ${summary.skipped} vì hết ngân sách thời gian` : null,
   ].filter((part) => part !== null);
-  return { ok: summary.failed === 0, message: `${parts.join(", ")}. Chi tiết từng kho ở danh sách trên.` };
+
+  const companionParts = [
+    companionSummary.checked === 0
+      ? "Repo phụ: chưa có repo đang bật để nuôi"
+      : `Repo phụ: đã xét ${companionSummary.checked} repo`,
+    companionSummary.checked > 0 ? `đẩy ${companionSummary.pushed} commit` : null,
+    companionSummary.checked > 0 ? `đạt quota ${companionSummary.completed}` : null,
+    companionSummary.failed > 0 ? `HỎNG ${companionSummary.failed}` : null,
+    companionSummary.skipped > 0
+      ? `bỏ lại ${companionSummary.skipped} vì hết ngân sách thời gian`
+      : null,
+  ].filter((part) => part !== null);
+
+  return {
+    ok: summary.failed === 0 && companionSummary.failed === 0,
+    message: `${primaryParts.join(", ")}. ${companionParts.join(", ")}. Chi tiết từng kho ở danh sách trên.`,
+  };
 }

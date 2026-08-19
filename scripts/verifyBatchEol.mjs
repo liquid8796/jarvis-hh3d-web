@@ -44,11 +44,13 @@ const assert = (condition, message) => {
   return true;
 };
 
-/** Đếm kết dòng của một buffer. `bareLf` > 0 nghĩa là cmd.exe sẽ trôi offset. */
+/** Đếm kết dòng của một buffer. Bất kỳ CR/LF đứng một mình nào cũng làm tệp không còn CRLF thuần. */
 const countEol = (buf) => {
-  const crlf = buf.toString("latin1").split("\r\n").length - 1;
-  const lf = buf.toString("latin1").split("\n").length - 1 - crlf;
-  return { crlf, bareLf: lf };
+  const text = buf.toString("latin1");
+  const crlf = text.split("\r\n").length - 1;
+  const lf = text.split("\n").length - 1;
+  const cr = text.split("\r").length - 1;
+  return { crlf, bareLf: lf - crlf, bareCr: cr - crlf };
 };
 
 // ---- 1. Chính phép đo phải bắt được LF trần -----------------------------------------------------
@@ -58,6 +60,7 @@ const countEol = (buf) => {
 assert(countEol(Buffer.from("a\r\nb\r\n")).bareLf === 0, "phép đo: CRLF thuần → 0 LF trần");
 assert(countEol(Buffer.from("a\nb\n")).bareLf === 2, "phép đo: LF thuần → đếm đủ LF trần");
 assert(countEol(Buffer.from("a\r\nb\nc\r\n")).bareLf === 1, "phép đo: pha trộn → bắt đúng dòng lạc");
+assert(countEol(Buffer.from("a\rb\r\n")).bareCr === 1, "phép đo: CR đứng một mình cũng bị bắt");
 assert(countEol(Buffer.from("")).bareLf === 0, "phép đo: tệp rỗng không phải lỗi");
 
 // ---- 2. Luật lúc checkout còn nguyên ------------------------------------------------------------
@@ -88,12 +91,12 @@ for (const file of tracked) {
     missing.push(file);
     continue;
   }
-  const { crlf, bareLf } = countEol(readFileSync(file));
+  const { crlf, bareLf, bareCr } = countEol(readFileSync(file));
   assert(
-    bareLf === 0,
-    bareLf === 0
-      ? `${file} — ${crlf} dòng CRLF, không dòng nào thiếu \\r`
-      : `${file} — ${bareLf} dòng LF TRẦN: cmd.exe sẽ trôi offset và vỡ ở cú goto đầu tiên. ` +
+    bareLf === 0 && bareCr === 0,
+    bareLf === 0 && bareCr === 0
+      ? `${file} — ${crlf} dòng CRLF, không CR/LF nào đứng một mình`
+      : `${file} — ${bareLf} LF trần + ${bareCr} CR trần: tệp không còn CRLF thuần. ` +
         `Chữa: xoá tệp rồi \`git checkout -- ${file}\` để bộ lọc eol=crlf dựng lại.`,
   );
 }

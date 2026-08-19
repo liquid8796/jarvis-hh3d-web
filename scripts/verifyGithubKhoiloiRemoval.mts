@@ -131,6 +131,10 @@ const candidate = (over: Partial<Candidate> = {}): Candidate => ({
 // ---- Bộ lọc tên -------------------------------------------------------------------------------
 {
   ok(looksLikeKhoiloiRepoName("cobalt-relay-ab12"), "tên tự sinh đời mới (hai từ + 4 hex) khớp bộ lọc");
+  ok(
+    looksLikeKhoiloiRepoName("cobalt-relay-0123456789abcdef"),
+    "tên tự sinh 64-bit (hai từ + 16 hex) khớp bộ lọc mà không làm mất tên 4-hex đời cũ",
+  );
   ok(looksLikeKhoiloiRepoName("LINH-SU-XYZ"), "so khớp KHÔNG phân biệt hoa thường");
   ok(!looksLikeKhoiloiRepoName("mot-kho-cua-nguoi-khac"), "tên lạ không lọt vào danh sách ứng viên");
 

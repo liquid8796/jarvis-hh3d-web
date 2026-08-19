@@ -1,14 +1,19 @@
+import { randomBytes, randomUUID } from "node:crypto";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { getAppSettings, saveAppSettings, type AppSettings } from "@/lib/services/settings";
 import {
   HEARTBEAT_PATH,
   KEEPALIVE_INTERVAL_DAYS,
+  MAX_DAILY_PUSHES,
   MS_PER_DAY,
+  REVISION_LEDGER_PATH,
   SCHEDULE_DISABLE_DAYS,
   explainFailure,
   isCommitDue,
   keepaliveOrder,
+  nurtureDayKey,
   parseWorkflowState,
+  reviewCompanionRepos,
   stationSlug,
   type WorkflowState,
 } from "@/lib/validation/githubStations";
@@ -84,6 +89,7 @@ const REQUEST_TIMEOUT_MS = 10_000;
 const LOOP_BUDGET_MS = 40_000;
 
 type Station = AppSettings["githubStations"][number];
+type CompanionRepo = Station["companionRepos"][number];
 
 /** Kết quả của một kho, đủ để ghi sổ lẫn để hiện lên tab admin. */
 export type StationPing = {
@@ -105,13 +111,23 @@ export type StationPing = {
 class StationError extends Error {}
 
 type GithubReply = { status: number; body: unknown };
+type GithubCallOptions = { deadlineAt?: number };
 
 async function callGithub(
   pat: string,
   method: "GET" | "PUT",
   path: string,
   payload?: Record<string, unknown>,
+  options: GithubCallOptions = {},
 ): Promise<GithubReply> {
+  const remaining = options.deadlineAt === undefined ? REQUEST_TIMEOUT_MS : options.deadlineAt - Date.now();
+  if (remaining <= 0) {
+    throw new StationError(`Hết ngân sách khi chuẩn bị ${method} ${path}.`);
+  }
+  // Mỗi request chịu CẢ trần riêng 10 giây lẫn deadline chung của route. Không làm thế thì một
+  // batch bắt đầu sát giây 45 vẫn có thể giữ ba fetch sống tới giây 55 rồi PUT tiếp ở repo khác.
+  const timeoutMs = Math.max(1, Math.floor(Math.min(REQUEST_TIMEOUT_MS, remaining)));
+  const deadlineBound = options.deadlineAt !== undefined && remaining <= REQUEST_TIMEOUT_MS;
   let response: Response;
   try {
     response = await fetch(`${API_ROOT}${path}`, {
@@ -127,13 +143,19 @@ async function callGithub(
       // Nhịp nuôi kho phải thấy sự thật HÔM NAY. Next.js vá `fetch` để nhớ mặc định, và một
       // trạng thái workflow được nhớ lại là một lượt tự chữa không bao giờ nổ ra.
       cache: "no-store",
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
     // `AbortSignal.timeout` ném `TimeoutError`; đứt mạng ném `TypeError`. Cả hai đều tới đây,
     // và cả hai đều phải nói ra ĐANG GỌI GÌ — một dòng「fetch failed」trần trụi trên tab admin
     // thì không ai lần được ra bước nào hỏng.
-    const reason = err instanceof Error && err.name === "TimeoutError" ? `quá ${REQUEST_TIMEOUT_MS / 1000}s không trả lời` : err instanceof Error ? err.message.slice(0, 120) : "lỗi lạ";
+    const deadlineExpired = options.deadlineAt !== undefined && Date.now() >= options.deadlineAt;
+    const timedOut = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+    if (timedOut && (deadlineExpired || deadlineBound)) {
+      throw new StationError(`Hết ngân sách khi ${method} ${path}.`);
+    }
+    const wait = timeoutMs >= 1_000 ? `${(timeoutMs / 1_000).toFixed(timeoutMs % 1_000 === 0 ? 0 : 1)}s` : `${timeoutMs}ms`;
+    const reason = timedOut ? `quá ${wait} không trả lời` : err instanceof Error ? err.message.slice(0, 120) : "lỗi lạ";
     throw new StationError(`${method} ${path} không tới được GitHub (${reason})`);
   }
 
@@ -150,10 +172,258 @@ async function callGithub(
   return { status: response.status, body };
 }
 
+/**
+ * Dấu nguồn sự thật nằm ngay trong `src/generated/revision-ledger.ts` của kho phụ.
+ *
+ * Database chỉ giữ bản sao để trang admin vẽ nhanh. Cron luôn đọc lại hai trường này từ GitHub
+ * trước khi ghi: nếu PUT thứ ba đã thành nhưng lượt ghi settings sau đó hỏng, lượt cron kế tiếp
+ * sẽ thấy ordinal = 3 và chỉ viết 4, 5 — không tạo tám commit trong cùng một ngày.
+ */
+export type RevisionLedgerMark = { day: string; ordinal: number };
+
+export function parseRevisionLedger(source: string): RevisionLedgerMark | null {
+  const day = /\bday:\s*"([^"]*)"/.exec(source)?.[1];
+  const ordinalRaw = /\bordinal:\s*(\d+)/.exec(source)?.[1];
+  if (day === undefined || ordinalRaw === undefined) {
+    return null;
+  }
+  const ordinal = Number(ordinalRaw);
+  // `day: ""` + ordinal 0 là hình bootstrap mà generator rải vào kho mới.
+  if ((day !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(day)) || !Number.isSafeInteger(ordinal) || ordinal < 0) {
+    return null;
+  }
+  return { day, ordinal };
+}
+
+/**
+ * Mã TypeScript hoàn chỉnh của một revision. Nội dung và câu chú thích đều tiếng Anh vì đây là
+ * source công khai của một software repo, không phải một mẩu trạng thái nội bộ của control plane.
+ */
+export function renderRevisionLedger(day: string, ordinal: number, at: Date, revision: string = randomUUID()): string {
+  const noise = randomBytes(6);
+  const ratio = (offset: number) => (0.5 + noise.readUInt16BE(offset) / 131_070).toFixed(4);
+  return [
+    "/**",
+    " * Runtime revision metadata generated by the repository maintenance pipeline.",
+    " * The application imports this value so every revision remains part of the compiled source.",
+    " */",
+    "export type RevisionLedger = Readonly<{",
+    "  day: string;",
+    "  ordinal: number;",
+    "  revision: string;",
+    "  generatedAt: string;",
+    "  signals: Readonly<{ confidence: number; coverage: number; entropy: number }>;",
+    "}>;",
+    "",
+    "export const revisionLedger: RevisionLedger = {",
+    `  day: "${day}",`,
+    `  ordinal: ${ordinal},`,
+    `  revision: "${revision}",`,
+    `  generatedAt: "${at.toISOString()}",`,
+    "  signals: {",
+    `    confidence: ${ratio(0)},`,
+    `    coverage: ${ratio(2)},`,
+    `    entropy: ${ratio(4)},`,
+    "  },",
+    "};",
+    "",
+  ].join("\n");
+}
+
+export type CompanionNurtureResult = {
+  /** Kho khôi lỗi cha — khoá để vá đúng station trong document settings. */
+  stationSlug: string;
+  /** Kho software được đẩy source. */
+  repo: string;
+  slug: string;
+  day: string;
+  target: number;
+  /** Ordinal cuối đọc/ghi được từ GitHub; null = chưa đọc nổi ledger. */
+  ordinal: number | null;
+  pushed: number;
+  ok: boolean;
+  note: string;
+};
+
+function companionResult(
+  station: Station,
+  companion: CompanionRepo,
+  day: string,
+  target: number,
+  over: Pick<CompanionNurtureResult, "ordinal" | "pushed" | "ok" | "note">,
+): CompanionNurtureResult {
+  return {
+    stationSlug: stationSlug(station),
+    repo: companion.repo,
+    slug: `${station.owner}/${companion.repo}`,
+    day,
+    target,
+    ...over,
+  };
+}
+
+/**
+ * Nuôi MỘT software repo tới đúng quota hôm nay.
+ *
+ * Một GET đầu vòng lấy cả content lẫn blob sha. Mỗi PUT kế tiếp trả blob sha mới, nên năm commit
+ * chỉ tốn sáu request chứ không mười; vẫn tuần tự vì PUT thứ n+1 bắt buộc mang sha của thứ n.
+ */
+export async function nurtureCompanionRepo(
+  station: Station,
+  companion: CompanionRepo,
+  now: Date,
+  options: { deadlineAt?: number } = {},
+): Promise<CompanionNurtureResult> {
+  const day = nurtureDayKey(now);
+  const target = station.dailyPushes;
+  const nameComplaint = reviewCompanionRepos(station.repo, [companion.repo]);
+  if (nameComplaint) {
+    return companionResult(station, companion, day, target, {
+      ordinal: null,
+      pushed: 0,
+      ok: false,
+      note: nameComplaint,
+    });
+  }
+
+  // 0 là van riêng của kho software. Không gọi GitHub, cũng không bắt PAT phải còn sống chỉ để
+  // xác nhận một quyết định "đừng đẩy" đã nằm ngay trong settings.
+  if (target === 0) {
+    const remembered = companion.lastNurtureDay === day ? companion.pushesToday : 0;
+    return companionResult(station, companion, day, target, {
+      ordinal: remembered,
+      pushed: 0,
+      ok: true,
+      note: "Đang tạm ngừng nuôi kho phụ (0 commit/ngày).",
+    });
+  }
+
+  if (!isEncrypted(station.pat)) {
+    return companionResult(station, companion, day, target, {
+      ordinal: null,
+      pushed: 0,
+      ok: false,
+      note: "Phong bì PAT hỏng hoặc trống — dán lại PAT ở form Sửa kho.",
+    });
+  }
+
+  let pat: string;
+  try {
+    pat = decryptSecret(station.pat);
+  } catch {
+    return companionResult(station, companion, day, target, {
+      ordinal: null,
+      pushed: 0,
+      ok: false,
+      note: "Không giải mã được PAT — kiểm tra ENCRYPTION_KEY rồi dán lại PAT.",
+    });
+  }
+
+  const path = `/repos/${encodeURIComponent(station.owner)}/${encodeURIComponent(companion.repo)}/contents/${REVISION_LEDGER_PATH}`;
+  let ordinal: number | null = null;
+  let pushed = 0;
+
+  try {
+    if (Date.now() >= (options.deadlineAt ?? Number.POSITIVE_INFINITY)) {
+      throw new StationError("Hết ngân sách thời gian trước khi đọc ledger.");
+    }
+    const current = await callGithub(pat, "GET", path, undefined, options);
+    if (current.status !== 200) {
+      throw new StationError(explainFailure(current.status, current.body, `đọc ${REVISION_LEDGER_PATH} của kho phụ`));
+    }
+    if (Array.isArray(current.body)) {
+      throw new StationError(`${REVISION_LEDGER_PATH} là một thư mục, không phải tệp source.`);
+    }
+
+    const body = current.body as { sha?: unknown; content?: unknown; encoding?: unknown } | null;
+    if (typeof body?.sha !== "string" || typeof body.content !== "string" || body.encoding !== "base64") {
+      throw new StationError(`GitHub không trả đủ sha/content base64 của ${REVISION_LEDGER_PATH}.`);
+    }
+    let blobSha = body.sha;
+    const source = Buffer.from(body.content.replace(/\s/g, ""), "base64").toString("utf8");
+    const mark = parseRevisionLedger(source);
+    if (!mark) {
+      throw new StationError(
+        `${REVISION_LEDGER_PATH} không đúng contract (thiếu day/ordinal) — khôi phục tệp do generator tạo rồi chạy lại.`,
+      );
+    }
+    if (mark.day > day) {
+      throw new StationError(`Ledger đang ở ngày tương lai ${mark.day}; máy chủ hôm nay là ${day}, dừng để không đẩy trùng.`);
+    }
+    let currentOrdinal = mark.day === day ? mark.ordinal : 0;
+    ordinal = currentOrdinal;
+
+    if (currentOrdinal >= target) {
+      return companionResult(station, companion, day, target, {
+        ordinal: currentOrdinal,
+        pushed,
+        ok: true,
+        note: `Đã đủ ${currentOrdinal}/${target} commit hôm nay; không đẩy trùng.`,
+      });
+    }
+
+    while (currentOrdinal < target) {
+      if (Date.now() >= (options.deadlineAt ?? Number.POSITIVE_INFINITY)) {
+        throw new StationError(
+          `Hết ngân sách sau ${currentOrdinal}/${target} revision.`,
+        );
+      }
+      const next: number = currentOrdinal + 1;
+      const written = await callGithub(pat, "PUT", path, {
+        message: `chore: advance revision ledger ${day} (${next}/${target})`,
+        content: Buffer.from(renderRevisionLedger(day, next, now), "utf8").toString("base64"),
+        sha: blobSha,
+      }, options);
+      if (written.status !== 200) {
+        throw new StationError(explainFailure(written.status, written.body, `ghi revision ${next}/${target} vào kho phụ`));
+      }
+
+      currentOrdinal = next;
+      ordinal = currentOrdinal;
+      pushed += 1;
+      if (currentOrdinal < target) {
+        const nextSha = (written.body as { content?: { sha?: unknown } } | null)?.content?.sha;
+        if (typeof nextSha !== "string") {
+          throw new StationError(
+            `GitHub đã nhận revision ${currentOrdinal}/${target} nhưng không trả blob sha mới.`,
+          );
+        }
+        blobSha = nextSha;
+      }
+    }
+
+    return companionResult(station, companion, day, target, {
+      ordinal: currentOrdinal,
+      pushed,
+      ok: true,
+      note: `Đã đẩy ${pushed} commit source; đủ ${currentOrdinal}/${target} hôm nay.`,
+    });
+  } catch (err) {
+    const rawNote =
+      err instanceof StationError
+        ? err.message
+        : `Lỗi không lường trước khi nuôi ${station.owner}/${companion.repo} (${err instanceof Error ? `${err.name}: ${err.message.slice(0, 180)}` : "không có câu chữ"})`;
+    const retryToday =
+      rawNote.startsWith("Hết ngân sách") || (ordinal !== null && ordinal < target)
+        ? " Chạy lại vòng nuôi trong cùng ngày để hoàn tất quota hôm nay; ngày sau bắt đầu quota mới, không bù lượt cũ."
+        : "";
+    return companionResult(station, companion, day, target, {
+      ordinal,
+      pushed,
+      ok: false,
+      note: `${rawNote}${retryToday}`,
+    });
+  }
+}
+
 /** Trạng thái lịch của workflow. Đây cũng là phép thử PAT: hỏng ở đây thì khỏi ghi gì cả. */
-async function readWorkflowState(station: Station, pat: string): Promise<WorkflowState> {
+async function readWorkflowState(
+  station: Station,
+  pat: string,
+  options: GithubCallOptions = {},
+): Promise<WorkflowState> {
   const path = `/repos/${encodeURIComponent(station.owner)}/${encodeURIComponent(station.repo)}/actions/workflows/${encodeURIComponent(station.workflowFile)}`;
-  const reply = await callGithub(pat, "GET", path);
+  const reply = await callGithub(pat, "GET", path, undefined, options);
   if (reply.status !== 200) {
     throw new StationError(explainFailure(reply.status, reply.body, `hỏi trạng thái workflow ${station.workflowFile}`));
   }
@@ -161,9 +431,9 @@ async function readWorkflowState(station: Station, pat: string): Promise<Workflo
 }
 
 /** Bật lại một lịch GitHub đã tắt. 204 là xong; gọi lên một workflow đang bật cũng vẫn 204. */
-async function enableWorkflow(station: Station, pat: string): Promise<void> {
+async function enableWorkflow(station: Station, pat: string, options: GithubCallOptions = {}): Promise<void> {
   const path = `/repos/${encodeURIComponent(station.owner)}/${encodeURIComponent(station.repo)}/actions/workflows/${encodeURIComponent(station.workflowFile)}/enable`;
-  const reply = await callGithub(pat, "PUT", path);
+  const reply = await callGithub(pat, "PUT", path, undefined, options);
   if (reply.status !== 204) {
     throw new StationError(explainFailure(reply.status, reply.body, "bật lại lịch workflow"));
   }
@@ -192,10 +462,15 @@ function heartbeatBody(now: Date): string {
  * 422. Vì thế 404 ở lượt đọc KHÔNG phải lỗi mà là một nhánh hợp lệ — lần nuôi đầu tiên của một
  * kho mới dựng luôn đi qua đó.
  */
-async function commitHeartbeat(station: Station, pat: string, now: Date): Promise<string> {
+async function commitHeartbeat(
+  station: Station,
+  pat: string,
+  now: Date,
+  options: GithubCallOptions = {},
+): Promise<string> {
   const path = `/repos/${encodeURIComponent(station.owner)}/${encodeURIComponent(station.repo)}/contents/${HEARTBEAT_PATH}`;
 
-  const current = await callGithub(pat, "GET", path);
+  const current = await callGithub(pat, "GET", path, undefined, options);
   let sha: string | undefined;
   if (current.status === 200) {
     const body = current.body;
@@ -220,7 +495,7 @@ async function commitHeartbeat(station: Station, pat: string, now: Date): Promis
     // Vắng `branch` = nhánh mặc định của kho. Ghim "main" ở đây là hẹn ngày hỏng với một kho
     // trót đặt tên nhánh khác, mà GitHub thì đã biết sẵn nhánh mặc định là nhánh nào.
     ...(sha ? { sha } : {}),
-  });
+  }, options);
   // 201 khi tạo mới, 200 khi ghi đè — cả hai đều là một commit thật.
   if (written.status !== 200 && written.status !== 201) {
     throw new StationError(explainFailure(written.status, written.body, `ghi ${HEARTBEAT_PATH}`));
@@ -276,7 +551,12 @@ function urgencyNote(lastCommitAt: string | null, now: Date): string {
  * `disabled_manually` — nút của admin là để thúc nhanh một việc vẫn đúng, không phải để phá một
  * hàng rào.
  */
-export async function pingStation(station: Station, now: Date, force: boolean): Promise<StationPing> {
+export async function pingStation(
+  station: Station,
+  now: Date,
+  force: boolean,
+  options: GithubCallOptions = {},
+): Promise<StationPing> {
   const slug = stationSlug(station);
 
   if (!isEncrypted(station.pat)) {
@@ -293,7 +573,7 @@ export async function pingStation(station: Station, now: Date, force: boolean): 
   }
 
   try {
-    const state = await readWorkflowState(station, pat);
+    const state = await readWorkflowState(station, pat, options);
 
     if (state === "disabled_manually") {
       return {
@@ -310,8 +590,8 @@ export async function pingStation(station: Station, now: Date, force: boolean): 
     if (state === "disabled_inactivity") {
       // Ngã rồi thì dựng dậy VÀ ghi mốc ngay, bất kể còn hạn hay không: bật lại mà không có
       // hoạt động mới thì kho vẫn đang đứng ở ngày thứ 60, và lượt tắt kế tiếp tới rất nhanh.
-      await enableWorkflow(station, pat);
-      const sha = await commitHeartbeat(station, pat, now);
+      await enableWorkflow(station, pat, options);
+      const sha = await commitHeartbeat(station, pat, now, options);
       return {
         slug,
         ok: true,
@@ -334,7 +614,7 @@ export async function pingStation(station: Station, now: Date, force: boolean): 
       };
     }
 
-    const sha = await commitHeartbeat(station, pat, now);
+    const sha = await commitHeartbeat(station, pat, now, options);
     return {
       slug,
       ok: true,
@@ -386,6 +666,156 @@ async function recordPing(result: StationPing, now: Date): Promise<void> {
   await saveAppSettings(settings);
 }
 
+/** Vá mọi trace vào MỘT snapshot settings mới; trả false nếu tất cả repo đã bị xoá giữa vòng. */
+export function applyCompanionNurtureResults(
+  settings: AppSettings,
+  results: readonly CompanionNurtureResult[],
+  recordedAt: Date,
+): boolean {
+  let changed = false;
+  for (const result of results) {
+    const station = settings.githubStations.find((item) => stationSlug(item) === result.stationSlug);
+    const companion = station?.companionRepos.find(
+      (item) => item.repo.toLowerCase() === result.repo.toLowerCase(),
+    );
+    if (!station || !companion) continue;
+
+    if (result.ordinal !== null) {
+      companion.lastNurtureDay = result.day;
+      companion.pushesToday = Math.min(MAX_DAILY_PUSHES, result.ordinal);
+    }
+    companion.lastPushOk = result.ok;
+    companion.lastPushNote = result.note.slice(0, 500);
+    if (result.pushed > 0) companion.lastPushAt = recordedAt.toISOString();
+    changed = true;
+  }
+  return changed;
+}
+
+/**
+ * Đúng MỘT fresh read + tối đa MỘT save cho cả vòng.
+ *
+ * Bản trước làm cặp read/save cho TỪNG repo; tám station là mười sáu cửa sổ có thể đè một lượt
+ * admin sửa settings. Gộp trace thu cửa sổ ấy về một. Nếu save cuối hỏng, ledger GitHub vẫn là
+ * nguồn thật và lần chạy lại cùng ngày đọc đúng ordinal để không push trùng.
+ */
+async function recordCompanionNurtureResults(results: readonly CompanionNurtureResult[], now: Date): Promise<void> {
+  if (results.length === 0) return;
+  const settings = await getAppSettings();
+  if (applyCompanionNurtureResults(settings, results, now)) {
+    await saveAppSettings(settings);
+  }
+}
+
+type CompanionJob = { station: Station; companion: CompanionRepo };
+
+/** Tối đa ba repo gọi GitHub đồng thời; bên trong từng repo, chuỗi PUT sha vẫn tuyệt đối tuần tự. */
+export const COMPANION_NURTURE_CONCURRENCY = 3;
+
+/** Bộ chạy pool thuần để đóng đinh concurrency/skipped mà không cần dựng database. */
+export async function runBoundedCompanionJobs<T, R>(
+  jobs: readonly T[],
+  options: {
+    deadlineAt: number;
+    concurrency?: number;
+    execute: (job: T) => Promise<R>;
+  },
+): Promise<{ results: R[]; skipped: number }> {
+  const requested = options.concurrency ?? COMPANION_NURTURE_CONCURRENCY;
+  const concurrency = Number.isFinite(requested) && requested >= 1
+    ? Math.floor(requested)
+    : COMPANION_NURTURE_CONCURRENCY;
+  const results = new Map<number, R>();
+  let cursor = 0;
+
+  // Mỗi worker lấy job kế ngay khi rảnh; một repo chậm không bắt hai lane còn lại ngồi chờ như
+  // cách chia batch cứng. Phép lấy index nằm trước `await`, nên event loop không thể phát trùng.
+  const worker = async () => {
+    while (Date.now() < options.deadlineAt && cursor < jobs.length) {
+      const index = cursor;
+      cursor += 1;
+      results.set(index, await options.execute(jobs[index]!));
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, jobs.length) }, () => worker()),
+  );
+
+  return {
+    results: [...results.entries()].sort(([left], [right]) => left - right).map(([, result]) => result),
+    // `cursor` chỉ tăng lúc một worker thật sự nhận job; phần đuôi chưa nhận mới là skipped.
+    skipped: jobs.length - cursor,
+  };
+}
+
+/**
+ * Kho chưa từng được đẩy/đẩy lâu nhất đi trước để một sổ dài hơn ngân sách vẫn tự luân phiên.
+ * Trả mảng mới; thứ tự người dùng nhìn trong settings không đổi.
+ */
+export function companionNurtureOrder(jobs: readonly CompanionJob[]): CompanionJob[] {
+  const stamp = (raw: string | null): number => {
+    if (!raw) return 0;
+    const parsed = Date.parse(raw);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+  return [...jobs].sort((a, b) => {
+    const byPush = stamp(a.companion.lastPushAt) - stamp(b.companion.lastPushAt);
+    if (byPush !== 0) return byPush;
+    const left = `${stationSlug(a.station)}/${a.companion.repo}`;
+    const right = `${stationSlug(b.station)}/${b.companion.repo}`;
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
+}
+
+export type CompanionNurtureSummary = {
+  /** Số kho phụ đã đọc ledger xong (0/day cũng tính là đã xét). */
+  checked: number;
+  /** Tổng commit source thật sự được GitHub nhận trong vòng này. */
+  pushed: number;
+  /** Số repo đã đạt quota hiện tại; target 0 được xem là hoàn tất. */
+  completed: number;
+  failed: number;
+  /** Repo chưa bắt đầu vì ngân sách route đã hết. */
+  skipped: number;
+  results: CompanionNurtureResult[];
+};
+
+/**
+ * Vòng nuôi HAI software repo của mỗi station.
+ *
+ * Tách khỏi `runKeepalive`: kho chính có luật workflow/60 ngày, kho phụ có quota source theo
+ * ngày. Route cron gọi cả hai nhưng báo cáo riêng, để một lỗi source ledger không nhuộm đỏ trạng
+ * thái khôi lỗi chính và ngược lại.
+ */
+export async function runCompanionNurture(options: { deadlineAt?: number } = {}): Promise<CompanionNurtureSummary> {
+  const settings = await getAppSettings();
+  const jobs = companionNurtureOrder(
+    settings.githubStations
+      .filter((station) => station.enabled)
+      .flatMap((station) => station.companionRepos.map((companion) => ({ station, companion }))),
+  );
+  const cutoff = Math.min(Date.now() + LOOP_BUDGET_MS, options.deadlineAt ?? Number.POSITIVE_INFINITY);
+  const { results, skipped } = await runBoundedCompanionJobs(jobs, {
+    deadlineAt: cutoff,
+    execute: ({ station, companion }) =>
+      nurtureCompanionRepo(station, companion, new Date(), { deadlineAt: cutoff }),
+  });
+  // Mọi network promise đã xong trước khi chạm settings; một lượt save duy nhất nên không có hai
+  // recorder của chính vòng này ghi đè nhau dù ba repo vừa chạy song song.
+  await recordCompanionNurtureResults(results, new Date());
+
+  return {
+    checked: results.length,
+    pushed: results.reduce((sum, result) => sum + result.pushed, 0),
+    completed: results.filter(
+      (result) => result.ok && result.ordinal !== null && result.ordinal >= result.target,
+    ).length,
+    failed: results.filter((result) => !result.ok).length,
+    skipped,
+    results,
+  };
+}
+
 export type KeepaliveSummary = {
   /** Số kho đã ngó xong trong lượt này. */
   checked: number;
@@ -406,25 +836,26 @@ export type KeepaliveSummary = {
  *
  * Kho `enabled: false` đứng ngoài hoàn toàn — không ngó, không ghi, không tính vào tổng kết.
  */
-export async function runKeepalive(options: { force?: boolean } = {}): Promise<KeepaliveSummary> {
+export async function runKeepalive(options: { force?: boolean; deadlineAt?: number } = {}): Promise<KeepaliveSummary> {
   const settings = await getAppSettings();
   // Thứ tự lặp là thứ tự ƯU TIÊN, không phải thứ tự sổ — xem `keepaliveOrder`. Từ lượt gỡ trần
   // số kho (18/08/2026) đây là thứ giữ cho một sổ dài hơn ngân sách không bỏ rơi mãi mãi đúng
   // mấy kho cuối danh sách.
   const due = keepaliveOrder(settings.githubStations.filter((s) => s.enabled));
   const startedAt = Date.now();
+  const cutoff = Math.min(startedAt + LOOP_BUDGET_MS, options.deadlineAt ?? Number.POSITIVE_INFINITY);
   const results: StationPing[] = [];
   let skipped = 0;
 
   for (const station of due) {
-    if (Date.now() - startedAt > LOOP_BUDGET_MS) {
+    if (Date.now() >= cutoff) {
       skipped += 1;
       continue;
     }
     const now = new Date();
     let result: StationPing;
     try {
-      result = await pingStation(station, now, options.force === true);
+      result = await pingStation(station, now, options.force === true, { deadlineAt: cutoff });
     } catch (err) {
       // `pingStation` chỉ ném `StationError` (nó tự bọc mọi thứ khác), nhưng bắt ở đây vẫn là
       // hàng rào cuối: luật「một kho hỏng không chặn kho còn lại」phải đứng vững kể cả khi ai đó

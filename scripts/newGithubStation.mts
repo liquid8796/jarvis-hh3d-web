@@ -1,26 +1,28 @@
 #!/usr/bin/env node
 /**
- * DỰNG MỘT KHÔI LỖI GITHUB VÀ GHI THẲNG NÓ VÀO SỔ — dán đúng một PAT, không gõ gì thêm.
+ * DỰNG BUNDLE GITHUB 3 REPO VÀ GHI THẲNG NÓ VÀO SỔ — dán đúng một PAT, không gõ gì thêm.
  *
  *   npm run github:new                          (hoặc bấm đúp new-github-khoiloi.bat)
  *   npm run github:new -- --dry-run --owner ai  soi kế hoạch: không đụng GitHub, không ghi sổ
  *
- * KHÁC GÌ `newGithubKhoiloi.mjs`: script ấy dựng KHO, và vẫn là nơi duy nhất làm việc đó — tệp
+ * KHÁC GÌ `newGithubKhoiloi.mjs`: script ấy dựng cả bundle, và vẫn là nơi duy nhất làm việc đó — tệp
  * này GỌI nó chứ không chép lại, vì phần dễ sai nhất (danh sách tệp phải chép) đã có
  * `assertImportsResolve` canh ở bên ấy, và một bản sao thứ hai là hẹn ngày hai bản trôi khỏi
  * nhau. Tệp này thêm ba thứ mà bên ấy không làm được vì nó là Node thuần, không chạm database:
  *
  *   1. Suy tài khoản GitHub TỪ CHÍNH PAT (`GET /user`) — người dùng chỉ phải dán một thứ, và
  *      không thể gõ nhầm tên tài khoản thành một cái không khớp với token.
- *   2. Đặt tên: kho ngẫu nhiên, `WORKER_ID` theo khuôn `khoiloi-tro-<mốc thời gian>`. Mốc ấy
- *      đi vào CẢ HAI cái tên nên nhìn một cái là biết cái kia. Luật đặt tên — kể cả danh sách từ
- *      cấm — nằm ở `scripts/khoiloiNaming.mjs`, không ở đây.
- *   3. Ghi kho vừa dựng vào sổ Kho GitHub của TRẠM ĐANG HOẠT ĐỘNG — đúng hình dạng mà
+ *   2. Đặt ba tên ngẫu nhiên khác nhau bằng entropy mật mã; tên repo chính cũng là `WORKER_ID` để
+ *      nhìn một cái là biết cái kia. Luật đặt tên — kể cả danh sách từ cấm — nằm ở
+ *      `scripts/khoiloiNaming.mjs`, không ở đây.
+ *   3. Ghi repo chính và hai repo software vừa dựng vào sổ Kho GitHub của TRẠM ĐANG HOẠT ĐỘNG — đúng hình dạng mà
  *      `saveGithubStationAction` ghi, rồi ngó một lượt để chứng minh PAT thật sự push được.
  *
  * PAT ĐI BẰNG BIẾN MÔI TRƯỜNG `GITHUB_PAT`, không bao giờ qua đối số: dòng lệnh thì ai mở Task
  * Manager cũng đọc được. Nó không bao giờ được in ra và không ghi xuống đĩa — chỗ duy nhất nó
  * nằm lại là phong bì secretBox trong sổ, và biến môi trường của `gh` trong đúng lượt chạy này.
+ * Lượt DỰNG chỉ nhận classic PAT có `repo` + `workflow` + `delete_repo`: ba repo là một transaction,
+ * nên không chứng minh được quyền rollback thì không được phép tạo repo đầu tiên.
  *
  * MỌI PHÉP KIỂM ĐỨNG TRƯỚC MỌI PHÉP TẠO. Thứ tự ấy là cả thiết kế: tạo kho xong mới phát hiện sổ
  * đầy, hay mới phát hiện không tra ra trạm hoạt động, là bỏ lại một kho công khai mồ côi trên tài
@@ -31,7 +33,7 @@
  * tiến trình trả về mã 127 THAY VÌ 0. Tức một lượt chạy hoàn hảo vẫn khiến tệp .bat in「Ket thuc
  * voi loi」. Nên mọi ngả kết thúc ở đây đều đi qua `process.exitCode` rồi để tiến trình tự tắt.
  *
- * ĐỌC TRƯỚC KHI CHẠY: kho tạo ra là CÔNG KHAI và nhật ký Actions của nó ai cũng đọc được, vĩnh
+ * ĐỌC TRƯỚC KHI CHẠY: cả ba kho tạo ra là CÔNG KHAI và nhật ký Actions của kho chính ai cũng đọc được, vĩnh
  * viễn, trong khi việc của khôi lỗi là nhận cookie game đã giải mã. Đánh đổi này đã được cân nhắc
  * và chấp nhận — deploy/github-actions.md §6.
  */
@@ -42,13 +44,15 @@ import { sqlTag } from "./pgTag.mjs";
 import { readControlDoc } from "../src/lib/control/read";
 import { encryptSecret } from "../src/lib/crypto/secretBox";
 import {
+  DEFAULT_DAILY_PUSHES,
   DEFAULT_WORKFLOW_FILE,
   explainFailure,
   reviewStationIdentity,
   stationSlug,
 } from "../src/lib/validation/githubStations";
 import { appDatabaseUrl } from "./activeStationPg.mts";
-import { randomSoftwareName, reviewGeneratedName } from "./khoiloiNaming.mjs";
+import { reviewBundlePatScopes } from "./githubBundleSafety.mjs";
+import { randomDistinctSoftwareNames, randomSoftwareName, reviewGeneratedName } from "./khoiloiNaming.mjs";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -151,8 +155,8 @@ async function whoami(token: string): Promise<{ login: string; scopes: string | 
 
   const body = (await res.json()) as { login?: string };
   if (!body.login) die("GitHub trả lời không có tên tài khoản — không rõ PAT này thuộc về ai, dừng cho chắc.");
-  // Token classic khai scope ở header này; token fine-grained thì KHÔNG có nó (quyền của chúng
-  // nằm ở dạng khác, không đọc được qua đây). Vắng ≠ thiếu quyền — xem chỗ dùng ở dưới.
+  // Token classic khai scope ở header này; token fine-grained thì KHÔNG có nó. Lượt dựng bundle
+  // cần chứng minh delete_repo trước mutation, nên header vắng sẽ bị policy bên dưới từ chối.
   return { login: body.login, scopes: res.headers.get("x-oauth-scopes") };
 }
 
@@ -181,25 +185,12 @@ async function main(): Promise<void> {
   if (!owner) die("Lượt chạy khô không có PAT thì phải truyền --owner <tên tài khoản GitHub>.");
 
   if (identity) {
-    const { scopes } = identity;
-    if (scopes !== null && scopes.trim().length > 0) {
-      const granted = new Set(scopes.split(",").map((s) => s.trim()));
-      const missing = ["repo", "workflow"].filter((need) => !granted.has(need));
-      if (missing.length > 0) {
-        die(
-          `PAT thiếu scope: ${missing.join(", ")}.\n` +
-            `  Token classic cần CẢ HAI: repo (đẩy mã, ghi mốc nuôi kho) và workflow (đẩy chính tệp\n` +
-            `  .github/workflows/, và bật lại lịch khi GitHub tắt vì im lặng).\n` +
-            `  Sửa ở https://github.com/settings/tokens rồi chạy lại.`,
-        );
-      }
-    } else if (scopes !== null) {
-      // Header có mặt nhưng rỗng = token classic không có scope nào. Đó là hỏng chắc chắn.
-      die("PAT không có scope nào cả — nó không tạo nổi kho. Cấp repo + workflow rồi chạy lại.");
-    } else {
-      console.log(
-        "• PAT dạng fine-grained (không khai scope qua header) — không kiểm hộ được quyền.\n" +
-          "  Kho ấy cần Contents: read/write VÀ Actions: read/write, nếu thiếu thì hỏng ở bước cuối.",
+    const policy = reviewBundlePatScopes(identity.scopes);
+    if (!policy.ok) {
+      die(
+        `${policy.message}\n` +
+          "  Sửa token classic ở https://github.com/settings/tokens rồi chạy lại.\n" +
+          "  KHÔNG repo nào đã được tạo; quyền delete_repo phải được chứng minh trước mutation đầu tiên.",
       );
     }
   }
@@ -238,6 +229,9 @@ async function main(): Promise<void> {
 
   const workerId = generated;
   const repo = arg("repo") ?? generated;
+  // Script con cũng tự sinh được khi gọi trực tiếp, nhưng lối có sổ phải rút tên tại ĐÂY: chỉ
+  // tiến trình này biết hai tên nào cần được ghi lại để vòng nuôi chạm đúng repo sau khi dựng.
+  const companionRepos = randomDistinctSoftwareNames(2, [repo, workerId]);
   const workflowFile = DEFAULT_WORKFLOW_FILE;
   const slug = `${owner}/${repo}`;
 
@@ -256,6 +250,7 @@ async function main(): Promise<void> {
   for (const [what, value] of [
     ["Tên kho", repo],
     ["WORKER_ID", workerId],
+    ...companionRepos.map((name, index) => [`Tên kho phụ ${index + 1}`, name] as const),
   ] as const) {
     const banned = reviewGeneratedName(what, value);
     if (banned) die(banned);
@@ -312,12 +307,15 @@ async function main(): Promise<void> {
   console.log(
     `\n── Sẽ dựng ──────────────────────────────────────────\n` +
       `  kho        ${slug} (CÔNG KHAI)\n` +
+      `  software 1 ${owner}/${companionRepos[0]} (CÔNG KHAI)\n` +
+      `  software 2 ${owner}/${companionRepos[1]} (CÔNG KHAI)\n` +
       `  worker id  ${workerId}\n` +
       `  workflow   ${workflowFile}\n` +
       `  ghi vào sổ ở trạm「${doc.activeSiteId}」(đang có ${settings.githubStations.length} kho)\n`,
   );
 
   const inner = ["scripts/newGithubKhoiloi.mjs", "--owner", owner, "--repo", repo, "--worker-id", workerId];
+  for (const companionRepo of companionRepos) inner.push("--companion-repo", companionRepo);
   // Địa chỉ web nướng vào workflow: lấy của trạm ĐANG HOẠT ĐỘNG cho lượt nối đầu đi thẳng. Trạm có
   // đổi về sau cũng không sao — khôi lỗi đi theo 409 như VM vẫn làm (src/lib/worker/controlFollow.mjs).
   if (doc.activeUrl) inner.push("--web-url", doc.activeUrl);
@@ -336,7 +334,7 @@ async function main(): Promise<void> {
       die(
         `Bước dựng kho hỏng (mã ${res.status}) — KHÔNG ghi gì vào sổ.\n` +
           `  Đọc dòng lỗi ngay trên. Kho có thể đã tạo dở, soi ở https://github.com/${owner}?tab=repositories\n` +
-          `  — nếu「${repo}」đã có mặt thì xoá nó đi rồi chạy lại, đừng để một kho không secret nằm đó.`,
+          `  — script đã cố dọn cả bundle; nếu còn repo nào trong ${[repo, ...companionRepos].join(", ")} thì xoá tay rồi chạy lại.`,
       );
     }
   };
@@ -387,7 +385,7 @@ async function main(): Promise<void> {
   /**
    * `workerId` là KHOÁ CHÍNH của bảng `workers`: hai khôi lỗi cùng id là hai tiến trình ghi đè
    * nhau trong sổ điểm danh, và mục Khôi Lỗi nói dối về việc ai đang trực. Tên rút ngẫu nhiên
-   * (53.924 cặp từ × 65536 hex ≈ 3,5 tỉ, từ 19/08/2026) nên trùng là chuyện hiếm tới mức không
+   * (53.924 cặp từ × 2^64 giá trị đuôi, từ 19/08/2026) nên trùng là chuyện hiếm tới mức không
    * đáng vòng lặp rút lại — nhưng hiếm không phải là không, và chỗ này là nơi DUY NHẤT biết được
    * sự thật ấy.
    *
@@ -416,6 +414,15 @@ async function main(): Promise<void> {
       workerId,
       pat: encryptSecret(pat),
       enabled: true,
+      companionRepos: companionRepos.map((companionRepo) => ({
+        repo: companionRepo,
+        lastNurtureDay: null,
+        pushesToday: 0,
+        lastPushAt: null,
+        lastPushOk: null,
+        lastPushNote: "",
+      })),
+      dailyPushes: DEFAULT_DAILY_PUSHES,
       lastPingAt: null,
       lastCommitAt: null,
       lastPingOk: null,
@@ -428,9 +435,11 @@ async function main(): Promise<void> {
     await saveAppSettings(fresh);
   } catch (err) {
     die(
-      `Kho ĐÃ TẠO XONG trên GitHub nhưng ghi sổ hỏng: ${err instanceof Error ? err.message : "lỗi lạ"}\n` +
-        `  Khôi lỗi vẫn sẽ lên ca bình thường, chỉ là chưa ai nuôi kho. Ghi tay ở trang Tông Môn →\n` +
-        `  tab Kho GitHub với đúng bốn giá trị: ${owner} / ${repo} / ${workflowFile} / ${workerId}`,
+      `Bundle ĐÃ TẠO XONG trên GitHub nhưng ghi sổ hỏng: ${err instanceof Error ? err.message : "lỗi lạ"}\n` +
+        `  Khôi lỗi vẫn sẽ lên ca bình thường, nhưng ba repo chưa nằm trong vòng nuôi. Ghi tay ở\n` +
+        `  Tông Môn → Kho GitHub với owner/repo/workflow/WORKER_ID: ${owner} / ${repo} / ` +
+        `${workflowFile} / ${workerId}; hai kho phụ: ${companionRepos.join(" / ")}; ` +
+        `số lượt/ngày: ${DEFAULT_DAILY_PUSHES}.`,
     );
   }
 
@@ -446,6 +455,8 @@ async function main(): Promise<void> {
   console.log(
     `\n✔ Kho đã dựng và đã vào sổ.\n` +
       `  kho       https://github.com/${slug}\n` +
+      `  software  https://github.com/${owner}/${companionRepos[0]}\n` +
+      `  software  https://github.com/${owner}/${companionRepos[1]}\n` +
       `  actions   https://github.com/${slug}/actions\n` +
       `  sổ        ${ping.ok ? "✔" : "✖"} ${ping.note}\n` +
       `\n  Nghiệm thu: mở Hàng Đợi → tab Khôi Lỗi, phải thấy「${workerId}」điểm danh trong ~4 phút.\n`,
@@ -455,7 +466,7 @@ async function main(): Promise<void> {
    * Ngó hỏng thì mã thoát KHÁC 0 — kho đã nằm trong sổ nhưng chưa có bằng chứng nào rằng PAT ấy
    * nuôi được nó, và một lượt chạy như thế không đáng gọi là thành công.
    *
-   * Nhưng phải nói rõ「đừng chạy lại」: mọi việc nặng đã xong, chạy lại chỉ đẻ thêm một kho công
+   * Nhưng phải nói rõ「đừng chạy lại」: mọi việc nặng đã xong, chạy lại chỉ đẻ thêm một bundle công
    * khai nữa và một khôi lỗi trùng vai. Cái cần sửa là PAT, và chỗ sửa là tab Kho GitHub.
    */
   if (!ping.ok) {

@@ -11,8 +11,11 @@ import {
   type StationView,
 } from "@/app/actions/githubStations";
 import {
+  DEFAULT_DAILY_PUSHES,
   DEFAULT_WORKFLOW_FILE,
   KEEPALIVE_INTERVAL_DAYS,
+  MAX_DAILY_PUSHES,
+  MIN_DAILY_PUSHES,
   PAT_SCOPES_NOTE,
   SCHEDULE_DISABLE_DAYS,
 } from "@/lib/validation/githubStations";
@@ -170,6 +173,51 @@ function PatVault({ slug }: { slug: string }) {
   );
 }
 
+/** Một dòng repo phụ: tên + tiến độ trong ngày + kết quả push gần nhất mà backend đã ghi. */
+function CompanionRepoStatus({
+  owner,
+  companion,
+  dailyPushes,
+}: {
+  owner: string;
+  companion: StationView["companionRepos"][number];
+  dailyPushes: number;
+}) {
+  const tone =
+    companion.lastPushOk === true
+      ? "text-[var(--color-jade-300)]"
+      : companion.lastPushOk === false
+        ? "text-[#f2a0a0]"
+        : "text-[var(--color-mist)]";
+  const progress =
+    dailyPushes === 0
+      ? "đã tạm dừng"
+      : companion.lastNurtureDay
+        ? `${companion.pushesToday}/${dailyPushes} lượt · ${companion.lastNurtureDay}`
+        : `0/${dailyPushes} lượt · chưa bắt đầu`;
+
+  return (
+    <div className="rounded-lg border border-[var(--color-ink-600)]/50 px-3 py-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <a
+          href={`https://github.com/${owner}/${companion.repo}`}
+          target="_blank"
+          rel="noreferrer"
+          className="min-w-0 truncate font-mono text-xs text-[var(--color-parchment)] hover:text-[var(--color-gold-300)]"
+        >
+          {owner}/{companion.repo}
+        </a>
+        <span className="shrink-0 font-mono text-[11px] text-[var(--color-mist)]">{progress}</span>
+      </div>
+      <p className={`mt-0.5 text-[11px] ${tone}`}>
+        {companion.lastPushAt
+          ? `Đẩy gần nhất ${when(companion.lastPushAt)}${companion.lastPushNote ? `: ${companion.lastPushNote}` : "."}`
+          : "Chưa có kết quả đẩy nào."}
+      </p>
+    </div>
+  );
+}
+
 export function GithubStationPanel({ stations }: { stations: StationView[] }) {
   const [saveState, saveAction, saving] = useActionState<StationResult | null, FormData>(saveGithubStationAction, null);
   const [pingState, pingAction, pinging] = useActionState<StationResult | null, FormData>(pingGithubStationAction, null);
@@ -205,7 +253,8 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
           không có commit nào, và khi tắt thì khôi lỗi im lặng ngừng lên ca. Vòng nuôi chạy mỗi ngày
           theo lịch <code>/api/cron</code>: ngó trạng thái của từng kho, và ghi một dòng mốc vào{" "}
           <code>.github/heartbeat.txt</code> mỗi ~{KEEPALIVE_INTERVAL_DAYS} ngày. Lịch nào đã bị tắt vì
-          im lặng thì nó bật lại; lịch bị tắt TAY thì nó để nguyên.
+          im lặng thì nó bật lại; lịch bị tắt TAY thì nó để nguyên. Hai kho phần mềm phụ của mỗi
+          khôi lỗi nhận số lượt đẩy riêng trong ngày mà Gia chủ đặt ở form sửa kho.
         </p>
 
         {stations.length === 0 ? (
@@ -243,6 +292,27 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                       {station.lastPingAt ? `Ngó ${when(station.lastPingAt)}: ${station.lastPingNote}` : "Chưa ngó lần nào."}
                     </p>
                     <p className="text-xs text-[var(--color-mist)]">Mốc ghi gần nhất: {when(station.lastCommitAt)}</p>
+                    <div className="mt-2">
+                      <p className="mb-1 text-[11px] font-medium tracking-wide text-[var(--color-mist)] uppercase">
+                        Kho phần mềm phụ · {station.dailyPushes} lượt/kho/ngày
+                      </p>
+                      {station.companionRepos.length === 0 ? (
+                        <p className="text-[11px] text-[var(--color-mist)]">
+                          Kho khôi lỗi cũ này chưa có cặp repo phụ; form sửa vẫn giữ nguyên trạng thái ấy.
+                        </p>
+                      ) : (
+                        <div className="grid gap-1 sm:grid-cols-2">
+                          {station.companionRepos.map((companion) => (
+                            <CompanionRepoStatus
+                              key={companion.repo}
+                              owner={station.owner}
+                              companion={companion}
+                              dailyPushes={station.dailyPushes}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <form action={pingAction}>
                     <input type="hidden" name="slug" value={station.slug} />
@@ -257,7 +327,10 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                     action={deleteAction}
                     onSubmit={(e) => {
                       // Xoá là mất phong bì PAT — một cú bấm nhầm không được phép đủ.
-                      if (!confirm(`Xoá kho「${station.slug}」khỏi sổ? PAT đã mã hoá mất theo, và từ nay không ai nuôi kho ấy nữa.`)) {
+                      if (!confirm(
+                        `Xoá station「${station.slug}」khỏi sổ? PAT đã mã hoá mất theo; cả ba repo ` +
+                          "trên GitHub vẫn được giữ nhưng từ nay không repo nào trong bundle được nuôi tự động.",
+                      )) {
                         e.preventDefault();
                       }
                     }}
@@ -341,6 +414,53 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                 defaultValue={editing?.workerId ?? ""}
               />
             </div>
+          </div>
+          <fieldset className="rounded-xl border border-[rgba(232,194,92,0.18)] p-4">
+            <legend className="px-1 text-sm font-medium text-[var(--color-parchment)]">
+              Hai kho phần mềm phụ
+            </legend>
+            <div className="flex flex-wrap gap-4">
+              {[0, 1].map((index) => (
+                <div key={index} className="min-w-[12rem] flex-1">
+                  <label className="label" htmlFor={`station-companion-${index + 1}`}>
+                    Tên kho phụ {index + 1}
+                  </label>
+                  <input
+                    id={`station-companion-${index + 1}`}
+                    name={`companionRepo${index + 1}`}
+                    className="input w-full font-mono"
+                    placeholder={index === 0 ? "harbor-lantern-a7f3" : "quiet-orbit-c9e1"}
+                    defaultValue={editing?.companionRepos[index]?.repo ?? ""}
+                    readOnly={editing?.companionRepos.length === 2}
+                    required={editing === null || (editing?.companionRepos.length ?? 0) > 0}
+                  />
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-[var(--color-mist)]">
+              Cùng tài khoản và PAT với kho khôi lỗi. Cặp đủ hai tên trở thành danh tính được khoá
+              cả ở giao diện lẫn server; kho cũ có thể để trống hoặc bổ sung đúng hai tên một lần.
+            </p>
+          </fieldset>
+          <div>
+            <label className="label" htmlFor="station-daily-pushes">
+              Số lượt đẩy mỗi ngày cho mỗi kho phụ
+            </label>
+            <input
+              id="station-daily-pushes"
+              name="dailyPushes"
+              type="number"
+              min={MIN_DAILY_PUSHES}
+              max={MAX_DAILY_PUSHES}
+              step={1}
+              className="input max-w-[10rem] font-mono"
+              defaultValue={editing?.dailyPushes ?? DEFAULT_DAILY_PUSHES}
+              required
+            />
+            <p className="mt-1 text-xs text-[var(--color-mist)]">
+              {MIN_DAILY_PUSHES}–{MAX_DAILY_PUSHES}; mặc định {DEFAULT_DAILY_PUSHES}. Chọn 0 để tạm
+              dừng nuôi hai repo phụ mà không tắt kho khôi lỗi chính.
+            </p>
           </div>
           <div>
             <label className="label" htmlFor="station-pat">

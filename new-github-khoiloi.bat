@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================================
-REM  Dung MOT KHOI LOI GITHUB MOI - tu mot PAT toi mot dong trong so kho.
+REM  Dung BUNDLE 3 REPO GITHUB MOI - tu mot PAT toi mot dong trong so kho.
 REM
 REM  CHAY TREN VM: so Kho GitHub nam trong Postgres cua backend (chi nghe
 REM  127.0.0.1 tren jarvis-oci-01), va `gh` - thu dat secret WORKER_TOKEN cho
@@ -9,12 +9,14 @@ REM  can `gh auth login`; may nha khong con phai cai gi ca.
 REM
 REM  Bam dup tep nay. No hoi dung MOT thu: PAT cua tai khoan GitHub se giu kho.
 REM
-REM  PAT CAN QUYEN (thieu la hong o tan buoc cuoi):
-REM    - Classic     : scope repo + workflow
-REM    - Fine-grained: Contents read/write + Actions read/write
+REM  PAT BAT BUOC LA CLASSIC VA CO DU 3 SCOPE (kiem truoc khi tao repo):
+REM    - repo + workflow + delete_repo
+REM  delete_repo la hang rao rollback: mot buoc push/secret hong thi script moi co
+REM  the xoa cac repo ma chinh luot nay vua tao. Fine-grained bi tu choi vi GitHub
+REM  khong cong bo du quyen cua no truoc khi repo moi ton tai.
 REM
 REM  HAI LUAT CUA TEP NAY, dung sua pham:
-REM    1. Ket dong phai la CRLF. cmd.exe doc theo byte offset nen thieu  la vo
+REM    1. Ket dong phai la CRLF. cmd.exe doc theo byte offset nen thieu CRLF la vo
 REM       ngay o khoi `if ( ... )` nhieu dong. .gitattributes dang ep dieu nay.
 REM    2. Chi dung ky tu ASCII. Mot chu co dau la nhieu byte trong UTF-8; sau
 REM       `chcp 65001` bo doc cua cmd lech cho va bam nat ca tep.

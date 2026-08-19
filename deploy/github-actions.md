@@ -209,7 +209,7 @@ có thể** — xem `KEEPALIVE_INTERVAL_DAYS`.
 | Cửa admin | `src/app/actions/githubStations.ts` + `src/app/admin/GithubStationPanel.tsx` (tab **Kho GitHub**) |
 | Quyền | `github_station.manage` — CHỈ Gia chủ (migration `0026`) |
 | Lịch | `/api/cron`, đi nhờ cron `0 3 * * *` đã có — **chỉ chạy ở trạm đang hoạt động**, xem dưới |
-| Kiểm chứng | `npm run verify:github-stations` — 11 nhóm ca, `fetch` giả, không cần database |
+| Kiểm chứng | `npm run verify:github-stations` — 24 nhóm ca, `fetch` giả, không cần database |
 
 **Không cần `git`.** `PUT /repos/{owner}/{repo}/contents/{path}` tạo ra một **commit thật**, nên
 cả việc này gọn trong một Vercel function — không clone, không thư mục tạm. Đây là chỗ dễ đi vòng
@@ -219,6 +219,20 @@ nhất nếu không biết.
 vết), lượt ghi mới là thứ đếm với GitHub. Tách hai nhịp ấy giữ được cả hai điều tốt: biết kho
 hỏng **ngay trong ngày**, mà chỉ ~18 commit rác một năm thay vì 365. 20 ngày cũng để lại **40
 ngày dự phòng** trước mốc 60 — phải trượt liên tiếp hai lượt tới hạn thì lịch mới thật sự tắt.
+
+Đó là luật của **repo khôi lỗi chính**. Hai repo software đi kèm có một nhịp khác theo yêu cầu
+vận hành ngày 19/08/2026: mỗi lượt cron hằng ngày đẩy mặc định **5 commit source/repo** vào
+`src/generated/revision-ledger.ts`. Ứng dụng import và hiển thị module này, nên đây là thay đổi mã
+nguồn có đi qua type-check/build chứ không phải một heartbeat giấu trong `.github/`. Số lượt là
+`githubStations[].dailyPushes`, đặt riêng theo từng station ở tab **Kho GitHub**, hợp lệ `0..24`;
+`0` tạm dừng hai repo phụ mà không tắt workflow khôi lỗi chính. Vì hệ chỉ có một cron mỗi ngày,
+N commit được tạo tuần tự trong chính lượt cron ấy, không trải thành N lịch riêng trong ngày.
+
+**Ledger trên GitHub là nguồn sự thật.** Trước khi ghi, service đọc `day + ordinal` đang nằm trong
+source. Nếu commit thứ ba đã lên GitHub nhưng lượt ghi dấu vết vào database hụt, vòng kế tiếp đọc
+được `3/5` và chỉ nối tiếp `4/5`, không đẩy lại từ đầu. Gọi cron hai lần cùng ngày sau khi đủ quota
+thì không tạo thêm commit. Dấu vết trong `app_settings` chỉ để admin vẽ nhanh trạng thái từng repo;
+station đời cũ tự đọc thành `companionRepos: []` và `dailyPushes: 5`, nên không cần migration SQL.
 
 **Nhánh tự chữa mới là phần đáng tiền.** Nếu lịch ĐÃ bị tắt vì im lặng thì một commit mới **không
 tự bật nó lại** — GitHub đòi một lượt bật tường minh. Nên khi thấy `disabled_inactivity`, vòng
@@ -278,6 +292,12 @@ Scope **`repo` + `workflow`** (classic), hoặc **Contents: read/write + Actions
 workflow lên, và **thiếu `workflow` là lỗi hay gặp nhất của cả lối này** — nó chỉ lộ ra ở đúng
 bước cuối cùng.
 
+Riêng lượt **tạo bundle mới** có contract chặt hơn: chỉ nhận **classic PAT** đủ `repo`, `workflow`
+và `delete_repo`. Ba repo là một transaction, nên `delete_repo` phải được chứng minh trước mutation
+đầu tiên để rollback được repo đã xác nhận tạo. Fine-grained PAT không công bố permission thực qua
+`X-OAuth-Scopes` trước khi repo mới tồn tại; dù một token Administration: write có thể xoá, script
+không đoán quyền rồi bắt đầu một giao dịch phá huỷ được.
+
 PAT nguy hiểm hơn cookie game một bậc: cookie mở một tài khoản game, PAT thì **push được mã** vào
 kho đang chạy khôi lỗi. Nên nó lưu bằng `secretBox` (`ENCRYPTION_KEY`) y như cookie, và quyền quản
 là **mã riêng chỉ Gia chủ** — không dùng lại `admin.panel`, cũng không dùng lại `site.switch`.
@@ -291,7 +311,7 @@ mang phong bì, nên mở tab admin vẫn không kéo PAT nào xuống trình du
 ô nhập: ô ấy để trống mới đúng nghĩa「giữ PAT cũ」, và đổ token vào đó nghĩa là lượt bấm「Cập nhật
 kho」kế tiếp sẽ đẩy ngược chính bí mật vừa xem lên máy chủ để mã hoá lại mà chẳng được gì.
 
-### Thêm một kho: bấm đúp `new-github-khoiloi.bat`
+### Thêm một bundle: bấm đúp `new-github-khoiloi.bat`
 
 > **16/08/2026 — bốn công cụ trong tài liệu này nay CHẠY TRÊN VM.** Sổ Kho GitHub nằm trong
 > Postgres của backend, mà Postgres ấy chỉ nghe `127.0.0.1` trên `jarvis-oci-01`. Nên
@@ -310,10 +330,29 @@ kho」kế tiếp sẽ đẩy ngược chính bí mật vừa xem lên máy ch�
 >   `repo`+`workflow`+`delete_repo` vào một tệp log dạng chữ.
 
 Nó hỏi đúng MỘT thứ — PAT của tài khoản GitHub sẽ giữ kho — rồi làm trọn: suy tên tài khoản từ
-chính token, rút MỘT cái tên ngẫu nhiên dùng cho cả tên kho lẫn `WORKER_ID`,
-dựng kho (gọi lại `newGithubKhoiloi.mjs`), dán secret, bấm chạy lượt đầu, **ghi kho vào sổ ở trạm
-đang hoạt động**, rồi ngó một lượt để chứng minh PAT push được. Xem trước mà chưa tạo gì:
+chính token, rút ba tên ngẫu nhiên khác nhau (tên chính dùng luôn cho `WORKER_ID`), dựng bundle
+(gọi lại `newGithubKhoiloi.mjs`), dán secret, bấm chạy lượt đầu, **ghi kho vào sổ ở trạm đang
+hoạt động**, rồi ngó một lượt để chứng minh PAT push được. Xem trước mà chưa tạo gì:
 `npm run github:new -- --dry-run --owner <tài-khoản>`.
+
+#### Bundle 3 repo (19/08/2026)
+
+Một lượt `github:new` nay tạo đúng **ba repo công khai** trong cùng một giao dịch: một repo khôi
+lỗi và hai repo software độc lập. Hai repo software chọn hai lĩnh vực đời sống khác nhau, mỗi repo
+có 14 tệp (hơn 400 dòng source): TypeScript domain model, validation, persistence, priority
+analytics, JSON/CSV exchange, Vite UI, CSS responsive và unit tests. Ứng dụng thật sự import
+`src/generated/revision-ledger.ts`; vòng nuôi chỉ cập nhật tệp này. README của cả ba repo đều viết
+hoàn toàn bằng tiếng Anh.
+
+Script dựng và commit thử cả ba cây trước khi chạm GitHub. `repo create` và `git push` là hai bước
+riêng: một slug chỉ vào danh sách rollback **sau khi create trả thành công**. Nếu create rơi mạng ở
+ranh giới mơ hồ, script không probe rồi suy rằng repo cùng tên là của mình — nó dừng, dọn các slug
+đã xác nhận trước đó và chỉ đưa URL để người vận hành kiểm tra. Push/secret hỏng thì xoá ngược mọi
+repo đã xác nhận do chính lượt ấy tạo; preflight `delete_repo` đứng trước repo đầu tiên.
+
+Hai lưới chạy cục bộ: `npm run verify:github-bundle` khóa thứ tự create → remember → push và policy
+scope; `npm run verify:github-companions` mặc định cài dependency, typecheck, Vite-build và chạy
+unit tests của **cả hai** app sinh ra (không chỉ soi chuỗi source).
 
 #### Luật đặt tên: `scripts/khoiloiNaming.mjs`
 
@@ -324,16 +363,18 @@ GitHub là ra sạch cả đàn. Bốn từ giữa dựng chân dung「kho sinh 
 thứ đã khiến GitHub gỡ `gautamkrishnar/keepalive-workflow`. Bốn từ cuối (thêm 17/08/2026) là chữ
 của CHÍNH TA: chúng không nói gì với người lạ, nhưng chúng nối các kho lại với nhau.
 
-**Từ 17/08/2026 không còn tiền tố nào cả.** `randomSoftwareName()` rút hai từ trung tính cộng bốn
-ký tự hex — `cobalt-relay-4f2a`, `tundra-orbit-1944` — và MỘT cái tên ấy dùng cho cả tên kho lẫn
+**Từ 17/08/2026 không còn tiền tố nào cả.** `randomSoftwareName()` rút hai từ trung tính; tên mới
+từ 19/08 mang thêm 16 ký tự hex (64 bit), như `cobalt-relay-0123456789abcdef`. Đời đầu của luật
+này dùng 4 hex và vẫn được nhận diện để dọn. MỘT cái tên ấy dùng cho cả tên kho lẫn
 `WORKER_ID`, để nhìn một id trên dashboard là biết ngay nó ở kho nào mà không phải tra sổ. Không
 có mốc thời gian trong tên: `…-20260813-233056-6143` là chữ ký của một cỗ máy sinh tên, còn
 `cobalt-relay-4f2a` thì không.
 
 Cái giá đã cân nhắc: mất phép「nhìn tiền tố biết là máy ở trọ」trên dashboard, và lượt XOÁ mất bộ
 lọc theo tiền tố. Bù lại, `looksLikeKhoiloiRepoName` nay hỏi **hình dạng** (`GENERATED_NAME_SHAPE`:
-hai từ thường + 4 hex) rồi mới hỏi các tiền tố ĐỜI CŨ — đủ hẹp để khoanh vùng ứng viên, đủ tầm
-thường để không nói gì với người lạ. Tiền tố chưa bao giờ là giấy phép xoá; `Evidence` mới là.
+hai từ thường + 4 hex đời cũ hoặc 16 hex đời mới) rồi mới hỏi các tiền tố ĐỜI CŨ — đủ hẹp để
+khoanh vùng ứng viên, đủ tầm thường để không nói gì với người lạ. Tiền tố chưa bao giờ là giấy
+phép xoá; `Evidence` mới là.
 
 Hai sợi dây MỀM còn lại, biết mà chấp nhận: `name` trong `package.json` của mọi kho đều là
 `scheduled-tasks` (lockfile dựng một lần rồi dùng chung, nên tên gói phải giống nhau), và tệp
@@ -355,22 +396,23 @@ Vẫn cần `gh` (chỉ vì lượt đặt secret — sealed-box, xem đầu `ne
 cần `gh auth login`**: PAT đi qua biến `GH_TOKEN` của riêng lượt chạy ấy. Cài `gh`:
 `winget install --id GitHub.cli`.
 
-Hai phép kiểm chạy TRƯỚC khi tạo bất cứ thứ gì, vì một kho công khai mồ côi thì phải vào GitHub
+Các phép kiểm chạy TRƯỚC khi tạo bất cứ thứ gì, vì một kho công khai mồ côi thì phải vào GitHub
 xoá tay: PAT còn sống và đủ scope, và `WORKER_ID` chưa ai mang — hỏi thẳng bảng `workers`, không
 chỉ tin vào mốc giây trong tên.
 
 **Sổ KHÔNG còn trần số kho** (gỡ 18/08/2026; trước đó là 8, hằng `GITHUB_STATION_LIMIT`). Cái giữ
-chỗ của nó là `keepaliveOrder`: vòng nuôi lặp theo NHU CẦU — kho có `lastCommitAt` cũ nhất (rỗng
-hoặc rác thì coi như cũ nhất) đi trước — nên khi ngân sách 40 giây hết, thứ bị bỏ lại luôn là kho
-CÒN NHIỀU HẠN nhất, và mọi kho đều tới lượt đứng đầu. Sổ dài hơn ngân sách vì thế chỉ có nghĩa
-"phải vài lượt cron mới phủ hết", không còn nghĩa "mấy kho cuối chết đói". Đo 18/08: 8 kho khoẻ
-xong trong dưới một giây, tức ~0,12s một kho, nên 40 giây đủ cho hàng trăm kho ở đường sung sức.
+chỗ của nó là thứ tự theo NHU CẦU: `keepaliveOrder` đưa kho chính gần vách 60 ngày nhất lên trước,
+còn `companionNurtureOrder` đưa repo software lâu chưa được push nhất lên trước. Cron chia phần
+GitHub thành 10 giây cho kho chính và tới mốc 45 giây cho repo phụ; khi ngân sách hết, kết quả ghi
+ra `skipped` và lượt sau ưu tiên phần còn nợ thay vì bỏ đói mãi đúng đuôi sổ. Đo 18/08: 8 kho chính
+khoẻ xong trong dưới một giây, tức ~0,12s một kho.
 
 ### Vận hành
 
-Tab **Kho GitHub** trong trang Tông Môn. Mỗi dòng hiện đếm ngược tới mốc tắt lịch — xanh là khoẻ,
-vàng là đã trượt một lượt ghi, đỏ là còn dưới một chu kỳ. Ba nút: **Nuôi ngay** (ép một kho),
-**Chạy vòng nuôi** (diễn tập đúng thứ cron chạy), **Sửa/Xoá**.
+Tab **Kho GitHub** trong trang Tông Môn. Mỗi dòng hiện đếm ngược tới mốc tắt lịch của kho chính,
+hai repo software, tiến độ `đã push/quota` trong ngày và kết quả push gần nhất. **Nuôi ngay** ép
+heartbeat của kho chính; **Chạy vòng nuôi** diễn tập cả hai vòng đúng như cron; **Sửa** cho đổi
+quota `0..24`; **Xoá** chỉ bỏ station/PAT khỏi sổ, không xoá repo nào trên GitHub.
 
 Lượt **Ghi vào sổ** tự ngó kho ngay sau khi lưu, nên một PAT dán nhầm chết trước mặt người vừa
 dán chứ không phải trong một lượt cron lúc ba giờ sáng. Với kho mới, lượt ấy ghi luôn một commit
@@ -384,7 +426,7 @@ curl -H "Authorization: Bearer $CRON_SECRET" https://<trạm>/api/cron
 
 ### Bằng chứng: `npm run verify:keepalive-live` (14/08/2026)
 
-Luật thì đã có `verify:github-stations` lái qua `fetch` giả (10 nhóm ca, kể cả hai ca đột biến:
+Luật thì đã có `verify:github-stations` lái qua `fetch` giả (24 nhóm ca, kể cả hai ca đột biến:
 gỡ hàng rào `disabled_manually` và lệch biên một ngày — cả hai làm script đỏ đúng chỗ). Nhưng
 `fetch` giả chỉ chứng minh được「mã phản ứng đúng với câu trả lời ta bịa ra」. Phần còn lại —
 GitHub thật có trả lời như ta đã bịa không — nay có công cụ riêng, và nó **không ghi commit nào**
@@ -479,6 +521,11 @@ npm run github:remove -- --repo <tên kho>     chọn khi tài khoản có nhi�
 npm run github:remove -- --force              xoá kể cả khi khôi lỗi ấy đang giữ đàn
 ```
 
+Từ khi `github:new` tạo bundle 3 repo, `github:remove` **vẫn chỉ xoá repo khôi lỗi chính** rồi bỏ
+dòng station. Hai repo software giữ nguyên source và lịch sử như các dự án độc lập; vì không còn
+trong station, vòng nuôi tự ngừng chạm chúng. Đây là ranh giới phá huỷ có chủ ý: một lệnh vốn được
+xác nhận bằng tên repo chính không được ngầm mở rộng thành xoá thêm hai repo khác.
+
 **Vì sao đáng có một công cụ, thay vì một cú bấm「Delete repository」:** một kho khôi lỗi để lại
 dấu chân ở **ba** nơi, và hai nơi trong đó không nằm trên GitHub.
 
@@ -488,12 +535,12 @@ dấu chân ở **ba** nơi, và hai nơi trong đó không nằm trên GitHub.
 | Dòng trong sổ Kho GitHub (trạm đang hoạt động) | vòng nuôi gõ vào một kho đã chết mỗi ngày, tab đỏ mãi; và vì `keepaliveOrder` xếp mốc rỗng lên ĐẦU, dòng ma còn ăn ngân sách trước cả kho còn thật |
 | Dòng trong bảng `workers` | `github:new` TỪ CHỐI dựng lại một khôi lỗi trùng id — phép kiểm bên ấy hỏi thẳng bảng này, và một cái xác trả lời y như một người đang trực |
 
-### PAT cần `delete_repo`, và đó là scope §7 KHÔNG đòi
+### PAT cần `delete_repo` — lượt dựng mới cũng đã đòi để rollback
 
-Lượt dựng cần `repo` + `workflow`; lượt xoá cần thêm **`delete_repo`** (classic) hoặc
-**Administration: read/write** (fine-grained). Nghĩa là **cái PAT đã dựng kho gần như chắc chắn
-không xoá được nó**. Phép soát scope vì thế đứng ngay đầu, trước cả lượt đọc sổ — một lượt chạy
-thiếu quyền hỏng trong hai giây thay vì hỏng sau khi đã in cả kế hoạch.
+Lượt dựng bundle hiện cần **`repo` + `workflow` + `delete_repo`** trên classic PAT; lượt xoá dùng
+chính `delete_repo`, hoặc **Administration: read/write** với fine-grained token. Kho đời cũ có thể
+được dựng bằng token thiếu quyền xoá, nên phép soát scope của `github:remove` vẫn đứng ngay đầu,
+trước cả lượt đọc sổ — một lượt chạy thiếu quyền hỏng trong hai giây thay vì sau cả kế hoạch.
 
 ### Ba luật an toàn
 

@@ -1,3 +1,5 @@
+import { randomInt } from "node:crypto";
+
 /**
  * LUẬT ĐẶT TÊN cho những cái tên mà lượt dựng khôi lỗi GitHub TỰ SINH RA — thuần, không mạng,
  * không database, không đọc `.env`.
@@ -74,8 +76,8 @@ export const FORBIDDEN_NAME_WORDS = Object.freeze([
  * nhau bằng mắt thường — tức đúng thứ mà cú đổi sang tên ngẫu nhiên (17/08) sinh ra để phá.
  *
  * Nay 221 × 244 = 53.924 cặp. Chín kho thì xác suất chạm một cặp trùng rơi từ ~10% xuống ~0,07%;
- * chung một từ đầu rơi từ gần như chắc chắn xuống ~2%. Trần thật của cả cái tên là 53.924 × 65536
- * ≈ 3,5 tỉ.
+ * chung một từ đầu rơi từ gần như chắc chắn xuống ~2%. Từ 19/08/2026 đuôi mới có 64 bit, nên
+ * không gian đầy đủ là hơn 9,9 × 10^23 tên; đuôi 4 hex chỉ còn là hình dạng lịch sử.
  *
  * Thêm từ thì cứ thêm, nhưng giữ ba luật mà lưới đang canh: chỉ `a-z`, dài 3–10 ký tự, và HAI RỔ
  * KHÔNG ĐƯỢC GIAO NHAU.
@@ -150,22 +152,50 @@ export const NAME_TAILS = Object.freeze([
 ]);
 
 /**
- * Một cái tên mới: `<đầu>-<đuôi>-<4 hex>`.
+ * Một cái tên mới: `<đầu>-<đuôi>-<16 hex>`.
  *
- * Đuôi hex KHÔNG phải để trang trí — nó là thứ giữ cho hai lượt dựng cùng rơi vào một cặp từ vẫn
- * ra hai cái tên khác nhau. Từ 19/08/2026 rổ rộng hơn 150 lần (53.924 cặp) nên cặp trùng đã thành
- * chuyện hiếm, nhưng hex vẫn phải ở lại: người gọi vẫn soát trùng với sổ, và hex là thứ biến
- *「hiếm」thành「gần như không bao giờ」.
+ * Đuôi 16 hex là 64 bit ngẫu nhiên. Nó KHÔNG phải để trang trí — nó là thứ giữ cho ba kho được
+ * dựng trong cùng một bundle, hoặc hai lượt dựng cùng rơi vào một cặp từ, vẫn gần như chắc chắn
+ * mang tên khác nhau. Với 53.924 cặp từ, không gian tên mới lớn hơn 9,9 × 10^23.
  *
  * `pick` tiêm vào được để lưới kiểm chứng chạy tất định; mặc định là ngẫu nhiên thật.
  *
+ * Mặc định dùng `crypto.randomInt`, không dùng `Math.random`: tên repo là định danh công khai tồn
+ * tại lâu dài, nên lấy entropy từ bộ sinh của hệ điều hành là cái giá rất rẻ cho một xác suất va
+ * chạm thấp và không phụ thuộc seed của tiến trình Node.
+ *
  * @param {(n: number) => number} [pick] trả về một số nguyên trong [0, n)
  */
-export function randomSoftwareName(pick = (n) => Math.floor(Math.random() * n)) {
-  const head = NAME_HEADS[pick(NAME_HEADS.length)];
-  const tail = NAME_TAILS[pick(NAME_TAILS.length)];
-  const hex = Array.from({ length: 4 }, () => "0123456789abcdef"[pick(16)]).join("");
+export function randomSoftwareName(pick) {
+  const draw = pick ?? ((n) => randomInt(n));
+  const head = NAME_HEADS[draw(NAME_HEADS.length)];
+  const tail = NAME_TAILS[draw(NAME_TAILS.length)];
+  const hex = Array.from({ length: 16 }, () => "0123456789abcdef"[draw(16)]).join("");
   return `${head}-${tail}-${hex}`;
+}
+
+/**
+ * Rút nhiều tên trong MỘT bundle và đóng đinh tính khác nhau ngay tại nguồn.
+ *
+ * Xác suất va chạm của 64 bit đã rất thấp, nhưng một vòng `Set` vừa rẻ vừa biến yêu cầu「khác
+ * repo chính và khác nhau」thành bất biến thay vì một lời cầu may. `excluded` nhận cả tên gõ tay.
+ */
+export function randomDistinctSoftwareNames(count, excluded = [], pick) {
+  if (!Number.isInteger(count) || count < 0) throw new TypeError("count must be a non-negative integer");
+  const used = new Set(Array.from(excluded, (name) => String(name).toLowerCase()));
+  const names = [];
+  const maxAttempts = Math.max(100, count * 20);
+  for (let attempts = 0; names.length < count && attempts < maxAttempts; attempts += 1) {
+    const candidate = randomSoftwareName(pick);
+    const key = candidate.toLowerCase();
+    if (used.has(key)) continue;
+    used.add(key);
+    names.push(candidate);
+  }
+  if (names.length !== count) {
+    throw new Error(`Không rút được ${count} tên repo khác nhau sau ${maxAttempts} lượt.`);
+  }
+  return names;
 }
 
 /**
@@ -177,9 +207,9 @@ export function randomSoftwareName(pick = (n) => Math.floor(Math.random() * n)) 
  * cảnh cần dọn nhất, và cũng là cảnh KHÔNG có dòng nào trong sổ để bắt bằng đường khác — sẽ tàng
  * hình trước chính công cụ dọn của mình.
  *
- * Nên bộ lọc chuyển từ TỪ sang HÌNH: hai từ thường và bốn ký tự hex. Nó đủ hẹp để chỉ còn vài ứng
- * viên trên một tài khoản, và đủ tầm thường để không nói gì với người lạ. Vẫn KHÔNG phải giấy
- * phép xoá — `Evidence` mới là, y như trước.
+ * Nên bộ lọc chuyển từ TỪ sang HÌNH: hai từ thường và đuôi hex (4 ký tự đời cũ, 16 ký tự đời
+ * mới). Nó đủ hẹp để chỉ còn vài ứng viên trên một tài khoản, và đủ tầm thường để không nói gì
+ * với người lạ. Vẫn KHÔNG phải giấy phép xoá — `Evidence` mới là, y như trước.
  */
 /**
  * `name` trong `package.json` của kho khôi lỗi — MỘT chuỗi dùng chung cho mọi kho, và đó là ràng
@@ -196,7 +226,8 @@ export function randomSoftwareName(pick = (n) => Math.floor(Math.random() * n)) 
  */
 export const PACKAGE_NAME = "scheduled-tasks";
 
-export const GENERATED_NAME_SHAPE = /^[a-z]+-[a-z]+-[0-9a-f]{4}$/;
+// Giữ nhánh 4 hex để remove/rename vẫn nhận ra mọi kho đời 17–19/08/2026. Tên mới dùng 16 hex.
+export const GENERATED_NAME_SHAPE = /^[a-z]+-[a-z]+-(?:[0-9a-f]{4}|[0-9a-f]{16})$/;
 
 /**
  * Những tiền tố tên kho mà các bản TRƯỚC từng đặt — **không còn tiền tố nào đang hành nghề**.

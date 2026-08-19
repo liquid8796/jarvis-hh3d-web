@@ -26,6 +26,21 @@
 /** Tệp mốc nuôi kho. Trong `.github/` nhưng KHÔNG trong `.github/workflows/` — xem `PAT_SCOPES_NOTE`. */
 export const HEARTBEAT_PATH = ".github/heartbeat.txt";
 
+/**
+ * Tệp MÃ NGUỒN mà hai kho phần mềm đi kèm cập nhật ở mỗi lượt nuôi.
+ *
+ * Không dùng một activity log giấu trong `.github/`: yêu cầu của tính năng là các lượt đẩy
+ * tiếp tục tiến hoá chính phần mềm đã sinh, nên generator tạo tệp TypeScript này, ứng dụng import
+ * nó, và vòng nuôi chỉ ghi đúng contract ấy. Đường dẫn là hằng số chung để generator, service và
+ * phép thử không âm thầm trôi thành ba tên khác nhau.
+ */
+export const REVISION_LEDGER_PATH = "src/generated/revision-ledger.ts";
+
+/** Mặc định năm commit/ngày/repo; 0 là tạm ngừng riêng hai kho phụ. */
+export const DEFAULT_DAILY_PUSHES = 5;
+export const MIN_DAILY_PUSHES = 0;
+export const MAX_DAILY_PUSHES = 24;
+
 /** Workflow mà `scripts/newGithubKhoiloi.mjs` rải ra ở mọi kho nó dựng. */
 export const DEFAULT_WORKFLOW_FILE = "linh-su.yml";
 
@@ -91,6 +106,41 @@ export function reviewStationIdentity(owner: string, repo: string, workflowFile:
     return `Tên tệp workflow phải kết thúc bằng .yml hoặc .yaml (mặc định ${DEFAULT_WORKFLOW_FILE}).`;
   }
   return null;
+}
+
+/**
+ * Soát phần cấu hình hai kho phần mềm đi kèm một station.
+ *
+ * Station cũ được phép chưa có kho nào; station mới do script tạo luôn ghi đúng hai kho. Tầng
+ * schema vì thế nhận 0..2 để deploy mới đọc được document cũ, còn script chịu trách nhiệm luật
+ * "đúng hai" của lượt tạo mới. Không cho trùng kho chính hoặc trùng nhau vì cả hai trường hợp sẽ
+ * khiến một cron đẩy hai lần vào cùng một ledger rồi tự vượt quota ngày.
+ */
+export function reviewCompanionRepos(primaryRepo: string, repos: readonly string[]): string | null {
+  if (repos.length > 2) {
+    return "Mỗi khôi lỗi chỉ có tối đa hai kho phần mềm đi kèm.";
+  }
+
+  const seen = new Set<string>();
+  for (const repo of repos) {
+    if (repo.length === 0 || repo.length > 100 || !REPO_RE.test(repo) || repo === "." || repo === "..") {
+      return "Tên kho phụ: 1–100 ký tự chữ/số/dấu chấm/gạch ngang/gạch dưới.";
+    }
+    const normalized = repo.toLowerCase();
+    if (normalized === primaryRepo.toLowerCase()) {
+      return "Kho phụ không được trùng kho khôi lỗi chính.";
+    }
+    if (seen.has(normalized)) {
+      return "Hai kho phụ phải có tên khác nhau.";
+    }
+    seen.add(normalized);
+  }
+  return null;
+}
+
+/** Ngày vận hành theo giờ Việt Nam/Asia-Bangkok (UTC+7, không có DST). */
+export function nurtureDayKey(at: Date): string {
+  return new Date(at.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 /**
@@ -202,6 +252,31 @@ export function reviewKeepaliveDuty(siteId: string, activeSiteId: string | null)
     return { feed: true, why: `Trạm đang hoạt động (${me}).` };
   }
   return { feed: false, why: `Trạm nghỉ (${me}) — để trạm đang hoạt động「${active}」nuôi.` };
+}
+
+/**
+ * Duty của hai software repo CỐ Ý NGƯỢC chiều fail-open ở trên.
+ *
+ * Kho chính chỉ cần một commit mỗi 20 ngày để khỏi chết lịch; thừa một commit khi control doc
+ * chớp là cái giá nhỏ. Repo phụ thì mang cấu hình admin theo NGÀY, kể cả `dailyPushes = 0`.
+ * Một trạm cũ giữ snapshot `5` mà fail-open khi không đọc được active site sẽ đẩy mười commit
+ * trái với lệnh tạm dừng ở trạm mới. Vì vậy chỉ đúng cặp SITE_ID hiện tại == active mới được
+ * chạy tự động. Nút admin không dùng phép gác này: người bấm đang chủ động chọn database hiện tại.
+ */
+export function reviewCompanionNurtureDuty(siteId: string, activeSiteId: string | null): KeepaliveDuty {
+  const me = siteId.trim();
+  const active = (activeSiteId ?? "").trim();
+
+  if (active.length === 0) {
+    return { feed: false, why: "Chưa xác định được trạm hoạt động — không đẩy repo phụ để khỏi dùng cấu hình cũ." };
+  }
+  if (me.length === 0) {
+    return { feed: false, why: "Trạm này chưa khai SITE_ID — không thể chứng minh đây là trạm hoạt động." };
+  }
+  if (me === active) {
+    return { feed: true, why: `Trạm đang hoạt động (${me}).` };
+  }
+  return { feed: false, why: `Trạm nghỉ (${me}) — repo phụ chỉ do trạm đang hoạt động「${active}」nuôi.` };
 }
 
 /**

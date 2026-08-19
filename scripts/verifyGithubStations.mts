@@ -19,16 +19,33 @@
  *      chặn kho còn lại」, và nó phải đứng vững cả với những ngả ném không phải Error.
  */
 import { encryptSecret } from "../src/lib/crypto/secretBox";
-import { pingStation, type StationPing } from "../src/lib/services/githubStations";
 import {
+  applyCompanionNurtureResults,
+  COMPANION_NURTURE_CONCURRENCY,
+  companionNurtureOrder,
+  nurtureCompanionRepo,
+  parseRevisionLedger,
+  pingStation,
+  renderRevisionLedger,
+  runBoundedCompanionJobs,
+  type StationPing,
+} from "../src/lib/services/githubStations";
+import { appSettingsSchema } from "../src/lib/services/settings";
+import {
+  DEFAULT_DAILY_PUSHES,
   DEFAULT_WORKFLOW_FILE,
   HEARTBEAT_PATH,
   KEEPALIVE_INTERVAL_DAYS,
+  MAX_DAILY_PUSHES,
   MS_PER_DAY,
+  REVISION_LEDGER_PATH,
   explainFailure,
   isCommitDue,
   keepaliveOrder,
+  nurtureDayKey,
   parseWorkflowState,
+  reviewCompanionNurtureDuty,
+  reviewCompanionRepos,
   reviewKeepaliveDuty,
   reviewStationIdentity,
   stationSlug,
@@ -49,6 +66,8 @@ const SLUG = `${OWNER}/${REPO}`;
 const WORKFLOW_PATH = `/repos/${OWNER}/${REPO}/actions/workflows/${DEFAULT_WORKFLOW_FILE}`;
 const ENABLE_PATH = `${WORKFLOW_PATH}/enable`;
 const CONTENTS_PATH = `/repos/${OWNER}/${REPO}/contents/${HEARTBEAT_PATH}`;
+const COMPANION_REPO = "quiet-harbor-planner";
+const COMPANION_PATH = `/repos/${OWNER}/${COMPANION_REPO}/contents/${REVISION_LEDGER_PATH}`;
 
 const NOW = new Date("2026-08-12T08:00:00.000Z");
 const daysAgo = (n: number) => new Date(NOW.getTime() - n * MS_PER_DAY).toISOString();
@@ -87,12 +106,25 @@ function station(overrides: Partial<Parameters<typeof pingStation>[0]> = {}) {
     workerId: "github-zhangyu4",
     pat: encryptSecret("ghp_phepthu"),
     enabled: true,
+    companionRepos: [],
+    dailyPushes: 5,
     lastPingAt: null,
     lastCommitAt: null,
     lastPingOk: null,
     lastPingNote: "",
     workflowState: "",
     ...overrides,
+  };
+}
+
+function companion(repo = COMPANION_REPO) {
+  return {
+    repo,
+    lastNurtureDay: null,
+    pushesToday: 0,
+    lastPushAt: null,
+    lastPushOk: null,
+    lastPushNote: "",
   };
 }
 
@@ -366,6 +398,28 @@ async function run() {
     // Khoảng trắng thừa là chuyện của biến môi trường dán tay, không phải chuyện của luật.
     assert(reviewKeepaliveDuty("  auto-hh3d-2  ", "auto-hh3d-2").feed, "SITE_ID có khoảng trắng thừa vẫn là chính nó.");
     assert(!reviewKeepaliveDuty("auto-hh3d-20", "auto-hh3d-2").feed, "So khớp phải TRỌN chuỗi — 'auto-hh3d-20' không phải 'auto-hh3d-2'.");
+
+    // Repo phụ mang quota admin theo ngày nên NGƯỢC chiều: không biết active site là phải dừng.
+    assert(
+      reviewCompanionNurtureDuty("auto-hh3d-2", "auto-hh3d-2").feed,
+      "Repo phụ phải chạy ở đúng active station.",
+    );
+    assert(
+      !reviewCompanionNurtureDuty("auto-hh3d-2", null).feed,
+      "Không đọc được control doc mà repo phụ vẫn chạy — stale station có thể phá dailyPushes=0.",
+    );
+    assert(
+      !reviewCompanionNurtureDuty("", "auto-hh3d-2").feed,
+      "Thiếu SITE_ID không chứng minh được quyền đẩy repo phụ.",
+    );
+    assert(
+      !reviewCompanionNurtureDuty("auto-hh3d-1", "auto-hh3d-2").feed,
+      "Trạm nghỉ không được đẩy repo phụ bằng snapshot quota cũ.",
+    );
+    assert(
+      reviewCompanionNurtureDuty(" auto-hh3d-2 ", "auto-hh3d-2").feed,
+      "Duty repo phụ phải trim SITE_ID giống keepalive chính.",
+    );
   }
 
   // ---- 12. explainFailure: mã lỗi nào đổ cho PAT, mã lỗi nào KHÔNG -------------------------
@@ -409,8 +463,316 @@ async function run() {
     assert(explainFailure(418, null, "x").includes("418"), "Mã lạ vẫn phải hiện nguyên số.");
   }
 
+  // ───────── 13. Schema mở rộng nhưng document cũ không cần migrate SQL ─────────
+  {
+    const old = appSettingsSchema.parse({
+      githubStations: [{ owner: OWNER, repo: REPO, pat: "v1.phong-bi-doi-cu" }],
+    }).githubStations[0]!;
+    assert(old.companionRepos.length === 0, "Station cũ thiếu companionRepos phải đọc thành [], không được làm mất cả sổ.");
+    assert(old.dailyPushes === DEFAULT_DAILY_PUSHES, "Station cũ phải nhận mặc định 5 commit/ngày.");
+
+    const expanded = appSettingsSchema.parse({
+      githubStations: [
+        {
+          owner: OWNER,
+          repo: REPO,
+          pat: "v1.phong-bi",
+          dailyPushes: MAX_DAILY_PUSHES + 1,
+          companionRepos: [{ repo: COMPANION_REPO }],
+        },
+      ],
+    }).githubStations[0]!;
+    assert(expanded.dailyPushes === DEFAULT_DAILY_PUSHES, "Quota vượt 24 phải rơi về mặc định an toàn.");
+    assert(expanded.companionRepos[0]?.pushesToday === 0, "Trace thiếu trong document phải được điền 0/null.");
+
+    assert(reviewCompanionRepos(REPO, []) === null, "Station đời cũ không có kho phụ vẫn phải hợp lệ.");
+    assert(reviewCompanionRepos(REPO, [COMPANION_REPO, "second-toolkit"]) === null, "Hai tên kho phụ hợp lệ bị chặn.");
+    assert(reviewCompanionRepos(REPO, [COMPANION_REPO, COMPANION_REPO.toUpperCase()]) !== null, "Tên kho GitHub trùng khác hoa/thường phải bị chặn.");
+    assert(reviewCompanionRepos(REPO, [REPO]) !== null, "Kho phụ trùng kho khôi lỗi chính phải bị chặn.");
+  }
+
+  // ───────── 14. Ngày quota là UTC+7, không phải ngày UTC của Vercel ─────────
+  {
+    assert(
+      nurtureDayKey(new Date("2026-08-18T16:59:59.999Z")) === "2026-08-18",
+      "Một mili giây trước nửa đêm UTC+7 vẫn phải thuộc ngày cũ.",
+    );
+    assert(
+      nurtureDayKey(new Date("2026-08-18T17:00:00.000Z")) === "2026-08-19",
+      "Đúng nửa đêm UTC+7 phải sang ngày mới.",
+    );
+  }
+
+  // ───────── 15. Renderer tạo TypeScript tiếng Anh và parser đọc đúng contract generator ─────────
+  {
+    const bootstrap = renderRevisionLedger("", 0, NOW, "bootstrap");
+    assert(parseRevisionLedger(bootstrap)?.ordinal === 0, "Ledger bootstrap của generator phải đọc được.");
+    const source = renderRevisionLedger(nurtureDayKey(NOW), 4, NOW, "revision-fixed");
+    const mark = parseRevisionLedger(source);
+    assert(mark?.day === nurtureDayKey(NOW) && mark.ordinal === 4, "Renderer và parser trôi contract khỏi nhau.");
+    assert(source.includes("export const revisionLedger"), "Mỗi lượt phải ghi source TypeScript được app import.");
+    assert(source.includes("Runtime revision metadata"), "Chú thích public source phải là tiếng Anh.");
+    assert(parseRevisionLedger("export const revisionLedger = {};") === null, "Source thiếu day/ordinal không được đoán bừa.");
+  }
+
+  const ledgerReply = (day: string, ordinal: number, sha = `blob-${ordinal}`): Reply => ({
+    status: 200,
+    body: {
+      sha,
+      encoding: "base64",
+      content: Buffer.from(renderRevisionLedger(day, ordinal, NOW, ordinal === 0 ? "bootstrap" : `revision-${ordinal}`)).toString("base64"),
+    },
+  });
+
+  // ───────── 16. Mặc định 5: một GET + đúng năm PUT source tuần tự ─────────
+  {
+    let expected = 1;
+    let expectedSha = "blob-0";
+    const calls = installFetch((call) => {
+      if (call.method === "GET" && call.path === COMPANION_PATH) return ledgerReply("", 0);
+      if (call.method === "PUT" && call.path === COMPANION_PATH) {
+        const source = Buffer.from(String(call.body?.content), "base64").toString("utf8");
+        const mark = parseRevisionLedger(source);
+        assert(mark?.ordinal === expected, `Revision phải đi tuần tự ${expected}, nhận ${mark?.ordinal}.`);
+        if (!mark) throw new Error("PUT không mang revision ledger hợp lệ.");
+        assert(mark.day === nurtureDayKey(NOW), "Source phải mang ngày UTC+7 hiện tại.");
+        assert(call.body?.sha === expectedSha, `Chuỗi sha đứt: PUT ${mark.ordinal} dùng ${String(call.body?.sha)}, cần ${expectedSha}.`);
+        assert(String(call.body?.message).startsWith("chore: advance revision ledger"), "Commit message phải là tiếng Anh.");
+        expectedSha = `blob-${mark.ordinal}`;
+        expected += 1;
+        return { status: 200, body: { content: { sha: `blob-${mark.ordinal}` }, commit: { sha: `commit-${mark.ordinal}` } } };
+      }
+      throw new Error(`GitHub giả không biết đường companion ${call.method} ${call.path}`);
+    });
+    const parent = station({ companionRepos: [companion()], dailyPushes: DEFAULT_DAILY_PUSHES });
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW);
+    assert(result.ok && result.pushed === 5 && result.ordinal === 5, `Mặc định phải đẩy đúng 5 commit: ${result.note}`);
+    assert(calls.filter((call) => call.method === "GET").length === 1, "Năm commit chỉ cần một GET ledger đầu vòng.");
+    assert(writes(calls).length === 5, `Phải có đúng 5 PUT, đang có ${writes(calls).length}.`);
+  }
+
+  // ───────── 17. GitHub ordinal thắng DB: đủ thì 0 PUT, thiếu thì chỉ nối phần còn lại ─────────
+  {
+    const calls = installFetch((call) => {
+      if (call.method === "GET" && call.path === COMPANION_PATH) return ledgerReply(nurtureDayKey(NOW), 5);
+      throw new Error("Ledger đã đủ mà service vẫn định ghi.");
+    });
+    const parent = station({
+      companionRepos: [{ ...companion(), lastNurtureDay: null, pushesToday: 0 }],
+      dailyPushes: 5,
+    });
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW);
+    assert(result.ok && result.pushed === 0 && result.ordinal === 5, "DB rỗng nhưng GitHub đã đủ thì không được đẩy trùng.");
+    assert(writes(calls).length === 0, "Idempotency phải là hành vi 0 PUT, không chỉ là câu status.");
+  }
+  {
+    let next = 4;
+    const calls = installFetch((call) => {
+      if (call.method === "GET" && call.path === COMPANION_PATH) return ledgerReply(nurtureDayKey(NOW), 3);
+      if (call.method === "PUT" && call.path === COMPANION_PATH) {
+        const mark = parseRevisionLedger(Buffer.from(String(call.body?.content), "base64").toString("utf8"));
+        assert(mark?.ordinal === next, `Resume phải bắt đầu ở ${next}, nhận ${mark?.ordinal}.`);
+        next += 1;
+        return { status: 200, body: { content: { sha: `blob-${mark!.ordinal}` } } };
+      }
+      throw new Error("Đường companion lạ.");
+    });
+    const parent = station({ companionRepos: [companion()], dailyPushes: 5 });
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW);
+    assert(result.ok && result.pushed === 2 && result.ordinal === 5, `Ledger 3/5 chỉ được nối hai lượt: ${result.note}`);
+    assert(writes(calls).length === 2, "Resume 3/5 phải đúng hai PUT.");
+  }
+
+  // ───────── 18. Hỏng giữa vòng trả ordinal thật để lượt sau nối tiếp, không nhận nhầm đủ ─────────
+  {
+    let accepted = 0;
+    const calls = installFetch((call) => {
+      if (call.method === "GET" && call.path === COMPANION_PATH) return ledgerReply("", 0);
+      if (call.method === "PUT" && call.path === COMPANION_PATH) {
+        const mark = parseRevisionLedger(Buffer.from(String(call.body?.content), "base64").toString("utf8"))!;
+        if (mark.ordinal === 4) return { status: 409, body: { message: "sha moved" } };
+        accepted = mark.ordinal;
+        return { status: 200, body: { content: { sha: `blob-${mark.ordinal}` } } };
+      }
+      throw new Error("Đường companion lạ.");
+    });
+    const parent = station({ companionRepos: [companion()], dailyPushes: 5 });
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW);
+    assert(!result.ok && result.pushed === 3 && result.ordinal === 3 && accepted === 3, "Hỏng PUT 4 phải giữ đúng tiến độ 3/5.");
+    assert(result.note.includes("409"), `Lỗi conflict phải có mã để vận hành: ${result.note}`);
+    assert(result.note.includes("cùng ngày") && result.note.includes("không bù"), "Partial 3/5 phải nói rõ chỉ retry cùng ngày mới đủ quota.");
+    assert(writes(calls).length === 4, "Ba PUT thành + một PUT hỏng phải hiện đủ trong sổ gọi.");
+  }
+
+  // ───────── 19. Quota 0 và deadline hết đều không được chạm GitHub ─────────
+  {
+    const calls = installFetch(() => {
+      throw new Error("dailyPushes=0 tuyệt đối không được chạm mạng.");
+    });
+    const parent = station({ companionRepos: [companion()], dailyPushes: 0 });
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW);
+    assert(result.ok && result.target === 0 && result.pushed === 0, "Quota 0 phải là trạng thái tạm ngừng hợp lệ.");
+    assert(calls.length === 0, "Quota 0 vẫn gọi GitHub.");
+  }
+  {
+    const calls = installFetch(() => {
+      throw new Error("Hết deadline tuyệt đối không được bắt đầu request mới.");
+    });
+    const parent = station({ companionRepos: [companion()], dailyPushes: MAX_DAILY_PUSHES });
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW, { deadlineAt: Date.now() - 1 });
+    assert(!result.ok && result.pushed === 0, "Hết ngân sách phải trả partial failure để summary báo được.");
+    assert(result.note.includes("cùng ngày"), `Quota hụt phải bảo chạy lại CÙNG ngày: ${result.note}`);
+    assert(result.note.includes("không bù"), `Không được hứa ngày sau bù quota cũ: ${result.note}`);
+    assert(calls.length === 0, "Hết deadline mà vẫn bắt đầu GET — route có thể vượt 60 giây.");
+  }
+
+  // ───────── 20. Ledger ngày tương lai fail closed, không tạo commit ngược thời gian ─────────
+  {
+    const calls = installFetch((call) => {
+      if (call.method === "GET" && call.path === COMPANION_PATH) return ledgerReply("2099-01-01", 1);
+      throw new Error("Ledger tương lai mà vẫn định ghi.");
+    });
+    const parent = station({ companionRepos: [companion()], dailyPushes: 5 });
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW);
+    assert(!result.ok && /tương lai/.test(result.note), "Ledger tương lai phải hiện lỗi rõ ràng.");
+    assert(writes(calls).length === 0, "Ledger tương lai không được có PUT.");
+  }
+
+  // ───────── 21. Hết budget không ghim cứng đuôi sổ: repo lâu chưa push đi trước ─────────
+  {
+    const oldParent = station({
+      repo: "worker-old",
+      companionRepos: [{ ...companion("software-old"), lastPushAt: daysAgo(10) }],
+    });
+    const newParent = station({
+      repo: "worker-new",
+      companionRepos: [{ ...companion("software-new"), lastPushAt: daysAgo(1) }],
+    });
+    const jobs = [
+      { station: newParent, companion: newParent.companionRepos[0]! },
+      { station: oldParent, companion: oldParent.companionRepos[0]! },
+    ];
+    const ordered = companionNurtureOrder(jobs);
+    assert(ordered[0]?.companion.repo === "software-old", "Kho lâu chưa push phải nhận ngân sách trước.");
+    assert(jobs[0]?.companion.repo === "software-new", "Phép xếp ưu tiên không được sửa thứ tự settings gốc.");
+  }
+
+  // ───────── 22. AbortSignal co theo deadline chung, không đợi tròn timeout 10 giây ─────────
+  {
+    globalThis.fetch = ((_: RequestInfo | URL, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal;
+        if (!signal) return reject(new Error("Request GitHub thiếu AbortSignal."));
+        // AbortSignal.timeout dùng timer unref; safety timer giữ process phép thử sống đủ lâu để
+        // thật sự quan sát abort, thay vì Node thoát mã 0 giữa một Promise còn treo.
+        const safety = setTimeout(() => reject(new Error("AbortSignal không nổ trong 2 giây.")), 2_000);
+        const aborted = () => {
+          clearTimeout(safety);
+          reject(signal.reason ?? new Error("aborted"));
+        };
+        if (signal.aborted) aborted();
+        else signal.addEventListener("abort", aborted, { once: true });
+      })) as typeof fetch;
+    const parent = station({ companionRepos: [companion()], dailyPushes: 5 });
+    const started = Date.now();
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW, {
+      deadlineAt: started + 40,
+    });
+    const elapsed = Date.now() - started;
+    assert(!result.ok && result.note.startsWith("Hết ngân sách"), `Deadline abort phải hiện đúng nguyên nhân: ${result.note}`);
+    assert(result.note.includes("cùng ngày") && result.note.includes("không bù"), "Deadline hụt quota phải hướng dẫn retry cùng ngày.");
+    assert(elapsed < 1_000, `Request sát deadline vẫn treo ${elapsed}ms thay vì abort sớm.`);
+    globalThis.fetch = realFetch;
+  }
+
+  // ───────── 23. Pool giới hạn concurrency và skipped chỉ đếm job CHƯA khởi động ─────────
+  {
+    let active = 0;
+    let peak = 0;
+    const all = await runBoundedCompanionJobs([0, 1, 2, 3, 4, 5, 6], {
+      deadlineAt: Date.now() + 2_000,
+      concurrency: COMPANION_NURTURE_CONCURRENCY,
+      execute: async (job) => {
+        active += 1;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        active -= 1;
+        return job;
+      },
+    });
+    assert(peak === COMPANION_NURTURE_CONCURRENCY, `Pool phải đạt nhưng không vượt concurrency ${COMPANION_NURTURE_CONCURRENCY}; peak=${peak}.`);
+    assert(all.results.join(",") === "0,1,2,3,4,5,6", "Promise hoàn tất khác thứ tự không được làm summary đổi thứ tự repo.");
+    assert(all.skipped === 0, "Deadline rộng mà vẫn bỏ job.");
+
+    active = 0;
+    peak = 0;
+    const bounded = await runBoundedCompanionJobs([0, 1, 2, 3, 4], {
+      deadlineAt: Date.now() + 10,
+      concurrency: 2,
+      execute: async (job) => {
+        active += 1;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        active -= 1;
+        return job;
+      },
+    });
+    assert(bounded.results.length === 2, `Batch đầu đã khởi động phải có 2 result, nhận ${bounded.results.length}.`);
+    assert(bounded.skipped === 3, `Ba job chưa khởi động mới là skipped, nhận ${bounded.skipped}.`);
+    assert(peak === 2, `Pool bounded phải chạy đúng hai job song song, peak=${peak}.`);
+  }
+
+  // ───────── 24. Trace nhiều repo được vá cùng snapshot, không làm rơi config admin ─────────
+  {
+    const settings = appSettingsSchema.parse({
+      githubStations: [
+        {
+          owner: OWNER,
+          repo: REPO,
+          pat: "v1.phong-bi",
+          dailyPushes: 7,
+          companionRepos: [{ repo: COMPANION_REPO }, { repo: "second-toolkit" }],
+        },
+      ],
+    });
+    const recordedAt = new Date("2026-08-12T08:00:30.000Z");
+    const changed = applyCompanionNurtureResults(
+      settings,
+      [
+        {
+          stationSlug: SLUG,
+          repo: COMPANION_REPO,
+          slug: `${OWNER}/${COMPANION_REPO}`,
+          day: nurtureDayKey(NOW),
+          target: 7,
+          ordinal: 7,
+          pushed: 7,
+          ok: true,
+          note: "done",
+        },
+        {
+          stationSlug: SLUG,
+          repo: "second-toolkit",
+          slug: `${OWNER}/second-toolkit`,
+          day: nurtureDayKey(NOW),
+          target: 7,
+          ordinal: 3,
+          pushed: 3,
+          ok: false,
+          note: "partial",
+        },
+      ],
+      recordedAt,
+    );
+    const saved = settings.githubStations[0]!;
+    assert(changed, "Hai repo còn trong fresh settings phải tạo đúng một batch thay đổi.");
+    assert(saved.dailyPushes === 7, "Vá trace không được nuốt quota admin vừa đặt.");
+    assert(saved.companionRepos[0]?.pushesToday === 7 && saved.companionRepos[1]?.pushesToday === 3, "Hai trace phải cùng được vá vào một snapshot.");
+    assert(saved.companionRepos.every((repo) => repo.lastPushAt === recordedAt.toISOString()), "Repo đã push phải nhận cùng mốc ghi batch.");
+  }
+
   globalThis.fetch = realFetch;
-  console.log("✔ Vòng nuôi kho GitHub: 13 nhóm ca, mọi luật đứng vững.");
+  console.log("✔ Vòng nuôi kho GitHub: 24 nhóm ca, mọi luật đứng vững.");
 }
 
 run().catch((err) => {

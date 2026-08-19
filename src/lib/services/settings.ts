@@ -11,7 +11,12 @@ import {
 } from "@/lib/validation/retention";
 import { MAX_LINES_PER_NOTE, MAX_LINE_LENGTH, MAX_NOTES } from "@/lib/changelog";
 import { db, schema } from "@/lib/db/client";
-import { DEFAULT_WORKFLOW_FILE } from "@/lib/validation/githubStations";
+import {
+  DEFAULT_DAILY_PUSHES,
+  DEFAULT_WORKFLOW_FILE,
+  MAX_DAILY_PUSHES,
+  MIN_DAILY_PUSHES,
+} from "@/lib/validation/githubStations";
 import { DEFAULT_GAME_BASE_URL, normalizeGameBaseUrl } from "@/lib/quest-engine/cookies.mjs";
 import type { TagFrame } from "@/lib/validation/tags";
 
@@ -29,6 +34,23 @@ import type { TagFrame } from "@/lib/validation/tags";
 const backdropImageSchema = z.object({
   key: z.string().min(1).max(512),
   url: z.string().min(1).max(2048),
+});
+
+/**
+ * Một kho phần mềm phụ đi cùng kho khôi lỗi chính.
+ *
+ * Owner và PAT cố ý không lặp lại: cả ba kho do cùng một lượt `github:new` tạo dưới cùng tài
+ * khoản, và một bản sao PAT cho mỗi kho chỉ tạo thêm ba nơi có thể lệch nhau. Các trường còn lại
+ * là DẤU VẾT quan sát; ledger trên GitHub mới là nguồn sự thật về ordinal trong ngày, nên mọi
+ * trường đều có fallback để một document cũ/rác không làm mất cả station.
+ */
+const githubCompanionRepoSchema = z.object({
+  repo: z.string().min(1).max(100),
+  lastNurtureDay: z.string().max(10).nullable().catch(null).default(null),
+  pushesToday: z.number().int().min(0).max(MAX_DAILY_PUSHES).catch(0).default(0),
+  lastPushAt: z.string().nullable().catch(null).default(null),
+  lastPushOk: z.boolean().nullable().catch(null).default(null),
+  lastPushNote: z.string().max(500).catch("").default(""),
 });
 
 export const appSettingsSchema = z.object({
@@ -323,6 +345,23 @@ export const appSettingsSchema = z.object({
         pat: z.string().min(1),
         /** Tắt là đứng ngoài vòng nuôi — dòng và PAT giữ nguyên, chỉ không ai đụng tới kho ấy. */
         enabled: z.boolean().catch(true).default(true),
+        /**
+         * Hai kho phần mềm ngẫu nhiên được dựng cùng khôi lỗi. Station đời cũ không có trường
+         * này và phải tiếp tục đọc được nguyên vẹn, nên mặc định là mảng rỗng; chỉ lượt tạo MỚI
+         * bắt buộc đủ hai kho. Trace nằm theo repo để đổi thứ tự không gán nhầm trạng thái.
+         */
+        companionRepos: z.array(githubCompanionRepoSchema).max(2).catch([]).default([]),
+        /**
+         * Số commit MỖI NGÀY cho MỖI kho phụ. 0 chỉ tạm ngừng phần nuôi software, không tắt
+         * workflow khôi lỗi chính; đó là lý do không dùng chung cờ `enabled`.
+         */
+        dailyPushes: z
+          .number()
+          .int()
+          .min(MIN_DAILY_PUSHES)
+          .max(MAX_DAILY_PUSHES)
+          .catch(DEFAULT_DAILY_PUSHES)
+          .default(DEFAULT_DAILY_PUSHES),
         /**
          * HAI mốc thời gian, và chúng KHÔNG thay nhau được:
          *   • `lastPingAt` — lượt ngó gần nhất, mỗi ngày một lần. Trả lời「vòng nuôi còn chạy không」.

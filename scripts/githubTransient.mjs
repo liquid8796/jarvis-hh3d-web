@@ -25,29 +25,6 @@
  * Cùng bộ lọc với `whoami` bên `newGithubStation.mts` — chỗ ấy đọc `res.status`, chỗ này đọc chữ.
  */
 
-/**
- * `gh repo create` hỏng — có được phép GỌI LẠI không?
- *
- * Câu hỏi này KHÁC「có phải nhịp nấc không」, và chỗ khác nhau ấy tốn tiền thật: `gh repo create
- * --source . --push` làm HAI việc (tạo kho, rồi đẩy mã). Một cú 5xx có thể rơi trước cú tạo
- * (chưa có gì — gọi lại là đúng) hoặc SAU nó (kho đã nằm trên tài khoản — gọi lại chỉ nhận
- * 422「name already exists」rồi che mất sự thật là ta vừa để lại một kho rỗng).
- *
- * Nên phép quyết định hỏi thêm một sự thật ngoài đời: kho ấy CÓ trên GitHub chưa.
- *
- *   `"no"`      chưa có     → nấc thì gọi lại, an toàn tuyệt đối
- *   `"yes"`     đã có       → KHÔNG gọi lại; người gọi đi ngả dọn dẹp
- *   `"unknown"` không hỏi được (GitHub cũng đang nấc ở chính lời hỏi ấy) → KHÔNG gọi lại
- *
- * Ngả `"unknown"` là ngả dễ viết sai nhất: coi「không hỏi được」thành「chưa có」là đúng cái cách
- * người ta tạo ra hai kho trong một lượt chạy, giữa lúc GitHub đang sự cố — mà tên kho thì
- * ngẫu nhiên nên cái thứ hai không va vào cái thứ nhất để mà lộ ra.
- */
-export function shouldRetryCreate({ why, existence }) {
-  if (existence !== "no") return false;
-  return looksTransient(why);
-}
-
 /** Có phải một nhịp hỏng THOÁNG QUA (đáng thử lại) không. Chuỗi rỗng/không rõ → KHÔNG. */
 export function looksTransient(text) {
   const t = String(text ?? "").toLowerCase();

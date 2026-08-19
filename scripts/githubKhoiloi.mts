@@ -64,7 +64,7 @@ export type Candidate = {
 export function looksLikeKhoiloiRepoName(repo: string): boolean {
   const lower = repo.toLowerCase();
   // Từ 17/08/2026 tên kho là ngẫu nhiên, không còn tiền tố nào để bắt — nên bộ lọc hỏi HÌNH DẠNG
-  // (`<từ>-<từ>-<4 hex>`) trước, rồi mới hỏi các tiền tố ĐỜI CŨ cho những kho dựng trước lượt đổi.
+  // (`<từ>-<từ>-<4 hex đời cũ | 16 hex đời mới>`) trước, rồi mới hỏi các tiền tố ĐỜI CŨ.
   return GENERATED_NAME_SHAPE.test(lower) || ALL_REPO_NAME_PREFIXES.some((prefix) => lower.startsWith(prefix));
 }
 

@@ -88,6 +88,9 @@
     "verify:github-removal": "tsx scripts/verifyGithubKhoiloiRemoval.mts",
     "verify:roster-purge": "tsx scripts/verifyRosterPurge.mts",
     "verify:khoiloi-naming": "node scripts/verifyKhoiloiNaming.mjs",
+    "verify:github-companions": "node scripts/verifyCompanionProjects.mjs --build",
+    "verify:github-companions:static": "node scripts/verifyCompanionProjects.mjs",
+    "verify:github-bundle": "node scripts/verifyGithubBundleSafety.mjs",
     "verify:bat-eol": "node scripts/verifyBatchEol.mjs",
     "verify:app-db": "tsx scripts/verifyAppDatabase.mts",
     "verify:mirror-book": "tsx scripts/verifyMirrorBook.mts"

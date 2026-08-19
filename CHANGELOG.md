@@ -11,6 +11,45 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.21 — Gỡ màn kiểm tra GIỮA VÒNG, chỗ nó thật sự xuất hiện
+
+Đo sản xuất ngay sau khi bật cờ ở 1.3.20, và số liệu bác một giả định của chính tôi:
+
+```
+19:08:27  Trang game dựng màn kiểm tra (Cloudflare) GIỮA VÒNG …
+19:08:28  (lần nữa)
+--- 25 phút qua: việc thuận=0 · lần chặn=2
+```
+
+**Không một dòng「Đã bấm ô kiểm tra」.** Cú bấm dựng ở 1.3.18 vẫn chưa từng chạy, dù cờ đã bật ở
+1.3.20 — vì nó chỉ nằm trong vòng chờ của `ensureReady`, tức CỔNG ĐẦU VÒNG, còn màn kiểm tra thì
+đến GIỮA VÒNG. Lượt 1.3.19 tôi cố ý hoãn chỗ ấy với lý lẽ「vòng sau cổng sẽ bắt được」; sản xuất
+vừa chứng minh là không: cổng qua sạch (`phiên đăng nhập còn hiệu lực`), rồi mới bị chặn ở nhiệm
+vụ đầu tiên. Cứ thế lặp, nên cú bấm vĩnh viễn không có cơ hội nào.
+
+**Bản vá.** Engine nhận `clickTurnstile` **tiêm vào** thay vì tự biết cách bấm: nó không sở hữu
+danh tính trình duyệt (việc của runCycle), và nhập thẳng `attemptTurnstileClick` từ runCycle.mjs
+sẽ tạo vòng import. Gặp màn kiểm tra giữa vòng: bấm → hỏi lại trang tối đa 12 giây (nhịp 1,5s) →
+qua được thì **chạy lại nhiệm vụ ấy và đi tiếp**; không qua mới ném `CycleBlocked` như cũ, kèm
+câu「Đã thử bấm ô kiểm tra mà không qua」để lần đọc nhật ký sau phân biệt được hai cảnh.
+
+**MỘT DEFECT DO REVIEW BẮT ĐƯỢC, không phải do lưới:** nhánh「gỡ được → chạy lại」dùng `continue`,
+mà `continue` NHẢY QUA phép kiểm `attempt >= MAX_PAGE_RENDER_ATTEMPTS`. Một trang cứ dựng lại màn
+kiểm tra sau mỗi cú bấm sẽ giữ khôi lỗi trong **vòng lặp vô tận** — mỗi vòng 25 giây chờ + 12
+giây hỏi lại, ghế bị giữ mãi mà nhật ký không có dấu hiệu gì bất thường. Thêm trần
+`MAX_CHALLENGE_CLEARS = 2`, và thêm ca thử giả lập đúng cái bẫy ấy (một `clickTurnstile` luôn
+khai「gỡ được」trong khi trang vẫn là challenge).
+
+Lưới `verify:challenge-abort` lên **16 phép kiểm**: thêm nhánh gỡ-được-thì-đi-tiếp (đúng một cú
+bấm), nhánh chạm-trần-thì-dừng, và nhánh **cờ TẮT giữ nguyên nết 1.3.19** — kể cả việc lời báo
+không được nhận vơ là đã thử bấm.
+
+> Nói thẳng phần chưa biết: lưới chứng minh CƠ CHẾ (bấm, chờ, hỏi lại, dừng đúng lúc). Nó KHÔNG
+> chứng minh Cloudflare chấp nhận cú bấm — chuyện đó chỉ sản xuất trả lời được, và câu trả lời sẽ
+> nằm ngay trong Hoạt động ở dạng một trong hai dòng mới.
+
+---
+
 ## 1.3.20 — Bật cú bấm Turnstile cho khôi lỗi tông môn, và bắt nó NÓI RA
 
 Tông chủ báo「vẫn dính」. Bản vá 1.3.19 chạy đúng thiết kế — vòng dừng sau ~25 giây thay vì 16

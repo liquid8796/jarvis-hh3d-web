@@ -137,6 +137,76 @@ async function main() {
     check("KHÔNG ném CycleBlocked khi chỉ là trang hỏng", brokenThrew === null, String(brokenThrew));
     check("vẫn kết luận failed như trước", broken.outcome === "failed", `${broken.outcome}`);
     check("…và vẫn thử đủ 3 lượt (nết cũ không đổi)", hits === 3, `${hits} lượt tải`);
+    // ---- Gỡ màn kiểm tra GIỮA VÒNG (đo sản xuất 20/08: màn tới giữa vòng, không ở cổng) ----
+    // Cú bấm đặt ở cổng đầu vòng (1.3.18) chưa một lần được chạy vì màn kiểm tra không tới ở
+    // cổng. `clickTurnstile` được TIÊM vào engine nên ở đây giả lập được mà không cần trình
+    // duyệt thật phải thắng Cloudflare thật.
+    console.log("\nGỡ được màn kiểm tra giữa vòng — phải ĐI TIẾP, không bỏ chạy");
+    {
+      mode = "challenge";
+      hits = 0;
+      let clicks = 0;
+      // Gỡ thành công: đổi fixture sang trang khoẻ rồi khai true, đúng như một cú bấm ăn thua.
+      const engineClearing = createQuestEngine({
+        log: { info: () => {}, warning: () => {}, debug: () => {} },
+        clickTurnstile: async () => {
+          clicks++;
+          mode = "slow";
+          return true;
+        },
+      });
+      let threw: unknown = null;
+      let out: { outcome?: string } = {};
+      try {
+        out = await engineClearing.run(session, profile, questWaiting("/hub"));
+      } catch (err) {
+        threw = err;
+      }
+      check("gỡ được thì KHÔNG ném CycleBlocked", threw === null, String(threw));
+      check("…và nhiệm vụ chạy tiếp cho tới khi xong", out.outcome !== "failed", String(out.outcome));
+      check("…chỉ cần đúng một cú bấm", clicks === 1, `${clicks} cú`);
+    }
+
+    console.log("\nGỡ xong màn kiểm tra lại dựng lại — phải có TRẦN, không lặp vô tận");
+    {
+      mode = "challenge";
+      hits = 0;
+      let clicks = 0;
+      // Khai gỡ được MÃI nhưng trang vẫn là challenge: đúng cái bẫy vòng lặp vô tận.
+      const engineLying = createQuestEngine({
+        log: { info: () => {}, warning: () => {}, debug: () => {} },
+        clickTurnstile: async () => {
+          clicks++;
+          return true;
+        },
+      });
+      let threw: unknown = null;
+      try {
+        await engineLying.run(session, profile, questWaiting("/hub"));
+      } catch (err) {
+        threw = err;
+      }
+      check("chạm trần thì ném CycleBlocked chứ không quay vòng mãi", threw instanceof CycleBlocked, String(threw));
+      check("…và số cú bấm bị chặn ở trần (2)", clicks === 2, `${clicks} cú`);
+    }
+
+    console.log("\nKhông tiêm cách gỡ (cờ tắt) — giữ nguyên nết 1.3.19");
+    {
+      mode = "challenge";
+      hits = 0;
+      let threw: unknown = null;
+      try {
+        await engine.run(session, profile, questWaiting("/hub"));
+      } catch (err) {
+        threw = err;
+      }
+      check("vẫn dừng sớm như cũ", threw instanceof CycleBlocked, String(threw));
+      check(
+        "…và lời báo KHÔNG nhận vơ là đã thử bấm",
+        threw instanceof CycleBlocked && !threw.message.includes("Đã thử bấm"),
+        threw instanceof CycleBlocked ? threw.message.slice(-60) : "",
+      );
+    }
   } finally {
     if (browser) await browser.close().catch(() => {});
     await new Promise<void>((r) => server.close(() => r()));

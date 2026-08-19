@@ -296,6 +296,21 @@ export const automationJobs = pgTable(
     /** Số vòng đã được khôi lỗi tiếp nhận; tăng mỗi lần job thức dậy khỏi lịch chờ. */
     attempts: integer("attempts").notNull().default(0),
     workerId: text("worker_id"),
+    /**
+     * Khôi lỗi đã chạy vòng GẦN NHẤT của đàn này — chỉ để NHỚ, không mang nghĩa「đang giữ」.
+     *
+     * Hai cột chứ không một, và đó là chủ ý: `worker_id` cố ý bị xoá về null lúc đàn quay lại
+     * hàng chờ (migration 0027) để bảng Hàng Đợi thôi vẽ ra một sự phân công không có thật. Phép
+     * dính chân (`pickDispatch`) thì lại cần đúng cái ký ức ấy sống qua quãng cooldown.
+     *
+     * Vì sao cần dính chân: mỗi khôi lỗi là một IP khác, và `cf_clearance` của Cloudflare gắn
+     * chặt với IP đã giải nó. Đo 19/08/2026: một tài khoản chạy 39 vòng trên MƯỜI khôi lỗi trong
+     * sáu giờ — với Cloudflare đó là một phiên nhảy qua mười địa chỉ, và mỗi cú nhảy là một màn
+     * Turnstile mới.
+     *
+     * NULL = chưa từng chạy; đàn ấy không ưu ái ai, luân phiên chia như thường.
+     */
+    lastWorkerId: text("last_worker_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     /**
      * Lúc job đủ điều kiện được claim. Sau mỗi vòng, server đặt mốc này theo cooldown sớm

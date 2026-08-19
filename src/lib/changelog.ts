@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.15",
+    date: "2026-08-19",
+    lines: [
+      "Mỗi đàn nay ở lại với đúng cái máy đã chạy nó, thay vì mỗi vòng lại nhảy sang một máy khác.",
+      "Trước đây một tài khoản đi qua cả chục máy trong một buổi, mỗi máy một địa chỉ khác — trang game coi đó là đáng ngờ nên bắt xác minh.",
+      "Máy cũ nghỉ hoặc kín chỗ thì đàn vẫn sang máy khác ngay, không phải chờ.",
+    ],
+  },
+  {
     version: "1.3.14",
     date: "2026-08-19",
     lines: [

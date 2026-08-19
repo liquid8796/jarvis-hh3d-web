@@ -45,11 +45,12 @@ const runner = (over: Partial<DispatchRunner> & { id: string }): DispatchRunner 
   ...over,
 });
 
-/** Đàn vừa tới giờ của đạo hữu `u1`, chưa chọn「Giao đàn cho」. */
+/** Đàn vừa tới giờ của đạo hữu `u1`, chưa chọn「Giao đàn cho」, và CHƯA từng chạy ở đâu. */
 const job = (over: Partial<DispatchJob> & { id: string }): DispatchJob => ({
   userId: "u1",
   ownerPref: "any",
   dueAt: NOW,
+  lastRunner: null,
   ...over,
 });
 
@@ -240,6 +241,69 @@ console.log("Bộ cân tải luân phiên — việc phải chia theo lượt, k
   check("khai âm bị nâng lên 1", clampMaxJobs(-5) === 1);
   check("khai quá cao bị hạ về trần", clampMaxJobs(999) === MAX_JOBS_CEILING);
   check("số lẻ bị cắt xuống", clampMaxJobs(3.9) === 3);
+}
+
+// ---- 9. DÍNH CHÂN: đàn ở lại với khôi lỗi đã chạy nó ------------------------------------
+//
+// Vì sao có luật này, đo trên sổ thật 19/08/2026: tài khoản `fptshop` chạy 39 vòng trong sáu giờ
+// trên MƯỜI khôi lỗi khác nhau, `long01` 41 vòng cũng trên mười. Mỗi khôi lỗi là một IP khác, và
+// `cf_clearance` của Cloudflare gắn chặt với IP đã giải nó — nên với cổng kiểm tra thì đó là một
+// phiên đăng nhập nhảy qua mười địa chỉ trong một buổi sáng, và mỗi cú nhảy là một màn Turnstile.
+{
+  const runners = [
+    runner({ id: "w1", lastAssignedAt: NOW - 60_000 }),
+    runner({ id: "w2", lastAssignedAt: NOW - 10_000 }),
+  ];
+  const stuck = [job({ id: "j1", lastRunner: "w2" })];
+
+  // w1 đang tới lượt theo luân phiên — và vẫn KHÔNG được, vì đàn có chủ cũ còn trực.
+  const outsider = pick("w1", runners, stuck);
+  check("đàn đã có chủ cũ còn trực → khôi lỗi khác KHÔNG cướp, dù đang tới lượt", outsider.jobId === null, outsider.reason);
+  check("…và lý do nói đúng là dính chân", outsider.reason === "waiting-affinity", outsider.reason);
+  check("chủ cũ nhận lại đàn, bất kể vừa được giao việc xong", pick("w2", runners, stuck).jobId === "j1");
+
+  // Chủ cũ VẮNG thì đàn đi tiếp NGAY — dính chân không được phép thành một sợi xích.
+  const gone = [runner({ id: "w1", lastAssignedAt: NOW - 60_000 }), runner({ id: "w2", lastSeen: NOW - 120_000 })];
+  check("chủ cũ vắng mặt → đàn về luân phiên ngay, không chờ ai", pick("w1", gone, stuck).jobId === "j1");
+
+  // Chủ cũ HẾT GHẾ cũng vậy, và đây là đánh đổi có chủ ý: chờ một cái ghế trống có thể mất vài
+  // phút (một vòng chạy), đắt hơn hẳn cái lợi của việc ở lại đúng IP.
+  const busy = [
+    runner({ id: "w1", lastAssignedAt: NOW - 60_000 }),
+    runner({ id: "w2", running: 2, maxJobs: 2 }),
+  ];
+  check("chủ cũ hết ghế → đàn về luân phiên ngay", pick("w1", busy, stuck).jobId === "j1");
+
+  // Chủ cũ đã bị gỡ khỏi sổ điểm danh: `lastRunner` trỏ vào hư không, không được làm treo đàn.
+  const orphan = [runner({ id: "w1", lastAssignedAt: NOW - 60_000 })];
+  check("chủ cũ không còn trong sổ → đàn về luân phiên", pick("w1", orphan, stuck).jobId === "j1");
+
+  // Chủ cũ hết TƯ CÁCH: chủ đàn đổi sang「chỉ máy nhà」thì khôi lỗi tông môn cũ không giữ chỗ nữa.
+  const mineOnly = [job({ id: "j1", ownerPref: "mine", lastRunner: "w2" })];
+  const home = [
+    runner({ id: "nha", userId: "u1", lastAssignedAt: NOW - 60_000 }),
+    runner({ id: "w2", lastAssignedAt: NOW - 10_000 }),
+  ];
+  check("chủ cũ không còn đủ tư cách → máy nhà nhận đàn", pick("nha", home, mineOnly).jobId === "j1");
+
+  // VAN CHỐNG ĐÓI thắng dính chân — đây là thứ giữ cho luật này không bao giờ khoá cứng một đàn.
+  const overdue = [job({ id: "j1", lastRunner: "w2", dueAt: NOW - TURN_GRACE_MS })];
+  const late = pick("w1", runners, overdue);
+  check("quá hạn chờ → van mở, dính chân thôi giữ chỗ", late.jobId === "j1", late.reason);
+  check("…và lý do nói đúng là van chống đói", late.reason === "granted-overdue", late.reason);
+
+  // Dính chân của đàn NÀY không được chặn đàn KHÁC: một hàng chờ có một đàn dính chân vẫn phải
+  // chảy tiếp cho những đàn còn lại.
+  const mixed = [job({ id: "j1", lastRunner: "w2" }), job({ id: "j2" })];
+  check("đàn dính chân không chặn đàn phía sau", pick("w1", runners, mixed).jobId === "j2");
+
+  // Và dính chân ĐI TRƯỚC luân phiên cho chính mình: chủ cũ không phải chờ tới lượt để nhận lại
+  // đàn của nó — nếu phải chờ thì mỗi vòng lại là một cuộc đua mới, tức lại nhảy IP.
+  const justServed = [
+    runner({ id: "w1", lastAssignedAt: NOW - 60_000 }),
+    runner({ id: "w2", lastAssignedAt: NOW }),
+  ];
+  check("chủ cũ vừa được giao việc vẫn nhận lại đàn của mình ngay", pick("w2", justServed, stuck).jobId === "j1");
 }
 
 console.log(`\n${checks} phép kiểm — bộ cân tải chia việc đúng luật.`);

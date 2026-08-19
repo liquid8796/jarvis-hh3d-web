@@ -162,6 +162,7 @@ try {
             userId: rows[0].user_id,
             ownerPref: rows[0].owner_pref,
             dueAt: NOW,
+            lastRunner: null,
           },
         ],
       }).jobId === jobId

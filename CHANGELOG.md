@@ -11,6 +11,59 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.15 — Dính chân: một đàn ở lại với một khôi lỗi, thay vì đi tuần mười cái IP
+
+Tông chủ, sau bản vá client hints: *"vẫn bị CF phát hiện nếu 1 tk chạy ở nhiều IP khác nhau cùng
+lúc"*, kèm ảnh Turnstile「Xác minh bạn là con người」của `hoathinh3d.so`.
+
+**Đo trước khi sửa** (`job_events`, 6 giờ gần nhất):
+
+| tài khoản | số vòng | số khôi lỗi khác nhau |
+|---|---|---|
+| `fptshop` | 39 | **10** |
+| `long01` | 41 | **10** |
+| `vinhhades` | 8 | 7 |
+| `gaga` | 11 | 7 |
+
+Mỗi khôi lỗi là một IP khác — runner GitHub đổi IP mỗi lượt chạy — nên với Cloudflare thì đó
+không phải mười lượt khách, mà là **một phiên đăng nhập nhảy qua mười địa chỉ trong một buổi
+sáng**. `cf_clearance` gắn chặt với IP đã giải nó, nên mỗi cú nhảy là một lần trình diện từ một
+địa chỉ chưa từng qua cửa: một màn Turnstile mới, và lần này là loại phải bấm.
+
+Nguyên nhân nằm ở chính bộ cân tải luân phiên (0027): nó trải việc đều theo TỪNG VÒNG — đúng
+điều nó sinh ra để làm, và cũng chính là thứ đẩy một tài khoản đi tuần khắp đội máy.
+
+**Luật mới thêm một nấc TRƯỚC luân phiên** (`preferredRunner` trong `services/dispatch.ts`): đàn
+nào đã có khôi lỗi chạy nó thì trả về đúng khôi lỗi ấy — **miễn là** nó còn trực, còn ghế, và vẫn
+đủ tư cách. Ba điều kiện ấy là toàn bộ cái van an toàn, và cả ba đều có ca kiểm riêng.
+
+**Dính chân là ƯU TIÊN, không phải sợi xích.** Bốn đường thoát, mỗi đường một ca:
+
+- chủ cũ **vắng mặt** → đàn về luân phiên ngay, không chờ một giây nào;
+- chủ cũ **hết ghế** → cũng ngay, và đây là đánh đổi có chủ ý: chờ một ghế trống có thể mất vài
+  phút (trọn một vòng chạy), đắt hơn hẳn cái lợi của việc ở lại đúng IP;
+- chủ cũ **không còn trong sổ** (đã bị gỡ) → về luân phiên;
+- **van chống đói** (20 giây, có sẵn từ 0027) vẫn thắng tất cả — đàn quá hạn thì ai đủ tư cách
+  cũng nhận được, dính chân thôi giữ chỗ.
+
+Và dính chân **đi trước luân phiên cho chính chủ cũ**: nó không phải chờ tới lượt để nhận lại đàn
+của mình. Thiếu vế này thì mỗi vòng lại là một cuộc đua mới, tức lại nhảy IP — đúng cái vừa vá.
+
+**Cột thứ hai, không dùng lại `worker_id`** (migration `0029`): `worker_id` cố ý bị xoá về null
+lúc đàn quay lại hàng chờ (0027) để bảng Hàng Đợi thôi vẽ ra một sự phân công không có thật. Phép
+dính chân thì cần đúng cái ký ức ấy sống qua quãng cooldown, nên `last_worker_id` chỉ để NHỚ.
+Migration điền sẵn từ `worker_id` cho những đàn đang chạy; đàn đang nghỉ vốn đã null nên không có
+gì để chép, và null mang đúng nghĩa「chưa từng chạy, không ưu ái ai」.
+
+`verify:dispatch`: **46 phép kiểm** (35 cũ + 11 ca dính chân), tất cả xanh · `tsc` sạch ·
+`typecheck:scripts` đỏ đúng bốn tệp nợ cũ.
+
+**Điều KHÔNG hứa:** đây chữa cảnh một tài khoản đi vòng quanh đội máy theo THỜI GIAN. Nếu đạo hữu
+tự mở trang game ở nhà trong lúc khôi lỗi đang chạy chính tài khoản ấy thì vẫn là hai IP cùng lúc,
+và không dòng mã nào ngăn được — đó là hai người dùng thật của cùng một phiên.
+
+---
+
 ## 1.3.14 — Chromium thôi tự khai「HeadlessChrome」với Cloudflare
 
 Tông chủ: *"fix lỗi chromium ở các khôi lỗi đang bị CF đánh captcha"*. Sổ `job_events` hôm nay có

@@ -108,6 +108,11 @@ export type DispatchJob = {
   ownerPref: string;
   /** `next_run_at` tính bằng mili giây epoch — đầu vào của van chống đói. */
   dueAt: number;
+  /**
+   * Khôi lỗi đã chạy vòng GẦN NHẤT của đàn này (`automation_jobs.last_worker_id`), hoặc `null`
+   * khi đàn chưa từng chạy. Đầu vào của phép DÍNH CHÂN — xem `preferredRunner`.
+   */
+  lastRunner: string | null;
 };
 
 export type DispatchInput = {
@@ -136,7 +141,9 @@ export type DispatchReason =
   /** Có đàn đang chờ nhưng không đàn nào khôi lỗi này được phép cầm. */
   | "not-eligible"
   /** Có đàn mình cầm được, nhưng đang là lượt của khôi lỗi khác. */
-  | "waiting-turn";
+  | "waiting-turn"
+  /** Có đàn mình cầm được, nhưng nó đang dính chân với một khôi lỗi khác còn trực và còn ghế. */
+  | "waiting-affinity";
 
 export type DispatchDecision = {
   /** Đàn được trao — `null` là "chưa tới lượt ngươi", khôi lỗi hỏi lại sau một nhịp. */
@@ -167,6 +174,39 @@ function mayServe(runner: DispatchRunner, job: DispatchJob): boolean {
   const pref = job.ownerPref === "sect" || job.ownerPref === "mine" ? job.ownerPref : "any";
   if (runner.userId === null) return pref !== "mine";
   return runner.userId === job.userId && pref !== "sect";
+}
+
+/**
+ * ── DÍNH CHÂN: đàn ở lại với khôi lỗi đã chạy nó, chừng nào còn ở lại được ──────────────────
+ *
+ * Luân phiên trải việc đều — đúng điều nó sinh ra để làm — nhưng nó trải theo TỪNG VÒNG, mà mỗi
+ * khôi lỗi lại là một địa chỉ IP khác. Đo 19/08/2026 trên sổ thật: `fptshop` chạy 39 vòng trong
+ * sáu giờ trên MƯỜI khôi lỗi, `long01` 41 vòng cũng trên mười. Với Cloudflare thì đó không phải
+ * mười lượt khách; đó là MỘT phiên đăng nhập nhảy qua mười địa chỉ trong một buổi sáng.
+ * `cf_clearance` gắn chặt với IP đã giải nó, nên mỗi cú nhảy là một lần trình diện từ một địa chỉ
+ * chưa từng qua cửa — tức một màn Turnstile mới, và tông chủ thấy nó dưới dạng ảnh chụp「Xác minh
+ * bạn là con người」.
+ *
+ * Nên luật thêm một nấc TRƯỚC luân phiên: đàn nào đã có khôi lỗi chạy nó thì trả về đúng khôi lỗi
+ * ấy — miễn là nó còn trực, còn ghế, và vẫn đủ tư cách. Ba điều kiện ấy là toàn bộ cái van an
+ * toàn: khôi lỗi chết, hết ghế, hay đổi hạng thì đàn đi tiếp ngay, không chờ ai.
+ *
+ * Không có nấc「chờ mãi」: nếu khôi lỗi cũ còn sống nhưng đang bận, van chống đói (`TURN_GRACE_MS`)
+ * vẫn mở đúng như trước và đàn sang tay người khác sau 20 giây. Dính chân là một ƯU TIÊN, không
+ * phải một sợi xích — đổi một chút thông lượng lấy việc thôi nhảy IP, và chỉ trong 20 giây.
+ *
+ * Trả `null` nghĩa là「đàn này không dính chân ai cả」, không phải「không ai được cầm」.
+ */
+function preferredRunner(
+  job: DispatchJob,
+  runners: readonly DispatchRunner[],
+  now: number,
+): DispatchRunner | null {
+  if (job.lastRunner === null) return null;
+  const runner = runners.find((candidate) => candidate.id === job.lastRunner);
+  if (!runner) return null;
+  if (!isOnline(runner, now) || !hasSeat(runner) || !mayServe(runner, job)) return null;
+  return runner;
 }
 
 /**
@@ -212,14 +252,24 @@ export function pickDispatch(input: DispatchInput): DispatchDecision {
   if (jobs.length === 0) return { jobId: null, reason: "no-due-job" };
 
   let sawMine = false;
+  let heldByOther = false;
 
   for (const job of jobs) {
     if (!mayServe(me, job)) continue;
     sawMine = true;
 
-    // Van chống đói đứng TRƯỚC phép tính lượt: khi nó mở thì lượt của ai không còn quan
-    // trọng nữa, và ai hỏi trước thì người ấy được — miễn là đủ tư cách.
+    // Van chống đói đứng TRƯỚC mọi phép ưu tiên: khi nó mở thì cả lượt lẫn dính chân đều không
+    // còn quan trọng, và ai hỏi trước thì người ấy được — miễn là đủ tư cách. Đây cũng là cái
+    // van giữ cho dính chân không bao giờ thành một sợi xích.
     if (now - job.dueAt >= TURN_GRACE_MS) return { jobId: job.id, reason: "granted-overdue" };
+
+    // Dính chân đứng TRƯỚC luân phiên: đàn đã có chủ cũ còn trực thì không đem ra chia lại.
+    const preferred = preferredRunner(job, runners, now);
+    if (preferred !== null) {
+      if (preferred.id === askedBy) return { jobId: job.id, reason: "granted" };
+      heldByOther = true;
+      continue;
+    }
 
     const eligible = runners.filter(
       (runner) => isOnline(runner, now) && hasSeat(runner) && mayServe(runner, job),
@@ -227,5 +277,6 @@ export function pickDispatch(input: DispatchInput): DispatchDecision {
     if (turnHolder(eligible)?.id === askedBy) return { jobId: job.id, reason: "granted" };
   }
 
-  return { jobId: null, reason: sawMine ? "waiting-turn" : "not-eligible" };
+  if (sawMine) return { jobId: null, reason: heldByOther ? "waiting-affinity" : "waiting-turn" };
+  return { jobId: null, reason: "not-eligible" };
 }

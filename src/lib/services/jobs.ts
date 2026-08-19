@@ -615,7 +615,7 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
 
   const dueResult = await db().execute(sql`
     select
-      job.id, job.user_id, job.next_run_at,
+      job.id, job.user_id, job.next_run_at, job.last_worker_id,
       coalesce(
         (select uc.config->>'workerPref' from user_configs as uc where uc.user_id = job.user_id),
         'any'
@@ -689,6 +689,7 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
       userId: String(row.user_id),
       ownerPref: String(row.owner_pref ?? "any"),
       dueAt: new Date(String(row.next_run_at)).getTime(),
+      lastRunner: row.last_worker_id == null ? null : String(row.last_worker_id),
     })),
   });
 
@@ -708,6 +709,12 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
     update automation_jobs set
       status = 'running',
       worker_id = ${workerId},
+      -- Ký ức của phép DÍNH CHÂN, và nó phải được ghi ở ĐÂY: cột worker_id bị xoá về null lúc
+      -- đàn quay lại hàng chờ (migration 0027), nên nếu chỉ dựa vào nó thì mọi đàn đang nghỉ
+      -- đều trông như chưa từng chạy ở đâu, tức dính chân không bao giờ có hiệu lực. Xem
+      -- preferredRunner bên dispatch.ts.
+      -- (Không dấu huyền trong bình chú SQL: cả câu này nằm trong một template literal.)
+      last_worker_id = ${workerId},
       attempts = attempts + 1,
       -- queued là ranh giới an toàn: chưa browser nào dùng snapshot này. Đọc lại config
       -- ngay lúc claim để cookie/nhiệm vụ vừa lưu trong thời gian chờ có hiệu lực ở vòng tới,

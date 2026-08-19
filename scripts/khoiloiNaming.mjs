@@ -63,26 +63,99 @@ export const FORBIDDEN_NAME_WORDS = Object.freeze([
  * Chọn từ TRUNG TÍNH: vật liệu, màu, địa hình ghép với danh từ hạ tầng. Tránh mọi thứ nghe như
  * bot/farm/mining, và tất nhiên tránh danh sách cấm ở trên — `verify:khoiloi-naming` soi từng từ
  * một trong hai rổ, nên thêm một từ hớ vào đây là lưới đỏ ngay dưới máy.
+ *
+ * ── VÌ SAO RỔ PHẢI TO (19/08/2026, tông chủ yêu cầu) ─────────────────────────────────────────
+ *
+ * Bản đầu có 20 × 18 = 360 cặp, và cái hỏng KHÔNG phải là trùng tên: đuôi hex đã lo việc ấy (360
+ * × 65536 ≈ 23,6 triệu). Cái hỏng là **giống mặt nhau**. Với 20 từ đầu, chín kho gần như chắc
+ * chắn có vài cái chung một từ — sổ ngày 19/08 đo được đúng thế: `vellum-loom-ee60` và
+ * `vellum-loom-bd35` trùng CẢ CẶP, còn `amber-bridge` / `amber-render` và `jade-pier` /
+ * `garnet-pier` thì chung một nửa. Ba cái tên như vậy nằm trên ba tài khoản khác nhau vẫn nhận ra
+ * nhau bằng mắt thường — tức đúng thứ mà cú đổi sang tên ngẫu nhiên (17/08) sinh ra để phá.
+ *
+ * Nay 221 × 244 = 53.924 cặp. Chín kho thì xác suất chạm một cặp trùng rơi từ ~10% xuống ~0,07%;
+ * chung một từ đầu rơi từ gần như chắc chắn xuống ~2%. Trần thật của cả cái tên là 53.924 × 65536
+ * ≈ 3,5 tỉ.
+ *
+ * Thêm từ thì cứ thêm, nhưng giữ ba luật mà lưới đang canh: chỉ `a-z`, dài 3–10 ký tự, và HAI RỔ
+ * KHÔNG ĐƯỢC GIAO NHAU.
  */
 export const NAME_HEADS = Object.freeze([
-  "amber", "basalt", "cedar", "cinder", "cobalt", "dune", "ember", "flint",
-  "garnet", "harbor", "indigo", "jade", "kelp", "lumen", "marble", "onyx",
-  "quartz", "slate", "tundra", "vellum",
+  "alabaster", "almond", "alpine", "amber", "amethyst", "anise", "arbor", "ash",
+  "aspen", "aster", "aurora", "azure", "bamboo", "banyan", "barley", "basalt",
+  "bayberry", "beryl", "birch", "bismuth", "bloom", "boulder", "bramble", "brass",
+  "briar", "bronze", "burl", "cactus", "calico", "canyon", "cedar", "chalk",
+  "cherry", "chestnut", "cider", "cinder", "citrine", "clay", "clover", "cobalt",
+  "cobble", "comet", "copper", "coral", "cotton", "crag", "cream", "crimson",
+  "crocus", "crystal", "cypress", "dahlia", "delta", "dogwood", "driftwood", "dune",
+  "dusk", "ebony", "elder", "elm", "emerald", "fallow", "feather", "fennel",
+  "fern", "fjord", "flax", "fleece", "flint", "flora", "forest", "fossil",
+  "frost", "gale", "garland", "garnet", "geode", "ginger", "glacier", "glade",
+  "gneiss", "granite", "graphite", "grove", "gypsum", "harvest", "hazel", "heather",
+  "hemlock", "hickory", "hollow", "holly", "honey", "indigo", "iris", "ironwood",
+  "ivory", "ivy", "jade", "jasper", "juniper", "kelp", "lagoon", "lapis",
+  "larch", "laurel", "lava", "lichen", "lilac", "lime", "linen", "loam",
+  "lotus", "lunar", "magma", "magnolia", "malachite", "mango", "maple", "marble",
+  "marigold", "meadow", "mesa", "mica", "midnight", "mint", "mist", "moss",
+  "mulberry", "myrtle", "nebula", "nickel", "nimbus", "oak", "oasis", "obsidian",
+  "ochre", "olive", "onyx", "opal", "orchid", "palm", "pampas", "papyrus",
+  "pearl", "pebble", "pepper", "peridot", "pewter", "pine", "plum", "poplar",
+  "prairie", "pumice", "quarry", "quartz", "rain", "redwood", "reef", "resin",
+  "rhubarb", "ridge", "rill", "ripple", "river", "rose", "rowan", "ruby",
+  "rust", "saffron", "sage", "sand", "sandstone", "sapphire", "savanna", "scarlet",
+  "sequoia", "shale", "shore", "sienna", "silica", "silver", "sky", "slate",
+  "sorrel", "spruce", "steel", "stone", "storm", "stream", "sumac", "summit",
+  "sycamore", "taiga", "tallow", "tamarind", "teak", "thicket", "thistle", "tide",
+  "timber", "topaz", "tulip", "tundra", "turquoise", "umber", "valley", "vellum",
+  "velvet", "verdant", "vine", "violet", "walnut", "wheat", "willow", "winter",
+  "wisteria", "yarrow", "yew", "zinc", "zircon",
 ]);
 
-/** Nửa sau: danh từ hạ tầng, thứ hay thấy trong tên thư viện thật. */
+/**
+ * Nửa sau: danh từ hạ tầng, thứ hay thấy trong tên thư viện thật. Hai rổ KHÔNG giao nhau — một
+ * cái tên「prism-prism-4f2a」đọc lên là biết ngay có máy sinh ra nó.
+ */
 export const NAME_TAILS = Object.freeze([
-  "atlas", "bridge", "cache", "compass", "forge", "ledger", "lens", "loom",
-  "mesh", "orbit", "pier", "prism", "relay", "render", "scope", "shuttle",
-  "spindle", "vault",
+  "anchor", "anvil", "arcade", "archive", "array", "atlas", "atrium", "axle",
+  "bastion", "beacon", "beam", "bearing", "bellows", "bench", "binder", "blueprint",
+  "boiler", "bolt", "brace", "bracket", "bridge", "buffer", "bunker", "buoy",
+  "cabinet", "cable", "cairn", "caliper", "canal", "canvas", "capsule", "caravan",
+  "carriage", "cartridge", "cask", "causeway", "cell", "chamber", "channel", "chart",
+  "chassis", "chisel", "circuit", "cistern", "citadel", "clamp", "cluster", "cog",
+  "coil", "column", "compass", "conduit", "console", "corral", "cradle", "crane",
+  "crate", "crest", "crossing", "crucible", "cursor", "dam", "depot", "derrick",
+  "dial", "diode", "dock", "dome", "drum", "dynamo", "echo", "engine",
+  "envelope", "fabric", "ferry", "filament", "fixture", "flange", "flask", "fleet",
+  "forge", "foundry", "frame", "gantry", "gate", "gauge", "gear", "girder",
+  "glyph", "granary", "grid", "groove", "gyro", "hangar", "harness", "hatch",
+  "haven", "hearth", "helm", "hinge", "hoist", "hub", "index", "ingot",
+  "inlet", "junction", "keel", "kernel", "keystone", "kiln", "lattice", "ledger",
+  "lens", "lever", "lighthouse", "lock", "lodge", "loft", "loom", "mandrel",
+  "manifold", "mantle", "marker", "mast", "matrix", "meridian", "mesh", "mill",
+  "module", "mold", "monolith", "mooring", "mortar", "nexus", "node", "nozzle",
+  "obelisk", "orbit", "outpost", "palisade", "panel", "parapet", "pavilion", "pendulum",
+  "pier", "pillar", "pinion", "pipeline", "piston", "pivot", "platform", "plinth",
+  "plotter", "pontoon", "portal", "press", "prism", "pulley", "pump", "quay",
+  "rack", "rafter", "rail", "rampart", "ratchet", "reactor", "reel", "refinery",
+  "register", "relay", "render", "reservoir", "rig", "ring", "rivet", "rotor",
+  "rudder", "rung", "runway", "sail", "scaffold", "schema", "scope", "sector",
+  "sentinel", "servo", "shaft", "shelf", "shipyard", "shuttle", "sieve", "signal",
+  "silo", "sluice", "socket", "spar", "spindle", "spire", "spool", "spring",
+  "sprocket", "stack", "stage", "stanchion", "station", "stencil", "strand", "stratum",
+  "sump", "switch", "tablet", "tackle", "tank", "tender", "terminal", "terrace",
+  "tether", "thread", "throttle", "tiller", "tower", "transit", "treadle", "trellis",
+  "trestle", "trolley", "trough", "truss", "tunnel", "turbine", "turret", "valve",
+  "vane", "vault", "vector", "vessel", "viaduct", "vise", "wharf", "winch",
+  "windlass", "wire", "yard", "yoke",
 ]);
 
 /**
  * Một cái tên mới: `<đầu>-<đuôi>-<4 hex>`.
  *
- * Đuôi hex KHÔNG phải để trang trí — nó là thứ giữ cho hai lượt dựng cùng rơi vào một cặp từ (360
- * cặp, nên trùng là chuyện thường) vẫn ra hai cái tên khác nhau. Người gọi vẫn phải soát trùng
- * với sổ: hex chỉ làm trùng lặp HIẾM, không làm nó bất khả.
+ * Đuôi hex KHÔNG phải để trang trí — nó là thứ giữ cho hai lượt dựng cùng rơi vào một cặp từ vẫn
+ * ra hai cái tên khác nhau. Từ 19/08/2026 rổ rộng hơn 150 lần (53.924 cặp) nên cặp trùng đã thành
+ * chuyện hiếm, nhưng hex vẫn phải ở lại: người gọi vẫn soát trùng với sổ, và hex là thứ biến
+ *「hiếm」thành「gần như không bao giờ」.
  *
  * `pick` tiêm vào được để lưới kiểm chứng chạy tất định; mặc định là ngẫu nhiên thật.
  *

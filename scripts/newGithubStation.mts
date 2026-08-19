@@ -387,8 +387,13 @@ async function main(): Promise<void> {
   /**
    * `workerId` là KHOÁ CHÍNH của bảng `workers`: hai khôi lỗi cùng id là hai tiến trình ghi đè
    * nhau trong sổ điểm danh, và mục Khôi Lỗi nói dối về việc ai đang trực. Tên rút ngẫu nhiên
-   * (360 cặp từ × 65536 hex) nên trùng là chuyện hiếm tới mức không đáng vòng lặp rút lại — nhưng
-   * hiếm không phải là không, và chỗ này là nơi DUY NHẤT biết được sự thật ấy.
+   * (53.924 cặp từ × 65536 hex ≈ 3,5 tỉ, từ 19/08/2026) nên trùng là chuyện hiếm tới mức không
+   * đáng vòng lặp rút lại — nhưng hiếm không phải là không, và chỗ này là nơi DUY NHẤT biết được
+   * sự thật ấy.
+   *
+   * Cái giá khi nó nổ, phải nói ra vì nó không hiển nhiên: cửa này đứng SAU lượt dựng kho, nên
+   * một cú trùng để lại một kho CÔNG KHAI mồ côi trên GitHub, phải vào xoá tay. Đó là lý do rổ
+   * từ được nới rộng 150 lần thay vì thêm một vòng rút lại ở đây.
    */
   if (fresh.githubStations.some((s) => s.workerId.toLowerCase() === workerId.toLowerCase())) {
     die(

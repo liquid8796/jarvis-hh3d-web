@@ -96,10 +96,49 @@ for (const word of [...NAME_HEADS, ...NAME_TAILS]) {
     `từ「${word}」trong rổ tên tự nó hợp luật`,
   );
 }
+/**
+ * SÀN của hai rổ, và vì sao nó là 150 chứ không phải 10.
+ *
+ * Bản đầu (20 × 18) đặt sàn ở 10 — một con số chỉ chống được cảnh「ai đó xoá gần hết rổ」. Nó
+ * KHÔNG chống được cái hỏng thật, thứ đo được trên sổ ngày 19/08/2026: chín kho mà ba cặp tên
+ * giống mặt nhau (`vellum-loom` hai lần, `amber-*` hai lần, `*-pier` hai lần). Tên ngẫu nhiên
+ * sinh ra để mỗi kho đứng một mình; giống mặt nhau là hỏng đúng mục đích ấy, dù không một cái
+ * tên nào trùng khít.
+ *
+ * 150 mỗi rổ giữ số cặp trên hai vạn — đủ để chín kho gần như chắc chắn không đụng nhau. Sàn đứng
+ * đây thay vì trong lời dặn để lượt sau ai đó rút bớt từ thì lưới đỏ ngay dưới máy.
+ */
+const PAIR_FLOOR = 20_000;
 assert(
-  NAME_HEADS.length >= 10 && NAME_TAILS.length >= 10,
-  `hai rổ đủ rộng để tên không lặp lại trông thấy (${NAME_HEADS.length} × ${NAME_TAILS.length} cặp)`,
+  NAME_HEADS.length >= 150 && NAME_TAILS.length >= 150,
+  `hai rổ đủ rộng (${NAME_HEADS.length} đầu × ${NAME_TAILS.length} đuôi)`,
 );
+assert(
+  NAME_HEADS.length * NAME_TAILS.length >= PAIR_FLOOR,
+  `số cặp từ ${(NAME_HEADS.length * NAME_TAILS.length).toLocaleString("vi-VN")} vượt sàn ${PAIR_FLOOR.toLocaleString("vi-VN")}`,
+);
+
+/**
+ * Ba luật hình dạng của một TỪ trong rổ, mỗi luật chống một kiểu hỏng riêng:
+ *
+ *   • chỉ `a-z` — một dấu gạch hay chữ hoa lọt vào là `GENERATED_NAME_SHAPE` thôi khớp chính cái
+ *     tên ta vừa sinh ra, tức lượt XOÁ mất bộ lọc khoanh vùng;
+ *   • dài 3–10 — tên kho là thứ người ta đọc bằng mắt, và `alabaster-lighthouse-4f2a` đã là dài;
+ *   • KHÔNG TRÙNG trong một rổ — một từ chép hai lần là một từ được rút với xác suất gấp đôi, thứ
+ *     không ai thấy khi đọc mảng.
+ */
+for (const [name, list] of [["đầu", NAME_HEADS], ["đuôi", NAME_TAILS]]) {
+  const bad = list.filter((word) => !/^[a-z]{3,10}$/.test(word));
+  assert(bad.length === 0, `mọi từ rổ ${name} chỉ gồm a-z và dài 3–10 (lệch: ${bad.join(", ") || "không"})`);
+  assert(new Set(list).size === list.length, `rổ ${name} không có từ nào chép hai lần`);
+}
+
+/**
+ * HAI RỔ KHÔNG ĐƯỢC GIAO NHAU: một từ nằm ở cả hai chỗ đẻ ra được `prism-prism-4f2a`, và một cái
+ * tên như thế đọc lên là biết ngay có máy sinh ra nó — đúng thứ tên ngẫu nhiên phải giấu.
+ */
+const overlap = NAME_HEADS.filter((word) => NAME_TAILS.includes(word));
+assert(overlap.length === 0, `hai rổ rời nhau, không từ nào đứng cả hai chỗ (chung: ${overlap.join(", ") || "không"})`);
 assert(
   reviewGeneratedName("PACKAGE_NAME", PACKAGE_NAME) === null,
   `tên gói trong package.json「${PACKAGE_NAME}」tự nó hợp luật`,

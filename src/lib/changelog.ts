@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.11",
+    date: "2026-08-19",
+    lines: [
+      "Kho GitHub và khôi lỗi mới sinh ra nay lấy tên từ một cuốn từ điển 465 chữ, thay vì 38 chữ như trước.",
+      "Nhờ vậy các kho thôi trông giống hệt nhau — trước đây chín kho là đã có vài cái trùng nửa tên.",
+      "Kho và khôi lỗi đang chạy giữ nguyên tên cũ; chỉ những cái dựng từ hôm nay mới đổi.",
+    ],
+  },
+  {
     version: "1.3.10",
     date: "2026-08-19",
     lines: [

@@ -11,6 +11,51 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.11 — Từ điển tên kho: 38 chữ → 465 chữ
+
+Tông chủ: *"random ít tên quá dẫn tới dễ trùng nhiều"*. Đúng, và chỗ nó trùng không phải chỗ dễ
+đoán nhất — nên ghi lại cho rõ **cái gì hỏng và cái gì thì không**.
+
+**Không hỏng:** tên trùng khít. Đuôi 4 hex vốn đã lo việc ấy — 360 cặp × 65536 ≈ 23,6 triệu, nên
+một cú đụng độ thật là chuyện của thần thoại.
+
+**Hỏng:** **giống mặt nhau**. Cả cú đổi sang tên ngẫu nhiên ngày 17/08 sinh ra để mỗi kho đứng một
+mình, mà 20 từ đầu × 18 từ đuôi thì chín kho gần như chắc chắn có mấy cái chung một nửa. Sổ ngày
+19/08 đo được đúng thế: `vellum-loom-ee60` và `vellum-loom-bd35` trùng **cả cặp**, `amber-bridge` /
+`amber-render` chung từ đầu, `jade-pier` / `garnet-pier` chung từ đuôi. Ba cái tên như vậy nằm trên
+ba tài khoản khác nhau vẫn nhận ra nhau bằng mắt thường — tức cái đàn vẫn lộ, chỉ là lộ chậm hơn.
+
+Nay **221 từ đầu × 244 từ đuôi = 53.924 cặp**, và đây là con số đo được chứ không phải ước:
+
+| với 9 kho | 20 × 18 = 360 | 221 × 244 = 53.924 |
+|---|---|---|
+| trùng cả cặp | 9,59% | **0,07%** |
+| chung từ đầu | 88,10% | **15,21%** |
+| với 50 kho, trùng cặp | 97,19% | **2,25%** |
+| trần cả tên (× 65536) | 23,6 triệu | **3,53 tỉ** |
+
+Chạy 200.000 lượt rút thử 9 kho bằng chính `randomSoftwareName`: trùng cặp ở **0,06%** số lượt —
+khớp với lý thuyết. Con số「chung từ đầu」vẫn còn 15%: đó là trần của 221 từ, và nới tiếp thì lợi
+giảm dần, nên dừng ở đây là có chủ ý chứ không phải quên.
+
+**Cái giá của một cú trùng, thứ khiến việc này đáng làm hơn vẻ ngoài của nó:** phép soát trùng
+`WORKER_ID` bên `newGithubStation.mts` đứng **SAU** lượt dựng kho, nên một cú đụng để lại một **kho
+công khai mồ côi** trên GitHub, phải vào xoá tay. Đó là lý do lời giải là nới rổ từ chứ không phải
+thêm một vòng rút-lại ở cửa ấy.
+
+Ba luật mới do lưới canh, mỗi luật chống một kiểu hỏng riêng: mỗi từ chỉ `a-z` và dài 3–10 (một
+dấu gạch lọt vào là `GENERATED_NAME_SHAPE` thôi khớp chính cái tên ta vừa sinh, tức lượt XOÁ mất
+bộ lọc khoanh vùng); không từ nào chép hai lần trong một rổ (một từ được rút với xác suất gấp đôi
+là thứ không ai thấy khi đọc mảng); và **hai rổ không giao nhau** (`prism-prism-4f2a` đọc lên là
+biết ngay có máy sinh ra nó). Sàn 150 từ mỗi rổ + 20.000 cặp cũng vào lưới, thay cho sàn 10 cũ —
+sàn ấy chỉ chống được cảnh「ai đó xoá gần hết rổ」, không chống được cái hỏng thật.
+
+`verify:khoiloi-naming`: **502 phép kiểm**, tất cả xanh — trong đó 465 phép soi từng từ một trong
+hai rổ trước danh sách cấm mười một chữ. Kho và khôi lỗi đang chạy giữ nguyên tên; luật chỉ áp cho
+tên sinh ra từ hôm nay.
+
+---
+
 ## 1.3.10 — `github:revive`: dựng dậy khôi lỗi đã chết đứng, không chờ hết bốn giờ
 
 Tông chủ gửi ảnh tab Khôi Lỗi 19/08/2026: năm khôi lỗi「đang trực」ở bản 1.3.9, bốn cái khác xám

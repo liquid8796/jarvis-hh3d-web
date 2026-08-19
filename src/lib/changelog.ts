@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.22",
+    date: "2026-08-20",
+    lines: [
+      "Máy chạy tự động đang vào nhầm tên miền cũ của trang game — tên miền đó đã dời, nên phiên đăng nhập không theo sang được và trang coi máy như khách lạ.",
+      "Nay nó dùng đúng tên miền Tông Môn đã đặt. Nếu vẫn báo hết phiên đăng nhập, dán lại chuỗi đăng nhập lấy từ trang hiện tại ở Ngọc Giản Cấu Hình.",
+    ],
+  },
+  {
     version: "1.3.21",
     date: "2026-08-20",
     lines: [

@@ -11,6 +11,56 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.22 — KHÔNG phải Cloudflare: khôi lỗi vào nhầm một tên miền đã dời
+
+Năm lượt vá (1.3.14 → 1.3.21) đều đi chữa trình duyệt, vì triệu chứng đọc y hệt một cú chặn của
+Cloudflare. Lượt này tông chủ chỉ sang bản PC — máy vừa CHẠY ĐƯỢC vừa SOI ĐƯỢC — và chuỗi bằng
+chứng lật ngược toàn bộ chẩn đoán.
+
+**1. Trình duyệt vô can.** `npm run diagnose:cf` (công cụ mới) hỏi thẳng trang game bằng ba biến
+thể — `chrome-headless-shell` (đúng thứ khôi lỗi chạy), Chromium đầy đủ headless mới, và bản có
+giao diện. Trên `hoathinh3d.so`: **cả ba vào sạch, không màn kiểm tra nào.**
+
+**2. Hai nửa hệ thống trỏ hai tên miền khác nhau.**
+
+| | tên miền | từ máy nhà | từ VM |
+|---|---|---|---|
+| app PC (`settings.json`) | `hoathinh3d.so` | HTTP 200 | 403 (curl trần — bình thường) |
+| worker web (hằng số) | `hoathinh3d.one` | treo 15s rồi đứt | **301 → `hoathinh3d.so`** |
+
+**3. `.one` là tên miền ĐÃ DỜI.** Nó 301 sang `.so`, mà cookie gắn chặt theo tên miền nên KHÔNG
+đi theo cú nhảy. Tới `.so`, khôi lỗi là **khách lạ**: Cloudflare dựng màn kiểm tra, hub không bao
+giờ dựng bảng nhiệm vụ, mọi nhiệm vụ chết ở một selector vô tội. Mọi triệu chứng của năm ngày qua
+rơi ra từ đúng một sự thật này.
+
+**4. Tông chủ ĐÃ đặt đúng `.so` ở trang Tông Môn — giá trị ấy không có đường nào tới khôi lỗi.**
+`user_configs.config` giữ `gameBaseUrl` RIÊNG của từng người (mặc định rỗng — và cả 29 người đều
+rỗng), `claimNextJob` chép thô đúng document ấy, còn workflow khôi lỗi tông môn không đặt
+`GAME_BASE_URL`. Nên `runCycle` rơi xuống nấc cuối cùng của thứ tự nguồn: hằng số trong mã, vẫn
+là `.one`. Lời báo thành công của form đổi tên miền hứa「khôi lỗi dùng ngay từ vòng kế」— lời hứa
+suông từ ngày viết ra.
+
+**Bản vá.** Cửa phát việc (`api/worker/route.ts`) ghép tên miền của tông môn vào snapshot khi
+người dùng để trống — chỗ duy nhất mọi vòng chạy đều đi qua, và snapshot được dựng lại ở MỖI lượt
+claim nên đúng nghĩa「từ vòng kế」. Ai tự gõ tên miền riêng vẫn được tôn trọng, đúng thứ tự nguồn
+`runCycle` vẫn theo. Hằng số cuối nguồn cũng nhích `.one → .so`, và doc của nó nay chép lại cú dời
+này để lần sau không mất năm lượt nữa.
+
+Ba lưới ghim ba mệnh đề: cửa phát việc CÓ ghép, CHỈ ghép khi để trống, và hằng số không còn trỏ
+vào `.one`. Lưới cuối cố ý không ghim một chuỗi cụ thể — site đổi TLD định kỳ — chỉ ghim điều bất
+biến: không được là tên miền ta đã biết chắc là chết.
+
+**Bài học đắt nhất, ghi để đời sau đọc:** một cấu hình có UI, có lời báo thành công, và KHÔNG có
+đường dây tới nơi dùng nó thì tệ hơn là không có cấu hình ấy — nó khiến người ta tin rằng việc đã
+làm xong. Cả năm lượt vá trước đều đi tìm lỗi ở chỗ triệu chứng kêu to nhất (Cloudflare), trong
+khi nguyên nhân nằm ở một sợi dây chưa bao giờ được nối.
+
+Kèm theo: `npm run diagnose:cf` — công cụ sinh ra vì câu hỏi「chặn vì IP hay vì trình duyệt?」đã
+không ai trả lời được suốt năm lượt. Nó phân biệt rõ ba trạng thái (vào được / màn kiểm tra / đứt
+kết nối), vì gộp「đứt TLS」với「màn kiểm tra」chính là cách chẩn đoán sai chỗ.
+
+---
+
 ## 1.3.21 — Gỡ màn kiểm tra GIỮA VÒNG, chỗ nó thật sự xuất hiện
 
 Đo sản xuất ngay sau khi bật cờ ở 1.3.20, và số liệu bác một giả định của chính tôi:

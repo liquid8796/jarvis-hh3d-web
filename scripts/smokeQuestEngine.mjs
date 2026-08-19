@@ -22,7 +22,7 @@ import { createQuestEngine, enabledQuestsInOrder, questsForAccount } from "../sr
 import { createSession } from "../src/lib/quest-engine/session.mjs";
 import { parseCookieString, runCycle } from "../src/lib/quest-engine/runCycle.mjs";
 // Nhập thẳng từ module LÁ: `detectWordPressUser` chỉ biết định dạng cookie, không đi qua engine.
-import { detectWordPressUser } from "../src/lib/quest-engine/cookies.mjs";
+import { DEFAULT_GAME_BASE_URL, detectWordPressUser } from "../src/lib/quest-engine/cookies.mjs";
 import {
   _observeGate,
   _resetGate,
@@ -1513,6 +1513,26 @@ async function main() {
   check(
     "op claim gieo luyenDanThuong trước khi parse snapshot",
     workerRouteSrc.includes("storedConfigSchema.safeParse(seedLuyenDanThuong("),
+  );
+
+  // TÊN MIỀN GAME phải đi qua cửa phát việc. Trước 20/08/2026 nó không có đường nào tới khôi
+  // lỗi: user_configs giữ `gameBaseUrl` riêng của từng người (rỗng), claimNextJob chép thô
+  // document ấy, workflow khôi lỗi không đặt GAME_BASE_URL — nên runCycle rơi xuống hằng số,
+  // và hằng số ấy còn là một tên miền ĐÃ DỜI. Cả năm lượt vá sau đó đi chữa nhầm trình duyệt.
+  check(
+    "op claim ghép tên miền game của tông môn vào snapshot khi người dùng để trống",
+    workerRouteSrc.includes("gameBaseUrl: settings.game.baseUrl"),
+  );
+  check(
+    "…và CHỈ khi để trống — người tự gõ tên miền riêng vẫn được tôn trọng",
+    workerRouteSrc.includes("parsedConfig.gameBaseUrl.trim().length > 0"),
+  );
+  // Hằng số cuối nguồn phải theo kịp site. Không ghim đúng một chuỗi (site đổi TLD định kỳ),
+  // chỉ ghim điều bất biến: nó KHÔNG được là tên miền đã chết mà ta biết chắc.
+  check(
+    "hằng số tên miền không còn trỏ vào .one đã dời",
+    !DEFAULT_GAME_BASE_URL.includes("hoathinh3d.one"),
+    DEFAULT_GAME_BASE_URL,
   );
 
   console.log("\nKhoá「Dừng khi đủ huyền tinh」của Mê Cung trên tài nguyên chung");

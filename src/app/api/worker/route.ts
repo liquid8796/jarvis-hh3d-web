@@ -215,7 +215,30 @@ export async function POST(request: Request) {
         storedConfig.gameCookie.length > 0 && isEncrypted(storedConfig.gameCookie)
           ? decryptSecret(storedConfig.gameCookie)
           : storedConfig.gameCookie;
-      const config = configSchema.parse({ ...storedConfig, gameCookie: cookie });
+      const parsedConfig = configSchema.parse({ ...storedConfig, gameCookie: cookie });
+
+      /**
+       * TÊN MIỀN GAME của tông môn, ghép vào ĐÂY — chỗ duy nhất mọi vòng chạy đều đi qua.
+       *
+       * Trước bản này nó không tới được khôi lỗi bằng đường nào cả: `user_configs.config`
+       * giữ `gameBaseUrl` RIÊNG của từng người (mặc định rỗng, và cả 29 người đều rỗng),
+       * `claimNextJob` chép thô đúng document ấy, còn workflow của khôi lỗi tông môn thì
+       * không đặt `GAME_BASE_URL`. Nên `runCycle` rơi xuống nấc cuối — hằng số trong mã.
+       *
+       * Cái giá đã trả, đo 20/08/2026: hằng số ấy còn là `hoathinh3d.one`, một tên miền ĐÃ
+       * DỜI — nó trả 301 sang `hoathinh3d.so`. Cookie gắn chặt theo tên miền nên KHÔNG đi
+       * theo cú nhảy, và trang mới nhìn khôi lỗi như khách lạ: Cloudflare dựng màn kiểm tra,
+       * hub không bao giờ dựng bảng nhiệm vụ, mọi nhiệm vụ chết ở một selector vô tội. Tông
+       * chủ ĐÃ đặt đúng tên miền `.so` trong trang Tông Môn từ trước, và lời báo thành công
+       * của form ấy hứa「khôi lỗi dùng ngay từ vòng kế」— lời hứa suông suốt từ đó tới nay.
+       *
+       * Chỉ điền khi người dùng để TRỐNG: ai tự gõ tên miền riêng thì đó là phủ quyết của
+       * họ, y như thứ tự nguồn `runCycle` vẫn tôn trọng (người gọi > server > env > hằng số).
+       */
+      const config =
+        parsedConfig.gameBaseUrl.trim().length > 0
+          ? parsedConfig
+          : { ...parsedConfig, gameBaseUrl: settings.game.baseUrl };
 
       // Luật nhà của khôi lỗi tông môn, áp ở ĐÂY chứ không chỉ lúc lưu ngọc giản.
       //

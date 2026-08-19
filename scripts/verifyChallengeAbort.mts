@@ -152,7 +152,7 @@ async function main() {
         clickTurnstile: async () => {
           clicks++;
           mode = "slow";
-          return true;
+          return { cleared: true, clicked: true };
         },
       });
       let threw: unknown = null;
@@ -177,7 +177,7 @@ async function main() {
         log: { info: () => {}, warning: () => {}, debug: () => {} },
         clickTurnstile: async () => {
           clicks++;
-          return true;
+          return { cleared: true, clicked: true };
         },
       });
       let threw: unknown = null;
@@ -187,7 +187,37 @@ async function main() {
         threw = err;
       }
       check("chạm trần thì ném CycleBlocked chứ không quay vòng mãi", threw instanceof CycleBlocked, String(threw));
+      check(
+        "…và lời báo kể ĐÚNG là đã gỡ được 2 lần mà nó cứ dựng lại",
+        threw instanceof CycleBlocked && threw.message.includes("Đã gỡ được 2 lần mà màn kiểm tra cứ dựng lại"),
+        threw instanceof CycleBlocked ? threw.message.slice(-70) : "",
+      );
       check("…và số cú bấm bị chặn ở trần (2)", clicks === 2, `${clicks} cú`);
+    }
+
+    // Đúng cảnh SẢN XUẤT đo được 20/08/2026: nhánh gỡ có chạy, nhưng không tìm thấy ô nào để bấm
+    // (màn kiểm tra dạng tự chạy). Lời báo phải nói ra ĐÚNG điều đó — bản đầu nói「Đã thử bấm … mà
+    // không qua」cho cả ca này, tức nói dối về một việc chưa hề xảy ra.
+    console.log("\nKHÔNG có ô nào để bấm — đúng cảnh sản xuất đo được 20/08/2026");
+    {
+      mode = "challenge";
+      const engineNoBox = createQuestEngine({
+        log: { info: () => {}, warning: () => {}, debug: () => {} },
+        clickTurnstile: async () => ({ cleared: false, clicked: false }),
+      });
+      let threw: unknown = null;
+      try {
+        await engineNoBox.run(session, profile, questWaiting("/hub"));
+      } catch (err) {
+        threw = err;
+      }
+      check(
+        "lời báo nói RÕ là không tìm thấy ô, chứ KHÔNG nói dối là đã bấm",
+        threw instanceof CycleBlocked &&
+          threw.message.includes("Không tìm thấy ô nào để bấm") &&
+          !threw.message.includes("Đã bấm"),
+        threw instanceof CycleBlocked ? threw.message.slice(-70) : String(threw),
+      );
     }
 
     console.log("\nKhông tiêm cách gỡ (cờ tắt) — giữ nguyên nết 1.3.19");

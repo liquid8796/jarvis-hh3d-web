@@ -11,6 +11,38 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.13 — Hỷ Sự Đường có bản VIP (schema hồ sơ 71)
+
+Tông chủ chốt: chép flow Hỷ Sự Đường từ hạng thường sang cho hạng VIP. Và chép ở đây nghĩa là
+**dùng lại**, không phải nhân bản: `WeddingHallFree(L)` thành `WeddingHall(L, requiresVip)`,
+hai lượt gọi, đúng khuôn mọi cặp sinh đôi khác trong tệp (Hoang Vực, Khoáng Mạch, Mê Cung,
+Luyện Đan). Hai bản khác nhau ĐÚNG hai trường: `Id` và `RequiresVip`.
+
+**Vì sao một bộ bước phục vụ được cả hai hạng** — điều này KHÔNG đúng với mọi quest, nên phải
+nói rõ: cả đường đi của Hỷ Sự Đường đều nằm trên trang chung. Sảnh treo trên `/tien-duyen`,
+phòng cưới là `/hong-nhan` và `/phong-cuoi`; không trang nào có nhánh riêng cho hạng, không
+selector nào trong bộ bước hỏi tới hạng. Ba quest cùng mục tiêu mà dùng selector khác nhau
+giữa hai hạng (Điểm Danh, Phúc Lợi, Thí Luyện) là lý do `questsForAccount` tồn tại — cặp sinh
+đôi ở đây sinh ra vì cái cửa chia việc ấy, chứ không vì hai trang khác nhau.
+
+**Một khác biệt đã đo được nhưng chưa có bản ghi**, ghi ra để khỏi phát hiện lại: thân trả lời
+`show_all_wedding` mang `is_vip` và `show_auto_blessing` — bản ghi 18/08 quay trên tài khoản
+thường nên cả hai đều `false`. Nếu site vẽ thêm nút chúc-tự-động cho VIP thì bộ bước này không
+biết dùng: nó vẫn đi từng phòng, tức CHẬM HƠN chứ không sai. Muốn dạy nó phải có bản ghi trên
+tài khoản VIP; đừng đoán markup của cái nút ấy.
+
+**`FREE_ONLY_QUESTS` đã gỡ.** Hỷ Sự Đường là thành viên cuối cùng của khái niệm「nhiệm vụ chỉ
+hạng thường」; giữ lại một mảng rỗng cùng hai chỗ spread không bao giờ spread gì là mã chết.
+Luật nó canh thì vẫn còn giá trị nên được chép vào doc của `FREE_QUESTS`: một khoá chỉ được vào
+`SIMPLE_QUESTS` khi hồ sơ CÓ bản VIP để chạy, bằng không ô tick ở tab VIP là lời hứa suông.
+
+Lưới: năm phép kiểm mới — đủ cặp và đúng hạng mỗi bản; hai khối khác nhau đúng hai trường (kể
+cả `note`); hai bản cùng TÊN, vì lớp dịch cấu hình tìm quest theo tên nên lệch tên là cách im
+lặng nhất để một tài khoản VIP bật mà không có gì chạy; một công tắc `hySuDuong` bật cả hai;
+và `questsForAccount` phát đúng một bản cho mỗi hạng, không tài khoản nào chạy cả hai.
+
+---
+
 ## 1.3.12 — Nhật ký của đàn thôi hiện đôi
 
 Tông chủ chụp lại hai dòng liền nhau, cùng giây `16:49:38`:

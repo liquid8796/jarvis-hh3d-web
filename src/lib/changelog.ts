@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.13",
+    date: "2026-08-19",
+    lines: [
+      "Hỷ Sự Đường nay bật được cho cả tài khoản VIP — trước giờ ô này chỉ hiện ở thẻ Thường.",
+      "Vẫn đúng một ô tick: bật lên là cả tài khoản VIP lẫn tài khoản thường cùng đi chúc và bóc lì xì.",
+    ],
+  },
+  {
     version: "1.3.12",
     date: "2026-08-19",
     lines: [

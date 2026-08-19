@@ -23,7 +23,8 @@ import { useDashboardAccountLive } from "./DashboardLiveProvider";
  * LuyenDanFieldset / KhoangMachFieldset).
  */
 /**
- * Chín nhiệm vụ chỉ có công tắc — key khớp với configSchema và SIMPLE_QUESTS của engine.
+ * Những nhiệm vụ chỉ có công tắc — key khớp với configSchema và SIMPLE_QUESTS của engine.
+ * (Không đếm số ở đây: dòng này từng ghi "Chín" trong khi danh sách đã mười, rồi mười một.)
  * Mô tả viết cho người chơi, không phải cho người đọc mã.
  */
 /**
@@ -46,6 +47,13 @@ const SIMPLE_QUESTS: ReadonlyArray<SimpleQuest> = [
     key: "vanDap",
     name: "Vấn Đáp",
     hint: "Tra danh sách đáp án cộng đồng. Câu không có trong danh sách sẽ để bạn tự làm.",
+  },
+  {
+    key: "hySuDuong",
+    name: "Hỷ Sự Đường",
+    hint:
+      "Chúc phúc các tiệc cưới đang mở bên Tiên Duyên — mỗi lời chúc tốn 30 Tiên Ngọc, nhận 120 Tu Vi. " +
+      "Tiệc nào còn lì xì chưa mở thì luôn được ghé để bóc, bất kể bộ lọc chọn gì.",
   },
   {
     key: "phanThuongHoatDong",
@@ -72,30 +80,22 @@ const FREE_QUEST_KEYS = new Set([
   // nên twin thường chạy đúng script ấy (hồ sơ schema 66). Hub bản thường mà không có mục
   // này thì lượt chạy nói ra rồi hẹn giờ — không đỏ, không tự khoá cả ngày.
   "phanThuongHoatDong",
+  // Từ schema 71 có twin VIP: cả sảnh Hỷ Sự lẫn hai loại phòng cưới đều là trang chung,
+  // không selector nào đổi theo hạng, nên một bộ bước phục vụ cả hai. Trước đó khoá này chỉ
+  // hiện ở tab Thường vì hồ sơ không có bản VIP nào để chạy.
+  "hySuDuong",
 ]);
 
 /**
- * Nhiệm vụ CHỈ có ở hạng thường — hồ sơ không có twin VIP, nên không được hiện ở lưới
- * "Nhiệm vụ ngày" của tab VIP: engine không bao giờ chạy nó cho tài khoản VIP, một ô tick
- * ở đó là lời hứa suông. Vẫn đi chung state và hidden input với mười nhiệm vụ kia.
+ * Lưới của tab Thường = những nhiệm vụ trên CÓ twin `-thuong` trong hồ sơ.
+ *
+ * Chiều ngược lại từng có một danh sách riêng (`FREE_ONLY_QUESTS`, cho nhiệm vụ chỉ hạng
+ * thường), gỡ ở schema 71 khi Hỷ Sự Đường — thành viên cuối cùng — có bản VIP. Luật nó giữ vẫn
+ * còn nguyên giá trị, nên chép lại đây: **một khoá chỉ được vào `SIMPLE_QUESTS` khi hồ sơ có
+ * bản VIP để chạy**, bằng không ô tick ở tab VIP là lời hứa suông. Ngày nào lại có nhiệm vụ
+ * chỉ-hạng-thường thì dựng lại danh sách riêng, đừng nhét nó vào `SIMPLE_QUESTS`.
  */
-const FREE_ONLY_QUESTS: ReadonlyArray<SimpleQuest> = [
-  {
-    key: "hySuDuong",
-    name: "Hỷ Sự Đường",
-    hint:
-      "Chúc phúc các tiệc cưới đang mở bên Tiên Duyên — mỗi lời chúc tốn 30 Tiên Ngọc, nhận 120 Tu Vi. " +
-      "Tiệc nào còn lì xì chưa mở thì luôn được ghé để bóc, bất kể bộ lọc chọn gì.",
-  },
-];
-
-const FREE_QUESTS = [
-  ...SIMPLE_QUESTS.filter((quest) => FREE_QUEST_KEYS.has(quest.key)),
-  ...FREE_ONLY_QUESTS,
-];
-
-/** Đủ bộ nhiệm vụ một-công-tắc — nguồn cho state và hidden input, bất kể lưới nào hiện gì. */
-const ALL_SIMPLE_QUESTS: ReadonlyArray<SimpleQuest> = [...SIMPLE_QUESTS, ...FREE_ONLY_QUESTS];
+const FREE_QUESTS = SIMPLE_QUESTS.filter((quest) => FREE_QUEST_KEYS.has(quest.key));
 
 /**
  * Luyện Đan Đường có HAI bản cấu hình — tab VIP khắc `luyenDan`, tab Thường khắc
@@ -590,7 +590,7 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
   const [lockedQuest, setLockedQuest] = useState<SimpleQuest | null>(null);
   const [simpleEnabled, setSimpleEnabled] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(
-      ALL_SIMPLE_QUESTS.map((quest) => [
+      SIMPLE_QUESTS.map((quest) => [
         quest.key,
         // Nhiệm vụ đang khoá luôn khởi sinh TẮT, kể cả khi cấu hình cũ trong database còn
         // bật: server đã ép tắt ở cửa phát việc, nên vẽ nó đang bật là nói dối người xem về
@@ -675,8 +675,9 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
         </p>
       )}
 
-      {/* Một input thật cho mỗi config key. Checkbox ở hai tab chỉ là hai mặt của cùng state. */}
-      {ALL_SIMPLE_QUESTS.map((quest) =>
+      {/* Một input thật cho mỗi config key, cho ĐỦ bộ nhiệm vụ chứ không theo lưới đang hiện:
+          checkbox ở hai tab chỉ là hai mặt của cùng một state. */}
+      {SIMPLE_QUESTS.map((quest) =>
         simpleEnabled[quest.key] ? (
           <input key={quest.key} type="hidden" name={`q_${quest.key}`} value="on" />
         ) : null,

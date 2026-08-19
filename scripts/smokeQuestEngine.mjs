@@ -18,7 +18,7 @@ import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
-import { createQuestEngine, enabledQuestsInOrder } from "../src/lib/quest-engine/engine.mjs";
+import { createQuestEngine, enabledQuestsInOrder, questsForAccount } from "../src/lib/quest-engine/engine.mjs";
 import { createSession } from "../src/lib/quest-engine/session.mjs";
 import { parseCookieString, runCycle } from "../src/lib/quest-engine/runCycle.mjs";
 // Nhập thẳng từ module LÁ: `detectWordPressUser` chỉ biết định dạng cookie, không đi qua engine.
@@ -1747,9 +1747,12 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     ["van-dap", "van-dap-thuong"],
     ["me-cung", "me-cung-thuong"],
     ["luyen-dan-duong", "luyen-dan-duong-thuong"],
+    // Từ schema 71. Cặp này còn chặt hơn bốn cặp trên — nó không dùng tới cái nới
+    // `fallbackCooldownSeconds`, và có một phép kiểm riêng dưới mục Hỷ Sự Đường canh đúng điều ấy.
+    ["hy-su-duong", "hy-su-duong-thuong"],
   ];
   check(
-    "bốn cặp twin thường là bản sao nguyên flow VIP, chỉ đổi id/hạng/nhịp ghé lại",
+    "năm cặp twin thường là bản sao nguyên flow VIP, chỉ đổi id/hạng/nhịp ghé lại",
     copiedPairs.every(([vipId, freeId]) => {
       const vip = shipped.quests.find((q) => q.id === vipId);
       const free = shipped.quests.find((q) => q.id === freeId);
@@ -1936,7 +1939,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // cùng hình dạng, chỉ khác tên — nên bản vá là một phép HỢP SELECTOR, không phải nhánh mới.
     // (Nhãn dòng dưới trước đây ghi 68 trong khi phép so hỏi 69 — sửa luôn cho khớp.)
     "hồ sơ đang ở schema 70",
-    loadProfileForSchema().schemaVersion === 70,
+    loadProfileForSchema().schemaVersion === 71,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -3592,6 +3595,53 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // Vòng chúc phúc trọn vẹn: 3 phòng chưa chúc (hồng-nhan đứng đầu danh sách), mỗi vòng
     // vào một phòng, chọn lời chúc ngẫu nhiên, gửi qua hộp xác nhận, quay về mở lại modal —
     // cho tới khi server nói cả ba đều "Đã chúc".
+    // ---- Cặp sinh đôi VIP/thường (schema 71) ------------------------------------------
+    // Hỷ Sự Đường là quest đầu tiên có twin VIP dựng bằng cách DÙNG LẠI trọn bộ bước của bản
+    // thường — hợp lệ vì cả sảnh lẫn hai loại phòng cưới đều là trang chung, không selector nào
+    // đổi theo hạng. Ba phép kiểm dưới đây canh đúng ba chỗ một lượt「chép sang VIP」dễ hỏng:
+    // khối bị chép lệch, hai bản lệch TÊN (thành ra một công tắc chỉ bật được một bản), và cửa
+    // chia việc theo hạng phát nhầm bản cho tài khoản.
+    const hySuVip = exportedProfile.quests.find((q) => q.id === "hy-su-duong");
+    const hySuFree = exportedProfile.quests.find((q) => q.id === "hy-su-duong-thuong");
+    const sansTier = (q) => {
+      const { id, requiresVip, ...rest } = structuredClone(q);
+      return JSON.stringify(rest);
+    };
+    check(
+      "hồ sơ có đủ cặp sinh đôi Hỷ Sự Đường, đúng hạng mỗi bản",
+      hySuVip?.requiresVip === true && hySuFree?.requiresVip === false,
+      `vip=${hySuVip?.requiresVip} · thường=${hySuFree?.requiresVip}`,
+    );
+    check(
+      "hai bản khác nhau ĐÚNG hai trường id + requiresVip — chặt hơn lưới copiedPairs, vốn còn nới nhịp ghé lại",
+      sansTier(hySuVip) === sansTier(hySuFree),
+      sansTier(hySuVip) === sansTier(hySuFree) ? "" : "hai khối đã trôi khỏi nhau",
+    );
+    // Lớp dịch cấu hình tìm quest theo TÊN, nên một công tắc bật cả hai bản. Hai bản lệch tên là
+    // cách im lặng nhất để tài khoản VIP bật mà không có gì chạy.
+    check(
+      "hai bản cùng TÊN → một công tắc cấu hình bật cả hai",
+      hySuVip?.name === hySuFree?.name,
+      `${hySuVip?.name} vs ${hySuFree?.name}`,
+    );
+    {
+      const { configSchema } = await import("../src/lib/services/configs.ts");
+      const lit = profileForConfig(configSchema.parse({ quests: { hySuDuong: { enabled: true } } }), () => {});
+      const on = lit.quests.filter((q) => q.id.startsWith("hy-su-duong") && q.enabled).map((q) => q.id);
+      check(
+        "bật một khoá hySuDuong → CẢ HAI bản sáng",
+        on.length === 2 && on.includes("hy-su-duong") && on.includes("hy-su-duong-thuong"),
+        on.join(",") || "(không bản nào sáng)",
+      );
+      const forVip = questsForAccount(lit, { isVip: true }).map((q) => q.id);
+      const forFree = questsForAccount(lit, { isVip: false }).map((q) => q.id);
+      check(
+        "…nhưng mỗi tài khoản chỉ nhận ĐÚNG bản của hạng mình, không chạy cả hai",
+        forVip.includes("hy-su-duong") && !forVip.includes("hy-su-duong-thuong") &&
+          forFree.includes("hy-su-duong-thuong") && !forFree.includes("hy-su-duong"),
+        `vip=[${forVip.join(",")}] · thường=[${forFree.join(",")}]`,
+      );
+    }
     const hySu = exportedProfile.quests.find((q) => q.id === "hy-su-duong-thuong");
     const hySuFirst = await run(hySu);
     check("chúc hết các phòng rồi hoàn tất", hySuFirst.outcome === "completed", `${hySuFirst.outcome}: ${hySuFirst.message}`);

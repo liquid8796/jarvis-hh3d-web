@@ -214,6 +214,15 @@ export type ActiveRun = {
   headSha: string;
   /** Số hiệu hiện trên giao diện Actions, chỉ để kể cho người đọc. */
   number: number | null;
+  /**
+   * `status` nguyên văn của GitHub — `in_progress`, `queued`, `waiting`, `requested`, `pending`.
+   *
+   * `reviewRestart` không đọc nó (mọi lượt chưa xong đều mang mã cũ như nhau), nhưng
+   * `reviewRevive` thì có, và chỗ khác nhau ấy là cả lý do nó tồn tại: một lượt ĐANG CHẠY với
+   * một runner đã chết thì phải cắt, còn một lượt ĐANG XẾP HÀNG chính là lượt sắp hồi sinh khôi
+   * lỗi — cắt nó đi rồi phát lại một lượt y hệt là tự làm chậm chính mình.
+   */
+  status: string;
 };
 
 /**
@@ -240,6 +249,7 @@ export function activeRuns(body: unknown): ActiveRun[] {
       id: row.id,
       headSha: typeof row.head_sha === "string" ? row.head_sha : "",
       number: typeof row.run_number === "number" ? row.run_number : null,
+      status: row.status,
     });
   }
   return out;
@@ -322,6 +332,85 @@ export function reviewRestart(input: {
  * máy bị chỉnh chậm gấp năm. Dòng một khi đã chèn thì NẰM ĐÓ chờ được soi, nên không lượt gõ cửa
  * nào lọt qua khe giữa hai lượt soi.
  */
+/**
+ * ── HỒI SINH MỘT KHÔI LỖI ĐÃ CHẾT ĐỨNG (`github:revive`) ─────────────────────────────────────
+ *
+ * Vì sao đây là một phép phán xử RIÊNG chứ không phải một cờ nữa của `reviewRestart`: hai câu hỏi
+ * khác nhau, và trả lời bằng hai loại bằng chứng khác nhau.
+ *
+ *   `reviewRestart` hỏi「lượt đang chạy có mang MÃ CŨ không」— bằng chứng là `head_sha`. Nó cố ý
+ *   CHỪA khôi lỗi đang giữ đàn, vì cắt một runner đang cày là cắt vòng chạy của một đạo hữu.
+ *
+ *   `reviewRevive` hỏi「khôi lỗi này còn SỐNG không」— bằng chứng là sổ điểm danh. Mã cũ hay mới
+ *   không liên quan: một runner đã ngừng gõ cửa thì lượt Actions của nó là một cái xác còn chiếm
+ *   ghế, dù nó đang chạy đúng bản mới nhất.
+ *
+ * Chính vì thế nó KHÔNG hỏi `heldJobs`. Nghe thì liều, nhưng ngược lại: một khôi lỗi im lặng quá
+ * `STALE_AFTER_MS` (3 phút) đã bị `reapStaleJobs` tước sạch đàn từ lâu, nên tới lúc ngưỡng ở đây
+ * (mặc định 10 phút) chạm tới thì không còn đàn nào để cắt. Hàng rào thật nằm ở NGƯỠNG: chừng nào
+ * ngưỡng còn rộng hơn nhiều lần cửa sổ điểm danh 30 giây thì một khôi lỗi đang khoẻ không bao giờ
+ * lọt vào danh sách này.
+ */
+
+/**
+ * Im lặng bao lâu thì coi là chết hẳn. 10 phút = 20 lần cửa sổ「vắng mặt」của sổ điểm danh (30
+ * giây), đủ rộng để một lượt bàn giao giữa hai lượt Actions, một nhịp mạng xấu, hay một lượt khởi
+ * động chậm không bị hiểu nhầm là cái chết. Đổi bằng `--away <phút>` khi cần tay nhanh hơn.
+ */
+export const REVIVE_AWAY_MS = 10 * 60 * 1000;
+
+/**
+ * Trạng thái GitHub dùng cho một lượt ĐÃ có runner cầm. Chỉ những lượt này mới bị cắt: một lượt
+ * còn xếp hàng chưa hại ai, và nó chính là thứ sắp hồi sinh khôi lỗi.
+ */
+const RUNNING_STATUS = "in_progress";
+
+export type ReviveVerdict =
+  | { go: false; message: string }
+  | { go: true; cancel: ActiveRun[]; dispatch: boolean; message: string };
+
+/**
+ * Khôi lỗi này có đáng hồi sinh không, và hồi sinh bằng cách nào.
+ *
+ * Bốn cảnh, và cảnh thứ tư là cảnh khiến hàm này đáng có thay vì một dòng `if` trong script:
+ *
+ *   1. Còn gõ cửa trong ngưỡng → ĐỨNG YÊN. Không đọc gì thêm, không cắt gì cả.
+ *   2. Đã im quá ngưỡng, có lượt `in_progress` → cắt lượt ấy (runner trong đó đã chết).
+ *   3. Đã im quá ngưỡng, không lượt nào → chỉ cần phát một lượt mới.
+ *   4. Đã im quá ngưỡng, có lượt ĐANG XẾP HÀNG → cắt lượt đang chạy (nếu có) nhưng KHÔNG phát
+ *      thêm: `cancel-in-progress: false` giữ đúng một-chạy-một-chờ, nên lượt đang chờ sẽ vào ca
+ *      ngay khi ghế trống. Phát thêm ở đây là dựng một hàng đợi hai lượt cho một khôi lỗi.
+ *
+ * `lastSeen` là `null` khi sổ điểm danh chưa từng có dòng nào của khôi lỗi ấy — kho vừa dựng mà
+ * runner chưa bao giờ lên tiếng. Đó là ca ĐÁNG hồi sinh nhất, nên nó đi thẳng vào nhánh "đã im".
+ */
+export function reviewRevive(input: {
+  lastSeen: Date | null;
+  now: Date;
+  awayMs: number;
+  runs: readonly ActiveRun[];
+}): ReviveVerdict {
+  const { lastSeen, now, awayMs, runs } = input;
+
+  if (lastSeen != null) {
+    const awayFor = now.getTime() - lastSeen.getTime();
+    if (awayFor < awayMs) {
+      return { go: false, message: `còn trực — điểm danh ${Math.max(0, Math.round(awayFor / 1000))}s trước` };
+    }
+  }
+
+  const running = runs.filter((run) => run.status === RUNNING_STATUS);
+  const waiting = runs.filter((run) => run.status !== RUNNING_STATUS);
+  const dispatch = waiting.length === 0;
+
+  const parts: string[] = [];
+  if (running.length > 0) parts.push(`cắt ${running.length} lượt đang treo`);
+  if (dispatch) parts.push("phát lượt mới");
+  else parts.push(`đã có ${waiting.length} lượt đang xếp hàng — không phát thêm`);
+
+  return { go: true, cancel: running, dispatch, message: parts.join(", ") };
+}
+
 export const PURGE_SETTLE_MS = 30_000;
 
 /** Nhịp soi lại — bằng đúng nhịp gõ cửa, để một lượt hồi sinh bị bắt trong vòng một nhịp. */

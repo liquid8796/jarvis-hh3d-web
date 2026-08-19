@@ -29,7 +29,9 @@ import {
   activeRuns,
   planKhoiloiTree,
   resolveDeployWorkerId,
+  REVIVE_AWAY_MS,
   reviewRestart,
+  reviewRevive,
   webUrlFromWorkflow,
   workerIdFromWorkflow,
   type ActiveRun,
@@ -279,7 +281,9 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
 
   const MOI = "aaaaaaa";
   const CU = "bbbbbbb";
-  const run = (id: number, headSha: string): ActiveRun => ({ id, headSha, number: id });
+  // `status` không đổi phán quyết của `reviewRestart` (mọi lượt chưa xong đều mang mã cũ như
+  // nhau) — nó có mặt vì `reviewRevive` đọc nó. Xem mục 6b.
+  const run = (id: number, headSha: string): ActiveRun => ({ id, headSha, number: id, status: "in_progress" });
 
   {
     // Ca đã xảy ra thật 14/08/2026: sau lượt chuyển trạm, runner gõ vào trạm đã xoá, nhận 404 mỗi
@@ -344,6 +348,85 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
   check("activeRunIds là cùng một sự thật, chỉ bớt cột", activeRunIds(body).join(",") === "11,13");
   check("thân rác → mảng rỗng, không ném", activeRuns({ workflow_runs: "không phải mảng" }).length === 0);
   check("thân null → mảng rỗng", activeRuns(null).length === 0);
+}
+
+// ---- 6b. Hồi sinh: câu hỏi khác, bằng chứng khác -------------------------------------------------
+{
+  console.log("\n6b. reviewRevive — khôi lỗi CÒN SỐNG không (github:revive)");
+
+  const NOW = new Date("2026-08-19T12:00:00.000Z");
+  const phutTruoc = (n: number) => new Date(NOW.getTime() - n * 60_000);
+  const chay = (id: number): ActiveRun => ({ id, headSha: "aaaaaaa", number: id, status: "in_progress" });
+  const cho = (id: number): ActiveRun => ({ id, headSha: "aaaaaaa", number: id, status: "queued" });
+  const soi = (lastSeen: Date | null, runs: ActiveRun[]) =>
+    reviewRevive({ lastSeen, now: NOW, awayMs: REVIVE_AWAY_MS, runs });
+
+  {
+    // Hàng rào DUY NHẤT của lệnh này. Khôi lỗi khoẻ gõ cửa mỗi 5 giây, nên một mốc điểm danh mới
+    // tinh phải làm nó bất khả xâm phạm — kể cả khi đang có lượt chạy trông rất giống lượt treo.
+    const v = soi(phutTruoc(1), [chay(1)]);
+    check("còn gõ cửa trong ngưỡng → ĐỨNG YÊN, không cắt gì", !v.go);
+  }
+  {
+    const v = soi(phutTruoc(9.9), []);
+    check("sát ngưỡng mà chưa chạm → vẫn đứng yên", !v.go);
+  }
+  {
+    const v = soi(phutTruoc(10), []);
+    check("chạm đúng ngưỡng → coi là đã chết (biên đóng, không hở một phút)", v.go);
+  }
+  {
+    // Cảnh trong ảnh tông chủ gửi 19/08/2026: bốn khôi lỗi「vắng 1 giờ 37 phút」trong khi năm cái
+    // khác vẫn trực. Lượt Actions còn đó nhưng runner bên trong đã chết.
+    const v = soi(phutTruoc(97), [chay(41)]);
+    check("vắng 97 phút + lượt đang treo → cắt lượt ấy", v.go && v.cancel.length === 1 && v.cancel[0].id === 41);
+    check("…và phát lượt mới, vì không còn lượt nào xếp hàng", v.go && v.dispatch);
+  }
+  {
+    const v = soi(phutTruoc(97), []);
+    check("vắng mà không lượt nào → chỉ cần phát lượt mới", v.go && v.cancel.length === 0 && v.dispatch);
+  }
+  {
+    // Đây là chỗ dễ sai nhất: phát thêm một lượt khi đã có lượt xếp hàng là dựng một hàng đợi hai
+    // lượt cho một khôi lỗi, trong khi `cancel-in-progress: false` vốn giữ đúng một-chạy-một-chờ.
+    const v = soi(phutTruoc(97), [chay(41), cho(42)]);
+    check("có lượt đang XẾP HÀNG → vẫn cắt lượt treo…", v.go && v.cancel.length === 1 && v.cancel[0].id === 41);
+    check("…nhưng KHÔNG phát thêm lượt nào", v.go && !v.dispatch);
+  }
+  {
+    const v = soi(phutTruoc(97), [cho(42)]);
+    check("chỉ có lượt xếp hàng → không cắt gì cả, và cũng không phát thêm", v.go && v.cancel.length === 0 && !v.dispatch);
+  }
+  {
+    // Kho vừa dựng mà runner chưa bao giờ lên tiếng: sổ điểm danh không có dòng nào. Đó là ca
+    // ĐÁNG hồi sinh nhất, không phải ca để bỏ qua vì thiếu dữ liệu.
+    const v = soi(null, []);
+    check("chưa từng điểm danh → hồi sinh, không phải bỏ qua", v.go && v.dispatch);
+  }
+  {
+    const v = soi(phutTruoc(97), [chay(1), chay(2)]);
+    check("hai lượt cùng treo → cắt cả hai", v.go && v.cancel.length === 2);
+  }
+  {
+    // Ngưỡng do người vận hành đưa vào phải THỰC SỰ điều khiển phép phán xử — bằng không cờ
+    // `--away` chỉ là một dòng chữ trong trợ giúp.
+    const gap = reviewRevive({ lastSeen: phutTruoc(20), now: NOW, awayMs: 30 * 60_000, runs: [] });
+    check("--away rộng hơn → chính khôi lỗi ấy lại được coi là còn sống", !gap.go);
+  }
+
+  // `status` phải đi được qua phép đọc thân JSON, bằng không mọi phán xử trên chỉ đúng trong
+  // phòng thí nghiệm: `activeRuns` là đường DUY NHẤT dựng ActiveRun từ câu trả lời thật.
+  const parsedStatus = activeRuns({
+    workflow_runs: [
+      { id: 21, status: "in_progress", head_sha: "aaaaaaa", run_number: 1 },
+      { id: 22, status: "queued", head_sha: "aaaaaaa", run_number: 2 },
+    ],
+  });
+  check(
+    "activeRuns chở theo `status` — thứ tách lượt ĐANG CHẠY khỏi lượt ĐANG CHỜ",
+    parsedStatus.map((r) => r.status).join(",") === "in_progress,queued",
+    parsedStatus.map((r) => r.status).join(","),
+  );
 }
 
 // ---- SỐ BẢN ĐÓNG DẤU VÀO GÓI ---------------------------------------------------------------

@@ -11,6 +11,50 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.10 — `github:revive`: dựng dậy khôi lỗi đã chết đứng, không chờ hết bốn giờ
+
+Tông chủ gửi ảnh tab Khôi Lỗi 19/08/2026: năm khôi lỗi「đang trực」ở bản 1.3.9, bốn cái khác xám
+ngắt kèm「vắng 1 giờ 37 phút」và đứng nguyên ở bản 1.3.6. Lượt Actions của chúng vẫn còn đó —
+runner bên trong đã chết (hết RAM, đứt mạng, GitHub cắt ngang) mà lượt chạy thì chưa kết thúc, nên
+`schedule` không phát lượt mới và bốn cái ghế ấy nằm chết tới bốn giờ.
+
+**Vì sao `--restart` không chữa được cảnh này** — và đây là lý do lệnh mới đáng tồn tại chứ không
+phải một cờ nữa: hai bên hỏi hai câu khác nhau, bằng hai loại bằng chứng khác nhau.
+
+| | câu hỏi | bằng chứng | chừa ai |
+|---|---|---|---|
+| `deploy --restart` | lượt này có mang MÃ CŨ không | `head_sha` | khôi lỗi đang giữ đàn |
+| `github:revive` | khôi lỗi này còn SỐNG không | sổ điểm danh | khôi lỗi đang trực |
+
+Một runner đã ngừng gõ cửa là một cái xác còn chiếm ghế — dù nó đang chạy đúng bản mới nhất, nên
+phép so `head_sha` không nhìn thấy nó. Ngược lại, `revive` không quan tâm mã cũ hay mới; nó chỉ
+hỏi sổ điểm danh.
+
+**Nó KHÔNG hỏi `heldJobs`, và đó là chủ ý.** Nghe liều nhưng ngược lại: một khôi lỗi im quá
+`STALE_AFTER_MS` (3 phút) đã bị `reapStaleJobs` tước sạch đàn từ lâu, nên tới lúc ngưỡng mặc định
+(10 phút) chạm tới thì không còn đàn nào để cắt. **Hàng rào thật là NGƯỠNG**, và nó rộng có lý do:
+10 phút = 20 lần cửa sổ「vắng mặt」30 giây của sổ điểm danh, đủ cho một lượt bàn giao giữa hai lượt
+Actions hay một nhịp mạng xấu. Khôi lỗi gõ cửa mỗi 5 giây thì không đời nào lọt vào danh sách.
+
+**Lượt ĐANG XẾP HÀNG không bị cắt.** `cancel-in-progress: false` giữ đúng một-chạy-một-chờ, nên
+lượt đang chờ chính là thứ sắp hồi sinh khôi lỗi ấy — cắt nó rồi phát lại một lượt y hệt là tự làm
+chậm mình. Cùng lẽ ấy: đã có lượt chờ thì KHÔNG phát thêm.
+
+Ba chi tiết nhỏ mà thiếu là hỏng: `WORKER_ID` đọc theo luật cũ (sổ trước, tệp workflow sau — đoán
+bừa ở đây là đọc sổ điểm danh của một khôi lỗi KHÁC rồi cắt nhầm lượt); nhánh để `dispatch` **hỏi
+GitHub** (`default_branch`) chứ không đoán là `main`; và sổ điểm danh chỉ lấy dòng `user_id is
+null` — máy nhà của đạo hữu không do lệnh này dựng lên.
+
+Lệnh này **không đẩy một byte mã nào**. Muốn vừa hồi sinh vừa nâng bản thì `github:deploy
+--restart` trước, `github:revive` sau.
+
+Cửa bấm đúp: `revive-github-khoiloi.bat` (xem trước → hỏi → làm thật, cùng khuôn với
+`force-github-khoiloi.bat`). Lưới: `verify:github-deploy` thêm mục 6b — 13 khẳng định thuần cho
+`reviewRevive`, gồm cả hai ca biên ngưỡng, ca「chưa từng điểm danh」và ca「đã có lượt xếp hàng」
+— 91 phép kiểm, tất cả xanh.
+
+---
+
 ## 1.3.9 — Hỷ Sự Đường khai hồng bao ở CẢ phòng Đạo Lữ (schema hồ sơ 70)
 
 Bản ghi `hy-su-duong-20260819-110345`, kèm lời dặn của tông chủ nằm ngay trong `steps.json`:

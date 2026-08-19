@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.12",
+    date: "2026-08-19",
+    lines: [
+      "Nhật ký của đàn thôi hiện đôi: những dòng như「đã đủ huyền tinh hôm nay」trước đây hiện hai lần liền nhau, nay chỉ một.",
+      "Lời nhắc về giá trị tự nhập của Mê Cung và Khoáng Mạch cũng vậy — mỗi việc kể đúng một lần.",
+      "Không mất chữ nào: chỗ nào nhiệm vụ thật sự chạy hai lượt thì nhật ký vẫn kể đủ cả hai.",
+    ],
+  },
+  {
     version: "1.3.11",
     date: "2026-08-19",
     lines: [

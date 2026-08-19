@@ -1317,6 +1317,20 @@ async function main() {
   check("kickHp lạ được giữ nguyên văn", opt(meCung, "kickHp").selectedValue === "250000");
   check("kickHp lạ bật allowCustom", opt(meCung, "kickHp").allowCustom === true);
   check("và việc đó được kể lại", notes.some((n) => n.includes("250000")), notes.join(" / "));
+  // ĐÚNG MỘT LẦN: từ schema 45 mỗi tên nhiệm vụ là một cặp flow VIP/thường, nên vòng dịch
+  // chạy hai lượt và trước 19/08/2026 kể lại y hệt hai lần — 414 dòng thừa trong ba ngày
+  // nhật ký thật, từng đôi cách nhau 156ms. Tên nhiệm vụ nằm sẵn trong câu nên trùng chữ là
+  // trùng sự thật; `profileForConfig` lọc ở cửa ra.
+  check(
+    "…đúng MỘT lần, dù nhiệm vụ có cặp flow VIP/thường",
+    notes.filter((n) => n.includes("250000")).length === 1,
+    String(notes.filter((n) => n.includes("250000")).length),
+  );
+  check(
+    "không câu dịch nào bị kể hai lần",
+    new Set(notes).size === notes.length,
+    notes.filter((n, i) => notes.indexOf(n) !== i).join(" / ") || "(sạch)",
+  );
   check("capCheck=false → nhánh «không kiểm tra»", opt(meCung, "capCheck").selectedValue.includes("«"));
   check("tier → Cực Phẩm", opt(luyenDan, "tier").selectedValue === "Cực Phẩm");
 
@@ -2863,11 +2877,21 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
 
     // Nhật ký người dùng nói tiếng người (ảnh 05/08): lý do dừng hiện TRẦN, còn "stopIf",
     // "repeat", "until" — ngôn ngữ của script — không được rơi vào kênh info/warning.
+    //
+    // Lý do dừng đi ra bằng `result.message`, KHÔNG bằng một dòng log của engine: người kể
+    // là `OUTCOME_TEXT` bên runCycle. Trước 19/08/2026 engine kể thêm một lần nữa ở chỗ
+    // `stopIf` khớp, nên nhật ký thật hiện hai dòng y hệt cách nhau vài mili giây (323 đôi
+    // trong ba ngày) — chốt ngay dưới canh đúng chuyện ấy.
     check(
-      "nhật ký kể lý do trần, không lộ từ ngữ của script",
-      infos.some((m) => m.includes("đã tế lễ hôm nay")) &&
+      "lý do dừng ra bằng lời trần, không lộ từ ngữ của script",
+      sacrificeAgain.message?.includes("đã tế lễ hôm nay") &&
         !infos.some((m) => /stopIf|repeat|until/.test(m)),
-      infos.filter((m) => /stopIf|repeat|until/.test(m)).join(" / ") || "(sạch)",
+      `${sacrificeAgain.message} · ${infos.filter((m) => /stopIf|repeat|until/.test(m)).join(" / ") || "(sạch)"}`,
+    );
+    check(
+      "engine KHÔNG tự kể lý do dừng — kể cả hai nơi là nhật ký hiện đôi",
+      !infos.some((m) => m.includes("đã tế lễ hôm nay")),
+      infos.filter((m) => m.includes("đã tế lễ hôm nay")).join(" / ") || "(sạch)",
     );
 
     console.log("\nKhoáng Mạch — vào mỏ, chờ chín, đào tới khi ĐẦY TRẦN NGÀY (không phải N lần)");

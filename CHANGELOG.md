@@ -11,6 +11,65 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.12 — Nhật ký của đàn thôi hiện đôi
+
+Tông chủ chụp lại hai dòng liền nhau, cùng giây `16:49:38`:
+
+```
+Quest:Mê Cung: đã đủ huyền tinh hôm nay
+Mê Cung: đã đủ huyền tinh hôm nay
+```
+
+Soi ra **HAI** nguồn chứ không phải một, và cả hai đều tất định. Đo trên `job_events` thật của ba
+ngày gần nhất (7.490 dòng, trong đó 2.031 mang tiền tố `Quest:`):
+
+**Lớp 1 — 323 đôi, trải 11 nhiệm vụ.** `stopIf` khớp thì `engine.mjs` kể lý do dừng ở mức info
+(`Quest:<tên>: <lý do>`), rồi chính `stopReason` ấy đi tiếp vào `result.message` và `OUTCOME_TEXT`
+của `runCycle` kể lại y hệt (`<tên>: <lý do>`). Hai dòng khác nhau đúng tiền tố `Quest:` của
+scope. Đo được cách nhau **3ms** — và vì cả hai đều là POST bắn-rồi-quên nên thứ tự còn đảo qua
+đảo lại giữa các lượt, khiến một lỗi trông như hai.
+
+**Lớp 2 — 414 dòng.** Từ schema 45 mỗi tên nhiệm vụ là một CẶP flow VIP/thường dùng chung cấu
+hình, nên mọi vòng dịch trong `profileForConfig` chạy hai lượt và `setOption` kể lại hai lần:
+`Option 'kickIdle' của「Mê Cung」nhận giá trị tự nhập: '20'.` × 2, cách nhau **156ms**.
+
+**Chữa ở NGUỒN, không lọc ở chỗ hiển thị — và đây là phần đáng ghi nhất.** Một phép lọc
+「hai dòng giống nhau trong N giây thì bỏ một」nghe gọn hơn nhiều, nhưng nó quét luôn một lớp thứ
+ba mà ta KHÔNG được mất: `Quest:Khoáng Mạch: Đang ở đúng mỏ «Hỗn Độn»` lặp lại là hai VÒNG CHẠY
+khác nhau (đo được cách nhau 8 phút), và vòng `repeat` kể lại sau một cú tải lại trang là lời khai
+ĐÚNG rằng nhiệm vụ đã được thử hai lần. Lọc theo thời gian không phân biệt nổi「nói hai lần」với
+「xảy ra hai lần」; sửa ở nguồn thì không phải phân biệt.
+
+- **`engine.mjs`**: gỡ `log.info(scope, state.stopReason)` ở nhánh `stopIf`. Lý do dừng vẫn tới tay
+  người đọc — người kể nay là vòng chạy, và dòng của nó sạch hơn (không tiền tố `Quest:`) lẫn đúng
+  khuôn với mọi nhiệm vụ khác. Ngả `onCooldown` còn gộp được đồng hồ vào cùng một dòng:
+  `Mê Cung: đang chờ — còn 2h 5m (đã đủ huyền tinh hôm nay)`.
+- **`profile.mjs`**: `profileForConfig` lọc trùng ngay tại CỬA RA (một `Set` bọc lấy hàm `say` của
+  người gọi), chứ không lọc ở từng vòng dịch. Đặt ở cửa ra vì hai lẽ: người gọi nào cũng khỏi tự
+  lọc, và một vòng dịch thêm sau này không kéo cái lỗi ấy sống lại. Lọc được mà KHÔNG mất gì, vì
+  tên nhiệm vụ nằm sẵn trong mọi câu — trùng chữ nghĩa là trùng cả nhiệm vụ lẫn option.
+
+**Một lưới cũ đang bám đúng dòng vừa gỡ, và nó nói lên vì sao dòng ấy từng tồn tại.** Chốt
+「nhật ký kể lý do trần, không lộ từ ngữ của script」(sinh từ ảnh 05/08) đọc `infos` để chắc rằng
+người đọc thấy「đã tế lễ hôm nay」chứ không phải「stopIf khớp」. Ý định ấy còn nguyên giá trị — chỉ
+là nó phải hỏi ĐÚNG CHỖ. Nay nó hỏi `result.message`, hợp đồng thật của engine; nửa canh
+「không lộ stopIf/repeat/until」giữ y nguyên. Đây là chỗ dễ sa vào việc sửa lưới cho vừa mã: phân
+biệt nằm ở chỗ ý định được giữ, chỉ đổi nhân chứng.
+
+Thêm ba chốt canh chính cái lỗi này: engine KHÔNG được tự kể lý do dừng; một câu dịch phải ra đúng
+một lần dù nhiệm vụ có cặp flow; và không câu dịch nào được kể hai lần.
+
+**Kiểm chứng.** `npm run smoke` **440 thuận, 0 nghịch** (bốn chốt liên quan đều xanh, trong đó chốt「engine KHÔNG tự kể lý do dừng」chạy qua trình duyệt thật trên nhiệm vụ Tế Lễ). Đo trực tiếp lớp 2 trước/sau trên cùng
+một cấu hình: **10 dòng (5 bản sao) → 5 dòng, 0 bản sao**. Và một phép so sâu 24 ca cấu hình giữa
+`profileForConfig` cũ và mới: hồ sơ trả về **giống hệt** — phép lọc không chạm gì tới việc dịch,
+cả hai twin vẫn nhận đủ option. `npx tsc --noEmit` sạch; `typecheck:scripts` đỏ đúng bốn tệp nợ cũ.
+
+Hai lưới đang đỏ SẴN, không liên quan bản vá này (phép so sâu ở trên là bằng chứng): `verify:maze-cap`
+đòi vòng ngoài 6 lượt trong khi hồ sơ nay khai 18, và `verify:phu-daily` đòi chuỗi「doat thanh cong」
+mà `ca2cd48` đã đổi sang nghe xác nhận ở ngả mạng.
+
+---
+
 ## 1.3.11 — Từ điển tên kho: 38 chữ → 465 chữ
 
 Tông chủ: *"random ít tên quá dẫn tới dễ trùng nhiều"*. Đúng, và chỗ nó trùng không phải chỗ dễ

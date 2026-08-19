@@ -128,7 +128,39 @@ try {
   //
   // Chỉ「HeadlessChrome」bị thay. Brand GREASE và「Chromium」phải còn nguyên: một danh sách chỉ
   // có mỗi Google Chrome là một dấu vân tay không tồn tại ngoài đời.
-  check("brand GREASE của bản dựng còn nguyên", /Not[=(_][A-Za-z?: ]*Brand/.test(chUa), chUa);
+  //
+  //「Còn nguyên」phải là ĐO, không phải nhận dạng bằng regex — và cái giá của việc không đo đã
+  // trả ngay hôm nay ở bản desktop: bản vá bên ấy chép GREASE của Chromium 151 (`Not=A?Brand`,
+  // v99) vào một bản dựng 149 vốn gửi `Not)A;Brand`, v24. Chuỗi GREASE là hàm của SỐ HIỆU BẢN,
+  // không suy ra được và không có getter nào trong CDP; nên nó phải được một trình duyệt TRẦN
+  // nói cho biết.
+  const grease = (value: string): string => {
+    for (const [, brand, version] of value.matchAll(/"([^"]+)";v="([^"]+)"/g)) {
+      if (!["Chromium", "Google Chrome", "HeadlessChrome", "Chrome"].includes(brand)) {
+        return `"${brand}";v="${version}"`;
+      }
+    }
+    return "";
+  };
+
+  const plain = await chromium.launch({ headless: true });
+  let rawGrease = "";
+  try {
+    const plainPage = await (await plain.newContext()).newPage();
+    await plainPage.goto(url, { waitUntil: "load" });
+    await plainPage.goto(url, { waitUntil: "load" });
+    rawGrease = grease(String((seen[seen.length - 1] ?? {})["sec-ch-ua"] ?? ""));
+  } finally {
+    await plain.close();
+  }
+
+  console.log(`    GREASE bản dựng tự gửi      : ${rawGrease}`);
+  check("đọc được brand GREASE thật của bản dựng", rawGrease.length > 0);
+  check(
+    `GREASE ta ghi (${grease(chUa)}) đúng bằng của bản dựng`,
+    grease(chUa) === rawGrease,
+    "sửa hằng GREASE trong wearRealBrowserIdentity cho khớp",
+  );
   check("brand「Chromium」còn nguyên", /"Chromium";v="\d+"/.test(chUa), chUa);
   check("nền tảng vẫn khớp UA (Windows)", header("sec-ch-ua-platform") === '"Windows"', header("sec-ch-ua-platform"));
 } finally {

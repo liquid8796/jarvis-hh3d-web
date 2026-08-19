@@ -621,6 +621,25 @@ thích, chứ không im lặng không làm gì.
 
 Cửa bấm đúp: `force-github-khoiloi.bat` (đã truyền sẵn `--restart --force`), thêm
 `--even-if-current` để bật mode bất chấp.
+### `WORKER_SOLVE_TURNSTILE`: tự bấm ô Turnstile (mặc định TẮT)
+
+Khi worker vấp màn Cloudflare「Just a moment」, nó vốn chỉ ĐỨNG CHỜ (tối đa 45s) cho màn tự qua.
+Đặt `WORKER_SOLVE_TURNSTILE=1` thì trong lúc chờ, worker còn tự **bấm ô tick Turnstile** bằng
+chính browser của mình — cùng phiên, cùng IP, KHÔNG tiêm token từ đâu (cf_clearance khoá theo
+IP+UA+TLS nên token giải ở nơi khác là vô hiệu; xem `attemptTurnstileClick` trong runCycle.mjs).
+
+Hai giới hạn phải nói thẳng, đừng kỳ vọng nhầm:
+
+- Chỉ giúp màn Turnstile **tương tác** (có ô để bấm). Màn managed non-interactive tự chạy, không
+  có ô — cú bấm rơi vào khoảng không, vô hại.
+- **Không chữa gốc IP.** Đo 19/08/2026: gốc chặn là danh tiếng IP trung tâm dữ liệu của GitHub
+  Actions runner. Một IP đã bị đánh dấu thì bấm kiểu gì Cloudflare cũng phát lại màn kiểm tra.
+  Đường chữa gốc là **proxy dân dụng / IP dân dụng**, không phải cờ này.
+
+Vì thế nó TẮT mặc định (một cú bấm sai chỗ trên hạ tầng CHUNG có thể làm Cloudflare nghi hơn), và
+đáng bật nhất cho **máy IP dân dụng** — nơi nó có cửa ăn thua. Đã đo cơ chế bằng
+`npm run verify:turnstile` (Chromium thật, fixture iframe): tìm đúng iframe, tính đúng toạ độ ô
+tick, cú bấm rơi đúng vùng. CHƯA đo được với Cloudflare thật — không dựng lại được màn ấy từ máy.
 
 ### Vì sao mãi tới nay mới có, và vì sao thiếu nó là một cái bẫy
 

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.18",
+    date: "2026-08-19",
+    lines: [
+      "Máy chạy tự động nay có thêm một cách tự vượt bước kiểm tra của trang khi bị chặn ở cổng.",
+      "Mặc định tắt, bật riêng cho từng máy khi cần — màn hình không đổi gì.",
+    ],
+  },
+  {
     version: "1.3.17",
     date: "2026-08-19",
     lines: [

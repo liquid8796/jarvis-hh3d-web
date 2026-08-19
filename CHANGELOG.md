@@ -11,6 +11,36 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.18 — Tự bấm ô Turnstile khi vấp màn Cloudflare (cách 2, tắt mặc định)
+
+Tông chủ chọn「cách 2」sau khi cân nhắc: chín khôi lỗi đều SỐNG, đúng bản mới, mà vòng nào cũng
+`0 thuận` vì trang game dựng màn Cloudflare「Just a moment」và IP trung tâm dữ liệu không qua nổi.
+
+**Vì sao KHÔNG mượn được repo solver.** Cả `Turnstile-Solver` (harvest token) lẫn
+`cloudflare-bypass-2026` (SeleniumBase UC) đều solve ở MỘT NƠI rồi trả token/cf_clearance để dùng
+chỗ khác. Không dùng được cho ta: `cf_clearance` bị Cloudflare khoá theo **IP + User-Agent + dấu
+tay TLS**, nên token giải ở IP khác (hoặc bằng Python/Selenium — khác TLS với Node/Playwright của
+worker) là vô hiệu ngay khi worker dùng. Đường duy nhất đúng kiến trúc: để CHÍNH browser của
+worker bấm ô Turnstile, cùng phiên, cùng IP.
+
+**Bản vá.** `attemptTurnstileClick` (runCycle.mjs) tìm iframe `challenges.cloudflare.com`, tính
+toạ độ ô tick (`turnstileCheckboxPoint` — thuần, kiểm được), di chuột một quãng ngắn rồi bấm qua
+toạ độ trang (xuyên được iframe khác gốc). Best-effort: không bao giờ ném, trả `{ clicked, note }`.
+Gọi trong vòng chờ của `ensureReady`, nhiều nhất 2 lần mỗi màn, cách nhau 6s — màn managed
+non-interactive không có ô thì `clicked=false`, ghi Debug rồi chờ tiếp như cũ.
+
+**TẮT mặc định (`WORKER_SOLVE_TURNSTILE=1` để bật).** Chưa đo được với Cloudflare thật, và một cú
+bấm sai chỗ trên hạ tầng CHUNG (nhiều đàn của người khác trên cùng worker) có thể làm Cloudflare
+nghi hơn. Đáng bật nhất cho máy **IP dân dụng** — nơi nó có cửa ăn thua.
+
+**Hai giới hạn nói thẳng:** (1) chỉ giúp màn Turnstile *tương tác*; (2) **không chữa gốc IP** —
+một IP đã bị đánh dấu thì bấm kiểu gì cũng bị phát lại màn kiểm tra, đường chữa gốc là proxy dân
+dụng. Lưới `verify:turnstile` (10 phép kiểm, Chromium thật + fixture iframe) đo được CƠ CHẾ — tìm
+iframe, tính toạ độ, cú bấm rơi đúng vùng ô tick — nhưng KHÔNG đo được liệu Cloudflare có chấp
+nhận, vì không dựng lại được màn ấy từ máy.
+
+---
+
 ## 1.3.15 — Dính chân: một đàn ở lại với một khôi lỗi, thay vì đi tuần mười cái IP
 
 Tông chủ, sau bản vá client hints: *"vẫn bị CF phát hiện nếu 1 tk chạy ở nhiều IP khác nhau cùng

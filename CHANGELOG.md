@@ -11,6 +11,19 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.24 — Vòng chạy NÓI RA mình mở bằng binary nào
+
+Bản vá kênh trình duyệt (1.3.23) đặt dòng「mở bằng …」ở mức `log.debug`, mà debug chỉ vào console
+của runner chứ KHÔNG vào `job_events`. Thế là đúng cái bằng chứng quyết định — máy này chạy
+Chromium đầy đủ hay đã lặng lẽ lui về shell — lại không ai đọc được. Đây là lần THỨ BA cùng một
+lỗi trong tuần: bật một thứ rồi không đo được nó.
+
+Nâng lên mức info. Từ nay mỗi vòng mở đầu bằng một dòng nói thẳng binary đang dùng, nên câu hỏi
+「vẫn bị chặn — vì bản vá không ăn thua, hay vì bản vá chưa hề chạy?」trả lời được bằng cách đọc,
+không phải bằng cách đoán.
+
+---
+
 ## 1.3.23 — Thủ phạm là chrome-headless-shell, không phải IP và không phải tên miền
 
 Sáu lượt vá đi tìm nhầm chỗ. Lượt này công cụ chẩn đoán được mở rộng thành chế độ **đi bộ** —

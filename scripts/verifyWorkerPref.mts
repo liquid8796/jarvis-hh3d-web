@@ -244,6 +244,30 @@ try {
   assert(await mineCanSee(junkJob, strangerId), "giá trị lạ thì máy nhà cũng vẫn phải nhận được");
   console.log("✔ Giá trị lạ (chỉ có thể do sửa tay database): cả hai loại vẫn cầm được, đàn không nằm câm.");
 
+  // ---- 5b. Ngọc giản TRỐNG KHÔNG được tự điền tên mỏ ---------------------------------------
+  // Ô nhập lấy `defaultValue` từ chính giá trị đã parse, nên một giá trị mặc định trong lược đồ
+  // KHÔNG nằm yên ở tầng dữ liệu: nó hiện lên ô như thể đạo hữu đã tự gõ, và người chưa hề chọn
+  // mỏ vẫn bị dời sang mỏ của người viết mã. Rỗng = đào tiếp mỏ đang ở, tức không đụng gì.
+  {
+    const troi = configSchema.parse({});
+    assert(
+      troi.quests.khoangMach.mineName === "",
+      `Khoáng Mạch (VIP): ngọc giản trống phải cho tên mỏ RỖNG — nhận ${JSON.stringify(troi.quests.khoangMach.mineName)}`,
+    );
+    assert(
+      troi.quests.khoangMachThuong.mineName === "",
+      `Khoáng Mạch (thường): ngọc giản trống phải cho tên mỏ RỖNG — nhận ${JSON.stringify(troi.quests.khoangMachThuong.mineName)}`,
+    );
+    // Chốt có răng: nếu ai đó gõ tên mỏ thì nó phải đi qua NGUYÊN VẸN, bằng không phép trên
+    // vẫn xanh với một lược đồ đã hỏng hẳn (kiểu luôn trả rỗng).
+    const daGo = configSchema.parse({ quests: { khoangMach: { mineName: "Bất Diệt Sơn" } } });
+    assert(
+      daGo.quests.khoangMach.mineName === "Bất Diệt Sơn",
+      `tên mỏ đạo hữu gõ phải giữ nguyên — nhận ${JSON.stringify(daGo.quests.khoangMach.mineName)}`,
+    );
+  }
+  console.log("✔ Tên mỏ: ngọc giản trống thì RỖNG (đào tiếp mỏ đang ở), gõ tay thì giữ nguyên.");
+
   // ---- 6. Lựa chọn KHÔNG bị Khắc Ngọc Giản xoá, và cũng không xoá ngọc giản ---------------
   // Hai chiều của cùng một lỗi: hai đường ghi vào chung một document JSONB.
   await setWorkerPref(ownerId, "mine");

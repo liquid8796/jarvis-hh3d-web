@@ -59,8 +59,14 @@ const khoangMachQuest = z
     /**
      * Đích đến là một LITERAL trong nguồn bước evaluateJavaScript của hồ sơ — cùng ranh
      * giới tin cậy với chatMessage, nên cùng một phép làm sạch, không chế phép thứ hai.
+     *
+     * MẶC ĐỊNH RỖNG, có chủ ý. Rỗng nghĩa là「đào tiếp mỏ đang ở」(xem chú thích đầu khối),
+     * tức KHÔNG lùa tài khoản đi đâu cả. Trước đây chỗ này ghim sẵn một tên mỏ, và vì ô nhập
+     * lấy `defaultValue` từ chính giá trị đã parse, cái tên ấy hiện ra như thể đạo hữu đã tự
+     * gõ — nên người chưa hề chọn mỏ vẫn bị dời sang mỏ của người viết mã. Tên gợi ý nay chỉ
+     * còn là `placeholder` của ô, đúng thân phận của nó.
      */
-    mineName: z.string().max(1000).default("Thông Thiên Kiếm Phái").transform(sanitizeChatMessage),
+    mineName: z.string().max(1000).default("").transform(sanitizeChatMessage),
     /**
      * Ngưỡng % bonus tu vi của mỏ để CHỐT LỜI — dưới mức này thì phần đã đào cứ treo ở
      * 「Đạt tối đa」chờ lượt sau, không nhận. KHÁC `hostMinBonus` (ngưỡng tiêu tiền để đoạt);

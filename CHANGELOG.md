@@ -11,6 +11,39 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.26 — Tên mỏ: gợi ý là gợi ý, đừng giả làm lựa chọn của người dùng
+
+Ô「Tên mỏ」của Khoáng Mạch hiện sẵn `Thông Thiên Kiếm Phái` — trông y như đạo hữu đã tự gõ, dù họ
+chưa hề chạm vào. Nguồn không nằm ở form mà ở lược đồ: `khoangMachQuest.mineName` khai
+`.default("Thông Thiên Kiếm Phái")`, và ô nhập lấy `defaultValue` từ chính giá trị đã parse. Nên
+một giá trị mặc định ở tầng dữ liệu KHÔNG nằm yên tại đó — nó trèo lên mặt người dùng và tự nhận
+là lựa chọn của họ. Hậu quả thật: người chưa hề chọn mỏ vẫn bị dời sang mỏ của người viết mã.
+
+Mặc định về rỗng. Mọi thứ khác đã sẵn sàng đón rỗng từ trước, nên bản vá đúng MỘT dòng:
+
+| chỗ | vốn đã đúng |
+| --- | --- |
+| chú thích lược đồ | đã ghi「RỖNG = đào tiếp mỏ đang ở」 |
+| bước chọn mỏ trong `profile.json` | `want.length > 0 ? … : null` rồi rơi về mỏ ĐANG Ở |
+| `profile.mjs` | `km.mineName ?? ""` |
+| `ConfigForm.tsx` | đã có `placeholder="vd: …"` |
+
+Nói cách khác chỉ mỗi `.default(...)` đi ngược lại tài liệu của chính nó. Sau bản vá, `mineName`
+khớp đúng khuôn `chatMessage` nằm ngay dưới nó trong cùng tệp: `.default("").transform(sanitize…)`.
+
+**Ai bị đổi hành vi, nói thẳng:** người ĐÃ từng Khắc Ngọc Giản thì tên mỏ đã nằm trong sổ, không
+suy suyển. Chỉ người CHƯA từng lưu mới đổi — từ「bị lùa sang Thông Thiên Kiếm Phái」thành「đào tiếp
+mỏ đang ở」, tức thôi đụng vào tài khoản họ. Tôi KHÔNG đụng tới dữ liệu đã lưu của ai.
+
+Chốt canh ở `verify:worker-pref`, chỗ `configSchema.parse({})` vốn đã chạy sẵn nên thêm phép kiểm
+là miễn phí — và có kèm đối chứng: tên gõ tay phải đi qua NGUYÊN VẸN, bằng không một lược đồ hỏng
+kiểu luôn-trả-rỗng vẫn xanh.
+
+> Lượt này bản tin người dùng chạm TRẦN 50 mục và `verify:changelog` chặn lại đúng như thiết kế
+> (「thứ để liếc, không phải sử biên niên」). Đã cắt mục cổ nhất — 0.82.0 — để nhường chỗ.
+
+---
+
 ## 1.3.25 — Log kernel không có cửa lên Hoạt động
 
 Tông chủ chỉ vào đúng một dòng trên màn Hoạt động: `Trình duyệt: mở bằng Chromium đầy đủ.`

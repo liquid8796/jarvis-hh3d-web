@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.26",
+    date: "2026-08-21",
+    lines: [
+      "Khoáng Mạch: ô「Tên mỏ」thôi tự điền sẵn một cái tên. Để trống nghĩa là cứ đào tiếp mỏ đạo hữu đang ở; muốn dời mỏ thì gõ tên vào.",
+    ],
+  },
+  {
     version: "1.3.25",
     date: "2026-08-20",
     lines: [
@@ -459,13 +466,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Việc được chia đều cho mọi máy đang trực thay vì dồn vào máy hỏi nhanh nhất, nên đàn tới giờ ít phải chờ hơn.",
       "Đàn đang nghỉ thôi hiện tên máy sẽ chạy nó — cái tên ấy trước đây chỉ là phỏng đoán.",
-    ],
-  },
-  {
-    version: "0.82.0",
-    date: "2026-08-13",
-    lines: [
-      "Luyện Đan: nhật ký nói rõ viên đan nào được giữ lại và viên nào đem phân giải, thay vì chỉ im lặng làm.",
     ],
   },
 ];

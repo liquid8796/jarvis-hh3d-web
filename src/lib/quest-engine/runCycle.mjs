@@ -148,8 +148,9 @@ export async function wearRealBrowserIdentity(context, page) {
  * một bản dựng riêng, gọn hơn, thiếu nhiều thứ của trình duyệt thật. Cloudflare phân biệt được
  * hai thứ ấy, và nó chặn đúng cái shell.
  *
- * ĐO 20/08/2026 bằng `npm run diagnose:cf -- --walk`, chạy TRÊN VM (đúng dải IP trung tâm dữ
- * liệu mà khôi lỗi GitHub dùng), LẶP BA LƯỢT, kết quả y hệt cả ba:
+ * ĐO 20/08/2026 bằng `npm run diagnose:cf -- --walk`, chạy TRÊN VM (IP của Oracle Cloud — KHÔNG
+ * phải dải IP mà khôi lỗi GitHub dùng; phép đo này chứng minh chuyện BINARY, đừng đọc nó thành
+ * bằng chứng về IP), LẶP BA LƯỢT, kết quả y hệt cả ba:
  *
  *   chrome-headless-shell → sạch ở trang chủ, CHẶN ngay trang thứ hai (/nhiem-vu-hang-ngay)
  *   Chromium đầy đủ       → đi hết 8 trang của một vòng thật, không chặn lần nào
@@ -157,6 +158,13 @@ export async function wearRealBrowserIdentity(context, page) {
  * Chú ý cái bẫy đã giấu nó suốt năm lượt vá: TRANG CHỦ QUA ĐƯỢC Ở CẢ HAI. Mọi phép đo một
  * trang đều báo xanh, nên IP và tên miền lần lượt bị đổ oan. Chỉ phép đi bộ nhiều trang trong
  * cùng một phiên mới lộ ra — đúng thứ khôi lỗi làm mà chẩn đoán không làm.
+ *
+ * XÁC NHẬN TRÊN PRODUCTION 20/08/2026, lần này ĐÚNG dải IP GitHub, nhóm theo giờ UTC:
+ *
+ *   15h (bản cũ, shell)      4 lần bị chặn · 0 việc xong · 0 vòng đi trọn
+ *   16h (bản này, Chromium)  0 lần bị chặn · 4 việc xong · 1 vòng đi trọn
+ *
+ * Mẫu một giờ là nhỏ, nhưng vòng-đi-trọn nhảy từ 0 lên 1 là lần đầu kể từ khi lỗi bắt đầu.
  */
 const PREFERRED_CHANNEL = "chromium";
 

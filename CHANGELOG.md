@@ -27,8 +27,8 @@ không phải bằng cách đoán.
 ## 1.3.23 — Thủ phạm là chrome-headless-shell, không phải IP và không phải tên miền
 
 Sáu lượt vá đi tìm nhầm chỗ. Lượt này công cụ chẩn đoán được mở rộng thành chế độ **đi bộ** —
-ghé đúng chuỗi trang của một vòng thật, trong MỘT phiên — và chạy TRÊN VM, tức đúng dải IP trung
-tâm dữ liệu mà khôi lỗi GitHub dùng. Lặp ba lượt, kết quả y hệt cả ba:
+ghé đúng chuỗi trang của một vòng thật, trong MỘT phiên — và chạy TRÊN VM. Lặp ba lượt, kết quả
+y hệt cả ba:
 
 ```
 chrome-headless-shell   1. /                    ok
@@ -36,6 +36,23 @@ chrome-headless-shell   1. /                    ok
 
 Chromium đầy đủ         1..8  ok ok ok ok ok ok ok ok   ← đi hết, không lần nào bị chặn
 ```
+
+> **Đính chính (20/08/2026).** Bản đầu của mục này viết rằng phép đo trên VM chạy「đúng dải IP
+> trung tâm dữ liệu mà khôi lỗi GitHub dùng」. SAI: VM là IP của Oracle Cloud, khôi lỗi chạy trên
+> IP của GitHub Actions — hai dải khác hẳn. Phép đi bộ chứng minh được chuyện BINARY, nó không
+> chứng minh gì về IP. Câu đã gỡ; bằng chứng cho dải IP GitHub nằm ở đoạn dưới, đo trên production.
+
+**Xác nhận trên production, đúng dải IP GitHub** (đo 20/08/2026, nhóm theo giờ UTC):
+
+```
+giờ    lần bị CHẶN   việc xong   vòng đi trọn
+15h          4            0            0        ← bản cũ (chrome-headless-shell)
+16h          0            4            1        ← bản này (Chromium đầy đủ)
+```
+
+Và khôi lỗi tự khai binary nó dùng: `Chromium đầy đủ` — không lượt nào phải lui về shell. Mẫu
+một giờ thì nhỏ, nói thẳng vậy; nhưng **`vòng đi trọn` nhảy từ 0 lên 1 là lần đầu tiên có một
+vòng nào đi hết kể từ lúc lỗi bắt đầu**, và đó là thứ sáu lượt vá trước không lượt nào làm được.
 
 **Cái bẫy đã giấu nguyên nhân suốt sáu lượt: TRANG CHỦ QUA ĐƯỢC Ở CẢ HAI.** Mọi phép đo một
 trang — kể cả phép đo của chính lượt 1.3.22, thứ đã dẫn tới kết luận「không phải Cloudflare, là

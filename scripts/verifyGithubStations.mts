@@ -39,6 +39,9 @@ import {
   MAX_DAILY_PUSHES,
   MS_PER_DAY,
   REVISION_LEDGER_PATH,
+  SCHEDULE_DISABLE_DAYS,
+  countUrgent,
+  countdownLevel,
   explainFailure,
   isCommitDue,
   keepaliveOrder,
@@ -771,8 +774,59 @@ async function run() {
     assert(saved.companionRepos.every((repo) => repo.lastPushAt === recordedAt.toISOString()), "Repo đã push phải nhận cùng mốc ghi batch.");
   }
 
+  // ── Đếm ngược: phân hạng, và phép đếm mà tab Kho GitHub dùng để nói「trang này giấu mất
+  // mấy kho」sau khi sổ được chia trang.
+  //
+  // Hai ngưỡng ấy chỉ đẻ ra một dòng chữ, nhưng cái chúng chống lại là một dạng hỏng CÂM: hạng
+  // rộng quá thì một kho sắp tắt lịch nằm im ở trang hai mà không ai được báo; hạng chặt quá thì
+  // cảnh báo đỏ ở mọi nhịp bình thường, và người vận hành học đúng một điều — lờ nó đi.
+  {
+    assert(countdownLevel(null) === "unknown", "Chưa ghi mốc lần nào là KHÔNG BIẾT, không phải khoẻ.");
+    assert(countdownLevel(0) === "critical", "Hết sạch ngày phải là hạng nặng nhất.");
+    assert(countdownLevel(KEEPALIVE_INTERVAL_DAYS) === "critical", "Còn đúng một chu kỳ ghi vẫn là nặng.");
+    assert(countdownLevel(KEEPALIVE_INTERVAL_DAYS + 1) === "warn", "Trên ngưỡng nặng một ngày thì xuống hạng nhắc.");
+    assert(
+      countdownLevel(SCHEDULE_DISABLE_DAYS - KEEPALIVE_INTERVAL_DAYS - 1) === "warn",
+      "Sát dưới mốc 40 vẫn phải là hạng nhắc.",
+    );
+    // Kho KHOẺ chạm đáy đúng ở 40 mỗi chu kỳ, ngay trước lượt ghi trong ngày. Nhắc ở đó là nhắc
+    // vào nhịp bình thường — đúng cái làm màu cảnh báo mất nghĩa sau tuần đầu.
+    assert(
+      countdownLevel(SCHEDULE_DISABLE_DAYS - KEEPALIVE_INTERVAL_DAYS) === "ok",
+      "Đứng đúng ở 40 là nhịp BÌNH THƯỜNG của kho khoẻ, phải xanh.",
+    );
+    assert(countdownLevel(SCHEDULE_DISABLE_DAYS) === "ok", "Vừa ghi mốc xong thì xanh.");
+
+    const book = [
+      { enabled: true, daysToDisable: 3 }, // nặng
+      { enabled: true, daysToDisable: 30 }, // nhắc
+      { enabled: true, daysToDisable: 58 }, // khoẻ
+      { enabled: true, daysToDisable: null }, // chưa biết — không phải cớ để báo động
+      { enabled: false, daysToDisable: 0 }, // kho TẮT: đỏ là đúng trạng thái đã chọn
+    ];
+    const inBook = countUrgent(book);
+    assert(inBook.critical === 1 && inBook.warn === 1, `Đếm sai cả sổ: ${JSON.stringify(inBook)}`);
+    assert(
+      countUrgent(book.filter((station) => !station.enabled)).critical === 0,
+      "Sổ chỉ toàn kho TẮT phải đếm ra 0 — bằng không tab admin đỏ vĩnh viễn.",
+    );
+    assert(countUrgent([]).critical === 0 && countUrgent([]).warn === 0, "Sổ rỗng không có gì để nhắc.");
+
+    // Phép trừ mà tab admin làm mỗi lượt vẽ: cả sổ trừ trang đang xem.
+    const wholeBookShown = countUrgent(book);
+    assert(
+      inBook.critical - wholeBookShown.critical === 0 && inBook.warn - wholeBookShown.warn === 0,
+      "Trang chở hết sổ thì không còn gì để nhắc — mức「mỗi trang」lớn phải làm dòng cảnh báo tắt hẳn.",
+    );
+    const firstPage = countUrgent(book.slice(0, 1));
+    assert(
+      inBook.critical - firstPage.critical === 0 && inBook.warn - firstPage.warn === 1,
+      "Trang bỏ lại đúng một kho hạng nhắc thì phải nhắc đúng một, không nhắc thừa kho nặng đang hiện.",
+    );
+  }
+
   globalThis.fetch = realFetch;
-  console.log("✔ Vòng nuôi kho GitHub: 24 nhóm ca, mọi luật đứng vững.");
+  console.log("✔ Vòng nuôi kho GitHub: 25 nhóm ca, mọi luật đứng vững.");
 }
 
 run().catch((err) => {

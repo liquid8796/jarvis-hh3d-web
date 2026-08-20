@@ -335,6 +335,55 @@ export function keepaliveOrder<
   });
 }
 
+/**
+ * Hạng của một cái đếm ngược. `unknown` = chưa ghi mốc lần nào, nên KHÔNG BIẾT — và「không
+ * biết」phải giữ nguyên là không biết, đừng gộp vào「còn nhiều ngày」cho gọn bảng.
+ */
+export type CountdownLevel = "unknown" | "critical" | "warn" | "ok";
+
+/**
+ * Còn N ngày trước mốc GitHub tắt lịch thì nặng tới đâu. Hai ngưỡng, và cả hai suy ra từ nhịp
+ * ghi thật chứ không phải số tròn cho đẹp — một kho KHOẺ phải luôn ở hạng `ok`, bằng không
+ * hạng `warn` mất hết nghĩa sau tuần đầu.
+ *
+ * Kho khoẻ dao động giữa 60 (vừa ghi) và 40 (đúng lúc tới hạn, trước khi vòng nuôi trong ngày
+ * chạy). Nên ngưỡng `warn` là「THẤP HƠN 40」chứ không phải「từ 40 trở xuống」: đứng đúng ở 40 là
+ * trạng thái bình thường mỗi chu kỳ, và cảnh báo cho nó là dạy người vận hành bỏ qua cảnh báo.
+ *
+ * Ở đây chứ không ở tab admin vì hai chỗ đọc nó theo hai kiểu: một chỗ tô màu MỘT hàng, một chỗ
+ * ĐẾM cả sổ để nói「trang này giấu mất mấy kho」. Hai phép ấy mà lệch nhau một ngưỡng thì con số
+ * cảnh báo và cái màu trên màn hình nói hai chuyện khác nhau.
+ */
+export function countdownLevel(days: number | null): CountdownLevel {
+  if (days === null) return "unknown";
+  // Còn ít hơn một chu kỳ ghi: lượt ghi kế mà hỏng nữa là không còn lần thứ ba nào trước mốc tắt.
+  if (days <= KEEPALIVE_INTERVAL_DAYS) return "critical";
+  // Đã trượt hẳn một lượt ghi — vòng nuôi có chạy, nhưng kho này không nhận được commit nào.
+  if (days < SCHEDULE_DISABLE_DAYS - KEEPALIVE_INTERVAL_DAYS) return "warn";
+  return "ok";
+}
+
+/**
+ * Đếm kho đáng ngó trong một lát sổ, theo hai hạng nặng.
+ *
+ * CHỈ tính kho `enabled`: kho tắt đứng ngoài vòng nuôi hoàn toàn (`runKeepalive` lọc `enabled`),
+ * nên đếm ngược của nó chắc chắn trôi về 0 — đó là trạng thái đã chọn, không phải sự cố. Đếm nó
+ * vào thì lời cảnh báo đỏ vĩnh viễn, và người vận hành học được đúng một điều: bỏ qua nó.
+ */
+export function countUrgent(
+  stations: readonly { enabled: boolean; daysToDisable: number | null }[],
+): { critical: number; warn: number } {
+  let critical = 0;
+  let warn = 0;
+  for (const station of stations) {
+    if (!station.enabled) continue;
+    const level = countdownLevel(station.daysToDisable);
+    if (level === "critical") critical += 1;
+    else if (level === "warn") warn += 1;
+  }
+  return { critical, warn };
+}
+
 export function isCommitDue(lastCommitAt: string | null, now: Date): boolean {
   if (!lastCommitAt) {
     return true;

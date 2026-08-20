@@ -12,6 +12,8 @@ import {
 } from "@/app/actions/githubStations";
 import { PageSizeSelect, Pager, usePageSize, usePaged } from "@/components/Pager";
 import {
+  countdownLevel,
+  countUrgent,
   DEFAULT_DAILY_PUSHES,
   DEFAULT_WORKFLOW_FILE,
   KEEPALIVE_INTERVAL_DAYS,
@@ -19,6 +21,7 @@ import {
   MIN_DAILY_PUSHES,
   PAT_SCOPES_NOTE,
   SCHEDULE_DISABLE_DAYS,
+  type CountdownLevel,
 } from "@/lib/validation/githubStations";
 
 /**
@@ -54,29 +57,10 @@ const STATION_PAGE_SIZES = [5, 10, 20, 50] as const;
 /** Mở ở mức nhỏ nhất; ai muốn xem trọn một mạch thì đổi, và lựa chọn ấy sống qua lần mở sau. */
 const STATION_DEFAULT_PAGE_SIZE = STATION_PAGE_SIZES[0];
 
-type CountdownLevel = "unknown" | "critical" | "warn" | "ok";
-
 /**
- * Phân hạng đếm ngược. Hai ngưỡng, và cả hai suy ra từ nhịp ghi thật chứ không phải số tròn
- * cho đẹp — một kho KHOẺ phải luôn xanh, bằng không màu vàng mất hết nghĩa sau tuần đầu.
- *
- * Kho khoẻ dao động giữa 60 (vừa ghi) và 40 (đúng lúc tới hạn, trước khi vòng nuôi trong ngày
- * chạy). Nên ngưỡng vàng là「THẤP HƠN 40」chứ không phải「từ 40 trở xuống」: đứng đúng ở 40 là
- * trạng thái bình thường mỗi chu kỳ, và tô vàng cho nó là dạy người vận hành bỏ qua màu vàng.
- *
- * Tách khỏi `countdownTone` từ ngày sổ có phân trang: câu cảnh báo「ngoài trang này còn…」phải
- * đếm theo ĐÚNG hai ngưỡng đang tô màu, mà đếm bằng cách so chuỗi class thì lệch ngay lượt đầu
- * ai đó đổi một mã màu.
+ * Bảng màu cho từng hạng đếm ngược. Phép PHÂN HẠNG nằm ở `@/lib/validation/githubStations`
+ * cùng hai con số nó so — ở đây chỉ còn chuyện tô màu, thứ thật sự thuộc về giao diện.
  */
-function countdownLevel(days: number | null): CountdownLevel {
-  if (days === null) return "unknown";
-  // Còn ít hơn một chu kỳ ghi: lượt ghi kế mà hỏng nữa là không còn lần thứ ba nào trước mốc tắt.
-  if (days <= KEEPALIVE_INTERVAL_DAYS) return "critical";
-  // Đã trượt hẳn một lượt ghi — vòng nuôi có chạy, nhưng kho này không nhận được commit nào.
-  if (days < SCHEDULE_DISABLE_DAYS - KEEPALIVE_INTERVAL_DAYS) return "warn";
-  return "ok";
-}
-
 const COUNTDOWN_CLASS: Record<CountdownLevel, string> = {
   unknown: "text-[var(--color-mist)]",
   critical: "text-[#f2a0a0]",
@@ -90,25 +74,6 @@ function countdownTone(days: number | null): { text: string; className: string }
     text: days === null ? "chưa ghi mốc lần nào" : `còn ${days} ngày`,
     className: COUNTDOWN_CLASS[countdownLevel(days)],
   };
-}
-
-/**
- * Đếm kho đang đếm ngược trong một lát sổ, theo hai hạng đáng ngó.
- *
- * CHỈ tính kho `enabled`: kho tắt đứng ngoài vòng nuôi hoàn toàn (`runKeepalive` lọc `enabled`),
- * nên đếm ngược của nó chắc chắn trôi về 0 — đó là trạng thái đã chọn, không phải sự cố. Đếm
- * nó vào thì câu cảnh báo sẽ đỏ mãi mãi và người vận hành học được đúng một điều: bỏ qua nó.
- */
-function countUrgent(stations: readonly StationView[]): { critical: number; warn: number } {
-  let critical = 0;
-  let warn = 0;
-  for (const station of stations) {
-    if (!station.enabled) continue;
-    const level = countdownLevel(station.daysToDisable);
-    if (level === "critical") critical += 1;
-    else if (level === "warn") warn += 1;
-  }
-  return { critical, warn };
 }
 
 /** Chữ Việt cho `state` GitHub khai. Giá trị lạ hiện NGUYÊN VĂN — đoán bừa còn tệ hơn không dịch. */

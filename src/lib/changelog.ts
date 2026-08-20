@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.31",
+    date: "2026-08-21",
+    lines: [
+      "Sửa gấp: bộ cài khôi lỗi máy nhà phát ra ở bản trước thiếu một tệp nên chạy là lỗi ngay. Ai vừa cài trong khoảng đó xin chạy lại bộ cài một lần.",
+    ],
+  },
+  {
     version: "1.3.30",
     date: "2026-08-21",
     lines: [
@@ -461,13 +468,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-14",
     lines: [
       "Chỗ soạn bản tin của tông môn chỉnh lại cách gỡ mục; với đạo hữu thì màn hình không đổi gì.",
-    ],
-  },
-  {
-    version: "0.87.0",
-    date: "2026-08-14",
-    lines: [
-      "Gia chủ sửa được thẳng nội dung bản tin này ngay trên trang Tông Môn, không phải chờ bản sau.",
     ],
   },
 ];

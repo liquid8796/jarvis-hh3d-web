@@ -24,7 +24,7 @@
  * cố ý FAIL BUILD khi không tìm thấy dòng import — nếu ai đó đổi đường dẫn mà quên nơi này,
  * thà vỡ lúc build còn hơn phát ra một gói cài xong không chạy.
  */
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -51,6 +51,10 @@ try {
       'import { createWorkerCall } from "../src/lib/worker/controlFollow.mjs";',
       'import { createWorkerCall } from "./controlFollow.mjs";',
     ],
+    [
+      'import { UPDATE_EXIT_CODE, selfUpdateEnabled, shouldSelfUpdate } from "../src/lib/worker/selfUpdate.mjs";',
+      'import { UPDATE_EXIT_CODE, selfUpdateEnabled, shouldSelfUpdate } from "./selfUpdate.mjs";',
+    ],
   ];
   let bundledWorker = workerSource;
   for (const [needle, replacement] of importRewrites) {
@@ -73,6 +77,14 @@ try {
   cpSync(
     path.join(root, "src", "lib", "worker", "controlFollow.mjs"),
     path.join(staging, "controlFollow.mjs"),
+  );
+
+  // 2b. Luật tự thay gói. Cùng lẽ với controlFollow.mjs, và cùng bài học: worker.mjs `import`
+  //     nó, nên thiếu nó là gói giải nén ra chết ngay giây đầu bằng ERR_MODULE_NOT_FOUND —
+  //     mà vòng nuôi thì cứ dựng lại mỗi 10 giây để chết tiếp. Xem chốt ở mục 4b.
+  cpSync(
+    path.join(root, "src", "lib", "worker", "selfUpdate.mjs"),
+    path.join(staging, "selfUpdate.mjs"),
   );
 
   // 2. Toàn bộ quest-engine — engine + profile.json là MỘT khối, thiếu profile là engine
@@ -108,6 +120,47 @@ try {
       2,
     ) + "\n",
   );
+
+  // 4b. CHỐT: mọi `import` tương đối trong gói phải trỏ tới một tệp CÓ THẬT trong gói.
+  //
+  //     Bài học này kho mã đã trả giá MỘT LẦN ở phía tông môn — xem khối bình chú của
+  //     `COPIED_PATHS` trong khoiloiPayload.mjs: một commit thêm import thứ ba mà quên chép,
+  //     kho sinh ra chết ngay giây đầu. Bên ấy dựng `assertImportsResolve` để chặn; gói máy
+  //     nhà thì KHÔNG có gì cả, và 21/08/2026 dính đúng lỗi ấy — `selfUpdate.mjs` bị bỏ quên,
+  //     gói 1.3.30 phát ra đã hỏng và chỉ lộ khi có người mở gói production ra soi.
+  //
+  //     Đặt ở đây chứ không ở một lưới `verify:*` riêng, vì đây là chỗ DUY NHẤT mọi lượt dựng
+  //     gói đều đi qua: một lưới phải nhớ chạy là một lưới sẽ có ngày quên chạy.
+  {
+    const thieu = [];
+    const coTrongGoi = (p) => existsSync(path.join(staging, p));
+    const duyet = (thuMuc, tienTo) => {
+      for (const muc of readdirSync(path.join(staging, thuMuc), { withFileTypes: true })) {
+        const rel = tienTo ? `${tienTo}/${muc.name}` : muc.name;
+        if (muc.isDirectory()) {
+          if (rel === "node_modules") continue; // gói của người khác, không phải việc của ta
+          duyet(path.join(thuMuc, muc.name), rel);
+          continue;
+        }
+        if (!/\.(mjs|js)$/.test(muc.name)) continue;
+        const src = readFileSync(path.join(staging, thuMuc, muc.name), "utf8");
+        // Ba hình dạng import, y như assertImportsResolve bên tông môn. Thứ tự trong nhóm chọn
+        // CÓ Ý NGHĨA: `import\s*\(` phải đứng trước `import\s*`, bằng không `import(` bị nuốt.
+        for (const m of src.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s*)["'](\.[^"']*)["']/g)) {
+          const dich = path.posix.normalize(path.posix.join(path.posix.dirname(rel), m[1]));
+          if (!coTrongGoi(dich)) thieu.push(`  ${rel} → ${m[1]}`);
+        }
+      }
+    };
+    duyet(".", "");
+    if (thieu.length > 0) {
+      throw new Error(
+        "Gói linh sư THIẾU TỆP — máy nhà giải nén ra sẽ chết bằng ERR_MODULE_NOT_FOUND:\n" +
+          `${thieu.join("\n")}\n` +
+          "Thêm cú `cpSync` cho tệp còn thiếu ở trên, đừng phát ra một gói hỏng im lặng.",
+      );
+    }
+  }
 
   // 5. Nén, gói phẳng — giải nén ra là thấy worker.mjs ngay, không có thư mục bọc ngoài.
   //    tar chạy với cwd = staging và ghi ra ĐƯỜNG DẪN TƯƠNG ĐỐI, rồi fs copy về đích: GNU

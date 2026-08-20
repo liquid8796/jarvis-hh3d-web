@@ -11,6 +11,44 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.31 — Gói 1.3.30 phát ra đã hỏng, và vì sao không lưới nào thấy
+
+`worker.mjs` của 1.3.30 `import` một module mới (`selfUpdate.mjs`), nhưng `buildWorkerBundle.mjs`
+chép tệp theo DANH SÁCH GÕ TAY và không ai thêm nó vào. Gói phát ra mang đúng số bản `1.3.30`,
+đủ `worker.mjs`, đủ `quest-engine` — và chết ở dòng `import` đầu tiên bằng `ERR_MODULE_NOT_FOUND`.
+Vòng nuôi thì cứ dựng lại mỗi 10 giây để chết tiếp: một cái máy tắt ngóm, đúng thứ cả bản vá
+1.3.30 dựng lên để tránh.
+
+**Lộ ra thế nào:** không phải bởi lưới nào cả. `smoke` 450/0, `verify:worker-selfupdate` 46/0,
+`tsc` sạch — tất cả xanh, vì tất cả đều đọc mã NGUỒN, nơi `selfUpdate.mjs` nằm đúng chỗ. Chỉ lượt
+mở GÓI PRODUCTION ra soi sau khi deploy mới thấy. Bài học: một lưới xanh trên cây mã nguồn không
+nói gì về thứ thật sự được phát đi.
+
+**Kho mã ĐÃ TỪNG trả giá đúng lỗi này — ở nửa kia.** Khối bình chú của `COPIED_PATHS` trong
+`khoiloiPayload.mjs` kể lại: commit「khôi lỗi đi theo trạm」thêm `controlFollow.mjs` mà quên chép,
+kho sinh ra chết ngay giây đầu. Bên ấy dựng `assertImportsResolve` để chặn. **Gói máy nhà thì
+không ai dựng gì cả**, nên nó dính lại y hệt, bảy ngày sau.
+
+**Bản vá — và chỗ đặt nó mới là phần đáng nói.** Chốt nằm TRONG `buildWorkerBundle.mjs`, không
+phải trong một `verify:*` riêng: đây là chỗ DUY NHẤT mọi lượt dựng gói đều đi qua, còn một lưới
+phải nhớ chạy là một lưới sẽ có ngày quên chạy. Nó duyệt cây gói đã dựng, đọc mọi `.mjs`, và đòi
+mọi `import` tương đối trỏ tới một tệp CÓ THẬT trong gói — cùng ba hình dạng import mà
+`assertImportsResolve` bắt (`from "…"`, `import("…")`, và `import "…"` chỉ-để-chạy).
+
+**Chốt bắt được nhiều hơn tôi tưởng.** Tôi thêm `cpSync` cho `selfUpdate.mjs` rồi dựng lại — vẫn
+đỏ. Vì gói là PHẲNG: `worker.mjs` trong gói vẫn giữ đường `../src/lib/worker/selfUpdate.mjs`, và
+`importRewrites` cũng là một danh sách gõ tay mà tôi chưa cập nhật. Nghĩa là bản vá「chép thêm
+tệp」của tôi TỰ NÓ vẫn phát ra một gói hỏng, và chỉ chốt mới thấy.
+
+**Đã chạy thật:** giải nén gói vừa dựng rồi cho chạy với một `WEB_URL` bịa — nó tự giới thiệu,
+vào vòng hỏi việc, báo `fetch failed` như phải thế. Không `ERR_MODULE_NOT_FOUND`. Đó mới là bằng
+chứng, không phải `grep`.
+
+`selfUpdate.mjs` cũng vào `COPIED_PATHS` của gói tông môn. Bên ấy `assertImportsResolve` sẽ chặn
+lượt phát hành nếu quên — nó vốn đã làm đúng việc của mình.
+
+---
+
 ## 1.3.30 — Khôi lỗi máy nhà tự thay gói, và nói ra khi chưa thay được
 
 Tông môn có `github:deploy --restart`; máy nhà không có gì tương đương, nên ba máy đang chạy nằm

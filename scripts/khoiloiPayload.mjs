@@ -57,6 +57,7 @@ export const COPIED_PATHS = Object.freeze([
   "scripts/worker.mjs",
   "src/lib/quest-engine",
   "src/lib/worker/controlFollow.mjs",
+  "src/lib/worker/selfUpdate.mjs",
 ]);
 
 /**

@@ -11,6 +11,49 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.29 — Lời hứa "tắt trình duyệt thoải mái" chỉ đúng một nửa
+
+Tông chủ chỉ vào đúng câu dưới danh sách đàn:
+
+> Tắt trình duyệt thoải mái. Còn tắt máy thì tuỳ ai đang chạy: khôi lỗi tông môn không sao,
+> khôi lỗi nằm trên máy bạn sẽ dừng theo.
+
+và sửa: **tắt trình duyệt hay tắt máy thì khôi lỗi máy nhà đều dừng theo** — không riêng cú tắt
+máy. Vế đầu của câu cũ («thoải mái») chỉ đúng với khôi lỗi tông môn, mà nó lại đứng trần trụi ở
+đầu câu như một lời hứa cho tất cả.
+
+Nay tách hẳn hai ngả, mỗi ngả nói đủ cả hai cách tắt:
+
+> Khôi lỗi tông môn cày tiếp dù bạn tắt trình duyệt hay tắt máy. Còn khôi lỗi nằm trên máy bạn
+> thì dừng theo — cả khi tắt trình duyệt lẫn khi tắt máy.
+
+**Sửa BA chỗ, không phải một** — cùng một lời hứa được chép ở ba nơi trong cùng một màn hình, nên
+chữa mỗi chỗ tông chủ chụp là để trang tự cãi nhau:
+
+- `ControlPanel.tsx` — câu dưới danh sách đàn (chỗ trong ảnh).
+- `ControlPanel.tsx` — `RUN_BY_OPTIONS`, dòng mô tả lối «Máy nhà của tôi»: «tắt máy là auto nghỉ»
+  → «tắt trình duyệt hay tắt máy là auto nghỉ».
+- `LinhSuPanel.tsx` — dòng mở đầu mục cài đặt: «Máy bật là auto chạy, tắt máy là auto nghỉ» →
+  thêm vế trình duyệt.
+
+Chỗ thứ tư KHÔNG đụng tới, cố ý: `page.tsx` khai «khôi lỗi trên server tự vận hành — đóng trình
+duyệt, tắt máy, đàn pháp vẫn chạy». Câu ấy đã tự khoanh vùng đúng vào khôi lỗi server nên nó
+không hứa thừa.
+
+**Một điều ghi lại cho người sau, vì mã trong kho này nói ngược.** `public/linh-su/install.ps1`
+dựng khôi lỗi máy nhà thành tiến trình NỀN: `launcher.vbs` chạy `run.ps1` qua `wscript //B`, cắm
+khoá `Run` để tự lên ca mỗi lần đăng nhập, và `worker.mjs` không hề truyền `headless` nên nó lấy
+mặc định `true` — tức không có cửa sổ trình duyệt nào để mà tắt. Đọc riêng mã ấy thì kết luận sẽ
+là «tắt trình duyệt không ảnh hưởng gì». Tông chủ nói ngược lại, và câu chữ đi theo tông chủ vì
+hai lẽ: người ra lệnh nắm cách người dùng thật sự chạy auto (có thể qua đường cài khác, hoặc bản
+PC), và trong hai kiểu sai thì «hứa thừa rồi auto đứng lặng mà không ai hiểu vì sao» tệ hơn hẳn
+«dặn kỹ quá». Nên **đừng đọc `install.ps1` rồi sửa câu này ngược lại** — nếu ngày nào đó muốn
+đổi, hỏi tông chủ trước.
+
+Kiểm chứng: `npx tsc --noEmit` sạch; ảnh chụp lại đúng vùng ấy sau khi phát hành.
+
+---
+
 ## 1.3.28 — Cờ Turnstile bật ở đúng chỗ nó KHÔNG ăn thua, tắt ở đúng chỗ nó ăn thua
 
 Soát khôi lỗi máy nhà so với khôi lỗi tông môn, và khe hở lộ ra ngay ở dòng đầu tiên của bảng:

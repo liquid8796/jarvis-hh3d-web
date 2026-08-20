@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.29",
+    date: "2026-08-20",
+    lines: [
+      "Nói lại cho đúng chỗ dễ hiểu nhầm: auto chạy bằng máy nhà sẽ dừng khi bạn tắt trình duyệt, chứ không riêng lúc tắt máy.",
+      "Auto chạy bằng khôi lỗi tông môn thì vẫn cày tiếp — tắt trình duyệt hay tắt máy đều không sao.",
+      "Chỉ là câu chữ trên màn hình; cách auto chạy không đổi gì.",
+    ],
+  },
+  {
     version: "1.3.28",
     date: "2026-08-21",
     lines: [
@@ -458,14 +467,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Số hiệu bản ở góc màn hình nay bấm được, mở ra đúng danh sách này.",
       "Có bản mới thì cạnh số hiệu hiện một chấm vàng, xem xong là tắt.",
-    ],
-  },
-  {
-    version: "0.85.0",
-    date: "2026-08-14",
-    lines: [
-      "Khoáng Mạch có thêm ô「Ngưỡng % tu vi để đào」: mỏ đang cho ít hơn mức đặt thì để dành, phần đã đào vẫn treo nguyên và lát sau ghé lại.",
-      "Để ngưỡng ở 0 thì mọi thứ chạy y như trước.",
     ],
   },
 ];

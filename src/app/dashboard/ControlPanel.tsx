@@ -63,7 +63,7 @@ const RUN_BY_OPTIONS: { value: WorkerPref; label: string; note: string }[] = [
   {
     value: "mine",
     label: "Máy nhà của tôi",
-    note: "Chỉ máy đã cài khôi lỗi của đạo hữu chạy; tắt máy là auto nghỉ.",
+    note: "Chỉ máy đã cài khôi lỗi của đạo hữu chạy; tắt trình duyệt hay tắt máy là auto nghỉ.",
   },
 ];
 
@@ -270,12 +270,16 @@ export function ControlPanel({
         </p>
       )}
 
-      {/* Nói cho ĐỦ, không chỉ nói phần hay ho. "Tắt trình duyệt vẫn chạy" là thật, nhưng
-          bỏ lửng ở đó thì người ta suy ra "tắt máy chắc cũng thế" — sai, nếu khôi lỗi đang
-          nằm trên chính máy họ. Một câu hứa đúng một nửa còn tệ hơn không hứa. */}
+      {/* Nói cho ĐỦ, không chỉ nói phần hay ho. "Tắt trình duyệt vẫn chạy" chỉ đúng với khôi
+          lỗi TÔNG MÔN; bỏ lửng ở đó thì người đang chạy bằng máy nhà suy ra mình cũng thế,
+          rồi tắt trình duyệt và không hiểu vì sao đàn đứng im. Một câu hứa đúng một nửa còn
+          tệ hơn không hứa — nên câu này tách hẳn hai ngả, và ở ngả máy nhà thì kể ĐỦ CẢ HAI
+          cách tắt chứ không chỉ "tắt máy".
+          Cùng lời hứa ấy còn nằm ở `RUN_BY_OPTIONS` phía trên và ở LinhSuPanel: sửa một chỗ
+          thì sửa cả ba, không thì trang tự cãi nhau ngay trong một màn hình. */}
       <p className="mb-2 text-xs text-[var(--color-mist)]">
-        Tắt trình duyệt thoải mái. Còn tắt máy thì tuỳ ai đang chạy: khôi lỗi tông môn không
-        sao, khôi lỗi nằm trên máy bạn sẽ dừng theo.
+        Khôi lỗi tông môn cày tiếp dù bạn tắt trình duyệt hay tắt máy. Còn khôi lỗi nằm trên
+        máy bạn thì dừng theo — cả khi tắt trình duyệt lẫn khi tắt máy.
       </p>
 
       <div className="mb-1 flex items-center justify-between gap-3">

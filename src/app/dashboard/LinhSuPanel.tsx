@@ -322,8 +322,8 @@ export function LinhSuPanel({
           Cho auto chạy trên máy của bạn
         </h3>
         <p className="mt-1 text-xs text-[var(--color-mist)]">
-          Máy bật là auto chạy, <span className="text-[var(--color-parchment)]">tắt máy là auto
-          nghỉ</span>. Bộ cài mang sẵn mọi thứ, bạn không phải cài thêm phần mềm nào.
+          Máy bật là auto chạy, <span className="text-[var(--color-parchment)]">tắt trình duyệt
+          hay tắt máy là auto nghỉ</span>. Bộ cài mang sẵn mọi thứ, bạn không phải cài thêm phần mềm nào.
         </p>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">

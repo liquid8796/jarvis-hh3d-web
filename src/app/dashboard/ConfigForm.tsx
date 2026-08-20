@@ -276,7 +276,12 @@ function KhoangMachFieldset({
             type="text"
             maxLength={60}
             defaultValue={config.mineName}
-            placeholder="vd: Thông Thiên Kiếm Phái"
+            /* Tên BỊA, và phải giữ nguyên như vậy. Ô này để trống nghĩa là「đào tiếp mỏ đang
+               ở」, nên placeholder chỉ có một việc: cho thấy HÌNH DẠNG của một cái tên. Dùng
+               tên mỏ có thật thì nó đọc ra thành một lời gợi ý — người ta gõ theo, hoặc tưởng
+               đó là mặc định — mà mỏ thật thì đổi theo mùa và theo hạng, nên lời gợi ý ấy sai
+               ngay từ ngày mai. "Huyễn" (ảo) là chỗ cái tên tự khai mình không có thật. */
+            placeholder="vd: Huyễn Nguyệt Kiếm Phái"
           />
           <p className="mt-1 text-xs text-[var(--color-mist)]">
             Gõ một phần tên cũng khớp, không cần đủ dấu. Bỏ trống = đào tiếp mỏ đang ở.

@@ -312,7 +312,13 @@ export async function openBrowserPreferringFullChromium(chromium, fingerprint, p
       return { browser, context, via: plan.note };
     } catch (err) {
       lastError = err;
-      log?.warning?.("Trình duyệt", `Không mở được bằng ${plan.note}: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
+      // DEBUG, không phải warning. Cú lui là ĐƯỜNG ĐI CÓ THIẾT KẾ, không phải sự cố: trên một
+      // máy chỉ có shell thì kế hoạch đầu hụt là chuyện bình thường của MỌI vòng, và kêu lên
+      // Hoạt động mỗi vòng là dựng một cảnh báo vĩnh viễn mà người dùng không làm gì được.
+      //
+      // Không nuốt thông tin: nếu MỌI kế hoạch đều hụt thì `lastError` được NÉM ngay dưới đây,
+      // và lỗi thật đi lên theo đường lỗi bình thường. Chỉ tiếng ồn bị bỏ, không phải sự thật.
+      log?.debug?.("Trình duyệt", `Không mở được bằng ${plan.note}: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
     }
   }
   throw lastError ?? new Error("Không mở được trình duyệt bằng bất kỳ kênh nào.");
@@ -692,11 +698,18 @@ export async function runCycle(deps) {
   const opened = await openBrowserPreferringFullChromium(chromium, fingerprint, profileDir, log);
   const browser = opened.browser;
   const context = opened.context;
-  // MỨC INFO, không phải debug: `log.debug` chỉ vào console của runner chứ không vào job_events,
-  // nên suốt ba lượt vá vừa rồi tôi mù đúng chỗ cần nhìn. Binary nào được mở là BẰNG CHỨNG quyết
-  // định của bản vá kênh trình duyệt — nếu một máy thiếu Chromium đầy đủ và lặng lẽ lui về shell,
-  // dòng này là thứ duy nhất nói ra, thay vì để người đọc đoán từ việc「vẫn bị chặn」.
-  await say(`Trình duyệt: mở bằng ${opened.via}.`);
+  // TẦNG KHÔI LỖI, KHÔNG phải Hoạt động. Binary nào được mở là chuyện ruột gan của bộ máy:
+  // người dùng không đọc được nó, và cũng không làm được gì với nó. Hoạt động là chỗ kể việc
+  // tu luyện chạy tới đâu — mỗi dòng kernel chen vào đó là một dòng đẩy tin thật ra khỏi màn.
+  //
+  // Vì sao KHÔNG xoá hẳn: đây vẫn là thứ duy nhất phân biệt「vẫn bị chặn vì bản vá không ăn
+  // thua」với「vẫn bị chặn vì máy này lặng lẽ lui về shell」. Console của khôi lỗi GitHub được
+  // Actions giữ nguyên, nên cần thì tra ở đó — đúng tầng, đúng người cần đọc.
+  //
+  // Lịch sử để người sau khỏi lật ngược: dòng này ĐÃ từng ở mức info (1.3.24) và bị gỡ xuống
+  // ngay sau đó vì lọt lên màn người dùng. Muốn nhìn nó lại thì đọc log khôi lỗi, đừng nâng
+  // mức — `smokeQuestEngine` có chốt canh đúng chuyện này và sẽ đỏ.
+  log.debug("Trình duyệt", `Mở bằng ${opened.via}.`);
 
   let done = 0;
   let failed = 0;

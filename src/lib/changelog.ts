@@ -66,10 +66,17 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.25",
+    date: "2026-08-20",
+    lines: [
+      "Hoạt động thôi hiện dòng kỹ thuật「máy mở bằng bản trình duyệt nào」. Chỗ ấy để kể việc tu luyện của đạo hữu, phần máy móc lui về nhật ký của máy chạy.",
+    ],
+  },
+  {
     version: "1.3.24",
     date: "2026-08-20",
     lines: [
-      "Mỗi vòng chạy nay ghi rõ máy mở bằng bản trình duyệt nào — đọc Hoạt động là biết ngay, khỏi đoán.",
+      "Máy chạy tự động ghi lại bản trình duyệt nó dùng, để khi cần dò lỗi là có sẵn.",
     ],
   },
   {

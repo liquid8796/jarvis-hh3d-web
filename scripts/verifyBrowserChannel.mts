@@ -74,6 +74,30 @@ async function main() {
     check("…và NÓI RA là đang chạy đường lui", String(r.via).includes("đường lui"), r.via);
   }
 
+  console.log("");
+  console.log("Cú lui KHÔNG được kêu lên Hoạt động");
+  {
+    // Bắt log theo TẦNG, vì đây là chỗ phân tầng dễ trượt nhất: `info`/`warning` trong bộ máy
+    // này nghĩa là LÊN THẲNG màn người dùng, còn `debug` mới là tầng khôi lỗi. Máy chỉ có shell
+    // thì kế hoạch đầu hụt ở MỌI vòng — kêu lên Hoạt động là dựng một cảnh báo vĩnh viễn mà
+    // người dùng không làm gì được, đúng thứ tông chủ vừa bác ở dòng「mở bằng …」.
+    const tren: string[] = [];
+    const duoi: string[] = [];
+    const bat = {
+      info: (s: string, m: string) => { tren.push(`info ${s}: ${m}`); },
+      warning: (s: string, m: string) => { tren.push(`warn ${s}: ${m}`); },
+      debug: (s: string, m: string) => { duoi.push(`${s}: ${m}`); },
+    };
+    const { chromium } = fakeChromium((ch) => ch === "chromium");
+    await openBrowserPreferringFullChromium(chromium, launchProfile(true), "", bat);
+    check("lui một nhịp mà KHÔNG đẩy dòng nào lên Hoạt động", tren.length === 0, tren.join(" | "));
+    check(
+      "…nhưng tầng khôi lỗi vẫn ghi lại, không phải giấu biệt",
+      duoi.some((l) => l.includes("Không mở được bằng")),
+      duoi.join(" | "),
+    );
+  }
+
   console.log("\nHồ sơ BỀN cũng đi qua đúng lối ấy");
   {
     const { chromium, calls } = fakeChromium((ch) => ch === "chromium");

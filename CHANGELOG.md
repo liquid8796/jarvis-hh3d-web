@@ -11,6 +11,59 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.25 — Log kernel không có cửa lên Hoạt động
+
+Tông chủ chỉ vào đúng một dòng trên màn Hoạt động: `Trình duyệt: mở bằng Chromium đầy đủ.`
+Chuyện binary là ruột gan bộ máy — người dùng không đọc được nó, không làm gì được với nó, và
+mỗi dòng như thế chen vào là một dòng đẩy tin thật ra khỏi màn.
+
+Dòng ấy hạ xuống `log.debug`, tức **tầng khôi lỗi**: console của khôi lỗi GitHub được Actions
+giữ nguyên, nên cần tra vẫn tra được — đúng tầng, đúng người cần đọc. Nó KHÔNG bị xoá, vì nó
+vẫn là thứ duy nhất phân biệt「vẫn bị chặn vì bản vá không ăn thua」với「vẫn bị chặn vì máy này
+lặng lẽ lui về shell」.
+
+**Đây là lỗi của chính lượt 1.3.24.** Tôi nâng dòng ấy lên `info` để bản vá kênh trình duyệt tự
+chứng minh, và đã đúng — nó chứng minh xong. Nhưng `info` trong bộ máy này nghĩa là *lên thẳng
+màn người dùng*, và tôi đổi cái mù của mình lấy cái ồn của họ. Bằng chứng cho tôi, không phải
+tin cho họ: hai thứ ấy khác tầng.
+
+**Soát cả nhà chứ không sửa mỗi dòng bị chỉ**, vì lời dặn nói về một LOẠI tin. Kết quả: dây nối
+`session.mjs` → info/warning là dây ngủ yên (`session.mjs` chỉ phát `debug`); `engine.mjs` dùng
+`log.info(scope…)` với scope là tên nhiệm vụ nên đúng là tin cho người đọc. Còn đúng ba chỗ mang
+chất kernel, và chỉ MỘT chỗ là tin thông báo thuần:
+
+| chỗ | loại | xử |
+| --- | --- | --- |
+| `Trình duyệt: mở bằng …` | thông báo nội bộ | **hạ xuống debug** |
+| cú LUI về shell hụt kế hoạch đầu | đường đi có thiết kế | **hạ xuống debug** |
+| không đè được client hints | cảnh báo bất thường thật | giữ — chờ tông chủ định |
+| đóng trình duyệt hụt hạn | cảnh báo bất thường thật | giữ — chờ tông chủ định |
+
+**Chỗ rò thứ hai lộ ra lúc tự soi, không phải lúc được chỉ.** `openBrowserPreferringFullChromium`
+kêu `log.warning` mỗi lần một kế hoạch mở hụt — nghĩa là trên một máy CHỈ CÓ shell, người dùng ăn
+dòng `Trình duyệt: Không mở được bằng Chromium đầy đủ: …` ở MỌI vòng, vĩnh viễn. Cú lui là đường đi
+có thiết kế chứ không phải sự cố, nên nó cũng xuống `debug`. Không nuốt thông tin: hụt HẾT mọi kế
+hoạch thì `lastError` vẫn được ném, lỗi thật vẫn đi lên theo đường lỗi bình thường.
+
+Chốt của smoke KHÔNG bắt được chỗ này — trong smoke kế hoạch đầu luôn thành công, nên nhánh lui
+không bao giờ chạy. Nó được canh ở `verify:browser-channel` (nay 14 phép), bằng một CẶP chốt tự
+chứng minh lẫn nhau: một cái đòi Hoạt động rỗng, cái kia đòi tầng debug có tin. Đổi mức theo chiều
+nào cũng làm đỏ đúng một cái, nên không có cửa xanh giả.
+
+Hai chỗ sau là *cảnh báo về một sự cố có thật*. Giấu cảnh báo là một quyết định khác hẳn với dọn
+tin ồn, và nó thuộc về tông chủ chứ không phải về tôi, nên tôi để nguyên và hỏi.
+
+**Chốt canh, và chốt ấy tự chứng minh là có răng.** `smokeQuestEngine` nay bắt theo TỪ VỰNG
+kernel trên đúng những dòng một vòng thật đẩy lên Hoạt động — sửa lời văn mà vẫn để nó lên thì
+vẫn đỏ. Nhưng một phép「không có gì lọt」đứng một mình vẫn xanh hồn nhiên kể cả khi từ vựng gõ
+sai và cái lưới thủng hoàn toàn, nên có thêm một phép đối chứng: chốt phải bắt được ĐÚNG câu đã
+lọt ra thật hồi 1.3.24, và phải KHÔNG bắt nhầm một dòng nhiệm vụ bình thường.
+
+Mục 1.3.24 trong bản tin người dùng cũng sửa: nó hứa「đọc Hoạt động là biết ngay」, mà lượt này
+gỡ đúng dòng ấy khỏi Hoạt động — để nguyên là bản tin nói dối người đọc.
+
+---
+
 ## 1.3.24 — Vòng chạy NÓI RA mình mở bằng binary nào
 
 Bản vá kênh trình duyệt (1.3.23) đặt dòng「mở bằng …」ở mức `log.debug`, mà debug chỉ vào console

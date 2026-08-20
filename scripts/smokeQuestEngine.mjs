@@ -5027,6 +5027,38 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         cycleLines.some((line) => line.includes("Đã đủ lượt hôm nay: Điểm Danh")),
         cycleLines.join(" | "),
       );
+
+      // Hoạt động là màn kể chuyện tu luyện, không phải nơi đổ ruột gan bộ máy. Chốt này ra
+      // đời sau một lượt để lọt thật: dòng「Trình duyệt: mở bằng Chromium đầy đủ」từng được
+      // nâng lên info để chứng minh một bản vá, rồi hiện lên đúng màn người dùng đọc.
+      //
+      // Bắt theo TỪ VỰNG chứ không theo một câu cụ thể — sửa lại lời văn mà vẫn để nó lên
+      // Hoạt động thì vẫn phải đỏ. Muốn nhìn những dòng này: đọc log khôi lỗi (mức debug).
+      const TU_VUNG_KERNEL = [
+        "mở bằng",
+        "Chromium đầy đủ",
+        "chrome-headless-shell",
+        "đường lui",
+      ];
+      const dinhKernel = (line) =>
+        TU_VUNG_KERNEL.some((tu) => line.toLowerCase().includes(tu.toLowerCase()));
+
+      // Chốt phải TỰ CHỨNG MINH LÀ CÓ RĂNG. Một phép「không có gì lọt」đứng một mình vẫn xanh
+      // hồi hộp kể cả khi từ vựng gõ sai và nó chẳng bắt được gì — tức canh gác bằng một cái
+      // lưới thủng. Nên đối chứng bằng ĐÚNG câu đã lọt ra thật ở 1.3.24.
+      check(
+        "chốt kernel có răng — vẫn bắt được đúng câu đã lọt ra hồi 1.3.24",
+        dinhKernel("Trình duyệt: mở bằng Chromium đầy đủ.") &&
+          dinhKernel("Trình duyệt: mở bằng chrome-headless-shell (đường lui).") &&
+          !dinhKernel("Điểm Danh: đã điểm danh hôm nay"),
+      );
+
+      const loLot = cycleLines.filter(dinhKernel);
+      check(
+        "Hoạt động KHÔNG dính log kernel — chuyện binary/trình duyệt thuộc tầng khôi lỗi",
+        loLot.length === 0,
+        `lọt: ${loLot.join(" | ")}`,
+      );
     }
 
     // Cửa giao thức: sổ chỉ có nghĩa khi nó đi được cả hai chiều trên dây. Hai chốt đọc thẳng

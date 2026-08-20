@@ -163,10 +163,20 @@ if [ -z "$WORKER_ID" ]; then
   if [ -z "$SUFFIX" ]; then SUFFIX="$(LC_ALL=C tr -dc 'a-z0-9' </dev/urandom | head -c 6)"; fi
   WORKER_ID="$(hostname -s | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-' | sed 's/-*$//')-$SUFFIX"
 fi
+# WORKER_SOLVE_TURNSTILE=1 — bật cú tự bấm ô Turnstile khi vấp màn kiểm tra Cloudflare.
+#
+# Vì sao máy nhà bật mà mặc định của gói lại TẮT: cú bấm ấy chỉ ăn thua ở màn TƯƠNG TÁC, và màn
+# tương tác chỉ hiện với IP dân dụng — đúng thứ máy nhà có mà runner trung tâm dữ liệu không có.
+# Khôi lỗi tông môn đã khai cờ này trong deploy/github/linh-su.yml từ lâu; máy nhà thì không ai
+# khai hộ, nên suốt thời gian qua nó bỏ đúng cái cửa duy nhất mình có. Nay bộ cài khai luôn.
+#
+# Không muốn thì sửa dòng ấy trong .env rồi khởi động lại — vòng nuôi đọc lại .env mỗi lượt dựng.
+# Lưu ý: cài lại là .env được ghi mới hoàn toàn, nên lựa chọn sửa tay sẽ trở về 1.
 cat > "$DIR/.env" <<ENV
 WEB_URL=$BASE
 WORKER_TOKEN=$TOKEN
 WORKER_ID=$WORKER_ID
+WORKER_SOLVE_TURNSTILE=1
 ENV
 chmod 600 "$DIR/.env"
 

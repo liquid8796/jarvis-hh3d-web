@@ -11,6 +11,49 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.28 — Cờ Turnstile bật ở đúng chỗ nó KHÔNG ăn thua, tắt ở đúng chỗ nó ăn thua
+
+Soát khôi lỗi máy nhà so với khôi lỗi tông môn, và khe hở lộ ra ngay ở dòng đầu tiên của bảng:
+`WORKER_SOLVE_TURNSTILE=1` chỉ được khai trong `deploy/github/linh-su.yml`. Hai bộ cài máy nhà
+(`install.ps1`, `install.sh`) ghi đúng BA biến — `WEB_URL`, `WORKER_TOKEN`, `WORKER_ID` — nên cờ
+ấy nằm ở mặc định TẮT.
+
+Mà chính mã nguồn đã viết sẵn nó nên bật cho ai: cú tự bấm ô Turnstile chỉ ăn thua ở màn TƯƠNG
+TÁC, và màn tương tác chỉ hiện với IP dân dụng — thứ máy nhà có, runner GitHub không. Tức suốt
+thời gian qua cờ này **bật ở đúng chỗ nó ít ăn thua nhất, và tắt ở đúng chỗ nó ăn thua nhất.**
+Ngược hoàn toàn, và không lượt kiểm nào bắt được vì chưa từng có ai đối chiếu hai bên.
+
+Hai bộ cài nay khai cờ ấy. Sửa tay trong `.env` vẫn tắt được; cài lại thì `.env` ghi mới nên
+lựa chọn ấy trở về 1 — nói rõ trong chú thích ngay cạnh.
+
+**Soát nốt phần còn lại của bảng, để không dừng ở cái đầu tiên tìm thấy:**
+
+| biến | tông môn | máy nhà | phán |
+| --- | --- | --- | --- |
+| `WORKER_MAX_JOBS` | 2 | mặc định 2 | khớp, không phải khe hở |
+| `WORKER_MAX_LIFETIME_MS` · `_DRAIN_TIMEOUT_MS` | có | không | **cố ý khác** — Actions cắt ở 6 giờ, máy nhà chạy vô hạn |
+| `WORKER_QUEST_TABS` | 3 | không | **biến chết**, không mã nào đọc — rác ở phía tông môn |
+| `WORKER_SOLVE_TURNSTILE` | 1 | **thiếu** | **khe hở thật** |
+
+**Lưới mới `npm run verify:worker-env`** (19 phép, thuần — không mạng, không database). Nó rút tên
+biến từ ĐÚNG khối khai chứ không quét cả tệp, vì `install.ps1` nhắc `WORKER_TOKEN` trong chú thích
+lẫn trong regex đọc `.env` cũ, quét cả tệp là tưởng đã khai trong khi chưa.
+
+Điều khiến nó khác một danh sách cho qua: **mọi miễn trừ kiểm được thì đều bị kiểm lại.** 「Biến
+chết」phải thật sự không được `worker.mjs` đọc; 「mặc định đã bằng」phải khớp cả mặc định trong mã
+lẫn con số trong yml. Một biến chết sống lại, hay một mặc định bị đổi, là lúc miễn trừ thành nói
+dối — và lưới đỏ ngay lúc ấy chứ không đợi ai phát hiện.
+
+> Đã đo là lưới CÓ RĂNG chứ không tin lời: gỡ cờ khỏi `install.ps1` rồi chạy lại thì đỏ từ BA
+> hướng độc lập (khớp ps1↔sh, phủ tông môn→máy nhà, và phép ghim riêng cho cờ). Phục hồi xong
+> xanh lại 19/0.
+
+**Điều bản vá này KHÔNG làm, nói thẳng:** ba khôi lỗi máy nhà đang chạy (`1.2.0`, `1.3.0`, `1.3.0`)
+vẫn ở nguyên bản cũ. Không lệnh nào với tới máy người khác, và gói mới chỉ tới tay họ khi họ tự
+chạy lại bộ cài. Bản vá này chỉ bảo đảm lượt cài lại ấy CHO RA một khôi lỗi ngang hàng tông môn.
+
+---
+
 ## 1.3.27 — Sổ kho GitHub chia trang, và cái giá của phép chia ấy
 
 Tab Kho GitHub vẽ trọn sổ trong một cuộn: sáu kho production, mỗi kho là một tấm thẻ mang

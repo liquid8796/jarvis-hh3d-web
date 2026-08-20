@@ -208,10 +208,20 @@ if (-not $workerId) {
   }
   $workerId = ($env:COMPUTERNAME.ToLower() -replace "[^a-z0-9-]", "-") + "-" + $suffix
 }
+# WORKER_SOLVE_TURNSTILE=1 — bật cú tự bấm ô Turnstile khi vấp màn kiểm tra Cloudflare.
+#
+# Vì sao máy nhà bật mà mặc định của gói lại TẮT: cú bấm ấy chỉ ăn thua ở màn TƯƠNG TÁC, và màn
+# tương tác chỉ hiện với IP dân dụng — đúng thứ máy nhà có mà runner trung tâm dữ liệu không có.
+# Khôi lỗi tông môn đã khai cờ này trong deploy/github/linh-su.yml từ lâu; máy nhà thì không ai
+# khai hộ, nên suốt thời gian qua nó bỏ đúng cái cửa duy nhất mình có. Nay bộ cài khai luôn.
+#
+# Không muốn thì sửa dòng ấy trong .env rồi khởi động lại — vòng nuôi đọc lại .env mỗi lượt dựng.
+# Lưu ý: cài lại là .env được ghi mới hoàn toàn, nên lựa chọn sửa tay sẽ trở về 1.
 @(
   "WEB_URL=$base"
   "WORKER_TOKEN=$token"
   "WORKER_ID=$workerId"
+  "WORKER_SOLVE_TURNSTILE=1"
 ) -join "`r`n" | Set-Content -Encoding ascii (Join-Path $dir ".env")
 
 # --- 6. run.ps1 — vòng nuôi: worker chết là dựng lại sau 10 giây -------------

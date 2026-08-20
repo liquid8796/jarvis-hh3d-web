@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.28",
+    date: "2026-08-21",
+    lines: [
+      "Khôi lỗi chạy trên máy nhà nay tự bấm ô kiểm tra khi trang game dựng lên — trước giờ chỉ máy của tông môn làm việc đó, dù máy nhà mới là nơi nó có tác dụng.",
+      "Đang chạy bản cũ thì cài lại bộ cài ở mục Khôi Lỗi mới nhận được thay đổi này.",
+    ],
+  },
+  {
     version: "1.3.27",
     date: "2026-08-21",
     lines: [
@@ -458,14 +466,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khoáng Mạch có thêm ô「Ngưỡng % tu vi để đào」: mỏ đang cho ít hơn mức đặt thì để dành, phần đã đào vẫn treo nguyên và lát sau ghé lại.",
       "Để ngưỡng ở 0 thì mọi thứ chạy y như trước.",
-    ],
-  },
-  {
-    version: "0.84.0",
-    date: "2026-08-14",
-    lines: [
-      "Khoáng Mạch nay chạy được cho cả tài khoản thường, không riêng tài khoản VIP.",
-      "Bảng Hàng Đợi bỏ bớt một đoạn giải thích cũ đã không còn đúng.",
     ],
   },
 ];

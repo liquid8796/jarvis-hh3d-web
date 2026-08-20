@@ -162,6 +162,33 @@ check(
   /\^\(\[A-Z_\]\+\)=/.test(ps1Src) && /^[A-Z_]+$/.test("WORKER_SOLVE_TURNSTILE"),
 );
 
+console.log("\nBỘ CÀI PHẢI CÒN CÚ PHÁP HỢP LỆ");
+// Chốt này ra đời từ một lỗi TÔI TỰ GÂY RA 21/08/2026: một phép ghép chuỗi nuốt mất dấu xuống
+// dòng, biến `}` + `'@` thành `}'@`. Trong PowerShell, dấu đóng here-string PHẢI đứng đầu dòng —
+// dính vào dòng trên là here-string không bao giờ đóng và CẢ BỘ CÀI vỡ ngay dòng đầu tiên.
+//
+// Không lưới nào bắt được, vì mọi phép kiểm khi ấy chỉ đọc NỘI DUNG chứ không đọc CẤU TRÚC. Và
+// phép kiểm đầu tiên tôi dựng để soi nó còn báo động giả: PowerShell 5.1 đọc tệp UTF-8 không BOM
+// theo bảng mã ANSI, nên chữ Việt làm lệch phép ghép nháy và BẢN GỐC cũng "hỏng" y hệt. Bài học
+// kép: chạy đối chứng trước khi tin một phép kiểm mới, và kiểm cấu trúc bằng thứ không phụ thuộc
+// bảng mã — đọc dòng, như dưới đây, chạy được cả trên VM Linux lẫn máy nhà.
+{
+  const loi: string[] = [];
+  for (const [ten, src] of [["install.ps1", ps1Src], ["install.sh", shSrc]] as const) {
+    src.split("\n").forEach((dong, i) => {
+      if (/\S.*['"]@\s*\|/.test(dong) && !/^['"]@/.test(dong)) {
+        loi.push(`${ten}:${i + 1} — dấu đóng here-string không đứng đầu dòng`);
+      }
+    });
+  }
+  check("mọi dấu đóng here-string đều mở đầu dòng", loi.length === 0, loi.join(" | "));
+
+  // Đếm mở/đóng phải cân — bắt ca ngược lại: thêm một here-string mà quên đóng.
+  const mo = (ps1Src.match(/^@['"]$/gm) ?? []).length;
+  const dong = (ps1Src.match(/^['"]@/gm) ?? []).length;
+  check("install.ps1: số here-string mở bằng số đóng", mo === dong, `mở ${mo}, đóng ${dong}`);
+}
+
 console.log(`\n${passed} thuận, ${failures.length} nghịch.`);
 if (failures.length > 0) {
   for (const f of failures) console.log(`  ✗ ${f}`);

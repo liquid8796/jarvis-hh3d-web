@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.30",
+    date: "2026-08-21",
+    lines: [
+      "Khôi lỗi chạy trên máy nhà nay tự cập nhật: thấy bản mới thì nó làm nốt việc đang dở, thay gói, rồi chạy tiếp — không cần đạo hữu đụng tay.",
+      "Mục Khôi Lỗi cũng báo khi có máy đang chạy bản cũ, kèm cách xử lý.",
+      "Máy cài từ bản trước 1.3.30 vẫn phải chạy lại bộ cài một lần cuối để nhận được phép tự cập nhật.",
+    ],
+  },
+  {
     version: "1.3.29",
     date: "2026-08-20",
     lines: [
@@ -459,14 +468,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-14",
     lines: [
       "Gia chủ sửa được thẳng nội dung bản tin này ngay trên trang Tông Môn, không phải chờ bản sau.",
-    ],
-  },
-  {
-    version: "0.86.0",
-    date: "2026-08-14",
-    lines: [
-      "Số hiệu bản ở góc màn hình nay bấm được, mở ra đúng danh sách này.",
-      "Có bản mới thì cạnh số hiệu hiện một chấm vàng, xem xong là tắt.",
     ],
   },
 ];

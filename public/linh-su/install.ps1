@@ -217,11 +217,16 @@ if (-not $workerId) {
 #
 # Không muốn thì sửa dòng ấy trong .env rồi khởi động lại — vòng nuôi đọc lại .env mỗi lượt dựng.
 # Lưu ý: cài lại là .env được ghi mới hoàn toàn, nên lựa chọn sửa tay sẽ trở về 1.
+#
+# WORKER_SELF_UPDATE=1 — cho phép khôi lỗi XIN vòng nuôi thay gói khi trạm đã sang bản mới.
+# Chỉ bật ở đây: máy nhà có vòng nuôi (run.ps1/run.sh) đứng ngoài nhặt mã thoát rồi đi lấy gói.
+# Khôi lỗi tông môn chạy trong GitHub Actions, không có ai đứng ngoài, nên cờ này mặc định TẮT.
 @(
   "WEB_URL=$base"
   "WORKER_TOKEN=$token"
   "WORKER_ID=$workerId"
   "WORKER_SOLVE_TURNSTILE=1"
+  "WORKER_SELF_UPDATE=1"
 ) -join "`r`n" | Set-Content -Encoding ascii (Join-Path $dir ".env")
 
 # --- 6. run.ps1 — vòng nuôi: worker chết là dựng lại sau 10 giây -------------
@@ -235,7 +240,53 @@ foreach ($line in Get-Content (Join-Path $dir ".env")) {
 }
 $node = Join-Path $dir "node\node.exe"
 $log = Join-Path $dir "linh-su.log"
+
+# --- Tự thay gói ------------------------------------------------------------
+#
+# Vòng nuôi làm việc này, KHÔNG phải bản thân khôi lỗi, và cũng không phải install.ps1.
+#
+# Vì sao không gọi lại install.ps1: nó GIẾT tiến trình trước rồi mới tải gói. Mất mạng đúng
+# quãng giữa là máy tắt ngóm, không còn ai dựng lại — đổi một lượt lệch bản vô hại lấy một
+# cái máy chết. Ở đây thì ngược: tải xong, mở ra, soi thấy đủ mặt rồi mới đụng thư mục cài.
+# Hỏng ở bất kỳ nhịp nào cũng chỉ là「thôi, chạy tiếp bản cũ」.
+#
+# Vòng nuôi cũng không nằm trong gói (gói chỉ có worker.mjs, quest-engine, package.json,
+# node_modules), nên nó không bao giờ tự ghi đè lên chính mình giữa chừng.
+function Ban-DangCai {
+  try { (Get-Content (Join-Path $dir "package.json") -Raw | ConvertFrom-Json).version } catch { "" }
+}
+function Thay-Goi {
+  if (-not $env:WEB_URL) { return $false }
+  $tmp = Join-Path $env:TEMP ("linh-su-" + [guid]::NewGuid().ToString("N"))
+  try {
+    New-Item -ItemType Directory -Path (Join-Path $tmp "x") -Force | Out-Null
+    $tgz = Join-Path $tmp "goi.tgz"
+    Invoke-WebRequest -UseBasicParsing -Uri "$($env:WEB_URL.TrimEnd('/'))/linh-su/goi-linh-su.tgz" -OutFile $tgz -TimeoutSec 300
+    & (Join-Path $env:SystemRoot "System32\tar.exe") -xzf $tgz -C (Join-Path $tmp "x")
+    # Soi ba mặt trước khi tin: thiếu bất kỳ cái nào nghĩa là gói hỏng hoặc tải dở, và chép
+    # một gói dở vào thư mục cài là tự tay làm hỏng bản đang chạy được.
+    foreach ($can in @("worker.mjs", "package.json", "quest-engine")) {
+      if (-not (Test-Path (Join-Path $tmp "x\$can"))) { return $false }
+    }
+    Copy-Item (Join-Path $tmp "x\*") $dir -Recurse -Force
+    return $true
+  } catch {
+    return $false
+  } finally {
+    Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+
+# Cờ trao cho khôi lỗi ở lượt dựng kế. Tắt khi một lượt thay gói ĐÃ CHẠY mà số bản không đổi:
+# trạm hứa một đằng, gói phát ra một nẻo (thường là deploy đang dở). Không có cửa này thì khôi
+# lỗi thoát-thay-thoát mãi mãi và không cày được nhiệm vụ nào. Sáu giờ sau thì hỏi lại.
+$xinThayGoi = "1"
+$thoiHoiToi = [datetime]::MinValue
+
 while ($true) {
+  if ((Get-Date) -ge $thoiHoiToi) { $xinThayGoi = "1" }
+  $env:WORKER_SELF_UPDATE = $xinThayGoi
+
   # Cắt nhật ký khi quá 5MB. Khôi lỗi chạy quanh năm, và khi web không với tới được nó
   # ghi một dòng "claim lỗi" mỗi 5 giây — mất mạng một đêm là vài chục nghìn dòng.
   if ((Test-Path $log) -and ((Get-Item $log).Length -gt 5MB)) { Remove-Item $log -Force }
@@ -244,6 +295,20 @@ while ($true) {
   # tiếng Việt do Node in ra bị băm nát, và stderr còn bị bọc thành NativeCommandError kèm
   # cả stack trace PowerShell. cmd thì đổ thẳng byte sang tệp, không dịch, không bọc.
   & cmd /c "`"$node`" `"$dir\worker.mjs`" >> `"$log`" 2>&1"
+
+  if ($LASTEXITCODE -eq 90) {
+    $truoc = Ban-DangCai
+    $duoc = Thay-Goi
+    $sau = Ban-DangCai
+    if ($duoc -and $sau -ne $truoc) {
+      Add-Content $log "[vòng nuôi] Đã thay gói: $truoc -> $sau"
+    } else {
+      Add-Content $log "[vòng nuôi] Thay gói không đổi được bản (đang ở $truoc) — thôi hỏi trong 6 giờ."
+      $xinThayGoi = "0"
+      $thoiHoiToi = (Get-Date).AddHours(6)
+    }
+  }
+
   Start-Sleep -Seconds 10
 }
 '@ | Set-Content -Encoding utf8 (Join-Path $dir "run.ps1")

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { forgetLinhSuAction, issueLinhPhuAction, revokeLinhPhuAction } from "@/app/actions/linhsu";
-import { describeWorkerVersion } from "@/lib/worker/version";
+import { anyMineStale, describeWorkerVersion, MINE_STALE_NOTICE } from "@/lib/worker/version";
 import { useDashboardPresenceLive } from "./DashboardLiveProvider";
 
 /**
@@ -238,6 +238,18 @@ export function LinhSuPanel({
             </span>
           )}
         </div>
+
+        {/* Lời nhắc gộp, đặt TRÊN danh sách: nhãn「· bản x.y.z」cạnh từng dòng nói được là máy
+            nào lệch, nhưng nó là chữ xám nhỏ cạnh một cái tên máy — người ta đọc lướt qua suốt
+            nhiều ngày mà không thấy đó là việc phải làm. Câu này nói thẳng ra thành việc. */}
+        {anyMineStale(mine, presence?.webVersion) && (
+          <p className="rounded border border-[var(--color-gold-300)]/40 bg-[var(--color-gold-300)]/10 px-2 py-1 text-xs text-[var(--color-gold-300)]">
+            {MINE_STALE_NOTICE}{" "}
+            <span className="text-[var(--color-mist)]">
+              Máy đang bật sẽ tự thay gói ở vòng kế; máy cài từ bản cũ thì chạy lại bộ cài ở dưới.
+            </span>
+          </p>
+        )}
 
         {mine.map((w) => {
           // Chỉ nói chuyện phiên bản với khôi lỗi ĐANG TRỰC. Một dòng xám đã tắt máy mà còn bị

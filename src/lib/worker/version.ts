@@ -44,3 +44,28 @@ export function describeWorkerVersion(
   if (worker === web) return { state: "current", label: `bản ${worker}`, stale: false };
   return { state: "mismatch", label: `bản ${worker} — web đang ở ${web}, nên cài lại`, stale: true };
 }
+
+/**
+ * Lời nhắc hiện lên khi có khôi lỗi máy nhà ĐANG TRỰC mà lệch bản với trạm.
+ *
+ * Chuỗi này là nguyên văn tông chủ đặt, giữ y vậy — nó là câu người dùng đọc, không phải nhãn
+ * kỹ thuật để tôi nắn lại cho gọn.
+ */
+export const MINE_STALE_NOTICE =
+  "Khôi lỗi máy nhà đã cũ, cần được update để theo kịp tông môn.";
+
+/**
+ * Có khôi lỗi máy nhà nào đáng bị nhắc không.
+ *
+ * CHỈ tính máy ĐANG TRỰC — cùng luật đã áp cho từng dòng trong danh sách. Một máy đã tắt mang
+ * số bản của lần chạy cuối, không phải của thứ đang chạy; giục nó là dựng một việc phải làm
+ * mà người dùng không có cách nào làm.
+ *
+ * Tách khỏi JSX vì đây là một LUẬT, và luật thì phải kiểm được mà không cần dựng React lên.
+ */
+export function anyMineStale(
+  mine: readonly { online: boolean; version: string | null }[],
+  webVersion: string | null | undefined,
+): boolean {
+  return mine.some((w) => w.online && describeWorkerVersion(w.version, webVersion).stale);
+}

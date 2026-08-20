@@ -11,6 +11,85 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.30 — Khôi lỗi máy nhà tự thay gói, và nói ra khi chưa thay được
+
+Tông môn có `github:deploy --restart`; máy nhà không có gì tương đương, nên ba máy đang chạy nằm
+lì ở `1.2.0`/`1.3.0` trong khi tông môn ở `1.3.29`. Lượt này dựng đường nối ấy.
+
+**Số bản đi được HAI chiều.** Trước nay khôi lỗi khai bản lên, máy chủ không hề nói lại bản của
+mình. Nay mọi hồi đáp `claim` chở kèm `webVersion` — đi cùng `claim` chứ không dựng op riêng, vì
+claim là op dày nhịp nhất và là op DUY NHẤT một khôi lỗi nhàn rỗi vẫn gọi đều (đúng lý do
+`recordWorkerSeen` được đặt ở đó). Một op「hỏi bản」riêng là thêm một nhịp mạng cho mọi khôi lỗi,
+mỗi 5 giây, để chở một chuỗi sáu ký tự.
+
+**VÒNG NUÔI thay gói, KHÔNG phải khôi lỗi tự gọi bộ cài.** Đây là quyết định kiến trúc của cả bản
+vá, và lý do nằm ở một chi tiết của `install.ps1`: nó **giết tiến trình trước, tải gói sau**. Mất
+mạng đúng quãng giữa là máy tắt ngóm, không còn ai dựng lại — đổi một cú lệch bản vô hại lấy một
+cái máy chết. Vòng nuôi thì ngược: tải xong, mở ra, soi đủ ba mặt (`worker.mjs`, `package.json`,
+`quest-engine`) rồi mới đụng thư mục cài. Hỏng ở bất kỳ nhịp nào cũng chỉ là「thôi, chạy tiếp bản
+cũ」. Vòng nuôi cũng KHÔNG nằm trong gói, nên nó không bao giờ tự ghi đè lên chính mình giữa chừng.
+
+Khôi lỗi thấy lệch bản thì `beginDrain` — cơ chế rút lui SẴN CÓ, dựng cho hạn đời runner GitHub,
+không chế thêm cái thứ hai. Nó thôi nhận việc mới, chờ đàn đang chạy đi nốt vòng, rồi thoát bằng mã
+**90**. Không cắt ngang ai. Job vừa được phát vẫn được nhận trước khi thu — bỏ ngang là để nó nằm
+chờ phép dọn kết liễu, tức một người mất một vòng chỉ vì ta nôn nóng.
+
+**Cờ là XIN VÀO, mặc định TẮT** — và đây là một lỗi tôi tự bắt được lúc soi lại. Mặc định BẬT nghĩa
+là khôi lỗi TÔNG MÔN cũng thu đàn rồi thoát mỗi khi lệch bản, mà chúng chạy trong GitHub Actions,
+**không có vòng nuôi nào** để nhặt mã thoát lên. Thoát như thế chỉ đổi một cú lệch bản vô hại lấy
+thời gian chết có thật. Bộ cài máy nhà bật cờ; nơi nào không dùng được thì không bật.
+
+**Ba cửa từ chối, mỗi cửa chống một tai nạn:**
+
+| cửa | chống |
+| --- | --- |
+| gói không khai số bản | không tự kiểm chứng được ⇒ vòng thay-gói vô tận |
+| máy chủ chưa nói bản | luật「tuyệt đối không đoán là cũ」của `version.ts` |
+| vòng nuôi tắt cờ | trạm hứa một đằng gói phát một nẻo ⇒ thoát-thay-thoát mãi mãi |
+
+Cửa thứ ba là cửa quan trọng nhất mà cũng dễ quên nhất: sau một lượt thay gói mà số bản KHÔNG đổi,
+vòng nuôi tự tắt cờ trong sáu giờ. Không có nó, một lượt deploy đang dở đủ để mọi máy nhà ngừng cày.
+
+**So BẰNG chứ không so thứ tự.** Cùng lẽ đã chốt ở `version.ts`: trạm gương có thể mang bản CŨ hơn
+gói đang chạy. So thứ tự thì khôi lỗi đứng lệch với chính trạm nó đang nói chuyện; so bằng thì hai
+bên luôn hội tụ về một bản mã.
+
+**Lời nhắc**, nguyên văn tông chủ đặt:「Khôi lỗi máy nhà đã cũ, cần được update để theo kịp tông
+môn.」Đặt TRÊN danh sách chứ không cạnh từng dòng: nhãn `· bản x.y.z` nói được máy nào lệch, nhưng
+nó là chữ xám nhỏ cạnh một tên máy — người ta đọc lướt qua suốt nhiều ngày mà không thấy đó là việc
+phải làm. Chỉ nhắc về máy ĐANG TRỰC; máy đã tắt mang số bản của lần chạy cuối, giục nó là dựng một
+việc phải làm mà người dùng không có cách nào làm.
+
+**ĐÃ CHẠY THẬT, không chỉ đọc mã.** Phần PowerShell là nửa không kiểm được bằng lưới thuần, nên nó
+được chạy trong một sa bàn trên máy Windows thật — 11 phép, gồm cả cửa sống còn:
+
+```
+WEB_URL rỗng      → trả false, thư mục cài còn nguyên
+URL hỏng          → trả false, KHÔNG làm hỏng bản đang chạy, không để lại mảnh vụn
+URL thật          → thay được, 0.0.1 → 1.3.29, đủ worker.mjs + quest-engine + node_modules
+```
+
+**Một lỗi tôi TỰ GÂY RA giữa chừng, và cách nó bị bắt.** Phép ghép chuỗi nuốt mất dấu xuống dòng,
+biến `}` + `'@` thành `}'@`. Trong PowerShell dấu đóng here-string phải đứng đầu dòng — dính vào
+dòng trên là here-string không bao giờ đóng và **cả bộ cài vỡ**. Không lưới nào bắt được, vì mọi
+phép kiểm khi ấy chỉ đọc NỘI DUNG chứ không đọc CẤU TRÚC.
+
+Tệ hơn: phép kiểm đầu tiên tôi dựng để soi nó **báo động giả** — PowerShell 5.1 đọc tệp UTF-8 không
+BOM theo bảng mã ANSI, nên chữ Việt làm lệch phép ghép nháy và **BẢN GỐC cũng "hỏng" y hệt**. Chỉ
+lượt chạy ĐỐI CHỨNG trên bản gốc mới lộ ra là phép kiểm sai chứ không phải tệp sai. Nay `verify:
+worker-env` canh cấu trúc bằng phép đọc dòng — không phụ thuộc bảng mã, chạy được cả trên VM Linux.
+
+Hai lưới: `verify:worker-selfupdate` (46 phép) và `verify:worker-env` (21, thêm 2 phép cấu trúc).
+Cả hai đã ĐO là có răng: gỡ cờ ra thì lưới đỏ từ ba hướng; tái tạo lỗi `}'@` thì đỏ từ hai hướng và
+chỉ đúng số dòng.
+
+**Điều bản vá này KHÔNG làm.** Ba máy đang chạy `1.2.0`/`1.3.0` KHÔNG có mã này, nên không tự cập
+nhật được — con gà và quả trứng, nói thẳng ra chứ không giấu sau chữ「tự động」. Chúng phải chạy lại
+bộ cài MỘT LẦN CUỐI; từ đó về sau mới tự theo kịp. Đó cũng đúng là lý do lời nhắc phải có: nó là
+nửa duy nhất với tới được những máy đã lỡ nhịp.
+
+---
+
 ## 1.3.29 — Lời hứa "tắt trình duyệt thoải mái" chỉ đúng một nửa
 
 Tông chủ chỉ vào đúng câu dưới danh sách đàn:

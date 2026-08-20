@@ -1,4 +1,18 @@
 import { NextResponse, after } from "next/server";
+// Cùng nguồn số bản mà dashboard đang dùng (services/dashboard.ts) — hai nguồn là hai sự thật.
+import pkg from "../../../../package.json";
+
+/**
+ * Bản của TRẠM ĐANG PHỤC VỤ, gửi kèm mọi hồi đáp `claim`.
+ *
+ * Vì sao đi cùng `claim` chứ không dựng một op riêng: claim là op dày nhịp nhất, và là op DUY
+ * NHẤT một khôi lỗi NHÀN RỖI vẫn gọi đều — đúng lý do `recordWorkerSeen` được đặt ở đó. Một op
+ * 「hỏi bản」riêng là thêm một nhịp mạng cho mọi khôi lỗi, mỗi 5 giây, để chở một chuỗi 6 ký tự.
+ *
+ * Gửi cho MỌI khôi lỗi chứ không riêng máy nhà: tông môn cũng có lúc lệch bản, và một trường
+ * chỉ-đôi-khi-có là thứ không ai kiểm được.
+ */
+const WEB_VERSION = pkg.version.trim() || null;
 import { isAdminUser } from "@/lib/auth/permissions";
 import { z } from "zod";
 import { authorizeWorker } from "@/lib/auth/worker";
@@ -194,7 +208,7 @@ export async function POST(request: Request) {
       // bình chú ở `claimNextJob`. Giữ lại một cú chặn ở đây nữa là dựng hai cửa cho một luật.
       const job = await claimNextJob(body.workerId, scope);
       if (!job) {
-        return NextResponse.json({ job: null });
+        return NextResponse.json({ job: null, webVersion: WEB_VERSION });
       }
 
       // Đọc SAU cú thoát sớm, không phải trước: chỉ hồi đáp CÓ job mới cần `game.baseUrl`, mà
@@ -271,6 +285,7 @@ export async function POST(request: Request) {
       // cửa phát việc nghĩa là mọi khôi lỗi, ở mọi máy, dùng tên miền mới ngay từ vòng kế —
       // không cài lại, không sửa env, không deploy.
       return NextResponse.json({
+        webVersion: WEB_VERSION,
         job: {
           id: job.id,
           userId: job.userId,

@@ -172,11 +172,16 @@ fi
 #
 # Không muốn thì sửa dòng ấy trong .env rồi khởi động lại — vòng nuôi đọc lại .env mỗi lượt dựng.
 # Lưu ý: cài lại là .env được ghi mới hoàn toàn, nên lựa chọn sửa tay sẽ trở về 1.
+#
+# WORKER_SELF_UPDATE=1 — cho phép khôi lỗi XIN vòng nuôi thay gói khi trạm đã sang bản mới.
+# Chỉ bật ở đây: máy nhà có vòng nuôi (run.ps1/run.sh) đứng ngoài nhặt mã thoát rồi đi lấy gói.
+# Khôi lỗi tông môn chạy trong GitHub Actions, không có ai đứng ngoài, nên cờ này mặc định TẮT.
 cat > "$DIR/.env" <<ENV
 WEB_URL=$BASE
 WORKER_TOKEN=$TOKEN
 WORKER_ID=$WORKER_ID
 WORKER_SOLVE_TURNSTILE=1
+WORKER_SELF_UPDATE=1
 ENV
 chmod 600 "$DIR/.env"
 
@@ -185,11 +190,59 @@ cat > "$DIR/run.sh" <<'RUN'
 #!/usr/bin/env bash
 cd "$(dirname "$0")"
 set -a; . ./.env; set +a
+
+# --- Tự thay gói ------------------------------------------------------------
+#
+# Vòng nuôi làm việc này, KHÔNG phải bản thân khôi lỗi, và cũng không phải install.sh.
+# Bộ cài GIẾT tiến trình trước rồi mới tải gói; mất mạng đúng quãng giữa là máy tắt ngóm.
+# Ở đây thì tải xong, mở ra, soi thấy đủ mặt rồi mới đụng thư mục cài — hỏng ở nhịp nào cũng
+# chỉ là "thôi, chạy tiếp bản cũ". Vòng nuôi không nằm trong gói nên không tự ghi đè lên mình.
+ban_dang_cai() {
+  ./node/bin/node -p "require('./package.json').version" 2>/dev/null || echo ""
+}
+thay_goi() {
+  [ -n "${WEB_URL:-}" ] || return 1
+  tmp="$(mktemp -d)" || return 1
+  mkdir -p "$tmp/x" || { rm -rf "$tmp"; return 1; }
+  curl -fsSL --max-time 300 "${WEB_URL%/}/linh-su/goi-linh-su.tgz" -o "$tmp/goi.tgz" \
+    || { rm -rf "$tmp"; return 1; }
+  tar -xzf "$tmp/goi.tgz" -C "$tmp/x" || { rm -rf "$tmp"; return 1; }
+  # Soi ba mặt trước khi tin: thiếu cái nào nghĩa là gói hỏng hoặc tải dở, và chép một gói dở
+  # vào thư mục cài là tự tay làm hỏng bản đang chạy được.
+  for can in worker.mjs package.json quest-engine; do
+    [ -e "$tmp/x/$can" ] || { rm -rf "$tmp"; return 1; }
+  done
+  cp -R "$tmp/x/." . || { rm -rf "$tmp"; return 1; }
+  rm -rf "$tmp"
+  return 0
+}
+
+# Cờ trao cho khôi lỗi ở lượt dựng kế. Tắt khi một lượt thay gói ĐÃ CHẠY mà số bản không đổi:
+# trạm hứa một đằng, gói phát ra một nẻo. Không có cửa này thì khôi lỗi thoát-thay-thoát mãi
+# mãi và không cày được nhiệm vụ nào. Sáu giờ sau thì hỏi lại.
+xin_thay_goi=1
+thoi_hoi_toi=0
+
 while true; do
+  [ "$(date +%s)" -ge "$thoi_hoi_toi" ] && xin_thay_goi=1
+  export WORKER_SELF_UPDATE="$xin_thay_goi"
   # Cắt nhật ký khi quá 5MB. Khôi lỗi chạy quanh năm, và khi web không với tới được nó ghi
   # một dòng "claim lỗi" mỗi 5 giây — mất mạng một đêm là vài chục nghìn dòng.
   if [ -f linh-su.log ] && [ "$(wc -c < linh-su.log)" -gt 5242880 ]; then : > linh-su.log; fi
   ./node/bin/node worker.mjs >> linh-su.log 2>&1
+  ma=$?
+  if [ "$ma" -eq 90 ]; then
+    truoc="$(ban_dang_cai)"
+    if thay_goi; then duoc=1; else duoc=0; fi
+    sau="$(ban_dang_cai)"
+    if [ "$duoc" -eq 1 ] && [ "$sau" != "$truoc" ]; then
+      echo "[vòng nuôi] Đã thay gói: $truoc -> $sau" >> linh-su.log
+    else
+      echo "[vòng nuôi] Thay gói không đổi được bản (đang ở $truoc) — thôi hỏi trong 6 giờ." >> linh-su.log
+      xin_thay_goi=0
+      thoi_hoi_toi=$(( $(date +%s) + 21600 ))
+    fi
+  fi
   sleep 10
 done
 RUN

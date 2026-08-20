@@ -167,11 +167,8 @@ async function walk(v: Variant) {
       viewport: fingerprint.viewport,
     });
     const page = await context.newPage();
-    await wearRealBrowserIdentity(context, page, {
-      info: () => {},
-      warning: () => {},
-      debug: () => {},
-    });
+    // Hai tham số, đúng chữ ký thật — hàm này tự nuốt lỗi và trả `{ok, detail}`, không nhận log.
+    await wearRealBrowserIdentity(context, page);
 
     for (let i = 0; i < WALK_PATHS.length; i++) {
       const path = WALK_PATHS[i];

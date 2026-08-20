@@ -11,6 +11,51 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.23 — Thủ phạm là chrome-headless-shell, không phải IP và không phải tên miền
+
+Sáu lượt vá đi tìm nhầm chỗ. Lượt này công cụ chẩn đoán được mở rộng thành chế độ **đi bộ** —
+ghé đúng chuỗi trang của một vòng thật, trong MỘT phiên — và chạy TRÊN VM, tức đúng dải IP trung
+tâm dữ liệu mà khôi lỗi GitHub dùng. Lặp ba lượt, kết quả y hệt cả ba:
+
+```
+chrome-headless-shell   1. /                    ok
+                        2. /nhiem-vu-hang-ngay  CHẶN     ← dừng ở đây, cả ba lượt
+
+Chromium đầy đủ         1..8  ok ok ok ok ok ok ok ok   ← đi hết, không lần nào bị chặn
+```
+
+**Cái bẫy đã giấu nguyên nhân suốt sáu lượt: TRANG CHỦ QUA ĐƯỢC Ở CẢ HAI.** Mọi phép đo một
+trang — kể cả phép đo của chính lượt 1.3.22, thứ đã dẫn tới kết luận「không phải Cloudflare, là
+tên miền」— đều báo xanh. Chỉ phép đi bộ nhiều trang trong cùng một phiên mới lộ ra, đúng thứ
+khôi lỗi làm mà chẩn đoán trước đó không làm.
+
+**Nguyên nhân.** Từ Playwright 1.49, `headless: true` KHÔNG còn mở Chromium: nó mở
+`chrome-headless-shell`, một bản dựng riêng, gọn hơn, thiếu nhiều thứ của trình duyệt thật.
+Cloudflare phân biệt được hai thứ ấy và chặn đúng cái shell.
+
+**Bản vá.** `launchProfile` khai `channel: "chromium"`, và mọi lượt mở đi qua
+`openBrowserPreferringFullChromium`: ưu tiên Chromium đầy đủ, **lui về shell** nếu máy này không
+có nó. Đường lui bắt buộc phải có — `npx playwright install chromium` cài cả hai binary, nhưng một
+khôi lỗi cũ, một máy nhà cài tay, hay một image gọt bớt thì có thể chỉ có shell; đòi cứng ở đó là
+đổi một cú chặn Cloudflare lấy một cú CHẾT HẲN từ dòng mở trình duyệt. Lượt chạy cũng nói ra mình
+mở bằng binary nào, để bản vá tự chứng minh thay vì hứa.
+
+**Về pupflare** (repo tông chủ chỉ sang): tinh thần đúng — đừng chạy cái binary tự khai là bot —
+nhưng ta KHÔNG cần dựng proxy hay thêm `puppeteer-extra-plugin-stealth`. Bệnh của ta cụ thể hơn:
+sai BINARY, không phải thiếu vá dấu vân tay. Đổi kênh rẻ hơn và ít rủi ro hơn hẳn việc chèn một
+tầng proxy vào đường chạy của mọi đàn.
+
+Lưới mới `npm run verify:browser-channel` — 12 phép kiểm trên một `chromium` giả: có đòi kênh đầy
+đủ không, máy chỉ có shell thì có LUI được không (nhánh nguy hiểm nhất), hồ sơ bền có đi cùng lối
+không, và hỏng cả hai kênh thì có NÉM chứ không nuốt lặng lẽ. Lưới này cố ý KHÔNG giả vờ đo
+Cloudflare — nó đo phần đo được.
+
+> Ghi lại một ca chập chờn, không giấu: lượt smoke đầu sau bản vá ra 447/1 (một ca Khoáng Mạch),
+> lượt sau 448/0. Đã loại một giả thuyết bằng đo đạc — Chromium đầy đủ có xin thêm `/favicon.ico`
+> nhưng fixture trả nhánh mặc định nên KHÔNG đổi trạng thái. Ca ấy đáng theo dõi ở những lượt sau.
+
+---
+
 ## 1.3.22 — KHÔNG phải Cloudflare: khôi lỗi vào nhầm một tên miền đã dời
 
 Năm lượt vá (1.3.14 → 1.3.21) đều đi chữa trình duyệt, vì triệu chứng đọc y hệt một cú chặn của

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.23",
+    date: "2026-08-20",
+    lines: [
+      "Tìm ra vì sao trang game cứ dựng bước kiểm tra: máy chạy tự động dùng một bản trình duyệt rút gọn mà trang nhận ra ngay.",
+      "Nay nó chạy bản trình duyệt đầy đủ. Đo thử ba lượt: bản cũ chặn ngay trang thứ hai, bản mới đi hết tám trang không lần nào bị chặn.",
+    ],
+  },
+  {
     version: "1.3.22",
     date: "2026-08-20",
     lines: [

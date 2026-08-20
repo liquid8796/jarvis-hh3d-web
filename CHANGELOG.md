@@ -11,6 +11,46 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.27 — Sổ kho GitHub chia trang, và cái giá của phép chia ấy
+
+Tab Kho GitHub vẽ trọn sổ trong một cuộn: sáu kho production, mỗi kho là một tấm thẻ mang
+đếm ngược, trạng thái lịch, ghi chú lượt ngó, mốc ghi và lưới hai kho phần mềm phụ — dài quá
+một màn hình từ lâu. Nay nó dùng chung `@/components/Pager` với sổ môn đồ và hàng đợi.
+
+Hai chỗ phải nghĩ, không chỗ nào là「gắn cái pager vào rồi xong」:
+
+**Thang mức chung cắt hụt.** `PAGE_SIZES` là `[10, 20, 50, 100]` và mặc định 20 — hợp cho một
+dòng bảng cao một dòng. Đem nguyên sang đây thì với sáu kho, phân trang KHÔNG BAO GIỜ cắt gì:
+thêm một tính năng mà người vận hành không thấy khác gì. Nên `usePageSize`/`PageSizeSelect`
+nhận thêm hai tham số có mặc định (`sizes`, `initial`) — hai chỗ gọi cũ không đổi một chữ — và
+sổ kho đưa thang riêng `[5, 10, 20, 50]`, mở ở 5. `initial` tách khỏi `sizes[0]` vì hai thứ ấy
+độc lập thật: sổ môn đồ mở ở 20 trong khi thang của nó bắt đầu từ 10.
+
+**Phép chia trang ĐÁNH ĐỔI đúng cái tab này sinh ra để làm.** Chú thích đầu `GithubStationPanel`
+viết rõ: thứ đáng nhìn nhất ở đây là đếm ngược, liếc một cái là biết có kho nào sắp chết. Cắt
+trang là giấu mất một phần cái liếc ấy — kho đỏ nằm ở trang hai thì không ai thấy. Nên khi trang
+đang xem giấu kho đang đếm ngược, một dòng nói thẳng ra: *「Trang này không phải cả sổ — ngoài nó
+còn N kho sắp tắt lịch」*. Nó chỉ hiện khi thật sự có kho bị giấu, nên chọn mức 50 là nó biến mất.
+
+Ba chi tiết của dòng cảnh báo ấy:
+
+- Đếm bằng `countdownLevel` — phần phân hạng vừa tách khỏi `countdownTone`. Đếm bằng cách so
+  chuỗi class màu thì lệch ngay lượt đầu ai đó đổi một mã màu.
+- CHỈ đếm kho `enabled`. Kho tắt đứng ngoài vòng nuôi hoàn toàn (`runKeepalive` lọc `enabled`),
+  nên đếm ngược của nó chắc chắn trôi về 0 — đó là trạng thái đã chọn, không phải sự cố. Đếm nó
+  vào thì dòng ấy đỏ vĩnh viễn và người vận hành học được đúng một điều: bỏ qua nó.
+- Là hiệu của「cả sổ」trừ「trang này」, nên nó tự đúng ở mọi mức và mọi trang, không cần luật riêng.
+
+KHÔNG đưa về trang đầu khi `stations` đổi: mọi thao tác ở tab này (nuôi, sửa, xoá) đều
+`revalidatePath("/admin")` rồi trả về cùng một sổ chỉ khác vài mốc thời gian — ném người đang đọc
+trang 2 về đầu sau mỗi cú「Nuôi ngay」là phá đúng việc họ đang làm. Trang vượt tầm sau một lượt xoá
+thì phép kẹp sẵn có trong `usePaged` lo.
+
+Ô「Mỗi trang」đứng TRƯỚC nút「Chạy vòng nuôi」: nút ấy đã đậu ở góc phải từ trước, và một tuỳ chọn
+mới không đáng đẩy một cái nút người ta đã quen tay đi chỗ khác. Nó ở lại cả khi sổ trống — cùng
+lẽ với chính nút nuôi ngay bên cạnh, thứ cũng không làm gì được với một cuốn sổ rỗng.
+
+---
 ## 1.3.26 — Tên mỏ: gợi ý là gợi ý, đừng giả làm lựa chọn của người dùng
 
 Ô「Tên mỏ」của Khoáng Mạch hiện sẵn `Thông Thiên Kiếm Phái` — trông y như đạo hữu đã tự gõ, dù họ

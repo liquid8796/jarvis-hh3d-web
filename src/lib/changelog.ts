@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.27",
+    date: "2026-08-21",
+    lines: [
+      "Sổ kho khôi lỗi GitHub ở trang Tông Môn nay chia trang: mở sẵn năm kho một trang, và mức đã chọn được nhớ cho lần sau.",
+      "Trang đang xem mà giấu mất kho nào sắp tới hạn thì có một dòng nhắc ngay trên đầu danh sách, khỏi phải lật từng trang đi tìm.",
+    ],
+  },
+  {
     version: "1.3.26",
     date: "2026-08-21",
     lines: [
@@ -460,15 +468,8 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Bảng Hàng Đợi bỏ bớt một đoạn giải thích cũ đã không còn đúng.",
     ],
   },
-  {
-    version: "0.83.0",
-    date: "2026-08-14",
-    lines: [
-      "Việc được chia đều cho mọi máy đang trực thay vì dồn vào máy hỏi nhanh nhất, nên đàn tới giờ ít phải chờ hơn.",
-      "Đàn đang nghỉ thôi hiện tên máy sẽ chạy nó — cái tên ấy trước đây chỉ là phỏng đoán.",
-    ],
-  },
 ];
+
 
 /**
  * Khoá localStorage nhớ số bản người dùng đã đọc tin.

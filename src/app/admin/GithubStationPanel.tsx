@@ -10,6 +10,7 @@ import {
   type StationResult,
   type StationView,
 } from "@/app/actions/githubStations";
+import { PageSizeSelect, Pager, usePageSize, usePaged } from "@/components/Pager";
 import {
   DEFAULT_DAILY_PUSHES,
   DEFAULT_WORKFLOW_FILE,
@@ -31,29 +32,83 @@ import {
  * Thứ đáng nhìn nhất trên tab này là ĐẾM NGƯỢC của từng kho, nên nó là dòng to nhất mỗi hàng —
  * mọi thứ khác (ghi chú lượt ngó, mốc thời gian) là chữ nhỏ dưới nó. Một tab mà mọi dòng đều
  * cùng cỡ thì người vận hành phải đọc hết mới biết có kho nào sắp chết hay không.
+ *
+ * Sổ được CẮT TRANG (`@/components/Pager`), và chính cái lệ「liếc một cái là thấy kho sắp chết」
+ * ở trên là thứ phải trả giá cho phép cắt ấy: một kho đỏ nằm ở trang hai thì không ai liếc thấy.
+ * Nên trang nào giấu kho đang đếm ngược thì nói thẳng ra — xem `offPageParts` bên dưới.
  */
 
+/** Khoá riêng cho lựa chọn số kho mỗi trang, để không giẫm lên sổ môn đồ hay hàng đợi. */
+const STATIONS_PAGE_SIZE_KEY = "jarvis:admin-github-stations:per-page";
+
 /**
- * Tông màu của đếm ngược. Hai ngưỡng, và cả hai suy ra từ nhịp ghi thật chứ không phải số tròn
+ * Thang mức RIÊNG, bắt đầu từ 5 thay vì thang chung `[10, 20, 50, 100]`.
+ *
+ * Một dòng ở đây không phải một dòng bảng: nó là một tấm thẻ mang đếm ngược, trạng thái lịch,
+ * ghi chú lượt ngó, mốc ghi, rồi lưới hai kho phần mềm phụ — cao gấp chục lần một dòng sổ môn
+ * đồ. Sổ production hiện có sáu kho mà đã dài quá một màn hình, nên một thang bắt đầu từ 10 là
+ * một thang không bao giờ cắt gì cả: thêm phân trang mà người vận hành không thấy khác gì.
+ */
+const STATION_PAGE_SIZES = [5, 10, 20, 50] as const;
+
+/** Mở ở mức nhỏ nhất; ai muốn xem trọn một mạch thì đổi, và lựa chọn ấy sống qua lần mở sau. */
+const STATION_DEFAULT_PAGE_SIZE = STATION_PAGE_SIZES[0];
+
+type CountdownLevel = "unknown" | "critical" | "warn" | "ok";
+
+/**
+ * Phân hạng đếm ngược. Hai ngưỡng, và cả hai suy ra từ nhịp ghi thật chứ không phải số tròn
  * cho đẹp — một kho KHOẺ phải luôn xanh, bằng không màu vàng mất hết nghĩa sau tuần đầu.
  *
  * Kho khoẻ dao động giữa 60 (vừa ghi) và 40 (đúng lúc tới hạn, trước khi vòng nuôi trong ngày
  * chạy). Nên ngưỡng vàng là「THẤP HƠN 40」chứ không phải「từ 40 trở xuống」: đứng đúng ở 40 là
  * trạng thái bình thường mỗi chu kỳ, và tô vàng cho nó là dạy người vận hành bỏ qua màu vàng.
+ *
+ * Tách khỏi `countdownTone` từ ngày sổ có phân trang: câu cảnh báo「ngoài trang này còn…」phải
+ * đếm theo ĐÚNG hai ngưỡng đang tô màu, mà đếm bằng cách so chuỗi class thì lệch ngay lượt đầu
+ * ai đó đổi một mã màu.
  */
-function countdownTone(days: number | null): { text: string; className: string } {
-  if (days === null) {
-    return { text: "chưa ghi mốc lần nào", className: "text-[var(--color-mist)]" };
-  }
+function countdownLevel(days: number | null): CountdownLevel {
+  if (days === null) return "unknown";
   // Còn ít hơn một chu kỳ ghi: lượt ghi kế mà hỏng nữa là không còn lần thứ ba nào trước mốc tắt.
-  if (days <= KEEPALIVE_INTERVAL_DAYS) {
-    return { text: `còn ${days} ngày`, className: "text-[#f2a0a0]" };
-  }
+  if (days <= KEEPALIVE_INTERVAL_DAYS) return "critical";
   // Đã trượt hẳn một lượt ghi — vòng nuôi có chạy, nhưng kho này không nhận được commit nào.
-  if (days < SCHEDULE_DISABLE_DAYS - KEEPALIVE_INTERVAL_DAYS) {
-    return { text: `còn ${days} ngày`, className: "text-[var(--color-gold-300)]" };
+  if (days < SCHEDULE_DISABLE_DAYS - KEEPALIVE_INTERVAL_DAYS) return "warn";
+  return "ok";
+}
+
+const COUNTDOWN_CLASS: Record<CountdownLevel, string> = {
+  unknown: "text-[var(--color-mist)]",
+  critical: "text-[#f2a0a0]",
+  warn: "text-[var(--color-gold-300)]",
+  ok: "text-[var(--color-jade-300)]",
+};
+
+/** Tông màu + chữ của đếm ngược, cho đúng một hàng kho. */
+function countdownTone(days: number | null): { text: string; className: string } {
+  return {
+    text: days === null ? "chưa ghi mốc lần nào" : `còn ${days} ngày`,
+    className: COUNTDOWN_CLASS[countdownLevel(days)],
+  };
+}
+
+/**
+ * Đếm kho đang đếm ngược trong một lát sổ, theo hai hạng đáng ngó.
+ *
+ * CHỈ tính kho `enabled`: kho tắt đứng ngoài vòng nuôi hoàn toàn (`runKeepalive` lọc `enabled`),
+ * nên đếm ngược của nó chắc chắn trôi về 0 — đó là trạng thái đã chọn, không phải sự cố. Đếm
+ * nó vào thì câu cảnh báo sẽ đỏ mãi mãi và người vận hành học được đúng một điều: bỏ qua nó.
+ */
+function countUrgent(stations: readonly StationView[]): { critical: number; warn: number } {
+  let critical = 0;
+  let warn = 0;
+  for (const station of stations) {
+    if (!station.enabled) continue;
+    const level = countdownLevel(station.daysToDisable);
+    if (level === "critical") critical += 1;
+    else if (level === "warn") warn += 1;
   }
-  return { text: `còn ${days} ngày`, className: "text-[var(--color-jade-300)]" };
+  return { critical, warn };
 }
 
 /** Chữ Việt cho `state` GitHub khai. Giá trị lạ hiện NGUYÊN VĂN — đoán bừa còn tệ hơn không dịch. */
@@ -226,6 +281,34 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
   /** slug đang sửa — đổ sẵn mọi thứ trừ PAT; PAT thì không bao giờ đổ lại. */
   const [editing, setEditing] = useState<StationView | null>(null);
 
+  const [perPage, setPerPage] = usePageSize(
+    STATIONS_PAGE_SIZE_KEY,
+    STATION_PAGE_SIZES,
+    STATION_DEFAULT_PAGE_SIZE,
+  );
+  const paged = usePaged(stations, perPage);
+
+  /**
+   * Kho đang đếm ngược mà trang hiện tại KHÔNG cho thấy — hiệu của「cả sổ」trừ「trang này」.
+   *
+   * Không đưa về trang đầu khi `stations` đổi: mọi thao tác ở tab này (nuôi, sửa, xoá) đều
+   * `revalidatePath("/admin")` rồi trả về CÙNG một sổ chỉ khác vài mốc thời gian — ném người
+   * đang đọc trang 2 về đầu sau mỗi cú「Nuôi ngay」là phá đúng việc họ đang làm. Trang vượt tầm
+   * sau một lượt xoá thì `usePaged` đã kẹp lại.
+   */
+  const urgentInBook = countUrgent(stations);
+  const urgentOnPage = countUrgent(paged.items);
+  const offPage = {
+    critical: urgentInBook.critical - urgentOnPage.critical,
+    warn: urgentInBook.warn - urgentOnPage.warn,
+  };
+  const offPageParts = [
+    offPage.critical > 0 ? `${offPage.critical} kho sắp tắt lịch` : null,
+    offPage.warn > 0 ? `${offPage.warn} kho đã trượt một lượt ghi` : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(" · ");
+
   const notice = [saveState, pingState, deleteState, loopState].find((s) => s !== null);
 
   return (
@@ -242,11 +325,18 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
       <section className="card card-hairline p-6">
         <div className="mb-2 flex flex-wrap items-start justify-between gap-4">
           <h2 className="h-display text-lg font-semibold text-gilded">Sổ kho khôi lỗi GitHub</h2>
-          <form action={loopAction}>
-            <button type="submit" className="btn btn-ghost text-sm" disabled={looping}>
-              {looping ? "Đang chạy vòng…" : "Chạy vòng nuôi"}
-            </button>
-          </form>
+          {/* Ô chọn đứng TRƯỚC nút nuôi: nút ấy đã đậu ở góc phải từ trước, và một tuỳ chọn mới
+              không đáng đẩy một cái nút người vận hành đã quen tay đi chỗ khác. Nó ở lại kể cả
+              khi sổ trống — cùng lẽ với chính nút「Chạy vòng nuôi」ngay bên cạnh, thứ cũng không
+              làm gì được với một cuốn sổ rỗng mà vẫn đứng nguyên đó. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <PageSizeSelect perPage={perPage} onPerPage={setPerPage} unit="kho" sizes={STATION_PAGE_SIZES} />
+            <form action={loopAction}>
+              <button type="submit" className="btn btn-ghost text-sm" disabled={looping}>
+                {looping ? "Đang chạy vòng…" : "Chạy vòng nuôi"}
+              </button>
+            </form>
+          </div>
         </div>
         <p className="mb-5 max-w-prose text-xs text-[var(--color-mist)]">
           GitHub tắt lịch <code>schedule</code> của một kho công khai sau {SCHEDULE_DISABLE_DAYS} ngày
@@ -264,86 +354,101 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
             đặt tên, rồi tự ghi vào sổ này. Form dưới dành cho kho đã có sẵn.
           </p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {stations.map((station) => {
-              const countdown = countdownTone(station.daysToDisable);
-              return (
-                <div
-                  key={station.slug}
-                  className="flex flex-wrap items-center gap-3 rounded-xl border border-[rgba(232,194,92,0.18)] px-4 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="flex flex-wrap items-baseline gap-x-2 font-semibold">
-                      <span className="truncate font-mono">{station.slug}</span>
-                      <span className={`text-sm font-normal ${countdown.className}`}>{countdown.text}</span>
-                      {!station.enabled && (
-                        <span className="rounded-full border border-[rgba(155,150,190,0.5)] px-2 py-0.5 text-xs font-normal text-[var(--color-mist)]">
-                          đang tắt
-                        </span>
-                      )}
-                    </p>
-                    <p className="truncate text-xs text-[var(--color-mist)]">
-                      {station.workflowFile} · {workflowStateLabel(station.workflowState)}
-                      {station.workerId && <> · WORKER_ID {station.workerId}</>}
-                    </p>
-                    <p
-                      className={`text-xs ${station.lastPingOk ? "text-[var(--color-jade-300)]" : station.lastPingOk === false ? "text-[#f2a0a0]" : "text-[var(--color-mist)]"}`}
-                    >
-                      {station.lastPingAt ? `Ngó ${when(station.lastPingAt)}: ${station.lastPingNote}` : "Chưa ngó lần nào."}
-                    </p>
-                    <p className="text-xs text-[var(--color-mist)]">Mốc ghi gần nhất: {when(station.lastCommitAt)}</p>
-                    <div className="mt-2">
-                      <p className="mb-1 text-[11px] font-medium tracking-wide text-[var(--color-mist)] uppercase">
-                        Kho phần mềm phụ · {station.dailyPushes} lượt/kho/ngày
-                      </p>
-                      {station.companionRepos.length === 0 ? (
-                        <p className="text-[11px] text-[var(--color-mist)]">
-                          Kho khôi lỗi cũ này chưa có cặp repo phụ; form sửa vẫn giữ nguyên trạng thái ấy.
-                        </p>
-                      ) : (
-                        <div className="grid gap-1 sm:grid-cols-2">
-                          {station.companionRepos.map((companion) => (
-                            <CompanionRepoStatus
-                              key={companion.repo}
-                              owner={station.owner}
-                              companion={companion}
-                              dailyPushes={station.dailyPushes}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <form action={pingAction}>
-                    <input type="hidden" name="slug" value={station.slug} />
-                    <button type="submit" className="btn btn-ghost text-sm" disabled={pinging}>
-                      {pinging ? "Đang nuôi…" : "Nuôi ngay"}
-                    </button>
-                  </form>
-                  <button type="button" className="btn btn-ghost text-sm" onClick={() => setEditing(station)}>
-                    Sửa
-                  </button>
-                  <form
-                    action={deleteAction}
-                    onSubmit={(e) => {
-                      // Xoá là mất phong bì PAT — một cú bấm nhầm không được phép đủ.
-                      if (!confirm(
-                        `Xoá station「${station.slug}」khỏi sổ? PAT đã mã hoá mất theo; cả ba repo ` +
-                          "trên GitHub vẫn được giữ nhưng từ nay không repo nào trong bundle được nuôi tự động.",
-                      )) {
-                        e.preventDefault();
-                      }
-                    }}
+          <>
+            {offPageParts && (
+              /* `role="status"` là một vùng live lịch sự: bấm sang trang khác thì người dùng
+                 trình đọc màn hình nghe được luôn là trang mới có giấu kho đang đếm ngược không,
+                 mà không cắt ngang thứ họ đang nghe dở. */
+              <p
+                role="status"
+                className={`mb-3 text-xs ${offPage.critical > 0 ? "text-[#f2a0a0]" : "text-[var(--color-gold-300)]"}`}
+              >
+                Trang này không phải cả sổ — ngoài nó còn {offPageParts}. Lật trang hoặc tăng
+                「Mỗi trang」để nhìn trọn.
+              </p>
+            )}
+            <div className="flex flex-col gap-3">
+              {paged.items.map((station) => {
+                const countdown = countdownTone(station.daysToDisable);
+                return (
+                  <div
+                    key={station.slug}
+                    className="flex flex-wrap items-center gap-3 rounded-xl border border-[rgba(232,194,92,0.18)] px-4 py-3"
                   >
-                    <input type="hidden" name="slug" value={station.slug} />
-                    <button type="submit" className="btn btn-danger text-sm" disabled={deleting}>
-                      Xoá
+                    <div className="min-w-0 flex-1">
+                      <p className="flex flex-wrap items-baseline gap-x-2 font-semibold">
+                        <span className="truncate font-mono">{station.slug}</span>
+                        <span className={`text-sm font-normal ${countdown.className}`}>{countdown.text}</span>
+                        {!station.enabled && (
+                          <span className="rounded-full border border-[rgba(155,150,190,0.5)] px-2 py-0.5 text-xs font-normal text-[var(--color-mist)]">
+                            đang tắt
+                          </span>
+                        )}
+                      </p>
+                      <p className="truncate text-xs text-[var(--color-mist)]">
+                        {station.workflowFile} · {workflowStateLabel(station.workflowState)}
+                        {station.workerId && <> · WORKER_ID {station.workerId}</>}
+                      </p>
+                      <p
+                        className={`text-xs ${station.lastPingOk ? "text-[var(--color-jade-300)]" : station.lastPingOk === false ? "text-[#f2a0a0]" : "text-[var(--color-mist)]"}`}
+                      >
+                        {station.lastPingAt ? `Ngó ${when(station.lastPingAt)}: ${station.lastPingNote}` : "Chưa ngó lần nào."}
+                      </p>
+                      <p className="text-xs text-[var(--color-mist)]">Mốc ghi gần nhất: {when(station.lastCommitAt)}</p>
+                      <div className="mt-2">
+                        <p className="mb-1 text-[11px] font-medium tracking-wide text-[var(--color-mist)] uppercase">
+                          Kho phần mềm phụ · {station.dailyPushes} lượt/kho/ngày
+                        </p>
+                        {station.companionRepos.length === 0 ? (
+                          <p className="text-[11px] text-[var(--color-mist)]">
+                            Kho khôi lỗi cũ này chưa có cặp repo phụ; form sửa vẫn giữ nguyên trạng thái ấy.
+                          </p>
+                        ) : (
+                          <div className="grid gap-1 sm:grid-cols-2">
+                            {station.companionRepos.map((companion) => (
+                              <CompanionRepoStatus
+                                key={companion.repo}
+                                owner={station.owner}
+                                companion={companion}
+                                dailyPushes={station.dailyPushes}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <form action={pingAction}>
+                      <input type="hidden" name="slug" value={station.slug} />
+                      <button type="submit" className="btn btn-ghost text-sm" disabled={pinging}>
+                        {pinging ? "Đang nuôi…" : "Nuôi ngay"}
+                      </button>
+                    </form>
+                    <button type="button" className="btn btn-ghost text-sm" onClick={() => setEditing(station)}>
+                      Sửa
                     </button>
-                  </form>
-                </div>
-              );
-            })}
-          </div>
+                    <form
+                      action={deleteAction}
+                      onSubmit={(e) => {
+                        // Xoá là mất phong bì PAT — một cú bấm nhầm không được phép đủ.
+                        if (!confirm(
+                          `Xoá station「${station.slug}」khỏi sổ? PAT đã mã hoá mất theo; cả ba repo ` +
+                            "trên GitHub vẫn được giữ nhưng từ nay không repo nào trong bundle được nuôi tự động.",
+                        )) {
+                          e.preventDefault();
+                        }
+                      }}
+                    >
+                      <input type="hidden" name="slug" value={station.slug} />
+                      <button type="submit" className="btn btn-danger text-sm" disabled={deleting}>
+                        Xoá
+                      </button>
+                    </form>
+                  </div>
+                );
+              })}
+            </div>
+            <Pager paged={paged} unit="kho" />
+          </>
         )}
       </section>
 

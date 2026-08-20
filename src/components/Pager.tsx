@@ -3,28 +3,35 @@
 import { useCallback, useEffect, useState } from "react";
 
 /**
- * Phân trang dùng chung cho các bảng dài — sổ môn đồ và hàng đợi.
+ * Phân trang dùng chung cho các bảng dài — sổ môn đồ, hàng đợi, và sổ kho khôi lỗi GitHub.
  *
  * CẮT Ở CLIENT chứ không LIMIT/OFFSET ở server, và đây là một lựa chọn có điều kiện chứ không
- * phải lười: cả hai danh sách vốn đã nằm trọn trong client (sổ môn đồ đi vào bằng prop từ
- * server component; hàng đợi giữ một ảnh chụp tự làm mới theo nhịp SSE + poll). Đổi sang phân
- * trang phía server sẽ bắt hàng đợi hỏi lại server mỗi lần bấm sang trang, đúng lúc nó đang có
- * một kênh trực tiếp làm việc ấy hộ rồi — hai nguồn cùng ghi vào một danh sách là cách nhanh
- * nhất để số trên màn hình nhảy loạn. Sổ môn đồ thì 26 dòng: một câu LIMIT cho ngần ấy dòng là
- * bắt cả một vòng round-trip trả giá cho việc cắt một mảng.
+ * phải lười: cả ba danh sách vốn đã nằm trọn trong client (sổ môn đồ đi vào bằng prop từ
+ * server component; hàng đợi giữ một ảnh chụp tự làm mới theo nhịp SSE + poll; sổ kho GitHub là
+ * một khối JSONB trong `app_settings`, đọc lẻ một trang của nó còn tốn hơn đọc cả). Đổi sang
+ * phân trang phía server sẽ bắt hàng đợi hỏi lại server mỗi lần bấm sang trang, đúng lúc nó
+ * đang có một kênh trực tiếp làm việc ấy hộ rồi — hai nguồn cùng ghi vào một danh sách là cách
+ * nhanh nhất để số trên màn hình nhảy loạn. Sổ môn đồ thì 26 dòng: một câu LIMIT cho ngần ấy
+ * dòng là bắt cả một vòng round-trip trả giá cho việc cắt một mảng.
  *
  * NGÀY NÀO danh sách đủ lớn để tải trọn gói là gánh nặng thật, chỗ phải sửa là `listUsers` và
  * `getQueueSnapshot` — không phải tệp này.
  */
 
-/** Các mức cho người dùng chọn. Có 100 vì sổ môn đồ hiện chỉ 26 dòng — ai muốn xem trọn một mạch. */
+/**
+ * Thang mức MẶC ĐỊNH, hợp cho một dòng bảng cao một dòng. Có 100 vì sổ môn đồ hiện chỉ 26 dòng
+ * — ai muốn xem trọn một mạch.
+ *
+ * Bảng nào mà「một dòng」là một tấm thẻ cao chục dòng thì thang này cắt hụt: sổ kho GitHub đưa
+ * thang riêng bắt đầu từ 5. Xem tham số `sizes` của `usePageSize`/`PageSizeSelect`.
+ */
 export const PAGE_SIZES = [10, 20, 50, 100] as const;
 
 /** Mặc định khi chưa ai chọn gì, và cũng là bản vẽ ở LƯỢT ĐẦU trước khi đọc được lựa chọn cũ. */
 export const DEFAULT_PAGE_SIZE = 20;
 
-const isPageSize = (value: unknown): value is number =>
-  typeof value === "number" && (PAGE_SIZES as readonly number[]).includes(value);
+const isPageSize = (value: unknown, sizes: readonly number[]): value is number =>
+  typeof value === "number" && sizes.includes(value);
 
 /**
  * Số dòng mỗi trang, nhớ qua các lần mở lại.
@@ -35,9 +42,21 @@ const isPageSize = (value: unknown): value is number =>
  * thứ đổi chỉ là số dòng chứ không phải nội dung.
  *
  * @param storageKey khoá riêng cho từng bảng, để sổ môn đồ và hàng đợi không giẫm lên nhau
+ * @param sizes thang mức của bảng ấy. Phải là HẰNG SỐ cấp module — một mảng dựng ngay tại chỗ
+ *   gọi mang danh tính mới mỗi lượt vẽ, và effect dưới đây sẽ chạy lại mỗi lượt (không hỏng:
+ *   nó chỉ đọc localStorage rồi đặt lại đúng con số cũ, nên React bỏ qua — chỉ là phí).
+ * @param initial mức lúc chưa ai chọn gì. Tách khỏi `sizes[0]` vì hai thứ ấy độc lập thật: sổ
+ *   môn đồ mở ở 20 trong khi thang của nó bắt đầu từ 10. Giá trị ngoài thang rơi về mức nhỏ nhất
+ *   — thà mở ở một mức chọn lại được còn hơn để ô chọn hiện một mục không tồn tại.
  */
-export function usePageSize(storageKey: string): [number, (next: number) => void] {
-  const [perPage, setPerPage] = useState<number>(DEFAULT_PAGE_SIZE);
+export function usePageSize(
+  storageKey: string,
+  sizes: readonly number[] = PAGE_SIZES,
+  initial: number = DEFAULT_PAGE_SIZE,
+): [number, (next: number) => void] {
+  const [perPage, setPerPage] = useState<number>(() =>
+    isPageSize(initial, sizes) ? initial : (sizes[0] ?? DEFAULT_PAGE_SIZE),
+  );
 
   useEffect(() => {
     try {
@@ -46,16 +65,16 @@ export function usePageSize(storageKey: string): [number, (next: number) => void
       // Chỉ nhận đúng những mức đang có trong danh sách: giá trị lạ (bản cũ để lại, hay ai đó
       // sửa tay trong DevTools) mà lọt vào thì ô chọn hiện một mục không tồn tại và bảng cắt
       // theo một con số không ai chọn được nữa.
-      if (isPageSize(parsed)) setPerPage(parsed);
+      if (isPageSize(parsed, sizes)) setPerPage(parsed);
     } catch {
       // localStorage bị chặn (chế độ riêng tư): dùng mặc định, không có gì để cứu và cũng
       // không có gì hỏng.
     }
-  }, [storageKey]);
+  }, [storageKey, sizes]);
 
   const choose = useCallback(
     (next: number) => {
-      if (!isPageSize(next)) return;
+      if (!isPageSize(next, sizes)) return;
       setPerPage(next);
       try {
         window.localStorage.setItem(storageKey, String(next));
@@ -63,7 +82,7 @@ export function usePageSize(storageKey: string): [number, (next: number) => void
         // Không ghi được thì lựa chọn vẫn đúng trong phiên này, chỉ không sống qua lần sau.
       }
     },
-    [storageKey],
+    [storageKey, sizes],
   );
 
   return [perPage, choose];
@@ -142,10 +161,14 @@ export function PageSizeSelect({
   onPerPage,
   /** Danh từ đếm được — chỉ dùng cho nhãn trợ năng, vì trên màn hình đã có chữ「Mỗi trang」. */
   unit,
+  sizes = PAGE_SIZES,
 }: {
   perPage: number;
   onPerPage: (next: number) => void;
   unit: string;
+  /** Phải là ĐÚNG thang đã đưa cho `usePageSize`: lệch nhau thì hook từ chối đúng những mức mà
+   *  ô này đang mời người ta bấm, và cú bấm ấy im lặng không làm gì cả. */
+  sizes?: readonly number[];
 }) {
   return (
     /* `whitespace-nowrap`: hàng công cụ là flex-wrap, nên khi chỗ hẹp đi thì nhãn bị bóp cho
@@ -163,7 +186,7 @@ export function PageSizeSelect({
         value={perPage}
         onChange={(e) => onPerPage(Number(e.target.value))}
       >
-        {PAGE_SIZES.map((size) => (
+        {sizes.map((size) => (
           <option key={size} value={size}>
             {size}
           </option>

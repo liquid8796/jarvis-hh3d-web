@@ -4,6 +4,7 @@
  *
  *   npm run diagnose:cf
  *   npm run diagnose:cf -- --url https://hoathinh3d.one --headed
+ *   npm run diagnose:cf -- --walk        đi hết đường của một vòng thật trong MỘT phiên
  *
  * Đây là CÔNG CỤ, không phải lưới kiểm: nó cần mạng và cần trang game thật, nên không bao giờ
  * được gọi từ `npm run smoke`. Nó sinh ra vì suốt năm lượt vá (1.3.14 → 1.3.21) câu hỏi quyết
@@ -130,7 +131,93 @@ async function probeVariant(v: Variant) {
   }
 }
 
+/**
+ * ĐƯỜNG ĐI CỦA MỘT VÒNG THẬT — những trang khôi lỗi ghé, theo đúng thứ tự.
+ *
+ * Vì sao cần: phép đo MỘT trang cho kết quả sạch từ cả IP trung tâm dữ liệu (đo 20/08/2026),
+ * trong khi khôi lỗi vẫn bị chặn GIỮA VÒNG. Khác biệt duy nhất còn lại là chuỗi ghé nhiều
+ * trang liên tiếp trong CÙNG một phiên — thứ một lượt `goto` đơn lẻ không bao giờ tái hiện.
+ */
+const WALK_PATHS = [
+  "/",
+  "/nhiem-vu-hang-ngay",
+  "/hoang-vuc",
+  "/tien-duyen",
+  "/luyen-dan-duong",
+  "/khoang-mach",
+  "/nhiem-vu-hang-ngay",
+  "/hoang-vuc",
+];
+
+/**
+ * Đi hết đường ấy trong MỘT context, dừng ngay ở trang đầu tiên dựng màn kiểm tra.
+ *
+ * Không cookie: nếu chuỗi ghé đủ để kích màn kiểm tra thì nó kích cả với khách vãng lai, và
+ * kết luận ấy không cần chạm tới tài khoản của ai. Ngược lại, sạch trơn ở đây nghĩa là biến
+ * số nằm ở PHIÊN ĐĂNG NHẬP — cũng là một câu trả lời, và là câu trả lời khác hẳn.
+ */
+async function walk(v: Variant) {
+  const browser = await v.launch();
+  let context: BrowserContext | null = null;
+  try {
+    context = await browser.newContext({
+      userAgent: fingerprint.userAgent,
+      locale: fingerprint.locale,
+      timezoneId: fingerprint.timezoneId,
+      viewport: fingerprint.viewport,
+    });
+    const page = await context.newPage();
+    await wearRealBrowserIdentity(context, page, {
+      info: () => {},
+      warning: () => {},
+      debug: () => {},
+    });
+
+    for (let i = 0; i < WALK_PATHS.length; i++) {
+      const path = WALK_PATHS[i];
+      const url = new URL(path, BASE).toString();
+      let navError = null;
+      try {
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      } catch (err) {
+        navError = err instanceof Error ? err.message.split("\n")[0] : String(err);
+      }
+      const probe = navError
+        ? null
+        : ((await page.evaluate(readinessProbe)) as { challenge?: boolean } | null);
+      const mark = navError ? "ĐỨT" : probe?.challenge === true ? "CHẶN" : "ok";
+      console.log(`   ${String(i + 1).padStart(2)}. ${path.padEnd(22)} ${mark}${navError ? ` — ${navError}` : ""}`);
+      if (mark !== "ok") return { blockedAt: path, index: i + 1, navError };
+      // Nhịp giữa hai trang: xấp xỉ humanDelay của session thật, để phép đo không nhanh hơn
+      // đời thật (nhanh hơn thì nó đo một thứ khác).
+      await new Promise((r) => setTimeout(r, 900));
+    }
+    return { blockedAt: null, index: 0, navError: null };
+  } finally {
+    if (context) await context.close().catch(() => {});
+    await browser.close().catch(() => {});
+  }
+}
+
 async function main() {
+  if (argv.includes("--walk")) {
+    console.log(`Đi hết đường của một vòng thật trên ${BASE}, trong MỘT phiên\n`);
+    for (const v of VARIANTS) {
+      if (v.name === "headed") continue; // VM không có màn hình — đã đo được là luôn đứt
+      console.log(`── ${v.name} — ${v.note}`);
+      try {
+        const r = await walk(v);
+        console.log(
+          r.blockedAt == null
+            ? `   → đi hết ${WALK_PATHS.length} trang, KHÔNG bị chặn lần nào.\n`
+            : `   → dừng ở trang thứ ${r.index} (${r.blockedAt}).\n`,
+        );
+      } catch (err) {
+        console.log(`   ĐỨT/HỎNG: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}\n`);
+      }
+    }
+    return;
+  }
   console.log(`Hỏi thẳng ${BASE} — chờ mỗi biến thể tối đa ${Math.round(SETTLE_MS / 1000)}s\n`);
   const rows: { name: string; challenge: boolean; hasBox: boolean; error?: string }[] = [];
 

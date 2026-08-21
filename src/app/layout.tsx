@@ -33,8 +33,10 @@ export const viewport: Viewport = {
  * kế không có. Thêm 400 vào đây là cách duy nhất chữa, và nó cũng làm mốc ngày
  * (`.chat-day span`, vốn thừa hưởng font-weight 400) nhẹ lại đúng như bản thiết kế.
  *
- * Ba lớp còn lại dùng `--font-display` đều tự khai nét ≥600 (`.h-display` luôn đi kèm
- * `font-semibold`, `.chat-author` khai 600), nên chúng KHÔNG đổi hình.
+ * Ba lớp còn lại dùng `--font-display` đều tự khai nét ≥600, nên chúng KHÔNG đổi hình:
+ * `.chat-author` khai 600; còn `.h-display` thì 38/39 chỗ đi kèm `font-semibold`, và chỗ thứ 39
+ * — tiêu đề「Phòng Chat」— nhận 600 từ `.chat-head h1`. Ai thêm một `.h-display` TRẦN sau này
+ * thì nó sẽ nhẹ đi thấy rõ; đó là hệ quả đã lường, không phải hồi quy.
  */
 const display = Noto_Serif({
   subsets: ["latin", "vietnamese"],

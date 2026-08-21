@@ -23,9 +23,22 @@ export const viewport: Viewport = {
   minimumScale: 1,
 };
 
+/**
+ * Chữ chân của cả app. Trước 21/08/2026 chỉ nạp 600 và 700 — đủ cho tiêu đề, vì trước đó chữ
+ * chân CHỈ dùng làm tiêu đề.
+ *
+ * Nay Phòng Chat mặc chữ chân cho TRỌN khung (xem `.chat-frame` trong globals.css), tức lần đầu
+ * có câu chữ dài chạy bằng font này. Thiếu nét 400 thì trình duyệt không báo lỗi gì cả: nó lặng
+ * lẽ lấy nét gần nhất — 600 — nên mọi câu trong sảnh sẽ đậm như tiêu đề, đúng thứ mà bản thiết
+ * kế không có. Thêm 400 vào đây là cách duy nhất chữa, và nó cũng làm mốc ngày
+ * (`.chat-day span`, vốn thừa hưởng font-weight 400) nhẹ lại đúng như bản thiết kế.
+ *
+ * Ba lớp còn lại dùng `--font-display` đều tự khai nét ≥600 (`.h-display` luôn đi kèm
+ * `font-semibold`, `.chat-author` khai 600), nên chúng KHÔNG đổi hình.
+ */
 const display = Noto_Serif({
   subsets: ["latin", "vietnamese"],
-  weight: ["600", "700"],
+  weight: ["400", "600", "700"],
   variable: "--font-display",
 });
 

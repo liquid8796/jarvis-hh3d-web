@@ -78,6 +78,12 @@ const GROUP_WINDOW_MS = 5 * 60 * 1000;
  *
  * Lượt thu nhỏ 17/08/2026 KHÔNG đụng tới ba số đó — nó chỉ lấy lại đệm, khe và chiều cao chết
  * của làn chân dung, tức những chỗ không có gì để đọc.
+ *
+ * 21/08/2026: bài vị hạ tiếp 74 → 60px, CHÂN DUNG GIỮ NGUYÊN 62px — và lần này giữ nguyên mới
+ * là đúng thế cân, chứ không phải phá nó. Tỉ lệ 0,77 ở trên chính là chỗ lệch so với bản thiết
+ * kế (0,60): lượt 09/08 kéo chân dung xuống 53% cỡ thiết kế mà bài vị thì gần như đứng yên. Nay
+ * bài vị xuống 0,81 lần, tỉ lệ về 38/62 = 0,61 — trúng bản thiết kế. Lý lẽ và hai phép đo ở
+ * chú thích của `.chat-tagframe` trong globals.css.
  */
 const AVATAR_SIZE = 62;
 

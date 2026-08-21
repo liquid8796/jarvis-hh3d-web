@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.32",
+    date: "2026-08-21",
+    lines: [
+      "Bài vị danh xưng trong Phòng Chat thu gọn lại cho khít với tên, đúng cỡ của bản thiết kế — mỗi dòng danh tính ngắn đi một quãng nên sảnh đỡ chật.",
+      "Cả Phòng Chat nay dùng một giọng chữ duy nhất, giống hệt bản thiết kế; trước đây chữ trong sảnh và chữ khắc sẵn trên khung là hai kiểu khác nhau.",
+    ],
+  },
+  {
     version: "1.3.31",
     date: "2026-08-21",
     lines: [
@@ -461,13 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khoáng Mạch: thêm ô chọn có mua Linh Quang Phù hay không — nếu bật, mỗi ngày chỉ mua đúng một lá.",
       "Khôi lỗi chỉ mua phù hay đoạt mỏ khi khai thác đã đạt tối đa, và đào tới khi đầy giới hạn ngày.",
-    ],
-  },
-  {
-    version: "0.88.0",
-    date: "2026-08-14",
-    lines: [
-      "Chỗ soạn bản tin của tông môn chỉnh lại cách gỡ mục; với đạo hữu thì màn hình không đổi gì.",
     ],
   },
 ];

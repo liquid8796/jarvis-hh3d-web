@@ -562,6 +562,14 @@ body {
   /* Mốc của mọi `cqw` bên trong: chữ co theo BỀ RỘNG KHUNG, không theo bề rộng màn hình — nếu
      không thì trên màn siêu rộng khung đứng yên mà chữ cứ phình ra. */
   container-type: inline-size;
+  /* CẢ SẢNH DÙNG CHỮ CHÂN — đúng bản thiết kế, và đây là chỗ nó bị bỏ sót suốt từ đầu.
+     Khung này là một tấm ảnh: dòng mời "Nhập nội dung trò chuyện…" đã được khắc SẴN vào ảnh
+     bằng chữ chân nghiêng. Mọi chữ thật đặt lên trên lại thừa hưởng `--font-body` (Be Vietnam
+     Pro, chữ không chân) từ `body`, nên trong cùng một khung có hai giọng chữ đứng cạnh nhau —
+     thấy rõ nhất ở dòng dẫn dưới tiêu đề và ở câu chữ trong bong bóng. Bản thiết kế chỉ có một
+     giọng. Đặt ở ĐÂY chứ không ở từng lớp con để không sót chỗ nào: khay cảm xúc, ô nhập, mốc
+     giờ — thứ gì mọc trong khung thì mang giọng của khung. */
+  font-family: var(--font-display);
 }
 
 /* Tấm ảnh MANG kênh trong suốt từ 10/08/2026: mọi thứ ngoài viền vàng đã bị khoét rỗng, nên
@@ -825,19 +833,39 @@ body {
  * thử bốn cỡ với đúng tấm webp thật trước khi chọn: ở 66px (biển ~40px) chữ bắt đầu bết, nên
  * 74px là gần sàn rồi, đừng hạ tiếp mà không chụp lại.
  *
+ * ── 60px, 21/08/2026: KHÔNG phải hạ mù — chép lại đúng tỉ lệ của bản thiết kế ─────────────
+ *
+ * Chính lượt 09/08 ấy đã để lại một thế lệch: chân dung xuống 53% cỡ bản thiết kế (116→62px)
+ * còn bài vị thì gần như đứng yên (~100%). Nên trên màn thật cái bài vị dài ngoằng nằm cạnh
+ * một cái tên bé — đúng thứ đạo hữu gọi là「không khít, phí chỗ」.
+ *
+ * Đo lại trên bản thiết kế (ảnh 1448×1086, cùng khung với `/chat-frame.png` nên toạ độ khớp
+ * 1:1) và trên ảnh chụp thật 21/08/2026. Hai phép đo độc lập, cùng ra một con số:
+ *
+ *     bề ngang biển / đường kính chân dung   thiết kế 265/116 = 2,28   ta 177/62 = 2,85
+ *     chiều cao DÙNG THẬT / chân dung        thiết kế  70/116 = 0,60   ta  48/62 = 0,77
+ *
+ * Hệ số phải nhân: 2,28/2,85 = 0,80 → 74 × 0,80 ≈ 60px. Kiểm chéo bằng chiều cao dùng thật:
+ * 60 − 2×11 = 38px, chia cho chân dung 62 ra 0,61 — trúng 0,60 của bản thiết kế. Bề ngang biển
+ * theo đó rút 209 → 169px, tức hàng danh tính ngắn đi 40px và thấp đi 10px.
+ *
+ * Cảnh báo「66px là chữ bắt đầu bết」ở trên VẪN ĐỨNG, nên 60px đã được CHỤP LẠI đúng như nó
+ * dặn (ảnh cắt vùng, 2×): chữ khắc còn đọc rõ. Ai muốn hạ tiếp thì phải chụp lại lần nữa —
+ * đây đã là dưới ngưỡng cũ rồi.
+ *
  * `margin-block` âm thu lại phần quầng rỗng ấy để dòng tên không bị đội cao theo, và nó phải
- * co CÙNG TỈ LỆ với `height` — giữ nguyên -16px ở chiều cao 74px là ăn lẹm vào biển. Ai thay
- * bộ khung khác (viền sát mép hơn) thì phải chỉnh lại cả hai con số này.
+ * co CÙNG TỈ LỆ với `height` — giữ nguyên -16px ở chiều cao 74px là ăn lẹm vào biển (13 × 60/74
+ * ≈ 11). Ai thay bộ khung khác (viền sát mép hơn) thì phải chỉnh lại cả hai con số này.
  *
  * Chỉ ĐO ĐƯỢC bằng ảnh chụp thật — `getComputedStyle` báo 44px là "đúng như đã khai", nó
  * không biết trong 44px ấy có bao nhiêu phần là quầng sáng. Xem `npm run shot`.
  */
 .chat-tagframe {
   display: inline-block;
-  height: 74px;
+  height: 60px;
   width: auto;
   margin-left: 8px;
-  margin-block: -13px;
+  margin-block: -11px;
   vertical-align: middle;
   user-select: none;
 }
@@ -870,9 +898,15 @@ body {
  *
  * Cũng nhờ lùi 26px mỗi cặp mà hàng danh tính NGẮN đi: ba bài vị rộng nhất cộng lại 679px nay
  * còn 623px, nên ca ba-bài-vị càng khó chạm trần 820px của `.chat-bubble-col` và xuống dòng.
+ *
+ * 21/08/2026 — 28 → 23px: quầng sáng là một phần CỦA ẢNH nên nó co đúng theo `height`. Bảng đo
+ * ở trên tính ở 74px; ở 60px mọi con số ấy nhân 60/74 ≈ 0,81 (Đệ tử: rộng 209 → 169px, quầng
+ * 17,9 → 14,5px). Giữ nguyên -28px sau khi hạ chiều cao là lùi quá tay ~5px, tức hai cái biển
+ * bắt đầu ăn vào nhau — đúng cái bẫy mà đoạn trên đã dặn về「khung viền sát mép」, chỉ khác là
+ * lần này quầng mỏng đi vì ảnh nhỏ lại chứ không vì đổi bộ khung.
  */
 .chat-tagframe + .chat-tagframe {
-  margin-left: -28px;
+  margin-left: -23px;
 }
 
 /* Tag trang trí trong sảnh — viên nhỏ cạnh tên, đóng băng theo tin y như chính cái tên. */

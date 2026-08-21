@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.35",
+    date: "2026-08-22",
+    lines: [
+      "Phòng Chat nay nhớ chỗ đạo hữu đọc dở: quay lại sảnh là đứng ngay vạch「tin chưa đọc」, thay vì bị thả xuống tin mới nhất.",
+      "Thêm nút chat nổi ở góc phải bên dưới trên mọi trang, đeo số tin chưa đọc — bấm là vào thẳng sảnh.",
+    ],
+  },
+  {
     version: "1.3.34",
     date: "2026-08-21",
     lines: [
@@ -463,13 +471,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-15",
     lines: [
       "Bảng Hàng Đợi nay ghi rõ ở từng dòng: máy nào đang chạy đàn ấy, hoặc nó đang chờ loại máy nào.",
-    ],
-  },
-  {
-    version: "0.90.0",
-    date: "2026-08-15",
-    lines: [
-      "Các khôi lỗi trọ nay khai đúng số bản đang chạy trên bảng Khôi Lỗi, thay vì cùng hiện một con số cũ.",
     ],
   },
 ];

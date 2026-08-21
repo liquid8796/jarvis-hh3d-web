@@ -696,6 +696,88 @@ body {
 
 .chat-day span { font-family: var(--font-display); }
 
+/* Vạch「tin chưa đọc」— cùng khuôn kẻ ngang với mốc ngày nhưng đổi giọng sang son đỏ nhạt:
+   nó là lời nhắc, không phải một cột mốc lịch, và hai thứ đứng cạnh nhau phải phân biệt được
+   bằng liếc mắt. Đặt một lần lúc mở sảnh rồi đứng yên cả phiên (xem `dividerAt` bên ChatRoom). */
+.chat-unread {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 10px 8px;
+  color: rgba(242, 160, 160, 0.9);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+}
+
+.chat-unread::before,
+.chat-unread::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(242, 160, 160, 0.4));
+}
+
+.chat-unread::after {
+  background: linear-gradient(90deg, rgba(242, 160, 160, 0.4), transparent);
+}
+
+/* ── Icon Phòng Chat nổi (mọi trang trừ /chat) ────────────────────────────────────────────────
+   Cùng chất liệu với nút「về cuối」của sảnh: nền mực đêm, viền vàng. z-index 55 — dưới popup
+   thông báo (70) và nút Ngắm Tranh (60): một lời nhắn của tông môn phải thắng một lối tắt. */
+.chat-fab {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  background: rgba(9, 12, 26, 0.92);
+  border: 1px solid rgba(232, 194, 92, 0.4);
+  font-size: 1.35rem;
+  line-height: 1;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.chat-fab:hover {
+  transform: translateY(-2px);
+  border-color: rgba(232, 194, 92, 0.7);
+}
+
+.chat-fab:focus-visible {
+  outline: 2px solid var(--color-gold-300);
+  outline-offset: 2px;
+}
+
+/* Cùng lệ với .chat-hotspot: ai xin bớt chuyển động thì nút đứng yên, không nhún. */
+@media (prefers-reduced-motion: reduce) {
+  .chat-fab { transition: none; }
+  .chat-fab:hover { transform: none; }
+}
+
+/* Huy hiệu số tin chưa đọc. Son đỏ trên mực đêm — cùng họ đỏ với vạch chưa-đọc trong sảnh,
+   vì cả hai đang kể về cùng một con số. */
+.chat-fab-badge {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  display: grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: rgba(178, 52, 52, 0.95);
+  border: 1px solid rgba(9, 12, 26, 0.9);
+  color: #fdf2e3;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-style: normal;
+}
+
 .chat-row {
   display: flex;
   /* Khoảng chân-dung↔bong-bóng. 20px lúc đầu; 16px từ 11/08/2026 — bốn pixel ấy về thẳng cho

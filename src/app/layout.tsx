@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro, Noto_Serif } from "next/font/google";
 import { AppVersion } from "@/components/AppVersion";
 import { NoticePopup } from "@/components/NoticePopup";
+import { ChatFab } from "@/components/ChatFab";
 import { BackdropPeek } from "@/components/BackdropPeek";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { getRenderSettings } from "@/lib/services/settings";
@@ -125,6 +126,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             lời nhắn「phát lúc này」mà chỉ một trang thấy thì không phải là thông báo. Với khách
             vãng lai nó tự nằm im (một cú 401 rồi thôi hẳn) — xem components/NoticePopup.tsx. */}
         <NoticePopup />
+        {/* Icon Phòng Chat nổi — cũng ngoài cửa bế quan như popup trên, và cùng phép im lặng
+            với khách (một cú 401 rồi thôi). Trên chính /chat nó tự lặn. Xem ChatFab.tsx. */}
+        <ChatFab />
       </body>
     </html>
   );

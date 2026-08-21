@@ -104,6 +104,12 @@ const TYPING_FRESH_MS = 5000;
 const TYPING_TTL_SECONDS = 60;
 const MESSAGES = "chat_messages";
 const TYPING = "chat_typing";
+/**
+ * Mốc ĐÃ ĐỌC TỚI ĐÂU của từng người — `_id` là userId nên collection này, y như `chat_typing`,
+ * không bao giờ lớn hơn số thành viên. Tin thì hết hạn theo ngày còn mốc thì ở lại: một mốc
+ * trỏ vào tin đã bị dọn chỉ có nghĩa là「đã đọc hết những gì còn lại」, không cần dọn theo.
+ */
+const READS = "chat_reads";
 
 export const STORE_CLOSED_MESSAGE =
   "Tàng thư đàm đạo chưa khai mở — tông chủ cần lập kho MongoDB trên Vercel rồi deploy lại.";
@@ -121,11 +127,14 @@ type TypingDoc = { _id: string; name: string; at: Date };
  * Nhận `MONGODB_URI` (tên mà integration MongoDB Atlas trên Vercel phát ra) và chấp nhận
  * `MONGODB_URL` cho ai đặt tay. `null` = chưa cấu hình, KHÔNG phải lỗi.
  */
+type ReadDoc = { _id: string; lastReadAt: number };
+
 type ChatStore = {
   client: MongoClient;
   db: Db;
   messages: Collection<StoredMessage>;
   typing: Collection<TypingDoc>;
+  reads: Collection<ReadDoc>;
 };
 
 const globalForMongo = globalThis as unknown as { __jarvisChatStore?: Promise<ChatStore> };
@@ -145,6 +154,7 @@ async function connect(uri: string): Promise<ChatStore> {
   const db = client.db(databaseName(uri));
   const messages = db.collection<StoredMessage>(MESSAGES);
   const typing = db.collection<TypingDoc>(TYPING);
+  const reads = db.collection<ReadDoc>(READS);
 
   // Dựng index MỘT lần cho mỗi tiến trình, trong cùng promise đã cache — nên nó không bao
   // giờ chạy trên đường đi nóng của một request thứ hai. `createIndex` là idempotent.
@@ -153,7 +163,7 @@ async function connect(uri: string): Promise<ChatStore> {
     typing.createIndex({ at: 1 }, { name: "chat_typing_ttl", expireAfterSeconds: TYPING_TTL_SECONDS }),
   ]);
 
-  return { client, db, messages, typing };
+  return { client, db, messages, typing, reads };
 }
 
 /**
@@ -276,6 +286,71 @@ export async function getFeed(options: {
   });
 
   return { messages: view, typing: await readTyping(typing, options.viewerId) };
+}
+
+/**
+ * ── MỐC ĐÃ ĐỌC (18/08/2026, bản 22/08) ───────────────────────────────────────────────────────
+ *
+ * MỘT con số cho MỖI người: `createdAt` (ms) của tin mới nhất họ đã thấy. Con số ấy gánh cả hai
+ * tính năng — mở sảnh đứng ở chỗ đọc dở, và huy hiệu số tin chưa đọc trên icon nổi — nên nó
+ * sống Ở ĐÂY, cạnh tin nhắn, chứ không trong localStorage: huy hiệu phải đúng trên MỌI trang
+ * và MỌI thiết bị của cùng một người, mà phép đếm thì phải chạy ở nơi tin đang nằm.
+ *
+ * Mốc là TIMESTAMP CỦA TIN, không phải đồng hồ client: client chỉ vọng lại `createdAt` mà
+ * server đã phát, nên lệch giờ máy người dùng không chen vào được phép so nào.
+ */
+
+/** Mốc đã đọc của một người; `null` = chưa từng ghé sảnh (coi như đã đọc hết — xem countUnread). */
+export async function readChatMark(
+  userId: string,
+): Promise<{ storeClosed: true } | { storeClosed?: false; lastReadAt: number | null }> {
+  const opened = store();
+  if (!opened) return { storeClosed: true };
+  const { reads } = await opened;
+  const doc = await reads.findOne({ _id: userId });
+  return { lastReadAt: doc?.lastReadAt ?? null };
+}
+
+/**
+ * Đẩy mốc TIẾN LÊN — `$max` nên một request tới muộn mang mốc cũ không kéo lùi được ai, kể cả
+ * khi hai tab của cùng một người đua nhau ghi. Upsert vì lần ghé sảnh đầu tiên chưa có dòng nào.
+ */
+export async function advanceChatMark(
+  userId: string,
+  atMs: number,
+): Promise<{ storeClosed: true } | { storeClosed?: false; ok: true }> {
+  const opened = store();
+  if (!opened) return { storeClosed: true };
+  const { reads } = await opened;
+  await reads.updateOne({ _id: userId }, { $max: { lastReadAt: atMs } }, { upsert: true });
+  return { ok: true };
+}
+
+/**
+ * Bao nhiêu tin CHƯA ĐỌC đang chờ một người — nguồn của con số trên icon nổi.
+ *
+ * `lastReadAt = null` (chưa từng ghé sảnh) đếm ra 0, và đó là lựa chọn có chủ ý: một môn đồ
+ * vừa nhập môn mà icon đã đeo「50+」là bị đòi nợ cho những cuộc trò chuyện trước cả khi mình
+ * tới. Mốc chỉ bắt đầu có nghĩa từ lần ghé sảnh đầu tiên.
+ *
+ * Không đếm tin của CHÍNH MÌNH (gửi là đã đọc) và tin đã thu hồi (một tấm bia「tin đã được thu
+ * hồi」không phải thứ đáng gọi người ta quay lại đọc).
+ */
+export async function countUnread(
+  userId: string,
+): Promise<{ storeClosed: true } | { storeClosed?: false; unread: number }> {
+  const opened = store();
+  if (!opened) return { storeClosed: true };
+  const { messages, reads } = await opened;
+  const doc = await reads.findOne({ _id: userId });
+  const mark = doc?.lastReadAt ?? null;
+  if (mark === null) return { unread: 0 };
+  const unread = await messages.countDocuments({
+    createdAt: { $gt: mark },
+    userId: { $ne: userId },
+    deleted: { $ne: true },
+  });
+  return { unread };
 }
 
 /**

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { ChatPicker, type PickerTab } from "./ChatPicker";
 import { Avatar } from "@/components/Avatar";
 import { isSafeAttachmentUrl } from "@/lib/validation/chat";
+import { firstUnreadIndex, parseMarkMs } from "@/lib/validation/chatRead";
 import { framesForTags, normalizeTagLabel, type TagFrame } from "@/lib/validation/tags";
 import type { Gif } from "@/lib/services/gif";
 
@@ -61,6 +62,17 @@ const RENDER_WINDOW_STEP = 40;
 
 /** Cách đỉnh bao nhiêu thì coi là "người ta muốn đọc ngược" — nới cửa sổ hoặc lật trang cũ. */
 const NEAR_TOP_PX = 80;
+
+/**
+ * Lượt mở sảnh được LẬT NGƯỢC tối đa ngần này trang để tìm ranh giới đọc/chưa-đọc — tức vạch
+ *「tin chưa đọc」với chút ngữ cảnh đã-đọc phía trên nó. 4 trang cộng trang đầu là 250 tin;
+ * ai bỏ sảnh lâu hơn thế thì vạch nằm ở đỉnh vùng đã tải và huy hiệu vẫn nói con số THẬT —
+ * một cái trần thành thật, thay vì một vòng lặp kéo cả nghìn tin chỉ để đặt một vạch kẻ.
+ */
+const RESTORE_MAX_HOPS = 4;
+
+/** Vạch chưa-đọc đứng cách mép trên chừng này khi mở sảnh — đủ hở để thấy mình đang ở giữa dòng. */
+const RESTORE_TOP_GAP_PX = 24;
 
 /** Hai tin cùng một người cách nhau dưới ngần này thì gộp chung một khoảnh. */
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
@@ -195,6 +207,12 @@ export function ChatRoom({
   const [windowSize, setWindowSize] = useState(RENDER_WINDOW);
   /** Kho MongoDB chưa được tông chủ tạo — sảnh treo biển thay vì giả vờ trống. */
   const [storeClosed, setStoreClosed] = useState<string | null>(null);
+  /**
+   * Tin mang vạch「tin chưa đọc」phía trên nó — đặt MỘT lần lúc mở sảnh rồi đứng yên cả phiên,
+   * kể cả khi người ta đã đọc qua nó: vạch là chứng tích「mình đã rời đi ở đây」, đổi nó theo
+   * từng nhịp đọc là biến một cột mốc thành một con trỏ nhấp nháy.
+   */
+  const [dividerAt, setDividerAt] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -209,6 +227,10 @@ export function ChatRoom({
    * đo nhầm cái chiều cao đã mọc rồi.
    */
   const growAnchorHeight = useRef<number | null>(null);
+  /** Tin cần neo cuộn tới sau lượt vẽ đầu — tiêu thụ đúng một lần trong `useBeforePaint` dưới. */
+  const restoreAnchor = useRef<string | null>(null);
+  /** Mốc đã-đọc lớn nhất ĐÃ GỬI lên server (ms) — chặn việc lặp lại cùng một cú POST mỗi nhịp. */
+  const lastMarkSent = useRef(0);
 
   /**
    * Đặt chỗ cuộn TỨC THÌ, không bao giờ để nó trượt mượt.
@@ -321,13 +343,102 @@ export function ChatRoom({
       }
     };
 
-    tick();
-    const timer = setInterval(tick, POLL_MS);
+    /**
+     * LƯỢT MỞ SẢNH — khác nhịp poll ở đúng một câu hỏi: mình đã đọc tới đâu?
+     *
+     * `withMark=1` mang về mốc đã-đọc và số tin chưa đọc kèm trang tin mới nhất. Có tin chưa
+     * đọc thì sảnh KHÔNG ghim xuống đáy như mọi khi: nó lật ngược thêm vài trang (trần
+     * `RESTORE_MAX_HOPS`) cho tới khi ranh giới đọc/chưa-đọc lọt vào vùng đã tải, đặt vạch
+     *「tin chưa đọc」ở đó, rồi neo cuộn vào vạch. Toàn bộ diễn ra TRƯỚC lượt merge đầu tiên —
+     * nghĩa là không có khung hình nào ghim đáy rồi mới giật ngược lên: sảnh mở ra là đã đứng
+     * đúng chỗ đọc dở.
+     *
+     * Mọi ngả hỏng của bootstrap đều rơi về hành vi CŨ (ghim đáy): mốc là tiện nghi, không
+     * phải cửa — một lượt đọc mốc trượt không được phép chặn ai vào sảnh.
+     */
+    const bootstrap = async () => {
+      try {
+        const res = await fetch("/api/chat?withMark=1", { cache: "no-store" });
+        if (!alive) return;
+        if (res.status === 503) {
+          const data = await res.json().catch(() => ({}));
+          setStoreClosed(String(data.error ?? "Tàng thư đàm đạo chưa khai mở."));
+          return;
+        }
+        if (!res.ok) return;
+        setStoreClosed(null);
+        const data: {
+          messages: Message[];
+          typing: string[];
+          avatars?: AvatarMap;
+          lastReadAt?: string | null;
+          unread?: number;
+        } = await res.json();
+
+        let collected = data.messages;
+        let avatarsAll = data.avatars ?? {};
+        const markMs = parseMarkMs(data.lastReadAt);
+        const unread = typeof data.unread === "number" ? data.unread : 0;
+
+        let anchorId: string | null = null;
+        if (markMs !== null && unread > 0) {
+          let hops = 0;
+          // `idx === 0` nghĩa là CẢ vùng đã tải đều chưa đọc — ranh giới còn nằm trên nữa.
+          // `idx > 0` là đã thấy ranh giới; `-1` là chẳng có gì chưa đọc trong vùng này (đua
+          // giữa hai câu hỏi đếm/tải — vô hại, rơi về ghim đáy).
+          while (alive && hops < RESTORE_MAX_HOPS && collected.length > 0) {
+            if (firstUnreadIndex(collected, markMs, me.id) !== 0) break;
+            const oldest = collected[0];
+            const older = await fetch(
+              `/api/chat?beforeAt=${encodeURIComponent(oldest.createdAt)}&beforeId=${oldest.id}`,
+              { cache: "no-store" },
+            );
+            if (!older.ok) break;
+            const page: { messages: Message[]; avatars?: AvatarMap } = await older.json();
+            if (page.messages.length === 0) break;
+            collected = [...page.messages, ...collected];
+            avatarsAll = { ...avatarsAll, ...(page.avatars ?? {}) };
+            hops += 1;
+          }
+          if (!alive) return;
+          const idx = firstUnreadIndex(collected, markMs, me.id);
+          if (idx !== -1) anchorId = collected[idx].id;
+        }
+
+        for (const m of collected) knownIds.current.add(m.id);
+
+        if (anchorId) {
+          // Cùng MỘT lượt batch với merge: hiệu ứng ghim-đáy đọc `stuck` đã là false nên không
+          // tranh chỗ với phép neo vào vạch ngay sau lượt vẽ này.
+          setStuck(false);
+          setUnseen(unread);
+          setWindowSize(Math.max(RENDER_WINDOW, collected.length));
+          setDividerAt(anchorId);
+          restoreAnchor.current = anchorId;
+        }
+        // Mốc đã ở server rồi thì đừng gửi lại chính nó; chưa có mốc thì tin đầu tiên nhìn
+        // thấy sẽ lập mốc (0 thua mọi createdAt thật).
+        lastMarkSent.current = markMs ?? 0;
+
+        merge(collected, avatarsAll);
+        setTyping(data.typing);
+      } catch {
+        /* mạng chớp — nhịp poll đầu tiên sẽ vớt lại theo lối cũ */
+      }
+    };
+
+    // Poll chỉ khởi động SAU khi bootstrap ngã ngũ: một nhịp tick chen vào giữa lúc đang lật
+    // ngược tìm ranh giới sẽ merge trang mới nhất với stuck còn true — sảnh ghim đáy một khung
+    // hình rồi mới bị giật lên vạch, đúng cái giật mà bootstrap sinh ra để xoá.
+    let timer: ReturnType<typeof setInterval> | null = null;
+    void bootstrap().finally(() => {
+      if (alive) timer = setInterval(tick, POLL_MS);
+    });
     return () => {
       alive = false;
-      clearInterval(timer);
+      if (timer) clearInterval(timer);
     };
-  }, [merge]);
+  }, [merge, me.id]);
 
   // ---- Bấm ra ngoài thì đóng khay ------------------------------------------------------
   const popupOpen = panel !== "none" || pickerFor !== null;
@@ -421,6 +532,61 @@ export function ChatRoom({
     jumpScrollTo(el, el.scrollTop + (el.scrollHeight - before));
     growAnchorHeight.current = null;
   }, [windowSize]);
+
+  /**
+   * Neo cuộn vào vạch「tin chưa đọc」— chạy đúng MỘT lần, ở lượt vẽ đầu tiên có tin, trước khi
+   * trình duyệt kịp vẽ (cùng lý do với phép bù nới cửa sổ ở trên: sau lượt vẽ là người ta đã
+   * thấy sảnh đứng nhầm chỗ một khung hình).
+   *
+   * Tiêu thụ ref VÔ ĐIỀU KIỆN ở lượt có tin: thẻ neo chắc chắn nằm trong DOM vì bootstrap đã
+   * nới cửa sổ trùm hết vùng tải — còn nếu một ngày nào đó nó vắng mặt thì thà ghim đáy như
+   * cũ chứ không được để cái ref sống sót rồi giật màn hình ở một lượt vẽ vu vơ về sau.
+   */
+  useBeforePaint(() => {
+    const id = restoreAnchor.current;
+    const el = scrollRef.current;
+    if (!id || !el || visible.length === 0) return;
+    restoreAnchor.current = null;
+    const row = el.querySelector(`[data-msg-id="${id}"]`);
+    if (!(row instanceof HTMLElement)) return;
+    const top = row.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+    jumpScrollTo(el, Math.max(0, top - RESTORE_TOP_GAP_PX));
+  }, [visible]);
+
+  /**
+   * Đẩy mốc đã-đọc khi đang DÍNH ĐÁY và tab đang HIỆN — hai điều kiện, thiếu cái nào cũng
+   * thành nói dối: không dính đáy là đang đọc quá khứ (tin mới chưa lọt vào mắt), còn tab ẩn
+   * thì sảnh vẫn tự ghim đáy theo tin mới suốt đêm và một cái mốc chạy theo nó sẽ lặng lẽ
+   * đánh dấu đã-đọc cả trăm tin không ai nhìn.
+   *
+   * Gửi bằng fetch trần, không qua `post()`: mốc là việc hậu trường, một lượt ghi trượt không
+   * đáng một tấm toast — nhịp sau có tin mới hơn sẽ tự vá.
+   */
+  /**
+   * Tab hiện/ẩn thành state để hiệu ứng đẩy mốc THỨC DẬY lúc người ta quay lại tab: thiếu nó
+   * thì đêm tin về lúc tab ẩn sẽ treo mốc mãi tới khi có thêm một tin mới nữa — huy hiệu trên
+   * icon nổi cứ đeo con số cũ dù sảnh đang mở ngay trước mắt.
+   */
+  const [pageVisible, setPageVisible] = useState(true);
+  useEffect(() => {
+    const onVisibility = () => setPageVisible(document.visibilityState === "visible");
+    onVisibility();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+
+  useEffect(() => {
+    if (!stuck || storeClosed || messages.length === 0 || !pageVisible) return;
+    const newest = messages[messages.length - 1];
+    const newestMs = Date.parse(newest.createdAt);
+    if (!Number.isFinite(newestMs) || newestMs <= lastMarkSent.current) return;
+    lastMarkSent.current = newestMs;
+    void fetch("/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ op: "read", at: newest.createdAt }),
+    }).catch(() => {});
+  }, [messages, stuck, storeClosed, pageVisible]);
 
   const loadOlder = async () => {
     const oldest = messages[0];
@@ -654,8 +820,16 @@ export function ChatRoom({
           const own = msg.userId === me.id;
 
           return (
-            <div key={msg.id}>
+            <div key={msg.id} data-msg-id={msg.id}>
               {showDay && <div className="chat-day"><span>{fmtDay(msg.createdAt)}</span></div>}
+              {/* Vạch nằm SAU mốc ngày: mốc ngày kể「hôm nào」, vạch kể「từ đây là phần bạn
+                  chưa xem」— đảo lại thì vạch chỉ vào cả cái mốc ngày, một thứ không ai cần
+                  được nhắc là chưa đọc. */}
+              {dividerAt === msg.id && (
+                <div className="chat-unread" role="separator" aria-label="Tin chưa đọc bắt đầu từ đây">
+                  <span>tin chưa đọc</span>
+                </div>
+              )}
 
               <div className={`chat-row ${grouped ? "grouped" : ""}`}>
                 {grouped ? (

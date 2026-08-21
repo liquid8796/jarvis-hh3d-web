@@ -285,6 +285,45 @@ try {
   assert(ttl?.expireAfterSeconds === 60, `index TTL của typing phải đặt 60s, có ${ttl?.expireAfterSeconds}`);
   console.log("✔ Index: createdAt cho tin, TTL cho typing — dựng tự động lúc kết nối.");
 
+  // ---- Mốc đã-đọc (chat_reads) ----------------------------------------------------------
+  //
+  // Phía server của cặp luật mà `verify:chat-read` đo phía client: cùng định nghĩa「chưa
+  // đọc」(không tính tin mình, không tính tin thu hồi, so bằng >), và mốc thì CHỈ TIẾN.
+  {
+    const doc = await chat.readChatMark(member.id);
+    assert(!doc.storeClosed && doc.lastReadAt === null, "chưa từng ghé sảnh → mốc phải là null");
+    const c0 = await chat.countUnread(member.id);
+    assert(!c0.storeClosed && c0.unread === 0, "chưa có mốc → 0 tin chưa đọc (không đòi nợ người mới nhập môn)");
+
+    // Dựng cảnh: admin nhắn 3 tin, member nhắn 1, admin thu hồi 1 — mốc của member đặt trước cả cụm.
+    const markBase = Date.now();
+    assert((await chat.sendMessage(admin, { text: "tin một" })).ok, "gieo tin 1");
+    assert((await chat.sendMessage(admin, { text: "tin hai" })).ok, "gieo tin 2");
+    assert((await chat.sendMessage(member, { text: "tin của chính mình" })).ok, "gieo tin 3 (của member)");
+    assert((await chat.sendMessage(admin, { text: "tin sẽ thu hồi" })).ok, "gieo tin 4");
+    // `sendMessage` cố ý không trả id (client nhận tin qua nhịp poll) — tra id qua collection.
+    const delDoc = await bulkClient.findOne({ text: "tin sẽ thu hồi" });
+    assert(delDoc !== null, "tin vừa gieo phải nằm trong kho");
+    assert((await chat.deleteMessage({ id: admin.id }, String(delDoc!._id))).ok, "thu hồi tin 4");
+
+    await chat.advanceChatMark(member.id, markBase - 1);
+    const c1 = await chat.countUnread(member.id);
+    // 4 tin sau mốc nhưng: 1 của chính member, 1 đã thu hồi → còn 2.
+    assert(!c1.storeClosed && c1.unread === 2, `đếm phải loại tin mình + tin thu hồi: mong 2, có ${c1.storeClosed ? "?" : c1.unread}`);
+
+    // Mốc chỉ TIẾN: một request tới muộn mang mốc cũ không kéo lùi được ai.
+    await chat.advanceChatMark(member.id, markBase + 10 * 60 * 1000);
+    await chat.advanceChatMark(member.id, markBase - 999);
+    const m2 = await chat.readChatMark(member.id);
+    assert(
+      !m2.storeClosed && m2.lastReadAt === markBase + 10 * 60 * 1000,
+      "mốc phải đứng ở giá trị LỚN NHẤT từng ghi — $max, không phải lượt ghi cuối",
+    );
+    const c2 = await chat.countUnread(member.id);
+    assert(!c2.storeClosed && c2.unread === 0, "mốc đã vượt mọi tin → 0 chưa đọc");
+    console.log("✔ Mốc đã-đọc: null → 0, đếm loại tin mình + tin thu hồi, và mốc không bao giờ đi lùi.");
+  }
+
   console.log("\n✔ Tàng thư đàm đạo trên MongoDB: trọn vòng đời chạy thật, không một phép nào trượt.");
 } finally {
   // Pool của chat.ts phải được đóng bằng tay: nó cố ý sống qua các request trên web, nên

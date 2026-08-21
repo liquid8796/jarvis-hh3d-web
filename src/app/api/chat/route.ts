@@ -4,13 +4,17 @@ import { isAdminUser } from "@/lib/auth/permissions";
 import { avatarsByUserId } from "@/lib/services/users";
 import {
   STORE_CLOSED_MESSAGE,
+  advanceChatMark,
+  countUnread,
   deleteMessage,
   editMessage,
   getFeed,
   markTyping,
+  readChatMark,
   sendMessage,
   toggleReaction,
 } from "@/lib/services/chat";
+import { clampReadAt } from "@/lib/validation/chatRead";
 
 /**
  * Một endpoint cho cả sảnh đàm đạo — GET là nhịp poll của client (tin mới + ai đang gõ),
@@ -47,9 +51,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  const url = new URL(request.url);
+
+  /**
+   * Nhánh NHẸ cho icon nổi: chỉ một con số, không feed, không avatar, không typing — icon
+   * gõ cửa từ MỌI trang mỗi nửa phút, bắt nó trả tiền cho cả một trang tin là phí gấp trăm
+   * lần thứ nó cần. Cũng không quét hạn lưu ở đây: nhịp ấy thuộc về những người đang thật
+   * sự mở sảnh.
+   */
+  if (url.searchParams.get("unread") === "1") {
+    const counted = await countUnread(user.id);
+    return NextResponse.json({ unread: counted.storeClosed ? 0 : counted.unread });
+  }
+
   purgeOpportunistically();
 
-  const url = new URL(request.url);
   const beforeAt = url.searchParams.get("beforeAt");
   const beforeId = url.searchParams.get("beforeId");
 
@@ -80,6 +96,22 @@ export async function GET(request: Request) {
    * khoá chính của tối đa 50 id, và nó là cái giá để đổi ảnh không làm vỡ ảnh trong tin cũ.
    */
   const avatars = await avatarsByUserId(feed.messages.map((message) => message.userId));
+
+  /**
+   * Mốc đã-đọc CHỈ đi kèm khi client xin (`withMark=1`) — tức đúng lượt fetch ĐẦU TIÊN lúc mở
+   * sảnh. Nhịp poll 2.5s không cần nó (sảnh đã định vị xong), mà kẹp thêm hai lượt hỏi Mongo
+   * vào từng nhịp của từng người là trả tiền vĩnh viễn cho một câu chỉ cần hỏi một lần.
+   */
+  if (url.searchParams.get("withMark") === "1") {
+    const [mark, counted] = await Promise.all([readChatMark(user.id), countUnread(user.id)]);
+    return NextResponse.json({
+      ...feed,
+      avatars,
+      lastReadAt:
+        !mark.storeClosed && mark.lastReadAt !== null ? new Date(mark.lastReadAt).toISOString() : null,
+      unread: counted.storeClosed ? 0 : counted.unread,
+    });
+  }
 
   return NextResponse.json({ ...feed, avatars });
 }
@@ -125,6 +157,16 @@ export async function POST(request: Request) {
 
     case "typing": {
       await markTyping({ id: user.id, name: user.displayName }, payload.typing === true);
+      return NextResponse.json({ ok: true });
+    }
+
+    case "read": {
+      // Đẩy mốc đã-đọc. `clampReadAt` gác biên (chuỗi hỏng → bỏ qua, mốc tương lai → kẹp về
+      // hiện tại), còn `$max` dưới service lo chuyện không bao giờ đi lùi — nên nhánh này
+      // không có đường nào làm một người MẤT dấu chưa-đọc của họ.
+      const at = clampReadAt(payload.at, Date.now());
+      if (at === null) return NextResponse.json({ error: "bad at" }, { status: 400 });
+      await advanceChatMark(user.id, at);
       return NextResponse.json({ ok: true });
     }
 

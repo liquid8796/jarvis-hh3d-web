@@ -4326,6 +4326,106 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       _resetGate();
     }
 
+    console.log("\nLàn độc quyền theo tên — Mê Cung trên khôi lỗi tông môn: mỗi lúc một trận");
+
+    // Luật 22/08/2026: server gửi soloQuestNames=["Mê Cung"] cho khôi lỗi tông môn ở claim,
+    // runCycle gắn cờ `exclusive` cho nhiệm vụ mang tên ấy. Khối này đóng đinh các chốt của
+    // cổng: trần 1 theo TÊN, kẻ đợi vì tên không giam ghế của người khác (bài học「hub nhường」
+    // đã trả giá), FIFO giữa hai kẻ cùng tên, kẹt-cả-ghế-lẫn-tên vẫn chặn làn như thường, và
+    // không cờ (khôi lỗi riêng, server đời cũ) thì nếp cặp đôi từ 09/08 còn nguyên.
+    {
+      const tick = () => new Promise((r) => setTimeout(r, 20));
+      const grab = (name, { exclusive = false } = {}) => {
+        const holder = { admitted: false, aborted: false, slot: null };
+        holder.promise = acquireQuestSlot({ dedicated: true, exclusive, name }).then((result) => {
+          if (result.aborted) holder.aborted = true;
+          else {
+            holder.admitted = true;
+            holder.slot = result;
+          }
+        });
+        return holder;
+      };
+
+      const tranA = grab("Mê Cung", { exclusive: true });
+      await tick();
+      const tranB = grab("Mê Cung", { exclusive: true });
+      await tick();
+      check(
+        "trận Mê Cung thứ hai phải chờ dù làn trang riêng còn ghế — trần 1 theo tên",
+        tranA.admitted && !tranB.admitted,
+        `A=${tranA.admitted} B=${tranB.admitted}`,
+      );
+
+      const hoangVuc = grab("Hoang Vực");
+      await tick();
+      check(
+        "Hoang Vực tới SAU vẫn vào ghế trống — kẻ đợi vì tên không chặn làn",
+        hoangVuc.admitted,
+        "Hoang Vực bị bắt xếp hàng sau một Mê Cung chỉ kẹt tên",
+      );
+
+      const tranC = grab("Mê Cung", { exclusive: true });
+      await tick();
+      tranA.slot.release();
+      await tick();
+      check(
+        "Mê Cung buông thì kẻ đợi SỚM cùng tên vào, kẻ muộn tiếp tục chờ — FIFO theo tên",
+        tranB.admitted && !tranC.admitted,
+        `B=${tranB.admitted} C=${tranC.admitted}`,
+      );
+
+      tranB.slot.release();
+      await tick();
+      check("kẻ cùng tên còn lại vào nốt khi tới lượt", tranC.admitted, `C=${tranC.admitted}`);
+      tranC.slot.release();
+      hoangVuc.slot.release();
+      await tick();
+
+      // Kẹt CẢ ghế lẫn tên: phân loại theo LÝ DO kẹt, không theo loại nhiệm vụ — đang tranh
+      // ghế thì chặn làn như mọi trang riêng khác, hết tranh ghế thì thôi.
+      const giuMaze = grab("Mê Cung", { exclusive: true });
+      const giuHV = grab("Hoang Vực");
+      await tick();
+      const doiMaze = grab("Mê Cung", { exclusive: true });
+      await tick();
+      const doiTeLe = grab("Tế Lễ");
+      await tick();
+      check(
+        "làn đầy → kẻ tới sau không vượt mặt Mê Cung đang kẹt ghế",
+        giuMaze.admitted && giuHV.admitted && !doiMaze.admitted && !doiTeLe.admitted,
+        `giữ=${giuMaze.admitted}/${giuHV.admitted} đợi=${doiMaze.admitted}/${doiTeLe.admitted}`,
+      );
+      giuHV.slot.release();
+      await tick();
+      check(
+        "ghế trống mà Mê Cung còn kẹt tên → ghế về tay kẻ sau, không bị giam theo",
+        doiTeLe.admitted && !doiMaze.admitted,
+        `teLe=${doiTeLe.admitted} maze=${doiMaze.admitted}`,
+      );
+      giuMaze.slot.release();
+      await tick();
+      check("Mê Cung đầu xong → kẻ cùng tên đang đợi vào ngay", doiMaze.admitted, `maze=${doiMaze.admitted}`);
+      doiMaze.slot.release();
+      doiTeLe.slot.release();
+      await tick();
+
+      // Khôi lỗi riêng không nhận soloQuestNames → không cờ exclusive: hai tài khoản cùng
+      // đánh Mê Cung vẫn được cặp như từ 09/08 — luật mới không đổi nếp của máy nhà đạo hữu.
+      const rieng1 = grab("Mê Cung");
+      const rieng2 = grab("Mê Cung");
+      await tick();
+      check(
+        "không cờ độc quyền (khôi lỗi riêng) → hai Mê Cung vẫn chạy cặp như cũ",
+        rieng1.admitted && rieng2.admitted,
+        `r1=${rieng1.admitted} r2=${rieng2.admitted}`,
+      );
+      rieng1.slot.release();
+      rieng2.slot.release();
+
+      _resetGate();
+    }
+
     // Phân loại phải đọc từ hồ sơ thật, không từ một danh sách tay: twin thường của Điểm
     // Danh sống trên /diem-danh nên NÓ là trang riêng dù bản VIP là hub.
     {

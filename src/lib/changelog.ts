@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.36",
+    date: "2026-08-22",
+    lines: [
+      "Khôi lỗi của tông môn nay chỉ đánh một trận Mê Cung tại một thời điểm, dù đang cày cho nhiều tài khoản — trận thứ hai xếp hàng chờ trận trước xong.",
+      "Các nhiệm vụ khác không phải chờ theo: còn chỗ trống thì việc khác cứ chạy như thường.",
+      "Khôi lỗi chạy trên máy nhà của đạo hữu không bị luật này chạm tới.",
+    ],
+  },
+  {
     version: "1.3.35",
     date: "2026-08-22",
     lines: [
@@ -464,13 +473,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khoáng Mạch: ô mua Linh Quang Phù và ô ngưỡng đoạt nay nằm gọn trong khối「Đoạt mỏ」, và mờ đi khi không đoạt.",
       "Không bật đoạt mỏ thì khôi lỗi cũng thôi mua phù. Ngưỡng đã chọn vẫn giữ nguyên, bật lại là thấy đúng con số cũ.",
-    ],
-  },
-  {
-    version: "0.91.0",
-    date: "2026-08-15",
-    lines: [
-      "Bảng Hàng Đợi nay ghi rõ ở từng dòng: máy nào đang chạy đàn ấy, hoặc nó đang chờ loại máy nào.",
     ],
   },
 ];

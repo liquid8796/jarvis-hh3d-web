@@ -67,6 +67,16 @@ import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
  */
 const workerVersionSchema = z.string().trim().min(1).max(32).regex(/^[A-Za-z0-9.+-]+$/);
 
+/**
+ * Luật nhà thứ hai của ghế chung (lệnh tông chủ 22/08/2026): mỗi khôi lỗi TÔNG MÔN chỉ được
+ * đánh MỘT trận cho mỗi tên trong danh sách này tại một thời điểm, KHÔNG phân biệt tài khoản
+ * — hôm nay là Mê Cung, trận 35 phút giữ một phòng 5 người. Gửi kèm job ở `claim` dưới dạng
+ * danh sách TÊN nhiệm vụ (trùng `quest.name` trong hồ sơ) để chính sách nằm trọn ở server:
+ * các kho đông lạnh đọc danh sách mới ngay lượt claim kế, không cần nhận gói mới. Cách thực
+ * thi (làn độc quyền theo tên, kẻ đợi không chặn ghế người khác) ở `quest-engine/questGate.mjs`.
+ */
+const OPERATOR_SOLO_QUEST_NAMES = ["Mê Cung"];
+
 const bodySchema = z.discriminatedUnion("op", [
   // `runner` cũ của worker đời trước vẫn được CHẤP NHẬN nhưng bị bỏ qua — một khôi lỗi chưa
   // cập nhật không nên vỡ chỉ vì server đi trước nó một bản.
@@ -294,6 +304,10 @@ export async function POST(request: Request) {
           // nên khôi lỗi không cần biết gì về múi giờ — nó chỉ đọc danh sách và trả lại `day`
           // nguyên văn ở `complete`.
           dailyDone: dailyQuotaPlan(job.dailyDone),
+          // Gác theo SCOPE, cùng lẽ với enforceMazeCapPolicy ở trên: luật nói về CÁI MÁY chung,
+          // khôi lỗi riêng chạy trên máy của chính đạo hữu thì không ai phải xếp hàng sau lưng.
+          // Khôi lỗi đời cũ không biết trường này và bỏ qua — an toàn theo hướng giữ nếp cũ.
+          ...(scope.kind === "operator" ? { soloQuestNames: OPERATOR_SOLO_QUEST_NAMES } : {}),
         },
       });
     }

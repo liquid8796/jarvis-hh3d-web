@@ -364,6 +364,11 @@ export async function pingGithubStationAction(
  * Hai deadline chép đúng phần ngân sách GitHub của cron: tránh ghép hai vòng 40 giây thành một
  * server action 80 giây. Repo bị partial/skipped phải chạy lại trong CÙNG ngày nếu muốn đủ quota;
  * ngày mai mở quota mới chứ không bù số commit còn thiếu của hôm nay.
+ *
+ * TỪ 21/08/2026, "partial" GIỮA NGÀY là chuyện BÌNH THƯỜNG chứ không phải dấu hỏng: kho phụ nay
+ * rải commit theo nấc giờ (`companionDueByNow`), nên bấm nút lúc 3 giờ chiều thì nó đẩy đúng phần
+ * đã tới nấc rồi dừng — câu chữ trả về sẽ nói「còn chờ nấc sau」. Muốn thấy đủ 5/5 thì bấm sau
+ * 22:00 giờ VN, hoặc cứ để lịch mỗi giờ tự lo.
  */
 export async function runKeepaliveAction(
   _prev: StationResult | null,

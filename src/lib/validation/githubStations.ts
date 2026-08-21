@@ -144,6 +144,120 @@ export function nurtureDayKey(at: Date): string {
 }
 
 /**
+ * PHẠM VI của một lượt `/api/cron` — đọc từ `?only=`.
+ *
+ * Sinh ra vì hai việc trong route ấy nay chạy theo HAI nhịp khác nhau: quét dọn và ngó kho chính
+ * vẫn mỗi ngày một lần, còn nuôi kho phụ phải mỗi giờ mới rải được commit ra cả ngày. Thay vì kéo
+ * cả route lên nhịp giờ (24 lượt ngó kho chính, 24 lượt quét dọn — đổi hành vi của những thứ không
+ * ai yêu cầu đổi), lượt mỗi giờ tự khai mình chỉ tới vì kho phụ.
+ *
+ * Vắng `?only=` là TRỌN GÓI, đúng như trước — lịch cũ gọi y nguyên đường cũ và không đổi gì.
+ * Giá trị lạ thì từ chối thẳng chứ không lặng lẽ hiểu thành trọn gói: một lượt gõ sai chính tả
+ * mà vẫn chạy đủ ba việc là thứ chỉ lộ ra sau nhiều tuần.
+ */
+export type CronScope = { housekeeping: boolean; keepalive: boolean; companions: boolean };
+
+export function reviewCronScope(raw: string | null): { ok: true; scope: CronScope } | { ok: false; why: string } {
+  const wanted = (raw ?? "").trim().toLowerCase();
+  if (wanted === "") return { ok: true, scope: { housekeeping: true, keepalive: true, companions: true } };
+  if (wanted === "companions") return { ok: true, scope: { housekeeping: false, keepalive: false, companions: true } };
+  return { ok: false, why: `Không hiểu ?only=${wanted} — chỉ nhận "companions", hoặc bỏ trống để chạy trọn gói.` };
+}
+
+/** Phút-trong-ngày theo giờ Việt Nam — cùng gốc UTC+7 với `nurtureDayKey`. */
+export function nurtureMinuteOfDay(at: Date): number {
+  const vn = new Date(at.getTime() + 7 * 60 * 60 * 1000);
+  return vn.getUTCHours() * 60 + vn.getUTCMinutes();
+}
+
+/**
+ * CỬA SỔ GIỜ mà kho phụ được phép commit — 08:00 tới 22:00 giờ Việt Nam.
+ *
+ * Vì sao không phải cả ngày: nửa còn lại của việc này là TRÔNG GIỐNG một tài khoản dev bình
+ * thường. Một kho mà lịch sử commit rải đều suốt 24 giờ, đêm nào cũng có, là một dấu chân còn
+ * to hơn cả cụm năm commit lúc 3 giờ sáng — không người nào gõ mã theo nhịp ấy.
+ *
+ * 22:00 là mốc CHỐT chứ không phải mốc mềm: từ giây ấy trở đi `companionDueByNow` trả trọn quota
+ * ngày. Nhờ vậy chỉ cần MỘT lượt cron bất kỳ rơi vào khoảng 22:00–23:59 là hôm ấy đủ số, kể cả
+ * khi máy nằm im cả buổi chiều.
+ */
+export const NURTURE_WINDOW_START_MIN = 8 * 60;
+export const NURTURE_WINDOW_END_MIN = 22 * 60;
+
+/**
+ * Phần khoảng cách giữa hai nấc mà một nấc được phép xê dịch: ±0,4 nhịp.
+ *
+ * Trần 0,4 (chứ không 0,5) là thứ giữ cho hai nấc KHÔNG BAO GIỜ đổi chỗ cho nhau: hai tâm cách
+ * nhau đúng một nhịp, mỗi cái lệch tối đa 0,4 nhịp, nên khoảng hở nhỏ nhất còn 0,2 nhịp. Thứ tự
+ * nấc phải bất biến vì `companionDueByNow` đếm「bao nhiêu nấc đã qua」— đảo chỗ là số đếm nhảy lùi
+ * giữa hai lượt cron, và một số đếm nhảy lùi thì không bao giờ đẩy bù được.
+ */
+const NURTURE_JITTER_RATIO = 0.8;
+
+/**
+ * FNV-1a 32-bit — bộ băm tất định, không mật mã, đủ cho việc rải giờ.
+ *
+ * Cần TẤT ĐỊNH chứ không cần ngẫu nhiên thật: hai lượt cron trong cùng một giờ phải tính ra cùng
+ * một bộ nấc, bằng không lượt sau đọc ra một số đếm khác lượt trước và đẩy trùng. Đó cũng là lý do
+ * hạt giống chỉ gồm (ngày, tên kho, số thứ tự nấc) — không có `Math.random`, không có mốc giờ chạy.
+ */
+function fnv1a32(text: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * Phút-trong-ngày (giờ VN) của commit thứ `index` (đếm từ 1) trong ngày `day` của kho `repo`.
+ *
+ * Chia đều cửa sổ thành `dailyPushes` nhịp, lấy TÂM mỗi nhịp rồi xê dịch tất định trong ±0,4 nhịp.
+ * Lấy tâm chứ không lấy mép để nấc đầu không dính đúng 08:00 và nấc cuối không dính đúng 22:00 —
+ * hai con số tròn trịa cạnh nhau ở mọi kho là đúng thứ dấu vết đang muốn tránh.
+ */
+export function companionSlotMinute(day: string, repo: string, dailyPushes: number, index: number): number {
+  const span = NURTURE_WINDOW_END_MIN - NURTURE_WINDOW_START_MIN;
+  const spacing = span / dailyPushes;
+  const center = NURTURE_WINDOW_START_MIN + spacing * (index - 0.5);
+  // `/ 2**32` đưa băm về [0,1); trừ 0,5 để lệch được cả hai phía.
+  const drift = (fnv1a32(`${day}|${repo.toLowerCase()}|${index}`) / 2 ** 32 - 0.5) * spacing * NURTURE_JITTER_RATIO;
+  return Math.round(center + drift);
+}
+
+/**
+ * TỚI GIỜ NÀY thì kho phụ ấy đáng lẽ đã có bao nhiêu commit trong ngày — 0..dailyPushes.
+ *
+ * Đây là cận trên của vòng đẩy, thay cho `dailyPushes` trần. Nhờ nó, năm commit của một ngày rơi
+ * vào năm thời điểm rải trong cửa sổ thay vì một cụm; và vì hàm chỉ phụ thuộc (ngày, tên kho, giờ),
+ * hai lượt cron cùng giờ luôn đồng ý với nhau, còn ledger trên GitHub vẫn là thứ chốt số đã đẩy.
+ *
+ * BÙ DỒN LÀ CÓ CHỦ Ý: máy nằm im từ trưa tới tối thì lượt chạy đầu tiên sau đó thấy「đáng lẽ đã có
+ * 4」và đẩy một mạch cho đủ 4. Thà một cụm bù còn hơn mất commit — vì mất là mất luôn, ngày mai mở
+ * quota mới chứ không cộng dồn (xem `runKeepaliveAction`).
+ */
+export function companionDueByNow(now: Date, dailyPushes: number, repo: string): number {
+  if (!Number.isFinite(dailyPushes) || dailyPushes <= 0) return 0;
+  const quota = Math.min(MAX_DAILY_PUSHES, Math.floor(dailyPushes));
+  const minute = nurtureMinuteOfDay(now);
+  if (minute < NURTURE_WINDOW_START_MIN) return 0;
+  // Qua mốc chốt thì trả trọn quota — không cần dò từng nấc, và đây là điều bảo đảm hôm nào cũng
+  // đủ số miễn có một lượt cron sau 22:00.
+  if (minute >= NURTURE_WINDOW_END_MIN) return quota;
+
+  const day = nurtureDayKey(now);
+  let due = 0;
+  // Nấc đã được chứng minh là không đổi chỗ (xem NURTURE_JITTER_RATIO), nên gặp nấc đầu tiên còn ở
+  // tương lai là dừng được ngay.
+  for (let index = 1; index <= quota; index += 1) {
+    if (companionSlotMinute(day, repo, quota, index) > minute) break;
+    due += 1;
+  }
+  return due;
+}
+
+/**
  * PAT cần scope nào — hiện trên form, vì đây là chỗ hỏng nhiều nhất của cả lối này.
  *
  * `repo` cho lượt ghi `.github/heartbeat.txt`; `workflow` cho lượt bật lại lịch đã bị tắt. Tệp

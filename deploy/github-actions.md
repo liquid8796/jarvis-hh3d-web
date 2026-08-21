@@ -225,7 +225,17 @@ vận hành ngày 19/08/2026: mỗi lượt cron hằng ngày đẩy mặc đị
 `src/generated/revision-ledger.ts`. Ứng dụng import và hiển thị module này, nên đây là thay đổi mã
 nguồn có đi qua type-check/build chứ không phải một heartbeat giấu trong `.github/`. Số lượt là
 `githubStations[].dailyPushes`, đặt riêng theo từng station ở tab **Kho GitHub**, hợp lệ `0..24`;
-`0` tạm dừng hai repo phụ mà không tắt workflow khôi lỗi chính. Vì hệ chỉ có một cron mỗi ngày,
+`0` tạm dừng hai repo phụ mà không tắt workflow khôi lỗi chính.
+
+**RẢI TRONG NGÀY (21/08/2026).** Trước đó cả quota rơi trong MỘT lượt cron: lịch sử commit của kho
+phụ là một cụm năm cái lúc 10 giờ sáng, ngày nào cũng đúng giờ ấy — một dấu chân đọc ra ngay. Nay
+`companionDueByNow` (validation/githubStations.ts) chia quota thành từng nấc rải trong khung
+**08:00–22:00 giờ VN**, mỗi kho một bộ giờ riêng, tất định theo (ngày, tên kho) nên hai lượt cron
+cùng giờ không bao giờ đẩy trùng. Một lịch systemd thứ hai (`jarvis-companions.timer`, MỖI GIỜ,
+`RandomizedDelaySec=1500`) gọi `/api/cron?only=companions` để chạm tới từng nấc; quét dọn và ngó
+kho chính vẫn giữ nhịp NGÀY ở `jarvis-cron.timer`. Từ 22:00 trở đi hàm trả trọn quota, nên chỉ cần
+MỘT lượt rơi vào 22:00–23:59 là hôm ấy đủ số. Ledger trong kho vẫn là nguồn sự thật của「đã đẩy mấy
+cái」, nên đổi nhịp không đẻ commit thừa. Xưa,
 N commit được tạo tuần tự trong chính lượt cron ấy, không trải thành N lịch riêng trong ngày.
 
 **Ledger trên GitHub là nguồn sự thật.** Trước khi ghi, service đọc `day + ordinal` đang nằm trong

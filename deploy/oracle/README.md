@@ -118,7 +118,8 @@ Cùng ngày dựng lại máy, tông chủ quyết: **backend + database rời h
 | TLS | Caddy, `https://158.180.59.36.sslip.io` (Let's Encrypt HTTP-01 qua sslip.io) |
 | Postgres 17 | localhost:5432, db/role `jarvis`, mật khẩu `/etc/jarvis/pg-password` (root-only) |
 | MongoDB 8.0 | localhost:27017, db `jarvis` (tên theo nấc mặc định của `dbName.ts`) |
-| cron | systemd `jarvis-cron.timer` 03:00 UTC → `/api/cron` với `CRON_SECRET` — thay Vercel Cron |
+| cron | systemd `jarvis-cron.timer` 03:00 UTC → `/api/cron` (quét dọn + ngó kho chính) — thay Vercel Cron |
+| cron kho phụ | systemd `jarvis-companions.timer` MỖI GIỜ → `/api/cron?only=companions` — rải commit kho phụ ra cả ngày (từ 21/08/2026) |
 | media | vẫn Object Storage `jarvis-media` (mục 3) — không đổi |
 
 ### Phát hành blue/green — vì sao hai chỗ chạy

@@ -38,8 +38,12 @@ import {
   KEEPALIVE_INTERVAL_DAYS,
   MAX_DAILY_PUSHES,
   MS_PER_DAY,
+  NURTURE_WINDOW_END_MIN,
+  NURTURE_WINDOW_START_MIN,
   REVISION_LEDGER_PATH,
   SCHEDULE_DISABLE_DAYS,
+  companionDueByNow,
+  companionSlotMinute,
   countUrgent,
   countdownLevel,
   explainFailure,
@@ -49,6 +53,7 @@ import {
   parseWorkflowState,
   reviewCompanionNurtureDuty,
   reviewCompanionRepos,
+  reviewCronScope,
   reviewKeepaliveDuty,
   reviewStationIdentity,
   stationSlug,
@@ -73,6 +78,15 @@ const COMPANION_REPO = "quiet-harbor-planner";
 const COMPANION_PATH = `/repos/${OWNER}/${COMPANION_REPO}/contents/${REVISION_LEDGER_PATH}`;
 
 const NOW = new Date("2026-08-12T08:00:00.000Z");
+/**
+ * 22:30 giờ VN cùng ngày với NOW — mốc mà CẢ quota ngày đã tới hạn.
+ *
+ * Mọi ca kiểm CƠ CHẾ chuỗi PUT (nối tiếp sha, hỏng giữa vòng, hết ngân sách) dùng mốc này, vì
+ * chúng nói về vòng đẩy chứ không về nhịp rải. Ca nói về nhịp rải thì dùng NOW (15:00 giờ VN)
+ * hoặc một mốc ghi rõ tại chỗ.
+ */
+const FULL_DUE = new Date("2026-08-12T15:30:00.000Z");
+
 const daysAgo = (n: number) => new Date(NOW.getTime() - n * MS_PER_DAY).toISOString();
 
 type Call = { method: string; path: string; body: Record<string, unknown> | null };
@@ -528,7 +542,11 @@ async function run() {
   });
 
   // ───────── 16. Mặc định 5: một GET + đúng năm PUT source tuần tự ─────────
+  //
+  // SAU MỐC CHỐT (22:30 giờ VN) thì cả quota ngày mới tới hạn cùng lúc — đây là ca chứng minh
+  // đường「cuối ngày phải đủ số」chạy trọn vẹn qua hàm thật, chứ không chỉ đúng ở lưới thuần.
   {
+    const LATE = new Date("2026-08-12T15:30:00.000Z"); // 22:30 giờ VN, vẫn ngày 2026-08-12
     let expected = 1;
     let expectedSha = "blob-0";
     const calls = installFetch((call) => {
@@ -538,7 +556,7 @@ async function run() {
         const mark = parseRevisionLedger(source);
         assert(mark?.ordinal === expected, `Revision phải đi tuần tự ${expected}, nhận ${mark?.ordinal}.`);
         if (!mark) throw new Error("PUT không mang revision ledger hợp lệ.");
-        assert(mark.day === nurtureDayKey(NOW), "Source phải mang ngày UTC+7 hiện tại.");
+        assert(mark.day === nurtureDayKey(LATE), "Source phải mang ngày UTC+7 hiện tại.");
         assert(call.body?.sha === expectedSha, `Chuỗi sha đứt: PUT ${mark.ordinal} dùng ${String(call.body?.sha)}, cần ${expectedSha}.`);
         assert(String(call.body?.message).startsWith("chore: advance revision ledger"), "Commit message phải là tiếng Anh.");
         expectedSha = `blob-${mark.ordinal}`;
@@ -548,10 +566,44 @@ async function run() {
       throw new Error(`GitHub giả không biết đường companion ${call.method} ${call.path}`);
     });
     const parent = station({ companionRepos: [companion()], dailyPushes: DEFAULT_DAILY_PUSHES });
-    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW);
-    assert(result.ok && result.pushed === 5 && result.ordinal === 5, `Mặc định phải đẩy đúng 5 commit: ${result.note}`);
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, LATE);
+    assert(result.ok && result.pushed === 5 && result.ordinal === 5, `Sau 22:00 phải đẩy đủ 5 commit: ${result.note}`);
     assert(calls.filter((call) => call.method === "GET").length === 1, "Năm commit chỉ cần một GET ledger đầu vòng.");
     assert(writes(calls).length === 5, `Phải có đúng 5 PUT, đang có ${writes(calls).length}.`);
+  }
+
+  // ───────── 16b. GIỮA NGÀY chỉ đẩy phần đã tới nấc, và giờ chưa tới thì KHÔNG gọi GitHub ─────────
+  //
+  // Đây là ca giữ cho lượt rải không lặng lẽ quay về nhịp cụm: nếu một ngày nào đó cận vòng lặp bị
+  // đổi lại thành `dailyPushes` trần thì đúng ca này đỏ.
+  {
+    const calls = installFetch((call) => {
+      if (call.method === "GET" && call.path === COMPANION_PATH) return ledgerReply("", 0);
+      if (call.method === "PUT" && call.path === COMPANION_PATH) {
+        const mark = parseRevisionLedger(Buffer.from(String(call.body?.content), "base64").toString("utf8"));
+        return { status: 200, body: { content: { sha: `blob-${mark?.ordinal}` }, commit: { sha: `commit-${mark?.ordinal}` } } };
+      }
+      throw new Error(`GitHub giả không biết đường companion ${call.method} ${call.path}`);
+    });
+    const parent = station({ companionRepos: [companion()], dailyPushes: DEFAULT_DAILY_PUSHES });
+    const midday = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW); // 15:00 giờ VN
+    const due = companionDueByNow(NOW, DEFAULT_DAILY_PUSHES, COMPANION_REPO);
+    assert(due > 0 && due < DEFAULT_DAILY_PUSHES, `Giữa ngày phải là một phần của quota, đang là ${due}/5.`);
+    assert(
+      midday.ok && midday.pushed === due && midday.ordinal === due,
+      `Giữa ngày chỉ đẩy đúng phần tới nấc (${due}), nhận ${midday.pushed}: ${midday.note}`,
+    );
+    assert(midday.target === DEFAULT_DAILY_PUSHES, "`target` phải vẫn là quota CẢ NGÀY để giao diện khỏi khoe nhầm.");
+    assert(writes(calls).length === due, `Giữa ngày phải có đúng ${due} PUT, đang có ${writes(calls).length}.`);
+
+    // Trước 08:00 giờ VN: không một lời gọi nào, và không ghi sổ.
+    const early = installFetch(() => {
+      throw new Error("Giờ chưa tới nấc mà vẫn gọi GitHub — đúng thứ nhánh dueNow===0 phải chặn.");
+    });
+    const dawn = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, new Date("2026-08-11T23:30:00.000Z"));
+    assert(dawn.ok && dawn.pushed === 0 && dawn.dueNow === 0, "Trước cửa sổ giờ thì không đẩy gì.");
+    assert(dawn.worthRecording === false, "Lượt chưa tới nấc không đáng ghi sổ — bằng không mỗi ngày 24 lượt ghi vô nghĩa.");
+    assert(early.length === 0, "Lượt chưa tới nấc phải KHÔNG gọi GitHub lấy một lần.");
   }
 
   // ───────── 17. GitHub ordinal thắng DB: đủ thì 0 PUT, thiếu thì chỉ nối phần còn lại ─────────
@@ -564,7 +616,7 @@ async function run() {
       companionRepos: [{ ...companion(), lastNurtureDay: null, pushesToday: 0 }],
       dailyPushes: 5,
     });
-    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW);
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, FULL_DUE);
     assert(result.ok && result.pushed === 0 && result.ordinal === 5, "DB rỗng nhưng GitHub đã đủ thì không được đẩy trùng.");
     assert(writes(calls).length === 0, "Idempotency phải là hành vi 0 PUT, không chỉ là câu status.");
   }
@@ -581,7 +633,8 @@ async function run() {
       throw new Error("Đường companion lạ.");
     });
     const parent = station({ companionRepos: [companion()], dailyPushes: 5 });
-    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW);
+    // 22:30 giờ VN: cả quota đã tới hạn, nên phần còn thiếu được nối trọn trong một lượt.
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, new Date("2026-08-12T15:30:00.000Z"));
     assert(result.ok && result.pushed === 2 && result.ordinal === 5, `Ledger 3/5 chỉ được nối hai lượt: ${result.note}`);
     assert(writes(calls).length === 2, "Resume 3/5 phải đúng hai PUT.");
   }
@@ -600,7 +653,7 @@ async function run() {
       throw new Error("Đường companion lạ.");
     });
     const parent = station({ companionRepos: [companion()], dailyPushes: 5 });
-    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW);
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, FULL_DUE);
     assert(!result.ok && result.pushed === 3 && result.ordinal === 3 && accepted === 3, "Hỏng PUT 4 phải giữ đúng tiến độ 3/5.");
     assert(result.note.includes("409"), `Lỗi conflict phải có mã để vận hành: ${result.note}`);
     assert(result.note.includes("cùng ngày") && result.note.includes("không bù"), "Partial 3/5 phải nói rõ chỉ retry cùng ngày mới đủ quota.");
@@ -613,7 +666,7 @@ async function run() {
       throw new Error("dailyPushes=0 tuyệt đối không được chạm mạng.");
     });
     const parent = station({ companionRepos: [companion()], dailyPushes: 0 });
-    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW);
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, FULL_DUE);
     assert(result.ok && result.target === 0 && result.pushed === 0, "Quota 0 phải là trạng thái tạm ngừng hợp lệ.");
     assert(calls.length === 0, "Quota 0 vẫn gọi GitHub.");
   }
@@ -622,7 +675,7 @@ async function run() {
       throw new Error("Hết deadline tuyệt đối không được bắt đầu request mới.");
     });
     const parent = station({ companionRepos: [companion()], dailyPushes: MAX_DAILY_PUSHES });
-    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW, { deadlineAt: Date.now() - 1 });
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, FULL_DUE, { deadlineAt: Date.now() - 1 });
     assert(!result.ok && result.pushed === 0, "Hết ngân sách phải trả partial failure để summary báo được.");
     assert(result.note.includes("cùng ngày"), `Quota hụt phải bảo chạy lại CÙNG ngày: ${result.note}`);
     assert(result.note.includes("không bù"), `Không được hứa ngày sau bù quota cũ: ${result.note}`);
@@ -636,7 +689,7 @@ async function run() {
       throw new Error("Ledger tương lai mà vẫn định ghi.");
     });
     const parent = station({ companionRepos: [companion()], dailyPushes: 5 });
-    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW);
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, FULL_DUE);
     assert(!result.ok && /tương lai/.test(result.note), "Ledger tương lai phải hiện lỗi rõ ràng.");
     assert(writes(calls).length === 0, "Ledger tương lai không được có PUT.");
   }
@@ -678,7 +731,7 @@ async function run() {
       })) as typeof fetch;
     const parent = station({ companionRepos: [companion()], dailyPushes: 5 });
     const started = Date.now();
-    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, NOW, {
+    const result = await nurtureCompanionRepo(parent, parent.companionRepos[0]!, FULL_DUE, {
       deadlineAt: started + 40,
     });
     const elapsed = Date.now() - started;
@@ -748,6 +801,8 @@ async function run() {
           slug: `${OWNER}/${COMPANION_REPO}`,
           day: nurtureDayKey(NOW),
           target: 7,
+          dueNow: 7,
+          worthRecording: true,
           ordinal: 7,
           pushed: 7,
           ok: true,
@@ -759,6 +814,8 @@ async function run() {
           slug: `${OWNER}/second-toolkit`,
           day: nurtureDayKey(NOW),
           target: 7,
+          dueNow: 7,
+          worthRecording: true,
           ordinal: 3,
           pushed: 3,
           ok: false,
@@ -825,8 +882,76 @@ async function run() {
     );
   }
 
+  // ---- 26. RẢI COMMIT TRONG NGÀY (companionDueByNow) --------------------------------------------
+  //
+  // Luật thuần, không mạng: đóng đinh bốn điều mà cả tính năng dựa vào — tất định, không lùi,
+  // không bao giờ vượt quota, và cuối ngày CHẮC CHẮN đủ số.
+  {
+    const vn = (hhmm: string, day = "2026-08-21") =>
+      new Date(`${day}T${hhmm}:00+07:00`);
+    const REPO_A = "cobalt-relay-0123456789abcdef";
+    const REPO_B = "garnet-mill-fedcba9876543210";
+
+    assert(companionDueByNow(vn("07:59"), 5, REPO_A) === 0, "Trước 08:00 giờ VN chưa nấc nào tới hạn.");
+    assert(companionDueByNow(vn("22:00"), 5, REPO_A) === 5, "Đúng 22:00 phải trả trọn quota ngày.");
+    assert(companionDueByNow(vn("23:59"), 5, REPO_A) === 5, "Sau mốc chốt vẫn là trọn quota, không hơn.");
+    assert(companionDueByNow(vn("00:30"), 5, REPO_A) === 0, "Đầu ngày VN (sau nửa đêm) đếm lại từ 0.");
+    assert(companionDueByNow(vn("12:00"), 0, REPO_A) === 0, "Quota 0 thì mọi giờ đều là 0.");
+
+    // TẤT ĐỊNH: hai lượt cron cùng giờ phải đồng ý, bằng không lượt sau đẩy trùng.
+    assert(
+      companionDueByNow(vn("15:00"), 5, REPO_A) === companionDueByNow(vn("15:00"), 5, REPO_A),
+      "Cùng (giờ, kho, quota) phải cho cùng một số — hàm này bắt buộc tất định.",
+    );
+    // Hai kho khác nhau rải khác nhau, bằng không cả đàn commit cùng phút.
+    {
+      const slotsA = [1, 2, 3, 4, 5].map((i) => companionSlotMinute("2026-08-21", REPO_A, 5, i));
+      const slotsB = [1, 2, 3, 4, 5].map((i) => companionSlotMinute("2026-08-21", REPO_B, 5, i));
+      assert(slotsA.some((minute, i) => minute !== slotsB[i]), "Hai kho phải có giờ commit lệch nhau.");
+    }
+
+    // KHÔNG LÙI và KHÔNG VƯỢT: quét từng phút cả ngày, với nhiều mức quota và nhiều kho.
+    for (const quota of [1, 2, 5, 7, 24]) {
+      for (const repo of [REPO_A, REPO_B]) {
+        let previous = 0;
+        for (let minute = 0; minute < 24 * 60; minute += 1) {
+          const at = vn(`${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`);
+          const due = companionDueByNow(at, quota, repo);
+          assert(due >= previous, `Số nấc tới hạn không được lùi (quota ${quota}, phút ${minute}).`);
+          assert(due <= quota, `Số nấc tới hạn không được vượt quota ${quota}.`);
+          previous = due;
+        }
+        assert(previous === quota, `Cuối ngày phải đủ trọn quota ${quota} cho ${repo}.`);
+      }
+    }
+
+    // Nấc phải NẰM TRONG cửa sổ và TĂNG DẦN — thứ tự đảo là số đếm nhảy lùi.
+    for (const quota of [1, 3, 5, 24]) {
+      let last = -1;
+      for (let index = 1; index <= quota; index += 1) {
+        const minute = companionSlotMinute("2026-08-21", REPO_A, quota, index);
+        assert(minute > last, `Nấc ${index} phải muộn hơn nấc trước (quota ${quota}).`);
+        assert(
+          minute >= NURTURE_WINDOW_START_MIN && minute < NURTURE_WINDOW_END_MIN,
+          `Nấc ${index} phải nằm trong cửa sổ 08:00–22:00 (quota ${quota}).`,
+        );
+        last = minute;
+      }
+    }
+
+    // Phạm vi lượt cron: vắng cờ là trọn gói, `companions` là hẹp, chữ lạ bị từ chối.
+    {
+      const full = reviewCronScope(null);
+      assert(full.ok && full.scope.housekeeping && full.scope.keepalive && full.scope.companions, "Vắng ?only= phải là trọn gói.");
+      const only = reviewCronScope("companions");
+      assert(only.ok && !only.scope.housekeeping && !only.scope.keepalive && only.scope.companions, "?only=companions chỉ chạy phần kho phụ.");
+      assert(reviewCronScope("  COMPANIONS ").ok, "?only= phải bỏ qua hoa thường và khoảng trắng thừa.");
+      assert(!reviewCronScope("keepalive").ok, "Giá trị lạ phải bị từ chối, không im lặng chạy trọn gói.");
+    }
+  }
+
   globalThis.fetch = realFetch;
-  console.log("✔ Vòng nuôi kho GitHub: 25 nhóm ca, mọi luật đứng vững.");
+  console.log("✔ Vòng nuôi kho GitHub: 26 nhóm ca, mọi luật đứng vững.");
 }
 
 run().catch((err) => {

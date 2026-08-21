@@ -1,0 +1,11 @@
+[Unit]
+Description=Jarvis HH3D - rai commit kho phu (/api/cron?only=companions)
+After=jarvis-web.service
+
+[Service]
+Type=oneshot
+# Chi phan kho phu: ?only=companions. Quet don va ngo kho chinh giu nguyen nhip NGAY o
+# jarvis-cron.service - lich moi gio nay khong dung toi chung (xem reviewCronScope).
+#
+# CONG doc tu /etc/caddy/upstream.conf vi blue/green doi qua lai 3000<->3001.
+ExecStart=/bin/bash -c 'set -eu; PORT=$(grep -oE "127[.]0[.]0[.]1:[0-9]+" /etc/caddy/upstream.conf | cut -d: -f2); TOK=$(grep -m1 "^CRON_SECRET=" /opt/jarvis/shared/.env | cut -d= -f2-); curl -fsS -m 120 -H "Authorization: Bearer $TOK" "http://127.0.0.1:$PORT/api/cron?only=companions"'

@@ -4,7 +4,7 @@ import { readControlDoc } from "@/lib/control/read";
 import { purgeExpiredChat } from "@/lib/services/chat";
 import { runCompanionNurture, runKeepalive } from "@/lib/services/githubStations";
 import { purgeExpiredJobEvents, reapStaleJobs } from "@/lib/services/jobs";
-import { reviewCompanionNurtureDuty, reviewKeepaliveDuty } from "@/lib/validation/githubStations";
+import { reviewCompanionNurtureDuty, reviewCronScope, reviewKeepaliveDuty } from "@/lib/validation/githubStations";
 
 /**
  * Người quét dọn — cộng đúng MỘT việc không phải quét dọn, thêm vào 12/08/2026.
@@ -19,6 +19,14 @@ import { reviewCompanionNurtureDuty, reviewKeepaliveDuty } from "@/lib/validatio
  * Việc thứ tư — NUÔI KHO GITHUB (deploy/github-actions.md §7) — đi nhờ đúng cái lịch này thay
  * vì dựng lịch thứ hai, và đó không phải lười: gói Hobby cho đúng MỘT cron mỗi ngày, nên một
  * lịch thứ hai là bất khả. May thay nhịp ngày cũng chính là nhịp việc ấy cần.
+ *
+ * HAI CÂU TRÊN HẾT ĐÚNG TỪ 21/08/2026, giữ lại vì chúng giải thích hình dạng cũ của tệp này.
+ * Backend về VM từ 16/08 nên trần「một cron mỗi ngày」của Vercel không còn trói ai, và hoá ra nhịp
+ * ngày KHÔNG phải nhịp mà kho phụ cần: dồn cả quota vào một lượt thì lịch sử commit của kho phụ
+ * là một cụm năm cái lúc 10 giờ sáng, ngày nào cũng đúng giờ ấy — một dấu chân đọc ra ngay. Nay có
+ * lịch thứ hai chạy MỖI GIỜ gọi `?only=companions`, và `companionDueByNow` quyết định tới giờ ấy
+ * đáng lẽ đã có mấy commit. Ba việc quét dọn cùng lượt ngó kho chính GIỮ NGUYÊN nhịp ngày — lượt
+ * mỗi giờ không đụng tới chúng.
  *
  * NHƯNG việc thứ tư ấy CHỈ chạy ở trạm đang hoạt động, khác hẳn ba việc trên — vì nó là việc duy
  * nhất ở đây đụng vào thứ NẰM NGOÀI database của trạm này (một kho trên GitHub, dùng chung cho
@@ -58,12 +66,24 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  await reapStaleJobs();
-  const chat = await purgeExpiredChat();
-  // Nhật ký đàn quá hạn — van xả duy nhất giữ cho lượt chuyển trạm không dài ra theo năm tháng.
-  // Trả số ra ngoài để một lượt curl là biết nó có thật sự dọn được gì không; `more: true` nghĩa
-  // là còn nợ, lượt cron sau dọn tiếp.
-  const events = await purgeExpiredJobEvents();
+  // `?only=companions` là cửa của lịch MỖI GIỜ (xem `reviewCronScope`): nó chỉ tới để rải commit
+  // kho phụ, không đụng quét dọn lẫn kho chính — hai thứ ấy giữ nguyên nhịp ngày như trước.
+  const scoped = reviewCronScope(new URL(request.url).searchParams.get("only"));
+  if (!scoped.ok) {
+    return NextResponse.json({ error: scoped.why }, { status: 400 });
+  }
+  const scope = scoped.scope;
+
+  let chat: { purged: number } | null = null;
+  let events: Awaited<ReturnType<typeof purgeExpiredJobEvents>> | null = null;
+  if (scope.housekeeping) {
+    await reapStaleJobs();
+    chat = await purgeExpiredChat();
+    // Nhật ký đàn quá hạn — van xả duy nhất giữ cho lượt chuyển trạm không dài ra theo năm tháng.
+    // Trả số ra ngoài để một lượt curl là biết nó có thật sự dọn được gì không; `more: true` nghĩa
+    // là còn nợ, lượt cron sau dọn tiếp.
+    events = await purgeExpiredJobEvents();
+  }
 
   // Nuôi kho GitHub ĐỨNG SAU ba việc quét dọn, và thứ tự ấy là một lựa chọn: quét dọn là mạch
   // sống (xem đầu tệp), còn nuôi kho có 40 ngày dự phòng nên trượt một lượt cũng không sao. Nếu
@@ -81,7 +101,9 @@ export async function GET(request: Request) {
   const keepaliveDuty = reviewKeepaliveDuty(siteId, activeSiteId);
   const companionDuty = reviewCompanionNurtureDuty(siteId, activeSiteId);
 
-  if (!keepaliveDuty.feed) {
+  if (!scope.keepalive) {
+    keepalive = { skipped: true, why: "Lượt này chỉ tới vì kho phụ (?only=companions)." };
+  } else if (!keepaliveDuty.feed) {
     // Nói ra bằng cùng hình dạng với nhánh chạy thật: một lượt curl phải phân biệt được
     // "đã ngó, không phải việc của trạm này" với "đã chạy và không có kho nào tới hạn".
     keepalive = { skipped: true, why: keepaliveDuty.why };
@@ -133,8 +155,10 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    swept: true,
-    chat: chat.purged,
+    // `swept: false` + hai `null` là chữ ký của lượt mỗi giờ: một lượt curl phải phân biệt được
+    // "đã quét, không có gì để dọn" với "lượt này vốn không tới để quét".
+    swept: scope.housekeeping,
+    chat: chat?.purged ?? null,
     jobEvents: events,
     keepalive,
     companionNurture,

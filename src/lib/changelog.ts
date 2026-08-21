@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.33",
+    date: "2026-08-21",
+    lines: [
+      "Mấy kho phần mềm mà tông môn nuôi kèm nay được cập nhật rải đều trong ngày, thay vì dồn một cục lúc sáng sớm — nhìn tự nhiên như người thật dùng.",
+      "Số lượt mỗi ngày vẫn y như cũ, chỉ đổi giờ. Đạo hữu không phải làm gì cả.",
+    ],
+  },
+  {
     version: "1.3.32",
     date: "2026-08-21",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-15",
     lines: [
       "Các khôi lỗi trọ nay khai đúng số bản đang chạy trên bảng Khôi Lỗi, thay vì cùng hiện một con số cũ.",
-    ],
-  },
-  {
-    version: "0.89.0",
-    date: "2026-08-15",
-    lines: [
-      "Khoáng Mạch: thêm ô chọn có mua Linh Quang Phù hay không — nếu bật, mỗi ngày chỉ mua đúng một lá.",
-      "Khôi lỗi chỉ mua phù hay đoạt mỏ khi khai thác đã đạt tối đa, và đào tới khi đầy giới hạn ngày.",
     ],
   },
 ];

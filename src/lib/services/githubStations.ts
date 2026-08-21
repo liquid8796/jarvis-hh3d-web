@@ -8,6 +8,7 @@ import {
   MS_PER_DAY,
   REVISION_LEDGER_PATH,
   SCHEDULE_DISABLE_DAYS,
+  companionDueByNow,
   explainFailure,
   isCommitDue,
   keepaliveOrder,
@@ -237,12 +238,28 @@ export type CompanionNurtureResult = {
   repo: string;
   slug: string;
   day: string;
+  /** Quota CẢ NGÀY (`station.dailyPushes`) — thứ giao diện đọc thành「đã push/quota」. */
   target: number;
+  /**
+   * Cận trên của LƯỢT NÀY: tới giờ chạy thì đáng lẽ đã có ngần này commit (`companionDueByNow`).
+   *
+   * Tách khỏi `target` là chủ ý: trộn hai con số làm một thì giữa ngày giao diện sẽ khoe「2/2 —
+   * đạt quota」trong khi quota thật là 5, và phép đếm `completed` cũng hoá ra nói dối.
+   */
+  dueNow: number;
   /** Ordinal cuối đọc/ghi được từ GitHub; null = chưa đọc nổi ledger. */
   ordinal: number | null;
   pushed: number;
   ok: boolean;
   note: string;
+  /**
+   * Lượt này có gì đáng ghi vào sổ không.
+   *
+   * `false` DUY NHẤT ở nhánh「chưa tới nấc kế」: nhánh ấy không gọi GitHub, không biết thêm điều
+   * gì, nên ghi sổ chỉ tổ đạp lên câu chữ hữu ích của lượt trước (「Đã đẩy 3 commit…」) bằng một
+   * dòng rỗng nghĩa — và với nhịp mỗi-giờ thì đó là 24 lượt ghi document mỗi ngày cho không.
+   */
+  worthRecording: boolean;
 };
 
 function companionResult(
@@ -250,23 +267,32 @@ function companionResult(
   companion: CompanionRepo,
   day: string,
   target: number,
-  over: Pick<CompanionNurtureResult, "ordinal" | "pushed" | "ok" | "note">,
+  dueNow: number,
+  over: Pick<CompanionNurtureResult, "ordinal" | "pushed" | "ok" | "note"> & { worthRecording?: boolean },
 ): CompanionNurtureResult {
+  const { worthRecording = true, ...rest } = over;
   return {
     stationSlug: stationSlug(station),
     repo: companion.repo,
     slug: `${station.owner}/${companion.repo}`,
     day,
     target,
-    ...over,
+    dueNow,
+    worthRecording,
+    ...rest,
   };
 }
 
 /**
- * Nuôi MỘT software repo tới đúng quota hôm nay.
+ * Nuôi MỘT software repo tới đúng phần ĐÃ TỚI GIỜ của quota hôm nay.
  *
  * Một GET đầu vòng lấy cả content lẫn blob sha. Mỗi PUT kế tiếp trả blob sha mới, nên năm commit
  * chỉ tốn sáu request chứ không mười; vẫn tuần tự vì PUT thứ n+1 bắt buộc mang sha của thứ n.
+ *
+ * TỪ 21/08/2026 cận trên của vòng đẩy là `companionDueByNow`, không phải `dailyPushes` trần: cả
+ * năm commit vẫn về đủ trong ngày, nhưng rơi vào năm thời điểm rải trong khung 08:00–22:00 giờ VN
+ * thay vì một cụm lúc 03:00 UTC. Ledger vẫn là nguồn sự thật của「đã đẩy mấy cái」, nên đổi nhịp
+ * KHÔNG đẻ ra commit thừa: lượt nào đọc ra ordinal đã bằng phần tới giờ thì đứng im.
  */
 export async function nurtureCompanionRepo(
   station: Station,
@@ -276,9 +302,10 @@ export async function nurtureCompanionRepo(
 ): Promise<CompanionNurtureResult> {
   const day = nurtureDayKey(now);
   const target = station.dailyPushes;
+  const dueNow = companionDueByNow(now, target, companion.repo);
   const nameComplaint = reviewCompanionRepos(station.repo, [companion.repo]);
   if (nameComplaint) {
-    return companionResult(station, companion, day, target, {
+    return companionResult(station, companion, day, target, dueNow, {
       ordinal: null,
       pushed: 0,
       ok: false,
@@ -290,7 +317,7 @@ export async function nurtureCompanionRepo(
   // xác nhận một quyết định "đừng đẩy" đã nằm ngay trong settings.
   if (target === 0) {
     const remembered = companion.lastNurtureDay === day ? companion.pushesToday : 0;
-    return companionResult(station, companion, day, target, {
+    return companionResult(station, companion, day, target, dueNow, {
       ordinal: remembered,
       pushed: 0,
       ok: true,
@@ -298,8 +325,26 @@ export async function nurtureCompanionRepo(
     });
   }
 
+  /**
+   * CHƯA TỚI NẤC NÀO — về thẳng, không chạm GitHub và không ghi sổ.
+   *
+   * Đứng TRƯỚC mọi phép kiểm PAT là có chủ ý: với nhịp mỗi giờ thì phần lớn lượt chạy rơi vào đây,
+   * và một lượt không định đẩy gì thì cũng không có lý do gọi api.github.com. PAT hỏng vẫn lộ ra
+   * ở lượt đầu tiên TỚI nấc — chậm nhất là trong cùng ngày, đủ sớm cho một việc có 40 ngày dự phòng.
+   */
+  if (dueNow === 0) {
+    const remembered = companion.lastNurtureDay === day ? companion.pushesToday : 0;
+    return companionResult(station, companion, day, target, dueNow, {
+      ordinal: remembered,
+      pushed: 0,
+      ok: true,
+      note: "Chưa tới nấc kế trong ngày.",
+      worthRecording: false,
+    });
+  }
+
   if (!isEncrypted(station.pat)) {
-    return companionResult(station, companion, day, target, {
+    return companionResult(station, companion, day, target, dueNow, {
       ordinal: null,
       pushed: 0,
       ok: false,
@@ -311,7 +356,7 @@ export async function nurtureCompanionRepo(
   try {
     pat = decryptSecret(station.pat);
   } catch {
-    return companionResult(station, companion, day, target, {
+    return companionResult(station, companion, day, target, dueNow, {
       ordinal: null,
       pushed: 0,
       ok: false,
@@ -353,16 +398,18 @@ export async function nurtureCompanionRepo(
     let currentOrdinal = mark.day === day ? mark.ordinal : 0;
     ordinal = currentOrdinal;
 
-    if (currentOrdinal >= target) {
-      return companionResult(station, companion, day, target, {
+    if (currentOrdinal >= dueNow) {
+      return companionResult(station, companion, day, target, dueNow, {
         ordinal: currentOrdinal,
         pushed,
         ok: true,
-        note: `Đã đủ ${currentOrdinal}/${target} commit hôm nay; không đẩy trùng.`,
+        note: currentOrdinal >= target
+          ? `Đã đủ ${currentOrdinal}/${target} commit hôm nay; không đẩy trùng.`
+          : `Đã xong phần tới giờ này (${currentOrdinal}/${target}); chờ nấc kế.`,
       });
     }
 
-    while (currentOrdinal < target) {
+    while (currentOrdinal < dueNow) {
       if (Date.now() >= (options.deadlineAt ?? Number.POSITIVE_INFINITY)) {
         throw new StationError(
           `Hết ngân sách sau ${currentOrdinal}/${target} revision.`,
@@ -381,7 +428,9 @@ export async function nurtureCompanionRepo(
       currentOrdinal = next;
       ordinal = currentOrdinal;
       pushed += 1;
-      if (currentOrdinal < target) {
+      // Hỏi sha kế theo `dueNow`, KHÔNG theo `target`: vòng này dừng ở phần đã tới giờ, nên ở nấc
+      // cuối của lượt mà vẫn đòi một blob sha mới là dựng ra một lỗi không có thật giữa ngày.
+      if (currentOrdinal < dueNow) {
         const nextSha = (written.body as { content?: { sha?: unknown } } | null)?.content?.sha;
         if (typeof nextSha !== "string") {
           throw new StationError(
@@ -392,11 +441,13 @@ export async function nurtureCompanionRepo(
       }
     }
 
-    return companionResult(station, companion, day, target, {
+    return companionResult(station, companion, day, target, dueNow, {
       ordinal: currentOrdinal,
       pushed,
       ok: true,
-      note: `Đã đẩy ${pushed} commit source; đủ ${currentOrdinal}/${target} hôm nay.`,
+      note: currentOrdinal >= target
+        ? `Đã đẩy ${pushed} commit source; đủ ${currentOrdinal}/${target} hôm nay.`
+        : `Đã đẩy ${pushed} commit source; ${currentOrdinal}/${target} hôm nay, còn chờ nấc sau.`,
     });
   } catch (err) {
     const rawNote =
@@ -407,7 +458,7 @@ export async function nurtureCompanionRepo(
       rawNote.startsWith("Hết ngân sách") || (ordinal !== null && ordinal < target)
         ? " Chạy lại vòng nuôi trong cùng ngày để hoàn tất quota hôm nay; ngày sau bắt đầu quota mới, không bù lượt cũ."
         : "";
-    return companionResult(station, companion, day, target, {
+    return companionResult(station, companion, day, target, dueNow, {
       ordinal,
       pushed,
       ok: false,
@@ -700,9 +751,13 @@ export function applyCompanionNurtureResults(
  * nguồn thật và lần chạy lại cùng ngày đọc đúng ordinal để không push trùng.
  */
 async function recordCompanionNurtureResults(results: readonly CompanionNurtureResult[], now: Date): Promise<void> {
-  if (results.length === 0) return;
+  // Lọc TRƯỚC khi đọc settings: với nhịp mỗi giờ, phần lớn lượt chạy là「chưa tới nấc」và không
+  // biết thêm điều gì để ghi. Không lọc thì mỗi ngày có 24 lượt đọc-ghi trọn document cấu hình
+  // chỉ để chép lại đúng những con số cũ — và mỗi lượt ấy là một cửa sổ đè lên bài admin vừa sửa.
+  const worth = results.filter((result) => result.worthRecording);
+  if (worth.length === 0) return;
   const settings = await getAppSettings();
-  if (applyCompanionNurtureResults(settings, results, now)) {
+  if (applyCompanionNurtureResults(settings, worth, now)) {
     await saveAppSettings(settings);
   }
 }

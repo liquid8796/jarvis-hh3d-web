@@ -1,0 +1,15 @@
+[Unit]
+Description=Lich MOI GIO rai commit kho phu - de lich su commit khong dong thanh mot cum
+
+[Timer]
+# Moi gio dung. `companionDueByNow` moi la thu quyet dinh gio nao co commit; lich nay chi lo
+# danh thuc du day de cham toi tung nac.
+OnCalendar=hourly
+# Xe dich toi 25 phut: khong lan chay nao roi dung phut :00. Cac nac von da lech nhau theo tung
+# kho, day la lop thu hai cho khoi thanh mot nhip may moc.
+RandomizedDelaySec=1500
+# May tat vai tieng thi lan chay dau tien sau do bu cho phan da toi nac.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

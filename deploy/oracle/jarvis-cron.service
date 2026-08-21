@@ -1,0 +1,13 @@
+[Unit]
+Description=Jarvis HH3D - goi /api/cron tron goi (quet don + ngo kho chinh + mot nac kho phu)
+After=jarvis-web.service
+
+[Service]
+Type=oneshot
+# CRON_SECRET doc tu .env cua app - mot nguon su that, khong chep gia tri vao unit.
+#
+# CONG doc tu /etc/caddy/upstream.conf, KHONG ghi cung 3000. Blue/green doi qua lai 3000<->3001
+# va deployBackend.mts chi sua dung tep ay; ban truoc ghi cung 3000 nen mot nua so lan phat hanh
+# la cron goi vao SLOT CU - chay ma cua ban truoc suot ca ngay ma khong ai thay. Do 21/08/2026:
+# Caddy dang tro 3001 trong khi cron van go cua 3000.
+ExecStart=/bin/bash -c 'set -eu; PORT=$(grep -oE "127[.]0[.]0[.]1:[0-9]+" /etc/caddy/upstream.conf | cut -d: -f2); TOK=$(grep -m1 "^CRON_SECRET=" /opt/jarvis/shared/.env | cut -d= -f2-); curl -fsS -m 300 -H "Authorization: Bearer $TOK" "http://127.0.0.1:$PORT/api/cron"'

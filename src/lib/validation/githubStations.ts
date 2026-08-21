@@ -384,8 +384,29 @@ export function reviewCompanionNurtureDuty(siteId: string, activeSiteId: string 
   if (active.length === 0) {
     return { feed: false, why: "Chưa xác định được trạm hoạt động — không đẩy repo phụ để khỏi dùng cấu hình cũ." };
   }
+  /**
+   * SITE_ID RỖNG = BACKEND TRÊN VM, và đó là một danh tính KHẲNG ĐỊNH được, không phải「không rõ」.
+   *
+   * Bản đầu đọc nó thành「không chứng minh được」rồi fail-closed — đúng khi mỗi trạm còn là một bản
+   * app đầy đủ và một trạm đã nghỉ vẫn có thể chạy cron với `dailyPushes` cũ. Từ 16/08/2026 điều ấy
+   * hết đúng: năm trạm Vercel chỉ còn là vỏ proxy, không chạy mã nào, và backend trên VM là NƠI DUY
+   * NHẤT có cron. Nên hàng rào ấy không còn chặn một trạm stale nào cả — nó chặn đúng cái máy duy
+   * nhất được phép làm việc này.
+   *
+   * Cái giá đã trả, đo 21/08/2026: vòng nuôi kho phụ CHƯA TỪNG chạy kể từ ngày dọn về VM. Mỗi lượt
+   * cron đều trả `{"companionNurture":{"skipped":true}}` và không ai đọc dòng ấy, nên ba kho phần
+   * mềm nằm im suốt — trong khi phần chúng gánh chính là「trông như một tài khoản dev bình thường」.
+   *
+   * KHÔNG chữa bằng cách đặt SITE_ID cho VM: `registerSelfAction` và `backendIsStation`
+   * (lib/mirror/switchGuard.ts) cấm thẳng, vì làm vậy là lên đạn lại lượt chuyển trạm và tầng
+   * chuyển hướng — hai thứ đều đã hết đích. Chỗ phải sửa là cách ĐỌC cái rỗng ấy, tức ngay đây.
+   *
+   * Vẫn an toàn khi một vỏ proxy lỡ chuyển tiếp một lượt cron: mọi đường đều về cùng backend, cùng
+   * database, và ledger trong kho mới là thứ chốt「đã đẩy mấy cái」— hai lượt cùng lúc không đẩy
+   * trùng được.
+   */
   if (me.length === 0) {
-    return { feed: false, why: "Trạm này chưa khai SITE_ID — không thể chứng minh đây là trạm hoạt động." };
+    return { feed: true, why: "Backend trên VM — nơi duy nhất chạy cron, không phải một trạm trong vòng xoay." };
   }
   if (me === active) {
     return { feed: true, why: `Trạm đang hoạt động (${me}).` };

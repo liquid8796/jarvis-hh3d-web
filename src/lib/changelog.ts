@@ -66,10 +66,11 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
-    version: "1.3.33",
+    version: "1.3.34",
     date: "2026-08-21",
     lines: [
       "Mấy kho phần mềm mà tông môn nuôi kèm nay được cập nhật rải đều trong ngày, thay vì dồn một cục lúc sáng sớm — nhìn tự nhiên như người thật dùng.",
+      "Sửa luôn một lỗi im lặng: từ hôm dọn máy chủ về nhà mới, mấy kho ấy thật ra chưa hề được nuôi lần nào.",
       "Số lượt mỗi ngày vẫn y như cũ, chỉ đổi giờ. Đạo hữu không phải làm gì cả.",
     ],
   },

@@ -425,9 +425,15 @@ async function run() {
       !reviewCompanionNurtureDuty("auto-hh3d-2", null).feed,
       "Không đọc được control doc mà repo phụ vẫn chạy — stale station có thể phá dailyPushes=0.",
     );
+    // SITE_ID rỗng = backend trên VM, nơi DUY NHẤT chạy cron từ 16/08/2026 — phải được đẩy.
+    // Ca này từng ngược lại, và cái giá là vòng nuôi kho phụ nằm im suốt từ ngày dọn về VM.
     assert(
-      !reviewCompanionNurtureDuty("", "auto-hh3d-2").feed,
-      "Thiếu SITE_ID không chứng minh được quyền đẩy repo phụ.",
+      reviewCompanionNurtureDuty("", "auto-hh3d-2").feed,
+      "Backend trên VM (không SITE_ID) phải được nuôi kho phụ — nó là nơi duy nhất chạy cron.",
+    );
+    assert(
+      !reviewCompanionNurtureDuty("", null).feed,
+      "Nhưng không đọc được bảng điều phối thì vẫn dừng, kể cả ở backend.",
     );
     assert(
       !reviewCompanionNurtureDuty("auto-hh3d-1", "auto-hh3d-2").feed,

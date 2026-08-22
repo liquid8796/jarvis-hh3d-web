@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.40",
+    date: "2026-08-23",
+    lines: [
+      "Mê Cung thôi đuổi nhầm cả đội ngay sau khi đánh xong một lượt — trước đây phòng vì thế không bao giờ đủ người lại.",
+      "Ai vào phòng rồi ngồi im quá lâu thì vẫn bị mời ra như cũ; đồng hồ chỉ thôi tính cả thời gian đang đánh.",
+      "Và nếu hai lượt liền không gom đủ đội, auto trả phòng lại rồi đi làm việc khác thay vì ôm chỗ nửa tiếng.",
+    ],
+  },
+  {
     version: "1.3.39",
     date: "2026-08-22",
     lines: [
@@ -467,14 +476,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Hỷ Sự Đường nay chúc hết mọi tiệc cưới đang mở, kể cả tiệc đã phát lì xì.",
       "Trước đây chỉ cần một phòng mở không lên là những phòng còn lại bị bỏ luôn; giờ phòng nào trục trặc thì báo tên phòng đó rồi đi tiếp.",
-    ],
-  },
-  {
-    version: "0.94.0",
-    date: "2026-08-15",
-    lines: [
-      "Vòng Quay Phúc Vận nay quay đủ 4 lượt mỗi ngày, thay vì 3 như trước.",
-      "Lượt thứ tư chỉ mở ra sau khi xong hết nhiệm vụ trong ngày, mà đàn thì đã thôi ghé lại từ lúc hết lượt thứ ba — nên ngày nào cũng bỏ phí một vòng quay.",
     ],
   },
 ];

@@ -11,6 +11,80 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.40 — Mê Cung thôi đuổi sạch cả đội ngay sau hiệp đầu (schema 73)
+
+Tông chủ báo: *"mê cung chưa đánh đủ trần của ngày thì tự dưng giải tán phòng rồi đàn bị treo luôn
+ko tiếp tục quest nào cả, làm mình phải thu đàn rồi khai đàn lại."*
+
+Nhật ký của đàn ấy (`c242fcb5`, khôi lỗi `vine-citadel`, 22/08/2026) kể lại từng giây, và con số
+tự tố cáo:
+
+```
+17:11:58  «Hoang Qui Em» vào phòng · «Bạch Dạ» vào phòng · «Kim Kull» vào phòng
+17:12:38  Đủ đội — BẮT ĐẦU! Cả đội đang đánh ải
+17:14:34  Xong lượt đánh — huyền tinh hôm nay 142/860 (+142)
+17:14:34  Trục xuất «Hoang Qui Em» — không sẵn sàng sau 155s (ngưỡng 20s)
+17:14:34  Trục xuất «Bạch Dạ» · «Kim Kull» · «Huyền Phá Nguyên»
+```
+
+**17:11:58 → 17:14:34 là ĐÚNG 156 giây.** Tức cái đồng hồ mang tên「không sẵn sàng」đã chạy suốt
+trận đánh 116 giây. Đọc lại script thì thấy ngay: `S.since[tên]` được đặt lúc THẤY NGƯỜI LẦN ĐẦU
+và **không bao giờ đặt lại** — không khi họ bấm sẵn sàng, không khi một hiệp kết thúc. Nên hết
+trận, cả đội về sảnh ở trạng thái chưa bấm sẵn sàng, đồng hồ đã 155s > ngưỡng 20s, và **cả đội
+vừa cùng mình đánh xong bị đuổi sạch trong một giây**. Người mới vào sau cũng chịu đúng số phận
+ấy sau 20 giây — chưa kịp bấm sẵn sàng: nhật ký ghi «Bun Bin Thiên Tôn» và «Videl» vào lúc
+17:18:19 rồi rời lúc 17:18:39, đúng hai mươi giây tròn.
+
+Từ đó là một chuỗi domino, và cả ba mắt đều được vá:
+
+**1. Đồng hồ đo đúng cái tên nó mang.** Nay `since` về 0 ở **đầu mỗi vòng** (hết trận là cả phòng
+được một ân hạn mới trọn vẹn) và mỗi khi người ấy **đang** sẵn sàng (bấm rồi bỏ thì tính lại từ
+lúc bỏ). Ngưỡng vẫn còn răng: ai vào rồi ngồi im quá ngưỡng thì vẫn bị đuổi như cũ.
+
+**2. Vòng hụt đội thôi bịa ra một lượt đánh.** Bản ghi in `142/860 (+142)` **hai lần** trong khi
+tổng không nhúc nhích — vì script báo cáo cuối vòng đọc `sessionStorage.__jvz_mc_chest`, thứ chỉ
+được xoá một lần ở đầu LƯỢT GHÉ chứ không phải đầu mỗi vòng. Vòng thứ hai không lập nổi đội, không
+đánh ải nào, nhưng vẫn đọc phải số của vòng trước rồi khai là vừa xong một lượt. Nay sổ rương và
+cờ trận đánh cùng về trắng mỗi vòng, và bản tin đọc cờ ấy — ghi chú trong nguồn C# đã hứa điều này
+từ lâu (*"the flag lets the round report below distinguish a fought round from one that never
+began"*) nhưng dây chưa bao giờ được nối. Vòng không đánh nay nói thẳng:「Vòng này không lập được
+đội nên không đánh ải nào」.
+
+**3. Sảnh vắng thì trả đàn về, đừng giữ trọn 35 phút.** Đây là cái tông chủ thấy thành「đàn treo」:
+mỗi vòng hụt vẫn tiêu ~7 phút (5 phút chờ đủ đội + 90 giây thử bấm Bắt Đầu), và vòng ngoài có ngân
+sách 35 phút, nên Mê Cung ôm đàn suốt nửa tiếng mà không đánh thêm ải nào — mọi nhiệm vụ sau nó
+đứng chờ. Nay **hai vòng liền không lập được đội** thì cắm cờ `jvz-mc-noteam`, vòng ngoài thoát
+theo đường bình thường (giải tán phòng đàng hoàng, khai nhịp ghé lại), và nhịp ấy lùi hẳn **10
+phút** thay vì 1 phút — quay lại sau một phút chỉ để đứng nhìn thêm 15 phút nữa là đốt lượt chạy
+của mọi nhiệm vụ khác.
+
+**Vì sao lỗi này ship được: Mê Cung KHÔNG có một fixture nào trong `npm run smoke`.** Nay có
+`npm run verify:maze-kick` — 26 phép thử chạy CHÍNH ba script đang ship (đọc từ
+`profile.json`, không chép tay) trong Chromium thật, với `Date.now` bị ghim để thời gian là thứ
+điều khiển được, dựng lại đúng mốc 156 giây của bản ghi. Nói thẳng giới hạn của nó: máy này không
+có bản ghi hình Mê Cung nào, nên markup dựng từ đúng những selector script đang đọc chứ không chép
+từ `dom/*.html` — nó đóng đinh NGỮ NGHĨA CỦA CÁI ĐỒNG HỒ, không chứng minh được trang thật còn
+dùng những selector ấy. Có bản ghi thì việc đầu tiên nên làm là thay khối markup ấy bằng bản chép.
+
+**Hai lỗi của chính bản vá này do lưới bắt được trước khi ship**, ghi lại vì cả hai đều là loại
+lặng lẽ: (a) script nhịp ghé lại đọc `document`/`sessionStorage` mà không bọc try/catch — bộ smoke
+gọi nó trong Node, ném ở đó là cả nhiệm vụ rơi về trần một giờ; (b) phép reset đầu vòng lúc đầu
+viết `window.__jvz = window.__jvz || {}`, phá vỡ bất biến「`__jvz` luôn có `told: []`」và làm script
+quét phòng ném ở `S.told.includes` — mà `evaluate` nuốt lỗi trả `undefined`, nên cả phép đuổi người
+sẽ chết câm.
+
+Phép so parity giữa desktop và web cũng được nới đúng một nấc: cổng ở sảnh và `until` của vòng
+hiệp vẫn phải hỏi CÙNG MỘT câu về cờ đầy trần, nhưng vòng hiệp nay được mang thêm lý do thoát, nên
+phép so hỏi TIỀN TỐ thay vì đòi hai chuỗi khớp byte.
+
+**Kiểm chứng.** `npm run verify:maze-kick` 26 phép thử thuận. `npm run smoke` **457 thuận, 1 nghịch** — ca đỏ duy nhất là chốt schema, vì bản smoke trong
+cây làm việc là việc đang viết dở của một phiên khác và vẫn ghim 72; commit này chở bản HEAD
+cộng đúng dòng nhích chốt lên 73.
+Nguồn C# build sạch 0 cảnh báo. Lưới ghép hồ sơ: chỉ hai quest `me-cung*` đổi so với HEAD, web
+khớp nguồn ở MỌI quest, thứ tự 27 id nguyên vẹn, hai twin giống hệt nhau.
+
+---
+
 ## 1.3.39 — Hỷ Sự Đường vét nốt lì xì không còn phòng nào để ghé (schema 72)
 
 Tông chủ ghi thẳng trong bản ghi `hy-su-duong-20260822-222109`: *"ngoài việc vào từng phòng nhận

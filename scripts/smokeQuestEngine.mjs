@@ -1968,8 +1968,18 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // HAI twin dù nút mang huy hiệu VIP: nó gác bằng cờ DOM (jvz-hy-su-quick) chứ không bằng
     // requiresVip — hạng là phỏng đoán của ta, còn cái nút là quyết định của site. Lưới riêng:
     // npm run verify:hy-su-quick.
-    "hồ sơ đang ở schema 72",
-    loadProfileForSchema().schemaVersion === 72,
+    // 73 = Mê Cung thôi đuổi sạch cả đội ngay sau hiệp đầu (đàn c242fcb5, 22/08/2026). Đồng hồ
+    // "không sẵn sàng" vốn đếm từ lúc THẤY NGƯỜI LẦN ĐẦU và không bao giờ đặt lại, nên hết trận
+    // cả đội về sảnh là đã 155s > ngưỡng 20s và bị đuổi hết — nhật ký đàn ấy ghi đúng bốn dòng
+    // Trục xuất cùng một giây với dòng "Xong lượt đánh". Nay đồng hồ về 0 ở đầu MỖI VÒNG và mỗi
+    // khi người ấy đang sẵn sàng, nên nó đo đúng cái tên nó mang. Kèm hai chỗ nữa cùng gốc: sổ
+    // rương + cờ trận đánh nay cũng về trắng mỗi vòng (không thì vòng hụt đội vẫn báo lại con số
+    // của vòng trước — đàn ấy in "142/860 (+142)" hai lần trong khi tổng không nhúc nhích), và
+    // hai vòng liền không lập được đội thì cắm cờ jvz-mc-noteam cho vòng ngoài thoát sớm thay vì
+    // giữ trọn 35 phút ngân sách — chính cái tông chủ thấy thành "đàn treo". Lưới riêng:
+    // npm run verify:maze-kick.
+    "hồ sơ đang ở schema 73",
+    loadProfileForSchema().schemaVersion === 73,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -2312,12 +2322,17 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         schemaInCs !== null && Number(schemaInCs[1]) === loadProfileForSchema().schemaVersion,
         `desktop ${schemaInCs?.[1]} vs web ${loadProfileForSchema().schemaVersion}`);
 
-      // Cổng ở sảnh và until của vòng hiệp phải hỏi CÙNG MỘT câu ở cả hai bên.
+      // Cổng ở sảnh và until của vòng hiệp phải hỏi CÙNG MỘT câu VỀ CỜ ĐẦY TRẦN — hỏi lệch
+      // nhau là một trong hai chỗ mù, và đó là lỗi phép kiểm này sinh ra để bắt.
+      // Từ schema 73 vòng hiệp được phép mang THÊM lý do thoát (`body.jvz-mc-noteam` — hai vòng
+      // liền không lập được đội thì trả đàn về cho nhiệm vụ khác thay vì giữ trọn 35 phút), nên
+      // phép so hỏi TIỀN TỐ chứ không đòi hai chuỗi khớp byte. Vẫn đòi đủ HAI chỗ.
       const wanted = "body.jvz-cap-full, .mc-ht-daily-text.jvz-cap-full";
+      const capGates = cs.split(`Selector = "${wanted}`).length - 1;
       check(
         "desktop dùng đúng selector cờ đầy trần ở cả hai chỗ",
-        (cs.split(`Selector = "${wanted}"`).length - 1) === 2,
-        String(cs.split(`Selector = "${wanted}"`).length - 1));
+        capGates === 2,
+        String(capGates));
       check(
         "desktop KHÔNG còn so chuỗi 385/385 làm điều kiện",
         !cs.includes('Text = "{{capCheck}}"'));

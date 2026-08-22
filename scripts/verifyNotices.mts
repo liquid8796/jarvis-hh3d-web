@@ -11,6 +11,11 @@
  * scripts/verifyChatPurge.mts cùng lẽ), nên nó tự dọn: mọi dòng nó tạo đều mang tiền tố nhận
  * ra được và bị xoá trong `finally`, kể cả khi một phép so ở giữa ném.
  *
+ * Từ 21/08/2026 nó còn canh THỜI HẠN TỒN TẠI (nhóm 9). Cái sai ở đó cũng câm y hệt: hạn tính
+ * nhầm đơn vị thì một lời nhắn định sống ba giờ nằm lại ba ngày — không ai báo, chỉ có người
+ * dùng bấm「Đã hiểu」cho một tin đã chết, hoặc tệ hơn, một tin đáng sống một tuần biến mất sau
+ * một giờ và người vắng mặt không bao giờ biết nó từng có.
+ *
  * Chạy: npm run verify:notices
  */
 import { and, eq, inArray, like, sql } from "drizzle-orm";
@@ -29,6 +34,14 @@ import {
   serializeGuestSeen,
   GUEST_SEEN_MAX,
 } from "../src/lib/validation/guestSeen";
+import {
+  formatLifetime,
+  noticeInputSchema,
+  NOTICE_DEFAULT_LIFETIME_HOURS,
+  NOTICE_MAX_LIFETIME_DAYS,
+  NOTICE_MAX_LIFETIME_HOURS,
+  NOTICE_MIN_LIFETIME_HOURS,
+} from "../src/lib/validation/notices";
 
 loadEnv();
 
@@ -70,7 +83,12 @@ async function main() {
 
   // ---- 1. Phạm vi "đúng người này" -------------------------------------------------------
   const direct = await broadcastNotice(
-    { body: `${TAG} gửi riêng`, audienceKind: "users", audience: [alice.id] },
+    {
+      body: `${TAG} gửi riêng`,
+      audienceKind: "users",
+      audience: [alice.id],
+      lifetimeHours: NOTICE_DEFAULT_LIFETIME_HOURS,
+    },
     alice.id,
   );
   check("phát riêng: đếm đúng 1 người nhận", direct.recipients === 1, String(direct.recipients));
@@ -89,7 +107,12 @@ async function main() {
 
   // ---- 3. Phạm vi theo VAI ---------------------------------------------------------------
   const byRole = await broadcastNotice(
-    { body: `${TAG} gửi theo vai`, audienceKind: "roles", audience: [aliceRoles[0]] },
+    {
+      body: `${TAG} gửi theo vai`,
+      audienceKind: "roles",
+      audience: [aliceRoles[0]],
+      lifetimeHours: NOTICE_DEFAULT_LIFETIME_HOURS,
+    },
     alice.id,
   );
   const expected = await countRecipients("roles", [aliceRoles[0]]);
@@ -98,14 +121,27 @@ async function main() {
   check("người MANG vai ấy thấy", mine.some((n) => n.id === byRole.id));
 
   const byForeignRole = await broadcastNotice(
-    { body: `${TAG} gửi vai khác`, audienceKind: "roles", audience: [String(foreignRole)] },
+    {
+      body: `${TAG} gửi vai khác`,
+      audienceKind: "roles",
+      audience: [String(foreignRole)],
+      lifetimeHours: NOTICE_DEFAULT_LIFETIME_HOURS,
+    },
     alice.id,
   );
   mine = await unseenNotices(alice.id);
   check("vai mình KHÔNG mang thì không thấy", !mine.some((n) => n.id === byForeignRole.id));
 
   // ---- 4. Phạm vi cả tông môn ------------------------------------------------------------
-  const toAll = await broadcastNotice({ body: `${TAG} gửi tất cả`, audienceKind: "all", audience: [] }, alice.id);
+  const toAll = await broadcastNotice(
+    {
+      body: `${TAG} gửi tất cả`,
+      audienceKind: "all",
+      audience: [],
+      lifetimeHours: NOTICE_DEFAULT_LIFETIME_HOURS,
+    },
+    alice.id,
+  );
   const activeCount = await countRecipients("all", []);
   check("phát tất cả: đếm bằng số đạo hữu đang hoạt động", toAll.recipients === activeCount, `${toAll.recipients} vs ${activeCount}`);
   mine = await unseenNotices(alice.id);
@@ -166,7 +202,12 @@ async function main() {
   // viên, hoặc lời nhắn nội bộ của tông môn lọt ra cho người lạ đọc. Chiều sau mới là chiều
   // đắt — nó là một lượt rò rỉ ra ngoài Internet, không phải một cái popup thừa.
   const toGuests = await broadcastNotice(
-    { body: `${TAG} gửi khách`, audienceKind: "guests", audience: [] },
+    {
+      body: `${TAG} gửi khách`,
+      audienceKind: "guests",
+      audience: [],
+      lifetimeHours: NOTICE_DEFAULT_LIFETIME_HOURS,
+    },
     alice.id,
   );
 
@@ -194,6 +235,144 @@ async function main() {
       !forGuests.some((n) => n.id === byRole.id) &&
       !forGuests.some((n) => n.id === direct.id),
   );
+
+  // ---- 9. THỜI HẠN TỒN TẠI ----------------------------------------------------------------
+  //
+  // Ba tầng, và mỗi tầng hỏng một kiểu khác nhau:
+  //   • lược đồ  — gộp「số + đơn vị」thành giờ, chặn số ngoài khoảng;
+  //   • lượt ghi — hạn đóng dấu vào `expires_at` bằng đồng hồ của database;
+  //   • phép đọc — hết hạn thì cả hai đường (thành viên, khách) đều thôi trả về.
+  {
+    const parse = (raw: Record<string, unknown>) =>
+      noticeInputSchema.safeParse({ body: "Một lời nhắn đủ dài để qua cửa.", audienceKind: "all", ...raw });
+
+    const days3 = parse({ lifetimeValue: 3, lifetimeUnit: "days" });
+    check(
+      "lược đồ: 3 ngày thành 72 giờ",
+      days3.success && days3.data.lifetimeHours === 72,
+      JSON.stringify(days3.success ? days3.data.lifetimeHours : days3.error.issues[0]?.message),
+    );
+    const hours5 = parse({ lifetimeValue: "5", lifetimeUnit: "hours" });
+    check("lược đồ: chuỗi \"5\" giờ thành 5 giờ", hours5.success && hours5.data.lifetimeHours === 5);
+
+    const bare = parse({});
+    check(
+      "lược đồ: form CŨ không có ô thời hạn thì rơi về mặc định, không phải lỗi",
+      bare.success && bare.data.lifetimeHours === NOTICE_DEFAULT_LIFETIME_HOURS,
+      JSON.stringify(bare.success ? bare.data.lifetimeHours : bare.error.issues[0]?.message),
+    );
+
+    check("lược đồ: 0 bị chặn", !parse({ lifetimeValue: 0, lifetimeUnit: "hours" }).success);
+    check("lược đồ: số âm bị chặn", !parse({ lifetimeValue: -3, lifetimeUnit: "days" }).success);
+    check("lược đồ: số lẻ bị chặn", !parse({ lifetimeValue: 1.5, lifetimeUnit: "days" }).success);
+    check("lược đồ: chữ bị chặn", !parse({ lifetimeValue: "ba ngày", lifetimeUnit: "days" }).success);
+    check("lược đồ: ô rỗng bị chặn", !parse({ lifetimeValue: "", lifetimeUnit: "days" }).success);
+    check("lược đồ: đơn vị lạ bị chặn", !parse({ lifetimeValue: 3, lifetimeUnit: "tuần" }).success);
+
+    // Hai đầu của khoảng, và đúng một nấc ngoài mỗi đầu — chỗ một phép so `<` viết nhầm thành
+    // `<=` sẽ lộ ra.
+    check(
+      "lược đồ: đúng sàn 1 giờ thì qua",
+      parse({ lifetimeValue: NOTICE_MIN_LIFETIME_HOURS, lifetimeUnit: "hours" }).success,
+    );
+    check(
+      "lược đồ: đúng trần 30 ngày thì qua",
+      parse({ lifetimeValue: NOTICE_MAX_LIFETIME_DAYS, lifetimeUnit: "days" }).success,
+    );
+    check(
+      "lược đồ: trần tính theo GIỜ cũng phải đúng con số ấy",
+      parse({ lifetimeValue: NOTICE_MAX_LIFETIME_HOURS, lifetimeUnit: "hours" }).success,
+    );
+    check(
+      "lược đồ: quá trần một ngày bị chặn",
+      !parse({ lifetimeValue: NOTICE_MAX_LIFETIME_DAYS + 1, lifetimeUnit: "days" }).success,
+    );
+    check(
+      "lược đồ: quá trần một giờ bị chặn (đơn vị giờ KHÔNG lách được trần)",
+      !parse({ lifetimeValue: NOTICE_MAX_LIFETIME_HOURS + 1, lifetimeUnit: "hours" }).success,
+    );
+
+    check("đọc số giờ thành tiếng người: 168 → 7 ngày", formatLifetime(168) === "7 ngày");
+    check("…36 giờ thì giữ nguyên giờ, không làm tròn", formatLifetime(36) === "36 giờ");
+    check("…24 giờ nói là 1 ngày", formatLifetime(24) === "1 ngày");
+
+    // Hạn đóng dấu đúng lúc ghi: 5 giờ nghĩa là 5 giờ, không phải 5 ngày.
+    const shortLived = await broadcastNotice(
+      { body: `${TAG} hạn ngắn`, audienceKind: "users", audience: [alice.id], lifetimeHours: 5 },
+      alice.id,
+    );
+    const [stamped] = await db()
+      .select({ createdAt: schema.notices.createdAt, expiresAt: schema.notices.expiresAt })
+      .from(schema.notices)
+      .where(eq(schema.notices.id, shortLived.id));
+    const livedHours = (stamped.expiresAt.getTime() - stamped.createdAt.getTime()) / 3_600_000;
+    check(
+      "ghi: hạn 5 giờ đóng dấu đúng 5 giờ sau lúc phát",
+      Math.abs(livedHours - 5) < 0.01,
+      `${livedHours} giờ`,
+    );
+    check(
+      "…và lời nhắn hạn ngắn ấy vẫn hiện khi còn hạn",
+      (await unseenNotices(alice.id)).some((n) => n.id === shortLived.id),
+    );
+
+    /**
+     * Đẩy MỘT dòng về quá khứ để xem phép đọc có thật sự nhìn `expires_at` không.
+     *
+     * Phải dời CẢ `created_at`, không chỉ hạn: ràng buộc `notices_expires_after_created_check`
+     * cấm hạn nằm trước lúc phát. Dời cả hai vừa qua được hàng rào vừa dựng đúng cảnh có thật —
+     * một lời nhắn phát hai giờ trước với hạn một giờ.
+     */
+    await db()
+      .update(schema.notices)
+      .set({
+        createdAt: sql`now() - interval '2 hours'`,
+        expiresAt: sql`now() - interval '1 hour'`,
+      })
+      .where(eq(schema.notices.id, shortLived.id));
+    check(
+      "đọc: hết hạn thì thành viên thôi thấy, dù CHƯA bấm「Đã hiểu」",
+      !(await unseenNotices(alice.id)).some((n) => n.id === shortLived.id),
+    );
+
+    const guestExpired = await broadcastNotice(
+      { body: `${TAG} khách hạn ngắn`, audienceKind: "guests", audience: [], lifetimeHours: 1 },
+      alice.id,
+    );
+    check(
+      "đọc: lời nhắn cho khách còn hạn thì khách thấy",
+      (await guestNotices()).some((n) => n.id === guestExpired.id),
+    );
+    await db()
+      .update(schema.notices)
+      .set({
+        createdAt: sql`now() - interval '2 hours'`,
+        expiresAt: sql`now() - interval '1 hour'`,
+      })
+      .where(eq(schema.notices.id, guestExpired.id));
+    check(
+      "đọc: hết hạn thì đường của KHÁCH cũng thôi trả về",
+      !(await guestNotices()).some((n) => n.id === guestExpired.id),
+    );
+
+    // Hàng rào cuối, ở tầng database: một dòng chào đời đã hết hạn thì không đường đọc nào trả
+    // nó về, mà trong bảng nó trông y hệt một lượt phát thành công.
+    let refused = false;
+    try {
+      await db()
+        .insert(schema.notices)
+        .values({
+          body: `${TAG} hạn ngược`,
+          audienceKind: "all",
+          audience: [],
+          sentBy: alice.id,
+          expiresAt: sql`now() - interval '1 hour'`,
+        });
+    } catch {
+      refused = true;
+    }
+    check("database TỪ CHỐI một lời nhắn có hạn nằm trước lúc phát", refused);
+  }
 
   // ---- 8. Dấu「đã xem」của khách: thuần, và là thứ thay cho notice_reads -------------------
   {

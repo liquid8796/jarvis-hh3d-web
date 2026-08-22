@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { pingNoticeChannel } from "@/lib/realtime/noticeChannel";
-import { audienceIsBroad, NOTICE_WINDOW_DAYS, type NoticeInput } from "@/lib/validation/notices";
+import { audienceIsBroad, type NoticeInput } from "@/lib/validation/notices";
 
 /**
  * Thông báo tông môn: phát ra, đọc phần chưa xem, đánh dấu đã xem.
@@ -24,9 +24,9 @@ export type NoticeForUser = {
  * Những lời nhắn người này CHƯA bấm「Đã hiểu」, cũ nhất trước.
  *
  * Bốn điều kiện, mỗi cái một lý do:
- *   • trong hạn `NOTICE_WINDOW_DAYS` — xem chú thích ở validation/notices.ts;
+ *   • CHƯA hết hạn — mốc `expires_at` do người phát chọn, xem chú thích ở validation/notices.ts;
  *   • phát SAU khi người này nhập môn — người mới vào hôm nay không có lý do gì phải đọc lại
- *     một tuần thông báo cũ của tông môn, và cái popup đầu tiên họ thấy nên là lời chào chứ
+ *     cả một xấp thông báo cũ của tông môn, và cái popup đầu tiên họ thấy nên là lời chào chứ
  *     không phải bảy cái hộp xếp hàng;
  *   • chưa có dấu đã xem;
  *   • và phạm vi phải khớp — `all`, hoặc id nằm trong danh sách, hoặc mang một trong các vai.
@@ -45,7 +45,7 @@ export async function unseenNotices(userId: string): Promise<NoticeForUser[]> {
     select n.id, n.body, n.created_at, u.display_name as sender
       from notices n
       left join users u on u.id = n.sent_by
-     where n.created_at > now() - make_interval(days => ${NOTICE_WINDOW_DAYS})
+     where n.expires_at > now()
        and n.created_at > (select created_at from users where id = ${userId})
        and not exists (
              select 1 from notice_reads r
@@ -81,7 +81,7 @@ export async function unseenNotices(userId: string): Promise<NoticeForUser[]> {
  * Chỉ HAI điều kiện, và không cái nào giống `unseenNotices`:
  *   • `audience_kind = 'guests'` — tập rời hẳn với ba kiểu của thành viên, nên không lời nhắn
  *     nào lọt qua lại giữa hai đường đọc;
- *   • trong hạn `NOTICE_WINDOW_DAYS`.
+ *   • CHƯA hết hạn.
  *
  * KHÔNG có mệnh đề「phát sau khi người này nhập môn」: khách không có ngày nhập môn. Hệ quả là
  * một người mở trang lần đầu vẫn thấy mọi lời nhắn cho khách còn trong hạn — đúng ý, vì lời nhắn
@@ -107,7 +107,7 @@ export async function guestNotices(): Promise<NoticeForUser[]> {
       from notices n
       left join users u on u.id = n.sent_by
      where n.audience_kind = 'guests'
-       and n.created_at > now() - make_interval(days => ${NOTICE_WINDOW_DAYS})
+       and n.expires_at > now()
      order by n.created_at asc
      limit 20
   `);
@@ -182,6 +182,11 @@ const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  * Thứ tự CỐ Ý: ghi xuống database TRƯỚC, gõ cửa realtime SAU. Ngược lại thì tiếng gõ cửa có
  * thể tới trước lúc dòng kịp commit, và mọi trang sẽ hỏi "có gì mới không" đúng một nhịp
  * trước khi có gì để thấy — rồi im lặng cho tới lần tải trang sau.
+ *
+ * Hạn tính bằng ĐỒNG HỒ CỦA DATABASE (`now() + make_interval(...)`), không phải `Date.now()` của
+ * tiến trình web: `created_at` đã lấy từ đồng hồ ấy, và ràng buộc `expires_at > created_at` so
+ * hai cột với nhau. Trộn hai đồng hồ thì một cú lệch giờ vài giây trên máy chủ web biến thành
+ * một lượt phát bị database từ chối — mà chỉ với những lời nhắn hạn ngắn nhất.
  */
 export async function broadcastNotice(
   input: NoticeInput,
@@ -196,6 +201,7 @@ export async function broadcastNotice(
       audienceKind: input.audienceKind,
       audience: audienceIsBroad(input.audienceKind) ? [] : [...input.audience],
       sentBy,
+      expiresAt: sql`now() + make_interval(hours => ${input.lifetimeHours})`,
     })
     .returning({ id: schema.notices.id });
 

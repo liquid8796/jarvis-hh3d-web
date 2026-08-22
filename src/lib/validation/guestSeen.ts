@@ -1,4 +1,4 @@
-import { NOTICE_WINDOW_DAYS } from "@/lib/validation/notices";
+import { NOTICE_MAX_LIFETIME_HOURS } from "@/lib/validation/notices";
 
 /**
  * DẤU「ĐÃ XEM」CỦA KHÁCH CHƯA ĐĂNG NHẬP — sống trong một cookie, không trong database.
@@ -12,8 +12,8 @@ import { NOTICE_WINDOW_DAYS } from "@/lib/validation/notices";
  *   • Số dòng KHÔNG có trần. Mỗi con bot, mỗi lượt quét, mỗi trình duyệt xoá cookie là một danh
  *     tính mới. Một bảng như thế phình theo lưu lượng Internet chứ không theo số người dùng, và
  *     nó phình trên chính cái Neon vừa hạ tông môn bằng hạn mức truyền dữ liệu.
- *   • Dữ liệu ấy VÔ GIÁ TRỊ sau bảy ngày (`NOTICE_WINDOW_DAYS`) — thông báo hết hạn thì cái dấu
- *     cũng hết nghĩa. Một thứ tự hết hạn thì cookie làm đúng việc ấy miễn phí, còn bảng thì đòi
+ *   • Dữ liệu ấy VÔ GIÁ TRỊ khi lời nhắn hết hạn — dấu đã xem của một tin đã chết thì không còn
+ *     gì để đánh dấu. Một thứ tự hết hạn thì cookie làm đúng việc ấy miễn phí, còn bảng thì đòi
  *     thêm một vòng quét dọn nữa.
  *
  * Cái giá, nói thẳng: xoá cookie hay đổi trình duyệt là thấy lại popup. Với một lời nhắn cho
@@ -35,13 +35,22 @@ export const GUEST_SEEN_COOKIE = "jvz_notice_seen";
  * Giữ tối đa ngần này id.
  *
  * Trần cookie của trình duyệt là ~4KB; 20 uuid kèm dấu phẩy là ~740 byte, còn thừa chỗ cho mọi
- * cookie khác của trang. Con số cũng đủ rộng theo nghĩa thật: thông báo chỉ sống bảy ngày, nên
- * để chạm trần thì tông môn phải phát hơn hai mươi lời nhắn CHO KHÁCH trong một tuần.
+ * cookie khác của trang. Con số cũng đủ rộng theo nghĩa thật, và nó khớp với đầu kia của đường
+ * ống: `guestNotices` trả tối đa 20 dòng, nên cookie giữ được đúng bằng số lời nhắn cho khách
+ * có thể còn sống cùng lúc — chạm trần nghĩa là tông môn đang treo hơn hai mươi tấm bảng ở cửa.
  */
 export const GUEST_SEEN_MAX = 20;
 
-/** Cookie sống đúng bằng hạn của thông báo — dài hơn là giữ rác, ngắn hơn là hiện lại lời cũ. */
-export const GUEST_SEEN_MAX_AGE_SECONDS = NOTICE_WINDOW_DAYS * 24 * 60 * 60;
+/**
+ * Cookie sống bằng hạn DÀI NHẤT một lời nhắn có thể có, không phải hạn mặc định.
+ *
+ * Từ 21/08/2026 mỗi lời nhắn tự mang hạn riêng (tới `NOTICE_MAX_LIFETIME_HOURS`). Neo cookie vào
+ * hạn mặc định bảy ngày thì một tấm bảng treo ba mươi ngày sẽ hiện LẠI với chính người đã bấm
+ * 「Đã hiểu」, vào ngày thứ tám — đúng cái「ngắn hơn là hiện lại lời cũ」mà dòng chú thích cũ ở
+ * đây đã cảnh báo. Dài hơn cần thiết thì chỉ tốn ~740 byte nằm trong máy khách; ngắn hơn thì
+ * phiền đúng những người đã đọc.
+ */
+export const GUEST_SEEN_MAX_AGE_SECONDS = NOTICE_MAX_LIFETIME_HOURS * 60 * 60;
 
 /** Hình dạng uuid mà `gen_random_uuid()` sinh ra. Chỉ dùng để KHỎI NÉM, không phải để tin. */
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -68,8 +77,8 @@ export function parseGuestSeen(raw: string | undefined | null): string[] {
 /**
  * Thêm một id vào danh sách, MỚI NHẤT ĐỨNG ĐẦU, rồi cắt về trần.
  *
- * Mới nhất đứng đầu vì phép cắt chặt ở đuôi: id cũ nhất là id sắp hết hạn theo
- * `NOTICE_WINDOW_DAYS`, nên mất nó là mất một thứ sắp vô nghĩa. Cắt ở đầu thì ngược lại — người
+ * Mới nhất đứng đầu vì phép cắt chặt ở đuôi: id cũ nhất là id của lời nhắn sắp hết hạn trước
+ * tiên, nên mất nó là mất một thứ sắp vô nghĩa. Cắt ở đầu thì ngược lại — người
  * ta vừa bấm「Đã hiểu」xong đã thấy lại đúng cái vừa đóng.
  */
 export function addGuestSeen(current: readonly string[], noticeId: string): string[] {

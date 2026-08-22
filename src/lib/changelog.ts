@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.38",
+    date: "2026-08-22",
+    lines: [
+      "Thông báo của Tông Môn nay có thời hạn riêng: người phát đặt nó sống mấy giờ hay mấy ngày, thay vì bảy ngày cho mọi lời nhắn.",
+      "Hết hạn là popup thôi hiện — tin bảo trì tối nay không còn nhảy ra chặn màn hình suốt một tuần sau đó.",
+    ],
+  },
+  {
     version: "1.3.37",
     date: "2026-08-22",
     lines: [
@@ -465,13 +473,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-15",
     lines: [
       "Chỗ soạn bản tin của tông môn bớt phần dặn dò; với đạo hữu thì màn hình không đổi gì.",
-    ],
-  },
-  {
-    version: "0.92.0",
-    date: "2026-08-15",
-    lines: [
-      "Bảng Hàng Đợi chỉ ghi tên khôi lỗi khi thật sự có máy đang chạy đàn ấy; dòng đang nghỉ để trống.",
     ],
   },
 ];

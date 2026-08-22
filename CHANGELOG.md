@@ -11,6 +11,48 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.38 — Thông báo có thời hạn riêng, thay cái cửa sổ bảy ngày cứng
+
+Ô soạn của tab Phát Thông Báo tự gợi ý「Tối nay 21h tông môn bế quan trùng tu khoảng 15 phút」
+— một lời nhắn hết nghĩa lúc 21h15. Mà `unseenNotices`/`guestNotices` lại hỏi cứng
+`created_at > now() - interval '7 days'`, nên nó còn nhảy ra chặn màn hình suốt một tuần,
+kể cả với người vừa nhập môn hôm sau. Nay người phát tự đặt: một ô số + đơn vị giờ/ngày.
+
+**Mốc, không phải khoảng.** Cột mới là `expires_at`, đóng dấu MỘT LẦN lúc phát
+(`now() + make_interval(hours => …)`), nên cả hai đường đọc rút về đúng một mệnh đề
+`expires_at > now()` — dùng được index, và giống hệt nhau ở đường thành viên lẫn đường khách.
+Một cột「sống mấy giờ」thì mỗi câu truy vấn phải tự cộng lại, và mỗi chỗ cộng là một chỗ quên.
+Hạn cũng tính bằng đồng hồ của DATABASE, không phải `Date.now()` của tiến trình web: `created_at`
+vốn lấy từ đồng hồ ấy, và ràng buộc mới so hai cột với nhau.
+
+**Ba chỗ trong migration mà một câu SQL gọn hơn sẽ làm hỏng:**
+
+- Thêm cột NOT NULL kèm `DEFAULT now() + interval '7 days'` trong một câu thì DỰNG DẬY mọi
+  thông báo đã chết — dòng phát từ tháng trước bỗng có hạn tới bảy ngày TỚI, và cả tông môn ăn
+  một chồng popup cũ ngay lần vào kế tiếp. Nên: thêm cột rỗng → vá theo `created_at` của chính
+  từng dòng → mới siết NOT NULL. Sau lượt vá, mọi dòng cũ giữ ĐÚNG hạn nó vốn có.
+- Nhưng cột vẫn phải CÓ default, vì một lý do khác hẳn: `deploy:backend` có nút lùi bản, và bản
+  cũ thì `INSERT` không biết cột này. Thiếu default thì một cú lùi bản biến「phát thông báo」
+  thành lỗi NOT NULL — đúng lúc người ta cần nó nhất, vì lùi bản là lúc đang có sự cố.
+- Ràng buộc `expires_at > created_at` là hàng rào cho MÃ: một lời nhắn chào đời đã hết hạn thì
+  không đường đọc nào trả nó về, mà trong bảng nó trông y hệt một lượt phát thành công.
+
+**Một coupling suýt vỡ:** `GUEST_SEEN_MAX_AGE_SECONDS` — hạn cookie「đã xem」của khách — được
+neo vào đúng bảy ngày ấy, kèm chú thích「ngắn hơn là hiện lại lời cũ」. Cho phép hạn tới 30 ngày
+mà giữ nguyên cookie thì một tấm bảng treo 30 ngày sẽ hiện LẠI với chính người đã bấm「Đã hiểu」
+vào ngày thứ tám. Nay cookie neo vào hạn DÀI NHẤT có thể, không phải hạn mặc định.
+
+Khoảng cho phép: 1 giờ tới 30 ngày, mặc định vẫn 7 ngày. Trần 30 ngày là hàng rào chứ không
+phải số cho tròn — cái lẽ「đừng để popup xếp hàng」vẫn đúng, và thứ cần đứng lâu hơn thế thì chỗ
+của nó là Bản Tin chứ không phải popup. Lược đồ nhận「số + đơn vị」rồi mới gộp thành giờ ở một
+chỗ duy nhất (`.transform`), nên phía sau không nơi nào phải nhớ nhân với 24 — phép nhân bị quên
+đúng một chỗ là một lời nhắn sống 7 giờ thay vì 7 ngày, mà không có gì đỏ lên cả.
+
+`verify:notices` thêm nhóm ca thứ 9: 16 ca lược đồ (hai đầu khoảng và đúng một nấc ngoài mỗi
+đầu, ô rỗng, số lẻ, chữ, đơn vị lạ, form cũ thiếu hẳn hai ô), hạn đóng dấu đúng 5 giờ sau lúc
+phát, hết hạn thì cả hai đường đọc đều thôi trả về, và database từ chối hạn nằm trước lúc phát.
+
+---
 ## 1.3.31 — Gói 1.3.30 phát ra đã hỏng, và vì sao không lưới nào thấy
 
 `worker.mjs` của 1.3.30 `import` một module mới (`selfUpdate.mjs`), nhưng `buildWorkerBundle.mjs`

@@ -522,9 +522,34 @@ export const notices = pgTable(
      */
     sentBy: uuid("sent_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Hết hạn lúc nào — tính MỘT LẦN lúc phát (`now() + thời hạn người phát chọn`), không suy
+     * ra lúc đọc.
+     *
+     * Vì sao là mốc chứ không phải một cột「sống mấy giờ」: phép đọc chỉ còn `expires_at > now()`
+     * — một mệnh đề, dùng được index, và giống hệt nhau ở cả đường thành viên lẫn đường khách.
+     * Cột số giờ thì mỗi câu truy vấn phải tự cộng lại, và mỗi chỗ cộng là một chỗ quên.
+     *
+     * CÓ mặc định bảy ngày ở tầng database, và nó là lưới an toàn cho một lượt LÙI BẢN chứ không
+     * phải chỗ quyết định hạn: `broadcastNotice` luôn ghi hạn tường minh. Nhưng `deploy:backend`
+     * có nút lùi bản, và bản cũ thì `INSERT` không hề biết cột này — thiếu mặc định thì một cú lùi
+     * bản biến「phát thông báo」thành lỗi NOT NULL, đúng lúc người ta cần nó nhất (lùi bản là lúc
+     * đang có sự cố, và sự cố là lúc phải thông báo). Bảy ngày cũng chính là hành vi của bản cũ ấy.
+     */
+    expiresAt: timestamp("expires_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now() + interval '7 days'`),
   },
   (t) => [
     index("notices_created_idx").on(t.createdAt),
+    /** Cả hai đường đọc đều lọc theo cột này trước tiên, nên nó xứng một index như `created_at`. */
+    index("notices_expires_idx").on(t.expiresAt),
+    /**
+     * Hạn phải nằm SAU lúc phát. Cùng lối với ràng buộc `audience_kind` ngay dưới: hàng rào này
+     * dành cho MÃ, không cho người dùng — một lời nhắn chào đời đã hết hạn thì không đường đọc
+     * nào trả nó về, và nó sẽ nằm im trong bảng trông y như một lượt phát thành công.
+     */
+    check("notices_expires_after_created_check", sql`${t.expiresAt} > ${t.createdAt}`),
     /**
      * Luật về ba kiểu phạm vi được khai ở BA nơi (form, server action, và đây) — cố ý, không
      * phải thừa: hai nơi trên là hàng rào cho người dùng, còn cái này là hàng rào cho MÃ.

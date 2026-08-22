@@ -11,7 +11,7 @@ import {
   GUEST_SEEN_COOKIE,
   GUEST_SEEN_MAX_AGE_SECONDS,
 } from "@/lib/validation/guestSeen";
-import { noticeInputSchema, NOTICE_WINDOW_DAYS } from "@/lib/validation/notices";
+import { formatLifetime, noticeInputSchema } from "@/lib/validation/notices";
 import type { AdminResult } from "@/app/actions/admin";
 
 /**
@@ -42,6 +42,11 @@ export async function broadcastNoticeAction(
     // `getAll` chứ không `get`: phạm vi là nhiều ô tick cùng tên, và `get` chỉ trả về ô đầu —
     // một lời nhắn gửi ba vai sẽ lặng lẽ chỉ tới tay vai thứ nhất.
     audience: formData.getAll("audience").map((value) => String(value)),
+    // `?? undefined` chứ không `?? ""`: thiếu ô thì phải rơi vào `.default` của lược đồ (một tab
+    // mở từ trước lượt phát hành này không có hai ô ấy). `String(null)` sẽ thành chuỗi "null" và
+    // biến một form cũ thành một lời báo lỗi khó hiểu.
+    lifetimeValue: formData.get("lifetimeValue") ?? undefined,
+    lifetimeUnit: formData.get("lifetimeUnit") ?? undefined,
   });
 
   if (!parsed.success) {
@@ -61,8 +66,9 @@ export async function broadcastNoticeAction(
     return {
       ok: true,
       message:
-        `Đã phát cho khách chưa đăng nhập. Popup hiện ở lần tải trang kế tiếp của họ, trong vòng ` +
-        `${NOTICE_WINDOW_DAYS} ngày — không đếm được bao nhiêu người, vì khách không có trong sổ.`,
+        `Đã phát cho khách chưa đăng nhập. Popup hiện ở lần tải trang kế tiếp của họ, trong ` +
+        `${formatLifetime(parsed.data.lifetimeHours)} — không đếm được bao nhiêu người, vì khách ` +
+        `không có trong sổ.`,
     };
   }
 
@@ -76,9 +82,14 @@ export async function broadcastNoticeAction(
     };
   }
 
+  // Nhắc lại thời hạn trong câu trả lời, không phải cho đẹp: đó là thứ DUY NHẤT của lượt phát
+  // này không nhìn thấy được ở đâu khác sau khi form đã dọn — không có sổ nào bày lại hạn của
+  // một lời nhắn đã gửi, nên gõ nhầm 3 giờ thành 3 ngày thì đây là chỗ cuối cùng để nhận ra.
   return {
     ok: true,
-    message: `Đã phát tới ${recipients} đạo hữu. Popup hiện ngay trên màn hình những ai đang mở web.`,
+    message:
+      `Đã phát tới ${recipients} đạo hữu, sống ${formatLifetime(parsed.data.lifetimeHours)}. ` +
+      `Popup hiện ngay trên màn hình những ai đang mở web.`,
   };
 }
 

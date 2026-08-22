@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.37",
+    date: "2026-08-22",
+    lines: [
+      "Icon chat: vào sảnh xem hết tin là số tin chưa đọc tự biến mất, kể cả khi tin ít tới mức không cần cuộn.",
+    ],
+  },
+  {
     version: "1.3.36",
     date: "2026-08-22",
     lines: [
@@ -465,14 +472,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-15",
     lines: [
       "Bảng Hàng Đợi chỉ ghi tên khôi lỗi khi thật sự có máy đang chạy đàn ấy; dòng đang nghỉ để trống.",
-    ],
-  },
-  {
-    version: "0.91.1",
-    date: "2026-08-15",
-    lines: [
-      "Khoáng Mạch: ô mua Linh Quang Phù và ô ngưỡng đoạt nay nằm gọn trong khối「Đoạt mỏ」, và mờ đi khi không đoạt.",
-      "Không bật đoạt mỏ thì khôi lỗi cũng thôi mua phù. Ngưỡng đã chọn vẫn giữ nguyên, bật lại là thấy đúng con số cũ.",
     ],
   },
 ];

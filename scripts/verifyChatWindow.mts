@@ -126,7 +126,10 @@ try {
   let olderServed = 0;
   await page.route("**/api/chat**", async (route) => {
     const request = route.request();
-    if (request.method() !== "GET") return route.continue();
+    // POST cũng phải bị chặn, không phải chỉ GET — lời hứa đầu tệp là「không ghi gì cả」, mà
+    // từ 22/08 sảnh tự POST op:read khi đứng ở đáy: thả nó đi tiếp là lượt kiểm ghi đè mốc
+    // đã-đọc THẬT của tài khoản đóng vai bằng timestamp của tin giả.
+    if (request.method() !== "GET") return route.fulfill({ json: { ok: true } });
 
     if (!new URL(request.url()).searchParams.has("beforeAt")) {
       const messages = Array.from({ length: NEWEST_PAGE }, (_, i) => fakeMessage(280 + i));
@@ -243,6 +246,107 @@ try {
   const back = await probe();
   check(`về đáy → cửa sổ co lại còn ${WINDOW}`, back.rows === WINDOW, `dựng ${back.rows} thẻ`);
   check("…và vẫn đứng ở đáy sau khi co", back.toBottom < AT_BOTTOM_PX, `còn ${back.toBottom}px tới đáy`);
+  await page.close();
+
+  /**
+   * ── MỐC ĐÃ-ĐỌC: hai cảnh mở sảnh với tin chưa đọc ──────────────────────────────────────────
+   *
+   * Cảnh A canh đúng lỗi đã ship 22/08: cả phần chưa đọc lọt MỘT màn hình. Cú neo lúc mở sảnh
+   * trỏ về đúng scrollTop đang đứng nên không một sự kiện cuộn nào phát ra, `stuck` kẹt ở false,
+   * và mốc không bao giờ được đẩy — người ta đọc hết tin ngay trước mắt mà icon nổi vẫn đeo
+   * huy hiệu. Phán quyết: sảnh phải TỰ đẩy op:read với `at` = tin mới nhất, không cần một cú
+   * cuộn nào, và không được bày nút「Về cuối」chỉ vào chỗ đang đứng.
+   *
+   * Cảnh B giữ chiều ngược lại: cả trang đều chưa đọc (vạch nằm ở đỉnh) thì KHÔNG được đẩy mốc
+   * chừng nào chưa ai cuộn xuống đáy — đẩy sớm là đánh dấu đã-đọc hộ cả trăm tin chưa lọt vào
+   * mắt. Cuộn xuống đáy xong thì mốc phải đi, đeo đúng timestamp của tin cuối.
+   */
+  const sceneChecked = async (
+    label: string,
+    feed: { messages: ReturnType<typeof fakeMessage>[]; lastReadAt: string; unread: number },
+    run: (p: import("playwright-core").Page, readPosts: string[]) => Promise<void>,
+  ) => {
+    const scenePage = await context.newPage();
+    scenePage.on("console", (m) => {
+      if (m.type() === "error" || m.type() === "warning") noise.push(`${m.type()}: ${m.text().slice(0, 160)}`);
+    });
+    const readPosts: string[] = [];
+    await scenePage.route("**/api/chat**", async (route) => {
+      const request = route.request();
+      if (request.method() !== "GET") {
+        const body = JSON.parse(request.postData() ?? "{}") as { op?: string; at?: string };
+        if (body.op === "read" && typeof body.at === "string") readPosts.push(body.at);
+        return route.fulfill({ json: { ok: true } });
+      }
+      const wantsOlder = new URL(request.url()).searchParams.has("beforeAt");
+      return route.fulfill({
+        json: wantsOlder
+          ? { messages: [], typing: [], avatars: {} }
+          : { messages: feed.messages, typing: [], avatars: {}, lastReadAt: feed.lastReadAt, unread: feed.unread },
+      });
+    });
+    await scenePage.goto(`${ORIGIN}/chat`, { waitUntil: "domcontentloaded" });
+    await scenePage.waitForSelector(".chat-row", { timeout: 30_000 });
+    await scenePage.waitForTimeout(1500);
+    try {
+      await run(scenePage, readPosts);
+    } finally {
+      await scenePage.close();
+    }
+    void label;
+  };
+
+  // Cảnh A — n cố ý né bội số của 3: tin của CHÍNH người đóng vai không tính là chưa đọc.
+  const shortFeed = [fakeMessage(280), fakeMessage(281), fakeMessage(283)];
+  await sceneChecked(
+    "đọc dở, lọt một màn hình",
+    { messages: shortFeed, lastReadAt: shortFeed[0].createdAt, unread: 2 },
+    async (p, readPosts) => {
+      check(
+        "vạch「tin chưa đọc」hiện đúng chỗ đọc dở",
+        (await p.locator(".chat-unread").count()) === 1,
+      );
+      check(
+        "cả phần chưa đọc lọt một màn hình → mốc TỰ đẩy, không cần cú cuộn nào",
+        readPosts.length > 0 && readPosts[readPosts.length - 1] === shortFeed[2].createdAt,
+        `op:read = ${JSON.stringify(readPosts)}`,
+      );
+      check(
+        "…và KHÔNG bày nút「Về cuối」chỉ vào chỗ đang đứng",
+        (await p.locator(".chat-jump").count()) === 0,
+      );
+    },
+  );
+
+  // Cảnh B — 120 tin đều chưa đọc, mốc cổ hơn tất cả: vạch ở đỉnh, và mốc phải ĐỢI cú cuộn.
+  const longFeed = Array.from({ length: NEWEST_PAGE }, (_, i) => fakeMessage(161 + i));
+  await sceneChecked(
+    "cả trang chưa đọc",
+    {
+      messages: longFeed,
+      lastReadAt: new Date(new Date(longFeed[0].createdAt).getTime() - 60_000).toISOString(),
+      unread: NEWEST_PAGE,
+    },
+    async (p, readPosts) => {
+      const pos = await p.evaluate(`(() => {
+        const el = document.querySelector(".chat-scroll");
+        return { top: Math.round(el.scrollTop), h: el.scrollHeight - el.clientHeight };
+      })()`) as { top: number; h: number };
+      check("mở ra đứng ở ĐỈNH vùng chưa đọc, không phải đáy", pos.top < 80, `scrollTop = ${pos.top}/${pos.h}`);
+      check(
+        "chưa ai cuộn xuống → KHÔNG đẩy mốc hộ cả trăm tin chưa lọt vào mắt",
+        readPosts.length === 0,
+        `op:read = ${JSON.stringify(readPosts)}`,
+      );
+      await p.evaluate(`document.querySelector(".chat-scroll").scrollTo({ top: 1e9, behavior: "instant" })`);
+      await p.waitForTimeout(900);
+      check(
+        "cuộn tới đáy → mốc đi ngay, đeo timestamp của tin cuối",
+        readPosts.length > 0 && readPosts[readPosts.length - 1] === longFeed[longFeed.length - 1].createdAt,
+        `op:read = ${JSON.stringify(readPosts.slice(-2))}`,
+      );
+    },
+  );
 
   for (const line of results) console.log(`  ${line}`);
   console.log(

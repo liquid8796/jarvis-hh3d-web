@@ -64,6 +64,14 @@ const RENDER_WINDOW_STEP = 40;
 const NEAR_TOP_PX = 80;
 
 /**
+ * Cách đáy bao nhiêu thì coi là「đang đứng ở tin mới nhất」— tức `stuck`, cờ mở cả phép ghim
+ * đáy lẫn phép đẩy mốc đã-đọc. HAI nơi đọc nó: `onScroll` (người ta tự cuộn tới đáy) và phép
+ * neo sau khi mở sảnh (vạch chưa-đọc nằm sát đáy sẵn) — hai nơi mà lệch ngưỡng là cùng một tư
+ * thế đứng cho hai phán quyết khác nhau.
+ */
+const NEAR_BOTTOM_PX = 60;
+
+/**
  * Lượt mở sảnh được LẬT NGƯỢC tối đa ngần này trang để tìm ranh giới đọc/chưa-đọc — tức vạch
  *「tin chưa đọc」với chút ngữ cảnh đã-đọc phía trên nó. 4 trang cộng trang đầu là 250 tin;
  * ai bỏ sảnh lâu hơn thế thì vạch nằm ở đỉnh vùng đã tải và huy hiệu vẫn nói con số THẬT —
@@ -499,7 +507,7 @@ export function ChatRoom({
   const onScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
     setStuck(atBottom);
     if (atBottom) setUnseen(0);
 
@@ -551,6 +559,19 @@ export function ChatRoom({
     if (!(row instanceof HTMLElement)) return;
     const top = row.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
     jumpScrollTo(el, Math.max(0, top - RESTORE_TOP_GAP_PX));
+    /**
+     * ĐO LẠI TƯ THẾ ĐỨNG sau cú neo — lỗ hổng đã ship ngày 22/08 nằm đúng ở chỗ thiếu phép đo
+     * này. Bootstrap hạ `stuck` xuống false để phép ghim đáy khỏi tranh chỗ, và chỉ `onScroll`
+     * nâng nó lại — nhưng khi cả phần chưa đọc lọt trong một màn hình (sảnh vắng, một hai tin
+     * mới) thì cú neo trỏ về đúng scrollTop đang đứng, KHÔNG một sự kiện cuộn nào phát ra, và
+     * `stuck` kẹt ở false vĩnh viễn: người ta đọc hết tin ngay trước mắt mà mốc không bao giờ
+     * được đẩy — icon nổi đeo huy hiệu「1」mãi, kèm một nút「Về cuối」chỉ vào chỗ đang đứng.
+     *
+     * Đứng-sát-đáy sau cú neo nghĩa là tin mới nhất ĐANG trong tầm mắt — đúng định nghĩa của
+     * `stuck`, chỉ là tới bằng phép neo thay vì bằng tay. Nâng cờ ở đây thì hiệu ứng đẩy mốc
+     * và phép ghim đáy tự nối nhịp, y như sau một cú cuộn thật.
+     */
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX) setStuck(true);
   }, [visible]);
 
   /**

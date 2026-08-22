@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.39",
+    date: "2026-08-22",
+    lines: [
+      "Hỷ Sự Đường nay bấm thêm nút「Mở Lì Xì Nhanh」sau khi đã ghé các phòng, nên không còn sót lì xì nữa.",
+      "Chỗ sót là những lì xì của tiệc đã tan — phòng không còn trong danh sách để mà ghé vào nhận.",
+      "Nhật ký kể luôn mở được mấy cái và nhận về những gì.",
+    ],
+  },
+  {
     version: "1.3.38",
     date: "2026-08-22",
     lines: [
@@ -466,13 +475,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Vòng Quay Phúc Vận nay quay đủ 4 lượt mỗi ngày, thay vì 3 như trước.",
       "Lượt thứ tư chỉ mở ra sau khi xong hết nhiệm vụ trong ngày, mà đàn thì đã thôi ghé lại từ lúc hết lượt thứ ba — nên ngày nào cũng bỏ phí một vòng quay.",
-    ],
-  },
-  {
-    version: "0.93.0",
-    date: "2026-08-15",
-    lines: [
-      "Chỗ soạn bản tin của tông môn bớt phần dặn dò; với đạo hữu thì màn hình không đổi gì.",
     ],
   },
 ];

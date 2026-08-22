@@ -11,6 +11,72 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.39 — Hỷ Sự Đường vét nốt lì xì không còn phòng nào để ghé (schema 72)
+
+Tông chủ ghi thẳng trong bản ghi `hy-su-duong-20260822-222109`: *"ngoài việc vào từng phòng nhận
+lì xì thì chúng ta còn phải check thêm button mở lì xì nhanh nữa nhé, kết hợp cả 2 luôn mới ko
+sót phòng nào."*
+
+**Bằng chứng nằm ngay trong thân trả lời `show_all_wedding` của bản ghi ấy**, và nó là thứ giải
+thích vì sao ghé hết phòng vẫn chưa đủ:
+
+```
+unopened_li_xi_count: 1      ← còn một lì xì chưa mở
+data[0].has_li_xi: false     ← mà CẢ HAI phòng đang hiện
+data[1].has_li_xi: false     ← đều khai là không có
+```
+
+Tức có lì xì **không thuộc phòng nào còn trong danh sách** — tiệc đã tan, hoặc phòng đã rơi khỏi
+trang — và vòng ghé từng phòng không có đường nào với tới nó. Nút「Mở Lì Xì Nhanh」là đường duy
+nhất. Chiều ngược lại cũng đúng nên không bỏ được việc ghé phòng: nút chỉ mở LÌ XÌ, còn lời chúc
+(30 Tiên Ngọc đổi 120 Tu Vi) vẫn phải gửi trong phòng. Hai việc, không thay nhau được — đúng chữ
+"kết hợp cả 2".
+
+**CHỖ ĐỨNG của cụm là quyết định đắt nhất, không phải nội dung của nó.** Ngày「đã chúc hết」là
+ngày bước đếm cắm `jvz-hy-su-done` và `StopIf` KẾT THÚC nhiệm vụ sớm. Bản ghi 22/08 chụp đúng
+ngày ấy — `unbless_count: 0`, nút chúc nhanh xám ngắt「Đã Chúc Hết」— mà vẫn còn một lì xì. Nên
+cụm đặt TRƯỚC hai cổng ấy; đặt sau là mỗi ngày như thế lì xì nằm lại nguyên vẹn còn nhật ký vẫn
+báo xong.
+
+Chín bước, selector chép từ `dom/02..05` của bản ghi: dò nút + cắm cờ → bấm
+`#quick-open-li-xi-btn` → chờ `.td-confirm-overlay.active` → bấm `.td-confirm-btn-confirm` →
+chờ `.li-xi-result-modal.active` → phán xử bảng kết quả → bấm `.li-xi-result-ok-btn` → chờ bảng
+đóng → **đếm lại danh sách**.
+
+Ba chi tiết mà thiếu là hỏng:
+
+- **Cả cụm bám vào CỜ trên body, không hỏi lại cái nút.** Cú bấm là AJAX và trang thay HẲN nút
+  bằng `.no-li-xi-status`(「Không có lì xì nào chưa mở」), nên mọi bước sau mà hỏi
+  `#quick-open-li-xi-btn` sẽ bị bỏ qua ĐÚNG ở ca thành công — cùng bẫy đã trả giá ở cụm đoạt mỏ.
+- **Đếm lại sau khi vét.** Cú「Mở Tất Cả」tự gọi lại `show_all_wedding` nên các dòng
+  `.wedding-now-li-xi-available` đã rụng; không đếm lại thì hai cổng `StopIf` và `until` của vòng
+  lặp vẫn xử theo ảnh chụp TRƯỚC lúc vét, và lượt chạy quay lại những phòng chỉ「đáng ghé」vì cái
+  hồng bao vừa được khai mất.
+- **Phán xử đọc THẲNG bảng kết quả**, không suy từ việc cái nút biến mất. Không thấy bảng thì KÊU
+  nhưng không giết lượt — lì xì còn nguyên bên máy chủ cho lượt sau.
+
+**VÀO CẢ HAI TWIN dù nút mang huy hiệu VIP — và bản đầu của tôi làm ngược, bị lưới bắt.** Tông chủ
+dặn "(tài khoản vip)" nên tôi bọc cụm trong `if (requiresVip)`; `npm run smoke` đỏ ngay ở bất biến
+「hai twin phải giống nhau ở phần TRI THỨC VỀ SITE, chỉ được khác id/hạng/nhịp ghé lại」, và cả ở
+chốt riêng chặt hơn của chính Hỷ Sự Đường. Đọc lại thì bất biến ấy đúng hơn tôi: `RequiresVip` là
+PHỎNG ĐOÁN CỦA TA về hạng tài khoản, còn việc cái nút có được vẽ ra hay không là quyết định của
+SITE. Gác bằng cờ DOM chặt hơn — hạng đọc hụt một lượt là mất trắng phần lì xì, còn thừa một bước
+dò thì không mất gì. Trên tài khoản thường, bước dò không thấy nút nên cả cụm nằm im: hiệu quả
+vẫn đúng「chỉ VIP mới chạy」, chỉ là cái quyết định ấy do trang đưa ra chứ không do ta đoán.
+
+**Kiểm chứng.** Lưới riêng `npm run verify:hy-su-quick` (tệp mới): 32 phép thử thuận trên
+Chromium thật, markup chép nguyên văn từ `dom/*.html`, điều kiện hỏi bằng chính `conditionProbe`
+engine gửi xuống trang, script chạy qua đúng lớp bọc `session.evaluate`, selector đọc TỪ
+`profile.json` đang ship. Có đủ ca ngược: nút Hủy Bỏ đứng TRƯỚC trong hộp xác nhận (rút gọn
+selector là bấm nhầm ở mọi lượt), và「bấm xong mà không bảng nào lật ra」phải kêu TRƯỢT chứ không
+nhận vơ là xong. `npm run smoke` 458 thuận, 0 nghịch. Nguồn C# build sạch.
+
+Lưới ghép hồ sơ: xuất lại từ `DefaultQuestProfile.cs` rồi so — chỉ hai quest `hy-su-duong*` đổi so
+với HEAD, **web khớp nguồn ở MỌI quest** (deep-equal bỏ `note`), thứ tự 27 id nguyên vẹn, hai twin
+giống hệt nhau.
+
+---
+
 ## 1.3.38 — Thông báo có thời hạn riêng, thay cái cửa sổ bảy ngày cứng
 
 Ô soạn của tab Phát Thông Báo tự gợi ý「Tối nay 21h tông môn bế quan trùng tu khoảng 15 phút」

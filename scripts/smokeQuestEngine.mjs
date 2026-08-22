@@ -1958,8 +1958,18 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // #rewardReveal > #rewardItem, nên flow vào tới nơi rồi đứng nhìn cái khay. Cùng endpoint,
     // cùng hình dạng, chỉ khác tên — nên bản vá là một phép HỢP SELECTOR, không phải nhánh mới.
     // (Nhãn dòng dưới trước đây ghi 68 trong khi phép so hỏi 69 — sửa luôn cho khớp.)
-    "hồ sơ đang ở schema 70",
-    loadProfileForSchema().schemaVersion === 71,
+    // 72 = Hỷ Sự Đường bấm thêm nút「Mở Lì Xì Nhanh」bên cạnh việc ghé từng phòng — ghi chú của
+    // tông chủ trong bản ghi hy-su-duong-20260822-222109: "ngoài việc vào từng phòng nhận lì xì
+    // thì chúng ta còn phải check thêm button mở lì xì nhanh nữa nhé, kết hợp cả 2 luôn mới ko
+    // sót phòng nào". Bằng chứng ở ngay thân trả lời show_all_wedding của bản ghi ấy:
+    // unopened_li_xi_count = 1 trong khi CẢ HAI phòng đang hiện đều khai has_li_xi = false — tức
+    // có lì xì không còn phòng nào trong danh sách nhận, ghé hết vẫn sót đúng nó. Cụm đứng TRƯỚC
+    // hai cổng StopIf, vì ngày「đã chúc hết」chính là ngày StopIf kết thúc nhiệm vụ sớm. Vào CẢ
+    // HAI twin dù nút mang huy hiệu VIP: nó gác bằng cờ DOM (jvz-hy-su-quick) chứ không bằng
+    // requiresVip — hạng là phỏng đoán của ta, còn cái nút là quyết định của site. Lưới riêng:
+    // npm run verify:hy-su-quick.
+    "hồ sơ đang ở schema 72",
+    loadProfileForSchema().schemaVersion === 72,
     String(loadProfileForSchema().schemaVersion),
   );
 

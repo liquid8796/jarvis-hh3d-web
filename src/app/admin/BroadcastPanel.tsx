@@ -201,14 +201,19 @@ export function BroadcastPanel({ recipients }: { recipients: PublicUser[] }) {
               min={1}
               max={lifetimeUnit === "days" ? NOTICE_MAX_LIFETIME_DAYS : NOTICE_MAX_LIFETIME_HOURS}
               step={1}
-              className="input max-w-[6rem] font-mono"
+              className="input min-w-[6rem] max-w-[6rem] font-mono"
               value={lifetimeValue}
               onChange={(event) => setLifetimeValue(event.target.value)}
             />
             <select
               name="lifetimeUnit"
               aria-label="Đơn vị thời hạn"
-              className="input max-w-[7rem]"
+              /* min-w BẰNG max-w để ghim hẳn bề rộng, không phải cho đẹp: hàng này là flex và
+                  dòng chú thích bên phải co kéo hết chỗ, nên hai ô bị bóp lại — chữ「ngày」cụt
+                  mất cái đuôi (đo bằng ảnh chụp 22/08/2026). Không dùng `w-` được: `.input` khai
+                  `width: 100%` ngoài mọi `@layer` nên nó thắng mọi utility bề rộng của Tailwind;
+                  `min-w`/`max-w` là thuộc tính khác nên không phải cãi nhau với luật ấy. */
+              className="input min-w-[7rem] max-w-[7rem]"
               value={lifetimeUnit}
               onChange={(event) => setLifetimeUnit(event.target.value as NoticeLifetimeUnit)}
             >

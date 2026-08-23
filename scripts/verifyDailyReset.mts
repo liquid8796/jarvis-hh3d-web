@@ -106,14 +106,18 @@ try {
   `) as { id: string }[];
   userId = created[0].id;
 
+  /**
+   * `sqlTag` là tagged template có THAM SỐ HOÁ — mọi `${...}` thành một placeholder `$n`, không
+   * phải một mảnh SQL ghép vào. Nên mốc giờ và sổ đủ lượt phải là GIÁ TRỊ JS truyền xuống, không
+   * phải `now() + interval` viết chen vào giữa (lỗi đã trả giá ở lượt chạy đầu: cú nhúng ấy
+   * biến thành một truy vấn riêng và chết ở "syntax error at or near now").
+   */
   const makeJob = async (status: string, extra: { farFuture?: boolean } = {}) => {
+    const nextRunAt = new Date(Date.now() + (extra.farFuture ? 6 * 60 * 60 * 1000 : 0));
+    const memoryOfYesterday = { day: "hom-qua", questIds: ["diem-danh"] };
     const rows = (await sql`
       insert into automation_jobs (user_id, status, last_heartbeat, worker_id, next_run_at, daily_done)
-      values (
-        ${userId}, ${status}::job_status, now(), 'khoi-loi-thu',
-        ${extra.farFuture ? sql`now() + interval '6 hours'` : sql`now()`},
-        ${sql`jsonb_build_object('day', 'hom-qua', 'questIds', jsonb_build_array('diem-danh'))`}
-      )
+      values (${userId}, ${status}::job_status, now(), 'khoi-loi-thu', ${nextRunAt}, ${JSON.stringify(memoryOfYesterday)}::jsonb)
       returning id
     `) as { id: string }[];
     return rows[0].id;

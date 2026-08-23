@@ -8,11 +8,12 @@ import {
   type WorkerPref,
 } from "./configs";
 import { DEFAULT_MAX_JOBS, DISPATCH_CANDIDATES, pickDispatch } from "./dispatch";
-import { getAppSettings } from "./settings";
+import { getAppSettings, saveAppSettings } from "./settings";
 import { findById } from "./users";
 import { maintenanceAllowsAutomation } from "@/lib/auth/maintenance";
 import { ADMIN_ROLE_CODES } from "@/lib/auth/permissions";
 import { ONLINE_WINDOW_MS, workerOnlineFor } from "./workers";
+import { reviewDailyReset } from "@/lib/validation/dailyReset";
 import {
   JOB_EVENT_SWEEP_MIN_INTERVAL_MS,
   jobEventSweepInterval,
@@ -1012,19 +1013,31 @@ export async function completeWorkerCycle(
   const updated = await db().execute(sql`
     update automation_jobs set
       status = case
-        when status = 'stopping' or ${stopFromWorker} or ${accountRetired} then 'stopped'::job_status
+        when ${accountRetired} then 'stopped'::job_status
+        -- Đàn bị lượt reset sang ngày cắt ngang: nó ĐÃ dừng đúng như yêu cầu, và giờ phải vào
+        -- vòng mới ngay. Nhánh này đứng TRƯỚC nhánh 'stopping' chung, vì nhìn từ đây hai đường
+        -- giống hệt nhau — chỉ cột restart_after_stop phân biệt được (xem migration 0031).
+        when restart_after_stop then 'queued'::job_status
+        when status = 'stopping' or ${stopFromWorker} then 'stopped'::job_status
         else 'queued'::job_status
       end,
       finished_at = case
+        when restart_after_stop and not ${accountRetired} then null
         when status = 'stopping' or ${stopFromWorker} or ${accountRetired} then now()
         else null
       end,
+      -- now() chứ không phải now() cộng cooldown: đó là toàn bộ nghĩa của「chạy lại NGAY」. Đàn
+      -- vừa bị cắt ngang không nợ ai một quãng nghỉ nào — quãng nghỉ sinh ra để giãn nhịp giữa
+      -- hai vòng ĐÃ XONG, còn vòng vừa rồi thì chưa xong.
       next_run_at = case
+        when restart_after_stop and not ${accountRetired} then now()
         when status = 'stopping' or ${stopFromWorker} or ${accountRetired} then now()
         else ${nextRunAt}
       end,
+      -- Đàn xếp lại thì phải nhận ảnh cấu hình MỚI, y như mọi vòng bình thường: vòng vừa bị cắt
+      -- mang ảnh của ngày cũ, và giữ lại nó là chạy tiếp cho cái ngày vừa qua.
       config_snapshot = case
-        when status = 'stopping' or ${stopFromWorker} or ${accountRetired} then config_snapshot
+        when not restart_after_stop and (status = 'stopping' or ${stopFromWorker} or ${accountRetired}) then config_snapshot
         else coalesce(
           (select uc.config || jsonb_build_object(
               'gameCookie', acc.cookie_envelope,
@@ -1051,9 +1064,12 @@ export async function completeWorkerCycle(
       -- Dòng ĐÃ TẮT (stopped) thì giữ nguyên tên: nó là lịch sử, không phải hàng chờ, và
       -- người vận hành cần đọc được vòng cuối cùng chạy trên máy nào.
       worker_id = case
-        when status = 'stopping' or ${stopFromWorker} or ${accountRetired} then worker_id
+        when not restart_after_stop and (status = 'stopping' or ${stopFromWorker} or ${accountRetired}) then worker_id
         else null
       end,
+      -- Tắt ngay khi đã dùng: cờ này sống đúng một chặng (bật lúc reset → tắt lúc xếp lại). Để
+      -- nó bám lại là mọi cú Thu Đàn sau đó của đàn ấy đều bị hiểu thành reset.
+      restart_after_stop = false,
       last_heartbeat = now()
     where id = ${jobId}
       and status in ('running', 'stopping')
@@ -1374,4 +1390,92 @@ export async function countJobsForDrain(): Promise<{ running: number; queued: nu
     else running += row.n;
   }
   return { running, queued };
+}
+
+
+/** Kết cục một lượt reset sang ngày, để cron kể lại và lưới kiểm đọc thẳng. */
+export type DailyResetOutcome =
+  | { ran: false; why: string }
+  | { ran: true; day: string; restarted: number; interrupted: number };
+
+/**
+ * SANG NGÀY MỚI THÌ CHẠY LẠI TỪ ĐẦU — lượt reset lúc 00:00 giờ Việt Nam.
+ *
+ * Hai loại đàn, hai đường khác hẳn nhau, và chỗ khác nhau ấy là toàn bộ phần khó:
+ *
+ *   • ĐANG NGHỈ (`queued`) — không ai đang cầm nó, nên sửa thẳng: kéo mốc chạy về NGAY, xoá sổ
+ *     đủ lượt và tiến độ của ngày cũ. Một câu UPDATE, xong.
+ *   • ĐANG CÀY (`running`) — có một khôi lỗi đang mở trình duyệt trên tài khoản ấy. Ở đây KHÔNG
+ *     được phép sửa thẳng về `queued`: cửa phát việc sẽ trao đàn cho một khôi lỗi thứ hai ngay
+ *     nhịp sau, trong khi khôi lỗi thứ nhất vẫn đang đăng nhập trên cùng tài khoản game — hai
+ *     phiên đè nhau, và cái hỏng ấy nằm ngoài tầm với của ta để sửa. Nên đi đúng đường mà nút
+ *     Thu Đàn vẫn đi: đặt `stopping`, khôi lỗi tự buông ở điểm an toàn kế tiếp, rồi
+ *     `completeWorkerCycle` thấy cờ `restart_after_stop` mà xếp nó lại ngay.
+ *
+ * Đàn đang `stopping` sẵn thì KHÔNG đụng: nó đang dừng vì CHỦ nó bấm Thu Đàn, và một luật của
+ * tông môn không được phép lật quyết định ấy thành「chạy tiếp」.
+ *
+ * IDEMPOTENT theo ngày (`reviewDailyReset`): nhịp cron dày hơn nhịp ngày, nên không có phép gác
+ * ấy thì cứ mỗi giờ cả tông môn lại bị cắt ngang một lần.
+ *
+ * Ghi mốc ngày SAU khi đã sửa xong đàn, không phải trước: chết giữa chừng thì thà chạy lại lượt
+ * sau (idempotent, đàn đã kéo mốc rồi thì kéo lại cũng thế) còn hơn đóng dấu「xong」cho một lượt
+ * chưa làm gì.
+ */
+export async function runDailyReset(now: Date = new Date()): Promise<DailyResetOutcome> {
+  const settings = await getAppSettings();
+  const verdict = reviewDailyReset(now, settings.dailyReset.enabled, settings.dailyReset.lastRunDay);
+  if (!verdict.run) return { ran: false, why: verdict.why };
+
+  // Đàn đang NGHỈ: kéo về chạy ngay, và bỏ luôn hành trang của ngày cũ.
+  const requeued = await db().execute(sql`
+    update automation_jobs set
+      next_run_at = now(),
+      daily_done = null,
+      cycle_progress = null,
+      cycle_progress_at = null
+    where status = 'queued'
+    returning id, user_id
+  `);
+
+  // Đàn đang CÀY: xin buông ở điểm an toàn, và đánh dấu để lượt buông ấy dẫn tới hàng chờ chứ
+  // không dẫn tới cái chết.
+  const interrupted = await db().execute(sql`
+    update automation_jobs set
+      status = 'stopping'::job_status,
+      restart_after_stop = true
+    where status = 'running'
+    returning id, user_id
+  `);
+
+  const requeuedRows = (requeued.rows ?? []) as Array<{ id: string; user_id: string }>;
+  const interruptedRows = (interrupted.rows ?? []) as Array<{ id: string; user_id: string }>;
+
+  // Nói cho CHỦ ĐÀN biết vì sao đàn của mình vừa đổi nhịp. Không có dòng này thì một người đang
+  // nhìn màn hình lúc nửa đêm chỉ thấy đàn tự dưng dừng giữa chừng rồi chạy lại — trông y hệt
+  // một sự cố.
+  for (const row of interruptedRows) {
+    await addEvent(
+      row.id,
+      "info",
+      "Sang ngày mới — vòng này dừng ở điểm an toàn kế tiếp rồi bắt đầu lại từ đầu.",
+    );
+  }
+  for (const row of requeuedRows) {
+    await addEvent(row.id, "info", "Sang ngày mới — thôi nghỉ, vào vòng mới ngay.");
+  }
+
+  settings.dailyReset.lastRunDay = verdict.day;
+  await saveAppSettings(settings);
+
+  // Một tín hiệu cho MỌI màn hình: bảng Hàng Đợi vừa đổi hàng loạt, mà nhịp soát của nó là 30
+  // giây — đủ lâu để người đang nhìn tưởng mình đọc nhầm.
+  await notifyDashboard({ userId: "*", topic: "job" });
+
+  return {
+    ran: true,
+    day: verdict.day,
+    restarted: requeuedRows.length,
+    interrupted: interruptedRows.length,
+  };
 }

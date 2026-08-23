@@ -155,13 +155,35 @@ export function nurtureDayKey(at: Date): string {
  * Giá trị lạ thì từ chối thẳng chứ không lặng lẽ hiểu thành trọn gói: một lượt gõ sai chính tả
  * mà vẫn chạy đủ ba việc là thứ chỉ lộ ra sau nhiều tuần.
  */
-export type CronScope = { housekeeping: boolean; keepalive: boolean; companions: boolean };
+export type CronScope = {
+  housekeeping: boolean;
+  keepalive: boolean;
+  companions: boolean;
+  /** Lượt reset sang ngày mới (`services/jobs.ts` → `runDailyReset`). */
+  dailyReset: boolean;
+};
 
 export function reviewCronScope(raw: string | null): { ok: true; scope: CronScope } | { ok: false; why: string } {
   const wanted = (raw ?? "").trim().toLowerCase();
-  if (wanted === "") return { ok: true, scope: { housekeeping: true, keepalive: true, companions: true } };
-  if (wanted === "companions") return { ok: true, scope: { housekeeping: false, keepalive: false, companions: true } };
-  return { ok: false, why: `Không hiểu ?only=${wanted} — chỉ nhận "companions", hoặc bỏ trống để chạy trọn gói.` };
+  if (wanted === "") {
+    return { ok: true, scope: { housekeeping: true, keepalive: true, companions: true, dailyReset: true } };
+  }
+  if (wanted === "companions") {
+    /**
+     * Lịch MỖI GIỜ mang theo cả lượt reset sang ngày, và đó là chủ ý chứ không phải tiện tay:
+     * đây là cái lưới hứng cho lịch nửa đêm. Máy chủ nằm im đúng lúc 00:00 — trùng tu, một lượt
+     * phát hành dài, mất điện — thì lượt mỗi giờ kế tiếp làm nốt, vì `reviewDailyReset` đóng dấu
+     * theo NGÀY chứ không theo phút. Không có nó thì lỡ một đêm là lỡ hẳn, im lặng.
+     */
+    return { ok: true, scope: { housekeeping: false, keepalive: false, companions: true, dailyReset: true } };
+  }
+  if (wanted === "daily-reset") {
+    return { ok: true, scope: { housekeeping: false, keepalive: false, companions: false, dailyReset: true } };
+  }
+  return {
+    ok: false,
+    why: `Không hiểu ?only=${wanted} — chỉ nhận "companions" hoặc "daily-reset", hoặc bỏ trống để chạy trọn gói.`,
+  };
 }
 
 /** Phút-trong-ngày theo giờ Việt Nam — cùng gốc UTC+7 với `nurtureDayKey`. */

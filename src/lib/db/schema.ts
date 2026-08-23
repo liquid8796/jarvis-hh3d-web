@@ -358,6 +358,20 @@ export const automationJobs = pgTable(
      * lượt ghi kế tiếp tự viết đè, nên không cần một tiến trình dọn nào.
      */
     dailyDone: jsonb("daily_done").$type<DailyQuotaMemory>(),
+    /**
+     * XẾP LẠI NGAY SAU KHI DỪNG — dấu của lượt reset sang ngày, không phải của người bấm Thu Đàn.
+     *
+     * Vì sao phải là một CỘT chứ không suy ra từ mốc thời gian: cả hai đường đều đưa đàn về
+     * `stopping`, và nhìn từ `completeWorkerCycle` thì chúng giống hệt nhau. Đoán bằng cách so
+     * `started_at` với mốc reset gần nhất sẽ có ngày đọc nhầm một cú Thu Đàn của người dùng lúc
+     * 00:05 thành lượt reset — tức người ta bấm dừng mà đàn cứ chạy tiếp. Một cột boolean thì
+     * không bao giờ nhầm.
+     *
+     * Vòng đời đúng MỘT chặng: `runDailyReset` bật lên cùng lúc đặt `stopping`, và
+     * `completeWorkerCycle` tắt đi ngay khi xếp đàn về hàng chờ. Không có trạng thái nào khác
+     * đọc nó, nên nó không thể trôi.
+     */
+    restartAfterStop: boolean("restart_after_stop").notNull().default(false),
   },
   (t) => [
     index("jobs_user_idx").on(t.userId),

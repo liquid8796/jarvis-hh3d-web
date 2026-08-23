@@ -366,6 +366,49 @@ export async function saveBrowserEngineAction(
   };
 }
 
+/**
+ * Bật/tắt luật「sang ngày mới thì chạy lại từ đầu」.
+ *
+ * Câu trả lời phải nói ra CÁI GIÁ, không chỉ nói đã lưu: đây là luật duy nhất trong trang này
+ * cắt ngang một vòng đang chạy của người khác. Ai bật nó cần biết trước rằng đúng 00:00 những
+ * đàn đang cày sẽ buông việc đang làm — bằng không họ sẽ phát hiện điều đó vào lúc nửa đêm, qua
+ * một bảng Hàng Đợi tự dưng đổi hàng loạt.
+ */
+export async function saveDailyResetAction(
+  _prev: AdminResult | null,
+  formData: FormData,
+): Promise<AdminResult> {
+  await requireAdmin();
+
+  const enabled = String(formData.get("enabled") ?? "") === "on";
+  const settings = await getAppSettings();
+  if (settings.dailyReset.enabled === enabled) {
+    return {
+      ok: true,
+      message: enabled ? "Luật vẫn đang bật — không có gì để đổi." : "Luật vẫn đang tắt — không có gì để đổi.",
+    };
+  }
+
+  settings.dailyReset.enabled = enabled;
+  /**
+   * Bật lên thì XOÁ dấu ngày của lượt cũ. Không có bước này, một người tắt luật hôm nay rồi bật
+   * lại vẫn trong ngày ấy sẽ thấy nó nằm im tới tận nửa đêm hôm sau — vì dấu ngày còn ghi là
+   * "hôm nay đã chạy". Xoá đi thì lượt cron kế tiếp làm ngay, đúng điều người vừa bật đang chờ.
+   */
+  if (enabled) settings.dailyReset.lastRunDay = null;
+  await saveAppSettings(settings);
+  await notifyDashboard({ userId: "*", topic: "config" });
+
+  revalidatePath("/admin");
+  return {
+    ok: true,
+    message: enabled
+      ? "Đã bật: đúng 00:00 giờ Việt Nam, đàn đang nghỉ vào vòng mới ngay, còn đàn đang cày sẽ " +
+        "buông ở điểm an toàn kế tiếp rồi chạy lại từ đầu. Lượt đầu tiên chạy ở nhịp cron gần nhất."
+      : "Đã tắt: mốc nửa đêm trở lại thầm lặng như trước, đàn nào đang nghỉ thì nghỉ hết cooldown.",
+  };
+}
+
 /** Tên gọi cho người đọc — không để chuỗi kỹ thuật lọt vào câu trả lời. */
 const BROWSER_LABELS: Record<"chromium" | "obscura", string> = {
   chromium: "Chromium",

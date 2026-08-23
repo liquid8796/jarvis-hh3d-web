@@ -181,6 +181,38 @@ export const appSettingsSchema = z.object({
     })
     .prefault({ baseUrl: DEFAULT_GAME_BASE_URL }),
 
+  dailyReset: z
+    .object({
+      /**
+       * SANG NGÀY MỚI THÌ CHẠY LẠI TỪ ĐẦU — đúng 00:00:00 giờ Việt Nam.
+       *
+       * Bật lên thì mốc nửa đêm không còn là một cái mốc thầm lặng nữa: mọi đàn còn sống đều bỏ
+       * trạng thái đang mang (đàn nghỉ cooldown thôi đếm ngược, đàn đang cày buông ở điểm an
+       * toàn) rồi vào vòng mới ngay. Vì sao đáng có: vòng đang chạy lúc nửa đêm mang theo kế
+       * hoạch của NGÀY CŨ — sổ đủ lượt, ảnh cấu hình, danh sách nhiệm vụ đã bị cắt — nên nó
+       * đang cày cho một cái ngày không còn tồn tại. Còn đàn nghỉ cooldown thì có thể ngồi im
+       * tới sáng trong khi lượt ngày đã mở lại từ lúc nửa đêm.
+       *
+       * MẶC ĐỊNH TẮT, và điều đó quan trọng: mọi document đã ghi trước bản này không có nhánh
+       * `dailyReset`, nên default chính là thứ áp lên tất cả ngay khi deploy xong. Đây là một
+       * luật CẮT NGANG việc đang chạy — nó chỉ được phép chạy khi có người chủ động bật.
+       */
+      enabled: z.boolean().catch(false),
+      /**
+       * Ngày (giờ Việt Nam, `YYYY-MM-DD`) mà lượt reset gần nhất đã chạy xong.
+       *
+       * Đây là thứ giữ cho lượt reset CHỈ CHẠY MỘT LẦN mỗi ngày dù có bao nhiêu lượt cron gõ
+       * cửa — và cũng là thứ cho phép CHẠY BÙ: máy chủ nằm im đúng lúc nửa đêm thì lượt cron kế
+       * tiếp trong ngày thấy ngày ở đây còn là hôm qua và làm nốt. Không có nó thì hoặc reset
+       * lặp lại mỗi giờ, hoặc lỡ một đêm là lỡ hẳn.
+       *
+       * `null` = chưa từng chạy. Lượt đầu tiên sau khi bật sẽ chạy ngay ở lượt cron kế — có chủ
+       * ý: người vừa bật đang muốn thấy nó hoạt động.
+       */
+      lastRunDay: z.string().nullable().catch(null),
+    })
+    .prefault({ enabled: false, lastRunDay: null }),
+
   browser: z
     .object({
       /**

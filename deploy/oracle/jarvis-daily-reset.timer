@@ -1,0 +1,17 @@
+[Unit]
+Description=Sang ngay moi (00:00 gio Viet Nam) - moi dan bo trang thai cu va chay lai tu dau
+
+[Timer]
+# 17:00 UTC = 00:00:00 gio Viet Nam (UTC+7). Viet bang UTC chu khong dat Timezone= vi dong ho cua
+# VM chay UTC va moc reset luot ngay cua trang game theo gio Viet Nam - de lech hai thu ay o hai
+# noi la co ngay mot lan doi mui gio lam ca luat truot mot tieng ma khong ai thay.
+OnCalendar=*-*-* 17:00:00 UTC
+# KHONG xe dich: day la mot cai moc, khong phai mot nhip rai deu. Nguoi bat luat nay muon dung
+# nua dem, va mot cu xe dich 25 phut nhu lich kho phu se lam ho ngoi cho ma khong hieu vi sao.
+RandomizedDelaySec=0
+# May tat dung luc nua dem thi lan chay dau tien sau do lam not. Day la lop bu THU NHAT; lop thu
+# hai la lich moi gio (?only=companions cung mang theo dailyReset) - xem reviewCronScope.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -3,7 +3,7 @@ import { authorizeCronRequest } from "@/lib/auth/cronSecret";
 import { readControlDoc } from "@/lib/control/read";
 import { purgeExpiredChat } from "@/lib/services/chat";
 import { runCompanionNurture, runKeepalive } from "@/lib/services/githubStations";
-import { purgeExpiredJobEvents, reapStaleJobs } from "@/lib/services/jobs";
+import { purgeExpiredJobEvents, reapStaleJobs, runDailyReset } from "@/lib/services/jobs";
 import { reviewCompanionNurtureDuty, reviewCronScope, reviewKeepaliveDuty } from "@/lib/validation/githubStations";
 
 /**
@@ -153,8 +153,27 @@ export async function GET(request: Request) {
     }
   }
 
+  /**
+   * SANG NGÀY MỚI THÌ CHẠY LẠI — đứng CUỐI, sau mọi việc quét dọn.
+   *
+   * Thứ tự có nghĩa: `reapStaleJobs` ở đầu lượt kết liễu những đàn đã mất nhịp tim, nên tới đây
+   * danh sách「đang chạy」chỉ còn đàn thật sự sống — ta không đi cắt ngang những cái xác.
+   *
+   * Lỗi ở đây KHÔNG được phép nuốt cả hồi đáp: nó là thứ duy nhất trong route này cắt ngang việc
+   * đang chạy của người khác, nên một lượt hỏng phải đọc được từ chính hồi đáp cron.
+   */
+  let dailyReset: unknown = { skipped: true, why: "Lượt này không tới vì luật sang ngày mới." };
+  if (scope.dailyReset) {
+    try {
+      dailyReset = await runDailyReset();
+    } catch (err) {
+      dailyReset = { error: err instanceof Error ? err.message : "lỗi lạ" };
+    }
+  }
+
   return NextResponse.json({
     ok: true,
+    dailyReset,
     // `swept: false` + hai `null` là chữ ký của lượt mỗi giờ: một lượt curl phải phân biệt được
     // "đã quét, không có gì để dọn" với "lượt này vốn không tới để quét".
     swept: scope.housekeeping,

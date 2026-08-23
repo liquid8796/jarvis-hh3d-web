@@ -1,0 +1,16 @@
+[Unit]
+Description=Jarvis HH3D - sang ngay moi thi chay lai tu dau (/api/cron?only=daily-reset)
+After=jarvis-web.service
+
+[Service]
+Type=oneshot
+# Chi phan reset sang ngay: ?only=daily-reset. Quet don va nuoi kho giu nguyen lich rieng cua
+# chung (xem reviewCronScope) - luot nay khong dung toi chung.
+#
+# CONG doc tu /etc/caddy/upstream.conf vi blue/green doi qua lai 3000<->3001. Go cung mot cong o
+# day la mot nua so luot phat hanh se goi vao ban CU ma bang nao cung xanh - loi im lang da tra
+# gia mot lan voi jarvis-cron.service.
+#
+# Cong tac that nam trong app_settings (trang Tong Mon): timer nay chi go cua, con `runDailyReset`
+# moi quyet dinh co lam gi khong. Nho vay bat/tat luat khong phai SSH vao VM sua unit.
+ExecStart=/bin/bash -c 'set -eu; PORT=$(grep -oE "127[.]0[.]0[.]1:[0-9]+" /etc/caddy/upstream.conf | cut -d: -f2); TOK=$(grep -m1 "^CRON_SECRET=" /opt/jarvis/shared/.env | cut -d= -f2-); curl -fsS -m 120 -H "Authorization: Bearer $TOK" "http://127.0.0.1:$PORT/api/cron?only=daily-reset"'

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.45",
+    date: "2026-08-24",
+    lines: [
+      "Thêm lựa chọn ở trang Tông Môn: đúng 00:00 giờ Việt Nam, mọi đàn bỏ trạng thái cũ rồi vào vòng mới ngay.",
+      "Đàn đang nghỉ thôi đếm ngược; đàn đang cày sẽ buông ở điểm an toàn kế tiếp rồi cũng chạy lại từ đầu.",
+      "Mặc định TẮT — ai muốn thì bật ở tab Bảo Trì. Nên biết trước: vòng đang chạy dở lúc nửa đêm sẽ bị bỏ.",
+    ],
+  },
+  {
     version: "1.3.44",
     date: "2026-08-23",
     lines: [
@@ -467,14 +476,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Từ bản này, mỗi lượt cập nhật không còn làm gián đoạn: đang xem hay đang thao tác cũng không bị ngắt giữa chừng.",
       "Sửa lỗi lời nhắn của tông môn bật lại nhiều lần dù đã bấm「Đã hiểu」.",
       "Đăng nhập bằng địa chỉ cũ đã vào lại được bình thường.",
-    ],
-  },
-  {
-    version: "1.0.0",
-    date: "2026-08-16",
-    lines: [
-      "Cả hệ thống dọn về nhà mới — chạy nhanh và ổn định hơn, không còn phụ thuộc nhiều bên.",
-      "Địa chỉ trang, tài khoản, đàn và mọi dữ liệu giữ nguyên; đạo hữu không phải làm gì cả.",
     ],
   },
 ];

@@ -1,0 +1,15 @@
+-- SANG NGÀY MỚI THÌ CHẠY LẠI — một cột, để lượt reset 00:00 phân biệt được với nút Thu Đàn.
+--
+-- Lượt reset sang ngày (`runDailyReset`) đưa đàn ĐANG CHẠY về `stopping` để khôi lỗi tự buông ở
+-- điểm an toàn — đúng đường mà nút Thu Đàn vẫn đi. Nhưng hai lượt ấy muốn hai kết cục ngược nhau:
+-- Thu Đàn thì đàn phải TẮT HẲN, còn reset thì đàn phải xếp lại hàng chờ và chạy ngay vòng mới.
+--
+-- Nhìn từ `completeWorkerCycle` — nơi quyết định kết cục — hai đường ấy giống hệt nhau: cùng
+-- `status = 'stopping'`. Suy bằng mốc thời gian (so `started_at` với lượt reset gần nhất) là một
+-- cái bẫy: một người bấm Thu Đàn lúc 00:05 cho một đàn khởi động 23:50 sẽ bị đọc nhầm thành lượt
+-- reset, và đàn cứ thế chạy tiếp sau khi họ đã bảo nó dừng. Đó là loại sai không được phép có.
+--
+-- Mặc định FALSE, và mọi dòng đang có đều nhận đúng giá trị ấy: không đàn nào đang chờ được xếp
+-- lại, nên migration này không đổi hành vi của một đàn nào cả. Cột chỉ sống đúng một chặng — bật
+-- lúc reset, tắt ngay khi đàn về hàng chờ.
+ALTER TABLE "automation_jobs" ADD COLUMN "restart_after_stop" boolean DEFAULT false NOT NULL;

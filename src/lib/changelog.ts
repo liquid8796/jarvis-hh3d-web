@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.43",
+    date: "2026-08-23",
+    lines: [
+      "Dòng nhật ký đầu mỗi vòng chạy nói rõ hơn: auto đang khởi động tế đàn, thay cho chữ「khởi lư」khó đoán.",
+    ],
+  },
+  {
     version: "1.3.42",
     date: "2026-08-23",
     lines: [
@@ -468,14 +475,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Thông báo tông môn nay gửi được cho cả người CHƯA đăng nhập — chọn「Khách chưa đăng nhập」khi phát.",
       "Lời nhắn ấy hiện với bất kỳ ai mở trang, và tắt hẳn sau khi họ bấm「Đã hiểu」.",
       "Khác thông báo cho môn đồ: nó hiện ở lần tải trang kế tiếp, không bật lên tức thì.",
-    ],
-  },
-  {
-    version: "0.97.0",
-    date: "2026-08-15",
-    lines: [
-      "Khoáng Mạch: Linh Quang Phù nay chỉ mua SAU khi đoạt được mỏ. Không đoạt, hoặc đoạt không thành, thì không mua lá nào.",
-      "Trước đây phù được mua ngay khi mỏ đào xong, kể cả những lượt không đoạt — mà phù chỉ sống một giờ và sinh ra để cộng thêm cho mỏ vừa đoạt được.",
     ],
   },
 ];

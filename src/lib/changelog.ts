@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.41",
+    date: "2026-08-23",
+    lines: [
+      "Máy chạy tự động của tông môn nay tự gọi ca sau trước khi hết ca, nên không còn khoảng trống hàng giờ giữa hai ca như trước.",
+    ],
+  },
+  {
     version: "1.3.40",
     date: "2026-08-23",
     lines: [
@@ -468,14 +475,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-15",
     lines: [
       "Khoáng Mạch: Linh Quang Phù nay chỉ mua đúng MỘT lá mỗi ngày cho mỗi đàn — trước đây đàn chuyển sang máy khác giữa chừng là mua thêm một lá nữa.",
-    ],
-  },
-  {
-    version: "0.95.0",
-    date: "2026-08-15",
-    lines: [
-      "Hỷ Sự Đường nay chúc hết mọi tiệc cưới đang mở, kể cả tiệc đã phát lì xì.",
-      "Trước đây chỉ cần một phòng mở không lên là những phòng còn lại bị bỏ luôn; giờ phòng nào trục trặc thì báo tên phòng đó rồi đi tiếp.",
     ],
   },
 ];

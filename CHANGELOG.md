@@ -11,6 +11,93 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.41 — Khôi lỗi tông môn tự phát lượt kế, thôi lệ thuộc cron của GitHub
+
+Tông chủ hỏi vì sao vài khôi lỗi tông môn tắt. Truy ra thì chúng KHÔNG hỏng: lượt Actions gần
+nhất `completed / success`, tức khôi lỗi tự rút lui đúng hạn tuổi thọ. Cái thiếu là lượt thay thế.
+
+**Đo được, không đoán.** Cron của GitHub không mất nhịp — đếm 22/08/2026 ra đủ 6 lượt/ngày như
+`0 */4 * * *` khai. Nó chỉ **trễ**:
+
+```
+trễ so với mốc cron, 13 lượt gần nhất:  nhỏ nhất 52 · trung vị 67 · lớn nhất 211 phút
+```
+
+Ngân sách gối đầu của thiết kế cũ chỉ là `tuổi thọ − chu kỳ cron` = `290 − 240` = **50 phút**.
+Một dao động 159 phút không thể lọt qua khe 50 phút. Lỗ mở ra bất cứ khi nào lượt sau trễ hơn
+lượt trước quá 50 phút — hôm 22/08 lượt `20:00` trễ 54 phút còn lượt `00:00` trễ 188 phút, chênh
+134, **hở 84 phút**. Ngay cả lượt trễ ÍT NHẤT (52) cũng đã vượt biên.
+
+**Bản vá: lượt chạy tự phát lượt kế.** Hết lệ thuộc giờ giấc của cron.
+
+### Đính chính một lời cảnh báo SAI của chính tôi
+
+Lượt trước tôi bảo cách này đắt vì `GITHUB_TOKEN` bị cấm kích hoạt workflow, nên phải nhét một
+PAT `repo`+`workflow`+`delete_repo` vào từng kho. **Sai.** GitHub Docs viết rõ:
+
+> events triggered by the GITHUB_TOKEN will not create a new workflow run, **with the following
+> exceptions: `workflow_dispatch` and `repository_dispatch` events always create workflow runs**
+
+Không cần PAT nào. Chỉ thêm `actions: write` vào `permissions`. Cái giá bảo mật tôi nêu ra —
+lý do khiến tôi khuyên chọn cách khác — **không tồn tại**. May là tông chủ vẫn chọn cách này.
+
+### Phanh chống vòng lặp — phần đáng nói hơn cả cái chuỗi
+
+GitHub cấm `GITHUB_TOKEN` kích hoạt workflow CHÍNH VÌ sợ đệ quy, và chừa hai cửa ấy cho người
+biết mình đang làm gì. Đi qua cửa là phải tự gánh phần GitHub vừa buông: một lượt chết yểu mà
+vẫn phát lượt kế sẽ chết yểu tiếp, mãi mãi, đốt sạch phút Actions của tài khoản.
+
+Phanh: **chỉ nối chuỗi khi lượt đã sống quá NỬA tuổi thọ**, và ngưỡng ấy **suy từ**
+`WORKER_MAX_LIFETIME_MS` chứ không gõ tay. Hằng số gõ tay sẽ trôi khỏi cấu hình lúc ai đó chỉnh
+tuổi thọ, và trôi lặng lẽ — nên đó là điều lưới mới canh gắt nhất.
+
+Mốc giờ được ghi ở bước ĐẦU TIÊN, trước cả `checkout`: một lượt chết lúc `npm ci` cũng phải bị
+phanh giữ lại, mà ghi mốc sau bước cài là phanh đo hụt mất mấy phút đắt nhất.
+
+`if: always()` chứ không `success()`: lượt thoát 1 vì hụt hạn thu đàn VẪN là một lượt đã sống
+trọn đời, bỏ nối ở đó là tự tay mở lại đúng cái lỗ vừa vá.
+
+**Cron GIỮ NGUYÊN làm lưới đỡ.** Chuỗi đứt thì tối đa 4 giờ sau cron dựng lại đội. Bỏ cron đi là
+đổi một lỗ 84 phút lấy một lỗ vĩnh viễn.
+
+### Đã chạy thật — bảng chín ca trên chính đoạn script rút từ tệp
+
+Không chép lại đoạn bash rồi thử bản chép: rút thẳng khối `run:` của bước「Phát lượt kế」, chèn một
+hàm `curl()` giả, rồi cho `BAT_DAU_LUC`/`TUOI_THO_MS` chạy qua bảng.
+
+| ca | gọi dispatches? | kết quả |
+| --- | --- | --- |
+| chết yểu 1 phút (đời 290p) | không | phanh giữ |
+| sống 8699s — ngay DƯỚI nửa đời | không | phanh giữ |
+| sống 8700s — ĐÚNG nửa đời | có | phát |
+| rút lui bình thường | có | phát |
+| ca thử đời 3 phút, sống 100s | có | phát — phanh tự co giãn |
+| ca thử đời 3 phút, sống 50s | không | phanh giữ |
+| tuổi thọ `0` / rỗng | không | cảnh báo, để cron đỡ |
+| dispatches trả HTTP 403 | có | `::error::` + thoát 1 |
+
+Biên chính xác tới giây: 8699 chặn, 8700 cho qua.
+
+### Lưới mới `npm run verify:sect-chain` (19 phép, thuần)
+
+Canh những bất biến đọc được: quyền đủ-mà-không-thừa (`contents: read` phải CÒN — khai
+`permissions` là ghi đè TRỌN bộ mặc định, xoá nó là `checkout` mất quyền và lượt chết ngay), mốc
+giờ đứng trước `checkout`, không PAT nào lọt vào workflow, không nội suy `${{ }}` vào thân bash
+(cửa tiêm mã), phanh suy từ tuổi thọ, hai chỗ cùng đọc MỘT biểu thức tuổi thọ, hỏng thì kêu, và
+cron + concurrency vẫn còn.
+
+Đã đo là có răng: thay ngưỡng suy-ra bằng hằng số `8700` thì lưới đỏ đúng chỗ ấy.
+
+**Nói thẳng giới hạn:** lưới này KHÔNG chạy đoạn bash — bảng chín ca ở trên là chạy TAY. Kho
+không có parser YAML, và thêm một phụ thuộc chỉ để chạy một lưới là cái giá sai. Cách chạy lại
+bảng ấy được ghi trong đầu tệp lưới.
+
+`workflow_dispatch` nay nhận input `tuoi_tho_ms` — CHỈ để nghiệm chuỗi trong vài phút thay vì 6
+giờ. Lượt theo cron không bao giờ nhận input nên luôn rơi về mặc định; hạ nó không chạm được
+production.
+
+---
+
 ## 1.3.40 — Mê Cung thôi đuổi sạch cả đội ngay sau hiệp đầu (schema 73)
 
 Tông chủ báo: *"mê cung chưa đánh đủ trần của ngày thì tự dưng giải tán phòng rồi đàn bị treo luôn

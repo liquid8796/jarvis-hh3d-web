@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.46",
+    date: "2026-08-24",
+    lines: [
+      "Sửa một việc thừa vừa phát hiện: lượt kiểm nửa đêm đi hỏi cả mấy kho phần mềm nuôi kèm, dù không ai nhờ.",
+    ],
+  },
+  {
     version: "1.3.45",
     date: "2026-08-24",
     lines: [
@@ -467,15 +474,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Vòng Quay Phúc Vận trên tài khoản thường nay cũng quay đủ 4 lượt mỗi ngày, ngang tài khoản VIP.",
       "Trang vòng quay của bản thường không phân biệt được「đã quay đủ」với「lượt cuối chưa mở」, nên trước đây đàn thường dừng ở 3 lượt rồi nghỉ tới hôm sau.",
-    ],
-  },
-  {
-    version: "1.1.0",
-    date: "2026-08-16",
-    lines: [
-      "Từ bản này, mỗi lượt cập nhật không còn làm gián đoạn: đang xem hay đang thao tác cũng không bị ngắt giữa chừng.",
-      "Sửa lỗi lời nhắn của tông môn bật lại nhiều lần dù đã bấm「Đã hiểu」.",
-      "Đăng nhập bằng địa chỉ cũ đã vào lại được bình thường.",
     ],
   },
 ];

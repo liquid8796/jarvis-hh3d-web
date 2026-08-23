@@ -126,7 +126,13 @@ export async function GET(request: Request) {
 
   // KHÁC kho chính: repo phụ fail-closed. Khi control doc/SITE_ID không xác định, một trạm stale
   // có thể còn quota 5 trong khi active station vừa đặt 0; thừa commit lúc này là phá cấu hình.
-  if (!companionDuty.feed) {
+  if (!scope.companions) {
+    // Cửa của SCOPE phải đứng trước cửa của NHIỆM VỤ. Thiếu nó thì `?only=daily-reset` vẫn đi hỏi
+    // hai chục kho phụ mỗi đêm — đo được ngay lượt chạy thử đầu tiên của timer nửa đêm. Không kho
+    // nào bị đẩy commit (khung nuôi là 08:00–22:00 nên `companionDueByNow` chặn hết), nhưng đó là
+    // hai chục lượt gọi API GitHub lúc 00:00 cho một việc không ai nhờ.
+    companionNurture = { skipped: true, why: "Lượt này không tới vì kho phụ." };
+  } else if (!companionDuty.feed) {
     companionNurture = { skipped: true, why: companionDuty.why };
   } else {
     // Báo RIÊNG: workflow kho chính và source kho phụ là hai lời hứa khác nhau. Một ledger lỗi

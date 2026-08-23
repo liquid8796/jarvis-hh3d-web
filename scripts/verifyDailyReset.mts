@@ -22,6 +22,7 @@ import { sqlTag } from "./pgTag.mjs";
 import { completeWorkerCycle, runDailyReset } from "../src/lib/services/jobs";
 import { getAppSettings, saveAppSettings } from "../src/lib/services/settings";
 import { reviewDailyReset, vietnamDay } from "../src/lib/validation/dailyReset";
+import { reviewCronScope } from "../src/lib/validation/githubStations";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -74,6 +75,44 @@ check(
     return !off.run && off.why.length > 10 && !done.run && done.why.includes("2026-08-24");
   })(),
 );
+
+// ---------------------------------------------------------------------------------------------
+// 1b. PHẠM VI của lượt cron — cửa mà timer nửa đêm đi qua
+// ---------------------------------------------------------------------------------------------
+//
+// Đo được ở chính lượt chạy thử đầu tiên của timer: lượt `?only=daily-reset` vẫn đi hỏi hai chục
+// kho phụ, vì nhánh ấy chỉ hỏi「có phải việc của trạm này không」mà quên hỏi「lượt này có tới vì
+// kho phụ không」. Không kho nào bị đẩy commit, nhưng đó là hai chục lượt gọi API GitHub lúc
+// 00:00 cho một việc không ai nhờ — và nó im lặng.
+
+const scopeOf = (raw: string | null) => {
+  const v = reviewCronScope(raw);
+  if (!v.ok) throw new Error(`reviewCronScope(${raw}) phải hợp lệ: ${v.why}`);
+  return v.scope;
+};
+
+check(
+  "lượt TRỌN GÓI (không ?only) làm đủ mọi việc, gồm cả reset sang ngày",
+  (() => {
+    const s = scopeOf(null);
+    return s.housekeeping && s.keepalive && s.companions && s.dailyReset;
+  })(),
+);
+check(
+  "?only=daily-reset CHỈ reset — không quét dọn, không đụng kho nào",
+  (() => {
+    const s = scopeOf("daily-reset");
+    return s.dailyReset && !s.housekeeping && !s.keepalive && !s.companions;
+  })(),
+);
+check(
+  "?only=companions vẫn rải commit kho phụ, và MANG THEO reset làm lưới hứng cho lịch nửa đêm",
+  (() => {
+    const s = scopeOf("companions");
+    return s.companions && s.dailyReset && !s.housekeeping && !s.keepalive;
+  })(),
+);
+check("?only lạ thì TỪ CHỐI, không lặng lẽ hiểu thành trọn gói", reviewCronScope("linh-tinh").ok === false);
 
 // ---------------------------------------------------------------------------------------------
 // 2. ĐƯỜNG THẬT — trên database, gồm ca đối chứng

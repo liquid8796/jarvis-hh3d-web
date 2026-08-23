@@ -325,6 +325,53 @@ export async function saveGameDomainAction(
   };
 }
 
+/**
+ * Đổi TRÌNH DUYỆT mà khôi lỗi dùng để cày.
+ *
+ * Một ô chọn, hai giá trị, áp cho cả tông môn — nên câu trả lời phải nói đúng ba điều mà người
+ * bấm không nhìn thấy được ở đâu khác: lựa chọn có hiệu lực từ VÒNG KẾ (đàn đang chạy vẫn đi nốt
+ * bằng trình duyệt cũ), máy nào chưa cài obscura sẽ tự chạy Chromium, và không ai phải cài lại
+ * gói khôi lỗi vì lựa chọn đi kèm mỗi lượt phát việc.
+ */
+export async function saveBrowserEngineAction(
+  _prev: AdminResult | null,
+  formData: FormData,
+): Promise<AdminResult> {
+  await requireAdmin();
+
+  const raw = String(formData.get("engine") ?? "");
+  if (raw !== "chromium" && raw !== "obscura") {
+    return { ok: false, message: "Trình duyệt không hợp lệ — chọn Chromium hoặc Obscura." };
+  }
+
+  const settings = await getAppSettings();
+  const previous = settings.browser.engine;
+  if (previous === raw) {
+    return { ok: true, message: `Vẫn đang dùng ${BROWSER_LABELS[raw]} — không có gì để đổi.` };
+  }
+
+  settings.browser.engine = raw;
+  await saveAppSettings(settings);
+  await notifyDashboard({ userId: "*", topic: "config" });
+
+  revalidatePath("/admin");
+  return {
+    ok: true,
+    message:
+      `Đã đổi trình duyệt: ${BROWSER_LABELS[previous]} → ${BROWSER_LABELS[raw]}. ` +
+      "Khôi lỗi dùng từ vòng kế; đàn đang chạy đi nốt bằng trình duyệt cũ. " +
+      (raw === "obscura"
+        ? "Máy nào chưa cài Obscura sẽ tự chạy bằng Chromium và nói rõ trong nhật ký."
+        : "Mọi máy quay về Chromium ngay, không cần cài gì thêm."),
+  };
+}
+
+/** Tên gọi cho người đọc — không để chuỗi kỹ thuật lọt vào câu trả lời. */
+const BROWSER_LABELS: Record<"chromium" | "obscura", string> = {
+  chromium: "Chromium",
+  obscura: "Obscura",
+};
+
 /** Trần ước lượng: một ngày. Trùng tu lâu hơn thế thì con số không còn là ước lượng nữa. */
 const MAINTENANCE_MAX_MINUTES = 24 * 60;
 const MAINTENANCE_MAX_NOTE = 500;

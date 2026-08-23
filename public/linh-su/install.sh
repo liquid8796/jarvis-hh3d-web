@@ -109,6 +109,33 @@ echo "Tải gói khôi lỗi..."
 rm -rf "$DIR/quest-engine" "$DIR/node_modules"
 curl -fsSL "$BASE/linh-su/goi-linh-su.tgz" | tar -xz -C "$DIR"
 
+# --- 3b. Obscura (tuỳ chọn) --------------------------------------------------
+# Trình duyệt thứ hai, chỉ tải khi người cài KHAI muốn: LINH_SU_OBSCURA=1 trước lệnh cài.
+# Gói nặng 47–86 MB tuỳ nền tảng, mà phần lớn máy vẫn chạy Chromium — xem chú thích cùng chỗ
+# trong install.ps1 cho lý do không tự hỏi cấu hình tông môn.
+if [ "${LINH_SU_OBSCURA:-}" = "1" ]; then
+  echo "Tải Obscura (trình duyệt ẩn mình)..."
+  OBSCURA_VERSION="v0.2.1"   # ghim tag, cùng lẽ với workflow khôi lỗi tông môn
+  # Kiến trúc đọc từ chính máy: Oracle Ampere (aarch64) và máy để bàn (x86_64) dùng hai binary
+  # khác hẳn nhau, tải nhầm thì tới lúc chạy mới nổ「Exec format error」.
+  case "$(uname -m)" in
+    aarch64 | arm64) obscura_cpu="aarch64" ;;
+    *) obscura_cpu="x86_64" ;;
+  esac
+  case "$(uname -s)" in
+    Darwin) obscura_os="macos" ;;
+    *) obscura_os="linux" ;;
+  esac
+  obscura_asset="obscura-${obscura_cpu}-${obscura_os}-stealth.tar.gz"
+  # KHÔNG dừng bộ cài khi tải hỏng: obscura là tuỳ chọn, khôi lỗi thì phải cài xong. Thiếu nó
+  # thì máy chạy Chromium như bấy lâu và engine nói rõ một dòng.
+  if curl -fsSL --retry 3 --retry-delay 2       "https://github.com/h4ckf0r0day/obscura/releases/download/$OBSCURA_VERSION/$obscura_asset"       | tar -xz -C "$DIR" && [ -x "$DIR/obscura" ]; then
+    echo "Obscura $("$DIR/obscura" --version 2>/dev/null || echo "(không rõ bản)") — sẵn sàng"
+  else
+    echo "Tải Obscura không xong — bỏ qua, máy vẫn chạy Chromium."
+  fi
+fi
+
 # --- 4. Chromium -------------------------------------------------------------
 # Dùng CLI của CHÍNH playwright-core đi kèm gói — không npm, không registry, và không
 # thể lệch phiên bản: người tải browser và người dùng browser là cùng một bản mã.

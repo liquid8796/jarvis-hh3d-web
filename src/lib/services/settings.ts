@@ -181,6 +181,28 @@ export const appSettingsSchema = z.object({
     })
     .prefault({ baseUrl: DEFAULT_GAME_BASE_URL }),
 
+  browser: z
+    .object({
+      /**
+       * TRÌNH DUYỆT mà khôi lỗi mở để cày — lựa chọn của Gia chủ, áp cho MỌI khôi lỗi cùng lúc
+       * (tông môn lẫn máy nhà từng đạo hữu).
+       *
+       * `chromium` là nếp cũ và là mặc định: Chromium đầy đủ, chạy headless, kèm phép đè client
+       * hints (xem runCycle.mjs). `obscura` là trình duyệt headless viết bằng Rust với bản dựng
+       * stealth — thứ sinh ra để không mang cái tật「HeadlessChrome」mà Cloudflare soi.
+       *
+       * Nằm ở app_settings chứ không phải env, đúng lẽ của `game.baseUrl` ngay trên: đổi trình
+       * duyệt là chuyện của một ô chọn và vòng chạy KẾ, không phải một lượt phát hành gói cho
+       * chín kho khôi lỗi đông lạnh.
+       *
+       * `.catch("chromium")` — một giá trị rác (sửa tay JSONB) phải rơi về đường đã chạy suốt
+       * bấy lâu, không phải về đường mới. Và máy nào chưa cài obscura thì chính engine tự lui về
+       * Chromium: lựa chọn này không bao giờ được phép biến thành một vòng chạy chết.
+       */
+      engine: z.enum(["chromium", "obscura"]).catch("chromium"),
+    })
+    .prefault({ engine: "chromium" }),
+
   /**
    * Sổ gương trạm — danh mục trạm dự phòng cho hệ chuyển trạm (deploy/mirror/README.md §4).
    *

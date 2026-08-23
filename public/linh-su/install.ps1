@@ -156,6 +156,40 @@ foreach ($stale in @("quest-engine", "node_modules")) {
 Invoke-Tar @("-xzf", $tgz, "-C", $dir) "Bung gói khôi lỗi"
 Remove-Item $tgz -Force
 
+# --- 3b. Obscura (tuỳ chọn) --------------------------------------------------
+# Trình duyệt thứ hai. Chỉ tải khi người cài KHAI muốn — đặt $env:LINH_SU_OBSCURA='1' trước
+# lệnh cài — vì gói nặng ~74 MB và phần lớn máy vẫn chạy Chromium.
+#
+# Vì sao KHÔNG tự tải theo lựa chọn trên trang Tông Môn: bộ cài không có linh phù đủ quyền để
+# hỏi cấu hình của tông môn, và thêm một endpoint công khai chỉ để trả một chữ là mở thêm một
+# cánh cửa cho một tiện nghi. Ai đã chọn Obscura ở trang Tông Môn thì chạy lại lệnh cài kèm cờ
+# này; máy chưa có nó vẫn chạy Chromium bình thường và nói rõ một dòng trong nhật ký.
+if ($env:LINH_SU_OBSCURA -eq "1") {
+  Write-Host "Tải Obscura (trình duyệt ẩn mình)..."
+  # Ghim tag, cùng lẽ với workflow của khôi lỗi tông môn: một bản mới đổi cờ dòng lệnh sẽ làm
+  # mọi máy hỏng cùng lúc ở chỗ không ai nhìn.
+  $obscuraVersion = "v0.2.1"
+  $obscuraZip = Join-Path $env:TEMP "obscura.zip"
+  try {
+    Invoke-WebRequest -UseBasicParsing -OutFile $obscuraZip `
+      -Uri "https://github.com/h4ckf0r0day/obscura/releases/download/$obscuraVersion/obscura-x86_64-windows-stealth.zip"
+    Invoke-Tar @("-xf", $obscuraZip, "-C", $dir) "Bung Obscura"
+    Remove-Item $obscuraZip -Force
+    $obscuraExe = Join-Path $dir "obscura.exe"
+    if (Test-Path $obscuraExe) {
+      # Hỏi chính nó một câu: một tệp đúng tên mà sai kiến trúc vẫn giải nén ngon lành, rồi nằm
+      # im tới lúc chạy mới nổ giữa một vòng cày.
+      Write-Host ("Obscura " + (& $obscuraExe --version) + " — sẵn sàng") -ForegroundColor Green
+    } else {
+      Write-Host "Không thấy obscura.exe sau khi bung — máy này sẽ chạy Chromium." -ForegroundColor Yellow
+    }
+  } catch {
+    # KHÔNG ném: obscura là tuỳ chọn, còn khôi lỗi thì phải cài xong. Hỏng ở đây chỉ có nghĩa là
+    # máy này chạy Chromium như bấy lâu.
+    Write-Host "Tải Obscura không xong ($($_.Exception.Message)) — bỏ qua, máy vẫn chạy Chromium." -ForegroundColor Yellow
+  }
+}
+
 # --- 4. Chromium -------------------------------------------------------------
 # Dùng CLI của CHÍNH playwright-core đi kèm gói. Không `npx playwright@<bản>` — cách đó
 # cần npm, cần ra registry, và mở đường cho CLI lệch phiên bản đặt sẵn một revision

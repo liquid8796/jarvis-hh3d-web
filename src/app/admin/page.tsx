@@ -17,6 +17,7 @@ import { ChangelogPanel } from "./ChangelogPanel";
 import { ChatPurgePanel } from "./ChatPurgePanel";
 import { ChatSettingsForm } from "./ChatSettingsForm";
 import { TagFrameManager } from "./TagFrameManager";
+import { BrowserEngineForm } from "./BrowserEngineForm";
 import { GameDomainForm } from "./GameDomainForm";
 import { GithubStationPanel } from "./GithubStationPanel";
 import { JobEventRetentionForm } from "./JobEventRetentionForm";
@@ -162,6 +163,7 @@ export default async function AdminPage({
               pane: (
                 <div className="flex max-w-2xl flex-col gap-6">
                   <GameDomainForm baseUrl={settings.game.baseUrl} />
+                  <BrowserEngineForm engine={settings.browser.engine} />
                   <MaintenanceForm maintenance={settings.maintenance} drain={drain} />
                   <JobEventRetentionForm
                     retentionHours={jobEventStats.retentionHours}

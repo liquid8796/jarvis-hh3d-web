@@ -308,6 +308,12 @@ export async function POST(request: Request) {
           // khôi lỗi riêng chạy trên máy của chính đạo hữu thì không ai phải xếp hàng sau lưng.
           // Khôi lỗi đời cũ không biết trường này và bỏ qua — an toàn theo hướng giữ nếp cũ.
           ...(scope.kind === "operator" ? { soloQuestNames: OPERATOR_SOLO_QUEST_NAMES } : {}),
+          // Trình duyệt Gia chủ chọn ở trang Tông Môn. Ghép tại CỬA PHÁT VIỆC, cùng chỗ và cùng
+          // lẽ với `gameBaseUrl`: đây là sự thật của toàn hệ tại thời điểm phát việc, nên đổi ô
+          // chọn là mọi khôi lỗi — kể cả chín kho đông lạnh — đi theo ngay từ vòng kế, không cần
+          // đẩy gói mới. KHÔNG gác theo scope: đạo hữu chạy máy nhà cũng được hưởng lựa chọn ấy,
+          // và máy nào chưa cài thì chính engine lui về Chromium.
+          browserEngine: settings.browser.engine,
         },
       });
     }

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.44",
+    date: "2026-08-23",
+    lines: [
+      "Trang Tông Môn thêm ô chọn trình duyệt cho auto: giữ trình duyệt cũ, hoặc đổi sang Obscura — loại ẩn mình, đỡ bị trang game nghi là máy.",
+      "Đổi là auto dùng ngay từ vòng kế, không ai phải cài lại. Máy của tông môn đã có sẵn Obscura.",
+      "Máy nhà muốn dùng thì cài lại auto một lần theo hướng dẫn ngay dưới ô chọn; chưa cài thì vẫn chạy như cũ.",
+    ],
+  },
+  {
     version: "1.3.43",
     date: "2026-08-23",
     lines: [
@@ -466,15 +475,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Cả hệ thống dọn về nhà mới — chạy nhanh và ổn định hơn, không còn phụ thuộc nhiều bên.",
       "Địa chỉ trang, tài khoản, đàn và mọi dữ liệu giữ nguyên; đạo hữu không phải làm gì cả.",
-    ],
-  },
-  {
-    version: "0.98.0",
-    date: "2026-08-16",
-    lines: [
-      "Thông báo tông môn nay gửi được cho cả người CHƯA đăng nhập — chọn「Khách chưa đăng nhập」khi phát.",
-      "Lời nhắn ấy hiện với bất kỳ ai mở trang, và tắt hẳn sau khi họ bấm「Đã hiểu」.",
-      "Khác thông báo cho môn đồ: nó hiện ở lần tải trang kế tiếp, không bật lên tức thì.",
     ],
   },
 ];

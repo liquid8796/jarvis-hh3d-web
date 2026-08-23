@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.42",
+    date: "2026-08-23",
+    lines: [
+      "Ngọc Giản Cấu Hình bớt chữ thừa: hai khối Luyện Đan Đường và Khoáng Mạch thôi nhắc lại câu「bản này không đụng tab kia」.",
+      "Dòng mô tả Hỷ Sự Đường cũng gọn lại còn một câu.",
+    ],
+  },
+  {
     version: "1.3.41",
     date: "2026-08-23",
     lines: [
@@ -468,13 +476,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khoáng Mạch: Linh Quang Phù nay chỉ mua SAU khi đoạt được mỏ. Không đoạt, hoặc đoạt không thành, thì không mua lá nào.",
       "Trước đây phù được mua ngay khi mỏ đào xong, kể cả những lượt không đoạt — mà phù chỉ sống một giờ và sinh ra để cộng thêm cho mỏ vừa đoạt được.",
-    ],
-  },
-  {
-    version: "0.96.0",
-    date: "2026-08-15",
-    lines: [
-      "Khoáng Mạch: Linh Quang Phù nay chỉ mua đúng MỘT lá mỗi ngày cho mỗi đàn — trước đây đàn chuyển sang máy khác giữa chừng là mua thêm một lá nữa.",
     ],
   },
 ];

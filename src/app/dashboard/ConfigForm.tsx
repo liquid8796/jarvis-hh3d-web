@@ -51,9 +51,7 @@ const SIMPLE_QUESTS: ReadonlyArray<SimpleQuest> = [
   {
     key: "hySuDuong",
     name: "Hỷ Sự Đường",
-    hint:
-      "Chúc phúc các tiệc cưới đang mở bên Tiên Duyên — mỗi lời chúc tốn 30 Tiên Ngọc, nhận 120 Tu Vi. " +
-      "Tiệc nào còn lì xì chưa mở thì luôn được ghé để bóc, bất kể bộ lọc chọn gì.",
+    hint: "Chúc phúc và nhận lì xì ở các tiệc cưới.",
   },
   {
     key: "phanThuongHoatDong",
@@ -106,14 +104,12 @@ const FREE_QUESTS = SIMPLE_QUESTS.filter((quest) => FREE_QUEST_KEYS.has(quest.ke
  */
 function LuyenDanFieldset({
   prefix,
-  note,
   accentClass,
   config,
   enabled,
   onToggle,
 }: {
   prefix: "luyenDan" | "luyenDanThuong";
-  note: string;
   accentClass: string;
   config: EditableConfig["quests"]["luyenDan"];
   enabled: boolean;
@@ -133,8 +129,6 @@ function LuyenDanFieldset({
           Luyện Đan Đường
         </label>
       </legend>
-
-      <p className="mb-3 text-xs text-[var(--color-mist)]">{note}</p>
 
       <div
         className={`grid gap-4 transition-opacity duration-300 sm:grid-cols-2 ${
@@ -196,14 +190,12 @@ function LuyenDanFieldset({
  */
 function KhoangMachFieldset({
   prefix,
-  note,
   accentClass,
   config,
   enabled,
   onToggle,
 }: {
   prefix: "khoangMach" | "khoangMachThuong";
-  note: string;
   accentClass: string;
   config: EditableConfig["quests"]["khoangMach"];
   enabled: boolean;
@@ -237,8 +229,6 @@ function KhoangMachFieldset({
           Khoáng Mạch
         </label>
       </legend>
-
-      <p className="mb-3 text-xs text-[var(--color-mist)]">{note}</p>
 
       <div
         className={`grid gap-4 transition-opacity duration-300 sm:grid-cols-2 ${
@@ -855,7 +845,6 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       <div hidden={questTab !== "vip"}>
         <LuyenDanFieldset
           prefix="luyenDan"
-          note="Bản riêng cho tài khoản VIP — chỉnh ở đây không đụng tab Thường."
           accentClass="accent-[var(--color-gold-400)]"
           config={config.quests.luyenDan}
           enabled={luyenDan}
@@ -865,7 +854,6 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       <div hidden={questTab !== "free"}>
         <LuyenDanFieldset
           prefix="luyenDanThuong"
-          note="Bản riêng cho tài khoản thường — chỉnh ở đây không đụng tab VIP."
           accentClass="accent-[var(--color-jade-400)]"
           config={config.quests.luyenDanThuong}
           enabled={luyenDanThuong}
@@ -879,7 +867,6 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       <div hidden={questTab !== "vip"}>
         <KhoangMachFieldset
           prefix="khoangMach"
-          note="Bản riêng cho tài khoản VIP — chỉnh ở đây không đụng tab Thường."
           accentClass="accent-[var(--color-gold-400)]"
           config={config.quests.khoangMach}
           enabled={khoangMach}
@@ -889,7 +876,6 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       <div hidden={questTab !== "free"}>
         <KhoangMachFieldset
           prefix="khoangMachThuong"
-          note="Bản riêng cho tài khoản thường — chỉnh ở đây không đụng tab VIP."
           accentClass="accent-[var(--color-jade-400)]"
           config={config.quests.khoangMachThuong}
           enabled={khoangMachThuong}

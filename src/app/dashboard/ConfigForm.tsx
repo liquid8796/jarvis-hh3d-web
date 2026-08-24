@@ -102,35 +102,156 @@ const FREE_QUESTS = SIMPLE_QUESTS.filter((quest) => FREE_QUEST_KEYS.has(quest.ke
  * chỉ khác tiền tố tên field và bản config đằng sau — tiền tố khớp thẳng với key trong
  * configSchema nên saveConfigAction đọc không cần bảng dịch.
  */
+/**
+ * Khoá của một khối gấp được. Hai bản VIP/Thường của CÙNG một nhiệm vụ dùng chung một khoá:
+ * chúng là một nhiệm vụ, chỉ khác hạng tài khoản, nên gấp ở tab này thì tab kia cũng gấp —
+ * người dùng không phải gấp hai lần cho một thứ. Ngược lại hai lưới nhiệm-vụ-ngày là hai
+ * danh sách KHÁC nhau nên mỗi bên một khoá.
+ */
+type BlockKey = "simpleFree" | "meCung" | "luyenDan" | "khoangMach" | "simpleVip";
+
+const COLLAPSE_STORAGE_KEY = "jvz.config.collapsed";
+
+/**
+ * Nhớ khối nào đang gấp, qua các lượt mở trang.
+ *
+ * Đọc `localStorage` trong `useEffect` chứ KHÔNG phải lúc render, và đó không phải chuyện gu:
+ * máy chủ không có `localStorage`, nên đọc lúc render là hai bên dựng ra hai cây khác nhau và
+ * React kêu hydration mismatch. Lượt vẽ đầu vì thế luôn là "mở hết" — đúng hành vi cũ — rồi
+ * những khối đã gấp mới xếp lại ngay sau đó.
+ *
+ * Trình duyệt cấm `localStorage` (chế độ riêng tư, cookie bị chặn) thì ngọc giản vẫn dùng
+ * được y nguyên; chỉ là lần sau mở lại thì mọi khối đều mở. Nên mọi phép đọc/ghi ở đây đều
+ * nuốt lỗi có chủ ý.
+ */
+function useCollapsedBlocks() {
+  const [collapsed, setCollapsed] = useState<Partial<Record<BlockKey, boolean>>>({});
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(COLLAPSE_STORAGE_KEY);
+      if (!saved) return;
+      const parsed: unknown = JSON.parse(saved);
+      // Khoá này có thể mang rác của một đời mã khác, hoặc của một tiện ích nào đó. Chỉ nhận
+      // đúng hình dạng mình ghi ra; sai hình thì bỏ qua, đừng để nó ném giữa lượt dựng trang.
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        setCollapsed(parsed as Partial<Record<BlockKey, boolean>>);
+      }
+    } catch {
+      /* không nhớ được thì thôi — xem ghi chú trên */
+    }
+  }, []);
+
+  /**
+   * Chỉ ghi xuống đĩa SAU một cú bấm thật. Không có cái chốt này thì lượt vẽ đầu tiên sẽ ghi
+   * đè `{}` lên đúng thứ vừa đọc lên: hiệu ứng nạp ở trên gọi `setCollapsed`, nhưng lần render
+   * mang giá trị mới chỉ tới ở nhịp sau — nên một hiệu ứng ghi chạy cùng nhịp ấy vẫn đang cầm
+   * `{}`. Và phép ghi nằm ở đây chứ không trong hàm cập nhật state, để hàm ấy THUẦN: React gọi
+   * nó hai lần ở chế độ nghiêm ngặt.
+   */
+  const touched = useRef(false);
+  useEffect(() => {
+    if (!touched.current) return;
+    try {
+      window.localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(collapsed));
+    } catch {
+      /* như trên */
+    }
+  }, [collapsed]);
+
+  const toggle = (key: BlockKey) => {
+    touched.current = true;
+    setCollapsed((current) => ({ ...current, [key]: !current[key] }));
+  };
+
+  return { collapsed, toggle };
+}
+
+/**
+ * Nút gấp/mở đứng cạnh tên khối.
+ *
+ * `type="button"` là BẮT BUỘC chứ không phải cho đủ lệ: nút trần trong một `<form>` mặc định
+ * là `submit`, nên thiếu nó thì mỗi cú gấp là một lần khắc ngọc giản.
+ */
+function CollapseToggle({
+  bodyId,
+  collapsed,
+  onToggle,
+  label,
+}: {
+  bodyId: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={!collapsed}
+      aria-controls={bodyId}
+      title={collapsed ? `Mở ${label}` : `Gấp ${label}`}
+      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--color-mist)] transition hover:text-[var(--color-parchment)]"
+    >
+      <span
+        aria-hidden="true"
+        className={`text-[10px] leading-none transition-transform duration-200 ${
+          collapsed ? "-rotate-90" : ""
+        }`}
+      >
+        ▼
+      </span>
+      <span className="sr-only">{collapsed ? `Mở khối ${label}` : `Gấp khối ${label}`}</span>
+    </button>
+  );
+}
+
 function LuyenDanFieldset({
   prefix,
   accentClass,
   config,
   enabled,
   onToggle,
+  collapsed,
+  onToggleCollapse,
 }: {
   prefix: "luyenDan" | "luyenDanThuong";
   accentClass: string;
   config: EditableConfig["quests"]["luyenDan"];
   enabled: boolean;
   onToggle: (value: boolean) => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }) {
   return (
     <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
+      {/* <span> chứ không phải <div>: nội dung hợp lệ của <legend> là phrasing content, mà
+          <div> là flow content. Trình duyệt vẫn vẽ ra, nhưng đó là markup sai — và flex chạy
+          y hệt trên <span>. */}
       <legend className="px-2">
-        <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
-          <input
-            type="checkbox"
-            name={`${prefix}Enabled`}
-            defaultChecked={config.enabled}
-            onChange={(e) => onToggle(e.target.checked)}
-            className={`h-4 w-4 ${accentClass}`}
+        <span className="flex items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
+            <input
+              type="checkbox"
+              name={`${prefix}Enabled`}
+              defaultChecked={config.enabled}
+              onChange={(e) => onToggle(e.target.checked)}
+              className={`h-4 w-4 ${accentClass}`}
+            />
+            Luyện Đan Đường
+          </label>
+          <CollapseToggle
+            bodyId={`${prefix}-body`}
+            collapsed={collapsed}
+            onToggle={onToggleCollapse}
+            label="Luyện Đan Đường"
           />
-          Luyện Đan Đường
-        </label>
+        </span>
       </legend>
 
       <div
+        id={`${prefix}-body`}
+        hidden={collapsed}
         className={`grid gap-4 transition-opacity duration-300 sm:grid-cols-2 ${
           enabled ? "opacity-100" : "pointer-events-none opacity-40"
         }`}
@@ -194,12 +315,16 @@ function KhoangMachFieldset({
   config,
   enabled,
   onToggle,
+  collapsed,
+  onToggleCollapse,
 }: {
   prefix: "khoangMach" | "khoangMachThuong";
   accentClass: string;
   config: EditableConfig["quests"]["khoangMach"];
   enabled: boolean;
   onToggle: (value: boolean) => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }) {
   /**
    * Ô「Đoạt mỏ」là công tắc của cả cụm bên dưới nó, nên nó phải sống trong state chứ không
@@ -217,20 +342,33 @@ function KhoangMachFieldset({
 
   return (
     <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
+      {/* <span> chứ không phải <div>: nội dung hợp lệ của <legend> là phrasing content, mà
+          <div> là flow content. Trình duyệt vẫn vẽ ra, nhưng đó là markup sai — và flex chạy
+          y hệt trên <span>. */}
       <legend className="px-2">
-        <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
-          <input
-            type="checkbox"
-            name={`${prefix}Enabled`}
-            defaultChecked={config.enabled}
-            onChange={(e) => onToggle(e.target.checked)}
-            className={`h-4 w-4 ${accentClass}`}
+        <span className="flex items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
+            <input
+              type="checkbox"
+              name={`${prefix}Enabled`}
+              defaultChecked={config.enabled}
+              onChange={(e) => onToggle(e.target.checked)}
+              className={`h-4 w-4 ${accentClass}`}
+            />
+            Khoáng Mạch
+          </label>
+          <CollapseToggle
+            bodyId={`${prefix}-body`}
+            collapsed={collapsed}
+            onToggle={onToggleCollapse}
+            label="Khoáng Mạch"
           />
-          Khoáng Mạch
-        </label>
+        </span>
       </legend>
 
       <div
+        id={`${prefix}-body`}
+        hidden={collapsed}
         className={`grid gap-4 transition-opacity duration-300 sm:grid-cols-2 ${
           enabled ? "opacity-100" : "pointer-events-none opacity-40"
         }`}
@@ -581,6 +719,13 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
   const [luyenDanThuong, setLuyenDanThuong] = useState(config.quests.luyenDanThuong.enabled);
   const [khoangMach, setKhoangMach] = useState(config.quests.khoangMach.enabled);
   const [khoangMachThuong, setKhoangMachThuong] = useState(config.quests.khoangMachThuong.enabled);
+  /**
+   * Khối nào đang gấp. Gấp là chuyện của MẮT, không phải của dữ liệu: thân khối chỉ bị ẩn
+   * bằng thuộc tính `hidden`, mọi input vẫn nằm nguyên trong DOM và vẫn được nộp lên. Dựng
+   * lại thân khối theo điều kiện là cách chắc chắn nhất để xoá sạch cấu hình của người ta
+   * trong im lặng — form này uncontrolled, giá trị sống trong DOM chứ không trong state.
+   */
+  const { collapsed, toggle: toggleCollapsed } = useCollapsedBlocks();
   /** Nhiệm vụ đang khoá mà người dùng vừa bấm vào — `null` là không có popup nào. */
   const [lockedQuest, setLockedQuest] = useState<SimpleQuest | null>(null);
   const [simpleEnabled, setSimpleEnabled] = useState<Record<string, boolean>>(() =>
@@ -680,16 +825,26 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
 
       <div hidden={questTab !== "free"}>
         <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
-          <legend className="px-2 text-sm font-semibold text-[var(--color-parchment)]">
-            Nhiệm vụ tài khoản thường
+          <legend className="px-2">
+            <span className="flex items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
+              Nhiệm vụ tài khoản thường
+              <CollapseToggle
+                bodyId="simpleFree-body"
+                collapsed={collapsed.simpleFree === true}
+                onToggle={() => toggleCollapsed("simpleFree")}
+                label="Nhiệm vụ tài khoản thường"
+              />
+            </span>
           </legend>
-          <SimpleQuestGrid
-            quests={FREE_QUESTS}
-            enabled={simpleEnabled}
-            onToggle={toggleSimpleQuest}
-            onToggleMany={toggleQuests}
-            onLocked={setLockedQuest}
-          />
+          <div id="simpleFree-body" hidden={collapsed.simpleFree === true}>
+            <SimpleQuestGrid
+              quests={FREE_QUESTS}
+              enabled={simpleEnabled}
+              onToggle={toggleSimpleQuest}
+              onToggleMany={toggleQuests}
+              onLocked={setLockedQuest}
+            />
+          </div>
         </fieldset>
       </div>
 
@@ -705,19 +860,29 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       {/* ---------------------------------------------------------------- Mê Cung */}
       <fieldset className="mb-5 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
         <legend className="px-2">
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
-            <input
-              type="checkbox"
-              name="meCungEnabled"
-              defaultChecked={config.quests.meCung.enabled}
-              onChange={(e) => setMeCung(e.target.checked)}
-              className="h-4 w-4 accent-[var(--color-jade-400)]"
+          <span className="flex items-center gap-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
+              <input
+                type="checkbox"
+                name="meCungEnabled"
+                defaultChecked={config.quests.meCung.enabled}
+                onChange={(e) => setMeCung(e.target.checked)}
+                className="h-4 w-4 accent-[var(--color-jade-400)]"
+              />
+              Mê Cung
+            </label>
+            <CollapseToggle
+              bodyId="meCung-body"
+              collapsed={collapsed.meCung === true}
+              onToggle={() => toggleCollapsed("meCung")}
+              label="Mê Cung"
             />
-            Mê Cung
-          </label>
+          </span>
         </legend>
 
         <div
+          id="meCung-body"
+          hidden={collapsed.meCung === true}
           className={`grid gap-4 transition-opacity duration-300 sm:grid-cols-2 ${
             meCung ? "opacity-100" : "pointer-events-none opacity-40"
           }`}
@@ -845,6 +1010,8 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       <div hidden={questTab !== "vip"}>
         <LuyenDanFieldset
           prefix="luyenDan"
+          collapsed={collapsed.luyenDan === true}
+          onToggleCollapse={() => toggleCollapsed("luyenDan")}
           accentClass="accent-[var(--color-gold-400)]"
           config={config.quests.luyenDan}
           enabled={luyenDan}
@@ -854,6 +1021,8 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       <div hidden={questTab !== "free"}>
         <LuyenDanFieldset
           prefix="luyenDanThuong"
+          collapsed={collapsed.luyenDan === true}
+          onToggleCollapse={() => toggleCollapsed("luyenDan")}
           accentClass="accent-[var(--color-jade-400)]"
           config={config.quests.luyenDanThuong}
           enabled={luyenDanThuong}
@@ -867,6 +1036,8 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       <div hidden={questTab !== "vip"}>
         <KhoangMachFieldset
           prefix="khoangMach"
+          collapsed={collapsed.khoangMach === true}
+          onToggleCollapse={() => toggleCollapsed("khoangMach")}
           accentClass="accent-[var(--color-gold-400)]"
           config={config.quests.khoangMach}
           enabled={khoangMach}
@@ -876,6 +1047,8 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       <div hidden={questTab !== "free"}>
         <KhoangMachFieldset
           prefix="khoangMachThuong"
+          collapsed={collapsed.khoangMach === true}
+          onToggleCollapse={() => toggleCollapsed("khoangMach")}
           accentClass="accent-[var(--color-jade-400)]"
           config={config.quests.khoangMachThuong}
           enabled={khoangMachThuong}
@@ -886,19 +1059,29 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       {/* ------------------------------------------------------ Nhiệm vụ ngày còn lại */}
       <div hidden={questTab !== "vip"}>
       <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
-        <legend className="px-2 text-sm font-semibold text-[var(--color-parchment)]">
-          Nhiệm vụ ngày
+        <legend className="px-2">
+          <span className="flex items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
+            Nhiệm vụ ngày
+            <CollapseToggle
+              bodyId="simpleVip-body"
+              collapsed={collapsed.simpleVip === true}
+              onToggle={() => toggleCollapsed("simpleVip")}
+              label="Nhiệm vụ ngày"
+            />
+          </span>
         </legend>
-        <p className="mb-3 text-xs text-[var(--color-mist)]">
-          Mỗi ngày một lần. Tick là xong, không phải chỉnh gì thêm.
-        </p>
-        <SimpleQuestGrid
-          quests={SIMPLE_QUESTS}
-          enabled={simpleEnabled}
-          onToggle={toggleSimpleQuest}
-          onToggleMany={toggleQuests}
-          onLocked={setLockedQuest}
-        />
+        <div id="simpleVip-body" hidden={collapsed.simpleVip === true}>
+          <p className="mb-3 text-xs text-[var(--color-mist)]">
+            Mỗi ngày một lần. Tick là xong, không phải chỉnh gì thêm.
+          </p>
+          <SimpleQuestGrid
+            quests={SIMPLE_QUESTS}
+            enabled={simpleEnabled}
+            onToggle={toggleSimpleQuest}
+            onToggleMany={toggleQuests}
+            onLocked={setLockedQuest}
+          />
+        </div>
       </fieldset>
       </div>
 

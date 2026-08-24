@@ -11,6 +11,54 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.47 — Gấp được từng khối nhiệm vụ trong Ngọc Giản Cấu Hình
+
+Ngọc giản đã dài tới mức phải cuộn qua Mê Cung, Luyện Đan Đường, Khoáng Mạch rồi mới tới lưới
+nhiệm vụ ngày. Nay mỗi khối có một mũi tên cạnh tên để gấp lại, và trang nhớ lựa chọn ấy qua các
+lượt mở (`localStorage`, khoá `jvz.config.collapsed`).
+
+Năm khối gấp được: Mê Cung · Luyện Đan Đường · Khoáng Mạch · Nhiệm vụ ngày (tab VIP) · Nhiệm vụ
+tài khoản thường (tab Thường). Hai bản VIP/Thường của Luyện Đan và Khoáng Mạch dùng CHUNG một
+khoá — chúng là một nhiệm vụ, chỉ khác hạng, nên gấp ở tab này thì tab kia cũng gấp; còn hai lưới
+nhiệm-vụ-ngày là hai danh sách khác nhau nên mỗi bên một khoá.
+
+**Điều kiện cứng của bản vá này, và là chỗ dễ hỏng nhất: GẤP KHÔNG ĐƯỢC PHÉP DỰNG LẠI THÂN KHỐI.**
+Form này uncontrolled — giá trị sống trong DOM, không trong state, đúng như ghi chú đầu tệp đã
+dặn. Dựng thân khối theo điều kiện (`{!collapsed && <div>…</div>}`) là mọi input bên trong biến
+khỏi DOM, không được nộp lên, và zod ở máy chủ điền mặc định đè lên — tức **xoá sạch cấu hình của
+người dùng trong im lặng, chỉ vì họ gấp một khối lại cho đỡ rối mắt**. Nên thân khối chỉ mang
+thuộc tính `hidden`, y hệt cách hai tab VIP/Thường vẫn ẩn nhau từ trước. (`hidden` thắng được class
+`grid` là nhờ preflight của Tailwind v4 khai `display: none !important` — đã mở tệp ra đọc chứ
+không đoán.)
+
+Ba chi tiết nhỏ mà thiếu là hỏng:
+
+- **`type="button"` trên nút gấp.** Nút trần trong một `<form>` mặc định là `submit`, nên thiếu
+  nó thì mỗi cú gấp là một lần khắc ngọc giản.
+- **`<span>` chứ không phải `<div>` bọc trong `<legend>`.** Nội dung hợp lệ của `<legend>` là
+  phrasing content; `<div>` là flow content. Trình duyệt vẫn vẽ ra nên rất dễ để nguyên, nhưng đó
+  là markup sai — và `flex` chạy y hệt trên `<span>`.
+- **Đọc `localStorage` trong `useEffect`, không phải lúc render.** Máy chủ không có
+  `localStorage`, nên đọc lúc render là hai bên dựng ra hai cây khác nhau và React kêu hydration
+  mismatch. Lượt vẽ đầu vì thế luôn là「mở hết」— đúng hành vi cũ — rồi những khối đã gấp mới xếp
+  lại ngay sau.
+
+Kèm một chỗ đã sửa trong lượt soát ngược: phép ghi `localStorage` lúc đầu nằm TRONG hàm cập nhật
+state, tức hàm ấy không thuần và React gọi nó hai lần ở chế độ nghiêm ngặt. Nay nó ở một
+`useEffect` riêng, có chốt「chỉ ghi sau một cú bấm thật」— không có chốt ấy thì lượt vẽ đầu tiên
+ghi đè `{}` lên đúng thứ vừa đọc lên, vì hiệu ứng nạp gọi `setCollapsed` nhưng lần render mang giá
+trị mới chỉ tới ở nhịp sau.
+
+Trình duyệt cấm `localStorage` (chế độ riêng tư, cookie bị chặn) thì ngọc giản vẫn dùng được y
+nguyên, chỉ là lần sau mở lại mọi khối đều mở — mọi phép đọc/ghi đều nuốt lỗi có chủ ý.
+
+**Kiểm chứng.** `npx tsc --noEmit` sạch. Ảnh chụp trên production ở cả hai trạng thái (mở hết và
+gấp hết), kèm một phép đo đếm số input còn nằm trong DOM khi đã gấp — vì đó mới là thứ quyết định
+cấu hình có bị xoá hay không. KHÔNG chạy `next build` ở máy này: cây làm việc dùng chung `.next`
+với các phiên khác, nên bản dựng thật là bản trên VM.
+
+---
+
 ## 1.3.41 — Khôi lỗi tông môn tự phát lượt kế, thôi lệ thuộc cron của GitHub
 
 Tông chủ hỏi vì sao vài khôi lỗi tông môn tắt. Truy ra thì chúng KHÔNG hỏng: lượt Actions gần

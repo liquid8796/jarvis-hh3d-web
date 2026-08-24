@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.47",
+    date: "2026-08-23",
+    lines: [
+      "Mỗi khối nhiệm vụ trong Ngọc Giản Cấu Hình nay gấp lại được — bấm mũi tên cạnh tên khối.",
+      "Trang nhớ khối nào bạn đã gấp, lần sau mở lại vẫn y như bạn để.",
+      "Gấp chỉ là giấu cho gọn mắt: mọi lựa chọn bên trong vẫn được lưu đủ khi bấm Khắc Ngọc Giản.",
+    ],
+  },
+  {
     version: "1.3.46",
     date: "2026-08-24",
     lines: [
@@ -466,14 +475,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-16",
     lines: [
       "Tab Khôi Lỗi nói lại cho đúng: khôi lỗi riêng chạy thẳng ở máy nhà, không phải xếp hàng chờ ở hàng đợi.",
-    ],
-  },
-  {
-    version: "1.1.1",
-    date: "2026-08-16",
-    lines: [
-      "Vòng Quay Phúc Vận trên tài khoản thường nay cũng quay đủ 4 lượt mỗi ngày, ngang tài khoản VIP.",
-      "Trang vòng quay của bản thường không phân biệt được「đã quay đủ」với「lượt cuối chưa mở」, nên trước đây đàn thường dừng ở 3 lượt rồi nghỉ tới hôm sau.",
     ],
   },
 ];

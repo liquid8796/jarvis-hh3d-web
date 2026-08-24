@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.48",
+    date: "2026-08-23",
+    lines: [
+      "Khối nhiệm vụ gấp lại nay xếp gọn hẳn, thôi để lại một ô trống dưới tên khối.",
+    ],
+  },
+  {
     version: "1.3.47",
     date: "2026-08-23",
     lines: [
@@ -468,13 +475,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Mê Cung: đánh xong một đợt là tìm phòng đánh tiếp sau khoảng một phút, thay vì nghỉ hẳn một tiếng như trước.",
       "Mỗi lượt ghé cũng đánh được nhiều hiệp hơn trước khi giải tán — đội đã đủ người không còn bị bỏ phí giữa chừng.",
-    ],
-  },
-  {
-    version: "1.1.2",
-    date: "2026-08-16",
-    lines: [
-      "Tab Khôi Lỗi nói lại cho đúng: khôi lỗi riêng chạy thẳng ở máy nhà, không phải xếp hàng chờ ở hàng đợi.",
     ],
   },
 ];

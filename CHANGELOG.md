@@ -11,6 +11,22 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.48 — Khối đã gấp thôi để lại một hộp viền rỗng
+
+Ảnh chụp production ngay sau 1.3.47 cho thấy mỗi khối gấp lại vẫn để một ô viền trống cao chừng
+40px dưới dòng tiêu đề: `p-4` của `<fieldset>` còn nguyên trong khi thân khối đã ẩn, nên cái hộp
+vẫn giữ chỗ. Nhìn như lỗi vẽ, và làm mất gần hết cái lợi của phép gấp.
+
+Gấp xong thì khung phải ôm lấy đúng dòng tiêu đề: padding dọc về 0, giữ nguyên padding ngang và
+khoảng cách giữa các khối.
+
+**Đây là chỗ chỉ ẢNH CHỤP mới nói ra.** `tsc` sạch, và lưới `verify:config-collapse` 41 phép thử
+xanh — nó hỏi「thân khối có ẩn không」và「input còn trong DOM không」, hai câu đều đúng cả trước lẫn
+sau bản vá này. Không tấm ảnh nào thì cái hộp rỗng ấy đã sống qua nhiều lượt phát hành, đúng bài
+học「đo DOM không thay được mắt」đã chép ở Mê Cung.
+
+---
+
 ## 1.3.47 — Gấp được từng khối nhiệm vụ trong Ngọc Giản Cấu Hình
 
 Ngọc giản đã dài tới mức phải cuộn qua Mê Cung, Luyện Đan Đường, Khoáng Mạch rồi mới tới lưới

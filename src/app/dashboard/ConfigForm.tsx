@@ -224,7 +224,11 @@ function LuyenDanFieldset({
   onToggleCollapse: () => void;
 }) {
   return (
-    <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
+    <fieldset
+      className={`mb-6 rounded-xl border border-[var(--color-ink-600)]/60 ${
+        collapsed ? "px-4 py-0" : "p-4"
+      }`}
+    >
       {/* <span> chứ không phải <div>: nội dung hợp lệ của <legend> là phrasing content, mà
           <div> là flow content. Trình duyệt vẫn vẽ ra, nhưng đó là markup sai — và flex chạy
           y hệt trên <span>. */}
@@ -341,7 +345,11 @@ function KhoangMachFieldset({
   const subDimmed = enabled && !hostMode;
 
   return (
-    <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
+    <fieldset
+      className={`mb-6 rounded-xl border border-[var(--color-ink-600)]/60 ${
+        collapsed ? "px-4 py-0" : "p-4"
+      }`}
+    >
       {/* <span> chứ không phải <div>: nội dung hợp lệ của <legend> là phrasing content, mà
           <div> là flow content. Trình duyệt vẫn vẽ ra, nhưng đó là markup sai — và flex chạy
           y hệt trên <span>. */}
@@ -824,7 +832,11 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       )}
 
       <div hidden={questTab !== "free"}>
-        <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
+        <fieldset
+          className={`mb-6 rounded-xl border border-[var(--color-ink-600)]/60 ${
+            collapsed.simpleFree === true ? "px-4 py-0" : "p-4"
+          }`}
+        >
           <legend className="px-2">
             <span className="flex items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
               Nhiệm vụ tài khoản thường
@@ -858,7 +870,11 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
         Mê Cung chạy được cho cả hai hạng tài khoản — một bộ tuỳ chọn chung.
       </p>
       {/* ---------------------------------------------------------------- Mê Cung */}
-      <fieldset className="mb-5 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
+      <fieldset
+        className={`mb-5 rounded-xl border border-[var(--color-ink-600)]/60 ${
+          collapsed.meCung === true ? "px-4 py-0" : "p-4"
+        }`}
+      >
         <legend className="px-2">
           <span className="flex items-center gap-2">
             <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
@@ -1058,7 +1074,11 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
 
       {/* ------------------------------------------------------ Nhiệm vụ ngày còn lại */}
       <div hidden={questTab !== "vip"}>
-      <fieldset className="mb-6 rounded-xl border border-[var(--color-ink-600)]/60 p-4">
+      <fieldset
+        className={`mb-6 rounded-xl border border-[var(--color-ink-600)]/60 ${
+          collapsed.simpleVip === true ? "px-4 py-0" : "p-4"
+        }`}
+      >
         <legend className="px-2">
           <span className="flex items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
             Nhiệm vụ ngày

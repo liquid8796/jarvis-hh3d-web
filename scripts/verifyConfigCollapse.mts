@@ -42,12 +42,22 @@ function arg(name: string, fallback?: string): string | undefined {
 const origin = arg("origin", "http://localhost:3000")!;
 const username = arg("user") ?? process.env.ADMIN_USERNAME ?? "admin";
 
-/** Bốn khối của tab VIP — tab mở sẵn. Khối tab Thường được thử riêng ở mục cuối. */
+/**
+ * Bốn khối của tab VIP — tab mở sẵn. Khối tab Thường được thử riêng ở mục cuối.
+ *
+ * `ownsInputs` = thân khối có chứa CHÍNH những input được nộp lên hay không. Ba khối đầu thì
+ * có: ô của chúng mang `name` và giá trị đi thẳng vào FormData. Hai lưới nhiệm-vụ-ngày thì
+ * KHÔNG — ô tick của chúng không mang `name`, dữ liệu thật là những `<input type="hidden"
+ * name="q_…">` mà form dựng ra ở NGOÀI mọi fieldset. Nên với chúng, câu hỏi đúng không phải
+ * "input còn trong thân khối chứ?" mà là "mấy cái input thật ấy có nằm ngoài tầm với của phép
+ * gấp không?" — hỏi ở mục riêng bên dưới. Trộn hai câu ấy làm một là phép thử hoặc đỏ oan,
+ * hoặc đậu suông.
+ */
 const VIP_BLOCKS = [
-  { key: "meCung", label: "Mê Cung" },
-  { key: "luyenDan", label: "Luyện Đan Đường" },
-  { key: "khoangMach", label: "Khoáng Mạch" },
-  { key: "simpleVip", label: "Nhiệm vụ ngày" },
+  { key: "meCung", label: "Mê Cung", ownsInputs: true },
+  { key: "luyenDan", label: "Luyện Đan Đường", ownsInputs: true },
+  { key: "khoangMach", label: "Khoáng Mạch", ownsInputs: true },
+  { key: "simpleVip", label: "Nhiệm vụ ngày", ownsInputs: false },
 ] as const;
 
 const results: string[] = [];
@@ -117,7 +127,7 @@ try {
 
   const toggleOf = (key: string) => page.locator(`[aria-controls="${key}-body"]`).first();
 
-  for (const { key, label } of VIP_BLOCKS) {
+  for (const { key, label, ownsInputs } of VIP_BLOCKS) {
     const bodyId = `${key}-body`;
     const body = page.locator(`#${bodyId}`);
     const toggle = toggleOf(key);
@@ -141,14 +151,14 @@ try {
     const after = await snapshot(bodyId);
     check(
       `${label}: gấp rồi mà mọi input mang tên VẪN nằm trong DOM`,
-      after.length === before.length && before.length > 0,
+      JSON.stringify(after) === JSON.stringify(before) && after.every((c) => !c.disabled),
       `trước ${before.length} · sau ${after.length}`,
     );
-    check(
-      `${label}: …đủ tên, đủ giá trị, không cái nào bị disabled`,
-      JSON.stringify(after) === JSON.stringify(before) && after.every((c) => !c.disabled),
-      after.length === before.length ? "" : "số lượng đã lệch",
-    );
+    if (ownsInputs) {
+      // Chốt chống ĐẬU SUÔNG: ba khối này phải thật sự có input mang tên, không thì phép so
+      // ở trên chỉ đang so hai mảng rỗng với nhau và chẳng chứng minh điều gì.
+      check(`${label}: …và thân khối thật sự có input mang tên để mà giữ`, before.length > 0, `${before.length} ô`);
+    }
   }
 
   // ---- Nhớ qua một cú tải lại -------------------------------------------------------------
@@ -178,6 +188,29 @@ try {
       `${label}: input vẫn y nguyên sau một vòng gấp–mở`,
       JSON.stringify(await snapshot(`${key}-body`)) === JSON.stringify(before),
     );
+  }
+
+  // ---- Hai lưới nhiệm vụ ngày: dữ liệu thật nằm NGOÀI tầm với của phép gấp ------------------
+  {
+    // Ô tick trong lưới không mang `name`; thứ được nộp lên là các input ẩn `q_…` mà form dựng
+    // ra ở ngoài mọi fieldset. Nên phép gấp không thể chạm tới chúng — và đây là chỗ đóng đinh
+    // điều đó, thay cho phép đếm input trong thân khối vốn vô nghĩa với hai khối này.
+    const q = await page.evaluate(() => {
+      const all = Array.from(document.querySelectorAll<HTMLInputElement>('input[name^="q_"]'));
+      const inside = all.filter((el) => el.closest("#simpleVip-body") || el.closest("#simpleFree-body"));
+      return { total: all.length, inside: inside.length };
+    });
+    check("có ít nhất một ô nhiệm vụ ngày đang bật để mà kiểm", q.total > 0, `${q.total} ô ẩn q_*`);
+    check(
+      "…và KHÔNG ô nào nằm trong thân khối gấp được — phép gấp không với tới được dữ liệu",
+      q.inside === 0,
+      `${q.inside} ô nằm trong`,
+    );
+    // Lưới đang gấp mà ô tick vẫn còn trong DOM: người dùng mở ra lại thì thấy đúng cái mình để.
+    const boxes = await page.evaluate(
+      () => document.querySelectorAll('#simpleVip-body input[type="checkbox"]').length,
+    );
+    check("lưới đang gấp nhưng ô tick vẫn nằm nguyên trong DOM", boxes > 0, `${boxes} ô tick`);
   }
 
   // ---- Khối của tab Thường ------------------------------------------------------------------

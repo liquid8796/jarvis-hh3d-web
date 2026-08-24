@@ -11,6 +11,69 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.49 — Phúc Lợi Đường (bản thường) nhận cả rương mốc, và thôi bị popup chặn đường (schema 74)
+
+Bản ghi `phuc-loi-duong-20260824-235006`, ba ghi chú của tông chủ theo đúng thứ tự ngài bấm:
+
+> "một lúc nào đó khi đủ điều kiện nhận bonus rương, thì sẽ có popup thông báo như này"
+> "bạn bấm nhận bonus các rương nào available dưới đây nhé … rương nào ko available để bấm thì bỏ qua"
+> "sau khi nhận bonus rương có thể tiếp tục bấm các rương phúc lợi đường bình thường như flow cũ"
+
+**Đây không chỉ là thêm việc — nó gỡ một cái chốt đang chặn phần việc CŨ.** Popup
+`#pl-claim-overlay` là `position:fixed; inset:0; z-index:10050` kèm `backdrop-filter: blur(6px)`:
+nó che kín trang. Ngày nào còn rương mốc chưa nhận thì bốn cú bấm `#chest-N` của flow cũ đều bị
+chặn; chúng `optional` nên im lặng trượt hết, rồi bước nghiệm thu BẮT BUỘC ở cuối (đồng hồ phải
+rời `00:00`) hết giờ và **cả nhiệm vụ báo hỏng**. Tức bug này ăn trọn cả bốn rương ngày, không
+riêng phần mốc.
+
+**Hàng mốc là một thứ KHÁC hẳn bốn rương ngày.** Bốn rương ngày đi theo đồng hồ 30 phút, làm mới
+mỗi ngày. Hàng mốc nằm ngay dưới, tích điểm theo THÁNG, và chính trang tự dặn trong phần hướng
+dẫn:「Điểm tích luỹ sẽ làm mới khi sang tháng mới — nhớ nhận rương mốc (hàng dưới) khi đủ điểm」.
+Hai việc, hai đồng hồ, không thay nhau được — đúng chữ "kết hợp" của tông chủ.
+
+Năm bước, selector chép từ `dom/01-load.html`:
+
+1. bấm `#pl-claim-close-btn`「Đến nhận thưởng」khi `#pl-claim-overlay.is-open` — gỡ tấm che trước đã;
+2. chờ tấm che rời hẳn;
+3. quét hàng mốc, đánh dấu MỘT ô đang chờ, cắm cờ `jvz-pl-bonus`;
+4. vòng lặp (trần 6 vòng / 90 giây) `until` cờ hạ: bấm ô đã đánh dấu → chờ nó rụng `active` → quét lại;
+5. phán xử: đếm bằng `.received-reward` so với mốc chuẩn lúc quét đầu.
+
+**CHỖ ĐỨNG là quyết định đắt nhất: cụm nằm TRƯỚC cổng `StopIf` đồng hồ.** Hàng mốc chẳng liên
+quan gì tới đồng hồ 30 phút. Đặt cụm sau cổng ấy là mọi lượt ghé rơi vào giữa cooldown — tức phần
+lớn các lượt — sẽ dừng trước khi kịp nhận, và popup cứ đứng đó sang tháng sau, đúng lúc điểm bị
+làm mới. (Cùng một bài học đã trả giá ở Hỷ Sự Đường 1.3.39 và Mê Cung 1.3.40.)
+
+Ba chi tiết mà thiếu là hỏng:
+
+- **"Available" là do CSS của TRANG phán, không phải ta đoán.** Thẻ style của chính trang:
+  `.gift-box{pointer-events:none}` · `.gift-box.active{pointer-events:auto}` ·
+  `.gift-box.received-reward` = đã nhận. Nên `.active` LÀ định nghĩa của "available" mà tông chủ
+  nói tới, và ô chưa đủ điểm tự nó đã không bấm được.
+- **DOM chỉ rụng `active` SAU khi AJAX về**, không phải ngay lúc bấm — đo được ở chính bản ghi:
+  `dom/03` chụp ngay sau cú bấm vẫn còn `active=1`, mãi `dom/04` mới về `active=0, received=2`.
+  Nên cụm đánh dấu MỘT ô mỗi vòng rồi chờ nó rụng; bấm cả loạt là bấm trùng vào một rương đang
+  chờ trả lời.
+- **Bước quét phải đứng TRƯỚC vòng lặp.** `until` hỏi cờ, mà cờ do bước quét cắm — quét ở đầu
+  THÂN vòng thì lần kiểm `until` đầu tiên thấy cờ chưa ai cắm và vòng thoát ngay lập tức.
+
+**CHỈ bản thường**, đúng như tông chủ dặn — và điều đó tự nhiên ở đây: hai bản Phúc Lợi Đường
+KHÔNG phải cặp twin sao chép nhau như Mê Cung hay Hỷ Sự Đường. Bản VIP đi đường hoàn toàn khác
+(bấm `#nv-phucloi-open-btn` ngay trên trang nhiệm vụ ngày, không ghé `/phuc-loi-duong` bao giờ),
+nên nó không có hàng mốc nào để mà nhận. Lưới kiểm đóng đinh luôn điều đó.
+
+**Kiểm chứng.** Lưới riêng mới `npm run verify:welfare-bonus`: 28 phép thử thuận trên
+Chromium thật, markup CHÉP NGUYÊN VĂN từ `dom/01-load.html` (còn mốc chờ) và `dom/04-click.html`
+(đã sạch) kèm đúng mấy dòng CSS quyết định chuyện bấm được, script đọc TỪ `profile.json` đang
+ship. Có đủ ca ngược: hàng báo còn chờ mà không ô nào bấm được thì phải KÊU nhưng KHÔNG cắm cờ
+(cắm là vòng quay không tải 90 giây), và bấm mà máy chủ không nhận thì phán xử phải kêu chứ không
+nhận vơ. `npm run smoke` **457 thuận, 1 nghịch** — ca đỏ duy nhất là chốt schema, vì bản smoke trong cây làm việc là
+việc đang viết dở của một phiên khác và còn ghim 72 (HEAD đã ở 73); commit này chở bản HEAD cộng
+đúng dòng nhích chốt lên 74. Nguồn C# build sạch. Lưới ghép hồ sơ: chỉ `phuc-loi-duong-thuong`
+đổi so với HEAD, web khớp nguồn ở MỌI quest, thứ tự 27 id nguyên vẹn, bản VIP không suy suyển.
+
+---
+
 ## 1.3.48 — Khối đã gấp thôi để lại một hộp viền rỗng
 
 Ảnh chụp production ngay sau 1.3.47 cho thấy mỗi khối gấp lại vẫn để một ô viền trống cao chừng

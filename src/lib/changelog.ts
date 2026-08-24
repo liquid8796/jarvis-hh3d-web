@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.49",
+    date: "2026-08-25",
+    lines: [
+      "Phúc Lợi Đường (tài khoản thường): auto nay nhận cả rương mốc — hàng rương tích điểm theo tháng nằm dưới bốn rương ngày.",
+      "Trước đây bảng nhắc「Còn rương mốc chưa nhận!」che kín trang, làm auto không bấm nổi rương ngày nào; nay nó được đóng trước rồi mới làm tiếp.",
+      "Mốc nào chưa đủ điểm thì bỏ qua, và nhật ký kể rõ nhận được mấy rương mốc.",
+    ],
+  },
+  {
     version: "1.3.48",
     date: "2026-08-23",
     lines: [
@@ -467,14 +476,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khoáng Mạch: đoạt được mỏ trong game thì auto cũng ghi nhận là được — trước đây có lúc nó báo nhầm là hụt, rồi bỏ luôn lá Linh Quang Phù đáng mua.",
       "Nếu trang trả lời một câu lạ, nhật ký chép lại nguyên văn câu ấy để còn biết đường sửa.",
-    ],
-  },
-  {
-    version: "1.2.0",
-    date: "2026-08-16",
-    lines: [
-      "Mê Cung: đánh xong một đợt là tìm phòng đánh tiếp sau khoảng một phút, thay vì nghỉ hẳn một tiếng như trước.",
-      "Mỗi lượt ghé cũng đánh được nhiều hiệp hơn trước khi giải tán — đội đã đủ người không còn bị bỏ phí giữa chừng.",
     ],
   },
 ];

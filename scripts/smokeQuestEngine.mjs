@@ -1978,8 +1978,20 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // hai vòng liền không lập được đội thì cắm cờ jvz-mc-noteam cho vòng ngoài thoát sớm thay vì
     // giữ trọn 35 phút ngân sách — chính cái tông chủ thấy thành "đàn treo". Lưới riêng:
     // npm run verify:maze-kick.
-    "hồ sơ đang ở schema 73",
-    loadProfileForSchema().schemaVersion === 73,
+    // 74 = Phúc Lợi Đường bản THƯỜNG nhận thêm RƯƠNG MỐC — hàng mốc tích điểm theo THÁNG nằm
+    // ngay dưới bốn rương ngày (bản ghi phuc-loi-duong-20260824-235006). Đây không chỉ là thêm
+    // việc: popup cảnh báo `#pl-claim-overlay` là position:fixed inset:0 z-index:10050, nó CHE
+    // KÍN trang, nên ngày nào còn mốc chưa nhận thì bốn cú bấm #chest-N đều bị chặn, chúng
+    // optional nên im lặng trượt hết, rồi bước nghiệm thu BẮT BUỘC ở cuối hết giờ và cả nhiệm vụ
+    // báo hỏng. Cụm mới đóng popup trước, rồi nhận từng mốc một — "available" là do CSS của trang
+    // phán (.gift-box{pointer-events:none} · .gift-box.active{pointer-events:auto}), không phải
+    // ta đoán. Đánh dấu MỘT ô mỗi vòng vì DOM chỉ rụng `active` SAU khi AJAX về (dom/03 của bản
+    // ghi chụp ngay sau cú bấm vẫn còn active=1). Cụm đứng TRƯỚC cổng StopIf đồng hồ, vì hàng mốc
+    // không dính đồng hồ 30 phút của rương ngày — đặt sau là mọi lượt rơi vào giữa cooldown sẽ
+    // dừng trước khi kịp nhận. CHỈ bản thường: bản VIP đi đường khác hẳn (#nv-phucloi-open-btn
+    // trên trang nhiệm vụ ngày). Lưới riêng: npm run verify:welfare-bonus.
+    "hồ sơ đang ở schema 74",
+    loadProfileForSchema().schemaVersion === 74,
     String(loadProfileForSchema().schemaVersion),
   );
 

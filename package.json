@@ -32,6 +32,7 @@
     "verify:te-le-confirm": "tsx scripts/verifyTeLeConfirm.mts",
     "verify:hy-su-quick": "tsx scripts/verifyHySuQuickLiXi.mts",
     "verify:maze-kick": "tsx scripts/verifyMazeKickTimer.mts",
+    "verify:config-collapse": "tsx scripts/verifyConfigCollapse.mts",
     "diagnose:cf": "tsx scripts/diagnoseCloudflare.mts",
     "verify:turnstile": "tsx scripts/verifyTurnstileClick.mts",
     "verify:challenge-abort": "tsx scripts/verifyChallengeAbort.mts",

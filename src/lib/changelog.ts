@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.50",
+    date: "2026-08-26",
+    lines: [
+      "Luyện Đan Đường: chọn giữ đan từ mấy sao trở lên thì nay đặt thêm được số lượng muốn giữ.",
+      "Đủ số rồi, chọn một trong hai: phân giải viên dư để lấy lại dược liệu, hoặc giữ nguyên và thôi khai lô mới.",
+      "Chọn cách thứ hai thì mỗi lượt ghé vẫn thu mẻ đang chín rồi đếm lại, nên không luyện thừa.",
+    ],
+  },
+  {
     version: "1.3.49",
     date: "2026-08-25",
     lines: [
@@ -468,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Thêm nhiệm vụ Phần Thưởng Hoạt Động: tự mở hai rương mốc 75% và 100% trên trang nhiệm vụ ngày, có cho cả tài khoản thường lẫn VIP.",
       "Rương chưa tới mốc thì ghé lại sau nửa giờ; nhận hết cả hai rồi thì nghỉ tới hôm sau.",
       "Nhiệm vụ chạy sau các nhiệm vụ ngày khác, vì chính chúng là thứ đẩy tiến độ lên đủ mốc.",
-    ],
-  },
-  {
-    version: "1.2.1",
-    date: "2026-08-17",
-    lines: [
-      "Khoáng Mạch: đoạt được mỏ trong game thì auto cũng ghi nhận là được — trước đây có lúc nó báo nhầm là hụt, rồi bỏ luôn lá Linh Quang Phù đáng mua.",
-      "Nếu trang trả lời một câu lạ, nhật ký chép lại nguyên văn câu ấy để còn biết đường sửa.",
     ],
   },
 ];

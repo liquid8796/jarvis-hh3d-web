@@ -11,6 +11,96 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.50 — Luyện Đan Đường: hạn mức giữ đan (schema 75)
+
+Yêu cầu của tông chủ, nguyên văn:
+
+> "chỗ config quest luyện đan đường bổ sung input nếu user chọn giữ sao bất kỳ loại nào thì cũng
+> sẽ cho user tùy chọn nhập thêm số lượng đan loại đó cần giữ lại"
+
+và khi được hỏi đếm theo cái gì:
+
+> "chọn ý 2, nhưng phải có checkbox có đk enable input đó ko nhé"
+> "thêm checkbox chọn 1 trong 2 ý trên, riêng ý 2 bổ sung nếu đã đủ chỉ tiêu … và dừng luôn
+> luyện đan (nhớ check mỗi lần khai đàn mới đã đủ chỉ tiêu chưa tránh luyện thừa đan)"
+
+### Đếm bằng con số nào — và vì sao không phải con số kia
+
+Hộp thông tin viên đan mang HAI con số đếm được (markup chép nguyên văn từ `dom/12-click.html`
+của bản ghi `luyen-dan-duong-20260812-195342`, nay nằm trong `verifyLuyenDanStars.mts`):
+
+```
+Dược khí             4 sao
+Số lượng ô này       1
+Đan trong túi (phẩm) 1/10 viên
+```
+
+Hạn mức đọc dòng **thứ ba**. Dòng「Số lượng ô này」chỉ nói về đúng cái ô đang mở, nên muốn cộng
+đủ mọi bậc sao thì phải mở lần lượt từng ô — một vòng lặp mà flow này không có và không đáng
+dựng cho một hạn mức. Dòng「Đan trong túi (phẩm)」là con số DUY NHẤT một lần mở hộp trả lời
+trọn vẹn, và nó cũng chính là thứ tông chủ chọn khi được hỏi.
+
+### Hai chế độ, hai option, không chế độ nào biết chế độ kia
+
+`capOver` và `capFull` là hai option riêng chứ không phải một option kèm cờ chế độ, vì chúng mở
+hai nhánh khác nhau — mà `when` của một bước chỉ nhận ĐÚNG MỘT điều kiện. Mỗi lượt dịch thắp
+đúng một cái; cái còn lại giữ nguyên `«không hạn mức»`, một chuỗi không lời văn nào của trang
+chứa nổi (cùng mẹo ngoặc nhọn với `«luôn phân giải»`), nên nhánh của nó câm hẳn.
+
+- **Phân giải viên dư** — danh sách đếm từ `cap + 1`, tức chỉ đụng viên VƯỢT hạn mức. Nhánh đi
+  trọn cụm xác nhận của riêng nó (Phân Giải → chờ hộp → OK), nên xong cú ấy hộp đan đã đóng và
+  nhánh sao bên dưới không còn gì để giữ.
+- **Thôi khai lô mới** — danh sách đếm từ chính `cap`, và kết bằng `stopIf`. Đặt TRƯỚC cụm khai
+  lô nên「đủ chỉ tiêu」biết trước khi tốn 20 Tiên Ngọc, đúng câu dặn "tránh luyện thừa đan".
+  `luyen-dan-duong` không nằm trong `DAILY_QUOTA_QUEST_IDS` nên lượt dừng KHÔNG vào sổ ngày —
+  mỗi lượt ghé sau vẫn thu mẻ đang chín rồi đếm lại, và đan trong túi vơi đi là lò tự chạy lại.
+
+### Ba chỗ đã cân nhắc kỹ, chép lại để khỏi bị "dọn dẹp" mất
+
+**1. Cụm hạn mức nói TRƯỚC nhánh giữ sao.** Nhánh giữ giữ đan bằng cách ĐÓNG hộp, và cú đóng ấy
+mang luôn nút Phân Giải đi. Nên thứ gì muốn lật lại chữ「giữ」đều phải nói trước nó, lúc hộp còn
+mở và chữ còn sống. Không nhánh nào phải kiểm lại số sao: viên vượt hạn mức thì phân giải bất kể
+mấy sao, và đó cũng đúng là phán quyết nhánh sao sẽ đưa ra cho những bậc nó không giữ.
+
+**2. `stopIf` KHÔNG đóng hộp trước khi dừng.** Nó đọc lại chính đoạn chữ ấy, mà một hộp đã đóng
+chỉ còn trả lời được nhờ chữ cũ sót trong DOM (`conditionProbe` lùi về `els[0]` khi không phần
+tử nào đang hiện). Dựa vào cái sót ấy nghĩa là ngày trang game dọn ruột hộp lúc đóng, lượt dừng
+câm lặng và lò lại khai lô — đúng thứ hạn mức này sinh ra để chặn. Hộp còn mở là vô hại: lượt
+ghé sau mở lại trang từ đầu.
+
+**3. Mỗi mảnh so chuỗi kết thúc bằng dấu `/`.** Cửa của engine là `textMatches`, tức SO CHỮ chứ
+không so số, nên lớp dịch rải sẵn từng con số hợp lệ (`bagCountAtLeast`, trần 30 — túi đo được
+là 10 viên mỗi phẩm). Thiếu dấu `/` thì mảnh「… 1」nuốt luôn「… 11/10」— so chuỗi không có ranh
+giới từ — và một túi mười một viên bị đọc thành một viên. `verify:luyen-dan-stars` có hẳn cột
+11/12 để đóng đinh chỗ này.
+
+Và trần 30 hụt thì cửa THÔI KHỚP, không phải khớp bừa: im lặng ở đây nghiêng về phía GIỮ đan.
+Đó là phía an toàn duy nhất chấp nhận được cho một tính năng mà cái giá của phán đoán sai là
+đan của người khác.
+
+### Hai vết đã vá ngay trong lượt này
+
+- **Dòng nhật ký 2,4KB.** `setOption` kể NGUYÊN VĂN mọi giá trị tự nhập, và `runCycle` đẩy các
+  dòng ấy ra màn hình người dùng ở mức `warn`. Một danh sách hạn mức máy sinh sẽ biến bảng hoạt
+  động thành bãi rác mỗi vòng. Thêm tham số `describe` — đổi LỜI KỂ, không đổi giá trị — nên
+  dòng ấy nay đọc là「hạn mức giữ đan 5 viên — dư thì phân giải」.
+- **`max={20}` của ô nhập không gác gì cả**, vì `<form>` khai `noValidate` (hai tab dùng
+  `hidden`, một ô số invalid trong tab đang ẩn sẽ chặn cả lượt lưu). Con số gõ tay đi thẳng tới
+  server action, và để Zod từ chối thì CẢ bản cấu hình không lưu được, chỉ vì một ô. Nên kẹp tại
+  biên (`keepCapOf`) thay vì ném.
+
+### Còn lại, nói trước cho rõ
+
+Flow chỉ mở ô đan ĐẦU TIÊN trong túi mỗi lượt ghé — nết cũ, không phải cái mới này sinh ra.
+Hệ quả ở chế độ「thôi khai lô」: nếu ô đầu là một viên bậc sao không được giữ, lượt ấy dừng
+trước khi kịp phân giải nó, nên viên ấy nằm lại. Vô hại (đã thôi luyện thì túi không đầy thêm),
+nhưng nó là lý do chế độ「phân giải viên dư」vẫn là mặc định.
+
+Lưới: `npm run verify:luyen-dan-stars` — nay 33 phép, đo bằng Chromium thật trên markup chép từ
+bản ghi, gồm bảng 6 cấu hình × 8 mức túi và cả ca vượt trần.
+
+---
+
 ## 1.3.49 — Phúc Lợi Đường (bản thường) nhận cả rương mốc, và thôi bị popup chặn đường (schema 74)
 
 Bản ghi `phuc-loi-duong-20260824-235006`, ba ghi chú của tông chủ theo đúng thứ tự ngài bấm:

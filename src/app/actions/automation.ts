@@ -121,6 +121,21 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
   // Mười một nhiệm vụ một-công-tắc dùng chung một khuôn tên field: q_<key>.
   const simple = (key: string) => ({ enabled: formData.get(`q_${key}`) === "on" });
 
+  /**
+   * Hạn mức giữ đan — KẸP tại biên thay vì để Zod ném.
+   *
+   * Form khai `noValidate` (hai tab dùng `hidden`, một ô số invalid nằm trong tab đang ẩn sẽ
+   * chặn cả lượt lưu — xem ghi chú ở thẻ `<form>`), nên `max={20}` của ô nhập không gác được
+   * gì: con số gõ tay đi thẳng tới đây. Mà `safeParse` hỏng thì CẢ bản cấu hình không lưu
+   * được, chỉ vì một ô. Kẹp lại rồi hiện đúng con số đã lưu là thứ người gõ 25 thực sự muốn.
+   */
+  const keepCapOf = (name: string) => {
+    const raw = Math.trunc(Number(formData.get(name)));
+    return Number.isFinite(raw) && raw >= 1 ? Math.min(20, raw) : 10;
+  };
+  /** Cùng lẽ: một giá trị lạ (POST dựng tay) rơi về nết mặc định, không giết cả lượt lưu. */
+  const keepCapModeOf = (name: string) => (formData.get(name) === "stop" ? "stop" : "decompose");
+
   const parsed = configSchema.safeParse({
     // Cookie không đi đường này nữa — tài khoản sống ở bảng riêng với bộ action riêng.
     gameCookie: "",
@@ -145,11 +160,17 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
         enabled: formData.get("luyenDanEnabled") === "on",
         tier: String(formData.get("luyenDanTier") ?? "Hạ Phẩm"),
         keepStarsFrom: Number(formData.get("luyenDanKeepStars") ?? 0) || 0,
+        keepCapEnabled: formData.get("luyenDanKeepCapEnabled") === "on",
+        keepCap: keepCapOf("luyenDanKeepCap"),
+        keepCapMode: keepCapModeOf("luyenDanKeepCapMode"),
       },
       luyenDanThuong: {
         enabled: formData.get("luyenDanThuongEnabled") === "on",
         tier: String(formData.get("luyenDanThuongTier") ?? "Hạ Phẩm"),
         keepStarsFrom: Number(formData.get("luyenDanThuongKeepStars") ?? 0) || 0,
+        keepCapEnabled: formData.get("luyenDanThuongKeepCapEnabled") === "on",
+        keepCap: keepCapOf("luyenDanThuongKeepCap"),
+        keepCapMode: keepCapModeOf("luyenDanThuongKeepCapMode"),
       },
       diemDanh: simple("diemDanh"),
       hoangVuc: simple("hoangVuc"),

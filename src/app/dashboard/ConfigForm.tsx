@@ -223,6 +223,23 @@ function LuyenDanFieldset({
   collapsed: boolean;
   onToggleCollapse: () => void;
 }) {
+  /**
+   * Hai ô phải sống trong state chứ không nằm im ở `defaultValue`, cùng lẽ với「Đoạt mỏ」của
+   * Khoáng Mạch: cụm hạn mức bên dưới phải sáng/tắt ngay lúc bấm chứ không đợi tới lượt lưu.
+   *
+   * `keepStars === 0` là「Phân giải tất cả」— không giữ viên nào thì một hạn mức giữ đan chẳng
+   * còn gì để đếm, nên chính công tắc hạn mức bị khoá ở mức đó.
+   */
+  const [keepStars, setKeepStars] = useState(config.keepStarsFrom);
+  const [capEnabled, setCapEnabled] = useState(config.keepCapEnabled);
+  const capAllowed = keepStars !== 0;
+  const capOn = capAllowed && capEnabled;
+  /**
+   * Mờ cụm con CHỈ khi khung cha đang sáng — hai lớp opacity lồng nhau thì NHÂN với nhau, và
+   * 0.16 đọc như một lỗi vẽ chứ không như một ô đang tắt. Cùng phép đã viết cho Khoáng Mạch.
+   */
+  const subDimmed = enabled && !capOn;
+
   return (
     <fieldset
       className={`mb-6 rounded-xl border border-[var(--color-ink-600)]/60 ${
@@ -289,6 +306,7 @@ function LuyenDanFieldset({
             name={`${prefix}KeepStars`}
             className="input"
             defaultValue={config.keepStarsFrom}
+            onChange={(e) => setKeepStars(Number(e.target.value))}
           >
             <option value={0}>Phân giải tất cả</option>
             <option value={4}>Giữ 4 sao, phân giải 3 sao trở xuống</option>
@@ -301,6 +319,112 @@ function LuyenDanFieldset({
           <p className="mt-1 text-xs text-[var(--color-mist)]">
             Đan rơi từ 1–4 sao. Chỉ viên bị phân giải mới hoàn lại dược liệu.
           </p>
+        </div>
+
+        {/* Cụm HẠN MỨC GIỮ ĐAN — công tắc và hai thứ chỉ có nghĩa khi công tắc ấy bật, gói
+            chung một khung như cụm Đoạt mỏ của Khoáng Mạch. Chiếm trọn hàng vì nó cao gần gấp
+            ba một ô thường. */}
+        <div className="rounded-lg border border-[var(--color-ink-600)]/60 p-3 sm:col-span-2">
+          {/* Công tắc khoá bằng `disabled` THẬT khi đang「Phân giải tất cả」: một checkbox
+              disabled không đi cùng form và action đọc「vắng mặt」thành `false` — đúng nghĩa
+              「không giữ viên nào thì không có hạn mức nào」, tức màn hình và bản lưu nói cùng
+              một câu. `checked` (chứ không phải `defaultChecked`) để lựa chọn cũ hiện lại
+              nguyên vẹn khi đạo hữu quay về một mức có giữ đan. */}
+          <label
+            className={`flex items-center gap-2 text-sm text-[var(--color-parchment)] ${
+              capAllowed ? "cursor-pointer" : "cursor-not-allowed"
+            }`}
+          >
+            <input
+              type="checkbox"
+              name={`${prefix}KeepCapEnabled`}
+              checked={capOn}
+              disabled={!capAllowed}
+              onChange={(e) => setCapEnabled(e.target.checked)}
+              className={`h-4 w-4 ${accentClass}`}
+            />
+            Giới hạn số đan giữ lại
+          </label>
+          <p className="mt-1 text-xs text-[var(--color-mist)]">
+            {capAllowed
+              ? "Đếm tổng đan cùng loại đang nằm trong túi, không phân biệt mấy sao."
+              : "Chọn một mức có giữ đan ở ô bên trên thì mới đặt được hạn mức."}
+          </p>
+
+          <div className={`mt-3 grid gap-4 sm:grid-cols-2 ${subDimmed ? "opacity-40" : ""}`}>
+            {/* Ô số dùng `readOnly`, KHÔNG `disabled`: một ô số vắng mặt sẽ được action đọc
+                thành 10 (mặc định của nó), nên `disabled` ở đây là âm thầm ghi đè con số đạo
+                hữu đã chọn mỗi lượt lưu. Cùng bài học đã trả giá ở ô ngưỡng của Khoáng Mạch. */}
+            <div>
+              <label className="label" htmlFor={`${prefix}KeepCap`}>
+                Giữ tối đa (viên)
+              </label>
+              <input
+                id={`${prefix}KeepCap`}
+                name={`${prefix}KeepCap`}
+                className="input"
+                type="number"
+                min={1}
+                max={20}
+                defaultValue={config.keepCap}
+                readOnly={!capOn}
+                aria-disabled={!capOn}
+              />
+              <p className="mt-1 text-xs text-[var(--color-mist)]">
+                Túi chứa tối đa 10 viên mỗi loại, nên đặt quá 10 là không bao giờ chạm tới.
+              </p>
+            </div>
+
+            {/* Hai ô chọn KHÔNG bị `disabled` khi hạn mức đang tắt, và đó là chủ ý: radio
+                vắng mặt thì action đọc về mặc định `decompose`, tức mỗi lượt lưu lại lặng lẽ
+                xoá lựa chọn「dừng」của đạo hữu. `readOnly` thì radio không có, nên cách đúng
+                còn lại là để chúng sống và chỉ làm mờ đi. */}
+            <div>
+              <span className="label" id={`${prefix}KeepCapModeLabel`}>
+                Khi đã đủ số lượng
+              </span>
+              {/* Nhóm radio KHÔNG có `<label htmlFor>` nào trỏ vào cả nhóm được — mỗi ô đã có
+                  nhãn riêng của nó. `radiogroup` + `aria-labelledby` là cách nối dòng tiêu đề
+                  trên vào nhóm cho trình đọc màn hình. */}
+              <div
+                role="radiogroup"
+                aria-labelledby={`${prefix}KeepCapModeLabel`}
+                className="mt-1 flex flex-col gap-2"
+              >
+                <label className="flex cursor-pointer items-start gap-2 text-sm text-[var(--color-parchment)]">
+                  <input
+                    type="radio"
+                    name={`${prefix}KeepCapMode`}
+                    value="decompose"
+                    defaultChecked={config.keepCapMode === "decompose"}
+                    className={`mt-0.5 h-4 w-4 ${accentClass}`}
+                  />
+                  <span>
+                    Phân giải viên dư
+                    <span className="block text-xs text-[var(--color-mist)]">
+                      Vẫn luyện tiếp, viên vượt hạn mức đem hoàn lại dược liệu.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2 text-sm text-[var(--color-parchment)]">
+                  <input
+                    type="radio"
+                    name={`${prefix}KeepCapMode`}
+                    value="stop"
+                    defaultChecked={config.keepCapMode === "stop"}
+                    className={`mt-0.5 h-4 w-4 ${accentClass}`}
+                  />
+                  <span>
+                    Thôi khai lô mới
+                    <span className="block text-xs text-[var(--color-mist)]">
+                      Giữ nguyên đan trong túi và ngừng luyện; mỗi lượt ghé vẫn thu mẻ đang
+                      chín rồi đếm lại.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </fieldset>

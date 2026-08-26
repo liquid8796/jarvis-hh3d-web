@@ -35,7 +35,7 @@
  */
 import { chromium } from "playwright-core";
 import { conditionProbe } from "../src/lib/quest-engine/boardScripts.mjs";
-import { loadProfile } from "../src/lib/quest-engine/profile.mjs";
+import { loadProfile, profileForConfig } from "../src/lib/quest-engine/profile.mjs";
 
 /**
  * Ruột hộp thoại, CHÉP NGUYÊN VĂN từ `dom/12-click.html` của bản ghi
@@ -47,7 +47,8 @@ import { loadProfile } from "../src/lib/quest-engine/profile.mjs";
  *   • thanh nút mang `#ldModalUse` + `#ldModalDecompose` thay vì mỗi nút Đóng: đó là biến thể
  *     mở-từ-TÚI (`luyen-dan.min.js` dựng hai bộ nút khác nhau cho hộp-thưởng và hộp-trong-túi),
  *     và nhánh giữ/phân giải chỉ chạy ở biến thể ấy.
- * Số sao thay bằng `__SAO__` để thổi lại cho từng bậc.
+ * Hai chỗ thay được: `__SAO__` cho bậc sao, và `__TUI__` cho con số「Đan trong túi (phẩm)」—
+ * cái sau là thứ cửa HẠN MỨC đọc, nên nó phải thổi lại được y như bậc sao.
  */
 const MODAL_HTML = `
 <div class="ld-modal ld-modal--item" id="ldItemModal" role="dialog" aria-modal="true">
@@ -63,7 +64,7 @@ const MODAL_HTML = `
           <dt>Dược khí</dt><dd>__SAO__ sao</dd>
           <dt>Số lượng ô này</dt><dd>1</dd>
           <dt>Đan trong túi (phẩm)</dt>
-          <dd><span class="ld-info__usage ld-info__usage--bag"><span class="ld-info__usage-val">1/10 viên</span></span></dd>
+          <dd><span class="ld-info__usage ld-info__usage--bag"><span class="ld-info__usage-val">__TUI__/10 viên</span></span></dd>
           <dt>Tu Vi / lần dùng</dt><dd class="ld-info__tu-vi">5.000</dd>
           <dt>Đã sử dụng tháng này</dt>
           <dd><span class="ld-info__usage"><span class="ld-info__usage-val">2/8 viên</span></span></dd>
@@ -85,6 +86,10 @@ const MODAL_HTML = `
  * năng chết lặng, và một phép thử dưới đây đóng đinh rằng trang không có phần tử nào tên vậy.
  */
 const BROKEN_SELECTOR = "#ldModal";
+
+/** Hộp thoại với đúng bậc sao và đúng số đan đang nằm trong túi. */
+const modalHtml = (stars: number, bag = 1) =>
+  MODAL_HTML.replace("__SAO__", String(stars)).replace("__TUI__", String(bag));
 
 /**
  * BẢN ĐẶC TẢ: mỗi lựa chọn giữ lại những bậc sao nào.
@@ -139,7 +144,7 @@ const profile = loadProfile();
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage();
-  await page.setContent(`<!doctype html><html lang="vi"><body>${MODAL_HTML}</body></html>`);
+  await page.setContent(`<!doctype html><html lang="vi"><body>${modalHtml(2)}</body></html>`);
 
   /** Thổi lại số sao rồi hỏi engine đúng một câu, y như lúc chạy thật. */
   const ask = async (stars: number, selector: string, text: string): Promise<boolean> => {
@@ -147,7 +152,7 @@ try {
       ({ html }) => {
         document.body.innerHTML = html;
       },
-      { html: MODAL_HTML.replace("__SAO__", String(stars)) },
+      { html: modalHtml(stars) },
     );
     return page.evaluate(conditionProbe, { kind: "textMatches", selector, text });
   };
@@ -236,7 +241,7 @@ try {
     // Cửa này sống được là nhờ `conditionProbe` gộp mọi khoảng trắng về một dấu cách trước
     // khi so — mất phép gộp ấy là mất luôn tính năng, nên đóng đinh nó lại.
     const raw = await (async () => {
-      await page.evaluate(({ html }) => { document.body.innerHTML = html; }, { html: MODAL_HTML.replace("__SAO__", "2") });
+      await page.evaluate(({ html }) => { document.body.innerHTML = html; }, { html: modalHtml(2) });
       return page.evaluate(() => (document.querySelector("#ldModalBody") as HTMLElement).innerText);
     })();
     check(
@@ -265,7 +270,7 @@ try {
 
     const run = async (stars: number | null): Promise<unknown> => {
       await page.evaluate(({ html }) => { document.body.innerHTML = html; },
-        { html: stars == null ? "<p>không có hộp nào</p>" : MODAL_HTML.replace("__SAO__", String(stars)) });
+        { html: stars == null ? "<p>không có hộp nào</p>" : modalHtml(stars) });
       return page.evaluate(`(() => { const v = (${source}); return typeof v === "function" ? v() : v; })()`);
     };
 
@@ -329,7 +334,7 @@ try {
 
     const runKeep = async (stars: number | null): Promise<unknown> => {
       await page.evaluate(({ html }) => { document.body.innerHTML = html; },
-        { html: stars == null ? "<p>không có hộp nào</p>" : MODAL_HTML.replace("__SAO__", String(stars)) });
+        { html: stars == null ? "<p>không có hộp nào</p>" : modalHtml(stars) });
       return page.evaluate(`(() => { const v = (${keepSource}); return typeof v === "function" ? v() : v; })()`);
     };
 
@@ -353,13 +358,233 @@ try {
     const quietKeep = await runKeep(null);
     check("không có hộp thì nhánh GIỮ cũng im", quietKeep === "", JSON.stringify(quietKeep));
 
-    await page.evaluate(({ html }) => { document.body.innerHTML = html; }, { html: MODAL_HTML.replace("__SAO__", "4") });
+    await page.evaluate(({ html }) => { document.body.innerHTML = html; }, { html: modalHtml(4) });
     await page.evaluate(() => {
       const el = document.querySelector("#ldItemModal") as HTMLElement | null;
       if (el) el.style.display = "none";
     });
     const hidden = await page.evaluate(`(() => { const v = (${keepSource}); return typeof v === "function" ? v() : v; })()`);
     check("hộp ĐANG ẨN mà còn markup cũ thì vẫn im — phép đo bề rộng gác chỗ này", hidden === "", JSON.stringify(hidden));
+  }
+
+  // ---- 9. HẠN MỨC GIỮ ĐAN (schema 75) ----------------------------------------------------
+  //
+  // Hạn mức đếm dòng「Đan trong túi (phẩm)」/「5/10 viên」— tổng đan cùng phẩm đang nằm trong
+  // túi. Nó là con số DUY NHẤT một lần mở hộp trả lời trọn vẹn: dòng「Số lượng ô này」chỉ nói
+  // về đúng ô đang mở, nên muốn cộng đủ mọi bậc sao thì phải mở lần lượt từng ô — một vòng lặp
+  // mà flow này không có.
+  //
+  // Cửa vẫn là `textMatches`, tức SO CHỮ chứ không so số, nên lớp dịch rải sẵn từng con số hợp
+  // lệ (`bagCountAtLeast`). Hai cái bẫy của lối ấy được đóng đinh ở đây:
+  //
+  //   • mỗi mảnh phải kết thúc bằng dấu `/`, không thì「… 1」nuốt luôn「… 11/10」và một túi
+  //     mười một viên bị đọc thành một viên;
+  //   • hết trần 30 thì cửa thôi khớp — và đó là phía AN TOÀN: không khớp nghĩa là GIỮ đan,
+  //     chứ không phải phân giải nhầm.
+  {
+    const NO_CAP = "«không hạn mức»";
+    const CAP_KEYS = ["capOver", "capFull"] as const;
+    const selector = gates[0]?.selector ?? "";
+
+    type CapStep = {
+      action: string;
+      selector?: string;
+      note?: string;
+      script?: string;
+      when?: { kind?: string; selector?: string; text?: string };
+      condition?: { kind?: string; selector?: string; text?: string };
+    };
+    const stepsOf = (id: string) =>
+      (profile.quests.find((q: { id: string }) => q.id === id)?.steps ?? []) as CapStep[];
+    const optionOf = (id: string, key: string) =>
+      ((profile.quests.find((q: { id: string }) => q.id === id)?.options ?? []) as {
+        key: string;
+        selectedValue?: string;
+      }[]).find((o) => o.key === key);
+
+    /** Hỏi engine đúng một câu, với một hộp mang `stars` sao và `bag` viên trong túi. */
+    const askBag = async (stars: number, bag: number, text: string): Promise<boolean> => {
+      await page.evaluate(({ html }) => { document.body.innerHTML = html; }, { html: modalHtml(stars, bag) });
+      return page.evaluate(conditionProbe, { kind: "textMatches", selector, text });
+    };
+
+    // 9a. Hai option có mặt ở CẢ HAI twin, và mặc định của chúng là một chuỗi không khớp gì.
+    let present = 0;
+    for (const id of QUEST_IDS) {
+      for (const key of CAP_KEYS) {
+        if (optionOf(id, key)?.selectedValue === NO_CAP) present += 1;
+      }
+    }
+    check(
+      `cả ${QUEST_IDS.length} twin mang đủ ${CAP_KEYS.length} option hạn mức, mặc định「không hạn mức」`,
+      present === 4,
+      `${present}/4`,
+    );
+
+    // 9b. Mặc định ấy phải CÂM thật: không hộp nào — bậc sao nào, túi mấy viên — khớp nổi nó.
+    {
+      let leaked = 0;
+      for (const bag of [1, 5, 10, 30]) {
+        for (const stars of STARS) if (await askBag(stars, bag, NO_CAP)) leaked += 1;
+      }
+      check("「không hạn mức」không khớp ô nào trong 16 ô — nhánh tắt là nhánh câm", leaked === 0, `${leaked} ô lọt`);
+    }
+
+    // 9c. Thứ tự bước — đây là toàn bộ thiết kế, nên nó phải được đóng đinh.
+    //
+    // Nhánh giữ GIỮ đan bằng cách ĐÓNG hộp, và cú đóng ấy mang luôn nút Phân Giải đi. Nên thứ
+    // gì muốn lật lại chữ「giữ」đều phải nói trước nó, lúc hộp còn mở và chữ còn sống. Còn
+    // `stopIf` phải đứng trước cụm khai lô, không thì「đủ chỉ tiêu」biết muộn mất một mẻ đan.
+    {
+      let ordered = 0;
+      let beforeCraft = 0;
+      let chained = 0;
+      for (const id of QUEST_IDS) {
+        const steps = stepsOf(id);
+        const capOver = steps.findIndex((s) => s.when?.text === "{{capOver}}");
+        const stopIf = steps.findIndex((s) => s.action === "stopIf" && s.condition?.text === "{{capFull}}");
+        const keepClose = steps.findIndex(
+          (s) => s.action === "click" && s.selector === "#ldModalCloseBtn" && s.when?.text === "{{decompose}}",
+        );
+        const craft = steps.findIndex((s) => s.action === "click" && s.selector === "#ldBtnCraft");
+        if (capOver >= 0 && stopIf >= 0 && keepClose >= 0 && capOver < keepClose && stopIf < keepClose) ordered += 1;
+        if (stopIf >= 0 && craft >= 0 && stopIf < craft) beforeCraft += 1;
+
+        // Cụm phân giải của nhánh hạn mức phải TRỌN VẸN: kể chuyện, bấm Phân Giải, chờ hộp xác
+        // nhận, bấm OK. Thiếu cú xác nhận thì hộp treo giữa màn và mọi bước sau bấm vào khoảng
+        // không.
+        const chain = steps.slice(capOver, capOver + 4);
+        if (
+          capOver >= 0 &&
+          chain.length === 4 &&
+          chain[0]?.action === "evaluateJavaScript" &&
+          chain[1]?.selector === "#ldModalDecompose" &&
+          chain[2]?.action === "waitForCondition" &&
+          chain[3]?.selector === "#ldConfirmOk"
+        ) {
+          chained += 1;
+        }
+      }
+      check("cụm hạn mức nói TRƯỚC nhánh giữ sao — hộp còn mở thì mới lật lại được", ordered === 2, `${ordered}/2`);
+      check("stopIf đứng TRƯỚC cụm khai lô — đủ chỉ tiêu là thôi luyện, không luyện thừa một mẻ", beforeCraft === 2, `${beforeCraft}/2`);
+      check("nhánh vượt hạn mức đi trọn cụm: kể → Phân Giải → chờ xác nhận → OK", chained === 2, `${chained}/2`);
+    }
+
+    // 9d. BẢNG THẬT: lớp dịch sinh danh sách, Chromium chấm bài.
+    //
+    // `từ` là ngưỡng danh sách bắt đầu — mode phân giải lấy `cap + 1` (chỉ đụng viên DƯ), mode
+    // dừng lấy chính `cap` (đủ là dừng). Cột 11/12 là cái bẫy tiền tố: thiếu dấu `/` ở cuối mỗi
+    // mảnh thì một túi 11 viên khớp cả danh sách bắt đầu từ 1.
+    {
+      const listFor = (mode: "decompose" | "stop", cap: number): string => {
+        const built = profileForConfig({
+          quests: {
+            luyenDan: {
+              enabled: true,
+              tier: "Hạ Phẩm",
+              keepStarsFrom: 4,
+              keepCapEnabled: true,
+              keepCap: cap,
+              keepCapMode: mode,
+            },
+          },
+        });
+        const quest = built.quests.find((x: { id: string }) => x.id === QUEST_IDS[0]);
+        const key = mode === "stop" ? "capFull" : "capOver";
+        return (
+          ((quest?.options ?? []) as { key: string; selectedValue?: string }[]).find((o) => o.key === key)
+            ?.selectedValue ?? ""
+        );
+      };
+
+      const BAGS = [1, 2, 3, 4, 10, 11, 12, 30];
+      const CASES = [
+        ["decompose", 1],
+        ["decompose", 3],
+        ["decompose", 10],
+        ["stop", 1],
+        ["stop", 3],
+        ["stop", 11],
+      ] as const;
+      const rows: string[] = [];
+      let bad = 0;
+      for (const [mode, cap] of CASES) {
+        const text = listFor(mode, cap);
+        const from = mode === "stop" ? cap : cap + 1;
+        const got: number[] = [];
+        for (const bag of BAGS) if (await askBag(4, bag, text)) got.push(bag);
+        const want = BAGS.filter((b) => b >= from);
+        if (got.join(",") !== want.join(",")) bad += 1;
+        rows.push(
+          `      ${mode.padEnd(10)} hạn mức ${String(cap).padStart(2)} (từ ${String(from).padStart(2)})  khớp [${got.join(",")}]  (mong đợi [${want.join(",")}])`,
+        );
+      }
+      check(`bảng hạn mức: ${CASES.length} cấu hình × ${BAGS.length} mức túi, đo bằng chính conditionProbe`, bad === 0, bad ? `${bad} hàng sai` : "");
+      console.log("\n  Bảng hạn mức giữ đan đo được:");
+      for (const r of rows) console.log(r);
+      console.log("");
+
+      // Đường đi THẬT của giá trị này còn một chặng nữa mà phép đo trên không chạm tới:
+      // `buildOptionValues` của engine, với một giá trị tự nhập, CẮT bỏ nháy đơn, backslash và
+      // ký tự xuống dòng trước khi thay vào `{{capOver}}`. Danh sách nào mang một trong số ấy sẽ
+      // tới trang dưới hình dạng khác hẳn thứ đo được ở đây — nên đóng đinh rằng nó không mang.
+      const scrubbed = /['\\\n\r]/.test(listFor("decompose", 7));
+      check("danh sách sinh ra không mang ký tự nào engine sẽ cắt lúc thay {{…}}", !scrubbed);
+
+      // Trần 30: quá nó thì cửa thôi khớp, và im lặng ấy phải nghiêng về phía GIỮ đan.
+      const over = await askBag(4, 31, listFor("decompose", 3));
+      check("túi vượt trần 30 thì cửa thôi khớp — im lặng nghiêng về phía GIỮ, không phân giải", !over);
+
+      // Lớp dịch phải TỪ CHỐI đặt hạn mức khi không giữ viên nào: hạn mức của một tuỳ chọn
+      //「Phân giải tất cả」là một con số không có gì để đếm.
+      const none = profileForConfig({
+        quests: {
+          luyenDan: {
+            enabled: true,
+            tier: "Hạ Phẩm",
+            keepStarsFrom: 0,
+            keepCapEnabled: true,
+            keepCap: 3,
+            keepCapMode: "stop",
+          },
+        },
+      });
+      const quest0 = none.quests.find((x: { id: string }) => x.id === QUEST_IDS[0]);
+      const stillOff = CAP_KEYS.every(
+        (k) =>
+          ((quest0?.options ?? []) as { key: string; selectedValue?: string }[]).find((o) => o.key === k)
+            ?.selectedValue === NO_CAP,
+      );
+      check("chọn「Phân giải tất cả」thì hạn mức bị bỏ qua, dù công tắc có bật", stillOff);
+    }
+
+    // 9e. Hai dòng kể chuyện của cụm hạn mức — cùng luật với nhánh giữ: nói đúng, và IM khi
+    // không có hộp nào để đọc.
+    {
+      const scriptOf = (noteFragment: string) =>
+        stepsOf(QUEST_IDS[0]).find((s) => (s.note ?? "").includes(noteFragment))?.script ?? "";
+      const runScript = async (source: string, html: string | null): Promise<unknown> => {
+        await page.evaluate(({ h }) => { document.body.innerHTML = h; }, { h: html ?? "<p>không có hộp nào</p>" });
+        return page.evaluate(`(() => { const v = (${source}); return typeof v === "function" ? v() : v; })()`);
+      };
+
+      const overSrc = scriptOf("phân giải vì túi đã đủ hạn mức");
+      const fullSrc = scriptOf("đã đủ hạn mức, dừng luyện");
+      check("hồ sơ có đủ hai bước kể chuyện của cụm hạn mức", overSrc.length > 0 && fullSrc.length > 0);
+
+      const overSaid = String(await runScript(overSrc, modalHtml(4, 7)));
+      check(
+        "dòng vượt hạn mức nói đúng số viên trong túi VÀ bậc sao của viên bị phân giải",
+        overSaid.startsWith("!") && overSaid.includes(" 7 viên") && overSaid.includes("4 sao"),
+        overSaid,
+      );
+
+      const fullSaid = String(await runScript(fullSrc, modalHtml(2, 5)));
+      check("dòng đủ hạn mức nói đúng số viên đang giữ", fullSaid.startsWith("!") && fullSaid.includes(" 5 viên"), fullSaid);
+
+      const quiet = [await runScript(overSrc, null), await runScript(fullSrc, null)];
+      check("không có hộp thì cả hai dòng đều im", quiet.every((v) => v === ""), JSON.stringify(quiet));
+    }
   }
 } finally {
   await browser.close();

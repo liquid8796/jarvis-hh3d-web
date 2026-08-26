@@ -1990,8 +1990,13 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // không dính đồng hồ 30 phút của rương ngày — đặt sau là mọi lượt rơi vào giữa cooldown sẽ
     // dừng trước khi kịp nhận. CHỈ bản thường: bản VIP đi đường khác hẳn (#nv-phucloi-open-btn
     // trên trang nhiệm vụ ngày). Lưới riêng: npm run verify:welfare-bonus.
-    "hồ sơ đang ở schema 74",
-    loadProfileForSchema().schemaVersion === 74,
+    // 75 = Luyện Đan Đường nhận THÊM hạn mức giữ đan: hai option `capOver`/`capFull` cùng sáu bước
+    // đứng TRƯỚC nhánh giữ sao. Cả hai đều đọc dòng「Đan trong túi (phẩm) x/10 viên」của hộp
+    // thông tin viên đan, mặc định là「«không hạn mức»」nên không khớp gì cả — cùng mẹo
+    // với「«luôn phân giải»」. Lưới riêng, đo bằng Chromium thật trên markup chép từ bản ghi:
+    // npm run verify:luyen-dan-stars.
+    "hồ sơ đang ở schema 75",
+    loadProfileForSchema().schemaVersion === 75,
     String(loadProfileForSchema().schemaVersion),
   );
 

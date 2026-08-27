@@ -11,6 +11,110 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.51 — Hoang Vực: trang ăn đòn rồi đứng hình (schema 76)
+
+Tông chủ đưa một dòng nhật ký và một bản ghi:
+
+```
+00:12:01  Hoang Vực: Hết 120s chờ: #battle-button hidden
+```
+
+> "ở quest hoang vực thì button đánh boss đang bị lỗi ko tìm thấy như hình, cho nên cần update
+> cho flow quest hoang vực nhé (tài khoản thường + vip)"
+
+và ghi ngay trong lúc quay: *"tạm thời page đang bị bug đánh boss ở đoạn này, tạm patch như thế"*
+— "như thế" là cú bấm **Tải lại ngay** ngài vừa làm.
+
+### Không phải selector sai. Trang ăn đòn rồi câm
+
+Bản ghi `hoang-vuc-20260828-001635` bắt trọn. Cú POST đánh boss trả về:
+
+```json
+{"success":false,"data":{"error":"Phiên tấn công đã hết hạn do bạn không hoạt động quá 15 phút.
+ Vui lòng tải lại trang để tiếp tục.","error_code":"token_expired"}}
+```
+
+Trang dựng một toast cảnh báo rồi **đứng yên**: màn đánh vẫn mở, không hoạt ảnh, không
+`#damage-summary-container`, không đồng hồ, và `#battle-button` **vẫn hiện**. `probes.json` của
+chính bản ghi đo đúng thế ở cả hai lượt lấy mẫu sau cú bấm. Nhân chứng cũ —「chờ nút KHIÊU CHIẾN
+biến mất」— vì vậy không bao giờ đúng, và lượt chạy đốt trọn 120 giây rồi báo hỏng.
+
+**Nhưng đòn đã ăn.** Đo trên chính HTML server dựng, không phải trên thứ JS vẽ ra:
+
+| | trước cú bấm (`dom/01,02,03`) | sau lượt tải lại (`dom/04`) |
+|---|---|---|
+| `.remaining-attacks` | Lượt đánh còn lại: **5** | Lượt đánh còn lại: **4** |
+| `#countdown-timer` | `display:none`, rỗng | "Chờ 7 phút 25 giây…" |
+| `#battle-button` | hiện | `display:none` |
+
+Server đã trừ lượt và đã mở cooldown; chỉ tầng giao diện là kẹt. (Máu boss tụt thì **không**
+phải bằng chứng — websocket `update_hp` chạy liên tục vì cả server cùng đánh một con boss. Hai
+con số trong bảng mới là của riêng tài khoản này.)
+
+Nên bản vá không phải chờ lâu hơn, mà là **thôi tin cái trang đang kẹt**: tải lại rồi hỏi lại.
+Đúng cách tông chủ tự làm, chỉ khác ở chỗ đi bằng `Navigate` thay vì bấm cái link trong toast —
+toast tự tắt sau ~5 giây, mà một bước phụ thuộc vào thứ đang đếm ngược là một bước sẽ có ngày
+trượt.
+
+### Cụm mới, đặt giữa cú bấm và nhân chứng
+
+1. `waitMilliseconds 2500` — cho trang kịp kêu. Bản ghi: bấm 17:16:57.563, toast có mặt ở lượt
+   lấy mẫu 17:16:58.521 — dưới một giây.
+2. Cửa sổ chờ **120s** của đường thường, nay `optional`, và **bỏ qua hẳn** khi
+   `ul.notifications` đã mang chữ「phiên tấn công đã hết hạn」. Chờ 120 giây một thứ vừa được
+   tuyên bố là sẽ không xảy ra là 120 giây vứt đi, nhân 5 lượt đánh mỗi ngày mỗi tài khoản.
+3. Một dòng kể chuyện, nói **trước** lượt tải lại — vì tải lại là xoá sạch hiện trường.
+4. `Navigate /hoang-vuc` khi `#battle-button` vẫn hiện. **Không đánh thêm cú nào.**
+5. Đệm chờ XHR trạng thái 12s, y như ở đầu script: vỏ trang mới tải lại luôn vẽ sẵn nút KHIÊU
+   CHIẾN và một đồng hồ rỗng `display:none` (bản ghi: 17:17:01 nút còn hiện, 17:17:02.7 mới hết).
+6. Nhân chứng bắt buộc, `hidden #battle-button`, nay **30s** thay vì 120s.
+
+Con số 30 là một cú **rút ngắn có lý do**, không phải bước lùi khỏi hai lần đã đo thấy 45s là
+thiếu. Ngân sách dài dời **lên** bước (2), nơi nó vẫn giữ trọn 120s. Tới bước (6) thì một trong
+hai chuyện đã xảy ra rồi: cửa sổ ấy được thoả, hoặc trang vừa tải lại và đệm XHR vừa chạy. Không
+còn gì đang chạy hoạt ảnh, nên hai phút nữa chỉ mua được hai phút đứng nhìn một cái trang đã nói
+xong.
+
+**Và nó tự kiểm chứng.** Lượt tải lại chỉ đọc, không đánh. Đòn có ăn thì đồng hồ chạy và nút biến
+mất — nhân chứng nhận ra. Đòn **không** ăn thì nút vẫn còn sau lượt tải lại, và lượt chạy vẫn hỏng
+to như trước. Không ngả nào biến một trận chưa đánh thành một dòng "xong" — đó là cả giá trị của
+bản vá 0.29.0, và nó còn nguyên.
+
+### Fixture đang nói dối, đã sửa
+
+Trang boss trong `smokeQuestEngine.mjs` không hề có `<ul class="notifications">`, trong khi trang
+thật ship sẵn nó **rỗng** ở cả bốn bản chụp DOM. Thiếu phần tử ấy thì `textNotMatches` trả FALSE
+(selector không khớp gì), tức fixture khai rằng trang **đang** kêu phiên hết hạn — và cửa sổ chờ
+ở bước (2) bị bỏ qua ở mọi lượt chạy thử. Các phép kiểm vẫn xanh, nhưng xanh nhờ may: fixture cũ
+giấu nút sau 200ms, lọt thỏm trong cái chờ 2500ms ở bước (1).
+
+Đây đúng bằng cái lỗi `#ldModal` của trang Luyện Đan hồi 12/08 — một fixture bịa ra phần tử trang
+thật không có, và một tính năng chết lặng suốt nhiều tuần trong khi bộ chạy thử xanh mướt. Nên
+fixture nay ship khay toast rỗng, và có thêm chế độ `stale` dựng lại đúng cảnh đã ghi hình: server
+trừ lượt + mở cooldown, trang chỉ hiện toast rồi đứng im.
+
+Ba phép kiểm tĩnh cũng đổi theo, vì nhân chứng KHÔNG còn đứng ngay sau cú bấm nữa: hỏi theo **ý
+nghĩa** ("có một nhân chứng bắt buộc ở đâu đó sau cú bấm", "ngân sách 120s vẫn còn ở bước optional
+đứng trước", "giữa hai thứ ấy có lượt tải lại") thay vì ghim số thứ tự bước.
+
+Ca sống mới, kèm **đối chứng** giữ vĩnh viễn: bỏ cụm tải lại đi thì chính cái bẫy ấy phải quay lại
+cắn — fixture nào để flow không-tải-lại đi qua êm là fixture đang nói dối về sự cố này.
+
+### Một chỗ chưa trả lời được
+
+`securityToken` nằm trong `hh3dData` của HTML, và **hai lượt tải trang trong bản ghi mang cùng một
+token**, đúc lúc 16:15:12 UTC — tức 61 phút trước cú đánh. Nó là token của PHIÊN ĐĂNG NHẬP, không
+phải của lượt tải trang, nên một cú tải lại không đúc token mới. Vì sao server vẫn nhận đòn thì
+bản ghi không nói, và cũng không cần: flow này không đoán lý do, nó chỉ hỏi lại `.remaining-attacks`
+và `#countdown-timer` — hai thứ server dựng sẵn trong HTML.
+
+Đáng ngờ, chép lại để ngày sau còn lần: cooldown hạng thường là **900 giây = đúng 15 phút**, bằng
+khít cái ngưỡng「không hoạt động quá 15 phút」trong lời từ chối. Nếu quả thật vậy thì tài khoản
+thường sẽ gặp cảnh này gần như mỗi lượt ghé — và đó chính là lý do cụm vá này phải rẻ, chứ không
+phải một đường hiếm gặp.
+
+---
+
 ## 1.3.50 — Luyện Đan Đường: hạn mức giữ đan (schema 75)
 
 Yêu cầu của tông chủ, nguyên văn:

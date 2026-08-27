@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.51",
+    date: "2026-08-28",
+    lines: [
+      "Hoang Vực: trang game dạo này có lúc nhận đòn đánh rồi đứng hình — vẫn hiện nút KHIÊU CHIẾN như chưa đánh gì, kèm dòng nhắc tải lại trang.",
+      "Auto nay tải lại rồi đọc lại lượt đánh và đồng hồ, thay vì đứng chờ hai phút rồi báo hỏng cho một trận thật ra đã đánh xong.",
+      "Đòn nào thật sự không ăn thì vẫn báo hỏng như cũ — chỗ này không nhận vơ.",
+    ],
+  },
+  {
     version: "1.3.50",
     date: "2026-08-26",
     lines: [
@@ -468,15 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Bảng mức dùng của các trạm sẽ báo rõ khi nó ngừng cập nhật được, thay vì lặng lẽ giữ số cũ.",
       "Với đạo hữu thì màn hình không đổi gì; đây là chỗ sửa cho người trông nom hệ thống.",
-    ],
-  },
-  {
-    version: "1.3.0",
-    date: "2026-08-17",
-    lines: [
-      "Thêm nhiệm vụ Phần Thưởng Hoạt Động: tự mở hai rương mốc 75% và 100% trên trang nhiệm vụ ngày, có cho cả tài khoản thường lẫn VIP.",
-      "Rương chưa tới mốc thì ghé lại sau nửa giờ; nhận hết cả hai rồi thì nghỉ tới hôm sau.",
-      "Nhiệm vụ chạy sau các nhiệm vụ ngày khác, vì chính chúng là thứ đẩy tiến độ lên đủ mốc.",
     ],
   },
 ];

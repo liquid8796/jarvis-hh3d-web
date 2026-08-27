@@ -595,7 +595,7 @@ const bossRewardControls = () =>
  * @param state   "ready" (còn lượt) · "cooldown" (nút còn trong DOM nhưng display:none) ·
  *   "spent" (hết lượt hôm nay — site XOÁ HẲN nút khỏi DOM)
  */
-const bossPage = (broken, { stateMs = 0, cooling = false, turnsLeft = 5, reward = false } = {}) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+const bossPage = (broken, { stateMs = 0, cooling = false, turnsLeft = 5, reward = false, stale = false } = {}) => `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div id="boss-info">
   <div>${reward ? "Hỗn Thiên Ma Vương" : "Huyết Trư Địa Quỷ 61.55%"}</div>
   <div id="boss-slot">${reward ? bossRewardControls() : bossControls(turnsLeft)}</div>
@@ -605,6 +605,13 @@ const bossPage = (broken, { stateMs = 0, cooling = false, turnsLeft = 5, reward 
   <button class="attack-button">⚔️Tấn Công</button><button class="back-button">Trở lại</button>
 </div>
 <div id="damage-summary-container" style="display:none"><button class="close-button">Đóng</button></div>
+<!-- Khay toast ship SAN va RONG, dung nhu trang that: ca bon ban chup DOM cua ban ghi
+     hoang-vuc-20260828-001635 deu co ul.notifications, ke ca luc chua co toast nao. Thieu no
+     thi textNotMatches tren khay nay tra FALSE (selector khong khop gi), tuc fixture noi doi
+     rang trang DANG keu phien het han - cung loai loi ma #ldModal cua trang luyen dan da gay
+     ra mot lan. Khong dau tieng Viet, khong backtick: khoi HTML nay nam TRONG mot template
+     literal, mot dau backtick la cat dut ca chuoi. -->
+<ul class="notifications"></ul>
 <script>
 const $ = (s) => document.querySelector(s);
 const startCooldown = () => {
@@ -648,11 +655,22 @@ document.addEventListener('click', (e) => {
   } else if (t.classList.contains('attack-button')) {${
     broken
       ? "\n    /* đúng ca hỏng: site nuốt cú bấm, không gì đổi */"
+      : stale
+      ? `
+    /* Bản ghi hoang-vuc-20260828-001635. Server ĂN đòn — trừ lượt, mở cooldown — nhưng trang chỉ
+       dựng một toast rồi ĐỨNG YÊN: không hoạt ảnh, không bảng tổng kết, không đồng hồ, và
+       #battle-button VẪN HIỆN. Đây là chỗ nhân chứng cũ không bao giờ đúng, và cũng là chỗ chứng
+       minh vì sao lượt tải lại phải hỏi lại SERVER chứ không hỏi cái trang đang kẹt. */
+    fetch('/hv-attack-stale');
+    document.querySelector('ul.notifications').innerHTML =
+      '<li class="toast warning"><div class="column"><span>Phiên tấn công đã hết hạn do bạn '
+      + 'không hoạt động quá 15 phút. Vui lòng tải lại trang để tiếp tục. '
+      + '<a href="javascript:location.reload()">Tải lại ngay</a></span></div></li>';`
       : `
     // Server TỪ CHỐI theo sự thật của CHÍNH NÓ, không theo thứ trang đã kịp vẽ. Phân biệt này
     // là cả giá trị của fixture: gác theo DOM thì một flow bấm bừa vào vỏ trang lại được cho
     // qua đúng vào khoảnh khắc nó sai nhất — fixture hoá ra lại tha bổng chính cái bug.
-    if (${cooling ? "true" : "false"}) { document.body.dataset.refused = '1'; return; }
+    if (${cooling ? "true" : "false"}) { document.body.dataset.refused = '1'; fetch('/hv-refused'); return; }
     setTimeout(() => {
       $('#luot').textContent = String(Math.max(0, +$('#luot').textContent - 1));
       $('#damage-summary-container').style.display = 'block';
@@ -1995,8 +2013,13 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // thông tin viên đan, mặc định là「«không hạn mức»」nên không khớp gì cả — cùng mẹo
     // với「«luôn phân giải»」. Lưới riêng, đo bằng Chromium thật trên markup chép từ bản ghi:
     // npm run verify:luyen-dan-stars.
-    "hồ sơ đang ở schema 75",
-    loadProfileForSchema().schemaVersion === 75,
+    // 76 = Hoang Vực học cách sống với một trang ĂN đòn rồi đứng hình. Bản ghi
+    // hoang-vuc-20260828-001635: POST đánh boss trả `token_expired`, trang dựng toast rồi
+    // không vẽ lại gì — `#battle-button` VẪN HIỆN nên nhân chứng cũ chờ tới hết 120s rồi báo
+    // hỏng, trong khi server ĐÃ trừ lượt (5→4) và ĐÃ mở cooldown. Nay: bỏ qua cửa sổ chờ khi
+    // trang đã kêu phiên hết hạn, tải lại, rồi mới hỏi nhân chứng.
+    "hồ sơ đang ở schema 76",
+    loadProfileForSchema().schemaVersion === 76,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -2367,30 +2390,52 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     const attackAt = boss.steps.findIndex(
       (s) => s.action === "click" && s.selector === "#boss-damage-screen .attack-button",
     );
-    const confirm = boss.steps[attackAt + 1];
-    check(
-      `${bossId}: ngay sau cú bấm Tấn Công là một bước xác nhận`,
-      attackAt >= 0 &&
-        confirm?.action === "waitForCondition" &&
-        confirm.condition?.kind === "hidden" &&
-        confirm.condition?.selector === "#battle-button",
-      JSON.stringify(confirm?.condition ?? confirm),
+    // Từ schema 76 nhân chứng KHÔNG còn đứng ngay sau cú bấm: giữa hai thứ ấy là cụm tải lại
+    // của bản vá 28/08. Nên hỏi theo Ý NGHĨA — "có một nhân chứng bắt buộc ở đâu đó SAU cú bấm"
+    // — chứ đừng ghim số thứ tự, bằng không phép kiểm này đỏ mỗi lần chèn thêm một bước.
+    const after = boss.steps.slice(attackAt + 1);
+    const witnessAt = after.findIndex(
+      (s) =>
+        s.action === "waitForCondition" &&
+        s.condition?.kind === "hidden" &&
+        s.condition?.selector === "#battle-button" &&
+        s.optional !== true,
     );
-    // Đây là cả sự khác biệt giữa bản đã sửa và bản gây ra sự cố. Một chữ `optional` ở đây là
-    // quay lại đúng cái im lặng cũ.
     check(
-      `${bossId}: và bước ấy KHÔNG optional — trượt thì phải hỏng to`,
-      confirm?.optional !== true,
-      `optional=${confirm?.optional}`,
+      `${bossId}: sau cú bấm Tấn Công có một bước xác nhận, và nó KHÔNG optional`,
+      attackAt >= 0 && witnessAt >= 0,
+      JSON.stringify(after[witnessAt]?.condition ?? after[witnessAt]),
     );
     // Nhật ký 07/08 01:03:55: 45s không sống nổi cạnh một trận Mê Cung đủ đội trên VM hai
     // nhân — hoạt ảnh của tab bị bỏ đói CPU chạy chưa xong thì bằng chứng chưa xuất hiện.
-    // 120s = 10× mốc 12s đo trên tab rảnh; teo con số này lại là mở cửa cho đúng đêm lỗi ấy
-    // quay về, nên sàn của nó bị đóng đinh ở đây.
+    // 120s = 10× mốc 12s đo trên tab rảnh. Ngân sách ấy KHÔNG mất đi ở schema 76, nó dời lên
+    // bước optional đứng trước lượt tải lại — nên sàn của nó vẫn bị đóng đinh, chỉ là đóng ở
+    // đúng bước đang gánh việc chờ.
+    const budget = after.find(
+      (s) =>
+        s.action === "waitForCondition" &&
+        s.condition?.kind === "hidden" &&
+        s.condition?.selector === "#battle-button" &&
+        s.optional === true,
+    );
     check(
-      `${bossId}: ngân sách bằng chứng chịu được tab bị bỏ đói CPU (>= 120s)`,
-      (confirm?.timeoutMs ?? 0) >= 120000,
-      `timeoutMs=${confirm?.timeoutMs}`,
+      `${bossId}: ngân sách chờ hoạt ảnh vẫn >= 120s (nay ở bước optional trước nhân chứng)`,
+      (budget?.timeoutMs ?? 0) >= 120000,
+      `timeoutMs=${budget?.timeoutMs}`,
+    );
+    // Bản vá 28/08. Không có lượt tải lại này thì một trang ăn đòn rồi đứng hình sẽ mãi mãi
+    // giữ #battle-button trên màn, và nhân chứng — dù đúng — không bao giờ được thoả.
+    const reloadAt = after.findIndex(
+      (s) =>
+        s.action === "navigate" &&
+        s.text === "/hoang-vuc" &&
+        s.when?.kind === "visible" &&
+        s.when?.selector === "#battle-button",
+    );
+    check(
+      `${bossId}: giữa cú bấm và nhân chứng có lượt TẢI LẠI, gác bằng "nút vẫn còn"`,
+      reloadAt >= 0 && witnessAt >= 0 && reloadAt < witnessAt,
+      `reload@${reloadAt} · witness@${witnessAt}`,
     );
   }
 
@@ -2558,6 +2603,9 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   const hySuGifts = new Set(hySuRooms.filter((r) => r.gift).map((r) => r.id));
   const hySuBrokenRooms = new Set(); // id → trang phòng trả về hình dạng lạ (không form, không dấu đã chúc)
   let bossBroken = false;
+  let bossStale = false;
+  let hvRefused = 0;
+  let hvPageHits = 0;
   let bossStateMs = 0;
   let bossCooling = false;
   let bossTurnsLeft = 5;
@@ -2640,8 +2688,13 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // Lĩnh thưởng Hoang Vực: server ghi nhận VÀ đổi trạng thái — lượt tải lại kế tiếp phải là
     // trang boss bình thường, bằng không fixture nói dối ở đúng chỗ quan trọng nhất.
     else if (path === "/hv-claim") { hvClaims.push(new Date().toISOString()); bossReward = false; res.end("ok"); }
-    else if (path === "/hoang-vuc")
-      res.end(bossPage(bossBroken, { stateMs: bossStateMs, cooling: bossCooling, turnsLeft: bossTurnsLeft, reward: bossReward }));
+    // Đòn ĐÃ ăn ở phía server, dù trang sắp đứng hình: trừ lượt và mở cooldown ngay tại đây.
+    else if (path === "/hv-refused") { hvRefused += 1; res.end("ok"); }
+    else if (path === "/hv-attack-stale") { bossTurnsLeft = Math.max(0, bossTurnsLeft - 1); bossCooling = true; res.end("ok"); }
+    else if (path === "/hoang-vuc") {
+      hvPageHits += 1;
+      res.end(bossPage(bossBroken, { stateMs: bossStateMs, cooling: bossCooling, turnsLeft: bossTurnsLeft, reward: bossReward, stale: bossStale }));
+    }
     else if (path === "/luyen-dan-duong") res.end(furnacePage({ waveMs: 900 }));
     else if (path === "/ld-state") {
       tickFurnace();
@@ -3421,6 +3474,9 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     const bossQuest = exportedProfile.quests.find((q) => q.id === "hoang-vuc");
     const resetBoss = async () => {
       bossBroken = false;
+      bossStale = false;
+      hvRefused = 0;
+      hvPageHits = 0;
       bossStateMs = 0;
       bossCooling = false;
       bossTurnsLeft = 5;
@@ -3458,16 +3514,21 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     noBuffer.steps = noBuffer.steps.filter(
       (s) => !(s.action === "waitForCondition" && s.optional === true && s.condition?.selector === "#countdown-timer"),
     );
-    const confirmOld = noBuffer.steps.find(
-      (s) => s.action === "waitForCondition" && s.condition?.selector === "#battle-button" && !s.optional,
-    );
-    confirmOld.timeoutMs = 3000; // hỏng thì hỏng nhanh, đang thử HÀNH VI chứ không thử con số
+    // Rút ngắn MỌI cửa sổ chờ `#battle-button`, không riêng cái bắt buộc. Từ schema 76 có
+    // HAI: một optional gánh ngân sách hoạt ảnh 120s, một bắt buộc làm nhân chứng. Chỉ rút cái
+    // thứ hai thì cái thứ nhất vẫn đứng chờ trọn hai phút — thừa sức để đồng hồ 6000ms kịp hiện
+    // và ẩn nút GIÚP, và phép đối chứng ăn may thành "xong" đúng lúc nó phải có răng nhất.
+    for (const s of noBuffer.steps) {
+      if (s.action === "waitForCondition" && s.condition?.selector === "#battle-button") s.timeoutMs = 3000;
+    }
     await page.goto(`${baseUrl}/hoang-vuc`, { waitUntil: "domcontentloaded" });
     const bossOld = await run(noBuffer);
+    // Dấu「đã bị từ chối」đọc từ PHÍA SERVER: flow schema 76 tải lại trang khi nút còn đó, mà một
+    // lượt tải lại xoá sạch dataset của body. Hỏi cái body sau lượt ấy là hỏi một tờ giấy trắng.
     check(
       "flow CŨ trên cùng cái bẫy: bấm vào cooldown và bị từ chối",
-      bossOld.outcome === "failed" && (await page.getAttribute("body", "data-refused")) === "1",
-      `${bossOld.outcome} · refused=${await page.getAttribute("body", "data-refused")}`,
+      bossOld.outcome === "failed" && hvRefused === 1,
+      `${bossOld.outcome} · refused=${hvRefused}`,
     );
 
     console.log("\nHoang Vực — ba kết cục còn lại");
@@ -3514,6 +3575,49 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       "cú bấm rơi vào hư không → HỎNG, không nhận vơ là xong",
       bossMiss.outcome === "failed" && String(bossMiss.message ?? "").includes("#battle-button"),
       `${bossMiss.outcome}: ${bossMiss.message}`,
+    );
+    await resetBoss();
+
+    console.log("\nHoang Vực — trang ĂN đòn rồi đứng hình (bản ghi 28/08)");
+
+    // Cảnh thật, đo trọn trong hoang-vuc-20260828-001635: cú POST đánh boss trả về
+    //   {"success":false,...,"error_code":"token_expired"}
+    // trang dựng một toast「Phiên tấn công đã hết hạn…」rồi không vẽ lại gì nữa — màn đánh vẫn
+    // mở, không bảng tổng kết, không đồng hồ, #battle-button vẫn hiện. NHƯNG server đã trừ lượt
+    // (dom/01,02,03 ghi "còn lại: 5", dom/04 sau lượt tải lại ghi "còn lại: 4") và đã mở
+    // cooldown ("Chờ 7 phút 25 giây"). Nhân chứng cũ vì thế chờ tới hết giờ rồi báo hỏng cho
+    // một đòn đã ăn — đúng dòng「Hết 120s chờ: #battle-button hidden」trong nhật ký của tông chủ.
+    await resetBoss();
+    bossStale = true;
+    const hitsBefore = hvPageHits;
+    const bossStuck = await run(bossQuest);
+    check(
+      "trang kẹt sau cú đánh → tải lại rồi kết luận ĐÚNG là đã đánh",
+      bossStuck.outcome === "completed" && bossStuck.cooldownSeconds === 439,
+      `${bossStuck.outcome}: ${bossStuck.cooldownSeconds} · ${bossStuck.message}`,
+    );
+    check(
+      "…và lượt đánh bị trừ đúng một, đọc lại từ trang server dựng ở lượt tải lại",
+      bossTurnsLeft === 4 && hvPageHits >= hitsBefore + 2,
+      `còn ${bossTurnsLeft} lượt · ${hvPageHits - hitsBefore} lượt tải trang`,
+    );
+
+    // ĐỐI CHỨNG, giữ vĩnh viễn: bỏ cụm tải lại đi thì CHÍNH cái bẫy ấy phải quay lại cắn. Fixture
+    // nào để flow không-tải-lại đi qua êm là fixture đang nói dối về sự cố này.
+    await resetBoss();
+    bossStale = true;
+    const noReload = structuredClone(bossQuest);
+    noReload.steps = noReload.steps.filter(
+      (s) => !(s.action === "navigate" && s.text === "/hoang-vuc" && s.when?.selector === "#battle-button"),
+    );
+    noReload.steps.find(
+      (s) => s.action === "waitForCondition" && s.condition?.selector === "#battle-button" && !s.optional,
+    ).timeoutMs = 3000; // hỏng thì hỏng nhanh — đang thử HÀNH VI, không thử con số
+    const bossOldStuck = await run(noReload);
+    check(
+      "flow KHÔNG tải lại trên cùng cái bẫy: chờ tới hết giờ rồi báo hỏng",
+      bossOldStuck.outcome === "failed" && String(bossOldStuck.message ?? "").includes("#battle-button"),
+      `${bossOldStuck.outcome}: ${bossOldStuck.message}`,
     );
     await resetBoss();
 

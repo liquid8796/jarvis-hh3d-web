@@ -1207,7 +1207,10 @@ export function ChatRoom({
              trò chuyện…」đã được in vào tấm ảnh và `.chat-input-cover` lo việc xoá nó đi — thêm
              `placeholder` ở đó là hai dòng chữ chồng lên nhau. Trải kín màn hình thì tấm ảnh đi
              mất, và một ô nhập không lời mời là một ô nhập câm. */
-          placeholder={full ? "Nhập nội dung trò chuyện…" : undefined}
+          /* NGẮN hơn câu in trong ảnh, và đó là vì chỗ hẹp hơn: ô nhập ở đây chỉ còn ~210px sau
+             khi trừ ba nút 44px, nên「Nhập nội dung trò chuyện…」xuống hai dòng và bị cắt mất
+             chữ cuối — đã thấy trên ảnh chụp 390×844. */
+          placeholder={full ? "Nhập nội dung…" : undefined}
           className={`chat-input ${text ? "typing" : ""}`}
         />
         {/* Tấm che dòng chữ mời in sẵn trong ảnh. LUÔN dựng, và để CSS quyết lúc nào hiện —

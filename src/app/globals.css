@@ -1883,6 +1883,11 @@ body {
     white-space: pre-wrap;
     overflow-y: auto;
     font: normal 15px / 1.35 var(--font-body);
+    /* Ô cao dần theo chữ, tới trần 96px thì cuộn trong lòng nó. Một `textarea rows={1}` không
+       tự lớn, nên thiếu dòng này thì tin dài nằm trong một khe một dòng và người gõ không thấy
+       thứ mình vừa viết. Đây là phần THÊM: nơi nào chưa biết `field-sizing` thì ô đứng yên ở
+       `min-height` đúng như trước, không hỏng gì. */
+    field-sizing: content;
   }
 
   /* 16px chống iOS Safari TỰ PHÓNG TO cả trang khi ô nhập được focus — dưới 16px là nó zoom,

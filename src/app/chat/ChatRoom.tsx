@@ -153,6 +153,25 @@ const FRAME_HOTSPOTS = {
   send: { left: "89.7959%", top: "91.1237%", width: "4.9562%", height: "6.4211%" },
 } as const;
 
+/**
+ * Hình vẽ cho ba nút soạn tin, và nó CHỈ hiện khi sảnh trải kín màn hình.
+ *
+ * Chiếc kẹp, mặt cười và cánh én đã được vẽ SẴN trong `/chat-frame.webp`; ba cái nút kia chỉ là
+ * vùng bấm trong suốt đặt trùng lên. Đó là lý do bình thường chúng phải rỗng — thêm icon là đè
+ * hai lớp lên nhau. Nhưng chế độ trải kín màn hình bỏ tấm ảnh đi (nó không kéo giãn được mà
+ * không méo hoa văn), nên nếu không có ba hình này thì ba cái nút biến mất khỏi mắt người dùng
+ * trong khi vẫn bấm được — một thanh soạn tin vô hình.
+ *
+ * `aria-hidden`: cả ba nút đã mang `aria-label` riêng, đọc thêm một hình nữa chỉ làm rối.
+ */
+function HotspotIcon({ d }: { d: string }) {
+  return (
+    <svg className="chat-hotspot-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d={d} />
+    </svg>
+  );
+}
+
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
 
@@ -221,6 +240,18 @@ export function ChatRoom({
    * từng nhịp đọc là biến một cột mốc thành một con trỏ nhấp nháy.
    */
   const [dividerAt, setDividerAt] = useState<string | null>(null);
+  /**
+   * Sảnh đang trải kín màn hình — CHỈ có nghĩa trên điện thoại.
+   *
+   * Khung là một tấm ảnh tỉ lệ 1372:1059, nên trên màn dọc nó bị bề rộng quyết định: ở khung
+   * nhìn 390×844 khung chỉ cao 276px và bỏ trống hơn nửa màn. Phóng to là cách duy nhất lấy
+   * lại chỗ ấy — nhưng nó buộc phải BỎ tỉ lệ của tấm ảnh, nên chế độ này vẽ một khung thật
+   * bằng CSS thay cho tấm ảnh. Xem `.chat-full` trong globals.css.
+   *
+   * Khởi đầu `false` ở CẢ hai phía để lượt dựng của server và lượt dựng đầu của client ra cùng
+   * một cây — đọc bề rộng màn hình ngay trong render là cách chắc chắn nhất để gãy hydrate.
+   */
+  const [full, setFull] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -502,7 +533,11 @@ export function ChatRoom({
       // lại thì cửa sổ nở ra từ kho, không tốn một request nào.
       setWindowSize(RENDER_WINDOW);
     }
-  }, [messages, typing, stuck]);
+    // `full` nằm trong danh sách này vì trải/thu sảnh đổi chiều cao vùng cuộn một cách dữ dội
+    // (195px ↔ gần trọn màn hình) mà không sinh ra tin mới nào. Thiếu nó thì người đang đứng ở
+    // đáy bấm phóng to và rơi vào giữa quá khứ: `scrollTop` cũ giữ nguyên trong một khung cao
+    // gấp bốn, nên cái đáy đã trôi đi mất mà không ai kéo họ theo.
+  }, [messages, typing, stuck, full]);
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -595,6 +630,52 @@ export function ChatRoom({
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
+
+  /**
+   * Trải kín màn hình thì trang phía sau phải THÔI cuộn: sảnh là một tấm `position: fixed`, và
+   * nếu body vẫn cuộn được thì cú vuốt nào trượt khỏi vùng tin sẽ kéo cả trang bên dưới đi —
+   * người dùng thấy nền tiên hiệp trôi sau một khung đứng yên.
+   *
+   * Trả lại ĐÚNG giá trị cũ chứ không gán `""`: trang này không đặt `overflow` cho body, nhưng
+   * một lượt gán cứng sẽ đè mất luật của bất kỳ lớp nào đặt sau — và hàm dọn còn chạy cả lúc
+   * component lìa đời giữa chừng.
+   */
+  useEffect(() => {
+    if (!full) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [full]);
+
+  /**
+   * Esc thoát — cùng nết với mọi lớp phủ khác của app.
+   *
+   * Nhường cho khay emoji/cảm xúc: sảnh có sẵn một tay nghe Esc để đóng khay (xem `popupOpen`),
+   * và hai tay nghe cùng bắt một phím sẽ đóng cả hai thứ trong một nhịp — người ta bấm Esc để
+   * bỏ cái khay vừa mở lại mất luôn cả màn hình đang đọc. Khay đóng trước, sảnh đóng sau.
+   */
+  useEffect(() => {
+    if (!full || popupOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFull(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [full, popupOpen]);
+
+  /**
+   * Màn rộng ra (xoay ngang, hoặc cửa sổ desktop kéo to) thì tự thoát.
+   *
+   * Luật CSS của chế độ này nằm trong `@media (max-width: 767px)`, nên trên màn rộng cái cờ
+   * còn bật cũng không vẽ ra gì — nhưng nó vẫn khoá cuộn của body và vẫn chờ sẵn để bật lại
+   * khi xoay về dọc. Một trạng thái vô hình mà còn tác dụng phụ là thứ tệ hơn cả hai vế.
+   */
+  useEffect(() => {
+    if (!full) return;
+    const mq = window.matchMedia("(min-width: 768px)");
+    const sync = () => { if (mq.matches) setFull(false); };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [full]);
 
   useEffect(() => {
     if (!stuck || storeClosed || messages.length === 0 || !pageVisible) return;
@@ -782,7 +863,7 @@ export function ChatRoom({
   // ---- Vẽ ------------------------------------------------------------------------------
 
   return (
-    <div className="chat-frame">
+    <div className={`chat-frame ${full ? "chat-full" : ""}`}>
     {/* Tấm khung. `alt=""` + aria-hidden: nó là TRANG TRÍ, mọi thứ đọc được đã nằm ở chữ thật
         bên trên nó. Dùng <img> thường chứ không phải next/image — ảnh này luôn phủ trọn khung
         với kích thước do CSS quyết (`background-size` không dùng được vì cần `priority` cho
@@ -804,6 +885,29 @@ export function ChatRoom({
         <h1 className="h-display text-gilded">Phòng Chat</h1>
         <p>Sảnh đàm đạo chung — mọi môn đồ đã nhập môn đều nghe thấy nhau.</p>
       </header>
+
+      {/* Nút trải sảnh kín màn hình. Đứng NGOÀI `.chat-head` vì dải ấy mang `pointer-events:
+          none` (nó chỉ là chữ, để nó nuốt cú bấm là vùng tin mất một dải cao 12%). CSS giấu
+          hẳn nút này từ 768px trở lên — trên desktop khung đã cao bằng cả khung nhìn. */}
+      <button
+        type="button"
+        className="chat-expand"
+        onClick={() => setFull((v) => !v)}
+        /* Nhãn đổi theo VIỆC SẮP LÀM, nên KHÔNG kèm `aria-pressed`: hai thứ cùng lúc thì trình
+           đọc màn hình đọc ra「Thu sảnh về khung, nút bật/tắt, đang bật」— một câu tự mâu thuẫn.
+           Đổi nhãn là cách rõ hơn cho một nút chỉ có hai trạng thái nhìn thấy được. */
+        title={full ? "Thu sảnh về khung" : "Trải sảnh kín màn hình"}
+        aria-label={full ? "Thu sảnh về khung" : "Trải sảnh kín màn hình"}
+      >
+        {/* Hai mũi tên chéo — ra bốn góc khi đang thu, chụm về giữa khi đang trải. */}
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          {full ? (
+            <path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
+          ) : (
+            <path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
+          )}
+        </svg>
+      </button>
 
       <div ref={scrollRef} onScroll={onScroll} className="chat-scroll">
         {/* CHỈ khi cửa sổ đã trùm hết kho. Thiếu vế ấy thì dòng này thành một lời nói dối:
@@ -1067,6 +1171,7 @@ export function ChatRoom({
         >
           {/* Chỉ hiện khi đang tải — lúc rảnh nút phải TRỐNG để lộ hình chiếc kẹp vẽ trong ảnh. */}
           {uploading && <span className="chat-hotspot-busy">…</span>}
+          <HotspotIcon d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
         </button>
         {/* Ô nhập trong suốt đặt trùng lên khung đã vẽ. Không dùng thuộc tính `placeholder`:
             chữ mời đã in sẵn trong ảnh, và `.chat-input-cover` xoá nó đi — ngay từ lúc BẤM VÀO
@@ -1098,6 +1203,11 @@ export function ChatRoom({
           maxLength={4000}
           title="Enter gửi, Alt+Enter xuống dòng"
           aria-label="Nhập nội dung trò chuyện"
+          /* Dòng mời CHỈ có khi sảnh trải kín màn hình: lúc còn trong khung, câu「Nhập nội dung
+             trò chuyện…」đã được in vào tấm ảnh và `.chat-input-cover` lo việc xoá nó đi — thêm
+             `placeholder` ở đó là hai dòng chữ chồng lên nhau. Trải kín màn hình thì tấm ảnh đi
+             mất, và một ô nhập không lời mời là một ô nhập câm. */
+          placeholder={full ? "Nhập nội dung trò chuyện…" : undefined}
           className={`chat-input ${text ? "typing" : ""}`}
         />
         {/* Tấm che dòng chữ mời in sẵn trong ảnh. LUÔN dựng, và để CSS quyết lúc nào hiện —
@@ -1115,7 +1225,9 @@ export function ChatRoom({
           aria-label="Emoji, sticker và GIF"
           data-chat-popup-trigger
           onClick={() => openPanel("emoji")}
-        />
+        >
+          <HotspotIcon d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5v.5M15 9.5v.5" />
+        </button>
         <button
           type="button"
           className="chat-hotspot"
@@ -1124,7 +1236,9 @@ export function ChatRoom({
           aria-label="Truyền Âm"
           onClick={() => void send()}
           disabled={uploading}
-        />
+        >
+          <HotspotIcon d="M21.5 2.5L10.5 13.5M21.5 2.5l-7 19-4-8.5-8.5-4 19.5-6.5z" />
+        </button>
       </footer>
     </div>
     </div>

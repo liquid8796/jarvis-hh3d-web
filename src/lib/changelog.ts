@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.52",
+    date: "2026-08-28",
+    lines: [
+      "Phòng Chat trên điện thoại: mỗi khoảnh tin nay thu lại cho vừa khung — trước chỉ chứa vừa hai tin rưỡi, giờ được hơn ba tin rưỡi.",
+      "Thêm nút ở góc trên bên phải khung để trải sảnh kín màn hình; bấm lần nữa hoặc bấm Esc là thu về.",
+      "Lúc trải kín màn hình thì chữ trở lại cỡ thường và ô nhập rộng ra, đọc và gõ đều dễ hơn.",
+    ],
+  },
+  {
     version: "1.3.51",
     date: "2026-08-28",
     lines: [
@@ -468,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-17",
     lines: [
       "Công cụ dựng khôi lỗi GitHub thôi đổ lỗi cho chìa khi trục trặc nằm ở phía GitHub, và tự thử lại vài lần thay vì bắt gõ lại từ đầu.",
-      "Với đạo hữu thì màn hình không đổi gì; đây là chỗ sửa cho người trông nom hệ thống.",
-    ],
-  },
-  {
-    version: "1.3.1",
-    date: "2026-08-17",
-    lines: [
-      "Bảng mức dùng của các trạm sẽ báo rõ khi nó ngừng cập nhật được, thay vì lặng lẽ giữ số cũ.",
       "Với đạo hữu thì màn hình không đổi gì; đây là chỗ sửa cho người trông nom hệ thống.",
     ],
   },

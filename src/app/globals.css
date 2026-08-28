@@ -1654,6 +1654,253 @@ body {
 .chat-editbtns { display: flex; gap: 8px; margin-top: 4px; font-size: 0.75rem; }
 .chat-editbtns button { color: var(--color-gold-300); }
 
+/* ── SẢNH TRÊN ĐIỆN THOẠI ────────────────────────────────────────────────────────────────
+ *
+ * Khung là một TẤM ẢNH tỉ lệ 1372:1059, và trên màn hẹp nó bị bề rộng quyết định: ở khung nhìn
+ * 390px, khung chỉ còn 358×276px và vùng tin cao 195px. Nhưng mọi thứ BÊN TRONG khoảnh tin —
+ * chân dung 62px, bài vị 60px, chữ 1rem — đều là số tuyệt đối, đứng yên khi khung co lại. Hệ
+ * quả đo trên ảnh chụp 390×844: vùng tin chứa vừa HAI TIN RƯỠI, và mỗi bong bóng trông như bị
+ * nhồi vào một cái hộp bé hơn nó.
+ *
+ * Thu bằng `zoom` chứ không sửa từng con số, và đó là lựa chọn có chủ ý. Những con số ấy không
+ * độc lập: chân dung 62px, bài vị 60px và dòng tên 1.05rem là một THẾ CÂN đo bằng mắt trên ảnh
+ * chụp thật qua ba lượt chỉnh (09/08, 17/08, 21/08 — xem chú thích ở `.chat-tagframe`), và tỉ
+ * lệ 38/62 = 0,61 giữa bài vị với chân dung là thứ phải giữ. Sửa tay hơn hai chục giá trị là
+ * hai chục cơ hội làm lệch thế cân ấy; `zoom` nhân TẤT CẢ với cùng một số nên mọi tỉ lệ còn
+ * nguyên xi, và desktop không bị đụng tới một dòng nào.
+ *
+ * `zoom` chứ KHÔNG `transform: scale()`: transform vẽ lại một lớp đã dựng xong, nên chiều cao
+ * cuộn, vùng bấm và nét chữ đều tính theo cỡ CŨ — sảnh sẽ có một khoảng trống ma ở đáy và ngón
+ * tay bấm trượt. `zoom` dựng lại bố cục ở cỡ mới, nên `scrollHeight`, `getBoundingClientRect`
+ * và phép neo vạch chưa-đọc trong ChatRoom.tsx vẫn nói cùng một thứ tiếng.
+ *
+ * Đặt trên CON của `.chat-scroll`, không phải trên chính nó: `.chat-scroll` được định vị bằng
+ * PHẦN TRĂM của tấm khung, mà `zoom` nhân cả cái hộp của phần tử mang nó — thu chính vùng cuộn
+ * là thu luôn cái ô chữ nhật mà tấm khung chừa ra, và bố cục rời khỏi ảnh.
+ */
+.chat-frame { --chat-zoom: 1; }
+
+/* Nút trải sảnh kín màn hình — CHỈ có trên điện thoại (xem media query bên dưới). Vùng bấm
+   44×44 theo chuẩn ngón tay, còn thứ nhìn thấy chỉ là cái chip 30px ở giữa: phần dôi ra là
+   khoảng trong suốt, nên nút không thúc vào hoa văn góc khung mà tay vẫn không bấm trượt. */
+.chat-expand {
+  position: absolute;
+  z-index: 7;
+  display: none;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-gold-300);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chat-expand svg {
+  width: 30px;
+  height: 30px;
+  padding: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 194, 92, 0.3);
+  background: rgba(9, 12, 26, 0.72);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chat-expand:focus-visible svg { outline: 2px solid var(--color-gold-400); outline-offset: 2px; }
+
+/* Hình vẽ trong ba nút soạn tin: CÂM cho tới khi sảnh trải kín màn hình — lúc còn trong khung,
+   chiếc kẹp/mặt cười/cánh én đã nằm sẵn trong tấm ảnh. Xem `HotspotIcon` bên ChatRoom.tsx. */
+.chat-hotspot-icon { display: none; }
+
+@media (max-width: 767px) {
+  /* 0.72: đo trên chính hình dạng của sảnh (khung 358×276, vùng tin cao 195px) — vùng tin chứa
+     2,49 khoảnh ở cỡ thiết kế và 3,42 khoảnh ở 0,72, mà chữ trong bong bóng vẫn còn 11,5px.
+     Dưới mức ấy là đánh đổi cái đọc được lấy cái đếm được. Ai muốn đọc thoải mái thì đã có nút
+     trải kín màn hình, nơi `--chat-zoom` trở về 1. */
+  .chat-frame { --chat-zoom: 0.72; }
+  .chat-scroll > * { zoom: var(--chat-zoom); }
+
+  /* Nằm trong dải chữ trên đường kẻ, về phía phải — chỗ duy nhất của dải ấy còn trống. */
+  .chat-expand { display: grid; top: 0.5%; right: 3%; }
+
+  /* ── TRẢI KÍN MÀN HÌNH ─────────────────────────────────────────────────────────────────
+   *
+   * Chế độ này BỎ tấm ảnh khung, và đó là điều bắt buộc chứ không phải lựa chọn: ảnh mang tỉ
+   * lệ 1372:1059, kéo nó ra 390×844 là bóp hoa văn gấp gần ba lần theo chiều dọc, còn giữ tỉ
+   * lệ thì nó chỉ cao 301px giữa một màn 844px — tức đúng cái bệnh đang chữa. Nên ở đây khung
+   * được vẽ lại bằng CSS, lấy đúng bảng màu của tấm ảnh: nền lam thẫm, một nét vàng mảnh.
+   *
+   * Và vì tấm ảnh đi thì ba cái nút soạn tin vẽ trong nó cũng đi theo, `.chat-hotspot` ở đây
+   * thôi làm vùng bấm trong suốt mà trở thành nút thật — xem `.chat-hotspot-icon`.
+   */
+  .chat-frame.chat-full {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    width: 100%;
+    height: 100dvh;
+    /* Bỏ khoá tỉ lệ của tấm ảnh — cả điểm của chế độ này. */
+    aspect-ratio: auto;
+    margin: 0;
+    /* Trở về cỡ thiết kế: đã có cả màn hình thì không còn cớ gì để thu chữ lại. */
+    --chat-zoom: 1;
+    background: linear-gradient(178deg, #0c1330 0%, #090f26 55%, #070c20 100%);
+  }
+
+  .chat-full .chat-frame-img { display: none; }
+
+  .chat-full .chat-shell {
+    display: flex;
+    flex-direction: column;
+    /* Tai thỏ và vạch home của iOS. `env()` trả 0 ở nơi không có, nên không cần nhánh dự phòng. */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  /* Ba đứa con chuyển từ toạ độ PHẦN TRĂM của tấm ảnh sang một cột flex thật. Mọi con số %
+     bên dưới đều đo trên tấm ảnh, nên giữ lại một cái nào cũng là neo vào một tấm ảnh không
+     còn ở đó nữa. */
+  .chat-full .chat-head {
+    position: static;
+    width: auto;
+    height: auto;
+    flex: none;
+    padding: 10px 56px 10px 16px;
+    gap: 2px;
+    border-bottom: 1px solid rgba(232, 194, 92, 0.22);
+  }
+
+  .chat-full .chat-head h1 { font-size: 1.15rem; }
+  .chat-full .chat-head p { font-size: 0.72rem; }
+
+  /* Cộng `env()` bằng tay chứ không trông vào đệm của `.chat-shell`: một phần tử định vị tuyệt
+     đối bám vào HỘP ĐỆM của khối chứa, tức đệm an toàn kia không đẩy nó xuống. Thiếu dòng này
+     thì trên máy có tai thỏ, nút nằm khuất dưới tai. Cùng lẽ cho `.chat-jump` phía dưới. */
+  .chat-full .chat-expand {
+    top: calc(env(safe-area-inset-top) + 8px);
+    right: calc(env(safe-area-inset-right) + 8px);
+  }
+
+  .chat-full .chat-scroll {
+    position: static;
+    width: auto;
+    height: auto;
+    /* `min-height: 0` là dòng giữ cho cả bố cục đứng được: một flex item mặc định không co
+       xuống dưới nội dung của nó, nên thiếu nó thì vùng tin dài ra theo số tin và đẩy thanh
+       soạn xuống dưới đáy màn hình. */
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 4px 12px 8px;
+  }
+
+  /* Nổi trên vùng tin, ngay trên thanh soạn — `.chat-shell` là gốc toạ độ vì nó `absolute`. */
+  .chat-full .chat-jump {
+    bottom: calc(env(safe-area-inset-bottom) + 76px);
+    right: 14px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .chat-full .chat-trays {
+    position: static;
+    width: auto;
+    flex: none;
+    gap: 6px;
+    padding: 0 12px 6px;
+  }
+
+  .chat-full .chat-notice,
+  .chat-full .chat-replybar,
+  .chat-full .chat-staged { padding: 6px 10px; font-size: 12px; }
+
+  /* Thanh soạn thật: `relative` chứ không `static` để khay emoji còn neo được vào nó. */
+  .chat-full .chat-composer {
+    position: relative;
+    inset: auto;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px 10px;
+    border-top: 1px solid rgba(232, 194, 92, 0.22);
+    pointer-events: auto;
+  }
+
+  .chat-full .chat-hotspot {
+    position: static;
+    /* Ba nút mang toạ độ tuyệt đối do TSX truyền vào bằng `style` (FRAME_HOTSPOTS), mà một
+       inline style thì chỉ `!important` mới đè nổi — và tệp này không dùng `!important` ở đâu
+       cả. Nên thay vì chống lại chúng, làm cho chúng vô hại:
+         • `position: static` cắt nghĩa của `left`/`top` — chúng chỉ có tác dụng khi được định vị;
+         • `width: 4.66%` / `height: 6.04%` thì VẪN áp, không cắt được — nên cỡ thật đặt bằng
+           `min-width`/`min-height`, thứ luôn thắng một `width` nhỏ hơn nó. */
+    inset: auto;
+    flex: none;
+    display: grid;
+    place-items: center;
+    /* Ô vuông 44px — ngưỡng ngón tay. */
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 999px;
+    color: var(--color-gold-300);
+  }
+
+  .chat-full .chat-hotspot:disabled { opacity: 0.45; }
+
+  .chat-full .chat-hotspot-icon {
+    display: block;
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Ô nhập thôi trong suốt: dòng mời in trong ảnh đã đi cùng tấm ảnh, nên nó cần chữ thật,
+     nền thật và một `placeholder` thật. */
+  .chat-full .chat-input {
+    position: static;
+    inset: auto;
+    flex: 1 1 auto;
+    width: auto;
+    height: auto;
+    min-height: 40px;
+    max-height: 96px;
+    padding: 10px 14px;
+    border: 1px solid rgba(232, 194, 92, 0.28);
+    border-radius: 18px;
+    background: rgba(6, 10, 26, 0.9);
+    color: var(--color-parchment);
+    caret-color: var(--color-gold-400);
+    /* Bỏ `white-space: nowrap` của bản trong khung: ở đây ô cao được nên chữ dài xuống dòng. */
+    white-space: pre-wrap;
+    overflow-y: auto;
+    font: normal 15px / 1.35 var(--font-body);
+  }
+
+  /* 16px chống iOS Safari TỰ PHÓNG TO cả trang khi ô nhập được focus — dưới 16px là nó zoom,
+     và sau cú zoom ấy sảnh "toàn màn hình" không còn vừa màn hình nữa. */
+  @supports (-webkit-touch-callout: none) {
+    .chat-full .chat-input { font-size: 16px; }
+  }
+
+  .chat-full .chat-input::placeholder { color: rgba(143, 137, 179, 0.7); font-style: italic; }
+  .chat-full .chat-input-cover { display: none; }
+
+  .chat-full .chat-picker {
+    bottom: 100%;
+    right: 8px;
+    width: min(360px, calc(100vw - 24px));
+  }
+}
+
 /* Nhịp linh khí cho nút Khai Đàn khi đang chạy. */
 .pulse-jade {
   animation: pulse-jade 1.8s ease-in-out infinite;

@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.53",
+    date: "2026-08-28",
+    lines: [
+      "Sảnh toàn màn hình: dòng chữ mời trong ô nhập thôi bị cắt mất chữ cuối, và ô nhập nay cao dần theo tin đang gõ.",
+    ],
+  },
+  {
     version: "1.3.52",
     date: "2026-08-28",
     lines: [
@@ -470,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Phòng Chat: mỗi lời nói nay chiếm ít chỗ hơn — bong bóng bớt độn, khoảng hở giữa hai người nói liền nhau hẹp lại.",
       "Những tin nối tiếp của cùng một người thôi chừa một khoảng trống cao bằng ảnh đại diện, nên một màn hình chứa được nhiều lượt trò chuyện hơn hẳn.",
       "Cỡ chữ, ảnh đại diện và bài vị giữ nguyên — chỉ những chỗ trống không có gì để đọc bị thu lại.",
-    ],
-  },
-  {
-    version: "1.3.2",
-    date: "2026-08-17",
-    lines: [
-      "Công cụ dựng khôi lỗi GitHub thôi đổ lỗi cho chìa khi trục trặc nằm ở phía GitHub, và tự thử lại vài lần thay vì bắt gõ lại từ đầu.",
-      "Với đạo hữu thì màn hình không đổi gì; đây là chỗ sửa cho người trông nom hệ thống.",
     ],
   },
 ];

@@ -759,7 +759,21 @@ document.addEventListener('click', async (e) => {
 // là thứ ghi chú của người ghi hình chỉ vào — "phòng nào Chưa chúc thì vào chúc ngay bất kể có
 // Đã phát lì xì hay chưa" — nên fixture thiếu nó thì không phép thử nào chứng minh được điều đó.
 // Badge loại phòng cũng là thật: tên cặp đôi trong lời kể mang cả "💕 Đạo Lữ" ở đầu.
-const hySuHallPage = (rooms, blessed, gifts) => {
+// Cụm「Mở Lì Xì Nhanh」— CHỈ tài khoản VIP mới thấy (ngoài đời nút mang huy hiệu VIP). Fixture
+// dựng nó THEO CỜ chứ không dựng sẵn: bản `-thuong` phải thấy đúng cái sảnh KHÔNG có nút, bằng
+// không cổng ở bước 7 của luồng lại được thoả bởi một thứ tài khoản thường không bao giờ gặp —
+// và đó chính là kiểu fixture nói dối theo hướng êm ái nhất.
+//
+// Hai hình dạng của cụm, chép từ bản ghi hy-su-duong-20260822-222109: còn lì xì thì là cái NÚT;
+// hết rồi thì trang thay hẳn nút bằng dòng chữ, chứ không phải ẩn nút đi. Bước 8 của luồng hỏi
+// CỜ chứ không hỏi lại nút chính vì vậy.
+const hySuQuickSection = (count) =>
+  count > 0
+    ? `<div class="wedding-quick-li-xi-section"><button id="quick-open-li-xi-btn" class="wedding-quick-open-li-xi-btn" onclick="quickOpenAllLiXi()"><i class="fas fa-gift"></i> Mở Lì Xì Nhanh (${count})</button></div>`
+    : '<div class="wedding-quick-li-xi-section"><div class="no-li-xi-status"><span class="li-xi-icon">🧧</span><span class="status-text">Không có lì xì nào chưa mở</span></div></div>';
+const hySuQuickBless = '<div class="wedding-quick-bless-section"><button id="quick-bless-btn" class="wedding-quick-bless-btn disabled" onclick="quickBlessAll()" disabled=""><i class="fas fa-magic"></i> Đã Chúc Hết</button></div>';
+
+const hySuHallBody = (rooms, blessed, gifts, quick) => {
   const rows = rooms
     .map((room) => {
       const done = blessed.has(room.id) || room.preBlessed === true;
@@ -783,16 +797,50 @@ const hySuHallPage = (rooms, blessed, gifts) => {
       </div>`;
     })
     .join("");
-  return `<!doctype html><html lang="vi"><meta charset="utf-8">
+  return (quick === null ? "" : hySuQuickBless + hySuQuickSection(quick.count)) + rows;
+};
+
+const hySuHallPage = (rooms, blessed, gifts, quick) => `<!doctype html><html lang="vi"><meta charset="utf-8">
 <button class="tien-duyen-btn hy-su-btn">Hỷ Sự Đường <span class="notification-badge">${rooms.length}</span></button>
 <div id="wedding-now-modal" style="display:none"><div id="wedding-now-body">Đang tải danh sách tiệc cưới...</div></div>
 <script>
 document.querySelector('.hy-su-btn').addEventListener('click', () => {
   document.getElementById('wedding-now-modal').style.display = 'block';
-  setTimeout(() => { document.getElementById('wedding-now-body').innerHTML = ${JSON.stringify(rows)}; }, 80);
+  setTimeout(() => { document.getElementById('wedding-now-body').innerHTML = ${JSON.stringify(hySuHallBody(rooms, blessed, gifts, quick))}; }, 80);
 });
+// Hộp xác nhận và bảng kết quả được DỰNG RA lúc cần rồi gỡ đi, đúng như trang thật: dom/02 của
+// bản ghi không có cái nào, dom/03 mới có hộp xác nhận, dom/04 mới có bảng kết quả. Dựng sẵn
+// rồi ẩn đi sẽ là một fixture dễ dãi hơn đời thật.
+function quickOpenAllLiXi() {
+  const d = document.createElement('div');
+  d.className = 'td-confirm-overlay active';
+  d.innerHTML = '<div class="td-confirm-dialog"><h3 class="td-confirm-title">🧧 Mở Lì Xì Nhanh</h3><p class="td-confirm-message">Xác nhận mở tất cả lì xì hiện có?</p><div class="td-confirm-buttons"><button class="td-confirm-btn td-confirm-btn-cancel">Hủy Bỏ</button><button class="td-confirm-btn td-confirm-btn-confirm">Mở Tất Cả</button></div></div>';
+  document.body.appendChild(d);
+  d.querySelector('.td-confirm-btn-cancel').addEventListener('click', () => d.remove());
+  d.querySelector('.td-confirm-btn-confirm').addEventListener('click', () => {
+    d.remove();
+    fetch('/hy-su-quick-open').then((r) => r.json()).then((res) => {
+      // Máy chủ thật gọi lại show_all_wedding ngay trong cùng cú bấm, nên danh sách phải được
+      // dựng LẠI TỪ MÁY CHỦ chứ không phải gỡ tay mấy dòng hồng bao ở phía client.
+      fetch('/hy-su-hall').then((r2) => r2.text()).then((html) => {
+        document.getElementById('wedding-now-body').innerHTML = html;
+      });
+      const items = (res.summary || []).map((s) =>
+        '<div class="li-xi-summary-item"><span class="li-xi-summary-name">' + s.name + '</span><span class="li-xi-summary-amount">' + s.total + '</span></div>').join('');
+      const m = document.createElement('div');
+      m.className = 'li-xi-result-modal active';
+      m.innerHTML = '<div class="li-xi-result-content"><h3>🎉 Kết Quả Mở Lì Xì</h3><button class="li-xi-result-close">✕</button><p class="li-xi-result-message">' + res.message + '</p><div class="li-xi-summary-grid">' + items + '</div><button class="li-xi-result-ok-btn">Tuyệt Vời!</button></div>';
+      document.body.appendChild(m);
+      m.querySelector('.li-xi-result-ok-btn').addEventListener('click', closeLiXiResultModal);
+      m.querySelector('.li-xi-result-close').addEventListener('click', closeLiXiResultModal);
+    });
+  });
+}
+function closeLiXiResultModal() {
+  const m = document.querySelector('.li-xi-result-modal');
+  if (m) m.remove();
+}
 </script>`;
-};
 
 // Phòng cưới theo recording: form chúc phúc render sẵn, select mặc định tự điền textarea qua
 // onchange, "Gửi Chúc Phúc" mở hộp xác nhận, và server NHẬN là nút gửi bị gỡ khỏi DOM (~40ms
@@ -2722,6 +2770,15 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   const hySuLixi = []; // id phòng đã KHAI được hồng bao, theo thứ tự
   const hySuTrayClosed = []; // id phòng đã ĐÓNG khay lại — khay còn mở là form chúc bị che
   const hySuGifts = new Set(hySuRooms.filter((r) => r.gift).map((r) => r.id));
+  // Trang chỉ dựng cụm「Mở Lì Xì Nhanh」cho tài khoản VIP, nên cờ này mặc định TẮT: mọi kịch bản
+  // đã có từ trước vẫn thấy đúng cái sảnh của bản `-thuong`, không đổi một chốt nào.
+  let hySuQuickVip = false;
+  // Lì xì MỒ CÔI: nút vét cả những phong bao không thuộc phòng nào đang hiện trong danh sách —
+  // đó là lý do nó tồn tại, và cũng là chỗ một phép đếm "bằng số phòng có quà" sẽ sai.
+  let hySuQuickOrphan = 0;
+  const hySuQuickIds = []; // id phòng bị VÉT bằng nút, theo thứ tự
+  let hySuQuickCalls = 0; // số lần endpoint được gọi — một lượt chạy chỉ được bấm ĐÚNG một lần
+  const hySuQuickState = () => (hySuQuickVip ? { count: hySuGifts.size + hySuQuickOrphan } : null);
   const hySuBrokenRooms = new Set(); // id → trang phòng trả về hình dạng lạ (không form, không dấu đã chúc)
   let bossBroken = false;
   let bossStale = false;
@@ -2839,7 +2896,26 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       }
       res.end(furnaceJson());
     }
-    else if (path === "/tien-duyen") res.end(hySuHallPage(hySuRooms, hySuBlessed, hySuGifts));
+    else if (path === "/tien-duyen") res.end(hySuHallPage(hySuRooms, hySuBlessed, hySuGifts, hySuQuickState()));
+    else if (path === "/hy-su-hall") res.end(hySuHallBody(hySuRooms, hySuBlessed, hySuGifts, hySuQuickState()));
+    else if (path === "/hy-su-quick-open") {
+      // hh3d_quick_open_all_li_xi — mở TẤT CẢ trong một lần: hồng bao của các phòng đang hiện
+      // LẪN số mồ côi. Thân trả lời chép hình dạng bản ghi 22/08 (`message`, `opened_count`,
+      // `summary[].name/total`), vì đó chính là thứ bảng kết quả đọc ra rồi vẽ lên màn hình.
+      hySuQuickCalls++;
+      const swept = [...hySuGifts];
+      for (const id of swept) { hySuGifts.delete(id); hySuQuickIds.push(id); }
+      const n = swept.length + hySuQuickOrphan;
+      hySuQuickOrphan = 0;
+      res.end(JSON.stringify(n === 0
+        ? { success: true, message: "Không có lì xì nào để mở!", opened_count: 0, summary: [] }
+        : {
+          success: true,
+          message: `Đã mở thành công ${n} lì xì!`,
+          opened_count: n,
+          summary: [{ type: "mycred_tinh_thach", name: "Tinh Thạch", total: 63 * n }],
+        }));
+    }
     else if (path === "/phong-cuoi" || path === "/hong-nhan") {
       const id = url.searchParams.get("id") ?? "";
       const room = hySuRooms.find((r) => r.id === id);
@@ -4103,6 +4179,75 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       check("…và không gửi được lời chúc nào", hySuBlessed.size === 0, String(hySuBlessed.size));
       hySuBrokenRooms.clear();
       hySuBlessed.clear();
+    }
+
+    // ── Mở Lì Xì Nhanh: cụm CHỈ CÓ Ở TÀI KHOẢN VIP (schema 72) ──────────────────────────
+    //
+    // Tới 30/08/2026 đường này chưa lưới nào chạm tới: fixture không dựng nút, nên cổng ở bước
+    // 7 luôn rơi vào nhánh「tài khoản này không có nút」và bốn bước dưới nằm im. Đó đúng là cái
+    // bẫy đã cắn hai lần — selector VẮNG MẶT làm cửa chặn tự mở, và lưới xanh vì KHÔNG CHẠY
+    // chứ không phải vì chạy đúng.
+    //
+    // Hai chiều đều phải canh: bản `-thuong` thấy sảnh KHÔNG nút, bản VIP thấy sảnh CÓ nút.
+    // Thiếu chiều nào thì chiều ấy lại rơi về đúng kiểu xanh-vì-không-chạy.
+    check(
+      "sảnh của tài khoản thường KHÔNG dựng nút Mở Lì Xì Nhanh",
+      !hySuHallBody(hySuRooms, hySuBlessed, hySuGifts, null).includes("quick-open-li-xi-btn"),
+    );
+    check(
+      "…còn sảnh VIP thì có, và mang đúng số trên nhãn",
+      (() => { const html = hySuHallBody(hySuRooms, hySuBlessed, hySuGifts, { count: 5 });
+        return html.includes('id="quick-open-li-xi-btn"') && html.includes("Mở Lì Xì Nhanh (5)"); })(),
+      hySuHallBody(hySuRooms, hySuBlessed, hySuGifts, { count: 5 }).slice(0, 160),
+    );
+    check("lượt chạy của bản thường KHÔNG gọi endpoint vét lì xì", hySuQuickCalls === 0, String(hySuQuickCalls));
+
+    {
+      hySuBlessed.clear();
+      hySuGifts.clear();
+      for (const r of hySuRooms) if (r.gift) hySuGifts.add(r.id);
+      // Mồ côi khác 0 LÀ CÓ CHỦ Ý: nút vét cả những phong bao không còn phòng nào trong danh
+      // sách, nên một phép đếm「bằng số phòng có quà」sẽ ra 2 và đi qua êm ru. Nó phải ra 5.
+      hySuQuickOrphan = 3;
+      hySuQuickIds.length = 0;
+      hySuQuickCalls = 0;
+      infos.length = 0;
+      hySuQuickVip = true;
+      let hySuQuick;
+      try {
+        hySuQuick = await run(exportedProfile.quests.find((q) => q.id === "hy-su-duong"));
+      } finally {
+        // Trả cờ về TẮT trong finally: một lượt chạy ném ra mà để cờ bật là mọi kịch bản phía
+        // sau lặng lẽ chạy trên cái sảnh của hạng khác.
+        hySuQuickVip = false;
+      }
+
+      check(
+        "VIP: vòng chúc vẫn đi trọn khi có thêm cụm Mở Lì Xì Nhanh",
+        hySuQuick.outcome === "completed",
+        `${hySuQuick.outcome}: ${hySuQuick.message}`,
+      );
+      check("…và nút được bấm ĐÚNG MỘT LẦN", hySuQuickCalls === 1, String(hySuQuickCalls));
+      check(
+        "…đếm cả lì xì MỒ CÔI chứ không chỉ đếm phòng có quà (2 phòng + 3 mồ côi = 5)",
+        infos.some((m) => m.includes("Còn 5 lì xì chưa mở")),
+        infos.filter((m) => m.includes("lì xì")).join(" / ") || "(không dòng nào)",
+      );
+      check(
+        "…đọc THẲNG bảng kết quả, kê ra cả số lượng lẫn tên món",
+        infos.some((m) => m.includes("Đã mở thành công 5 lì xì!") && m.includes("315 Tinh Thạch")),
+        infos.filter((m) => m.includes("Tinh Thạch")).join(" / ") || "(không dòng nào)",
+      );
+      check(
+        "…KHÔNG rơi vào nhánh trượt",
+        !infos.some((m) => m.includes("MỞ LÌ XÌ NHANH TRƯỢT")),
+        infos.filter((m) => m.includes("TRƯỢT")).join(" / ") || "(sạch)",
+      );
+      check(
+        "…máy chủ vét đúng hai hồng bao của các phòng đang hiện, và xoá luôn số mồ côi",
+        hySuGifts.size === 0 && hySuQuickIds.length === 2 && hySuQuickOrphan === 0,
+        `còn ${hySuGifts.size} · vét ${hySuQuickIds.length} · mồ côi ${hySuQuickOrphan}`,
+      );
     }
 
     // Hết mùa cưới: modal mở ra danh sách RỖNG — phải phân biệt được với "đã chúc hết".

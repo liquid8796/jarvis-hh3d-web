@@ -45,6 +45,45 @@ import {
   parseQuizReferenceHtml,
 } from "../src/lib/quest-engine/quizReference.mjs";
 
+/**
+ * Cây bước của hồ sơ có TẦNG: một `repeat` mang thân riêng trong `steps`. Từ schema 78 cả cụm
+ * đánh boss nằm trong một vòng lặp như thế, nên mọi phép hỏi「có bước X ở đâu đó sau bước Y」
+ * và mọi phép SỬA flow để đối chứng đều phải đi qua ba hàm dưới đây.
+ *
+ * Hỏi ở tầng cao thôi là hỏi một cái cây đã cụt cành: `.find` trả `undefined`, `.filter` không
+ * bỏ được gì, và một phép đối chứng「flow CŨ phải hỏng」sẽ báo XONG — tức nó thôi có răng đúng
+ * lúc cần răng nhất. Đã trả giá 30/08/2026, chín ca đỏ cùng một gốc.
+ */
+const flatSteps = (steps) =>
+  (steps ?? []).flatMap((s) => (Array.isArray(s.steps) ? [s, ...flatSteps(s.steps)] : [s]));
+/** Duyệt MỌI bước, kể cả trong thân vòng lặp — dùng để vặn timeout khi dựng flow đối chứng. */
+const eachStep = (steps, fn) => {
+  for (const s of steps ?? []) {
+    fn(s);
+    if (Array.isArray(s.steps)) eachStep(s.steps, fn);
+  }
+};
+/** Bỏ bước ở MỌI tầng, trả về cây mới — thân vòng lặp được dựng lại chứ không sửa tại chỗ. */
+const dropSteps = (steps, pred) =>
+  (steps ?? [])
+    .filter((s) => !pred(s))
+    .map((s) => (Array.isArray(s.steps) ? { ...s, steps: dropSteps(s.steps, pred) } : s));
+
+/**
+ * Trả flow về dạng ĐỜI TRƯỚC: thay đúng một `repeat` (nhận diện theo `until`) bằng chính thân
+ * của nó, chạy một lượt phẳng. Chỉ dùng để dựng flow ĐỐI CHỨNG.
+ *
+ * Vì sao phải có: vòng lặp là thứ bản vá THÊM VÀO, nên một phép đối chứng còn giữ nó thì không
+ * còn đối chứng với flow cũ nữa. Đo 30/08/2026: giữ lại vòng lặp thì `until` kiểm trước vòng đầu,
+ * thấy nút đã ẩn vì cooldown nên bỏ qua cả cụm đánh — flow「cũ」đi qua êm ru và phép đối chứng
+ * thôi có răng. Nhận diện theo `until` chứ không gỡ mọi vòng lặp: cụm đổi ngũ hành CŨNG là một
+ * `repeat`, và nó vốn đã có từ đời trước.
+ */
+const unwrapRepeat = (steps, pick) =>
+  (steps ?? []).flatMap((s) =>
+    s.action === "repeat" && Array.isArray(s.steps) && pick(s) ? unwrapRepeat(s.steps, pick) : [s],
+  );
+
 const PAGE = `<!doctype html>
 <html lang="vi"><head><meta charset="utf-8"><title>Sảnh thử</title>
 <style>
@@ -2068,8 +2107,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // trang đã kêu phiên hết hạn, tải lại, rồi mới hỏi nhân chứng.
     // 77 = Mê Cung: cổng Bế Quan Trợ Chiến + tự đóng hộp thắng trận, và luật độ khó một-lần-
     // một-ngày viết thẳng vào nhãn ô chọn. Bản ghi me-cung-20260829-100237.
-    "hồ sơ đang ở schema 77",
-    loadProfileForSchema().schemaVersion === 77,
+    "hồ sơ đang ở schema 78",
+    loadProfileForSchema().schemaVersion === 78,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -2556,13 +2595,13 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   // cú bấm rơi vào hư không cho ra y hệt một trận đánh thật.
   for (const bossId of ["hoang-vuc", "hoang-vuc-thuong"]) {
     const boss = loadProfileForSchema().quests.find((q) => q.id === bossId);
-    const attackAt = boss.steps.findIndex(
+    const attackAt = flatSteps(boss.steps).findIndex(
       (s) => s.action === "click" && s.selector === "#boss-damage-screen .attack-button",
     );
     // Từ schema 76 nhân chứng KHÔNG còn đứng ngay sau cú bấm: giữa hai thứ ấy là cụm tải lại
     // của bản vá 28/08. Nên hỏi theo Ý NGHĨA — "có một nhân chứng bắt buộc ở đâu đó SAU cú bấm"
     // — chứ đừng ghim số thứ tự, bằng không phép kiểm này đỏ mỗi lần chèn thêm một bước.
-    const after = boss.steps.slice(attackAt + 1);
+    const after = flatSteps(boss.steps).slice(attackAt + 1);
     const witnessAt = after.findIndex(
       (s) =>
         s.action === "waitForCondition" &&
@@ -3708,16 +3747,19 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // ĐỐI CHỨNG, giữ vĩnh viễn: chính flow CŨ (không có đệm chờ XHR) trên cùng fixture phải
     // lao vào bấm và bị server từ chối. Fixture nào để flow cũ đi qua êm là fixture đang nói dối.
     const noBuffer = structuredClone(bossQuest);
-    noBuffer.steps = noBuffer.steps.filter(
-      (s) => !(s.action === "waitForCondition" && s.optional === true && s.condition?.selector === "#countdown-timer"),
+    // Gỡ vòng lặp của schema 78 ra trước: đối chứng phải là flow ĐỜI TRƯỚC, và vòng lặp ấy
+    // chính là thứ bản vá thêm vào.
+    noBuffer.steps = unwrapRepeat(noBuffer.steps, (s) => s.until?.selector === "#battle-button");
+    noBuffer.steps = dropSteps(noBuffer.steps,
+      (s) => (s.action === "waitForCondition" && s.optional === true && s.condition?.selector === "#countdown-timer"),
     );
     // Rút ngắn MỌI cửa sổ chờ `#battle-button`, không riêng cái bắt buộc. Từ schema 76 có
     // HAI: một optional gánh ngân sách hoạt ảnh 120s, một bắt buộc làm nhân chứng. Chỉ rút cái
     // thứ hai thì cái thứ nhất vẫn đứng chờ trọn hai phút — thừa sức để đồng hồ 6000ms kịp hiện
     // và ẩn nút GIÚP, và phép đối chứng ăn may thành "xong" đúng lúc nó phải có răng nhất.
-    for (const s of noBuffer.steps) {
+    eachStep(noBuffer.steps, (s) => {
       if (s.action === "waitForCondition" && s.condition?.selector === "#battle-button") s.timeoutMs = 3000;
-    }
+    });
     await page.goto(`${baseUrl}/hoang-vuc`, { waitUntil: "domcontentloaded" });
     const bossOld = await run(noBuffer);
     // Dấu「đã bị từ chối」đọc từ PHÍA SERVER: flow schema 76 tải lại trang khi nút còn đó, mà một
@@ -3804,8 +3846,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     await resetBoss();
     bossStale = true;
     const noReload = structuredClone(bossQuest);
-    noReload.steps = noReload.steps.filter(
-      (s) => !(s.action === "navigate" && s.text === "/hoang-vuc" && s.when?.selector === "#battle-button"),
+    noReload.steps = dropSteps(noReload.steps,
+      (s) => (s.action === "navigate" && s.text === "/hoang-vuc" && s.when?.selector === "#battle-button"),
     );
     noReload.steps.find(
       (s) => s.action === "waitForCondition" && s.condition?.selector === "#battle-button" && !s.optional,

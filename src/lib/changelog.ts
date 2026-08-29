@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.56",
+    date: "2026-08-30",
+    lines: [
+      "Hoang Vực: khi trang game báo hết phiên tấn công, máy chạy tự động nay tải lại rồi đánh lại ngay trong vòng đó, thay vì bỏ dở và chờ vòng sau.",
+    ],
+  },
+  {
     version: "1.3.55",
     date: "2026-08-25",
     lines: [
@@ -468,14 +475,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Hỷ Sự Đường: tiệc nào còn lì xì chưa mở thì nay tự ghé vào bóc, kể cả tiệc đã chúc rồi.",
       "Trước đây chỉ tiệc chưa chúc mới được ghé, nên lì xì cứ nằm đó tới lúc tiệc tan là mất trắng.",
       "Bóc lì xì xong mới gửi lời chúc, vì bao lì xì hiện lên là che kín cả trang.",
-    ],
-  },
-  {
-    version: "1.3.5",
-    date: "2026-08-18",
-    lines: [
-      "Hoang Vực: boss bị hạ mà phần thưởng còn treo thì auto lĩnh thưởng trước, rồi mới đánh boss mới trong cùng lượt ghé.",
-      "Trước đây gặp cảnh ấy nó tưởng đã hết lượt và nghỉ hết ngày — mất cả phần thưởng lẫn 5 lượt đánh của boss mới.",
     ],
   },
 ];

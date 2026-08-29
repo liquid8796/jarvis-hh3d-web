@@ -11,6 +11,60 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.56 — Hoang Vực: phiên đánh hết hạn thì ĐÁNH LẠI, không bỏ lượt (schema 78)
+
+Bản vá 28/08 lo được ca「đòn ĐÃ ăn mà trang đứng hình」. Ảnh của tông chủ 30/08 là ca KHÁC hẳn:
+toast nói「Phiên tấn công đã hết hạn do bạn không hoạt động quá 15 phút」— server TỪ CHỐI cú đánh,
+lượt vẫn nguyên, và sau lượt tải lại nút KHIÊU CHIẾN vẫn còn. Nhân chứng bắt buộc hết 30s rồi hỏng
+cả nhiệm vụ, trong khi thứ đúng ra phải làm là **đánh lại** — trang vừa tải xong đã có phiên mới.
+
+**Đo trước khi vá, 48 giờ toàn đội:** toast phiên hết hạn **2** lần, chết ở nhân chứng **2** lần —
+tương quan 1:1; Hoang Vực **63 thuận / 2 lỗi**. Và **không mất lượt nào**: cả hai lần vòng sau đều
+nhặt lại được (29/08 `01:38` chết → `02:00` chạy tiếp; `15:37` chết → `16:38`「đã hết 5 lượt hôm
+nay」). Nên bản vá này chữa **tiếng ồn và một vòng chờ**, không phải chữa mất mát — nói rõ để lượt
+sau không ai đọc nhầm mức nghiêm trọng.
+
+Cụm đánh nay nằm trong một `repeat`, `until` = *nút KHIÊU CHIẾN đã ẩn*, trần **2 vòng / 400s**.
+
+**Vì sao an toàn:** `until` được kiểm **TRƯỚC** mỗi vòng, trên trang **vừa tải lại**. Đòn đã ăn thì
+nút đã biến mất và vòng hai không bao giờ chạy. `until` chính là phép phân định「đòn có vào không」
+mà cụm tải-lại của 28/08 dựng ra — nay dùng để **quyết định** thay vì chỉ để phán xử.
+
+Hai `repeat` là **anh em cùng tầng** (cụm đổi ngũ hành đứng ngoài): `MAX_REPEAT_DEPTH` của engine
+là 2, lồng vào là dùng sạch biên độ ấy.
+
+### Cái bẫy suýt biến bản vá thành thảm hoạ
+
+Định kết cụm bằng `stopIf` cho「êm」. Nhưng `stopIf` cho ra `alreadyDone` kèm `dailyCapReached`, mà
+`dailyQuota.mjs:193` đọc cờ ấy thành「Hoang Vực xong HÔM NAY」. Đòn không vào thì không có đồng hồ
+nên nó rơi đúng nhánh ấy — **mất sạch lượt boss còn lại của ngày**, tệ hơn hẳn dòng đỏ đang chữa.
+Bỏ hẳn hướng đó; trượt cả hai vòng thì để nhân chứng hỏng như cũ, vì `failed` được vòng sau chạy lại.
+
+### Lưới phải học cách đi trong cây bước
+
+Từ schema 78 cụm đánh nằm trong thân vòng lặp, nên mọi phép `.find`/`.filter` trên mảng bước **cấp
+cao** đều hỏi một cái cây đã cụt cành. Thêm `flatSteps` / `eachStep` / `dropSteps` và chuyển bảy chỗ
+sang dùng chúng — hỏi theo **ý nghĩa**, đúng nguyên tắc chính khối ấy tự đặt ra từ schema 76.
+
+Nguy hiểm nhất không phải sáu chốt cấu trúc mà là **hai phép đối chứng**: chúng dựng「flow CŨ」bằng
+cách lọc bớt bước rồi đòi nó phải hỏng. Lọc không tới nơi thì flow cũ vẫn đủ tốt và báo **xong** —
+phép đối chứng thôi có răng đúng lúc cần răng nhất.
+
+Và `noBuffer` còn phải **gỡ vòng lặp ra** (`unwrapRepeat`) trước khi lọc: giữ vòng lặp lại thì
+`until` kiểm trước vòng đầu, thấy nút đã ẩn vì cooldown nên bỏ qua cả cụm đánh — flow「cũ」đi qua
+êm ru. Nhận diện theo `until` chứ không gỡ mọi `repeat`: cụm đổi ngũ hành cũng là một `repeat` và
+nó vốn có từ đời trước.
+
+> **Một lỗi tôi tự gây ra, thuộc loại âm thầm nhất.** `filter` nhận vị từ「GIỮ」, `dropSteps` nhận vị
+> từ「BỎ」— đổi tên hàm mà để nguyên lambda có dấu `!`, thành ra nó giữ đúng mấy bước đáng bỏ và bỏ
+> sạch phần còn lại. Cả hai chỗ dính đều là flow đối chứng, mà một flow đối chứng bị băm nát thì vẫn
+> `failed`, tức **vẫn có vẻ đúng**: chốt `noReload` đã XANH với một flow chỉ còn vài bước rời rạc.
+> Chỉ vì truy tới tận `refused=0` mới lộ ra.
+
+Chỉ hai quest đổi (`hoang-vuc`, `hoang-vuc-thuong`), bước 29 → 21. `smoke` 494/0.
+
+---
+
 ## 1.3.55 — Hoạt động gọi mục cài đặt bằng tên người đọc, không bằng khoá của lập trình viên
 
 Tông chủ chỉ vào mấy dòng vàng: `Option 'kickIdle' của「Mê Cung」nhận giá trị tự nhập: '20'.`

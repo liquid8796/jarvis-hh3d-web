@@ -11,6 +11,71 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.55 — Hoạt động gọi mục cài đặt bằng tên người đọc, không bằng khoá của lập trình viên
+
+Tông chủ chỉ vào mấy dòng vàng: `Option 'kickIdle' của「Mê Cung」nhận giá trị tự nhập: '20'.`
+`kickIdle`, `minBonus`, `chatLobby` là KHOÁ NỘI BỘ — chỉ có nghĩa với người viết mã. Người dùng
+đọc xong không biết mình vừa đặt cái gì.
+
+**Nhãn người đọc đã nằm sẵn trong dữ liệu.** Mỗi option trong `profile.json` mang `label`, và mỗi
+lựa chọn cũng vậy — chính những chữ giao diện Ngọc Giản đang hiện. Không phải dựng bảng ánh xạ
+nào cả; chỉ là chưa ai dùng tới.
+
+```
+trước:  Option 'kickIdle' của「Mê Cung」nhận giá trị tự nhập: '20'.
+sau:   「Mê Cung」· Trục xuất nếu không sẵn sàng sau (giây): dùng giá trị đạo hữu tự đặt '20'.
+
+trước:  Giá trị '250000' không có trong option 'kickHp' của「Mê Cung」— giữ mặc định '0'.
+sau:   「Mê Cung」· Ngưỡng HP để trục xuất: không dùng được giá trị '250000',
+        giữ nguyên mức "Không trục xuất".
+```
+
+Câu thứ hai còn sửa thêm một chỗ câm: nó từng in `giữ mặc định '0'` — con số thô ấy chẳng nói gì.
+Nay in NHÃN của lựa chọn đang giữ.
+
+Tên nhiệm vụ vẫn nằm trong mọi câu, có chủ ý: phép chống trùng ở `profileForConfig` dedupe theo
+NGUYÊN VĂN, và cặp flow VIP/thường dùng chung tên — bỏ tên ra là hai nhiệm vụ khác nhau bị gộp
+làm một.
+
+### Một lỗi mà lớp jargon cũ đang che
+
+Viết lại xong thì dòng này lộ ra, và nó ăn **mọi người dùng mặc định**:
+
+```
+「Khoáng Mạch」· Tên mỏ: dùng giá trị đạo hữu tự đặt ''.
+```
+
+`mineName` mặc định RỖNG từ 1.3.26. Rỗng không nằm trong danh sách lựa chọn nên `allowFreeform`
+nhận nó rồi kể lại — nghĩa là ai chỉ bật Khoáng Mạch mà không gõ gì cũng ăn một dòng vàng nói rằng
+họ "tự đặt" một giá trị rỗng. Sai cả nghĩa lẫn màu.
+
+Rỗng ở đây có nghĩa riêng của nó — tên mỏ rỗng = *đào tiếp mỏ đang ở* — và cái nghĩa ấy là MẶC
+ĐỊNH, tức không phải tin. Nay giá trị rỗng vẫn được NHẬN (engine vẫn hiểu đúng, `allowCustom` vẫn
+bật) nhưng thôi kể.
+
+Đo lại: người dùng mặc định từ **1 dòng vàng vô nghĩa → 0 dòng**. Và kiểm cả chiều ngược để chắc
+không nuốt mất tin thật: tên mỏ `"Thông Thiên Kiếm Phái"` CÓ trong danh sách nên im lặng là đúng,
+còn `"Mỏ Không Có Thật"` thì vẫn được kể.
+
+### Điều KHÔNG làm, và vì sao
+
+Cả ba loại tin ở lớp dịch đang bị `runCycle` ép chung một mức (`say(note, "warn")`), nên một lời
+XÁC NHẬN mặc áo cảnh báo giống hệt một lời TỪ CHỐI. Tách mức là việc đáng làm — nhưng nó buộc đổi
+`translationNotes` từ chuỗi thành object, mà `smokeQuestEngine` đang canh
+`new Set(notes).size === notes.length`. Với object thì phép ấy **xanh vĩnh viễn** (mỗi object là
+một tham chiếu khác nhau), tức là làm hỏng một cái lưới trong im lặng để đổi lấy một cải tiến
+không ai yêu cầu. Dừng lại và hỏi.
+
+> **Bằng chứng, và giới hạn của nó.** `smokeQuestEngine.mjs` đang bị một phiên khác mổ dở (125
+> thêm / 294 xoá, ghim schema 72 trong khi `profile.json` đã ở 77 và SẠCH), nên không thể có một
+> lượt smoke xanh trọn lúc này — 6 ca đỏ đều thuộc `hoang-vuc` và schema, không ca nào chạm tới
+> dòng log. Bản vá này được nghiệm bằng cách CHẠY THẲNG `profileForConfig` trên bốn kịch bản
+> (mặc định / có gõ / giá trị có trong danh sách / giá trị tự đặt thật) và đọc chuỗi thật in ra,
+> chứ không dựa vào smoke. Cũng vì smoke đang có chủ, chốt hồi quy cho luật「rỗng thì thôi kể」
+> CHƯA được gài — nợ lại, nói thẳng.
+
+---
+
 ## 1.3.54 — Mê Cung: hai chỗ trang mới mọc thêm mà hồ sơ chưa biết (schema 77)
 
 Bản ghi `me-cung-20260829-100237` — 222 sự kiện, 40 mốc lật của `probes.json`, 23 lượt HTTP

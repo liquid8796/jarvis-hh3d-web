@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.55",
+    date: "2026-08-25",
+    lines: [
+      "Bảng Hoạt động nay gọi đúng tên mục cài đặt như trên Ngọc Giản, thay vì mã nội bộ khó đoán.",
+      "Bỏ một dòng nhắc thừa vẫn hiện ra dù đạo hữu chưa tự đặt gì.",
+    ],
+  },
+  {
     version: "1.3.54",
     date: "2026-08-29",
     lines: [
@@ -468,15 +476,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Hoang Vực: boss bị hạ mà phần thưởng còn treo thì auto lĩnh thưởng trước, rồi mới đánh boss mới trong cùng lượt ghé.",
       "Trước đây gặp cảnh ấy nó tưởng đã hết lượt và nghỉ hết ngày — mất cả phần thưởng lẫn 5 lượt đánh của boss mới.",
-    ],
-  },
-  {
-    version: "1.3.4",
-    date: "2026-08-18",
-    lines: [
-      "Tài khoản thường nay đánh được Bí Cảnh Tông Môn: mỗi lượt ghé một đòn, chờ đủ bảy phút rồi tự quay lại, tối đa năm lượt mỗi ngày.",
-      "Bật nó ở mục Nhiệm vụ ngày của thẻ Thường — trước đây ô này chỉ hiện cho tài khoản VIP vì chưa có đường đi cho hạng thường.",
-      "Đánh hết lượt trong ngày thì nghỉ hẳn tới hôm sau, không quay lại gõ cửa vô ích.",
     ],
   },
 ];

@@ -2018,8 +2018,10 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // không vẽ lại gì — `#battle-button` VẪN HIỆN nên nhân chứng cũ chờ tới hết 120s rồi báo
     // hỏng, trong khi server ĐÃ trừ lượt (5→4) và ĐÃ mở cooldown. Nay: bỏ qua cửa sổ chờ khi
     // trang đã kêu phiên hết hạn, tải lại, rồi mới hỏi nhân chứng.
-    "hồ sơ đang ở schema 76",
-    loadProfileForSchema().schemaVersion === 76,
+    // 77 = Mê Cung: cổng Bế Quan Trợ Chiến + tự đóng hộp thắng trận, và luật độ khó một-lần-
+    // một-ngày viết thẳng vào nhãn ô chọn. Bản ghi me-cung-20260829-100237.
+    "hồ sơ đang ở schema 77",
+    loadProfileForSchema().schemaVersion === 77,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -2282,6 +2284,121 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     }
   }
 
+  console.log("\nMê Cung: cổng Bế Quan Trợ Chiến, và hộp thắng trận phải được đóng");
+
+  // Bản ghi me-cung-20260829-100237 — lời của chính trang trong #mc-tro-chien-lobby-hint:
+  // "Bế quan để vào Trợ Chiến (ATK >= 7000). Không thể Lập Đội / Vào Phòng. Phải bế quan tối
+  // thiểu 10 phút mới được Ngưng." Không có cổng thì lượt ghé bấm "Lập Đội" vào hư không rồi
+  // chết ở bước chờ #cr-mode-block — bước KHÔNG optional.
+  for (const mazeId of ["me-cung", "me-cung-thuong"]) {
+    const maze = loadProfileForSchema().quests.find((q) => q.id === mazeId);
+    const scanAt = maze.steps.findIndex((s) => (s.script || "").includes("jvz-mc-beq"));
+    const gateAt = maze.steps.findIndex(
+      (s) => s.action === "stopIf" && s.condition?.selector === "body.jvz-mc-beq");
+    const lobbyAt = maze.steps.findIndex(
+      (s) => s.condition?.selector === "#lobby-overview" && s.condition?.kind === "visible");
+    const createAt = maze.steps.findIndex(
+      (s) => s.action === "click" && s.selector === "#lobby-overview .btn-create-room");
+
+    check(
+      `${mazeId}: có cổng dừng khi đang bế quan Trợ Chiến`,
+      gateAt >= 0 && maze.steps[gateAt].condition?.kind === "visible",
+      gateAt >= 0 ? maze.steps[gateAt].condition?.kind : "(không có cổng nào)");
+    check(
+      `${mazeId}: phép đo bế quan đứng ngay TRƯỚC cổng đọc cờ`,
+      scanAt >= 0 && gateAt === scanAt + 1,
+      `đo@${scanAt}, cổng@${gateAt}`);
+    check(
+      `${mazeId}: cổng ấy đứng SAU cổng vào sảnh và TRƯỚC cú bấm "Lập Đội"`,
+      gateAt > lobbyAt && gateAt < createAt,
+      `sảnh@${lobbyAt} < bế quan@${gateAt} < tạo phòng@${createAt}`);
+    check(
+      `${mazeId}: dừng bằng stopIf (êm, một giờ sau ghé lại), không phải một bước hỏng`,
+      gateAt >= 0 && Boolean(maze.steps[gateAt].text) && maze.steps[gateAt].optional !== true,
+      gateAt >= 0 ? String(maze.steps[gateAt].text) : "");
+
+    // Thứ tự này là cả bản vá: bước đọc rương đọc window.__jvz.battle và cắm jvz-cap-full lên
+    // <body>. Bất cứ thứ gì có thể nạp lại trang mà chen lên trước nó là xoá cả hai.
+    const loop = maze.steps.find(
+      (s) => s.action === "repeat" && s.until?.selector?.includes("jvz-cap-full"));
+    const readAt = loop.steps.findIndex(
+      (s) => (s.script || "").includes("__jvz_mc_chest") && !(s.script || "").includes("__jvzChestHook"));
+    const waitAt = loop.steps.findIndex((s) => s.condition?.selector === "#modal-b5-reward");
+    const closeAt = loop.steps.findIndex((s) => (s.script || "").includes("#modal-b5-reward"));
+    check(
+      `${mazeId}: cụm đóng hộp thắng trận đứng SAU bước đọc rương`,
+      readAt >= 0 && waitAt > readAt && closeAt > waitAt,
+      `đọc rương@${readAt} < chờ@${waitAt} < đóng@${closeAt}`);
+    check(
+      `${mazeId}: cả hai bước ấy optional — hộp không hiện không được phép hỏng cả vòng`,
+      waitAt >= 0 && closeAt >= 0 &&
+        loop.steps[waitAt].optional === true && loop.steps[closeAt].optional === true);
+  }
+
+  // Phép đo bế quan: bốn trạng thái, và ca thứ tư là ca đắt nhất.
+  {
+    const scanSrc = loadProfileForSchema().quests
+      .find((q) => q.id === "me-cung").steps
+      .find((s) => (s.script || "").includes("jvz-mc-beq")).script;
+    // Khuôn của trang (bản ghi 29/08): hai nút nằm cạnh nhau, cái nào KHÔNG dùng thì mang
+    // thuộc tính hidden. Ở đây đo bằng kích thước, đúng thứ script hỏi.
+    const btn = (shown) => ({ getBoundingClientRect: () => (shown ? { width: 132, height: 34 } : { width: 0, height: 0 }) });
+    const runScan = (stop, go) => {
+      const set = new Set();
+      const body = { classList: { add: (c) => set.add(c), remove: (c) => set.delete(c) } };
+      const doc = {
+        body,
+        querySelector: (sel) =>
+          (sel === "#btn-tro-chien-ngung" ? stop : sel === "#btn-tro-chien-vao" ? go : null),
+      };
+      const said = new Function("document", `return (${scanSrc});`)(doc)();
+      return { flagged: set.has("jvz-mc-beq"), said };
+    };
+
+    const inside = runScan(btn(true), btn(false));
+    check("đang bế quan (nút Ngưng hiện, nút Vào ẩn) → cắm cờ dừng", inside.flagged, inside.said);
+    const outside = runScan(btn(false), btn(true));
+    check("đang ở ngoài (nút Vào hiện) → KHÔNG cắm cờ", !outside.flagged, outside.said);
+    const missing = runScan(null, null);
+    check("trang chưa có tính năng Trợ Chiến → KHÔNG cắm cờ, chạy như trước", !missing.flagged, missing.said);
+    // Ca đắt nhất: một luật CSS lạ làm CẢ HAI nút cùng hiện. Dương tính giả ở cổng này nghĩa là
+    // Mê Cung thôi chạy vĩnh viễn mà không ai được báo, nên nó phải nghiêng về phía CHẠY TIẾP.
+    const both = runScan(btn(true), btn(true));
+    check("cả hai nút cùng hiện (CSS lạ) → KHÔNG cắm cờ, thà chạy tiếp còn hơn khoá câm",
+      !both.flagged, both.said);
+  }
+
+  // Đoạn script đóng hộp: chạy thật trên ba trạng thái nó gặp ngoài đời.
+  {
+    const closeSrc = loadProfileForSchema().quests
+      .find((q) => q.id === "me-cung").steps
+      .find((s) => s.action === "repeat" && s.until?.selector?.includes("jvz-cap-full")).steps
+      .find((s) => (s.script || "").includes("#modal-b5-reward")).script;
+    // Đúng khuôn của trang: <div id="modal-b5-reward" class="modal-overlay hidden">, và CSS
+    // .hidden{display:none!important} — nên "đang hiện" = có kích thước, "đã tắt" = 0x0.
+    const modal = (shown) => {
+      const set = new Set(shown ? ["modal-overlay"] : ["modal-overlay", "hidden"]);
+      return {
+        classList: { add: (c) => set.add(c), remove: (c) => set.delete(c), contains: (c) => set.has(c) },
+        getBoundingClientRect: () => (set.has("hidden") ? { width: 0, height: 0 } : { width: 1366, height: 768 }),
+        has: (c) => set.has(c),
+      };
+    };
+    const runClose = (el) =>
+      new Function("document", `return (${closeSrc});`)({ querySelector: () => el })();
+
+    const shown = modal(true);
+    const said = runClose(shown);
+    check("hộp còn hiện → đóng hộ bằng đúng class .hidden của trang", shown.has("hidden"));
+    check("…và nói ra, vì đó là dấu hiệu trang đã đổi hành vi", said.includes("không tự tắt"), said);
+
+    const already = modal(false);
+    check("hộp đã tự tắt → im lặng, không thêm một dòng nhiễu mỗi vòng",
+      runClose(already) === "" && already.has("hidden"));
+    check("không có hộp nào (lượt thua, hoặc vòng chưa đánh) → im lặng, không ném",
+      runClose(null) === "");
+  }
+
   console.log("\nBản desktop phải mang ĐÚNG những đoạn script ấy, không phải bản chép tay");
 
   // Ba đoạn script Mê Cung sống ở HAI nơi: hồ sơ này, và DefaultQuestProfile.cs bên desktop.
@@ -2317,6 +2434,10 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
           (s) => (s.script || "").includes("__jvz_mc_chest") && !(s.script || "").includes("__jvzChestHook"))?.script],
         ["MazeCapScanScript", maze.steps.find(
           (s) => s.action === "evaluateJavaScript" && (s.script || "").includes("cap-scan"))?.script],
+        ["MazeCloseWinModalScript", loopStep.steps.find(
+          (s) => (s.script || "").includes("#modal-b5-reward"))?.script],
+        ["MazeTroChienScanScript", maze.steps.find(
+          (s) => (s.script || "").includes("jvz-mc-beq"))?.script],
         ["WeddingResetSeenScript", weddingScript("sổ kết cục được xoá")],
         ["WeddingTallyScript", weddingScript("jvz-hy-su-done")],
         ["WeddingPickRoomScript", weddingScript("location.assign")],

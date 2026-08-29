@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.54",
+    date: "2026-08-29",
+    lines: [
+      "Mê Cung: tài khoản đang bế quan Trợ Chiến thì auto bỏ qua lượt ấy và ghé lại sau, thay vì đứng bấm Lập Đội rồi báo hỏng.",
+      "Hộp mừng vượt 5 ải không còn che nút Bắt Đầu của lượt kế.",
+      "Ô chọn độ khó nay nói rõ: mỗi ải chỉ thưởng một lần mỗi ngày, và đi Thường trước là mất phần thưởng thêm của Khó/Ác Mộng.",
+    ],
+  },
+  {
     version: "1.3.53",
     date: "2026-08-28",
     lines: [
@@ -468,15 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Tài khoản thường nay đánh được Bí Cảnh Tông Môn: mỗi lượt ghé một đòn, chờ đủ bảy phút rồi tự quay lại, tối đa năm lượt mỗi ngày.",
       "Bật nó ở mục Nhiệm vụ ngày của thẻ Thường — trước đây ô này chỉ hiện cho tài khoản VIP vì chưa có đường đi cho hạng thường.",
       "Đánh hết lượt trong ngày thì nghỉ hẳn tới hôm sau, không quay lại gõ cửa vô ích.",
-    ],
-  },
-  {
-    version: "1.3.3",
-    date: "2026-08-17",
-    lines: [
-      "Phòng Chat: mỗi lời nói nay chiếm ít chỗ hơn — bong bóng bớt độn, khoảng hở giữa hai người nói liền nhau hẹp lại.",
-      "Những tin nối tiếp của cùng một người thôi chừa một khoảng trống cao bằng ảnh đại diện, nên một màn hình chứa được nhiều lượt trò chuyện hơn hẳn.",
-      "Cỡ chữ, ảnh đại diện và bài vị giữ nguyên — chỉ những chỗ trống không có gì để đọc bị thu lại.",
     ],
   },
 ];

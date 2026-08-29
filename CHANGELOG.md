@@ -11,6 +11,52 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.54 — Mê Cung: hai chỗ trang mới mọc thêm mà hồ sơ chưa biết (schema 77)
+
+Bản ghi `me-cung-20260829-100237` — 222 sự kiện, 40 mốc lật của `probes.json`, 23 lượt HTTP
+và một video 11 phút. Cả 25 điều kiện của hồ sơ vẫn khớp trang thật, nên đây không phải một
+lượt chữa cháy; hai chỗ dưới đây là những thứ trang có mà hồ sơ chưa nhìn thấy.
+
+**Bế Quan Trợ Chiến — một trạng thái giết cả nhiệm vụ.** Khối `#mc-tro-chien-lobby` nói thẳng:
+*"Bế quan để vào Trợ Chiến (ATK ≥ 7000). Không thể Lập Đội / Vào Phòng. Phải bế quan tối thiểu
+10 phút mới được Ngưng."* Một tài khoản đang đỗ ở đó thì lượt ghé bấm "Lập Đội" vào hư không,
+form độ khó không bao giờ mở, và bước chờ `#cr-mode-block` — bước **không** optional — giết cả
+nhiệm vụ bằng một timeout 10 giây chẳng nói được vì sao. Nay có cổng `stopIf`: dừng êm, đúng lý
+do, một giờ sau ghé lại. **Không** tự bấm "Ngưng Trợ Chiến": bế quan là quyết định của đạo hữu,
+và trong 10 phút đầu chính trang cũng từ chối cho ngưng.
+
+Cổng ấy **đo hai nút chứ không hỏi một selector**, và đó là chỗ đáng kể lại: bản đầu viết
+`stopIf` thẳng vào `#btn-tro-chien-ngung` visible — trang giấu nút bằng thuộc tính `hidden`, mà
+bản ghi **không lưu stylesheet ngoài**, nên "hidden thì chắc chắn không nhìn thấy" là một giả
+định không kiểm chứng được từ chứng cứ đang có. Một luật CSS ngoài đặt `display` cho nút ấy sẽ
+biến cổng thành dương tính giả, và dương tính giả ở đây nghĩa là Mê Cung **thôi chạy vĩnh viễn**
+mà không ai được báo. Nay một script đòi cả hai chiều — nút Ngưng hiện VÀ nút Vào ẩn — rồi mới
+cắm cờ `jvz-mc-beq`; `stopIf` chỉ đọc cờ. Lưới có ca "cả hai nút cùng hiện" và nó phải nghiêng
+về phía CHẠY TIẾP.
+
+**Hộp "🏆 CHINH PHỤC MÊ CUNG!" che phòng.** `#modal-b5-reward` là một `.modal-overlay` phủ kín
+màn hình sau mỗi lượt thắng; probe cùng bản ghi đọc `#btn-start` ở `op=0.6` trong lúc nó còn
+trên màn. Lần này site tự tắt sau ~9 giây nên chưa ai thấy đau, nhưng không dòng nào trong hồ sơ
+bắt trang phải làm thế. Nay: chờ nó tự tắt, còn thì đóng hộ bằng chính class `.hidden` của trang.
+
+**KHÔNG bấm "Quay Về Sảnh"** dù nút ấy nằm ngay đó: `onclick` của nó là `window.location.reload()`,
+và một cú nạp lại quét sạch hai thứ vòng lặp đang dựa vào — class `jvz-cap-full` trên `<body>`
+(chính là `until` của vòng ngoài, vừa được cắm ở bước liền trước) và `window.__jvz.battle` (cờ
+"đã đánh" mà phép đếm không-đủ-đội đọc). Đổi một tấm phủ lấy một vòng lặp không biết mình đã đầy
+trần là một cuộc đổi chác tồi. Vì thế cụm đóng hộp đứng **sau** bước đọc rương, và lưới chốt
+đúng thứ tự ấy.
+
+**Luật độ khó viết vào chỗ người ta chọn.** Hộp "Lập Đội Mới" ghi: *"Mỗi ải & rương ải 5 chỉ nhận
+thưởng một lần trong ngày. Đi Thường trước rồi mới đi Khó / Ác Mộng = không còn phần thưởng độ khó
+thêm."* Tức thứ tự trong NGÀY quyết định phần thưởng, mà ô chọn thì trông như một công tắc đổi lúc
+nào cũng được. Nhãn ba lựa chọn nay mang luôn hệ quả của từng lựa chọn.
+
+Đo được từ cùng bản ghi, để lần sau khỏi đoán: một lượt 5 ải của chủ phòng VIP mất **103 giây**
+(`vip_rounds: 2` — x2 là của CHỦ PHÒNG, huy hiệu `#vip-round-badge` ghi "Tốc độ tấn công VIP chủ
+phòng"); rương ải 5 trả `huyen_tinh_daily_total: 104 / cap: 645` (thứ Bảy +50%), tức ~6 lượt mới
+đầy trần; và phòng mất **7 phút 34** mới đủ 5 người thật.
+
+---
 ## 1.3.51 — Hoang Vực: trang ăn đòn rồi đứng hình (schema 76)
 
 Tông chủ đưa một dòng nhật ký và một bản ghi:

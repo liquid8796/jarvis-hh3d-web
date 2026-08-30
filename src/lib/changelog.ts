@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.57",
+    date: "2026-08-28",
+    lines: [
+      "Tab Khôi lỗi nay nói rõ từng máy đang làm gì: đang rảnh, đang bận, hay đã chết — thay vì chỉ một chữ đang trực cho cả hai trường hợp đầu.",
+      "Máy đã chết còn kể luôn nó vắng từ bao giờ, nên nhìn là biết vừa tắt hay tắt đã lâu.",
+    ],
+  },
+  {
     version: "1.3.56",
     date: "2026-08-30",
     lines: [
@@ -466,15 +474,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Sổ Kho GitHub thôi chặn ở 8 kho: nay thêm bao nhiêu khôi lỗi cũng được, không còn câu「Sổ đầy」chặn ở cửa.",
       "Vòng nuôi kho đổi cách xếp lượt: kho lâu chưa được ghi nhất luôn đi trước, nên sổ dài cũng không có kho nào bị bỏ quên.",
       "Với đạo hữu thì màn hình không đổi gì; đây là chỗ sửa cho người trông nom hệ thống.",
-    ],
-  },
-  {
-    version: "1.3.6",
-    date: "2026-08-18",
-    lines: [
-      "Hỷ Sự Đường: tiệc nào còn lì xì chưa mở thì nay tự ghé vào bóc, kể cả tiệc đã chúc rồi.",
-      "Trước đây chỉ tiệc chưa chúc mới được ghé, nên lì xì cứ nằm đó tới lúc tiệc tan là mất trắng.",
-      "Bóc lì xì xong mới gửi lời chúc, vì bao lì xì hiện lên là che kín cả trang.",
     ],
   },
 ];

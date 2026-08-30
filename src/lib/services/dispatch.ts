@@ -42,6 +42,22 @@
  */
 export const ONLINE_WINDOW_MS = 30 * 1000;
 
+/**
+ * Một đàn im lặng quá ngần này thì coi như đã chết — reaper kết liễu, và phép đếm ghế thôi tính nó.
+ *
+ * Hằng số sống ở đây cùng lẽ với `ONLINE_WINDOW_MS`: nó là luật ĐẾM GHẾ, và đã có BA nơi phải hỏi
+ * đúng một nguồn — reaper (`jobs.ts`), cửa phát việc, và nay cả sổ khôi lỗi ở tab Hàng Đợi. Trước
+ * 28/08/2026 nó là `const` riêng trong `jobs.ts`, mà `workers.ts` thì không import ngược được
+ * (`jobs.ts` đã import `workers.ts` — nhập vòng). Chép thành bản thứ hai là hẹn ngày giao diện
+ * khai「đang rảnh」trong khi cửa phát việc đọc là「đầy ghế」.
+ *
+ * Vì sao phép đếm ghế BẮT BUỘC lọc theo nhịp tim, không đếm mọi dòng `running` mang tên một khôi
+ * lỗi: một tiến trình vừa khởi động lại bỏ rơi các dòng của kiếp trước, và chúng còn đeo tên nó
+ * cho tới khi reaper ra tay. Đếm cả chúng thì khôi lỗi vừa sống lại bị đọc thành bận suốt ba phút
+ * đúng vào lúc nó rảnh nhất.
+ */
+export const STALE_AFTER_MS = 3 * 60 * 1000;
+
 /** Trần ghế của một khôi lỗi khi nó chưa tự khai (bản trước 1.1.0) — cũng là mặc định mới. */
 export const DEFAULT_MAX_JOBS = 2;
 

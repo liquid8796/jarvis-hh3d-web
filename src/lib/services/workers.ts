@@ -3,7 +3,7 @@ import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { hashWorkerToken, type WorkerScope } from "@/lib/auth/worker";
 import type { WorkerRow } from "@/lib/db/schema";
-import { clampMaxJobs, DEFAULT_MAX_JOBS, ONLINE_WINDOW_MS } from "./dispatch";
+import { clampMaxJobs, DEFAULT_MAX_JOBS, ONLINE_WINDOW_MS, STALE_AFTER_MS } from "./dispatch";
 import type { WorkerPref } from "./configs";
 
 /**
@@ -124,6 +124,20 @@ export async function getPresence(userId: string): Promise<WorkerPresence> {
 const ROSTER_LIMIT = 10;
 
 /**
+ * Ba trạng thái của một khôi lỗi, và chỉ ba.
+ *
+ * MỘT trường ba giá trị chứ không phải hai cờ `online` + `busy`: hai cờ dựng ra được một tổ hợp
+ * KHÔNG TỒN TẠI ngoài đời —「đã chết mà vẫn đang bận」— và đúng tổ hợp ấy là thứ dễ lọt nhất, vì
+ * một khôi lỗi vừa tắt vẫn còn dòng `running` đeo tên nó cho tới khi reaper ra tay. Gộp thành một
+ * trường thì cái tổ hợp ấy không viết ra được.
+ *
+ *   `busy`    đang trực VÀ đang giữ ít nhất một đàn còn nhịp tim
+ *   `idle`    đang trực, chưa cầm đàn nào — sẵn sàng nhận việc
+ *   `offline` im quá `ONLINE_WINDOW_MS`; cửa phát việc đã gạch tên
+ */
+export type WorkerState = "busy" | "idle" | "offline";
+
+/**
  * Một dòng trong tab Khôi Lỗi của trang Hàng Đợi.
  *
  * `id` là chỗ ranh giới riêng tư nằm: `null` nghĩa là người xem chỉ được biết LOẠI, không được
@@ -133,7 +147,7 @@ const ROSTER_LIMIT = 10;
 export type WorkerRosterEntry = {
   id: string | null;
   kind: "sect" | "mine";
-  online: boolean;
+  state: WorkerState;
   /**
    * Điểm danh lần cuối — CHỈ có khi đang vắng, và cái `null` lúc đang trực là chủ ý.
    *
@@ -183,6 +197,29 @@ export async function getWorkerRoster(viewerId: string): Promise<WorkerRosterEnt
     version: schema.workers.version,
   };
 
+  /**
+   * Khôi lỗi nào đang giữ đàn — MỘT câu gộp cho cả sổ, không phải một câu cho mỗi dòng.
+   *
+   * Mệnh đề lọc là BẢN SAO ĐÚNG của phép đếm ghế trong `claimNextJob` (jobs.ts): cùng hai trạng
+   * thái đàn, cùng cửa sổ nhịp tim `STALE_AFTER_MS`. Lệch một chi tiết là tab này khai「đang rảnh」
+   * trong khi cửa phát việc đọc「đầy ghế」, và người đọc sẽ đi tìm một cái hỏng không tồn tại.
+   *
+   * Lọc nhịp tim là phần KHÔNG được bỏ: một tiến trình vừa khởi động lại bỏ rơi các dòng của kiếp
+   * trước, và chúng còn đeo tên nó tới ba phút. Đếm cả chúng thì khôi lỗi vừa sống lại hiện「đang
+   * bận」suốt ba phút đúng lúc nó rảnh nhất.
+   */
+  const busyRows = await db().execute(sql`
+    select worker_id
+    from automation_jobs
+    where worker_id is not null
+      and status in ('running', 'stopping')
+      and last_heartbeat > now() - ${`${STALE_AFTER_MS} milliseconds`}::interval
+    group by worker_id
+  `);
+  const busy = new Set(
+    ((busyRows.rows ?? []) as Array<{ worker_id: unknown }>).map((row) => String(row.worker_id)),
+  );
+
   const [sect, mine] = await Promise.all([
     db()
       .select(columns)
@@ -199,6 +236,14 @@ export async function getWorkerRoster(viewerId: string): Promise<WorkerRosterEnt
   ]);
 
   const isOnline = (lastSeen: Date) => lastSeen > cutoff;
+  /**
+   * Vắng mặt THẮNG mọi thứ khác, và thứ tự hai nhánh này chính là chỗ luật ấy được thi hành.
+   *
+   * Một khôi lỗi vừa tắt còn để lại dòng `running` mang tên nó, nên nó vẫn nằm trong `busy`. Hỏi
+   * `online` trước là điều DUY NHẤT ngăn tab khai「đang bận」về một tiến trình đã chết.
+   */
+  const stateOf = (id: string, lastSeen: Date): WorkerState =>
+    !isOnline(lastSeen) ? "offline" : busy.has(id) ? "busy" : "idle";
   /** Mốc chỉ đi xuống dây khi ĐANG VẮNG — lý do ở `WorkerRosterEntry.lastSeen`. */
   const seenIfAway = (online: boolean, lastSeen: Date) => (online ? null : lastSeen.toISOString());
 
@@ -207,7 +252,7 @@ export async function getWorkerRoster(viewerId: string): Promise<WorkerRosterEnt
     return {
       id: row.id,
       kind: "sect",
-      online,
+      state: stateOf(row.id, row.lastSeen),
       lastSeen: seenIfAway(online, row.lastSeen),
       version: row.version,
     };
@@ -222,11 +267,16 @@ export async function getWorkerRoster(viewerId: string): Promise<WorkerRosterEnt
    * trình một nên nhánh ấy đã đi. `sect` xếp theo lần điểm danh mới nhất nên phần tử đầu là mốc
    * gần nhất.
    */
-  const anySectOnline = detailedSect.some((row) => row.online);
+  const anySectOnline = detailedSect.some((row) => row.state !== "offline");
+  /**
+   * Dòng gộp KHÔNG BAO GIỜ khai `busy`, kể cả khi nó khai đang trực: nó không đại diện cho một
+   * tiến trình nào nên không có ghế nào để mà bận. Nó chỉ trả lời đúng một câu —「tông môn có ai
+   * trực không」— và `idle`/`offline` là hai vế của đúng câu ấy.
+   */
   const groupedSect: WorkerRosterEntry = {
     id: null,
     kind: "sect",
-    online: anySectOnline,
+    state: anySectOnline ? "idle" : "offline",
     lastSeen: anySectOnline ? null : (sect[0]?.lastSeen.toISOString() ?? null),
     version: null,
   };
@@ -241,16 +291,18 @@ export async function getWorkerRoster(viewerId: string): Promise<WorkerRosterEnt
     return {
       id: row.id,
       kind: "mine",
-      online,
+      state: stateOf(row.id, row.lastSeen),
       lastSeen: seenIfAway(online, row.lastSeen),
       version: row.version,
     };
   });
 
   // Tông môn đứng trước: đó là khôi lỗi phục vụ mọi người, và với hầu hết đạo hữu thì nó là
-  // dòng DUY NHẤT đáng đọc. Trong mỗi nhóm, ai đang trực đứng trên.
+  // dòng DUY NHẤT đáng đọc. Trong mỗi nhóm, ai đang trực đứng trên — `busy` và `idle` NGANG NHAU
+  // ở phép xếp này, vì cả hai đều là「máy còn sống」, và xáo thứ tự mỗi lần một đàn bắt đầu hay
+  // kết thúc sẽ làm cả danh sách nhảy dưới mắt người đang đọc.
   const byPresence = (a: WorkerRosterEntry, b: WorkerRosterEntry) =>
-    Number(b.online) - Number(a.online);
+    Number(b.state !== "offline") - Number(a.state !== "offline");
   return [...sectRows.sort(byPresence), ...mineRows.sort(byPresence)];
 }
 

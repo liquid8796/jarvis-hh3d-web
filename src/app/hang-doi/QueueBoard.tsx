@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { forceStartJobAction, forceStopJobAction } from "@/app/actions/queue";
 import type { QueueEntry, QueueSnapshot } from "@/lib/services/queue";
+import type { WorkerState } from "@/lib/services/workers";
 import type { JobStatus } from "@/lib/realtime/dashboardTypes";
 import { describeAssignment } from "@/lib/validation/queueAssign";
 import { PageSizeSelect, Pager, usePageSize, usePaged } from "@/components/Pager";
@@ -154,6 +155,38 @@ function awayText(lastSeen: string | null): string {
   const ms = Date.now() - new Date(lastSeen).getTime();
   return ms < 60_000 ? "vừa vắng" : `vắng ${formatDuration(ms)}`;
 }
+
+/**
+ * Hình thức của ba trạng thái khôi lỗi — một bảng tra, không phải một chuỗi ba tầng `?:` trong JSX.
+ *
+ * Ba màu phải PHÂN BIỆT ĐƯỢC KHI KHÔNG CÓ MÀU, vì đó là ranh giới dễ hỏng nhất của một bảng trạng
+ * thái: chấm ngọc CÓ NHỊP THỞ (rảnh — máy đang chờ việc), chấm vàng ĐỨNG YÊN (bận — đang cày), chấm
+ * xám chìm (đã chết). Chuyển động và độ đậm gánh phần nghĩa, màu chỉ nhấn thêm.
+ *
+ * Vì sao「rảnh」lấy màu ngọc chứ không phải màu vàng: với người đọc trang này, một khôi lỗi rảnh là
+ * tin TỐT — đàn của họ sẽ được nhặt ngay. Bận không phải lỗi, nhưng nó là thứ giải thích vì sao
+ * hàng đợi chưa nhúc nhích, nên nó đeo màu「đang chờ」chứ không đeo màu「sẵn sàng」.
+ */
+const WORKER_LOOK: Record<WorkerState, { row: string; dot: string; text: string; label: string }> = {
+  idle: {
+    row: "border-[var(--color-jade-400)]/35 bg-[var(--color-jade-400)]/5",
+    dot: "bg-[var(--color-jade-400)] pulse-jade",
+    text: "text-[var(--color-jade-300)]",
+    label: "đang rảnh",
+  },
+  busy: {
+    row: "border-[var(--color-gold-400)]/35 bg-[var(--color-gold-400)]/5",
+    dot: "bg-[var(--color-gold-400)]",
+    text: "text-[var(--color-gold-300)]",
+    label: "đang bận",
+  },
+  offline: {
+    row: "border-[var(--color-ink-600)]/60",
+    dot: "bg-[var(--color-ink-600)]",
+    text: "text-[var(--color-mist)]",
+    label: "đã chết",
+  },
+};
 
 const TABS = [
   { id: "queue", label: "Hàng đợi" },
@@ -326,7 +359,7 @@ export function QueueBoard({
 
   const { entries, running, waiting, sleeping, stuck, workers } = snapshot;
   const stuckEntries = entries.filter((entry) => entry.stuckFor != null);
-  const workersOnline = workers.filter((worker) => worker.online).length;
+  const workersOnline = workers.filter((worker) => worker.state !== "offline").length;
   /**
    * Sổ khôi lỗi đi CHUNG ảnh chụp hàng đợi (xem `QueueSnapshot.workers`), nên nó tươi đúng
    * bằng ảnh chụp: mỗi khung SSE, mỗi nhịp hỏi lại. Một khôi lỗi vừa tắt có thể còn hiện
@@ -598,26 +631,26 @@ export function QueueBoard({
             chung — nó nhặt đàn của mọi người theo đúng thứ tự ở tab Hàng đợi, nên nó vắng thì cả
             hàng đứng im.{" "}
             <strong className="text-[var(--color-parchment)]">Khôi lỗi riêng</strong> chỉ chạy ở
-            máy nhà, không cần xếp hàng chờ ở hàng đợi. Quá 30 giây không gửi tín hiệu cho server
-            thì tính là vắng mặt.
+            máy nhà, không cần xếp hàng chờ ở hàng đợi.
+          </p>
+          <p className="mb-4 text-xs leading-relaxed text-[var(--color-mist)]">
+            <span className="text-[var(--color-jade-300)]">đang rảnh</span> — còn sống mà chưa cầm
+            đàn nào, đàn tới là nhặt ngay.{" "}
+            <span className="text-[var(--color-gold-300)]">đang bận</span> — đang phục vụ ít nhất
+            một đàn; nó vẫn nhận thêm nếu còn ghế trống.{" "}
+            <span className="text-[var(--color-parchment)]">đã chết</span> — quá 30 giây không gửi
+            tín hiệu cho server, cửa phát việc đã gạch tên nó.
           </p>
 
           <ul className="space-y-2">
-            {workers.map((worker) => (
+            {workers.map((worker) => {
+              const look = WORKER_LOOK[worker.state];
+              return (
               <li
                 key={`${worker.kind}:${worker.id ?? "gop"}`}
-                className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border p-3 text-sm ${
-                  worker.online
-                    ? "border-[var(--color-jade-400)]/35 bg-[var(--color-jade-400)]/5"
-                    : "border-[var(--color-ink-600)]/60"
-                }`}
+                className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border p-3 text-sm ${look.row}`}
               >
-                <span
-                  className={`inline-block h-2 w-2 rounded-full ${
-                    worker.online ? "bg-[var(--color-jade-400)] pulse-jade" : "bg-[var(--color-ink-600)]"
-                  }`}
-                  aria-hidden
-                />
+                <span className={`inline-block h-2 w-2 rounded-full ${look.dot}`} aria-hidden />
                 <span className="font-semibold text-[var(--color-parchment)]">
                   {worker.kind === "sect" ? "Khôi lỗi tông môn" : "Khôi lỗi riêng"}
                 </span>
@@ -626,12 +659,14 @@ export function QueueBoard({
                 {worker.id && (
                   <span className="font-mono text-[11px] text-[var(--color-mist)]">{worker.id}</span>
                 )}
-                <span
-                  className={
-                    worker.online ? "text-[var(--color-jade-300)]" : "text-[var(--color-mist)]"
-                  }
-                >
-                  {worker.online ? "đang trực" : awayText(worker.lastSeen)}
+                <span className={look.text}>
+                  {look.label}
+                  {/* Đã chết thì kể thêm VẮNG TỪ BAO GIỜ: nhãn trả lời「còn sống không」, con số
+                      trả lời「chết lâu chưa」— vừa tắt một phút và tắt từ hôm qua là hai tình
+                      cảnh khác hẳn nhau, và chỉ con số ấy phân biệt được. */}
+                  {worker.state === "offline" && (
+                    <span className="text-[var(--color-mist)]"> · {awayText(worker.lastSeen)}</span>
+                  )}
                 </span>
                 {/* Số bản chỉ đi kèm dòng có id: dòng GỘP không kể bản của ai cả, mà `null` ở
                     đó nghĩa là「không được cho biết」chứ không phải「bản cũ」— hai điều khác hẳn
@@ -642,7 +677,8 @@ export function QueueBoard({
                   </span>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
 
           {!hasOwnWorker && (

@@ -7,7 +7,7 @@ import {
   storedConfigSchema,
   type WorkerPref,
 } from "./configs";
-import { DEFAULT_MAX_JOBS, DISPATCH_CANDIDATES, pickDispatch } from "./dispatch";
+import { DEFAULT_MAX_JOBS, DISPATCH_CANDIDATES, pickDispatch, STALE_AFTER_MS } from "./dispatch";
 import { getAppSettings, saveAppSettings } from "./settings";
 import { findById } from "./users";
 import { maintenanceAllowsAutomation } from "@/lib/auth/maintenance";
@@ -35,8 +35,9 @@ import { notifyDashboard } from "@/lib/realtime/dashboardChannel";
 
 const ACTIVE: JobRow["status"][] = ["queued", "running", "stopping"];
 
-/** A worker that has not heartbeat within this window is presumed dead. */
-const STALE_AFTER_MS = 3 * 60 * 1000;
+/** A worker that has not heartbeat within this window is presumed dead. Nhà của nó nay là
+ *  `./dispatch` — sổ khôi lỗi ở tab Hàng Đợi cũng phải đếm ghế bằng đúng luật này. */
+export { STALE_AFTER_MS };
 
 export async function getActiveJobs(userId: string): Promise<JobRow[]> {
   return db()

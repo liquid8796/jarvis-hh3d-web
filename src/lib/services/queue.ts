@@ -507,7 +507,7 @@ export async function getQueueSnapshot(viewer: QueueViewer): Promise<QueueSnapsh
   );
   const now = Date.now();
   /** Khôi lỗi tông môn có đang trực không — hỏi một lần, dùng cho mọi dòng thuộc hàng chung. */
-  const sectOnline = workers.some((worker) => worker.kind === "sect" && worker.online);
+  const sectOnline = workers.some((worker) => worker.kind === "sect" && worker.state !== "offline");
 
   /**
    * "Đang xếp hàng" = đã tới giờ mà chưa ai nhặt. Tính MỘT LẦN ở đây rồi dùng chung cho cả phép

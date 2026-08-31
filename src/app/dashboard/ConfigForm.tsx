@@ -1062,6 +1062,26 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
             </p>
           </div>
 
+          <div>
+            <label className="label" htmlFor="meCungMinPlayers">
+              Đủ mấy người thì đánh
+            </label>
+            <input
+              id="meCungMinPlayers"
+              name="meCungMinPlayers"
+              type="number"
+              min={1}
+              max={5}
+              step={1}
+              className="input font-mono"
+              defaultValue={config.quests.meCung.minPlayers}
+            />
+            <p className="mt-1 text-xs text-[var(--color-mist)]">
+              Số người đã bấm sẵn sàng là đủ để vào ải — nhập 3 thì 3 người cũng đi, khỏi chờ
+              đủ 5. Để 5 nếu muốn luôn đánh full đội.
+            </p>
+          </div>
+
           <div className="sm:col-span-2">
             <label className="label" htmlFor="meCungKickIdle">
               Trục xuất nếu không sẵn sàng sau (giây)

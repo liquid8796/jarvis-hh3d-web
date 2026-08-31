@@ -148,6 +148,9 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
         mode: String(formData.get("meCungMode") ?? "is-normal"),
         kickHp: Number(formData.get("meCungKickHp") ?? 0) || 0,
         kickIdleSec: Number(formData.get("meCungKickIdle") ?? 0) || 0,
+        // `|| 5` bắt cả ô rỗng lẫn ô gõ chữ (`Number("") === 0`, `Number("ba")` là NaN) — hai ngả
+        // ấy phải về MẶC ĐỊNH đủ đội, không phải về 0. Zod còn kẹp lại 1..5 ở sau.
+        minPlayers: Number(formData.get("meCungMinPlayers") ?? 5) || 5,
         capCheck: formData.get("meCungCapCheck") === "on",
         // Hai lời nhắn đi qua sanitizeChatMessage của schema — form không phải tự làm sạch.
         chatLobby: String(formData.get("meCungChatLobby") ?? ""),

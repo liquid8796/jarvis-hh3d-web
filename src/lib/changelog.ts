@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.58",
+    date: "2026-08-31",
+    lines: [
+      "Mê Cung có thêm ô «Đủ mấy người thì đánh»: nhập 3 thì 3 người bấm sẵn sàng là vào ải luôn, khỏi ngồi chờ cho đủ 5.",
+      "Trang vẫn đòi mọi người đang trong phòng phải bấm sẵn sàng, nên ô này hạ mức tối thiểu chứ không bỏ qua người còn ngồi im.",
+      "Để nguyên 5 là chạy y như trước; ai không chỉnh gì thì không đổi gì cả.",
+    ],
+  },
+  {
     version: "1.3.57",
     date: "2026-08-28",
     lines: [
@@ -465,15 +474,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Trang Hàng Đợi: tab Khôi lỗi nay kể từng máy đang trực một — tên máy, đang trực hay vắng bao lâu, và bản đang chạy — thay vì gộp thành một dòng.",
       "Ở tab Hàng đợi, mỗi đàn đang chạy hiện luôn tên máy đang cầm nó, nên đạo hữu biết đàn mình nằm trong tay máy nào.",
       "Máy nhà của người khác vẫn được giấu tên như trước, và nút dừng đàn vẫn chỉ dành cho người được giao quyền.",
-    ],
-  },
-  {
-    version: "1.3.7",
-    date: "2026-08-19",
-    lines: [
-      "Sổ Kho GitHub thôi chặn ở 8 kho: nay thêm bao nhiêu khôi lỗi cũng được, không còn câu「Sổ đầy」chặn ở cửa.",
-      "Vòng nuôi kho đổi cách xếp lượt: kho lâu chưa được ghi nhất luôn đi trước, nên sổ dài cũng không có kho nào bị bỏ quên.",
-      "Với đạo hữu thì màn hình không đổi gì; đây là chỗ sửa cho người trông nom hệ thống.",
     ],
   },
 ];

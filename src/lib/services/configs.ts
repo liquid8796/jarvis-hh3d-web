@@ -215,6 +215,19 @@ export const configSchema = z.object({
            * là ghế người khác không ngồi được. Song sinh với option `kickIdle` bên desktop.
            */
           kickIdleSec: z.number().int().min(0).max(3600).default(0),
+          /**
+           * Đủ bao nhiêu người BẤM SẴN SÀNG thì bắt đầu ải — 1..5, mặc định 5 (đủ đội).
+           *
+           * Mặc định 5 giữ nguyên hành vi của mọi bản trước, vốn ghim cứng con số ấy vào bốn cái
+           * gác trong hồ sơ quest. Trần 5 là sức chứa một phòng mê cung; luật giãn ngưỡng thành
+           * điều kiện dò nằm ở `mazeReadyGate` (quest-engine/profile.mjs) — CHỖ ẤY là nơi con số
+           * này biến thành thứ engine đọc được, và cũng là nơi giải thích vì sao nó phải giãn.
+           *
+           * Hạ ngưỡng KHÔNG bỏ qua được người đang ngồi chưa sẵn sàng: trang giữ `blocked-start`
+           * tới khi mọi người CÓ MẶT đều sẵn sàng. Ngưỡng này chỉ cho phép một đội NHỎ hơn năm
+           * người khởi hành; ghế của người lười vẫn phải nhờ `kickIdleSec` dọn.
+           */
+          minPlayers: z.number().int().min(1).max(5).default(5),
           /** Stop when the daily huyền tinh cap is reached. */
           capCheck: z.boolean().default(true),
           /**

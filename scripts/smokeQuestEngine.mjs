@@ -1437,6 +1437,66 @@ async function main() {
     notes.filter((n, i) => notes.indexOf(n) !== i).join(" / ") || "(sạch)",
   );
   check("capCheck=false → nhánh «không kiểm tra»", opt(meCung, "capCheck").selectedValue.includes("«"));
+
+  // ---- Ngưỡng số người sẵn sàng (schema 79) ----------------------------------------------
+  //
+  // Bốn cửa chặn trên `#lobby-ready` đều phải mang ngưỡng, và ngưỡng phải là DANH SÁCH chứ
+  // không phải con số: `textMatches` hỏi「có chứa」, nên một cửa mang đúng chữ "3" sẽ để phòng
+  // đã đủ 4 người đứng chờ mãi. Đếm cửa bằng `flatSteps` vì cả cụm nằm trong thân vòng lặp —
+  // hỏi ở tầng cao chỉ thấy một cái cây cụt cành.
+  const readyGates = (quest) =>
+    flatSteps(quest.steps)
+      .flatMap((s) => [s.condition, s.when, s.until])
+      .filter((c) => c && c.selector === "#lobby-ready")
+      .map((c) => c.text);
+
+  // Bốn cửa chỉ TRỎ tới option; con số thật được engine thay lúc chạy (`fillCondition`), nên
+  // đây là chỗ hỏi「dây còn nối không」, không phải hỏi giá trị.
+  check(
+    "bốn cửa chặn đều trỏ vào option, không ai ghim lại số cứng",
+    readyGates(meCung).length === 4 && readyGates(meCung).every((t) => t === "{{minPlayers}}"),
+    readyGates(meCung).join(" / "),
+  );
+  check(
+    "vắng minPlayers trong config → vẫn đủ đội 5, y như mọi bản trước",
+    opt(meCung, "minPlayers").selectedValue === "5",
+    opt(meCung, "minPlayers").selectedValue,
+  );
+  {
+    const built = (minPlayers) =>
+      profileForConfig(
+        { gameCookie: "a=b", runner: "local", quests: { meCung: { enabled: true, minPlayers } } },
+        () => {},
+      ).quests.filter((q) => q.name === "Mê Cung");
+
+    // CẢ HAI twin (VIP và thường): một bản quên ngưỡng nghĩa là đúng một hạng tài khoản vẫn
+    // ngồi chờ đủ năm, và người dùng hạng ấy không có cách nào biết vì sao.
+    const twins = built(3);
+    check("hồ sơ có đủ hai bản sinh đôi Mê Cung", twins.length === 2, String(twins.length));
+    for (const twin of twins) {
+      const tier = twin.requiresVip ? "vip" : "thường";
+      check(
+        `minPlayers=3 → "3|4|5" ở bản ${tier}`,
+        opt(twin, "minPlayers").selectedValue === "3|4|5",
+        opt(twin, "minPlayers").selectedValue,
+      );
+      // Giá trị phải là một LỰA CHỌN CÓ SẴN, không phải chuỗi tự nhập. Đó là thứ khiến phép
+      // thay của engine trả về nguyên văn: `buildOptionValues` tìm thấy `chosen` nên đi nhánh
+      // `values.set(key, chosen.value)`, không đi nhánh tự-nhập vốn còn lọc bớt ký tự.
+      check(
+        `…và "3|4|5" là một lựa chọn có sẵn của option (bản ${tier})`,
+        (opt(twin, "minPlayers").choices ?? []).some((c) => c.value === "3|4|5"),
+        (opt(twin, "minPlayers").choices ?? []).map((c) => c.value).join(" / "),
+      );
+    }
+
+    // Ngả rác phải đi về phía thận trọng: đoán nhầm thành 5 chỉ khiến đội chờ như cũ, còn đoán
+    // nhầm thành 1 là lẳng lặng cho một người đi đánh ải năm người.
+    for (const [given, want] of [[0, "5"], [-2, "5"], [9, "5"], [1, "1|2|3|4|5"], [4, "4|5"]]) {
+      const value = opt(built(given)[0], "minPlayers").selectedValue;
+      check(`minPlayers=${given} → "${want}"`, value === want, String(value));
+    }
+  }
   check("tier → Cực Phẩm", opt(luyenDan, "tier").selectedValue === "Cực Phẩm");
 
   // Lời nhắn Trò Chuyện Đội (recording 08/08): chuỗi phải qua sanitizeChatMessage rồi tới
@@ -2107,8 +2167,10 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // trang đã kêu phiên hết hạn, tải lại, rồi mới hỏi nhân chứng.
     // 77 = Mê Cung: cổng Bế Quan Trợ Chiến + tự đóng hộp thắng trận, và luật độ khó một-lần-
     // một-ngày viết thẳng vào nhãn ô chọn. Bản ghi me-cung-20260829-100237.
-    "hồ sơ đang ở schema 78",
-    loadProfileForSchema().schemaVersion === 78,
+    // 79 = Mê Cung: ngưỡng số người sẵn sàng thành option (minPlayers) thay cho con số 5 ghim
+    // cứng ở bốn cửa chặn.
+    "hồ sơ đang ở schema 79",
+    loadProfileForSchema().schemaVersion === 79,
     String(loadProfileForSchema().schemaVersion),
   );
 

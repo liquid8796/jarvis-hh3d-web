@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.62",
+    date: "2026-09-01",
+    lines: [
+      "Khung Phòng Chat trên máy tính nay rộng thêm đúng một phần tư, cho dòng trò chuyện thoáng và ít xuống hàng hơn.",
+      "Trên điện thoại, sảnh vẫn ôm vừa màn hình như trước và không sinh phần tràn ngang.",
+    ],
+  },
+  {
     version: "1.3.61",
     date: "2026-08-31",
     lines: [
@@ -464,15 +472,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Nhật ký của đàn thôi hiện đôi: những dòng như「đã đủ huyền tinh hôm nay」trước đây hiện hai lần liền nhau, nay chỉ một.",
       "Lời nhắc về giá trị tự nhập của Mê Cung và Khoáng Mạch cũng vậy — mỗi việc kể đúng một lần.",
       "Không mất chữ nào: chỗ nào nhiệm vụ thật sự chạy hai lượt thì nhật ký vẫn kể đủ cả hai.",
-    ],
-  },
-  {
-    version: "1.3.11",
-    date: "2026-08-19",
-    lines: [
-      "Kho GitHub và khôi lỗi mới sinh ra nay lấy tên từ một cuốn từ điển 465 chữ, thay vì 38 chữ như trước.",
-      "Nhờ vậy các kho thôi trông giống hệt nhau — trước đây chín kho là đã có vài cái trùng nửa tên.",
-      "Kho và khôi lỗi đang chạy giữ nguyên tên cũ; chỉ những cái dựng từ hôm nay mới đổi.",
     ],
   },
 ];

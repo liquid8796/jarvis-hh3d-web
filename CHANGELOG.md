@@ -59,6 +59,15 @@ cao 48px là hai cái biển bắt đầu ăn vào nhau.
 Chữ bong bóng 1rem → 0,875rem, **không** xuống 13px như sảnh mẫu: cả sảnh mặc chữ chân, vốn có
 nét thanh nét đậm nên mảnh hơn chữ không chân ở cùng cỡ. 14px là đáy của chữ chân trên màn 1×.
 
+### Mốc giờ: chỗ duy nhất không co theo hệ số (1.3.61)
+
+Soi lại chính bản vừa phát hành thì mốc giờ ở `0.62rem` (9,9px) là chữ nhỏ nhất sảnh, và màu
+của nó là một `rgba(143,137,179,.9)` gõ tay — gần như `--color-mist` bị 10% alpha kéo tối đi.
+Tính ra trên nền bong bóng (#22254A sau khi trộn `rgba(41,42,78,.55)` lên ruột khung) thì nó
+chỉ được **3,9:1**, dưới ngưỡng AA 4,5:1 — một lỗi CÓ SẴN, nhưng lượt thu vừa làm chữ nhỏ đi
+nên nó mới thật sự cắn. Nay `0.65rem` và dùng thẳng `--color-mist`: **5,25:1**, và sảnh bớt đi
+một màu đứng ngoài bảng màu.
+
 ### Cái bẫy ở điện thoại
 
 `zoom: 0.72` của bản mobile được đo trên **cỡ chữ 16px** (16 × 0,72 = 11,5px, sàn đọc được).

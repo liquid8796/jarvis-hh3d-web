@@ -1143,8 +1143,16 @@ body {
    bên phải, câu dài thì nó lặn xuống góc phải đáy. Clearfix ở .chat-bubble::after đỡ nó. */
 .chat-meta {
   float: right;
-  font-size: 0.62rem;
-  color: rgba(143, 137, 179, 0.9);
+  /* 0,68 → 0,62 → 0,65rem: mốc giờ là chữ NHỎ NHẤT của sảnh, nên nó không được co theo đúng
+     hệ số của lượt thu 31/08/2026 — ở 0,62rem (9,9px) nó tụt hẳn một bậc rưỡi so với mọi thứ
+     quanh nó. 0,65rem = 10,4px, vẫn nhỏ hơn mốc ngày và viên tag. */
+  font-size: 0.65rem;
+  /* Về đúng màu của hệ thống thay vì một `rgba()` gõ tay. Con số cũ `rgba(143,137,179,.9)`
+     gần như chính là `--color-mist` (#9b96be) bị 10% alpha kéo tối đi, và cái 10% ấy phải trả
+     giá: trên nền bong bóng (#22254A sau khi trộn) nó cho tương phản 3,9:1 — DƯỚI ngưỡng AA
+     4,5:1, mà lượt thu vừa làm chữ nhỏ đi nữa. Chính token cho 5,25:1, và sảnh bớt đi một
+     màu gõ tay đứng ngoài bảng màu. */
+  color: var(--color-mist);
   /* 6px 0 0 12px → 4px 0 0 10px ngày 17/08/2026, theo đệm bong bóng vừa thít lại. Khoảng cách
      mắt thấy giữa giờ và mép bong bóng là margin NÀY cộng đệm bên kia, nên giữ nguyên số cũ
      trong một bong bóng chật hơn là để mốc giờ trôi xa câu chữ. */

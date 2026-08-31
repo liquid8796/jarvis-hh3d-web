@@ -97,33 +97,54 @@ for (const quest of twins) {
     hardcoded.join(" | "),
   );
 
-  const stopIndex = steps.findIndex((s) => s.action === "stopIf");
-  check(`${who}: vẫn còn bước stopIf`, stopIndex > 0);
+  // ── Hỏi bằng NGHĨA, đừng hỏi bằng vị trí ────────────────────────────────────────────────
+  //
+  // Bản đầu tìm "bước stopIf ĐẦU TIÊN" và "vòng repeat có maxIterations === 6". Cả hai mốc ấy
+  // đã mục: schema 77 chèn thêm một stopIf khác (cổng Bế Quan Trợ Chiến) lên TRƯỚC, còn trần
+  // vòng ngoài đổi 6 → 18 từ schema 64. Phép thử vì thế đỏ suốt mà không ai đọc — tức cái cổng
+  // nó canh đã bỏ trống bao lâu nay. Nay nó tự tìm lấy đúng bước mình muốn hỏi, nên một bước
+  // mới chen vào giữa không còn làm nó mù.
+  const stopIndex = steps.findIndex(
+    (s) => s.action === "stopIf" && s.condition?.kind === "visible" && s.condition?.selector === MARK_SELECTOR,
+  );
   check(
-    `${who}: stopIf hỏi cờ, không so chuỗi`,
-    steps[stopIndex].condition?.kind === "visible" && steps[stopIndex].condition?.selector === MARK_SELECTOR,
-    JSON.stringify(steps[stopIndex].condition),
+    `${who}: vẫn còn stopIf hỏi cờ đầy trần`,
+    stopIndex > 0,
+    JSON.stringify(steps.filter((s) => s.action === "stopIf").map((s) => s.condition?.selector)),
   );
 
   // Thứ tự là TẤT CẢ ở đây: cờ phải được cắm TRƯỚC khi có ai hỏi tới nó.
   check(`${who}: ngay trước stopIf là bước đọc trần`, isMarkStep(steps[stopIndex - 1]));
 
-  const loop = steps.find((s) => s.action === "repeat" && s.maxIterations === 6);
-  check(`${who}: còn vòng ngoài 6 lượt`, Boolean(loop));
+  const loop = steps.find(
+    (s) => s.action === "repeat" && typeof s.until?.selector === "string" && s.until.selector.startsWith(MARK_SELECTOR),
+  );
+  check(`${who}: còn vòng ngoài, và until của nó hỏi cờ`, Boolean(loop) && loop.until.kind === "visible");
+
+  // `until` được kiểm ở ĐẦU mỗi vòng, nên bước đọc trần phải đứng SAU vòng lái lượt đánh: đặt
+  // trước thì cờ luôn trễ đúng một lượt, tức vẫn đánh thừa một trận sau khi đã đầy. Trước
+  // schema 77 nó là bước CUỐI thân vòng và phép thử hỏi đúng như vậy; nay sau nó còn hai bước
+  // đóng hộp thắng trận, và chính hồ sơ giải thích vì sao chúng không được đứng trước. Nên điều
+  // kiện được viết lại cho đúng cái nó vẫn luôn muốn nói: sau vòng lái, và không cú nạp trang
+  // nào chen vào sau — một cú nạp là cuốn sạch cờ vừa cắm.
+  const markIndex = loop.steps.findLastIndex(isMarkStep);
+  const driverIndex = loop.steps.findIndex((s) => s.action === "repeat" && s.maxIterations >= 60);
   check(
-    `${who}: until hỏi cờ, không so chuỗi`,
-    loop.until?.kind === "visible" && loop.until?.selector === MARK_SELECTOR,
-    JSON.stringify(loop.until),
+    `${who}: bước đọc trần đứng sau vòng lái lượt đánh`,
+    driverIndex >= 0 && markIndex > driverIndex,
+    `vòng lái ${driverIndex} → đọc trần ${markIndex}`,
+  );
+  check(
+    `${who}: không cú nạp trang nào chen sau bước đọc trần`,
+    loop.steps.slice(markIndex + 1).every((s) => s.action !== "navigate"),
   );
 
-  // `until` được kiểm ở ĐẦU mỗi vòng, nên bước đọc trần phải là bước CUỐI của thân vòng —
-  // đặt ở đầu thì cờ luôn trễ đúng một lượt đánh, tức vẫn đánh thừa một trận sau khi đầy.
-  check(`${who}: bước đọc trần là bước cuối thân vòng`, isMarkStep(loop.steps.at(-1)));
-
-  // Hai bản sao của cùng một script: sửa một chỗ mà quên chỗ kia là lỗi im lặng y hệt lỗi cũ.
+  // Hai bước đọc cờ KHÔNG còn dùng chung một script từ schema 73 — bước ở sảnh quét ô chữ, bước
+  // cuối hiệp đọc số từ phản hồi rương. Bất biến còn lại, và là bất biến thật, là chúng cắm CÙNG
+  // một lá cờ: sửa tên cờ ở một chỗ mà quên chỗ kia thì cổng chặn im lặng bỏ trống y như lỗi cũ.
   check(
-    `${who}: hai bước đọc trần dùng chung một script`,
-    steps[stopIndex - 1].script === loop.steps.at(-1).script,
+    `${who}: hai bước đọc cờ cắm cùng một lá cờ`,
+    steps[stopIndex - 1].script.includes(MARK_CLASS) && loop.steps[markIndex].script.includes(MARK_CLASS),
   );
 
   const capOption = quest.options.find((o) => o.key === "capCheck");

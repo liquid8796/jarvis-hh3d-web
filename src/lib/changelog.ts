@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.59",
+    date: "2026-08-31",
+    lines: [
+      "Mê Cung kể lại từng ải trong lúc đánh — «Đang đánh ải 3/5» kèm tên boss — thay vì im lặng suốt cả trận rồi mới báo một dòng kết quả.",
+      "Phòng bị xoá giữa trận thì nay nói thẳng là đã ra khỏi phòng và lập phòng mới ở lượt ghé sau, thay vì đứng dò mười mấy phút không một dòng chữ nào.",
+      "Trận có đứng hình đi nữa thì cứ vài phút vẫn có một dòng báo đang ở đâu, nên liếc nhật ký là biết còn chạy hay đã kẹt.",
+    ],
+  },
+  {
     version: "1.3.58",
     date: "2026-08-31",
     lines: [
@@ -465,15 +474,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Hỷ Sự Đường: nay khai được cả hồng bao ở phòng cưới Đạo Lữ, không chỉ phòng Hồng Nhan như trước.",
       "Phòng nào đang treo dòng「Có lì xì chưa mở」là auto ghé khai, kể cả tiệc đã chúc từ trước.",
-    ],
-  },
-  {
-    version: "1.3.8",
-    date: "2026-08-19",
-    lines: [
-      "Trang Hàng Đợi: tab Khôi lỗi nay kể từng máy đang trực một — tên máy, đang trực hay vắng bao lâu, và bản đang chạy — thay vì gộp thành một dòng.",
-      "Ở tab Hàng đợi, mỗi đàn đang chạy hiện luôn tên máy đang cầm nó, nên đạo hữu biết đàn mình nằm trong tay máy nào.",
-      "Máy nhà của người khác vẫn được giấu tên như trước, và nút dừng đàn vẫn chỉ dành cho người được giao quyền.",
     ],
   },
 ];

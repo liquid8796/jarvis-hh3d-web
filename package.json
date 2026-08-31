@@ -40,6 +40,7 @@
     "verify:browser-channel": "tsx scripts/verifyBrowserChannel.mts",
     "verify:notices": "tsx scripts/verifyNotices.mts",
     "verify:maze-cap": "node scripts/verifyMazeCapMark.mjs",
+    "verify:maze-watch": "node scripts/verifyMazeRoundWatch.mjs",
     "verify:obscura": "node scripts/verifyObscura.mjs",
     "verify:profile": "tsx scripts/verifyUserProfile.mts",
     "verify:avatar": "tsx scripts/verifyAvatar.mts",

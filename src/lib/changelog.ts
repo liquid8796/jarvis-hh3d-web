@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.61",
+    date: "2026-08-31",
+    lines: [
+      "Mốc giờ trong Phòng Chat sáng lên và to lại một chút — lượt thu gọn ban nãy đã làm nó mờ quá mức đọc thoải mái.",
+    ],
+  },
+  {
     version: "1.3.60",
     date: "2026-08-31",
     lines: [
@@ -466,15 +473,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Kho GitHub và khôi lỗi mới sinh ra nay lấy tên từ một cuốn từ điển 465 chữ, thay vì 38 chữ như trước.",
       "Nhờ vậy các kho thôi trông giống hệt nhau — trước đây chín kho là đã có vài cái trùng nửa tên.",
       "Kho và khôi lỗi đang chạy giữ nguyên tên cũ; chỉ những cái dựng từ hôm nay mới đổi.",
-    ],
-  },
-  {
-    version: "1.3.10",
-    date: "2026-08-19",
-    lines: [
-      "Thêm một cửa cho người trông nom: khôi lỗi nào chết đứng — vẫn còn lượt chạy nhưng đã ngừng gửi tín hiệu — nay dựng dậy được ngay bằng một cú bấm.",
-      "Khôi lỗi đang trực tuyệt đối không bị đụng tới, nên đàn đang chạy không mất vòng nào.",
-      "Với đạo hữu thì màn hình không đổi gì; chỉ là những cái ghế chết sẽ sống lại sớm hơn nhiều.",
     ],
   },
 ];

@@ -11,6 +11,63 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.60 — Phòng Chat: khung nới theo màn hình, chữ và chân dung thu một bậc
+
+Đạo hữu đưa hai ảnh cạnh nhau — sảnh của ta và một sảnh chat mẫu — rồi bảo「chỉnh kích thước
+khung cũng như content bên trong cho giống」. Đo trên hai ảnh ấy ở cùng khung nhìn 1900×930:
+
+|                | sảnh của ta | sảnh mẫu |
+| -------------- | ----------- | -------- |
+| bề ngang khung | 912px       | 1113px   |
+| chân dung      | 62px        | 36px     |
+| chữ bong bóng  | 16px        | 13px     |
+
+Tức sảnh của ta vừa NHỎ hơn ở bề ngang vừa TO hơn ở mọi thứ bên trong — nhìn như đang phóng to.
+
+### Vì sao khung đứng yên ở 912px
+
+`.chat-frame` từ lâu đã có một phép kẹp theo chiều cao khung nhìn, đúng thứ cần cho một tấm
+khung khoá tỉ lệ 1372:1059. Nhưng `<main>` của trang lại đeo thêm `max-w-[60rem]`, và trong
+`min(100%, …)` thì **trần bề ngang ấy luôn thắng** trên desktop. Hai hệ quả, cả hai đều lặng lẽ:
+
+- màn 1080p còn chỗ cho 971px mà khung vẫn 912px;
+- màn 1440p, khung nhìn cao 1300px, khung **vẫn** 912px — càng màn to càng phí;
+- và hệ số `1.15` thêm ngày 10/08/2026 theo yêu cầu「nới khung thêm 15%」**chưa từng có hiệu
+  lực một ngày nào** trên desktop, vì nó nằm ở vế thua.
+
+Nay trần lên `78rem` để vế chiều cao thật sự cầm quyền, và `1.15` gỡ đi: giữ nó cùng với trần
+mới là khung cao 851px trong khung nhìn 930px — **trang** mọc thanh cuộn dọc trong khi vùng
+tin đã có thanh cuộn của riêng nó, đúng thứ một trang chat không được phép có.
+
+Con số trừ đi là chiều cao vỏ trang, **đo trên ảnh chụp thật** chứ không ước: thanh đầu trang
+74px + dòng ký tên 65px + `pb-6` của `<main>` 24px = 163px. Lấy 180 để chừa chỗ cho lượt cụm
+menu xuống dòng ở màn hẹp hơn.
+
+### Thu ruột: một hệ số cho tất cả, không thu lẻ
+
+Chân dung 62 → 50px (hệ số 0,806) kéo theo bài vị 60 → 48px và tên 1,05 → 0,88rem — ba con số
+mà chú thích cũ đã dặn là **không được đổi lẻ**. Hai tỉ lệ mà lượt 21/08/2026 vừa chỉnh trúng
+bản thiết kế vẫn được giữ nguyên sau lượt thu:
+
+- bề ngang biển / chân dung: 2,26 → **2,25** (thiết kế 2,28)
+- chiều cao dùng thật / chân dung: 0,61 → **0,60** (thiết kế 0,60)
+
+Hai lề âm của bài vị (`margin-block`, `+ .chat-tagframe`) cũng phải co cùng hệ số: chúng ôm lấy
+quầng sáng nằm TRONG chính tấm ảnh, mà quầng ấy co theo `height`. Giữ nguyên `-23px` ở chiều
+cao 48px là hai cái biển bắt đầu ăn vào nhau.
+
+Chữ bong bóng 1rem → 0,875rem, **không** xuống 13px như sảnh mẫu: cả sảnh mặc chữ chân, vốn có
+nét thanh nét đậm nên mảnh hơn chữ không chân ở cùng cỡ. 14px là đáy của chữ chân trên màn 1×.
+
+### Cái bẫy ở điện thoại
+
+`zoom: 0.72` của bản mobile được đo trên **cỡ chữ 16px** (16 × 0,72 = 11,5px, sàn đọc được).
+Hạ cỡ nền xuống 14px mà để nguyên `0.72` là chữ trên điện thoại rơi xuống **10,1px** — dưới hẳn
+cái sàn ấy, và không một dòng CSS nào kêu lên. Nên `--chat-zoom` lên `0.82`: 14 × 0,82 = 11,5px,
+đúng con số cũ. Lượt thu này vì thế **chỉ đụng tới desktop**, đúng như bản tin nói với người dùng.
+
+---
+
 ## 1.3.56 — Hoang Vực: phiên đánh hết hạn thì ĐÁNH LẠI, không bỏ lượt (schema 78)
 
 Bản vá 28/08 lo được ca「đòn ĐÃ ăn mà trang đứng hình」. Ảnh của tông chủ 30/08 là ca KHÁC hẳn:

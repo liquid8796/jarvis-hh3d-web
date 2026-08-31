@@ -554,9 +554,23 @@ body {
   /* Tỉ lệ của tấm ảnh SAU KHI CẮT rìa nền thừa (1372×1059). Lượt cắt ấy chỉ làm dải nền đặc
      mỏng đi chứ KHÔNG dứt được nó — xem chú thích ở `.chat-frame-img`, chỗ dứt hẳn là kênh
      alpha. Tỉ lệ vẫn phải khớp đúng tấm ảnh, vì mọi toạ độ % dưới đây đo trên nó.
-     Hệ số 1.15: đạo hữu yêu cầu nới khung thêm 15% ngày 10/08/2026. `min(100%, …)` vẫn kẹp
-     bề ngang, nên trên màn hẹp khung thu lại theo bề rộng thay vì tràn ra ngoài. */
-  width: min(100%, calc((100dvh - 190px) * 1.15 * 1372 / 1059));
+     `min(100%, …)` vẫn kẹp bề ngang, nên trên màn hẹp khung thu lại theo bề rộng thay vì
+     tràn ra ngoài.
+
+     ── 180px, và vì sao hệ số 1.15 đi mất (31/08/2026) ───────────────────────────────────
+     Con số trừ đi là CHIỀU CAO CỦA VỎ TRANG, đo trên ảnh chụp thật ở khung nhìn 1900×930:
+     thanh đầu trang 74px (đệm py-5 cộng cụm menu cao 34px) + dòng ký tên 65px (đệm 20/26,
+     chữ 19px) + `pb-6` của <main> 24px = 163px. Lấy 180 chứ không 163 vì cụm menu biết XUỐNG
+     DÒNG ở màn hẹp hơn: 17px dôi ra là chỗ cho cái dòng thứ hai ấy, và thà khung hụt 13px
+     còn hơn cả trang mọc thanh cuộn dọc.
+
+     Hệ số 1.15 (yêu cầu「nới khung thêm 15%」ngày 10/08/2026) gỡ đi vì trên desktop nó CHƯA
+     TỪNG có hiệu lực: trần `max-w-[60rem]` của <main> luôn thắng trong `min()`, nên khung
+     đứng nguyên 912px. Nay trần ấy nới lên 78rem thì vế này mới thật sự cầm quyền — và giữ
+     1.15 lúc đó là khung cao 851px trong khung nhìn 930px, tức TRANG mọc thanh cuộn dọc
+     trong khi vùng tin đã có thanh cuộn của riêng nó. Bỏ 1.15 mà nới trần là khung rộng ra
+     THẬT (912 → 971px ở 1080p, và hết bị ghim ở 912px trên màn cao hơn), chứ không hẹp lại. */
+  width: min(100%, calc((100dvh - 180px) * 1372 / 1059));
   aspect-ratio: 1372 / 1059;
   margin: 0 auto;
   /* Mốc của mọi `cqw` bên trong: chữ co theo BỀ RỘNG KHUNG, không theo bề rộng màn hình — nếu
@@ -670,9 +684,9 @@ body {
 
 .chat-top-note {
   text-align: center;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--color-mist);
-  padding: 8px 0;
+  padding: 6px 0;
 }
 
 /* Mốc ngày như bản thiết kế: chữ TRẦN canh phải — không viên thuốc, không viền — với một
@@ -681,9 +695,9 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin: 18px 8px 12px;
+  margin: 14px 8px 10px;
   color: rgba(232, 194, 92, 0.85);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   letter-spacing: 0.04em;
 }
 
@@ -703,9 +717,9 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin: 10px 8px;
+  margin: 8px;
   color: rgba(242, 160, 160, 0.9);
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   letter-spacing: 0.06em;
 }
 
@@ -781,8 +795,10 @@ body {
 .chat-row {
   display: flex;
   /* Khoảng chân-dung↔bong-bóng. 20px lúc đầu; 16px từ 11/08/2026 — bốn pixel ấy về thẳng cho
-     bề rộng câu chữ, mà mắt không nhận ra chúng đã đi đâu. */
-  gap: 16px;
+     bề rộng câu chữ, mà mắt không nhận ra chúng đã đi đâu. 16 → 12px ngày 31/08/2026, co
+     CÙNG TỈ LỆ với chân dung (62→50px): khe này là một phần của hàng danh tính, giữ nguyên
+     16px bên một chân dung nhỏ đi 20% là đẩy bong bóng ra xa cái mặt nó thuộc về. */
+  gap: 12px;
   /* Bản thiết kế vốn thở rộng (24px): mỗi người một khoảnh, không phải một dòng log nén chặt.
      24 → 14px ngày 11/08/2026, rồi 14 → 10px ngày 17/08/2026, cả hai lần đều theo yêu cầu
     「giảm kích thước mỗi khoảnh」.
@@ -790,8 +806,12 @@ body {
      mù. Lượt 17/08 hạ được vì phép phân nhịp đã MẠNH THÊM ở chỗ khác chứ không yếu đi: tin nối
      tiếp nay cao ~39px còn tin mở lời của một người mới cao ~96px (chân dung của tin nối tiếp
      hết chiếm 62px — xem `.chat-avatar-gap`), tức hai loại hàng chênh nhau gấp đôi rưỡi, mắt
-     bắt được nhịp mà không cần tới khoảng trống. Hạ tiếp thì phải chụp lại mà nhìn. */
-  margin-top: 10px;
+     bắt được nhịp mà không cần tới khoảng trống. Hạ tiếp thì phải chụp lại mà nhìn.
+
+     10 → 8px ngày 31/08/2026, và lời dặn trên đã được làm: ĐÃ chụp lại ở 1900×930. Nhịp vẫn
+     đọc được vì lượt ấy thu cả hàng danh tính — tin nối tiếp cao ~30px còn tin mở lời cao
+     ~69px, tức vẫn hơn gấp đôi, đúng cái chênh mà đoạn trên nói là đủ. */
+  margin-top: 8px;
   animation: chat-in 0.22s ease-out;
 }
 
@@ -891,7 +911,9 @@ body {
   /* Tên người nói trong bản thiết kế là chữ hiển thị lớn — cùng font với tiêu đề. 1.2rem lúc
      đầu; hạ còn 1.05rem cùng lượt thu nhỏ chân dung và bài vị (xem `.chat-tagframe`). */
   font-family: var(--font-display);
-  font-size: 1.05rem;
+  /* 1,2 → 1,05rem (09/08/2026) → 0,88rem (31/08/2026). Lượt sau đi CÙNG LƯỢT với chân dung
+     62→50px và bài vị 60→48px, y như đoạn trên dặn: đổi lẻ một trong ba là lệch thế cân. */
+  font-size: 0.88rem;
   font-weight: 600;
   color: var(--color-parchment);
   /* Khe tên↔bong-bóng: 6px → 2px (11/08/2026) → 1px (17/08/2026), cùng hai lượt hạ chiều cao.
@@ -941,13 +963,33 @@ body {
  *
  * Chỉ ĐO ĐƯỢC bằng ảnh chụp thật — `getComputedStyle` báo 44px là "đúng như đã khai", nó
  * không biết trong 44px ấy có bao nhiêu phần là quầng sáng. Xem `npm run shot`.
+ *
+ * ── 48px, 31/08/2026: cùng một phép tính, chỉ đổi mốc ────────────────────────────────────
+ *
+ * Đạo hữu đưa một sảnh chat mẫu để so và bảo「chỉnh kích thước cho giống」: ở đó chân dung
+ * 36px, chữ 13px — cạnh nó thì sảnh của ta trông như đang phóng to. Lượt thu này hạ chân dung
+ * 62 → 50px, nên bài vị PHẢI đi theo đúng hệ số 50/62 = 0,806: 60 × 0,806 ≈ 48px.
+ *
+ * Kiểm lại bằng chính hai phép đo của đoạn trên, ở height 48px (mọi con số của bảng quầng sáng
+ * nhân 48/74 = 0,649):
+ *
+ *     bề ngang biển / chân dung      (136 − 2×11,6) / 50 = 2,25   (thiết kế 2,28; trước 2,26)
+ *     chiều cao dùng thật / chân dung       (48 − 2×9) / 50 = 0,60 (thiết kế 0,60; trước 0,61)
+ *
+ * Cả hai vẫn trúng, nên đây KHÔNG phải một lượt hạ mù — nó là cùng một tỉ lệ ở một cỡ khác.
+ *
+ * Cảnh báo「66px là chữ bắt đầu bết」ở trên nay đã bị vượt qua hai lần, nên nó phải được TRẢ
+ * GIÁ đúng cách — và cách trả là ảnh chụp, không phải lý lẽ: `npm run shot -- --clip` cắt
+ * đúng vùng bài vị rồi chụp ở 2×. Ở 48px biển thật chỉ còn ~29px, tức đây là ĐÁY của bộ ảnh
+ * hiện tại; ai muốn xuống nữa thì phải đổi sang bộ bài vị có chữ khắc to hơn chứ không phải
+ * chụp lại một lần nữa.
  */
 .chat-tagframe {
   display: inline-block;
-  height: 60px;
+  height: 48px;
   width: auto;
-  margin-left: 8px;
-  margin-block: -11px;
+  margin-left: 6px;
+  margin-block: -9px;
   vertical-align: middle;
   user-select: none;
 }
@@ -988,7 +1030,9 @@ body {
  * lần này quầng mỏng đi vì ảnh nhỏ lại chứ không vì đổi bộ khung.
  */
 .chat-tagframe + .chat-tagframe {
-  margin-left: -23px;
+  /* -28px ở height 74px → -23px ở 60px → -18px ở 48px: quầng sáng là một phần CỦA ẢNH nên
+     nó co đúng theo `height`, và con số lùi phải co cùng hệ số (23 × 48/60 ≈ 18). */
+  margin-left: -18px;
 }
 
 /* Tag trang trí trong sảnh — viên nhỏ cạnh tên, đóng băng theo tin y như chính cái tên. */
@@ -1001,7 +1045,7 @@ body {
   background: rgba(232, 194, 92, 0.08);
   color: var(--color-gold-300);
   font-style: normal;
-  font-size: 0.64rem;
+  font-size: 0.6rem;
   line-height: 1.5;
   vertical-align: 1px;
 }
@@ -1014,16 +1058,23 @@ body {
      lấy lại kích thước — nó không đụng tới cỡ chữ, cỡ chân dung hay bài vị, tức không phá thế
      cân nào đã đo bằng ảnh chụp.
      Sàn của nó là chỗ chữ bắt đầu dính vào mép bo góc: ở bán kính 12px, đệm dọc dưới ~4px thì
-     dòng chữ chạm vào cung tròn ở hai đầu. 6px còn chừa được hai pixel. */
-  padding: 6px 14px;
+     dòng chữ chạm vào cung tròn ở hai đầu. 6px còn chừa được hai pixel.
+     6px 14px → 5px 11px ngày 31/08/2026: bán kính cũng hạ 12→10px cùng lượt, nên cái sàn
+    「4px ở bán kính 12px」nói trên co theo còn ~3,3px — 5px vẫn ở trên nó. */
+  padding: 5px 11px;
   /* 14 → 12px cùng lượt: bán kính phải co theo đệm, không thì một bong bóng một dòng trông như
      viên thuốc — cung tròn ăn gần hết chiều cao khối. */
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(41, 42, 78, 0.55);
   border: 1px solid transparent;
-  font-size: 1rem;
-  /* 1.5 → 1.45: cỡ chữ giữ nguyên 1rem (đây là chỗ để ĐỌC), chỉ khoảng dòng thít lại — mỗi
-     dòng thứ hai trở đi rẻ đi 0,8px mà mắt không nhận ra. */
+  /* 1rem → 0,875rem (14px) ngày 31/08/2026. Đây LÀ chỗ để đọc, nên con số không lấy từ sảnh
+     mẫu (13px): 14px là mức thấp nhất mà chữ CHÂN — vốn có nét thanh nét đậm, mảnh hơn chữ
+     không chân ở cùng cỡ — còn giữ được nét trên màn 1×. Cả sảnh mặc chữ chân (xem
+     `.chat-frame`), nên không mượn được ngưỡng của một sảnh chạy chữ không chân. */
+  font-size: 0.875rem;
+  /* 1.5 → 1.45 (17/08/2026): hồi ấy cỡ chữ giữ nguyên 1rem, chỉ khoảng dòng thít lại — mỗi
+     dòng thứ hai trở đi rẻ đi 0,8px mà mắt không nhận ra. Giữ 1.45 ở cỡ 0,875rem: khoảng dòng
+     là một BỘI SỐ của cỡ chữ nên nó đã tự co, hạ thêm là chữ dính nhau. */
   line-height: 1.45;
 }
 
@@ -1036,7 +1087,7 @@ body {
 
 .chat-bubble.sticker { background: transparent; border-color: transparent; }
 
-.chat-sticker { font-size: 3rem; line-height: 1.1; display: block; }
+.chat-sticker { font-size: 2.5rem; line-height: 1.1; display: block; }
 
 /* INLINE chứ không block: mốc giờ float phải đứng CÙNG DÒNG với câu chữ (「…thật đấy. 00:48」
    như bản thiết kế) khi còn chỗ, và tự rơi xuống đáy phải khi chữ dài. */
@@ -1049,24 +1100,26 @@ body {
   border-radius: 6px;
   /* 4px 8px / 6px → 3px 8px / 5px ngày 17/08/2026: khối trích dẫn là một bong bóng LỒNG trong
      bong bóng, nên đệm của nó cộng dồn với đệm ngoài — tin có trả lời vì thế là hàng cao nhất
-     sảnh. Bề ngang giữ nguyên 8px để vạch vàng bên trái không thúc vào chữ. */
-  padding: 3px 8px;
-  margin-bottom: 5px;
-  font-size: 0.78rem;
+     sảnh. Bề ngang 8 → 7px ngày 31/08/2026 — hạ ĐÚNG một pixel chứ không co theo tỉ lệ như
+     phần còn lại: vạch vàng bên trái dày 2px, nên mọi pixel lấy đi ở đây là lấy từ khoảng hở
+     giữa vạch ấy và chữ, và ở 6px chúng bắt đầu dính nhau. */
+  padding: 3px 7px;
+  margin-bottom: 4px;
+  font-size: 0.72rem;
   color: var(--color-mist);
 }
 
-.chat-quote b { display: block; color: var(--color-gold-300); font-size: 0.72rem; }
+.chat-quote b { display: block; color: var(--color-gold-300); font-size: 0.66rem; }
 /* Trần 320px → 520px ngày 11/08/2026, đi CÙNG LƯỢT với trần bong bóng (560→820px): đây là một
    dòng cắt-đuôi nằm TRONG bong bóng, giữ nguyên 320px là một ô hẹp lọt thỏm giữa một bong bóng
    rộng gấp đôi — và đoạn trích bị cắt sớm hơn mức cần. */
 .chat-quote span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 520px; }
 
-.chat-deleted { font-style: italic; color: var(--color-mist); font-size: 0.82rem; }
+.chat-deleted { font-style: italic; color: var(--color-mist); font-size: 0.75rem; }
 
 .chat-img img {
-  max-width: 280px;
-  max-height: 240px;
+  max-width: 230px;
+  max-height: 196px;
   border-radius: 10px;
   display: block;
   margin-top: 6px;
@@ -1080,7 +1133,7 @@ body {
   padding: 6px 10px;
   border-radius: 8px;
   background: rgba(232, 194, 92, 0.08);
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   color: var(--color-gold-300);
 }
 
@@ -1090,12 +1143,12 @@ body {
    bên phải, câu dài thì nó lặn xuống góc phải đáy. Clearfix ở .chat-bubble::after đỡ nó. */
 .chat-meta {
   float: right;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   color: rgba(143, 137, 179, 0.9);
   /* 6px 0 0 12px → 4px 0 0 10px ngày 17/08/2026, theo đệm bong bóng vừa thít lại. Khoảng cách
      mắt thấy giữa giờ và mép bong bóng là margin NÀY cộng đệm bên kia, nên giữ nguyên số cũ
      trong một bong bóng chật hơn là để mốc giờ trôi xa câu chữ. */
-  margin: 4px 0 0 10px;
+  margin: 3px 0 0 8px;
   white-space: nowrap;
 }
 
@@ -1722,8 +1775,15 @@ body {
   /* 0.72: đo trên chính hình dạng của sảnh (khung 358×276, vùng tin cao 195px) — vùng tin chứa
      2,49 khoảnh ở cỡ thiết kế và 3,42 khoảnh ở 0,72, mà chữ trong bong bóng vẫn còn 11,5px.
      Dưới mức ấy là đánh đổi cái đọc được lấy cái đếm được. Ai muốn đọc thoải mái thì đã có nút
-     trải kín màn hình, nơi `--chat-zoom` trở về 1. */
-  .chat-frame { --chat-zoom: 0.72; }
+     trải kín màn hình, nơi `--chat-zoom` trở về 1.
+
+     0,72 → 0,82 ngày 31/08/2026 — KHÔNG phải nới sảnh trên điện thoại, mà là GIỮ NGUYÊN nó.
+     Lượt ấy hạ cỡ chữ bong bóng 16 → 14px cho desktop, và `zoom` nhân lên trên cỡ đã hạ: giữ
+     0,72 là chữ trên điện thoại rơi xuống 10,1px, dưới hẳn cái sàn mà đoạn trên vừa dựng.
+     14 × 0,82 = 11,5px — đúng con số cũ. Số khoảnh trong vùng tin cũng đứng yên (~3,4), vì
+     mỗi khoảnh đã thấp đi gần đúng phần mà `zoom` vừa trả lại.
+     Ai đổi cỡ chữ bong bóng sau này thì phải tính lại con số này: nó là 11,5 / cỡ-chữ-mới. */
+  .chat-frame { --chat-zoom: 0.82; }
   .chat-scroll > * { zoom: var(--chat-zoom); }
 
   /* Nằm trong dải chữ trên đường kẻ, về phía phải — chỗ duy nhất của dải ấy còn trống. */

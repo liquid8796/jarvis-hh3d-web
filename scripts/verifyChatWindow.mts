@@ -54,7 +54,7 @@ const AT_BOTTOM_PX = 60;
  * để canh cái làn `.chat-avatar-gap` của tin nối tiếp vẫn còn đủ bề ngang: mất nó là cả cột
  * bong bóng của một người gãy hàng lề, và `tsc` mù trước chuyện ấy.
  */
-const AVATAR_LANE = 62;
+const AVATAR_LANE = 50;
 
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL chưa đặt — chạy `npm run env:pull`.");
 if (!process.env.AUTH_SECRET) throw new Error("AUTH_SECRET chưa đặt — chạy `npm run env:pull`.");

@@ -104,8 +104,17 @@ const GROUP_WINDOW_MS = 5 * 60 * 1000;
  * kế (0,60): lượt 09/08 kéo chân dung xuống 53% cỡ thiết kế mà bài vị thì gần như đứng yên. Nay
  * bài vị xuống 0,81 lần, tỉ lệ về 38/62 = 0,61 — trúng bản thiết kế. Lý lẽ và hai phép đo ở
  * chú thích của `.chat-tagframe` trong globals.css.
+ *
+ * 31/08/2026 — 62 → 50px, và lần này CẢ BA số đi cùng nhau đúng như đoạn trên dặn: bài vị
+ * 60 → 48px, tên 1,05 → 0,88rem. Hai tỉ lệ mà lượt 21/08 vừa chỉnh trúng đều được giữ y
+ * nguyên: bề ngang biển / chân dung = 2,25 (trước 2,26) và chiều cao dùng thật / chân dung
+ * = (48 − 2×9)/50 = 0,60 (trước 0,61).
+ *
+ * Vì sao lại thu: đạo hữu đưa một sảnh chat mẫu để so, và ở đó chân dung chỉ 36px cạnh chữ
+ * 13px — sảnh của ta trông như đang phóng to. Không chép thẳng 36px vì bài vị của ta là chữ
+ * KHẮC TRONG ẢNH, xuống quá thì mờ; 50px là mức xa nhất mà ảnh chụp 2× vẫn đọc được biển.
  */
-const AVATAR_SIZE = 62;
+const AVATAR_SIZE = 50;
 
 /**
  * `useLayoutEffect` ở trình duyệt, `useEffect` khi dựng phía server.

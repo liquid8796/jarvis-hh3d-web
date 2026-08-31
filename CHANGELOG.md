@@ -11,6 +11,32 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.63 — Phòng Chat: giữ ngang, hạ chiều cao 25%
+
+Sau lượt nới ngang, tông chủ yêu cầu khung chat thấp xuống 25% nhưng **giữ nguyên bề rộng vừa
+chỉnh**. Hai chiều vì thế thôi đi cùng một tỉ lệ: desktop đổi từ `1372:1059` sang
+`5488:3177`, bởi:
+
+```text
+cao mới = rộng × 3177 / 5488
+         = rộng × 1059 / 1372 × 0,75
+```
+
+Ở khung nhìn 1900×930, bề ngang đứng nguyên **1214,589px** còn chiều cao đi từ **937,5 →
+703,125px**, đúng 75% cỡ vừa phát hành. Công thức bề rộng và trần hữu dụng 1500px của 1.3.62
+không đổi một chữ.
+
+Chỉ desktop nhận tỉ lệ mới (`min-width: 768px`). Khung thường trên điện thoại vẫn 1372:1059:
+nếu nén cả nơi ấy thì một màn 390px sẽ từ 358×276 còn 358×207px, ô nhập và vùng bấm quá thấp;
+chế độ trải kín vẫn `height: 100dvh` + `aspect-ratio: auto` như cũ.
+
+Khung là một tấm ảnh duy nhất nên giảm riêng một chiều tất yếu nén hoa văn và ba nút tròn theo
+trục dọc. Ảnh và lớp tương tác cùng phủ một hộp, cùng nhận đúng phép nén, nên mọi toạ độ phần
+trăm vẫn bám đúng hình; đây là phép nén có chủ ý, không dùng `transform` để tránh chiều cao bố
+cục và vùng cuộn đứng lại ở cỡ cũ.
+
+---
+
 ## 1.3.62 — Phòng Chat: khung rộng thêm đúng 25%
 
 Tông chủ yêu cầu tăng riêng bề ngang khung chat thêm 25%. Có **hai** cái trần phải đi cùng

@@ -146,10 +146,11 @@ const TRIGGER_ATTR = "data-chat-popup-trigger";
 /**
  * Toạ độ các vùng bấm trên tấm khung, tính theo PHẦN TRĂM của ảnh gốc 1448×1086.
  *
- * Vì sao phần trăm chứ không phải pixel: khung co giãn theo màn hình nhưng LUÔN giữ tỉ lệ 4:3
- * (xem `.chat-frame` trong globals.css), nên một toạ độ theo % thì bám đúng chỗ ở mọi cỡ. Đây
- * là những con số của bản mẫu chia cho 1448 (ngang) và 1086 (dọc) — đừng làm tròn thêm, lệch
- * nửa phần trăm là hotspot trượt khỏi vòng tròn vẽ trong ảnh.
+ * Vì sao phần trăm chứ không phải pixel: ảnh và `.chat-shell` LUÔN phủ cùng một hộp. Từ
+ * 01/09/2026 desktop nén riêng trục dọc còn 75%, nhưng ảnh lẫn hotspot cùng nhận một phép nén,
+ * nên toạ độ theo % vẫn bám đúng hình; mobile giữ tỉ lệ gốc. Đây là những con số của bản mẫu
+ * chia cho 1448 (ngang) và 1086 (dọc) — đừng làm tròn thêm, lệch nửa phần trăm là hotspot
+ * trượt khỏi nút vẽ trong ảnh.
  *
  * Ba nút và ô nhập KHÔNG được vẽ bằng CSS: chúng đã nằm sẵn trong ảnh, kể cả dòng chữ mời
  * "Nhập nội dung trò chuyện…". Phần tử thật chỉ là vùng bấm TRONG SUỐT đặt trùng lên. Đó là

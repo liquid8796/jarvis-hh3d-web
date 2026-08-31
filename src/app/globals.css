@@ -545,18 +545,19 @@ body {
    diện thật chỉ là những vùng trong suốt đặt trùng lên. Ba nút tròn, ô nhập và cả dòng chữ mời
    đều đã nằm trong ảnh: đừng vẽ lại bất cứ cái nào, thêm một icon là đè hai lớp lên nhau.
 
-   Mọi toạ độ dưới đây là PHẦN TRĂM của ảnh gốc, chép từ bản dựng ở /chat-frame. Khung giữ
-   nguyên tỉ lệ 4:3 nên phần trăm bám đúng chỗ ở mọi cỡ màn hình. */
+   Mọi toạ độ dưới đây là PHẦN TRĂM của ảnh gốc, chép từ bản dựng ở /chat-frame. Ảnh và lớp
+   tương tác luôn phủ CÙNG một hộp: mobile giữ tỉ lệ gốc, còn desktop từ 01/09/2026 nén trục
+   dọc 25%; hai lớp cùng nén nên phần trăm vẫn bám đúng hình. */
 .chat-frame {
   position: relative;
-  /* Mốc gốc vừa chiều cao khung nhìn, rồi nới BỀ NGANG thêm đúng 25%. Vì tấm ảnh bắt buộc giữ
-     nguyên tỉ lệ, chiều cao cũng đi cùng hệ số ấy và desktop thấp có thể cuộn cả trang — đây
-     là hệ quả có chủ ý của việc làm khung thật sự rộng hơn, thay vì kéo méo riêng trục ngang. */
+  /* Bề ngang của bản 1.3.62 GIỮ NGUYÊN. Chiều cao desktop không còn suy từ tỉ lệ này nữa mà
+     được hạ đúng 25% ở media query ngay dưới; mobile vẫn dùng tỉ lệ gốc để ô nhập và hotspot
+     không bị ép xuống dưới cỡ dùng được. */
   /* Tỉ lệ của tấm ảnh SAU KHI CẮT rìa nền thừa (1372×1059). Lượt cắt ấy chỉ làm dải nền đặc
      mỏng đi chứ KHÔNG dứt được nó — xem chú thích ở `.chat-frame-img`, chỗ dứt hẳn là kênh
-     alpha. Tỉ lệ vẫn phải khớp đúng tấm ảnh, vì mọi toạ độ % dưới đây đo trên nó.
-     `min(100%, …)` vẫn kẹp bề ngang, nên trên màn hẹp khung thu lại theo bề rộng thay vì
-     tràn ra ngoài.
+     alpha. Đây là tỉ lệ nền cho mobile; desktop nén cả ảnh lẫn lớp tương tác cùng nhau nên
+     toạ độ % vẫn khớp dù hộp ngoài thấp hơn. `min(100%, …)` vẫn kẹp bề ngang, nên trên màn
+     hẹp khung thu lại theo bề rộng thay vì tràn ra ngoài.
 
      ── 180px và hệ số 1.25 (31/08/2026) ─────────────────────────────────────────────────
      Con số trừ đi là CHIỀU CAO CỦA VỎ TRANG, đo trên ảnh chụp thật ở khung nhìn 1900×930:
@@ -584,6 +585,17 @@ body {
      giọng. Đặt ở ĐÂY chứ không ở từng lớp con để không sót chỗ nào: khay cảm xúc, ô nhập, mốc
      giờ — thứ gì mọc trong khung thì mang giọng của khung. */
   font-family: var(--font-display);
+}
+
+/* Giữ NGUYÊN bề ngang 1.3.62, chỉ hạ chiều cao desktop còn 75%:
+
+     H mới = W × 3177 / 5488 = W × 1059 / 1372 × 0,75
+
+   Viết thành một tỉ lệ số nguyên để trình duyệt không phải làm tròn một chiều cao trung gian.
+   Không dùng `transform: scaleY(.75)`: transform chỉ bóp lớp vẽ, còn chiều cao bố cục/vùng cuộn
+   vẫn đứng ở cỡ cũ và để lại một khoảng trống ma. Mobile cố ý đứng ngoài — xem chú thích trên. */
+@media (min-width: 768px) {
+  .chat-frame { aspect-ratio: 5488 / 3177; }
 }
 
 /* Tấm ảnh MANG kênh trong suốt từ 10/08/2026: mọi thứ ngoài viền vàng đã bị khoét rỗng, nên
@@ -1598,8 +1610,8 @@ body {
    sáng, nên luật `filter: brightness(1.35)` cũ tuy đọc rất hợp lý nhưng KHÔNG hề hiện ra gì
    suốt từ ngày viết. `backdrop-filter` lọc thứ nằm SAU thẻ — tức đúng cái nút đã vẽ trong ảnh
    — và bị cắt theo `border-radius: 50%` của thẻ, nên vòng sáng khớp đúng vòng tròn vẽ sẵn.
-   (Ba hotspot đều VUÔNG tính bằng pixel: 64/60/68px trên tấm 1372×1059, nên 50% ra hình tròn
-   thật chứ không phải bầu dục.)
+   (Ba hotspot VUÔNG trên ảnh gốc; desktop nén cả ảnh lẫn hotspot theo trục dọc còn 75%, nên
+   `50%` bám đúng cùng hình bầu dục vừa được nén chứ không trượt khỏi nút.)
 
    Quầng vàng đi kèm có hai việc: nói "bấm được" theo đúng ngôn ngữ của nút Ngắm Tranh, và đỡ
    cho những trình duyệt chưa có `backdrop-filter` — ở đó vẫn còn một tín hiệu hover. */

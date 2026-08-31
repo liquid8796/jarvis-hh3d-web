@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.60",
+    date: "2026-08-31",
+    lines: [
+      "Phòng Chat nay nở theo màn hình: trước đây sảnh đứng yên một cỡ dù màn có lớn tới đâu, giờ màn càng cao sảnh càng rộng.",
+      "Chữ, ảnh đại diện và bài vị trong sảnh thu lại một bậc, nên mỗi màn hình chứa thêm chừng hai lượt trò chuyện mà vẫn đọc thoải mái.",
+      "Trên điện thoại chữ giữ nguyên cỡ cũ — lượt thu này chỉ đụng tới máy tính.",
+    ],
+  },
+  {
     version: "1.3.59",
     date: "2026-08-31",
     lines: [
@@ -466,14 +475,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Thêm một cửa cho người trông nom: khôi lỗi nào chết đứng — vẫn còn lượt chạy nhưng đã ngừng gửi tín hiệu — nay dựng dậy được ngay bằng một cú bấm.",
       "Khôi lỗi đang trực tuyệt đối không bị đụng tới, nên đàn đang chạy không mất vòng nào.",
       "Với đạo hữu thì màn hình không đổi gì; chỉ là những cái ghế chết sẽ sống lại sớm hơn nhiều.",
-    ],
-  },
-  {
-    version: "1.3.9",
-    date: "2026-08-19",
-    lines: [
-      "Hỷ Sự Đường: nay khai được cả hồng bao ở phòng cưới Đạo Lữ, không chỉ phòng Hồng Nhan như trước.",
-      "Phòng nào đang treo dòng「Có lì xì chưa mở」là auto ghé khai, kể cả tiệc đã chúc từ trước.",
     ],
   },
 ];

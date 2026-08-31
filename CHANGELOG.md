@@ -11,6 +11,27 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.62 — Phòng Chat: khung rộng thêm đúng 25%
+
+Tông chủ yêu cầu tăng riêng bề ngang khung chat thêm 25%. Có **hai** cái trần phải đi cùng
+nhau; đổi một cái thì con số trong mã đổi mà khung trên màn hình có thể đứng nguyên:
+
+1. `<main>` từng rộng tối đa 78rem, nhưng 48px trong đó là đệm hai bên — phần khung dùng thật
+   chỉ có 1200px. Mốc mới vì thế là **1500px** đúng 1,25 lần, cộng lại đệm thành
+   `max-w-[96.75rem]`; nhân thẳng 78 × 1,25 sẽ cho phần dùng thật 1512px và thành 26%.
+2. Ở phần lớn desktop, nhánh theo chiều cao khung nhìn của `.chat-frame` mới là nhánh thắng.
+   Nhánh ấy cũng nhân `1.25`; nếu không, nới `<main>` không làm khung rộng thêm một pixel nào.
+
+`min(100%, …)` vẫn là van ngang: màn hẹp và điện thoại chỉ rộng đúng phần chứa, không sinh
+thanh cuộn ngang; chế độ trải kín điện thoại vẫn `width: 100%` như cũ. Tấm khung giữ nguyên tỉ
+lệ 1372:1059 để ảnh và mọi vùng bấm còn khớp, nên chiều cao desktop cũng đi theo mức tăng và
+màn hình thấp có thể cuộn cả trang — đổi lại không kéo méo hoa văn theo riêng một trục.
+
+Phép đo ở khung nhìn 1900×930: **971,671 → 1214,589px**, đúng hệ số **1,25**. Trần cuối cũng
+đúng **1200 → 1500px**; production build sinh đủ cả utility 96,75rem lẫn công thức mới.
+
+---
+
 ## 1.3.60 — Phòng Chat: khung nới theo màn hình, chữ và chân dung thu một bậc
 
 Đạo hữu đưa hai ảnh cạnh nhau — sảnh của ta và một sảnh chat mẫu — rồi bảo「chỉnh kích thước

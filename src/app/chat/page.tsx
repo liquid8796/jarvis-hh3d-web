@@ -20,20 +20,19 @@ export default async function ChatPage() {
   return (
     <>
       <SiteHeader />
-      {/* Trần bề ngang của sảnh — 60rem cho tới 31/08/2026, nay 78rem (1248px).
+      {/* Trần bề ngang HỮU DỤNG của sảnh thêm đúng 25%: 1200 → 1500px. <main> còn mang
+          `sm:px-6` hai bên (48px), nên trần hộp ngoài đi từ 78rem (1248px) thành
+          96.75rem (1548px), không phải phép nhân thẳng 78 × 1.25.
 
-          Trần cũ là thứ ĐANG quyết định cỡ khung trên mọi màn hình desktop, và đó là chỗ nó
-          sai: `.chat-frame` đã có sẵn một phép kẹp theo CHIỀU CAO khung nhìn (xem
-          globals.css), tức nó tự biết không được cao quá màn hình. Chồng thêm một trần bề
-          ngang cứng nghĩa là trên màn 1080p khung đứng ở 912px trong khi còn chỗ cho 971px,
-          và trên màn 1440p nó vẫn cứ 912px giữa một khung nhìn cao 1300px — càng màn to càng
-          phí. 78rem đủ cao để phép kẹp chiều cao luôn là vế thắng ở mọi tỉ lệ màn thường gặp,
-          mà vẫn còn là một cái trần thật cho màn siêu rộng, nơi một sảnh chat kéo hết 2560px
-          chỉ làm mắt phải quét xa hơn.
+          Phải nới CẢ trần này lẫn nhánh tính bề rộng của `.chat-frame` trong globals.css:
+          chỉ đổi 78rem ở đây thì trên phần lớn desktop, phép kẹp theo chiều cao bên kia vẫn
+          thắng và khung không rộng thêm một pixel nào. 96.75rem giữ đúng cùng hệ số 1.25 với
+          BỀ RỘNG HỮU DỤNG cũ, nên trần không vô tình cắt mất mức tăng vừa được yêu cầu;
+          `w-full` và `min(100%, …)` bên khung vẫn giữ sảnh vừa màn hình ở khung nhìn hẹp.
 
           Viết thẳng con số chứ không ghép lúc chạy: Tailwind quét tĩnh, lớp dựng bằng biến sẽ
           không bao giờ được sinh ra CSS. */}
-      <main data-backdrop="chat" className="mx-auto w-full max-w-[78rem] flex-1 px-4 pb-6 sm:px-6">
+      <main data-backdrop="chat" className="mx-auto w-full max-w-[96.75rem] flex-1 px-4 pb-6 sm:px-6">
         <ChatRoom me={{ id: user.id, name: user.displayName }} tagFrames={settings.chat.tagFrames} />
       </main>
     </>

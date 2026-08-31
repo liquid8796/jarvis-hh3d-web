@@ -549,28 +549,28 @@ body {
    nguyên tỉ lệ 4:3 nên phần trăm bám đúng chỗ ở mọi cỡ màn hình. */
 .chat-frame {
   position: relative;
-  /* Rộng hết mức có thể NHƯNG không cao quá khung nhìn: `calc((100dvh - 190px) * 4/3)` là bề
-     rộng lớn nhất mà chiều cao (rộng × 3/4) vẫn còn chỗ cho thanh đầu trang và dòng ký tên. */
+  /* Mốc gốc vừa chiều cao khung nhìn, rồi nới BỀ NGANG thêm đúng 25%. Vì tấm ảnh bắt buộc giữ
+     nguyên tỉ lệ, chiều cao cũng đi cùng hệ số ấy và desktop thấp có thể cuộn cả trang — đây
+     là hệ quả có chủ ý của việc làm khung thật sự rộng hơn, thay vì kéo méo riêng trục ngang. */
   /* Tỉ lệ của tấm ảnh SAU KHI CẮT rìa nền thừa (1372×1059). Lượt cắt ấy chỉ làm dải nền đặc
      mỏng đi chứ KHÔNG dứt được nó — xem chú thích ở `.chat-frame-img`, chỗ dứt hẳn là kênh
      alpha. Tỉ lệ vẫn phải khớp đúng tấm ảnh, vì mọi toạ độ % dưới đây đo trên nó.
      `min(100%, …)` vẫn kẹp bề ngang, nên trên màn hẹp khung thu lại theo bề rộng thay vì
      tràn ra ngoài.
 
-     ── 180px, và vì sao hệ số 1.15 đi mất (31/08/2026) ───────────────────────────────────
+     ── 180px và hệ số 1.25 (31/08/2026) ─────────────────────────────────────────────────
      Con số trừ đi là CHIỀU CAO CỦA VỎ TRANG, đo trên ảnh chụp thật ở khung nhìn 1900×930:
      thanh đầu trang 74px (đệm py-5 cộng cụm menu cao 34px) + dòng ký tên 65px (đệm 20/26,
      chữ 19px) + `pb-6` của <main> 24px = 163px. Lấy 180 chứ không 163 vì cụm menu biết XUỐNG
      DÒNG ở màn hẹp hơn: 17px dôi ra là chỗ cho cái dòng thứ hai ấy, và thà khung hụt 13px
      còn hơn cả trang mọc thanh cuộn dọc.
 
-     Hệ số 1.15 (yêu cầu「nới khung thêm 15%」ngày 10/08/2026) gỡ đi vì trên desktop nó CHƯA
-     TỪNG có hiệu lực: trần `max-w-[60rem]` của <main> luôn thắng trong `min()`, nên khung
-     đứng nguyên 912px. Nay trần ấy nới lên 78rem thì vế này mới thật sự cầm quyền — và giữ
-     1.15 lúc đó là khung cao 851px trong khung nhìn 930px, tức TRANG mọc thanh cuộn dọc
-     trong khi vùng tin đã có thanh cuộn của riêng nó. Bỏ 1.15 mà nới trần là khung rộng ra
-     THẬT (912 → 971px ở 1080p, và hết bị ghim ở 912px trên màn cao hơn), chứ không hẹp lại. */
-  width: min(100%, calc((100dvh - 180px) * 1372 / 1059));
+     Hệ số 1.25 nằm NGAY trong nhánh đang quyết định kích thước desktop, nên mức tăng không
+     bị một trần khác nuốt mất như hệ số 1.15 cũ. Trần <main> cũng tăng đồng bộ 78 → 96.75rem
+     (đã tính 48px đệm, để phần hữu dụng tăng đúng 1200 → 1500px);
+     còn `min(100%, …)` tiếp tục là van an toàn: màn hẹp vẫn chỉ rộng đúng phần chứa, không
+     sinh thanh cuộn ngang. */
+  width: min(100%, calc((100dvh - 180px) * 1372 / 1059 * 1.25));
   aspect-ratio: 1372 / 1059;
   margin: 0 auto;
   /* Mốc của mọi `cqw` bên trong: chữ co theo BỀ RỘNG KHUNG, không theo bề rộng màn hình — nếu

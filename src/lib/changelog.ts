@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.63",
+    date: "2026-09-01",
+    lines: [
+      "Khung Phòng Chat trên máy tính nay thấp xuống đúng một phần tư, còn bề ngang rộng vừa chỉnh vẫn giữ nguyên.",
+      "Điện thoại giữ nguyên kích thước cũ để ô nhập và các nút không bị ép quá nhỏ.",
+    ],
+  },
+  {
     version: "1.3.62",
     date: "2026-09-01",
     lines: [
@@ -463,15 +471,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Hỷ Sự Đường nay bật được cho cả tài khoản VIP — trước giờ ô này chỉ hiện ở thẻ Thường.",
       "Vẫn đúng một ô tick: bật lên là cả tài khoản VIP lẫn tài khoản thường cùng đi chúc và bóc lì xì.",
-    ],
-  },
-  {
-    version: "1.3.12",
-    date: "2026-08-19",
-    lines: [
-      "Nhật ký của đàn thôi hiện đôi: những dòng như「đã đủ huyền tinh hôm nay」trước đây hiện hai lần liền nhau, nay chỉ một.",
-      "Lời nhắc về giá trị tự nhập của Mê Cung và Khoáng Mạch cũng vậy — mỗi việc kể đúng một lần.",
-      "Không mất chữ nào: chỗ nào nhiệm vụ thật sự chạy hai lượt thì nhật ký vẫn kể đủ cả hai.",
     ],
   },
 ];

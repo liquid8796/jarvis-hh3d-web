@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.64",
+    date: "2026-09-01",
+    lines: [
+      "Ba nút kẹp tệp, cảm xúc và gửi trong Phòng Chat đã tròn cân đối trở lại, không còn bị bè ngang sau lượt hạ khung.",
+      "Bề ngang và chiều cao khung vừa chỉnh vẫn giữ nguyên; giao diện điện thoại không đổi.",
+    ],
+  },
+  {
     version: "1.3.63",
     date: "2026-09-01",
     lines: [
@@ -463,14 +471,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Khôi lỗi thôi tự khai với Cloudflare rằng nó là trình duyệt tự động — trước đây nó nói một đằng ở chỗ này, một nẻo ở chỗ kia.",
       "Nhờ vậy màn kiểm tra「Just a moment」sẽ dựng lên ít hơn, tức bớt những vòng chạy phải bỏ dở vì không qua nổi cổng.",
       "Bản chạy trên máy nhà cũng được sửa y hệt; hai bên nay khai cùng một danh tính.",
-    ],
-  },
-  {
-    version: "1.3.13",
-    date: "2026-08-19",
-    lines: [
-      "Hỷ Sự Đường nay bật được cho cả tài khoản VIP — trước giờ ô này chỉ hiện ở thẻ Thường.",
-      "Vẫn đúng một ô tick: bật lên là cả tài khoản VIP lẫn tài khoản thường cùng đi chúc và bóc lì xì.",
     ],
   },
 ];

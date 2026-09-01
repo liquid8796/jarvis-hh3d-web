@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.65",
+    date: "2026-09-01",
+    lines: [
+      "Hạn mức Luyện Đan nay đếm riêng Hạ, Trung, Thượng hoặc Cực đang chọn; đan của phẩm khác không còn bị cộng nhầm.",
+      "Cả tài khoản VIP và Thường đều dùng đúng bộ đếm này, vẫn giữ hai bộ cấu hình riêng.",
+      "Phẩm đang khóa không còn làm khôi lỗi luyện nhầm phẩm cũ; chi phí trên form nay ghi đúng 20, 35, 55 hoặc 80 Tiên Ngọc.",
+    ],
+  },
+  {
     version: "1.3.64",
     date: "2026-09-01",
     lines: [
@@ -462,15 +471,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Mỗi đàn nay ở lại với đúng cái máy đã chạy nó, thay vì mỗi vòng lại nhảy sang một máy khác.",
       "Trước đây một tài khoản đi qua cả chục máy trong một buổi, mỗi máy một địa chỉ khác — trang game coi đó là đáng ngờ nên bắt xác minh.",
       "Máy cũ nghỉ hoặc kín chỗ thì đàn vẫn sang máy khác ngay, không phải chờ.",
-    ],
-  },
-  {
-    version: "1.3.14",
-    date: "2026-08-19",
-    lines: [
-      "Khôi lỗi thôi tự khai với Cloudflare rằng nó là trình duyệt tự động — trước đây nó nói một đằng ở chỗ này, một nẻo ở chỗ kia.",
-      "Nhờ vậy màn kiểm tra「Just a moment」sẽ dựng lên ít hơn, tức bớt những vòng chạy phải bỏ dở vì không qua nổi cổng.",
-      "Bản chạy trên máy nhà cũng được sửa y hệt; hai bên nay khai cùng một danh tính.",
     ],
   },
 ];

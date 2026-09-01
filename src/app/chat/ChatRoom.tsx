@@ -147,15 +147,15 @@ const TRIGGER_ATTR = "data-chat-popup-trigger";
  * Toạ độ các vùng bấm trên tấm khung, tính theo PHẦN TRĂM của ảnh gốc 1448×1086.
  *
  * Vì sao phần trăm chứ không phải pixel: ảnh và `.chat-shell` LUÔN phủ cùng một hộp. Từ
- * 01/09/2026 desktop nén riêng trục dọc còn 75%, nhưng ảnh lẫn hotspot cùng nhận một phép nén,
- * nên toạ độ theo % vẫn bám đúng hình; mobile giữ tỉ lệ gốc. Đây là những con số của bản mẫu
- * chia cho 1448 (ngang) và 1086 (dọc) — đừng làm tròn thêm, lệch nửa phần trăm là hotspot
- * trượt khỏi nút vẽ trong ảnh.
+ * 01/09/2026 desktop nén riêng trục dọc còn 75%; CSS bù riêng ba hotspot về hình tròn và phủ
+ * lên chúng một crop đúng tỉ lệ lấy từ chính tấm ảnh, còn mobile giữ tỉ lệ gốc. Đây là những
+ * con số của bản mẫu chia cho 1448 (ngang) và 1086 (dọc) — đừng làm tròn thêm, lệch nửa phần
+ * trăm là crop lẫn vùng bấm cùng trượt khỏi nút vẽ trong ảnh.
  *
- * Ba nút và ô nhập KHÔNG được vẽ bằng CSS: chúng đã nằm sẵn trong ảnh, kể cả dòng chữ mời
- * "Nhập nội dung trò chuyện…". Phần tử thật chỉ là vùng bấm TRONG SUỐT đặt trùng lên. Đó là
- * điều làm khung giống bản mẫu tuyệt đối — mọi lần trước vẽ lại bằng SVG/CSS đều trượt, vì
- * không tay nào chép lại được quầng sáng và vân mây của một tấm ảnh.
+ * Ba nút và ô nhập KHÔNG được vẽ lại bằng CSS: chúng đã nằm sẵn trong ảnh, kể cả dòng chữ mời
+ * "Nhập nội dung trò chuyện…". Mobile dùng vùng bấm trong suốt; desktop lấy lại chính pixel
+ * gốc qua crop CSS. Đó là điều làm khung giống bản mẫu tuyệt đối — mọi lần trước vẽ lại bằng
+ * SVG/CSS đều trượt, vì không tay nào chép lại được quầng sáng và vân mây của một tấm ảnh.
  */
 const FRAME_HOTSPOTS = {
   attach: { left: "3.8629%", top: "91.2181%", width: "4.6647%", height: "6.0435%" },
@@ -166,11 +166,11 @@ const FRAME_HOTSPOTS = {
 /**
  * Hình vẽ cho ba nút soạn tin, và nó CHỈ hiện khi sảnh trải kín màn hình.
  *
- * Chiếc kẹp, mặt cười và cánh én đã được vẽ SẴN trong `/chat-frame.webp`; ba cái nút kia chỉ là
- * vùng bấm trong suốt đặt trùng lên. Đó là lý do bình thường chúng phải rỗng — thêm icon là đè
- * hai lớp lên nhau. Nhưng chế độ trải kín màn hình bỏ tấm ảnh đi (nó không kéo giãn được mà
- * không méo hoa văn), nên nếu không có ba hình này thì ba cái nút biến mất khỏi mắt người dùng
- * trong khi vẫn bấm được — một thanh soạn tin vô hình.
+ * Chiếc kẹp, mặt cười và cánh én đã được vẽ SẴN trong `/chat-frame.webp`; ở khung thường, ba
+ * nút lấy lại đúng artwork ấy bằng crop CSS nên các SVG này vẫn phải câm. Nhưng chế độ trải kín
+ * màn hình bỏ tấm ảnh đi (nó không kéo giãn được mà không méo hoa văn), nên nếu không có ba
+ * hình này thì ba cái nút biến mất khỏi mắt người dùng trong khi vẫn bấm được — một thanh soạn
+ * tin vô hình.
  *
  * `aria-hidden`: cả ba nút đã mang `aria-label` riêng, đọc thêm một hình nữa chỉ làm rối.
  */
@@ -1172,7 +1172,7 @@ export function ChatRoom({
         />
         <button
           type="button"
-          className="chat-hotspot"
+          className="chat-hotspot chat-hotspot-attach"
           style={FRAME_HOTSPOTS.attach}
           title="Gửi file"
           aria-label="Gửi file"
@@ -1228,11 +1228,11 @@ export function ChatRoom({
             như trước thì lúc mới bấm vào ô (chưa gõ) nó chưa tồn tại, và dòng mời nằm chồng
             lên con trỏ. Nằm DƯỚI textarea theo z-index nên không chắn cú bấm nào. */}
         <div className="chat-input-cover" aria-hidden />
-        {/* Hai nút phải: khay Emoji/sticker/GIF và ấn Truyền Âm. Cả hai là vùng bấm TRỐNG —
-            mặt cười và cánh én đã được vẽ trong tấm khung, thêm icon nữa là đè hai lớp. */}
+        {/* Hai nút phải: khay Emoji/sticker/GIF và ấn Truyền Âm. Khung thường lấy lại đúng
+            artwork từ tấm ảnh qua crop CSS; SVG chỉ hiện ở chế độ mobile trải kín. */}
         <button
           type="button"
-          className="chat-hotspot"
+          className="chat-hotspot chat-hotspot-picker"
           style={FRAME_HOTSPOTS.picker}
           title="Emoji, sticker & GIF"
           aria-label="Emoji, sticker và GIF"
@@ -1243,7 +1243,7 @@ export function ChatRoom({
         </button>
         <button
           type="button"
-          className="chat-hotspot"
+          className="chat-hotspot chat-hotspot-send"
           style={FRAME_HOTSPOTS.send}
           title="Truyền Âm (Enter)"
           aria-label="Truyền Âm"

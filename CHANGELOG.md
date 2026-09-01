@@ -11,6 +11,27 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.64 — Phòng Chat: ba nút đáy trở lại hình tròn
+
+Tỉ lệ desktop `5488:3177` của 1.3.63 thấp hơn ảnh gốc đúng 25%, nên ba nút vốn được vẽ sẵn
+trong bitmap — kẹp tệp, cảm xúc và gửi — bị bè thành ellipse **4:3**. Hotspot trong suốt phủ
+lên chúng cũng méo theo; vì thế cả nút nhìn thấy, quầng hover và viền focus đều rộng ngang.
+
+Bản sửa không vẽ lại nét vàng hay icon. Mỗi hotspot desktop lấy một crop từ chính
+`/chat-frame.webp`, dựng ảnh nguồn ở `75% × 100%` hộp khung để trở về đúng tỉ lệ 1372:1059,
+rồi đặt crop trùng tâm nút. Phần nền sát nút trong cùng crop che kín ellipse cũ; artwork ở giữa
+trở lại tròn mà vẫn là đúng pixel gốc.
+
+Vùng bấm co riêng trục X còn 75%; pseudo chứa crop bù ngược `4/3`, nên artwork vẫn phủ hết
+vùng cũ trong khi hit target, hover và focus là hình tròn thật. Quy tắc chỉ chạy từ 768px và
+không đụng `.chat-full`, do đó mobile thường lẫn mobile toàn màn hình đứng nguyên.
+
+`verify:chat-window` có thêm phép đo ba `getBoundingClientRect`: cả ba phải lệch rộng/cao không
+quá 1px và pseudo phải thực sự dùng ảnh khung gốc. Nó chặn cả hai kiểu tái phát: nút lại thành
+ellipse, hoặc lớp bù còn hình học nhưng mất artwork.
+
+---
+
 ## 1.3.63 — Phòng Chat: giữ ngang, hạ chiều cao 25%
 
 Sau lượt nới ngang, tông chủ yêu cầu khung chat thấp xuống 25% nhưng **giữ nguyên bề rộng vừa

@@ -185,6 +185,31 @@ try {
   check("chưa trùm hết kho thì KHÔNG nói「Khởi nguồn」", !first.khoiNguon);
 
   /**
+   * Khung desktop thấp hơn 25% làm ba nút vốn nằm trong bitmap thành ellipse 4:3. Lớp bù CSS
+   * phải sửa CẢ artwork lẫn vùng bấm: `getBoundingClientRect` đã tính transform, nên đây là
+   * phép đo trực tiếp thứ người dùng nhìn và bấm, không phải chỉ đọc một con số khai báo.
+   */
+  const hotspotBoxes = (await page.locator(".chat-hotspot").evaluateAll((buttons) =>
+    buttons.map((button) => {
+      const box = button.getBoundingClientRect();
+      return {
+        name: button.getAttribute("aria-label") ?? "?",
+        width: box.width,
+        height: box.height,
+        hasOriginalArt: getComputedStyle(button, "::before").backgroundImage.includes("chat-frame.webp"),
+      };
+    }),
+  )) as Array<{ name: string; width: number; height: number; hasOriginalArt: boolean }>;
+  const roundHotspots =
+    hotspotBoxes.length === 3 &&
+    hotspotBoxes.every((box) => Math.abs(box.width - box.height) <= 1 && box.hasOriginalArt);
+  check(
+    "ba nút soạn tin desktop giữ hình tròn và dùng đúng artwork gốc",
+    roundHotspots,
+    hotspotBoxes.map((box) => `${box.name} ${box.width.toFixed(1)}×${box.height.toFixed(1)}px`).join(" · "),
+  );
+
+  /**
    * CHIỀU CAO CHẾT của tin nối tiếp — phép thử canh đúng cái bẫy đã gỡ ngày 17/08/2026.
    *
    * Trước đó tin nối tiếp vẫn dựng vòng tròn chân dung, chỉ đeo thêm `.invisible`

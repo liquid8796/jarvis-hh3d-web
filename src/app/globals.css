@@ -543,7 +543,8 @@ body {
 
    Nay khung CHÍNH LÀ tấm ảnh ấy (`/chat-frame.webp`, 1372×1059, 24KB, CÓ kênh alpha), còn giao
    diện thật chỉ là những vùng trong suốt đặt trùng lên. Ba nút tròn, ô nhập và cả dòng chữ mời
-   đều đã nằm trong ảnh: đừng vẽ lại bất cứ cái nào, thêm một icon là đè hai lớp lên nhau.
+   đều đã nằm trong ảnh. Desktop thấp hơn dùng crop của CHÍNH ảnh này để trả ba nút về tròn;
+   đừng vẽ lại icon bằng tay vì sẽ chồng hai lớp và lệch nét gốc.
 
    Mọi toạ độ dưới đây là PHẦN TRĂM của ảnh gốc, chép từ bản dựng ở /chat-frame. Ảnh và lớp
    tương tác luôn phủ CÙNG một hộp: mobile giữ tỉ lệ gốc, còn desktop từ 01/09/2026 nén trục
@@ -1585,9 +1586,10 @@ body {
   pointer-events: none;
 }
 
-/* Vùng bấm TRONG SUỐT đè lên nút đã vẽ trong ảnh. Toạ độ do TSX truyền vào (FRAME_HOTSPOTS),
-   vì chúng thuộc về tấm ảnh chứ không thuộc về bảng màu — để lẫn vào đây thì sửa ảnh là phải
-   đi lùng hai nơi. */
+/* Vùng bấm đè lên nút đã vẽ trong ảnh. Mobile giữ nó trong suốt; desktop thấp hơn bù riêng
+   hình học và artwork ở media query bên dưới. Toạ độ do TSX truyền vào (FRAME_HOTSPOTS), vì
+   chúng thuộc về tấm ảnh chứ không thuộc về bảng màu — để lẫn vào đây thì sửa ảnh là phải đi
+   lùng hai nơi. */
 .chat-hotspot {
   position: absolute;
   z-index: 4;
@@ -1610,8 +1612,8 @@ body {
    sáng, nên luật `filter: brightness(1.35)` cũ tuy đọc rất hợp lý nhưng KHÔNG hề hiện ra gì
    suốt từ ngày viết. `backdrop-filter` lọc thứ nằm SAU thẻ — tức đúng cái nút đã vẽ trong ảnh
    — và bị cắt theo `border-radius: 50%` của thẻ, nên vòng sáng khớp đúng vòng tròn vẽ sẵn.
-   (Ba hotspot VUÔNG trên ảnh gốc; desktop nén cả ảnh lẫn hotspot theo trục dọc còn 75%, nên
-   `50%` bám đúng cùng hình bầu dục vừa được nén chứ không trượt khỏi nút.)
+   (Mobile thường vẫn phủ đúng nút gốc. Desktop có lớp bù riêng ngay dưới, nên hiệu ứng cũ chỉ
+   còn là đường dự phòng cho những nơi không dùng lớp bù ấy.)
 
    Quầng vàng đi kèm có hai việc: nói "bấm được" theo đúng ngôn ngữ của nút Ngắm Tranh, và đỡ
    cho những trình duyệt chưa có `backdrop-filter` — ở đó vẫn còn một tín hiệu hover. */
@@ -1653,6 +1655,83 @@ body {
   height: 100%;
   color: var(--color-gold-300);
   font-size: clamp(12px, 1.4cqw, 20px);
+}
+
+/* ── DESKTOP THẤP: TRẢ BA NÚT VỀ HÌNH TRÒN ────────────────────────────────────────────────
+ *
+ * Khung desktop 1.3.63 giữ nguyên ngang nhưng chỉ còn 75% chiều cao, nên mọi pixel trong ảnh
+ * bị bè ngang đúng 4/3. Ba nút ở đáy lộ điều ấy rõ nhất: attach 56,7×42,5px, picker 53,1×39,8px
+ * và send 60,2×45,2px tại khung 1214,6×703,1.
+ *
+ * Không vẽ lại nút. `::before` lấy CHÍNH vùng tương ứng của `/chat-frame.webp`, nhưng dựng toàn
+ * ảnh nền ở 75% bề ngang khung × 100% chiều cao — đúng tỉ lệ gốc 1372:1059. Crop vì thế cho ra
+ * nút tròn cùng phần nền sát cạnh, phủ kín ellipse méo nằm dưới mà vẫn giữ nguyên nét vàng,
+ * quầng sáng và icon gốc.
+ *
+ * Hotspot thật co X còn 75% để vùng bấm/focus cũng tròn. Pseudo bù X ngược 4/3 để vẫn phủ hết
+ * ellipse cũ; hai transform triệt nhau trên artwork. Các background-position bên dưới giải từ
+ * tâm từng FRAME_HOTSPOTS, không phải số canh bằng mắt. Mobile và `.chat-full` cố ý đứng ngoài. */
+@media (min-width: 768px) {
+  .chat-frame:not(.chat-full) .chat-hotspot {
+    transform: scaleX(0.75);
+    transform-origin: 50% 50%;
+  }
+
+  .chat-frame:not(.chat-full) .chat-hotspot::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    background-image: url("/chat-frame.webp");
+    background-repeat: no-repeat;
+    pointer-events: none;
+    transform: scaleX(1.3333333333);
+    transform-origin: 50% 50%;
+    transition: filter 0.12s ease;
+  }
+
+  .chat-frame:not(.chat-full) .chat-hotspot-attach::before {
+    background-size: 1607.820439% 1654.670307%;
+    background-position: 3.290080% 97.085460%;
+  }
+
+  .chat-frame:not(.chat-full) .chat-hotspot-picker::before {
+    background-size: 1715.030528% 1764.975820%;
+    background-position: 87.074277% 96.896990%;
+  }
+
+  .chat-frame:not(.chat-full) .chat-hotspot-send::before {
+    background-size: 1513.256124% 1557.365560%;
+    background-position: 95.265248% 97.376332%;
+  }
+
+  /* Nút đã có pixel thật trên pseudo, nên desktop làm sáng chính crop ấy. Quầng/focus vẫn đặt
+     trên hotspot đã co thành hình tròn; không còn một hiệu ứng ellipse nào sót lại. */
+  .chat-frame:not(.chat-full) .chat-hotspot:hover:not(:disabled),
+  .chat-frame:not(.chat-full) .chat-hotspot:active:not(:disabled),
+  .chat-frame:not(.chat-full) .chat-hotspot:focus-visible {
+    backdrop-filter: none;
+  }
+
+  .chat-frame:not(.chat-full) .chat-hotspot:hover:not(:disabled)::before {
+    filter: brightness(1.45);
+  }
+
+  .chat-frame:not(.chat-full) .chat-hotspot:active:not(:disabled)::before {
+    filter: brightness(1.7);
+  }
+
+  .chat-frame:not(.chat-full) .chat-hotspot:focus-visible::before {
+    filter: brightness(1.45);
+  }
+
+  /* Dấu chờ là chữ thật nằm trong hotspot, nên bù ngược X để glyph không bị ép hẹp. */
+  .chat-frame:not(.chat-full) .chat-hotspot-busy {
+    position: relative;
+    z-index: 1;
+    transform: scaleX(1.3333333333);
+  }
 }
 
 /* Tấm che dòng chữ mời in trong ảnh. Nằm DƯỚI ô nhập một bậc z-index nên không chắn con trỏ;

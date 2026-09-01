@@ -293,7 +293,7 @@ function LuyenDanFieldset({
             <option>Cực Phẩm</option>
           </select>
           <p className="mt-1 text-xs text-[var(--color-mist)]">
-            Mỗi mẻ tốn dược liệu + 20 Tiên Ngọc.
+            Mỗi mẻ tốn dược liệu + Tiên Ngọc theo phẩm (Hạ 20 · Trung 35 · Thượng 55 · Cực 80).
           </p>
         </div>
 
@@ -347,7 +347,7 @@ function LuyenDanFieldset({
           </label>
           <p className="mt-1 text-xs text-[var(--color-mist)]">
             {capAllowed
-              ? "Đếm tổng đan cùng loại đang nằm trong túi, không phân biệt mấy sao."
+              ? "Đếm riêng phẩm đan đang chọn; cộng mọi mức sao, không cộng các phẩm khác."
               : "Chọn một mức có giữ đan ở ô bên trên thì mới đặt được hạn mức."}
           </p>
 
@@ -371,7 +371,7 @@ function LuyenDanFieldset({
                 aria-disabled={!capOn}
               />
               <p className="mt-1 text-xs text-[var(--color-mist)]">
-                Túi chứa tối đa 10 viên mỗi loại, nên đặt quá 10 là không bao giờ chạm tới.
+                So với đúng hàng đã chọn; sức chứa hiện tại: Hạ 10 · Trung 6 · Thượng 4 · Cực 2.
               </p>
             </div>
 

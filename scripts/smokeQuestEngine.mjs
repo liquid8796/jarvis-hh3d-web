@@ -742,6 +742,12 @@ const furnacePage = ({ waveMs = 1200 } = {}) => `<!doctype html><html lang="vi">
   <button id="ldBtnCollect" style="opacity:0;width:120px;height:36px" disabled>Thu Đan</button>
   <div id="ldStabilityWrap" style="width:220px;height:12px"></div>
   <div id="ldPanel"></div><div id="ldInventory"></div>
+  <div id="ldBagPillStats"><section class="ld-bag-usage--stored"><ul>
+    <li class="ld-bag-usage__row"><span class="ld-bag-usage__name">Hạ Phẩm</span><span class="ld-bag-usage__nums">0/10</span></li>
+    <li class="ld-bag-usage__row"><span class="ld-bag-usage__name">Trung Phẩm</span><span class="ld-bag-usage__nums">0/6</span></li>
+    <li class="ld-bag-usage__row"><span class="ld-bag-usage__name">Thượng Phẩm</span><span class="ld-bag-usage__nums">0/4</span></li>
+    <li class="ld-bag-usage__row"><span class="ld-bag-usage__name">Cực Phẩm</span><span class="ld-bag-usage__nums">0/2</span></li>
+  </ul></section></div>
 </div>
 <div id="ldModal" style="display:none"><button id="ldModalCloseBtn">Đóng</button><button id="ldModalDecompose">Phân Giải</button></div>
 <div id="ldConfirm" style="display:none"><button id="ldConfirmOk">Xác Nhận</button></div>
@@ -773,7 +779,7 @@ function render() {
   } else {
     hide($('#ldBtnTune')); hide($('#ldBtnCollect')); show($('#ldBtnCraft'), true);
     $('#ldStabilityWrap').classList.remove('is-tune-weak');
-    p.innerHTML = '<button class="ld-recipe-tier">Hạ Phẩm</button><p>Đan Lô đã phát nổ.</p>';
+    p.innerHTML = '<button class="ld-recipe-tier is-active" aria-disabled="false">Hạ Phẩm</button><p>Đan Lô đã phát nổ.</p>';
   }
 }
 setTimeout(async () => {
@@ -2169,8 +2175,11 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // một-ngày viết thẳng vào nhãn ô chọn. Bản ghi me-cung-20260829-100237.
     // 79 = Mê Cung: ngưỡng số người sẵn sàng thành option (minPlayers) thay cho con số 5 ghim
     // cứng ở bốn cửa chặn.
-    "hồ sơ đang ở schema 79",
-    loadProfileForSchema().schemaVersion === 79,
+    // 80 = Luyện Đan Đường bỏ số tổng/đoạn chữ modal đã biến mất: quét đúng hàng Hạ, Trung,
+    // Thượng hoặc Cực đang cấu hình trong `#ldBagPillStats`, so tử số bằng số thật và chỉ mở ô
+    // đan mang đúng `data-tier`. Hai twin VIP/thường dùng chung flow này.
+    "hồ sơ đang ở schema 80",
+    loadProfileForSchema().schemaVersion === 80,
     String(loadProfileForSchema().schemaVersion),
   );
 

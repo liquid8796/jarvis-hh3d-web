@@ -47,8 +47,9 @@ import { loadProfile, profileForConfig } from "../src/lib/quest-engine/profile.m
  *   • thanh nút mang `#ldModalUse` + `#ldModalDecompose` thay vì mỗi nút Đóng: đó là biến thể
  *     mở-từ-TÚI (`luyen-dan.min.js` dựng hai bộ nút khác nhau cho hộp-thưởng và hộp-trong-túi),
  *     và nhánh giữ/phân giải chỉ chạy ở biến thể ấy.
- * Hai chỗ thay được: `__SAO__` cho bậc sao, và `__TUI__` cho con số「Đan trong túi (phẩm)」—
- * cái sau là thứ cửa HẠN MỨC đọc, nên nó phải thổi lại được y như bậc sao.
+ * `__SAO__` là chỗ duy nhất thay đổi cho bảng giữ/phân giải theo sao. Dòng đếm cũ trong modal
+ * được giữ làm MỒI NHIỄU ở nhóm hạn mức bên dưới: schema 80 bắt buộc phải bỏ qua nó và đọc bốn
+ * hàng độc lập trong bảng「Đan trong túi」của record 01/09/2026.
  */
 const MODAL_HTML = `
 <div class="ld-modal ld-modal--item" id="ldItemModal" role="dialog" aria-modal="true">
@@ -87,9 +88,59 @@ const MODAL_HTML = `
  */
 const BROKEN_SELECTOR = "#ldModal";
 
-/** Hộp thoại với đúng bậc sao và đúng số đan đang nằm trong túi. */
+/** Hộp thoại với đúng bậc sao; `bag` chỉ là số MỒI cũ, không còn là nguồn hạn mức. */
 const modalHtml = (stars: number, bag = 1) =>
   MODAL_HTML.replace("__SAO__", String(stars)).replace("__TUI__", String(bag));
+
+type PillTier = "ha" | "trung" | "thuong" | "cuc";
+const TIER_META: Record<PillTier, { label: string; cap: number }> = {
+  ha: { label: "Hạ Phẩm", cap: 10 },
+  trung: { label: "Trung Phẩm", cap: 6 },
+  thuong: { label: "Thượng Phẩm", cap: 4 },
+  cuc: { label: "Cực Phẩm", cap: 2 },
+};
+
+/**
+ * Bảng túi mới, giữ đúng id/class/data-tier của `dom/01-load.html` trong record 01/09/2026.
+ * Bốn con số là bốn nguồn độc lập; tổng của chúng không được phép trở thành một hạn mức thứ năm.
+ */
+const bagHtml = (
+  counts: Record<PillTier, number>,
+  {
+    stars = 4,
+    modalBagDecoy = 99,
+    labelOverrides = {},
+    omitCellTier,
+  }: {
+    stars?: number;
+    modalBagDecoy?: number;
+    labelOverrides?: Partial<Record<PillTier, string>>;
+    omitCellTier?: PillTier;
+  } = {},
+) => `
+  <div class="ld-grid ld-grid--bag" id="ldInventory">
+    ${(["ha", "trung", "thuong", "cuc"] as PillTier[])
+      .filter((tier) => counts[tier] > 0 && tier !== omitCellTier)
+      .map(
+        (tier) =>
+          `<div class="ld-cell ld-cell--pill ld-tier-${tier} ld-stars-${stars}" data-kind="pill" data-tier="${tier}" data-stars="${stars}" title="${TIER_META[tier].label} Đan Dược ${stars}★ · túi ${counts[tier]}/${TIER_META[tier].cap} — chạm để xem"><span class="ld-qty">${counts[tier]}</span></div>`,
+      )
+      .join("")}
+  </div>
+  <div class="ld-bag-pill-stats" id="ldBagPillStats">
+    <section class="ld-bag-usage ld-bag-usage--stored">
+      <h3 class="ld-bag-usage__title">Đan trong túi</h3>
+      <ul class="ld-bag-usage__list">
+        ${(["ha", "trung", "thuong", "cuc"] as PillTier[])
+          .map(
+            (tier) =>
+              `<li class="ld-bag-usage__row ld-bag-usage__row--stored"><span class="ld-bag-usage__name">${labelOverrides[tier] ?? TIER_META[tier].label}</span><span class="ld-bag-usage__bar"></span><span class="ld-bag-usage__nums">${counts[tier]}/${TIER_META[tier].cap}</span></li>`,
+          )
+          .join("")}
+      </ul>
+    </section>
+  </div>
+  ${modalHtml(stars, modalBagDecoy)}`;
 
 /**
  * BẢN ĐẶC TẢ: mỗi lựa chọn giữ lại những bậc sao nào.
@@ -367,30 +418,23 @@ try {
     check("hộp ĐANG ẨN mà còn markup cũ thì vẫn im — phép đo bề rộng gác chỗ này", hidden === "", JSON.stringify(hidden));
   }
 
-  // ---- 9. HẠN MỨC GIỮ ĐAN (schema 75) ----------------------------------------------------
+  // ---- 9. HẠN MỨC GIỮ ĐAN THEO TỪNG PHẨM (schema 80) ------------------------------------
   //
-  // Hạn mức đếm dòng「Đan trong túi (phẩm)」/「5/10 viên」— tổng đan cùng phẩm đang nằm trong
-  // túi. Nó là con số DUY NHẤT một lần mở hộp trả lời trọn vẹn: dòng「Số lượng ô này」chỉ nói
-  // về đúng ô đang mở, nên muốn cộng đủ mọi bậc sao thì phải mở lần lượt từng ô — một vòng lặp
-  // mà flow này không có.
-  //
-  // Cửa vẫn là `textMatches`, tức SO CHỮ chứ không so số, nên lớp dịch rải sẵn từng con số hợp
-  // lệ (`bagCountAtLeast`). Hai cái bẫy của lối ấy được đóng đinh ở đây:
-  //
-  //   • mỗi mảnh phải kết thúc bằng dấu `/`, không thì「… 1」nuốt luôn「… 11/10」và một túi
-  //     mười một viên bị đọc thành một viên;
-  //   • hết trần 30 thì cửa thôi khớp — và đó là phía AN TOÀN: không khớp nghĩa là GIỮ đan,
-  //     chứ không phải phân giải nhầm.
+  // Record 01/09/2026 thay nguồn sự thật: `#ldBagPillStats` có bốn hàng độc lập Hạ / Trung /
+  // Thượng / Cực, và `/state.data.pill_bag` cũng trả bốn object tương ứng. Flow phải tìm đúng
+  // hàng của `{{tier}}`, so tử số bằng SỐ, rồi đánh dấu đúng pill cell có `data-tier` tương ứng.
+  // Tổng bốn hàng, ô đan đầu tiên, và con số cũ còn nằm trong modal đều là nguồn SAI.
   {
     const NO_CAP = "«không hạn mức»";
     const CAP_KEYS = ["capOver", "capFull"] as const;
-    const selector = gates[0]?.selector ?? "";
+    const SCAN_NOTE = "đọc số đan RIÊNG của phẩm đang chọn và đánh dấu đúng ô đan cần xử lý";
 
     type CapStep = {
       action: string;
       selector?: string;
       note?: string;
       script?: string;
+      optional?: boolean;
       when?: { kind?: string; selector?: string; text?: string };
       condition?: { kind?: string; selector?: string; text?: string };
     };
@@ -402,10 +446,78 @@ try {
         selectedValue?: string;
       }[]).find((o) => o.key === key);
 
-    /** Hỏi engine đúng một câu, với một hộp mang `stars` sao và `bag` viên trong túi. */
-    const askBag = async (stars: number, bag: number, text: string): Promise<boolean> => {
-      await page.evaluate(({ html }) => { document.body.innerHTML = html; }, { html: modalHtml(stars, bag) });
-      return page.evaluate(conditionProbe, { kind: "textMatches", selector, text });
+    type ConfigMode = "decompose" | "stop";
+    const configuredProfile = (
+      tier: (typeof TIER_META)[PillTier]["label"],
+      mode: ConfigMode,
+      cap: number,
+      keepStarsFrom = 4,
+    ) =>
+      profileForConfig({
+        quests: {
+          luyenDan: { enabled: true, tier, keepStarsFrom, keepCapEnabled: true, keepCap: cap, keepCapMode: mode },
+          luyenDanThuong: { enabled: true, tier, keepStarsFrom, keepCapEnabled: true, keepCap: cap, keepCapMode: mode },
+        },
+      });
+
+    /** Thay option vào script đúng luật `buildOptionValues` của engine (mọi giá trị ở đây an toàn). */
+    const materialize = (source: string, quest: { options?: { key: string; selectedValue?: string }[] }) => {
+      let out = source;
+      for (const option of quest.options ?? []) {
+        const value = String(option.selectedValue ?? "").replace(/['\\\n\r]/g, "").trim();
+        out = out.split(`{{${option.key}}}`).join(value);
+      }
+      return out;
+    };
+
+    const runBagScan = async ({
+      id = QUEST_IDS[0],
+      tier,
+      mode,
+      cap,
+      counts,
+      keepStarsFrom = 4,
+      modalBagDecoy = 99,
+      labelOverrides = {},
+      omitCellTier,
+    }: {
+      id?: string;
+      tier: (typeof TIER_META)[PillTier]["label"];
+      mode: ConfigMode;
+      cap: number;
+      counts: Record<PillTier, number>;
+      keepStarsFrom?: number;
+      modalBagDecoy?: number;
+      labelOverrides?: Partial<Record<PillTier, string>>;
+      omitCellTier?: PillTier;
+    }) => {
+      const built = configuredProfile(tier, mode, cap, keepStarsFrom);
+      const quest = built.quests.find((q: { id: string }) => q.id === id) as {
+        options?: { key: string; selectedValue?: string }[];
+        steps?: CapStep[];
+      } | undefined;
+      const source = quest?.steps?.find((s) => s.note === SCAN_NOTE)?.script ?? "";
+      await page.evaluate(
+        ({ html }) => { document.body.innerHTML = html; },
+        { html: bagHtml(counts, { modalBagDecoy, labelOverrides, omitCellTier }) },
+      );
+      if (source && quest) {
+        const script = materialize(source, quest);
+        await page.evaluate(`(() => { const v = (${script}); return typeof v === "function" ? v() : v; })()`);
+      }
+      return page.evaluate(() => {
+        const panel = document.querySelector("#ldBagPillStats") as HTMLElement | null;
+        return {
+          over: panel?.dataset.jvzCapOver ?? "",
+          full: panel?.dataset.jvzCapFull ?? "",
+          count: panel?.dataset.jvzTierCount ?? "",
+          ready: panel?.dataset.jvzScanReady ?? "",
+          bodyOver: document.body.dataset.jvzCapOver ?? "",
+          bodyFull: document.body.dataset.jvzCapFull ?? "",
+          marked: Array.from(document.querySelectorAll("#ldInventory .ld-cell--pill[data-jvz-selected-tier]"))
+            .map((el) => (el as HTMLElement).dataset.tier ?? ""),
+        };
+      });
     };
 
     // 9a. Hai option có mặt ở CẢ HAI twin, và mặc định của chúng là một chuỗi không khớp gì.
@@ -421,13 +533,36 @@ try {
       `${present}/4`,
     );
 
-    // 9b. Mặc định ấy phải CÂM thật: không hộp nào — bậc sao nào, túi mấy viên — khớp nổi nó.
+    // 9b. Mặc định ấy phải CÂM thật ở cả hai marker, dù túi và số MỒI trong modal đều rất lớn.
     {
+      const built = profileForConfig({
+        quests: {
+          luyenDan: { enabled: true, tier: "Hạ Phẩm", keepStarsFrom: 4, keepCapEnabled: false },
+          luyenDanThuong: { enabled: true, tier: "Hạ Phẩm", keepStarsFrom: 4, keepCapEnabled: false },
+        },
+      });
       let leaked = 0;
-      for (const bag of [1, 5, 10, 30]) {
-        for (const stars of STARS) if (await askBag(stars, bag, NO_CAP)) leaked += 1;
+      for (const id of QUEST_IDS) {
+        const quest = built.quests.find((q: { id: string }) => q.id === id) as {
+          options?: { key: string; selectedValue?: string }[];
+          steps?: CapStep[];
+        } | undefined;
+        const source = quest?.steps?.find((s) => s.note === SCAN_NOTE)?.script ?? "";
+        await page.evaluate(
+          ({ html }) => { document.body.innerHTML = html; },
+          { html: bagHtml({ ha: 30, trung: 20, thuong: 10, cuc: 5 }, { modalBagDecoy: 99 }) },
+        );
+        if (source && quest) {
+          const script = materialize(source, quest);
+          await page.evaluate(`(() => { const v = (${script}); return typeof v === "function" ? v() : v; })()`);
+        }
+        const lit = await page.evaluate(() => {
+          const p = document.querySelector("#ldBagPillStats") as HTMLElement | null;
+          return p?.dataset.jvzCapOver === "1" || p?.dataset.jvzCapFull === "1";
+        });
+        if (lit) leaked += 1;
       }
-      check("「không hạn mức」không khớp ô nào trong 16 ô — nhánh tắt là nhánh câm", leaked === 0, `${leaked} ô lọt`);
+      check("「không hạn mức」giữ cả hai marker tắt ở bản VIP lẫn thường", leaked === 0, `${leaked}/2 nhánh sáng nhầm`);
     }
 
     // 9c. Thứ tự bước — đây là toàn bộ thiết kế, nên nó phải được đóng đinh.
@@ -439,44 +574,177 @@ try {
       let ordered = 0;
       let beforeCraft = 0;
       let chained = 0;
+      let targeted = 0;
+      let collectAttemptBound = 0;
+      let scansFailClosed = 0;
+      let backlogClosed = 0;
+      let tierLockedSafe = 0;
       for (const id of QUEST_IDS) {
         const steps = stepsOf(id);
-        const capOver = steps.findIndex((s) => s.when?.text === "{{capOver}}");
-        const stopIf = steps.findIndex((s) => s.action === "stopIf" && s.condition?.text === "{{capFull}}");
+        const lateClose = steps.findIndex((s) => s.note === "đóng bảng thưởng của lượt thu muộn");
+        const scan = steps.findIndex((s) => s.note === SCAN_NOTE);
+        const capFullStops = steps
+          .map((s, i) => ({ s, i }))
+          .filter(({ s }) => s.action === "stopIf" && s.condition?.selector?.includes("data-jvz-cap-full"))
+          .map(({ i }) => i);
+        const stopIf = capFullStops[0] ?? -1;
+        const finalStopIf = capFullStops.at(-1) ?? -1;
+        const selectedOpen = steps.findIndex(
+          (s) => s.action === "click" && s.selector?.includes("data-jvz-selected-tier"),
+        );
+        const capOver = steps.findIndex(
+          (s) => s.action === "evaluateJavaScript" && s.when?.selector?.includes("data-jvz-cap-over"),
+        );
         const keepClose = steps.findIndex(
           (s) => s.action === "click" && s.selector === "#ldModalCloseBtn" && s.when?.text === "{{decompose}}",
         );
-        const craft = steps.findIndex((s) => s.action === "click" && s.selector === "#ldBtnCraft");
-        if (capOver >= 0 && stopIf >= 0 && keepClose >= 0 && capOver < keepClose && stopIf < keepClose) ordered += 1;
-        if (stopIf >= 0 && craft >= 0 && stopIf < craft) beforeCraft += 1;
+        const finalCollectClose = steps.findIndex((s) => s.note === "đóng bảng thưởng của lượt thu sát cửa khai lô");
+        const finalScan = steps.findIndex((s) => s.note === "quét lại đúng phẩm sau lượt Thu Đan sát cửa khai lô");
+        const postOverScan = steps.findIndex((s) => s.note === "xác nhận lại số đan đúng phẩm sau nhánh viên dư sát cửa khai lô");
+        const backlogGate = steps.findIndex(
+          (s, i) =>
+            i > postOverScan &&
+            s.action === "waitForCondition" &&
+            s.condition?.kind === "hidden" &&
+            s.condition?.selector?.includes("data-jvz-cap-over"),
+        );
+        const tierClick = steps.findIndex(
+          (s) => s.action === "click" && s.selector?.includes(".ld-recipe-tier:has-text"),
+        );
+        const tierProof = steps.findIndex((s) => s.note?.includes("xác nhận phẩm đang active") === true);
+        const tierGate = steps.findIndex(
+          (s, i) =>
+            i > tierProof &&
+            s.action === "waitForCondition" &&
+            s.condition?.selector?.includes("data-jvz-alchemy-tier-ready"),
+        );
+        const craft = steps.findIndex(
+          (s) =>
+            s.action === "click" &&
+            s.selector?.includes("data-jvz-alchemy-tier-ready") &&
+            s.selector?.includes("#ldBtnCraft"),
+        );
+        if (
+          lateClose >= 0 &&
+          scan > lateClose &&
+          stopIf > scan &&
+          selectedOpen > stopIf &&
+          capOver > selectedOpen &&
+          keepClose > capOver
+        ) {
+          ordered += 1;
+        }
+        if (
+          stopIf > scan &&
+          finalCollectClose > keepClose &&
+          finalScan > finalCollectClose &&
+          finalStopIf > finalScan &&
+          craft > finalStopIf
+        ) {
+          beforeCraft += 1;
+        }
+        if (
+          selectedOpen >= 0 &&
+          steps[selectedOpen]?.selector === '#ldInventory .ld-cell--pill[data-jvz-selected-tier="1"]' &&
+          steps[selectedOpen]?.when?.selector === steps[selectedOpen]?.selector
+        ) {
+          targeted += 1;
+        }
 
         // Cụm phân giải của nhánh hạn mức phải TRỌN VẸN: kể chuyện, bấm Phân Giải, chờ hộp xác
         // nhận, bấm OK. Thiếu cú xác nhận thì hộp treo giữa màn và mọi bước sau bấm vào khoảng
         // không.
-        const chain = steps.slice(capOver, capOver + 4);
+        const chain = steps.slice(capOver, capOver + 6);
         if (
           capOver >= 0 &&
-          chain.length === 4 &&
+          chain.length === 6 &&
           chain[0]?.action === "evaluateJavaScript" &&
           chain[1]?.selector === "#ldModalDecompose" &&
           chain[2]?.action === "waitForCondition" &&
-          chain[3]?.selector === "#ldConfirmOk"
+          chain[3]?.selector === "#ldConfirmOk" &&
+          chain[4]?.action === "waitForCondition" &&
+          chain[5]?.selector === "#ldDecomposeRewardOk" &&
+          chain.slice(1).every((s) => s.optional !== true)
         ) {
           chained += 1;
         }
+
+        const collectProbes = steps
+          .map((s, i) => ({ s, i }))
+          .filter(({ s }) => s.action === "evaluateJavaScript" && s.script?.includes("jvzCollectReady"));
+        if (
+          collectProbes.length === 3 &&
+          collectProbes.every(({ i }) => {
+            const click = steps[i + 1];
+            const wait = steps[i + 2];
+            return (
+              click?.action === "click" &&
+              click.selector === "#ldBtnCollect" &&
+              click.when?.selector?.includes("data-jvz-collect-ready") &&
+              click.optional !== true &&
+              wait?.action === "waitForCondition" &&
+              wait.when?.selector === click.when?.selector &&
+              wait.optional !== true
+            );
+          })
+        ) {
+          collectAttemptBound += 1;
+        }
+
+        const scans = steps
+          .map((s, i) => ({ s, i }))
+          .filter(({ s }) => s.action === "evaluateJavaScript" && s.script?.includes("jvzScanReady"));
+        if (
+          scans.length === 3 &&
+          scans.every(({ i }) => {
+            const gate = steps[i + 1];
+            return (
+              gate?.action === "waitForCondition" &&
+              gate.condition?.selector?.includes("data-jvz-scan-ready") &&
+              gate.optional !== true
+            );
+          })
+        ) {
+          scansFailClosed += 1;
+        }
+
+        if (
+          finalScan > finalCollectClose &&
+          postOverScan > finalScan &&
+          backlogGate > postOverScan &&
+          backlogGate < craft &&
+          steps[backlogGate]?.optional !== true
+        ) {
+          backlogClosed += 1;
+        }
+
+        if (
+          tierClick > backlogGate &&
+          tierProof > tierClick &&
+          tierGate > tierProof &&
+          craft > tierGate &&
+          steps[tierClick]?.optional !== true &&
+          steps[tierGate]?.optional !== true
+        ) {
+          tierLockedSafe += 1;
+        }
       }
-      check("cụm hạn mức nói TRƯỚC nhánh giữ sao — hộp còn mở thì mới lật lại được", ordered === 2, `${ordered}/2`);
-      check("stopIf đứng TRƯỚC cụm khai lô — đủ chỉ tiêu là thôi luyện, không luyện thừa một mẻ", beforeCraft === 2, `${beforeCraft}/2`);
-      check("nhánh vượt hạn mức đi trọn cụm: kể → Phân Giải → chờ xác nhận → OK", chained === 2, `${chained}/2`);
+      check("lượt thu muộn → quét đúng phẩm → dừng/mở ô → hạn mức → nhánh sao, đúng ở cả hai twin", ordered === 2, `${ordered}/2`);
+      check("cả lượt Thu sớm lẫn lượt Thu sát cửa đều được đếm lại trước khai lô", beforeCraft === 2, `${beforeCraft}/2`);
+      check("cả hai twin chỉ mở ô đã được quét đánh dấu đúng data-tier", targeted === 2, `${targeted}/2`);
+      check("nhánh vượt hạn mức đi trọn cụm bắt buộc tới bảng hoàn dược", chained === 2, `${chained}/2`);
+      check("ba lượt Thu Đan đều buộc wait/modal vào đúng marker của chính lần bấm", collectAttemptBound === 2, `${collectAttemptBound}/2`);
+      check("mọi lần quét bảng phẩm đều có cổng scan-ready bắt buộc ngay sau", scansFailClosed === 2, `${scansFailClosed}/2`);
+      check("vẫn còn viên dư sau hai lượt xử lý thì hỏng an toàn trước Craft", backlogClosed === 2, `${backlogClosed}/2`);
+      check("phẩm bị khóa/click trượt không thể giữ phẩm cũ rồi Craft", tierLockedSafe === 2, `${tierLockedSafe}/2`);
     }
 
-    // 9d. BẢNG THẬT: lớp dịch sinh danh sách, Chromium chấm bài.
+    // 9d. BẢNG THẬT: lớp dịch sinh ngưỡng SỐ, Chromium chạy chính script quét đang ship.
     //
-    // `từ` là ngưỡng danh sách bắt đầu — mode phân giải lấy `cap + 1` (chỉ đụng viên DƯ), mode
-    // dừng lấy chính `cap` (đủ là dừng). Cột 11/12 là cái bẫy tiền tố: thiếu dấu `/` ở cuối mỗi
-    // mảnh thì một túi 11 viên khớp cả danh sách bắt đầu từ 1.
+    // `từ` là ngưỡng bắt đầu — mode phân giải lấy `cap + 1` (chỉ đụng viên DƯ), mode dừng lấy
+    // chính `cap` (đủ là dừng). Không còn trần rải chuỗi và không còn phép khớp tiền tố 1/11.
     {
-      const listFor = (mode: "decompose" | "stop", cap: number): string => {
+      const thresholdFor = (mode: "decompose" | "stop", cap: number): string => {
         const built = profileForConfig({
           quests: {
             luyenDan: {
@@ -509,31 +777,125 @@ try {
       const rows: string[] = [];
       let bad = 0;
       for (const [mode, cap] of CASES) {
-        const text = listFor(mode, cap);
+        const threshold = thresholdFor(mode, cap);
         const from = mode === "stop" ? cap : cap + 1;
         const got: number[] = [];
-        for (const bag of BAGS) if (await askBag(4, bag, text)) got.push(bag);
+        for (const bag of BAGS) {
+          const scanned = await runBagScan({
+            tier: "Hạ Phẩm",
+            mode,
+            cap,
+            counts: { ha: bag, trung: 0, thuong: 0, cuc: 0 },
+          });
+          const lit = mode === "stop" ? scanned.full === "1" : scanned.over === "1";
+          if (lit) got.push(bag);
+        }
         const want = BAGS.filter((b) => b >= from);
-        if (got.join(",") !== want.join(",")) bad += 1;
+        if (threshold !== String(from) || got.join(",") !== want.join(",")) bad += 1;
         rows.push(
-          `      ${mode.padEnd(10)} hạn mức ${String(cap).padStart(2)} (từ ${String(from).padStart(2)})  khớp [${got.join(",")}]  (mong đợi [${want.join(",")}])`,
+          `      ${mode.padEnd(10)} hạn mức ${String(cap).padStart(2)} → ngưỡng ${threshold.padStart(2)}  sáng ở [${got.join(",")}]  (mong đợi [${want.join(",")}])`,
         );
       }
-      check(`bảng hạn mức: ${CASES.length} cấu hình × ${BAGS.length} mức túi, đo bằng chính conditionProbe`, bad === 0, bad ? `${bad} hàng sai` : "");
+      check(`bảng hạn mức: ${CASES.length} cấu hình × ${BAGS.length} mức túi, chạy chính bag-scan`, bad === 0, bad ? `${bad} hàng sai` : "");
       console.log("\n  Bảng hạn mức giữ đan đo được:");
       for (const r of rows) console.log(r);
       console.log("");
 
-      // Đường đi THẬT của giá trị này còn một chặng nữa mà phép đo trên không chạm tới:
-      // `buildOptionValues` của engine, với một giá trị tự nhập, CẮT bỏ nháy đơn, backslash và
-      // ký tự xuống dòng trước khi thay vào `{{capOver}}`. Danh sách nào mang một trong số ấy sẽ
-      // tới trang dưới hình dạng khác hẳn thứ đo được ở đây — nên đóng đinh rằng nó không mang.
-      const scrubbed = /['\\\n\r]/.test(listFor("decompose", 7));
-      check("danh sách sinh ra không mang ký tự nào engine sẽ cắt lúc thay {{…}}", !scrubbed);
+      // Ngưỡng chỉ còn chữ số, nên lớp thay option không thể cắt làm đổi nghĩa.
+      const scrubbed = /['\\\n\r]/.test(thresholdFor("decompose", 7));
+      check("ngưỡng sinh ra chỉ là số an toàn cho {{capOver}} / {{capFull}}", !scrubbed);
 
-      // Trần 30: quá nó thì cửa thôi khớp, và im lặng ấy phải nghiêng về phía GIỮ đan.
-      const over = await askBag(4, 31, listFor("decompose", 3));
-      check("túi vượt trần 30 thì cửa thôi khớp — im lặng nghiêng về phía GIỮ, không phân giải", !over);
+      // Không còn trần 30 của phép rải chuỗi: nếu site mở rộng túi, phép so số vẫn đúng.
+      const beyondOldCeiling = await runBagScan({
+        tier: "Hạ Phẩm",
+        mode: "decompose",
+        cap: 3,
+        counts: { ha: 31, trung: 0, thuong: 0, cuc: 0 },
+      });
+      check("31 viên vẫn được đọc là vượt hạn mức 3 — không còn mù sau trần chuỗi 30", beyondOldCeiling.over === "1");
+
+      // Ca đúng nguyên record: tổng túi là 6 nhưng Trung/Thượng/Cực đều bằng 0. Chọn Trung
+      // phải đọc 0, tuyệt đối không được lấy tổng 6 hoặc ô Hạ đứng đầu.
+      const recordedFree = await runBagScan({
+        id: QUEST_IDS[1],
+        tier: "Trung Phẩm",
+        mode: "stop",
+        cap: 1,
+        counts: { ha: 6, trung: 0, thuong: 0, cuc: 0 },
+        modalBagDecoy: 99,
+      });
+      check(
+        "bản thường chọn Trung: Hạ 6 + modal 99 vẫn đọc Trung = 0, không báo đủ",
+        recordedFree.ready === "1" && recordedFree.count === "0" && recordedFree.full === "0" && recordedFree.marked.length === 0,
+        JSON.stringify(recordedFree),
+      );
+
+      const mixedVip = await runBagScan({
+        tier: "Thượng Phẩm",
+        mode: "stop",
+        cap: 3,
+        counts: { ha: 6, trung: 2, thuong: 3, cuc: 1 },
+      });
+      check(
+        "bản VIP chọn Thượng: đọc đúng 3 và chỉ đánh dấu cell data-tier=thuong dù Hạ đứng đầu",
+        mixedVip.ready === "1" && mixedVip.count === "3" && mixedVip.full === "1" && mixedVip.marked.join(",") === "thuong",
+        JSON.stringify(mixedVip),
+      );
+
+      const foldedLabel = await runBagScan({
+        tier: "Thượng Phẩm",
+        mode: "stop",
+        cap: 3,
+        counts: { ha: 6, trung: 2, thuong: 3, cuc: 1 },
+        labelOverrides: { thuong: "  THUONG   PHAM  " },
+      });
+      check(
+        "tên hàng đổi hoa/thường, dấu và khoảng trắng vẫn map đúng Thượng Phẩm",
+        foldedLabel.ready === "1" && foldedLabel.count === "3" && foldedLabel.marked.join(",") === "thuong",
+        JSON.stringify(foldedLabel),
+      );
+
+      const stableMarker = await runBagScan({
+        tier: "Thượng Phẩm",
+        mode: "decompose",
+        cap: 2,
+        counts: { ha: 0, trung: 0, thuong: 3, cuc: 0 },
+      });
+      await page.evaluate(() => document.querySelector("#ldBagPillStats")?.remove());
+      const bodyMarkerAfterRender = await page.evaluate(() => document.body.dataset.jvzCapOver ?? "");
+      check(
+        "marker viên dư sống trên body dù trang render lại cả bảng túi sau cú xác nhận",
+        stableMarker.bodyOver === "1" && bodyMarkerAfterRender === "1",
+        JSON.stringify({ stableMarker, bodyMarkerAfterRender }),
+      );
+
+      let missingCellRejected = false;
+      try {
+        await runBagScan({
+          tier: "Thượng Phẩm",
+          mode: "stop",
+          cap: 3,
+          counts: { ha: 0, trung: 0, thuong: 3, cuc: 0 },
+          omitCellTier: "thuong",
+        });
+      } catch {
+        missingCellRejected = true;
+      }
+      check("bảng báo có đan nhưng thiếu cell đúng phẩm → scanner từ chối, không mở cell khác", missingCellRejected);
+
+      let missingRowRejected = false;
+      try {
+        await runBagScan({
+          tier: "Thượng Phẩm",
+          mode: "stop",
+          cap: 3,
+          counts: { ha: 0, trung: 0, thuong: 3, cuc: 0 },
+          labelOverrides: { thuong: "Phẩm không xác định" },
+        });
+      } catch {
+        missingRowRejected = true;
+      }
+      check("không tìm thấy hàng của phẩm cấu hình → scanner từ chối thay vì đếm tổng", missingRowRejected);
 
       // Lớp dịch phải TỪ CHỐI đặt hạn mức khi không giữ viên nào: hạn mức của một tuỳ chọn
       //「Phân giải tất cả」là một con số không có gì để đếm.
@@ -558,32 +920,54 @@ try {
       check("chọn「Phân giải tất cả」thì hạn mức bị bỏ qua, dù công tắc có bật", stillOff);
     }
 
-    // 9e. Hai dòng kể chuyện của cụm hạn mức — cùng luật với nhánh giữ: nói đúng, và IM khi
-    // không có hộp nào để đọc.
+    // 9e. Hai dòng kể chuyện phải nói đúng PHẨM + số của hàng ấy, và im khi nguồn biến mất.
     {
-      const scriptOf = (noteFragment: string) =>
-        stepsOf(QUEST_IDS[0]).find((s) => (s.note ?? "").includes(noteFragment))?.script ?? "";
-      const runScript = async (source: string, html: string | null): Promise<unknown> => {
-        await page.evaluate(({ h }) => { document.body.innerHTML = h; }, { h: html ?? "<p>không có hộp nào</p>" });
+      const sourceFor = (mode: ConfigMode, cap: number, noteFragment: string) => {
+        const built = configuredProfile("Thượng Phẩm", mode, cap);
+        const quest = built.quests.find((q: { id: string }) => q.id === QUEST_IDS[0]) as {
+          options?: { key: string; selectedValue?: string }[];
+          steps?: CapStep[];
+        } | undefined;
+        const source = quest?.steps?.find((s) => (s.note ?? "").includes(noteFragment))?.script ?? "";
+        return quest ? materialize(source, quest) : "";
+      };
+      const runScript = async (source: string): Promise<unknown> => {
         return page.evaluate(`(() => { const v = (${source}); return typeof v === "function" ? v() : v; })()`);
       };
 
-      const overSrc = scriptOf("phân giải vì túi đã đủ hạn mức");
-      const fullSrc = scriptOf("đã đủ hạn mức, dừng luyện");
+      const overSrc = sourceFor("decompose", 2, "viên đúng phẩm bị phân giải");
+      const fullSrc = sourceFor("stop", 3, "phẩm đang chọn đã đủ hạn mức");
       check("hồ sơ có đủ hai bước kể chuyện của cụm hạn mức", overSrc.length > 0 && fullSrc.length > 0);
 
-      const overSaid = String(await runScript(overSrc, modalHtml(4, 7)));
+      await runBagScan({
+        tier: "Thượng Phẩm",
+        mode: "decompose",
+        cap: 2,
+        counts: { ha: 6, trung: 1, thuong: 3, cuc: 0 },
+      });
+      const overSaid = String(await runScript(overSrc));
       check(
-        "dòng vượt hạn mức nói đúng số viên trong túi VÀ bậc sao của viên bị phân giải",
-        overSaid.startsWith("!") && overSaid.includes(" 7 viên") && overSaid.includes("4 sao"),
+        "dòng vượt hạn mức nói đúng Thượng Phẩm = 3 VÀ bậc sao của viên đang mở",
+        overSaid.startsWith("!") && overSaid.includes("Thượng Phẩm") && overSaid.includes(" 3 viên") && overSaid.includes("4 sao"),
         overSaid,
       );
 
-      const fullSaid = String(await runScript(fullSrc, modalHtml(2, 5)));
-      check("dòng đủ hạn mức nói đúng số viên đang giữ", fullSaid.startsWith("!") && fullSaid.includes(" 5 viên"), fullSaid);
+      await runBagScan({
+        tier: "Thượng Phẩm",
+        mode: "stop",
+        cap: 3,
+        counts: { ha: 6, trung: 1, thuong: 3, cuc: 0 },
+      });
+      const fullSaid = String(await runScript(fullSrc));
+      check(
+        "dòng đủ hạn mức nói đúng Thượng Phẩm = 3",
+        fullSaid.startsWith("!") && fullSaid.includes("Thượng Phẩm") && fullSaid.includes(" 3 viên"),
+        fullSaid,
+      );
 
-      const quiet = [await runScript(overSrc, null), await runScript(fullSrc, null)];
-      check("không có hộp thì cả hai dòng đều im", quiet.every((v) => v === ""), JSON.stringify(quiet));
+      await page.evaluate(() => { document.body.innerHTML = "<p>không có bảng túi hay hộp nào</p>"; });
+      const quiet = [await runScript(overSrc), await runScript(fullSrc)];
+      check("không có bảng túi/hộp thì cả hai dòng đều im", quiet.every((v) => v === ""), JSON.stringify(quiet));
     }
   }
 } finally {

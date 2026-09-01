@@ -41,21 +41,18 @@ const luyenDanQuest = z
     /**
      * HẠN MỨC GIỮ ĐAN — chỉ có nghĩa khi `keepStarsFrom` đang giữ lại một bậc sao nào đó.
      *
-     * Đếm theo dòng「Đan trong túi (phẩm) x/10 viên」của hộp thông tin viên đan, tức TỔNG đan
-     * cùng phẩm đang nằm trong túi, không phân biệt mấy sao. Chọn cách đếm ấy vì nó là con số
-     * DUY NHẤT đọc được trọn vẹn trong một lần mở hộp: dòng「Số lượng ô này」chỉ nói về đúng ô
-     * đang mở, nên muốn cộng đủ mọi bậc sao thì phải mở lần lượt từng ô — một vòng lặp mà
-     * flow này không có, và cũng không đáng dựng cho một hạn mức.
+     * Đếm RIÊNG hàng của `tier` đang chọn trong bảng「Đan trong túi」: Hạ, Trung, Thượng và Cực
+     * là bốn bộ đếm độc lập; mọi mức sao của CÙNG phẩm được cộng, đan của phẩm khác tuyệt đối
+     * không chen vào. Record 01/09/2026 chụp đúng bốn hàng `6/10 · 0/6 · 0/4 · 0/2`, đồng thời
+     * `/state.data.pill_bag` trả bốn object tương ứng — đây là nguồn mới thay cho câu modal cũ.
      *
      * `keepCapEnabled` tách riêng khỏi con số vì「chưa đặt hạn mức」và「hạn mức bằng 1」là hai
      * ý khác nhau; nhồi cả hai vào một số 0-là-tắt thì ô nhập phải mang một giá trị nói dối.
      */
     keepCapEnabled: z.boolean().default(false),
     /**
-     * Trần 20 buộc phải nhỏ hơn `BAG_COUNT_CEILING` (30) bên quest-engine: lớp dịch rải một
-     * mảnh so chuỗi cho TỪNG con số hợp lệ, nên một hạn mức vượt trần ấy sẽ không có mảnh nào
-     * nhận ra. Túi đo được là 10 viên mỗi phẩm (bản chụp 12/08/2026 ghi `1/10 viên`), nên 20
-     * đã rộng gấp đôi và 30 còn chừa thêm chỗ cho ngày sức chứa ấy nhích lên.
+     * Trần 20 chừa chỗ cho sức chứa mở rộng về sau. Flow so số thật từ tử số `x/y` của đúng
+     * hàng phẩm, nên không còn một trần rải-chuỗi riêng phải giữ đồng bộ.
      */
     keepCap: z.number().int().min(1).max(20).default(10),
     /**

@@ -11,6 +11,41 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.65 — Luyện Đan đếm hạn mức riêng từng phẩm
+
+Bản ghi `luyen-dan-duong-20260901-121715` cho thấy bốn bộ đếm độc lập trong cùng một túi:
+**Hạ 6/10 · Trung 0/6 · Thượng 0/4 · Cực 0/2**. Video còn nhắc hai lần rằng hạn mức phải theo
+từng loại, không phải tổng đan. Phản hồi `/wp-json/hh3d/v1/luyen-dan/state` xác nhận cùng sự
+thật ở `data.pill_bag`: mỗi phẩm có `stored` và `cap` riêng; `pill_stacks` của record chỉ có
+`ha:4 × 6`.
+
+Flow schema 75 từng đọc dòng `Đan trong túi (phẩm)` trong hộp viên đan. Trang hiện tại không còn
+dòng ấy, và cú mở `.ld-cell--pill` chung chung còn có thể lấy ô của phẩm đứng đầu thay vì phẩm
+đang cấu hình. Schema 80 thay cả hai giả định:
+
+- quét đúng hàng Hạ/Trung/Thượng/Cực trong `#ldBagPillStats .ld-bag-usage--stored`;
+- so tử số bằng số thật, không rải danh sách chuỗi và không còn trần giả 30;
+- cộng mọi mức sao của **cùng phẩm**, không cộng phẩm khác;
+- chỉ đánh dấu và mở cell có `data-tier` khớp cấu hình;
+- áp cùng logic cho hai flow VIP và Thường, nhưng vẫn giữ hai bộ cấu hình độc lập.
+
+Các cửa an toàn đi cùng thay đổi nguồn đếm. Mọi lượt Thu Đan được gắn marker riêng để lượt chờ
+không bám nhầm một viên cũ; túi được đếm lại sát trước Craft; nhánh phân giải phải đi trọn tới
+bảng hoàn dược. Nếu bảng báo còn dư sau các lượt xử lý, hoặc báo có đan mà không có cell đúng
+phẩm, flow hỏng an toàn và chưa khai lô mới.
+
+Record cũng có một bẫy khác: Cực Phẩm đang khóa trong khi Hạ Phẩm vẫn active. Trước đây click
+chọn Cực là bước tùy chọn, nên nó có thể trượt rồi Craft tiếp Hạ. Nay Craft chỉ được phép chạy
+sau khi chính phẩm cấu hình mang `is-active`, không `is-locked` và không bị `aria-disabled`.
+Phần mô tả chi phí trên form cũng sửa theo phản hồi recipe thật: Hạ/Trung/Thượng/Cực lần lượt
+tốn **20/35/55/80 Tiên Ngọc**, không còn nói mọi mẻ đều 20.
+
+`verify:luyen-dan-stars` dựng nguyên bốn hàng/cell của record trong Chromium: 45 phép thử xanh,
+gồm ca Thường chọn Trung nhưng Hạ đang có 6, ca VIP chọn Thượng giữa nhiều phẩm, tên hàng đổi
+hoa-thường/bỏ dấu, thiếu row/cell, backlog vượt hạn mức, phẩm bị khóa và ba race Thu Đan.
+
+---
+
 ## 1.3.64 — Phòng Chat: ba nút đáy trở lại hình tròn
 
 Tỉ lệ desktop `5488:3177` của 1.3.63 thấp hơn ảnh gốc đúng 25%, nên ba nút vốn được vẽ sẵn

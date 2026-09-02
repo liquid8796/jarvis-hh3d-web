@@ -1,3 +1,5 @@
+import type { PillBagCaps } from "@/lib/validation/pillBagCaps";
+
 export type JobStatus = "queued" | "running" | "stopping" | "stopped" | "failed" | "done";
 export type AccountTier = "vip" | "free";
 
@@ -44,6 +46,8 @@ export type DashboardAccount = {
   id: string;
   label: string;
   accountTier: AccountTier | null;
+  pillBagCaps: PillBagCaps | null;
+  pillBagCapsObservedAt: string | null;
   enabled: boolean;
 };
 

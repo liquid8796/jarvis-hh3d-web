@@ -2,9 +2,11 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { saveConfigAction, type ActionResult } from "@/app/actions/automation";
+import type { DashboardAccount } from "@/lib/realtime/dashboardTypes";
 import type { EditableConfig } from "@/lib/services/configs";
 import { AccountManager } from "./AccountManager";
 import { useDashboardAccountLive } from "./DashboardLiveProvider";
+import { PillBagCapacitySummary } from "./PillBagCapacitySummary";
 
 /**
  * Ngọc giản cấu hình. Uncontrolled inputs với defaultValue từ server — form chỉ là tấm
@@ -210,6 +212,7 @@ function LuyenDanFieldset({
   prefix,
   accentClass,
   config,
+  accounts,
   enabled,
   onToggle,
   collapsed,
@@ -218,6 +221,7 @@ function LuyenDanFieldset({
   prefix: "luyenDan" | "luyenDanThuong";
   accentClass: string;
   config: EditableConfig["quests"]["luyenDan"];
+  accounts: DashboardAccount[];
   enabled: boolean;
   onToggle: (value: boolean) => void;
   collapsed: boolean;
@@ -370,9 +374,10 @@ function LuyenDanFieldset({
                 readOnly={!capOn}
                 aria-disabled={!capOn}
               />
-              <p className="mt-1 text-xs text-[var(--color-mist)]">
-                So với đúng hàng đã chọn; sức chứa hiện tại: Hạ 10 · Trung 6 · Thượng 4 · Cực 2.
-              </p>
+              <PillBagCapacitySummary
+                accounts={accounts}
+                accountTier={prefix === "luyenDan" ? "vip" : "free"}
+              />
             </div>
 
             {/* Hai ô chọn KHÔNG bị `disabled` khi hạn mức đang tắt, và đó là chủ ý: radio
@@ -1174,6 +1179,7 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
           onToggleCollapse={() => toggleCollapsed("luyenDan")}
           accentClass="accent-[var(--color-gold-400)]"
           config={config.quests.luyenDan}
+          accounts={accounts}
           enabled={luyenDan}
           onToggle={setLuyenDan}
         />
@@ -1185,6 +1191,7 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
           onToggleCollapse={() => toggleCollapsed("luyenDan")}
           accentClass="accent-[var(--color-jade-400)]"
           config={config.quests.luyenDanThuong}
+          accounts={accounts}
           enabled={luyenDanThuong}
           onToggle={setLuyenDanThuong}
         />

@@ -26,6 +26,8 @@ import {
   sweepExpiredJobEventsIfDue,
 } from "@/lib/services/jobs";
 import { recordWorkerSeen } from "@/lib/services/workers";
+import { recordDetectedPillBagCapsForJob } from "@/lib/services/accounts";
+import { pillBagCapsSchema } from "@/lib/validation/pillBagCaps";
 import {
   configSchema,
   enforceMazeCapPolicy,
@@ -41,20 +43,21 @@ import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 /**
  * Giao thức khôi lỗi — MỘT endpoint, phân nhánh theo `op`.
  *
- * Gộp làm một thay vì năm route riêng là có chủ ý: cả năm thao tác dùng chung đúng một
+ * Gộp vào một route là có chủ ý: các thao tác dùng chung đúng một
  * cách xác thực, chung một hình thù request/response, và chúng luôn thay đổi cùng nhau
  * (thêm một trường vào heartbeat là đụng cả worker lẫn server). Một file giữ giao thức nằm
  * gọn trong một màn hình, và worker chỉ cần biết một URL.
  *
  * Xác thực trả về SCOPE chứ không phải có/không: khôi lỗi tông môn (WORKER_TOKEN) đụng
  * được mọi job, khôi lỗi riêng (linh phù) chỉ đụng được job của chủ mình. Claim đã lọc
- * trong SQL; bốn op còn lại đi qua `jobBelongsTo` — hai lớp, lớp nào thủng vẫn còn lớp kia.
+ * trong SQL; các op còn lại đi qua `jobBelongsTo` — hai lớp, lớp nào thủng vẫn còn lớp kia.
  *
- * Năm thao tác dựng nên vòng đời một lượt chạy:
+ * Các thao tác dựng nên vòng đời một lượt chạy:
  *   claim     — xin việc; trả về job kèm config snapshot, hoặc null nếu hàng chờ trống.
  *   heartbeat — "tôi còn sống", kèm tiến độ vòng này; trả về status HIỆN TẠI để worker biết
  *               người dùng đã bấm thu đàn.
  *   accountTier — hạng vừa chứng minh trên hub, để giao diện khóa tab đối nghịch.
+ *   pillBagCaps — sức chứa từng phẩm vừa đọc từ túi đan của tài khoản đang chạy.
  *   event     — một dòng nhật ký cho người dùng đọc.
  *   complete  — kết thúc một VÒNG; server tái xếp job, trừ khi người dùng đã Thu Đàn.
  */
@@ -130,6 +133,11 @@ const bodySchema = z.discriminatedUnion("op", [
     op: z.literal("accountTier"),
     jobId: z.string().uuid(),
     tier: z.enum(["vip", "free"]),
+  }),
+  z.object({
+    op: z.literal("pillBagCaps"),
+    jobId: z.string().uuid(),
+    caps: pillBagCapsSchema,
   }),
   z.object({
     op: z.literal("event"),
@@ -344,6 +352,15 @@ export async function POST(request: Request) {
       }
 
       await recordDetectedAccountTierForJob(body.jobId, body.tier);
+      return NextResponse.json({ ok: true });
+    }
+
+    case "pillBagCaps": {
+      if (!(await jobBelongsTo(body.jobId, scope))) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+
+      await recordDetectedPillBagCapsForJob(body.jobId, body.caps);
       return NextResponse.json({ ok: true });
     }
 

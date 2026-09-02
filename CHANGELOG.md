@@ -11,6 +11,31 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.66 — Sức chứa túi đan theo đúng tài khoản
+
+Bốn con số 10/6/4/2 trong record chỉ thuộc về tài khoản được quay, không phải trần chung của
+mọi túi. Dòng trợ giúp ở cấu hình từng biến chúng thành mặc định cố định, khiến người dùng
+nâng túi vẫn nhìn thấy sức chứa cũ. Nay mỗi lượt Luyện Đan VIP hoặc Thường đọc bốn mẫu số
+ngay trên `#ldBagPillStats .ld-bag-usage--stored` và báo về tài khoản của chính lượt chạy đó.
+Không mượn sức chứa của tài khoản trước, không gán mặc định khi chưa đọc được trang.
+
+`game_accounts` giữ lần quan sát gần nhất cùng thời điểm dò; dashboard nhận thay đổi qua
+luồng tài khoản sẵn có. Mỗi nhóm cấu hình liệt kê riêng tài khoản VIP hoặc Thường, có ngày giờ
+dò và trạng thái chưa biết. Giá trị **Giữ tối đa** do người dùng chọn vẫn giữ nguyên: sức chứa
+chỉ là thông tin tham khảo, không tự sửa hạn mức hoặc đổi chính sách phân giải.
+
+Worker gửi đủ bốn số nguyên không âm qua `pillBagCaps`. API kiểm tra quyền của job và chỉ ghi
+nếu tài khoản, chủ sở hữu, cookie snapshot và trạng thái đang chạy còn khớp. Đổi cookie xóa
+quan sát cũ, báo cáo đến muộn từ cookie trước không thể ghi đè. Trang thiếu hàng, trùng hàng
+hoặc dữ liệu lỗi thì không cập nhật; lỗi báo cáo cũng không làm hỏng quest. Worker cũ vẫn chạy
+bình thường, chỉ chưa gửi sức chứa cho đến lượt dùng gói mới.
+
+Ba bộ kiểm thử riêng phủ nguồn đọc DOM trong Chromium, cô lập nhiều tài khoản, helper quan
+sát, giao diện theo hạng và đường lưu có ràng buộc quyền/cookie. Migration chỉ thêm hai cột
+nullable, không đoán sức chứa cho tài khoản chưa được dò.
+
+---
+
 ## 1.3.65 — Luyện Đan đếm hạn mức riêng từng phẩm
 
 Bản ghi `luyen-dan-duong-20260901-121715` cho thấy bốn bộ đếm độc lập trong cùng một túi:

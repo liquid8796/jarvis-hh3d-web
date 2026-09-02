@@ -16,6 +16,7 @@ import {
 } from "drizzle-orm/pg-core";
 import type { CycleProgress } from "@/lib/realtime/dashboardTypes";
 import type { NoticeAudienceKind } from "@/lib/validation/notices";
+import type { PillBagCaps } from "@/lib/validation/pillBagCaps";
 
 /**
  * One database for everything, on purpose.
@@ -228,6 +229,9 @@ export const gameAccounts = pgTable(
     cookieEnvelope: text("cookie_envelope").notNull(),
     /** Hạng do khôi lỗi chứng minh trên hub; null = cookie này chưa được dò. */
     accountTier: text("account_tier").$type<"vip" | "free">(),
+    /** Sức chứa từng phẩm đọc từ túi của CHÍNH tài khoản này; null = chưa đọc được. */
+    pillBagCaps: jsonb("pill_bag_caps").$type<PillBagCaps>(),
+    pillBagCapsObservedAt: timestamp("pill_bag_caps_observed_at", { withTimezone: true }),
     /** Tắt là đứng ngoài Khai Đàn — cấu hình và lịch sử giữ nguyên, chỉ không chạy. */
     enabled: boolean("enabled").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

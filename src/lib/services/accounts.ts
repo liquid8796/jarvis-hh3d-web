@@ -1,8 +1,9 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { decryptSecret, encryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import type { GameAccountRow } from "@/lib/db/schema";
 import type { AccountTier } from "./configs";
+import { pillBagCapsSchema, type PillBagCaps } from "@/lib/validation/pillBagCaps";
 
 /**
  * Tài khoản game — số nhiều, mỗi cái một cookie, một công tắc, một verdict hạng.
@@ -19,6 +20,8 @@ export type GameAccountView = {
   id: string;
   label: string;
   accountTier: AccountTier | null;
+  pillBagCaps: PillBagCaps | null;
+  pillBagCapsObservedAt: string | null;
   enabled: boolean;
 };
 
@@ -27,10 +30,18 @@ export const MAX_ACCOUNTS_PER_USER = 10;
 const MAX_LABEL_LENGTH = 60;
 
 function toView(row: GameAccountRow): GameAccountView {
+  // JSONB có thể đến từ bản import cũ; không đưa dữ liệu sai hình dạng lên giao diện.
+  const caps = pillBagCapsSchema.safeParse(row.pillBagCaps);
+  const observedAt = row.pillBagCapsObservedAt;
   return {
     id: row.id,
     label: row.label,
     accountTier: row.accountTier ?? null,
+    pillBagCaps: caps.success ? caps.data : null,
+    pillBagCapsObservedAt:
+      caps.success && observedAt && Number.isFinite(observedAt.getTime())
+        ? observedAt.toISOString()
+        : null,
     enabled: row.enabled,
   };
 }
@@ -122,6 +133,7 @@ export async function addAccount(
 /**
  * Thay cookie của một tài khoản. Cookie mới có thể thuộc hạng đối nghịch nên verdict cũ bị
  * xoá — chỉ khôi lỗi nhìn hub mới được quyền phán lại (đúng luật đã đặt ở saveCookie cũ).
+ * Sức chứa túi cũng thuộc cookie, nên phải đọc lại thay vì giữ số của nhân vật trước.
  */
 export async function updateAccountCookie(
   userId: string,
@@ -138,6 +150,8 @@ export async function updateAccountCookie(
     .set({
       cookieEnvelope: encryptSecret(cookiePlain.trim()),
       accountTier: null,
+      pillBagCaps: null,
+      pillBagCapsObservedAt: null,
       updatedAt: new Date(),
     })
     .where(and(eq(schema.gameAccounts.id, accountId), eq(schema.gameAccounts.userId, userId)))
@@ -146,6 +160,30 @@ export async function updateAccountCookie(
     return { ok: false, error: "Không tìm thấy tài khoản này — có thể nó vừa bị xoá." };
   }
   return { ok: true, account: toView(rows[0]) };
+}
+
+/**
+ * Ghi sức chứa vào đúng tài khoản của lượt chạy đã đọc nó. So phong bì với snapshot ngay
+ * trong UPDATE: nếu chủ vừa thay cookie, kết quả cũ không được gắn vào nhân vật mới. Job
+ * không còn chạy hoặc không gắn tài khoản thì bỏ qua. Trigger tài khoản tự báo realtime.
+ */
+export async function recordDetectedPillBagCapsForJob(
+  jobId: string,
+  caps: PillBagCaps,
+): Promise<void> {
+  const observed = pillBagCapsSchema.parse(caps);
+  await db().execute(sql`
+    update game_accounts as acc set
+      pill_bag_caps = ${JSON.stringify(observed)}::jsonb,
+      pill_bag_caps_observed_at = now(),
+      updated_at = now()
+    from automation_jobs as job
+    where job.id = ${jobId}
+      and acc.id = job.account_id
+      and acc.user_id = job.user_id
+      and acc.cookie_envelope = job.config_snapshot ->> 'gameCookie'
+      and job.status in ('running', 'stopping')
+  `);
 }
 
 export async function renameAccount(

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.66",
+    date: "2026-09-02",
+    lines: [
+      "Sức chứa túi đan nay hiển thị riêng theo từng tài khoản VIP và Thường, không còn dùng chung một bộ số cố định.",
+      "Số liệu tự cập nhật sau mỗi lượt Luyện Đan, có thời điểm dò gần nhất; tài khoản chưa dò sẽ được ghi rõ.",
+      "Hạn mức giữ đan đã chọn vẫn được giữ nguyên. Khi đổi thông tin đăng nhập, sức chứa cũ được xóa để chờ dò lại.",
+    ],
+  },
+  {
     version: "1.3.65",
     date: "2026-09-01",
     lines: [
@@ -462,15 +471,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Mỗi khôi lỗi GitHub mới nay đi cùng hai dự án phần mềm hoàn chỉnh, mang tên và lĩnh vực khác nhau.",
       "Hai dự án ấy được chăm hằng ngày với năm lượt cập nhật mặc định; Gia chủ có thể đổi số lượt ngay trong Tông Môn.",
       "Tên kho khó trùng hơn nhiều, và toàn bộ lời giới thiệu trong các kho công khai đều dùng tiếng Anh.",
-    ],
-  },
-  {
-    version: "1.3.15",
-    date: "2026-08-19",
-    lines: [
-      "Mỗi đàn nay ở lại với đúng cái máy đã chạy nó, thay vì mỗi vòng lại nhảy sang một máy khác.",
-      "Trước đây một tài khoản đi qua cả chục máy trong một buổi, mỗi máy một địa chỉ khác — trang game coi đó là đáng ngờ nên bắt xác minh.",
-      "Máy cũ nghỉ hoặc kín chỗ thì đàn vẫn sang máy khác ngay, không phải chờ.",
     ],
   },
 ];

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.67",
+    date: "2026-09-02",
+    lines: [
+      "Bí Cảnh Tông Môn: khi boss đã bị hạ mà phần thưởng còn treo, khôi lỗi nay tự nhận thưởng rồi mới khiêu chiến tiếp.",
+      "Trước đây gặp màn nhận thưởng thì lượt ghé đứng chờ vô ích cho tới khi hết giờ, và phần thưởng chặn luôn boss kế.",
+      "Áp dụng cho cả tài khoản VIP lẫn Thường. Ngày đã hết lượt vẫn dừng sớm như cũ, không tốn thêm lượt tải trang nào.",
+    ],
+  },
+  {
     version: "1.3.66",
     date: "2026-09-02",
     lines: [
@@ -462,15 +471,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Trong lúc tông môn bế quan trùng tu, bậc trị sự vẫn khai đàn và chạy auto được như thường.",
       "Đàn của môn đồ khác vẫn nằm chờ tới lúc mở cửa lại, không đổi gì so với trước.",
-    ],
-  },
-  {
-    version: "1.3.16",
-    date: "2026-08-19",
-    lines: [
-      "Mỗi khôi lỗi GitHub mới nay đi cùng hai dự án phần mềm hoàn chỉnh, mang tên và lĩnh vực khác nhau.",
-      "Hai dự án ấy được chăm hằng ngày với năm lượt cập nhật mặc định; Gia chủ có thể đổi số lượt ngay trong Tông Môn.",
-      "Tên kho khó trùng hơn nhiều, và toàn bộ lời giới thiệu trong các kho công khai đều dùng tiếng Anh.",
     ],
   },
 ];

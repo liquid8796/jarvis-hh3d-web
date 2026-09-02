@@ -290,17 +290,20 @@ const FREE_WELFARE_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
  *
  * @param broken  nút Tấn Công nhận cú bấm rồi KHÔNG làm gì — ca "cú bấm rơi vào hư không"
  * @param state   "ready" · "cooldown" (còn lượt, chưa tới giờ) · "spent" (hết 5 lượt hôm nay)
+ *   · "claim" (boss đã chết, phần thưởng chưa nhận — trang KHÔNG vẽ nút khiêu chiến nào)
  * @param lastTurn  chỉ còn ĐÚNG MỘT lượt: đánh xong thì nút nhảy sang "Hết lượt hôm nay" chứ
  *   không phải đồng hồ — nửa còn lại của điều kiện nhân chứng `":|hết lượt"`
+ * @param claimBroken  nút Nhận Thưởng nhận cú bấm rồi KHÔNG làm gì — ca đối chứng cho nhân
+ *   chứng modal: thiếu nó thì một cú bấm rơi vào hư không vẫn đọc như một lượt nhận thành công
  * @param paintMs  bao lâu thì boss-system.js vẽ xong khối điều khiển
  * @param stateMs  bao lâu thì câu trả lời cooldown về (luôn SAU paintMs)
  */
-const biCanhPage = ({ broken = false, state = "ready", lastTurn = false, paintMs = 120, stateMs = 400 } = {}) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+const biCanhPage = ({ broken = false, claimBroken = false, state = "ready", lastTurn = false, paintMs = 120, stateMs = 400 } = {}) => `<!doctype html><html lang="vi"><meta charset="utf-8">
 <style>#challenge-boss-btn{text-transform:uppercase}</style>
 <a href="javascript:void(0)" class="fixed-back-btn"><span>Trở Lại</span></a>
 <div class="boss-game-container">
   <div class="game-title"><h1>Bí Cảnh Tông Môn</h1></div>
-  <div class="boss-info"><div id="boss-slot"></div></div>
+  <div class="boss-info"><div id="boss-status-container"></div></div>
 </div>
 <div id="attack-modal" style="display:none">
   <button id="attack-boss-btn">Tấn Công</button><button id="back-button">Trở lại</button>
@@ -308,9 +311,27 @@ const biCanhPage = ({ broken = false, state = "ready", lastTurn = false, paintMs
 <script>
 const STATE = ${JSON.stringify(state)};
 const BROKEN = ${JSON.stringify(broken)};
+const CLAIM_BROKEN = ${JSON.stringify(claimBroken)};
 // 1. boss-system.js vẽ khối điều khiển — LUÔN mở, luôn "KHIÊU CHIẾN", vì lúc này nó chưa hỏi ai.
 setTimeout(() => {
-  document.getElementById('boss-slot').innerHTML =
+  // Boss đã chết mà phần thưởng chưa nhận: trang KHÔNG vẽ nút khiêu chiến nào cả — chép theo
+  // dom/01-load.html của bản ghi bi-canh-tong-mon-20260902-091927. Khung chứa thì vẫn là nó,
+  // và đó chính là lý do cổng render phải hỏi khung chứ không hỏi nút.
+  if (STATE === 'claim') {
+    document.getElementById('boss-status-container').innerHTML =
+      '<div class="reward-claim-section">'
+      + '<div class="reward-celebration"><h2>Chúc Mừng!</h2></div>'
+      + '<div class="boss-defeated-info">Đạo hữu đã tham gia hạ gục boss thành công!</div>'
+      + '<div class="reward-rank-display">#22</div>'
+      + '<div class="reward-actions-section">'
+      + '<button id="claim-reward-btn" class="claim-reward-btn">Nhận Thưởng</button>'
+      + '<button id="view-full-ranking-btn" class="view-ranking-btn">Xem Bảng Xếp Hạng</button>'
+      + '</div>'
+      + '<div class="reward-note">Đạo hữu cần nhận thưởng trước khi có thể tham gia boss mới</div>'
+      + '</div>';
+    return;
+  }
+  document.getElementById('boss-status-container').innerHTML =
     '<div id="boss-timer-text">88:28:39</div>'
     + '<div class="boss-hp-section"><div class="hp-percentage">69.84%</div></div>'
     + '<button id="challenge-boss-btn" class="challenge-btn">KHIÊU CHIẾN</button>'
@@ -335,6 +356,23 @@ setTimeout(() => {
 }, ${stateMs});
 document.addEventListener('click', (e) => {
   const t = e.target;
+  if (t.id === 'claim-reward-btn') {
+    if (CLAIM_BROKEN) return; // site nuốt cú bấm: không POST, không modal
+    fetch('/btm-claim');
+    document.body.dataset.claimed = '1';
+    // Biên nhận đến SAU một nhịp, y như bản ghi (bấm 02:21:23,5 → modal 02:21:25,9).
+    setTimeout(() => {
+      document.body.insertAdjacentHTML('beforeend',
+        '<div class="reward-claim-modal-overlay show"><div class="reward-claim-modal">'
+        + '<div class="reward-modal-header"><div class="header-content">'
+        + '<h3>Nhận Thưởng Thành Công!</h3>'
+        + '<button class="reward-modal-close">×</button>'
+        + '</div></div>'
+        + '<div class="reward-modal-body">410 Cống Hiến · 890 Tu Vi · 300 Tinh Thạch</div>'
+        + '</div></div>');
+    }, 140);
+    return;
+  }
   if (t.id === 'challenge-boss-btn') {
     if (t.disabled) { document.body.dataset.refused = '1'; return; }
     setTimeout(() => { document.getElementById('attack-modal').style.display = 'block'; }, 150);
@@ -2178,8 +2216,11 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // 80 = Luyện Đan Đường bỏ số tổng/đoạn chữ modal đã biến mất: quét đúng hàng Hạ, Trung,
     // Thượng hoặc Cực đang cấu hình trong `#ldBagPillStats`, so tử số bằng số thật và chỉ mở ô
     // đan mang đúng `data-tier`. Hai twin VIP/thường dùng chung flow này.
-    "hồ sơ đang ở schema 80",
-    loadProfileForSchema().schemaVersion === 80,
+    // 81 = Bí Cảnh Tông Môn: cả hai twin mở màn bằng khúc nhận thưởng boss đã chết
+    // (`#claim-reward-btn` gác bằng `when`), vì thưởng chưa nhận là CỬA CHẶN boss kế chứ
+    // không phải phần thưởng bỏ quên. Bản ghi bi-canh-tong-mon-20260902-091927.
+    "hồ sơ đang ở schema 81",
+    loadProfileForSchema().schemaVersion === 81,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -2765,6 +2806,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   // hub thì KHÔNG mở trang boss」, thứ không đọc được từ kết cục của lượt chạy.
   let btmState = "ready";
   let btmBroken = false;
+  let btmClaimBroken = false;
+  const btmClaims = [];
   let btmLastTurn = false;
   let btmHubSpent = false;
   let btmHits = 0;
@@ -2963,9 +3006,13 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     else if (path === "/nhiem-vu-hang-ngay") res.end(hubPage({ ...ptState, biCanhSpent: btmHubSpent }));
     else if (path === "/bi-canh-tong-mon") {
       btmHits += 1;
-      res.end(biCanhPage({ broken: btmBroken, state: btmState, lastTurn: btmLastTurn }));
+      res.end(biCanhPage({ broken: btmBroken, claimBroken: btmClaimBroken, state: btmState, lastTurn: btmLastTurn }));
     }
     else if (path === "/btm-cooldown") res.end("ok");
+    // Cùng luật với /hv-claim: server ghi nhận VÀ đổi trạng thái, nên lượt tải lại kế tiếp là
+    // trang boss bình thường. Fixture giữ nguyên trạng thái「còn thưởng」sau một cú nhận thành
+    // công là fixture nói dối ở đúng chỗ quan trọng nhất.
+    else if (path === "/btm-claim") { btmClaims.push(new Date().toISOString()); btmState = "ready"; res.end("ok"); }
     else if (path === "/btm-attack") { btmAttacks.push(new Date().toISOString()); res.end("ok"); }
     else if (path === "/pt-claim") { ptState.claims.push(url.searchParams.get("stage") ?? "?"); res.end("ok"); }
     else if (path === "/phuc-loi-duong") res.end(FREE_WELFARE_PAGE);
@@ -3172,6 +3219,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     const resetBiCanh = async (over = {}) => {
       btmState = over.state ?? "ready";
       btmBroken = over.broken === true;
+      btmClaimBroken = over.claimBroken === true;
+      btmClaims.length = 0;
       btmLastTurn = over.lastTurn === true;
       btmHubSpent = over.hubSpent === true;
       btmAttacks.length = 0;
@@ -3271,6 +3320,80 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       "flow KHÔNG nhân chứng trên cùng ca hỏng: báo \"xong\" cho một trận chưa từng đánh",
       btmBlind.outcome === "completed" && btmAttacks.length === 0,
       `${btmBlind.outcome} · POST=${btmAttacks.length}`,
+    );
+
+    // ---- Boss đã chết, thưởng chưa nhận (bản ghi 02/09) -----------------------------------
+    // Cảnh mà flow cũ KHÔNG có chữ nào để tả: trang bỏ hẳn nút khiêu chiến và mời nhận thưởng,
+    // nên mọi điều kiện của script đời trước cùng trả "no match" — probes.json của bản ghi ghi
+    // đúng hai phút như thế. Nhận xong, trang trở lại bình thường và lượt đánh vẫn phải diễn ra.
+    await resetBiCanh({ state: "claim" });
+    const btmClaim = await run(biCanhFree);
+    check(
+      "thưởng đang chờ → nhận thưởng RỒI đánh tiếp, trọn một lượt",
+      btmClaim.outcome === "completed" && btmClaims.length === 1 && btmAttacks.length === 1,
+      `${btmClaim.outcome} · claim=${btmClaims.length} · attack=${btmAttacks.length}`,
+    );
+
+    // Ngày thường KHÔNG được đụng vào cửa nhận thưởng, và cũng không được tốn thêm lượt tải
+    // nào: `when` đọc trước bước nên không có phần tử thì bỏ qua sạch, và trang boss vẫn chỉ
+    // mở ĐÚNG MỘT lần y như trước khi có khúc này.
+    await resetBiCanh();
+    const btmNoReward = await run(biCanhFree);
+    check(
+      "không có thưởng chờ → bỏ qua khúc nhận, không POST claim, trang boss vẫn mở đúng 1 lần",
+      btmNoReward.outcome === "completed" &&
+        btmClaims.length === 0 &&
+        btmAttacks.length === 1 &&
+        btmHits === 1,
+      `${btmNoReward.outcome} · claim=${btmClaims.length} · attack=${btmAttacks.length} · hits=${btmHits}`,
+    );
+
+    // ---- Ngày đã cạn mà thưởng còn treo: HOÃN có chủ ý ------------------------------------
+    // Khúc nhận nằm SAU cửa hub, nên ngày đã cạn thì trang boss không được mở lần nào — đúng
+    // bất biến mà ca "hàng hub đã Xong" ở trên canh. Cái thưởng ấy không mất: cửa chặn chỉ cắn
+    // khi tài khoản định vào boss mới, và chính lượt ghé ấy sẽ nhận trước khi khiêu chiến.
+    await resetBiCanh({ state: "claim", hubSpent: true });
+    const btmClaimSpent = await run(biCanhFree);
+    check(
+      "ngày cạn + thưởng treo → dừng ở hub, hoãn khúc nhận, KHÔNG mở trang boss",
+      btmClaimSpent.outcome === "alreadyDone" && btmClaims.length === 0 && btmHits === 0,
+      `${btmClaimSpent.outcome} · claim=${btmClaims.length} · hits=${btmHits}`,
+    );
+
+    // ---- Cú bấm Nhận Thưởng rơi vào hư không: phải HỎNG, và hỏng NGAY ----------------------
+    await resetBiCanh({ state: "claim", claimBroken: true });
+    const btmClaimBrokenRun = await run(biCanhFree);
+    check(
+      "site nuốt cú bấm Nhận Thưởng → lượt chạy HỎNG, không đi tiếp như chưa có gì",
+      btmClaimBrokenRun.outcome === "failed" && btmClaims.length === 0,
+      `${btmClaimBrokenRun.outcome} · claim=${btmClaims.length}`,
+    );
+    const hitsWithWitness = btmHits;
+
+    // ĐỐI CHỨNG, cùng khuôn với đối chứng nhân chứng đòn đánh ở trên. Ở làn thường cú bấm bị
+    // nuốt rốt cuộc VẪN bị bắt — nút khiêu chiến không bao giờ hiện ra — nên thứ bước nhân
+    // chứng mua về không phải là "khỏi báo nhầm" mà là bắt ĐÚNG CHỖ và bắt SỚM: gỡ nó ra thì
+    // lượt chạy còn tải lại trang boss thêm một lượt nữa rồi mới chết ở một câu nói sai chỗ
+    // ("không thấy nút khiêu chiến"), đọc như một trang vẽ hỏng chứ không như một cửa chưa mở.
+    const btmNoClaimWitness = structuredClone(biCanhFree);
+    const claimWitnessAt = btmNoClaimWitness.steps.findIndex(
+      (s) =>
+        s.action === "waitForCondition" &&
+        s.optional !== true &&
+        s.condition?.selector === ".reward-claim-modal-overlay.show",
+    );
+    check(
+      "flow có ĐÚNG một bước nhân chứng bắt buộc sau cú Nhận Thưởng",
+      claimWitnessAt > 0,
+      String(claimWitnessAt),
+    );
+    btmNoClaimWitness.steps.splice(claimWitnessAt, 1);
+    await resetBiCanh({ state: "claim", claimBroken: true });
+    const btmClaimBlind = await run(btmNoClaimWitness);
+    check(
+      "flow KHÔNG nhân chứng: vẫn hỏng, nhưng muộn hơn một lượt tải và ở sai chỗ",
+      btmClaimBlind.outcome === "failed" && btmHits > hitsWithWitness,
+      `${btmClaimBlind.outcome} · hits ${hitsWithWitness} → ${btmHits}`,
     );
 
     // ---- Hình dạng của flow, những chỗ một lần sửa ẩu là mất im lặng ------------------------

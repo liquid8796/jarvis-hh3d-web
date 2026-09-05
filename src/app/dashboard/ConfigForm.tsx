@@ -466,6 +466,7 @@ function KhoangMachFieldset({
    * bản một cái, y như `enabled` của mỗi fieldset.
    */
   const [hostMode, setHostMode] = useState(config.hostMode);
+  const [buyPhu, setBuyPhu] = useState(config.buyPhu);
   /**
    * Mờ cụm con CHỈ khi khung cha đang sáng. Cả fieldset đã mang `opacity-40` lúc nhiệm vụ
    * tắt, mà hai lớp opacity lồng nhau thì NHÂN với nhau — 0.16 đọc như một lỗi vẽ chứ không
@@ -607,15 +608,36 @@ function KhoangMachFieldset({
                   type="checkbox"
                   name={`${prefix}BuyPhu`}
                   defaultChecked={config.buyPhu}
+                  onChange={(e) => setBuyPhu(e.target.checked)}
                   disabled={!hostMode}
                   className={`h-4 w-4 ${accentClass}`}
                 />
-                Mua Linh Quang Phù (tối đa 1 lá/ngày)
+                Mua Linh Quang Phù
               </label>
               <p className="mt-1 text-xs text-[var(--color-mist)]">
-                +20% tu vi trong 1 giờ, mua ngay trước lúc nhận thưởng — tiền thật, nên mỗi ngày
-                khôi lỗi chỉ mua đúng một lá.
+                +20% tu vi trong 1 giờ, chỉ mua sau khi đoạt mỏ thành công và ngay trước lúc
+                nhận thưởng.
               </p>
+
+              <div className={`mt-3 ${buyPhu ? "" : "opacity-40"}`}>
+                <label className="label" htmlFor={`${prefix}PhuDailyLimit`}>
+                  Số lá tối đa mỗi ngày
+                </label>
+                <input
+                  id={`${prefix}PhuDailyLimit`}
+                  name={`${prefix}PhuDailyLimit`}
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={3}
+                  defaultValue={config.phuDailyLimit}
+                  readOnly={!hostMode || !buyPhu}
+                  aria-disabled={!hostMode || !buyPhu}
+                />
+                <p className="mt-1 text-xs text-[var(--color-mist)]">
+                  Từ 1 đến 3 lá; mặc định 1 để giữ nguyên mức chi tiêu cũ.
+                </p>
+              </div>
             </div>
 
             {/* Ngưỡng thì `readOnly`, KHÔNG `disabled`: một ô số vắng mặt sẽ được action đọc

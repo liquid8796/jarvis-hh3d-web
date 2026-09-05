@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.69",
+    date: "2026-09-06",
+    lines: [
+      "Vấn Đáp nay đọc được cả bảng tham khảo có thẻ lỗi hoặc đổi thuộc tính, và tự thử lại khi nguồn tạm trả trang rỗng.",
+      "Khoáng Mạch có ô đặt tối đa 1–3 Linh Quang Phù mỗi ngày; mặc định vẫn là 1 để giữ nguyên mức chi tiêu cũ.",
+      "Hạn mức được đếm chung theo tài khoản qua mọi khôi lỗi, áp dụng riêng cho cấu hình VIP lẫn Thường.",
+    ],
+  },
+  {
     version: "1.3.68",
     date: "2026-09-02",
     lines: [
@@ -464,14 +473,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khi trang game chặn máy chạy tự động ở cổng, vòng chạy nay dừng ngay và nói đúng lý do, thay vì thử lại từng nhiệm vụ suốt mười mấy phút.",
       "Nhờ vậy máy được nhả sớm cho đàn khác, và nhật ký thôi đổ lỗi nhầm cho trang chậm.",
-    ],
-  },
-  {
-    version: "1.3.18",
-    date: "2026-08-19",
-    lines: [
-      "Máy chạy tự động nay có thêm một cách tự vượt bước kiểm tra của trang khi bị chặn ở cổng.",
-      "Mặc định tắt, bật riêng cho từng máy khi cần — màn hình không đổi gì.",
     ],
   },
 ];

@@ -68,7 +68,7 @@ const luyenDanQuest = z
 /**
  * Khoáng Mạch — MỘT hình thù, HAI bản ghi (`khoangMach` cho hạng VIP, `khoangMachThuong`
  * cho hạng thường), cùng bài học tách đôi đã trả giá ở luyenDanQuest: hai hạng có quyền đào
- * hai mỏ khác nhau. Bốn lựa chọn khớp 1-1 với options của hồ sơ quest (dựng từ bản ghi
+ * hai mỏ khác nhau. Các lựa chọn khớp 1-1 với options của hồ sơ quest (dựng từ bản ghi
  * khoang-mach-20260814-133812):
  *
  *   - `mineType`: nút loại khoáng thứ 1/2/3 trên trang (Thượng/Trung/Hạ).
@@ -99,12 +99,16 @@ const khoangMachQuest = z
      */
     minBonus: z.number().int().min(0).max(500).default(0),
     /**
-     * Mua Linh Quang Phù (+20% tu vi, 1 giờ) ngay trước cú chốt lời — TỐI ĐA 1 lá/ngày, suất
-     * ngày do engine giữ. Mặc định true giữ đúng hành vi schema 59 (thời hostMode bật là mua
-     * kèm); cái mới của schema 60 là suất 1/ngày và quyền tắt hẳn. Tách khỏi `hostMode`: phù
-     * phục vụ cú CHỐT LỜI, không riêng gì đoạt.
+     * Mua Linh Quang Phù (+20% tu vi, 1 giờ) ngay trước cú chốt lời. Mặc định true giữ đúng
+     * hành vi schema 59; quyền tắt hẳn có từ schema 60. Tách khỏi `hostMode`: phù phục vụ cú
+     * CHỐT LỜI, không riêng gì đoạt.
      */
     buyPhu: z.boolean().default(true),
+    /**
+     * Trần mua theo ngày, 1..3 vì chính trang chỉ cho ba lượt tấn công/đoạt mỗi ngày. Mặc định
+     * 1 giữ nguyên mức chi tiêu của mọi cấu hình đã lưu trước khi ô số này ra đời.
+     */
+    phuDailyLimit: z.number().int().min(1).max(3).default(1),
     hostMode: z.boolean().default(false),
     hostMinBonus: z.number().int().min(0).max(500).default(100),
   })

@@ -2219,8 +2219,10 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // 81 = Bí Cảnh Tông Môn: cả hai twin mở màn bằng khúc nhận thưởng boss đã chết
     // (`#claim-reward-btn` gác bằng `when`), vì thưởng chưa nhận là CỬA CHẶN boss kế chứ
     // không phải phần thưởng bỏ quên. Bản ghi bi-canh-tong-mon-20260902-091927.
-    "hồ sơ đang ở schema 81",
-    loadProfileForSchema().schemaVersion === 81,
+    // 82 = Khoáng Mạch: số Linh Quang Phù tối đa mỗi ngày là option 1..3 thay vì ghim 1;
+    // parser Vấn Đáp chịu được thẻ có thuộc tính/thiếu đóng nhưng không đổi schema quest.
+    "hồ sơ đang ở schema 82",
+    loadProfileForSchema().schemaVersion === 82,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -3524,7 +3526,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       kmDrift.outcome,
     );
 
-    console.log("\nKhoáng Mạch — mua phù & đoạt mỏ: CHỈ khi đã chín, hai công tắc rời, suất 1 lá/ngày");
+    console.log("\nKhoáng Mạch — mua phù & đoạt mỏ: CHỈ khi đã chín, hai công tắc rời, hạn mức 1..3 lá/ngày");
 
     // hostMode + buyPhu cùng bật mà CHƯA CHÍN → không đóng/mở sổ, không mua, không đoạt.
     kmState = kmFresh();
@@ -3562,7 +3564,25 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       kmSecond.outcome === "completed" && kmState.bought.length === 0 && kmState.owner === true,
       `bought=${kmState.bought.length}; owner=${kmState.owner}`,
     );
-    check("…và nhật ký nói rõ vì sao không mua", infos.some((m) => m.includes("đã dùng suất")));
+    check("…và nhật ký nói rõ vì sao không mua", infos.some((m) => m.includes("đã mua đủ")));
+
+    // Trần do người dùng đặt phải là BỘ ĐẾM, không phải checkbox trá hình: trần 2 cho phép đúng
+    // hai lần mua rồi chặn lần ba trong cùng ngày/hồ sơ trình duyệt.
+    await kmClearDay();
+    for (let visit = 1; visit <= 3; visit++) {
+      kmState = kmFresh();
+      kmState.inMine = true;
+      const result = await run(kmWith({
+        hostMode: kmOn("hostMode"),
+        hostMinBonus: "100",
+        phuDailyLimit: "2",
+      }));
+      check(
+        `trần 2 lá — lượt ${visit} ${visit <= 2 ? "được mua" : "bị chặn"}`,
+        result.outcome === "completed" && kmState.bought.length === (visit <= 2 ? 1 : 0),
+        `${result.outcome}; bought=${kmState.bought.length}`,
+      );
+    }
 
     // buyPhu «không mua»: đoạt vẫn chạy, ví tiền đứng yên — hai công tắc thật sự rời nhau.
     kmState = kmFresh();
@@ -3852,30 +3872,32 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       `${kmF1.outcome}: ${kmF1.cooldownSeconds}s`,
     );
 
-    // Lớp dịch config → hồ sơ: mỗi twin nhận ĐÚNG bộ tuỳ chọn của tab mình, đủ sáu khoá.
+    // Lớp dịch config → hồ sơ: mỗi twin nhận ĐÚNG bộ tuỳ chọn của tab mình, đủ bảy khoá.
     {
       const translated = profileForConfig({
         quests: {
-          khoangMach: { enabled: true, mineType: "1", mineName: "Địa", minBonus: 80, buyPhu: true, hostMode: true, hostMinBonus: 120 },
-          khoangMachThuong: { enabled: true, mineType: "3", mineName: "Thạch Thôn", minBonus: 0, buyPhu: false, hostMode: false, hostMinBonus: 100 },
+          khoangMach: { enabled: true, mineType: "1", mineName: "Địa", minBonus: 80, buyPhu: true, phuDailyLimit: 3, hostMode: true, hostMinBonus: 120 },
+          khoangMachThuong: { enabled: true, mineType: "3", mineName: "Thạch Thôn", minBonus: 0, buyPhu: false, phuDailyLimit: 2, hostMode: false, hostMinBonus: 100 },
         },
       });
       const opt = (quest, key) => quest.options.find((o) => o.key === key)?.selectedValue;
       const vipT = translated.quests.find((q) => q.id === "khoang-mach");
       const freeT = translated.quests.find((q) => q.id === "khoang-mach-thuong");
       check(
-        "twin VIP nhận tab VIP: loại 1, mỏ Địa, ngưỡng đào 80, MUA phù, đoạt bật ngưỡng 120",
+        "twin VIP nhận tab VIP: loại 1, mỏ Địa, ngưỡng đào 80, MUA tối đa 3 phù, đoạt bật ngưỡng 120",
         vipT.enabled === true && opt(vipT, "mineType") === "1" && opt(vipT, "mineName") === "Địa" &&
           opt(vipT, "minBonus") === "80" && !opt(vipT, "buyPhu").includes("«") &&
+          opt(vipT, "phuDailyLimit") === "3" &&
           !opt(vipT, "hostMode").includes("«") && opt(vipT, "hostMinBonus") === "120",
-        JSON.stringify([opt(vipT, "mineType"), opt(vipT, "mineName"), opt(vipT, "minBonus"), opt(vipT, "buyPhu"), opt(vipT, "hostMode"), opt(vipT, "hostMinBonus")]),
+        JSON.stringify([opt(vipT, "mineType"), opt(vipT, "mineName"), opt(vipT, "minBonus"), opt(vipT, "buyPhu"), opt(vipT, "phuDailyLimit"), opt(vipT, "hostMode"), opt(vipT, "hostMinBonus")]),
       );
       check(
-        "twin thường nhận tab Thường: loại 3, mỏ Thạch Thôn, KHÔNG mua phù, không đoạt",
+        "twin thường nhận tab Thường: loại 3, mỏ Thạch Thôn, KHÔNG mua phù, vẫn giữ trần 2, không đoạt",
         freeT.enabled === true && opt(freeT, "mineType") === "3" &&
           opt(freeT, "mineName") === "Thạch Thôn" && opt(freeT, "minBonus") === "0" &&
-          opt(freeT, "buyPhu").includes("«") && opt(freeT, "hostMode").includes("«"),
-        JSON.stringify([opt(freeT, "mineType"), opt(freeT, "mineName"), opt(freeT, "buyPhu"), opt(freeT, "hostMode")]),
+          opt(freeT, "buyPhu").includes("«") && opt(freeT, "phuDailyLimit") === "2" &&
+          opt(freeT, "hostMode").includes("«"),
+        JSON.stringify([opt(freeT, "mineType"), opt(freeT, "mineName"), opt(freeT, "buyPhu"), opt(freeT, "phuDailyLimit"), opt(freeT, "hostMode")]),
       );
       // HAI ngưỡng phải đặt được ĐỘC LẬP — gộp chúng là mất hẳn một quyết định của người dùng.
       check(

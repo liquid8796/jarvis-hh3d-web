@@ -11,6 +11,28 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.69 — Vấn Đáp chịu được nguồn chập chờn; Khoáng Mạch có hạn mức mua phù
+
+Ảnh lỗi ngày 06/09 ghi đúng một chuỗi nguyên nhân: nguồn `user_search.php` trả HTTP thành
+công nhưng parser không đọc được dòng nào, nên câu “Vũ hồn thứ hai của Đường Tam là gì?” dù
+có sẵn đáp án **Hạo Thiên Chùy** vẫn bị bỏ lại. Regex cũ đòi thẻ `<tr>`/`<td>` trần và đủ
+thẻ đóng; phản hồi gây lỗi không được lưu lại để kết luận nó lệch ở đâu, nhưng chính trang
+hiện đã có các dòng HTML thiếu `</td>` và chứng minh giả định ấy không còn an toàn.
+
+Parser mới tách theo thẻ mở, chấp nhận thuộc tính và ô thiếu thẻ đóng nhưng vẫn buộc cột đầu
+là ID số để không nuốt bảng khác. Nếu một lần tải trả trang rỗng hoặc lỗi mạng, worker thử
+lại đúng một lần rồi mới cảnh báo; cache tốt trước đó vẫn được giữ. Verifier tải nguồn thật,
+đóng đinh đúng câu trong ảnh và thêm fixture malformed cho cả web lẫn parser C#.
+
+Khoáng Mạch không còn ghim cứng một Linh Quang Phù mỗi ngày. Hai khung VIP và Thường đều có
+ô **Số lá tối đa mỗi ngày**, nhận 1–3 và mặc định 1. Cổng mua lưu `{day,count}` trong
+`localStorage`, vẫn đọc được dấu ngày chuỗi của bản cũ. Trên web, mỗi lần mua phát một dấu
+duy nhất về sổ của đàn; vì vậy bộ đếm sống qua việc vòng sau chuyển sang khôi lỗi khác và hai
+flow hạng tài khoản dùng chung đúng hạn mức của tài khoản.
+
+Schema quest 82 thêm option `phuDailyLimit` cho cả hai flow. Smoke Chromium chạy ba lượt với
+trần 2: mua ở lượt một, mua ở lượt hai, chặn lượt ba; toàn bộ 515 phép hồi quy đều xanh.
+
 ## 1.3.66 — Sức chứa túi đan theo đúng tài khoản
 
 Bốn con số 10/6/4/2 trong record chỉ thuộc về tài khoản được quay, không phải trần chung của

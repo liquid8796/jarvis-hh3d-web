@@ -249,9 +249,13 @@ Nên chia thế này:
 - **Trình duyệt được TIÊM VÀO.** `runCycle` nhận `chromium` từ người gọi, nên `quest-engine/`
   không phụ thuộc Playwright và bundle của Next không kéo theo thư viện nó không dùng.
 - **Vấn Đáp dùng cùng danh sách tham khảo với PC.** Worker tải toàn bộ bảng cộng đồng về máy,
-  cache 12 giờ rồi so câu/đáp án cục bộ. Nó bỏ dấu và số thứ tự nhưng chỉ chấp nhận đáp án
-  khớp nguyên vẹn một lựa chọn đang hiện; nguồn mâu thuẫn hoặc câu lạ thì dừng để giữ lượt.
-  Không có nhánh Gemini trên web.
+  cache 12 giờ rồi so câu/đáp án cục bộ. Parser chịu được thẻ có thuộc tính/thiếu đóng và thử
+  tải lại một lần nếu nguồn tạm rỗng. Nó bỏ dấu, số thứ tự và ghi chú cuối, nhưng chỉ chấp nhận
+  khi đúng một lựa chọn đang hiện khớp; nguồn mâu thuẫn hoặc câu lạ thì dừng để giữ lượt. Không
+  có nhánh Gemini trên web.
+- **Khoáng Mạch đếm hạn mức mua phù theo tài khoản.** Hai tab VIP/Thường có ô riêng để đặt
+  tối đa 1–3 Linh Quang Phù mỗi ngày (mặc định 1). Mỗi lần mua được ghi vào sổ ngày của đàn,
+  nên đổi khôi lỗi giữa các vòng không làm bộ đếm quay lại từ đầu.
 - **Nhiệm vụ ngày đã đủ lượt thì thôi mở lại.** Mỗi đàn giữ một *sổ đủ lượt hôm nay*
   (`automation_jobs.daily_done`, ngày theo giờ Việt Nam): vòng nào thấy một trong chín nhiệm
   vụ ngày tự báo hết lượt thì vòng sau không mở trang ấy nữa, và khi cả kế hoạch đã đủ lượt

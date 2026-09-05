@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Kiểm chứng SUẤT LINH QUANG PHÙ — một lá mỗi ngày cho mỗi đàn, và cái sổ giữ lời hứa ấy.
+ * Kiểm chứng HẠN MỨC LINH QUANG PHÙ — số lá người dùng đặt cho mỗi ngày, và cái sổ giữ lời hứa ấy.
  *
  * Vì sao đáng có lưới riêng: cổng cũ nằm trong một khoá `localStorage`, mà `localStorage` thuộc
  * về MỘT hồ sơ trình duyệt trên MỘT máy — còn đàn thì nhảy giữa các khôi lỗi. Đo trên đàn
@@ -20,7 +20,11 @@
  */
 import { readFileSync } from "node:fs";
 import { createQuestEngine } from "../src/lib/quest-engine/engine.mjs";
-import { PHU_DAILY_MARK, profileForConfig } from "../src/lib/quest-engine/profile.mjs";
+import {
+  countPhuDailyMarks,
+  PHU_DAILY_MARK,
+  profileForConfig,
+} from "../src/lib/quest-engine/profile.mjs";
 
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);
@@ -33,7 +37,7 @@ const check = (label: string, condition: unknown, detail = "") => {
   console.log(`  ✓ ${label}`);
 };
 
-console.log("Suất Linh Quang Phù — một lá mỗi ngày, ghi ở sổ của ĐÀN chứ không ở máy\n");
+console.log("Hạn mức Linh Quang Phù — 1..3 lá mỗi ngày, ghi ở sổ của ĐÀN chứ không ở máy\n");
 
 // ---- 1. Hồ sơ quest mang đúng chuỗi dấu mà mã đang chờ ---------------------------------------
 type Step = { action?: string; script?: string; when?: { selector?: string } };
@@ -42,6 +46,26 @@ type Quest = { id: string; steps?: Step[] };
 const profileJson = JSON.parse(
   readFileSync(new URL("../src/lib/quest-engine/profile.json", import.meta.url), "utf8"),
 ) as { quests: Quest[] };
+
+// ---- 0. Giao diện + đường lưu: cả hai tab phải có đúng ô số của mình -----------------------
+{
+  const form = readFileSync(new URL("../src/app/dashboard/ConfigForm.tsx", import.meta.url), "utf8");
+  const action = readFileSync(new URL("../src/app/actions/automation.ts", import.meta.url), "utf8");
+  const schema = readFileSync(new URL("../src/lib/services/configs.ts", import.meta.url), "utf8");
+  check(
+    "form Khoáng Mạch dựng ô số hạn mức dùng được cho cả prefix VIP/Thường",
+    form.includes("name={`${prefix}PhuDailyLimit`}") && form.includes("defaultValue={config.phuDailyLimit}"),
+  );
+  check(
+    "server action đọc riêng hạn mức của tab VIP và tab Thường",
+    action.includes('phuDailyLimitOf("khoangMachPhuDailyLimit")') &&
+      action.includes('phuDailyLimitOf("khoangMachThuongPhuDailyLimit")'),
+  );
+  check(
+    "schema giữ mặc định cũ là 1 và chặn ngoài khoảng 1..3",
+    schema.includes("phuDailyLimit: z.number().int().min(1).max(3).default(1)"),
+  );
+}
 
 const MARK_LINE = `@${PHU_DAILY_MARK}`;
 /**
@@ -115,10 +139,10 @@ for (const quest of twins) {
 
 // ---- 3. Có dấu trong sổ → tuỳ chọn mua phù bị ép TẮT -----------------------------------------
 {
-  const configWith = (buyPhu: boolean) => ({
+  const configWith = (buyPhu: boolean, phuDailyLimit = 1) => ({
     quests: {
-      khoangMach: { enabled: true, mineType: "2", mineName: "", minBonus: 0, buyPhu, hostMode: false, hostMinBonus: 100 },
-      khoangMachThuong: { enabled: true, mineType: "2", mineName: "", minBonus: 0, buyPhu, hostMode: false, hostMinBonus: 100 },
+      khoangMach: { enabled: true, mineType: "2", mineName: "", minBonus: 0, buyPhu, phuDailyLimit, hostMode: false, hostMinBonus: 100 },
+      khoangMachThuong: { enabled: true, mineType: "2", mineName: "", minBonus: 0, buyPhu, phuDailyLimit, hostMode: false, hostMinBonus: 100 },
     },
   });
   /**
@@ -150,6 +174,22 @@ for (const quest of twins) {
 
   const spentFromSet = profileForConfig(configWith(true), undefined, new Set([PHU_DAILY_MARK]));
   check("nhận cả Set lẫn mảng — runCycle đưa xuống mảng của sổ", isOff(phuValueOf(spentFromSet, "khoang-mach")));
+
+  const twoMarks = [`${PHU_DAILY_MARK}:a`, `${PHU_DAILY_MARK}:b`];
+  const belowThree = profileForConfig(configWith(true, 3), undefined, twoMarks);
+  check(
+    "đặt trần 3 + đã mua 2 → CẢ HAI flow vẫn còn được mua",
+    isOn(phuValueOf(belowThree, "khoang-mach")) && isOn(phuValueOf(belowThree, "khoang-mach-thuong")),
+  );
+  const atThree = profileForConfig(configWith(true, 3), undefined, [...twoMarks, `${PHU_DAILY_MARK}:c`]);
+  check(
+    "đặt trần 3 + đã mua 3 → CẢ HAI flow cùng bị chặn",
+    isOff(phuValueOf(atThree, "khoang-mach")) && isOff(phuValueOf(atThree, "khoang-mach-thuong")),
+  );
+  check(
+    "bộ đếm nhận dấu đời cũ là 1, nhận dấu mới theo từng hậu tố và bỏ qua khoá gần giống",
+    countPhuDailyMarks([PHU_DAILY_MARK, `${PHU_DAILY_MARK}:a`, `${PHU_DAILY_MARK}:b`, `${PHU_DAILY_MARK}-nhầm`]) === 3,
+  );
 
   const userOff = profileForConfig(configWith(false), undefined, []);
   check("người dùng tắt → vẫn tắt, sổ không có quyền bật hộ", isOff(phuValueOf(userOff, "khoang-mach")));
@@ -217,8 +257,8 @@ for (const quest of twins) {
   check(`${quest.id}: đúng MỘT script cắm cờ mua`, setters.length === 1, `thấy ${setters.length}`);
   const won = setters[0]?.script ?? "";
   check(
-    `${quest.id}: script ấy đòi trang xác nhận「đoạt thành công」VÀ phù còn suất`,
-    won.includes("doat thanh cong") && won.includes("jvz-km-buy-go"),
+    `${quest.id}: script ấy đòi tai nghe xác nhận「đoạt thành công」VÀ phù còn suất`,
+    won.includes("jvz-km-won") && won.includes("jvz-km-buy-go"),
   );
   // Phép đọc văn bản toàn trang có thể ăn phải câu của lượt TRƯỚC — bộ chạy thử 15/08 đã dựng
   // đúng cảnh ấy. Nên trước khi mừng, phải hỏi một sự thật không thể cũ: lượt NÀY có bấm nút
@@ -241,8 +281,10 @@ for (const quest of twins) {
   const markStep = steps.find((s) => s.script?.includes(MARK_LINE));
   check(
     `${quest.id}: bước ghi dấu tiêu CẢ HAI sổ — localStorage của máy và dấu ngày của đàn`,
-    markStep != null && markStep.script!.includes("localStorage.setItem('__jvz_km_phu'"),
+    markStep != null && markStep.script!.includes("localStorage.setItem('__jvz_km_phu'") &&
+      markStep.script!.includes("JSON.stringify({ day: today, count: used })") &&
+      markStep.script!.includes(`return '${MARK_LINE}:' + nonce`),
   );
 }
 
-console.log(`\n✔ Suất Linh Quang Phù: ${checks} khẳng định, tất cả đứng vững.`);
+console.log(`\n✔ Hạn mức Linh Quang Phù: ${checks} khẳng định, tất cả đứng vững.`);

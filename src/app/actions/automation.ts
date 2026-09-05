@@ -133,6 +133,11 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
     const raw = Math.trunc(Number(formData.get(name)));
     return Number.isFinite(raw) && raw >= 1 ? Math.min(20, raw) : 10;
   };
+  /** Giới hạn tiền thật: form `noValidate` nên luôn kẹp lại 1..3 tại biên server. */
+  const phuDailyLimitOf = (name: string) => {
+    const raw = Math.trunc(Number(formData.get(name)));
+    return Number.isFinite(raw) && raw >= 1 ? Math.min(3, raw) : 1;
+  };
   /** Cùng lẽ: một giá trị lạ (POST dựng tay) rơi về nết mặc định, không giết cả lượt lưu. */
   const keepCapModeOf = (name: string) => (formData.get(name) === "stop" ? "stop" : "decompose");
 
@@ -193,6 +198,7 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
         mineName: String(formData.get("khoangMachMineName") ?? ""),
         minBonus: Number(formData.get("khoangMachMinBonus") ?? 0) || 0,
         buyPhu: formData.get("khoangMachBuyPhu") === "on",
+        phuDailyLimit: phuDailyLimitOf("khoangMachPhuDailyLimit"),
         hostMode: formData.get("khoangMachHostMode") === "on",
         hostMinBonus: Number(formData.get("khoangMachHostMinBonus") ?? 100) || 0,
       },
@@ -202,6 +208,7 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
         mineName: String(formData.get("khoangMachThuongMineName") ?? ""),
         minBonus: Number(formData.get("khoangMachThuongMinBonus") ?? 0) || 0,
         buyPhu: formData.get("khoangMachThuongBuyPhu") === "on",
+        phuDailyLimit: phuDailyLimitOf("khoangMachThuongPhuDailyLimit"),
         hostMode: formData.get("khoangMachThuongHostMode") === "on",
         hostMinBonus: Number(formData.get("khoangMachThuongHostMinBonus") ?? 100) || 0,
       },

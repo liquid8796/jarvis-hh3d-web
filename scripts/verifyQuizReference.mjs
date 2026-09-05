@@ -28,6 +28,21 @@ if (entries.size < 200) {
   throw new Error(`Parser chỉ đọc được ${entries.size} câu — cấu trúc nguồn có thể đã đổi.`);
 }
 
+// Hình dạng làm regex cũ đọc 0 dòng: thẻ có thuộc tính và ô câu hỏi thiếu `</td>`. Trang thật
+// hiện cũng có vài hàng thiếu thẻ đóng, nên đây không phải HTML bịa để thử một khả năng xa xôi.
+const malformed = parseQuizReferenceHtml(`
+  <table><tbody>
+    <tr class="qa-row" data-id="129">
+      <td class="id">129</td>
+      <td data-field="question">Vũ hồn thứ hai của Đường Tam là gì?
+      <td data-field="answer">2. Hạo Thiên Chùy</td>
+    </tr>
+  </tbody></table>
+`);
+if (malformed.size !== 1 || malformed.values().next().value?.[0] !== "Hạo Thiên Chùy") {
+  throw new Error(`Parser không chịu được hàng HTML thiếu thẻ đóng/có thuộc tính: ${JSON.stringify([...malformed])}.`);
+}
+
 const candidate = [...entries].find(([, answers]) => answers.length === 1 && answers[0]?.trim());
 if (!candidate) throw new Error("Không tìm được một câu có đúng một đáp án để kiểm resolver.");
 
@@ -46,6 +61,39 @@ const resolved = await directory.find(
 
 if (resolved?.option !== expected || resolved.index !== 1) {
   throw new Error(`Resolver không chọn lại được đáp án từ nguồn thật: ${JSON.stringify(resolved)}.`);
+}
+
+// Đóng đinh đúng câu trong ảnh báo lỗi, trên chính nguồn đang sống.
+const reportedQuestion = await directory.find(
+  {
+    text: "Vũ hồn thứ hai của Đường Tam là gì?",
+    options: ["Lam Ngân Thảo", "Nhu Cốt Thỏ", "Hạo Thiên Chùy", "Thất Bảo Lưu Ly Tháp"],
+  },
+  { url: DEFAULT_QUIZ_REFERENCE_URL, log: SILENT_LOG },
+);
+if (reportedQuestion?.option !== "Hạo Thiên Chùy") {
+  throw new Error(`Câu trong ảnh chưa được giải đúng từ nguồn thật: ${JSON.stringify(reportedQuestion)}.`);
+}
+
+// HTTP 200 nhưng không có bảng từng xảy ra trong production. Directory phải thử tải lại ngay,
+// thay vì cache thất bại rồi bỏ trắng cả bài Vấn Đáp của lượt ấy.
+let retryCalls = 0;
+const retryDirectory = createQuizReferenceDirectory({
+  fetchImpl: async () => ({
+    ok: true,
+    status: 200,
+    text: async () => (++retryCalls === 1 ? "<html><body>tạm thời chưa có bảng</body></html>" : html),
+  }),
+});
+const retried = await retryDirectory.find(
+  {
+    text: "Vũ hồn thứ hai của Đường Tam là gì?",
+    options: ["Lam Ngân Thảo", "Hạo Thiên Chùy"],
+  },
+  { url: DEFAULT_QUIZ_REFERENCE_URL, log: SILENT_LOG },
+);
+if (retryCalls !== 2 || retried?.option !== "Hạo Thiên Chùy") {
+  throw new Error(`Nguồn rỗng tạm thời chưa được thử lại đúng: calls=${retryCalls}, result=${JSON.stringify(retried)}.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,5 +144,5 @@ if ((await lookup(nestedKey, ["A", "B", "C", "D"])) !== null) {
 
 console.log(
   `✔ nguồn thật HTTP ${response.status}; đã đọc ${entries.size} câu, resolver khớp đáp án theo text, ` +
-    "ba nấc khớp đúng thứ tự và mơ hồ thì từ chối.",
+    "hàng HTML lỗi vẫn đọc được, phản hồi rỗng được thử lại, và câu trong ảnh ra Hạo Thiên Chùy.",
 );

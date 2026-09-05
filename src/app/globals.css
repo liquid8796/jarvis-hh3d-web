@@ -856,6 +856,27 @@ body {
   height: 0;
 }
 
+/* Chân dung CÓ ẢNH là một cái nút — bấm để ngắm to tại chỗ. Nút phải trong suốt hoàn toàn:
+   vòng tròn bên trong đã là toàn bộ hình hài, nên nền/viền/đệm mà trình duyệt tự thêm cho
+   <button> đều phải gỡ. `flex: none` chuyển lên đây vì nút nay là con của hàng flex, còn
+   `flex: none` của chính `.avatar` đã lùi vào một lớp và không với tới hàng nữa.
+   Vòng kim quang `.chat-row .avatar` vẫn khớp: nó là bộ chọn hậu duệ, không phải con trực tiếp. */
+.chat-avatar-btn {
+  flex: none;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 999px;
+  cursor: zoom-in;
+}
+
+/* Cùng lệ với .chat-fab: viền vàng, lệch 2px. */
+.chat-avatar-btn:focus-visible {
+  outline: 2px solid var(--color-gold-300);
+  outline-offset: 2px;
+}
+
 /* Vòng kim quang quanh ảnh đại diện — CHỈ trong sảnh: nơi khác (thanh đầu trang, bảng môn
    đồ) vòng tròn là chi tiết phụ, ở đây nó là chân dung trên bài vị. */
 .chat-row .avatar {
@@ -1129,6 +1150,11 @@ body {
 .chat-quote span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 520px; }
 
 .chat-deleted { font-style: italic; color: var(--color-mist); font-size: 0.75rem; }
+
+/* Con trỏ nói trước điều cú bấm sắp làm: phóng to tại chỗ, không rời sảnh. */
+.chat-img {
+  cursor: zoom-in;
+}
 
 .chat-img img {
   max-width: 230px;

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.68",
+    date: "2026-09-02",
+    lines: [
+      "Phòng Chat: bấm vào ảnh trong tin nhắn hoặc ảnh đại diện nay phóng to ngay tại chỗ, không mở tab mới nữa.",
+      "Bấm ra ngoài hoặc bấm phím Esc để đóng; giữ Ctrl hoặc bấm chuột giữa vẫn mở ảnh ở tab mới như trước.",
+      "Ảnh đại diện chưa đặt vẫn là vòng tròn chữ cái như cũ, không bấm được.",
+    ],
+  },
+  {
     version: "1.3.67",
     date: "2026-09-02",
     lines: [
@@ -463,14 +472,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Máy chạy tự động nay có thêm một cách tự vượt bước kiểm tra của trang khi bị chặn ở cổng.",
       "Mặc định tắt, bật riêng cho từng máy khi cần — màn hình không đổi gì.",
-    ],
-  },
-  {
-    version: "1.3.17",
-    date: "2026-08-19",
-    lines: [
-      "Trong lúc tông môn bế quan trùng tu, bậc trị sự vẫn khai đàn và chạy auto được như thường.",
-      "Đàn của môn đồ khác vẫn nằm chờ tới lúc mở cửa lại, không đổi gì so với trước.",
     ],
   },
 ];

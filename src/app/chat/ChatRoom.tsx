@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChatPicker, type PickerTab } from "./ChatPicker";
 import { Avatar } from "@/components/Avatar";
+import { ImageLightbox } from "@/components/ImageLightbox";
 import { isSafeAttachmentUrl } from "@/lib/validation/chat";
 import { firstUnreadIndex, parseMarkMs } from "@/lib/validation/chatRead";
 import { framesForTags, normalizeTagLabel, type TagFrame } from "@/lib/validation/tags";
@@ -227,6 +228,9 @@ export function ChatRoom({
 }) {
   const [store, setStore] = useState<Map<string, Message>>(new Map());
   const [avatars, setAvatars] = useState<AvatarMap>({});
+  /** Ảnh đang ngắm phóng to — `null` là không ngắm gì. Một state cho cả chân dung lẫn ảnh đính kèm. */
+  const [zoomed, setZoomed] = useState<{ src: string; alt: string } | null>(null);
+  const closeZoom = useCallback(() => setZoomed(null), []);
   const [typing, setTyping] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [staged, setStaged] = useState<Attachment[]>([]);
@@ -975,7 +979,24 @@ export function ChatRoom({
                   // `.chat-avatar-gap` trong globals.css.
                   <span className="chat-avatar-gap" style={{ width: AVATAR_SIZE }} aria-hidden="true" />
                 ) : (
-                  <Avatar name={msg.author} url={avatars[msg.userId]} size={AVATAR_SIZE} />
+                  (() => {
+                    // Chỉ chân dung CÓ ẢNH mới bấm được: người chưa đặt ảnh chỉ có một chữ cái
+                    // trên nền màu, phóng to nó lên chẳng để làm gì mà lại mọc thêm một chốt
+                    // dừng bàn phím rỗng nghĩa trên mỗi tin.
+                    const url = avatars[msg.userId];
+                    const face = <Avatar name={msg.author} url={url} size={AVATAR_SIZE} />;
+                    if (!url) return face;
+                    return (
+                      <button
+                        type="button"
+                        className="chat-avatar-btn"
+                        aria-label={`Xem ảnh đại diện của ${msg.author}`}
+                        onClick={() => setZoomed({ src: url, alt: `Ảnh đại diện của ${msg.author}` })}
+                      >
+                        {face}
+                      </button>
+                    );
+                  })()
                 )}
 
                 <div className="chat-bubble-col">
@@ -1046,7 +1067,22 @@ export function ChatRoom({
                               ⚠ <span>{a.name}</span> <small>đính kèm không hợp lệ</small>
                             </span>
                           ) : a.type.startsWith("image/") ? (
-                            <a key={a.url} href={a.url} target="_blank" rel="noreferrer" className="chat-img">
+                            <a
+                              key={a.url}
+                              href={a.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="chat-img"
+                              onClick={(event) => {
+                                // Giữ nguyên mọi lối mở tab CÓ CHỦ Ý — ctrl/cmd/shift/alt-click,
+                                // chuột giữa, và mục「mở ở tab mới」của menu chuột phải đều đi
+                                // đường cũ vì thẻ vẫn là một <a href> thật. Chỉ cú bấm trái trơn
+                                // mới đổi nghĩa thành ngắm tại chỗ.
+                                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                                event.preventDefault();
+                                setZoomed({ src: a.url, alt: a.name });
+                              }}
+                            >
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img src={a.url} alt={a.name} loading="lazy" />
                             </a>
@@ -1254,6 +1290,10 @@ export function ChatRoom({
         </button>
       </footer>
     </div>
+
+    {/* Con trực tiếp của `.chat-frame`, cố ý — xem ghi chú trong ImageLightbox về `zoom` của
+        vùng cuộn và tầng xếp chồng của `.chat-shell`. */}
+    <ImageLightbox src={zoomed?.src ?? null} alt={zoomed?.alt ?? ""} onClose={closeZoom} />
     </div>
   );
 }

@@ -35,12 +35,14 @@ Bản vá có hai lớp:
   không replay POST mơ hồ. Redirect tự động bị tắt để Bearer token không thể theo một `Location`
   lạ; response đồng thời dùng compare-and-swap để lời cũ không kéo URL ngược. Fallback không dính
   vĩnh viễn: mỗi năm phút một probe GET không token thử cổng chính, sống lại thì tự trở về.
+  Probe chạy nền và có timeout nên một primary blackhole không chặn heartbeat qua fallback;
+  chính POST worker cũng hết hạn sau 15 giây, nằm xa dưới cửa reaper ba phút.
 
 Đường dựng kho mới không còn lấy `activeUrl` Vercel từ control doc làm bootstrap worker. Lượt
 phát hành vẫn có thể đổi `WEB_URL` tường minh, nhưng template bắt buộc phải giữ cổng cứu hộ.
 Lưới env cũng được sửa để neo vào đúng bước `Trực ca` thay vì đọc nhầm khối env của Obscura.
 
-Đo: `verify:worker-follow` 84/84 (gồm failback, body đứt, hai chiều 409/fallback);
+Đo: `verify:worker-follow` 88/88 (gồm failback, blackhole, body đứt, hai chiều 409/fallback);
 `verify:worker-env` 25/25. `verify:github-deploy` khóa cả
 workflow sinh ra và chạy sau khi commit vì gói cố ý đọc blob `HEAD`. Phát hành production đổi
 cả mười kho sang backend trực tiếp; hàng rào `heldJobs` giữ nguyên runner nào còn cầm đàn.

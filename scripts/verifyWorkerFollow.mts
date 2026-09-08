@@ -186,6 +186,10 @@ ok(
     "mọi fetch cấm tự đi theo redirect — Bearer token không sang Location lạ",
   );
   ok(
+    inits.every((init) => init.signal instanceof AbortSignal),
+    "mọi POST có timeout — socket blackhole không giữ heartbeat quá cửa reaper",
+  );
+  ok(
     inits[0].body === inits[1].body &&
       (inits[0].headers as Record<string, string>)?.authorization === "Bearer t" &&
       (inits[1].headers as Record<string, string>)?.authorization === "Bearer t",
@@ -333,10 +337,61 @@ for (const status of [502, 503, 504]) {
   now = 2_000;
   await call("claim");
   ok(
-    calls.length === 6 && calls[4].url === `${OLD}/api/maintenance` && calls[5].url === `${OLD}/api/worker`,
-    "probe đúng route app → op trở về đường chính",
+    calls.length === 6 && calls[4].url === `${OLD}/api/maintenance` && calls[5].url === `${FALLBACK}/api/worker`,
+    "op châm probe vẫn hoàn tất qua fallback, không đợi probe",
   );
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
   ok(currentUrl() === OLD, "cổng chính sống lại thì fallback thôi sticky");
+  await call("claim");
+  ok(calls.length === 7 && calls[6].url === `${OLD}/api/worker`, "op kế tiếp mới trở về cổng chính");
+}
+
+// ---- preferred blackhole không được chặn heartbeat qua fallback đang khỏe --------------------
+{
+  let now = 0;
+  let firstPrimary = true;
+  let probes = 0;
+  let fallbackPosts = 0;
+  const response = (body: unknown) => ({
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    json: async () => body,
+  });
+  const fetchImpl = (async (url: string) => {
+    if (url === `${OLD}/api/worker` && firstPrimary) {
+      firstPrimary = false;
+      throw new Error("ECONNRESET");
+    }
+    if (url === `${OLD}/api/maintenance`) {
+      probes++;
+      return new Promise(() => {}); // blackhole: kể cả fake không tôn trọng AbortSignal
+    }
+    if (url === `${FALLBACK}/api/worker`) {
+      fallbackPosts++;
+      return response({ job: null });
+    }
+    throw new Error(`không chờ request tới ${url}`);
+  }) as unknown as typeof fetch;
+  const { call } = createWorkerCall({
+    webUrl: OLD,
+    fallbackUrl: FALLBACK,
+    token: "t",
+    fetchImpl,
+    log: silent,
+    nowImpl: () => now,
+    fallbackProbeMs: 1_000,
+    probeTimeoutMs: 500,
+  });
+  await call("claim").catch(() => {});
+  now = 1_000;
+  const outcome = await Promise.race([
+    call("heartbeat", { jobId: "j" }).then(() => "done"),
+    new Promise<string>((resolve) => setTimeout(() => resolve("blocked"), 50)),
+  ]);
+  ok(outcome === "done" && fallbackPosts === 1, "probe blackhole không chặn heartbeat qua fallback");
+  await call("heartbeat", { jobId: "j" });
+  ok(probes === 1 && fallbackPosts === 2, "nhiều heartbeat dùng chung một probe đang bay, không tạo bão GET");
 }
 
 // ---- thân response chết giữa đường: đổi cho lượt kế, không replay -----------------------------

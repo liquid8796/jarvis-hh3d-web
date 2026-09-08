@@ -177,8 +177,9 @@ phát việc đóng trong lúc chuyển (đo 10/08: ~12 phút cả chờ đàn).
     HTTPS origin sạch không path/query/credentials. Header nền tảng hoặc đúng body 402 mang
     `DEPLOYMENT_*` đổi cổng và replay đúng một lần; body 500 không được tin. Lỗi mạng, body đứt
     hoặc 502/503/504 chỉ đổi cho lượt kế để không phát lại một POST chưa biết app đã nhận chưa.
-    Redirect tự động bị cấm vì request mang Bearer token. Mỗi năm phút, một GET không token thử
-    cổng chính và tự trở về khi nó sống lại — fallback không được thành đường poll vĩnh viễn.
+    Redirect tự động bị cấm vì request mang Bearer token. Mỗi năm phút, một GET không token chạy
+    nền để thử cổng chính và tự trở về khi nó sống lại — primary blackhole không được chặn
+    heartbeat qua fallback. POST worker có timeout 15 giây, probe 4 giây, đều dưới cửa reap 3 phút.
   - Fallback không thay bảng điều phối và không tự tin một URL từ thân lỗi: target phải được
     operator nướng sẵn. `verify:worker-follow` khóa cả 409, 402, gateway, lỗi mạng, redirect và
     race giữa nhiều heartbeat/event cùng lúc.

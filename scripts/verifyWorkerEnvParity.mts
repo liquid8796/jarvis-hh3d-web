@@ -39,6 +39,8 @@ const WORKER = "scripts/worker.mjs";
  * dòng ở đây là một lời khẳng định về hành vi, và phần lớn được lưới bên dưới kiểm lại bằng mã.
  */
 const CHI_RIENG_ACTIONS: Record<string, string> = {
+  WORKER_FALLBACK_URL:
+    "Chỉ operator được nướng cổng cứu hộ; linh phù máy nhà không được tự gửi sang production khi cài cho origin dev/custom.",
   WORKER_MAX_LIFETIME_MS:
     "GitHub Actions cắt lượt chạy ở 6 giờ nên runner phải tự rút lui trước; máy nhà chạy vô hạn.",
   WORKER_DRAIN_TIMEOUT_MS: "Chỉ có nghĩa khi có hạn đời — đi kèm WORKER_MAX_LIFETIME_MS.",
@@ -56,8 +58,12 @@ const MAC_DINH_DA_BANG: Record<string, string> = { WORKER_MAX_JOBS: "2" };
 // regex đọc .env cũ, nên lưới sẽ tưởng đã khai trong khi thật ra chưa.
 
 function bienCuaTongMon(src: string): string[] {
-  const start = src.indexOf("\n        env:");
-  if (start < 0) throw new Error(`${YML}: không thấy khối env: của bước chạy`);
+  // Workflow còn một khối env của bước tải Obscura đứng trước. Phải neo vào TÊN bước Trực ca;
+  // quét env đầu tiên từng khiến lưới đọc đúng một biến OBSCURA_VERSION rồi báo hai lỗi giả.
+  const step = src.indexOf("\n      - name: Trực ca");
+  if (step < 0) throw new Error(`${YML}: không thấy bước Trực ca`);
+  const start = src.indexOf("\n        env:", step);
+  if (start < 0) throw new Error(`${YML}: không thấy khối env: của bước Trực ca`);
   const rest = src.slice(start + 1);
   const end = rest.search(/\n\s{8}run:/);
   const block = end < 0 ? rest : rest.slice(0, end);

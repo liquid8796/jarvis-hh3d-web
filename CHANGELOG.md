@@ -11,6 +11,37 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.70 — Tám khôi lỗi còn sống nhưng gõ vào một trạm đã chết
+
+Sáng 08/09, tám khôi lỗi tông môn cùng ngừng điểm danh trong 11 giây. GitHub Actions không
+chết: mọi runner vẫn đứng ở bước `Trực ca` và lặp mỗi năm giây. Cái chết nằm trước app — cả tám
+workflow nướng `WEB_URL=https://auto-hh3d-4.vercel.app`, còn tài khoản Hobby giữ project ấy bị
+Vercel soft-block lúc 07:10:22 giờ VN với `FAIR_USE_LIMITS_EXCEEDED / edgeRequest`. Mép Vercel
+trả `402 DEPLOYMENT_DISABLED`; cùng thời điểm, usage 30 ngày đã khoảng 3,06 triệu Edge Requests
+trên hạn 1 triệu. Tám lượt poll mỗi năm giây tự tạo khoảng 138.240 request/ngày, gần khớp dải
+150–170 nghìn/ngày đo từ API của chính project.
+
+Khôi lỗi trước đây chỉ biết theo `409 + activeUrl` do app phát. Một deployment chết ở mép không
+bao giờ chạy được app để phát 409, nên `controlFollow` ném 402, vòng ngoài bắt lỗi rồi lại gõ đúng
+cái xác ấy. Cron, nối chuỗi và restart cũng chỉ dựng một runner mới mang cùng URL hỏng.
+
+Bản vá có hai lớp:
+
+- workflow GitHub mới đi thẳng `https://158.180.59.36.sslip.io`; cổng Vercel ổn định còn lại là
+  `WORKER_FALLBACK_URL`, không nằm trên đường poll thường;
+- worker chỉ nhận fallback là một HTTPS origin sạch do operator cấu hình. `DEPLOYMENT_*` được
+  replay đúng một lần vì request chắc chắn bị chặn trước app. Lỗi mạng và 502/503/504 chỉ đổi
+  cổng cho lượt kế, không replay POST mơ hồ. Redirect tự động bị tắt để Bearer token không thể
+  theo một `Location` lạ; response đồng thời dùng compare-and-swap để lời cũ không kéo URL ngược.
+
+Đường dựng kho mới không còn lấy `activeUrl` Vercel từ control doc làm bootstrap worker. Lượt
+phát hành vẫn có thể đổi `WEB_URL` tường minh, nhưng template bắt buộc phải giữ cổng cứu hộ.
+Lưới env cũng được sửa để neo vào đúng bước `Trực ca` thay vì đọc nhầm khối env của Obscura.
+
+Đo: `verify:worker-follow` 68/68; `verify:worker-env` 22/22. `verify:github-deploy` khóa cả
+workflow sinh ra và chạy sau khi commit vì gói cố ý đọc blob `HEAD`. Phát hành production đổi
+cả mười kho sang backend trực tiếp; hàng rào `heldJobs` giữ nguyên runner nào còn cầm đàn.
+
 ## 1.3.69 — Vấn Đáp chịu được nguồn chập chờn; Khoáng Mạch có hạn mức mua phù
 
 Ảnh lỗi ngày 06/09 ghi đúng một chuỗi nguyên nhân: nguồn `user_search.php` trả HTTP thành

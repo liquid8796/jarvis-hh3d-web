@@ -104,8 +104,9 @@ kho gốc.
 
 Nên khôi lỗi GitHub **chỉ sống trên các tài khoản khác**, trong kho do `github:new` dựng:
 `newGithubKhoiloi.mjs` đọc bản mẫu rồi ghi vào `.github/workflows/linh-su.yml` **của kho ấy**,
-thay đúng hai dòng `WORKER_ID` và `WEB_URL`. Một bản mẫu, nhiều kho — bộ số 290/50/350/360 không
-có cơ hội trôi khỏi nhau.
+thay đúng hai dòng `WORKER_ID` và `WEB_URL`; `WORKER_FALLBACK_URL` đi nguyên từ bản mẫu và bị
+lưới phát hành bắt buộc phải còn. Một bản mẫu, nhiều kho — bộ số 290/50/350/360 và cổng cứu hộ
+không có cơ hội trôi khỏi nhau.
 
 Hàng rào này là **một tệp KHÔNG có mặt**, mà loại hàng rào ấy không tự giữ được mình: một cú
 `git mv` ngược lại, hay một bản chép để「chạy thử một lượt rồi xoá」, dựng lại nó mà chẳng ai thấy.
@@ -398,9 +399,10 @@ phải ghi sổ được. Vì thế phép kiểm nằm ở `khoiloiNaming.mjs` c
 VM) — vô hại, vì id ấy đặt trong `.env` của VM chứ không đi qua đường sinh tên này.
 
 Hai thứ luật này **không** với tới, vì chúng không phải tên do script đặt: đường dẫn
-`scripts/worker.mjs` (chép nguyên từ kho web, dùng chung với VM) và `WEB_URL` nướng vào workflow —
-địa chỉ trạm thật, hiện đang là `https://auto-hh3d-2.vercel.app`. Muốn dọn nốt thì phải đổi tên
-tệp dùng chung và đổi tên miền trạm, hai việc lớn hơn hẳn lượt này.
+`scripts/worker.mjs` (chép nguyên từ kho web, dùng chung với VM) và hai origin nướng vào workflow.
+`WEB_URL` của worker đi thẳng `https://158.180.59.36.sslip.io` để nhịp poll năm giây không đốt
+Edge Requests Vercel; `WORKER_FALLBACK_URL=https://auto-hh3d.vercel.app` chỉ mở khi đường chính
+hỏng. Cả hai là địa chỉ vận hành, không phải tên sản phẩm.
 
 Vẫn cần `gh` (chỉ vì lượt đặt secret — sealed-box, xem đầu `newGithubKhoiloi.mjs`), nhưng **không
 cần `gh auth login`**: PAT đi qua biến `GH_TOKEN` của riêng lượt chạy ấy. Cài `gh`:

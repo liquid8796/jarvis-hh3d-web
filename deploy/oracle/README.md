@@ -439,7 +439,7 @@ nới và phải xem lại.
 **Chỉ khi muốn máy này làm khôi lỗi** — `scp` [setup.sh](setup.sh) lên VM rồi:
 
 ```bash
-WEB_URL='https://auto-hh3d.vercel.app' WORKER_TOKEN='<WORKER_TOKEN trên Vercel>' \
+WEB_URL='https://158.180.59.36.sslip.io' WORKER_TOKEN='<WORKER_TOKEN của backend>' \
   sudo -E bash setup.sh
 ```
 

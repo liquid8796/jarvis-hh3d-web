@@ -360,12 +360,13 @@ Worker mà tông môn nuôi cho mọi thành viên. Toàn bộ hướng dẫn �
 Tóm tắt: VM.Standard.A1.Flex (Ampere ARM, gói Always Free) + Ubuntu 24.04 aarch64, rồi:
 
 ```bash
-WEB_URL='https://<app>.vercel.app' WORKER_TOKEN='<token trên Vercel>' sudo -E bash setup.sh
+WEB_URL='https://158.180.59.36.sslip.io' WORKER_TOKEN='<token của backend>' sudo -E bash setup.sh
 ```
 
 Script tải **gói khôi lỗi** từ chính web (`/linh-su/goi-linh-su.tgz` — đóng lại ở mỗi deploy
 từ đúng engine đang chạy), dựng systemd service, và từ đó "cập nhật" nghĩa là chạy lại đúng
-một lệnh ấy.
+một lệnh ấy. Bộ cài còn ghi `WORKER_FALLBACK_URL=https://auto-hh3d.vercel.app`; đường cứu hộ
+chỉ mở khi cổng chính lỗi, không gánh nhịp poll thường.
 
 ### Bước 3 — Deploy
 
@@ -511,7 +512,9 @@ Cơ chế, và vì sao từng mảnh lại như vậy:
 Dev muốn chạy worker thô từ repo thì vẫn được:
 
 ```bash
-WEB_URL=https://<app>.vercel.app WORKER_TOKEN=<token> npm run worker
+WEB_URL=https://158.180.59.36.sslip.io \
+WORKER_FALLBACK_URL=https://auto-hh3d.vercel.app \
+WORKER_TOKEN=<token> npm run worker
 ```
 
 ---

@@ -52,6 +52,7 @@ import {
 } from "./khoiloiPayload.mjs";
 
 const repoRoot = path.join(import.meta.dirname, "..");
+const EXPECTED_WORKER_FALLBACK = "https://auto-hh3d.vercel.app";
 
 let checks = 0;
 const check = (label: string, condition: unknown, detail = "") => {
@@ -210,6 +211,10 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
 
   check("moi được WORKER_ID khỏi bản mẫu", workerIdFromWorkflow(template) !== null);
   check("moi được WEB_URL khỏi bản mẫu", webUrlFromWorkflow(template) !== null);
+  check(
+    "bản mẫu khai cổng worker dự phòng HTTPS",
+    template.includes(`WORKER_FALLBACK_URL: \${{ vars.WORKER_FALLBACK_URL || '${EXPECTED_WORKER_FALLBACK}' }}`),
+  );
 
   const rendered = renderWorkflow({
     template,
@@ -218,6 +223,10 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
   });
   check("vẽ xong thì WORKER_ID là id mới", workerIdFromWorkflow(rendered) === "khoiloi-tro-kiem-chung");
   check("vẽ xong thì WEB_URL là địa chỉ mới", webUrlFromWorkflow(rendered) === "https://vi-du.invalid");
+  check(
+    "đổi WEB_URL không làm trôi cổng dự phòng",
+    rendered.includes(`WORKER_FALLBACK_URL: \${{ vars.WORKER_FALLBACK_URL || '${EXPECTED_WORKER_FALLBACK}' }}`),
+  );
   check(
     "id của bản mẫu KHÔNG còn sót lại đâu trong tệp đã vẽ",
     !rendered.includes(`WORKER_ID: ${workerIdFromWorkflow(template)}`),
@@ -229,6 +238,15 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
     "bản mẫu mất dòng WORKER_ID → ném, không phát hành id mặc định",
     () => renderWorkflow({ template: template.replace(/^\s*WORKER_ID:.*$/m, ""), workerId: "x", webUrl: "https://a.invalid" }),
     "WORKER_ID",
+  );
+  throws(
+    "bản mẫu mất WORKER_FALLBACK_URL → ném",
+    () => renderWorkflow({
+      template: template.replace(/^\s*WORKER_FALLBACK_URL:.*$/m, ""),
+      workerId: "x",
+      webUrl: "https://a.invalid",
+    }),
+    "WORKER_FALLBACK_URL",
   );
   throws(
     "bản mẫu mất chỗ WEB_URL → ném",
@@ -545,6 +563,12 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
     lockfile: Buffer.from(JSON.stringify({ name: "x", version: webVersion, packages: { "": { version: webVersion } } })),
   });
   check("gói dựng xong mang đúng số bản kho gốc", JSON.parse(good.get("package.json").toString("utf8")).version === webVersion);
+  check(
+    "workflow trong gói còn nguyên cổng dự phòng",
+    good.get(WORKFLOW_TARGET_PATH).toString("utf8").includes(
+      `WORKER_FALLBACK_URL: \${{ vars.WORKER_FALLBACK_URL || '${EXPECTED_WORKER_FALLBACK}' }}`,
+    ),
+  );
 
   // Lockfile KHÔNG đọc được số bản (bản cũ, hay tệp lạ) thì im lặng cho qua — đây là lưới bắt
   // lệch, không phải phép soát định dạng lockfile.

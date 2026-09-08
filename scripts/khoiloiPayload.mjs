@@ -175,6 +175,12 @@ export function renderWorkflow({ template, workerId, webUrl }) {
         `mặc định của bản mẫu thay vì ${webUrl}.`,
     );
   }
+  if (!/^\s*WORKER_FALLBACK_URL:\s*\$\{\{\s*vars\.WORKER_FALLBACK_URL\s*\|\|\s*'https:\/\/[^']+'\s*\}\}\s*$/m.test(workflow)) {
+    throw new Error(
+      "Workflow thiếu WORKER_FALLBACK_URL HTTPS đáng tin — một cổng WEB_URL chết ở mép nền tảng " +
+        "sẽ bỏ lại khôi lỗi gõ vào xác ấy mãi mãi.",
+    );
+  }
   return workflow;
 }
 

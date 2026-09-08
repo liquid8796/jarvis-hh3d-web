@@ -78,6 +78,7 @@ fi
 
 cat > "$APP_DIR/.env" <<ENV
 WEB_URL=$WEB_URL
+WORKER_FALLBACK_URL=https://auto-hh3d.vercel.app
 WORKER_TOKEN=$WORKER_TOKEN
 WORKER_ID=$WORKER_ID
 ENV

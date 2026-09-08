@@ -58,6 +58,8 @@ import { loadEnv } from "./loadEnv.mjs";
 loadEnv();
 
 const repoRoot = path.join(import.meta.dirname, "..");
+/** Worker polling đi thẳng backend; control doc là đường của web/proxy, không phải bootstrap worker. */
+const DIRECT_WORKER_URL = "https://158.180.59.36.sslip.io";
 const argv = process.argv.slice(2);
 const dryRun = argv.includes("--dry-run");
 const arg = (name: string): string | undefined => {
@@ -316,9 +318,10 @@ async function main(): Promise<void> {
 
   const inner = ["scripts/newGithubKhoiloi.mjs", "--owner", owner, "--repo", repo, "--worker-id", workerId];
   for (const companionRepo of companionRepos) inner.push("--companion-repo", companionRepo);
-  // Địa chỉ web nướng vào workflow: lấy của trạm ĐANG HOẠT ĐỘNG cho lượt nối đầu đi thẳng. Trạm có
-  // đổi về sau cũng không sao — khôi lỗi đi theo 409 như VM vẫn làm (src/lib/worker/controlFollow.mjs).
-  if (doc.activeUrl) inner.push("--web-url", doc.activeUrl);
+  // Không lấy `doc.activeUrl`: đó là một vỏ Vercel có quota Edge Requests, trong khi mỗi worker
+  // gõ cửa 5 giây/lần. Ngày 08/09/2026 tám kho cùng bám auto-hh3d-4 và chết khi vỏ ấy bị khoá.
+  // Workflow mang thêm WORKER_FALLBACK_URL; cổng chính của worker luôn đi thẳng backend.
+  inner.push("--web-url", DIRECT_WORKER_URL);
 
   /** Gọi script dựng kho. Nó in thẳng ra màn hình; ta chỉ quan tâm nó sống hay chết. */
   const buildRepo = (extra: string[] = []): void => {

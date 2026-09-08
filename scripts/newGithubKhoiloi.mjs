@@ -150,7 +150,9 @@ if (!token) {
   process.exit(1);
 }
 
-const DEFAULT_WEB_URL = "https://auto-hh3d.vercel.app";
+// Worker hỏi việc mỗi 5 giây: đi qua Vercel là tự đốt hạn Edge Requests. Backend trực tiếp là
+// cổng khởi động chuẩn; workflow còn nướng một proxy khác làm WORKER_FALLBACK_URL.
+const DEFAULT_WEB_URL = "https://158.180.59.36.sslip.io";
 
 /**
  * `.env` KHÔNG phải nguồn đáng tin cho `WEB_URL`, và đây là một bẫy đã bắt được ngay lượt chạy

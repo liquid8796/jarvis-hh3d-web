@@ -173,8 +173,13 @@ phát việc đóng trong lúc chuyển (đo 10/08: ~12 phút cả chờ đàn).
     giữ chỗ này (23 phép, chạy bằng `fetch` giả — không cần mạng, không cần trạm nào phải nghỉ).
   - Chỉ nhận `https://`: khôi lỗi gửi token theo mọi request, nên địa chỉ nền quyết định token
     đi về đâu. Bảng chỉ chứa https nên siết ở đây không bỏ sót ca hợp lệ nào.
-  - Giới hạn còn nguyên: trạm cũ chết HẲN thì không ai phát 409 — xem §11, lời giải là custom
-    domain, không phải thêm mã ở worker.
+  - **Trạm chết trước app:** workflow/operator có thể khai `WORKER_FALLBACK_URL`, chỉ nhận một
+    HTTPS origin sạch không path/query/credentials. Mã `DEPLOYMENT_*` của mép nền tảng đổi cổng
+    và replay đúng một lần; lỗi mạng hoặc 502/503/504 chỉ đổi cho lượt kế để không phát lại một
+    POST chưa biết app đã nhận chưa. Redirect tự động bị cấm vì request mang Bearer token.
+  - Fallback không thay bảng điều phối và không tự tin một URL từ thân lỗi: target phải được
+    operator nướng sẵn. `verify:worker-follow` khóa cả 409, 402, gateway, lỗi mạng, redirect và
+    race giữa nhiều heartbeat/event cùng lúc.
 - Media: URL công khai `objectstorage.…oraclecloud.com/...` nằm trong tin nhắn đã lưu —
   đổi trạm không làm vỡ một ảnh nào, vì bucket không đổi. Khoá ghi (`OCI_*`) nằm trong env
   của mọi trạm.

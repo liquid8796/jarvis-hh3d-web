@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.70",
+    date: "2026-09-08",
+    lines: [
+      "Khôi lỗi tông môn nay đi thẳng tới máy chủ, không còn đốt hạn lượt gọi của một trạm trung gian mỗi năm giây.",
+      "Nếu cổng đang dùng bị khóa hoặc tạm mất kết nối, khôi lỗi tự chuyển sang cổng cứu hộ đã được tông môn tin cậy.",
+      "Tám khôi lỗi bị kẹt sáng 08/09 đã được chuyển đường; việc đang chạy được giữ nguyên khi phát hành.",
+    ],
+  },
+  {
     version: "1.3.69",
     date: "2026-09-06",
     lines: [
@@ -465,14 +474,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Máy chạy tự động nay tự bấm ô kiểm tra của trang khi bị chặn ở cổng, và ghi lại là đã bấm mấy lần.",
       "Nhờ vậy đọc Hoạt động là biết ngay: chưa từng thử, hay thử rồi mà trang vẫn không cho qua.",
-    ],
-  },
-  {
-    version: "1.3.19",
-    date: "2026-08-20",
-    lines: [
-      "Khi trang game chặn máy chạy tự động ở cổng, vòng chạy nay dừng ngay và nói đúng lý do, thay vì thử lại từng nhiệm vụ suốt mười mấy phút.",
-      "Nhờ vậy máy được nhả sớm cho đàn khác, và nhật ký thôi đổ lỗi nhầm cho trang chậm.",
     ],
   },
 ];

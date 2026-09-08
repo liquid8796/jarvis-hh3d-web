@@ -3,7 +3,7 @@
 # Dựng KHÔI LỖI TÔNG MÔN trên VM Oracle Cloud Always Free — Ubuntu 24.04 aarch64.
 #
 # Chạy TRÊN VM (user mặc định `ubuntu`, có sudo):
-#   WEB_URL='https://auto-hh3d.vercel.app' WORKER_TOKEN='<token tông môn>' \
+#   WEB_URL='https://158.180.59.36.sslip.io' WORKER_TOKEN='<token tông môn>' \
 #     sudo -E bash setup.sh
 #
 # Idempotent: chạy lại = cập nhật (tải gói mới nhất, cài lại thư viện, restart service).
@@ -11,7 +11,9 @@
 # =============================================================================
 set -euo pipefail
 
-WEB_URL="${WEB_URL:-}"
+DIRECT_WORKER_URL="https://158.180.59.36.sslip.io"
+FALLBACK_WORKER_URL="https://auto-hh3d.vercel.app"
+WEB_URL="${WEB_URL:-$DIRECT_WORKER_URL}"
 WORKER_TOKEN="${WORKER_TOKEN:-}"
 APP_DIR="/opt/auto-hh3d/linh-su"
 APP_USER="linhsu"
@@ -21,11 +23,15 @@ if [ "$(id -u)" -ne 0 ]; then
   echo "Chạy bằng sudo: WEB_URL=... WORKER_TOKEN=... sudo -E bash setup.sh" >&2
   exit 1
 fi
-if [ -z "$WEB_URL" ] || [ -z "$WORKER_TOKEN" ]; then
-  echo "Thiếu WEB_URL hoặc WORKER_TOKEN (nhớ sudo -E để biến môi trường đi qua sudo)." >&2
+if [ -z "$WORKER_TOKEN" ]; then
+  echo "Thiếu WORKER_TOKEN (nhớ sudo -E để biến môi trường đi qua sudo)." >&2
   exit 1
 fi
 WEB_URL="${WEB_URL%/}"
+if [ "$WEB_URL" = "$FALLBACK_WORKER_URL" ]; then
+  echo "WEB_URL đang trùng cổng cứu hộ và sẽ đốt Edge Requests. Dùng $DIRECT_WORKER_URL." >&2
+  exit 1
+fi
 
 echo "== [1/6] Node.js 22 LTS =="
 if ! command -v node >/dev/null 2>&1 || [ "$(node --version | sed 's/^v//' | cut -d. -f1)" -lt 20 ]; then
@@ -78,7 +84,7 @@ fi
 
 cat > "$APP_DIR/.env" <<ENV
 WEB_URL=$WEB_URL
-WORKER_FALLBACK_URL=https://auto-hh3d.vercel.app
+WORKER_FALLBACK_URL=$FALLBACK_WORKER_URL
 WORKER_TOKEN=$WORKER_TOKEN
 WORKER_ID=$WORKER_ID
 ENV

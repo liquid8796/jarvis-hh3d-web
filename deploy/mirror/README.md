@@ -174,9 +174,11 @@ phát việc đóng trong lúc chuyển (đo 10/08: ~12 phút cả chờ đàn).
   - Chỉ nhận `https://`: khôi lỗi gửi token theo mọi request, nên địa chỉ nền quyết định token
     đi về đâu. Bảng chỉ chứa https nên siết ở đây không bỏ sót ca hợp lệ nào.
   - **Trạm chết trước app:** workflow/operator có thể khai `WORKER_FALLBACK_URL`, chỉ nhận một
-    HTTPS origin sạch không path/query/credentials. Mã `DEPLOYMENT_*` của mép nền tảng đổi cổng
-    và replay đúng một lần; lỗi mạng hoặc 502/503/504 chỉ đổi cho lượt kế để không phát lại một
-    POST chưa biết app đã nhận chưa. Redirect tự động bị cấm vì request mang Bearer token.
+    HTTPS origin sạch không path/query/credentials. Header nền tảng hoặc đúng body 402 mang
+    `DEPLOYMENT_*` đổi cổng và replay đúng một lần; body 500 không được tin. Lỗi mạng, body đứt
+    hoặc 502/503/504 chỉ đổi cho lượt kế để không phát lại một POST chưa biết app đã nhận chưa.
+    Redirect tự động bị cấm vì request mang Bearer token. Mỗi năm phút, một GET không token thử
+    cổng chính và tự trở về khi nó sống lại — fallback không được thành đường poll vĩnh viễn.
   - Fallback không thay bảng điều phối và không tự tin một URL từ thân lỗi: target phải được
     operator nướng sẵn. `verify:worker-follow` khóa cả 409, 402, gateway, lỗi mạng, redirect và
     race giữa nhiều heartbeat/event cùng lúc.

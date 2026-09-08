@@ -52,6 +52,7 @@ import {
 } from "./khoiloiPayload.mjs";
 
 const repoRoot = path.join(import.meta.dirname, "..");
+const EXPECTED_DIRECT_WORKER_URL = "https://158.180.59.36.sslip.io";
 const EXPECTED_WORKER_FALLBACK = "https://auto-hh3d.vercel.app";
 
 let checks = 0;
@@ -210,7 +211,7 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
   const template = readCommittedFile(repoRoot, WORKFLOW_TEMPLATE_PATH).toString("utf8");
 
   check("moi được WORKER_ID khỏi bản mẫu", workerIdFromWorkflow(template) !== null);
-  check("moi được WEB_URL khỏi bản mẫu", webUrlFromWorkflow(template) !== null);
+  check("WEB_URL mặc định của bản mẫu đi thẳng backend", webUrlFromWorkflow(template) === EXPECTED_DIRECT_WORKER_URL);
   check(
     "bản mẫu khai cổng worker dự phòng HTTPS",
     template.includes(`WORKER_FALLBACK_URL: \${{ vars.WORKER_FALLBACK_URL || '${EXPECTED_WORKER_FALLBACK}' }}`),
@@ -266,6 +267,17 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
     "chỗ gói đặt workflow khớp chỗ sổ đi hỏi trạng thái",
     WORKFLOW_TARGET_PATH === `.github/workflows/${DEFAULT_WORKFLOW_FILE}`,
     `${WORKFLOW_TARGET_PATH} vs .github/workflows/${DEFAULT_WORKFLOW_FILE}`,
+  );
+  const newGithubRaw = readCommittedFile(repoRoot, "scripts/newGithubKhoiloi.mjs").toString("utf8");
+  const newStationRaw = readCommittedFile(repoRoot, "scripts/newGithubStation.mts").toString("utf8");
+  check(
+    "lối dựng kho trần mặc định worker đi thẳng backend",
+    newGithubRaw.includes(`DEFAULT_WEB_URL = "${EXPECTED_DIRECT_WORKER_URL}"`),
+  );
+  check(
+    "lối dựng-và-ghi-sổ cũng ép worker đi thẳng backend",
+    newStationRaw.includes(`DIRECT_WORKER_URL = "${EXPECTED_DIRECT_WORKER_URL}"`) &&
+      newStationRaw.includes('inner.push("--web-url", DIRECT_WORKER_URL)'),
   );
 
   const dayDu = new Map([

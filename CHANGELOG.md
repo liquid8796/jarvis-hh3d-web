@@ -29,16 +29,19 @@ Bản vá có hai lớp:
 
 - workflow GitHub mới đi thẳng `https://158.180.59.36.sslip.io`; cổng Vercel ổn định còn lại là
   `WORKER_FALLBACK_URL`, không nằm trên đường poll thường;
-- worker chỉ nhận fallback là một HTTPS origin sạch do operator cấu hình. `DEPLOYMENT_*` được
-  replay đúng một lần vì request chắc chắn bị chặn trước app. Lỗi mạng và 502/503/504 chỉ đổi
-  cổng cho lượt kế, không replay POST mơ hồ. Redirect tự động bị tắt để Bearer token không thể
-  theo một `Location` lạ; response đồng thời dùng compare-and-swap để lời cũ không kéo URL ngược.
+- worker chỉ nhận fallback là một HTTPS origin sạch do operator cấu hình. Đúng chữ ký
+  `402/DEPLOYMENT_*` được replay một lần vì request chắc chắn bị chặn trước app; một câu tương tự
+  trong body 500 không được tin. Lỗi mạng, body truyền dở và 502/503/504 chỉ đổi cổng cho lượt kế,
+  không replay POST mơ hồ. Redirect tự động bị tắt để Bearer token không thể theo một `Location`
+  lạ; response đồng thời dùng compare-and-swap để lời cũ không kéo URL ngược. Fallback không dính
+  vĩnh viễn: mỗi năm phút một probe GET không token thử cổng chính, sống lại thì tự trở về.
 
 Đường dựng kho mới không còn lấy `activeUrl` Vercel từ control doc làm bootstrap worker. Lượt
 phát hành vẫn có thể đổi `WEB_URL` tường minh, nhưng template bắt buộc phải giữ cổng cứu hộ.
 Lưới env cũng được sửa để neo vào đúng bước `Trực ca` thay vì đọc nhầm khối env của Obscura.
 
-Đo: `verify:worker-follow` 68/68; `verify:worker-env` 22/22. `verify:github-deploy` khóa cả
+Đo: `verify:worker-follow` 84/84 (gồm failback, body đứt, hai chiều 409/fallback);
+`verify:worker-env` 25/25. `verify:github-deploy` khóa cả
 workflow sinh ra và chạy sau khi commit vì gói cố ý đọc blob `HEAD`. Phát hành production đổi
 cả mười kho sang backend trực tiếp; hàng rào `heldJobs` giữ nguyên runner nào còn cầm đàn.
 

@@ -32,6 +32,7 @@ const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "u
 const YML = "deploy/github/linh-su.yml";
 const PS1 = "public/linh-su/install.ps1";
 const SH = "public/linh-su/install.sh";
+const ORACLE = "deploy/oracle/setup.sh";
 const WORKER = "scripts/worker.mjs";
 
 /**
@@ -87,6 +88,7 @@ function bienCuaSh(src: string): string[] {
 const ymlSrc = read(YML);
 const ps1Src = read(PS1);
 const shSrc = read(SH);
+const oracleSrc = read(ORACLE);
 const workerSrc = read(WORKER);
 
 const tongMon = bienCuaTongMon(ymlSrc);
@@ -97,6 +99,20 @@ console.log("Đọc được gì ở mỗi bên");
 check("tông môn khai được ít nhất WEB_URL + token + id", tongMon.length >= 3, tongMon.join(", "));
 check("install.ps1 đọc được khối .env", ps1.length >= 3, ps1.join(", "));
 check("install.sh đọc được khối .env", sh.length >= 3, sh.join(", "));
+
+console.log("\nKhôi lỗi VM: cổng chính và cổng cứu hộ không được trùng");
+check(
+  "setup Oracle mặc định đi thẳng backend",
+  /DIRECT_WORKER_URL="https:\/\/158\.180\.59\.36\.sslip\.io"/.test(oracleSrc),
+);
+check(
+  "setup Oracle giữ proxy ở vai trò fallback",
+  /FALLBACK_WORKER_URL="https:\/\/auto-hh3d\.vercel\.app"/.test(oracleSrc),
+);
+check(
+  "setup Oracle từ chối WEB_URL trùng fallback",
+  /if \[ "\$WEB_URL" = "\$FALLBACK_WORKER_URL" \]/.test(oracleSrc),
+);
 
 console.log("\nHai bộ cài máy nhà phải KHỚP NHAU");
 // Bộ cài Windows và bộ cài Unix lệch nhau thì cùng một người dùng nhận hai hành vi khác nhau

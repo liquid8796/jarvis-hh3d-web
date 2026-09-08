@@ -94,6 +94,10 @@ ok(
   "nhận ra deployment chết từ header Vercel",
 );
 ok(!isDeadDeploymentResponse(402, "payment required"), "402 thường không bị gọi nhầm là deployment chết");
+ok(
+  !isDeadDeploymentResponse(500, "DEPLOYMENT_DISABLED"),
+  "body 500 nhắc DEPLOYMENT_DISABLED không đủ quyền cho replay POST",
+);
 
 // ---- đi theo 409 kèm activeUrl --------------------------------------------------------------
 {
@@ -210,10 +214,28 @@ ok(!isDeadDeploymentResponse(402, "payment required"), "402 thường không b�
   ok(currentUrl() === OLD, "402 thường không đổi cổng");
 }
 
+// ---- body app nhắc DEPLOYMENT_* không được biến 500 thành replay an toàn ----------------------
+{
+  const { impl, calls } = fakeFetch({ [OLD]: { status: 500, body: "DEPLOYMENT_DISABLED" } });
+  const { call, currentUrl } = createWorkerCall({
+    webUrl: OLD,
+    fallbackUrl: FALLBACK,
+    token: "t",
+    fetchImpl: impl,
+    log: silent,
+  });
+  let message = "";
+  await call("complete", { jobId: "j" }).catch((err: unknown) => {
+    message = err instanceof Error ? err.message : "";
+  });
+  ok(message.includes("HTTP 500") && calls.length === 1, "500 body marker không replay complete");
+  ok(currentUrl() === OLD, "500 body marker không tự đổi cổng");
+}
+
 // ---- gateway/network: đổi đường cho LƯỢT KẾ, tuyệt đối không replay POST mơ hồ ----------------
 for (const status of [502, 503, 504]) {
   const { impl, calls } = fakeFetch({
-    [OLD]: { status, body: "upstream unavailable" },
+    [OLD]: { status, body: status === 503 ? "DEPLOYMENT_DISABLED" : "upstream unavailable" },
     [FALLBACK]: { status: 200, body: JSON.stringify({ job: null }) },
   });
   const { call, currentUrl } = createWorkerCall({
@@ -256,6 +278,97 @@ for (const status of [502, 503, 504]) {
   ok(currentUrl() === FALLBACK, "lỗi mạng đặt fallback làm cổng cho lượt kế");
   await call("claim");
   ok(calls.length === 2 && calls[1].startsWith(FALLBACK), "lượt kế sau lỗi mạng dùng fallback");
+}
+
+// ---- fallback chỉ là chỗ trú: tới hạn probe không token, cổng chính sống thì trở về ------------
+{
+  let now = 0;
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  let firstPrimary = true;
+  let probes = 0;
+  const response = (status: number, body: string) => ({
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: () => null },
+    text: async () => body,
+    json: async () => JSON.parse(body),
+  });
+  const fetchImpl = (async (url: string, init?: RequestInit) => {
+    calls.push({ url, init: init ?? {} });
+    if (url === `${OLD}/api/worker` && firstPrimary) {
+      firstPrimary = false;
+      throw new Error("ECONNRESET");
+    }
+    if (url === `${FALLBACK}/api/worker`) return response(200, JSON.stringify({ job: null }));
+    if (url === `${OLD}/api/maintenance`) {
+      probes++;
+      return response(200, probes === 1 ? "<html>parking</html>" : JSON.stringify({ active: false }));
+    }
+    if (url === `${OLD}/api/worker`) return response(200, JSON.stringify({ job: null }));
+    throw new Error(`không chờ request tới ${url}`);
+  }) as unknown as typeof fetch;
+  const { call, currentUrl } = createWorkerCall({
+    webUrl: OLD,
+    fallbackUrl: FALLBACK,
+    token: "t",
+    fetchImpl,
+    log: silent,
+    nowImpl: () => now,
+    fallbackProbeMs: 1_000,
+  });
+  await call("claim").catch(() => {});
+  await call("claim");
+  ok(currentUrl() === FALLBACK && calls.length === 2, "trước hạn vẫn dùng fallback, không probe dày");
+  now = 1_000;
+  await call("claim");
+  ok(
+    calls.length === 4 && calls[2].url === `${OLD}/api/maintenance` && calls[3].url === `${FALLBACK}/api/worker`,
+    "probe 200 nhưng sai hình dạng app → vẫn ở fallback",
+  );
+  ok(
+    !("authorization" in ((calls[2].init.headers ?? {}) as Record<string, string>)),
+    "probe failback KHÔNG mang Bearer token",
+  );
+  ok(currentUrl() === FALLBACK, "trang parking 200 không bị gọi nhầm là cổng chính đã sống");
+  now = 2_000;
+  await call("claim");
+  ok(
+    calls.length === 6 && calls[4].url === `${OLD}/api/maintenance` && calls[5].url === `${OLD}/api/worker`,
+    "probe đúng route app → op trở về đường chính",
+  );
+  ok(currentUrl() === OLD, "cổng chính sống lại thì fallback thôi sticky");
+}
+
+// ---- thân response chết giữa đường: đổi cho lượt kế, không replay -----------------------------
+for (const scene of ["error-text", "success-json"] as const) {
+  const calls: string[] = [];
+  const fetchImpl = (async (url: string) => {
+    calls.push(url);
+    if (scene === "error-text") {
+      return {
+        ok: false,
+        status: 503,
+        headers: { get: () => null },
+        text: async () => { throw new Error("body ECONNRESET"); },
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () => { throw new Error("body terminated"); },
+    };
+  }) as unknown as typeof fetch;
+  const { call, currentUrl } = createWorkerCall({
+    webUrl: OLD,
+    fallbackUrl: FALLBACK,
+    token: "t",
+    fetchImpl,
+    log: silent,
+  });
+  await call("claim").catch(() => {});
+  ok(calls.length === 1, `${scene}: body hỏng không replay POST hiện tại`);
+  ok(currentUrl() === FALLBACK, `${scene}: body hỏng đổi cổng cho lượt kế`);
 }
 
 // ---- fallback không tin cậy/trùng cổng: không bao giờ nhận Bearer token -----------------------
@@ -309,6 +422,28 @@ for (const status of [400, 401, 403, 404]) {
     "hai ngân sách độc lập kết thúc sau đúng ba request, không loop",
   );
   ok(currentUrl() === FALLBACK, "chuỗi ba cổng kết ở fallback");
+}
+
+{
+  const { impl, calls } = fakeFetch({
+    [OLD]: { status: 402, body: "DEPLOYMENT_DISABLED" },
+    [FALLBACK]: { status: 409, body: JSON.stringify({ activeUrl: NEW }) },
+    [NEW]: { status: 200, body: JSON.stringify({ job: null }) },
+  });
+  const { call, currentUrl } = createWorkerCall({
+    webUrl: OLD,
+    fallbackUrl: FALLBACK,
+    token: "t",
+    fetchImpl: impl,
+    log: silent,
+  });
+  const res = await call("claim");
+  ok(res.job === null, "deployment chết → fallback 409 → activeUrl vẫn cứu được");
+  ok(
+    calls.length === 3 && calls[0].startsWith(OLD) && calls[1].startsWith(FALLBACK) && calls[2].startsWith(NEW),
+    "chiều ngược kết thúc sau đúng ba request",
+  );
+  ok(currentUrl() === NEW, "chiều ngược kết ở activeUrl do fallback chỉ dẫn");
 }
 
 // ---- response cũ về muộn không được kéo base ngược khỏi fallback -----------------------------

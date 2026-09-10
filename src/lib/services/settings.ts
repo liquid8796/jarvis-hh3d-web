@@ -72,6 +72,8 @@ const githubCompanionRepoSchema = z.object({
   nextDecisionAt: z.string().nullable().optional(),
   lastCommitSha: z.string().max(100).optional(),
   topic: z.string().max(1000).optional(),
+  language: z.string().max(80).optional(),
+  sourcePaths: z.array(z.string().min(1).max(240)).max(256).optional(),
   forkedFrom: z.string().max(141).optional(),
   pendingDelete: z.boolean().optional(),
   actionsDisabled: z.boolean().optional(),
@@ -459,6 +461,9 @@ export const appSettingsSchema = z.object({
           kind: z.enum(["create", "fork"]),
           source: z.string().max(141).optional(),
           githubId: z.number().int().positive().optional(),
+          metadataVersion: z.literal(2).optional(),
+          language: z.string().max(80).optional(),
+          sourcePaths: z.array(z.string().min(1).max(240)).max(24).optional(),
         }).optional(),
         /**
          * Giới hạn commit MỖI NGÀY cho MỖI kho phụ. 0 chỉ tạm ngừng phần nuôi software, không tắt

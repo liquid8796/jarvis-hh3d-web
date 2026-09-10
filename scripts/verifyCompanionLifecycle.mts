@@ -11,7 +11,7 @@ import type { CompanionDecision } from "../src/lib/services/ollamaCompanion";
 type Station = AppSettings["githubStations"][number];
 type Dependencies = NonNullable<Parameters<typeof createCompanionEngine>[0]>;
 type PlanInput = Parameters<Dependencies["plan"]>[0];
-type Event = { method: string; slug: string; files?: SourceFile[]; message?: string; description?: string };
+type Event = { method: string; slug: string; files?: SourceFile[]; message?: string; description?: string; sourcePaths?: readonly string[] };
 
 const previousEncryptionKey = process.env.ENCRYPTION_KEY;
 const previousDatabaseUrl = process.env.DATABASE_URL;
@@ -32,7 +32,8 @@ const modelSource = [
 ];
 const decision = (action: CompanionDecision["action"], repo = "library-explorer", extra: Partial<CompanionDecision> = {}): CompanionDecision => ({
   action, repo, description: "Search a local catalog", reason: "Improve the local catalog search", commitMessage: "feat: add catalog search",
-  files: action === "create" || action === "commit" ? structuredClone(modelSource) : [], nextCheckMinutes: 30, ...extra,
+  files: action === "create" || action === "commit" ? structuredClone(modelSource) : [], nextCheckMinutes: 30,
+  ...(action === "create" ? { language: "Python", sourcePaths: ["src/catalog.py"] } : {}), ...extra,
 });
 function stationFixture(overrides: Record<string, unknown> = {}): Station {
   const parsed = appSettingsSchema.parse({ githubStations: [{ owner: "fixture", repo: "worker-main", workerId: "worker-main", pat: encryptSecret(FIXTURE_PAT), enabled: true, ...overrides }] });
@@ -93,17 +94,17 @@ function harness(options: {
     },
     async fork(): Promise<RepoInfo> { throw new Error("Unexpected fork in lifecycle fixture."); },
     async disableActions(owner: string, repo: string) { events.push({ method: "disableActions", slug: `${owner}/${repo}`.toLowerCase() }); },
-    async snapshot(owner: string, repo: string): Promise<RepoSnapshot | null> {
+    async snapshot(owner: string, repo: string, _contextWindow: number, sourcePaths?: readonly string[]): Promise<RepoSnapshot | null> {
       const slug = `${owner}/${repo}`.toLowerCase();
-      events.push({ method: "snapshot", slug });
+      events.push({ method: "snapshot", slug, sourcePaths });
       const info = remote.get(slug);
       if (!info) return null;
       return { branch: "main", head: "fixture-head", tree: "fixture-tree", githubId: info.id, context: "Existing local catalog source.",
         files: new Map((storedFiles.get(slug) ?? []).map((file) => [file.path, { sha: "fixture-blob", mode: "100644", content: file.content ?? "" }])) };
     },
-    async commit(owner: string, repo: string, _snapshot: RepoSnapshot, files: SourceFile[], message: string) {
+    async commit(owner: string, repo: string, _snapshot: RepoSnapshot, files: SourceFile[], message: string, _readPaths?: string[], _maxCommits?: number, sourcePaths?: readonly string[]) {
       const slug = `${owner}/${repo}`.toLowerCase();
-      events.push({ method: "commit", slug, files: structuredClone(files), message });
+      events.push({ method: "commit", slug, files: structuredClone(files), message, sourcePaths });
       storedFiles.set(slug, structuredClone(files));
       return { pushed: 1, sha: `fixture-commit-${++serial}` };
     },
@@ -182,7 +183,10 @@ try {
       assert.deepEqual(h.storedFiles.get(`fixture/${companion.repo}`), modelSource);
     }
     assert.deepEqual(h.events.slice(0, 4).map((event) => event.method), ["info", "create", "disableActions", "commit"]);
-    assert.ok(h.events.find((event) => event.method === "create")?.description?.includes("[companion:"));
+    assert.equal(h.events.find((event) => event.method === "create")?.description, "Search a local catalog");
+    assert.equal(state.githubStations[0].companionRepos[0].language, "Python");
+    assert.deepEqual(state.githubStations[0].companionRepos[0].sourcePaths, ["src/catalog.py"]);
+    assert.deepEqual(h.plans[2].languageHistory, ["Python", "Python"]);
     assert.equal(h.plans[0].mode, "create");
     assert.ok(h.plans[0].existingRepos.includes("worker-main"));
     assert.ok(h.plans[2].existingRepos.includes("catalog-one"));
@@ -349,7 +353,7 @@ try {
     assert.equal(h.plans.length, 0);
   });
 
-  await test("lost create response keeps its reservation and recovers the marked remote without another create", async () => {
+  await test("lost create response preserves private intent and stops for review without adopting the same-name repo", async () => {
     const h = harness({ station: { companionCountOverride: 1 }, loseCreateResponse: true, decisions: [decision("create"), decision("commit")] });
     const interrupted = await h.engine.run();
     assert.equal(interrupted.failed, 1);
@@ -358,15 +362,70 @@ try {
     assert.equal(pending.githubId, undefined, "no response means the host has not learned the ID yet");
     assert.equal(h.state().githubStations[0].companionRepos.length, 0);
     const remote = h.remote.get("fixture/library-explorer")!;
-    assert.ok(remote.description?.includes(`companion:${pending.operationId}`));
+    assert.equal(pending.metadataVersion, 2);
+    assert.equal(remote.description, "Search a local catalog");
     const resumed = await h.engine.run();
-    assert.equal(resumed.failed, 0);
-    assert.equal(resumed.pushed, 1);
+    assert.equal(resumed.failed, 1);
+    assert.equal(resumed.pushed, 0);
+    assert.match(resumed.results[0].note, /chưa xác minh được ID/);
     assert.equal(h.events.filter((event) => event.method === "create").length, 1);
+    assert.deepEqual(h.state().githubStations[0].nurturePending, pending);
+    assert.equal(h.state().githubStations[0].companionRepos.length, 0);
+    assert.deepEqual(h.plans.map((input) => input.mode), ["create"]);
+  });
+
+  await test("saved private GitHub ID recovers clean About after registration checkpoint failure", async () => {
+    const h = harness({ station: { companionCountOverride: 1 }, decisions: [decision("create"), decision("commit")] });
+    h.failNextMutationWhen((next) => next.githubStations[0].companionRepos.length === 1);
+    assert.equal((await h.engine.run()).failed, 1);
+    const pending = h.state().githubStations[0].nurturePending!;
+    assert.ok(pending.githubId);
+    assert.equal(pending.language, "Python");
+    assert.equal(h.remote.get("fixture/library-explorer")!.description, "Search a local catalog");
+    assert.equal((await h.engine.run()).failed, 0);
+    const recovered = h.state().githubStations[0].companionRepos[0];
+    assert.equal(recovered.githubId, pending.githubId);
+    assert.equal(recovered.language, "Python");
+    assert.deepEqual(recovered.sourcePaths, ["src/catalog.py"]);
     assert.equal(h.state().githubStations[0].nurturePending, undefined);
-    assert.equal(h.state().githubStations[0].companionRepos[0].githubId, remote.id);
-    assert.deepEqual(h.storedFiles.get("fixture/library-explorer"), modelSource);
-    assert.deepEqual(h.plans.map((input) => input.mode), ["create", "maintain"]);
+    assert.equal(h.events.filter((event) => event.method === "create").length, 1);
+  });
+
+  await test("legacy pending create still recovers its exact old marker", async () => {
+    const operationId = `${Date.now()}-11111111-2222-4333-8444-555555555555`;
+    const h = harness({ station: { companionCountOverride: 1, nurturePending: { repo: "library-explorer", kind: "create", operationId } }, decisions: [decision("commit")] });
+    h.remote.set("fixture/library-explorer", { id: 1001, full_name: "fixture/library-explorer", default_branch: "main", private: false, description: `Search a local catalog [companion:${operationId}]` });
+    assert.equal((await h.engine.run()).failed, 0);
+    assert.equal(h.state().githubStations[0].companionRepos[0].topic, "Search a local catalog");
+    assert.equal(h.state().githubStations[0].nurturePending, undefined);
+    assert.equal(h.events.filter((event) => event.method === "create").length, 0);
+  });
+
+  await test("language history spans accounts in creation order and unknown source declarations reach snapshot and commit", async () => {
+    const h = harness({ station: { companionCountOverride: 1 }, otherStations: [stationFixture({ owner: "another", enabled: false, companionRepos: [
+      companionFixture("older", 501, { language: "Python", createdAt: "2026-09-01T00:00:00Z" }),
+      companionFixture("newer", 502, { language: "Rust", createdAt: "2026-09-02T00:00:00Z" }),
+    ] })], decisions: [decision("create", "janet-catalog", { language: "Janet", sourcePaths: ["src/main.janet"], files: [{ path: "src/main.janet", content: '(defn lookup [xs q] (filter |(= $ q) xs))' }] }), decision("wait", "janet-catalog")] });
+    assert.equal((await h.engine.run({ stationSlug: SLUG })).failed, 0);
+    assert.deepEqual(h.plans[0].languageHistory, ["Rust", "Python"]);
+    assert.deepEqual(h.events.find((e) => e.method === "commit")!.sourcePaths, ["src/main.janet"]);
+    h.update((all) => { all.githubStations[0].companionRepos[0].nextDecisionAt = null; });
+    assert.equal((await h.engine.run({ stationSlug: SLUG })).failed, 0);
+    assert.deepEqual(h.events.find((e) => e.method === "snapshot")!.sourcePaths, ["src/main.janet"]);
+    assert.match(h.plans[1].context, /Existing primary language: Janet/);
+    assert.equal(h.plans[1].language, "Janet");
+    assert.deepEqual(h.plans[1].declaredSourcePaths, ["src/main.janet"]);
+    assert.deepEqual(h.state().githubStations[0].companionRepos[0].sourcePaths, ["src/main.janet"]);
+  });
+
+  await test("historical source declarations do not consume the per-commit file limit", async () => {
+    const oldPaths = Array.from({ length: 24 }, (_, i) => `src/module-${i}.janet`);
+    const h = harness({ station: { companionCountOverride: 1, companionRepos: [companionFixture("library-explorer", 101, { language: "Janet", sourcePaths: oldPaths })] }, decisions: [decision("commit", "library-explorer", {
+      language: "Janet", sourcePaths: ["src/new.janet"], files: [{ path: "src/new.janet", content: '(defn lookup [xs q] (filter |(= $ q) xs))' }],
+    })] });
+    assert.equal((await h.engine.run()).failed, 0);
+    assert.deepEqual(h.events.find((event) => event.method === "commit")!.sourcePaths, ["src/new.janet"]);
+    assert.deepEqual(h.state().githubStations[0].companionRepos[0].sourcePaths, [...oldPaths, "src/new.janet"]);
   });
 
   await test("create recovery refuses a same-name remote without the pending operation marker", async () => {

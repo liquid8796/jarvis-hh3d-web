@@ -1,6 +1,6 @@
 {
   "name": "jarvis-hh3d-web",
-  "version": "1.3.72",
+  "version": "1.3.73",
   "private": true,
   "description": "Auto HH3D — control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn tự động chạy trên server.",
   "scripts": {
@@ -98,6 +98,7 @@
     "github:revive": "tsx scripts/reviveGithubKhoiloi.mts",
     "github:rename": "tsx scripts/renameGithubKhoiloi.mts",
     "github:companions:backfill": "tsx scripts/backfillCompanionRepos.mts",
+    "github:companions:cleanup-about": "tsx scripts/cleanupCompanionAbout.mts",
     "verify:github-provisioning-inputs": "tsx scripts/verifyGithubProvisioningInputs.mts",
     "verify:github-provisioning-cli": "tsx scripts/verifyGithubProvisionCli.mts",
     "verify:github-provisioning-bat": "tsx scripts/verifyGithubProvisionBat.mts",
@@ -119,6 +120,7 @@
     "github:redact-public-endpoints": "tsx scripts/redactGithubPublicMetadata.mts",
     "verify:companion-github": "tsx scripts/verifyCompanionGithub.mts",
     "verify:companion-lifecycle": "tsx scripts/verifyCompanionLifecycle.mts",
+    "verify:companion-metadata": "tsx scripts/verifyCompanionMetadata.mts",
     "verify:github-settings-merge": "tsx scripts/verifyGithubSettingsMerge.mts",
     "verify:github-nurture-ui": "tsx scripts/verifyGithubNurtureUi.mts --check",
     "verify:github-removal": "tsx scripts/verifyGithubKhoiloiRemoval.mts",

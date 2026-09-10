@@ -152,6 +152,28 @@ systemctl list-timers --all jarvis-companions.timer
 sudo journalctl -u jarvis-companions.service -n 20 --no-pager
 ```
 
+### Làm sạch About kho phụ cũ
+
+Sau khi phát hành bản 1.3.73 trở lên, chạy tại `/opt/jarvis/ops-repo` dưới user `jarvis`:
+
+```bash
+npm run github:companions:cleanup-about
+npm run github:companions:cleanup-about -- --apply
+npm run github:companions:cleanup-about
+```
+
+Lượt mặc định chỉ xem trước; `--repo owner/repo` giới hạn vào một kho phụ đã đăng ký.
+Công cụ chỉ bỏ hậu tố `[companion:…]` đúng định dạng cũ, giữ nguyên phần mô tả còn lại,
+kiểm ID repo và lưu ID thiếu trước khi cập nhật. Kho đang có lượt nuôi sẽ được bỏ qua để
+chạy lại sau. Không dùng công cụ này cho kho chính. Thông tin ngôn ngữ còn thiếu được
+bổ sung từ GitHub vào backend để Ollama tránh lặp lại ngôn ngữ khi chọn dự án mới.
+
+Các lượt tạo mới chỉ lưu nhận diện trong backend. Nếu mất phản hồi tạo và chưa lưu được ID,
+hệ thống giữ tiến độ và báo lỗi để kiểm tra; không dựa vào tên hoặc About để nhận repo đó.
+Dự án mới khai báo ngôn ngữ và tệp source; ngôn ngữ không nằm trong bộ nhận diện vẫn được
+chấp nhận qua đường dẫn source an toàn. Mỗi lượt đổi tối đa 24 tệp, đọc tối đa 16 tệp trong
+ngân sách context; backend lưu tối đa 256 đường dẫn source đã khai báo cho mỗi kho.
+
 ### Phát hành blue/green — vì sao hai chỗ chạy
 
 `next start` **phớt lờ SIGTERM**. Đo 16/08/2026 từ journal của chính máy này: mỗi

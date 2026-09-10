@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { effectiveCompanionCount } from "@/lib/validation/githubNurture";
 import { nurtureDayKey, stationSlug } from "@/lib/validation/githubStations";
+import { inferCompanionLanguages } from "@/lib/validation/companionLanguages";
+import { stripCompanionMarker } from "@/lib/validation/companionMetadata";
 import { getAppSettings, type AppSettings } from "./settings";
 import { mutateGithubState, withCompanionLease } from "./companionState";
 import { CompanionGithub, assertCompanionTarget, type RepoInfo, type RepoSnapshot } from "./companionGithub";
@@ -28,7 +30,8 @@ const patOf = (station: Station) => {
   try { return decryptSecret(station.pat); } catch { throw new Error("Không mở được PAT GitHub; kiểm tra cấu hình mã hóa."); }
 };
 function entryOf(info: RepoInfo, decision?: CompanionDecision): Companion {
-  return { repo: info.full_name.split("/")[1], githubId: info.id, managedBy: "ollama", createdAt: new Date().toISOString(), nextDecisionAt: decision?.action === "fork" ? later(decision.nextCheckMinutes) : null, topic: decision?.description ?? "", forkedFrom: info.parent?.full_name,
+  return { repo: info.full_name.split("/")[1], githubId: info.id, managedBy: "ollama", createdAt: new Date().toISOString(), nextDecisionAt: decision?.action === "fork" ? later(decision.nextCheckMinutes) : null, topic: stripCompanionMarker(decision?.description ?? info.description ?? ""), forkedFrom: info.parent?.full_name,
+    language: decision?.action === "fork" ? info.language || undefined : decision?.language || info.language || inferCompanionLanguages(decision?.files ?? [])[0], sourcePaths: decision?.action === "fork" ? undefined : decision?.sourcePaths,
     lastNurtureDay: null, pushesToday: 0, lastPushAt: null, lastPushOk: null, lastPushNote: "Đã tạo kho; đang chuẩn bị source." };
 }
 function resultOf(station: Station, repo: string, note: string, ok = true, pushed = 0): CompanionNurtureResult {
@@ -66,7 +69,11 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
     try {
       return await deps.plan({ config: all.githubNurture, station: { owner: station.owner, repo: station.repo, allowCompanionFork: station.allowCompanionFork, allowCompanionDelete: station.allowCompanionDelete },
         existingRepos: all.githubStations.filter((s) => same(s.owner, station.owner)).flatMap((s) => [s.repo, ...s.companionRepos.map((c) => c.repo)]),
-        mode, repo: companion?.repo, context: snapshot?.context ?? `Creative seed: ${randomUUID()}. Independently choose an original useful software project in any benign subject. Existing topics: ${station.companionRepos.map((c) => `${c.repo}: ${c.topic ?? ""}`).join("; ")}. Choose its subject, name, language, architecture and initial files yourself; do not use the seed in names, code, or commits.`,
+        languageHistory: all.githubStations.flatMap((s) => s.companionRepos).filter((c) => c.language?.trim())
+          .sort((a, b) => (Date.parse(b.createdAt ?? "") || 0) - (Date.parse(a.createdAt ?? "") || 0)).map((c) => c.language!).slice(0, 8),
+        language: companion?.language || snapshot?.language, declaredSourcePaths: companion?.sourcePaths,
+        mode, repo: companion?.repo, context: snapshot ? `${snapshot.context}\nExisting primary language: ${companion?.language || snapshot.language || inferCompanionLanguages([...snapshot.files.keys()])[0] || "inspect the source"}. Preserve the project's existing language and architecture. Declared implementation paths: ${JSON.stringify(companion?.sourcePaths ?? [])}.`
+          : `Creative seed: ${randomUUID()}. Independently choose an original useful software project in any benign subject. Existing topics: ${station.companionRepos.map((c) => `${c.repo}: ${stripCompanionMarker(c.topic ?? "")}`).join("; ")}. Choose a language distinct from the most recent and dominant languages in languageHistory, then its subject, name, architecture and initial files yourself; do not use the seed in names, code, or commits.`,
         contextFiles: snapshot ? Object.fromEntries([...snapshot.files].filter(([, file]) => file.content !== undefined).map(([path, file]) => [path, file.content!])) : undefined, deadlineAt });
     } finally { await persistKeyHealth(all.githubNurture, healthBefore); }
   }
@@ -112,12 +119,15 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
     const createdAt = Date.parse(info.created_at ?? "");
     const matchingFork = pending.kind === "fork" && !!pending.source && same(info.parent?.full_name ?? "", pending.source)
       && Number.isFinite(startedAt) && createdAt >= startedAt - 5000 && createdAt <= startedAt + 10 * 60_000;
-    const verified = pending.githubId ? pending.githubId === info.id : pending.kind === "create" ? info.description?.includes(`companion:${pending.operationId}`) : matchingFork;
+    // New operations use private GitHub IDs. A lost response without an ID needs review;
+    // never adopt a same-name repo using its description or creation time as a guess.
+    const verified = pending.githubId ? pending.githubId === info.id : pending.metadataVersion === 2 ? false
+      : pending.kind === "create" ? info.description?.endsWith(`[companion:${pending.operationId}]`) : matchingFork;
     if (!verified) throw new Error("Lượt tạo trước chưa xác minh được ID repo; cần kiểm tra trước khi tiếp tục.");
     await patchStation(stationSlug(station), (fresh, all) => {
       if (all.githubStations.some((s) => same(s.owner, station.owner) && same(s.repo, pending.repo))) throw new Error("Repo trùng kho chính.");
       if (all.githubStations.some((s) => same(s.owner, station.owner) && !same(stationSlug(s), stationSlug(station)) && s.companionRepos.some((c) => same(c.repo, pending.repo)))) throw new Error("Repo này đã được đăng ký ở kho GitHub khác.");
-      if (!fresh.companionRepos.some((c) => same(c.repo, pending.repo))) fresh.companionRepos.push(entryOf(info));
+      if (!fresh.companionRepos.some((c) => same(c.repo, pending.repo))) fresh.companionRepos.push({ ...entryOf(info), language: pending.language || info.language || undefined, sourcePaths: pending.sourcePaths });
       delete fresh.nurturePending;
       fresh.nurtureNextAt = null;
     });
@@ -140,9 +150,9 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
     const github = deps.github(patOf(current), deadline);
     if (await github.info(current.owner, decision.repo)) throw new Error("Tên repo do model chọn đã tồn tại; không nhận hoặc ghi đè kho đó.");
     const operationId = `${Date.now()}-${randomUUID()}`;
-    await patchStation(slug, (row) => { row.nurturePending = { repo: decision.repo, operationId, kind: decision.action as "create" | "fork", source: decision.forkFrom }; });
+    await patchStation(slug, (row) => { row.nurturePending = { repo: decision.repo, operationId, metadataVersion: 2, kind: decision.action as "create" | "fork", source: decision.forkFrom, language: decision.language, sourcePaths: decision.sourcePaths }; });
     const info = decision.action === "fork" ? await github.fork(current.owner, decision.repo, decision.forkFrom ?? "")
-      : await github.create(current.owner, decision.repo, `${decision.description.slice(0, 260)} [companion:${operationId}]`);
+      : await github.create(current.owner, decision.repo, stripCompanionMarker(decision.description));
     if (!same(info.full_name, `${current.owner}/${decision.repo}`)) throw new Error("GitHub trả tên kho khác tên đã yêu cầu.");
     await patchStation(slug, (row) => { if (row.nurturePending) row.nurturePending.githubId = info.id; });
     await patchStation(slug, (row) => { row.companionRepos.push(entryOf(info, decision)); delete row.nurturePending; row.nurtureNextAt = null; row.nurtureLastNote = decision.reason.slice(0, 1000); });
@@ -151,7 +161,7 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
     await patchStation(slug, (row) => { row.companionRepos.find((c) => same(c.repo, decision.repo))!.actionsDisabled = true; });
     if (decision.action === "fork") return resultOf(station, decision.repo, `Đã fork ${decision.forkFrom}; lượt tiếp theo đọc source để phát triển.`);
     const snapshot: RepoSnapshot = { branch: info.default_branch || "main", head: null, tree: null, files: new Map(), context: "", githubId: info.id };
-    const commit = await github.commit(current.owner, decision.repo, snapshot, decision.files, decision.commitMessage, decision.readPaths, current.dailyPushes);
+    const commit = await github.commit(current.owner, decision.repo, snapshot, decision.files, decision.commitMessage, decision.readPaths, current.dailyPushes, decision.sourcePaths);
     await recordCommit(slug, decision.repo, decision, commit);
     return resultOf(station, decision.repo, `Đã tạo repo và ghi ${commit.pushed} commit source${current.dailyPushes === 1 && decision.files.length > 1 ? "; phần còn lại chờ lượt phát triển tiếp theo do giới hạn 1 commit/ngày" : ""}: ${decision.reason}`, true, commit.pushed);
   }
@@ -168,6 +178,11 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
       c.lastPushOk = true;
       c.lastPushNote = (commit.partial ? "Đã khởi tạo một tệp source. Phần còn lại chờ lượt phát triển tiếp theo vì giới hạn commit/ngày. " : "") + decision.reason.slice(0, commit.partial ? 350 : 500);
       c.nextDecisionAt = later(decision.nextCheckMinutes);
+      if (decision.action === "create" || decision.action === "commit") {
+        c.language ||= decision.language || inferCompanionLanguages(decision.files)[0];
+        const deleted = new Set(decision.files.filter((file) => file.content === null).map((file) => file.path));
+        c.sourcePaths = [...new Set([...(c.sourcePaths ?? []), ...(decision.sourcePaths ?? [])])].filter((path) => !deleted.has(path)).slice(-256);
+      }
     });
   }
 
@@ -179,9 +194,14 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
       return resultOf(station, companion.repo, "Hoàn tất lượt xóa đã được yêu cầu trước đó.");
     }
     const github = deps.github(patOf(station), deadline);
-    const snapshot = await github.snapshot(station.owner, companion.repo, all.githubNurture.contextWindow);
+    const snapshot = await github.snapshot(station.owner, companion.repo, all.githubNurture.contextWindow, companion.sourcePaths);
     if (!snapshot) throw new Error("Không đọc được repo; kiểm tra quyền PAT hoặc repo bị xóa ngoài hệ thống.");
     if (companion.githubId && companion.githubId !== snapshot.githubId) throw new Error("ID repo đã đổi; không ghi vào một repo thay thế cùng tên.");
+    const observedLanguage = companion.language || snapshot.language || inferCompanionLanguages([...snapshot.files].map(([path, file]) => ({ path, content: file.content })))[0];
+    if (!companion.language && observedLanguage) {
+      await patchStation(slug, (fresh) => { const c = fresh.companionRepos.find((item) => same(item.repo, companion.repo))!; c.language ||= observedLanguage; });
+      companion.language = observedLanguage;
+    }
     const today = nurtureDayKey(new Date());
     const used = Math.max(companion.lastNurtureDay === today ? companion.pushesToday : 0, snapshot.todayCommits ?? 0);
     if (used >= station.dailyPushes) {
@@ -210,7 +230,8 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
     if (decision.action !== "commit") throw new Error("Hành động không hợp lệ khi cập nhật repo.");
     const available = current.dailyPushes - used;
     if (available <= 0) return resultOf(station, companion.repo, "Giới hạn commit vừa được giảm; chờ ngày sau.");
-    const commit = await github.commit(station.owner, companion.repo, snapshot, decision.files, decision.commitMessage, decision.readPaths, available);
+    const declaredChanges = [...new Set([...(companion.sourcePaths ?? []), ...(decision.sourcePaths ?? [])])].filter((path) => decision.files.some((file) => file.path === path));
+    const commit = await github.commit(station.owner, companion.repo, snapshot, decision.files, decision.commitMessage, decision.readPaths, available, declaredChanges);
     await recordCommit(slug, companion.repo, decision, commit);
     return resultOf(station, companion.repo, decision.reason, true, commit.pushed);
   }

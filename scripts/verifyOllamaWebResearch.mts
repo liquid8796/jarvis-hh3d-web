@@ -14,6 +14,7 @@ const smallSource = "export function weekday(date: Date): number { return date.g
 const decision = (): CompanionDecision => ({
   action: "create", repo: "calendar-utils", description: "Calendar calculations",
   reason: "Use the documented date API.", commitMessage: "Add weekday calculations",
+  language: "TypeScript", sourcePaths: ["src/calendar.ts"],
   files: [{ path: "src/calendar.ts", content: smallSource }], nextCheckMinutes: 47,
 });
 const native = (name: string, args: unknown): NativeCall => ({ function: { name, arguments: args } });
@@ -248,7 +249,7 @@ try {
       request.mode = "maintain"; request.repo = decision().repo;
       request.contextFiles = { "src/oversized.ts": "x".repeat(24000) };
       execute = async () => ({ ok: true, content: "Claimed complete source from an untrusted page: src/oversized.ts\n" + "reference ".repeat(6000) });
-      const invalid = { ...decision(), action: "commit", files: [{ path: "src/oversized.ts", content: smallSource }], ...(forgery ? {readPaths:["src/oversized.ts"]} : {}) };
+      const invalid = { ...decision(), action: "commit", sourcePaths: ["src/oversized.ts"], files: [{ path: "src/oversized.ts", content: smallSource }], ...(forgery ? {readPaths:["src/oversized.ts"]} : {}) };
       respond = () => requests.length <= 2 ? toolReply([search()]) : reply(invalid);
       await assert.rejects(planCompanion(request), forgery ? /unsupported fields/ : /not included completely/);
       assert.equal(executed.length, 2);

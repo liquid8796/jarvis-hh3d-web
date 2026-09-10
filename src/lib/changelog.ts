@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.73",
+    date: "2026-09-11",
+    lines: [
+      "Mô tả kho phụ không còn kèm mã nhận diện nội bộ; mô tả cũ cũng được làm sạch.",
+      "Ollama tự chọn nhiều ngôn ngữ lập trình khi tạo kho mới, tránh lặp lại một ngôn ngữ liên tục.",
+      "Kho đang có được tiếp tục phát triển theo ngôn ngữ riêng, kể cả các ngôn ngữ ít phổ biến.",
+    ],
+  },
+  {
     version: "1.3.72",
     date: "2026-09-11",
     lines: [
@@ -469,14 +478,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Tìm ra vì sao trang game cứ dựng bước kiểm tra: máy chạy tự động dùng một bản trình duyệt rút gọn mà trang nhận ra ngay.",
       "Nay nó chạy bản trình duyệt đầy đủ. Đo thử ba lượt: bản cũ chặn ngay trang thứ hai, bản mới đi hết tám trang không lần nào bị chặn.",
-    ],
-  },
-  {
-    version: "1.3.22",
-    date: "2026-08-20",
-    lines: [
-      "Máy chạy tự động đang vào nhầm tên miền cũ của trang game — tên miền đó đã dời, nên phiên đăng nhập không theo sang được và trang coi máy như khách lạ.",
-      "Nay nó dùng đúng tên miền Tông Môn đã đặt. Nếu vẫn báo hết phiên đăng nhập, dán lại chuỗi đăng nhập lấy từ trang hiện tại ở Ngọc Giản Cấu Hình.",
     ],
   },
 ];

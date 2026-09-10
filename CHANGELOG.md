@@ -11,6 +11,14 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.73 — About kho phụ và lựa chọn ngôn ngữ (11/09/2026)
+
+- Bỏ hậu tố nhận diện `[companion:…]` khỏi About khi tạo repo; ID và tiến độ chỉ lưu trong backend. Lượt tạo mất phản hồi và chưa lưu được ID sẽ dừng để kiểm tra, không tự nhận repo cùng tên.
+- Thêm công cụ dọn About của các kho phụ đã đăng ký: mặc định xem trước, kiểm định danh, lưu ID trước khi bỏ dấu cũ, giữ nguyên mô tả và xác minh lại sau cập nhật.
+- Ollama tự chọn ngôn ngữ trước khi chọn dự án mới. Lịch sử tám kho gần nhất trên các tài khoản giúp tránh lặp ngôn ngữ vừa dùng hoặc đang chiếm đa số; kết quả không đạt được yêu cầu sửa lại.
+- Chấp nhận ngôn ngữ và phần mở rộng source mới qua khai báo tệp, kiểm tra khớp với các ngôn ngữ nhận diện được và giữ ngôn ngữ của dự án đang phát triển.
+- Bổ sung kiểm tra hồi phục theo ID riêng, làm sạch metadata, đa dạng ngôn ngữ, đọc/commit phần mở rộng chưa biết và bảo toàn giới hạn quyền ghi source.
+
 ## 1.3.72 — Tạo repo GitHub trực tiếp từ admin (11/09/2026)
 
 - Thay form chỉ ghi sổ bằng luồng provisioning chung với CLI: suy ra tài khoản từ PAT, tạo repo, đẩy source/workflow, đặt secret, ghi sổ và khởi động workflow/kho phụ.

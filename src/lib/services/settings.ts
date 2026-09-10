@@ -19,6 +19,19 @@ import {
 } from "@/lib/validation/githubStations";
 import { DEFAULT_GAME_BASE_URL, normalizeGameBaseUrl } from "@/lib/quest-engine/cookies.mjs";
 import type { TagFrame } from "@/lib/validation/tags";
+import { mergeGithubBranch } from "@/lib/validation/githubSettingsMerge";
+import {
+  DEFAULT_COMPANION_COUNT,
+  MAX_COMPANION_COUNT,
+  DEFAULT_OLLAMA_MODEL,
+  DEFAULT_OLLAMA_CONTEXT_WINDOW,
+  MIN_OLLAMA_CONTEXT_WINDOW,
+  MAX_OLLAMA_CONTEXT_WINDOW,
+  MAX_OLLAMA_API_KEYS,
+  DEFAULT_SEARXNG_BASE_URL,
+  DEFAULT_WEB_SEARCH_ENABLED,
+  parseSearxngUrl,
+} from "@/lib/validation/githubNurture";
 
 /**
  * Cấu hình toàn hệ thống — một document JSONB duy nhất, Zod gác CẢ HAI CHIỀU y như
@@ -51,6 +64,15 @@ const githubCompanionRepoSchema = z.object({
   lastPushAt: z.string().nullable().catch(null).default(null),
   lastPushOk: z.boolean().nullable().catch(null).default(null),
   lastPushNote: z.string().max(500).catch("").default(""),
+  managedBy: z.literal("ollama").optional(),
+  githubId: z.number().int().positive().optional(),
+  createdAt: z.string().optional(),
+  nextDecisionAt: z.string().nullable().optional(),
+  lastCommitSha: z.string().max(100).optional(),
+  topic: z.string().max(1000).optional(),
+  forkedFrom: z.string().max(141).optional(),
+  pendingDelete: z.boolean().optional(),
+  actionsDisabled: z.boolean().optional(),
 });
 
 export const appSettingsSchema = z.object({
@@ -381,6 +403,25 @@ export const appSettingsSchema = z.object({
    * khoản game, PAT thì PUSH ĐƯỢC MÃ vào kho đang chạy khôi lỗi. Vì thế cửa vào là
    * `github_station.manage`, mã riêng chỉ Gia chủ.
    */
+  githubNurture: z.object({
+    defaultCompanionCount: z.number().int().min(0).max(MAX_COMPANION_COUNT).catch(DEFAULT_COMPANION_COUNT).default(DEFAULT_COMPANION_COUNT),
+    model: z.string().trim().min(1).max(200).catch(DEFAULT_OLLAMA_MODEL).default(DEFAULT_OLLAMA_MODEL),
+    contextWindow: z.number().int().min(MIN_OLLAMA_CONTEXT_WINDOW).max(MAX_OLLAMA_CONTEXT_WINDOW).catch(DEFAULT_OLLAMA_CONTEXT_WINDOW).default(DEFAULT_OLLAMA_CONTEXT_WINDOW),
+    webSearchEnabled: z.boolean().catch(DEFAULT_WEB_SEARCH_ENABLED).optional(),
+    searxngBaseUrl: z.string().max(2048).refine((value) => {
+      try { parseSearxngUrl(value); return true; } catch { return false; }
+    }).catch(DEFAULT_SEARXNG_BASE_URL).optional(),
+    apiKeys: z.array(z.object({
+      id: z.string().min(1).max(100),
+      label: z.string().max(100).default("Ollama API key"),
+      secret: z.string().min(1),
+      disabled: z.boolean().catch(false).default(false),
+      cooldownUntil: z.string().nullable().catch(null).default(null),
+      lastUsedAt: z.string().nullable().catch(null).default(null),
+      lastError: z.string().max(500).catch("").default(""),
+    })).max(MAX_OLLAMA_API_KEYS).catch([]).default([]),
+  }).prefault({}),
+
   githubStations: z
     .array(
       z.object({
@@ -399,14 +440,23 @@ export const appSettingsSchema = z.object({
         pat: z.string().min(1),
         /** Tắt là đứng ngoài vòng nuôi — dòng và PAT giữ nguyên, chỉ không ai đụng tới kho ấy. */
         enabled: z.boolean().catch(true).default(true),
+        /** Registered companion repos retain their identity and activity history. */
+        companionRepos: z.array(githubCompanionRepoSchema).max(MAX_COMPANION_COUNT).catch([]).default([]),
+        companionCountOverride: z.number().int().min(0).max(MAX_COMPANION_COUNT).nullable().optional(),
+        allowCompanionFork: z.boolean().optional(),
+        allowCompanionDelete: z.boolean().optional(),
+        nurtureNextAt: z.string().nullable().optional(),
+        nurtureLastRunAt: z.string().optional(),
+        nurtureLastNote: z.string().max(1000).optional(),
+        nurturePending: z.object({
+          repo: z.string().min(1).max(100),
+          operationId: z.string().min(1).max(200),
+          kind: z.enum(["create", "fork"]),
+          source: z.string().max(141).optional(),
+          githubId: z.number().int().positive().optional(),
+        }).optional(),
         /**
-         * Hai kho phần mềm ngẫu nhiên được dựng cùng khôi lỗi. Station đời cũ không có trường
-         * này và phải tiếp tục đọc được nguyên vẹn, nên mặc định là mảng rỗng; chỉ lượt tạo MỚI
-         * bắt buộc đủ hai kho. Trace nằm theo repo để đổi thứ tự không gán nhầm trạng thái.
-         */
-        companionRepos: z.array(githubCompanionRepoSchema).max(2).catch([]).default([]),
-        /**
-         * Số commit MỖI NGÀY cho MỖI kho phụ. 0 chỉ tạm ngừng phần nuôi software, không tắt
+         * Giới hạn commit MỖI NGÀY cho MỖI kho phụ. 0 chỉ tạm ngừng phần nuôi software, không tắt
          * workflow khôi lỗi chính; đó là lý do không dùng chung cờ `enabled`.
          */
         dailyPushes: z
@@ -527,6 +577,7 @@ export const appSettingsSchema = z.object({
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 
 const GLOBAL_ID = "global";
+const githubReadBaselines = new WeakMap<AppSettings, Pick<AppSettings, "githubStations" | "githubNurture">>();
 
 export async function getAppSettings(): Promise<AppSettings> {
   const rows = await db()
@@ -536,7 +587,9 @@ export async function getAppSettings(): Promise<AppSettings> {
     .limit(1);
 
   const parsed = appSettingsSchema.safeParse(rows[0]?.value ?? {});
-  return parsed.success ? parsed.data : appSettingsSchema.parse({});
+  const settings = parsed.success ? parsed.data : appSettingsSchema.parse({});
+  githubReadBaselines.set(settings, structuredClone({ githubStations: settings.githubStations, githubNurture: settings.githubNurture }));
+  return settings;
 }
 
 /**
@@ -558,11 +611,17 @@ export const getRenderSettings = cache(getAppSettings);
 
 export async function saveAppSettings(value: AppSettings): Promise<void> {
   const clean = appSettingsSchema.parse(value);
-  await db()
-    .insert(schema.appSettings)
-    .values({ id: GLOBAL_ID, value: clean, updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: schema.appSettings.id,
-      set: { value: clean, updatedAt: sql`now()` },
-    });
+  const baseline = githubReadBaselines.get(value);
+  await db().transaction(async (tx) => {
+    await tx.insert(schema.appSettings).values({ id: GLOBAL_ID, value: clean, updatedAt: new Date() }).onConflictDoNothing();
+    const [row] = await tx.select().from(schema.appSettings).where(eq(schema.appSettings.id, GLOBAL_ID)).for("update");
+    if (baseline) {
+      const current = appSettingsSchema.parse(row.value);
+      clean.githubStations = mergeGithubBranch(baseline.githubStations, clean.githubStations, current.githubStations) as AppSettings["githubStations"];
+      clean.githubNurture = mergeGithubBranch(baseline.githubNurture, clean.githubNurture, current.githubNurture) as AppSettings["githubNurture"];
+    }
+    await tx.update(schema.appSettings).set({ value: appSettingsSchema.parse(clean), updatedAt: sql`now()` }).where(eq(schema.appSettings.id, GLOBAL_ID));
+  });
+  // Keep the baseline paired with the caller's object, which may be saved again later.
+  githubReadBaselines.set(value, structuredClone({ githubStations: value.githubStations, githubNurture: value.githubNurture }));
 }

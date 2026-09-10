@@ -185,26 +185,15 @@ export function renderWorkflow({ template, workerId, webUrl }) {
 }
 
 /**
- * README nằm ngay trang đầu của một kho CÔNG KHAI, nên nó là chỗ dễ nói hớ nhất. Giữ đúng một
- * việc nó phải làm — dặn người mở kho đừng sửa tay — và bỏ mọi thứ chỉ đường về tông môn.
+ * Public overview retains its factual purpose without duplicating a backend endpoint.
+ * @param {{ workerId: string, webUrl?: string }} input
  */
-/**
- * README của kho CÔNG KHAI — tệp đầu tiên người lạ đọc, nên nó nói ít nhất có thể.
- *
- * Bản trước mở đầu bằng「# Tông môn — <workerId>」và viết trọn bằng tiếng Việt. Hai điều ấy cùng
- * làm một việc: nối kho này với những kho khác qua một chữ dùng chung, và nói cho người đọc biết
- * nó thuộc về một nhóm. Từ 17/08/2026 tiêu đề chỉ còn chính cái tên ngẫu nhiên của kho, lời văn
- * là tiếng Anh trung tính — đúng giọng một kho công cụ bất kỳ.
- *
- * Vẫn giữ câu「đừng sửa tay ở đây」: nó phục vụ người vận hành, và không nói gì thêm về trò gì.
- */
-export function renderReadme({ workerId, webUrl }) {
+export function renderReadme({ workerId, webUrl: _webUrl }) {
   return (
     `# ${workerId}\n\n` +
     `Scheduled background task runner.\n\n` +
     `Generated from an upstream template — do not edit here. Edit upstream and redeploy, or the\n` +
-    `two copies will drift apart.\n\n` +
-    `Endpoint: ${webUrl}\n`
+    `two copies will drift apart.\n`
   );
 }
 

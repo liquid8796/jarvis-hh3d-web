@@ -81,7 +81,7 @@ async function dropSchemas(): Promise<void> {
 // `information_schema` và `regclass`, và bẻ nó chỉ để chiều một phép kiểm là làm hỏng thứ
 // đang chạy thật. Ta kiểm ĐÚNG KỸ THUẬT mà engine dùng, trên cùng dữ liệu khó.
 const q = (n: string) => `"${n.replace(/"/g, '""')}"`;
-const one = <T>(r: unknown): T => (Array.isArray(r) ? r[0] : (r as { rows: T[] }).rows[0]) as T;
+const one = <T,>(r: unknown): T => (Array.isArray(r) ? r[0] : (r as { rows: T[] }).rows[0]) as T;
 
 async function copyPage(table: string, offset: number, limit: number): Promise<number> {
   const page = `select * from ${SRC}.${q(table)} order by id limit ${limit} offset ${offset}`;

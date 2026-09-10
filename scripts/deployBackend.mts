@@ -30,7 +30,7 @@
  * hành được một số hiệu đã đang chạy**. Có `--same-version` cho lượt phát hành lại thật sự cần.
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -217,7 +217,7 @@ try {
   console.log(`• Dựng release + khởi động cổng ${state.idle} (npm ci + next build — vài phút)…`);
   remoteOrDie(
     [
-      "set -e",
+      "set -eo pipefail",
       `REL=/opt/jarvis/releases/${sha}-$(date +%H%M%S)`,
       "sudo mkdir -p $REL /opt/jarvis/shared",
       "sudo tar -xzf /tmp/jarvis-app.tar.gz -C $REL",
@@ -267,5 +267,10 @@ try {
 
   console.log(`  Lùi bản tức thì nếu cần: npm run deploy:backend -- --rollback  (về ${state.versionActive})`);
 } finally {
-  rmSync(tmp, { recursive: true, force: true });
+  const resolvedTmp = realpathSync(tmp);
+  const resolvedRoot = realpathSync(tmpdir());
+  if (path.dirname(resolvedTmp) !== resolvedRoot || !path.basename(resolvedTmp).startsWith("deploy-backend-")) {
+    throw new Error("Refusing to remove a deployment directory outside the temporary workspace.");
+  }
+  rmSync(resolvedTmp, { recursive: true, force: true });
 }

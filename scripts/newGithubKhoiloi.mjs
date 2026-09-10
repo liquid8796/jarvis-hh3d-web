@@ -1,54 +1,29 @@
 #!/usr/bin/env node
 /**
- * DỰNG BUNDLE GITHUB MỚI — một khôi lỗi và hai software repo, từ repo trắng tới lượt chạy đầu.
+ * Create the primary GitHub worker repository, install its secret, and dispatch its workflow.
  *
- *   node scripts/newGithubKhoiloi.mjs --owner <tài-khoản> [--repo tên] [--worker-id id]
- *     [--companion-repo tên-1 --companion-repo tên-2]
- *   node scripts/newGithubKhoiloi.mjs --owner <tài-khoản> --dry-run    # in kế hoạch, không làm gì
+ * node scripts/newGithubKhoiloi.mjs --owner <account> [--repo name] [--worker-id id]
+ * node scripts/newGithubKhoiloi.mjs --owner <account> --dry-run
  *
- * VÌ SAO CÓ TỆP NÀY: mỗi tài khoản GitHub là một quỹ phút Actions riêng, nên thêm một tài khoản
- * là thêm một khôi lỗi tông môn nữa mà không tốn đồng nào. Mỗi lượt còn cần hai repo software
- * có source thật để vòng nuôi duy trì hằng ngày. Việc dựng thì lặp đi lặp lại — tạo ba repo,
- * chép đúng payload, dán secret, bấm chạy — và「lặp đi lặp lại」là chỗ để quên: quên
- * `--public` thì mất quỹ phút miễn phí, quên đổi WORKER_ID thì hai tiến trình ghi đè nhau trong
- * bảng `workers`.
+ * This low-level builder does not write the station register. `github:new` registers the worker
+ * with no companion repositories, then lets the configured Ollama runtime create companions.
+ * Direct callers can register the worker in the admin UI and run github:companions:backfill.
  *
- * KHO KHÔI LỖI KHÔNG PHẢI BẢN SAO CỦA WEB REPO. Worker chỉ cần `scripts/worker.mjs`, toàn bộ
- * `src/lib/quest-engine/`, và `playwright-core`. Giữ NGUYÊN bố cục thư mục là cố ý: worker.mjs
- * import `../src/lib/quest-engine/…`, nên chép nguyên hình dạng thì không phải viết lại một
- * đường dẫn nào — đúng cái bẫy mà `buildWorkerBundle.mjs` phải chống bằng phép rewrite và một
- * lời thề「thà vỡ lúc build còn hơn phát ra một gói cài xong không chạy」.
+ * The worker payload comes from committed HEAD through khoiloiPayload.mjs. GitHub CLI handles
+ * the sealed-box secret and authenticates using GH_TOKEN or its existing login. Creation still
+ * requires a classic PAT with repo + workflow + delete_repo so confirmed creations can be
+ * rolled back on push/secret failure. WORKER_TOKEN must be present in the environment.
  *
- * VÌ SAO DỰA VÀO `gh`: đặt secret qua API GitHub đòi mã hoá sealed-box (X25519 + XSalsa20), thứ
- * Node không có sẵn — làm tay thì phải kéo thêm `libsodium` vào một app web chỉ để phục vụ một
- * script phát hành. `gh` làm sẵn việc ấy, và nó cũng đã cầm sẵn phần xác thực. Cùng lối với
- * `deployAllStations.mts` gọi `vercel`.
- *
- * CẦN CÓ TRƯỚC:
- *   1. `gh` đã cài, và có ĐÚNG MỘT cái chìa dùng được — hoặc biến `GH_TOKEN` (lối mà
- *      `newGithubStation.mts` đi: nó dán PAT vào biến ấy rồi gọi xuống đây), hoặc một lượt
- *      `gh auth login` đúng tài khoản đích (nhiều tài khoản thì `gh auth switch --user <login>`
- *      trước khi chạy). Token phải là classic PAT có `repo` + `workflow` + `delete_repo`; scope
- *      cuối là điều kiện để rollback bundle hỏng. Fine-grained bị từ chối vì không chứng minh
- *      được quyền xoá trước khi repo mới tồn tại. Xem `assertGhCanAuthenticate`/`assertGhCanRollback`.
- *   2. `.env` ở gốc repo có `WORKER_TOKEN` — lấy bằng
- *      `vercel env pull .env --environment=production --yes`.
- *      KHÔNG dùng `npm run env:pull`: lệnh ấy kéo môi trường development, nơi biến này không tồn tại.
- *
- * ĐỌC TRƯỚC KHI CHẠY: cả ba repo tạo ra là CÔNG KHAI, và nhật ký Actions của repo chính thì ai
- * cũng đọc được, vĩnh viễn — trong khi việc của khôi lỗi là nhận cookie game đã giải mã. Đây là
- * đánh đổi đã được cân nhắc và chấp nhận; xem deploy/github-actions.md mục 6.
+ * The resulting worker repository and Actions logs are public; see deploy/github-actions.md §6.
  */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
-  randomDistinctSoftwareNames,
   randomSoftwareName,
   reviewGeneratedName,
 } from "./khoiloiNaming.mjs";
-import { buildCompanionProjects, COMPANION_REPO_COUNT } from "./companionProject.mjs";
 import {
   oauthScopesFromGhApiOutput,
   publishConfirmedRepository,
@@ -72,8 +47,6 @@ const arg = (name, fallback) => {
   const at = argv.indexOf(`--${name}`);
   return at > -1 && argv[at + 1] && !argv[at + 1].startsWith("--") ? argv[at + 1] : fallback;
 };
-const args = (name) => argv.flatMap((value, index) =>
-  value === `--${name}` && argv[index + 1] && !argv[index + 1].startsWith("--") ? [argv[index + 1]] : []);
 
 const owner = arg("owner");
 if (!owner) {
@@ -98,26 +71,11 @@ const repoName = arg("repo", generatedName);
  */
 const workerId = arg("worker-id", repoName === generatedName ? generatedName : repoName);
 const slug = `${owner}/${repoName}`;
-const companionFlagCount = argv.filter((value) => value === "--companion-repo").length;
-const suppliedCompanionRepos = args("companion-repo");
-if (companionFlagCount !== suppliedCompanionRepos.length) {
-  console.error("Mỗi cờ --companion-repo phải có một tên ngay sau nó.\nKHÔNG tạo gì cả.");
-  process.exit(1);
-}
-if (suppliedCompanionRepos.length !== 0 && suppliedCompanionRepos.length !== COMPANION_REPO_COUNT) {
+if (argv.includes("--companion-repo")) {
   console.error(
-    `Cần đúng ${COMPANION_REPO_COUNT} cờ --companion-repo, hoặc không truyền cờ nào để script tự sinh.\n` +
-      `  Đã nhận ${suppliedCompanionRepos.length}: ${suppliedCompanionRepos.join(", ") || "(trống)"}\n` +
-      "KHÔNG tạo gì cả.",
+    "Cờ --companion-repo đã được bỏ. Kho phụ do runtime Ollama tạo theo cấu hình sau khi trạm được ghi vào sổ.\n" +
+      "Dùng npm run github:new để tạo và ghi sổ kho chính, hoặc github:companions:backfill cho trạm đã có.\nKHÔNG tạo gì cả.",
   );
-  process.exit(1);
-}
-const companionRepoNames = suppliedCompanionRepos.length === COMPANION_REPO_COUNT
-  ? suppliedCompanionRepos
-  : randomDistinctSoftwareNames(COMPANION_REPO_COUNT, [repoName, workerId]);
-const bundleRepoNames = [repoName, ...companionRepoNames];
-if (new Set(bundleRepoNames.map((name) => name.toLowerCase())).size !== bundleRepoNames.length) {
-  console.error(`Ba tên repo trong bundle phải khác nhau: ${bundleRepoNames.join(", ")}\nKHÔNG tạo gì cả.`);
   process.exit(1);
 }
 
@@ -132,7 +90,6 @@ if (new Set(bundleRepoNames.map((name) => name.toLowerCase())).size !== bundleRe
 for (const [what, value] of [
   ["Tên kho", repoName],
   ["WORKER_ID", workerId],
-  ...companionRepoNames.map((name, index) => [`Tên kho phụ ${index + 1}`, name]),
 ]) {
   const banned = reviewGeneratedName(what, value);
   if (banned) {
@@ -401,10 +358,8 @@ function assertGhCanRollback() {
 const playwrightVersion = playwrightVersionOf(repoRoot);
 
 console.log(
-  `Sắp dựng bundle GitHub gồm 3 kho CÔNG KHAI:\n` +
+  `Sắp dựng kho khôi lỗi GitHub CÔNG KHAI:\n` +
     `  khôi lỗi   ${slug}\n` +
-    `  software 1 ${owner}/${companionRepoNames[0]}\n` +
-    `  software 2 ${owner}/${companionRepoNames[1]}\n` +
     `  worker id  ${workerId}\n` +
     `  web        ${webUrl}\n` +
     `  engine     playwright-core ${playwrightVersion}\n`,
@@ -464,8 +419,6 @@ try {
     writeFileSync(full, bytes);
   }
 
-  console.log("── Dựng hai ứng dụng TypeScript độc lập…");
-  const companionProjects = buildCompanionProjects({ repoNames: companionRepoNames });
   const stagedRepos = [
     {
       kind: "worker",
@@ -475,24 +428,6 @@ try {
       description: `Scheduled background task runner — ${workerId}`,
       commit: "feat: initialize scheduled task runner",
     },
-    ...companionProjects.map((project, index) => {
-      const cwd = path.join(stagingRoot, `software-${index + 1}`);
-      mkdirSync(cwd, { recursive: true });
-      for (const [rel, bytes] of project.files) {
-        const full = path.join(cwd, rel);
-        mkdirSync(path.dirname(full), { recursive: true });
-        writeFileSync(full, bytes);
-      }
-      return {
-        kind: "companion",
-        repoName: project.repoName,
-        slug: `${owner}/${project.repoName}`,
-        cwd,
-        description: project.theme.tagline,
-        commit: `feat: launch ${project.theme.product}`,
-        theme: project.theme,
-      };
-    }),
   ];
 
   /**
@@ -507,7 +442,7 @@ try {
   for (const repo of stagedRepos) {
     run("git", ["init", "-q", "-b", "main"], { cwd: repo.cwd });
     run("git", ["add", "-A"], { cwd: repo.cwd });
-    // Use a neutral public identity and English commit messages in all three repositories.
+    // Keep the existing public author identity for the primary worker repository.
     run("git", ["-c", "user.name=project-maintainer", "-c", "user.email=project-maintainer@users.noreply.github.com",
       "commit", "-q", "-m", repo.commit], { cwd: repo.cwd });
   }
@@ -536,7 +471,7 @@ try {
       walk(dir, prefix);
       return files;
     };
-    console.log("--dry-run: đã dựng và commit thử trọn bundle:\n");
+    console.log("--dry-run: đã dựng và commit thử kho khôi lỗi:\n");
     for (const repo of stagedRepos) {
       const files = list(repo.cwd);
       const subject = run("git", ["log", "-1", "--pretty=%s"], { cwd: repo.cwd, quiet: true }).trim();
@@ -551,12 +486,12 @@ try {
     process.exit(0);
   }
 
-  // Soi cả ba tên trước khi tạo cái đầu tiên. Nếu một tên đã tồn tại, tuyệt đối không được để
+  // Soi tên kho trước khi tạo. Nếu tên đã tồn tại, tuyệt đối không được để
   // nhánh cleanup hiểu nhầm nó là repo vừa sinh rồi xoá tài sản có sẵn của người dùng.
   for (const repo of stagedRepos) {
     const existence = probeRepoExistence(repo.slug);
     if (existence === "yes") {
-      throw new Error(`Repo ${repo.slug} đã tồn tại trước lượt dựng — dừng trước khi tạo bundle.`);
+      throw new Error(`Repo ${repo.slug} đã tồn tại trước lượt dựng — dừng trước khi tạo kho.`);
     }
     if (existence === "unknown") {
       throw new Error(`Không xác định được ${repo.slug} đã tồn tại hay chưa — dừng để tránh tạo/xoá nhầm.`);
@@ -569,7 +504,7 @@ try {
   };
   const cleanupBundle = () => {
     if (createdSlugs.length === 0) return;
-    console.error(`\n✖ Bundle hỏng giữa chừng — dọn ${createdSlugs.length} repo do chính lượt này tạo…`);
+    console.error(`\n✖ Lượt dựng hỏng giữa chừng — dọn ${createdSlugs.length} repo do chính lượt này tạo…`);
     for (const createdSlug of [...createdSlugs].reverse()) {
       try {
         runWithRetry("xoá repo dở", "gh", ["repo", "delete", createdSlug, "--yes"], { timeout: 60_000 });
@@ -584,10 +519,8 @@ try {
   };
 
   try {
-    // Tạo hai software repo trước. Repo khôi lỗi chỉ xuất hiện khi đủ nền nuôi; vậy một lỗi sớm
-    // không để lại một worker đã chạy nhưng sổ chưa có đủ hai repo phụ.
-    const creationOrder = [...stagedRepos.filter((repo) => repo.kind === "companion"), stagedRepos[0]];
-    for (const repo of creationOrder) {
+    // Đặt secret sau khi đã xác nhận repo chính và đẩy payload thành công.
+    for (const repo of stagedRepos) {
       console.log(`\n── Tạo kho ${repo.slug}…`);
       try {
         publishConfirmedRepository({
@@ -667,10 +600,9 @@ try {
   }
 
   console.log(
-    `\n✔ Xong bundle 3 repo. ${workerId} ${dispatched ? "đang lên ca" : "sẽ lên ca ở mốc schedule kế (≤ 4 giờ)"}.\n` +
+    `\n✔ Xong kho khôi lỗi. ${workerId} ${dispatched ? "đang lên ca" : "sẽ lên ca ở mốc schedule kế (≤ 4 giờ)"}.\n` +
       `  Theo dõi: https://github.com/${slug}/actions\n` +
-      `  Software: https://github.com/${owner}/${companionRepoNames[0]}\n` +
-      `  Software: https://github.com/${owner}/${companionRepoNames[1]}\n` +
+      `  Kho phụ: runtime Ollama tạo theo cấu hình sau khi trạm được ghi vào sổ.\n` +
       `  Nghiệm thu: mở Hàng Đợi → tab Khôi Lỗi, phải thấy ${workerId} điểm danh trong ~4 phút.\n`,
   );
 } finally {

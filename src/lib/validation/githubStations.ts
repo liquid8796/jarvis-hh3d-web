@@ -36,7 +36,7 @@ export const HEARTBEAT_PATH = ".github/heartbeat.txt";
  */
 export const REVISION_LEDGER_PATH = "src/generated/revision-ledger.ts";
 
-/** Mặc định năm commit/ngày/repo; 0 là tạm ngừng riêng hai kho phụ. */
+/** Giới hạn mặc định năm commit/ngày/repo; 0 tạm ngừng phát triển kho phụ. */
 export const DEFAULT_DAILY_PUSHES = 5;
 export const MIN_DAILY_PUSHES = 0;
 export const MAX_DAILY_PUSHES = 24;
@@ -117,8 +117,8 @@ export function reviewStationIdentity(owner: string, repo: string, workflowFile:
  * khiến một cron đẩy hai lần vào cùng một ledger rồi tự vượt quota ngày.
  */
 export function reviewCompanionRepos(primaryRepo: string, repos: readonly string[]): string | null {
-  if (repos.length > 2) {
-    return "Mỗi khôi lỗi chỉ có tối đa hai kho phần mềm đi kèm.";
+  if (repos.length > 20) {
+    return "Mỗi kho GitHub có tối đa 20 kho phần mềm đi kèm.";
   }
 
   const seen = new Set<string>();
@@ -131,7 +131,7 @@ export function reviewCompanionRepos(primaryRepo: string, repos: readonly string
       return "Kho phụ không được trùng kho khôi lỗi chính.";
     }
     if (seen.has(normalized)) {
-      return "Hai kho phụ phải có tên khác nhau.";
+      return "Các kho phụ phải có tên khác nhau.";
     }
     seen.add(normalized);
   }
@@ -287,7 +287,7 @@ export function companionDueByNow(now: Date, dailyPushes: number, repo: string):
  * `workflow` — nhưng cùng cái PAT ấy còn được `scripts/newGithubKhoiloi.mjs` dùng để đẩy chính
  * workflow lên, và thiếu scope ấy thì lượt push bị GitHub từ chối ở đúng bước cuối.
  */
-export const PAT_SCOPES_NOTE = "Cần scope repo + workflow (classic), hoặc Contents: read/write + Actions: read/write (fine-grained).";
+export const PAT_SCOPES_NOTE = "Cần scope repo + workflow (classic), hoặc Contents: read/write + Actions: read/write (fine-grained). Tạo/fork cần quyền tạo repo; xoá cần thêm delete_repo (classic) hoặc Administration: write (fine-grained).";
 
 /** Chuỗi định danh một kho trong sổ — cũng là khoá tra và là thứ hiện trên giao diện. */
 export function stationSlug(station: { owner: string; repo: string }): string {

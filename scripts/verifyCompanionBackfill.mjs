@@ -1,119 +1,58 @@
 #!/usr/bin/env node
-/** Luật thuần cho lượt bù kho phụ — không mạng, không database, không `gh`. */
+/** Count and selection checks; no database, GitHub, or Ollama calls. */
+import assert from "node:assert/strict";
 import {
-  avoidNamesFor,
   deficitOf,
-  emptyCompanionEntry,
   planStations,
-  withCreatedCompanions,
+  targetCountForStation,
 } from "./companionBackfillPlan.mjs";
 
 let count = 0;
 const check = (condition, message) => {
+  assert.ok(condition, message);
   count += 1;
-  if (!condition) throw new Error(message);
   console.log(`✔ ${message}`);
 };
-
-const companion = (repo) => ({ repo, lastNurtureDay: null, pushesToday: 0, lastPushAt: null, lastPushOk: null, lastPushNote: "" });
-const station = (over = {}) => ({
-  owner: "acct",
-  repo: "cobalt-relay-0000000000000000",
-  workflowFile: "linh-su.yml",
-  workerId: "cobalt-relay-0000000000000000",
-  pat: "v1.xxx",
-  enabled: true,
-  companionRepos: [],
-  ...over,
+const station = (overrides = {}) => ({
+  owner: "acct", repo: "example", enabled: true,
+  companionCountOverride: null, companionRepos: [], ...overrides,
 });
+const companions = (n) => Array.from({ length: n }, (_, index) => ({ repo: `project-${index}` }));
 
-// ---- deficitOf: 0/1/2, không bao giờ âm ---------------------------------------------------------
-check(deficitOf(station({ companionRepos: [] })) === 2, "không kho phụ nào → thiếu 2");
-check(deficitOf(station({ companionRepos: [companion("a")] })) === 1, "một kho phụ → thiếu 1");
-check(deficitOf(station({ companionRepos: [companion("a"), companion("b")] })) === 0, "đủ hai → thiếu 0");
-check(deficitOf(station({ companionRepos: [companion("a"), companion("b"), companion("c")] })) === 0, "ba kho phụ (rác) vẫn kẹp về 0, không âm");
-check(deficitOf({ owner: "x", repo: "y" }) === 2, "vắng hẳn companionRepos → coi như thiếu 2");
+check(targetCountForStation(station()) === 3, "stations inherit the default of three companions");
+check(targetCountForStation(station(), 5) === 5, "configured global count is respected");
+check(targetCountForStation(station({ companionCountOverride: 1 }), 5) === 1, "station override wins");
+check(targetCountForStation(station({ companionCountOverride: 0 }), 5) === 0, "zero override is not replaced by the global count");
+check(deficitOf(station()) === 3, "empty station needs three companions by default");
+check(deficitOf(station({ companionRepos: companions(2) })) === 1, "legacy two-companion station needs one");
+check(deficitOf(station({ companionRepos: companions(3) })) === 0, "three companions meet the default target");
+check(deficitOf(station({ companionRepos: companions(8) })) === 0, "lower target preserves existing repositories without negative deficit");
+check(deficitOf(station({ companionCountOverride: 5, companionRepos: companions(2) }), 1) === 3, "deficit follows the station override");
+check(deficitOf({ owner: "old", repo: "legacy" }) === 3, "old stations without companion fields inherit the default");
 
-// ---- emptyCompanionEntry: đúng hình dạng schema, mọi trường quan sát để trống -------------------
-{
-  const entry = emptyCompanionEntry("garnet-mill-1111111111111111");
-  check(entry.repo === "garnet-mill-1111111111111111", "entry giữ đúng tên repo");
-  check(
-    entry.lastNurtureDay === null && entry.pushesToday === 0 && entry.lastPushAt === null &&
-      entry.lastPushOk === null && entry.lastPushNote === "",
-    "entry mới để trống mọi trường quan sát — vòng nuôi kế nhận là tới hạn",
-  );
-}
+const stations = [
+  station({ owner: "one", repo: "empty" }),
+  station({ owner: "two", repo: "legacy", companionRepos: companions(2) }),
+  station({ owner: "three", repo: "full", companionRepos: companions(3) }),
+  station({ owner: "four", repo: "paused", enabled: false }),
+  station({ owner: "five", repo: "zero", companionCountOverride: 0 }),
+];
+const snapshot = structuredClone(stations);
+const plan = planStations(stations);
+check(plan.error === null && plan.targets.length === 2, "plan selects only enabled stations with missing companions");
+check(plan.targets[0].have === 0 && plan.targets[0].target === 3 && plan.targets[0].need === 3, "plan exposes current, requested and missing counts");
+check(plan.targets[1].need === 1, "plan backfills only the missing legacy slot");
+check(plan.skipped.some((row) => row.slug === "four/paused" && row.reason.includes("tắt")), "disabled station has an explicit skip reason");
+check(plan.skipped.some((row) => row.slug === "three/full" && row.reason.includes("3/3")), "full station displays its actual configured count");
+assert.deepEqual(stations, snapshot);
+check(true, "planning does not mutate settings or companion entries");
 
-// ---- avoidNamesFor: gom repo chính + workerId + kho phụ đã có, hạ thường, không trùng ----------
-{
-  const avoid = avoidNamesFor(station({
-    repo: "Cobalt-Relay-AAAA",
-    workerId: "Cobalt-Relay-AAAA",
-    companionRepos: [companion("Garnet-Mill-BBBB")],
-  }));
-  check(avoid.includes("cobalt-relay-aaaa"), "tránh tên kho chính (đã hạ thường)");
-  check(avoid.includes("garnet-mill-bbbb"), "tránh tên kho phụ đã có");
-  check(avoid.length === 2, "repo trùng workerId chỉ tính một lần trong danh sách tránh");
-}
+check(planStations(stations, "LEGACY").targets[0]?.slug === "two/legacy", "repo filter is case insensitive");
+check(planStations(stations, "TWO/LEGACY").targets[0]?.slug === "two/legacy", "owner/repo filter resolves an exact station");
+check(planStations(stations, "missing").error !== null, "unknown repo filter fails explicitly");
+const sameNames = [station({ owner: "a" }), station({ owner: "b" })];
+check(planStations(sameNames, "example").error !== null, "ambiguous repo name requires owner/repo");
+check(planStations(sameNames, "b/example").targets.length === 1, "owner/repo resolves duplicate basenames");
+check(planStations(stations, null, 5).targets.length === 3, "global target changes the count plan");
 
-// ---- planStations: chia phải-bù / bỏ-qua đúng ---------------------------------------------------
-{
-  const stations = [
-    station({ owner: "a", repo: "empty-one-0000000000000000", companionRepos: [] }),
-    station({ owner: "b", repo: "half-two-1111111111111111", companionRepos: [companion("x")] }),
-    station({ owner: "c", repo: "full-three-2222222222222222", companionRepos: [companion("x"), companion("y")] }),
-  ];
-  const plan = planStations(stations, null);
-  check(plan.error === null, "sổ hợp lệ không có lỗi");
-  check(plan.targets.length === 2, "hai kho thiếu vào danh sách phải bù");
-  check(plan.targets.find((t) => t.slug === "a/empty-one-0000000000000000").need === 2, "kho rỗng cần 2");
-  check(plan.targets.find((t) => t.slug === "b/half-two-1111111111111111").need === 1, "kho có một cần 1");
-  check(
-    plan.targets.find((t) => t.slug === "b/half-two-1111111111111111").avoid.includes("x"),
-    "kho phụ đã có ('x') nằm trong danh sách tránh của kho cần bù",
-  );
-  check(
-    plan.skipped.some((s) => s.slug === "c/full-three-2222222222222222" && s.reason === "đã đủ hai kho phụ"),
-    "kho đủ hai bị bỏ qua với đúng lý do",
-  );
-}
-
-// ---- planStations --repo: chỉ kho được nêu, và tên lạ là LỖI -----------------------------------
-{
-  const stations = [
-    station({ owner: "a", repo: "empty-one-0000000000000000", companionRepos: [] }),
-    station({ owner: "b", repo: "empty-two-1111111111111111", companionRepos: [] }),
-  ];
-  const one = planStations(stations, "empty-two-1111111111111111");
-  check(
-    one.error === null && one.targets.length === 1 && one.targets[0].slug === "b/empty-two-1111111111111111",
-    "--repo giới hạn đúng một kho",
-  );
-  check(
-    one.skipped.some((s) => s.slug === "a/empty-one-0000000000000000" && s.reason === "không nằm trong --repo"),
-    "kho ngoài --repo bị bỏ qua với lý do riêng",
-  );
-  check(planStations(stations, "EMPTY-TWO-1111111111111111").targets.length === 1, "--repo khớp không phân biệt hoa thường");
-  const missing = planStations(stations, "khong-co-trong-so");
-  check(missing.error !== null && missing.targets.length === 0, "--repo trỏ tên lạ là lỗi, không phải im lặng");
-}
-
-// ---- withCreatedCompanions: giữ cái cũ, thêm cái mới, KẸP về hai --------------------------------
-{
-  const merged0 = withCreatedCompanions([], ["new-a-0000000000000000", "new-b-1111111111111111"]);
-  check(merged0.length === 2 && merged0[0].repo === "new-a-0000000000000000", "0 + 2 → hai, đúng thứ tự");
-
-  const merged1 = withCreatedCompanions([companion("old-x-2222222222222222")], ["new-y-3333333333333333"]);
-  check(
-    merged1.length === 2 && merged1[0].repo === "old-x-2222222222222222" && merged1[1].repo === "new-y-3333333333333333",
-    "1 + 1 → hai, cái CŨ đứng trước và giữ nguyên trạng thái",
-  );
-  check(merged1[0].lastPushNote === "", "dòng cũ giữ nguyên mọi trường quan sát, không bị đặt lại");
-
-  // Hàng rào cuối: người gọi lỡ đưa dư thì KẸP về hai, không ghi mảng ba (schema .catch([]) nuốt cả sổ).
-  const clamped = withCreatedCompanions([companion("old-1")], ["new-2", "new-3"]);
-  check(clamped.length === 2, "không bao giờ ghi quá hai kho phụ, kể cả khi bị gọi sai");
-}
-
-console.log(`\n✔ ${count} phép kiểm — luật bù kho phụ đứng vững.`);
+console.log(`\n✔ ${count} checks — Ollama companion backfill count plan.`);

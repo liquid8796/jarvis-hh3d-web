@@ -221,29 +221,71 @@ vết), lượt ghi mới là thứ đếm với GitHub. Tách hai nhịp ấy g
 hỏng **ngay trong ngày**, mà chỉ ~18 commit rác một năm thay vì 365. 20 ngày cũng để lại **40
 ngày dự phòng** trước mốc 60 — phải trượt liên tiếp hai lượt tới hạn thì lịch mới thật sự tắt.
 
-Đó là luật của **repo khôi lỗi chính**. Hai repo software đi kèm có một nhịp khác theo yêu cầu
-vận hành ngày 19/08/2026: mỗi lượt cron hằng ngày đẩy mặc định **5 commit source/repo** vào
-`src/generated/revision-ledger.ts`. Ứng dụng import và hiển thị module này, nên đây là thay đổi mã
-nguồn có đi qua type-check/build chứ không phải một heartbeat giấu trong `.github/`. Số lượt là
-`githubStations[].dailyPushes`, đặt riêng theo từng station ở tab **Kho GitHub**, hợp lệ `0..24`;
-`0` tạm dừng hai repo phụ mà không tắt workflow khôi lỗi chính.
+Đó là luật của **repo khôi lỗi chính**. Kho phần mềm đi kèm dùng runtime Ollama tại
+`src/lib/services/companionNurture.ts`. Model tạo dự án và đề xuất các thay đổi source theo tiến
+độ dự án; lỗi model được báo trong trạng thái kho, không chuyển sang template hay generator cũ.
+`src/generated/revision-ledger.ts` của các kho cũ không còn là nội dung được sinh định kỳ.
 
-**RẢI TRONG NGÀY (21/08/2026).** Trước đó cả quota rơi trong MỘT lượt cron: lịch sử commit của kho
-phụ là một cụm năm cái lúc 10 giờ sáng, ngày nào cũng đúng giờ ấy — một dấu chân đọc ra ngay. Nay
-`companionDueByNow` (validation/githubStations.ts) chia quota thành từng nấc rải trong khung
-**08:00–22:00 giờ VN**, mỗi kho một bộ giờ riêng, tất định theo (ngày, tên kho) nên hai lượt cron
-cùng giờ không bao giờ đẩy trùng. Một lịch systemd thứ hai (`jarvis-companions.timer`, MỖI GIỜ,
-`RandomizedDelaySec=1500`) gọi `/api/cron?only=companions` để chạm tới từng nấc; quét dọn và ngó
-kho chính vẫn giữ nhịp NGÀY ở `jarvis-cron.timer`. Từ 22:00 trở đi hàm trả trọn quota, nên chỉ cần
-MỘT lượt rơi vào 22:00–23:59 là hôm ấy đủ số. Ledger trong kho vẫn là nguồn sự thật của「đã đẩy mấy
-cái」, nên đổi nhịp không đẻ commit thừa. Xưa,
-N commit được tạo tuần tự trong chính lượt cron ấy, không trải thành N lịch riêng trong ngày.
+**Số kho phụ cấu hình được (10/09/2026).** `githubNurture.defaultCompanionCount` mặc định **3**,
+cho phép `0..20`; `githubStations[].companionCountOverride` đặt riêng cho một trạm, `null` kế
+thừa mặc định toàn cục. Runtime chỉ tạo phần còn thiếu. Tăng mục tiêu từ 2 lên 3 sẽ bổ sung một
+kho; giảm mục tiêu giữ nguyên các repo đang có. Trạm đang tắt không được xử lý.
 
-**Ledger trên GitHub là nguồn sự thật.** Trước khi ghi, service đọc `day + ordinal` đang nằm trong
-source. Nếu commit thứ ba đã lên GitHub nhưng lượt ghi dấu vết vào database hụt, vòng kế tiếp đọc
-được `3/5` và chỉ nối tiếp `4/5`, không đẩy lại từ đầu. Gọi cron hai lần cùng ngày sau khi đủ quota
-thì không tạo thêm commit. Dấu vết trong `app_settings` chỉ để admin vẽ nhanh trạng thái từng repo;
-station đời cũ tự đọc thành `companionRepos: []` và `dailyPushes: 5`, nên không cần migration SQL.
+Model mặc định là `gemma4:31b-cloud`; model, context window và danh sách API key Ollama được
+quản lý trong tab **Kho GitHub**. Các key được mã hoá khi lưu. Không có key dùng được hoặc
+Ollama trả lỗi thì lượt chạy ghi lỗi để người vận hành sửa cấu hình, không tạo nội dung thay thế.
+
+Runtime gọi cố định `https://ollama.com/api/chat`, dùng Bearer API key theo
+[Ollama Cloud API](https://docs.ollama.com/cloud#cloud-api-access). Model mặc định có trang
+[gemma4:31b-cloud](https://ollama.com/library/gemma4:31b-cloud); khi gọi API cloud, runtime dùng
+tên `gemma4:31b` sau khi bỏ hậu tố `-cloud`. Thay model trong cấu hình khi cần.
+
+**Web research.** Harness có `WebSearch` và `WebFetch` theo
+[WebSearchTool.cs](../../jarvis-code/src/JarvisCode.Core/Tools/BuiltIn/WebSearchTool.cs) và
+[WebFetchTool.cs](../../jarvis-code/src/JarvisCode.Core/Tools/BuiltIn/WebFetchTool.cs).
+Mặc định bật, dùng SearXNG `https://jarvis-searxng.vercel.app`; chỉnh hoặc tắt trong **Admin →
+Kho GitHub → Ollama**. SearXNG cần bật JSON. Search hỗ trợ lọc domain, khoảng thời gian và tối
+đa 20 kết quả; Fetch chuyển nội dung trang công khai thành văn bản. Model cần hỗ trợ
+[tool calling của Ollama](https://docs.ollama.com/capabilities/tool-calling).
+
+Mỗi quyết định dùng tối đa 4 vòng nghiên cứu, 6 lời gọi; kết quả được đưa lại qua message `tool`
+và tính vào context budget. Tài liệu web luôn là dữ liệu tham khảo, không phải chỉ dẫn được
+phép ghi đè quyền hoặc ranh giới repo. Web host chỉ truy cập địa chỉ công khai, kiểm DNS và
+redirect, không chuyển API key Ollama/PAT sang trang ngoài. Không có fallback tìm kiếm riêng
+của Anthropic khi chạy Ollama.
+
+**Endpoint trong tài liệu công khai.** README được sinh mới không còn ghi URL backend.
+Để sửa README/About của các repo chính đã có, dùng `github:redact-public-endpoints` trên VM
+cạnh database ứng dụng. Lệnh mặc định chỉ lập kế hoạch; `--apply` cập nhật README qua SHA và
+About qua các trường `description`/`homepage` đã kiểm tra. Chỉ URL thuộc origin backend đã xác
+định từ cấu hình/workflow hoặc mẫu README cũ được thay; liên kết khác và mô tả chức năng giữ
+nguyên. Lệnh này không phát hành source, sửa workflow hay viết lại lịch sử Git.
+
+```bash
+npm run github:redact-public-endpoints -- --dry-run
+npm run github:redact-public-endpoints -- --apply
+# Giới hạn vào một repo đã đăng ký nếu cần:
+npm run github:redact-public-endpoints -- --repo owner/repo --dry-run
+```
+
+Model chọn `nextDecisionAt` từ **5 phút đến 7 ngày**. `jarvis-companions.timer` gọi
+`/api/cron?only=companions` mỗi **5 phút + 0–30 giây ngẫu nhiên** (`AccuracySec=1s`) để tìm việc
+đã tới hạn. Đây là độ trễ thăm dò khi VM hoạt động bình thường; thời điểm thực thi còn phụ thuộc
+khóa, API và ngân sách lượt chạy. `dailyPushes` là **trần commit/ngày**, không phải mục tiêu cố
+định; `0` tạm dừng phần kho phụ. Quét dọn và ngó kho chính vẫn ở `jarvis-cron.timer`.
+
+Service chờ HTTP tới 300 giây, systemd tới 330 giây, bao quanh ngân sách runtime tối đa 240 giây.
+Đổi unit trong repo chưa tự đổi unit trên VM: làm theo [bước cài lại lịch Ollama](oracle/README.md#cập-nhật-lịch-ollama-trên-vm)
+sau phát hành app. Nhiều kho có thể cần nhiều lượt; theo dõi trạng thái và tiến độ trong sổ.
+
+Harness tham khảo [AgentOrchestrator.cs](../../jarvis-code/src/JarvisCode.Core/Agent/AgentOrchestrator.cs),
+[ContextWindows.cs](../../jarvis-code/src/JarvisCode.Core/Agent/ContextWindows.cs),
+[TurnRecovery.cs](../../jarvis-code/src/JarvisCode.Core/Agent/TurnRecovery.cs),
+[SystemPromptBuilder.cs](../../jarvis-code/src/JarvisCode.Core/Agent/SystemPromptBuilder.cs) và
+[OllamaProvider.cs](../../jarvis-code/src/JarvisCode.Providers/Ollama/OllamaProvider.cs): giới hạn ngữ
+cảnh theo tệp đầy đủ, sửa phản hồi lỗi với số lần hữu hạn, và tuần tự hóa các thao tác ghi.
+Chương trình model sinh ra không được thực thi trên máy chủ web; kiểm thử runtime dùng các mô
+phỏng cô lập, không gọi GitHub/Ollama/database thật.
 
 **Nhánh tự chữa mới là phần đáng tiền.** Nếu lịch ĐÃ bị tắt vì im lặng thì một commit mới **không
 tự bật nó lại** — GitHub đòi một lượt bật tường minh. Nên khi thấy `disabled_inactivity`, vòng
@@ -303,8 +345,8 @@ Scope **`repo` + `workflow`** (classic), hoặc **Contents: read/write + Actions
 workflow lên, và **thiếu `workflow` là lỗi hay gặp nhất của cả lối này** — nó chỉ lộ ra ở đúng
 bước cuối cùng.
 
-Riêng lượt **tạo bundle mới** có contract chặt hơn: chỉ nhận **classic PAT** đủ `repo`, `workflow`
-và `delete_repo`. Ba repo là một transaction, nên `delete_repo` phải được chứng minh trước mutation
+Riêng lượt **tạo kho khôi lỗi mới** có contract chặt hơn: chỉ nhận **classic PAT** đủ `repo`, `workflow`
+và `delete_repo`. `delete_repo` phải được chứng minh trước mutation
 đầu tiên để rollback được repo đã xác nhận tạo. Fine-grained PAT không công bố permission thực qua
 `X-OAuth-Scopes` trước khi repo mới tồn tại; dù một token Administration: write có thể xoá, script
 không đoán quyền rồi bắt đầu một giao dịch phá huỷ được.
@@ -322,7 +364,7 @@ mang phong bì, nên mở tab admin vẫn không kéo PAT nào xuống trình du
 ô nhập: ô ấy để trống mới đúng nghĩa「giữ PAT cũ」, và đổ token vào đó nghĩa là lượt bấm「Cập nhật
 kho」kế tiếp sẽ đẩy ngược chính bí mật vừa xem lên máy chủ để mã hoá lại mà chẳng được gì.
 
-### Thêm một bundle: bấm đúp `new-github-khoiloi.bat`
+### Thêm một khôi lỗi: bấm đúp `new-github-khoiloi.bat`
 
 > **16/08/2026 — bốn công cụ trong tài liệu này nay CHẠY TRÊN VM.** Sổ Kho GitHub nằm trong
 > Postgres của backend, mà Postgres ấy chỉ nghe `127.0.0.1` trên `jarvis-oci-01`. Nên
@@ -341,29 +383,42 @@ kho」kế tiếp sẽ đẩy ngược chính bí mật vừa xem lên máy ch�
 >   `repo`+`workflow`+`delete_repo` vào một tệp log dạng chữ.
 
 Nó hỏi đúng MỘT thứ — PAT của tài khoản GitHub sẽ giữ kho — rồi làm trọn: suy tên tài khoản từ
-chính token, rút ba tên ngẫu nhiên khác nhau (tên chính dùng luôn cho `WORKER_ID`), dựng bundle
+chính token, rút tên kho chính (dùng luôn cho `WORKER_ID`), dựng kho
 (gọi lại `newGithubKhoiloi.mjs`), dán secret, bấm chạy lượt đầu, **ghi kho vào sổ ở trạm đang
-hoạt động**, rồi ngó một lượt để chứng minh PAT push được. Xem trước mà chưa tạo gì:
+hoạt động**, rồi ngó một lượt để chứng minh PAT push được. Sau đó runtime Ollama tạo kho phụ
+theo cấu hình đã lưu. Xem trước mà chưa tạo gì:
 `npm run github:new -- --dry-run --owner <tài-khoản>`.
 
-#### Bundle 3 repo (19/08/2026)
+#### Tạo kho chính và bổ sung kho phụ bằng Ollama (10/09/2026)
 
-Một lượt `github:new` nay tạo đúng **ba repo công khai** trong cùng một giao dịch: một repo khôi
-lỗi và hai repo software độc lập. Hai repo software chọn hai lĩnh vực đời sống khác nhau, mỗi repo
-có 14 tệp (hơn 400 dòng source): TypeScript domain model, validation, persistence, priority
-analytics, JSON/CSV exchange, Vite UI, CSS responsive và unit tests. Ứng dụng thật sự import
-`src/generated/revision-ledger.ts`; vòng nuôi chỉ cập nhật tệp này. README của cả ba repo đều viết
-hoàn toàn bằng tiếng Anh.
+`newGithubKhoiloi.mjs` chỉ dựng kho khôi lỗi chính. `newGithubStation.mts` ghi station với
+`companionRepos: []` và `companionCountOverride: null`, rồi gọi `runLlmCompanionNurture` cho
+đúng station ấy. Số repo phần mềm được quyết định bởi cấu hình, không còn một cặp template cố
+định. Cờ `--companion-repo` ở builder cũ bị từ chối kèm hướng dẫn chuyển sang runtime.
 
-Script dựng và commit thử cả ba cây trước khi chạm GitHub. `repo create` và `git push` là hai bước
+Script dựng và commit thử cây worker trước khi chạm GitHub. `repo create` và `git push` là hai bước
 riêng: một slug chỉ vào danh sách rollback **sau khi create trả thành công**. Nếu create rơi mạng ở
 ranh giới mơ hồ, script không probe rồi suy rằng repo cùng tên là của mình — nó dừng, dọn các slug
 đã xác nhận trước đó và chỉ đưa URL để người vận hành kiểm tra. Push/secret hỏng thì xoá ngược mọi
 repo đã xác nhận do chính lượt ấy tạo; preflight `delete_repo` đứng trước repo đầu tiên.
 
-Hai lưới chạy cục bộ: `npm run verify:github-bundle` khóa thứ tự create → remember → push và policy
-scope; `npm run verify:github-companions` mặc định cài dependency, typecheck, Vite-build và chạy
-unit tests của **cả hai** app sinh ra (không chỉ soi chuỗi source).
+Kho chính đã được ghi sổ sẽ được giữ lại nếu Ollama lỗi hoặc hết thời gian. Không chạy lại
+`github:new` để bù kho phụ, vì lệnh đó dựng thêm một khôi lỗi. Dùng:
+
+```sh
+npm run vm -- npm run github:companions:backfill -- --dry-run
+npm run vm -- npm run github:companions:backfill -- --repo owner/repo
+```
+
+Backfill đọc số kho hiện có và mục tiêu rồi chỉ chọn các station còn thiếu. `--repo` cũng nhận
+tên kho nếu tên ấy không trùng ở nhiều owner. **Dry-run chỉ đọc cấu hình** và in số lượng:
+không gọi GitHub/Ollama/control API, không tạo repo, không ghi sổ. Lượt thật gọi cùng runtime
+Ollama với cron, có thể tiếp tục phát triển các kho hiện có của station được chọn. Ngân sách
+CLI là 120 giây cho một lượt; kết quả in số kho còn thiếu đã đọc lại từ sổ để chạy tiếp khi cần.
+
+`npm run verify:companion-backfill` kiểm luật số lượng/lọc station hoàn toàn cục bộ.
+`npm run verify:github-bundle` kiểm thứ tự create → remember → push và policy scope của worker.
+`verify:github-companions` chỉ còn kiểm các template fixture cũ, không chứng minh runtime Ollama.
 
 #### Luật đặt tên: `scripts/khoiloiNaming.mjs`
 
@@ -414,17 +469,16 @@ chỉ tin vào mốc giây trong tên.
 
 **Sổ KHÔNG còn trần số kho** (gỡ 18/08/2026; trước đó là 8, hằng `GITHUB_STATION_LIMIT`). Cái giữ
 chỗ của nó là thứ tự theo NHU CẦU: `keepaliveOrder` đưa kho chính gần vách 60 ngày nhất lên trước,
-còn `companionNurtureOrder` đưa repo software lâu chưa được push nhất lên trước. Cron chia phần
-GitHub thành 10 giây cho kho chính và tới mốc 45 giây cho repo phụ; khi ngân sách hết, kết quả ghi
-ra `skipped` và lượt sau ưu tiên phần còn nợ thay vì bỏ đói mãi đúng đuôi sổ. Đo 18/08: 8 kho chính
+còn vòng Ollama xử lý các kho phụ theo tiến độ được lưu. Khi ngân sách hết, kết quả ghi
+ra `skipped` để lượt sau tiếp tục. Đo 18/08: 8 kho chính
 khoẻ xong trong dưới một giây, tức ~0,12s một kho.
 
 ### Vận hành
 
 Tab **Kho GitHub** trong trang Tông Môn. Mỗi dòng hiện đếm ngược tới mốc tắt lịch của kho chính,
-hai repo software, tiến độ `đã push/quota` trong ngày và kết quả push gần nhất. **Nuôi ngay** ép
+các repo phần mềm, tiến độ dự án và kết quả push gần nhất. **Nuôi ngay** ép
 heartbeat của kho chính; **Chạy vòng nuôi** diễn tập cả hai vòng đúng như cron; **Sửa** cho đổi
-quota `0..24`; **Xoá** chỉ bỏ station/PAT khỏi sổ, không xoá repo nào trên GitHub.
+số kho phụ riêng hoặc dùng mặc định toàn cục; **Xoá** chỉ bỏ station/PAT khỏi sổ, không xoá repo nào trên GitHub.
 
 Lượt **Ghi vào sổ** tự ngó kho ngay sau khi lưu, nên một PAT dán nhầm chết trước mặt người vừa
 dán chứ không phải trong một lượt cron lúc ba giờ sáng. Với kho mới, lượt ấy ghi luôn một commit
@@ -533,10 +587,10 @@ npm run github:remove -- --repo <tên kho>     chọn khi tài khoản có nhi�
 npm run github:remove -- --force              xoá kể cả khi khôi lỗi ấy đang giữ đàn
 ```
 
-Từ khi `github:new` tạo bundle 3 repo, `github:remove` **vẫn chỉ xoá repo khôi lỗi chính** rồi bỏ
-dòng station. Hai repo software giữ nguyên source và lịch sử như các dự án độc lập; vì không còn
+`github:remove` **chỉ xoá repo khôi lỗi chính** rồi bỏ
+dòng station. Các repo phần mềm giữ nguyên source và lịch sử như các dự án độc lập; vì không còn
 trong station, vòng nuôi tự ngừng chạm chúng. Đây là ranh giới phá huỷ có chủ ý: một lệnh vốn được
-xác nhận bằng tên repo chính không được ngầm mở rộng thành xoá thêm hai repo khác.
+xác nhận bằng tên repo chính không được ngầm mở rộng thành xoá các repo phụ.
 
 **Vì sao đáng có một công cụ, thay vì một cú bấm「Delete repository」:** một kho khôi lỗi để lại
 dấu chân ở **ba** nơi, và hai nơi trong đó không nằm trên GitHub.

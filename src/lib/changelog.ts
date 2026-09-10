@@ -66,6 +66,16 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.71",
+    date: "2026-09-10",
+    lines: [
+      "Kho GitHub có trang chi tiết để đặt số kho phụ, chọn quyền tạo lại và quản lý từng kho.",
+      "Mặc định mỗi kho có ba kho phụ. Gia chủ có thể đổi số lượng, chọn model và nhập danh sách khóa Ollama.",
+      "Ollama có thể tra cứu tài liệu trên web trước khi viết mã và tự chọn thời điểm phát triển tiếp.",
+      "Tài liệu công khai của các kho khôi lỗi không còn ghi địa chỉ máy chủ.",
+    ],
+  },
+  {
     version: "1.3.70",
     date: "2026-09-08",
     lines: [
@@ -466,14 +476,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Gặp bước kiểm tra của trang giữa chừng, máy chạy tự động nay tự bấm qua rồi làm tiếp, thay vì bỏ dở cả vòng.",
       "Bấm mấy lần không qua thì nó dừng và nói rõ, không quay vòng vô ích.",
-    ],
-  },
-  {
-    version: "1.3.20",
-    date: "2026-08-20",
-    lines: [
-      "Máy chạy tự động nay tự bấm ô kiểm tra của trang khi bị chặn ở cổng, và ghi lại là đã bấm mấy lần.",
-      "Nhờ vậy đọc Hoạt động là biết ngay: chưa từng thử, hay thử rồi mà trang vẫn không cho qua.",
     ],
   },
 ];

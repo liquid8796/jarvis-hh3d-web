@@ -327,8 +327,8 @@ try {
   assert(adminRow != null, "bậc trị sự thấy đúng danh sách ấy");
   assert(adminRow!.version === "9.9.9-verify", `và thấy cả số bản của nó, nhận ${adminRow!.version}`);
   assert(
-    adminRow!.online === true && adminRow!.lastSeen === null,
-    "khôi lỗi vừa điểm danh phải là ĐANG TRỰC, và mốc điểm danh không đi xuống dây lúc ấy",
+    adminRow!.state === "busy" && adminRow!.lastSeen === null,
+    "khôi lỗi vừa điểm danh và đang giữ đàn phải là ĐANG BẬN, và mốc điểm danh không đi xuống dây lúc ấy",
   );
   assert(
     asMember.workers.some((worker) => worker.kind === "mine" && worker.id === ownWorkerId),

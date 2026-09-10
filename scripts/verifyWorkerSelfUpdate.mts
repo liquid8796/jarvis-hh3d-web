@@ -80,7 +80,7 @@ for (const ca of [
 }
 
 console.log("\nMã thoát phải KHÁC hai mã đã có nghĩa");
-check("khác 0 (xong việc) và khác 1 (thu đàn hụt hạn)", UPDATE_EXIT_CODE !== 0 && UPDATE_EXIT_CODE !== 1);
+check("khác 0 (xong việc) và khác 1 (thu đàn hụt hạn)", ![0, 1].includes(UPDATE_EXIT_CODE));
 check("là số nguyên trong dải mã thoát hợp lệ", Number.isInteger(UPDATE_EXIT_CODE) && UPDATE_EXIT_CODE > 0 && UPDATE_EXIT_CODE < 256);
 
 console.log("\nLời nhắc: nguyên văn tông chủ đặt, và chỉ nhắc về máy ĐANG TRỰC");

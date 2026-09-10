@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { getAppSettings, saveAppSettings, type AppSettings } from "@/lib/services/settings";
+import { mutateGithubState } from "./companionState";
 import {
   HEARTBEAT_PATH,
   KEEPALIVE_INTERVAL_DAYS,
@@ -702,19 +703,15 @@ export async function pingStation(
  * Dòng đã bị xoá giữa chừng thì lặng lẽ bỏ qua: nó không còn là việc của ai nữa.
  */
 async function recordPing(result: StationPing, now: Date): Promise<void> {
-  const settings = await getAppSettings();
-  const station = settings.githubStations.find((s) => stationSlug(s) === result.slug);
-  if (!station) {
-    return;
-  }
-  station.lastPingAt = now.toISOString();
-  station.lastPingOk = result.ok;
-  station.lastPingNote = result.note;
-  station.workflowState = result.workflowState;
-  if (result.committed) {
-    station.lastCommitAt = now.toISOString();
-  }
-  await saveAppSettings(settings);
+  await mutateGithubState((settings) => {
+    const station = settings.githubStations.find((s) => stationSlug(s) === result.slug);
+    if (!station) return;
+    station.lastPingAt = now.toISOString();
+    station.lastPingOk = result.ok;
+    station.lastPingNote = result.note;
+    station.workflowState = result.workflowState;
+    if (result.committed) station.lastCommitAt = now.toISOString();
+  });
 }
 
 /** Vá mọi trace vào MỘT snapshot settings mới; trả false nếu tất cả repo đã bị xoá giữa vòng. */
@@ -843,32 +840,8 @@ export type CompanionNurtureSummary = {
  * thái khôi lỗi chính và ngược lại.
  */
 export async function runCompanionNurture(options: { deadlineAt?: number } = {}): Promise<CompanionNurtureSummary> {
-  const settings = await getAppSettings();
-  const jobs = companionNurtureOrder(
-    settings.githubStations
-      .filter((station) => station.enabled)
-      .flatMap((station) => station.companionRepos.map((companion) => ({ station, companion }))),
-  );
-  const cutoff = Math.min(Date.now() + LOOP_BUDGET_MS, options.deadlineAt ?? Number.POSITIVE_INFINITY);
-  const { results, skipped } = await runBoundedCompanionJobs(jobs, {
-    deadlineAt: cutoff,
-    execute: ({ station, companion }) =>
-      nurtureCompanionRepo(station, companion, new Date(), { deadlineAt: cutoff }),
-  });
-  // Mọi network promise đã xong trước khi chạm settings; một lượt save duy nhất nên không có hai
-  // recorder của chính vòng này ghi đè nhau dù ba repo vừa chạy song song.
-  await recordCompanionNurtureResults(results, new Date());
-
-  return {
-    checked: results.length,
-    pushed: results.reduce((sum, result) => sum + result.pushed, 0),
-    completed: results.filter(
-      (result) => result.ok && result.ordinal !== null && result.ordinal >= result.target,
-    ).length,
-    failed: results.filter((result) => !result.ok).length,
-    skipped,
-    results,
-  };
+  const { runLlmCompanionNurture } = await import("./companionNurture");
+  return runLlmCompanionNurture(options);
 }
 
 export type KeepaliveSummary = {

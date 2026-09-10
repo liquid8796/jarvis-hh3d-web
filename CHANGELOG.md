@@ -11,6 +11,15 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.71 — Ollama quản lý kho phụ và tra cứu tài liệu (10/09/2026)
+
+- Thêm trang chi tiết kho GitHub, mặc định ba repo phụ và ghi đè số lượng theo từng kho; quyền fork/tự xóa mặc định tắt.
+- Dùng Ollama Cloud để chọn dự án, viết source và quyết định lần làm tiếp. Admin cấu hình model, context budget và nhập khóa mã hóa với trạng thái/cooldown riêng.
+- Thêm WebSearch/SearXNG và WebFetch theo harness Jarvis Code, với context theo tệp đầy đủ, kiểm tra đầu ra, giới hạn tool và truy cập web công khai.
+- Lưu tiến độ tạo/xóa, kiểm ID repo, chống ghi đè thay đổi đồng thời và bảo vệ source chưa được model đọc. Timer kiểm tra việc tới hạn mỗi năm phút.
+- Bỏ endpoint trong mẫu README; công cụ metadata riêng đã làm sạch hai repo chính đang đăng ký, không thay source/workflow.
+- Sửa bảy chẩn đoán kiểu cũ trong script kiểm tra/vận hành. Quy ước phát hành tự động sau patch được lưu trong AGENTS.md.
+
 ## 1.3.70 — Tám khôi lỗi còn sống nhưng gõ vào một trạm đã chết
 
 Sáng 08/09, tám khôi lỗi tông môn cùng ngừng điểm danh trong 11 giây. GitHub Actions không

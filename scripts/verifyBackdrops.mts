@@ -50,11 +50,11 @@ assert(
   "mã trang không được trùng nhau — hai trang cùng mã là hai luật CSS đè lên nhau",
 );
 assert(
-  !BACKDROP_PAGES.some((p) => p.key === DEFAULT_SLOT),
+  !new Set<string>(BACKDROP_PAGES.map((page) => page.key)).has(DEFAULT_SLOT),
   `không trang nào được mang mã「${DEFAULT_SLOT}」— nó là tên ô của nền mặc định`,
 );
 assert(
-  !BACKDROP_PAGES.some((p) => p.path === "/"),
+  !new Set<string>(BACKDROP_PAGES.map((page) => page.path)).has("/"),
   "trang chủ KHÔNG được có trong sổ: nó chính là nền mặc định, không phải một mục chọn riêng",
 );
 for (const page of BACKDROP_PAGES) {

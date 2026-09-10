@@ -1,6 +1,6 @@
 {
   "name": "jarvis-hh3d-web",
-  "version": "1.3.70",
+  "version": "1.3.71",
   "private": true,
   "description": "Auto HH3D — control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn tự động chạy trên server.",
   "scripts": {
@@ -104,6 +104,16 @@
     "verify:job-event-sweep": "tsx scripts/verifyJobEventSweep.mts",
     "verify:worker-version": "tsx scripts/verifyWorkerVersion.mts",
     "verify:github-stations": "tsx scripts/verifyGithubStations.mts",
+    "verify:ollama-companion": "tsx scripts/verifyOllamaCompanion.mts",
+    "verify:llm-web-tools": "tsx scripts/verifyLlmWebTools.mts",
+    "verify:ollama-web-research": "tsx scripts/verifyOllamaWebResearch.mts",
+    "verify:github-public-metadata": "node scripts/verifyGithubPublicMetadata.mjs",
+    "verify:github-public-metadata-migration": "tsx scripts/verifyGithubPublicMetadataMigration.mts",
+    "github:redact-public-endpoints": "tsx scripts/redactGithubPublicMetadata.mts",
+    "verify:companion-github": "tsx scripts/verifyCompanionGithub.mts",
+    "verify:companion-lifecycle": "tsx scripts/verifyCompanionLifecycle.mts",
+    "verify:github-settings-merge": "tsx scripts/verifyGithubSettingsMerge.mts",
+    "verify:github-nurture-ui": "tsx scripts/verifyGithubNurtureUi.mts --check",
     "verify:github-removal": "tsx scripts/verifyGithubKhoiloiRemoval.mts",
     "verify:roster-purge": "tsx scripts/verifyRosterPurge.mts",
     "verify:khoiloi-naming": "node scripts/verifyKhoiloiNaming.mjs",
@@ -138,6 +148,7 @@
     "drizzle-kit": "^0.31.4",
     "mongodb-memory-server": "^11.2.0",
     "tailwindcss": "^4.1.11",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.2"
   }
 }

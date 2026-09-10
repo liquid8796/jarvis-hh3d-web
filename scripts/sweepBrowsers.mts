@@ -37,7 +37,7 @@ export type SweepResult = { killed: number; stale: number };
  */
 export async function sweepOrphans(options: { all?: boolean; verbose?: boolean } = {}): Promise<SweepResult> {
   const records = listRecords(options.all ? 0 : ORPHAN_AGE_MS);
-  const result: SweepResult = { closed: 0, killed: 0, stale: 0 };
+  const result: SweepResult = { killed: 0, stale: 0 };
 
   for (const record of records) {
     const outcome = await disposeOne(record);

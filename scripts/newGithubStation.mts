@@ -1,41 +1,22 @@
 #!/usr/bin/env node
 /**
- * DỰNG BUNDLE GITHUB 3 REPO VÀ GHI THẲNG NÓ VÀO SỔ — dán đúng một PAT, không gõ gì thêm.
+ * Create and register a primary GitHub worker, then reconcile companions through Ollama.
  *
- *   npm run github:new                          (hoặc bấm đúp new-github-khoiloi.bat)
- *   npm run github:new -- --dry-run --owner ai  soi kế hoạch: không đụng GitHub, không ghi sổ
+ * npm run github:new
+ * npm run github:new -- --dry-run --owner <account>
  *
- * KHÁC GÌ `newGithubKhoiloi.mjs`: script ấy dựng cả bundle, và vẫn là nơi duy nhất làm việc đó — tệp
- * này GỌI nó chứ không chép lại, vì phần dễ sai nhất (danh sách tệp phải chép) đã có
- * `assertImportsResolve` canh ở bên ấy, và một bản sao thứ hai là hẹn ngày hai bản trôi khỏi
- * nhau. Tệp này thêm ba thứ mà bên ấy không làm được vì nó là Node thuần, không chạm database:
+ * PAT identity/scope checks and register checks happen before creation. The primary worker
+ * payload, GitHub secret, workflow dispatch and rollback remain in newGithubKhoiloi.mjs.
+ * Register the completed primary worker with companionRepos: [] and the global count default;
+ * the Ollama runtime owns companion generation/publication. Partial generation is resumed by
+ * cron or github:companions:backfill, without recreating the primary worker.
  *
- *   1. Suy tài khoản GitHub TỪ CHÍNH PAT (`GET /user`) — người dùng chỉ phải dán một thứ, và
- *      không thể gõ nhầm tên tài khoản thành một cái không khớp với token.
- *   2. Đặt ba tên ngẫu nhiên khác nhau bằng entropy mật mã; tên repo chính cũng là `WORKER_ID` để
- *      nhìn một cái là biết cái kia. Luật đặt tên — kể cả danh sách từ cấm — nằm ở
- *      `scripts/khoiloiNaming.mjs`, không ở đây.
- *   3. Ghi repo chính và hai repo software vừa dựng vào sổ Kho GitHub của TRẠM ĐANG HOẠT ĐỘNG — đúng hình dạng mà
- *      `saveGithubStationAction` ghi, rồi ngó một lượt để chứng minh PAT thật sự push được.
+ * GITHUB_PAT stays in process environment and is encrypted when saved in the register. It is
+ * never passed on a command line. A classic PAT needs repo + workflow + delete_repo for the
+ * primary creator's rollback contract. Repositories and Actions logs are public (§6).
  *
- * PAT ĐI BẰNG BIẾN MÔI TRƯỜNG `GITHUB_PAT`, không bao giờ qua đối số: dòng lệnh thì ai mở Task
- * Manager cũng đọc được. Nó không bao giờ được in ra và không ghi xuống đĩa — chỗ duy nhất nó
- * nằm lại là phong bì secretBox trong sổ, và biến môi trường của `gh` trong đúng lượt chạy này.
- * Lượt DỰNG chỉ nhận classic PAT có `repo` + `workflow` + `delete_repo`: ba repo là một transaction,
- * nên không chứng minh được quyền rollback thì không được phép tạo repo đầu tiên.
- *
- * MỌI PHÉP KIỂM ĐỨNG TRƯỚC MỌI PHÉP TẠO. Thứ tự ấy là cả thiết kế: tạo kho xong mới phát hiện sổ
- * đầy, hay mới phát hiện không tra ra trạm hoạt động, là bỏ lại một kho công khai mồ côi trên tài
- * khoản người ta — thứ phải vào GitHub xoá tay.
- *
- * KHÔNG DÙNG `process.exit()` — ĐO ĐƯỢC 12/08/2026: dưới `tsx` trên Windows, gọi `process.exit`
- * sau một lượt `fetch` làm libuv ném `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` và
- * tiến trình trả về mã 127 THAY VÌ 0. Tức một lượt chạy hoàn hảo vẫn khiến tệp .bat in「Ket thuc
- * voi loi」. Nên mọi ngả kết thúc ở đây đều đi qua `process.exitCode` rồi để tiến trình tự tắt.
- *
- * ĐỌC TRƯỚC KHI CHẠY: cả ba kho tạo ra là CÔNG KHAI và nhật ký Actions của kho chính ai cũng đọc được, vĩnh
- * viễn, trong khi việc của khôi lỗi là nhận cookie game đã giải mã. Đánh đổi này đã được cân nhắc
- * và chấp nhận — deploy/github-actions.md §6.
+ * Set process.exitCode and allow tsx to exit naturally: process.exit after fetch can trigger
+ * a Windows libuv assertion (observed 12/08/2026).
  */
 import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -52,7 +33,7 @@ import {
 } from "../src/lib/validation/githubStations";
 import { appDatabaseUrl } from "./activeStationPg.mts";
 import { reviewBundlePatScopes } from "./githubBundleSafety.mjs";
-import { randomDistinctSoftwareNames, randomSoftwareName, reviewGeneratedName } from "./khoiloiNaming.mjs";
+import { randomSoftwareName, reviewGeneratedName } from "./khoiloiNaming.mjs";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -231,9 +212,6 @@ async function main(): Promise<void> {
 
   const workerId = generated;
   const repo = arg("repo") ?? generated;
-  // Script con cũng tự sinh được khi gọi trực tiếp, nhưng lối có sổ phải rút tên tại ĐÂY: chỉ
-  // tiến trình này biết hai tên nào cần được ghi lại để vòng nuôi chạm đúng repo sau khi dựng.
-  const companionRepos = randomDistinctSoftwareNames(2, [repo, workerId]);
   const workflowFile = DEFAULT_WORKFLOW_FILE;
   const slug = `${owner}/${repo}`;
 
@@ -252,7 +230,6 @@ async function main(): Promise<void> {
   for (const [what, value] of [
     ["Tên kho", repo],
     ["WORKER_ID", workerId],
-    ...companionRepos.map((name, index) => [`Tên kho phụ ${index + 1}`, name] as const),
   ] as const) {
     const banned = reviewGeneratedName(what, value);
     if (banned) die(banned);
@@ -309,15 +286,13 @@ async function main(): Promise<void> {
   console.log(
     `\n── Sẽ dựng ──────────────────────────────────────────\n` +
       `  kho        ${slug} (CÔNG KHAI)\n` +
-      `  software 1 ${owner}/${companionRepos[0]} (CÔNG KHAI)\n` +
-      `  software 2 ${owner}/${companionRepos[1]} (CÔNG KHAI)\n` +
+      `  kho phụ    Ollama sẽ tạo theo cấu hình: ${settings.githubNurture.defaultCompanionCount} kho (sau khi ghi sổ)\n` +
       `  worker id  ${workerId}\n` +
       `  workflow   ${workflowFile}\n` +
       `  ghi vào sổ ở trạm「${doc.activeSiteId}」(đang có ${settings.githubStations.length} kho)\n`,
   );
 
   const inner = ["scripts/newGithubKhoiloi.mjs", "--owner", owner, "--repo", repo, "--worker-id", workerId];
-  for (const companionRepo of companionRepos) inner.push("--companion-repo", companionRepo);
   // Không lấy `doc.activeUrl`: đó là một vỏ Vercel có quota Edge Requests, trong khi mỗi worker
   // gõ cửa 5 giây/lần. Ngày 08/09/2026 tám kho cùng bám auto-hh3d-4 và chết khi vỏ ấy bị khoá.
   // Workflow mang thêm WORKER_FALLBACK_URL; cổng chính của worker luôn đi thẳng backend.
@@ -337,7 +312,7 @@ async function main(): Promise<void> {
       die(
         `Bước dựng kho hỏng (mã ${res.status}) — KHÔNG ghi gì vào sổ.\n` +
           `  Đọc dòng lỗi ngay trên. Kho có thể đã tạo dở, soi ở https://github.com/${owner}?tab=repositories\n` +
-          `  — script đã cố dọn cả bundle; nếu còn repo nào trong ${[repo, ...companionRepos].join(", ")} thì xoá tay rồi chạy lại.`,
+          `  — script đã cố dọn kho vừa tạo; nếu còn ${repo} thì kiểm tra trước khi chạy lại.`,
       );
     }
   };
@@ -417,14 +392,8 @@ async function main(): Promise<void> {
       workerId,
       pat: encryptSecret(pat),
       enabled: true,
-      companionRepos: companionRepos.map((companionRepo) => ({
-        repo: companionRepo,
-        lastNurtureDay: null,
-        pushesToday: 0,
-        lastPushAt: null,
-        lastPushOk: null,
-        lastPushNote: "",
-      })),
+      companionRepos: [],
+      companionCountOverride: null,
       dailyPushes: DEFAULT_DAILY_PUSHES,
       lastPingAt: null,
       lastCommitAt: null,
@@ -438,10 +407,10 @@ async function main(): Promise<void> {
     await saveAppSettings(fresh);
   } catch (err) {
     die(
-      `Bundle ĐÃ TẠO XONG trên GitHub nhưng ghi sổ hỏng: ${err instanceof Error ? err.message : "lỗi lạ"}\n` +
-        `  Khôi lỗi vẫn sẽ lên ca bình thường, nhưng ba repo chưa nằm trong vòng nuôi. Ghi tay ở\n` +
+      `Kho chính ĐÃ TẠO XONG trên GitHub nhưng ghi sổ hỏng: ${err instanceof Error ? err.message : "lỗi lạ"}\n` +
+        `  Khôi lỗi vẫn sẽ lên ca bình thường, nhưng chưa nằm trong vòng nuôi. Ghi tay ở\n` +
         `  Tông Môn → Kho GitHub với owner/repo/workflow/WORKER_ID: ${owner} / ${repo} / ` +
-        `${workflowFile} / ${workerId}; hai kho phụ: ${companionRepos.join(" / ")}; ` +
+        `${workflowFile} / ${workerId}; kho phụ để trống cho Ollama tạo; ` +
         `số lượt/ngày: ${DEFAULT_DAILY_PUSHES}.`,
     );
   }
@@ -455,14 +424,33 @@ async function main(): Promise<void> {
    */
   const ping = await pingStationBySlug(slug, false);
 
+  // Registration is durable before any model generation. A failed/partial model run can be
+  // resumed by cron/backfill without recreating the primary worker repository.
+  let companionNote = "";
+  try {
+    const { runLlmCompanionNurture } = await import("../src/lib/services/companionNurture");
+    const nurture = await runLlmCompanionNurture({ stationSlug: slug, deadlineAt: Date.now() + 120_000 });
+    const afterNurture = await getAppSettings();
+    const row = afterNurture.githubStations.find((station) => stationSlug(station) === slug);
+    const target = row?.companionCountOverride ?? afterNurture.githubNurture.defaultCompanionCount;
+    companionNote = `${row?.companionRepos.length ?? 0}/${target} kho; lỗi ${nurture.failed}, bỏ qua ${nurture.skipped}`;
+    if (nurture.failed > 0) {
+      process.exitCode = 1;
+      for (const result of nurture.results) if (!result.ok) console.error(`  ✖ Ollama: ${result.note}`);
+    }
+  } catch {
+    companionNote = "lượt Ollama chưa hoàn tất; kiểm tra cấu hình rồi chạy github:companions:backfill";
+    process.exitCode = 1;
+  }
+
   console.log(
     `\n✔ Kho đã dựng và đã vào sổ.\n` +
       `  kho       https://github.com/${slug}\n` +
-      `  software  https://github.com/${owner}/${companionRepos[0]}\n` +
-      `  software  https://github.com/${owner}/${companionRepos[1]}\n` +
+      `  kho phụ   ${companionNote}\n` +
       `  actions   https://github.com/${slug}/actions\n` +
       `  sổ        ${ping.ok ? "✔" : "✖"} ${ping.note}\n` +
-      `\n  Nghiệm thu: mở Hàng Đợi → tab Khôi Lỗi, phải thấy「${workerId}」điểm danh trong ~4 phút.\n`,
+      `\n  Kho phụ còn thiếu sẽ được cron/bù kho phụ tiếp tục. ĐỪNG chạy lại github:new để bù kho phụ.\n` +
+      `  Nghiệm thu: mở Hàng Đợi → tab Khôi Lỗi, phải thấy「${workerId}」điểm danh trong ~4 phút.\n`,
   );
 
   /**

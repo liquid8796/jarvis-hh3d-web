@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Verify the two ordinary software repositories produced with each GitHub worker bundle. */
+/** Verify archived template fixtures only. Live companion creation uses the Ollama runtime. */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -22,7 +22,7 @@ const names = ["amber-relay-0123456789abcdef", "cobalt-bridge-fedcba9876543210"]
 const now = new Date("2026-08-19T06:30:00.000Z");
 const projects = buildCompanionProjects({ repoNames: names, now });
 
-check(projects.length === COMPANION_REPO_COUNT, "generator returns exactly two companion projects");
+check(projects.length === COMPANION_REPO_COUNT, "legacy fixture builder returns its two archived projects");
 check(new Set(projects.map((project) => project.repoName)).size === 2, "companion repository names are distinct");
 check(new Set(projects.map((project) => project.theme.id)).size === 2, "one bundle selects two different life domains");
 
@@ -113,4 +113,4 @@ if (process.argv.includes("--build")) {
   }
 }
 
-console.log(`\n✔ ${count} checks — companion project bundles are ready.`);
+console.log(`\n✔ ${count} checks — legacy companion template fixtures (not the live Ollama path).`);

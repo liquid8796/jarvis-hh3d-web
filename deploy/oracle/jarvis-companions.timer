@@ -1,14 +1,12 @@
 [Unit]
-Description=Lich MOI GIO rai commit kho phu - de lich su commit khong dong thanh mot cum
+Description=Poll due Ollama companion work every five minutes
 
 [Timer]
-# Moi gio dung. `companionDueByNow` moi la thu quyet dinh gio nao co commit; lich nay chi lo
-# danh thuc du day de cham toi tung nac.
-OnCalendar=hourly
-# Xe dich toi 25 phut: khong lan chay nao roi dung phut :00. Cac nac von da lech nhau theo tung
-# kho, day la lop thu hai cho khoi thanh mot nhip may moc.
-RandomizedDelaySec=1500
-# May tat vai tieng thi lan chay dau tien sau do bu cho phan da toi nac.
+# The model chooses nextDecisionAt (5 minutes to 7 days); this timer only polls due work.
+OnCalendar=*-*-* *:00/5:00
+RandomizedDelaySec=30
+AccuracySec=1s
+# After downtime, poll once for work whose saved decision time is already due.
 Persistent=true
 
 [Install]

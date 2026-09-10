@@ -56,7 +56,7 @@ import { reviewCompanionNurtureDuty, reviewCronScope, reviewKeepaliveDuty } from
  * FAIL CLOSED khi chưa đặt `CRON_SECRET`: thà việc quét dọn không chạy (nó vốn đã có đường
  * chạy tiện thể từ nhịp đọc dashboard) còn hơn để ngỏ một endpoint cho cả Internet.
  */
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   // Budget tính từ ĐẦU request, không phải từ lúc housekeeping đã xong. Nếu ba lượt dọn mất
@@ -138,7 +138,7 @@ export async function GET(request: Request) {
     // Báo RIÊNG: workflow kho chính và source kho phụ là hai lời hứa khác nhau. Một ledger lỗi
     // không được biến status khôi lỗi thành đỏ, cũng không được chặn các repo phụ còn lại.
     try {
-      const summary = await runCompanionNurture({ deadlineAt: routeStartedAt + 45_000 });
+      const summary = await runCompanionNurture({ deadlineAt: routeStartedAt + 240_000 });
       companionNurture = {
         checked: summary.checked,
         pushed: summary.pushed,

@@ -119,8 +119,38 @@ Cùng ngày dựng lại máy, tông chủ quyết: **backend + database rời h
 | Postgres 17 | localhost:5432, db/role `jarvis`, mật khẩu `/etc/jarvis/pg-password` (root-only) |
 | MongoDB 8.0 | localhost:27017, db `jarvis` (tên theo nấc mặc định của `dbName.ts`) |
 | cron | systemd `jarvis-cron.timer` 03:00 UTC → `/api/cron` (quét dọn + ngó kho chính) — thay Vercel Cron |
-| cron kho phụ | systemd `jarvis-companions.timer` MỖI GIỜ → `/api/cron?only=companions` — rải commit kho phụ ra cả ngày (từ 21/08/2026) |
+| cron kho phụ | systemd `jarvis-companions.timer` mỗi 5 phút + độ trễ ngẫu nhiên 0–30 giây → `/api/cron?only=companions`; runtime Ollama chỉ xử lý kho đã tới `nextDecisionAt` |
 | media | vẫn Object Storage `jarvis-media` (mục 3) — không đổi |
+
+### Cập nhật lịch Ollama trên VM
+
+Model chọn lần xem tiếp theo từ **5 phút đến 7 ngày**. Timer thăm dò mỗi 5 phút, cộng tối đa
+30 giây ngẫu nhiên và `AccuracySec=1s`; khi VM hoạt động bình thường, một mốc vừa tới hạn được
+phát hiện ở lần thăm dò kế. Khóa đang bận, API lỗi hoặc hết ngân sách có thể đẩy việc thực thi
+sang lượt sau. `dailyPushes` là trần commit/ngày, `0` tạm dừng; timer không ép tạo commit mỗi lượt.
+
+Service cho `curl` tối đa **300 giây**, `TimeoutStartSec=330`, đủ bao quanh ngân sách runtime
+tối đa 240 giây. Cú pháp lịch và độ trễ theo [systemd.time](https://github.com/systemd/systemd/blob/main/man/systemd.time.xml)
+và [systemd.timer](https://github.com/systemd/systemd/blob/main/man/systemd.timer.xml).
+
+**`deploy:backend` và `setup-backend.sh` chưa cài lại hai unit companion.** Sau khi phát hành app
+chứa thay đổi này, chạy trên VM bằng tài khoản `ubuntu` để lấy unit từ đúng release đang phục vụ:
+
+```bash
+set -eu
+companion_port=$(grep -oE '127[.]0[.]0[.]1:[0-9]+' /etc/caddy/upstream.conf | cut -d: -f2)
+case "$companion_port" in 3000|3001) ;; *) echo 'Khong xac dinh duoc cong dang phuc vu' >&2; exit 1 ;; esac
+companion_release=$(readlink -f "/opt/jarvis/slot-$companion_port")
+sudo systemd-analyze verify "$companion_release/deploy/oracle/jarvis-companions.service" "$companion_release/deploy/oracle/jarvis-companions.timer"
+systemd-analyze calendar --iterations=3 '*-*-* *:00/5:00'
+sudo install -m 0644 "$companion_release/deploy/oracle/jarvis-companions.service" /etc/systemd/system/jarvis-companions.service
+sudo install -m 0644 "$companion_release/deploy/oracle/jarvis-companions.timer" /etc/systemd/system/jarvis-companions.timer
+sudo systemctl daemon-reload
+sudo systemctl enable jarvis-companions.timer
+sudo systemctl restart jarvis-companions.timer
+systemctl list-timers --all jarvis-companions.timer
+sudo journalctl -u jarvis-companions.service -n 20 --no-pager
+```
 
 ### Phát hành blue/green — vì sao hai chỗ chạy
 

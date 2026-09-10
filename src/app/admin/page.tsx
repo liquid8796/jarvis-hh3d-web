@@ -7,6 +7,7 @@ import { BACKDROP_PREFIX, humanBytes, listObjectsUnder } from "@/lib/services/me
 import { DEFAULT_RELEASE_NOTES, mergeReleaseNotes } from "@/lib/changelog";
 import { getAppSettings } from "@/lib/services/settings";
 import { githubStationsForAdmin } from "@/app/actions/githubStations";
+import { githubNurtureForAdmin } from "@/app/actions/githubNurture";
 import { mirrorsForAdmin } from "@/app/actions/mirrors";
 import { switchStateForAdmin } from "@/app/actions/mirrorSwitch";
 import { countPending, listUsers } from "@/lib/services/users";
@@ -21,6 +22,7 @@ import { BrowserEngineForm } from "./BrowserEngineForm";
 import { DailyResetForm } from "./DailyResetForm";
 import { GameDomainForm } from "./GameDomainForm";
 import { GithubStationPanel } from "./GithubStationPanel";
+import { GithubNurtureSettings } from "./GithubNurtureSettings";
 import { JobEventRetentionForm } from "./JobEventRetentionForm";
 import { MaintenanceForm } from "./MaintenanceForm";
 import { MirrorPanel } from "./MirrorPanel";
@@ -30,6 +32,7 @@ import { BroadcastPanel } from "./BroadcastPanel";
 import { CreateUserPanel } from "./CreateUserPanel";
 
 export const metadata = { title: "Tông Môn" };
+export const maxDuration = 300;
 
 /**
  * Tông Môn — sổ bộ môn đồ.
@@ -226,7 +229,12 @@ export default async function AdminPage({
               ? [{
                   key: "khoGithub",
                   label: "Kho GitHub",
-                  pane: <GithubStationPanel stations={await githubStationsForAdmin()} />,
+                  pane: (
+                    <div className="flex flex-col gap-6">
+                      <GithubNurtureSettings config={await githubNurtureForAdmin()} />
+                      <GithubStationPanel stations={await githubStationsForAdmin()} />
+                    </div>
+                  ),
                 }]
               : []),
           ]}

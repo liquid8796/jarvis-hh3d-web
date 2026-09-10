@@ -11,6 +11,14 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.72 — Tạo repo GitHub trực tiếp từ admin (11/09/2026)
+
+- Thay form chỉ ghi sổ bằng luồng provisioning chung với CLI: suy ra tài khoản từ PAT, tạo repo, đẩy source/workflow, đặt secret, ghi sổ và khởi động workflow/kho phụ.
+- UI và launcher hỏi tên repo, tên workflow và giới hạn lượt đẩy mỗi kho phụ. Bỏ trống dùng tên tự sinh, `linh-su.yml` và `5`; WORKER_ID lấy theo tên repo.
+- Repo tồn tại hoặc không xác minh được thì dừng trước khi tạo. Rollback chỉ áp dụng repo vừa được xác nhận tạo bởi lượt này, kiểm ID/HEAD và xác minh đã xóa; kết quả mơ hồ được báo để kiểm tra.
+- Web đọc payload từ release không có `.git`, dùng lockfile tạo sẵn; CLI lấy source và lockfile từ cùng Git HEAD. Workflow tùy chỉnh được dùng cả khi gọi lượt kế và deploy sau này.
+- Các bước mạng/tiến trình chạy bất đồng bộ, có deadline chung và thời gian dự phòng dọn dẹp. UI phân biệt lỗi tạo với cảnh báo sau khi repo đã được đăng ký.
+
 ## 1.3.71 — Ollama quản lý kho phụ và tra cứu tài liệu (10/09/2026)
 
 - Thêm trang chi tiết kho GitHub, mặc định ba repo phụ và ghi đè số lượng theo từng kho; quyền fork/tự xóa mặc định tắt.

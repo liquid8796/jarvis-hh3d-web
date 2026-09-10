@@ -47,7 +47,13 @@ if (process.argv.includes("--check")) {
 
 const mockActions = `
   const complete = (label) => async (_previous, form) => {
+    globalThis.__fixtureSubmitted = {label, values:Object.fromEntries(form)};
     await new Promise(resolve => setTimeout(resolve, 1500));
+    if (label === "provisionGithubStationAction") {
+      const outcome = new URLSearchParams(location.search).get("outcome");
+      if (outcome === "error") return {ok:false,stage:"preflight",slug:"sample-owner/existing-repo",message:"Kho GitHub đã tồn tại. Không có thay đổi nào được thực hiện.",warnings:[]};
+      return {ok:true,stage:"complete",slug:"sample-owner/created-repo",message:"Đã tạo và đăng ký kho GitHub.",warnings:outcome === "warning" ? ["Kho đã đăng ký; lượt khởi chạy workflow cần được kiểm tra lại."] : []};
+    }
     if (label === "deleteGithubCompanionAction" && form.get("confirmedRepo") !== form.get("repo")) {
       return {ok:false,message:"Nhập đúng tên kho phụ để xác nhận xoá vĩnh viễn."};
     }
@@ -60,6 +66,8 @@ const mockActions = `
   export const saveGithubCompanionSettingsAction = complete("saveGithubCompanionSettingsAction");
   export const deleteGithubCompanionAction = complete("deleteGithubCompanionAction");
   export const saveGithubStationAction = complete("saveGithubStationAction");
+  export const provisionGithubStationAction = complete("provisionGithubStationAction");
+  export const updateGithubStationAction = complete("updateGithubStationAction");
   export const deleteGithubStationAction = complete("deleteGithubStationAction");
   export const pingGithubStationAction = complete("pingGithubStationAction");
   export const runKeepaliveAction = complete("runKeepaliveAction");
@@ -90,6 +98,7 @@ const companion = {
 };
 const station = {
   slug:"sample-owner/primary-repo",owner:"sample-owner",repo:"primary-repo",
+  provisionedBy:new URLSearchParams(location.search).get("managed") === "1" ? "jarvis" : undefined,
   workflowFile:"linh-su.yml",workerId:"github-sample",enabled:true,lastPingAt:stamp,lastCommitAt:stamp,
   lastPingOk:true,lastPingNote:"Workflow đang chạy.",workflowState:"active",daysToDisable:57,dailyPushes:5,
   companionCountOverride:null,allowCompanionFork:false,allowCompanionDelete:false,
@@ -208,6 +217,82 @@ if (!process.argv.includes("--check")) {
         report.push({ view, width, scrollWidth: dimensions.scrollWidth, screenshot });
         if (dimensions.scrollWidth > width + 1) failures.push(`${view}/${width} overflow: ${JSON.stringify(dimensions)}`);
       }
+      for (const outcome of ["success", "warning", "error"]) {
+        await page.goto(`${origin}/?view=stations&outcome=${outcome}`);
+        const createForm = page.locator("form").filter({ has: page.locator("#station-pat") });
+        assert.equal(await createForm.locator("input[name=owner],input[name=workerId],textarea[name=companionRepos],input[name=enabled]").count(), 0);
+        assert.equal(await createForm.locator("input").count(), 4);
+        assert.equal(await page.locator("#station-pat").getAttribute("type"), "password");
+        assert.notEqual(await page.locator("#station-pat").getAttribute("required"), null);
+        for (const selector of ["#station-repo", "#station-workflow", "#station-daily-pushes"]) {
+          assert.equal(await page.locator(selector).inputValue(), "");
+          assert.equal(await page.locator(selector).getAttribute("required"), null);
+        }
+        assert.equal(await page.locator("#station-workflow").getAttribute("placeholder"), "linh-su.yml");
+        assert.equal(await page.locator("#station-daily-pushes").getAttribute("placeholder"), "5");
+        await page.locator("#station-pat").fill("offline-fixture-pat");
+        await page.getByRole("button", { name: "Tạo repo + workflow", exact: true }).click();
+        const pending = page.getByRole("button", { name: "Đang tạo repo + workflow…", exact: true });
+        await pending.waitFor();
+        assert.ok(await pending.isDisabled());
+        assert.ok(await page.locator("#station-pat").isDisabled());
+        if (outcome === "success") await page.screenshot({ path: join(output, `create-pending-${width}.png`), fullPage: true });
+        await page.getByRole("button", { name: "Tạo repo + workflow", exact: true }).waitFor();
+        const submitted = await page.evaluate(() => (window as typeof window & { __fixtureSubmitted: { label: string; values: Record<string, string> } }).__fixtureSubmitted);
+        assert.equal(submitted.label, "provisionGithubStationAction");
+        assert.deepEqual(submitted.values, { pat: "offline-fixture-pat", repo: "", workflowFile: "", dailyPushes: "" });
+        const status = page.locator("section[aria-labelledby=station-form-title]").getByRole("status");
+        assert.match(await status.innerText(), outcome === "error" ? /Kho GitHub đã tồn tại/ : /Đã tạo và đăng ký/);
+        assert.match(await status.innerText(), outcome === "error" ? /sample-owner\/existing-repo/ : /sample-owner\/created-repo/);
+        assert.equal(await status.locator("li").count(), outcome === "warning" ? 1 : 0);
+        if (outcome === "warning") assert.match(await status.innerText(), /cần được kiểm tra lại/);
+        assert.ok(!(await status.innerText()).includes("offline-fixture-pat"));
+        const screenshot = join(output, `create-${outcome}-${width}.png`);
+        await page.screenshot({ path: screenshot, fullPage: true });
+        const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+        report.push({ view: `create-${outcome}`, width, scrollWidth, screenshot });
+        if (scrollWidth > width + 1) failures.push(`create-${outcome}/${width} overflow: ${scrollWidth}`);
+      }
+      for (const managed of [false, true]) {
+        await page.goto(`${origin}/?view=stations&managed=${managed ? "1" : "0"}`);
+        await page.getByRole("button", { name: "Sửa", exact: true }).click();
+        const editForm = page.locator("form").filter({ has: page.locator("#station-pat") });
+        assert.equal(await editForm.locator("input[name=owner],input[name=repo],textarea[name=companionRepos]").count(), 0);
+        assert.equal(await editForm.locator("input[name=slug]").inputValue(), "sample-owner/primary-repo");
+        assert.equal(await page.locator("#station-pat").inputValue(), "");
+        assert.equal(await page.locator("#station-pat").getAttribute("required"), null);
+        assert.match(await editForm.innerText(), /sample-owner\/primary-repo/);
+        assert.equal(await page.locator("#station-daily-pushes").inputValue(), "5");
+        if (managed) {
+          assert.equal(await editForm.locator("input[name=workflowFile],input[name=workerId]").count(), 0);
+          assert.match(await editForm.innerText(), /Workflow: linh-su.yml/);
+          assert.match(await editForm.innerText(), /WORKER_ID: github-sample/);
+        } else {
+          assert.equal(await page.locator("#station-workflow").inputValue(), "linh-su.yml");
+          await page.locator("#station-workflow").fill("corrected.yaml");
+          await page.locator("#station-worker").fill("correct-worker");
+        }
+        await page.locator("#station-daily-pushes").fill("0");
+        await page.locator("#station-enabled").uncheck();
+        await page.getByRole("button", { name: "Cập nhật kho", exact: true }).click();
+        const updating = page.getByRole("button", { name: "Đang cập nhật…", exact: true });
+        await updating.waitFor(); assert.ok(await updating.isDisabled());
+        await page.getByRole("button", { name: "Cập nhật kho", exact: true }).waitFor();
+        const submitted = await page.evaluate(() => (window as typeof window & { __fixtureSubmitted: { label: string; values: Record<string, string> } }).__fixtureSubmitted);
+        assert.equal(submitted.label, "updateGithubStationAction");
+        assert.equal(submitted.values.slug, "sample-owner/primary-repo");
+        assert.equal(submitted.values.dailyPushes, "0"); assert.equal(submitted.values.enabledPresent, "1"); assert.equal(submitted.values.enabled, undefined);
+        assert.equal(submitted.values.owner, undefined); assert.equal(submitted.values.repo, undefined); assert.equal(submitted.values.companionRepos, undefined);
+        assert.equal(submitted.values.workflowFile, managed ? undefined : "corrected.yaml"); assert.equal(submitted.values.workerId, managed ? undefined : "correct-worker");
+        const screenshot = join(output, `edit-${managed ? "managed" : "legacy"}-${width}.png`);
+        await page.screenshot({ path: screenshot, fullPage: true });
+        const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+        report.push({ view: `edit-${managed ? "managed" : "legacy"}`, width, scrollWidth, screenshot });
+        if (scrollWidth > width + 1) failures.push(`edit/${width} overflow: ${scrollWidth}`);
+        await page.getByRole("button", { name: "Tạo kho mới", exact: true }).click();
+        assert.equal(await page.locator("#station-repo").inputValue(), "");
+        assert.equal(await page.locator("section[aria-labelledby=station-form-title]").getByRole("status").count(), 0);
+      }
       await page.close();
     }
 
@@ -266,7 +351,7 @@ if (!process.argv.includes("--check")) {
     console.log(JSON.stringify({ report, failures }, null, 2));
     await writeFile(join(output, "report.json"), JSON.stringify({ report, failures }, null, 2), "utf8");
     assert.deepEqual(failures, [], "Browser errors or horizontal overflow detected");
-    console.log("PASS: 390/1366 layout, defaults, safe permission fallbacks, settings/key import/toggle pending states, key and typed repo delete confirmation cancellation.");
+    console.log("PASS: 390/1366 layout; create defaults/pending/success/warning/error; immutable managed and editable legacy station forms; settings/key pending states and delete confirmation cancellation.");
   } finally {
     await browser?.close();
     await new Promise<void>((resolve) => server.close(() => resolve()));

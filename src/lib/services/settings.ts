@@ -20,6 +20,8 @@ import {
 import { DEFAULT_GAME_BASE_URL, normalizeGameBaseUrl } from "@/lib/quest-engine/cookies.mjs";
 import type { TagFrame } from "@/lib/validation/tags";
 import { mergeGithubBranch } from "@/lib/validation/githubSettingsMerge";
+import { withDatabaseDeadline } from "../db/deadline";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   DEFAULT_COMPANION_COUNT,
   MAX_COMPANION_COUNT,
@@ -438,6 +440,9 @@ export const appSettingsSchema = z.object({
         workerId: z.string().max(120).catch("").default(""),
         /** PAT của tài khoản giữ kho, phong bì secretBox `v1.…`. */
         pat: z.string().min(1),
+        provisionedBy: z.literal("jarvis").optional(),
+        githubId: z.number().int().positive().optional(),
+        initialCommitSha: z.string().max(100).optional(),
         /** Tắt là đứng ngoài vòng nuôi — dòng và PAT giữ nguyên, chỉ không ai đụng tới kho ấy. */
         enabled: z.boolean().catch(true).default(true),
         /** Registered companion repos retain their identity and activity history. */
@@ -576,15 +581,34 @@ export const appSettingsSchema = z.object({
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 
+/** Display fallbacks must never erase ownership evidence during a GitHub mutation. */
+export function parseGithubSettingsForMutation(value: unknown): AppSettings {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid GitHub settings");
+  const raw = value as Record<string, unknown>;
+  const stations = raw.githubStations;
+  if (stations !== undefined && !Array.isArray(stations)) throw new Error("Invalid GitHub register");
+  const parsed = appSettingsSchema.parse(value);
+  if (Array.isArray(stations)) {
+    if (stations.length !== parsed.githubStations.length) throw new Error("Invalid GitHub register");
+    for (let index = 0; index < stations.length; index++) {
+      const station = stations[index] as Record<string, unknown>;
+      if (!station || typeof station !== "object" || (station.workerId !== undefined && typeof station.workerId !== "string")) throw new Error("Invalid worker identity");
+      if (station.companionRepos !== undefined && (!Array.isArray(station.companionRepos) || station.companionRepos.length !== parsed.githubStations[index].companionRepos.length)) throw new Error("Invalid companion ownership");
+    }
+  }
+  return parsed;
+}
+
 const GLOBAL_ID = "global";
 const githubReadBaselines = new WeakMap<AppSettings, Pick<AppSettings, "githubStations" | "githubNurture">>();
 
-export async function getAppSettings(): Promise<AppSettings> {
-  const rows = await db()
+export async function getAppSettings(options: { deadlineAt?: number } = {}): Promise<AppSettings> {
+  const read = (database: NodePgDatabase<typeof schema>) => database
     .select({ value: schema.appSettings.value })
     .from(schema.appSettings)
     .where(eq(schema.appSettings.id, GLOBAL_ID))
     .limit(1);
+  const rows = options.deadlineAt === undefined ? await read(db()) : await withDatabaseDeadline(options.deadlineAt, read);
 
   const parsed = appSettingsSchema.safeParse(rows[0]?.value ?? {});
   const settings = parsed.success ? parsed.data : appSettingsSchema.parse({});

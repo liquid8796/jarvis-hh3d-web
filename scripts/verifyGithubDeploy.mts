@@ -48,7 +48,9 @@ import {
   renderPackageJsonFor,
   renderReadme,
   renderWorkflow,
+  stationKhoiloiPayload,
   webVersionOf,
+  workflowTargetPath,
 } from "./khoiloiPayload.mjs";
 
 const repoRoot = path.join(import.meta.dirname, "..");
@@ -180,6 +182,37 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
     const b = planKhoiloiTree({ payload: xao, remote: new Map(), ownedPrefixes: OWNED_PREFIXES });
     check("thứ tự đầu vào không đổi được kế hoạch", a.changed.join(",") === b.changed.join(","));
   }
+
+  {
+    const customWorkflow = workflowTargetPath("nightly.yaml");
+    const unrelatedWorkflow = ".github/workflows/manual.yml";
+    const stationFiles = stationKhoiloiPayload({
+      basePayload: new Map([
+        [WORKFLOW_TARGET_PATH, Buffer.from("placeholder", "utf8")],
+        [unrelatedWorkflow, Buffer.from("maintained elsewhere", "utf8")],
+      ]),
+      template: readCommittedFile(repoRoot, WORKFLOW_TEMPLATE_PATH).toString("utf8"),
+      workerId: "night-worker",
+      webUrl: "https://night.example.invalid",
+      workflowFile: "nightly.yaml",
+    });
+    check("helper đặt workflow riêng của trạm đúng đường dẫn", stationFiles.has(customWorkflow));
+    check("helper bỏ workflow placeholder mặc định", !stationFiles.has(WORKFLOW_TARGET_PATH));
+    check("helper giữ workflow không liên quan", stationFiles.has(unrelatedWorkflow));
+    const renderedCustomWorkflow = stationFiles.get(customWorkflow)?.toString("utf8") ?? "";
+    check("workflow phát hành tự phát lại đúng tên riêng", renderedCustomWorkflow.includes("/actions/workflows/nightly.yaml/dispatches"));
+    check("workflow phát hành không còn tự phát vào tên mặc định", !renderedCustomWorkflow.includes("/actions/workflows/linh-su.yml/dispatches"));
+
+    const customPayload = new Map(
+      [...stationFiles].map(([relPath, bytes]) => [relPath, gitBlobSha(bytes)]),
+    );
+    const remote = new Map(customPayload);
+    remote.set(customWorkflow, "old");
+    remote.set(WORKFLOW_TARGET_PATH, "unrelated");
+    const plan = planKhoiloiTree({ payload: customPayload, remote, ownedPrefixes: OWNED_PREFIXES });
+    check("workflow riêng của trạm được cập nhật đúng đường dẫn", plan.changed.join(",") === customWorkflow);
+    check("workflow mặc định không thuộc trạm được giữ nguyên", !plan.removed.includes(WORKFLOW_TARGET_PATH));
+  }
 }
 
 // ---- 3. Danh tính khôi lỗi ----------------------------------------------------------------------
@@ -221,9 +254,12 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
     template,
     workerId: "khoiloi-tro-kiem-chung",
     webUrl: "https://vi-du.invalid",
+    workflowFile: "nightly.yaml",
   });
   check("vẽ xong thì WORKER_ID là id mới", workerIdFromWorkflow(rendered) === "khoiloi-tro-kiem-chung");
   check("vẽ xong thì WEB_URL là địa chỉ mới", webUrlFromWorkflow(rendered) === "https://vi-du.invalid");
+  check("workflow riêng tự phát lại đúng tệp", rendered.includes("/actions/workflows/nightly.yaml/dispatches"));
+  check("workflow riêng không còn tự phát vào linh-su.yml", !rendered.includes("/actions/workflows/linh-su.yml/dispatches"));
   check(
     "đổi WEB_URL không làm trôi cổng dự phòng",
     rendered.includes(`WORKER_FALLBACK_URL: \${{ vars.WORKER_FALLBACK_URL || '${EXPECTED_WORKER_FALLBACK}' }}`),
@@ -265,7 +301,7 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
 
   check(
     "chỗ gói đặt workflow khớp chỗ sổ đi hỏi trạng thái",
-    WORKFLOW_TARGET_PATH === `.github/workflows/${DEFAULT_WORKFLOW_FILE}`,
+    workflowTargetPath(DEFAULT_WORKFLOW_FILE) === WORKFLOW_TARGET_PATH,
     `${WORKFLOW_TARGET_PATH} vs .github/workflows/${DEFAULT_WORKFLOW_FILE}`,
   );
   const newGithubRaw = readCommittedFile(repoRoot, "scripts/newGithubKhoiloi.mjs").toString("utf8");
@@ -541,6 +577,10 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
   check("package.json của gói mang ĐÚNG số bản kho gốc", rendered.version === webVersion);
   check("…không còn là hằng số 1.0.0", rendered.version !== "1.0.0" || webVersion === "1.0.0");
 
+  // `buildKhoiloiPayload` mặc định chọn git HEAD, nên các kỳ vọng của riêng builder phải đọc
+  // cùng nguồn. Cây làm việc có thể đã bump bản cho release kế tiếp trước khi commit.
+  const headVersion = JSON.parse(readCommittedFile(repoRoot, "package.json").toString("utf8")).version;
+
   // Thiếu số bản thì NÉM, không lặng lẽ ghi một chuỗi rỗng: một gói khai version rỗng làm
   // `readOwnVersion` trả null, tức sổ điểm danh hiện "không rõ" — tệ hơn cả 1.0.0.
   let threw = false;
@@ -564,7 +604,7 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
   } catch (err) {
     lockGuard = err instanceof Error ? err.message : String(err);
   }
-  check("lockfile lệch số bản → ném, kèm CẢ HAI con số", lockGuard.includes("0.0.1") && lockGuard.includes(webVersion));
+  check("lockfile lệch số bản → ném, kèm CẢ HAI con số", lockGuard.includes("0.0.1") && lockGuard.includes(headVersion));
   check("…và nói ra hậu quả thật: npm ci sẽ từ chối chạy trên runner", lockGuard.includes("npm ci"));
 
   // Lockfile ĐÚNG bản thì đi qua, và gói mang đúng số bản ấy.
@@ -572,9 +612,9 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
     repoRoot,
     workerId: "khoiloi-tro-kiem-thu",
     webUrl: "https://vi-du.test",
-    lockfile: Buffer.from(JSON.stringify({ name: "x", version: webVersion, packages: { "": { version: webVersion } } })),
+    lockfile: Buffer.from(JSON.stringify({ name: "x", version: headVersion, packages: { "": { version: headVersion } } })),
   });
-  check("gói dựng xong mang đúng số bản kho gốc", JSON.parse(good.get("package.json").toString("utf8")).version === webVersion);
+  check("gói dựng xong mang đúng số bản HEAD", JSON.parse(good.get("package.json").toString("utf8")).version === headVersion);
   check(
     "workflow trong gói còn nguyên cổng dự phòng",
     good.get(WORKFLOW_TARGET_PATH).toString("utf8").includes(

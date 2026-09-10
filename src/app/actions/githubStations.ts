@@ -7,15 +7,11 @@ import { decryptSecret, encryptSecret, isEncrypted } from "@/lib/crypto/secretBo
 import { pingStationBySlug, runCompanionNurture, runKeepalive } from "@/lib/services/githubStations";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
 import { mutateGithubState } from "@/lib/services/companionState";
-import { MAX_COMPANION_COUNT } from "@/lib/validation/githubNurture";
+import { provisionGithubStation, productionGithubProvisionDependencies } from "@/lib/services/githubProvisioning";
+import { createGithubStationFormHandlers, type GithubStationFormResult } from "@/lib/services/githubStationForms";
 import {
-  DEFAULT_DAILY_PUSHES,
-  DEFAULT_WORKFLOW_FILE,
-  MAX_DAILY_PUSHES,
-  MIN_DAILY_PUSHES,
   MS_PER_DAY,
   SCHEDULE_DISABLE_DAYS,
-  reviewStationIdentity,
   stationSlug,
 } from "@/lib/validation/githubStations";
 
@@ -32,7 +28,7 @@ import {
  * `revealGithubStationPatAction`, và nó chỉ mở khi có người bấm: xem ghi chú tại chỗ.
  */
 
-export type StationResult = { ok: boolean; message: string };
+export type StationResult = GithubStationFormResult;
 
 /** Hình chiếu an toàn cho client: KHÔNG mang phong bì PAT, chỉ mang dấu vết đủ để vận hành. */
 export type StationView = {
@@ -42,6 +38,7 @@ export type StationView = {
   repo: string;
   workflowFile: string;
   workerId: string;
+  provisionedBy?: "jarvis";
   enabled: boolean;
   lastPingAt: string | null;
   lastCommitAt: string | null;
@@ -97,6 +94,7 @@ function viewOf(station: AppSettings["githubStations"][number], now: number): St
     repo: station.repo,
     workflowFile: station.workflowFile,
     workerId: station.workerId,
+    provisionedBy: station.provisionedBy,
     enabled: station.enabled,
     lastPingAt: station.lastPingAt,
     lastCommitAt: station.lastCommitAt,
@@ -176,193 +174,43 @@ export async function revealGithubStationPatAction(slug: string): Promise<Statio
   }
 }
 
-/**
- * Thêm/sửa một kho, rồi NGÓ NGAY — cùng lối với `saveMirrorAction`: một PAT dán nhầm phải chết
- * ở đây, trước mặt người vừa dán, chứ không phải trong một lượt cron lúc ba giờ sáng.
- *
- * Lượt ngó ấy đi qua `force: false`, và chỗ ấy quan trọng hơn vẻ ngoài của nó:
- *   • Kho MỚI chưa có `lastCommitAt` nên đằng nào cũng tới hạn → nó ghi một commit thật, tức
- *     chứng minh trọn đường「PAT push được mã vào kho này」ngay lúc lưu.
- *   • Kho CŨ sửa mỗi cái `workerId` thì không tới hạn → chỉ một lượt GET, không rác một commit
- *     nào vào kho người ta chỉ vì admin gõ lại một cái nhãn.
- */
+/** Guarded form adapters: create provisions a real repository; update only edits an existing row. */
+const stationForms = createGithubStationFormHandlers({
+  requireManage: requireStationManage,
+  provision: provisionGithubStation,
+  getSettings: getAppSettings,
+  mutate: mutateGithubState,
+  whoami: productionGithubProvisionDependencies.whoami,
+  encrypt: encryptSecret,
+  isEncrypted,
+  ping: (slug) => pingStationBySlug(slug, false),
+  invalidate: (slug) => {
+    revalidatePath("/admin");
+    if (slug) revalidatePath(`/admin/github/${slug}`);
+  },
+});
+
+export async function provisionGithubStationAction(
+  _prev: StationResult | null,
+  formData: FormData,
+): Promise<StationResult> {
+  return stationForms.provision(formData);
+}
+
+export async function updateGithubStationAction(
+  _prev: StationResult | null,
+  formData: FormData,
+): Promise<StationResult> {
+  return stationForms.update(formData);
+}
+
+/** Compatibility with already loaded admin clients; this path can never append a registration. */
 export async function saveGithubStationAction(
   _prev: StationResult | null,
   formData: FormData,
 ): Promise<StationResult> {
-  await requireStationManage();
-
-  const owner = String(formData.get("owner") ?? "").trim();
-  const repo = String(formData.get("repo") ?? "").trim();
-  const workflowFile = String(formData.get("workflowFile") ?? "").trim() || DEFAULT_WORKFLOW_FILE;
-  const workerId = String(formData.get("workerId") ?? "").trim();
-  const patInput = String(formData.get("pat") ?? "").trim();
-  const enabled = formData.get("enabled") === "on";
-
-  const complaint = reviewStationIdentity(owner, repo, workflowFile);
-  if (complaint) {
-    return { ok: false, message: complaint };
-  }
-  if (workerId.length > 120) {
-    return { ok: false, message: "WORKER_ID dài quá 120 ký tự — chép nhầm gì rồi." };
-  }
-  // Khoảng trắng trong PAT gần như luôn là lỗi chép-dán (nuốt cả dấu xuống dòng của terminal),
-  // và nó sẽ đi thẳng vào một header HTTP. Chặn ở đây thay vì để GitHub trả 401 khó hiểu.
-  if (patInput.length > 0 && /\s/.test(patInput)) {
-    return { ok: false, message: "PAT có khoảng trắng — chép lại, đừng kèm dấu xuống dòng." };
-  }
-
-  const settings = await getAppSettings();
-  const slug = `${owner}/${repo}`;
-  const existing = settings.githubStations.find((s) => stationSlug(s) === slug);
-
-  // Client cũ không gửi trường này: giữ giá trị đang lưu (hoặc mặc định cho kho mới) thay vì
-  // vô tình tạm dừng kho phụ trong một lượt sửa PAT/WORKER_ID không liên quan.
-  const dailyPushesInput = formData.get("dailyPushes");
-  let dailyPushes = existing?.dailyPushes ?? DEFAULT_DAILY_PUSHES;
-  if (dailyPushesInput !== null) {
-    const raw = String(dailyPushesInput).trim();
-    if (!/^\d+$/.test(raw)) {
-      return {
-        ok: false,
-        message: `Số lượt đẩy mỗi ngày phải là số nguyên từ ${MIN_DAILY_PUSHES} đến ${MAX_DAILY_PUSHES}.`,
-      };
-    }
-    dailyPushes = Number(raw);
-    if (!Number.isSafeInteger(dailyPushes) || dailyPushes < MIN_DAILY_PUSHES || dailyPushes > MAX_DAILY_PUSHES) {
-      return {
-        ok: false,
-        message: `Số lượt đẩy mỗi ngày phải nằm trong khoảng ${MIN_DAILY_PUSHES}–${MAX_DAILY_PUSHES}; chọn 0 để tạm dừng.`,
-      };
-    }
-  }
-
-  const hasCompanionFields = formData.has("companionRepos") || formData.has("companionRepo1") || formData.has("companionRepo2");
-  const submittedCompanionNames = hasCompanionFields
-    ? formData.has("companionRepos")
-      ? String(formData.get("companionRepos") ?? "").split(/[\r\n,]+/).map((name) => name.trim())
-      : ["companionRepo1", "companionRepo2"].map((field) => String(formData.get(field) ?? "").trim())
-    : (existing?.companionRepos.map((companion) => companion.repo) ?? []);
-  const submittedFilledCompanionNames = submittedCompanionNames.filter((name) => name.length > 0);
-  if (submittedFilledCompanionNames.length > MAX_COMPANION_COUNT) {
-    return { ok: false, message: `Chỉ đăng ký tối đa ${MAX_COMPANION_COUNT} kho phần mềm phụ.` };
-  }
-
-  const storedCompanions = existing?.companionRepos ?? [];
-  if (storedCompanions.length > 0 && hasCompanionFields) {
-    const storedNames = new Set(storedCompanions.map((companion) => companion.repo.toLowerCase()));
-    const submittedNames = new Set(submittedFilledCompanionNames.map((name) => name.toLowerCase()));
-    const isSameList =
-      submittedFilledCompanionNames.length === storedCompanions.length &&
-      submittedNames.size === storedNames.size &&
-      [...storedNames].every((name) => submittedNames.has(name));
-    if (!isSameList) {
-      return {
-        ok: false,
-        message: "Danh sách kho phụ đã thay đổi hoặc tên đang được sửa. Tải lại trang; dùng trang chi tiết để quản lý kho phụ.",
-      };
-    }
-  }
-
-  // Keep canonical names and operational metadata when editing an existing registration.
-  const filledCompanionNames =
-    storedCompanions.length > 0
-      ? storedCompanions.map((companion) => companion.repo)
-      : submittedFilledCompanionNames;
-  for (const [index, companionRepo] of filledCompanionNames.entries()) {
-    const companionComplaint = reviewStationIdentity(owner, companionRepo, DEFAULT_WORKFLOW_FILE);
-    if (companionComplaint) {
-      return { ok: false, message: `Kho phần mềm phụ ${index + 1}: ${companionComplaint}` };
-    }
-  }
-  const distinctRepos = new Set([repo, ...filledCompanionNames].map((name) => name.toLowerCase()));
-  if (distinctRepos.size !== 1 + filledCompanionNames.length) {
-    return { ok: false, message: "Kho khôi lỗi và các kho phần mềm phụ phải có tên khác nhau, không trùng lặp." };
-  }
-
-  if (!existing && patInput.length === 0) {
-    return { ok: false, message: "Kho mới cần một PAT — không có chìa thì không nuôi được." };
-  }
-
-  // Ô để trống nghĩa là「giữ phong bì cũ」, cùng luật với sổ gương trạm: admin sửa mỗi cái
-  // WORKER_ID không phải lục lại token từ két.
-  const patEnvelope = patInput
-    ? encryptSecret(patInput)
-    : existing && isEncrypted(existing.pat)
-      ? existing.pat
-      : "";
-  if (patEnvelope.length === 0) {
-    return { ok: false, message: "Kho này chưa có PAT hợp lệ trong sổ — dán một cái mới vào ô PAT." };
-  }
-
-  const entry: AppSettings["githubStations"][number] = {
-    ...existing,
-    owner,
-    repo,
-    workflowFile,
-    workerId,
-    pat: patEnvelope,
-    enabled,
-    // Dấu vết GIỮ NGUYÊN qua lượt sửa: `lastCommitAt` là mốc đếm ngược tới ngày GitHub tắt lịch,
-    // và xoá nó vì admin đổi một cái nhãn là vứt đúng con số duy nhất nói được kho còn bao lâu.
-    lastPingAt: existing?.lastPingAt ?? null,
-    lastCommitAt: existing?.lastCommitAt ?? null,
-    lastPingOk: existing?.lastPingOk ?? null,
-    lastPingNote: existing?.lastPingNote ?? "",
-    workflowState: existing?.workflowState ?? "",
-    dailyPushes,
-    companionRepos:
-      storedCompanions.length > 0
-        ? storedCompanions.map((companion) => ({ ...companion }))
-        : filledCompanionNames.map((companionRepo) => ({
-            repo: companionRepo,
-            lastNurtureDay: null,
-            pushesToday: 0,
-            lastPushAt: null,
-            lastPushOk: null,
-            lastPushNote: "",
-          })),
-  };
-
-  try {
-    await mutateGithubState((currentSettings) => {
-      const current = currentSettings.githubStations.find((station) => stationSlug(station) === slug);
-      if (Boolean(current) !== Boolean(existing)) throw new Error("changed");
-      const companions = current?.companionRepos.length ? current.companionRepos : entry.companionRepos;
-      const reserved = new Set(currentSettings.githubStations
-        .filter((station) => stationSlug(station) !== slug && station.owner.toLowerCase() === owner.toLowerCase())
-        .flatMap((station) => [station.repo, ...station.companionRepos.map((companion) => companion.repo)])
-        .map((name) => name.toLowerCase()));
-      if ([repo, ...companions.map((companion) => companion.repo)].some((name) => reserved.has(name.toLowerCase()))) {
-        throw new Error("duplicate");
-      }
-      const updated = current ? {
-        ...current,
-        workflowFile, workerId, enabled,
-        pat: patInput ? patEnvelope : current.pat,
-        dailyPushes: dailyPushesInput === null ? current.dailyPushes : dailyPushes,
-        companionRepos: companions,
-      } : entry;
-      currentSettings.githubStations = current
-        ? currentSettings.githubStations.map((station) => stationSlug(station) === slug ? updated : station)
-        : [...currentSettings.githubStations, updated];
-    });
-  } catch {
-    return { ok: false, message: "Không lưu được: sổ vừa thay đổi, có tên repo đã đăng ký ở kho khác, hoặc máy chủ không ghi được dữ liệu. Tải lại trang rồi thử lại." };
-  }
-
-  // Ngó SAU khi lưu, không phải trước: `pingStationBySlug` đọc sổ, nên dòng phải nằm sẵn ở đó —
-  // và nhờ thứ tự ấy, kết quả lượt ngó cũng được ghi thẳng vào dòng vừa lưu.
-  const ping = await pingStationBySlug(slug, false);
-  revalidatePath("/admin");
-  revalidatePath(`/admin/github/${owner}/${repo}`);
-
-  return {
-    ok: ping.ok,
-    message: `${existing ? "Đã cập nhật" : "Đã ghi"} kho「${slug}」. ${ping.note}`,
-  };
+  return stationForms.saveLegacy(formData);
 }
-
 export async function deleteGithubStationAction(
   _prev: StationResult | null,
   formData: FormData,

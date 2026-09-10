@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.72",
+    date: "2026-09-11",
+    lines: [
+      "Có thể tạo kho GitHub và tệp chạy ngay tại Tông Môn, tài khoản được xác định tự động từ PAT.",
+      "Form trên web và tệp chạy nhanh cùng cho nhập tên kho, tên tệp chạy và giới hạn lượt đẩy; bỏ trống sẽ dùng mặc định.",
+      "Tên kho đã có sẽ được báo rõ và dừng trước khi tạo. Đổi tên tệp chạy lúc tạo cũng được giữ đúng ở các lượt sau.",
+    ],
+  },
+  {
     version: "1.3.71",
     date: "2026-09-10",
     lines: [
@@ -468,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Máy chạy tự động đang vào nhầm tên miền cũ của trang game — tên miền đó đã dời, nên phiên đăng nhập không theo sang được và trang coi máy như khách lạ.",
       "Nay nó dùng đúng tên miền Tông Môn đã đặt. Nếu vẫn báo hết phiên đăng nhập, dán lại chuỗi đăng nhập lấy từ trang hiện tại ở Ngọc Giản Cấu Hình.",
-    ],
-  },
-  {
-    version: "1.3.21",
-    date: "2026-08-20",
-    lines: [
-      "Gặp bước kiểm tra của trang giữa chừng, máy chạy tự động nay tự bấm qua rồi làm tiếp, thay vì bỏ dở cả vòng.",
-      "Bấm mấy lần không qua thì nó dừng và nói rõ, không quay vòng vô ích.",
     ],
   },
 ];

@@ -7,7 +7,8 @@ import {
   pingGithubStationAction,
   revealGithubStationPatAction,
   runKeepaliveAction,
-  saveGithubStationAction,
+  provisionGithubStationAction,
+  updateGithubStationAction,
   type StationResult,
   type StationView,
 } from "@/app/actions/githubStations";
@@ -24,7 +25,6 @@ import {
   SCHEDULE_DISABLE_DAYS,
   type CountdownLevel,
 } from "@/lib/validation/githubStations";
-import { MAX_COMPANION_COUNT } from "@/lib/validation/githubNurture";
 
 /**
  * Tab Kho GitHub — sổ tài khoản đang giữ khôi lỗi chạy trên Actions (deploy/github-actions.md §7).
@@ -241,7 +241,6 @@ function CompanionRepoStatus({
 }
 
 export function GithubStationPanel({ stations }: { stations: StationView[] }) {
-  const [saveState, saveAction, saving] = useActionState<StationResult | null, FormData>(saveGithubStationAction, null);
   const [pingState, pingAction, pinging] = useActionState<StationResult | null, FormData>(pingGithubStationAction, null);
   const [deleteState, deleteAction, deleting] = useActionState<StationResult | null, FormData>(deleteGithubStationAction, null);
   const [loopState, loopAction, looping] = useActionState<StationResult | null, FormData>(runKeepaliveAction, null);
@@ -276,7 +275,7 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
     .filter((part): part is string => part !== null)
     .join(" · ");
 
-  const notice = [saveState, pingState, deleteState, loopState].find((s) => s !== null);
+  const notice = [pingState, deleteState, loopState].find((s) => s !== null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -316,9 +315,7 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
 
         {stations.length === 0 ? (
           <p className="text-sm text-[var(--color-mist)]">
-            Sổ còn trống, nên chưa kho nào được nuôi. Đường ngắn nhất: bấm đúp{" "}
-            <code>new-github-khoiloi.bat</code> ở gốc repo — nhập đúng một PAT, nó tự dựng kho, tự
-            đặt tên, rồi tự ghi vào sổ này. Form dưới dành cho kho đã có sẵn.
+            Sổ còn trống. Dùng form bên dưới để tạo repo GitHub, cài workflow và đăng ký kho vào vòng nuôi.
           </p>
         ) : (
           <>
@@ -420,155 +417,124 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
         )}
       </section>
 
-      <section className="card card-hairline max-w-2xl p-6">
-        <h2 className="h-display mb-5 text-lg font-semibold text-gilded">
-          {editing ? `Sửa kho「${editing.slug}」` : "Ghi kho mới"}
-        </h2>
-        {/* key ép React dựng lại form khi đổi giữa thêm/sửa — defaultValue chỉ đọc lúc mount. */}
-        <form key={editing?.slug ?? "new"} action={saveAction} className="flex flex-col gap-4">
-          <div className="flex flex-wrap gap-4">
-            <div className="min-w-[12rem] flex-1">
-              <label className="label" htmlFor="station-owner">
-                Tài khoản GitHub
-              </label>
-              <input
-                id="station-owner"
-                name="owner"
-                className="input w-full font-mono"
-                placeholder="zhangyu4"
-                defaultValue={editing?.owner ?? ""}
-                readOnly={editing !== null}
-                required
-              />
-            </div>
-            <div className="min-w-[12rem] flex-1">
-              <label className="label" htmlFor="station-repo">
-                Tên kho
-              </label>
-              <input
-                id="station-repo"
-                name="repo"
-                className="input w-full font-mono"
-                placeholder="linh-su"
-                defaultValue={editing?.repo ?? ""}
-                readOnly={editing !== null}
-                required
-              />
-            </div>
-          </div>
-          {editing && (
-            <p className="-mt-2 text-xs text-[var(--color-mist)]">
-              Tài khoản và tên kho là danh tính của dòng này nên không sửa được — đổi kho thì xoá dòng
-              cũ rồi ghi dòng mới.
-            </p>
+      <StationEditor key={editing?.slug ?? "new"} station={editing} onNew={() => setEditing(null)} />
+    </div>
+  );
+}
+
+/** A keyed editor keeps create/update action state and secret input isolated per station. */
+function StationEditor({ station, onNew }: { station: StationView | null; onNew: () => void }) {
+  const [state, action, pending] = useActionState<StationResult | null, FormData>(
+    station ? updateGithubStationAction : provisionGithubStationAction,
+    null,
+  );
+  const managed = station?.provisionedBy === "jarvis";
+  return (
+    <section className="card card-hairline w-full max-w-2xl min-w-0 p-4 sm:p-6" aria-labelledby="station-form-title">
+      <h2 id="station-form-title" className="h-display text-lg font-semibold text-gilded">
+        {station ? "Sửa cấu hình kho GitHub" : "Tạo kho GitHub mới"}
+      </h2>
+      <p className="mt-2 mb-5 text-sm text-[var(--color-mist)]">
+        {station
+          ? "Giữ nguyên tài khoản và tên kho. Các kho phụ và lịch sử vận hành được giữ khi cập nhật."
+          : "Jarvis xác định tài khoản từ PAT, tạo repo công khai, đẩy workflow và đưa kho vào vòng nuôi. Tên repo đã tồn tại sẽ dừng trước khi thay đổi."}
+      </p>
+      {state && !pending && (
+        <div role="status" className={`mb-4 rounded-lg border p-3 text-sm break-words ${state.ok ? "border-[rgba(76,201,154,0.4)] text-[var(--color-jade-300)]" : "border-[rgba(255,120,120,0.4)] text-[#f2a0a0]"}`}>
+          <p>{state.message}</p>
+          {state.slug && <p className="mt-1 break-all font-mono">{state.slug}</p>}
+          {!!state.warnings?.length && (
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--color-gold-300)]">
+              {state.warnings.map((warning, index) => <li key={index}>{warning}</li>)}
+            </ul>
           )}
-          <div className="flex flex-wrap gap-4">
-            <div className="min-w-[12rem] flex-1">
-              <label className="label" htmlFor="station-workflow">
-                Tệp workflow
-              </label>
-              <input
-                id="station-workflow"
-                name="workflowFile"
-                className="input w-full font-mono"
-                placeholder={DEFAULT_WORKFLOW_FILE}
-                defaultValue={editing?.workflowFile ?? DEFAULT_WORKFLOW_FILE}
-              />
-            </div>
-            <div className="min-w-[12rem] flex-1">
-              <label className="label" htmlFor="station-worker">
-                WORKER_ID <span className="font-normal">(tuỳ chọn)</span>
-              </label>
-              <input
-                id="station-worker"
-                name="workerId"
-                className="input w-full font-mono"
-                placeholder="github-zhangyu4"
-                defaultValue={editing?.workerId ?? ""}
-              />
-            </div>
-          </div>
-          <fieldset className="rounded-xl border border-[rgba(232,194,92,0.18)] p-4">
-            <legend className="px-1 text-sm font-medium text-[var(--color-parchment)]">
-              Kho phần mềm phụ đã có sẵn
-            </legend>
-            <label className="label" htmlFor="station-companions">Tên repo, mỗi dòng một tên (tuỳ chọn)</label>
-            <textarea
-              id="station-companions"
-              name={editing?.companionRepos.length ? undefined : "companionRepos"}
-              className="input w-full font-mono"
-              rows={3}
-              maxLength={MAX_COMPANION_COUNT * 102}
-              placeholder={"my-existing-project\nanother-project"}
-              defaultValue={editing?.companionRepos.map((companion) => companion.repo).join("\n") ?? ""}
-              readOnly={(editing?.companionRepos.length ?? 0) > 0}
-            />
-            <p className="mt-2 text-xs text-[var(--color-mist)]">
-              Đăng ký 0–{MAX_COMPANION_COUNT} repo cùng tài khoản và PAT với kho khôi lỗi. Để trống để model tự tạo.
-              Các tên đã đăng ký được giữ nguyên khi sửa; quản lý và xoá tại trang chi tiết.
-            </p>
-          </fieldset>
-          <div>
-            <label className="label" htmlFor="station-daily-pushes">
-              Giới hạn lượt đẩy mỗi ngày cho mỗi kho phụ
-            </label>
-            <input
-              id="station-daily-pushes"
-              name="dailyPushes"
-              type="number"
-              min={MIN_DAILY_PUSHES}
-              max={MAX_DAILY_PUSHES}
-              step={1}
-              className="input max-w-[10rem] font-mono"
-              defaultValue={editing?.dailyPushes ?? DEFAULT_DAILY_PUSHES}
-              required
-            />
-            <p className="mt-1 text-xs text-[var(--color-mist)]">
-              {MIN_DAILY_PUSHES}–{MAX_DAILY_PUSHES}; mặc định {DEFAULT_DAILY_PUSHES}. Chọn 0 để tạm
-              dừng nuôi repo phụ mà không tắt kho khôi lỗi chính. Đây là giới hạn tối đa; model không phải đẩy đủ số lượt.
-            </p>
-          </div>
+        </div>
+      )}
+      <form action={action} aria-busy={pending}>
+        <fieldset disabled={pending} className="flex min-w-0 flex-col gap-4">
+          {station && (
+            <>
+              <input type="hidden" name="slug" value={station.slug} />
+              <div className="rounded-lg border border-[var(--color-ink-600)] p-3">
+                <p className="text-xs text-[var(--color-mist)]">Tài khoản / Tên kho (cố định)</p>
+                <p className="mt-1 break-all font-mono text-sm">{station.owner}/{station.repo}</p>
+              </div>
+            </>
+          )}
           <div>
             <label className="label" htmlFor="station-pat">
-              PAT của tài khoản giữ kho{editing && " — để trống là giữ PAT cũ"}
+              {station ? "PAT thay thế (để trống để giữ PAT cũ)" : "PAT GitHub (bắt buộc)"}
             </label>
-            <input
-              id="station-pat"
-              name="pat"
-              type="password"
-              className="input w-full font-mono"
-              placeholder={editing ? "đang giữ một PAT — dán cái mới để thay" : "ghp_… hoặc github_pat_…"}
-              autoComplete="off"
-            />
-            {/* Nói ngay chỗ lấy và scope nào: thiếu `workflow` là lỗi hay gặp nhất của cả lối này,
-                và nó chỉ lộ ra ở đúng bước cuối cùng. */}
+            <input id="station-pat" name="pat" type="password" className="input w-full font-mono" autoComplete="off"
+              required={!station} placeholder={station ? "Dán PAT mới của cùng tài khoản" : "ghp_…"} />
             <p className="mt-1 text-xs text-[var(--color-mist)]">
-              Lấy ở <code>github.com/settings/tokens</code>, đăng nhập ĐÚNG tài khoản giữ kho.{" "}
-              {PAT_SCOPES_NOTE}
+              {station
+                ? <>PAT mới phải thuộc đúng tài khoản đang giữ kho. {PAT_SCOPES_NOTE}</>
+                : <>Tạo classic PAT tại github.com/settings/tokens với đủ quyền <code>repo</code>, <code>workflow</code> và <code>delete_repo</code>. Quyền xoá dùng để thu hồi kho vừa tạo nếu thiết lập thất bại.</>}
             </p>
-            {editing && <PatVault key={editing.slug} slug={editing.slug} />}
+            {station && <PatVault key={station.slug} slug={station.slug} />}
           </div>
-          <label className="flex items-center gap-2 text-sm" htmlFor="station-enabled">
-            <input
-              id="station-enabled"
-              name="enabled"
-              type="checkbox"
-              defaultChecked={editing ? editing.enabled : true}
-            />
-            Nằm trong vòng nuôi hằng ngày
-          </label>
-          <div className="flex gap-3">
-            <button type="submit" className="btn btn-gold" disabled={saving}>
-              {saving ? "Đang ghi + ngó kho…" : editing ? "Cập nhật kho" : "Ghi vào sổ"}
+          {!station && (
+            <div>
+              <label className="label" htmlFor="station-repo">Tên repo (tuỳ chọn)</label>
+              <input id="station-repo" name="repo" className="input w-full font-mono" maxLength={100} placeholder="Để trống để tạo tên ngẫu nhiên" />
+              <p className="mt-1 text-xs text-[var(--color-mist)]">Mặc định: tên ngẫu nhiên. Tên này cũng là WORKER_ID.</p>
+            </div>
+          )}
+          {managed ? (
+            <div className="rounded-lg border border-[var(--color-ink-600)] p-3 text-sm">
+              <p className="text-xs text-[var(--color-mist)]">Cấu hình do Jarvis tạo (cố định)</p>
+              <p className="mt-1 break-all font-mono">Workflow: {station.workflowFile}</p>
+              <p className="break-all font-mono">WORKER_ID: {station.workerId}</p>
+            </div>
+          ) : (
+            <div className="flex min-w-0 flex-wrap gap-4">
+              <div className="min-w-0 basis-48 flex-1">
+                <label className="label" htmlFor="station-workflow">Tệp workflow{!station && " (tuỳ chọn)"}</label>
+                <input id="station-workflow" name="workflowFile" className="input w-full font-mono" maxLength={100}
+                  defaultValue={station?.workflowFile ?? ""} placeholder={DEFAULT_WORKFLOW_FILE} required={!!station} />
+                <p className="mt-1 text-xs text-[var(--color-mist)]">
+                  {station ? "Nhập đúng tên workflow đang có trong kho." : `Để trống dùng ${DEFAULT_WORKFLOW_FILE}. Chỉ nhập tên tệp .yml hoặc .yaml.`}
+                </p>
+              </div>
+              {station && (
+                <div className="min-w-0 basis-48 flex-1">
+                  <label className="label" htmlFor="station-worker">WORKER_ID (tuỳ chọn)</label>
+                  <input id="station-worker" name="workerId" className="input w-full font-mono" maxLength={120} defaultValue={station.workerId} />
+                  <p className="mt-1 text-xs text-[var(--color-mist)]">Kho đăng ký từ trước: sửa để khớp workflow đang chạy.</p>
+                </div>
+              )}
+            </div>
+          )}
+          <div>
+            <label className="label" htmlFor="station-daily-pushes">Giới hạn lượt đẩy mỗi ngày cho mỗi kho phụ{!station && " (tuỳ chọn)"}</label>
+            <input id="station-daily-pushes" name="dailyPushes" type="number" min={MIN_DAILY_PUSHES} max={MAX_DAILY_PUSHES} step={1}
+              className="input w-full max-w-[10rem] font-mono" defaultValue={station?.dailyPushes ?? ""} placeholder={String(DEFAULT_DAILY_PUSHES)} required={!!station} />
+            <p className="mt-1 text-xs text-[var(--color-mist)]">
+              {MIN_DAILY_PUSHES}–{MAX_DAILY_PUSHES}; mặc định {DEFAULT_DAILY_PUSHES}. Chọn 0 để tạm dừng nuôi kho phụ. Model không phải đẩy đủ số lượt.
+            </p>
+          </div>
+          {station && (
+            <>
+              <p className="text-xs text-[var(--color-mist)]">
+                Đang giữ {station.companionRepos.length} kho phụ. <Link className="underline" href={`/admin/github/${encodeURIComponent(station.owner)}/${encodeURIComponent(station.repo)}`}>Quản lý kho phụ tại trang chi tiết</Link>.
+              </p>
+              <input type="hidden" name="enabledPresent" value="1" />
+              <label className="flex items-center gap-2 text-sm" htmlFor="station-enabled">
+                <input id="station-enabled" name="enabled" type="checkbox" defaultChecked={station.enabled} />
+                Nằm trong vòng nuôi hằng ngày
+              </label>
+            </>
+          )}
+          <div className="flex flex-wrap gap-3">
+            <button type="submit" className="btn btn-gold" disabled={pending}>
+              {pending ? station ? "Đang cập nhật…" : "Đang tạo repo + workflow…" : station ? "Cập nhật kho" : "Tạo repo + workflow"}
             </button>
-            {editing && (
-              <button type="button" className="btn btn-ghost" onClick={() => setEditing(null)}>
-                Thôi, ghi kho mới
-              </button>
-            )}
+            {station && <button type="button" className="btn btn-ghost" onClick={onNew}>Tạo kho mới</button>}
           </div>
-        </form>
-      </section>
-    </div>
+        </fieldset>
+        {pending && <p role="status" className="mt-3 text-sm text-[var(--color-mist)]">{station ? "Đang lưu và kiểm tra workflow…" : "Đang tạo repo, đẩy workflow và đăng ký kho. Lượt tạo có thể mất tối đa 4 phút."}</p>}
+      </form>
+    </section>
   );
 }

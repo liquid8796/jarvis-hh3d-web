@@ -364,7 +364,23 @@ mang phong bì, nên mở tab admin vẫn không kéo PAT nào xuống trình du
 ô nhập: ô ấy để trống mới đúng nghĩa「giữ PAT cũ」, và đổ token vào đó nghĩa là lượt bấm「Cập nhật
 kho」kế tiếp sẽ đẩy ngược chính bí mật vừa xem lên máy chủ để mã hoá lại mà chẳng được gì.
 
-### Thêm một khôi lỗi: bấm đúp `new-github-khoiloi.bat`
+### Tạo kho GitHub từ admin hoặc `new-github-khoiloi.bat`
+
+Từ **1.3.72**, **Tông Môn → Kho GitHub → Tạo kho GitHub mới** tạo repo công khai thật,
+đẩy source/workflow, đặt secret, ghi sổ rồi khởi chạy. Tài khoản được lấy từ PAT; không nhập
+owner hoặc WORKER_ID. Nếu repo đã tồn tại hoặc không xác minh được trạng thái, lượt tạo dừng
+trước mọi thay đổi trên GitHub.
+
+| Mục | Bỏ trống |
+|---|---|
+| PAT | Bắt buộc classic PAT có `repo`, `workflow`, `delete_repo` |
+| Tên repo | Sinh tên ngẫu nhiên; WORKER_ID dùng đúng tên repo |
+| Tệp workflow | `linh-su.yml`; có thể dùng basename `.yml`/`.yaml` khác |
+| Giới hạn lượt đẩy mỗi kho phụ | `5`; chấp nhận `0..24`, `0` tạm dừng kho phụ |
+
+Tên workflow được dùng cả lúc khởi chạy, tự gọi lượt kế và deploy sau này. Workflow/WORKER_ID
+của repo do luồng mới tạo được khóa trong form Sửa; các dòng đăng ký cũ vẫn có thể chỉnh để
+khớp repo đang có. Thay PAT khi sửa phải dùng token của cùng tài khoản.
 
 > **16/08/2026 — bốn công cụ trong tài liệu này nay CHẠY TRÊN VM.** Sổ Kho GitHub nằm trong
 > Postgres của backend, mà Postgres ấy chỉ nghe `127.0.0.1` trên `jarvis-oci-01`. Nên
@@ -382,25 +398,31 @@ kho」kế tiếp sẽ đẩy ngược chính bí mật vừa xem lên máy ch�
 >   `/var/log/auth.log`, nên `sudo -u jarvis env GITHUB_PAT=…` là chép một PAT có quyền
 >   `repo`+`workflow`+`delete_repo` vào một tệp log dạng chữ.
 
-Nó hỏi đúng MỘT thứ — PAT của tài khoản GitHub sẽ giữ kho — rồi làm trọn: suy tên tài khoản từ
-chính token, rút tên kho chính (dùng luôn cho `WORKER_ID`), dựng kho
-(gọi lại `newGithubKhoiloi.mjs`), dán secret, bấm chạy lượt đầu, **ghi kho vào sổ ở trạm đang
-hoạt động**, rồi ngó một lượt để chứng minh PAT push được. Sau đó runtime Ollama tạo kho phụ
-theo cấu hình đã lưu. Xem trước mà chưa tạo gì:
-`npm run github:new -- --dry-run --owner <tài-khoản>`.
+Launcher hỏi PAT ở chế độ ẩn rồi hỏi ba mục tùy chọn, kể cả khi PAT đã có trong environment.
+Giá trị được kiểm tra trước khi đưa sang VM. UI và `github:new` dùng chung service
+`src/lib/services/githubProvisioning.ts`; UI đọc source từ release đang phục vụ, CLI đọc Git
+HEAD. UI dùng lockfile dựng sẵn khi build; CLI tự sinh từ cùng source HEAD, kể cả khi ops-repo
+chưa từng được build. Xem trước mà không tạo repo:
+
+```sh
+npm run github:new -- --dry-run --owner example-owner --repo example-repo --workflow-file nightly.yaml --daily-pushes 7
+```
+
+`--owner` chỉ dùng cho dry-run không PAT. Chạy thật lấy owner từ `GITHUB_PAT`. Launcher giữ
+`--dry-run` và `--no-pause`; ba giá trị tùy chọn được hỏi trực tiếp.
 
 #### Tạo kho chính và bổ sung kho phụ bằng Ollama (10/09/2026)
 
-`newGithubKhoiloi.mjs` chỉ dựng kho khôi lỗi chính. `newGithubStation.mts` ghi station với
-`companionRepos: []` và `companionCountOverride: null`, rồi gọi `runLlmCompanionNurture` cho
-đúng station ấy. Số repo phần mềm được quyết định bởi cấu hình, không còn một cặp template cố
-định. Cờ `--companion-repo` ở builder cũ bị từ chối kèm hướng dẫn chuyển sang runtime.
+Service provisioning chung ghi station với `companionRepos: []` và `companionCountOverride:
+null`, rồi gọi một lượt `runLlmCompanionNurture` cho đúng station ấy. Phần còn thiếu được cron
+bổ sung sau. `newGithubKhoiloi.mjs` còn dành cho caller cũ và kiểm payload dry-run; UI/launcher
+mới không gọi luồng tạo live riêng của script cũ.
 
-Script dựng và commit thử cây worker trước khi chạm GitHub. `repo create` và `git push` là hai bước
-riêng: một slug chỉ vào danh sách rollback **sau khi create trả thành công**. Nếu create rơi mạng ở
-ranh giới mơ hồ, script không probe rồi suy rằng repo cùng tên là của mình — nó dừng, dọn các slug
-đã xác nhận trước đó và chỉ đưa URL để người vận hành kiểm tra. Push/secret hỏng thì xoá ngược mọi
-repo đã xác nhận do chính lượt ấy tạo; preflight `delete_repo` đứng trước repo đầu tiên.
+Lượt tạo kiểm PAT/quyền, trùng tên, payload và công cụ trước khi tạo repo. Git và `gh` chạy bất
+đồng bộ, PAT qua environment/header và secret qua stdin. Deadline chung là 240 giây, trong đó
+30 giây dự phòng dọn dẹp. Repo chỉ được rollback khi create trả thành công rõ ràng; trước khi
+xóa phải khớp ID/HEAD và không có station tham chiếu, sau xóa phải xác minh 404. Kết quả mơ hồ
+yêu cầu kiểm tra repo theo slug trước khi thử lại.
 
 Kho chính đã được ghi sổ sẽ được giữ lại nếu Ollama lỗi hoặc hết thời gian. Không chạy lại
 `github:new` để bù kho phụ, vì lệnh đó dựng thêm một khôi lỗi. Dùng:

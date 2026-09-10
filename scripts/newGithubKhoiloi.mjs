@@ -64,6 +64,7 @@ if (!owner) {
  */
 const generatedName = randomSoftwareName();
 const repoName = arg("repo", generatedName);
+const workflowFile = arg("workflow-file", "linh-su.yml");
 /**
  * WORKER_ID mặc định suy từ tên tài khoản, không phải một chuỗi cố định — trùng id thì hai tiến
  * trình ghi đè nhau trong bảng `workers` và mục Khôi Lỗi nói dối về việc ai đang trực. Suy ra
@@ -71,6 +72,15 @@ const repoName = arg("repo", generatedName);
  */
 const workerId = arg("worker-id", repoName === generatedName ? generatedName : repoName);
 const slug = `${owner}/${repoName}`;
+if (
+  workflowFile.length > 100 ||
+  workflowFile.includes("/") ||
+  workflowFile.includes("\\") ||
+  !/^[A-Za-z0-9][A-Za-z0-9._-]*\.ya?ml$/.test(workflowFile)
+) {
+  console.error("--workflow-file must be a safe .yml or .yaml basename.\nKHONG tao gi ca.");
+  process.exit(1);
+}
 if (argv.includes("--companion-repo")) {
   console.error(
     "Cờ --companion-repo đã được bỏ. Kho phụ do runtime Ollama tạo theo cấu hình sau khi trạm được ghi vào sổ.\n" +
@@ -411,7 +421,7 @@ try {
   // Lượt giải cây phụ thuộc nằm bên trong `buildKhoiloiPayload`; báo trước vì nó là bước lâu nhất
   // của cả lượt dựng — npm phải hỏi registry.
   console.log("── Dựng gói + giải cây phụ thuộc (package-lock.json)…");
-  const payload = buildKhoiloiPayload({ repoRoot, workerId, webUrl });
+  const payload = buildKhoiloiPayload({ repoRoot, workerId, webUrl, workflowFile });
 
   for (const [rel, bytes] of payload) {
     const full = path.join(staging, rel);
@@ -583,7 +593,7 @@ try {
   let dispatched = false;
   for (let attempt = 1; attempt <= 3 && !dispatched; attempt += 1) {
     try {
-      run("gh", ["workflow", "run", "linh-su.yml", "--repo", slug], { cwd: staging, quiet: true });
+      run("gh", ["workflow", "run", workflowFile, "--repo", slug], { cwd: staging, quiet: true });
       dispatched = true;
     } catch (err) {
       if (attempt < 3) {

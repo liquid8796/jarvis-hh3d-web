@@ -12,10 +12,11 @@
  * bấm đúp), nên nó không nhập nổi TypeScript. Bên phát hành chạy bằng `tsx` nên nhập được cả hai
  * chiều.
  *
- * ── BYTES LẤY TỪ BLOB `HEAD`, KHÔNG LẤY TỪ CÂY LÀM VIỆC ──────────────────────────────────────
+ * ── HAI NGUỒN BYTES, CÙNG MỘT GÓI ─────────────────────────────────────────────────────────────
  *
- * Đây là điều đổi so với bản trước (bản ấy `cpSync` thẳng từ cây làm việc), và nó sửa một sai
- * lệch có thật:
+ * CLI/phát hành lấy bytes từ blob `HEAD`, không lấy từ cây làm việc. Web tạo kho lấy bytes từ
+ * cây release bất biến đã đóng gói, nơi không có `.git`; adapter ấy chỉ đọc allowlist và từ chối
+ * symlink/path escape. Phần HEAD sửa một sai lệch có thật của bản cũ (`cpSync` cây làm việc):
  *
  *   • **Kết thúc dòng.** Máy Windows này có `core.autocrlf` bật, nên cây làm việc mang CRLF trong
  *     khi blob git mang LF. Lượt dựng cũ chép CRLF vào thư mục tạm rồi `git add` chuyển ngược về
@@ -34,10 +35,20 @@
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  lstatSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { PACKAGE_NAME } from "./khoiloiNaming.mjs";
+
+/** @typedef {{ read: (relPath: string) => Buffer, list: (prefix: string) => string[] }} PayloadSource */
 
 /**
  * Những gì được chép NGUYÊN từ kho gốc sang kho khôi lỗi, giữ nguyên bố cục thư mục.
@@ -76,6 +87,10 @@ export const OWNED_PREFIXES = Object.freeze(["scripts/", "src/"]);
 /** Bản mẫu workflow trong kho gốc — NGOÀI `.github/workflows/`, xem `deploy/github-actions.md` §4. */
 export const WORKFLOW_TEMPLATE_PATH = "deploy/github/linh-su.yml";
 
+/** Lockfile dựng sẵn cho lối tạo kho từ immutable web release. */
+export const GITHUB_PROVISIONING_LOCK_ARTIFACT_PATH =
+  "public/linh-su/github-provisioning-lock.json";
+
 /**
  * Chỗ workflow nằm trong kho khôi lỗi.
  *
@@ -83,7 +98,10 @@ export const WORKFLOW_TEMPLATE_PATH = "deploy/github/linh-su.yml";
  * dùng hằng số bên ấy để hỏi trạng thái lịch. Không nhập được (bên ấy là TypeScript), nên bên phát
  * hành đối chiếu hai giá trị lúc chạy; xem `assertWorkflowPathAgrees`.
  */
-export const WORKFLOW_TARGET_PATH = ".github/workflows/linh-su.yml";
+export const workflowTargetPath = (workflowFile = "linh-su.yml") =>
+  `.github/workflows/${workflowFile}`;
+
+export const WORKFLOW_TARGET_PATH = workflowTargetPath();
 
 /** Tệp SINH RA (không chép từ kho gốc) — cũng là ranh giới xoá cho lượt phát hành. */
 export const FIXED_FILES = Object.freeze([
@@ -117,9 +135,10 @@ function git(repoRoot, args, encoding = "utf8") {
  * System.Text.Json xuất ra) trong khi mọi tệp .mjs mang LF. Đọc thành chuỗi rồi ghi lại là mời
  * một phép chuẩn hoá không ai gọi đến chen vào giữa.
  */
+/** @returns {Buffer} */
 export function readCommittedFile(repoRoot, relPath) {
   try {
-    return git(repoRoot, ["show", `HEAD:${relPath}`], "buffer");
+    return /** @type {Buffer} */ (git(repoRoot, ["show", `HEAD:${relPath}`], "buffer"));
   } catch (err) {
     throw new Error(
       `Không đọc được \`${relPath}\` từ HEAD — tệp chưa commit, vừa bị đổi tên, hoặc đã bị xoá.\n` +
@@ -132,6 +151,116 @@ export function readCommittedFile(repoRoot, relPath) {
 function committedPathsUnder(repoRoot, prefix) {
   const out = git(repoRoot, ["ls-tree", "-r", "--name-only", "HEAD", "--", prefix]);
   return out.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
+}
+
+/**
+ * Nguồn payload đã commit dành cho CLI/phát hành. Giữ nguyên phép đọc `git show HEAD` cũ,
+ * nhưng gom `read`/`list` thành cùng giao diện với bản phát hành bất biến của web.
+ */
+/** @returns {Readonly<PayloadSource>} */
+export function gitHeadPayloadSource(repoRoot) {
+  return Object.freeze({
+    read: (relPath) => readCommittedFile(repoRoot, relPath),
+    list: (prefix) => committedPathsUnder(repoRoot, prefix),
+  });
+}
+
+const FILESYSTEM_SOURCE_INPUTS = Object.freeze([
+  ...COPIED_PATHS,
+  WORKFLOW_TEMPLATE_PATH,
+  "package.json",
+]);
+
+const normalizePayloadPath = (relPath) => {
+  if (typeof relPath !== "string" || relPath.length === 0 || relPath.includes("\\")) {
+    throw new Error("Đường dẫn payload nằm ngoài phạm vi cho phép.");
+  }
+  const normalized = path.posix.normalize(relPath);
+  if (
+    normalized === "." ||
+    normalized === ".." ||
+    normalized.startsWith("../") ||
+    path.posix.isAbsolute(normalized)
+  ) {
+    throw new Error(`Đường dẫn payload \`${relPath}\` escape khỏi thư mục phát hành.`);
+  }
+  return normalized;
+};
+
+const allowedFilesystemInput = (relPath) =>
+  FILESYSTEM_SOURCE_INPUTS.some(
+    (input) => relPath === input || relPath.startsWith(`${input}/`),
+  );
+
+/**
+ * Nguồn payload từ cây tệp của một release đã đóng gói, nơi không có thư mục `.git`.
+ * Chỉ các đầu vào đã liệt kê của gói được đọc; mọi liên kết tượng trưng và đường thoát gốc
+ * đều bị từ chối trước khi đọc một byte.
+ */
+/** @returns {Readonly<PayloadSource>} */
+export function filesystemPayloadSource(repoRoot) {
+  const root = realpathSync(repoRoot);
+
+  const resolveAllowed = (relPath) => {
+    const normalized = normalizePayloadPath(relPath);
+    if (!allowedFilesystemInput(normalized)) {
+      throw new Error(`\`${normalized}\` không nằm trong phạm vi payload cho phép.`);
+    }
+
+    let current = root;
+    for (const segment of normalized.split("/")) {
+      current = path.join(current, segment);
+      const stat = lstatSync(current);
+      if (stat.isSymbolicLink()) {
+        throw new Error(`Payload không cho phép symbolic link: \`${normalized}\`.`);
+      }
+    }
+
+    const resolved = realpathSync(current);
+    const relative = path.relative(root, resolved);
+    if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      throw new Error(`Đường dẫn payload \`${normalized}\` escape khỏi thư mục phát hành.`);
+    }
+    return { normalized, resolved };
+  };
+
+  const listFiles = (relPath) => {
+    const { normalized, resolved } = resolveAllowed(relPath);
+    const stat = lstatSync(resolved);
+    if (stat.isFile()) return [normalized];
+    if (!stat.isDirectory()) throw new Error(`Payload chỉ đọc tệp hoặc thư mục: \`${normalized}\`.`);
+
+    const files = [];
+    const visit = (directory, prefix) => {
+      const entries = readdirSync(directory, { withFileTypes: true })
+        .sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+      for (const entry of entries) {
+        const childRel = `${prefix}/${entry.name}`;
+        if (entry.isSymbolicLink()) {
+          throw new Error(`Payload không cho phép symbolic link: \`${childRel}\`.`);
+        }
+        const child = path.join(directory, entry.name);
+        if (entry.isDirectory()) visit(child, childRel);
+        else if (entry.isFile()) files.push(childRel);
+        else throw new Error(`Payload chỉ đọc tệp thường: \`${childRel}\`.`);
+      }
+    };
+    visit(resolved, normalized);
+    return files.sort();
+  };
+
+  return Object.freeze({
+    read(relPath) {
+      const { normalized, resolved } = resolveAllowed(relPath);
+      if (!lstatSync(resolved).isFile()) {
+        throw new Error(`Payload cần một tệp thường tại \`${normalized}\`.`);
+      }
+      return readFileSync(resolved);
+    },
+    list(prefix) {
+      return listFiles(prefix);
+    },
+  });
 }
 
 /**
@@ -158,10 +287,16 @@ export function uncommittedPayloadPaths(repoRoot) {
  * phép thay bằng biểu thức chính quy hỏng LẶNG LẼ khi hình dạng bản mẫu đổi: nó chỉ đơn giản là
  * không thay gì cả, và kho phát ra mang `WORKER_ID` của bản mẫu — tức trùng id với một kho khác.
  */
-export function renderWorkflow({ template, workerId, webUrl }) {
+export function renderWorkflow({ template, workerId, webUrl, workflowFile = "linh-su.yml" }) {
+  const templateDispatchTarget = "/actions/workflows/linh-su.yml/dispatches";
+  const renderedDispatchTarget = `/actions/workflows/${workflowFile}/dispatches`;
+  if (!template.includes(templateDispatchTarget)) {
+    throw new Error("Workflow template is missing its self-dispatch target.");
+  }
   const workflow = template
     .replace(/^(\s*WORKER_ID:\s*).*$/m, `$1${workerId}`)
-    .replace(/\$\{\{ vars\.WEB_URL \|\| '[^']*' \}\}/, `\${{ vars.WEB_URL || '${webUrl}' }}`);
+    .replace(/\$\{\{ vars\.WEB_URL \|\| '[^']*' \}\}/, `\${{ vars.WEB_URL || '${webUrl}' }}`)
+    .replaceAll(templateDispatchTarget, renderedDispatchTarget);
 
   if (!workflow.includes(`WORKER_ID: ${workerId}`)) {
     throw new Error(
@@ -174,6 +309,9 @@ export function renderWorkflow({ template, workerId, webUrl }) {
       `Không thay được WEB_URL trong workflow — hình dạng bản mẫu đã đổi. Kho sẽ gọi về địa chỉ ` +
         `mặc định của bản mẫu thay vì ${webUrl}.`,
     );
+  }
+  if (!workflow.includes(renderedDispatchTarget) || (workflowFile !== "linh-su.yml" && workflow.includes(templateDispatchTarget))) {
+    throw new Error("Workflow self-dispatch target does not match the configured workflow filename.");
   }
   if (!/^\s*WORKER_FALLBACK_URL:\s*\$\{\{\s*vars\.WORKER_FALLBACK_URL\s*\|\|\s*'https:\/\/[^']+'\s*\}\}\s*$/m.test(workflow)) {
     throw new Error(
@@ -255,6 +393,19 @@ export function renderPackageJsonFor(repoRoot) {
   });
 }
 
+/** Dựng package.json từ cùng nguồn bytes mà payload đã chọn. */
+export function renderPackageJsonForSource(source) {
+  const sourcePackage = JSON.parse(source.read("package.json").toString("utf8"));
+  const sourcePlaywrightVersion = sourcePackage.dependencies?.["playwright-core"];
+  if (typeof sourcePlaywrightVersion !== "string" || sourcePlaywrightVersion.length === 0) {
+    throw new Error("package.json của nguồn payload không khai `playwright-core` — không dựng gói được.");
+  }
+  return renderPackageJson({
+    playwrightVersion: sourcePlaywrightVersion,
+    version: sourcePackage.version,
+  });
+}
+
 /** Bản `playwright-core` mà kho gốc đang ghim — kho khôi lỗi phải cài đúng bản ấy. */
 export function playwrightVersionOf(repoRoot) {
   const version = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"))
@@ -300,7 +451,11 @@ export function generateLockfile(packageJson) {
     );
   } finally {
     try {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      const resolved = realpathSync(dir);
+      if (path.dirname(resolved) !== realpathSync(tmpdir()) || !path.basename(resolved).startsWith("khoiloi-lock-")) {
+        throw new Error("Unowned lockfile staging directory.");
+      }
+      rmSync(resolved, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     } catch {
       // Bỏ quên một thư mục tạm vài chục KB là chuyện vặt; đánh sập lượt chạy vì nó thì không.
     }
@@ -349,30 +504,61 @@ export function assertImportsResolve(files) {
 }
 
 /**
+ * Vẽ hai tệp mang danh tính riêng của một trạm lên gói nền, không đổi gói nền và không đụng
+ * những workflow khác do kho tự quản.
+ */
+export function stationKhoiloiPayload({
+  basePayload,
+  template,
+  workerId,
+  webUrl,
+  workflowFile = "linh-su.yml",
+}) {
+  const files = new Map(basePayload);
+  files.delete(WORKFLOW_TARGET_PATH);
+  files.set(
+    workflowTargetPath(workflowFile),
+    Buffer.from(renderWorkflow({ template, workerId, webUrl, workflowFile }), "utf8"),
+  );
+  files.set("README.md", Buffer.from(renderReadme({ workerId, webUrl }), "utf8"));
+  return files;
+}
+
+/**
  * Dựng trọn gói của MỘT kho khôi lỗi: `Map<đường dẫn, Buffer>`, đường dẫn kiểu POSIX.
  *
  * `lockfile` truyền vào được để lượt phát hành giải cây phụ thuộc ĐÚNG MỘT LẦN rồi dùng lại cho
  * mọi kho — nó giống nhau ở mọi kho (chỉ phụ thuộc bản `playwright-core`), mà mỗi lượt gọi npm là
  * vài giây.
  */
-export function buildKhoiloiPayload({ repoRoot, workerId, webUrl, lockfile }) {
+export function buildKhoiloiPayload({
+  repoRoot,
+  source = gitHeadPayloadSource(repoRoot),
+  workerId,
+  webUrl,
+  workflowFile = "linh-su.yml",
+  lockfile,
+}) {
   const files = new Map();
 
   for (const prefix of COPIED_PATHS) {
-    const paths = committedPathsUnder(repoRoot, prefix);
+    const paths = source.list(prefix);
     if (paths.length === 0) {
       throw new Error(
-        `\`${prefix}\` không có tệp nào đã commit trong HEAD — danh sách COPIED_PATHS đã lạc hậu ` +
+        `\`${prefix}\` không có tệp nào trong nguồn payload — danh sách COPIED_PATHS đã lạc hậu ` +
           "so với kho gốc (tệp vừa bị dời hay đổi tên?).",
       );
     }
-    for (const relPath of paths) files.set(relPath, readCommittedFile(repoRoot, relPath));
+    for (const relPath of paths) files.set(relPath, source.read(relPath));
   }
 
-  const packageJson = renderPackageJsonFor(repoRoot);
-  const template = readCommittedFile(repoRoot, WORKFLOW_TEMPLATE_PATH).toString("utf8");
+  const packageJson = renderPackageJsonForSource(source);
+  const template = source.read(WORKFLOW_TEMPLATE_PATH).toString("utf8");
 
-  files.set(WORKFLOW_TARGET_PATH, Buffer.from(renderWorkflow({ template, workerId, webUrl }), "utf8"));
+  files.set(
+    workflowTargetPath(workflowFile),
+    Buffer.from(renderWorkflow({ template, workerId, webUrl, workflowFile }), "utf8"),
+  );
   files.set("package.json", Buffer.from(packageJson, "utf8"));
 
   /**

@@ -68,12 +68,12 @@ import {
   WORKFLOW_TEMPLATE_PATH,
   buildKhoiloiPayload,
   generateLockfile,
+  gitHeadPayloadSource,
   gitBlobSha,
-  readCommittedFile,
-  renderPackageJsonFor,
-  renderReadme,
-  renderWorkflow,
+  renderPackageJsonForSource,
+  stationKhoiloiPayload,
   uncommittedPayloadPaths,
+  workflowTargetPath,
 } from "./khoiloiPayload.mjs";
 import { loadEnv } from "./loadEnv.mjs";
 
@@ -155,7 +155,7 @@ const die = (message: string): never => {
  * chạy mã mới nhưng lịch của nó chết dần mà không ai thấy. Rẻ hơn nhiều so với việc phát hiện
  * bằng mắt ba tuần sau.
  */
-if (WORKFLOW_TARGET_PATH !== `.github/workflows/${DEFAULT_WORKFLOW_FILE}`) {
+if (workflowTargetPath(DEFAULT_WORKFLOW_FILE) !== WORKFLOW_TARGET_PATH) {
   die(
     `Hai hằng số workflow đã trôi khỏi nhau:\n` +
       `  khoiloiPayload.mjs   → ${WORKFLOW_TARGET_PATH}\n` +
@@ -298,7 +298,8 @@ console.log("\n── Giải cây phụ thuộc một lần cho mọi kho…");
  * Lockfile giải MỘT LẦN rồi dùng lại: nó chỉ phụ thuộc bản `playwright-core`, giống hệt nhau ở
  * mọi kho, mà mỗi lượt gọi npm là vài giây.
  */
-const lockfile = generateLockfile(renderPackageJsonFor(repoRoot));
+const payloadSource = gitHeadPayloadSource(repoRoot);
+const lockfile = generateLockfile(renderPackageJsonForSource(payloadSource));
 
 /**
  * Gói NỀN dựng một lần với một `workerId` giả. Hai tệp mang danh tính riêng của từng kho —
@@ -306,22 +307,13 @@ const lockfile = generateLockfile(renderPackageJsonFor(repoRoot));
  * chỉ chạy đúng một lần thay vì một lần cho mỗi kho.
  */
 const basePayload = buildKhoiloiPayload({
+  source: payloadSource,
   repoRoot,
   workerId: "khoiloi-mau",
   webUrl: "https://mau.invalid",
   lockfile,
 });
-const workflowTemplate = readCommittedFile(repoRoot, WORKFLOW_TEMPLATE_PATH).toString("utf8");
-
-function payloadFor(workerId: string, webUrl: string): Map<string, Buffer> {
-  const files = new Map(basePayload);
-  files.set(
-    WORKFLOW_TARGET_PATH,
-    Buffer.from(renderWorkflow({ template: workflowTemplate, workerId, webUrl }), "utf8"),
-  );
-  files.set("README.md", Buffer.from(renderReadme({ workerId, webUrl }), "utf8"));
-  return files;
-}
+const workflowTemplate = payloadSource.read(WORKFLOW_TEMPLATE_PATH).toString("utf8");
 
 // ---- 4. Cửa gọi GitHub ------------------------------------------------------------------------
 
@@ -636,7 +628,13 @@ async function deployOne(station: Station): Promise<Outcome> {
     }
 
     // 5.4 — Kế hoạch.
-    const files = payloadFor(workerId, webUrl);
+    const files = stationKhoiloiPayload({
+      basePayload,
+      template: workflowTemplate,
+      workerId,
+      webUrl,
+      workflowFile: station.workflowFile,
+    });
     const localShas = new Map<string, string>();
     for (const [path, bytes] of files) localShas.set(path, gitBlobSha(bytes));
 

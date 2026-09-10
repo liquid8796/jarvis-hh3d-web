@@ -103,6 +103,11 @@ check(
     creator.includes('GIT_TERMINAL_PROMPT: "0"'),
   "split git push authenticates through gh without exposing PAT or opening an interactive prompt",
 );
+check(
+  /buildKhoiloiPayload\(\{[^}]*workflowFile/s.test(creator) &&
+    /\["workflow", "run", workflowFile,/.test(creator),
+  "custom workflow filename reaches both the payload and initial dispatch",
+);
 const rollbackCheckIndex = creator.indexOf("assertGhCanRollback();");
 const stagingIndex = creator.indexOf("const stagingRoot = mkdtempSync");
 check(

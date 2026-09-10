@@ -19,5 +19,6 @@ next-env.d.ts
 
 # Gói khôi lỗi — sinh ra ở prebuild từ scripts/buildWorkerBundle.mjs, không commit
 /public/linh-su/goi-linh-su.tgz
+/public/linh-su/github-provisioning-lock.json
 
 .env*

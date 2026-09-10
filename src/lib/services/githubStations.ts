@@ -702,7 +702,7 @@ export async function pingStation(
  * vòng là nuốt mất lượt sửa ấy — đúng loại mất mát không ai phát hiện ra cho tới lượt nuôi sau.
  * Dòng đã bị xoá giữa chừng thì lặng lẽ bỏ qua: nó không còn là việc của ai nữa.
  */
-async function recordPing(result: StationPing, now: Date): Promise<void> {
+async function recordPing(result: StationPing, now: Date, options: GithubCallOptions = {}): Promise<void> {
   await mutateGithubState((settings) => {
     const station = settings.githubStations.find((s) => stationSlug(s) === result.slug);
     if (!station) return;
@@ -711,7 +711,7 @@ async function recordPing(result: StationPing, now: Date): Promise<void> {
     station.lastPingNote = result.note;
     station.workflowState = result.workflowState;
     if (result.committed) station.lastCommitAt = now.toISOString();
-  });
+  }, options);
 }
 
 /** Vá mọi trace vào MỘT snapshot settings mới; trả false nếu tất cả repo đã bị xoá giữa vòng. */
@@ -915,14 +915,14 @@ export async function runKeepalive(options: { force?: boolean; deadlineAt?: numb
  * Cho phép chạm vào dòng đã tắt là có chủ ý: người ta tắt một kho rồi muốn thử lại PAT trước khi
  * bật, và bắt họ bật lên mới thử được là bắt mở van trước khi biết đường ống có thủng không.
  */
-export async function pingStationBySlug(slug: string, force: boolean): Promise<StationPing> {
-  const settings = await getAppSettings();
+export async function pingStationBySlug(slug: string, force: boolean, options: GithubCallOptions = {}): Promise<StationPing> {
+  const settings = await getAppSettings(options);
   const station = settings.githubStations.find((s) => stationSlug(s) === slug);
   if (!station) {
     return { slug, ok: false, note: `Không có kho「${slug}」trong sổ.`, committed: false, workflowState: "unknown" };
   }
   const now = new Date();
-  const result = await pingStation(station, now, force);
-  await recordPing(result, now);
+  const result = await pingStation(station, now, force, options);
+  await recordPing(result, now, options);
   return result;
 }

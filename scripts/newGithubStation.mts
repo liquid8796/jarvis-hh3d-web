@@ -1,480 +1,175 @@
 #!/usr/bin/env node
-/**
- * Create and register a primary GitHub worker, then reconcile companions through Ollama.
- *
- * npm run github:new
- * npm run github:new -- --dry-run --owner <account>
- *
- * PAT identity/scope checks and register checks happen before creation. The primary worker
- * payload, GitHub secret, workflow dispatch and rollback remain in newGithubKhoiloi.mjs.
- * Register the completed primary worker with companionRepos: [] and the global count default;
- * the Ollama runtime owns companion generation/publication. Partial generation is resumed by
- * cron or github:companions:backfill, without recreating the primary worker.
- *
- * GITHUB_PAT stays in process environment and is encrypted when saved in the register. It is
- * never passed on a command line. A classic PAT needs repo + workflow + delete_repo for the
- * primary creator's rollback contract. Repositories and Actions logs are public (§6).
- *
- * Set process.exitCode and allow tsx to exit naturally: process.exit after fetch can trigger
- * a Windows libuv assertion (observed 12/08/2026).
- */
-import { randomBytes } from "node:crypto";
-import { spawnSync } from "node:child_process";
+/** Thin CLI adapter for the shared primary GitHub provisioning service. */
+import { spawn } from "node:child_process";
 import path from "node:path";
-import { sqlTag } from "./pgTag.mjs";
-import { readControlDoc } from "../src/lib/control/read";
-import { encryptSecret } from "../src/lib/crypto/secretBox";
+import { pathToFileURL } from "node:url";
 import {
-  DEFAULT_DAILY_PUSHES,
-  DEFAULT_WORKFLOW_FILE,
-  explainFailure,
-  reviewStationIdentity,
-  stationSlug,
-} from "../src/lib/validation/githubStations";
-import { appDatabaseUrl } from "./activeStationPg.mts";
-import { reviewBundlePatScopes } from "./githubBundleSafety.mjs";
-import { randomSoftwareName, reviewGeneratedName } from "./khoiloiNaming.mjs";
+  normalizeGithubProvisionInput,
+  reviewNormalizedProvisionIdentity,
+  type GithubProvisionInput,
+} from "../src/lib/validation/githubProvisioning";
+import {
+  provisionGithubStation,
+  githubProvisioningDependenciesForPayloadSource,
+  productionGithubProvisionDependencies,
+  type GithubProvisionResult,
+} from "../src/lib/services/githubProvisioning";
 import { loadEnv } from "./loadEnv.mjs";
+import { randomSoftwareName } from "./khoiloiNaming.mjs";
 
-loadEnv();
-
-const repoRoot = path.join(import.meta.dirname, "..");
-/** Worker polling đi thẳng backend; control doc là đường của web/proxy, không phải bootstrap worker. */
-const DIRECT_WORKER_URL = "https://158.180.59.36.sslip.io";
-const argv = process.argv.slice(2);
-const dryRun = argv.includes("--dry-run");
-const arg = (name: string): string | undefined => {
-  const at = argv.indexOf(`--${name}`);
-  return at > -1 && argv[at + 1] && !argv[at + 1].startsWith("--") ? argv[at + 1] : undefined;
+export type GithubProvisionCliOptions = {
+  input: GithubProvisionInput;
 };
 
-/**
- * Lời từ chối của script này. Ném chứ không `process.exit` (xem ghi chú đầu tệp), và mang một
- * lớp riêng để lượt bắt ở cuối phân biệt được「ta chủ động dừng」với「một lỗi không ai lường」—
- * cái sau phải giữ nguyên stack cho người sửa, không được nuốt thành một dòng đẹp đẽ.
- */
-class Stop extends Error {}
+export type GithubProvisionCliDependencies = {
+  provision: (input: GithubProvisionInput) => Promise<GithubProvisionResult>;
+  dryRun: (input: GithubProvisionInput) => Promise<GithubProvisionResult>;
+};
 
-function die(message: string): never {
-  console.error(`\n✖ ${message}\n`);
-  throw new Stop(message);
-}
+type GithubProvisionCliIo = {
+  log: (message: string) => void;
+  error: (message: string) => void;
+};
 
-/** Việt Nam là UTC+7 quanh năm — cùng hằng số với `vietnamDayKey` bên services/jobs.ts. */
-const VIETNAM_UTC_OFFSET_MS = 7 * 60 * 60 * 1000;
+const valueFlags = new Map([
+  ["--repo", "repo"],
+  ["--workflow-file", "workflowFile"],
+  ["--daily-pushes", "dailyPushes"],
+  ["--owner", "ownerForDryRun"],
+] as const);
 
-/**
- * Số lần hỏi danh tính, và quãng nghỉ giữa hai lần — chỉ dùng cho mạng ném và 5xx.
- *
- * Ba lần × 2 giây là đủ để đi qua một nhịp 5xx của GitHub mà vẫn không bắt người đang đứng trước
- * dấu nhắc chờ quá lâu. Trần xấu nhất: 3 × 20 giây (trần mỗi lượt gọi) + 2 × 2 giây nghỉ = 64
- * giây — và đó là ca mọi lượt đều treo tới hết giờ, chứ 5xx thì trả lời tức thì.
- */
-const IDENTITY_ATTEMPTS = 3;
-const IDENTITY_BACKOFF_MS = 2_000;
+/** Parse only the documented CLI surface. Blank values remain blank for the shared normalizer. */
+export function parseGithubProvisionArgs(
+  argv: string[],
+  env: NodeJS.ProcessEnv = process.env,
+): GithubProvisionCliOptions {
+  const values: Partial<Record<"repo" | "workflowFile" | "dailyPushes" | "ownerForDryRun", string>> = {};
+  let dryRun = false;
 
-/**
- * Mốc thời gian trong tên: `YYYYMMDD-HHmmss` theo giờ Việt Nam.
- *
- * Giây có mặt trong mốc là CÓ CHỦ Ý, không phải cho đẹp: `WORKER_ID` là khoá chính của bảng
- * `workers`, hai tiến trình trùng id thì ghi đè nhau và dashboard nói dối về việc ai đang trực.
- * Phút thôi thì hai lượt chạy liền nhau trong cùng một phút sẽ đụng — mà bấm đúp hai lần là
- * chuyện người ta làm thật. Vẫn còn một phép kiểm nữa ở dưới hỏi thẳng database.
- */
-function vietnamStamp(at: Date): string {
-  const iso = new Date(at.getTime() + VIETNAM_UTC_OFFSET_MS).toISOString();
-  return `${iso.slice(0, 10).replace(/-/g, "")}-${iso.slice(11, 19).replace(/:/g, "")}`;
-}
-
-/**
- * Hỏi GitHub xem PAT này là của ai, và nó mở được những gì.
- *
- * Đây cũng là phép thử token RẺ NHẤT và SỚM NHẤT: sai chìa thì hỏng ngay ở đây, trước khi có bất
- * cứ thứ gì được tạo ra ở bất cứ đâu.
- */
-async function whoami(token: string): Promise<{ login: string; scopes: string | null }> {
-  let res: Response | null = null;
-  let lastError = "";
-
-  // MỘT NHỊP HỎNG THOÁNG QUA KHÔNG ĐƯỢC PHÉP VỨT CẢ CHUỖI PAT VỪA GÕ TAY.
-  //
-  // Công cụ này TƯƠNG TÁC: `.bat` hỏi PAT ở dấu nhắc, ký tự không hiện, và người ta chép-dán
-  // từng đoạn. Bản trước gọi đúng một lần rồi chết — nên 17/08/2026 một cú 503 năm phút của
-  // GitHub đủ để bắt tông chủ gõ lại từ đầu, và vì câu lỗi đổ cho PAT, đi tạo hẳn một chìa mới.
-  // Chỉ thử lại đúng hai ngả ĐÁNG thử: mạng ném, và 5xx. 4xx thì thử lại bao nhiêu cũng vậy —
-  // một PAT sai không tự đúng lên.
-  for (let attempt = 1; attempt <= IDENTITY_ATTEMPTS; attempt++) {
-    try {
-      res = await fetch("https://api.github.com/user", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/vnd.github+json",
-          // Không mang tên trò lẫn tên công cụ — cùng luật với tên kho, xem `khoiloiNaming.mjs`.
-          // GitHub đòi header này có mặt; nó không đòi header ấy khai ra ta đang làm gì.
-          "User-Agent": "linh-su-station-setup",
-        },
-        signal: AbortSignal.timeout(20_000),
-      });
-      if (res.status < 500) break;
-      lastError = `HTTP ${res.status}`;
-    } catch (err) {
-      res = null;
-      lastError = err instanceof Error ? err.message : "lỗi lạ";
+  for (let at = 0; at < argv.length; at += 1) {
+    const token = argv[at];
+    if (token === "--dry-run") {
+      dryRun = true;
+      continue;
     }
+    // Kept as a harmless compatibility flag for direct launcher invocations.
+    if (token === "--no-pause") continue;
 
-    if (attempt < IDENTITY_ATTEMPTS) {
-      console.error(`  … ${lastError} — thử lại lần ${attempt + 1}/${IDENTITY_ATTEMPTS} sau ${IDENTITY_BACKOFF_MS / 1000}s`);
-      await new Promise((wake) => setTimeout(wake, IDENTITY_BACKOFF_MS));
+    const field = valueFlags.get(token as "--repo" | "--workflow-file" | "--daily-pushes" | "--owner");
+    if (!field) throw new Error("Unknown option. Use --repo, --workflow-file, --daily-pushes, --dry-run, or PAT-less --owner.");
+    const value = argv[at + 1];
+    if (value === undefined || (value.startsWith("--") && value.length > 0)) {
+      throw new Error(`${token} requires a value.`);
     }
+    values[field] = value;
+    at += 1;
   }
 
-  if (!res) {
-    die(`Không gọi được api.github.com sau ${IDENTITY_ATTEMPTS} lần (${lastError}). Mạng có chặn không?`);
+  const pat = env.GITHUB_PAT ?? "";
+  const ownerForDryRun = values.ownerForDryRun?.trim() || undefined;
+  if (ownerForDryRun && (pat.length > 0 || !dryRun)) {
+    throw new Error("--owner is available only for a PAT-less --dry-run; live ownership comes from the PAT.");
   }
-  // Phán xử bằng CHUNG một bộ từ điển với vòng nuôi kho và lượt phát hành (`explainFailure`), chứ
-  // không tự chế câu ở đây. Bản cũ tự chế, và nó gộp MỌI mã lỗi không-401 thành「Kiểm lại PAT」—
-  // kể cả 5xx, thứ hoàn toàn không phải chuyện của PAT.
-  if (!res.ok) die(explainFailure(res.status, await res.json().catch(() => null), "hỏi danh tính"));
+  if (!pat && !dryRun) {
+    throw new Error("GITHUB_PAT is required for a live provisioning run.");
+  }
+  if (!pat && dryRun && !ownerForDryRun) {
+    throw new Error("A PAT-less --dry-run requires --owner <GitHub account>.");
+  }
 
-  const body = (await res.json()) as { login?: string };
-  if (!body.login) die("GitHub trả lời không có tên tài khoản — không rõ PAT này thuộc về ai, dừng cho chắc.");
-  // Token classic khai scope ở header này; token fine-grained thì KHÔNG có nó. Lượt dựng bundle
-  // cần chứng minh delete_repo trước mutation, nên header vắng sẽ bị policy bên dưới từ chối.
-  return { login: body.login, scopes: res.headers.get("x-oauth-scopes") };
+  return {
+    input: {
+      pat,
+      repo: values.repo?.trim() || undefined,
+      workflowFile: values.workflowFile?.trim() || undefined,
+      dailyPushes: values.dailyPushes?.trim() || undefined,
+      ...(dryRun ? { dryRun: true } : {}),
+      ...(ownerForDryRun ? { ownerForDryRun } : {}),
+    },
+  };
+}
+
+async function legacyDryRun(input: GithubProvisionInput): Promise<GithubProvisionResult> {
+  const now = Date.now;
+  const budget = { now, deadlineAt: now() + 60_000 };
+  let owner = input.ownerForDryRun ?? "";
+  if (input.pat) {
+    const identity = await productionGithubProvisionDependencies.whoami(input.pat, budget);
+    owner = identity.login;
+    await productionGithubProvisionDependencies.checkScopes(identity.scopes);
+  }
+
+  const normalized = normalizeGithubProvisionInput(
+    { ...input, pat: input.pat || "offline-dry-run" },
+    { randomRepo: () => randomSoftwareName() },
+  );
+  if (!owner || reviewNormalizedProvisionIdentity(owner, normalized)) {
+    throw new Error("The dry-run owner, repository, or workflow identity is invalid.");
+  }
+
+  const args = [
+    path.join(import.meta.dirname, "newGithubKhoiloi.mjs"),
+    "--dry-run",
+    "--owner",
+    owner,
+    "--repo",
+    normalized.repo,
+    "--workflow-file",
+    normalized.workflowFile,
+  ];
+  const childEnv = { ...process.env };
+  delete childEnv.GITHUB_PAT;
+  delete childEnv.GH_TOKEN;
+
+  return new Promise(resolve => {
+    const child = spawn(process.execPath, args, {
+      cwd: path.join(import.meta.dirname, ".."),
+      env: childEnv,
+      shell: false,
+      windowsHide: true,
+      stdio: "inherit",
+    });
+    child.on("error", () => resolve({ ok: false, stage: "preflight", message: "Could not start the dry-run payload check.", warnings: [] }));
+    child.on("close", code => resolve(code === 0
+      ? { ok: true, stage: "complete", slug: `${owner}/${normalized.repo}`, message: `Dry-run payload check completed with daily limit ${normalized.dailyPushes}. No GitHub or database changes were made.`, warnings: [] }
+      : { ok: false, stage: "preflight", message: "Dry-run payload check failed. No GitHub or database changes were made.", warnings: [] }));
+  });
+}
+
+const productionDependencies: GithubProvisionCliDependencies = {
+  provision: input => provisionGithubStation(input, githubProvisioningDependenciesForPayloadSource("git-head")),
+  dryRun: legacyDryRun,
+};
+
+function printResult(result: GithubProvisionResult, io: GithubProvisionCliIo): void {
+  const write = result.ok ? io.log : io.error;
+  const slug = result.slug ? ` (${result.slug})` : "";
+  write(`${result.ok ? "OK" : "FAILED"} [${result.stage}]${slug}: ${result.message}`);
+  for (const warning of result.warnings) io.log(`WARNING: ${warning}`);
+}
+
+export async function runGithubProvisionCli(
+  argv: string[],
+  env: NodeJS.ProcessEnv = process.env,
+  dependencies: GithubProvisionCliDependencies = productionDependencies,
+  io: GithubProvisionCliIo = console,
+): Promise<number> {
+  const { input } = parseGithubProvisionArgs(argv, env);
+  const result = input.dryRun ? await dependencies.dryRun(input) : await dependencies.provision(input);
+  printResult(result, io);
+  return result.ok && result.stage === "complete" ? 0 : 1;
 }
 
 async function main(): Promise<void> {
-  // ---- 1. PAT, và tài khoản suy ra từ nó --------------------------------------------------------
-
-  const pat = (process.env.GITHUB_PAT ?? "").trim();
-
-  // Cùng luật với `saveGithubStationAction`: khoảng trắng trong PAT gần như luôn là lỗi chép-dán
-  // (nuốt cả dấu xuống dòng), và nó sẽ đi thẳng vào một header HTTP rồi trả về 401 khó hiểu.
-  if (pat.length > 0 && /\s/.test(pat)) {
-    die("PAT có khoảng trắng — chép lại, đừng kèm dấu xuống dòng hay dấu cách.");
-  }
-  // Lượt chạy THẬT bắt buộc có PAT: thiếu nó thì `gh` bên trong sẽ hỏng ở tận bước tạo kho, với
-  // một câu nói về `gh auth login` — lối mà script này cố ý không dùng.
-  if (!dryRun && !pat) {
-    die(
-      "Chưa có PAT. Bấm đúp new-github-khoiloi.bat để nhập, hoặc đặt biến GITHUB_PAT rồi chạy lại.\n" +
-        "  (Chỉ lượt chạy khô mới được phép thiếu, và khi ấy phải truyền --owner <tên tài khoản>.)",
-    );
-  }
-
-  // Hỏi danh tính ĐÚNG MỘT LẦN rồi dùng cho cả tên tài khoản lẫn phép soát scope.
-  const identity = pat ? await whoami(pat) : null;
-  const owner = arg("owner") ?? identity?.login ?? "";
-  if (!owner) die("Lượt chạy khô không có PAT thì phải truyền --owner <tên tài khoản GitHub>.");
-
-  if (identity) {
-    const policy = reviewBundlePatScopes(identity.scopes);
-    if (!policy.ok) {
-      die(
-        `${policy.message}\n` +
-          "  Sửa token classic ở https://github.com/settings/tokens rồi chạy lại.\n" +
-          "  KHÔNG repo nào đã được tạo; quyền delete_repo phải được chứng minh trước mutation đầu tiên.",
-      );
-    }
-  }
-
-  // ---- 2. Những thứ phải có sẵn dưới máy --------------------------------------------------------
-
-  if (!process.env.WORKER_TOKEN) {
-    die(
-      "Thiếu WORKER_TOKEN trong .env — khôi lỗi mới sẽ không xác thực nổi với /api/worker.\n" +
-        "  Lấy về: vercel env pull .env --environment=production --yes\n" +
-        "  KHÔNG dùng npm run env:pull — lệnh ấy kéo môi trường development, nơi biến này không tồn tại.",
-    );
-  }
-  if (!process.env.ENCRYPTION_KEY) {
-    die("Thiếu ENCRYPTION_KEY trong .env.local — không mã hoá nổi PAT thì không được phép ghi nó vào sổ.");
-  }
-  if (!process.env.DATABASE_URL) {
-    die("Thiếu DATABASE_URL trong .env.local — không có đường nào tới sổ.");
-  }
-
-  // ---- 3. Tên kho và tên khôi lỗi ---------------------------------------------------------------
-
-  /**
-   * MỘT cái tên ngẫu nhiên, dùng cho CẢ tên kho lẫn `WORKER_ID` (17/08/2026).
-   *
-   * Dùng chung một tên là có chủ ý: người vận hành nhìn một id trên dashboard là biết ngay nó ở
-   * kho nào, không phải tra sổ. Hai chuỗi ngẫu nhiên rời nhau thì giấu được nhiều hơn đúng một
-   * chút, mà đổi lại mỗi lần cần lần ngược đều phải mở sổ ra dò.
-   *
-   * Phép soát TRÙNG KHÔNG đứng ở đây, và chỗ ấy là một lỗi đã suýt đi vào production: sổ chỉ được
-   * nạp ở bước ghi (`getAppSettings` cuối tệp), nên đọc nó tại đây là chạm vào một `const` chưa
-   * khởi tạo — `tsc` không bắt vì hai chỗ khác tầng hàm, còn lượt chạy thật thì chết ngay dòng
-   * đầu. Phép soát vì thế nằm ở bước ghi, nơi sổ đã có thật.
-   */
-  const generated = randomSoftwareName();
-
-  const workerId = generated;
-  const repo = arg("repo") ?? generated;
-  const workflowFile = DEFAULT_WORKFLOW_FILE;
-  const slug = `${owner}/${repo}`;
-
-  // Cùng bộ luật mà form admin dùng — không có luật thứ hai sống song song.
-  const complaint = reviewStationIdentity(owner, repo, workflowFile);
-  if (complaint) die(`${complaint}\n  (Tài khoản「${owner}」, kho「${repo}」)`);
-
-  /**
-   * Luật TỪ CẤM, và nó KHÔNG nằm trong `reviewStationIdentity` — chỗ tách ấy là cả chủ ý.
-   *
-   * `reviewStationIdentity` gác cả form admin, nơi người ta ghi vào sổ một kho ĐÃ CÓ SẴN. Nhét
-   * luật này vào đó là cấm luôn việc khai báo những kho dựng trước 13/08/2026 — chúng đang mang
-   * đúng cái tên `auto-hh3d-linh-su-…` mà luật mới cấm, và chúng vẫn đang chạy. Luật này chỉ áp
-   * cho tên ta SINH RA, không áp cho tên ta CHẤP NHẬN.
-   */
-  for (const [what, value] of [
-    ["Tên kho", repo],
-    ["WORKER_ID", workerId],
-  ] as const) {
-    const banned = reviewGeneratedName(what, value);
-    if (banned) die(banned);
-  }
-
-  // ---- 4. Sổ có thẩm quyền nằm ở TRẠM ĐANG HOẠT ĐỘNG --------------------------------------------
-
-  const doc = await readControlDoc();
-  if (!doc) {
-    // `readControlDoc` KHÔNG BAO GIỜ ném: thiếu env, mạng hỏng, chữ ký sai — tất cả cùng về null.
-    // Nên câu này phải kể ra các ngả ấy, bằng không người đọc chỉ thấy "không đọc được".
-    die(
-      "Không đọc được bảng điều phối — chưa biết trạm nào đang hoạt động thì không dám ghi sổ.\n" +
-        "  Ba ngả cùng ra kết quả này: thiếu OCI_REGION/OCI_NAMESPACE/OCI_BUCKET hoặc WORKER_TOKEN\n" +
-        "  trong .env.local, bucket không với tới được, hoặc chữ ký bảng không khớp WORKER_TOKEN.\n" +
-        "  Soi bằng: npm run mirror:control status",
-    );
-  }
-
-  // Database mà APP dùng — từ 16/08/2026 là Postgres trên VM, không phải Neon của một trạm.
-  // Ghi sổ vào một bản đóng băng thì mọi bước sau vẫn báo xanh mà không ai đọc được kết quả.
-  const activePg = ((): string => {
-    try {
-      return appDatabaseUrl();
-    } catch (err) {
-      return die(err instanceof Error ? err.message : "Không tra ra database của app.");
-    }
-  })();
-  // Từ dòng này trở đi MỌI thứ đọc/ghi qua `db()` đều rơi vào trạm đang hoạt động. Nhập MUỘN, sau
-  // khi biến đã đổi: `db()` đọc `DATABASE_URL` lười rồi NHỚ MÃI (xem db/client.ts), nên thứ tự này
-  // là thứ giữ cho sổ không bị ghi nhầm vào trạm đã nghỉ — loại hỏng không để lại dấu vết nào.
-  process.env.DATABASE_URL = activePg;
-  const { getAppSettings, saveAppSettings } = await import("../src/lib/services/settings");
-  const { pingStationBySlug } = await import("../src/lib/services/githubStations");
-
-  const settings = await getAppSettings();
-  if (settings.githubStations.some((s) => stationSlug(s) === slug)) {
-    die(`Sổ đã có kho「${slug}」— trùng tên gần như không thể, kiểm xem có phải vừa chạy hai lượt.`);
-  }
-  /**
-   * Id khôi lỗi này đã có ai mang chưa — hỏi thẳng bảng `workers`, đừng chỉ tin vào cái mốc giây.
-   *
-   * Trùng id không làm chạy đôi một đàn (câu claim nguyên tử lo việc ấy), nhưng nó phá phần QUAN
-   * SÁT: hai tiến trình gộp làm một dòng, số bản nhảy qua lại, và `automation_jobs.worker_id`
-   * thôi chỉ ra được máy nào đang giữ đàn — đúng phép soát người ta dựa vào để chọn lúc restart.
-   */
-  const clash = (await sqlTag(activePg)`select 1 from workers where id = ${workerId} limit 1`) as unknown[];
-  if (clash.length > 0) {
-    die(`Đã có khôi lỗi mang id「${workerId}」trong sổ điểm danh. Đợi một giây rồi chạy lại.`);
-  }
-
-  // ---- 5. Kế hoạch ------------------------------------------------------------------------------
-
-  console.log(
-    `\n── Sẽ dựng ──────────────────────────────────────────\n` +
-      `  kho        ${slug} (CÔNG KHAI)\n` +
-      `  kho phụ    Ollama sẽ tạo theo cấu hình: ${settings.githubNurture.defaultCompanionCount} kho (sau khi ghi sổ)\n` +
-      `  worker id  ${workerId}\n` +
-      `  workflow   ${workflowFile}\n` +
-      `  ghi vào sổ ở trạm「${doc.activeSiteId}」(đang có ${settings.githubStations.length} kho)\n`,
-  );
-
-  const inner = ["scripts/newGithubKhoiloi.mjs", "--owner", owner, "--repo", repo, "--worker-id", workerId];
-  // Không lấy `doc.activeUrl`: đó là một vỏ Vercel có quota Edge Requests, trong khi mỗi worker
-  // gõ cửa 5 giây/lần. Ngày 08/09/2026 tám kho cùng bám auto-hh3d-4 và chết khi vỏ ấy bị khoá.
-  // Workflow mang thêm WORKER_FALLBACK_URL; cổng chính của worker luôn đi thẳng backend.
-  inner.push("--web-url", DIRECT_WORKER_URL);
-
-  /** Gọi script dựng kho. Nó in thẳng ra màn hình; ta chỉ quan tâm nó sống hay chết. */
-  const buildRepo = (extra: string[] = []): void => {
-    const res = spawnSync(process.execPath, [...inner, ...extra], {
-      cwd: repoRoot,
-      stdio: "inherit",
-      // PAT chỉ sống trong biến môi trường của tiến trình con: `gh` đọc GH_TOKEN nên không cần
-      // `gh auth login`, và giá trị không bao giờ nằm trên dòng lệnh.
-      env: { ...process.env, GH_TOKEN: pat },
-    });
-    if (res.error) die(`Không chạy được scripts/newGithubKhoiloi.mjs: ${res.error.message}`);
-    if (res.status !== 0) {
-      die(
-        `Bước dựng kho hỏng (mã ${res.status}) — KHÔNG ghi gì vào sổ.\n` +
-          `  Đọc dòng lỗi ngay trên. Kho có thể đã tạo dở, soi ở https://github.com/${owner}?tab=repositories\n` +
-          `  — script đã cố dọn kho vừa tạo; nếu còn ${repo} thì kiểm tra trước khi chạy lại.`,
-      );
-    }
-  };
-
-  if (dryRun) {
-    buildRepo(["--dry-run"]);
-    console.log(
-      `\n--dry-run: đã soi trọn kế hoạch và dựng thử cây tệp. KHÔNG tạo kho, KHÔNG ghi sổ.\n` +
-        `  Bỏ --dry-run để làm thật.`,
-    );
-    return;
-  }
-
-  // ---- 6. Làm thật ------------------------------------------------------------------------------
-
-  // `gh` là bắt buộc cho lượt đặt secret (sealed-box X25519+XSalsa20, thứ Node không có sẵn — xem
-  // đầu newGithubKhoiloi.mjs). Kiểm ở đây để câu chỉ dẫn nói đúng lối cài của Windows.
-  // KHÔNG shell — phép kiểm phải đi ĐÚNG con đường mà lượt gọi thật sẽ đi (xem `run` trong
-  // newGithubKhoiloi.mjs, nơi shell đã bị gỡ ngày 13/08/2026). Kiểm qua shell rồi gọi thật không
-  // shell là dựng một phép kiểm xanh đứng trước một lượt chạy ENOENT.
-  const ghCheck = spawnSync("gh", ["--version"], { stdio: "ignore" });
-  if (ghCheck.error || ghCheck.status !== 0) {
-    die(
-      "Chưa có `gh` (GitHub CLI) — nó là thứ đặt được secret WORKER_TOKEN cho kho mới.\n" +
-        "  Cài: winget install --id GitHub.cli    (hoặc https://cli.github.com)\n" +
-        "  KHÔNG cần `gh auth login`: script này đưa PAT qua biến GH_TOKEN.",
-    );
-  }
-
-  buildRepo();
-
-  // ---- 7. Ghi vào sổ ----------------------------------------------------------------------------
-
-  console.log("── Ghi kho vào sổ của trạm đang hoạt động…");
-
-  /**
-   * ĐỌC LẠI sổ ngay trước khi ghi, không dùng bản đã đọc ở bước kiểm.
-   *
-   * Giữa hai mốc ấy là cả lượt dựng kho — vài chục giây có `gh` chạy ở giữa. `saveAppSettings` ghi
-   * TRỌN document cấu hình, nên ghi bằng bản chụp cũ sẽ lặng lẽ lộn ngược mọi thứ trưởng môn vừa
-   * sửa trong quãng ấy: một lời nhắn bảo trì, một hạn lưu nhật ký, một thông báo. Đọc lại thì cửa
-   * sổ ấy co về vài mili giây, đúng bằng cửa sổ mà form admin vẫn có.
-   */
-  const fresh = await getAppSettings();
-  if (fresh.githubStations.some((s) => stationSlug(s) === slug)) {
-    die(`Sổ vừa có thêm kho「${slug}」trong lúc dựng — có phiên khác đang làm cùng việc. Không ghi đè.`);
-  }
-  /**
-   * `workerId` là KHOÁ CHÍNH của bảng `workers`: hai khôi lỗi cùng id là hai tiến trình ghi đè
-   * nhau trong sổ điểm danh, và mục Khôi Lỗi nói dối về việc ai đang trực. Tên rút ngẫu nhiên
-   * (53.924 cặp từ × 2^64 giá trị đuôi, từ 19/08/2026) nên trùng là chuyện hiếm tới mức không
-   * đáng vòng lặp rút lại — nhưng hiếm không phải là không, và chỗ này là nơi DUY NHẤT biết được
-   * sự thật ấy.
-   *
-   * Cái giá khi nó nổ, phải nói ra vì nó không hiển nhiên: cửa này đứng SAU lượt dựng kho, nên
-   * một cú trùng để lại một kho CÔNG KHAI mồ côi trên GitHub, phải vào xoá tay. Đó là lý do rổ
-   * từ được nới rộng 150 lần thay vì thêm một vòng rút lại ở đây.
-   */
-  if (fresh.githubStations.some((s) => s.workerId.toLowerCase() === workerId.toLowerCase())) {
-    die(
-      `WORKER_ID「${workerId}」vừa trùng một dòng đã có trong sổ — rút trúng cùng một cái tên.
-` +
-        "  Chạy lại lệnh là xong: lượt sau rút một tên khác.",
-    );
-  }
-  /**
-   * Hình dạng dòng sổ chép ĐÚNG bản mà `saveGithubStationAction` ghi — kể cả bốn trường dấu vết để
-   * trống. Lệch một trường thì `appSettingsSchema` sẽ lặng lẽ điền mặc định và dòng do script sinh
-   * ra sẽ khác dòng do người bấm nút sinh ra, ở đúng chỗ không ai soi.
-   */
-  fresh.githubStations = [
-    ...fresh.githubStations,
-    {
-      owner,
-      repo,
-      workflowFile,
-      workerId,
-      pat: encryptSecret(pat),
-      enabled: true,
-      companionRepos: [],
-      companionCountOverride: null,
-      dailyPushes: DEFAULT_DAILY_PUSHES,
-      lastPingAt: null,
-      lastCommitAt: null,
-      lastPingOk: null,
-      lastPingNote: "",
-      workflowState: "",
-    },
-  ];
-
+  loadEnv();
   try {
-    await saveAppSettings(fresh);
-  } catch (err) {
-    die(
-      `Kho chính ĐÃ TẠO XONG trên GitHub nhưng ghi sổ hỏng: ${err instanceof Error ? err.message : "lỗi lạ"}\n` +
-        `  Khôi lỗi vẫn sẽ lên ca bình thường, nhưng chưa nằm trong vòng nuôi. Ghi tay ở\n` +
-        `  Tông Môn → Kho GitHub với owner/repo/workflow/WORKER_ID: ${owner} / ${repo} / ` +
-        `${workflowFile} / ${workerId}; kho phụ để trống cho Ollama tạo; ` +
-        `số lượt/ngày: ${DEFAULT_DAILY_PUSHES}.`,
-    );
-  }
-
-  /**
-   * Ngó ngay sau khi ghi, `force: false` — đúng đường của form admin.
-   *
-   * Kho mới chưa có `lastCommitAt` nên đằng nào cũng tới hạn: lượt này ghi một commit thật, tức
-   * chứng minh trọn đường「PAT push được mã vào kho này」ngay bây giờ, trước mặt người vừa dán PAT,
-   * chứ không phải trong một lượt cron lúc ba giờ sáng.
-   */
-  const ping = await pingStationBySlug(slug, false);
-
-  // Registration is durable before any model generation. A failed/partial model run can be
-  // resumed by cron/backfill without recreating the primary worker repository.
-  let companionNote = "";
-  try {
-    const { runLlmCompanionNurture } = await import("../src/lib/services/companionNurture");
-    const nurture = await runLlmCompanionNurture({ stationSlug: slug, deadlineAt: Date.now() + 120_000 });
-    const afterNurture = await getAppSettings();
-    const row = afterNurture.githubStations.find((station) => stationSlug(station) === slug);
-    const target = row?.companionCountOverride ?? afterNurture.githubNurture.defaultCompanionCount;
-    companionNote = `${row?.companionRepos.length ?? 0}/${target} kho; lỗi ${nurture.failed}, bỏ qua ${nurture.skipped}`;
-    if (nurture.failed > 0) {
-      process.exitCode = 1;
-      for (const result of nurture.results) if (!result.ok) console.error(`  ✖ Ollama: ${result.note}`);
-    }
-  } catch {
-    companionNote = "lượt Ollama chưa hoàn tất; kiểm tra cấu hình rồi chạy github:companions:backfill";
-    process.exitCode = 1;
-  }
-
-  console.log(
-    `\n✔ Kho đã dựng và đã vào sổ.\n` +
-      `  kho       https://github.com/${slug}\n` +
-      `  kho phụ   ${companionNote}\n` +
-      `  actions   https://github.com/${slug}/actions\n` +
-      `  sổ        ${ping.ok ? "✔" : "✖"} ${ping.note}\n` +
-      `\n  Kho phụ còn thiếu sẽ được cron/bù kho phụ tiếp tục. ĐỪNG chạy lại github:new để bù kho phụ.\n` +
-      `  Nghiệm thu: mở Hàng Đợi → tab Khôi Lỗi, phải thấy「${workerId}」điểm danh trong ~4 phút.\n`,
-  );
-
-  /**
-   * Ngó hỏng thì mã thoát KHÁC 0 — kho đã nằm trong sổ nhưng chưa có bằng chứng nào rằng PAT ấy
-   * nuôi được nó, và một lượt chạy như thế không đáng gọi là thành công.
-   *
-   * Nhưng phải nói rõ「đừng chạy lại」: mọi việc nặng đã xong, chạy lại chỉ đẻ thêm một bundle công
-   * khai nữa và một khôi lỗi trùng vai. Cái cần sửa là PAT, và chỗ sửa là tab Kho GitHub.
-   */
-  if (!ping.ok) {
-    console.error(
-      `✖ Lượt ngó đầu tiên KHÔNG thành. ĐỪNG chạy lại tệp này — kho và dòng sổ đã có rồi.\n` +
-        `  Vào Tông Môn → Kho GitHub, bấm Sửa ở dòng「${slug}」, dán lại PAT (cần repo + workflow),\n` +
-        `  rồi bấm「Nuôi ngay」. Câu chữ của lượt hỏng nằm ngay trên.\n`,
-    );
+    process.exitCode = await runGithubProvisionCli(process.argv.slice(2));
+  } catch (error) {
+    console.error(`FAILED [preflight]: ${error instanceof Error ? error.message : "Invalid CLI input."}`);
     process.exitCode = 1;
   }
 }
 
-try {
-  await main();
-} catch (err) {
-  // `Stop` là lời từ chối đã in ra tử tế rồi — chỉ cần mã thoát. Mọi lỗi khác giữ NGUYÊN stack:
-  // nuốt nó thành một dòng đẹp là lấy mất của người sửa thứ duy nhất chỉ đúng dòng hỏng.
-  if (!(err instanceof Stop)) throw err;
-  process.exitCode = 1;
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  void main();
 }

@@ -288,5 +288,10 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
   return { run, remove };
 }
 
-export const runLlmCompanionNurture = (options: Options = {}) => createCompanionEngine().run(options);
+export const runLlmCompanionNurture = (options: Options = {}) => createCompanionEngine(options.deadlineAt === undefined ? defaults : {
+  ...defaults,
+  read: () => getAppSettings({ deadlineAt: options.deadlineAt }),
+  mutate: change => mutateGithubState(change, { deadlineAt: options.deadlineAt }),
+  lease: (slug, work) => withCompanionLease(slug, work, { deadlineAt: options.deadlineAt }),
+}).run(options);
 export const deleteManagedCompanion = (slug: string, repo: string) => createCompanionEngine().remove(slug, repo);

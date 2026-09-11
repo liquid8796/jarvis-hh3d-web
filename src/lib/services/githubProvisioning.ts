@@ -1,8 +1,16 @@
+import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { lstat, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { normalizeGithubProvisionInput, reviewNormalizedProvisionIdentity, type GithubProvisionInput, type NormalizedGithubProvisionInput } from "../validation/githubProvisioning";
+import {
+  normalizeGithubProvisionInput,
+  reviewNormalizedProvisionIdentity,
+  reviewPrimaryRepoAgainstKhoiloiNames,
+  reviewProvisionWorkerId,
+  type GithubProvisionInput,
+  type NormalizedGithubProvisionInput,
+} from "../validation/githubProvisioning";
 
 export type GithubProvisionResult = {
   ok: boolean;
@@ -21,7 +29,9 @@ type Lease = { assertHeld: (budget?: GithubProvisionBudget) => Promise<void>; re
 export type GithubProvisioningDependencies = {
   now?: () => number;
   deadlineAt?: number;
-  generateRepoName: (owner: string, budget: GithubProvisionBudget) => Promise<string>;
+  generateRepoName: (owner: string, budget: GithubProvisionBudget, forbiddenNames: readonly string[]) => Promise<string>;
+  generateWorkerId: (owner: string, repo: string, budget: GithubProvisionBudget, forbiddenNames: readonly string[]) => Promise<string>;
+  listKhoiloiNames: (owner: string, budget: GithubProvisionBudget) => Promise<string[]>;
   whoami: (pat: string, budget: GithubProvisionBudget) => Promise<{ login: string; scopes: string | null }>;
   checkScopes: (scopes: string | null) => Promise<void>;
   localPreflight: (context: GithubProvisionContext) => Promise<Prepared>;
@@ -119,19 +129,30 @@ export async function provisionGithubStation(input: GithubProvisionInput, deps: 
     const normalized = normalizeGithubProvisionInput(input);
     const identity = await work(() => deps.whoami(normalized.pat, budget));
     await work(() => deps.checkScopes(identity.scopes));
+    const khoiloiNames = await work(() => deps.listKhoiloiNames(identity.login, budget));
     if (normalized.generatedRepo) {
       try {
         const namingBudget = { ...budget, deadlineAt: Math.min(budget.deadlineAt, now() + 45_000) };
-        const repo = await bounded(namingBudget, () => deps.generateRepoName(identity.login, namingBudget));
-        if (typeof repo !== "string" || reviewNormalizedProvisionIdentity(identity.login, { ...normalized, repo })) throw Error("invalid model name");
+        const repo = await bounded(namingBudget, () => deps.generateRepoName(identity.login, namingBudget, khoiloiNames));
+        if (
+          typeof repo !== "string"
+          || reviewNormalizedProvisionIdentity(identity.login, { ...normalized, repo })
+          || reviewPrimaryRepoAgainstKhoiloiNames(repo, khoiloiNames)
+        ) throw Error("invalid model name");
         normalized.repo = repo;
-        normalized.workerId = repo;
       } catch {
         safeMessage = "Không thể nhờ Ollama đặt tên kho. Kiểm tra model, API key và kết nối, hoặc nhập tên kho để tạo; chưa tạo repo nào.";
         throw Error("Ollama naming failed");
       }
     }
+    const khoiloiCollision = reviewPrimaryRepoAgainstKhoiloiNames(normalized.repo, khoiloiNames);
+    if (khoiloiCollision) {
+      safeMessage = khoiloiCollision;
+      throw Error("repository collides with worker name");
+    }
     if (reviewNormalizedProvisionIdentity(identity.login, normalized)) throw Error("identity");
+    normalized.workerId = await work(() => deps.generateWorkerId(identity.login, normalized.repo, budget, khoiloiNames));
+    if (reviewProvisionWorkerId(normalized.workerId, normalized.repo)) throw Error("invalid worker id");
     context = { ...normalized, ...budget, owner: identity.login, slug: `${identity.login}/${normalized.repo}` };
     const ctx = context;
     prepared = await bounded(budget, () => deps.localPreflight(ctx), deps.dispose);
@@ -229,23 +250,57 @@ const repoEndpoint = (ctx: GithubProvisionContext) => `/repos/${encodeURICompone
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 type Settings = import("./settings").AppSettings;
 function references(settings: Settings, ctx: GithubProvisionContext): boolean {
-  return settings.githubStations.some(s => same(s.workerId, ctx.workerId) || (same(s.owner, ctx.owner) && (same(s.repo, ctx.repo) || s.companionRepos.some(c => same(c.repo, ctx.repo)) || same(s.nurturePending?.repo ?? "", ctx.repo))));
+  return settings.githubStations.some(s =>
+    same(s.workerId, ctx.workerId)
+    || same(s.workerId, ctx.repo)
+    || same(s.repo, ctx.workerId)
+    || (same(s.owner, ctx.owner) && (same(s.repo, ctx.repo) || s.companionRepos.some(c => same(c.repo, ctx.repo)) || same(s.nurturePending?.repo ?? "", ctx.repo)))
+  );
 }
-async function freshSettings(ctx: GithubProvisionContext): Promise<Settings> {
+async function readFreshGithubSettings(deadlineAt: number): Promise<Settings> {
   // Do not use getAppSettings' display fallback: a malformed register must fail closed here.
   const { schema } = await import("../db/client");
   const { withDatabaseDeadline } = await import("../db/deadline");
   const { eq } = await import("drizzle-orm");
   const { parseGithubSettingsForMutation } = await import("./settings");
-  const [row] = await withDatabaseDeadline(ctx.deadlineAt, database => database.select().from(schema.appSettings).where(eq(schema.appSettings.id, "global")).limit(1));
+  const [row] = await withDatabaseDeadline(deadlineAt, database => database.select().from(schema.appSettings).where(eq(schema.appSettings.id, "global")).limit(1));
   return parseGithubSettingsForMutation(row?.value ?? {});
+}
+async function freshSettings(ctx: GithubProvisionContext): Promise<Settings> {
+  return readFreshGithubSettings(ctx.deadlineAt);
 }
 async function assertWorkerFree(ctx: GithubProvisionContext): Promise<void> {
   const { schema } = await import("../db/client");
   const { withDatabaseDeadline } = await import("../db/deadline");
-  const { sql } = await import("drizzle-orm");
-  const rows = await withDatabaseDeadline(ctx.deadlineAt, database => database.select({ id: schema.workers.id }).from(schema.workers).where(sql`lower(${schema.workers.id}) = ${ctx.workerId.toLowerCase()}`).limit(1));
+  const { inArray, sql } = await import("drizzle-orm");
+  const wanted = [ctx.workerId.toLowerCase(), ctx.repo.toLowerCase()];
+  const rows = await withDatabaseDeadline(ctx.deadlineAt, database => database.select({ id: schema.workers.id }).from(schema.workers).where(inArray(sql`lower(${schema.workers.id})`, wanted)).limit(1));
   if (rows.length) throw new GithubProvisionCollisionError("worker");
+}
+
+async function readKhoiloiNames(deadlineAt: number): Promise<string[]> {
+  const { schema } = await import("../db/client");
+  const { withDatabaseDeadline } = await import("../db/deadline");
+  const settings = await readFreshGithubSettings(deadlineAt);
+  const rows = await withDatabaseDeadline(deadlineAt, database => database.select({ id: schema.workers.id }).from(schema.workers));
+  return [
+    ...settings.githubStations.map(station => station.workerId),
+    ...rows.map(row => row.id),
+  ].filter(name => name.trim().length > 0);
+}
+
+function randomWorkerId(forbiddenNames: readonly string[], repo: string): string {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  const forbidden = new Set([...forbiddenNames, repo].map(name => name.toLowerCase()));
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const bytes = randomBytes(20);
+    const value = Array.from(bytes, (byte, index) => {
+      const source = index === 0 ? "abcdefghijklmnopqrstuvwxyz" : alphabet;
+      return source[byte % source.length];
+    }).join("");
+    if (!forbidden.has(value.toLowerCase()) && !reviewProvisionWorkerId(value, repo)) return value;
+  }
+  throw new Error("Could not draw a distinct worker id");
 }
 
 async function productionLocalPreflight(ctx: GithubProvisionContext, sourceMode: GithubProvisionPayloadSourceMode): Promise<Prepared> {
@@ -269,9 +324,15 @@ async function productionLocalPreflight(ctx: GithubProvisionContext, sourceMode:
 }
 
 export const productionGithubProvisionDependencies: GithubProvisioningDependencies = {
-  async generateRepoName(owner, budget) {
+  async generateRepoName(owner, budget, forbiddenNames) {
     const { generatePrimaryRepoName } = await import("./ollamaRepoNaming");
-    return generatePrimaryRepoName(owner, budget);
+    return generatePrimaryRepoName(owner, budget, forbiddenNames);
+  },
+  async generateWorkerId(_owner, repo, _budget, forbiddenNames) {
+    return randomWorkerId(forbiddenNames, repo);
+  },
+  async listKhoiloiNames(_owner, budget) {
+    return readKhoiloiNames(budget.deadlineAt);
   },
   async whoami(pat, budget) {
     const response = await request(pat, budget, "/user");

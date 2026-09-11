@@ -33,6 +33,7 @@ import {
   playwrightVersionOf,
   uncommittedPayloadPaths,
 } from "./khoiloiPayload.mjs";
+import { randomSoftwareName } from "./khoiloiNaming.mjs";
 import { loadEnv } from "./loadEnv.mjs";
 
 loadEnv();
@@ -64,8 +65,17 @@ if (!suppliedRepo) {
   console.log("--dry-run: preview-only chỉ là tên tạm để kiểm tra payload. Ollama chọn tên thật khi tạo qua npm run github:new; lượt này không gọi Ollama.");
 }
 const workflowFile = arg("workflow-file", "linh-su.yml");
-/** Match the shared provisioner: an explicit repository name is also the default worker ID. */
-const workerId = arg("worker-id", repoName);
+function drawWorkerId(repo) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const candidate = randomSoftwareName();
+    if (candidate.toLowerCase() !== repo.toLowerCase()) return candidate;
+  }
+  console.error("Không rút được WORKER_ID khác tên repo sau 100 lượt.\nKHÔNG tạo gì cả.");
+  process.exit(1);
+}
+
+const suppliedWorkerId = arg("worker-id", "").trim();
+const workerId = suppliedWorkerId || drawWorkerId(repoName);
 const slug = `${owner}/${repoName}`;
 if (
   workflowFile.length > 100 ||
@@ -93,6 +103,10 @@ for (const [what, value] of [
     console.error(`${what} chỉ được gồm 1–100 ký tự chữ, số, dấu chấm, gạch nối hoặc gạch dưới; không được là . hoặc ..\nKHÔNG tạo gì cả.`);
     process.exit(1);
   }
+}
+if (workerId.toLowerCase() === repoName.toLowerCase()) {
+  console.error("Tên repo chính không được trùng WORKER_ID / tên khôi lỗi.\nKHÔNG tạo gì cả.");
+  process.exit(1);
 }
 
 const token = process.env.WORKER_TOKEN;

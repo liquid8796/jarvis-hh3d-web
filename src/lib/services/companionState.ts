@@ -31,10 +31,11 @@ async function acquireGithubSessionLease(keys: readonly string[], deadlineAt: nu
 }
 
 export async function acquireGithubProvisioningLease(slug: string, workerId: string, deadlineAt = Date.now() + 240_000): Promise<GithubSessionLease | null> {
-  const owner = slug.split("/")[0]?.toLowerCase() ?? "";
+  const [owner = "", repo = ""] = slug.split("/").map(part => part.toLowerCase());
   return acquireGithubSessionLease([
     `provision-owner:${owner}`,
     `provision:${slug.toLowerCase()}`,
+    `provision-worker:${repo}`,
     `provision-worker:${workerId.toLowerCase()}`,
   ], deadlineAt, "Provisioning lease unavailable");
 }
@@ -53,6 +54,7 @@ export async function acquireGithubOwnerDeletionLease(
     `provision-owner:${normalizedOwner}`,
     ...targets.flatMap((target) => [
       `provision:${target.slug.toLowerCase()}`,
+      `provision-worker:${target.slug.split("/")[1]?.toLowerCase() ?? ""}`,
       `provision-worker:${target.workerId.toLowerCase()}`,
       `companion:${target.slug.toLowerCase()}`,
     ]),

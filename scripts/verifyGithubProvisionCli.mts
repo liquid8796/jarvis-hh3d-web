@@ -51,7 +51,7 @@ assert.deepEqual(provisionInput, {
   dailyPushes: "24",
 });
 const explicit = normalizeGithubProvisionInput(provisionInput!);
-assert.equal(explicit.workerId, "chosen-repo", "an explicit repository must also be the worker ID");
+assert.equal(explicit.workerId, "", "an explicit repository no longer doubles as the worker ID");
 
 let called = false;
 await assert.rejects(
@@ -119,7 +119,8 @@ assert.ok(!/github:new[^\r\n]*%\*/i.test(bat), "raw launcher arguments are never
 const lowLevel = readFileSync(path.join(repoRoot, "scripts", "newGithubKhoiloi.mjs"), "utf8");
 assert.match(lowLevel, /buildKhoiloiPayload\(\{[^}]*workflowFile/s, "low-level payload uses the chosen workflow");
 assert.match(lowLevel, /\["workflow", "run", workflowFile,/s, "low-level dispatch uses the chosen workflow");
-assert.doesNotMatch(lowLevel, /randomSoftwareName|reviewGeneratedName/, "direct builder has no template fallback or forbidden-topic naming rule");
+assert.match(lowLevel, /randomSoftwareName/, "direct builder draws a separate default worker identity");
+assert.match(lowLevel, /Tên repo chính không được trùng WORKER_ID/, "direct builder rejects repo/worker identity collisions");
 
 for (const value of [undefined, "", "  "]) {
   const args = [path.join(repoRoot, "scripts", "newGithubKhoiloi.mjs"), "--owner", "sample-owner"];
@@ -131,6 +132,14 @@ for (const value of [undefined, "", "  "]) {
   assert.match(result.stderr, /Thiếu --repo/);
   assert.match(result.stderr, /npm run github:new/);
   assert.doesNotMatch(result.stdout + result.stderr, /Thiếu WORKER_TOKEN|Sắp dựng|Tạo kho sample-owner/, "missing direct names stop before tokens, staging, or network");
+}
+{
+  const result = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "newGithubKhoiloi.mjs"), "--owner", "sample-owner", "--repo", "same-name", "--worker-id", "same-name"], {
+    cwd: repoRoot, env: { ...process.env, WORKER_TOKEN: "" }, encoding: "utf8", timeout: 10_000, windowsHide: true,
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /trùng WORKER_ID/);
+  assert.doesNotMatch(result.stdout + result.stderr, /Thiếu WORKER_TOKEN|Sắp dựng|Tạo kho sample-owner/, "repo/worker collision stops before tokens, staging, or network");
 }
 
 const previewCalls: string[] = [];

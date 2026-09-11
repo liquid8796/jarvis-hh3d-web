@@ -3,7 +3,9 @@
 import assert from "node:assert/strict";
 import {
   normalizeGithubProvisionInput,
+  reviewPrimaryRepoAgainstKhoiloiNames,
   reviewNormalizedProvisionIdentity,
+  reviewProvisionWorkerId,
 } from "../src/lib/validation/githubProvisioning";
 
 const fixturePat = "ghp_fixture_value";
@@ -29,7 +31,7 @@ const supplied = normalizeGithubProvisionInput(
   { pat: fixturePat, repo: "  given-worker  ", workflowFile: "worker.yaml", dailyPushes: 24 },
 );
 assert.equal(supplied.repo, "given-worker", "explicit repository names are only trimmed");
-assert.equal(supplied.workerId, "given-worker");
+assert.equal(supplied.workerId, "", "worker identity is assigned after the repository name is accepted");
 assert.equal(supplied.generatedRepo, false);
 
 for (const good of ["0", "24"]) {
@@ -50,6 +52,15 @@ assert.notEqual(
   reviewNormalizedProvisionIdentity("valid-owner", normalize({ repo: "invalid repo" })),
   null,
   "repository identity must be checked after the owner is resolved",
+);
+assert.equal(reviewProvisionWorkerId("worker-name", "repo-name"), null);
+assert.notEqual(reviewProvisionWorkerId("repo-name", "repo-name"), null, "worker id must differ from the primary repo");
+assert.notEqual(reviewProvisionWorkerId("bad worker", "repo-name"), null, "worker id keeps a safe repository-like shape");
+assert.equal(reviewPrimaryRepoAgainstKhoiloiNames("repo-name", ["other-worker"]), null);
+assert.notEqual(
+  reviewPrimaryRepoAgainstKhoiloiNames("Repo-Name", ["repo-name"]),
+  null,
+  "primary repo cannot reuse an existing khôi lỗi name",
 );
 
 console.log("✔ GitHub provisioning input normalization: defaults, bounds, identity, and safety checks passed.");

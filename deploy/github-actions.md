@@ -374,13 +374,14 @@ trước mọi thay đổi trên GitHub.
 | Mục | Bỏ trống |
 |---|---|
 | PAT | Bắt buộc classic PAT có `repo`, `workflow`, `delete_repo` |
-| Tên repo | Sinh tên ngẫu nhiên; WORKER_ID dùng đúng tên repo |
+| Tên repo | Để trống thì Ollama đặt tên; tên này phải khác mọi tên khôi lỗi |
 | Tệp workflow | `linh-su.yml`; có thể dùng basename `.yml`/`.yaml` khác |
 | Giới hạn lượt đẩy mỗi kho phụ | `5`; chấp nhận `0..24`, `0` tạm dừng kho phụ |
 
-Tên workflow được dùng cả lúc khởi chạy, tự gọi lượt kế và deploy sau này. Workflow/WORKER_ID
-của repo do luồng mới tạo được khóa trong form Sửa; các dòng đăng ký cũ vẫn có thể chỉnh để
-khớp repo đang có. Thay PAT khi sửa phải dùng token của cùng tài khoản.
+Tên workflow được dùng cả lúc khởi chạy, tự gọi lượt kế và deploy sau này. `WORKER_ID` được
+tạo riêng với tên repo chính, bị chặn nếu trùng repo hoặc bất kỳ tên khôi lỗi đang có. Workflow/
+WORKER_ID của repo do luồng mới tạo được khóa trong form Sửa; các dòng đăng ký cũ vẫn có thể
+chỉnh để khớp repo đang có. Thay PAT khi sửa phải dùng token của cùng tài khoản.
 
 > **16/08/2026 — bốn công cụ trong tài liệu này nay CHẠY TRÊN VM.** Sổ Kho GitHub nằm trong
 > Postgres của backend, mà Postgres ấy chỉ nghe `127.0.0.1` trên `jarvis-oci-01`. Nên
@@ -453,9 +454,10 @@ của CHÍNH TA: chúng không nói gì với người lạ, nhưng chúng nối
 
 **Từ 17/08/2026 không còn tiền tố nào cả.** `randomSoftwareName()` rút hai từ trung tính; tên mới
 từ 19/08 mang thêm 16 ký tự hex (64 bit), như `cobalt-relay-0123456789abcdef`. Đời đầu của luật
-này dùng 4 hex và vẫn được nhận diện để dọn. MỘT cái tên ấy dùng cho cả tên kho lẫn
-`WORKER_ID`, để nhìn một id trên dashboard là biết ngay nó ở kho nào mà không phải tra sổ. Không
-có mốc thời gian trong tên: `…-20260813-233056-6143` là chữ ký của một cỗ máy sinh tên, còn
+này dùng 4 hex và vẫn được nhận diện để dọn. Từ 11/09/2026, tên repo chính và `WORKER_ID` được
+tách hẳn: repo là tên công khai trên GitHub, còn `WORKER_ID` là danh tính runner nội bộ. Hai tên
+này không được trùng nhau, và repo chính cũng không được trùng bất kỳ tên khôi lỗi đang điểm danh.
+Không có mốc thời gian trong tên: `…-20260813-233056-6143` là chữ ký của một cỗ máy sinh tên, còn
 `cobalt-relay-4f2a` thì không.
 
 Cái giá đã cân nhắc: mất phép「nhìn tiền tố biết là máy ở trọ」trên dashboard, và lượt XOÁ mất bộ

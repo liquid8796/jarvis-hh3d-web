@@ -20,11 +20,13 @@ export type NormalizedGithubProvisionInput = {
   repo: string;
   workflowFile: string;
   dailyPushes: number;
+  /** Filled after the owner and repository name are known. */
   workerId: string;
   generatedRepo: boolean;
 };
 
 const SAFE_WORKFLOW_BASENAME = /^[A-Za-z0-9][A-Za-z0-9._-]*\.(?:ya?ml)$/;
+const WORKER_ID_RE = /^[A-Za-z0-9._-]+$/;
 
 function normalizedDailyPushes(value: GithubProvisionInput["dailyPushes"]): number {
   if (value === undefined || value === "" || (typeof value === "string" && value.trim() === "")) {
@@ -67,7 +69,7 @@ export function normalizeGithubProvisionInput(
     repo,
     workflowFile,
     dailyPushes: normalizedDailyPushes(input.dailyPushes),
-    workerId: repo,
+    workerId: "",
     generatedRepo,
   };
 }
@@ -78,4 +80,19 @@ export function reviewNormalizedProvisionIdentity(
   input: Pick<NormalizedGithubProvisionInput, "repo" | "workflowFile">,
 ): string | null {
   return reviewStationIdentity(owner, input.repo, input.workflowFile);
+}
+
+export function reviewProvisionWorkerId(workerId: string, repo: string): string | null {
+  if (workerId.length === 0 || workerId.length > 100 || !WORKER_ID_RE.test(workerId) || workerId === "." || workerId === "..") {
+    return "Tên khôi lỗi: 1-100 ký tự chữ/số/dấu chấm/gạch ngang/gạch dưới.";
+  }
+  if (workerId.toLowerCase() === repo.toLowerCase()) {
+    return "Tên repo chính không được trùng tên khôi lỗi.";
+  }
+  return null;
+}
+
+export function reviewPrimaryRepoAgainstKhoiloiNames(repo: string, names: readonly string[]): string | null {
+  const match = names.find((name) => name.trim().length > 0 && name.toLowerCase() === repo.toLowerCase());
+  return match ? `Tên repo chính không được trùng tên khôi lỗi「${match}」. Chọn tên repo khác.` : null;
 }

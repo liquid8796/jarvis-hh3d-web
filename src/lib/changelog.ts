@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.77",
+    date: "2026-09-11",
+    lines: [
+      "Tên repo chính nay luôn khác tên khôi lỗi, kể cả khi tự nhập hoặc để Ollama đặt tên.",
+      "WORKER_ID được tạo riêng và giữ riêng, nên đổi tên repo chính không đổi danh tính điểm danh.",
+      "Có công cụ đổi các repo chính cũ còn trùng tên khôi lỗi sang tên mới do Ollama chọn.",
+    ],
+  },
+  {
     version: "1.3.76",
     date: "2026-09-11",
     lines: [
@@ -473,13 +482,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Sổ kho khôi lỗi GitHub ở trang Tông Môn nay chia trang: mở sẵn năm kho một trang, và mức đã chọn được nhớ cho lần sau.",
       "Trang đang xem mà giấu mất kho nào sắp tới hạn thì có một dòng nhắc ngay trên đầu danh sách, khỏi phải lật từng trang đi tìm.",
-    ],
-  },
-  {
-    version: "1.3.26",
-    date: "2026-08-21",
-    lines: [
-      "Khoáng Mạch: ô「Tên mỏ」thôi tự điền sẵn một cái tên. Để trống nghĩa là cứ đào tiếp mỏ đạo hữu đang ở; muốn dời mỏ thì gõ tên vào.",
     ],
   },
 ];

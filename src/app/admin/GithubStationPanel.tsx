@@ -494,7 +494,7 @@ function StationEditor({ station, onNew }: { station: StationView | null; onNew:
             <div>
               <label className="label" htmlFor="station-repo">Tên repo (tuỳ chọn)</label>
               <input id="station-repo" name="repo" className="input w-full font-mono" maxLength={100} placeholder="Để trống để Ollama tự đặt tên" />
-              <p className="mt-1 text-xs text-[var(--color-mist)]">Để trống: Ollama tự chọn tên, không dùng khuôn cố định. Cần model và API key Ollama dùng được; lỗi sẽ dừng tạo kho. Tên tự nhập được giữ nguyên và cũng là WORKER_ID.</p>
+              <p className="mt-1 text-xs text-[var(--color-mist)]">Để trống: Ollama tự chọn tên, không dùng khuôn cố định. Cần model và API key Ollama dùng được; lỗi sẽ dừng tạo kho. Tên tự nhập được giữ nguyên; tên khôi lỗi được tạo riêng để không trùng repo.</p>
             </div>
           )}
           {managed ? (

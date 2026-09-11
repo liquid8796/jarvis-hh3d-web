@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.77 — Tách tên repo chính khỏi tên khôi lỗi (11/09/2026)
+
+- Tạo repo chính qua admin, CLI hoặc tên do Ollama chọn đều bị chặn nếu trùng với bất kỳ `WORKER_ID` đã đăng ký hoặc dòng đang điểm danh trong bảng `workers`.
+- `WORKER_ID` của repo chính được tạo riêng, không còn lấy theo tên repo. Tên người dùng nhập vẫn được giữ nguyên nếu hợp lệ và không đụng tên khôi lỗi.
+- Luồng đặt tên bằng Ollama nhận danh sách tên cần tránh và tự sửa nếu model trả về tên đã dùng, trùng worker hoặc không đúng cú pháp GitHub.
+- `github:rename` nay chỉ đổi tên repo chính đang trùng tên khôi lỗi, giữ nguyên `WORKER_ID`, không đụng repo phụ và có thể nhận `--repo owner/repo` để xử lý một kho.
+
 ## 1.3.76 — Xóa repo chính theo tài khoản từ admin (11/09/2026)
 
 - Nút Xóa của một station nay xóa mọi repo chính đã đăng ký dưới cùng tài khoản GitHub, xác minh đúng `full_name` và ID đã lưu, đọc lại 404 sau khi xóa rồi mới gỡ các station khỏi sổ.

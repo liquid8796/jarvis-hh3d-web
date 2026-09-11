@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * ĐỔI TÊN kho khôi lỗi GitHub (và `WORKER_ID` của nó) sang tên ngẫu nhiên của luật mới.
+ * ĐỔI TÊN repo chính GitHub ra khỏi tên khôi lỗi đang dùng.
  *
  *   npm run vm -- npm run github:rename -- --dry-run     xem kế hoạch, KHÔNG đụng gì
  *   npm run vm -- npm run github:rename -- --yes         đổi tên MỌI kho còn mang tên đời cũ
@@ -9,10 +9,10 @@
  *
  * ── VÌ SAO CẦN ────────────────────────────────────────────────────────────────────────────────
  *
- * Luật đặt tên đổi ngày 17/08/2026 (xem `khoiloiNaming.mjs`): tên kho và `WORKER_ID` nay là một
- * cái tên ngẫu nhiên kiểu `cobalt-relay-4f2a`, không còn tiền tố. Nhưng luật chỉ áp cho kho DỰNG
- * TỪ ĐÓ — tám kho đang chạy vẫn mang `linh-su-…` và `khoiloi-tro-…`, tức vẫn nhận ra nhau bằng
- * mắt thường. Tệp này là lượt dọn ấy.
+ * Luật đặt tên đổi ngày 11/09/2026: repo chính KHÔNG được trùng tên khôi lỗi (`WORKER_ID` hoặc
+ * dòng trong bảng workers). Repo là cái tên công khai trên GitHub; WORKER_ID là danh tính runner
+ * đang điểm danh trong tông môn. Hai thứ trùng nhau làm người nhìn nối kho công khai với khôi lỗi
+ * đang chạy, nên tệp này đổi REPO, giữ nguyên WORKER_ID.
  *
  * ── BA ĐIỀU QUYẾT ĐỊNH HÌNH DẠNG TỆP NÀY ─────────────────────────────────────────────────────
  *
@@ -30,21 +30,16 @@
  *    kết phải nói thẳng kho nào giờ đang LỆCH — tên trên GitHub đã đổi mà sổ chưa kịp ghi — vì đó
  *    là trạng thái duy nhất cần người sửa tay.
  *
- * ── SAU LƯỢT NÀY CÒN HAI BƯỚC ─────────────────────────────────────────────────────────────────
+ * ── SAU LƯỢT NÀY ───────────────────────────────────────────────────────────────────────────────
  *
- * Đổi tên xong thì runner ĐANG CHẠY vẫn mang `WORKER_ID` cũ (nó đã checkout từ trước), và workflow
- * trong kho vẫn ghi id cũ. Nên:
- *
- *   npm run vm -- npm run github:deploy -- --restart   đẩy workflow mang id mới + phát lượt mới
- *   npm run vm -- npm run roster:purge                 dọn dòng id CŨ khỏi sổ điểm danh
- *
- * Script này KHÔNG tự làm hai bước ấy: bước đầu cắt runner (đàn đang cày sẽ hỏng), nên nó phải là
- * một quyết định riêng của người vận hành — cùng lẽ với `--force` bên `github:deploy`.
+ * Đổi tên repo không đổi runner đang chạy: GitHub giữ redirect tên cũ, workflow vẫn khai cùng
+ * WORKER_ID, và lượt phát hành kế tiếp sẽ đẩy vào tên mới trong sổ.
  */
 import { sqlTag } from "./pgTag.mjs";
 import { decryptSecret, isEncrypted } from "../src/lib/crypto/secretBox";
-import { explainFailure, reviewStationIdentity } from "../src/lib/validation/githubStations";
-import { randomSoftwareName, reviewGeneratedName, GENERATED_NAME_SHAPE } from "./khoiloiNaming.mjs";
+import { DEFAULT_WORKFLOW_FILE, explainFailure, reviewStationIdentity } from "../src/lib/validation/githubStations";
+import { reviewPrimaryRepoAgainstKhoiloiNames } from "../src/lib/validation/githubProvisioning";
+import { generatePrimaryRepoName } from "../src/lib/services/ollamaRepoNaming";
 import { appDatabaseUrl } from "./activeStationPg.mts";
 import { loadEnv } from "./loadEnv.mjs";
 
@@ -106,6 +101,7 @@ const sql = sqlTag(databaseUrl);
 const rows = (await sql`
   SELECT value -> 'githubStations' AS stations FROM app_settings WHERE id = 'global'
 `) as Array<{ stations: unknown }>;
+const workerRows = (await sql`SELECT id FROM workers`) as Array<{ id: unknown }>;
 
 const raw = rows[0]?.stations;
 if (raw != null && !Array.isArray(raw)) {
@@ -128,39 +124,58 @@ for (const row of (raw ?? []) as Array<Record<string, unknown>>) {
 
 if (stations.length === 0) die("Sổ Kho GitHub trống — không có gì để đổi tên.");
 
-/** Kho đã hợp luật mới thì bỏ qua, trừ khi `--all`: đổi tên một kho đang yên là tốn công vô ích. */
-const needsRename = (s: Station) =>
-  renameAll || !GENERATED_NAME_SHAPE.test(s.repo.toLowerCase()) || !GENERATED_NAME_SHAPE.test(s.workerId.toLowerCase());
+const khoiloiNames = [
+  ...stations.map((station) => station.workerId),
+  ...workerRows.map((row) => String(row.id ?? "")),
+].filter((name) => name.trim().length > 0);
+const khoiloiNameSet = new Set(khoiloiNames.map((name) => name.toLowerCase()));
+
+/** Kho đã khác mọi tên khôi lỗi thì bỏ qua, trừ khi `--all`. */
+const needsRename = (s: Station) => renameAll || khoiloiNameSet.has(s.repo.toLowerCase());
 
 const picked = stations.filter(
-  (s) => (onlyRepo ? s.repo.toLowerCase() === onlyRepo.toLowerCase() : needsRename(s)),
+  (s) => (onlyRepo
+    ? s.repo.toLowerCase() === onlyRepo.toLowerCase()
+      || `${s.owner}/${s.repo}`.toLowerCase() === onlyRepo.toLowerCase()
+    : needsRename(s)),
 );
 
 if (picked.length === 0) {
-  console.log("\n✔ Mọi kho trong sổ đã mang tên hợp luật mới — không có gì để làm.");
+  console.log("\n✔ Mọi repo chính trong sổ đã khác tên khôi lỗi — không có gì để làm.");
   process.exit(0);
 }
 
 /**
- * Rút tên cho CẢ LƯỢT trước khi đụng vào GitHub, và soát trùng với mọi tên đang có trong sổ lẫn
- * mọi tên vừa rút. Rút sẵn cũng là thứ cho phép `--dry-run` in ra đúng những cái tên sẽ dùng.
+ * Nhờ Ollama đặt tên cho CẢ LƯỢT trước khi đụng vào GitHub, và soát trùng với mọi tên đang có
+ * trong sổ, mọi tên khôi lỗi, lẫn mọi tên vừa rút. Rút sẵn cũng là thứ cho phép `--dry-run` in
+ * ra đúng những cái tên sẽ dùng.
  */
 const taken = new Set(stations.flatMap((s) => [s.repo.toLowerCase(), s.workerId.toLowerCase()]));
-const plan = picked.map((station) => {
-  let name = randomSoftwareName();
-  for (let attempt = 0; taken.has(name) && attempt < 50; attempt++) name = randomSoftwareName();
-  if (taken.has(name)) die("Rút năm chục lần vẫn trùng tên đã có — hai rổ từ quá hẹp so với số kho.");
-  const complaint = reviewGeneratedName("Tên mới", name);
-  if (complaint) die(complaint);
-  taken.add(name);
-  return { station, name };
-});
+const plan: Array<{ station: Station; name: string }> = [];
+for (const station of picked) {
+  let name = "";
+  const rejected: string[] = [];
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const deadlineAt = Date.now() + 60_000;
+    name = await generatePrimaryRepoName(station.owner, { now: Date.now, deadlineAt }, [...taken, ...khoiloiNames, ...rejected]);
+    const complaint =
+      reviewStationIdentity(station.owner, name, DEFAULT_WORKFLOW_FILE)
+      ?? reviewPrimaryRepoAgainstKhoiloiNames(name, khoiloiNames)
+      ?? (taken.has(name.toLowerCase()) ? "Tên mới bị trùng tên repo/worker đã có trong sổ." : null);
+    if (!complaint) break;
+    rejected.push(name);
+    name = "";
+  }
+  if (!name) die(`Ollama chưa rút được tên repo mới hợp lệ cho ${station.owner}/${station.repo}.`);
+  taken.add(name.toLowerCase());
+  plan.push({ station, name });
+}
 
-console.log(`\nĐổi tên kho khôi lỗi — ${plan.length}/${stations.length} kho\n`);
+console.log(`\nĐổi tên repo chính đang trùng tên khôi lỗi — ${plan.length}/${stations.length} kho\n`);
 for (const { station, name } of plan) {
   console.log(`  ${station.owner}/${station.repo}`);
-  console.log(`    → kho      : ${name}`);
-  console.log(`    → WORKER_ID: ${station.workerId} → ${name}`);
+  console.log(`    → repo     : ${name}`);
+  console.log(`    → WORKER_ID: giữ nguyên ${station.workerId}`);
 }
 
 if (dryRun) {
@@ -170,7 +185,7 @@ if (dryRun) {
 
 if (!yes) {
   die(
-    "Thiếu --yes. Lượt này đổi tên kho CÔNG KHAI và đổi luôn danh tính khôi lỗi trong sổ.\n" +
+    "Thiếu --yes. Lượt này đổi tên repo CÔNG KHAI trên GitHub và cập nhật sổ.\n" +
       "  Xem trước bằng --dry-run, rồi chạy lại kèm --yes.",
   );
 }
@@ -206,7 +221,7 @@ for (const { station, name } of plan) {
                  '{githubStations}',
                  (SELECT jsonb_agg(
                            CASE WHEN s->>'owner' = ${station.owner} AND s->>'repo' = ${station.repo}
-                                THEN s || jsonb_build_object('repo', ${name}::text, 'workerId', ${name}::text)
+                                THEN s || jsonb_build_object('repo', ${name}::text)
                                 ELSE s END)
                     FROM jsonb_array_elements(value -> 'githubStations') s))
          WHERE id = 'global'
@@ -217,12 +232,12 @@ for (const { station, name } of plan) {
         state: "LỆCH SỔ",
         detail:
           `kho trên GitHub ĐÃ thành「${name}」nhưng ghi sổ hỏng: ${err instanceof Error ? err.message : String(err)}.\n` +
-          `      Sửa TAY ở tab Kho GitHub: đổi repo và WORKER_ID của dòng「${slug}」thành「${name}」.`,
+          `      Sửa TAY ở tab Kho GitHub: đổi repo của dòng「${slug}」thành「${name}」, giữ WORKER_ID「${station.workerId}」.`,
       });
       continue;
     }
 
-    outcomes.push({ slug, state: "đã đổi", detail: `→ ${station.owner}/${name} · WORKER_ID ${name}` });
+    outcomes.push({ slug, state: "đã đổi", detail: `→ ${station.owner}/${name} · WORKER_ID giữ ${station.workerId}` });
   } catch (err) {
     outcomes.push({ slug, state: "HỎNG", detail: err instanceof Error ? err.message : String(err) });
   }
@@ -232,11 +247,4 @@ console.log("\n── Tổng kết ───────────────
 for (const o of outcomes) console.log(`  ${o.state === "đã đổi" ? "✔" : "✗"} ${o.slug} ${o.state}  ${o.detail}`);
 
 const broken = outcomes.filter((o) => o.state !== "đã đổi");
-if (outcomes.some((o) => o.state === "đã đổi")) {
-  console.log(
-    "\n  CÒN HAI BƯỚC, và cả hai đều cắt runner nên phải do người vận hành bấm:\n" +
-      "    npm run vm -- npm run github:deploy -- --restart   đẩy workflow mang WORKER_ID mới\n" +
-      "    npm run vm -- npm run roster:purge                 dọn dòng id CŨ khỏi sổ điểm danh",
-  );
-}
 process.exit(broken.length > 0 ? 1 : 0);

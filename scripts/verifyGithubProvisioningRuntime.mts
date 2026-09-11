@@ -17,7 +17,7 @@ try {
   process.env.WORKER_TOKEN = "fixture-worker-token";
   process.env.DATABASE_URL = "postgresql://unused.invalid/fixture";
   process.chdir(release);
-  const ctx = { pat: "fixture-pat", repo: "fixture-project", workerId: "fixture-project", owner: "Fixture", slug: "Fixture/fixture-project", workflowFile: "custom.yaml", dailyPushes: 4, generatedRepo: false, now: Date.now, deadlineAt: Date.now() + 210_000 };
+  const ctx = { pat: "fixture-pat", repo: "fixture-project", workerId: "fixture-worker", owner: "Fixture", slug: "Fixture/fixture-project", workflowFile: "custom.yaml", dailyPushes: 4, generatedRepo: false, now: Date.now, deadlineAt: Date.now() + 210_000 };
   prepared = await production.localPreflight(ctx);
   const tempRoot = await realpath(tmpdir());
   for (const rejected of [tempRoot, root, release, path.join(root, "github-provision-Outside"), path.join(tempRoot, "github-provision-x", "nested"), "github-provision-relative"]) await assert.rejects(resolveGithubProvisioningTemp(rejected));
@@ -28,7 +28,7 @@ try {
   const proof = await production.stage(ctx, prepared);
   assert.match(proof.initialCommitSha, /^[a-f0-9]{40}$/);
   const workflow = await readFile(path.join(prepared.directory, ".github/workflows/custom.yaml"), "utf8");
-  assert.ok(workflow.includes("WORKER_ID: fixture-project"));
+  assert.ok(workflow.includes("WORKER_ID: fixture-worker"));
   assert.ok(workflow.includes("/actions/workflows/custom.yaml/dispatches"));
   assert.ok(!workflow.includes("/actions/workflows/linh-su.yml/dispatches"));
   const packageJson = JSON.parse(await readFile(path.join(prepared.directory, "package.json"), "utf8"));

@@ -131,7 +131,7 @@ export async function runGithubProvisionDryRun(
   const previewOnly = normalized.generatedRepo;
   if (previewOnly) {
     normalized.repo = "preview-only";
-    normalized.workerId = normalized.repo;
+    normalized.workerId = "preview-worker";
   }
   if (!owner || reviewNormalizedProvisionIdentity(owner, normalized)) {
     throw new Error("The dry-run owner, repository, or workflow identity is invalid.");

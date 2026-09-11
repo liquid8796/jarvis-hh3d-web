@@ -13,6 +13,8 @@ function fixture(failure = "") {
   const fail = (stage: string) => { if (failure === stage) throw new Error(`${input.pat} raw worker-secret stderr`); };
   const deps: GithubProvisioningDependencies = {
     generateRepoName: async () => { events.push("llm-name"); fail("llm-name"); return "generated-project"; },
+    generateWorkerId: async () => { events.push("worker-id"); fail("worker-id"); return "worker-identity"; },
+    listKhoiloiNames: async () => { events.push("khoiloi-names"); fail("khoiloi-names"); return ["sect-worker"]; },
     whoami: async () => { events.push("whoami"); fail("whoami"); return { login: "Owner", scopes: "repo, workflow, delete_repo" }; },
     checkScopes: async () => { events.push("scope"); fail("scope"); },
     localPreflight: async () => { events.push("local-preflight"); fail("local-preflight"); return { directory: "fake", encryptedPat: "encrypted", workerToken: "worker-secret" }; },
@@ -48,7 +50,7 @@ for (const kind of ["station", "worker"] as const) {
 assert.deepEqual(await provisionGithubStation(input, happy.deps), {
   ok: true, stage: "complete", slug: "Owner/small-project", message: "Đã tạo và đăng ký kho GitHub.", warnings: [],
 });
-assert.deepEqual(happy.events, ["whoami", "scope", "local-preflight", "settings-check", "worker-check", "repo-404", "lease", "repo-404", "stage", "create", "push", "secret", "register", "dispatch", "ping", "nurture"]);
+assert.deepEqual(happy.events, ["whoami", "scope", "khoiloi-names", "worker-id", "local-preflight", "settings-check", "worker-check", "repo-404", "lease", "repo-404", "stage", "create", "push", "secret", "register", "dispatch", "ping", "nurture"]);
 assert.deepEqual(happy.state(), { registered: true, created: true, deleted: false, leased: false });
 assert.ok(!happy.events.includes("llm-name"), "explicit repo never calls the model");
 for (const chosen of ["Prism", "notes_engine", "garden.v2"]) {
@@ -65,10 +67,33 @@ for (const chosen of ["Prism", "notes_engine", "garden.v2"]) {
   assert.equal(result.ok, true);
   assert.equal(result.slug, `Owner/${chosen}`);
   assert.equal(received?.repo, chosen);
-  assert.equal(received?.workerId, chosen);
+  assert.equal(received?.workerId, "worker-identity");
   assert.equal(received?.generatedRepo, true);
-  assert.deepEqual(f.events.slice(0, 4), ["whoami", "scope", "llm-name", "local-preflight"]);
+  assert.deepEqual(f.events.slice(0, 6), ["whoami", "scope", "khoiloi-names", "llm-name", "worker-id", "local-preflight"]);
   assert.equal(f.events.filter(e => e === "llm-name").length, 1);
+}
+{
+  const f = fixture();
+  f.deps.listKhoiloiNames = async () => { f.events.push("khoiloi-names"); return ["small-project"]; };
+  const result = await provisionGithubStation(input, f.deps);
+  assert.equal(result.ok, false);
+  assert.match(result.message, /trùng tên khôi lỗi/);
+  assert.deepEqual(f.events, ["whoami", "scope", "khoiloi-names"]);
+}
+{
+  const f = fixture();
+  f.deps.listKhoiloiNames = async () => { f.events.push("khoiloi-names"); return ["generated-project"]; };
+  const result = await provisionGithubStation({ ...input, repo: "" }, f.deps);
+  assert.equal(result.ok, false);
+  assert.match(result.message, /Ollama.*chưa tạo repo/);
+  assert.ok(!f.events.includes("worker-id") && !f.events.includes("local-preflight"));
+}
+{
+  const f = fixture();
+  f.deps.generateWorkerId = async () => { f.events.push("worker-id"); return "small-project"; };
+  const result = await provisionGithubStation(input, f.deps);
+  assert.equal(result.ok, false);
+  assert.ok(!f.events.includes("local-preflight"));
 }
 for (const failure of ["whoami", "scope", "llm-name"]) {
   const f = fixture(failure);
@@ -94,7 +119,7 @@ for (const invalid of ["", ".", "..", "bad/name", "bad name", "a".repeat(101)]) 
   assert.equal(f.events.filter(e => e === "llm-name").length, 1, "collision stops instead of adding a generated suffix");
   assert.ok(!f.events.includes("create"));
 }
-for (const failure of ["whoami", "scope", "local-preflight", "settings-check", "worker-check", "existing", "unknown", "locked-existing", "locked-settings", "locked-worker", "lost-lease", "stage", "create-422", "create-500", "create-no-id", "ambiguous-create"]) {
+for (const failure of ["whoami", "scope", "khoiloi-names", "worker-id", "local-preflight", "settings-check", "worker-check", "existing", "unknown", "locked-existing", "locked-settings", "locked-worker", "lost-lease", "stage", "create-422", "create-500", "create-no-id", "ambiguous-create"]) {
   const f = fixture(failure), result = await provisionGithubStation(input, f.deps);
   assert.equal(result.ok, false, failure);
   assert.equal(f.state().registered, false, failure);

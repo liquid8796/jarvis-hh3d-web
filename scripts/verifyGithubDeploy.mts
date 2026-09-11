@@ -21,6 +21,7 @@
  *「phép ấy chạy được trên tệp THẬT」, không phải một giá trị cụ thể nào.
  */
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { DEFAULT_WORKFLOW_FILE } from "../src/lib/validation/githubStations";
 import { looksTransient } from "./githubTransient.mjs";
@@ -304,16 +305,19 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
     workflowTargetPath(DEFAULT_WORKFLOW_FILE) === WORKFLOW_TARGET_PATH,
     `${WORKFLOW_TARGET_PATH} vs .github/workflows/${DEFAULT_WORKFLOW_FILE}`,
   );
-  const newGithubRaw = readCommittedFile(repoRoot, "scripts/newGithubKhoiloi.mjs").toString("utf8");
-  const newStationRaw = readCommittedFile(repoRoot, "scripts/newGithubStation.mts").toString("utf8");
+  const newGithubRaw = readFileSync(path.join(repoRoot, "scripts/newGithubKhoiloi.mjs"), "utf8");
+  const newStationRaw = readFileSync(path.join(repoRoot, "scripts/newGithubStation.mts"), "utf8");
+  const provisioningRaw = readFileSync(path.join(repoRoot, "src/lib/services/githubProvisioning.ts"), "utf8");
+  const provisioningPayloadRaw = readFileSync(path.join(repoRoot, "scripts/githubProvisioningPayload.mjs"), "utf8");
   check(
     "lối dựng kho trần mặc định worker đi thẳng backend",
     newGithubRaw.includes(`DEFAULT_WEB_URL = "${EXPECTED_DIRECT_WORKER_URL}"`),
   );
   check(
     "lối dựng-và-ghi-sổ cũng ép worker đi thẳng backend",
-    newStationRaw.includes(`DIRECT_WORKER_URL = "${EXPECTED_DIRECT_WORKER_URL}"`) &&
-      newStationRaw.includes('inner.push("--web-url", DIRECT_WORKER_URL)'),
+    newStationRaw.includes('githubProvisioningDependenciesForPayloadSource("git-head")') &&
+      provisioningRaw.includes("productionLocalPreflight(ctx, sourceMode)") &&
+      provisioningPayloadRaw.includes(`webUrl: "${EXPECTED_DIRECT_WORKER_URL}"`),
   );
 
   const dayDu = new Map([

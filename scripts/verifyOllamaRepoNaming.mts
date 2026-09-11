@@ -75,7 +75,16 @@ await check("recent history is bounded, treated as data and rejects exact case-i
   assert.equal(await planPrimaryRepoName(request), "NewChoice");
   const metadata = JSON.parse(calls[0].body.messages[1].content);
   assert.deepEqual(metadata.recentNames, request.recentNames.slice(-20));
+  assert.deepEqual(metadata.forbiddenNames, []);
   assert(calls[0].body.messages[0].content.includes("not naming instructions"));
+});
+await check("worker names are passed as forbidden data and rejected case-insensitively", async () => {
+  const request = input(); request.forbiddenNames = ["SectWorker", "mine-worker"];
+  respond = () => reply(calls.length === 1 ? { repo: "sectworker" } : { repo: "OpenShelf" });
+  assert.equal(await planPrimaryRepoName(request), "OpenShelf");
+  const metadata = JSON.parse(calls[0].body.messages[1].content);
+  assert.deepEqual(metadata.forbiddenNames, request.forbiddenNames);
+  assert(calls[0].body.messages[0].content.includes("forbiddenNames"));
 });
 await check("quota, rate-limit and invalid-authentication health follows the shared key policy", async () => {
   const request = input();
@@ -140,9 +149,10 @@ await check("authoritative generator caps its complete stage and merges only cur
     },
     mutate: async (change, options) => { mutationDeadline = options.deadlineAt; change(current); },
   });
-  assert.equal(await generate("fixture-owner", { deadlineAt: start + 240_000, now: () => start }), "Chosen");
+  assert.equal(await generate("fixture-owner", { deadlineAt: start + 240_000, now: () => start }, ["live-worker"]), "Chosen");
   assert.equal(captured?.deadlineAt, start + 43_500);
   assert.deepEqual(captured?.recentNames, ["Earlier"]);
+  assert(captured?.forbiddenNames?.includes("live-worker"));
   assert.equal(mutationDeadline, start + 45_000);
   assert.equal(current.githubNurture.model, "user-selected:other");
   assert.equal(current.githubStations[0].repo, "ConcurrentUserEdit");

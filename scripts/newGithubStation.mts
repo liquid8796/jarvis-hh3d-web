@@ -15,7 +15,6 @@ import {
   type GithubProvisionResult,
 } from "../src/lib/services/githubProvisioning";
 import { loadEnv } from "./loadEnv.mjs";
-import { randomSoftwareName } from "./khoiloiNaming.mjs";
 
 export type GithubProvisionCliOptions = {
   input: GithubProvisionInput;
@@ -89,20 +88,51 @@ export function parseGithubProvisionArgs(
   };
 }
 
-async function legacyDryRun(input: GithubProvisionInput): Promise<GithubProvisionResult> {
+type GithubProvisionDryRunDependencies = Pick<typeof productionGithubProvisionDependencies, "whoami" | "checkScopes"> & {
+  checkPayload: (args: string[]) => Promise<boolean>;
+};
+
+async function checkDryRunPayload(args: string[]): Promise<boolean> {
+  const childEnv = { ...process.env };
+  delete childEnv.GITHUB_PAT;
+  delete childEnv.GH_TOKEN;
+  return new Promise(resolve => {
+    const child = spawn(process.execPath, args, {
+      cwd: path.join(import.meta.dirname, ".."),
+      env: childEnv,
+      shell: false,
+      windowsHide: true,
+      stdio: "inherit",
+    });
+    child.on("error", () => resolve(false));
+    child.on("close", code => resolve(code === 0));
+  });
+}
+
+/** Preview payload bytes without invoking Ollama or updating API key health in the database. */
+export async function runGithubProvisionDryRun(
+  input: GithubProvisionInput,
+  dependencies: GithubProvisionDryRunDependencies = {
+    whoami: productionGithubProvisionDependencies.whoami,
+    checkScopes: productionGithubProvisionDependencies.checkScopes,
+    checkPayload: checkDryRunPayload,
+  },
+): Promise<GithubProvisionResult> {
   const now = Date.now;
   const budget = { now, deadlineAt: now() + 60_000 };
   let owner = input.ownerForDryRun ?? "";
   if (input.pat) {
-    const identity = await productionGithubProvisionDependencies.whoami(input.pat, budget);
+    const identity = await dependencies.whoami(input.pat, budget);
     owner = identity.login;
-    await productionGithubProvisionDependencies.checkScopes(identity.scopes);
+    await dependencies.checkScopes(identity.scopes);
   }
 
-  const normalized = normalizeGithubProvisionInput(
-    { ...input, pat: input.pat || "offline-dry-run" },
-    { randomRepo: () => randomSoftwareName() },
-  );
+  const normalized = normalizeGithubProvisionInput({ ...input, pat: input.pat || "offline-dry-run" });
+  const previewOnly = normalized.generatedRepo;
+  if (previewOnly) {
+    normalized.repo = "preview-only";
+    normalized.workerId = normalized.repo;
+  }
   if (!owner || reviewNormalizedProvisionIdentity(owner, normalized)) {
     throw new Error("The dry-run owner, repository, or workflow identity is invalid.");
   }
@@ -117,28 +147,20 @@ async function legacyDryRun(input: GithubProvisionInput): Promise<GithubProvisio
     "--workflow-file",
     normalized.workflowFile,
   ];
-  const childEnv = { ...process.env };
-  delete childEnv.GITHUB_PAT;
-  delete childEnv.GH_TOKEN;
-
-  return new Promise(resolve => {
-    const child = spawn(process.execPath, args, {
-      cwd: path.join(import.meta.dirname, ".."),
-      env: childEnv,
-      shell: false,
-      windowsHide: true,
-      stdio: "inherit",
-    });
-    child.on("error", () => resolve({ ok: false, stage: "preflight", message: "Could not start the dry-run payload check.", warnings: [] }));
-    child.on("close", code => resolve(code === 0
-      ? { ok: true, stage: "complete", slug: `${owner}/${normalized.repo}`, message: `Dry-run payload check completed with daily limit ${normalized.dailyPushes}. No GitHub or database changes were made.`, warnings: [] }
-      : { ok: false, stage: "preflight", message: "Dry-run payload check failed. No GitHub or database changes were made.", warnings: [] }));
-  });
+  const ok = await dependencies.checkPayload(args);
+  return ok
+    ? {
+      ok: true, stage: "complete", ...(!previewOnly ? { slug: `${owner}/${normalized.repo}` } : {}),
+      message: `Dry-run payload check completed with daily limit ${normalized.dailyPushes}. ` +
+        (previewOnly ? "preview-only is a payload placeholder; Ollama will choose the actual repository name only on live creation. " : "") +
+        "No Ollama calls, GitHub changes, or database changes were made.", warnings: [],
+    }
+    : { ok: false, stage: "preflight", message: "Dry-run payload check failed. No GitHub or database changes were made.", warnings: [] };
 }
 
 const productionDependencies: GithubProvisionCliDependencies = {
   provision: input => provisionGithubStation(input, githubProvisioningDependenciesForPayloadSource("git-head")),
-  dryRun: legacyDryRun,
+  dryRun: runGithubProvisionDryRun,
 };
 
 function printResult(result: GithubProvisionResult, io: GithubProvisionCliIo): void {

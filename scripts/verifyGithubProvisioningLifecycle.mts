@@ -12,7 +12,7 @@ function fixture(failure = "") {
   let registered = false, created = false, deleted = false, leased = false, probes = 0;
   const fail = (stage: string) => { if (failure === stage) throw new Error(`${input.pat} raw worker-secret stderr`); };
   const deps: GithubProvisioningDependencies = {
-    randomRepo: () => "generated-project",
+    generateRepoName: async () => { events.push("llm-name"); fail("llm-name"); return "generated-project"; },
     whoami: async () => { events.push("whoami"); fail("whoami"); return { login: "Owner", scopes: "repo, workflow, delete_repo" }; },
     checkScopes: async () => { events.push("scope"); fail("scope"); },
     localPreflight: async () => { events.push("local-preflight"); fail("local-preflight"); return { directory: "fake", encryptedPat: "encrypted", workerToken: "worker-secret" }; },
@@ -50,6 +50,50 @@ assert.deepEqual(await provisionGithubStation(input, happy.deps), {
 });
 assert.deepEqual(happy.events, ["whoami", "scope", "local-preflight", "settings-check", "worker-check", "repo-404", "lease", "repo-404", "stage", "create", "push", "secret", "register", "dispatch", "ping", "nurture"]);
 assert.deepEqual(happy.state(), { registered: true, created: true, deleted: false, leased: false });
+assert.ok(!happy.events.includes("llm-name"), "explicit repo never calls the model");
+for (const chosen of ["Prism", "notes_engine", "garden.v2"]) {
+  const f = fixture(); let received: Parameters<GithubProvisioningDependencies["create"]>[0] | undefined;
+  f.deps.generateRepoName = async (owner, budget) => {
+    f.events.push("llm-name");
+    assert.equal(owner, "Owner");
+    assert.ok(budget.deadlineAt > budget.now() && budget.deadlineAt - budget.now() <= 45_000);
+    return chosen;
+  };
+  const originalCreate = f.deps.create;
+  f.deps.create = async ctx => { received = ctx; return originalCreate(ctx); };
+  const result = await provisionGithubStation({ ...input, repo: "  " }, f.deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.slug, `Owner/${chosen}`);
+  assert.equal(received?.repo, chosen);
+  assert.equal(received?.workerId, chosen);
+  assert.equal(received?.generatedRepo, true);
+  assert.deepEqual(f.events.slice(0, 4), ["whoami", "scope", "llm-name", "local-preflight"]);
+  assert.equal(f.events.filter(e => e === "llm-name").length, 1);
+}
+for (const failure of ["whoami", "scope", "llm-name"]) {
+  const f = fixture(failure);
+  const result = await provisionGithubStation({ ...input, repo: "" }, f.deps);
+  assert.equal(result.ok, false);
+  assert.ok(!f.events.includes("create") && !f.events.includes("delete") && !f.events.includes("local-preflight"));
+  if (failure !== "llm-name") assert.ok(!f.events.includes("llm-name"));
+  else assert.match(result.message, /Ollama.*chưa tạo repo/);
+  assert.ok(!JSON.stringify(result).includes(input.pat));
+}
+for (const invalid of ["", ".", "..", "bad/name", "bad name", "a".repeat(101)]) {
+  const f = fixture(); f.deps.generateRepoName = async () => invalid;
+  const result = await provisionGithubStation({ ...input, repo: "" }, f.deps);
+  assert.equal(result.ok, false);
+  assert.match(result.message, /Ollama/);
+  assert.ok(!f.events.includes("create") && !f.events.includes("local-preflight"));
+}
+{
+  const f = fixture("existing");
+  const result = await provisionGithubStation({ ...input, repo: "" }, f.deps);
+  assert.equal(result.ok, false);
+  assert.match(result.message, /đã tồn tại/);
+  assert.equal(f.events.filter(e => e === "llm-name").length, 1, "collision stops instead of adding a generated suffix");
+  assert.ok(!f.events.includes("create"));
+}
 for (const failure of ["whoami", "scope", "local-preflight", "settings-check", "worker-check", "existing", "unknown", "locked-existing", "locked-settings", "locked-worker", "lost-lease", "stage", "create-422", "create-500", "create-no-id", "ambiguous-create"]) {
   const f = fixture(failure), result = await provisionGithubStation(input, f.deps);
   assert.equal(result.ok, false, failure);
@@ -132,6 +176,14 @@ hung.deps.whoami = () => new Promise(() => {});
 const beforeHung = Date.now();
 assert.equal((await provisionGithubStation(input, hung.deps)).ok, false);
 assert.ok(Date.now() - beforeHung < 1_000, "hung adapter must obey the shared timeout");
+const hungName = fixture(); hungName.deps.deadlineAt = Date.now() + 30_020;
+hungName.deps.generateRepoName = () => new Promise(() => {});
+const beforeHungName = Date.now();
+const timedOutName = await provisionGithubStation({ ...input, repo: "" }, hungName.deps);
+assert.equal(timedOutName.ok, false);
+assert.match(timedOutName.message, /Ollama/);
+assert.ok(Date.now() - beforeHungName < 1_000);
+assert.ok(!hungName.events.includes("create") && !hungName.events.includes("local-preflight"));
 for (const finalStatus of [404, 200, "error"] as const) {
   const f = fixture("secret"); const probe = f.deps.probe;
   f.deps.probe = async ctx => {

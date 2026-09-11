@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.74 — Ollama đặt tên repo chính (11/09/2026)
+
+- Bỏ bộ ghép từ và hậu tố hex khỏi tên mặc định của repo chính. Form admin và CLI cùng nhờ Ollama chọn tên khi để trống, dùng model và khóa đã cấu hình; tên người dùng nhập được giữ nguyên.
+- Việc đặt tên chỉ chạy sau khi kiểm tra PAT/quyền GitHub, có giới hạn thời gian và kiểm tra tên hợp lệ. Ollama lỗi thì dừng trước khi tạo; tên trùng cũng dừng, không nối thêm hậu tố hay tự nhận kho đã có.
+- Dùng chung client Ollama với kho phụ để giữ đúng hành vi khóa/cooldown. Chỉ gửi yêu cầu đặt tên và lịch sử tên gần đây, không gửi PAT hay endpoint backend.
+- Luồng xem trước dùng tên mẫu được ghi rõ, không gọi model. Công cụ dựng gói cấp thấp yêu cầu tên cụ thể khi tạo thật; launcher hướng người dùng tới luồng Ollama chung.
+
 ## 1.3.73 — About kho phụ và lựa chọn ngôn ngữ (11/09/2026)
 
 - Bỏ hậu tố nhận diện `[companion:…]` khỏi About khi tạo repo; ID và tiến độ chỉ lưu trong backend. Lượt tạo mất phản hồi và chưa lưu được ID sẽ dừng để kiểm tra, không tự nhận repo cùng tên.

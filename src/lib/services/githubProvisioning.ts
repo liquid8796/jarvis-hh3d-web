@@ -2,7 +2,6 @@ import { spawn } from "node:child_process";
 import { lstat, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { randomSoftwareName } from "../../../scripts/khoiloiNaming.mjs";
 import { normalizeGithubProvisionInput, reviewNormalizedProvisionIdentity, type GithubProvisionInput, type NormalizedGithubProvisionInput } from "../validation/githubProvisioning";
 
 export type GithubProvisionResult = {
@@ -22,7 +21,7 @@ type Lease = { assertHeld: (budget?: GithubProvisionBudget) => Promise<void>; re
 export type GithubProvisioningDependencies = {
   now?: () => number;
   deadlineAt?: number;
-  randomRepo: () => string;
+  generateRepoName: (owner: string, budget: GithubProvisionBudget) => Promise<string>;
   whoami: (pat: string, budget: GithubProvisionBudget) => Promise<{ login: string; scopes: string | null }>;
   checkScopes: (scopes: string | null) => Promise<void>;
   localPreflight: (context: GithubProvisionContext) => Promise<Prepared>;
@@ -117,12 +116,24 @@ export async function provisionGithubStation(input: GithubProvisionInput, deps: 
   try {
     // CLI handles offline dry runs separately; this service never mutates for a dry run.
     if (input.dryRun) throw Error("dry run is an adapter concern");
-    const normalized = normalizeGithubProvisionInput(input, deps);
+    const normalized = normalizeGithubProvisionInput(input);
     const identity = await work(() => deps.whoami(normalized.pat, budget));
+    await work(() => deps.checkScopes(identity.scopes));
+    if (normalized.generatedRepo) {
+      try {
+        const namingBudget = { ...budget, deadlineAt: Math.min(budget.deadlineAt, now() + 45_000) };
+        const repo = await bounded(namingBudget, () => deps.generateRepoName(identity.login, namingBudget));
+        if (typeof repo !== "string" || reviewNormalizedProvisionIdentity(identity.login, { ...normalized, repo })) throw Error("invalid model name");
+        normalized.repo = repo;
+        normalized.workerId = repo;
+      } catch {
+        safeMessage = "Không thể nhờ Ollama đặt tên kho. Kiểm tra model, API key và kết nối, hoặc nhập tên kho để tạo; chưa tạo repo nào.";
+        throw Error("Ollama naming failed");
+      }
+    }
     if (reviewNormalizedProvisionIdentity(identity.login, normalized)) throw Error("identity");
     context = { ...normalized, ...budget, owner: identity.login, slug: `${identity.login}/${normalized.repo}` };
     const ctx = context;
-    await work(() => deps.checkScopes(identity.scopes));
     prepared = await bounded(budget, () => deps.localPreflight(ctx), deps.dispose);
     await work(() => deps.checkSettings(ctx, false));
     await work(() => deps.checkWorker(ctx, false));
@@ -258,7 +269,10 @@ async function productionLocalPreflight(ctx: GithubProvisionContext, sourceMode:
 }
 
 export const productionGithubProvisionDependencies: GithubProvisioningDependencies = {
-  randomRepo: () => randomSoftwareName(),
+  async generateRepoName(owner, budget) {
+    const { generatePrimaryRepoName } = await import("./ollamaRepoNaming");
+    return generatePrimaryRepoName(owner, budget);
+  },
   async whoami(pat, budget) {
     const response = await request(pat, budget, "/user");
     if (response.status !== 200) throw Error("identity unavailable");

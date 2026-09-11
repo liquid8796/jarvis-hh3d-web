@@ -152,6 +152,19 @@ systemctl list-timers --all jarvis-companions.timer
 sudo journalctl -u jarvis-companions.service -n 20 --no-pager
 ```
 
+### Đặt tên kho GitHub chính
+
+Từ 1.3.74, để trống tên trong form admin hoặc `new-github-khoiloi.bat` sẽ nhờ Ollama đặt tên
+bằng model và API key trong cấu hình GitHub/Ollama của admin. Tên được giữ đúng như model
+trả về sau khi kiểm cú pháp GitHub, không ghép danh sách từ hay nối mã ngẫu nhiên. Nhập tên
+cụ thể thì bỏ qua bước gọi model; WORKER_ID vẫn lấy theo tên repo.
+
+Bước đặt tên có tối đa 45 giây trong thời gian provisioning chung. Lỗi model, thiếu key
+hoặc tên không hợp lệ sẽ dừng trước khi tạo repo; tên đã có trên GitHub cũng dừng để báo lỗi.
+`--dry-run` không gọi Ollama: khi bỏ trống tên, chỉ dựng gói với tên mẫu `preview-only` và
+ghi rõ tên thật chưa được quyết định. Công cụ cấp thấp `scripts/newGithubKhoiloi.mjs`
+cần `--repo` khi tạo thật; dùng `npm run github:new` để nhận luồng đặt tên bằng Ollama.
+
 ### Làm sạch About kho phụ cũ
 
 Sau khi phát hành bản 1.3.73 trở lên, chạy tại `/opt/jarvis/ops-repo` dưới user `jarvis`:

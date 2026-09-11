@@ -30,7 +30,7 @@ if (process.platform !== "win32") {
           env: { ...process.env, PATH: `${directory};${process.env.PATH ?? ""}`, GITHUB_PAT: "fixture-pat-for-bat-test", BAT_FIXTURE_ARGS: argsFile, BAT_FIXTURE_EXIT: String(entry.exit) },
         });
         let stdout = "", stderr = "", step = 0;
-        const prompts = ["Repository [random]:", "Workflow [linh-su.yml]:", "Daily pushes [5]:"];
+        const prompts = ["Repository [Ollama chooses]:", "Workflow [linh-su.yml]:", "Daily pushes [5]:"];
         const timer = setTimeout(() => { child.kill(); reject(Error("Launcher prompt timed out")); }, 20_000);
         child.stdout.on("data", (chunk: Buffer) => {
           stdout += chunk.toString();

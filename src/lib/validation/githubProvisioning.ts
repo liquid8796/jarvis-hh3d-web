@@ -24,10 +24,6 @@ export type NormalizedGithubProvisionInput = {
   generatedRepo: boolean;
 };
 
-type GithubProvisionDependencies = {
-  randomRepo: () => string;
-};
-
 const SAFE_WORKFLOW_BASENAME = /^[A-Za-z0-9][A-Za-z0-9._-]*\.(?:ya?ml)$/;
 
 function normalizedDailyPushes(value: GithubProvisionInput["dailyPushes"]): number {
@@ -52,11 +48,10 @@ function normalizedWorkflowFile(value: string | undefined): string {
 
 /**
  * Normalize the CLI/form boundary before the caller identifies the GitHub owner.
- * Identity review remains a separate phase because the owner comes from the PAT.
+ * A blank repo stays unresolved until the service asks Ollama after PAT validation.
  */
 export function normalizeGithubProvisionInput(
   input: GithubProvisionInput,
-  { randomRepo }: GithubProvisionDependencies,
 ): NormalizedGithubProvisionInput {
   if (!input.pat || /\s/.test(input.pat)) {
     throw new Error("PAT must not be empty or contain whitespace.");
@@ -64,7 +59,7 @@ export function normalizeGithubProvisionInput(
 
   const suppliedRepo = input.repo?.trim() ?? "";
   const generatedRepo = suppliedRepo.length === 0;
-  const repo = generatedRepo ? randomRepo() : suppliedRepo;
+  const repo = suppliedRepo;
   const workflowFile = normalizedWorkflowFile(input.workflowFile);
 
   return {

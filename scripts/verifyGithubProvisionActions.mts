@@ -50,7 +50,7 @@ function fixture(provisionedBy?: "jarvis") {
     deps: {} as GithubStationFormDependencies,
   };
   const lifecycle: GithubProvisionDependencies = {
-    randomRepo: () => { events.push("random"); return "random-project"; },
+    generateRepoName: async () => { events.push("llm-name"); return "random-project"; },
     whoami: async () => { events.push("whoami-create"); return { login: "FixtureOwner", scopes: "repo,workflow,delete_repo" }; },
     checkScopes: async () => {}, localPreflight: async (ctx) => { f.normalized = ctx; return { directory: "offline", encryptedPat: "encrypted:new", workerToken: "fixture-worker-token" }; },
     checkSettings: async () => {}, checkWorker: async () => {}, probe: async () => ({ status: f.probeStatus }),
@@ -85,8 +85,8 @@ for (const name of ["provisionGithubStationAction", "updateGithubStationAction",
   assert.equal(result.slug, "FixtureOwner/random-project");
   assert.deepEqual(f.submitted, { pat, repo: "", workflowFile: "", dailyPushes: "" });
   assert.equal(f.normalized?.dailyPushes, 5); assert.equal(f.normalized?.workflowFile, "linh-su.yml"); assert.equal(f.normalized?.workerId, "random-project");
-  assert.equal(f.events.filter(event => event === "random").length, 1);
-  assert.deepEqual(f.events.slice(0, 4), ["auth", "permission", "provision", "random"]);
+  assert.equal(f.events.filter(event => event === "llm-name").length, 1);
+  assert.deepEqual(f.events.slice(0, 5), ["auth", "permission", "provision", "whoami-create", "llm-name"]);
 }
 {
   const f = fixture(); f.probeStatus = 200;
@@ -98,6 +98,7 @@ for (const name of ["provisionGithubStationAction", "updateGithubStationAction",
   const f = fixture(); f.warning = true;
   const result = await actions.provisionGithubStationAction(null, form({ pat, repo: "new-project" }));
   assert.equal(result.ok, true); assert.ok(result.warnings?.length); assert.equal(result.slug, "FixtureOwner/new-project");
+  assert.ok(!f.events.includes("llm-name"), "explicit form name bypasses Ollama");
   assert.ok(!JSON.stringify(result).includes(pat) && !JSON.stringify(result).includes("child stderr"));
 }
 {

@@ -26,6 +26,8 @@ echo   === Create a new GitHub worker ===
 echo.
 echo   The repository and its Actions logs will be PUBLIC.
 echo   Required classic PAT scopes: repo + workflow + delete_repo.
+echo   Leave Repository blank for Ollama to choose a name without a fixed template.
+echo   A blank name requires the configured Ollama model and API key; errors stop creation.
 echo.
 
 REM A pre-set PAT skips only the secret prompt; the non-secret prompts still run.
@@ -39,7 +41,7 @@ if not defined GITHUB_PAT (
 
 :prompt_values
 set "REPO_NAME="
-set /p "REPO_NAME=  Repository [random]: "
+set /p "REPO_NAME=  Repository [Ollama chooses]: "
 set "WORKFLOW_FILE=linh-su.yml"
 set /p "WORKFLOW_FILE=  Workflow [linh-su.yml]: "
 set "DAILY_PUSHES=5"

@@ -2,12 +2,13 @@
 /**
  * Create the primary GitHub worker repository, install its secret, and dispatch its workflow.
  *
- * node scripts/newGithubKhoiloi.mjs --owner <account> [--repo name] [--worker-id id]
+ * node scripts/newGithubKhoiloi.mjs --owner <account> --repo <name> [--worker-id id]
  * node scripts/newGithubKhoiloi.mjs --owner <account> --dry-run
  *
  * This low-level builder does not write the station register. `github:new` registers the worker
  * with no companion repositories, then lets the configured Ollama runtime create companions.
- * Direct callers can register the worker in the admin UI and run github:companions:backfill.
+ * Live direct callers must supply --repo. Use `npm run github:new` to let Ollama choose a name
+ * and register the worker. A blank dry-run name uses the preview-only payload placeholder.
  *
  * The worker payload comes from committed HEAD through khoiloiPayload.mjs. GitHub CLI handles
  * the sealed-box secret and authenticates using GH_TOKEN or its existing login. Creation still
@@ -20,10 +21,6 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import {
-  randomSoftwareName,
-  reviewGeneratedName,
-} from "./khoiloiNaming.mjs";
 import {
   oauthScopesFromGhApiOutput,
   publishConfirmedRepository,
@@ -52,25 +49,23 @@ const owner = arg("owner");
 if (!owner) {
   console.error(
     "Thiếu --owner. Ví dụ:\n" +
-      "  node scripts/newGithubKhoiloi.mjs --owner zhangyu4\n" +
+      "  node scripts/newGithubKhoiloi.mjs --owner zhangyu4 --repo my-project\n" +
       "Tên tài khoản (hoặc tổ chức) GitHub sẽ giữ kho khôi lỗi mới.",
   );
   process.exit(1);
 }
-/**
- * Không truyền `--repo` thì tự rút một cái tên ngẫu nhiên, và `--worker-id` mặc định lấy ĐÚNG cái
- * tên ấy — xem `randomSoftwareName`. Bản trước lấy tên tài khoản làm id ("…-<owner>"), tức dán
- * tên người ta lên một thứ công khai mà chẳng được gì thêm về mặt duy nhất.
- */
-const generatedName = randomSoftwareName();
-const repoName = arg("repo", generatedName);
+const suppliedRepo = arg("repo", "").trim();
+if (!suppliedRepo && !dryRun) {
+  console.error("Thiếu --repo. Dùng npm run github:new để Ollama tự đặt tên theo cấu hình admin, hoặc nhập --repo <tên>.\nKHÔNG tạo gì cả.");
+  process.exit(1);
+}
+const repoName = suppliedRepo || "preview-only";
+if (!suppliedRepo) {
+  console.log("--dry-run: preview-only chỉ là tên tạm để kiểm tra payload. Ollama chọn tên thật khi tạo qua npm run github:new; lượt này không gọi Ollama.");
+}
 const workflowFile = arg("workflow-file", "linh-su.yml");
-/**
- * WORKER_ID mặc định suy từ tên tài khoản, không phải một chuỗi cố định — trùng id thì hai tiến
- * trình ghi đè nhau trong bảng `workers` và mục Khôi Lỗi nói dối về việc ai đang trực. Suy ra
- * từ một thứ vốn đã duy nhất thì không có gì để quên.
- */
-const workerId = arg("worker-id", repoName === generatedName ? generatedName : repoName);
+/** Match the shared provisioner: an explicit repository name is also the default worker ID. */
+const workerId = arg("worker-id", repoName);
 const slug = `${owner}/${repoName}`;
 if (
   workflowFile.length > 100 ||
@@ -89,21 +84,13 @@ if (argv.includes("--companion-repo")) {
   process.exit(1);
 }
 
-/**
- * LUẬT TỪ CẤM, đứng trước mọi thứ khác trong tệp này.
- *
- * Kiểm ở ĐÂY chứ không chỉ ở `newGithubStation.mts`, dù lượt gọi thường đi qua bên ấy: tệp này là
- * một cửa vào riêng (`node scripts/newGithubKhoiloi.mjs --owner … --repo …`), và một luật chỉ gác
- * được cửa nó đứng thì không phải luật. Đây cũng là cửa DUY NHẤT mà `--repo` gõ tay đi qua được
- * tới lệnh `gh repo create`.
- */
+/** Validate direct-call slugs without restricting their topic, words, or naming pattern. */
 for (const [what, value] of [
   ["Tên kho", repoName],
   ["WORKER_ID", workerId],
 ]) {
-  const banned = reviewGeneratedName(what, value);
-  if (banned) {
-    console.error(`${banned}\n\nKHÔNG tạo gì cả, nên không có kho mồ côi nào phải dọn.`);
+  if (value.length < 1 || value.length > 100 || !/^[A-Za-z0-9._-]+$/.test(value) || value === "." || value === "..") {
+    console.error(`${what} chỉ được gồm 1–100 ký tự chữ, số, dấu chấm, gạch nối hoặc gạch dưới; không được là . hoặc ..\nKHÔNG tạo gì cả.`);
     process.exit(1);
   }
 }

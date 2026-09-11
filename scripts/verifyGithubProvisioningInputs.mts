@@ -7,47 +7,30 @@ import {
 } from "../src/lib/validation/githubProvisioning";
 
 const fixturePat = "ghp_fixture_value";
-const fixtureRepo = "amber-lake-0123456789abcdef";
-
 const normalize = (input: Partial<Parameters<typeof normalizeGithubProvisionInput>[0]> = {}) =>
   normalizeGithubProvisionInput(
     { pat: fixturePat, repo: "given-worker", workflowFile: "worker.yml", dailyPushes: "5", ...input },
-    { randomRepo: () => fixtureRepo },
   );
 
-let randomCalls = 0;
 const defaults = normalizeGithubProvisionInput(
   { pat: fixturePat, repo: "", workflowFile: "", dailyPushes: "" },
-  {
-    randomRepo: () => {
-      randomCalls += 1;
-      return fixtureRepo;
-    },
-  },
 );
 assert.deepEqual(defaults, {
   pat: fixturePat,
-  repo: fixtureRepo,
+  repo: "",
   workflowFile: "linh-su.yml",
   dailyPushes: 5,
-  workerId: fixtureRepo,
+  workerId: "",
   generatedRepo: true,
 });
-assert.equal(randomCalls, 1, "randomRepo must run once for a blank repo");
+assert.deepEqual(normalize({ repo: "  " }), { ...normalize(), repo: "", workerId: "", generatedRepo: true });
 
-randomCalls = 0;
 const supplied = normalizeGithubProvisionInput(
-  { pat: fixturePat, repo: "given-worker", workflowFile: "worker.yaml", dailyPushes: 24 },
-  {
-    randomRepo: () => {
-      randomCalls += 1;
-      return fixtureRepo;
-    },
-  },
+  { pat: fixturePat, repo: "  given-worker  ", workflowFile: "worker.yaml", dailyPushes: 24 },
 );
+assert.equal(supplied.repo, "given-worker", "explicit repository names are only trimmed");
 assert.equal(supplied.workerId, "given-worker");
 assert.equal(supplied.generatedRepo, false);
-assert.equal(randomCalls, 0, "randomRepo must not run for a supplied repo");
 
 for (const good of ["0", "24"]) {
   assert.doesNotThrow(() => normalize({ dailyPushes: good }), `dailyPushes=${good} should be accepted`);

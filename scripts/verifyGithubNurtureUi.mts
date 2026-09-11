@@ -229,6 +229,9 @@ if (!process.argv.includes("--check")) {
           assert.equal(await page.locator(selector).getAttribute("required"), null);
         }
         assert.equal(await page.locator("#station-workflow").getAttribute("placeholder"), "linh-su.yml");
+        assert.equal(await page.locator("#station-repo").getAttribute("placeholder"), "Để trống để Ollama tự đặt tên");
+        assert.match(await createForm.innerText(), /Ollama tự chọn tên, không dùng khuôn cố định/);
+        assert.match(await createForm.innerText(), /lỗi sẽ dừng tạo kho/);
         assert.equal(await page.locator("#station-daily-pushes").getAttribute("placeholder"), "5");
         await page.locator("#station-pat").fill("offline-fixture-pat");
         await page.getByRole("button", { name: "Tạo repo + workflow", exact: true }).click();

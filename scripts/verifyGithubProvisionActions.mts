@@ -16,6 +16,7 @@ const mocks: Record<string, string> = {
   "@/lib/services/settings": "export const getAppSettings = () => globalThis.__stationFixture.deps.getSettings();",
   "@/lib/services/companionState": "export const mutateGithubState = change => globalThis.__stationFixture.deps.mutate(change);",
   "@/lib/services/githubProvisioning": "export const provisionGithubStation = input => globalThis.__stationFixture.deps.provision(input); export const productionGithubProvisionDependencies = { whoami: (pat,budget) => globalThis.__stationFixture.deps.whoami(pat,budget) };",
+  "@/lib/services/githubPrimaryDeletion": "export const deletePrimaryGithubAccountGroup = (slug,expectedGroup) => globalThis.__stationFixture.deps.deletePrimary(slug,expectedGroup);",
   "@/lib/services/githubStations": "export const pingStationBySlug = slug => globalThis.__stationFixture.deps.ping(slug); export const runCompanionNurture = async () => ({}); export const runKeepalive = async () => ({});",
 };
 const bundle = await build({ entryPoints: [resolve(root, "src/app/actions/githubStations.ts")], bundle: true, write: false, platform: "node", format: "cjs", plugins: [{
@@ -27,8 +28,9 @@ const bundle = await build({ entryPoints: [resolve(root, "src/app/actions/github
     builder.onLoad({ filter: /.*/, namespace: "mock" }, ({ path }) => ({ contents: mocks[path], loader: "js" }));
   },
 }] });
-type Action = (previous: GithubStationFormResult | null, form: FormData) => Promise<GithubStationFormResult>;
-const module = { exports: {} as Record<"provisionGithubStationAction" | "updateGithubStationAction" | "saveGithubStationAction", Action> };
+type ActionResult = GithubStationFormResult & { deletedPrimaries?: number; retainedCompanions?: number; detached?: boolean };
+type Action = (previous: GithubStationFormResult | null, form: FormData) => Promise<ActionResult>;
+const module = { exports: {} as Record<"provisionGithubStationAction" | "updateGithubStationAction" | "saveGithubStationAction" | "deleteGithubStationAction", Action> };
 new Function("require", "module", "exports", bundle.outputFiles[0].text)(createRequire(import.meta.url), module, module.exports);
 const actions = module.exports;
 const pat = "offline-fixture-pat-never-log";
@@ -69,6 +71,10 @@ function fixture(provisionedBy?: "jarvis") {
     encrypt: () => { events.push("encrypt"); return "encrypted:new"; }, isEncrypted: (value) => value.startsWith("encrypted:"),
     ping: async () => { events.push("ping"); return { ok: true }; }, invalidate: () => {},
   };
+  (f.deps as GithubStationFormDependencies & { deletePrimary: (slug: string, expectedGroup: string) => Promise<ActionResult> }).deletePrimary = async (slug, expectedGroup) => {
+    events.push(`delete-primary:${slug}:${expectedGroup}`);
+    return { ok: true, message: "Đã xoá nhóm repo chính.", deletedPrimaries: 2, retainedCompanions: 5 };
+  };
   (globalThis as typeof globalThis & { __stationFixture?: typeof f }).__stationFixture = f;
   return f;
 }
@@ -77,6 +83,20 @@ for (const name of ["provisionGithubStationAction", "updateGithubStationAction",
   const f = fixture(); f.allowed = false;
   assert.equal((await actions[name](null, form({ pat, slug: "FixtureOwner/existing-repo" }))).ok, false);
   assert.deepEqual(f.events, ["auth", "permission"], `${name} must authorize before any external call`);
+}
+{
+  const f = fixture(); f.allowed = false;
+  await assert.rejects(() => actions.deleteGithubStationAction(null, form({ slug: "FixtureOwner/existing-repo" })));
+  assert.deepEqual(f.events, ["auth", "permission"], "delete must authorize before calling the account deletion service");
+}
+{
+  const f = fixture();
+  const result = await actions.deleteGithubStationAction(null, form({ slug: "FixtureOwner/existing-repo", expectedGroup: "fixtureowner/existing-repo#42" }));
+  assert.deepEqual(result, { ok: true, message: "Đã xoá nhóm repo chính.", deletedPrimaries: 2, retainedCompanions: 5 });
+  assert.deepEqual(f.events, [
+    "auth", "permission", "delete-primary:FixtureOwner/existing-repo:fixtureowner/existing-repo#42",
+    "invalidate:/admin", "invalidate:/admin/github/[owner]/[repo]",
+  ]);
 }
 {
   const f = fixture();
@@ -160,4 +180,4 @@ for (const change of [{ workerId: "forged-worker" }, { workflowFile: "different.
   assert.equal(f.settings.githubStations.length, 1); assert.ok(!f.events.includes("provision"));
 }
 delete (globalThis as typeof globalThis & { __stationFixture?: unknown }).__stationFixture;
-console.log("PASS: real guarded actions, four-field provisioning/defaults, owner inference, existing refusal, safe errors/warnings, immutable managed edits, legacy updates, fresh metadata and PAT owner validation (offline).");
+console.log("PASS: real guarded actions, account-wide primary deletion passthrough, four-field provisioning/defaults, owner inference, existing refusal, safe errors/warnings, immutable managed edits, legacy updates, fresh metadata and PAT owner validation (offline).");

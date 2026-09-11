@@ -445,6 +445,8 @@ export const appSettingsSchema = z.object({
         provisionedBy: z.literal("jarvis").optional(),
         githubId: z.number().int().positive().optional(),
         initialCommitSha: z.string().max(100).optional(),
+        primaryDeleteVerifiedGithubId: z.number().int().positive().optional(),
+        primaryDeleteVerifiedAt: z.string().optional(),
         /** Tắt là đứng ngoài vòng nuôi — dòng và PAT giữ nguyên, chỉ không ai đụng tới kho ấy. */
         enabled: z.boolean().catch(true).default(true),
         /** Registered companion repos retain their identity and activity history. */

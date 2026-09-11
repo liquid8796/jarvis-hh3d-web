@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.76 — Xóa repo chính theo tài khoản từ admin (11/09/2026)
+
+- Nút Xóa của một station nay xóa mọi repo chính đã đăng ký dưới cùng tài khoản GitHub, xác minh đúng `full_name` và ID đã lưu, đọc lại 404 sau khi xóa rồi mới gỡ các station khỏi sổ.
+- Repo phụ không bao giờ trở thành đích của API xóa và vẫn nằm nguyên trên GitHub. Trang xác nhận hiển thị trước số repo chính sẽ mất vĩnh viễn và số repo phụ được giữ.
+- Tài khoản đã biến mất, bị đình chỉ hoặc bị chặn pháp lý được phép chỉ gỡ sổ. PAT hỏng trong khi tài khoản vẫn tồn tại, thiếu quyền, rate limit, lỗi mạng và lỗi GitHub tạm thời đều giữ nguyên sổ để tránh bỏ sót repo.
+- Khóa theo tài khoản chặn lượt tạo repo mới và vòng nuôi chạy xen lúc xóa. Toàn bộ repo chính được kiểm tra trước lệnh DELETE đầu tiên; nếu xóa dở, sổ vẫn giữ để lượt sau tiếp tục an toàn.
+
 ## 1.3.75 — Đọc tên do Gemma trả về (11/09/2026)
 
 - Lượt gọi thật cho thấy Gemma bọc JSON tên kho trong một khối Markdown dù được yêu cầu trả JSON thuần. Chấp nhận đúng một khối JSON đầy đủ, vẫn từ chối văn bản xen ngoài, nhiều kết quả, tên sai cú pháp và dữ liệu bí mật.

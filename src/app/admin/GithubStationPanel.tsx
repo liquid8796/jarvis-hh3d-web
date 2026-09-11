@@ -25,6 +25,7 @@ import {
   SCHEDULE_DISABLE_DAYS,
   type CountdownLevel,
 } from "@/lib/validation/githubStations";
+import { githubPrimaryOwnerGroupFingerprint } from "@/lib/validation/githubPrimaryDeletion";
 
 /**
  * Tab Kho GitHub — sổ tài khoản đang giữ khôi lỗi chạy trên Actions (deploy/github-actions.md §7).
@@ -246,6 +247,8 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
   const [loopState, loopAction, looping] = useActionState<StationResult | null, FormData>(runKeepaliveAction, null);
   /** slug đang sửa — đổ sẵn mọi thứ trừ PAT; PAT thì không bao giờ đổ lại. */
   const [editing, setEditing] = useState<StationView | null>(null);
+  /** Chỉ đổi chữ ở đúng nút đã xác nhận; mọi nút vẫn bị khoá trong lúc xoá cả nhóm tài khoản. */
+  const [deletingSlug, setDeletingSlug] = useState<string | null>(null);
 
   const [perPage, setPerPage] = usePageSize(
     STATIONS_PAGE_SIZE_KEY,
@@ -334,6 +337,13 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
             <div className="flex flex-col gap-3">
               {paged.items.map((station) => {
                 const countdown = countdownTone(station.daysToDisable);
+                const accountStations = stations.filter(
+                  (candidate) => candidate.owner.toLowerCase() === station.owner.toLowerCase(),
+                );
+                const retainedCompanions = accountStations.reduce(
+                  (total, candidate) => total + candidate.companionRepos.length,
+                  0,
+                );
                 return (
                   <div
                     key={station.slug}
@@ -384,6 +394,7 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                     <Link href={`/admin/github/${encodeURIComponent(station.owner)}/${encodeURIComponent(station.repo)}`} className="btn btn-ghost text-sm">Kho phụ / Chi tiết</Link>
                     <form action={pingAction}>
                       <input type="hidden" name="slug" value={station.slug} />
+                      <input type="hidden" name="expectedGroup" value={githubPrimaryOwnerGroupFingerprint(accountStations, station.owner)} />
                       <button type="submit" className="btn btn-ghost text-sm" disabled={pinging}>
                         {pinging ? "Đang nuôi…" : "Nuôi ngay"}
                       </button>
@@ -394,18 +405,23 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                     <form
                       action={deleteAction}
                       onSubmit={(e) => {
-                        // Xoá là mất phong bì PAT — một cú bấm nhầm không được phép đủ.
+                        // Một lượt xoá áp dụng cho mọi repo chính cùng tài khoản, nên lời xác nhận
+                        // phải nói rõ phạm vi và khẳng định các repo phụ vẫn nằm nguyên trên GitHub.
                         if (!confirm(
-                          `Xoá station「${station.slug}」khỏi sổ? PAT đã mã hoá mất theo; các repo ` +
-                            "trên GitHub vẫn được giữ nhưng từ nay không repo nào trong bundle được nuôi tự động.",
+                          `XÓA VĨNH VIỄN ${accountStations.length} REPO CHÍNH của tài khoản GitHub「${station.owner}」?\n\n` +
+                            `${retainedCompanions} repo phụ đã đăng ký sẽ được GIỮ NGUYÊN trên GitHub.\n\n` +
+                            "Nếu tài khoản không còn truy cập được, chẳng hạn bị đình chỉ, hệ thống chỉ xoá " +
+                            "các station khỏi sổ.",
                         )) {
                           e.preventDefault();
+                          return;
                         }
+                        setDeletingSlug(station.slug);
                       }}
                     >
                       <input type="hidden" name="slug" value={station.slug} />
                       <button type="submit" className="btn btn-danger text-sm" disabled={deleting}>
-                        Xoá
+                        {deleting && deletingSlug === station.slug ? "Đang xoá kho chính…" : "Xoá"}
                       </button>
                     </form>
                   </div>

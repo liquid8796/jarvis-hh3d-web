@@ -9,6 +9,7 @@ import { getAppSettings, type AppSettings } from "@/lib/services/settings";
 import { mutateGithubState } from "@/lib/services/companionState";
 import { provisionGithubStation, productionGithubProvisionDependencies } from "@/lib/services/githubProvisioning";
 import { createGithubStationFormHandlers, type GithubStationFormResult } from "@/lib/services/githubStationForms";
+import { deletePrimaryGithubAccountGroup } from "@/lib/services/githubPrimaryDeletion";
 import {
   MS_PER_DAY,
   SCHEDULE_DISABLE_DAYS,
@@ -36,6 +37,7 @@ export type StationView = {
   slug: string;
   owner: string;
   repo: string;
+  githubId?: number;
   workflowFile: string;
   workerId: string;
   provisionedBy?: "jarvis";
@@ -92,6 +94,7 @@ function viewOf(station: AppSettings["githubStations"][number], now: number): St
     slug: stationSlug(station),
     owner: station.owner,
     repo: station.repo,
+    githubId: station.githubId,
     workflowFile: station.workflowFile,
     workerId: station.workerId,
     provisionedBy: station.provisionedBy,
@@ -217,22 +220,12 @@ export async function deleteGithubStationAction(
 ): Promise<StationResult> {
   await requireStationManage();
   const slug = String(formData.get("slug") ?? "").trim();
-  let found = false;
-  await mutateGithubState((settings) => {
-    found = settings.githubStations.some((station) => stationSlug(station) === slug);
-    settings.githubStations = settings.githubStations.filter((station) => stationSlug(station) !== slug);
-  });
-  if (!found) {
-    return { ok: false, message: `Không có kho「${slug}」trong sổ.` };
-  }
-  revalidatePath("/admin");
-  revalidatePath("/admin/github/[owner]/[repo]", "page");
-  return {
-    ok: true,
-    message:
-      `Đã xoá station「${slug}」khỏi sổ. Repo khôi lỗi và các repo software trên GitHub đều ` +
-      "được giữ nguyên; từ nay vòng tự động không nuôi repo nào trong bundle ấy nữa.",
-  };
+  const expectedGroup = String(formData.get("expectedGroup") ?? "");
+  const result = await deletePrimaryGithubAccountGroup(slug, expectedGroup);
+  // Cache refresh cannot turn a completed remote + database deletion into a retry prompt.
+  try { revalidatePath("/admin"); } catch { /* The next request reads the committed registry. */ }
+  try { revalidatePath("/admin/github/[owner]/[repo]", "page"); } catch { /* Same committed registry. */ }
+  return result;
 }
 
 /**

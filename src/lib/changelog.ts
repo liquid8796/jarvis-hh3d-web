@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.76",
+    date: "2026-09-11",
+    lines: [
+      "Nút Xóa kho GitHub nay xóa toàn bộ repo chính cùng tài khoản; các repo phụ vẫn được giữ nguyên trên GitHub.",
+      "Nếu tài khoản đã bị đình chỉ hoặc không còn tồn tại, hệ thống chỉ gỡ các station khỏi sổ.",
+      "Lỗi quyền, giới hạn hoặc kết nối sẽ dừng an toàn và giữ sổ để thử lại.",
+    ],
+  },
+  {
     version: "1.3.75",
     date: "2026-09-11",
     lines: [
@@ -471,13 +480,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-21",
     lines: [
       "Khoáng Mạch: ô「Tên mỏ」thôi tự điền sẵn một cái tên. Để trống nghĩa là cứ đào tiếp mỏ đạo hữu đang ở; muốn dời mỏ thì gõ tên vào.",
-    ],
-  },
-  {
-    version: "1.3.25",
-    date: "2026-08-20",
-    lines: [
-      "Hoạt động thôi hiện dòng kỹ thuật「máy mở bằng bản trình duyệt nào」. Chỗ ấy để kể việc tu luyện của đạo hữu, phần máy móc lui về nhật ký của máy chạy.",
     ],
   },
 ];

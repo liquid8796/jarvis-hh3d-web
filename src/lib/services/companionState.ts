@@ -5,8 +5,10 @@ import { Client } from "pg";
 import { withDatabaseDeadline } from "../db/deadline";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
+export type GithubSessionLease = { assertHeld: (budget?: { deadlineAt: number }) => Promise<void>; release: () => Promise<void> };
+
 /** Session locks span GitHub calls without holding a transaction or a settings row lock. */
-export async function acquireGithubProvisioningLease(slug: string, workerId: string, deadlineAt = Date.now() + 240_000): Promise<{ assertHeld: (budget?: { deadlineAt: number }) => Promise<void>; release: () => Promise<void> } | null> {
+async function acquireGithubSessionLease(keys: readonly string[], deadlineAt: number, unavailable: string): Promise<GithubSessionLease | null> {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
   const left = () => { const ms = deadlineAt - Date.now(); if (ms <= 0) throw Error("Provisioning deadline reached"); return Math.min(10_000, ms); };
   const client = new Client({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: left(), query_timeout: left() });
@@ -15,7 +17,7 @@ export async function acquireGithubProvisioningLease(slug: string, workerId: str
   client.on("error", () => { healthy = false; });
   try {
     await client.connect();
-    for (const key of [`provision:${slug.toLowerCase()}`, `provision-worker:${workerId.toLowerCase()}`]) {
+    for (const key of [...new Set(keys)].sort()) {
       const query = { text: "select pg_try_advisory_lock(hashtext($1)) as locked", values: [key], query_timeout: left() };
       const result = await client.query(query);
       if (!result.rows[0]?.locked) { await client.end(); return null; }
@@ -25,7 +27,36 @@ export async function acquireGithubProvisioningLease(slug: string, workerId: str
       // Closing this dedicated session releases every session advisory lock without another query.
       release: async () => { healthy = false; await client.end(); },
     };
-  } catch { await client.end().catch(() => {}); throw new Error("Provisioning lease unavailable"); }
+  } catch { await client.end().catch(() => {}); throw new Error(unavailable); }
+}
+
+export async function acquireGithubProvisioningLease(slug: string, workerId: string, deadlineAt = Date.now() + 240_000): Promise<GithubSessionLease | null> {
+  const owner = slug.split("/")[0]?.toLowerCase() ?? "";
+  return acquireGithubSessionLease([
+    `provision-owner:${owner}`,
+    `provision:${slug.toLowerCase()}`,
+    `provision-worker:${workerId.toLowerCase()}`,
+  ], deadlineAt, "Provisioning lease unavailable");
+}
+
+/** Freeze same-owner creation plus every primary/companion runner while deleting the account group. */
+export async function acquireGithubOwnerDeletionLease(
+  owner: string,
+  targets: readonly { slug: string; workerId: string }[],
+  deadlineAt = Date.now() + 240_000,
+): Promise<GithubSessionLease | null> {
+  const normalizedOwner = owner.toLowerCase();
+  if (!normalizedOwner || targets.length === 0 || targets.some((target) => target.slug.split("/")[0]?.toLowerCase() !== normalizedOwner)) {
+    throw new Error("Invalid GitHub deletion lease targets");
+  }
+  return acquireGithubSessionLease([
+    `provision-owner:${normalizedOwner}`,
+    ...targets.flatMap((target) => [
+      `provision:${target.slug.toLowerCase()}`,
+      `provision-worker:${target.workerId.toLowerCase()}`,
+      `companion:${target.slug.toLowerCase()}`,
+    ]),
+  ], deadlineAt, "GitHub deletion lease unavailable");
 }
 
 /** Keep network operations outside the row lock; merge each checkpoint into fresh settings. */

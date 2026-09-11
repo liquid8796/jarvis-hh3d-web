@@ -98,6 +98,7 @@ const companion = {
 };
 const station = {
   slug:"sample-owner/primary-repo",owner:"sample-owner",repo:"primary-repo",
+  githubId:101,
   provisionedBy:new URLSearchParams(location.search).get("managed") === "1" ? "jarvis" : undefined,
   workflowFile:"linh-su.yml",workerId:"github-sample",enabled:true,lastPingAt:stamp,lastCommitAt:stamp,
   lastPingOk:true,lastPingNote:"Workflow đang chạy.",workflowState:"active",daysToDisable:57,dailyPushes:5,
@@ -109,12 +110,17 @@ const station = {
 };
 const detail = {station,defaultCompanionCount:3,effectiveCompanionCount:3};
 const view = new URLSearchParams(location.search).get("view") || "settings";
+const stationList = new URLSearchParams(location.search).get("deletion") === "1" ? [
+  station,
+  {...station,slug:"sample-owner/second-primary",repo:"second-primary",githubId:102,companionRepos:station.companionRepos.slice(0,2)},
+  {...station,slug:"other-owner/foreign-primary",owner:"other-owner",repo:"foreign-primary",githubId:201,companionRepos:station.companionRepos.slice(0,1)},
+] : [station];
 createRoot(document.getElementById("root")).render(
   <main className="mx-auto w-full max-w-6xl px-4 pb-24 sm:px-6">
     <nav className="card mb-5 mt-5 flex flex-wrap gap-4 p-4 text-sm">
       <strong>Offline fixture</strong><a href="/?view=settings">Ollama settings</a><a href="/?view=detail">Companion detail</a><a href="/?view=stations">Station list</a>
     </nav>
-    {view === "detail" ? <GithubCompanionDetail detail={detail}/> : view === "stations" ? <GithubStationPanel stations={[station]}/> : <GithubNurtureSettings config={config}/>}
+    {view === "detail" ? <GithubCompanionDetail detail={detail}/> : view === "stations" ? <GithubStationPanel stations={stationList}/> : <GithubNurtureSettings config={config}/>}
   </main>
 );
 `;
@@ -139,7 +145,10 @@ await build({
           : 'export const useRouter = () => ({refresh(){},push(){}}); export const usePathname=()=>location.pathname; export const useSearchParams=()=>new URLSearchParams(location.search);',
         loader: "js", resolveDir: root,
       }));
-      builder.onResolve({ filter: /^@\// }, (args) => ({ path: resolve(root, "src", args.path.slice(2)) + (args.path.endsWith("githubStations") || args.path.endsWith("githubNurture") ? ".ts" : ".tsx") }));
+      builder.onResolve({ filter: /^@\// }, (args) => {
+        const base = resolve(root, "src", args.path.slice(2));
+        return { path: existsSync(`${base}.ts`) ? `${base}.ts` : `${base}.tsx` };
+      });
     },
   }],
 });
@@ -296,6 +305,27 @@ if (!process.argv.includes("--check")) {
         assert.equal(await page.locator("#station-repo").inputValue(), "");
         assert.equal(await page.locator("section[aria-labelledby=station-form-title]").getByRole("status").count(), 0);
       }
+      await page.goto(`${origin}/?view=stations&deletion=1`);
+      let accountDeleteConfirmation = "";
+      page.once("dialog", async (dialog) => {
+        accountDeleteConfirmation = dialog.message();
+        await dialog.dismiss();
+      });
+      await page.getByRole("button", { name: "Xoá", exact: true }).first().click();
+      assert.match(accountDeleteConfirmation, /XÓA VĨNH VIỄN 2 REPO CHÍNH/);
+      assert.match(accountDeleteConfirmation, /sample-owner/);
+      assert.match(accountDeleteConfirmation, /5 repo phụ đã đăng ký sẽ được GIỮ NGUYÊN trên GitHub/);
+      assert.match(accountDeleteConfirmation, /tài khoản không còn truy cập được/);
+      assert.match(accountDeleteConfirmation, /chỉ xoá các station khỏi sổ/);
+      const expectedGroup = await page.locator('input[name="expectedGroup"]').first().inputValue();
+      assert.equal(expectedGroup, "sample-owner/primary-repo#101\nsample-owner/second-primary#102");
+      assert.equal(await page.getByRole("button", { name: "Đang xoá kho chính…", exact: true }).count(), 0);
+      assert.equal(await page.evaluate(() => (globalThis as typeof globalThis & { __fixtureSubmitted?: unknown }).__fixtureSubmitted ?? null), null);
+      const deleteScreenshot = join(output, `primary-delete-confirm-cancel-${width}.png`);
+      await page.screenshot({ path: deleteScreenshot, fullPage: true });
+      const deleteScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      report.push({ view: "primary-delete-confirm-cancel", width, scrollWidth: deleteScrollWidth, screenshot: deleteScreenshot });
+      if (deleteScrollWidth > width + 1) failures.push(`primary-delete-confirm/${width} overflow: ${deleteScrollWidth}`);
       await page.close();
     }
 
@@ -354,7 +384,7 @@ if (!process.argv.includes("--check")) {
     console.log(JSON.stringify({ report, failures }, null, 2));
     await writeFile(join(output, "report.json"), JSON.stringify({ report, failures }, null, 2), "utf8");
     assert.deepEqual(failures, [], "Browser errors or horizontal overflow detected");
-    console.log("PASS: 390/1366 layout; create defaults/pending/success/warning/error; immutable managed and editable legacy station forms; settings/key pending states and delete confirmation cancellation.");
+    console.log("PASS: 390/1366 layout; create defaults/pending/success/warning/error; immutable managed and editable legacy station forms; account-wide primary and companion delete confirmation cancellation; settings/key pending states.");
   } finally {
     await browser?.close();
     await new Promise<void>((resolve) => server.close(() => resolve()));

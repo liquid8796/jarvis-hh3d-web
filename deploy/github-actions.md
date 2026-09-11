@@ -614,6 +614,24 @@ dòng station. Các repo phần mềm giữ nguyên source và lịch sử như 
 trong station, vòng nuôi tự ngừng chạm chúng. Đây là ranh giới phá huỷ có chủ ý: một lệnh vốn được
 xác nhận bằng tên repo chính không được ngầm mở rộng thành xoá các repo phụ.
 
+### Nút Xóa trên trang admin
+
+Nút **Xóa** ở một station áp dụng cho toàn bộ repo chính đã đăng ký của cùng tài khoản GitHub.
+Đích xóa chỉ được lấy từ trường `repo` của các station cùng owner; danh sách `companionRepos` và
+repo đang chờ tạo chỉ dùng làm hàng rào chống trùng tên, không bao giờ được gửi tới API xóa.
+Hộp xác nhận kể trước số repo chính sẽ mất vĩnh viễn và số repo phụ đã đăng ký được giữ nguyên.
+
+Hệ thống xác minh tài khoản từ các PAT đã lưu, kiểm `full_name` và `githubId` của mọi repo trước
+lệnh DELETE đầu tiên, rồi đòi GitHub trả 404 sau mỗi lượt xóa. Chỉ khi toàn bộ repo chính đã biến
+mất thì các station cùng owner mới được gỡ khỏi sổ. Nếu một phần đã xóa nhưng lượt sau lỗi, sổ
+vẫn giữ nguyên; chạy lại sẽ tiếp tục các repo còn lại.
+
+Nếu GitHub xác nhận tài khoản đã bị đình chỉ/disabled, trả 451, hoặc tài khoản công khai không
+còn tồn tại, bước xóa từ xa được bỏ qua và chỉ các station cùng owner bị gỡ. Một PAT hết hạn trong
+khi tài khoản vẫn tồn tại, thiếu quyền, rate limit, lỗi mạng và lỗi 5xx không được coi là tài khoản
+đã mất: thao tác dừng và giữ nguyên sổ. Khóa theo owner chặn provisioning mới, còn khóa từng
+station chặn vòng nuôi repo phụ chạy xen trong thời gian xóa.
+
 **Vì sao đáng có một công cụ, thay vì một cú bấm「Delete repository」:** một kho khôi lỗi để lại
 dấu chân ở **ba** nơi, và hai nơi trong đó không nằm trên GitHub.
 

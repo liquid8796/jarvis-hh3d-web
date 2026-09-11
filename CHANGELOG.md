@@ -11,6 +11,11 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.75 — Đọc tên do Gemma trả về (11/09/2026)
+
+- Lượt gọi thật cho thấy Gemma bọc JSON tên kho trong một khối Markdown dù được yêu cầu trả JSON thuần. Chấp nhận đúng một khối JSON đầy đủ, vẫn từ chối văn bản xen ngoài, nhiều kết quả, tên sai cú pháp và dữ liệu bí mật.
+- Thêm kiểm tra theo dạng phản hồi quan sát được trên Ollama Cloud để tên hợp lệ không bị báo lỗi sau hai lượt.
+
 ## 1.3.74 — Ollama đặt tên repo chính (11/09/2026)
 
 - Bỏ bộ ghép từ và hậu tố hex khỏi tên mặc định của repo chính. Form admin và CLI cùng nhờ Ollama chọn tên khi để trống, dùng model và khóa đã cấu hình; tên người dùng nhập được giữ nguyên.

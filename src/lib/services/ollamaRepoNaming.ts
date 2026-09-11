@@ -44,7 +44,9 @@ export async function planPrimaryRepoName(input: PrimaryRepoNameInput): Promise<
       if (reply.tool_calls?.length) throw new Error("Repository naming does not allow tools.");
       if (redactOllamaSecrets(reply.content, client.secrets) !== reply.content) throw new Error("Repository naming returned authentication material.");
       let value: unknown;
-      try { value = JSON.parse(reply.content); } catch { throw new Error("Return one complete JSON object with only repo."); }
+      const trimmed = reply.content.trim();
+      const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(trimmed);
+      try { value = JSON.parse(fenced ? fenced[1] : trimmed); } catch { throw new Error("Return one complete JSON object with only repo."); }
       if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length !== 1 || !("repo" in value)) throw new Error("Return one complete JSON object with only repo.");
       const repo = (value as { repo: unknown }).repo;
       if (!validName(input.owner, repo)) throw new Error("Repository name violates the stated GitHub name syntax.");

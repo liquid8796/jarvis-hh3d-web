@@ -22,6 +22,19 @@ const reply = (value: unknown) => new Response(JSON.stringify({ message: { conte
 let passed = 0;
 async function check(name: string, run: () => Promise<void>) { calls = []; await run(); console.log(`ok ${++passed} - ${name}`); }
 
+await check("a complete Markdown JSON fence from Gemma is accepted but surrounding prose is not", async () => {
+  for (const content of ['```json\n{"repo":"Caldera"}\n```', '```\n{"repo":"river.notes"}\n```']) {
+    calls = [];
+    respond = () => reply(content);
+    assert.equal(await planPrimaryRepoName(input()), content.includes("Caldera") ? "Caldera" : "river.notes");
+    assert.equal(calls.length, 1);
+  }
+  calls = [];
+  respond = () => reply('Here is the name: ```json\n{"repo":"Caldera"}\n```');
+  await assert.rejects(planPrimaryRepoName(input()), /failed after one repair/);
+  assert.equal(calls.length, 2);
+});
+
 await check("configured cloud model and keys use a bounded native request without unsupported format or tools", async () => {
   const request = input();
   respond = () => reply({ repo: "Quill" });

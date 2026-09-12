@@ -44,7 +44,7 @@ export const maxDuration = 300;
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; tab?: string }>;
 }) {
   const viewer = await requireAdmin();
 
@@ -100,6 +100,7 @@ export default async function AdminPage({
 
         {/* Mỗi khu cấu hình một tab — thêm tính năng sau này là thêm một mục vào mảng. */}
         <AdminTabs
+          initialKey={params.tab}
           tabs={[
             {
               key: "monDo",

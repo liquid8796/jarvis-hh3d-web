@@ -11,6 +11,11 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.78 — Giữ tab Tông Môn sau khi tải lại (12/09/2026)
+
+- Tab đang mở trên trang admin được ghi vào tham số `tab` của URL; tải lại trang hoặc render lại từ server vẫn trở về đúng khu đang làm việc.
+- Lựa chọn tab giữ nguyên các tham số tìm kiếm/lọc hiện có. Giá trị tab không hợp lệ hoặc tab mà tài khoản không được quyền thấy sẽ tự rơi về tab đầu tiên.
+
 ## 1.3.77 — Tách tên repo chính khỏi tên khôi lỗi (11/09/2026)
 
 - Tạo repo chính qua admin, CLI hoặc tên do Ollama chọn đều bị chặn nếu trùng với bất kỳ `WORKER_ID` đã đăng ký hoặc dòng đang điểm danh trong bảng `workers`.

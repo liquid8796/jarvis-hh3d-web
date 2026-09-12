@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.78",
+    date: "2026-09-12",
+    lines: [
+      "Trang Tông Môn nay nhớ tab đang mở, nên tải lại trang vẫn trở về đúng khu đang làm việc.",
+    ],
+  },
+  {
     version: "1.3.77",
     date: "2026-09-11",
     lines: [
@@ -474,14 +481,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khôi lỗi chạy trên máy nhà nay tự bấm ô kiểm tra khi trang game dựng lên — trước giờ chỉ máy của tông môn làm việc đó, dù máy nhà mới là nơi nó có tác dụng.",
       "Đang chạy bản cũ thì cài lại bộ cài ở mục Khôi Lỗi mới nhận được thay đổi này.",
-    ],
-  },
-  {
-    version: "1.3.27",
-    date: "2026-08-21",
-    lines: [
-      "Sổ kho khôi lỗi GitHub ở trang Tông Môn nay chia trang: mở sẵn năm kho một trang, và mức đã chọn được nhớ cho lần sau.",
-      "Trang đang xem mà giấu mất kho nào sắp tới hạn thì có một dòng nhắc ngay trên đầu danh sách, khỏi phải lật từng trang đi tìm.",
     ],
   },
 ];

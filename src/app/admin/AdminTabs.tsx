@@ -4,14 +4,35 @@ import { useState, type ReactNode } from "react";
 
 /**
  * Khung tab của trang Tông Môn. Nội dung từng tab là server-render sẵn và truyền vào làm
- * slot — client chỉ giữ đúng một mảnh state "đang mở tab nào", nên thêm khu cấu hình mới
- * về sau là thêm một mục vào mảng này + một slot, không đụng dữ liệu hay quyền.
+ * slot — client giữ tab đang mở và phản chiếu nó lên URL, nên thêm khu cấu hình mới về sau là
+ * thêm một mục vào mảng này + một slot, không đụng dữ liệu hay quyền.
  *
  * Tab ĐỔI HIỂN THỊ chứ không unmount (cùng bài học với form nhiệm vụ): bảng môn đồ giữ
  * nguyên scroll và ô tìm kiếm đang gõ dở khi tông chủ liếc sang tab khác rồi quay lại.
  */
-export function AdminTabs({ tabs }: { tabs: Array<{ key: string; label: string; pane: ReactNode }> }) {
-  const [active, setActive] = useState(tabs[0]?.key ?? "");
+export function AdminTabs({
+  tabs,
+  initialKey,
+}: {
+  tabs: Array<{ key: string; label: string; pane: ReactNode }>;
+  initialKey?: string;
+}) {
+  const firstKey = tabs[0]?.key ?? "";
+  const [active, setActive] = useState(() =>
+    tabs.some((tab) => tab.key === initialKey) ? (initialKey ?? firstKey) : firstKey,
+  );
+  const activeKey = tabs.some((tab) => tab.key === active) ? active : firstKey;
+
+  function openTab(key: string) {
+    setActive(key);
+
+    // Ghi lựa chọn vào chính URL để một lượt refresh hoặc server render sau thao tác ghi vẫn
+    // trở về đúng khu đang làm việc. Giữ nguyên q/status và hash; tab đầu không cần tham số.
+    const url = new URL(window.location.href);
+    if (key === firstKey) url.searchParams.delete("tab");
+    else url.searchParams.set("tab", key);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }
 
   return (
     <>
@@ -27,15 +48,15 @@ export function AdminTabs({ tabs }: { tabs: Array<{ key: string; label: string; 
           <button
             key={t.key}
             type="button"
-            onClick={() => setActive(t.key)}
-            aria-pressed={active === t.key}
+            onClick={() => openTab(t.key)}
+            aria-pressed={activeKey === t.key}
             /* Viền trong suốt ở MỌI tab, tab đang mở chỉ đổi màu viền — cùng bài học với
                `.queue-tabs`: thêm viền cho riêng tab đang mở là cả hàng cao thêm 2px mỗi lần
                bấm. Và viền vàng là thứ mang HÌNH của tab đang mở: nền thanh nay đã tối, nên
                mảng nền tím một mình chỉ hơn thanh 1.25:1 — nhìn ra chữ vàng chứ không nhìn ra
                cái nút. Vàng 0.6 đưa đường viền ấy lên 3.90:1, qua chuẩn 3:1 cho nét giao diện. */
             className={`flex-1 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
-              active === t.key
+              activeKey === t.key
                 ? "border-[var(--color-gold-400)]/60 bg-[var(--color-spirit-500)]/25 text-[var(--color-gold-300)]"
                 : "border-transparent text-[var(--color-mist)] hover:bg-[var(--color-ink-600)]/50 hover:text-[var(--color-parchment)]"
             }`}
@@ -46,7 +67,7 @@ export function AdminTabs({ tabs }: { tabs: Array<{ key: string; label: string; 
       </div>
 
       {tabs.map((t) => (
-        <div key={t.key} hidden={active !== t.key}>
+        <div key={t.key} hidden={activeKey !== t.key}>
           {t.pane}
         </div>
       ))}

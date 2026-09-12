@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   deleteGithubStationAction,
@@ -18,11 +19,8 @@ import {
   countUrgent,
   DEFAULT_DAILY_PUSHES,
   DEFAULT_WORKFLOW_FILE,
-  KEEPALIVE_INTERVAL_DAYS,
   MAX_DAILY_PUSHES,
   MIN_DAILY_PUSHES,
-  PAT_SCOPES_NOTE,
-  SCHEDULE_DISABLE_DAYS,
   type CountdownLevel,
 } from "@/lib/validation/githubStations";
 import { githubPrimaryOwnerGroupFingerprint } from "@/lib/validation/githubPrimaryDeletion";
@@ -35,9 +33,9 @@ import { githubPrimaryOwnerGroupFingerprint } from "@/lib/validation/githubPrima
  * tab này ra không kéo PAT nào xuống trình duyệt; muốn đọc thì phải BẤM (xem `PatVault`), và ô
  * sửa để trống vẫn nghĩa là「giữ PAT cũ」.
  *
- * Thứ đáng nhìn nhất trên tab này là ĐẾM NGƯỢC của từng kho, nên nó là dòng to nhất mỗi hàng —
- * mọi thứ khác (ghi chú lượt ngó, mốc thời gian) là chữ nhỏ dưới nó. Một tab mà mọi dòng đều
- * cùng cỡ thì người vận hành phải đọc hết mới biết có kho nào sắp chết hay không.
+ * Thứ đáng nhìn nhất trên tab này là ĐẾM NGƯỢC của từng kho, nên nó đứng ngay cạnh tên. Màn
+ * tổng quan chỉ giữ trạng thái, số kho phụ và lỗi cần xem; tên/note từng kho phụ đã có trang
+ * chi tiết, bung lại ở đây chỉ bắt người vận hành cuộn qua cùng một dữ liệu hai lần.
  *
  * Sổ được CẮT TRANG (`@/components/Pager`), và chính cái lệ「liếc một cái là thấy kho sắp chết」
  * ở trên là thứ phải trả giá cho phép cắt ấy: một kho đỏ nằm ở trang hai thì không ai liếc thấy.
@@ -47,14 +45,7 @@ import { githubPrimaryOwnerGroupFingerprint } from "@/lib/validation/githubPrima
 /** Khoá riêng cho lựa chọn số kho mỗi trang, để không giẫm lên sổ môn đồ hay hàng đợi. */
 const STATIONS_PAGE_SIZE_KEY = "jarvis:admin-github-stations:per-page";
 
-/**
- * Thang mức RIÊNG, bắt đầu từ 5 thay vì thang chung `[10, 20, 50, 100]`.
- *
- * Một dòng ở đây không phải một dòng bảng: nó là một tấm thẻ mang đếm ngược, trạng thái lịch,
- * ghi chú lượt ngó, mốc ghi, rồi lưới kho phần mềm phụ — cao gấp chục lần một dòng sổ môn
- * đồ. Sổ production hiện có sáu kho mà đã dài quá một màn hình, nên một thang bắt đầu từ 10 là
- * một thang không bao giờ cắt gì cả: thêm phân trang mà người vận hành không thấy khác gì.
- */
+/** Thang riêng bắt đầu từ 5 để màn tổng quan vẫn là một lượt quét ngắn trên điện thoại. */
 const STATION_PAGE_SIZES = [5, 10, 20, 50] as const;
 
 /** Mở ở mức nhỏ nhất; ai muốn xem trọn một mạch thì đổi, và lựa chọn ấy sống qua lần mở sau. */
@@ -196,57 +187,13 @@ function PatVault({ slug }: { slug: string }) {
   );
 }
 
-/** Một dòng repo phụ: tên + tiến độ trong ngày + kết quả push gần nhất mà backend đã ghi. */
-function CompanionRepoStatus({
-  owner,
-  companion,
-  dailyPushes,
-}: {
-  owner: string;
-  companion: StationView["companionRepos"][number];
-  dailyPushes: number;
-}) {
-  const tone =
-    companion.lastPushOk === true
-      ? "text-[var(--color-jade-300)]"
-      : companion.lastPushOk === false
-        ? "text-[#f2a0a0]"
-        : "text-[var(--color-mist)]";
-  const progress =
-    dailyPushes === 0
-      ? "đã tạm dừng"
-      : companion.lastNurtureDay
-        ? `${companion.pushesToday} lượt · giới hạn ${dailyPushes} · ${companion.lastNurtureDay}`
-        : `Giới hạn ${dailyPushes} lượt/ngày · chưa bắt đầu`;
-
-  return (
-    <div className="min-w-0 rounded-lg border border-[var(--color-ink-600)]/50 px-3 py-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <a
-          href={`https://github.com/${owner}/${companion.repo}`}
-          target="_blank"
-          rel="noreferrer"
-          className="min-w-0 truncate font-mono text-xs text-[var(--color-parchment)] hover:text-[var(--color-gold-300)]"
-        >
-          {owner}/{companion.repo}
-        </a>
-        <span className="font-mono text-[11px] text-[var(--color-mist)]">{progress}</span>
-      </div>
-      <p className={`mt-0.5 text-[11px] ${tone}`}>
-        {companion.lastPushAt
-          ? `Đẩy gần nhất ${when(companion.lastPushAt)}${companion.lastPushNote ? `: ${companion.lastPushNote}` : "."}`
-          : "Chưa có kết quả đẩy nào."}
-      </p>
-    </div>
-  );
-}
-
 export function GithubStationPanel({ stations }: { stations: StationView[] }) {
   const [pingState, pingAction, pinging] = useActionState<StationResult | null, FormData>(pingGithubStationAction, null);
   const [deleteState, deleteAction, deleting] = useActionState<StationResult | null, FormData>(deleteGithubStationAction, null);
   const [loopState, loopAction, looping] = useActionState<StationResult | null, FormData>(runKeepaliveAction, null);
-  /** slug đang sửa — đổ sẵn mọi thứ trừ PAT; PAT thì không bao giờ đổ lại. */
   const [editing, setEditing] = useState<StationView | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const editorTrigger = useRef<HTMLButtonElement | null>(null);
   /** Chỉ đổi chữ ở đúng nút đã xác nhận; mọi nút vẫn bị khoá trong lúc xoá cả nhóm tài khoản. */
   const [deletingSlug, setDeletingSlug] = useState<string | null>(null);
 
@@ -280,8 +227,54 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
 
   const notice = [pingState, deleteState, loopState].find((s) => s !== null);
 
+  function openEditor(station: StationView | null, trigger: HTMLButtonElement) {
+    editorTrigger.current = trigger;
+    setEditing(station);
+    setEditorOpen(true);
+  }
+
+  function closeEditor() {
+    setEditorOpen(false);
+    requestAnimationFrame(() => editorTrigger.current?.focus());
+  }
+
+  useEffect(() => {
+    if (!editorOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focus = requestAnimationFrame(() => document.getElementById("station-form-title")?.focus());
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setEditorOpen(false);
+        requestAnimationFrame(() => editorTrigger.current?.focus());
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const dialog = document.getElementById("station-editor-dialog");
+      const focusable = dialog
+        ? [...dialog.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]")]
+        : [];
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && (document.activeElement === first || document.activeElement?.id === "station-form-title")) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      cancelAnimationFrame(focus);
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [editorOpen, editing?.slug]);
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       {notice && (
         <p
           role="status"
@@ -291,35 +284,31 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
         </p>
       )}
 
-      <section className="card card-hairline p-6">
-        <div className="mb-2 flex flex-wrap items-start justify-between gap-4">
-          <h2 className="h-display text-lg font-semibold text-gilded">Sổ kho khôi lỗi GitHub</h2>
-          {/* Ô chọn đứng TRƯỚC nút nuôi: nút ấy đã đậu ở góc phải từ trước, và một tuỳ chọn mới
-              không đáng đẩy một cái nút người vận hành đã quen tay đi chỗ khác. Nó ở lại kể cả
-              khi sổ trống — cùng lẽ với chính nút「Chạy vòng nuôi」ngay bên cạnh, thứ cũng không
-              làm gì được với một cuốn sổ rỗng mà vẫn đứng nguyên đó. */}
-          <div className="flex flex-wrap items-center gap-3">
+      <section className="card card-hairline p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="h-display text-lg font-semibold text-gilded">Kho chính</h2>
+            <p className="mt-0.5 text-xs text-[var(--color-mist)]">
+              {urgentInBook.critical > 0 || urgentInBook.warn > 0
+                ? `${urgentInBook.critical} sắp tắt lịch · ${urgentInBook.warn} cần ghi mốc`
+                : "Workflow và repo phụ đang được theo dõi"}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className="btn btn-gold px-3 py-2 text-sm" onClick={(event) => openEditor(null, event.currentTarget)}>
+              Tạo kho mới
+            </button>
             <PageSizeSelect perPage={perPage} onPerPage={setPerPage} unit="kho" sizes={STATION_PAGE_SIZES} />
             <form action={loopAction}>
-              <button type="submit" className="btn btn-ghost text-sm" disabled={looping}>
+              <button type="submit" className="btn btn-ghost px-3 py-2 text-sm" disabled={looping}>
                 {looping ? "Đang chạy · chờ Ollama…" : "Chạy vòng nuôi"}
               </button>
             </form>
           </div>
         </div>
-        <p className="mb-5 max-w-prose text-xs text-[var(--color-mist)]">
-          GitHub tắt lịch <code>schedule</code> của một kho công khai sau {SCHEDULE_DISABLE_DAYS} ngày
-          không có commit nào, và khi tắt thì khôi lỗi im lặng ngừng lên ca. Vòng nuôi chạy mỗi ngày
-          theo lịch <code>/api/cron</code>: ngó trạng thái của từng kho, và ghi một dòng mốc vào{" "}
-          <code>.github/heartbeat.txt</code> mỗi ~{KEEPALIVE_INTERVAL_DAYS} ngày. Lịch nào đã bị tắt vì
-          im lặng thì nó bật lại; lịch bị tắt TAY thì nó để nguyên. Các kho phần mềm phụ được Ollama
-          phát triển theo nhu cầu trong giới hạn đẩy hằng ngày; chỉnh số lượng và quyền tại trang chi tiết.
-        </p>
 
         {stations.length === 0 ? (
-          <p className="text-sm text-[var(--color-mist)]">
-            Sổ còn trống. Dùng form bên dưới để tạo repo GitHub, cài workflow và đăng ký kho vào vòng nuôi.
-          </p>
+          <p className="py-10 text-center text-sm text-[var(--color-mist)]">Chưa có kho GitHub.</p>
         ) : (
           <>
             {offPageParts && (
@@ -328,15 +317,17 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                  mà không cắt ngang thứ họ đang nghe dở. */
               <p
                 role="status"
-                className={`mb-3 text-xs ${offPage.critical > 0 ? "text-[#f2a0a0]" : "text-[var(--color-gold-300)]"}`}
+                className={`mt-3 text-xs ${offPage.critical > 0 ? "text-[#f2a0a0]" : "text-[var(--color-gold-300)]"}`}
               >
-                Trang này không phải cả sổ — ngoài nó còn {offPageParts}. Lật trang hoặc tăng
-                「Mỗi trang」để nhìn trọn.
+                Ngoài trang này còn {offPageParts}.
               </p>
             )}
-            <div className="flex flex-col gap-3">
+            <div className="mt-4 flex flex-col gap-2">
               {paged.items.map((station) => {
                 const countdown = countdownTone(station.daysToDisable);
+                const companionIssues = station.companionRepos.filter(
+                  (companion) => companion.lastPushOk === false || companion.pendingDelete,
+                ).length;
                 const accountStations = stations.filter(
                   (candidate) => candidate.owner.toLowerCase() === station.owner.toLowerCase(),
                 );
@@ -345,11 +336,11 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                   0,
                 );
                 return (
-                  <div
+                  <article
                     key={station.slug}
-                    className="flex flex-wrap items-center gap-3 rounded-xl border border-[rgba(232,194,92,0.18)] px-4 py-3"
+                    className="grid min-w-0 gap-3 rounded-xl border border-[rgba(232,194,92,0.18)] px-3 py-3 sm:px-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
                   >
-                    <div className="w-full min-w-0 sm:w-auto sm:flex-1">
+                    <div className="min-w-0">
                       <p className="flex flex-wrap items-baseline gap-x-2 font-semibold">
                         <Link href={`/admin/github/${encodeURIComponent(station.owner)}/${encodeURIComponent(station.repo)}`} className="truncate font-mono hover:text-[var(--color-gold-300)] hover:underline">{station.slug}</Link>
                         <span className={`text-sm font-normal ${countdown.className}`}>{countdown.text}</span>
@@ -359,72 +350,53 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                           </span>
                         )}
                       </p>
-                      <p className="truncate text-xs text-[var(--color-mist)]">
-                        {station.workflowFile} · {workflowStateLabel(station.workflowState)}
-                        {station.workerId && <> · WORKER_ID {station.workerId}</>}
+                      <p className={`mt-0.5 text-xs ${companionIssues > 0 ? "text-[var(--color-gold-300)]" : "text-[var(--color-mist)]"}`}>
+                        {workflowStateLabel(station.workflowState)} · {station.companionRepos.length} kho phụ
+                        {companionIssues > 0 && <> · {companionIssues} cần xem</>}
+                        {station.dailyPushes === 0 ? " · đã dừng nuôi" : ` · ${station.dailyPushes} lượt/kho/ngày`}
                       </p>
                       <p
-                        className={`text-xs ${station.lastPingOk ? "text-[var(--color-jade-300)]" : station.lastPingOk === false ? "text-[#f2a0a0]" : "text-[var(--color-mist)]"}`}
+                        className={`mt-0.5 truncate text-xs ${station.lastPingOk === false ? "text-[#f2a0a0]" : "text-[var(--color-mist)]"}`}
+                        title={station.lastPingOk === false ? station.lastPingNote : undefined}
                       >
-                        {station.lastPingAt ? `Ngó ${when(station.lastPingAt)}: ${station.lastPingNote}` : "Chưa ngó lần nào."}
+                        {station.lastPingAt ? `Ngó ${when(station.lastPingAt)}` : "Chưa ngó"} · mốc {when(station.lastCommitAt)}
+                        {station.lastPingOk === false && station.lastPingNote ? ` · ${station.lastPingNote}` : ""}
                       </p>
-                      <p className="text-xs text-[var(--color-mist)]">Mốc ghi gần nhất: {when(station.lastCommitAt)}</p>
-                      <div className="mt-2">
-                        <p className="mb-1 text-[11px] font-medium tracking-wide text-[var(--color-mist)] uppercase">
-                          Kho phần mềm phụ · giới hạn {station.dailyPushes} lượt/kho/ngày
-                        </p>
-                        {station.companionRepos.length === 0 ? (
-                          <p className="text-[11px] text-[var(--color-mist)]">
-                            Chưa có kho phụ. Ollama sẽ tạo khi vòng nuôi chạy và cấu hình cho phép.
-                          </p>
-                        ) : (
-                          <div className="grid min-w-0 grid-cols-1 gap-1 sm:grid-cols-2">
-                            {station.companionRepos.map((companion) => (
-                              <CompanionRepoStatus
-                                key={companion.repo}
-                                owner={station.owner}
-                                companion={companion}
-                                dailyPushes={station.dailyPushes}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
                     </div>
-                    <Link href={`/admin/github/${encodeURIComponent(station.owner)}/${encodeURIComponent(station.repo)}`} className="btn btn-ghost text-sm">Kho phụ / Chi tiết</Link>
-                    <form action={pingAction}>
-                      <input type="hidden" name="slug" value={station.slug} />
-                      <input type="hidden" name="expectedGroup" value={githubPrimaryOwnerGroupFingerprint(accountStations, station.owner)} />
-                      <button type="submit" className="btn btn-ghost text-sm" disabled={pinging}>
-                        {pinging ? "Đang nuôi…" : "Nuôi ngay"}
+                    <div className="flex flex-wrap gap-2 lg:justify-end">
+                      <Link href={`/admin/github/${encodeURIComponent(station.owner)}/${encodeURIComponent(station.repo)}`} className="btn btn-ghost px-3 py-1.5 text-xs">Chi tiết</Link>
+                      <form action={pingAction}>
+                        <input type="hidden" name="slug" value={station.slug} />
+                        <input type="hidden" name="expectedGroup" value={githubPrimaryOwnerGroupFingerprint(accountStations, station.owner)} />
+                        <button type="submit" className="btn btn-ghost px-3 py-1.5 text-xs" disabled={pinging}>
+                          {pinging ? "Đang nuôi…" : "Nuôi ngay"}
+                        </button>
+                      </form>
+                      <button type="button" className="btn btn-ghost px-3 py-1.5 text-xs" onClick={(event) => openEditor(station, event.currentTarget)}>
+                        Sửa
                       </button>
-                    </form>
-                    <button type="button" className="btn btn-ghost text-sm" onClick={() => setEditing(station)}>
-                      Sửa
-                    </button>
-                    <form
-                      action={deleteAction}
-                      onSubmit={(e) => {
-                        // Một lượt xoá áp dụng cho mọi repo chính cùng tài khoản, nên lời xác nhận
-                        // phải nói rõ phạm vi và khẳng định các repo phụ vẫn nằm nguyên trên GitHub.
-                        if (!confirm(
-                          `XÓA VĨNH VIỄN ${accountStations.length} REPO CHÍNH của tài khoản GitHub「${station.owner}」?\n\n` +
-                            `${retainedCompanions} repo phụ đã đăng ký sẽ được GIỮ NGUYÊN trên GitHub.\n\n` +
-                            "Nếu tài khoản không còn truy cập được, chẳng hạn bị đình chỉ, hệ thống chỉ xoá " +
-                            "các station khỏi sổ.",
-                        )) {
-                          e.preventDefault();
-                          return;
-                        }
-                        setDeletingSlug(station.slug);
-                      }}
-                    >
-                      <input type="hidden" name="slug" value={station.slug} />
-                      <button type="submit" className="btn btn-danger text-sm" disabled={deleting}>
-                        {deleting && deletingSlug === station.slug ? "Đang xoá kho chính…" : "Xoá"}
-                      </button>
-                    </form>
-                  </div>
+                      <form
+                        action={deleteAction}
+                        onSubmit={(e) => {
+                          if (!confirm(
+                            `XÓA VĨNH VIỄN ${accountStations.length} REPO CHÍNH của tài khoản GitHub「${station.owner}」?\n\n` +
+                              `${retainedCompanions} repo phụ đã đăng ký sẽ được GIỮ NGUYÊN trên GitHub.\n\n` +
+                              "Nếu tài khoản không còn truy cập được, chẳng hạn bị đình chỉ, hệ thống chỉ xoá " +
+                              "các station khỏi sổ.",
+                          )) {
+                            e.preventDefault();
+                            return;
+                          }
+                          setDeletingSlug(station.slug);
+                        }}
+                      >
+                        <input type="hidden" name="slug" value={station.slug} />
+                        <button type="submit" className="btn btn-danger px-3 py-1.5 text-xs" disabled={deleting}>
+                          {deleting && deletingSlug === station.slug ? "Đang xoá…" : "Xoá"}
+                        </button>
+                      </form>
+                    </div>
+                  </article>
                 );
               })}
             </div>
@@ -433,28 +405,56 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
         )}
       </section>
 
-      <StationEditor key={editing?.slug ?? "new"} station={editing} onNew={() => setEditing(null)} />
+      {editorOpen && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(6,8,20,0.78)] p-3 sm:p-6"
+          onClick={(event) => { if (event.target === event.currentTarget) closeEditor(); }}
+        >
+          <StationEditor
+            key={editing?.slug ?? "new"}
+            station={editing}
+            onNew={() => setEditing(null)}
+            onClose={closeEditor}
+          />
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
 
 /** A keyed editor keeps create/update action state and secret input isolated per station. */
-function StationEditor({ station, onNew }: { station: StationView | null; onNew: () => void }) {
+function StationEditor({
+  station,
+  onNew,
+  onClose,
+}: {
+  station: StationView | null;
+  onNew: () => void;
+  onClose: () => void;
+}) {
   const [state, action, pending] = useActionState<StationResult | null, FormData>(
     station ? updateGithubStationAction : provisionGithubStationAction,
     null,
   );
   const managed = station?.provisionedBy === "jarvis";
   return (
-    <section className="card card-hairline w-full max-w-2xl min-w-0 p-4 sm:p-6" aria-labelledby="station-form-title">
-      <h2 id="station-form-title" className="h-display text-lg font-semibold text-gilded">
-        {station ? "Sửa cấu hình kho GitHub" : "Tạo kho GitHub mới"}
-      </h2>
-      <p className="mt-2 mb-5 text-sm text-[var(--color-mist)]">
-        {station
-          ? "Giữ nguyên tài khoản và tên kho. Các kho phụ và lịch sử vận hành được giữ khi cập nhật."
-          : "Jarvis xác định tài khoản từ PAT, tạo repo công khai, đẩy workflow và đưa kho vào vòng nuôi. Tên repo đã tồn tại sẽ dừng trước khi thay đổi."}
-      </p>
+    <section
+      id="station-editor-dialog"
+      className="card card-hairline max-h-[85dvh] w-full max-w-2xl min-w-0 overflow-y-auto p-4 sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="station-form-title"
+    >
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 id="station-form-title" tabIndex={-1} className="h-display text-lg font-semibold text-gilded">
+            {station ? "Sửa kho GitHub" : "Tạo kho GitHub mới"}
+          </h2>
+          <p className="mt-1 text-xs text-[var(--color-mist)]">{station ? "Tên kho và tài khoản được giữ nguyên." : "Tài khoản được xác định từ PAT."}</p>
+        </div>
+        <button type="button" className="btn btn-ghost px-2.5 py-1 text-sm" onClick={onClose} aria-label="Đóng form kho GitHub">✕</button>
+      </div>
       {state && !pending && (
         <div role="status" className={`mb-4 rounded-lg border p-3 text-sm break-words ${state.ok ? "border-[rgba(76,201,154,0.4)] text-[var(--color-jade-300)]" : "border-[rgba(255,120,120,0.4)] text-[#f2a0a0]"}`}>
           <p>{state.message}</p>
@@ -485,8 +485,8 @@ function StationEditor({ station, onNew }: { station: StationView | null; onNew:
               required={!station} placeholder={station ? "Dán PAT mới của cùng tài khoản" : "ghp_…"} />
             <p className="mt-1 text-xs text-[var(--color-mist)]">
               {station
-                ? <>PAT mới phải thuộc đúng tài khoản đang giữ kho. {PAT_SCOPES_NOTE}</>
-                : <>Tạo classic PAT tại github.com/settings/tokens với đủ quyền <code>repo</code>, <code>workflow</code> và <code>delete_repo</code>. Quyền xoá dùng để thu hồi kho vừa tạo nếu thiết lập thất bại.</>}
+                ? "PAT mới phải thuộc đúng tài khoản và đủ quyền GitHub."
+                : <>Classic PAT cần <code>repo</code> · <code>workflow</code> · <code>delete_repo</code>.</>}
             </p>
             {station && <PatVault key={station.slug} slug={station.slug} />}
           </div>
@@ -494,7 +494,7 @@ function StationEditor({ station, onNew }: { station: StationView | null; onNew:
             <div>
               <label className="label" htmlFor="station-repo">Tên repo (tuỳ chọn)</label>
               <input id="station-repo" name="repo" className="input w-full font-mono" maxLength={100} placeholder="Để trống để Ollama tự đặt tên" />
-              <p className="mt-1 text-xs text-[var(--color-mist)]">Để trống: Ollama tự chọn tên, không dùng khuôn cố định. Cần model và API key Ollama dùng được; lỗi sẽ dừng tạo kho. Tên tự nhập được giữ nguyên; tên khôi lỗi được tạo riêng để không trùng repo.</p>
+              <p className="mt-1 text-xs text-[var(--color-mist)]">Để trống để Ollama đặt tên.</p>
             </div>
           )}
           {managed ? (
@@ -510,14 +510,14 @@ function StationEditor({ station, onNew }: { station: StationView | null; onNew:
                 <input id="station-workflow" name="workflowFile" className="input w-full font-mono" maxLength={100}
                   defaultValue={station?.workflowFile ?? ""} placeholder={DEFAULT_WORKFLOW_FILE} required={!!station} />
                 <p className="mt-1 text-xs text-[var(--color-mist)]">
-                  {station ? "Nhập đúng tên workflow đang có trong kho." : `Để trống dùng ${DEFAULT_WORKFLOW_FILE}. Chỉ nhập tên tệp .yml hoặc .yaml.`}
+                  {station ? "Tên workflow đang chạy." : `Mặc định: ${DEFAULT_WORKFLOW_FILE}.`}
                 </p>
               </div>
               {station && (
                 <div className="min-w-0 basis-48 flex-1">
                   <label className="label" htmlFor="station-worker">WORKER_ID (tuỳ chọn)</label>
                   <input id="station-worker" name="workerId" className="input w-full font-mono" maxLength={120} defaultValue={station.workerId} />
-                  <p className="mt-1 text-xs text-[var(--color-mist)]">Kho đăng ký từ trước: sửa để khớp workflow đang chạy.</p>
+                  <p className="mt-1 text-xs text-[var(--color-mist)]">Dành cho kho đăng ký từ trước.</p>
                 </div>
               )}
             </div>
@@ -527,7 +527,7 @@ function StationEditor({ station, onNew }: { station: StationView | null; onNew:
             <input id="station-daily-pushes" name="dailyPushes" type="number" min={MIN_DAILY_PUSHES} max={MAX_DAILY_PUSHES} step={1}
               className="input w-full max-w-[10rem] font-mono" defaultValue={station?.dailyPushes ?? ""} placeholder={String(DEFAULT_DAILY_PUSHES)} required={!!station} />
             <p className="mt-1 text-xs text-[var(--color-mist)]">
-              {MIN_DAILY_PUSHES}–{MAX_DAILY_PUSHES}; mặc định {DEFAULT_DAILY_PUSHES}. Chọn 0 để tạm dừng nuôi kho phụ. Model không phải đẩy đủ số lượt.
+              {MIN_DAILY_PUSHES}–{MAX_DAILY_PUSHES} · mặc định {DEFAULT_DAILY_PUSHES} · 0 là tạm dừng.
             </p>
           </div>
           {station && (
@@ -549,7 +549,7 @@ function StationEditor({ station, onNew }: { station: StationView | null; onNew:
             {station && <button type="button" className="btn btn-ghost" onClick={onNew}>Tạo kho mới</button>}
           </div>
         </fieldset>
-        {pending && <p role="status" className="mt-3 text-sm text-[var(--color-mist)]">{station ? "Đang lưu và kiểm tra workflow…" : "Đang tạo repo, đẩy workflow và đăng ký kho. Lượt tạo có thể mất tối đa 4 phút."}</p>}
+        {pending && <p role="status" className="mt-3 text-sm text-[var(--color-mist)]">{station ? "Đang lưu và kiểm tra workflow…" : "Đang tạo repo và workflow; có thể mất đến 4 phút."}</p>}
       </form>
     </section>
   );

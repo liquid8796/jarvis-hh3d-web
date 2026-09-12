@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.79",
+    date: "2026-09-12",
+    lines: [
+      "Kho GitHub nay chia thành ba mục gọn; mở vào thấy ngay danh sách kho chính mà không phải cuộn qua cấu hình.",
+      "Mỗi kho chỉ hiện trạng thái cần thiết; form tạo hoặc sửa mở riêng và dễ dùng hơn trên điện thoại.",
+    ],
+  },
+  {
     version: "1.3.78",
     date: "2026-09-12",
     lines: [
@@ -473,14 +481,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Nói lại cho đúng chỗ dễ hiểu nhầm: auto chạy bằng máy nhà sẽ dừng khi bạn tắt trình duyệt, chứ không riêng lúc tắt máy.",
       "Auto chạy bằng khôi lỗi tông môn thì vẫn cày tiếp — tắt trình duyệt hay tắt máy đều không sao.",
       "Chỉ là câu chữ trên màn hình; cách auto chạy không đổi gì.",
-    ],
-  },
-  {
-    version: "1.3.28",
-    date: "2026-08-21",
-    lines: [
-      "Khôi lỗi chạy trên máy nhà nay tự bấm ô kiểm tra khi trang game dựng lên — trước giờ chỉ máy của tông môn làm việc đó, dù máy nhà mới là nơi nó có tác dụng.",
-      "Đang chạy bản cũ thì cài lại bộ cài ở mục Khôi Lỗi mới nhận được thay đổi này.",
     ],
   },
 ];

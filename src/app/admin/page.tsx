@@ -21,8 +21,7 @@ import { TagFrameManager } from "./TagFrameManager";
 import { BrowserEngineForm } from "./BrowserEngineForm";
 import { DailyResetForm } from "./DailyResetForm";
 import { GameDomainForm } from "./GameDomainForm";
-import { GithubStationPanel } from "./GithubStationPanel";
-import { GithubNurtureSettings } from "./GithubNurtureSettings";
+import { GithubAdminWorkspace } from "./GithubAdminWorkspace";
 import { JobEventRetentionForm } from "./JobEventRetentionForm";
 import { MaintenanceForm } from "./MaintenanceForm";
 import { MirrorPanel } from "./MirrorPanel";
@@ -44,7 +43,7 @@ export const maxDuration = 300;
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; tab?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; tab?: string; githubPanel?: string }>;
 }) {
   const viewer = await requireAdmin();
 
@@ -231,10 +230,11 @@ export default async function AdminPage({
                   key: "khoGithub",
                   label: "Kho GitHub",
                   pane: (
-                    <div className="flex flex-col gap-6">
-                      <GithubNurtureSettings config={await githubNurtureForAdmin()} />
-                      <GithubStationPanel stations={await githubStationsForAdmin()} />
-                    </div>
+                    <GithubAdminWorkspace
+                      config={await githubNurtureForAdmin()}
+                      stations={await githubStationsForAdmin()}
+                      initialSection={params.githubPanel}
+                    />
                   ),
                 }]
               : []),

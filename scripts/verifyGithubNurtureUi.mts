@@ -77,9 +77,8 @@ const mockActions = `
 const fixture = `
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { GithubNurtureSettings } from "@/app/admin/GithubNurtureSettings";
+import { GithubAdminWorkspace } from "@/app/admin/GithubAdminWorkspace";
 import { GithubCompanionDetail } from "@/app/admin/github/[owner]/[repo]/GithubCompanionDetail";
-import { GithubStationPanel } from "@/app/admin/GithubStationPanel";
 const stamp = "2026-09-10T08:00:00.000Z";
 const config = {
   defaultCompanionCount:3, model:"gemma4:31b-cloud", contextWindow:32768,
@@ -109,7 +108,8 @@ const station = {
     {...companion,repo:"legacy-tool",managedBy:undefined,topic:"Kho được đăng ký từ trước.",pendingDelete:true}],
 };
 const detail = {station,defaultCompanionCount:3,effectiveCompanionCount:3};
-const view = new URLSearchParams(location.search).get("view") || "settings";
+const params = new URLSearchParams(location.search);
+const view = params.get("view") || "workspace";
 const stationList = new URLSearchParams(location.search).get("deletion") === "1" ? [
   station,
   {...station,slug:"sample-owner/second-primary",repo:"second-primary",githubId:102,companionRepos:station.companionRepos.slice(0,2)},
@@ -118,9 +118,11 @@ const stationList = new URLSearchParams(location.search).get("deletion") === "1"
 createRoot(document.getElementById("root")).render(
   <main className="mx-auto w-full max-w-6xl px-4 pb-24 sm:px-6">
     <nav className="card mb-5 mt-5 flex flex-wrap gap-4 p-4 text-sm">
-      <strong>Offline fixture</strong><a href="/?view=settings">Ollama settings</a><a href="/?view=detail">Companion detail</a><a href="/?view=stations">Station list</a>
+      <strong>Offline fixture</strong><a href="/?view=workspace">Kho chính</a><a href="/?view=workspace&githubPanel=ollama">Ollama</a><a href="/?view=workspace&githubPanel=keys">API key</a><a href="/?view=detail">Kho phụ</a>
     </nav>
-    {view === "detail" ? <GithubCompanionDetail detail={detail}/> : view === "stations" ? <GithubStationPanel stations={stationList}/> : <GithubNurtureSettings config={config}/>}
+    {view === "detail"
+      ? <GithubCompanionDetail detail={detail}/>
+      : <GithubAdminWorkspace stations={stationList} config={config} initialSection={params.get("githubPanel") || undefined}/>}
   </main>
 );
 `;
@@ -189,9 +191,10 @@ const server = createServer((request, response) => {
 await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
 const address = server.address();
 if (!address || typeof address === "string") throw new Error("Fixture server did not bind a TCP port.");
-console.log(`Offline fixture: http://127.0.0.1:${address.port}/?view=settings`);
+console.log(`Offline fixture: http://127.0.0.1:${address.port}/?view=workspace`);
+console.log(`Ollama: http://127.0.0.1:${address.port}/?view=workspace&githubPanel=ollama`);
+console.log(`API keys: http://127.0.0.1:${address.port}/?view=workspace&githubPanel=keys`);
 console.log(`Detail: http://127.0.0.1:${address.port}/?view=detail`);
-console.log(`Station list: http://127.0.0.1:${address.port}/?view=stations`);
 console.log(`Artifacts: ${output}`);
 if (!process.argv.includes("--check")) {
   console.log("Check widths 390 and 1366; forms show a disabled/pending state for 1.5 seconds. Ctrl+C stops the preview.");
@@ -210,10 +213,26 @@ if (!process.argv.includes("--check")) {
       const page = await context.newPage();
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
       page.on("pageerror", (error) => failures.push(error.message));
-      for (const view of ["settings", "detail", "stations"]) {
-        await page.goto(`${origin}/?view=${view}`);
+      for (const { view, query, tabId } of [
+        { view: "stations", query: "?view=workspace", tabId: "stations" },
+        { view: "ollama", query: "?view=workspace&githubPanel=ollama", tabId: "ollama" },
+        { view: "keys", query: "?view=workspace&githubPanel=keys", tabId: "keys" },
+        { view: "detail", query: "?view=detail", tabId: null },
+      ]) {
+        await page.goto(`${origin}/${query}`);
         await page.locator("main section").first().waitFor();
         await page.evaluate(() => document.fonts.ready);
+        if (tabId) {
+          assert.equal(await page.getByRole("tab").count(), 3);
+          assert.equal(await page.locator(`#github-workspace-tab-${tabId}`).getAttribute("aria-selected"), "true");
+          await page.locator(`#github-workspace-panel-${tabId}`).waitFor({ state: "visible" });
+        }
+        if (view === "stations") {
+          assert.equal(await page.getByRole("dialog").count(), 0, "Create/edit modal must be closed in the initial station view");
+          assert.equal(await page.locator("#station-pat").count(), 0, "Station form fields must stay out of the compact initial view");
+          const compactHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+          assert.ok(compactHeight <= (width === 390 ? 844 : 900), `Initial station view is taller than one viewport at ${width}px: ${compactHeight}px`);
+        }
         const dimensions = await page.evaluate(() => ({
           scrollWidth: document.documentElement.scrollWidth,
           overflow: [...document.querySelectorAll("main *")].filter((node) => {
@@ -226,8 +245,42 @@ if (!process.argv.includes("--check")) {
         report.push({ view, width, scrollWidth: dimensions.scrollWidth, screenshot });
         if (dimensions.scrollWidth > width + 1) failures.push(`${view}/${width} overflow: ${JSON.stringify(dimensions)}`);
       }
+
+      await page.goto(`${origin}/?view=workspace`);
+      const stationTab = page.locator("#github-workspace-tab-stations");
+      await stationTab.press("ArrowRight");
+      await page.waitForFunction(() => new URL(location.href).searchParams.get("githubPanel") === "ollama");
+      assert.equal(await page.locator("#github-workspace-tab-ollama").getAttribute("aria-selected"), "true");
+      assert.equal(await page.locator('[role="tabpanel"]:visible').count(), 1);
+      assert.equal(await page.evaluate(() => document.activeElement?.id), "github-workspace-tab-ollama");
+      await page.reload();
+      assert.equal(await page.locator("#github-workspace-tab-ollama").getAttribute("aria-selected"), "true", "URL must restore the selected GitHub sub-tab after refresh");
+      await page.locator("#github-workspace-tab-ollama").press("End");
+      await page.waitForFunction(() => new URL(location.href).searchParams.get("githubPanel") === "keys");
+      assert.equal(await page.locator("#github-workspace-tab-keys").getAttribute("aria-selected"), "true");
+      assert.equal(await page.evaluate(() => document.activeElement?.id), "github-workspace-tab-keys");
+      await page.locator("#github-workspace-tab-keys").press("Home");
+      await page.waitForFunction(() => !new URL(location.href).searchParams.has("githubPanel"));
+      assert.equal(await stationTab.getAttribute("aria-selected"), "true");
+      assert.equal(await page.evaluate(() => document.activeElement?.id), "github-workspace-tab-stations");
+      await stationTab.press("ArrowLeft");
+      await page.waitForFunction(() => new URL(location.href).searchParams.get("githubPanel") === "keys");
+      assert.equal(await page.locator("#github-workspace-tab-keys").getAttribute("aria-selected"), "true", "ArrowLeft must wrap from the first to the last GitHub sub-tab");
+
+      await page.goto(`${origin}/?view=workspace`);
+      const createTrigger = page.getByRole("button", { name: "Tạo kho mới", exact: true });
+      await createTrigger.click();
+      await page.getByRole("dialog").waitFor();
+      await page.keyboard.press("Escape");
+      await page.getByRole("dialog").waitFor({ state: "detached" });
+      await page.waitForFunction(() => document.activeElement?.textContent?.trim() === "Tạo kho mới");
+      assert.ok(await createTrigger.evaluate((element) => element === document.activeElement), "Escape must return focus to the button that opened the station modal");
+
       for (const outcome of ["success", "warning", "error"]) {
-        await page.goto(`${origin}/?view=stations&outcome=${outcome}`);
+        await page.goto(`${origin}/?view=workspace&outcome=${outcome}`);
+        assert.equal(await page.getByRole("dialog").count(), 0);
+        await page.getByRole("button", { name: "Tạo kho mới", exact: true }).click();
+        await page.getByRole("dialog").waitFor();
         const createForm = page.locator("form").filter({ has: page.locator("#station-pat") });
         assert.equal(await createForm.locator("input[name=owner],input[name=workerId],textarea[name=companionRepos],input[name=enabled]").count(), 0);
         assert.equal(await createForm.locator("input").count(), 4);
@@ -239,8 +292,7 @@ if (!process.argv.includes("--check")) {
         }
         assert.equal(await page.locator("#station-workflow").getAttribute("placeholder"), "linh-su.yml");
         assert.equal(await page.locator("#station-repo").getAttribute("placeholder"), "Để trống để Ollama tự đặt tên");
-        assert.match(await createForm.innerText(), /Ollama tự chọn tên, không dùng khuôn cố định/);
-        assert.match(await createForm.innerText(), /lỗi sẽ dừng tạo kho/);
+        assert.match(await createForm.innerText(), /Để trống để Ollama đặt tên/);
         assert.equal(await page.locator("#station-daily-pushes").getAttribute("placeholder"), "5");
         await page.locator("#station-pat").fill("offline-fixture-pat");
         await page.getByRole("button", { name: "Tạo repo + workflow", exact: true }).click();
@@ -266,8 +318,10 @@ if (!process.argv.includes("--check")) {
         if (scrollWidth > width + 1) failures.push(`create-${outcome}/${width} overflow: ${scrollWidth}`);
       }
       for (const managed of [false, true]) {
-        await page.goto(`${origin}/?view=stations&managed=${managed ? "1" : "0"}`);
+        await page.goto(`${origin}/?view=workspace&managed=${managed ? "1" : "0"}`);
+        assert.equal(await page.getByRole("dialog").count(), 0);
         await page.getByRole("button", { name: "Sửa", exact: true }).click();
+        await page.getByRole("dialog").waitFor();
         const editForm = page.locator("form").filter({ has: page.locator("#station-pat") });
         assert.equal(await editForm.locator("input[name=owner],input[name=repo],textarea[name=companionRepos]").count(), 0);
         assert.equal(await editForm.locator("input[name=slug]").inputValue(), "sample-owner/primary-repo");
@@ -301,11 +355,11 @@ if (!process.argv.includes("--check")) {
         const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
         report.push({ view: `edit-${managed ? "managed" : "legacy"}`, width, scrollWidth, screenshot });
         if (scrollWidth > width + 1) failures.push(`edit/${width} overflow: ${scrollWidth}`);
-        await page.getByRole("button", { name: "Tạo kho mới", exact: true }).click();
+        await page.getByRole("dialog").getByRole("button", { name: "Tạo kho mới", exact: true }).click();
         assert.equal(await page.locator("#station-repo").inputValue(), "");
         assert.equal(await page.locator("section[aria-labelledby=station-form-title]").getByRole("status").count(), 0);
       }
-      await page.goto(`${origin}/?view=stations&deletion=1`);
+      await page.goto(`${origin}/?view=workspace&deletion=1`);
       let accountDeleteConfirmation = "";
       page.once("dialog", async (dialog) => {
         accountDeleteConfirmation = dialog.message();
@@ -331,7 +385,8 @@ if (!process.argv.includes("--check")) {
 
     const page = await context.newPage();
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(`${origin}/?view=settings`);
+    await page.goto(`${origin}/?view=workspace&githubPanel=ollama`);
+    assert.equal(await page.locator("#github-workspace-tab-ollama").getAttribute("aria-selected"), "true");
     assert.equal(await page.locator("#nurture-default-count").inputValue(), "3");
     assert.equal(await page.locator("#nurture-context").getAttribute("min"), "8192");
     assert.equal(await page.locator("#nurture-web-search").isChecked(), true);
@@ -342,8 +397,12 @@ if (!process.argv.includes("--check")) {
     const saving = page.getByRole("button", { name: "Đang lưu…", exact: true });
     await saving.waitFor();
     assert.ok(await saving.isDisabled());
-    await page.screenshot({ path: join(output, "settings-pending-390.png"), fullPage: true });
+    await page.screenshot({ path: join(output, "ollama-pending-390.png"), fullPage: true });
     await page.getByRole("button", { name: "Lưu cấu hình Ollama", exact: true }).waitFor();
+    assert.equal(await page.getByRole("status").count(), 1);
+    await page.getByRole("tab", { name: /API key/ }).click();
+    await page.waitForFunction(() => new URL(location.href).searchParams.get("githubPanel") === "keys");
+    assert.equal(await page.locator("#github-workspace-tab-keys").getAttribute("aria-selected"), "true");
     await page.locator("#nurture-api-keys").fill("offline-fixture-key-one");
     await page.locator("#nurture-key-file").setInputFiles({ name: "fixture-keys.json", mimeType: "application/json", buffer: Buffer.from('["offline-fixture-key-two"]') });
     await page.getByRole("button", { name: "Nhập API key", exact: true }).click();
@@ -351,7 +410,7 @@ if (!process.argv.includes("--check")) {
     await importing.waitFor();
     assert.ok(await importing.isDisabled());
     await page.getByRole("button", { name: "Nhập API key", exact: true }).waitFor();
-    assert.equal(await page.getByRole("status").count(), 2);
+    assert.equal(await page.getByRole("status").count(), 1);
     const toggle = page.getByRole("button", { name: "Tạm tắt", exact: true }).first();
     await toggle.click();
     assert.ok(await toggle.isDisabled());
@@ -384,7 +443,7 @@ if (!process.argv.includes("--check")) {
     console.log(JSON.stringify({ report, failures }, null, 2));
     await writeFile(join(output, "report.json"), JSON.stringify({ report, failures }, null, 2), "utf8");
     assert.deepEqual(failures, [], "Browser errors or horizontal overflow detected");
-    console.log("PASS: 390/1366 layout; create defaults/pending/success/warning/error; immutable managed and editable legacy station forms; account-wide primary and companion delete confirmation cancellation; settings/key pending states.");
+    console.log("PASS: compact 390/1366 GitHub workspace; station/Ollama/key screenshots; keyboard and URL-persistent sub-tabs; modal create/edit defaults and pending states; account-wide primary and companion delete confirmation cancellation.");
   } finally {
     await browser?.close();
     await new Promise<void>((resolve) => server.close(() => resolve()));

@@ -18,7 +18,7 @@ export default async function GithubStationPage({ params }: {
     <>
       <SiteHeader />
       <main data-backdrop="admin" className="mx-auto w-full max-w-5xl px-4 pb-24 sm:px-6">
-        <Link href="/admin" className="mb-5 inline-block text-sm text-[var(--color-gold-300)] hover:underline">← Về Tông Môn</Link>
+        <Link href="/admin?tab=khoGithub" className="mb-5 inline-block text-sm text-[var(--color-gold-300)] hover:underline">← Về Kho GitHub</Link>
         <h1 className="h-display text-2xl font-bold break-all text-gilded">{detail.station.slug}</h1>
         <p className="mt-2 mb-6 text-sm text-[var(--color-mist)]">Cấu hình và quản lý các kho phần mềm phụ của kho khôi lỗi này.</p>
         <GithubCompanionDetail detail={detail} />

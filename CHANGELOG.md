@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.79 — Thu gọn tab Kho GitHub (12/09/2026)
+
+- Chia màn quản lý thành ba subtab `Kho chính`, `Ollama` và `API key`; lựa chọn được ghi vào URL và giữ nguyên sau khi tải lại.
+- Màn mặc định chỉ hiện trạng thái tóm tắt của kho chính, số repo phụ và cảnh báo cần xem. Chi tiết từng repo phụ vẫn nằm ở trang riêng.
+- Form tạo/sửa kho chỉ mở khi bấm nút, nằm trong hộp cuộn riêng có hỗ trợ bàn phím. Cấu hình Ollama và danh sách key cũng được xếp lại gọn hơn.
+- Rút các đoạn hướng dẫn dài thành ghi chú ngắn và sửa đường quay lại từ trang chi tiết để trở về đúng tab Kho GitHub.
+
 ## 1.3.78 — Giữ tab Tông Môn sau khi tải lại (12/09/2026)
 
 - Tab đang mở trên trang admin được ghi vào tham số `tab` của URL; tải lại trang hoặc render lại từ server vẫn trở về đúng khu đang làm việc.

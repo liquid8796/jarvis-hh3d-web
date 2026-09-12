@@ -11,6 +11,14 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.80 — Hoang Vực và Khoáng Mạch theo hộp xác nhận mới (13/09/2026)
+
+- Bản ghi `hoang-vuc-20260913-002546` cho thấy nút `#battle-button` vẫn hiện và bấm được; lỗi `Click hỏng` là hậu quả của hộp `Đổi` phía trước chưa được đóng. Trang đã thay `.swal2-confirm` bằng `#hh3d-confirm-layer .hh3d-confirm__btn--confirm`, nên lớp phủ còn nằm trên màn và chặn cú KHIÊU CHIẾN kế tiếp.
+- Cả twin VIP và Thường của Hoang Vực nay chờ rồi bấm nút positive trong component mới. Fixture bắt đầu ở Ngũ Hành bất lợi, chỉ đạt nếu bot đổi thành công, đóng lớp phủ, khiêu chiến, tấn công và đọc lại lượt `5 → 4` cùng cooldown.
+- Bản ghi `khoang-mach-20260913-002738` và probes xác nhận mọi selector SweetAlert2 cũ đều `no match`; hộp vào mỏ dùng `#hh3d-confirm-layer`, nút thật mang class `.hh3d-confirm__btn--confirm`, còn AJAX sau cú bấm trả `Đã di chuyển sang khoáng mạch`.
+- Ba điểm xác nhận của Khoáng Mạch — vào mỏ, đoạt quyền chủ mỏ và mua Linh Quang Phù — cùng chuyển sang component mới cho cả tài khoản VIP lẫn Thường. Các cổng ngưỡng, hạn mức phù và nhân chứng phản hồi mạng giữ nguyên.
+- Schema quest tăng `82 → 83` ở nguồn desktop và hồ sơ web. Profile được xuất lại từ `DefaultQuestProfile.cs`; smoke Chromium chạy `520 thuận, 0 nghịch` với fixture không còn dựng SweetAlert2 cho hai trang này.
+
 ## 1.3.79 — Thu gọn tab Kho GitHub (12/09/2026)
 
 - Chia màn quản lý thành ba subtab `Kho chính`, `Ollama` và `API key`; lựa chọn được ghi vào URL và giữ nguyên sau khi tải lại.

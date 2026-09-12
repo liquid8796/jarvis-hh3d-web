@@ -447,15 +447,16 @@ btn.onclick=()=>{if(btn.disabled)return;document.body.insertAdjacentHTML('before
     setTimeout(()=>{btn.innerHTML='<i class="fas fa-times"></i> Đã Tế Lễ';btn.disabled=true;
       btn.className='btn group-button';btn.dataset.offered='1'},40)}}</script>`;
 
-// Trang Khoáng Mạch theo bản ghi 14/08 (khoang-mach-20260814-133812). KHÁC mọi fixture trước:
+// Trang Khoáng Mạch theo bản ghi 14/08 (khoang-mach-20260814-133812), cập nhật bằng bản ghi
+// 13/09 (khoang-mach-20260913-002738). KHÁC mọi fixture trước:
 // trang thật chạy trong IFRAME của hub (?nv_embed=1) nên dom/*.html của bản ghi KHÔNG chứa nó,
 // và body HTML trong network.json bị cắt ở 32KB đầu (toàn <head>). Markup dưới đây vì thế dựng
 // từ hai nguồn chứng cứ còn lại: selector THẬT của 64 cú click trong steps.json (recorder xuyên
 // được iframe) + 83 control từ các lượt quét trạng thái — không có dòng nào bịa từ trí nhớ.
 //
-//   • Trang này CÒN SweetAlert2 — ngược với trang tế lễ. Ba hộp xác nhận đã ghi đều là
-//     `.swal2-container … button.swal2-confirm` (click#47/#236/#246). Đừng "đồng bộ cho gọn"
-//     sang #hh3d-confirm-layer: hai trang, hai họ hộp, và fixture phải theo trang của NÓ.
+//   • Trang nay đã đổi sang hộp nhà `#hh3d-confirm-layer`, cùng họ với Tế Lễ. Bản ghi 13/09
+//     bắt đúng nút `.hh3d-confirm__btn--confirm`「Có, vào ngay」và probes.json đo toàn bộ selector
+//     swal2 cũ là `no match`. Fixture không được dựng lại một thư viện mà production đã bỏ.
 //   • Dòng của MÌNH trong sổ mỏ nhận diện bằng cặp class chỉ nó mới có: `button.chua-dat`
 //     (đang đào, disabled) ↔ `button.claim-reward` (chữ「Nhận Thưởng」khi chín, và VẪN class
 //     ấy với chữ「Đã nhận (Xs)」sau khi nhận — nên phép nhận diện phải hỏi thêm CHỮ).
@@ -514,16 +515,21 @@ ${km.hideStats
 const KM = ${JSON.stringify({ type: km.type, inMine: km.inMine, minedMin: km.minedMin, maxed: km.maxed, claimed: km.claimedJustNow, owner: km.owner, attacksUsed: km.attacksUsed, bonus: km.bonus, says: km.seizeSays ?? "net" })};
 const LISTS = ${JSON.stringify(lists)};
 let page = 1;
-const swal = (text, confirmLabel, onYes) => {
+const confirmDialog = (text, confirmLabel, onYes) => {
   const c = document.createElement('div');
-  c.className = 'swal2-container swal2-center';
-  c.innerHTML = '<div class="swal2-popup swal2-modal"><h2 class="swal2-title">Xác nhận</h2>'
-    + '<div class="swal2-html-container">' + text + '</div>'
-    + '<div class="swal2-actions"><button type="button" class="swal2-confirm swal2-styled">' + confirmLabel + '</button>'
-    + '<button type="button" class="swal2-cancel swal2-styled">Không</button></div></div>';
+  c.id = 'hh3d-confirm-layer';
+  c.setAttribute('role', 'alertdialog');
+  c.setAttribute('aria-modal', 'true');
+  c.style.cssText = 'position:fixed;inset:0;z-index:200000;display:grid;place-items:center';
+  c.innerHTML = '<div class="hh3d-confirm__backdrop" aria-hidden="true" style="position:absolute;inset:0"></div>'
+    + '<div class="hh3d-confirm__panel" style="position:relative"><div class="hh3d-confirm__head">'
+    + '<h2 class="hh3d-confirm__title" id="hh3d-confirm-title">Xác nhận</h2></div>'
+    + '<div class="hh3d-confirm__body"><p class="hh3d-confirm__text" id="hh3d-confirm-text">' + text + '</p></div>'
+    + '<div class="hh3d-confirm__actions"><button type="button" class="hh3d-confirm__btn hh3d-confirm__btn--cancel">Không</button>'
+    + '<button type="button" class="hh3d-confirm__btn hh3d-confirm__btn--confirm">' + confirmLabel + '</button></div></div>';
   document.body.append(c);
-  c.querySelector('.swal2-cancel').onclick = () => { c.remove(); document.body.dataset.cancelled = '1'; };
-  c.querySelector('.swal2-confirm').onclick = () => { c.remove(); onYes(); };
+  c.querySelector('.hh3d-confirm__btn--cancel').onclick = () => { c.remove(); document.body.dataset.cancelled = '1'; };
+  c.querySelector('.hh3d-confirm__btn--confirm').onclick = () => { c.remove(); onYes(); };
 };
 const toast = (text) => { const t = document.createElement('div'); t.className = 'km-toast'; t.textContent = text; document.body.append(t); setTimeout(() => t.remove(), 3000); };
 const mineCard = (name, cls, mine) => {
@@ -571,7 +577,7 @@ const renderModal = () => {
     setTimeout(() => { KM.maxed = false; KM.claimed = true; document.body.dataset.claimed = String((Number(document.body.dataset.claimed) || 0) + 1); renderModal(); }, 40);
   };
   const doat = document.querySelector('#user-list button.doat-mo-btn');
-  if (doat) doat.onclick = () => swal('Đạo hữu có chắc chắn muốn đoạt quyền chủ mỏ này không?', 'Xác nhận', () => {
+  if (doat) doat.onclick = () => confirmDialog('Đạo hữu có chắc chắn muốn đoạt quyền chủ mỏ này không?', 'Xác nhận', () => {
     if (KM.owner || KM.attacksUsed >= 3) { document.body.dataset.refused = 'seize'; return; }
     fetch('/km-seize?says=' + KM.says);
     // Đoạt xong thì bonus tu vi của mỏ TĂNG — bản ghi 14/08: 100% → 120% sau khi mua Linh
@@ -592,7 +598,7 @@ function enterMine() {
   const btn = this;
   if (KM.inMine) { document.body.dataset.refused = 'enter'; return; }
   btn.classList.add('loading'); btn.disabled = true;
-  swal('Nếu có phần thưởng từ khoáng mạch khác, sẽ tự động nhận trước khi di chuyển.', 'Có, vào ngay', () => {
+  confirmDialog('Nếu có phần thưởng từ khoáng mạch khác, sẽ tự động nhận trước khi di chuyển.', 'Có, vào ngay', () => {
     fetch('/km-enter');
     setTimeout(() => { KM.inMine = true; document.body.dataset.entered = '1'; renderList(); }, 40);
   });
@@ -611,7 +617,7 @@ for (const [i, b] of [...document.querySelectorAll('.mine-type-button')].entries
 document.getElementById('shopButton').onclick = () => { document.getElementById('shop-container').style.display = 'block'; };
 for (const b of document.querySelectorAll('.shop-item-button')) b.onclick = () => {
   const name = b.closest('.shop-item').textContent;
-  swal('Đạo hữu có muốn mua ' + name.replace('Mua Ngay', '').trim() + '?', 'Mua Ngay', () => {
+  confirmDialog('Đạo hữu có muốn mua ' + name.replace('Mua Ngay', '').trim() + '?', 'Mua Ngay', () => {
     fetch('/km-buy?item=' + encodeURIComponent(name.includes('Linh Quang') ? 'linh-quang-phu' : 'khac'));
     setTimeout(() => { document.body.dataset.bought = String((Number(document.body.dataset.bought) || 0) + 1); toast('Đạo hữu đã mua thành công Linh Quang Phù! Thời gian hết hạn còn lại: 01 giờ 00 phút.'); }, 40);
   });
@@ -638,9 +644,11 @@ const FREE_WHEEL_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
  * Khối điều khiển boss, ĐÚNG như server giao trong bản ghi 06/08 21:00: nút KHIÊU CHIẾN vẽ
  * sẵn và mở, bộ đếm lượt mang giá trị THẬT ngay từ HTML đầu tiên.
  */
-const bossControls = (turnsLeft) =>
+const bossControls = (turnsLeft, elementGood = true) =>
   '<button class="battle-button" id="battle-button">KHIÊU CHIẾN</button>' +
-  '<div class="increase-damage">Đạo hữu được tăng 15% sát thương</div>' +
+  `<div id="element-status" class="${elementGood ? "increase-damage" : "decrease-damage"}">` +
+  `${elementGood ? "Đạo hữu được tăng" : "Đạo hữu bị giảm"} 15% sát thương</div>` +
+  '<button class="change-element-container change-element-button" id="change-element-button">Thay đổi</button>' +
   `<div class="remaining-attacks">Lượt đánh còn lại: <span id="luot">${turnsLeft}</span></div>`;
 
 /**
@@ -672,10 +680,10 @@ const bossRewardControls = () =>
  * @param state   "ready" (còn lượt) · "cooldown" (nút còn trong DOM nhưng display:none) ·
  *   "spent" (hết lượt hôm nay — site XOÁ HẲN nút khỏi DOM)
  */
-const bossPage = (broken, { stateMs = 0, cooling = false, turnsLeft = 5, reward = false, stale = false } = {}) => `<!doctype html><html lang="vi"><meta charset="utf-8">
+const bossPage = (broken, { stateMs = 0, cooling = false, turnsLeft = 5, reward = false, stale = false, elementGood = true } = {}) => `<!doctype html><html lang="vi"><meta charset="utf-8">
 <div id="boss-info">
   <div>${reward ? "Hỗn Thiên Ma Vương" : "Huyết Trư Địa Quỷ 61.55%"}</div>
-  <div id="boss-slot">${reward ? bossRewardControls() : bossControls(turnsLeft)}</div>
+  <div id="boss-slot">${reward ? bossRewardControls() : bossControls(turnsLeft, elementGood)}</div>
 </div>
 <div id="countdown-timer" style="display:none"></div>
 <div id="boss-damage-screen" style="display:none">
@@ -691,6 +699,22 @@ const bossPage = (broken, { stateMs = 0, cooling = false, turnsLeft = 5, reward 
 <ul class="notifications"></ul>
 <script>
 const $ = (s) => document.querySelector(s);
+const bossConfirm = (text, confirmLabel, onYes) => {
+  const c = document.createElement('div');
+  c.id = 'hh3d-confirm-layer';
+  c.setAttribute('role', 'alertdialog');
+  c.setAttribute('aria-modal', 'true');
+  c.style.cssText = 'position:fixed;inset:0;z-index:200000;display:grid;place-items:center';
+  c.innerHTML = '<div class="hh3d-confirm__backdrop" aria-hidden="true" style="position:absolute;inset:0"></div>'
+    + '<div class="hh3d-confirm__panel" style="position:relative"><div class="hh3d-confirm__head">'
+    + '<h2 class="hh3d-confirm__title" id="hh3d-confirm-title">Xác nhận thay đổi</h2></div>'
+    + '<div class="hh3d-confirm__body"><p class="hh3d-confirm__text" id="hh3d-confirm-text">' + text + '</p></div>'
+    + '<div class="hh3d-confirm__actions"><button type="button" class="hh3d-confirm__btn hh3d-confirm__btn--cancel">Hủy</button>'
+    + '<button type="button" class="hh3d-confirm__btn hh3d-confirm__btn--confirm">' + confirmLabel + '</button></div></div>';
+  document.body.append(c);
+  c.querySelector('.hh3d-confirm__btn--cancel').onclick = () => c.remove();
+  c.querySelector('.hh3d-confirm__btn--confirm').onclick = () => { c.remove(); onYes(); };
+};
 const startCooldown = () => {
   $('#countdown-timer').textContent = 'Chờ 7 phút 19 giây để tấn công lần tiếp theo.';
   $('#countdown-timer').style.display = 'block';
@@ -727,6 +751,13 @@ document.addEventListener('click', (e) => {
        #battle-button cho cụm khiêu chiến bên dưới. */
     document.querySelector('.reward-notification').remove();
     setTimeout(() => location.reload(), 60);
+  } else if (t.id === 'change-element-button') {
+    bossConfirm('Sử dụng lượt miễn phí thay đổi', 'Đổi', () => {
+      const effect = $('#element-status');
+      effect.className = 'increase-damage';
+      effect.textContent = 'Đạo hữu được tăng 15% sát thương';
+      document.body.dataset.elementChanged = '1';
+    });
   } else   if (t.id === 'battle-button') {
     setTimeout(() => { $('#boss-damage-screen').style.display = 'block'; }, 300);
   } else if (t.classList.contains('attack-button')) {${
@@ -2221,10 +2252,38 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // không phải phần thưởng bỏ quên. Bản ghi bi-canh-tong-mon-20260902-091927.
     // 82 = Khoáng Mạch: số Linh Quang Phù tối đa mỗi ngày là option 1..3 thay vì ghim 1;
     // parser Vấn Đáp chịu được thẻ có thuộc tính/thiếu đóng nhưng không đổi schema quest.
-    "hồ sơ đang ở schema 82",
-    loadProfileForSchema().schemaVersion === 82,
+    // 83 = Hoang Vực + Khoáng Mạch bỏ selector SweetAlert2 đã chết, theo hai bản ghi 13/09.
+    // Hoang Vực phải đóng được hộp Đổi trước khi bấm #battle-button; Khoáng Mạch dùng cùng hộp
+    // nhà cho cả ba chỗ vào mỏ, đoạt mỏ và mua phù. Cả hai twin VIP/thường cùng đổi.
+    "hồ sơ đang ở schema 83",
+    loadProfileForSchema().schemaVersion === 83,
     String(loadProfileForSchema().schemaVersion),
   );
+
+  const housePanel = "#hh3d-confirm-layer .hh3d-confirm__panel";
+  const houseYes = "#hh3d-confirm-layer .hh3d-confirm__btn--confirm";
+  for (const bossId of ["hoang-vuc", "hoang-vuc-thuong"]) {
+    const all = flatSteps(loadProfileForSchema().quests.find((q) => q.id === bossId).steps);
+    check(
+      `${bossId}: hộp Đổi dùng nút positive của component mới`,
+      all.some((s) => s.action === "waitForCondition" && s.condition?.selector === houseYes) &&
+        all.some((s) => s.action === "click" && s.selector === houseYes) &&
+        !all.some((s) => String(s.selector ?? s.condition?.selector ?? "").includes("swal2")),
+    );
+  }
+  for (const mineId of ["khoang-mach", "khoang-mach-thuong"]) {
+    const all = flatSteps(loadProfileForSchema().quests.find((q) => q.id === mineId).steps);
+    const panelWaits = all.filter(
+      (s) => s.action === "waitForCondition" && s.condition?.selector === housePanel,
+    ).length;
+    const confirmClicks = all.filter((s) => s.action === "click" && s.selector === houseYes).length;
+    check(
+      `${mineId}: cả ba hộp vào/đoạt/mua dùng component mới`,
+      panelWaits === 3 && confirmClicks === 3 &&
+        !all.some((s) => String(s.selector ?? s.condition?.selector ?? "").includes("swal2")),
+      `panel=${panelWaits}; confirm=${confirmClicks}`,
+    );
+  }
 
   console.log("\nMê Cung phải RA KHỎI PHÒNG trước khi mở phòng mới");
 
@@ -2943,6 +3002,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   let bossCooling = false;
   let bossTurnsLeft = 5;
   let bossReward = false;
+  let bossElementGood = true;
   const hvClaims = [];
 
   // Lò luyện đan phía "server", đúng luật đo trong luyen-dan.min.js (06/08): lửa tụt theo
@@ -3030,7 +3090,14 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     else if (path === "/hv-attack-stale") { bossTurnsLeft = Math.max(0, bossTurnsLeft - 1); bossCooling = true; res.end("ok"); }
     else if (path === "/hoang-vuc") {
       hvPageHits += 1;
-      res.end(bossPage(bossBroken, { stateMs: bossStateMs, cooling: bossCooling, turnsLeft: bossTurnsLeft, reward: bossReward, stale: bossStale }));
+      res.end(bossPage(bossBroken, {
+        stateMs: bossStateMs,
+        cooling: bossCooling,
+        turnsLeft: bossTurnsLeft,
+        reward: bossReward,
+        stale: bossStale,
+        elementGood: bossElementGood,
+      }));
     }
     else if (path === "/luyen-dan-duong") res.end(furnacePage({ waveMs: 900 }));
     else if (path === "/ld-state") {
@@ -3463,7 +3530,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     await kmClearDay();
     const km1 = await run(kmQuest);
     check(
-      "lượt 1: vào mỏ qua swal2 rồi thoát onCooldown với đồng hồ THẬT (30′ − 12′ đã đào = 18′)",
+      "lượt 1: vào mỏ qua hộp xác nhận mới rồi thoát onCooldown với đồng hồ THẬT (30′ − 12′ đã đào = 18′)",
       km1.outcome === "onCooldown" && km1.cooldownSeconds === 18 * 60,
       `${km1.outcome}: ${km1.cooldownSeconds}s`,
     );
@@ -3551,7 +3618,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       `${kmH1.outcome}; bought=${kmState.bought.join()}; owner=${kmState.owner}; claims=${kmState.claims}`,
     );
     check(
-      "…swal đoạt đi qua nút Xác nhận, không đụng Không",
+      "…hộp đoạt đi qua nút Xác nhận, không đụng Không",
       (await kmBody("data-seized")) === "1" && (await kmBody("data-cancelled")) == null,
     );
 
@@ -3933,6 +4000,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       bossCooling = false;
       bossTurnsLeft = 5;
       bossReward = false;
+      bossElementGood = true;
       hvClaims.length = 0;
       await page.goto(`${baseUrl}/hoang-vuc`, { waitUntil: "domcontentloaded" });
     };
@@ -3987,6 +4055,21 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     );
 
     console.log("\nHoang Vực — ba kết cục còn lại");
+
+    // Bản ghi 13/09/2026: nút Thay đổi nay mở hộp nhà #hh3d-confirm-layer. Selector swal2 cũ
+    // bỏ lọt nút Đổi, để backdrop phủ nguyên trang; #battle-button phía sau vẫn hiện nhưng cú
+    // click bị lớp phủ chặn và nhật ký đổ oan cho chính nó. Ca này phải đi trọn nhánh đổi rồi
+    // đánh được, nên vừa khóa selector mới vừa khóa nguyên nhân dây chuyền của lỗi production.
+    await resetBoss();
+    bossElementGood = false;
+    const bossChanged = await run(bossQuest);
+    check(
+      "ngũ hành bất lợi → bấm Đổi trong hộp mới rồi vẫn khiêu chiến được",
+      bossChanged.outcome === "completed" &&
+        (await page.getAttribute("body", "data-element-changed")) === "1" &&
+        (await page.getAttribute("body", "data-attacked")) === "1",
+      `${bossChanged.outcome}; changed=${await page.getAttribute("body", "data-element-changed")}; attacked=${await page.getAttribute("body", "data-attacked")}`,
+    );
 
     // Còn lượt, không cooldown: đánh thật, tiêu đúng một lượt.
     await resetBoss();

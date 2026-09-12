@@ -40,7 +40,7 @@ const check = (label: string, condition: unknown, detail = "") => {
 console.log("Hạn mức Linh Quang Phù — 1..3 lá mỗi ngày, ghi ở sổ của ĐÀN chứ không ở máy\n");
 
 // ---- 1. Hồ sơ quest mang đúng chuỗi dấu mà mã đang chờ ---------------------------------------
-type Step = { action?: string; script?: string; when?: { selector?: string } };
+type Step = { action?: string; script?: string; selector?: string; when?: { selector?: string } };
 type Quest = { id: string; steps?: Step[] };
 
 const profileJson = JSON.parse(
@@ -74,6 +74,7 @@ const MARK_LINE = `@${PHU_DAILY_MARK}`;
  * dấu của lượt trước còn nguyên ở lượt sau (bộ chạy thử 15/08/2026 bắt được đúng cảnh ấy).
  */
 const BUY_WHEN = "body.jvz-km-buy-now .jvz-km-buy";
+const HOUSE_CONFIRM = "#hh3d-confirm-layer .hh3d-confirm__btn--confirm";
 const twins = profileJson.quests.filter((q) => q.id === "khoang-mach" || q.id === "khoang-mach-thuong");
 check("hồ sơ có ĐỦ HAI bản Khoáng Mạch (VIP + thường)", twins.length === 2, twins.map((q) => q.id).join(","));
 
@@ -92,7 +93,9 @@ for (const quest of twins) {
   );
 
   // Và nó phải đứng SAU cú bấm xác nhận: ghi trước là ghi cho một việc chưa xảy ra.
-  const confirmAt = steps.findIndex((s) => s.action === "click" && String(s["selector" as keyof Step] ?? "").includes("swal2-confirm"));
+  const confirmAt = steps.findIndex(
+    (s) => s.action === "click" && s.selector === HOUSE_CONFIRM && s.when?.selector === BUY_WHEN,
+  );
   const markAt = steps.indexOf(markSteps[0]);
   check(`${quest.id}: dấu đứng SAU cú bấm xác nhận mua`, confirmAt >= 0 && markAt > confirmAt, `xác nhận=${confirmAt} · dấu=${markAt}`);
 }
@@ -238,7 +241,7 @@ for (const quest of twins) {
 
   // Cửa mua phải nằm SAU cú bấm xác nhận đoạt — bằng không "sau khi đoạt" chỉ là lời nói.
   const doatConfirmAt = steps.findIndex(
-    (s) => s.action === "click" && whenOf(s) === ".jvz-km-doat" && String(s.selector ?? "").includes("swal2-confirm"),
+    (s) => s.action === "click" && whenOf(s) === ".jvz-km-doat" && s.selector === HOUSE_CONFIRM,
   );
   check(
     `${quest.id}: mọi bước TIÊU TIỀN đòi cả cờ quyết định lẫn dấu trên nút`,

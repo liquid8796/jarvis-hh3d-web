@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.80",
+    date: "2026-09-13",
+    lines: [
+      "Hoang Vực nay bấm được nút Đổi trong hộp xác nhận mới, không còn để lớp phủ chặn nút KHIÊU CHIẾN.",
+      "Khoáng Mạch nhận diện lại các hộp vào mỏ, đoạt mỏ và mua Linh Quang Phù cho cả tài khoản VIP lẫn Thường.",
+    ],
+  },
+  {
     version: "1.3.79",
     date: "2026-09-12",
     lines: [
@@ -472,15 +480,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Khôi lỗi chạy trên máy nhà nay tự cập nhật: thấy bản mới thì nó làm nốt việc đang dở, thay gói, rồi chạy tiếp — không cần đạo hữu đụng tay.",
       "Mục Khôi Lỗi cũng báo khi có máy đang chạy bản cũ, kèm cách xử lý.",
       "Máy cài từ bản trước 1.3.30 vẫn phải chạy lại bộ cài một lần cuối để nhận được phép tự cập nhật.",
-    ],
-  },
-  {
-    version: "1.3.29",
-    date: "2026-08-20",
-    lines: [
-      "Nói lại cho đúng chỗ dễ hiểu nhầm: auto chạy bằng máy nhà sẽ dừng khi bạn tắt trình duyệt, chứ không riêng lúc tắt máy.",
-      "Auto chạy bằng khôi lỗi tông môn thì vẫn cày tiếp — tắt trình duyệt hay tắt máy đều không sao.",
-      "Chỉ là câu chữ trên màn hình; cách auto chạy không đổi gì.",
     ],
   },
 ];

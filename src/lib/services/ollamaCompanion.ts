@@ -46,11 +46,100 @@ const MAX_FILE_BYTES = 256 * 1024;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const REPO_NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
 
+function tryJson(text: string): { ok: true; value: unknown } | { ok: false } {
+  try { return { ok: true, value: JSON.parse(text) }; }
+  catch { return { ok: false }; }
+}
+
+/** JSON forbids literal control characters inside strings; their meaning is unambiguous. */
+function escapeJsonStringControls(text: string): string {
+  let result = "";
+  let quoted = false;
+  let escaped = false;
+  for (const char of text) {
+    const code = char.charCodeAt(0);
+    if (quoted && !escaped && code < 0x20) {
+      result += char === "\n" ? "\\n" : char === "\r" ? "\\r" : char === "\t" ? "\\t" : `\\u${code.toString(16).padStart(4, "0")}`;
+      continue;
+    }
+    result += char;
+    if (!quoted) {
+      if (char === '"') quoted = true;
+      continue;
+    }
+    if (escaped) escaped = false;
+    else if (char === "\\") escaped = true;
+    else if (char === '"') quoted = false;
+  }
+  return result;
+}
+
+function tryDecisionJson(text: string): { ok: true; value: unknown } | { ok: false } {
+  const strict = tryJson(text);
+  if (strict.ok) return strict;
+  const escaped = escapeJsonStringControls(text);
+  return escaped === text ? strict : tryJson(escaped);
+}
+
+function jsonSyntaxHint(text: string): string {
+  try { JSON.parse(escapeJsonStringControls(text)); }
+  catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (/unexpected end|unterminated/i.test(message)) return "Decision JSON ended before its object or string was complete.";
+    const position = /position\s+(\d+)/i.exec(message)?.[1];
+    if (position) return `Decision JSON syntax is invalid near character ${position}.`;
+  }
+  return "Decision JSON syntax is invalid.";
+}
+
+/** Finds top-level brace pairs without mistaking braces inside JSON strings for structure. */
+function jsonObjectCandidates(text: string): string[] {
+  const candidates: string[] = [];
+  let start = -1;
+  let depth = 0;
+  let quoted = false;
+  let escaped = false;
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index];
+    if (start < 0) {
+      if (char === "{") { start = index; depth = 1; quoted = false; escaped = false; }
+      continue;
+    }
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') quoted = false;
+      continue;
+    }
+    if (char === '"') quoted = true;
+    else if (char === "{") depth++;
+    else if (char === "}" && --depth === 0) {
+      candidates.push(text.slice(start, index + 1));
+      start = -1;
+    }
+  }
+  return candidates;
+}
+
 function parseDecision(raw: string): unknown {
   const trimmed = raw.trim();
-  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(trimmed);
-  try { return JSON.parse(fenced?.[1] ?? trimmed); }
-  catch { throw new Error("Decision must be one complete JSON object."); }
+  const direct = tryJson(trimmed);
+  if (direct.ok) return direct.value;
+
+  // Some chat models put private reasoning before the answer or wrap the JSON in a fenced
+  // block despite an explicit plain-JSON instruction. Only the one complete JSON object is
+  // used; two independently valid objects remain ambiguous and are rejected.
+  const visible = trimmed.replace(/^(?:<think\b[^>]*>[\s\S]*?<\/think>\s*)+/i, "").trim();
+  const objectTexts = jsonObjectCandidates(visible);
+  const objects = objectTexts.map(tryDecisionJson).filter((candidate): candidate is { ok: true; value: unknown } => candidate.ok);
+  if (objects.length === 1) return objects[0].value;
+  if (objects.length > 1) throw new Error("Decision must be one complete JSON object.");
+  const fences = [...visible.matchAll(/```(?:json)?\s*([\s\S]*?)\s*```/gi)]
+    .map((match) => tryDecisionJson(match[1].trim()))
+    .filter((candidate): candidate is { ok: true; value: unknown } => candidate.ok);
+  if (fences.length === 1) return fences[0].value;
+  if (objectTexts.length === 1) throw new Error(jsonSyntaxHint(objectTexts[0]));
+  throw new Error("Decision must be one complete JSON object.");
 }
 
 function recentLanguages(input: PlanInput): string[] {
@@ -132,7 +221,7 @@ Create mode permits create, fork (only with permission), or wait. Maintain mode 
 Only contextFiles contains complete source you have read. Metadata, file lists, and prior generated output do not count as reading a file. Never edit or delete an existing file absent from contextFiles; choose another useful change or wait.
 At most 24 files and 256 KiB combined. Relative forward-slash paths only. No path traversal, secrets or credential files, .env files, private keys, .github writes/workflows, git metadata or hooks. JSON files must parse. Do not emit tools, execution instructions or extra JSON fields. Explain a wait instead of guessing missing source.`;
 
-function buildMessages(input: PlanInput, secrets: readonly string[], outputTokens: number, repair?: { raw: string; error: string }, research: Message[] = [], offerTools = false): { messages: Message[]; readPaths: string[] } {
+function buildMessages(input: PlanInput, secrets: readonly string[], outputTokens: number, repair?: { raw: string; error: string; truncated?: boolean }, research: Message[] = [], offerTools = false): { messages: Message[]; readPaths: string[] } {
   // A UTF-8 byte ceiling is deliberately conservative: unlike characters/4 it
   // does not undercount code, CJK, emoji, JSON escaping or tool-like payloads.
   const budget = input.config.contextWindow - outputTokens - 256 - (offerTools ? Buffer.byteLength(JSON.stringify(WEB_TOOL_DEFINITIONS), "utf8") : 0);
@@ -151,7 +240,11 @@ function buildMessages(input: PlanInput, secrets: readonly string[], outputToken
     const length = Math.floor(context.length * scale);
     const messages: Message[] = [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: redact(JSON.stringify({ ...metadata, context: context.slice(0, length), contextTruncated: length < context.length, contextFiles: selectedFiles, ...(input.mode === "maintain" ? { declaredSourcePaths: input.declaredSourcePaths?.filter((path) => Object.prototype.hasOwnProperty.call(selectedFiles, path)) } : {}) }), secrets) }];
     messages.push(...history);
-    if (repair) messages.push({ role: "assistant", content: prior.slice(0, Math.floor(prior.length * scale)) }, { role: "user", content: `Repair the decision once. Validation: ${repair.error}. Return the complete corrected JSON object, or a valid wait if you cannot produce a safe meaningful change.` });
+    if (repair?.truncated) {
+      messages.push({ role: "user", content: "The previous decision was cut off at the output limit. Start over with a much smaller complete JSON object: change at most one small source file, or return a valid wait. Do not continue or repeat the truncated response." });
+    } else if (repair) {
+      messages.push({ role: "assistant", content: prior.slice(0, Math.floor(prior.length * scale)) }, { role: "user", content: `Repair once. Validation: ${repair.error} Return one bare JSON object without Markdown fences, or a valid wait. JSON-escape every newline, quote and control character inside files.content.` });
+    }
     if (research.length && !offerTools) messages.push({ role: "user", content: "The research budget is exhausted. Return the final source decision JSON now, or a valid wait. Do not request more tools." });
     return messages;
   };
@@ -192,13 +285,16 @@ export async function planCompanion(input: PlanInput): Promise<CompanionDecision
   const webEnabled = input.config.webSearchEnabled ?? DEFAULT_WEB_SEARCH_ENABLED;
   const webTools = input.webTools ?? createLlmWebTools({ enabled: webEnabled, searxngBaseUrl: input.config.searxngBaseUrl ?? DEFAULT_SEARXNG_BASE_URL,
     deadlineAt: input.deadlineAt, secrets, maxOutputChars: Math.min(2000, Math.floor(input.config.contextWindow / 8)) });
-  let repair: { raw: string; error: string } | undefined;
+  let repair: { raw: string; error: string; truncated?: boolean } | undefined;
   const research: Message[] = [];
   let webCalls = 0, webRounds = 0, repairs = 0;
   for (let round = 0; round < MAX_WEB_ROUNDS + 2; round++) {
     const offerTools = webEnabled && webCalls < MAX_WEB_CALLS && webRounds < MAX_WEB_ROUNDS && repairs === 0;
     const prompt = buildMessages(input, secrets, outputTokens, repair, research, offerTools);
-    const reply = await client.request(prompt.messages, { tools: offerTools ? WEB_TOOL_DEFINITIONS : undefined });
+    const reply = await client.request(prompt.messages, {
+      tools: offerTools ? WEB_TOOL_DEFINITIONS : undefined,
+      temperature: repair ? 0 : undefined,
+    });
     const raw = reply.content;
     if (reply.tool_calls?.length) {
       if (!offerTools) throw new Error("Ollama requested tools after the research budget ended or while web search is disabled.");
@@ -232,8 +328,11 @@ export async function planCompanion(input: PlanInput): Promise<CompanionDecision
       return { ...decision, readPaths: prompt.readPaths };
     }
     catch (error) {
-      const detail = error instanceof Error ? error.message : "Invalid decision.";
-      repair = { raw, error: redact(detail, secrets) };
+      const truncated = reply.doneReason === "length";
+      const detail = truncated
+        ? "Decision was cut off at the output token limit; return a smaller change or wait."
+        : error instanceof Error ? error.message : "Invalid decision.";
+      repair = { raw: truncated ? "" : raw, error: redact(detail, secrets), truncated };
       repairs++;
       if (repairs >= 2) break;
     }

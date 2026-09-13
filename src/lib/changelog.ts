@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.81",
+    date: "2026-09-13",
+    lines: [
+      "Ollama nay đọc được quyết định dù model bọc câu trả lời bằng lời dẫn, khối mã hoặc phần suy nghĩ.",
+      "Nếu câu trả lời sai hoặc bị cắt, lượt sửa sẽ yêu cầu một bản nhỏ và đúng định dạng trước khi tiếp tục.",
+    ],
+  },
+  {
     version: "1.3.80",
     date: "2026-09-13",
     lines: [
@@ -471,15 +479,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-21",
     lines: [
       "Sửa gấp: bộ cài khôi lỗi máy nhà phát ra ở bản trước thiếu một tệp nên chạy là lỗi ngay. Ai vừa cài trong khoảng đó xin chạy lại bộ cài một lần.",
-    ],
-  },
-  {
-    version: "1.3.30",
-    date: "2026-08-21",
-    lines: [
-      "Khôi lỗi chạy trên máy nhà nay tự cập nhật: thấy bản mới thì nó làm nốt việc đang dở, thay gói, rồi chạy tiếp — không cần đạo hữu đụng tay.",
-      "Mục Khôi Lỗi cũng báo khi có máy đang chạy bản cũ, kèm cách xử lý.",
-      "Máy cài từ bản trước 1.3.30 vẫn phải chạy lại bộ cài một lần cuối để nhận được phép tự cập nhật.",
     ],
   },
 ];

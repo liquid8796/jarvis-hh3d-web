@@ -11,6 +11,14 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.81 — Sửa quyết định JSON của Ollama (13/09/2026)
+
+- Lượt gọi thật cho `zenon6415/rust-mark-down-parser` cho thấy Ollama trả HTTP 200 nhưng hai câu trả lời liên tiếp đều là JSON sai cú pháp gần cuối. Parser cũ chỉ nhận JSON thuần hoặc một code fence bao trọn, rồi gửi lời repair quá chung nên model lặp lại cùng dạng lỗi.
+- Nay chấp nhận đúng một object hợp lệ nằm trong lời dẫn, code fence hoặc sau khối suy luận; dấu ngoặc và chuỗi `<think>` trong source được giữ nguyên. Hai object vẫn bị từ chối, còn toàn bộ kiểm tra field, secret, path, kích thước và quyền không đổi.
+- Chuỗi nhiều dòng có control character thô được chuẩn hoá theo đúng phép escape của JSON. Các lỗi cú pháp khác vẫn phải qua lượt repair, với vị trí lỗi, yêu cầu bỏ Markdown fence, escape nội dung file và temperature 0.
+- Giữ `done_reason` của Ollama: output bị cắt vì giới hạn token sẽ bỏ phần dở và yêu cầu một thay đổi nhỏ hơn hoặc `wait`. Probe không ghi dữ liệu trên đúng snapshot lỗi đã thành công sau một lượt repair, trả quyết định commit hai file.
+- Không bật structured output vì tài liệu Ollama ghi Cloud chưa hỗ trợ khả năng này.
+
 ## 1.3.80 — Hoang Vực và Khoáng Mạch theo hộp xác nhận mới (13/09/2026)
 
 - Bản ghi `hoang-vuc-20260913-002546` cho thấy nút `#battle-button` vẫn hiện và bấm được; lỗi `Click hỏng` là hậu quả của hộp `Đổi` phía trước chưa được đóng. Trang đã thay `.swal2-confirm` bằng `#hh3d-confirm-layer .hh3d-confirm__btn--confirm`, nên lớp phủ còn nằm trên màn và chặn cú KHIÊU CHIẾN kế tiếp.

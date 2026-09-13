@@ -3,7 +3,7 @@ import type { AppSettings } from "./settings";
 
 export type OllamaToolCall = { function: { name: string; arguments: Record<string, unknown> } };
 export type OllamaMessage = { role: "system" | "user" | "assistant" | "tool"; content: string; tool_calls?: OllamaToolCall[]; tool_name?: string };
-export type OllamaReply = { content: string; tool_calls?: unknown[] };
+export type OllamaReply = { content: string; tool_calls?: unknown[]; doneReason?: string };
 type Config = AppSettings["githubNurture"];
 type Key = Config["apiKeys"][number];
 const API_URL = "https://ollama.com/api/chat";
@@ -107,14 +107,18 @@ export function createOllamaChatClient(options: {
           throw new Error(key.lastError);
         }
         const raw = await readBounded(response, maxResponseBytes);
-        let payload: { message?: { content?: unknown; tool_calls?: unknown }; error?: unknown };
+        let payload: { message?: { content?: unknown; tool_calls?: unknown }; error?: unknown; done_reason?: unknown };
         try { payload = JSON.parse(raw); } catch { throw new Error("Ollama returned an invalid response envelope."); }
         if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("Ollama returned an invalid response envelope.");
         if (payload.error || !payload.message || (typeof payload.message.content !== "string" && !Array.isArray(payload.message.tool_calls))) throw new Error("Ollama returned no usable decision; check model/service availability.");
         preferred = key;
         key.cooldownUntil = null;
         key.lastError = "";
-        return { content: typeof payload.message.content === "string" ? payload.message.content : "", tool_calls: Array.isArray(payload.message.tool_calls) ? payload.message.tool_calls : undefined };
+        return {
+          content: typeof payload.message.content === "string" ? payload.message.content : "",
+          tool_calls: Array.isArray(payload.message.tool_calls) ? payload.message.tool_calls : undefined,
+          doneReason: typeof payload.done_reason === "string" ? payload.done_reason : undefined,
+        };
       } catch (error) {
         // Raw provider bodies, request URLs, headers and transport exceptions are
         // deliberately never placed in storage, prompts or user-visible errors.

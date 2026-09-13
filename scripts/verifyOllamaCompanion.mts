@@ -26,7 +26,7 @@ globalThis.fetch = async (url, init) => {
   calls.push(call);
   return respond(call);
 };
-const reply = (value: unknown) => new Response(JSON.stringify({ message: { content: typeof value === "string" ? value : JSON.stringify(value) }, done: true }), { status: 200 });
+const reply = (value: unknown, doneReason?: string) => new Response(JSON.stringify({ message: { content: typeof value === "string" ? value : JSON.stringify(value) }, done: true, ...(doneReason ? { done_reason: doneReason } : {}) }), { status: 200 });
 let passed = 0;
 async function check(name: string, run: () => Promise<void>) {
   calls = [];
@@ -201,6 +201,82 @@ try {
     assert.equal(calls.length, 2);
     respond = () => reply("{invalid"); calls = [];
     await assert.rejects(planCompanion(input()), /decision|quyết định|JSON/i);
+    assert.equal(calls.length, 2);
+  });
+  await check("extracts a single decision from prose, fences and private think blocks", async () => {
+    const encoded = JSON.stringify(decision());
+    const wrapped = [
+      `Here is the requested decision.\n${encoded}\nDone.`,
+      `Here is the requested decision.\n\`\`\`json\n${encoded}\n\`\`\`\nDone.`,
+      `<think>Compare two approaches, including a discarded {\"action\":\"wait\"} sketch.</think>\n${encoded}`,
+    ];
+    for (const output of wrapped) {
+      calls = [];
+      respond = () => reply(output);
+      assert.deepEqual(await planCompanion(input()), { ...decision(), readPaths: [] });
+      assert.equal(calls.length, 1);
+    }
+  });
+  await check("braces inside JSON strings are not mistaken for separate decisions", async () => {
+    const candidate = {
+      ...decision(),
+      description: "Converts {markdown} while preserving literal braces such as } and {.",
+      files: [{ path: "src/contrast.ts", content: "export function wrap(value: string): string { return `<think>{${value}}</think>`; }\n" }],
+    };
+    respond = () => reply(`Decision follows:\n${JSON.stringify(candidate)}\nEnd of decision.`);
+    assert.deepEqual(await planCompanion(input()), { ...candidate, readPaths: [] });
+    assert.equal(calls.length, 1);
+  });
+  await check("accepts raw multiline file content inside an outer JSON fence and gives strict repair guidance", async () => {
+    const rawContent = "pub fn answer() -> i32 {\n    42\n}\n// ```rust\n// let result = answer();\n// ```\n";
+    const candidate = {
+      ...decision(),
+      language: "Rust",
+      sourcePaths: ["src/lib.rs"],
+      files: [{ path: "src/lib.rs", content: rawContent }],
+    };
+    const encodedContent = JSON.stringify(rawContent);
+    const rawMultiline = JSON.stringify(candidate).replace(encodedContent, `"${rawContent}"`);
+    respond = () => reply(`\`\`\`json\n${rawMultiline}\n\`\`\``);
+    assert.deepEqual(await planCompanion(input()), { ...candidate, readPaths: [] });
+    assert.equal(calls.length, 1);
+
+    calls = [];
+    const trailingComma = JSON.stringify(candidate).replace('"nextCheckMinutes":93}', '"nextCheckMinutes":93,}');
+    respond = () => calls.length === 1 ? reply(`\`\`\`json\n${trailingComma}\n\`\`\``) : reply(candidate);
+    assert.deepEqual(await planCompanion(input()), { ...candidate, readPaths: [] });
+    assert.equal(calls.length, 2);
+    const repairMessages = calls[1].body.messages as Array<{ role: string; content: string }>;
+    const repairInstruction = repairMessages.filter((message) => message.role === "user").at(-1)?.content ?? "";
+    assert.match(repairInstruction, /without (?:Markdown )?(?:code )?fences/i);
+    assert.match(repairInstruction, /JSON-escape.*(?:newline|control)/i);
+    assert.equal((calls[1].body.options as { temperature?: number }).temperature, 0);
+  });
+  await check("rejects ambiguous multiple JSON decisions, including identical duplicates", async () => {
+    const encoded = JSON.stringify(decision());
+    const alternatives = [
+      `${encoded}\n${JSON.stringify({ ...decision(), repo: "second-valid-project" })}`,
+      `${encoded}\n${encoded}`,
+    ];
+    for (const output of alternatives) {
+      calls = [];
+      respond = () => reply(output);
+      await assert.rejects(planCompanion(input()), /one complete JSON object/);
+      assert.equal(calls.length, 2);
+    }
+  });
+  await check("a length-truncated decision repairs with a smaller fresh response", async () => {
+    const wait = { ...decision(), action: "wait" as const, commitMessage: "", files: [], language: undefined, sourcePaths: undefined };
+    respond = () => calls.length === 1 ? reply('{"action":"create","repo":"cut-off', "length") : reply(wait, "stop");
+    assert.equal((await planCompanion(input())).action, "wait");
+    assert.equal(calls.length, 2);
+    const repairMessages = calls[1].body.messages as Array<{ role: string; content: string }>;
+    assert(repairMessages.some((message) => message.role === "user" && /cut off at the output limit.*much smaller complete JSON object/i.test(message.content)));
+    assert(!repairMessages.some((message) => message.role === "assistant" && message.content.includes('"repo":"cut-off')));
+
+    calls = [];
+    respond = () => reply('{"action":"create","repo":"cut-off', "length");
+    await assert.rejects(planCompanion(input()), /output token limit/);
     assert.equal(calls.length, 2);
   });
   await check("context budget includes repair history and reserves output", async () => {

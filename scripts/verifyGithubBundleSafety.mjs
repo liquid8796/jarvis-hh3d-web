@@ -108,6 +108,12 @@ check(
     /\["workflow", "run", workflowFile,/.test(creator),
   "custom workflow filename reaches both the payload and initial dispatch",
 );
+check(
+  creator.includes('publicIdentityForWorker } from "./githubPublicIdentity.mjs"') &&
+    creator.includes("description: publicIdentity.aboutDescription") &&
+    creator.includes("publicIdentity.workflowName"),
+  "low-level creation uses one public identity for About and the workflow display name",
+);
 const rollbackCheckIndex = creator.indexOf("assertGhCanRollback();");
 const stagingIndex = creator.indexOf("const stagingRoot = mkdtempSync");
 check(

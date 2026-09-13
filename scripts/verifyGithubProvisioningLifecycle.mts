@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { provisionGithubStation, productionGithubProvisionDependencies, GithubProvisionCollisionError, type GithubProvisioningDependencies } from "../src/lib/services/githubProvisioning";
+import { provisionGithubStation, productionGithubProvisionDependencies, GithubProvisionCollisionError, type GithubProvisionContext, type GithubProvisioningDependencies } from "../src/lib/services/githubProvisioning";
 import { parseGithubSettingsForMutation } from "../src/lib/services/settings";
+import { publicIdentityForWorker } from "./githubPublicIdentity.mjs";
 
 assert.throws(() => parseGithubSettingsForMutation({ githubStations: [{ owner: "Owner", repo: "existing", pat: "encrypted", companionRepos: [{ repo: "owned-repo" }, null] }] }));
 assert.throws(() => parseGithubSettingsForMutation({ githubStations: [{ owner: "Owner", repo: "existing", pat: "encrypted", workerId: 123 }] }));
@@ -227,5 +228,35 @@ for (const locked of [false, true]) {
     assert.equal(result.message, status === 200 ? "Kho GitHub đã tồn tại. Không có thay đổi nào được thực hiện." : "Không xác định được kho GitHub có tồn tại hay không. Không có thay đổi nào được thực hiện.");
     assert.ok(!f.events.includes("create"));
   }
+}
+{
+  const originalFetch = globalThis.fetch;
+  const context: GithubProvisionContext = {
+    pat: input.pat,
+    owner: "Owner",
+    repo: input.repo,
+    slug: `Owner/${input.repo}`,
+    workflowFile: input.workflowFile,
+    dailyPushes: input.dailyPushes,
+    workerId: "worker-identity",
+    generatedRepo: false,
+    now: Date.now,
+    deadlineAt: Date.now() + 30_000,
+  };
+  let requestBody: Record<string, unknown> | undefined;
+  try {
+    globalThis.fetch = async (_url: RequestInfo | URL, init?: RequestInit) => {
+      requestBody = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ id: 123, full_name: context.slug }), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      });
+    };
+    assert.deepEqual(await productionGithubProvisionDependencies.create(context), { status: 201, githubId: 123 });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(requestBody?.description, publicIdentityForWorker(context.workerId).aboutDescription);
+  assert.ok(!JSON.stringify(requestBody).includes(context.workerId));
 }
 console.log("PASS: GitHub provisioning lifecycle, shared deadline/reserved cleanup, verified rollback, distinct repo states, warnings and double submission (no external calls).");

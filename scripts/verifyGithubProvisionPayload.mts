@@ -60,11 +60,14 @@ try {
   write(
     "deploy/github/linh-su.yml",
     [
-      "name: fixture",
+      'name: "__PUBLIC_WORKFLOW_NAME__"',
       "env:",
       "  WORKER_ID: fixture-worker",
       "  WEB_URL: ${{ vars.WEB_URL || 'https://old.example.invalid' }}",
       "  WORKER_FALLBACK_URL: ${{ vars.WORKER_FALLBACK_URL || 'https://fallback.example.invalid' }}",
+      "jobs:",
+      "  linh-su:",
+      '    name: "__PUBLIC_JOB_NAME__"',
       "  run: curl $GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/linh-su.yml/dispatches",
       "",
     ].join("\n"),
@@ -108,6 +111,8 @@ try {
   const customWorkflow = payload.get(".github/workflows/nightly.yaml")!.toString("utf8");
   assert.match(customWorkflow, /\/actions\/workflows\/nightly\.yaml\/dispatches/);
   assert.doesNotMatch(customWorkflow, /\/actions\/workflows\/linh-su\.yml\/dispatches/);
+  assert.doesNotMatch(customWorkflow, /__PUBLIC_(?:WORKFLOW|JOB)_NAME__/);
+  assert.match(customWorkflow, /^jobs:\n  linh-su:\n    name: "[A-Za-z0-9 '&-]+"$/m, "public job label changes without renaming the internal job key");
   assert.deepEqual(payload.get("src/lib/quest-engine/exact-bytes.bin"), binaryBytes);
 
   const stationBase = buildKhoiloiPayload({

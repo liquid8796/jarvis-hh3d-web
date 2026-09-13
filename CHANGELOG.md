@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.82 — Mỗi kho GitHub mang một diện mạo riêng (13/09/2026)
+
+- README, About, tên workflow và tên job của repo chính nay cùng lấy từ một hồ sơ chủ đề riêng. Mười hai chủ đề đời thường kết hợp sáu bố cục README làm các kho không còn lặp lại câu “Scheduled background task runner” hay cùng một khuôn trình bày.
+- Hồ sơ được chọn ổn định bằng SHA-256 của `WORKER_ID`: cùng một repo nhận lại đúng nội dung qua mọi lượt deploy, trong khi repo khác rơi vào tổ hợp khác. Phần công khai không nội suy `WORKER_ID`, URL backend hoặc từ ngữ vận hành.
+- Workflow dùng placeholder bắt buộc cho hai tên hiển thị và kiểm tra chúng đã được thay đúng một lần. Tên file workflow, job key `linh-su`, self-dispatch và `WORKER_ID` nội bộ giữ nguyên, nên đổi giao diện không làm đứt dispatch hay điểm danh.
+- Luồng tạo repo mới đặt About từ cùng hồ sơ. `github:deploy` nay cũng so About của repo hiện có, đọc lại GitHub ID, nhánh và giá trị ngay trước PATCH rồi GET nghiệm thu; nếu lượt đọc sát ấy thấy thay đổi đồng thời thì dừng thay vì ghi đè.
+
 ## 1.3.81 — Sửa quyết định JSON của Ollama (13/09/2026)
 
 - Lượt gọi thật cho `zenon6415/rust-mark-down-parser` cho thấy Ollama trả HTTP 200 nhưng hai câu trả lời liên tiếp đều là JSON sai cú pháp gần cuối. Parser cũ chỉ nhận JSON thuần hoặc một code fence bao trọn, rồi gửi lời repair quá chung nên model lặp lại cùng dạng lỗi.

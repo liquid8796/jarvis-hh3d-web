@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 /** Offline public-metadata checks: no GitHub, database, auth, or publishing. */
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { renderReadme, renderWorkflow } from "./khoiloiPayload.mjs";
+import {
+  PUBLIC_IDENTITY_LAYOUT_COUNT,
+  PUBLIC_IDENTITY_THEME_COUNT,
+  publicIdentityForWorker,
+} from "./githubPublicIdentity.mjs";
 import { BACKEND_ENDPOINT_REDACTION as hidden, redactKnownBackendUrls as redact } from "./githubPublicMetadata.mjs";
 
 let checks = 0;
@@ -10,22 +16,63 @@ function check(name, work) { work(); checks++; console.log(`✔ ${name}`); }
 const endpoint = "https://backend.example.invalid";
 const origins = [endpoint, "https://secondary.example.invalid:8443"];
 
-check("README keeps its existing factual prose and omits only the endpoint disclosure", () => {
-  assert.equal(renderReadme({ workerId: "fixture-worker", webUrl: `${endpoint}/private-route` }),
-    "# fixture-worker\n\n" +
-    "Scheduled background task runner.\n\n" +
-    "Generated from an upstream template — do not edit here. Edit upstream and redeploy, or the\n" +
-    "two copies will drift apart.\n");
+check("one private identity always selects the same complete public identity", () => {
+  assert.deepEqual(publicIdentityForWorker("fixture-worker"), publicIdentityForWorker("fixture-worker"));
+  assert.equal(
+    renderReadme({ workerId: "fixture-worker", webUrl: `${endpoint}/private-route` }),
+    publicIdentityForWorker("fixture-worker").readme,
+  );
+});
+check("the v1 corpus stays pinned instead of silently reshuffling every repository", () => {
+  const snapshots = new Map([
+    ["fixture-alpha-001", "cad4ca2b10fc89f5070b6b00d2380f1543c2b9c3ac95b56de61ce20eea18309c"],
+    ["fixture-beta-002", "23ce397880df96ef07e2ca667ae29983f8bdd80900a9df108f396f883e1f2cbd"],
+    ["fixture-gamma-003", "f5eb30b28e823458d8af1106e8b36fd572c18984a89801a998d6cf9eb1a61719"],
+  ]);
+  for (const [workerId, expected] of snapshots) {
+    const actual = createHash("sha256").update(JSON.stringify(publicIdentityForWorker(workerId))).digest("hex");
+    assert.equal(actual, expected);
+  }
 });
 check("README never includes a configured backend URL", () => {
   const readme = renderReadme({ workerId: "fixture-worker", webUrl: `${endpoint}/api/worker?fixture=private` });
   assert.ok(!readme.includes("backend.example.invalid"));
   assert.ok(!readme.includes("private"));
 });
-check("operational workflow still receives its configured endpoint", () => {
+check("public identities vary in topic, layout, About copy and display labels", () => {
+  const identities = Array.from({ length: 192 }, (_, index) => publicIdentityForWorker(`fixture-private-identity-${index}`));
+  assert.ok(new Set(identities.map((identity) => identity.themeId)).size >= PUBLIC_IDENTITY_THEME_COUNT - 1);
+  assert.equal(new Set(identities.map((identity) => identity.layoutId)).size, PUBLIC_IDENTITY_LAYOUT_COUNT);
+  assert.ok(new Set(identities.map((identity) => identity.aboutDescription)).size >= 30);
+  assert.ok(new Set(identities.map((identity) => identity.workflowName)).size >= 30);
+  assert.ok(new Set(identities.map((identity) => identity.jobName)).size >= 30);
+});
+check("public output contains no private identity, operational vocabulary or URL", () => {
+  const forbidden = /\b(?:action|actions|agent|automation|automated|backend|background|build|cron|deploy|dispatch|endpoint|github|heartbeat|job|pipeline|repository|repo|runner|runtime|schedule|scheduled|scheduler|script|server|source|task|template|worker|workflow)\b|hh3d|jarvis|kh[oô]i[ -]?l[oỗ]i|linh[ -]?sư|t[oô]ng m[oô]n|https?:\/\/|www\./iu;
+  for (let index = 0; index < 192; index++) {
+    const workerId = `private-identity-${index}-do-not-publish`;
+    const identity = publicIdentityForWorker(workerId);
+    const publicText = [identity.readme, identity.aboutDescription, identity.workflowName, identity.jobName].join("\n");
+    assert.ok(!publicText.toLowerCase().includes(workerId.toLowerCase()));
+    assert.doesNotMatch(publicText, forbidden);
+  }
+  for (const workerId of ["clay", "book", "sky"]) {
+    const identity = publicIdentityForWorker(workerId);
+    const publicText = [identity.readme, identity.aboutDescription, identity.workflowName, identity.jobName].join("\n");
+    assert.ok(!publicText.toLowerCase().includes(workerId), `${workerId} must trigger a deterministic reselection`);
+  }
+});
+check("workflow receives public labels while its private key and endpoint routing stay unchanged", () => {
   const template = readFileSync(new URL("../deploy/github/linh-su.yml", import.meta.url), "utf8");
-  const workflow = renderWorkflow({ template, workerId: "fixture-worker", webUrl: endpoint });
+  const workerId = "fixture-worker";
+  const identity = publicIdentityForWorker(workerId);
+  const workflow = renderWorkflow({ template, workerId, webUrl: endpoint });
+  assert.ok(workflow.includes(`name: "${identity.workflowName}"`));
+  assert.ok(workflow.includes(`name: "${identity.jobName}"`));
+  assert.match(workflow, /^jobs:\n  linh-su:\n    name:/m);
+  assert.ok(workflow.includes(`WORKER_ID: ${workerId}`));
   assert.ok(workflow.includes(`vars.WEB_URL || '${endpoint}'`));
+  assert.doesNotMatch(workflow, /__PUBLIC_(?:WORKFLOW|JOB)_NAME__/);
 });
 check("known URLs are redacted including path, query and fragment", () => {
   assert.equal(redact(`Endpoint: ${endpoint}/api/worker?fixture=private#status`, origins), `Endpoint: ${hidden}`);

@@ -47,6 +47,11 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { PACKAGE_NAME } from "./khoiloiNaming.mjs";
+import {
+  PUBLIC_JOB_NAME_PLACEHOLDER,
+  PUBLIC_WORKFLOW_NAME_PLACEHOLDER,
+  publicIdentityForWorker,
+} from "./githubPublicIdentity.mjs";
 
 /** @typedef {{ read: (relPath: string) => Buffer, list: (prefix: string) => string[] }} PayloadSource */
 
@@ -86,6 +91,7 @@ export const OWNED_PREFIXES = Object.freeze(["scripts/", "src/"]);
 
 /** Bản mẫu workflow trong kho gốc — NGOÀI `.github/workflows/`, xem `deploy/github-actions.md` §4. */
 export const WORKFLOW_TEMPLATE_PATH = "deploy/github/linh-su.yml";
+const PUBLIC_IDENTITY_SOURCE_PATH = "scripts/githubPublicIdentity.mjs";
 
 /** Lockfile dựng sẵn cho lối tạo kho từ immutable web release. */
 export const GITHUB_PROVISIONING_LOCK_ARTIFACT_PATH =
@@ -272,6 +278,7 @@ export function filesystemPayloadSource(repoRoot) {
 export function uncommittedPayloadPaths(repoRoot) {
   const out = git(repoRoot, [
     "status", "--porcelain", "--", ...COPIED_PATHS, WORKFLOW_TEMPLATE_PATH,
+    PUBLIC_IDENTITY_SOURCE_PATH,
   ]);
   return out
     .split("\n")
@@ -290,13 +297,21 @@ export function uncommittedPayloadPaths(repoRoot) {
 export function renderWorkflow({ template, workerId, webUrl, workflowFile = "linh-su.yml" }) {
   const templateDispatchTarget = "/actions/workflows/linh-su.yml/dispatches";
   const renderedDispatchTarget = `/actions/workflows/${workflowFile}/dispatches`;
+  const publicIdentity = publicIdentityForWorker(workerId);
   if (!template.includes(templateDispatchTarget)) {
     throw new Error("Workflow template is missing its self-dispatch target.");
+  }
+  for (const placeholder of [PUBLIC_WORKFLOW_NAME_PLACEHOLDER, PUBLIC_JOB_NAME_PLACEHOLDER]) {
+    if (template.split(placeholder).length !== 2) {
+      throw new Error(`Workflow template must contain exactly one ${placeholder} placeholder.`);
+    }
   }
   const workflow = template
     .replace(/^(\s*WORKER_ID:\s*).*$/m, `$1${workerId}`)
     .replace(/\$\{\{ vars\.WEB_URL \|\| '[^']*' \}\}/, `\${{ vars.WEB_URL || '${webUrl}' }}`)
-    .replaceAll(templateDispatchTarget, renderedDispatchTarget);
+    .replaceAll(templateDispatchTarget, renderedDispatchTarget)
+    .replace(PUBLIC_WORKFLOW_NAME_PLACEHOLDER, publicIdentity.workflowName)
+    .replace(PUBLIC_JOB_NAME_PLACEHOLDER, publicIdentity.jobName);
 
   if (!workflow.includes(`WORKER_ID: ${workerId}`)) {
     throw new Error(
@@ -313,6 +328,14 @@ export function renderWorkflow({ template, workerId, webUrl, workflowFile = "lin
   if (!workflow.includes(renderedDispatchTarget) || (workflowFile !== "linh-su.yml" && workflow.includes(templateDispatchTarget))) {
     throw new Error("Workflow self-dispatch target does not match the configured workflow filename.");
   }
+  if (
+    workflow.includes(PUBLIC_WORKFLOW_NAME_PLACEHOLDER) ||
+    workflow.includes(PUBLIC_JOB_NAME_PLACEHOLDER) ||
+    !workflow.includes(`name: "${publicIdentity.workflowName}"`) ||
+    !workflow.includes(`name: "${publicIdentity.jobName}"`)
+  ) {
+    throw new Error("Workflow public display identity was not rendered exactly once.");
+  }
   if (!/^\s*WORKER_FALLBACK_URL:\s*\$\{\{\s*vars\.WORKER_FALLBACK_URL\s*\|\|\s*'https:\/\/[^']+'\s*\}\}\s*$/m.test(workflow)) {
     throw new Error(
       "Workflow thiếu WORKER_FALLBACK_URL HTTPS đáng tin — một cổng WEB_URL chết ở mép nền tảng " +
@@ -323,16 +346,11 @@ export function renderWorkflow({ template, workerId, webUrl, workflowFile = "lin
 }
 
 /**
- * Public overview retains its factual purpose without duplicating a backend endpoint.
+ * The public overview is stable for one private identity and does not expose that identity.
  * @param {{ workerId: string, webUrl?: string }} input
  */
 export function renderReadme({ workerId, webUrl: _webUrl }) {
-  return (
-    `# ${workerId}\n\n` +
-    `Scheduled background task runner.\n\n` +
-    `Generated from an upstream template — do not edit here. Edit upstream and redeploy, or the\n` +
-    `two copies will drift apart.\n`
-  );
+  return publicIdentityForWorker(workerId).readme;
 }
 
 /**

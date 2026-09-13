@@ -76,6 +76,13 @@ import {
   workflowTargetPath,
 } from "./khoiloiPayload.mjs";
 import { loadEnv } from "./loadEnv.mjs";
+import { publicIdentityForWorker } from "./githubPublicIdentity.mjs";
+import {
+  GithubPrimaryDescriptionError,
+  parseRepositoryMetadata,
+  reconcilePublicDescription,
+  type RepositoryMetadata,
+} from "./githubPrimaryDescription.mts";
 
 loadEnv();
 
@@ -381,6 +388,26 @@ async function demand(
 
 const seg = (value: string) => encodeURIComponent(value);
 
+/** Adapt the injected, testable About reconciler to this command's bounded GitHub transport. */
+async function syncPublicDescription(input: {
+  pat: string;
+  base: string;
+  slug: string;
+  before: RepositoryMetadata;
+  description: string;
+}): Promise<void> {
+  const { pat, base, slug, before, description } = input;
+  await reconcilePublicDescription({
+    slug,
+    before,
+    description,
+    read: () => demand(pat, "GET", base, "đọc hoặc nghiệm thu About", [200]),
+    patch: (next) => demand(pat, "PATCH", base, "đổi About theo hồ sơ công khai riêng", [200], {
+      description: next,
+    }),
+  });
+}
+
 /**
  * Tên nhánh đi vào đường dẫn `/git/ref/heads/<nhánh>` mà KHÔNG được `encodeURIComponent`.
  *
@@ -395,7 +422,7 @@ const SAFE_BRANCH_RE = /^[A-Za-z0-9][A-Za-z0-9._\-/]*$/;
 
 type Outcome = {
   slug: string;
-  state: "đã đẩy" | "đã đúng bản" | "kế hoạch" | "HỎNG";
+  state: "đã đẩy" | "đã cập nhật" | "đã đúng bản" | "kế hoạch" | "HỎNG";
   detail: string;
   /** Lượt khởi động lại đã làm gì — `null` khi không bật `--restart`. */
   restart?: string;
@@ -527,13 +554,8 @@ async function deployOne(station: Station): Promise<Outcome> {
   try {
     // 5.1 — Kho còn sống không, và nhánh mặc định tên gì. Ghim "main" là hẹn ngày hỏng với một
     // kho trót đặt tên nhánh khác; GitHub thì đã biết sẵn.
-    const repoInfo = (await demand(pat, "GET", base, "hỏi thông tin kho", [200])) as {
-      default_branch?: unknown;
-    };
-    const branch = typeof repoInfo?.default_branch === "string" ? repoInfo.default_branch : "";
-    if (branch.length === 0) {
-      throw new RepoError("GitHub không khai `default_branch` cho kho này — không biết đẩy vào nhánh nào.");
-    }
+    const repoInfo = parseRepositoryMetadata(await demand(pat, "GET", base, "hỏi thông tin kho", [200]), slug);
+    const branch = repoInfo.defaultBranch;
     if (!SAFE_BRANCH_RE.test(branch)) {
       throw new RepoError(`Tên nhánh mặc định「${branch}」mang ký tự lạ — không ghép an toàn vào URL được.`);
     }
@@ -560,6 +582,8 @@ async function deployOne(station: Station): Promise<Outcome> {
     const chosen = resolveDeployWorkerId({ fromBook: station.workerId, fromWorkflow: inRepoWorkerId });
     if (!chosen.ok) return { slug, state: "HỎNG", detail: chosen.message };
     const workerId = chosen.workerId;
+    const publicIdentity = publicIdentityForWorker(workerId);
+    const descriptionChanged = repoInfo.description !== publicIdentity.aboutDescription;
 
     /**
      * Sổ và kho khai hai id khác nhau là chuyện PHẢI NÓI RA, không phải chuyện lặng lẽ chọn một
@@ -647,6 +671,29 @@ async function deployOne(station: Station): Promise<Outcome> {
       const note = restart
         ? await restartRuns({ pat, base, branch, workflowFile: station.workflowFile, workerId, headSha: parentSha })
         : undefined;
+      if (descriptionChanged) {
+        if (dryRun) {
+          return {
+            slug,
+            state: "kế hoạch",
+            detail: `${workerId} · mã đã khớp · About sẽ đổi${idNote}`,
+            restart: note,
+          };
+        }
+        await syncPublicDescription({
+          pat,
+          base,
+          slug,
+          before: repoInfo,
+          description: publicIdentity.aboutDescription,
+        });
+        return {
+          slug,
+          state: "đã cập nhật",
+          detail: `${workerId} · mã đã khớp · About đã đổi${idNote}`,
+          restart: note,
+        };
+      }
       return {
         slug,
         state: "đã đúng bản",
@@ -658,7 +705,7 @@ async function deployOne(station: Station): Promise<Outcome> {
     const summary =
       `${workerId} · ${plan.changed.length} tệp đổi` +
       (plan.removed.length > 0 ? `, ${plan.removed.length} xoá` : "") +
-      `, ${plan.unchanged} giữ nguyên${idNote}`;
+      `, ${plan.unchanged} giữ nguyên${descriptionChanged ? ", About đổi" : ""}${idNote}`;
 
     console.log(`\n── ${slug} ─────────────────────────────`);
     console.log(`   worker id ${workerId}   ·   web ${webUrl}   ·   nhánh ${branch}`);
@@ -738,6 +785,16 @@ async function deployOne(station: Station): Promise<Outcome> {
       );
     }
 
+    if (descriptionChanged) {
+      await syncPublicDescription({
+        pat,
+        base,
+        slug,
+        before: repoInfo,
+        description: publicIdentity.aboutDescription,
+      });
+    }
+
     // Khởi động lại đứng SAU phép nghiệm thu và dùng chính commit vừa tạo làm mốc「mã mới」, nên
     // nó không bao giờ huỷ nhầm một lượt chạy đã mang bản này.
     const note = restart
@@ -746,7 +803,9 @@ async function deployOne(station: Station): Promise<Outcome> {
 
     return { slug, state: "đã đẩy", detail: `${summary} → ${commitSha.slice(0, 7)}`, restart: note };
   } catch (err) {
-    if (err instanceof RepoError) return { slug, state: "HỎNG", detail: err.message };
+    if (err instanceof RepoError || err instanceof GithubPrimaryDescriptionError) {
+      return { slug, state: "HỎNG", detail: err.message };
+    }
     const detail = err instanceof Error ? `${err.name}: ${err.message.slice(0, 200)}` : "không có câu chữ";
     return { slug, state: "HỎNG", detail: `Lỗi không lường trước (${detail})` };
   }
@@ -763,6 +822,7 @@ for (const station of targets) {
 
 const broken = outcomes.filter((o) => o.state === "HỎNG");
 const pushed = outcomes.filter((o) => o.state === "đã đẩy");
+const metadataOnly = outcomes.filter((o) => o.state === "đã cập nhật");
 const already = outcomes.filter((o) => o.state === "đã đúng bản");
 
 console.log("\n── Tổng kết ─────────────────────────────────────────");
@@ -784,6 +844,9 @@ if (dryRun) {
 }
 if (already.length > 0 && pushed.length === 0 && !dryRun) {
   console.log("\n  Mọi kho đã mang đúng gói này — không commit nào được tạo ra.");
+}
+if (metadataOnly.length > 0 && !dryRun) {
+  console.log(`\n  ${metadataOnly.length} kho không cần commit mới; About đã được đồng bộ và đọc lại thành công.`);
 }
 
 if (broken.length > 0) {

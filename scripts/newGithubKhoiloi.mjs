@@ -28,6 +28,7 @@ import {
   reviewBundlePatScopes,
 } from "./githubBundleSafety.mjs";
 import { looksTransient } from "./githubTransient.mjs";
+import { publicIdentityForWorker } from "./githubPublicIdentity.mjs";
 import {
   buildKhoiloiPayload,
   playwrightVersionOf,
@@ -76,6 +77,7 @@ function drawWorkerId(repo) {
 
 const suppliedWorkerId = arg("worker-id", "").trim();
 const workerId = suppliedWorkerId || drawWorkerId(repoName);
+const publicIdentity = publicIdentityForWorker(workerId);
 const slug = `${owner}/${repoName}`;
 if (
   workflowFile.length > 100 ||
@@ -436,7 +438,7 @@ try {
       repoName,
       slug,
       cwd: staging,
-      description: `Scheduled background task runner — ${workerId}`,
+      description: publicIdentity.aboutDescription,
       commit: "feat: initialize scheduled task runner",
     },
   ];
@@ -605,7 +607,7 @@ try {
       console.warn(
         `\n⚠ Không bấm chạy được lượt đầu: ${why}\n` +
           `  Kho và secret ĐÃ XONG, nên đây không phải hỏng — chỉ là chưa chạy ngay.\n` +
-          `  Muốn chạy ngay: https://github.com/${slug}/actions → „Khôi lỗi tông môn (GitHub)" → Run workflow.`,
+          `  Muốn chạy ngay: https://github.com/${slug}/actions → „${publicIdentity.workflowName}" → Run workflow.`,
       );
     }
   }

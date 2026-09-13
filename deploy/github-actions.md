@@ -104,9 +104,11 @@ kho gốc.
 
 Nên khôi lỗi GitHub **chỉ sống trên các tài khoản khác**, trong kho do `github:new` dựng:
 `newGithubKhoiloi.mjs` đọc bản mẫu rồi ghi vào `.github/workflows/linh-su.yml` **của kho ấy**,
-thay đúng hai dòng `WORKER_ID` và `WEB_URL`; `WORKER_FALLBACK_URL` đi nguyên từ bản mẫu và bị
-lưới phát hành bắt buộc phải còn. Một bản mẫu, nhiều kho — bộ số 290/50/350/360 và cổng cứu hộ
-không có cơ hội trôi khỏi nhau.
+thay `WORKER_ID`, `WEB_URL` và hai nhãn công khai của workflow/job; `WORKER_FALLBACK_URL` đi
+nguyên từ bản mẫu và bị lưới phát hành bắt buộc phải còn. README, About và hai nhãn công khai
+được chọn ổn định theo `WORKER_ID` từ nhiều chủ đề đời thường, còn tên tệp workflow, job key và
+danh tính điểm danh không đổi. Một bản mẫu, nhiều kho — bộ số 290/50/350/360 và cổng cứu hộ không
+có cơ hội trôi khỏi nhau.
 
 Hàng rào này là **một tệp KHÔNG có mặt**, mà loại hàng rào ấy không tự giữ được mình: một cú
 `git mv` ngược lại, hay một bản chép để「chạy thử một lượt rồi xoá」, dựng lại nó mà chẳng ai thấy.
@@ -127,8 +129,8 @@ Lấy giá trị: `vercel env pull .env --environment=production --yes` rồi đ
 **Không** dùng `npm run env:pull` — lệnh ấy kéo môi trường *development*, nơi `WORKER_TOKEN`,
 `AUTH_SECRET` và `DATABASE_URL` đều không tồn tại.
 
-Chạy thử: Actions → **Khôi lỗi tông môn (GitHub)** → Run workflow, ở kho sinh ra chứ không phải
-kho gốc.
+Chạy thử: Actions → chọn workflow mang tên chủ đề riêng của kho → Run workflow, ở kho sinh ra chứ
+không phải kho gốc.
 
 **Dấu hiệu khoẻ:** mục Khôi Lỗi trên dashboard hiện HAI khôi lỗi tông môn đang trực. Thiếu
 secret thì bước cuối dừng ngay với một dòng đỏ nói rõ, không chạy rỗng.
@@ -459,6 +461,12 @@ tách hẳn: repo là tên công khai trên GitHub, còn `WORKER_ID` là danh t�
 này không được trùng nhau, và repo chính cũng không được trùng bất kỳ tên khôi lỗi đang điểm danh.
 Không có mốc thời gian trong tên: `…-20260813-233056-6143` là chữ ký của một cỗ máy sinh tên, còn
 `cobalt-relay-4f2a` thì không.
+
+Từ 13/09/2026, lớp trình bày công khai cũng không còn một khuôn chung. SHA-256 của `WORKER_ID`
+chọn một hồ sơ đã soát gồm chủ đề, bố cục README, About, tên workflow và tên job. Cùng một kho luôn
+nhận lại đúng hồ sơ ấy qua mọi lượt phát hành; kho khác rơi vào tổ hợp khác mà không cần gọi model
+lúc deploy, nên chạy lại không tạo commit chỉ vì câu chữ đổi ngẫu nhiên. Hồ sơ không nội suy
+`WORKER_ID`, URL hay thuật ngữ vận hành vào phần công khai.
 
 Cái giá đã cân nhắc: mất phép「nhìn tiền tố biết là máy ở trọ」trên dashboard, và lượt XOÁ mất bộ
 lọc theo tiền tố. Bù lại, `looksLikeKhoiloiRepoName` nay hỏi **hình dạng** (`GENERATED_NAME_SHAPE`:

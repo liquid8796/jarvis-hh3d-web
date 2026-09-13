@@ -36,7 +36,7 @@
 # bằng tay. Thiếu nó thì bước cuối dừng ngay với một câu nói rõ, không chạy rỗng rồi để người ta
 # đoán.
 
-name: Khôi lỗi tông môn (GitHub)
+name: "__PUBLIC_WORKFLOW_NAME__"
 
 on:
   schedule:
@@ -65,6 +65,7 @@ permissions:
 
 jobs:
   linh-su:
+    name: "__PUBLIC_JOB_NAME__"
     runs-on: ubuntu-latest
     # 350 phút: để timeout của GitHub bắn TRƯỚC trần 6 giờ của nền tảng, nên lượt chạy kết thúc
     # bằng một dòng đỏ đọc được thay vì biến mất không lời giải thích.

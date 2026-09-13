@@ -9,7 +9,7 @@ const root = process.cwd();
 const release = await mkdtemp(path.join(await realpath(tmpdir()), "gitless-provision-test-"));
 let prepared: Awaited<ReturnType<typeof production.localPreflight>> | undefined;
 try {
-  for (const relative of ["scripts/githubProvisioningPayload.mjs", "scripts/khoiloiPayload.mjs", "scripts/khoiloiNaming.mjs", "scripts/worker.mjs", "src/lib/quest-engine", "src/lib/worker/controlFollow.mjs", "src/lib/worker/selfUpdate.mjs", "deploy/github/linh-su.yml", "package.json", "public/linh-su/github-provisioning-lock.json"]) {
+  for (const relative of ["scripts/githubProvisioningPayload.mjs", "scripts/githubPublicIdentity.mjs", "scripts/khoiloiPayload.mjs", "scripts/khoiloiNaming.mjs", "scripts/worker.mjs", "src/lib/quest-engine", "src/lib/worker/controlFollow.mjs", "src/lib/worker/selfUpdate.mjs", "deploy/github/linh-su.yml", "package.json", "public/linh-su/github-provisioning-lock.json"]) {
     await mkdir(path.dirname(path.join(release, relative)), { recursive: true });
     await cp(path.join(root, relative), path.join(release, relative), { recursive: true });
   }
@@ -31,6 +31,8 @@ try {
   assert.ok(workflow.includes("WORKER_ID: fixture-worker"));
   assert.ok(workflow.includes("/actions/workflows/custom.yaml/dispatches"));
   assert.ok(!workflow.includes("/actions/workflows/linh-su.yml/dispatches"));
+  assert.ok(!workflow.includes("__PUBLIC_WORKFLOW_NAME__") && !workflow.includes("__PUBLIC_JOB_NAME__"));
+  assert.match(workflow, /^jobs:\n  linh-su:\n    name: "[A-Za-z0-9 '&-]+"$/m);
   const packageJson = JSON.parse(await readFile(path.join(prepared.directory, "package.json"), "utf8"));
   const lock = JSON.parse(await readFile(path.join(prepared.directory, "package-lock.json"), "utf8"));
   assert.equal(packageJson.version, lock.packages[""].version);

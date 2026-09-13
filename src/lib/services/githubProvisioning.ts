@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { lstat, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { publicIdentityForWorker } from "../../../scripts/githubPublicIdentity.mjs";
 import {
   normalizeGithubProvisionInput,
   reviewNormalizedProvisionIdentity,
@@ -363,7 +364,12 @@ export const productionGithubProvisionDependencies: GithubProvisioningDependenci
     return { initialCommitSha };
   },
   async create(ctx) {
-    const response = await request(ctx.pat, ctx, "/user/repos", "POST", { name: ctx.repo, private: false, auto_init: false, description: "Scheduled background task runner." });
+    const response = await request(ctx.pat, ctx, "/user/repos", "POST", {
+      name: ctx.repo,
+      private: false,
+      auto_init: false,
+      description: publicIdentityForWorker(ctx.workerId).aboutDescription,
+    });
     if (response.status !== 201) { await response.body?.cancel(); return { status: response.status }; }
     const info = await response.json() as { id?: number; full_name?: string };
     if (!info.full_name || !same(info.full_name, ctx.slug)) throw Error("create identity mismatch");

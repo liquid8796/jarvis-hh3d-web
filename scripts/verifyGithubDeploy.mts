@@ -309,6 +309,33 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
   const newStationRaw = readFileSync(path.join(repoRoot, "scripts/newGithubStation.mts"), "utf8");
   const provisioningRaw = readFileSync(path.join(repoRoot, "src/lib/services/githubProvisioning.ts"), "utf8");
   const provisioningPayloadRaw = readFileSync(path.join(repoRoot, "scripts/githubProvisioningPayload.mjs"), "utf8");
+  const workflowTemplateRaw = readFileSync(path.join(repoRoot, WORKFLOW_TEMPLATE_PATH), "utf8");
+  check(
+    "workflow có input kiểm tra provisioning và bỏ qua toàn bộ worker job",
+    /workflow_dispatch:\s*\n\s*inputs:\s*\n\s*provision_check:\s*\n(?:\s+.*\n)*?\s+type: boolean\s*\n\s+default: false/m.test(workflowTemplateRaw) &&
+      /jobs:\s*\n\s*linh-su:\s*\n(?:\s*#.*\n)*\s*if:.*inputs\.provision_check != true/m.test(workflowTemplateRaw),
+  );
+  const serviceActionsIndex = provisioningRaw.indexOf("deps.checkActions(ctx)");
+  const serviceSecretIndex = provisioningRaw.indexOf("deps.setSecret(ctx, local)");
+  check(
+    "lối UI dispatch lượt rỗng trước khi cài secret",
+    serviceActionsIndex >= 0 && serviceSecretIndex >= 0 && serviceActionsIndex < serviceSecretIndex &&
+      provisioningRaw.includes('inputs: { provision_check: "true" }'),
+  );
+  check(
+    "HTTP 422 Actions-disabled được phân loại riêng mà không đưa provider body ra UI",
+    provisioningRaw.includes("Actions has been disabled for this user") &&
+      provisioningRaw.includes('reason: "account-disabled"') &&
+      provisioningRaw.includes("boundedGithubMessage(response)"),
+  );
+  const cliActionsIndex = newGithubRaw.indexOf("assertGithubActionsRunnable(stagedRepos[0]);");
+  const cliSecretIndex = newGithubRaw.indexOf('runWithRetry("dán secret"');
+  check(
+    "lối dựng trần cũng kiểm tra Actions trước khi cài secret",
+    cliActionsIndex >= 0 && cliSecretIndex >= 0 && cliActionsIndex < cliSecretIndex &&
+      newGithubRaw.includes('"--raw-field", "provision_check=true"'),
+  );
+  check("lối dựng trần nhận đúng lỗi Actions-disabled", newGithubRaw.includes("actions has been disabled for this user"));
   check(
     "lối dựng kho trần mặc định worker đi thẳng backend",
     newGithubRaw.includes(`DEFAULT_WEB_URL = "${EXPECTED_DIRECT_WORKER_URL}"`),

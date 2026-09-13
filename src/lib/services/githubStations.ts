@@ -482,6 +482,28 @@ async function readWorkflowState(
   return parseWorkflowState((reply.body as { state?: unknown } | null)?.state);
 }
 
+/**
+ * Đếm lịch sử chạy của đúng workflow. GitHub có thể vẫn trả `state: active` cho tệp workflow
+ * trong khi Actions đã bị khoá ở cấp tài khoản; lúc ấy chỉ nhìn trạng thái tệp sẽ vẽ một dòng
+ * xanh giả. Một workflow chưa từng có run cũng chưa phải bằng chứng rằng khôi lỗi đang sống.
+ */
+async function readWorkflowRunCount(
+  station: Station,
+  pat: string,
+  options: GithubCallOptions = {},
+): Promise<number> {
+  const path = `/repos/${encodeURIComponent(station.owner)}/${encodeURIComponent(station.repo)}/actions/workflows/${encodeURIComponent(station.workflowFile)}/runs?per_page=1`;
+  const reply = await callGithub(pat, "GET", path, undefined, options);
+  if (reply.status !== 200) {
+    throw new StationError(explainFailure(reply.status, reply.body, `hỏi lịch sử chạy workflow ${station.workflowFile}`));
+  }
+  const totalCount = (reply.body as { total_count?: unknown } | null)?.total_count;
+  if (typeof totalCount !== "number" || !Number.isInteger(totalCount) || totalCount < 0) {
+    throw new StationError(`GitHub trả lịch sử workflow ${station.workflowFile} nhưng thiếu \`total_count\` hợp lệ — không thể xác nhận khôi lỗi đang chạy.`);
+  }
+  return totalCount;
+}
+
 /** Bật lại một lịch GitHub đã tắt. 204 là xong; gọi lên một workflow đang bật cũng vẫn 204. */
 async function enableWorkflow(station: Station, pat: string, options: GithubCallOptions = {}): Promise<void> {
   const path = `/repos/${encodeURIComponent(station.owner)}/${encodeURIComponent(station.repo)}/actions/workflows/${encodeURIComponent(station.workflowFile)}/enable`;
@@ -650,6 +672,18 @@ export async function pingStation(
         note: `Lịch ĐÃ BỊ TẮT vì ${SCHEDULE_DISABLE_DAYS} ngày im lặng — đã bật lại và ghi mốc (${sha}).`,
         committed: true,
         workflowState: "active",
+      };
+    }
+
+    if (state === "active" && await readWorkflowRunCount(station, pat, options) === 0) {
+      return {
+        slug,
+        ok: false,
+        note:
+          "Workflow đang được GitHub khai là active nhưng chưa có lượt chạy nào — khôi lỗi chưa được xác nhận đang hoạt động. Kiểm tra tab Actions và trạng thái Actions của tài khoản." +
+          urgencyNote(station.lastCommitAt, now),
+        committed: false,
+        workflowState: state,
       };
     }
 

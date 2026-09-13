@@ -31,6 +31,8 @@ try {
   assert.ok(workflow.includes("WORKER_ID: fixture-worker"));
   assert.ok(workflow.includes("/actions/workflows/custom.yaml/dispatches"));
   assert.ok(!workflow.includes("/actions/workflows/linh-su.yml/dispatches"));
+  assert.match(workflow, /workflow_dispatch:\s*\n\s*inputs:\s*\n\s*provision_check:\s*\n(?:\s+.*\n)*?\s+type: boolean\s*\n\s+default: false/);
+  assert.match(workflow, /jobs:\s*\n\s*linh-su:\s*\n(?:\s*#.*\n)*\s*if:.*inputs\.provision_check != true/, "the provisioning dispatch must skip the worker job");
   const packageJson = JSON.parse(await readFile(path.join(prepared.directory, "package.json"), "utf8"));
   const lock = JSON.parse(await readFile(path.join(prepared.directory, "package-lock.json"), "utf8"));
   assert.equal(packageJson.version, lock.packages[""].version);

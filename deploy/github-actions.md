@@ -425,6 +425,17 @@ Lượt tạo kiểm PAT/quyền, trùng tên, payload và công cụ trước k
 xóa phải khớp ID/HEAD và không có station tham chiếu, sau xóa phải xác minh 404. Kết quả mơ hồ
 yêu cầu kiểm tra repo theo slug trước khi thử lại.
 
+Từ **1.3.82**, workflow có input `provision_check`. Sau khi push source nhưng trước khi cài
+`WORKER_TOKEN` hoặc ghi station, cả UI lẫn CLI dispatch input này; job worker bị skip hoàn toàn,
+nên lượt kiểm tra không mở runner. Chỉ HTTP 204 mới được đi tiếp. Nếu GitHub đã tắt Actions cho
+tài khoản, repo mới được rollback và UI yêu cầu khôi phục Actions hoặc dùng tài khoản khác.
+Không dùng riêng `GET /actions/permissions` làm bằng chứng: ca `prism8146/pokemon-mmo` trả
+`enabled=true` ở cấp repo nhưng dispatch vẫn trả 422 `Actions has been disabled for this user`.
+
+Vòng keepalive cũng đọc `total_count` của đúng workflow khi state là `active`. `active` mà không
+còn một run nào không được báo xanh hay ghi heartbeat; sổ hiện lỗi để người vận hành kiểm tra
+Actions của tài khoản. Workflow bị tắt tay vẫn dừng trước phép đọc này và không bị tự bật lại.
+
 Kho chính đã được ghi sổ sẽ được giữ lại nếu Ollama lỗi hoặc hết thời gian. Không chạy lại
 `github:new` để bù kho phụ, vì lệnh đó dựng thêm một khôi lỗi. Dùng:
 

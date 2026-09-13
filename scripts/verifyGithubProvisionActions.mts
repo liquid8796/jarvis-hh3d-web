@@ -60,7 +60,7 @@ function fixture(provisionedBy?: "jarvis") {
     checkSettings: async () => {}, checkWorker: async () => {}, probe: async () => ({ status: f.probeStatus }),
     acquireLease: async () => ({ assertHeld: async () => {}, release: async () => {} }),
     stage: async () => ({ initialCommitSha: "test-sha" }), create: async () => { events.push("create"); return { status: 201, githubId: 123 }; },
-    push: async () => {}, setSecret: async () => {}, register: async () => { events.push("register"); },
+    push: async () => {}, checkActions: async () => { events.push("actions-check"); return { ok: true }; }, setSecret: async () => {}, register: async () => { events.push("register"); },
     cleanupSnapshot: async () => ({ githubId: 123, head: "test-sha", referenced: false }), deleteRepo: async () => { events.push("delete"); },
     dispatch: async () => { if (f.warning) throw Error(pat + " child stderr"); }, ping: async () => {}, nurture: async () => {}, dispose: async () => {},
   };

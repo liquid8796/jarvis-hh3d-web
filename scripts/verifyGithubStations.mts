@@ -72,6 +72,7 @@ const OWNER = "zhangyu4";
 const REPO = "github-khoiloi";
 const SLUG = `${OWNER}/${REPO}`;
 const WORKFLOW_PATH = `/repos/${OWNER}/${REPO}/actions/workflows/${DEFAULT_WORKFLOW_FILE}`;
+const WORKFLOW_RUNS_PATH = `${WORKFLOW_PATH}/runs?per_page=1`;
 const ENABLE_PATH = `${WORKFLOW_PATH}/enable`;
 const CONTENTS_PATH = `/repos/${OWNER}/${REPO}/contents/${HEARTBEAT_PATH}`;
 const COMPANION_REPO = "quiet-harbor-planner";
@@ -148,6 +149,7 @@ function companion(repo = COMPANION_REPO) {
 /** GitHub giả「mọi thứ đều khoẻ」: workflow đang chạy, tệp mốc đã có, ghi được. */
 const healthy: Handler = (call) => {
   if (call.method === "GET" && call.path === WORKFLOW_PATH) return { status: 200, body: { state: "active" } };
+  if (call.method === "GET" && call.path === WORKFLOW_RUNS_PATH) return { status: 200, body: { total_count: 3, workflow_runs: [{}] } };
   if (call.method === "GET" && call.path === CONTENTS_PATH) return { status: 200, body: { sha: "cu5a" } };
   if (call.method === "PUT" && call.path === CONTENTS_PATH) return { status: 200, body: { commit: { sha: "abcdef1234567890" } } };
   if (call.method === "PUT" && call.path === ENABLE_PATH) return { status: 204 };
@@ -269,7 +271,7 @@ async function run() {
     assert(result.ok, `Kho khoẻ mà báo hỏng: ${result.note}`);
     assert(!result.committed, "Chưa tới hạn mà vẫn ghi commit.");
     assert(writes(calls).length === 0, `Chưa tới hạn thì tuyệt đối không được GHI gì — đã có ${writes(calls).length} lượt PUT.`);
-    assert(calls.length === 1, `Lượt ngó phải đúng MỘT lời gọi, đang có ${calls.length}.`);
+    assert(calls.length === 2, `Lượt ngó workflow đang active phải đọc cả trạng thái lẫn lịch sử chạy, đang có ${calls.length} lời gọi.`);
     assert(result.note.includes(`${KEEPALIVE_INTERVAL_DAYS - 3} ngày`), `Phải nói còn mấy ngày nữa tới lượt ghi: ${result.note}`);
   }
 
@@ -324,6 +326,37 @@ async function run() {
       writes(calls).length === 0,
       `force=${force}: người ta tắt lịch bằng tay là một quyết định — nút「Nuôi ngay」không được cãi lại nó (${writes(calls).length} lượt PUT).`,
     );
+    assert(calls.length === 1, `force=${force}: lịch tắt tay phải dừng ngay, không được hỏi lịch sử run (${calls.length} lời gọi).`);
+  }
+
+  // ───────── Ca 5b: state active nhưng chưa từng có run → báo hỏng, không ghi heartbeat ─────────
+  for (const force of [false, true]) {
+    const calls = installFetch((call) =>
+      call.method === "GET" && call.path === WORKFLOW_RUNS_PATH
+        ? { status: 200, body: { total_count: 0, workflow_runs: [] } }
+        : healthy(call),
+    );
+    const result = await pingStation(station({ lastCommitAt: daysAgo(1) }), NOW, force);
+    assert(!result.ok, `force=${force}: workflow active nhưng chưa có run mà vẫn báo xanh.`);
+    assert(!result.committed, `force=${force}: workflow chưa từng chạy mà vẫn ghi heartbeat.`);
+    assert(result.workflowState === "active", `Phải giữ đúng state GitHub trả về: ${result.workflowState}.`);
+    assert(result.note.includes("chưa có lượt chạy nào"), `Phải nói đúng bằng chứng còn thiếu: ${result.note}`);
+    assert(calls.some((call) => call.path === WORKFLOW_RUNS_PATH), "Không thấy lượt kiểm lịch sử workflow.");
+    assert(writes(calls).length === 0, `force=${force}: không được ghi gì khi khôi lỗi chưa từng chạy.`);
+  }
+
+  // GitHub trả lỗi account-level ở endpoint run history dù metadata workflow vẫn là `active`.
+  {
+    const calls = installFetch((call) =>
+      call.method === "GET" && call.path === WORKFLOW_RUNS_PATH
+        ? { status: 422, body: { message: "Actions has been disabled for this user." } }
+        : healthy(call),
+    );
+    const result = await pingStation(station({ lastCommitAt: daysAgo(1) }), NOW, true);
+    assert(!result.ok && !result.committed, "Actions bị khoá ở cấp tài khoản mà vẫn báo khoẻ hoặc ghi heartbeat.");
+    assert(result.note.includes("vô hiệu hoá Actions cho tài khoản"), `Phải chẩn đoán đúng lỗi cấp tài khoản: ${result.note}`);
+    assert(result.note.includes("Actions has been disabled for this user."), `Phải giữ câu GitHub trả về: ${result.note}`);
+    assert(writes(calls).length === 0, "Actions bị khoá mà vẫn cố ghi heartbeat.");
   }
 
   // ───────── Ca 6: force bỏ qua phép tính hạn (nhưng chỉ phép tính hạn) ─────────
@@ -458,6 +491,10 @@ async function run() {
     assert(doiChoPat(401).includes("401") && /PAT/.test(doiChoPat(401)), "401 phải gọi tên PAT.");
     assert(/scope|tần suất/.test(doiChoPat(403)), "403 phải nói tới quyền hoặc hạn mức.");
     assert(/tên kho|quyền nhìn/.test(doiChoPat(404)), "404 phải nói tới tên kho.");
+
+    const actionsDisabled = explainFailure(422, { message: "Actions has been disabled for this user" }, "hỏi lịch sử workflow");
+    assert(/vô hiệu hoá Actions cho tài khoản/.test(actionsDisabled), `422 account-level phải nói đúng nguyên nhân: ${actionsDisabled}`);
+    assert(!/nhánh vừa nhích|PAT thiếu scope/.test(actionsDisabled), `422 account-level không được rơi vào lời giải thích push chung: ${actionsDisabled}`);
 
     for (const status of [500, 502, 503, 504]) {
       const noi = explainFailure(status, null, "hỏi danh tính");

@@ -13,7 +13,7 @@
  * The worker payload comes from committed HEAD through khoiloiPayload.mjs. GitHub CLI handles
  * the sealed-box secret and authenticates using GH_TOKEN or its existing login. Creation still
  * requires a classic PAT with repo + workflow + delete_repo so confirmed creations can be
- * rolled back on push/secret failure. WORKER_TOKEN must be present in the environment.
+ * rolled back on push/Actions/secret failure. WORKER_TOKEN must be present in the environment.
  *
  * The resulting worker repository and Actions logs are public; see deploy/github-actions.md §6.
  */
@@ -268,7 +268,7 @@ function assertGhSupportsPlannedCalls() {
     { cmd: ["repo", "create"], flags: ["--public", "--description"] },
     { cmd: ["repo", "delete"], flags: ["--yes"] },
     { cmd: ["secret", "set"], flags: ["--repo"] },
-    { cmd: ["workflow", "run"], flags: ["--repo"] },
+    { cmd: ["workflow", "run"], flags: ["--repo", "--ref", "--raw-field"] },
     { cmd: ["auth", "git-credential"], flags: [] },
     { cmd: ["api"], flags: ["--include"] },
   ];
@@ -364,6 +364,51 @@ function assertGhCanRollback() {
     );
     process.exit(1);
   }
+}
+
+function actionsCheckFailure(error) {
+  const detail = [error?.stderr, error?.stdout, error?.message]
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join("\n");
+  if (/actions has been disabled for this user\.?/i.test(detail)) {
+    return { detail, retry: false, message: "GitHub đã tắt Actions cho tài khoản này. Khôi phục Actions hoặc dùng tài khoản GitHub khác." };
+  }
+  if (/\b(?:401|403)\b|bad credentials|resource not accessible|actions (?:are|is) disabled/i.test(detail)) {
+    return { detail, retry: false, message: "GitHub từ chối quyền chạy Actions. Bật Actions và kiểm tra quyền workflow của PAT." };
+  }
+  if (/\b404\b|could not find any workflows?|workflow.+not found/i.test(detail)) {
+    return { detail, retry: true, message: "GitHub chưa tìm thấy workflow vừa đẩy." };
+  }
+  if (/\b422\b|validation failed/i.test(detail)) {
+    return { detail, retry: false, message: "GitHub từ chối nhánh main hoặc input kiểm tra của workflow." };
+  }
+  if (looksTransient(detail)) {
+    return { detail, retry: true, message: "GitHub Actions đang tạm thời không khả dụng." };
+  }
+  return { detail, retry: false, message: "GitHub Actions từ chối lượt kiểm tra workflow." };
+}
+
+/** Dispatch a worker-free run before WORKER_TOKEN or the register can be written. */
+function assertGithubActionsRunnable(repository) {
+  let failure = { retry: false, message: "GitHub Actions từ chối lượt kiểm tra workflow." };
+  for (let attempt = 1; attempt <= GH_ATTEMPTS; attempt += 1) {
+    try {
+      run("gh", ["workflow", "run", workflowFile, "--repo", repository.slug, "--ref", "main", "--raw-field", "provision_check=true"], {
+        cwd: repository.cwd,
+        quiet: true,
+        timeout: 60_000,
+      });
+      return;
+    } catch (error) {
+      failure = actionsCheckFailure(error);
+      if (!failure.retry || attempt >= GH_ATTEMPTS) break;
+      console.error(`  … GitHub chưa nhận workflow, thử lại lần ${attempt + 1}/${GH_ATTEMPTS} sau ${GH_BACKOFF_MS / 1000}s`);
+      sleepSync(GH_BACKOFF_MS);
+    }
+  }
+  // Provider output is deliberately omitted: it may contain authenticated request details.
+  throw new Error(`${failure.message} Repo mới sẽ được rollback; chưa cài secret và chưa ghi sổ.`);
 }
 
 const playwrightVersion = playwrightVersionOf(repoRoot);
@@ -565,6 +610,9 @@ try {
         throw err;
       }
     }
+
+    console.log("── Kiểm tra GitHub Actions bằng lượt chạy rỗng…");
+    assertGithubActionsRunnable(stagedRepos[0]);
 
     console.log("── Dán secret WORKER_TOKEN vào kho khôi lỗi…");
     // Token đi qua STDIN, không qua đối số: đối số nằm trong command line mà ai mở Task Manager

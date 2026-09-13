@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { provisionGithubStation, productionGithubProvisionDependencies, GithubProvisionCollisionError, type GithubProvisioningDependencies } from "../src/lib/services/githubProvisioning";
+import { classifyGithubActionsCheckStatus, provisionGithubStation, productionGithubProvisionDependencies, shouldRetryGithubActionsCheck, GithubProvisionCollisionError, type GithubActionsCheckFailure, type GithubProvisioningDependencies } from "../src/lib/services/githubProvisioning";
 import { parseGithubSettingsForMutation } from "../src/lib/services/settings";
 
 assert.throws(() => parseGithubSettingsForMutation({ githubStations: [{ owner: "Owner", repo: "existing", pat: "encrypted", companionRepos: [{ repo: "owned-repo" }, null] }] }));
@@ -25,6 +25,7 @@ function fixture(failure = "") {
     stage: async () => { events.push("stage"); fail("stage"); return { initialCommitSha: "first-sha" }; },
     create: async () => { events.push("create"); if (failure === "ambiguous-create") throw Error("network secret"); if (failure === "create-422") return { status: 422 }; if (failure === "create-500") return { status: 500 }; if (failure === "create-no-id") return { status: 201 }; created = true; return { status: 201, githubId: 123 }; },
     push: async () => { events.push("push"); fail("push"); },
+    checkActions: async () => { events.push("actions-check"); fail("actions"); return { ok: true }; },
     setSecret: async () => { events.push("secret"); fail("secret"); },
     register: async () => { events.push("register"); fail("register"); registered = true; if (failure === "ambiguous-register") throw Error("commit acknowledgement lost"); },
     cleanupSnapshot: async () => ({ referenced: registered || failure === "cleanup-reference", githubId: failure === "cleanup-id" ? 456 : 123, head: failure === "cleanup-head" ? "foreign-sha" : "first-sha" }),
@@ -50,7 +51,7 @@ for (const kind of ["station", "worker"] as const) {
 assert.deepEqual(await provisionGithubStation(input, happy.deps), {
   ok: true, stage: "complete", slug: "Owner/small-project", message: "Đã tạo và đăng ký kho GitHub.", warnings: [],
 });
-assert.deepEqual(happy.events, ["whoami", "scope", "khoiloi-names", "worker-id", "local-preflight", "settings-check", "worker-check", "repo-404", "lease", "repo-404", "stage", "create", "push", "secret", "register", "dispatch", "ping", "nurture"]);
+assert.deepEqual(happy.events, ["whoami", "scope", "khoiloi-names", "worker-id", "local-preflight", "settings-check", "worker-check", "repo-404", "lease", "repo-404", "stage", "create", "push", "actions-check", "secret", "register", "dispatch", "ping", "nurture"]);
 assert.deepEqual(happy.state(), { registered: true, created: true, deleted: false, leased: false });
 assert.ok(!happy.events.includes("llm-name"), "explicit repo never calls the model");
 for (const chosen of ["Prism", "notes_engine", "garden.v2"]) {
@@ -130,13 +131,72 @@ for (const failure of ["whoami", "scope", "khoiloi-names", "worker-id", "local-p
   if (failure === "ambiguous-create") assert.equal(result.stage, "attention");
   assert.ok(!JSON.stringify(result).includes(input.pat));
 }
-for (const failure of ["push", "secret", "register"]) {
+for (const failure of ["push", "actions", "secret", "register"]) {
   const f = fixture(failure), result = await provisionGithubStation(input, f.deps);
   assert.equal(result.ok, false, failure);
   assert.equal(f.state().deleted, true, failure);
   assert.equal(f.state().registered, false, failure);
   assert.equal(f.state().leased, false, failure);
+  if (failure === "actions") assert.ok(!f.events.includes("secret") && !f.events.includes("register"));
   assert.ok(!JSON.stringify(result).includes("worker-secret"));
+  assert.ok(!JSON.stringify(result).includes(input.pat));
+}
+for (const [reason, message] of [
+  ["account-disabled", /đã tắt Actions.*tài khoản/],
+  ["permission", /quyền chạy Actions/],
+  ["workflow", /chưa tìm thấy workflow/],
+  ["validation", /nhánh main hoặc input/],
+  ["unavailable", /tạm thời không khả dụng/],
+  ["rejected", /từ chối lượt kiểm tra/],
+] as const satisfies readonly (readonly [GithubActionsCheckFailure, RegExp])[]) {
+  const f = fixture();
+  f.deps.checkActions = async () => { f.events.push("actions-check"); return { ok: false, reason }; };
+  const result = await provisionGithubStation(input, f.deps);
+  assert.equal(result.ok, false, reason);
+  assert.equal(result.stage, "actions", reason);
+  assert.match(result.message, message, reason);
+  assert.equal(f.state().deleted, true, reason);
+  assert.ok(!f.events.includes("secret") && !f.events.includes("register"), reason);
+}
+for (const [status, providerMessage, expected] of [
+  [204, null, "ok"],
+  [401, null, "permission"],
+  [403, null, "permission"],
+  [404, null, "workflow"],
+  [422, null, "validation"],
+  [422, "Actions has been disabled for this user.", "account-disabled"],
+  [422, "actions HAS been disabled for THIS user", "account-disabled"],
+  [422, "Actions has been disabled for this user today", "validation"],
+  [429, null, "unavailable"],
+  [503, null, "unavailable"],
+  [409, null, "rejected"],
+] as const) {
+  const classified = classifyGithubActionsCheckStatus(status, providerMessage);
+  assert.equal(classified.ok ? "ok" : classified.reason, expected, String(status));
+  assert.equal(shouldRetryGithubActionsCheck(classified), expected === "workflow" || expected === "unavailable", `retry ${status}/${expected}`);
+}
+{
+  const savedFetch = globalThis.fetch;
+  const pat = "github-actions-check-pat-never-echo";
+  let calls = 0;
+  try {
+    globalThis.fetch = (async (url, init) => {
+      calls += 1;
+      assert.ok(!String(url).includes(pat));
+      assert.equal(new Headers(init?.headers).get("authorization"), `Bearer ${pat}`);
+      assert.deepEqual(JSON.parse(String(init?.body)), { ref: "main", inputs: { provision_check: "true" } });
+      return new Response(JSON.stringify({ message: "Actions has been disabled for this user." }), { status: 422, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    const result = await productionGithubProvisionDependencies.checkActions({
+      ...input, pat, owner: "Owner", workerId: "worker-identity", generatedRepo: false,
+      slug: "Owner/small-project", now: Date.now, deadlineAt: Date.now() + 10_000,
+    });
+    assert.deepEqual(result, { ok: false, reason: "account-disabled" });
+    assert.equal(calls, 1, "account-disabled is permanent and must not be retried");
+    assert.ok(!JSON.stringify(result).includes(pat));
+  } finally {
+    globalThis.fetch = savedFetch;
+  }
 }
 for (const failure of ["cleanup-id", "cleanup-head", "cleanup-reference", "delete"]) {
   const f = fixture(failure);
@@ -175,14 +235,17 @@ const offline = fixture();
 assert.equal((await provisionGithubStation({ ...input, dryRun: true }, offline.deps)).ok, false);
 assert.deepEqual(offline.events, []);
 // Review regression: one shared budget reserves the final 30 seconds for cleanup.
-for (const expiresAt of ["stage", "push", "register", "dispatch"]) {
+for (const expiresAt of ["stage", "push", "actions", "register", "dispatch"]) {
   const f = fixture(); let now = 1_000;
   f.deps.now = () => now;
-  const original = f.deps[expiresAt as "stage" | "push" | "register" | "dispatch"];
-  f.deps[expiresAt as "stage"] = (async (...args: unknown[]) => { const result = await (original as (...args: unknown[]) => Promise<unknown>)(...args); now = 211_001; return result; }) as typeof f.deps.stage;
+  const key = expiresAt === "actions" ? "checkActions" : expiresAt;
+  const mutable = f.deps as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+  const original = mutable[key];
+  mutable[key] = async (...args: unknown[]) => { const result = await original(...args); now = 211_001; return result; };
   const result = await provisionGithubStation(input, f.deps);
   if (expiresAt === "stage") { assert.equal(result.ok, false); assert.ok(!f.events.includes("create")); }
   if (expiresAt === "push") { assert.equal(result.ok, false); assert.ok(!f.events.includes("secret")); assert.equal(f.state().deleted, true); }
+  if (expiresAt === "actions") { assert.equal(result.ok, false); assert.ok(!f.events.includes("secret")); assert.equal(f.state().deleted, true); }
   if (expiresAt === "register" || expiresAt === "dispatch") { assert.equal(result.ok, true); assert.ok(!f.events.includes("nurture")); }
 }
 const forwarded = fixture(); let clock = 1_000; let nurtureDeadline = 0;

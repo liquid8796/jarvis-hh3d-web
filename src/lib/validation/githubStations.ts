@@ -332,9 +332,6 @@ export function explainFailure(status: number, body: unknown, what: string): str
   if (status === 409) {
     return `Xung đột (409) khi ${what}: kho rỗng, hoặc tệp mốc vừa bị đổi bởi một lượt khác${suffix}`;
   }
-  if (status === 422 && /^Actions has been disabled for this user\.?$/i.test(detail.trim())) {
-    return `GitHub đã vô hiệu hoá Actions cho tài khoản này (422) khi ${what}. Kiểm tra trạng thái Actions của tài khoản rồi chạy lại${suffix}`;
-  }
   if (status === 422) {
     return `GitHub từ chối (422) khi ${what}: nhánh vừa nhích dưới chân lượt đẩy, hoặc PAT thiếu scope \`workflow\` để đụng .github/workflows/${suffix}`;
   }

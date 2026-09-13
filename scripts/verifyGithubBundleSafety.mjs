@@ -108,14 +108,6 @@ check(
     /\["workflow", "run", workflowFile,/.test(creator),
   "custom workflow filename reaches both the payload and initial dispatch",
 );
-const actionsCheckIndex = creator.indexOf("assertGithubActionsRunnable(stagedRepos[0]);");
-const secretWriteIndex = creator.indexOf('runWithRetry("dán secret"');
-check(
-  actionsCheckIndex >= 0 && secretWriteIndex >= 0 && actionsCheckIndex < secretWriteIndex &&
-    creator.includes('"--raw-field", "provision_check=true"') &&
-    creator.includes("actions has been disabled for this user"),
-  "the no-op Actions dispatch is mandatory before the worker secret is written",
-);
 const rollbackCheckIndex = creator.indexOf("assertGhCanRollback();");
 const stagingIndex = creator.indexOf("const stagingRoot = mkdtempSync");
 check(

@@ -11,14 +11,6 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
-## 1.3.82 — Không nhận kho bị GitHub khóa Actions (13/09/2026)
-
-- `jq6487vt1cxpcc1t2ywd` thuộc `prism8146/pokemon-mmo` từng điểm danh khoảng 98 phút rồi dừng. Không có job nào gắn với worker; workflow và quyền repo vẫn báo active/enabled nhưng lịch sử run bị xóa sạch, còn dispatch thật trả 422 `Actions has been disabled for this user`.
-- Kho mới nay phải vượt qua một `workflow_dispatch` kiểm tra trước khi cài `WORKER_TOKEN` và ghi station. Input `provision_check` khiến job worker bị skip hoàn toàn; lỗi sẽ rollback repo vừa tạo theo ID/HEAD thay vì ghi một khôi lỗi chết vào sổ.
-- Luồng UI và CLI cùng phân loại riêng tài khoản bị khóa Actions, đọc tối đa 2 KiB và chỉ dùng trường message an toàn. Chỉ lỗi workflow chưa kịp xuất hiện hoặc GitHub tạm thời hỏng mới được retry.
-- Keepalive đọc thêm tổng số run khi workflow khai active. Không có run hoặc response sai hình dạng sẽ báo đỏ và không ghi heartbeat; workflow bị tắt tay vẫn giữ nguyên hành vi cũ.
-- Station `prism8146/pokemon-mmo` và ba repo phụ được giữ nguyên. Chính account này chỉ chạy lại được khi GitHub mở Actions; deploy hay PAT mới trên cùng account không thể vượt trạng thái 422.
-
 ## 1.3.81 — Sửa quyết định JSON của Ollama (13/09/2026)
 
 - Lượt gọi thật cho `zenon6415/rust-mark-down-parser` cho thấy Ollama trả HTTP 200 nhưng hai câu trả lời liên tiếp đều là JSON sai cú pháp gần cuối. Parser cũ chỉ nhận JSON thuần hoặc một code fence bao trọn, rồi gửi lời repair quá chung nên model lặp lại cùng dạng lỗi.

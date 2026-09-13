@@ -66,14 +66,6 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
-    version: "1.3.82",
-    date: "2026-09-13",
-    lines: [
-      "Kho GitHub mới chỉ được ghi sổ sau khi GitHub thật sự nhận một lượt chạy thử rỗng.",
-      "Sổ không còn báo xanh khi lịch vẫn mang nhãn đang bật nhưng thực tế không có lượt chạy nào.",
-    ],
-  },
-  {
     version: "1.3.81",
     date: "2026-09-13",
     lines: [
@@ -480,6 +472,13 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Bài vị danh xưng trong Phòng Chat thu gọn lại cho khít với tên, đúng cỡ của bản thiết kế — mỗi dòng danh tính ngắn đi một quãng nên sảnh đỡ chật.",
       "Cả Phòng Chat nay dùng một giọng chữ duy nhất, giống hệt bản thiết kế; trước đây chữ trong sảnh và chữ khắc sẵn trên khung là hai kiểu khác nhau.",
+    ],
+  },
+  {
+    version: "1.3.31",
+    date: "2026-08-21",
+    lines: [
+      "Sửa gấp: bộ cài khôi lỗi máy nhà phát ra ở bản trước thiếu một tệp nên chạy là lỗi ngay. Ai vừa cài trong khoảng đó xin chạy lại bộ cài một lần.",
     ],
   },
 ];

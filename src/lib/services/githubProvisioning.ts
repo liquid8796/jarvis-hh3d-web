@@ -14,7 +14,7 @@ import {
 
 export type GithubProvisionResult = {
   ok: boolean;
-  stage: "preflight" | "create" | "publish" | "actions" | "secret" | "register" | "complete" | "attention";
+  stage: "preflight" | "create" | "publish" | "secret" | "register" | "complete" | "attention";
   slug?: string;
   message: string;
   warnings: string[];
@@ -24,23 +24,6 @@ export type GithubProvisionContext = NormalizedGithubProvisionInput & { owner: s
 type Prepared = { directory: string; encryptedPat: string; workerToken: string };
 type Staged = { initialCommitSha: string };
 type Lease = { assertHeld: (budget?: GithubProvisionBudget) => Promise<void>; release: () => Promise<void> };
-export type GithubActionsCheckFailure = "account-disabled" | "permission" | "workflow" | "validation" | "unavailable" | "rejected";
-export type GithubActionsCheckResult = { ok: true } | { ok: false; reason: GithubActionsCheckFailure };
-
-/** Only the documented, bounded GitHub message is inspected; it never crosses this boundary. */
-export function classifyGithubActionsCheckStatus(status: number, message: string | null = null): GithubActionsCheckResult {
-  if (status === 204) return { ok: true };
-  if (status === 401 || status === 403) return { ok: false, reason: "permission" };
-  if (status === 404) return { ok: false, reason: "workflow" };
-  if (status === 422 && message !== null && /^Actions has been disabled for this user\.?$/i.test(message)) return { ok: false, reason: "account-disabled" };
-  if (status === 422) return { ok: false, reason: "validation" };
-  if (status === 429 || status >= 500) return { ok: false, reason: "unavailable" };
-  return { ok: false, reason: "rejected" };
-}
-
-export function shouldRetryGithubActionsCheck(result: GithubActionsCheckResult): boolean {
-  return !result.ok && (result.reason === "workflow" || result.reason === "unavailable");
-}
 
 /** Every effect is replaceable; injected lifecycle tests never import DB/network/process adapters. */
 export type GithubProvisioningDependencies = {
@@ -59,7 +42,6 @@ export type GithubProvisioningDependencies = {
   stage: (context: GithubProvisionContext, prepared: Prepared) => Promise<Staged>;
   create: (context: GithubProvisionContext) => Promise<{ status: number; githubId?: number }>;
   push: (context: GithubProvisionContext, prepared: Prepared) => Promise<void>;
-  checkActions: (context: GithubProvisionContext) => Promise<GithubActionsCheckResult>;
   setSecret: (context: GithubProvisionContext, prepared: Prepared) => Promise<void>;
   register: (context: GithubProvisionContext, prepared: Prepared, proof: Staged & { githubId: number }) => Promise<void>;
   cleanupSnapshot: (context: GithubProvisionContext) => Promise<{ githubId: number; head: string | null; referenced: boolean }>;
@@ -115,21 +97,11 @@ const messages = {
   preflight: "Không thể chuẩn bị kho GitHub. Kiểm tra PAT, quyền repo/workflow/delete_repo, cấu hình máy chủ và tên kho chưa được sử dụng.",
   create: "GitHub từ chối tạo kho. Không có kho nào được nhận làm mục tiêu rollback.",
   publish: "Không thể đẩy gói khôi lỗi lên kho GitHub.",
-  actions: "GitHub Actions chưa nhận được lượt kiểm tra workflow rỗng. Kho chưa được đăng ký; kiểm tra Actions, workflow và PAT rồi thử lại.",
   secret: "Không thể cài WORKER_TOKEN cho kho GitHub.",
   register: "Không thể đăng ký kho GitHub vào sổ.",
   complete: "Đã tạo và đăng ký kho GitHub.",
   attention: "Cần kiểm tra kho GitHub thủ công trước khi thử lại. Không tự động tạo lại hoặc xoá kho chưa xác minh.",
 } as const;
-
-const githubActionsMessages: Record<GithubActionsCheckFailure, string> = {
-  "account-disabled": "GitHub đã tắt Actions cho tài khoản này. Khôi phục Actions hoặc dùng tài khoản GitHub khác rồi thử lại.",
-  permission: "GitHub từ chối quyền chạy Actions. Bật Actions cho tài khoản/kho và kiểm tra quyền workflow của PAT rồi thử lại.",
-  workflow: "GitHub chưa tìm thấy workflow vừa đẩy. Kiểm tra tên tệp workflow và trạng thái GitHub Actions rồi thử lại.",
-  validation: "GitHub từ chối nhánh main hoặc input kiểm tra của workflow. Kiểm tra cú pháp workflow rồi thử lại.",
-  unavailable: "GitHub Actions đang tạm thời không khả dụng. Kho chưa được đăng ký; thử tạo lại sau.",
-  rejected: "GitHub Actions từ chối lượt kiểm tra workflow. Kho chưa được đăng ký; kiểm tra cấu hình Actions rồi thử lại.",
-};
 
 export async function provisionGithubStation(input: GithubProvisionInput, deps: GithubProvisioningDependencies = productionGithubProvisionDependencies): Promise<GithubProvisionResult> {
   const now = deps.now ?? Date.now;
@@ -206,15 +178,6 @@ export async function provisionGithubStation(input: GithubProvisionInput, deps: 
     stage = "publish";
     await work(() => lease!.assertHeld(budget));
     await work(() => deps.push(ctx, local));
-    stage = "actions";
-    await work(() => lease!.assertHeld(budget));
-    let actionsCheck: GithubActionsCheckResult;
-    try { actionsCheck = await work(() => deps.checkActions(ctx)); }
-    catch { safeMessage = messages.actions; throw Error("actions preflight unavailable"); }
-    if (!actionsCheck.ok) {
-      safeMessage = githubActionsMessages[actionsCheck.reason];
-      throw Error("actions preflight rejected");
-    }
     stage = "secret";
     await work(() => lease!.assertHeld(budget));
     await work(() => deps.setSecret(ctx, local));
@@ -282,30 +245,6 @@ async function request(pat: string, budget: GithubProvisionBudget, endpoint: str
     headers: { Authorization: `Bearer ${pat}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "station-provisioner", ...(body ? { "Content-Type": "application/json" } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
-}
-
-async function boundedGithubMessage(response: Response): Promise<string | null> {
-  const reader = response.body?.getReader();
-  if (!reader) return null;
-  const decoder = new TextDecoder();
-  let bytes = 0, text = "";
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      bytes += chunk.value.byteLength;
-      if (bytes > 2_048) { await reader.cancel(); return null; }
-      text += decoder.decode(chunk.value, { stream: true });
-    }
-    text += decoder.decode();
-    const value = JSON.parse(text) as { message?: unknown };
-    return typeof value.message === "string" && value.message.length <= 256 ? value.message : null;
-  } catch {
-    try { await reader.cancel(); } catch { /* Response is already closed. */ }
-    return null;
-  } finally {
-    reader.releaseLock();
-  }
 }
 const repoEndpoint = (ctx: GithubProvisionContext) => `/repos/${encodeURIComponent(ctx.owner)}/${encodeURIComponent(ctx.repo)}`;
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
@@ -436,27 +375,6 @@ export const productionGithubProvisionDependencies: GithubProvisioningDependenci
       cwd: prepared.directory, timeout: 120_000, budget: ctx,
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0", JARVIS_GIT_AUTH: `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${ctx.pat}`).toString("base64")}` },
     });
-  },
-  async checkActions(ctx) {
-    let last: GithubActionsCheckResult = { ok: false, reason: "unavailable" };
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      try {
-        const response = await request(ctx.pat, ctx, `${repoEndpoint(ctx)}/actions/workflows/${encodeURIComponent(ctx.workflowFile)}/dispatches`, "POST", {
-          ref: "main",
-          inputs: { provision_check: "true" },
-        });
-        const providerMessage = response.status === 422 ? await boundedGithubMessage(response) : null;
-        if (response.status !== 422) await response.body?.cancel();
-        last = classifyGithubActionsCheckStatus(response.status, providerMessage);
-      } catch {
-        last = { ok: false, reason: "unavailable" };
-      }
-      if (!shouldRetryGithubActionsCheck(last) || attempt === 3) return last;
-      // A just-pushed workflow can take a moment to appear in the Actions index.
-      if (ctx.deadlineAt - ctx.now() <= 2_000) return last;
-      await new Promise(resolve => setTimeout(resolve, 2_000));
-    }
-    return last;
   },
   async setSecret(ctx, prepared) {
     await run("gh", ["secret", "set", "WORKER_TOKEN", "--repo", ctx.slug], { budget: ctx, input: prepared.workerToken, env: { ...process.env, GH_TOKEN: ctx.pat, GH_HOST: "github.com", GH_PROMPT_DISABLED: "1" } });

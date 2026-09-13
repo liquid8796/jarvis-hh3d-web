@@ -44,11 +44,6 @@ on:
     - cron: "0 */4 * * *"
   workflow_dispatch:
     inputs:
-      provision_check:
-        description: "Chỉ kiểm tra workflow có nhận dispatch được không"
-        required: false
-        type: boolean
-        default: false
       tuoi_tho_ms:
         # CHỈ để nghiệm phép nối chuỗi: bước cuối nằm sau worker, nên muốn thấy chuỗi chạy
         # thật thì phải cho lượt kết thúc sớm. Lượt theo cron KHÔNG bao giờ nhận input nên
@@ -70,9 +65,6 @@ permissions:
 
 jobs:
   linh-su:
-    # Lượt dựng repo gửi provision_check=true TRƯỚC khi cài WORKER_TOKEN. GitHub vẫn phải
-    # nhận và tạo workflow run, nhưng job này bị skip nên không mở runner và không chạy worker.
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.provision_check != true }}
     runs-on: ubuntu-latest
     # 350 phút: để timeout của GitHub bắn TRƯỚC trần 6 giờ của nền tảng, nên lượt chạy kết thúc
     # bằng một dòng đỏ đọc được thay vì biến mất không lời giải thích.

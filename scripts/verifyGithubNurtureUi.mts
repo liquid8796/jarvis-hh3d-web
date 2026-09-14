@@ -51,7 +51,7 @@ const mockActions = `
     await new Promise(resolve => setTimeout(resolve, 1500));
     if (label === "provisionGithubStationAction") {
       const outcome = new URLSearchParams(location.search).get("outcome");
-      if (outcome === "error") return {ok:false,stage:"preflight",slug:"sample-owner/existing-repo",message:"Kho GitHub đã tồn tại. Không có thay đổi nào được thực hiện.",warnings:[]};
+      if (outcome === "error") return {ok:false,stage:"preflight",message:"Classic PAT còn thiếu scope: delete_repo.",failureCode:"github_scopes_missing",diagnosticId:"0123456789abcdef",warnings:[]};
       return {ok:true,stage:"complete",slug:"sample-owner/created-repo",message:"Đã tạo và đăng ký kho GitHub.",warnings:outcome === "warning" ? ["Kho đã đăng ký; lượt khởi chạy workflow cần được kiểm tra lại."] : []};
     }
     if (label === "deleteGithubCompanionAction" && form.get("confirmedRepo") !== form.get("repo")) {
@@ -292,6 +292,18 @@ if (!process.argv.includes("--check")) {
         }
         assert.equal(await page.locator("#station-workflow").getAttribute("placeholder"), "linh-su.yml");
         assert.equal(await page.locator("#station-repo").getAttribute("placeholder"), "Để trống để Ollama tự đặt tên");
+        assert.equal(await page.locator("#station-repo").getAttribute("pattern"), "[A-Za-z0-9._\\-]+");
+        assert.equal(await page.locator("#station-workflow").getAttribute("pattern"), "[A-Za-z0-9][A-Za-z0-9._\\-]*\\.(?:ya?ml)");
+        await page.locator("#station-repo").fill("bad repo");
+        assert.equal(await page.locator("#station-repo").evaluate((element: HTMLInputElement) => element.checkValidity()), false);
+        await page.locator("#station-repo").fill("good.repo-1");
+        assert.equal(await page.locator("#station-repo").evaluate((element: HTMLInputElement) => element.checkValidity()), true);
+        await page.locator("#station-repo").fill("");
+        await page.locator("#station-workflow").fill("bad/path.yml");
+        assert.equal(await page.locator("#station-workflow").evaluate((element: HTMLInputElement) => element.checkValidity()), false);
+        await page.locator("#station-workflow").fill("custom-name.yaml");
+        assert.equal(await page.locator("#station-workflow").evaluate((element: HTMLInputElement) => element.checkValidity()), true);
+        await page.locator("#station-workflow").fill("");
         assert.match(await createForm.innerText(), /Để trống để Ollama đặt tên/);
         assert.equal(await page.locator("#station-daily-pushes").getAttribute("placeholder"), "5");
         await page.locator("#station-pat").fill("offline-fixture-pat");
@@ -306,8 +318,10 @@ if (!process.argv.includes("--check")) {
         assert.equal(submitted.label, "provisionGithubStationAction");
         assert.deepEqual(submitted.values, { pat: "offline-fixture-pat", repo: "", workflowFile: "", dailyPushes: "" });
         const status = page.locator("section[aria-labelledby=station-form-title]").getByRole("status");
-        assert.match(await status.innerText(), outcome === "error" ? /Kho GitHub đã tồn tại/ : /Đã tạo và đăng ký/);
-        assert.match(await status.innerText(), outcome === "error" ? /sample-owner\/existing-repo/ : /sample-owner\/created-repo/);
+        assert.match(await status.innerText(), outcome === "error" ? /Classic PAT còn thiếu scope: delete_repo/ : /Đã tạo và đăng ký/);
+        if (outcome === "error") assert.ok(!(await status.innerText()).includes("sample-owner/"));
+        else assert.match(await status.innerText(), /sample-owner\/created-repo/);
+        assert.equal((await status.innerText()).includes("0123456789abcdef · github_scopes_missing"), outcome === "error");
         assert.equal(await status.locator("li").count(), outcome === "warning" ? 1 : 0);
         if (outcome === "warning") assert.match(await status.innerText(), /cần được kiểm tra lại/);
         assert.ok(!(await status.innerText()).includes("offline-fixture-pat"));

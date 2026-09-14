@@ -380,6 +380,11 @@ trước mọi thay đổi trên GitHub.
 | Tệp workflow | `linh-su.yml`; có thể dùng basename `.yml`/`.yaml` khác |
 | Giới hạn lượt đẩy mỗi kho phụ | `5`; chấp nhận `0..24`, `0` tạm dừng kho phụ |
 
+Nếu lượt tạo dừng trước GitHub, form trả đúng nhóm nguyên nhân — PAT bị từ chối, scope còn thiếu,
+input sai, sổ không đọc được, công cụ/payload trên máy chủ hỏng hoặc tên đang bị một lượt khác giữ.
+Mỗi lỗi có `diagnosticId` 16 ký tự để đối chiếu journal. Dòng journal chỉ mang id, stage, step và
+failure code hữu hạn; không ghi exception, stack, đối số, môi trường, PAT/token hay tên kho.
+
 Tên workflow được dùng cả lúc khởi chạy, tự gọi lượt kế và deploy sau này. `WORKER_ID` được
 tạo riêng với tên repo chính, bị chặn nếu trùng repo hoặc bất kỳ tên khôi lỗi đang có. Workflow/
 WORKER_ID của repo do luồng mới tạo được khóa trong form Sửa; các dòng đăng ký cũ vẫn có thể

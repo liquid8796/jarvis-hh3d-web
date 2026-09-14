@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { provisionGithubStation, productionGithubProvisionDependencies, GithubProvisionCollisionError, type GithubProvisionContext, type GithubProvisioningDependencies } from "../src/lib/services/githubProvisioning";
+import {
+  provisionGithubStation,
+  productionGithubProvisionDependencies,
+  GithubProvisionCollisionError,
+  GithubProvisionSafeError,
+  type GithubProvisionContext,
+  type GithubProvisionFailureRecord,
+  type GithubProvisioningDependencies,
+} from "../src/lib/services/githubProvisioning";
 import { parseGithubSettingsForMutation } from "../src/lib/services/settings";
 import { publicIdentityForWorker } from "./githubPublicIdentity.mjs";
 
@@ -105,6 +113,48 @@ for (const failure of ["whoami", "scope", "llm-name"]) {
   else assert.match(result.message, /Ollama.*chưa tạo repo/);
   assert.ok(!JSON.stringify(result).includes(input.pat));
 }
+for (const [failure, code, words] of [
+  ["whoami", "github_identity_unavailable", /PAT/],
+  ["scope", "github_scopes_missing", /quyền|scope/],
+  ["khoiloi-names", "registry_unavailable", /sổ GitHub/],
+  ["worker-id", "worker_identity_unavailable", /WORKER_ID/],
+  ["local-preflight", "payload_unavailable", /provisioning|phát hành/],
+  ["stage", "local_stage_failed", /commit ban đầu/],
+] as const) {
+  const f = fixture(failure);
+  const result = await provisionGithubStation(input, f.deps);
+  assert.equal(result.failureCode, code, failure);
+  assert.match(result.message, words, failure);
+  assert.match(result.diagnosticId ?? "", /^[a-f0-9]{16}$/, failure);
+}
+{
+  const f = fixture("local-preflight");
+  let recorded: GithubProvisionFailureRecord | undefined;
+  f.deps.recordFailure = (record) => { recorded = record; };
+  const result = await provisionGithubStation(input, f.deps);
+  assert.deepEqual(recorded, {
+    diagnosticId: result.diagnosticId,
+    stage: "preflight",
+    step: "local_preflight",
+    code: "payload_unavailable",
+  });
+  const serialized = JSON.stringify(recorded);
+  assert.ok(!serialized.includes(input.pat) && !serialized.includes(input.repo) && !serialized.includes("worker-secret"));
+}
+for (const [badInput, message] of [
+  [{ ...input, pat: "bad token" }, /PAT trống|khoảng trắng/],
+  [{ ...input, workflowFile: "../bad.yml" }, /basename.*\.yml/],
+  [{ ...input, dailyPushes: 25 }, /0 đến 24/],
+] as const) {
+  const result = await provisionGithubStation(badInput, fixture().deps);
+  assert.equal(result.failureCode, "invalid_input");
+  assert.match(result.message, message);
+}
+{
+  const result = await provisionGithubStation({ ...input, repo: "bad name" }, fixture().deps);
+  assert.equal(result.failureCode, "invalid_input");
+  assert.match(result.message, /Tên kho: 1–100 ký tự/);
+}
 for (const invalid of ["", ".", "..", "bad/name", "bad name", "a".repeat(101)]) {
   const f = fixture(); f.deps.generateRepoName = async () => invalid;
   const result = await provisionGithubStation({ ...input, repo: "" }, f.deps);
@@ -128,7 +178,10 @@ for (const failure of ["whoami", "scope", "khoiloi-names", "worker-id", "local-p
   assert.equal(f.state().leased, false, failure);
   assert.ok(f.events.filter(e => e === "create").length <= 1);
   if (!["create-422", "create-500", "create-no-id", "ambiguous-create"].includes(failure)) assert.ok(!f.events.includes("create"), failure);
-  if (failure === "ambiguous-create") assert.equal(result.stage, "attention");
+  if (failure === "ambiguous-create") {
+    assert.equal(result.stage, "attention");
+    assert.match(result.message, /Cần kiểm tra kho GitHub thủ công/);
+  }
   assert.ok(!JSON.stringify(result).includes(input.pat));
 }
 for (const failure of ["push", "secret", "register"]) {
@@ -144,12 +197,24 @@ for (const failure of ["cleanup-id", "cleanup-head", "cleanup-reference", "delet
   f.deps.setSecret = async () => { throw Error("secret failure"); };
   const result = await provisionGithubStation(input, f.deps);
   assert.equal(result.stage, "attention", failure);
+  assert.match(result.message, /Cần kiểm tra kho GitHub thủ công/, failure);
   assert.equal(f.state().deleted, false, failure);
   assert.equal(f.state().created, true, failure);
 }
 const ambiguousRegister = fixture("ambiguous-register");
-assert.equal((await provisionGithubStation(input, ambiguousRegister.deps)).stage, "attention");
+const ambiguousRegisterResult = await provisionGithubStation(input, ambiguousRegister.deps);
+assert.equal(ambiguousRegisterResult.stage, "attention");
+assert.match(ambiguousRegisterResult.message, /Cần kiểm tra kho GitHub thủ công/);
 assert.equal(ambiguousRegister.state().deleted, false);
+{
+  const f = fixture();
+  f.deps.register = async () => { throw new GithubProvisionCollisionError("station"); };
+  f.deps.cleanupSnapshot = async () => ({ referenced: true, githubId: 123, head: "first-sha" });
+  const result = await provisionGithubStation(input, f.deps);
+  assert.equal(result.stage, "attention");
+  assert.match(result.message, /Cần kiểm tra kho GitHub thủ công/);
+  assert.doesNotMatch(result.message, /Chọn tên kho khác/);
+}
 for (const failure of ["dispatch", "ping", "nurture", "dispose"]) {
   const f = fixture(failure), result = await provisionGithubStation(input, f.deps);
   assert.equal(result.ok, true, failure);
@@ -164,9 +229,29 @@ assert.equal(results.filter(r => r.ok).length, 1);
 assert.equal(twice.events.filter(e => e === "create").length, 1);
 assert.equal(twice.state().leased, false);
 for (const scope of [null, "", "repo, workflow", "public_repo, workflow, delete_repo"]) {
-  await assert.rejects(productionGithubProvisionDependencies.checkScopes(scope));
+  await assert.rejects(
+    productionGithubProvisionDependencies.checkScopes(scope),
+    (error: unknown) => error instanceof GithubProvisionSafeError &&
+      error.code === "github_scopes_missing" &&
+      /Classic PAT còn thiếu scope/.test(error.safeMessage ?? ""),
+  );
 }
 await productionGithubProvisionDependencies.checkScopes("repo, workflow, delete_repo");
+{
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response(null, { status: 401 });
+    await assert.rejects(
+      productionGithubProvisionDependencies.whoami(input.pat, { now: Date.now, deadlineAt: Date.now() + 30_000 }),
+      (error: unknown) => error instanceof GithubProvisionSafeError &&
+        error.code === "github_identity_unavailable" &&
+        /HTTP 401/.test(error.safeMessage ?? "") &&
+        !(error.safeMessage ?? "").includes(input.pat),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
 const owner = fixture();
 let receivedOwner = "";
 owner.deps.create = async ctx => { receivedOwner = ctx.owner; return { status: 201, githubId: 123 }; };

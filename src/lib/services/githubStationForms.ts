@@ -8,6 +8,8 @@ export type GithubStationFormResult = {
   message: string;
   slug?: string;
   stage?: GithubProvisionResult["stage"];
+  failureCode?: GithubProvisionResult["failureCode"];
+  diagnosticId?: string;
   warnings?: string[];
 };
 
@@ -52,7 +54,12 @@ export function createGithubStationFormHandlers(deps: GithubStationFormDependenc
       // No owner, workerId, enabled, or companion fields cross the create boundary.
       const result = await deps.provision({ pat, repo: read(form, "repo"), workflowFile: read(form, "workflowFile"), dailyPushes: read(form, "dailyPushes") });
       const slug = safeSlug(result.slug);
-      const response = { ...result, slug: slug && !(pat && slug.includes(pat)) ? slug : undefined, message: redact(result.message, pat), warnings: result.warnings.map((warning) => redact(warning, pat)) };
+      const response = {
+        ...result,
+        slug: slug && !(pat && slug.includes(pat)) ? slug : undefined,
+        message: redact(result.message, pat),
+        warnings: result.warnings.map((warning) => redact(warning, pat)),
+      };
       if (result.ok) invalidate(slug);
       return response;
     } catch {

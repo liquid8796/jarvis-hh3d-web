@@ -70,7 +70,7 @@ try {
       '    name: "__PUBLIC_JOB_NAME__"',
       "  run: curl $GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/linh-su.yml/dispatches",
       "",
-    ].join("\n"),
+    ].join("\r\n"),
   );
   write("scripts/worker.mjs", "export const worker = true;\n");
   write("src/lib/worker/controlFollow.mjs", "export const follow = true;\n");
@@ -78,11 +78,29 @@ try {
   write("src/lib/quest-engine/z-last.mjs", "export const z = true;\n");
   write("src/lib/quest-engine/a-first.mjs", "export const a = true;\n");
   write("src/lib/quest-engine/exact-bytes.bin", binaryBytes);
+  write("archive-eol.txt", "committed\nline-feed\n");
   execFileSync("git", ["init", "-q"], { cwd: fixtureRoot });
   execFileSync("git", ["config", "user.name", "fixture"], { cwd: fixtureRoot });
   execFileSync("git", ["config", "user.email", "fixture@example.invalid"], { cwd: fixtureRoot });
+  execFileSync("git", ["config", "core.autocrlf", "true"], { cwd: fixtureRoot });
   execFileSync("git", ["add", "."], { cwd: fixtureRoot });
   execFileSync("git", ["commit", "-q", "-m", "fixture release"], { cwd: fixtureRoot });
+
+  const deployBackendSource = readFileSync(path.join(repoRoot, "scripts", "deployBackend.mts"), "utf8");
+  assert.match(
+    deployBackendSource,
+    /execFileSync\("git", \["-c", "core\.autocrlf=false", "archive", "--format=tar\.gz"/,
+    "backend deploy must disable implicit checkout EOL conversion for git archive",
+  );
+  const archivePath = path.join(fixtureRoot, "release.tar");
+  execFileSync(
+    "git",
+    ["-c", "core.autocrlf=false", "archive", "--format=tar", "-o", archivePath, "HEAD", "archive-eol.txt"],
+    { cwd: fixtureRoot },
+  );
+  const committedLf = execFileSync("git", ["show", "HEAD:archive-eol.txt"], { cwd: fixtureRoot });
+  const archivedLf = execFileSync("tar", ["-xOf", archivePath, "archive-eol.txt"]);
+  assert.deepEqual(archivedLf, committedLf, "backend archive override preserves committed LF bytes under core.autocrlf=true");
 
   assert.equal(workflowTargetPath(), WORKFLOW_TARGET_PATH);
   assert.equal(workflowTargetPath("nightly.yaml"), ".github/workflows/nightly.yaml");
@@ -109,10 +127,11 @@ try {
   assert(payload.has(".github/workflows/nightly.yaml"));
   assert(!payload.has(".github/workflows/linh-su.yml"));
   const customWorkflow = payload.get(".github/workflows/nightly.yaml")!.toString("utf8");
+  assert.match(customWorkflow, /\r\n/, "filesystem payload preserves an immutable release's CRLF input");
   assert.match(customWorkflow, /\/actions\/workflows\/nightly\.yaml\/dispatches/);
   assert.doesNotMatch(customWorkflow, /\/actions\/workflows\/linh-su\.yml\/dispatches/);
   assert.doesNotMatch(customWorkflow, /__PUBLIC_(?:WORKFLOW|JOB)_NAME__/);
-  assert.match(customWorkflow, /^jobs:\n  linh-su:\n    name: "[A-Za-z0-9 '&-]+"$/m, "public job label changes without renaming the internal job key");
+  assert.match(customWorkflow, /^jobs:\r?\n  linh-su:\r?\n    name: "[A-Za-z0-9 '&-]+"$/m, "public job label changes without renaming the internal job key");
   assert.deepEqual(payload.get("src/lib/quest-engine/exact-bytes.bin"), binaryBytes);
 
   const stationBase = buildKhoiloiPayload({

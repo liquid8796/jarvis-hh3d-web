@@ -69,7 +69,7 @@ check("workflow receives public labels while its private key and endpoint routin
   const workflow = renderWorkflow({ template, workerId, webUrl: endpoint });
   assert.ok(workflow.includes(`name: "${identity.workflowName}"`));
   assert.ok(workflow.includes(`name: "${identity.jobName}"`));
-  assert.match(workflow, /^jobs:\n  linh-su:\n    name:/m);
+  assert.match(workflow, /^jobs:\r?\n  linh-su:\r?\n    name:/m);
   assert.ok(workflow.includes(`WORKER_ID: ${workerId}`));
   assert.ok(workflow.includes(`vars.WEB_URL || '${endpoint}'`));
   assert.doesNotMatch(workflow, /__PUBLIC_(?:WORKFLOW|JOB)_NAME__/);

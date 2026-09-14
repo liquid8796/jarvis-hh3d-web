@@ -11,6 +11,14 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.83 — Lỗi tạo kho GitHub nói đúng nguyên nhân (14/09/2026)
+
+- Màn hình trong lượt lỗi 14/09 chỉ báo chung “Không thể chuẩn bị kho GitHub”, trong khi active release `1.3.82` đã được tái hiện trực tiếp: lock artifact đúng bản, payload sinh đủ 22 tệp, local preflight, git staging, database và advisory lease đều qua. Lượt cũ dừng trước khi có slug nhưng raw exception đã bị nuốt, nên không còn bằng chứng để phân biệt PAT bị từ chối, thiếu scope hay input sai.
+- Provisioning nay gắn từng bước với một mã lỗi hữu hạn. PAT HTTP 401, scope `repo`/`workflow`/`delete_repo` còn thiếu, tên repo/workflow sai, sổ database, Git/gh, payload, collision, probe, lease và local staging đều có câu trả lời riêng; complaint tên kho của validator không còn bị đổi thành lỗi PAT/cấu hình chung.
+- Mỗi thất bại trả một mã chẩn đoán 16 ký tự cho admin. Journal production chỉ ghi `{diagnosticId, stage, step, code}`; không ghi raw error, stack, argv, env, stdin, PAT, token, owner, repo hay slug. Form giữ nguyên phép redaction ở biên và hiển thị mã/code dưới lời lỗi.
+- Input tên repo và workflow có thêm pattern trình duyệt để chặn ký tự sai trước khi gửi. Các kiểm tra offline đóng đinh phân loại lỗi, mã chẩn đoán, đường truyền qua server action và cách hiển thị ở modal 390/1366 px.
+- `git archive` trên máy Windows từng áp `core.autocrlf=true`, làm release trên Linux mang CRLF và khiến verifier LF-only báo hỏng dù preflight thật đã qua. Backend deploy nay tắt riêng cấu hình ngầm này, giữ đúng byte đã commit cùng các luật BAT=CRLF/SH=LF; các phép đọc workflow chấp nhận cả hai kiểu EOL.
+
 ## 1.3.82 — Mỗi kho GitHub mang một diện mạo riêng (13/09/2026)
 
 - README, About, tên workflow và tên job của repo chính nay cùng lấy từ một hồ sơ chủ đề riêng. Mười hai chủ đề đời thường kết hợp sáu bố cục README làm các kho không còn lặp lại câu “Scheduled background task runner” hay cùng một khuôn trình bày.

@@ -205,8 +205,10 @@ console.log(`  đang phục vụ: cổng ${state.active} bản ${state.versionAc
 const tmp = mkdtempSync(path.join(tmpdir(), "deploy-backend-"));
 const tarball = path.join(tmp, "app.tar.gz");
 try {
-  // `git archive` bung theo .gitattributes nên .sh giữ LF — đúng thứ VM cần.
-  execFileSync("git", ["archive", "--format=tar.gz", "-o", tarball, "HEAD"], { stdio: "inherit" });
+  // `git archive` vẫn áp bộ đổi EOL của checkout: trên máy Windows này, `core.autocrlf=true`
+  // từng biến blob LF thành CRLF ngay trong tarball. Tắt riêng cấu hình ngầm ấy để release giữ
+  // đúng bytes đã commit; quy tắc tường minh trong .gitattributes (BAT=CRLF, SH=LF) vẫn được giữ.
+  execFileSync("git", ["-c", "core.autocrlf=false", "archive", "--format=tar.gz", "-o", tarball, "HEAD"], { stdio: "inherit" });
 
   console.log("• Chở gói lên VM…");
   const scp = spawnSync("scp", ["-q", "-i", SSH_KEY, tarball, `${VM_USER}@${VM_HOST}:/tmp/jarvis-app.tar.gz`], {

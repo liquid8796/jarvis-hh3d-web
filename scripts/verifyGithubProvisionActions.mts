@@ -135,6 +135,22 @@ for (const name of ["provisionGithubStationAction", "updateGithubStationAction",
   const result = await actions.provisionGithubStationAction(null, form({ pat }));
   assert.equal(result.ok, false); assert.equal(result.stage, "attention"); assert.ok(!JSON.stringify(result).includes(pat)); assert.ok(!JSON.stringify(result).includes("stderr"));
 }
+{
+  const f = fixture();
+  f.deps.provision = async () => ({
+    ok: false,
+    stage: "preflight",
+    message: `Classic PAT ${pat} còn thiếu scope: delete_repo.`,
+    warnings: [`Không được lộ ${pat}.`],
+    failureCode: "github_scopes_missing",
+    diagnosticId: "0123456789abcdef",
+  });
+  const result = await actions.provisionGithubStationAction(null, form({ pat }));
+  assert.equal(result.failureCode, "github_scopes_missing");
+  assert.equal(result.diagnosticId, "0123456789abcdef");
+  assert.match(result.message, /\[PAT đã ẩn\].*delete_repo/);
+  assert.ok(!JSON.stringify(result).includes(pat));
+}
 for (const values of [{ pat: "" }, { pat: "has whitespace" }, { pat, dailyPushes: "25" }, { pat, workflowFile: "../bad.yml" }]) {
   const f = fixture();
   assert.equal((await actions.provisionGithubStationAction(null, form(values))).ok, false);

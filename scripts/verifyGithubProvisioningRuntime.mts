@@ -32,7 +32,7 @@ try {
   assert.ok(workflow.includes("/actions/workflows/custom.yaml/dispatches"));
   assert.ok(!workflow.includes("/actions/workflows/linh-su.yml/dispatches"));
   assert.ok(!workflow.includes("__PUBLIC_WORKFLOW_NAME__") && !workflow.includes("__PUBLIC_JOB_NAME__"));
-  assert.match(workflow, /^jobs:\n  linh-su:\n    name: "[A-Za-z0-9 '&-]+"$/m);
+  assert.match(workflow, /^jobs:\r?\n  linh-su:\r?\n    name: "[A-Za-z0-9 '&-]+"$/m);
   const packageJson = JSON.parse(await readFile(path.join(prepared.directory, "package.json"), "utf8"));
   const lock = JSON.parse(await readFile(path.join(prepared.directory, "package-lock.json"), "utf8"));
   assert.equal(packageJson.version, lock.packages[""].version);

@@ -459,6 +459,11 @@ function StationEditor({
         <div role="status" className={`mb-4 rounded-lg border p-3 text-sm break-words ${state.ok ? "border-[rgba(76,201,154,0.4)] text-[var(--color-jade-300)]" : "border-[rgba(255,120,120,0.4)] text-[#f2a0a0]"}`}>
           <p>{state.message}</p>
           {state.slug && <p className="mt-1 break-all font-mono">{state.slug}</p>}
+          {state.diagnosticId && (
+            <p className="mt-1 font-mono text-xs text-[var(--color-mist)]">
+              Mã chẩn đoán: {state.diagnosticId}{state.failureCode ? ` · ${state.failureCode}` : ""}
+            </p>
+          )}
           {!!state.warnings?.length && (
             <ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--color-gold-300)]">
               {state.warnings.map((warning, index) => <li key={index}>{warning}</li>)}
@@ -493,7 +498,9 @@ function StationEditor({
           {!station && (
             <div>
               <label className="label" htmlFor="station-repo">Tên repo (tuỳ chọn)</label>
-              <input id="station-repo" name="repo" className="input w-full font-mono" maxLength={100} placeholder="Để trống để Ollama tự đặt tên" />
+              <input id="station-repo" name="repo" className="input w-full font-mono" maxLength={100}
+                pattern={"[A-Za-z0-9._\\-]+"} title="Chỉ dùng chữ, số, dấu chấm, gạch ngang hoặc gạch dưới."
+                placeholder="Để trống để Ollama tự đặt tên" />
               <p className="mt-1 text-xs text-[var(--color-mist)]">Để trống để Ollama đặt tên.</p>
             </div>
           )}
@@ -508,6 +515,8 @@ function StationEditor({
               <div className="min-w-0 basis-48 flex-1">
                 <label className="label" htmlFor="station-workflow">Tệp workflow{!station && " (tuỳ chọn)"}</label>
                 <input id="station-workflow" name="workflowFile" className="input w-full font-mono" maxLength={100}
+                  pattern={"[A-Za-z0-9][A-Za-z0-9._\\-]*\\.(?:ya?ml)"}
+                  title="Nhập một tên tệp .yml hoặc .yaml, không kèm đường dẫn."
                   defaultValue={station?.workflowFile ?? ""} placeholder={DEFAULT_WORKFLOW_FILE} required={!!station} />
                 <p className="mt-1 text-xs text-[var(--color-mist)]">
                   {station ? "Tên workflow đang chạy." : `Mặc định: ${DEFAULT_WORKFLOW_FILE}.`}

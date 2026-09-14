@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.83",
+    date: "2026-09-14",
+    lines: [
+      "Khi tạo kho GitHub lỗi, màn hình nay nói rõ PAT bị từ chối, còn thiếu quyền nào hoặc trường nào chưa hợp lệ.",
+      "Mỗi lỗi có mã để tra cứu an toàn; bộ dựng kho cũng giữ đúng định dạng tệp khi phát hành từ Windows.",
+    ],
+  },
+  {
     version: "1.3.82",
     date: "2026-09-13",
     lines: [
@@ -472,14 +480,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Mấy kho phần mềm mà tông môn nuôi kèm nay được cập nhật rải đều trong ngày, thay vì dồn một cục lúc sáng sớm — nhìn tự nhiên như người thật dùng.",
       "Sửa luôn một lỗi im lặng: từ hôm dọn máy chủ về nhà mới, mấy kho ấy thật ra chưa hề được nuôi lần nào.",
       "Số lượt mỗi ngày vẫn y như cũ, chỉ đổi giờ. Đạo hữu không phải làm gì cả.",
-    ],
-  },
-  {
-    version: "1.3.32",
-    date: "2026-08-21",
-    lines: [
-      "Bài vị danh xưng trong Phòng Chat thu gọn lại cho khít với tên, đúng cỡ của bản thiết kế — mỗi dòng danh tính ngắn đi một quãng nên sảnh đỡ chật.",
-      "Cả Phòng Chat nay dùng một giọng chữ duy nhất, giống hệt bản thiết kế; trước đây chữ trong sảnh và chữ khắc sẵn trên khung là hai kiểu khác nhau.",
     ],
   },
 ];

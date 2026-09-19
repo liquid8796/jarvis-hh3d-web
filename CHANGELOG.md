@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.85 — Nhiệm vụ ngày còn dở thì vòng kế nghỉ ít nhất 10 phút (20/09/2026)
+
+- Nhật ký production cho thấy Phần Thưởng Hoạt Động đang hẹn 30 phút nhưng vòng kế vẫn thức sau 31–58 giây. Timer hub không sai: Mê Cung cố ý tự khai 60 giây sau một lượt thành công, còn bộ lập lịch lấy cooldown nhỏ nhất của cả vòng, nên 60 giây lấn át mọi nhịp khác.
+- Khi kế hoạch vẫn còn nhiệm vụ ngày chưa được trang xác nhận đủ lượt, vòng kế nay có sàn 10 phút (cộng jitter 0–25 giây). Mê Cung vẫn giữ nhịp 60 giây của riêng nó, nhưng không còn được phép kéo cả đàn quay nóng trong giai đoạn việc ngày còn dở.
+- Khi các nhiệm vụ ngày đã vào sổ đủ lượt, sàn 10 phút tự biến mất; cooldown thật của Hoang Vực, Bí Cảnh, Luyện Đan và Mê Cung lại quyết định như trước. Regression test đóng đinh cả hai phía để không đổi một lỗi quay nóng lấy một lỗi thức muộn.
+
 ## 1.3.84 — Nhận cookie hoathinh3d.de ngay khi site vừa đổi TLD (19/09/2026)
 
 - File export mới mang wrapper `{url, cookies}` với URL nguồn `https://hoathinh3d.de` cùng các field `hostOnly`, `session`, `storeId`, `sameSite` và `expirationDate`. Các field ấy vốn đọc được; lỗi thật nằm ở bộ lọc domain vẫn đối chiếu với target `.so`, nên cookie `.de` hợp lệ bị loại sạch và giao diện báo nhầm là chuỗi cookie không đọc được.

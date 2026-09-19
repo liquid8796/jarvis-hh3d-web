@@ -91,7 +91,9 @@ Chọn xong nhớ bấm **Khắc Ngọc Giản**.
 ### Bước 3 — Khai Đàn
 
 Bấm **Khai Đàn**. Xong. Auto tự canh thời gian chờ rồi chạy hết vòng này sang vòng khác;
-không cần quay lại bấm Khai Đàn sau mỗi vòng. Tắt trình duyệt đi ngủ cũng được.
+không cần quay lại bấm Khai Đàn sau mỗi vòng. Khi nhiệm vụ ngày vẫn còn mục chưa đủ lượt, giữa
+hai vòng sẽ nghỉ ít nhất khoảng **10 phút**; khi các mục ngày đã đủ, auto lại theo thời gian chờ
+thật của những việc còn lại. Tắt trình duyệt đi ngủ cũng được.
 
 Nhưng nhớ một điều: **tắt máy thì tuỳ ai đang chạy hộ bạn.** Khôi lỗi tông môn nằm ở máy
 khác nên vẫn chạy tiếp; còn khôi lỗi cài trên máy bạn thì tắt máy là nghỉ theo. Xem mục 3

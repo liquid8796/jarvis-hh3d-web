@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.85",
+    date: "2026-09-20",
+    lines: [
+      "Auto nay nghỉ ít nhất khoảng 10 phút giữa hai vòng khi nhiệm vụ ngày vẫn còn dở, thay vì có lúc quay lại sau vài chục giây.",
+      "Khi nhiệm vụ ngày đã đủ lượt, auto lại theo thời gian chờ thật của những việc còn lại như trước.",
+    ],
+  },
+  {
     version: "1.3.84",
     date: "2026-09-19",
     lines: [
@@ -471,14 +479,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Khôi lỗi của tông môn nay chỉ đánh một trận Mê Cung tại một thời điểm, dù đang cày cho nhiều tài khoản — trận thứ hai xếp hàng chờ trận trước xong.",
       "Các nhiệm vụ khác không phải chờ theo: còn chỗ trống thì việc khác cứ chạy như thường.",
       "Khôi lỗi chạy trên máy nhà của đạo hữu không bị luật này chạm tới.",
-    ],
-  },
-  {
-    version: "1.3.35",
-    date: "2026-08-22",
-    lines: [
-      "Phòng Chat nay nhớ chỗ đạo hữu đọc dở: quay lại sảnh là đứng ngay vạch「tin chưa đọc」, thay vì bị thả xuống tin mới nhất.",
-      "Thêm nút chat nổi ở góc phải bên dưới trên mọi trang, đeo số tin chưa đọc — bấm là vào thẳng sảnh.",
     ],
   },
 ];

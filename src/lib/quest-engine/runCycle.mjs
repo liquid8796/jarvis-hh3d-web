@@ -403,12 +403,34 @@ function formatDuration(seconds) {
 }
 
 
+/**
+ * Khi còn nhiệm vụ NGÀY chưa được trang game xác nhận đủ lượt, một đồng hồ nội bộ quá ngắn
+ * không được phép kéo CẢ đàn quay nóng. Ca thật 20/09/2026: Phần Thưởng Hoạt Động nói rõ
+ *「ghé lại sau 30 phút」nhưng Mê Cung tự khai 60 giây, và luật lấy cooldown nhỏ nhất khiến
+ * vòng kế thức sau 31–58 giây. Mười phút là sàn của VÒNG, không sửa đồng hồ thật của quest.
+ *
+ * `quests` đã bị `splitPlanForToday` gỡ những nhiệm vụ vào sổ từ vòng trước; `cappedToday`
+ * gỡ nốt những nhiệm vụ vừa đủ lượt trong vòng này. Vì vậy phép hỏi bên dưới trả lời đúng
+ * câu「sau vòng này còn nhiệm vụ ngày nào phải ghé lại không」mà không cần đoán từ lời log.
+ */
+export const PENDING_DAILY_MIN_DELAY_SECONDS = 10 * 60;
+
+export function pendingDailyMinimumSeconds(quests, cappedToday = []) {
+  const capped = new Set(cappedToday);
+  return (quests ?? []).some((quest) => isDailyQuotaQuest(quest) && !capped.has(quest.id))
+    ? PENDING_DAILY_MIN_DELAY_SECONDS
+    : 0;
+}
+
 /** Mọi kết quả không-phải-stop đều mang theo lịch vòng kế để server tái xếp đúng nhịp. */
-function scheduledCycleResult(outcome, message, results = []) {
+function scheduledCycleResult(outcome, message, results = [], { minimumSeconds = 0 } = {}) {
   return {
     outcome,
     message,
-    nextDelaySeconds: computeNextDelaySeconds(results, { cycleFailed: outcome === "failed" }),
+    nextDelaySeconds: computeNextDelaySeconds(results, {
+      cycleFailed: outcome === "failed",
+      minimumSeconds,
+    }),
   };
 }
 
@@ -1036,6 +1058,7 @@ export async function runCycle(deps) {
               "done",
               `Hết ngân sách của lát này — xong ${done}/${quests.length}, phần còn lại để vòng sau.`,
               results,
+              { minimumSeconds: pendingDailyMinimumSeconds(quests, cappedToday) },
             ),
             dailyCapQuestIds: cappedToday,
           };
@@ -1080,6 +1103,7 @@ export async function runCycle(deps) {
               "failed",
               `${err.message} Đã xong ${done}/${quests.length} nhiệm vụ trước khi bị chặn.`,
               results,
+              { minimumSeconds: pendingDailyMinimumSeconds(quests, cappedToday) },
             );
           }
           throw err;
@@ -1132,10 +1156,21 @@ export async function runCycle(deps) {
       );
     }
 
+    const minimumSeconds = pendingDailyMinimumSeconds(quests, cappedToday);
     return {
       ...(failed > 0
-        ? scheduledCycleResult("done", `Đi hết một vòng — ${done} thuận, ${failed} trắc trở.`, results)
-        : scheduledCycleResult("done", `Đi hết một vòng — ${done} nhiệm vụ thuận lợi.`, results)),
+        ? scheduledCycleResult(
+            "done",
+            `Đi hết một vòng — ${done} thuận, ${failed} trắc trở.`,
+            results,
+            { minimumSeconds },
+          )
+        : scheduledCycleResult(
+            "done",
+            `Đi hết một vòng — ${done} nhiệm vụ thuận lợi.`,
+            results,
+            { minimumSeconds },
+          )),
       dailyCapQuestIds: cappedToday,
     };
   } finally {

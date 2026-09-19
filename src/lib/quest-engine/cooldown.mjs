@@ -63,7 +63,9 @@ export function parseCooldownSeconds(text) {
  *
  * Failure không được phép làm lịch chạy dồn dập hơn: nếu mọi quest đều hỏng và chẳng đọc
  * được đồng hồ nào, nghỉ nửa giờ. Một vòng không có đồng hồ nhưng cũng không hỏng thì năm
- * phút ghé lại. Jitter nhỏ giữ nhiều khôi lỗi khỏi cùng thức dậy đúng một giây.
+ * phút ghé lại. Người gọi còn có thể đưa `minimumSeconds` để đặt sàn cho CẢ vòng mà không
+ * sửa đồng hồ thật của từng quest — web dùng nó khi nhiệm vụ ngày còn dở. Jitter nhỏ giữ
+ * nhiều khôi lỗi khỏi cùng thức dậy đúng một giây.
  */
 const WAIT_FLOOR_SECONDS = 30;
 const WAIT_CEILING_SECONDS = 24 * 3600;
@@ -71,7 +73,10 @@ const NO_TIMER_RETRY_SECONDS = 300;
 const FAILED_ONLY_RETRY_SECONDS = 1800;
 const JITTER_SECONDS = 25;
 
-export function computeNextDelaySeconds(results, { cycleFailed = false, random = Math.random } = {}) {
+export function computeNextDelaySeconds(
+  results,
+  { cycleFailed = false, minimumSeconds = WAIT_FLOOR_SECONDS, random = Math.random } = {},
+) {
   let soonest = null;
   let anyFailed = cycleFailed;
 
@@ -84,7 +89,12 @@ export function computeNextDelaySeconds(results, { cycleFailed = false, random =
     }
   }
 
-  const baseSeconds = soonest ?? (anyFailed ? FAILED_ONLY_RETRY_SECONDS : NO_TIMER_RETRY_SECONDS);
+  const requestedFloor = Number(minimumSeconds);
+  const floorSeconds = Number.isFinite(requestedFloor) && requestedFloor > 0
+    ? Math.max(WAIT_FLOOR_SECONDS, Math.min(WAIT_CEILING_SECONDS, Math.round(requestedFloor)))
+    : WAIT_FLOOR_SECONDS;
+  const rawBaseSeconds = soonest ?? (anyFailed ? FAILED_ONLY_RETRY_SECONDS : NO_TIMER_RETRY_SECONDS);
+  const baseSeconds = Math.max(floorSeconds, rawBaseSeconds);
   const jitter = Math.floor(Math.max(0, Math.min(0.999999, Number(random()) || 0)) * (JITTER_SECONDS + 1));
-  return Math.max(WAIT_FLOOR_SECONDS, Math.min(WAIT_CEILING_SECONDS, Math.round(baseSeconds) + jitter));
+  return Math.min(WAIT_CEILING_SECONDS, Math.round(baseSeconds) + jitter);
 }

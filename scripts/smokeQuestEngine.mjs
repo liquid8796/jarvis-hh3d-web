@@ -20,7 +20,12 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import { createQuestEngine, enabledQuestsInOrder, questsForAccount } from "../src/lib/quest-engine/engine.mjs";
 import { createSession } from "../src/lib/quest-engine/session.mjs";
-import { parseCookieString, runCycle } from "../src/lib/quest-engine/runCycle.mjs";
+import {
+  parseCookieString,
+  pendingDailyMinimumSeconds,
+  PENDING_DAILY_MIN_DELAY_SECONDS,
+  runCycle,
+} from "../src/lib/quest-engine/runCycle.mjs";
 // Nhập thẳng từ module LÁ: `detectWordPressUser` chỉ biết định dạng cookie, không đi qua engine.
 import { DEFAULT_GAME_BASE_URL, detectWordPressUser } from "../src/lib/quest-engine/cookies.mjs";
 import {
@@ -1197,6 +1202,45 @@ async function main() {
   check(
     "jitter lịch nằm trong 0–25 giây",
     computeNextDelaySeconds([], { random: () => 0.999 }) === 325,
+  );
+
+  // 20/09/2026: production có Phần Thưởng Hoạt Động đang hẹn 30 phút nhưng Mê Cung tự
+  // khai 60 giây, khiến luật「cooldown nhỏ nhất thắng」đánh thức CẢ vòng sau vài chục giây.
+  // Sàn 10 phút chỉ tồn tại khi kế hoạch còn nhiệm vụ ngày chưa đủ lượt; hết việc ngày thì
+  // timer thật/synthetic của các quest còn lại lại được quyền quyết định như trước.
+  const pendingDailyPlan = [{ id: "phan-thuong-hoat-dong" }, { id: "me-cung" }];
+  const pendingDailyFloor = pendingDailyMinimumSeconds(pendingDailyPlan, []);
+  check(
+    "còn nhiệm vụ ngày chưa đủ lượt → sàn vòng là 10 phút",
+    pendingDailyFloor === PENDING_DAILY_MIN_DELAY_SECONDS && pendingDailyFloor === 600,
+    String(pendingDailyFloor),
+  );
+  check(
+    "Mê Cung 60s không kéo vòng có nhiệm vụ ngày còn dở xuống dưới 10 phút",
+    computeNextDelaySeconds(
+      [{ outcome: "completed", cooldownSeconds: 60 }],
+      { random: () => 0, minimumSeconds: pendingDailyFloor },
+    ) === 600,
+  );
+  check(
+    "sàn 10 phút không rút ngắn một timer thật dài hơn",
+    computeNextDelaySeconds(
+      [{ outcome: "onCooldown", cooldownSeconds: 1800 }],
+      { random: () => 0, minimumSeconds: pendingDailyFloor },
+    ) === 1800,
+  );
+  const finishedDailyFloor = pendingDailyMinimumSeconds(pendingDailyPlan, ["phan-thuong-hoat-dong"]);
+  check(
+    "nhiệm vụ ngày đã đủ lượt → bỏ sàn 10 phút",
+    finishedDailyFloor === 0,
+    String(finishedDailyFloor),
+  );
+  check(
+    "sau khi việc ngày đã đủ, Mê Cung 60s lại được giữ nguyên",
+    computeNextDelaySeconds(
+      [{ outcome: "completed", cooldownSeconds: 60 }],
+      { random: () => 0, minimumSeconds: finishedDailyFloor },
+    ) === 60,
   );
 
   console.log("\nDanh sách tham khảo Vấn Đáp");

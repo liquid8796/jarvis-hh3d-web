@@ -30,9 +30,11 @@ làm gián đoạn nếu chính máy ấy đang nuôi khôi lỗi; khôi lỗi t
 
 Một lần Khai Đàn tạo **một ý định sống dai**, không phải một vé chạy đúng một vòng. Hết mỗi
 vòng, server đọc cooldown sớm nhất, đặt `next_run_at`, đóng browser trong lúc nghỉ rồi tự đưa
-cùng job trở lại hàng chờ. Chỉ Thu Đàn mới biến nó thành trạng thái kết thúc. Worker đời cũ
-không gửi được cooldown vẫn tương thích: server dùng 5 phút cho vòng thường, 30 phút cho vòng
-chỉ có lỗi; worker mới gửi đồng hồ thật để thức dậy đúng lúc hơn.
+cùng job trở lại hàng chờ. Riêng khi kế hoạch vẫn còn nhiệm vụ ngày chưa được trang xác nhận đủ
+lượt, vòng kế có sàn khoảng **10 phút**: một nhịp nội bộ ngắn như Mê Cung 60 giây không còn kéo
+cả đàn quay nóng. Khi các nhiệm vụ ngày đã đủ, sàn ấy tự bỏ và cooldown thật lại quyết định như
+trước. Chỉ Thu Đàn mới biến job thành trạng thái kết thúc. Worker đời cũ không gửi được cooldown
+vẫn tương thích: server dùng 5 phút cho vòng thường, 30 phút cho vòng chỉ có lỗi.
 
 Mọi khôi lỗi đều là **một tiến trình `worker.mjs` sống dai** — khác nhau ở *ai nuôi nó* và
 *chìa nó cầm*:

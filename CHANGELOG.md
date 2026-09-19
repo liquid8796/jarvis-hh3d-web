@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.84 — Nhận cookie hoathinh3d.de ngay khi site vừa đổi TLD (19/09/2026)
+
+- File export mới mang wrapper `{url, cookies}` với URL nguồn `https://hoathinh3d.de` cùng các field `hostOnly`, `session`, `storeId`, `sameSite` và `expirationDate`. Các field ấy vốn đọc được; lỗi thật nằm ở bộ lọc domain vẫn đối chiếu với target `.so`, nên cookie `.de` hợp lệ bị loại sạch và giao diện báo nhầm là chuỗi cookie không đọc được.
+- Parser nay dùng `url` của wrapper làm nguồn domain khi URL đó vẫn thuộc cùng họ `hoathinh3d.*`. Hàng rào site khác giữ nguyên: wrapper từ domain không cùng second-level domain không thể nới phép lọc. Regression test đóng đinh cả ca `.so → .de` và ca export site lạ.
+- Tên miền mặc định chuyển sang `https://hoathinh3d.de`; hướng dẫn lấy cookie cũng cập nhật theo domain hiện tại. Cấu hình production được đổi sang `.de` trong cùng lượt phát hành để khôi lỗi không còn gõ cửa `.so`.
+
 ## 1.3.83 — Lỗi tạo kho GitHub nói đúng nguyên nhân (14/09/2026)
 
 - Màn hình trong lượt lỗi 14/09 chỉ báo chung “Không thể chuẩn bị kho GitHub”, trong khi active release `1.3.82` đã được tái hiện trực tiếp: lock artifact đúng bản, payload sinh đủ 22 tệp, local preflight, git staging, database và advisory lease đều qua. Lượt cũ dừng trước khi có slug nhưng raw exception đã bị nuốt, nên không còn bằng chứng để phân biệt PAT bị từ chối, thiếu scope hay input sai.

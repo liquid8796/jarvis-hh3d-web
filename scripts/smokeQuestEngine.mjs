@@ -1330,6 +1330,57 @@ async function main() {
     `nhận ${fromJson[0]?.expires}`,
   );
 
+  // 19/09/2026: site sang .de và extension xuất wrapper mới có hostOnly/session/storeId/sameSite.
+  // Cấu hình tông môn vẫn có thể còn .so đúng lúc người dùng dán file mới; URL nguồn trong wrapper
+  // phải thắng RIÊNG cho việc đọc cookie cùng họ hoathinh3d.*, không được mở cửa cho site lạ.
+  const deExport = JSON.stringify({
+    url: "https://hoathinh3d.de",
+    cookies: [
+      {
+        domain: "hoathinh3d.de",
+        hostOnly: true,
+        httpOnly: true,
+        name: "WPSESSID_x",
+        path: "/",
+        sameSite: "lax",
+        secure: true,
+        session: true,
+        storeId: "0",
+        value: "session",
+      },
+      {
+        domain: "hoathinh3d.de",
+        expirationDate: 1791088874.347298,
+        hostOnly: true,
+        httpOnly: true,
+        name: "wordpress_logged_in_x",
+        path: "/",
+        sameSite: "unspecified",
+        secure: true,
+        session: false,
+        storeId: "0",
+        value: "ironstark%7C1791045674%7Ctoken%7Chmac",
+      },
+      { domain: ".google.com", name: "NID", value: "khong-duoc-nhan" },
+    ],
+  });
+  const fromDeExport = parseCookieString(deExport, "https://hoathinh3d.so");
+  check(
+    "wrapper .de vẫn đọc được khi cấu hình còn .so",
+    fromDeExport.length === 2 && fromDeExport.some((c) => c.name === "wordpress_logged_in_x"),
+    `nhận ${fromDeExport.length}`,
+  );
+  check("wrapper .de vẫn loại cookie site khác", !fromDeExport.some((c) => c.name === "NID"));
+
+  const foreignWrapper = JSON.stringify({
+    url: "https://example.com",
+    cookies: [{ domain: "example.com", name: "wordpress_logged_in_x", value: "x" }],
+  });
+  check(
+    "URL wrapper site khác không được nới hàng rào domain",
+    parseCookieString(foreignWrapper, "https://hoathinh3d.so").length === 0,
+  );
+
   const fromArray = parseCookieString('[{"name":"a","value":"1"}]', "https://e.test");
   check("mảng JSON trần của extension cũng đọc được", fromArray.length === 1 && fromArray[0].url === "https://e.test");
 

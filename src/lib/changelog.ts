@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.84",
+    date: "2026-09-19",
+    lines: [
+      "Phiên đăng nhập mới lấy từ hoathinh3d.de nay dùng được ngay cả khi cấu hình tông môn vẫn còn tên miền .so.",
+      "Bản xuất từ trang khác vẫn bị chặn, nên việc tự theo tên miền mới không làm lỏng lớp bảo vệ đăng nhập.",
+    ],
+  },
+  {
     version: "1.3.83",
     date: "2026-09-14",
     lines: [
@@ -471,15 +479,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Phòng Chat nay nhớ chỗ đạo hữu đọc dở: quay lại sảnh là đứng ngay vạch「tin chưa đọc」, thay vì bị thả xuống tin mới nhất.",
       "Thêm nút chat nổi ở góc phải bên dưới trên mọi trang, đeo số tin chưa đọc — bấm là vào thẳng sảnh.",
-    ],
-  },
-  {
-    version: "1.3.34",
-    date: "2026-08-21",
-    lines: [
-      "Mấy kho phần mềm mà tông môn nuôi kèm nay được cập nhật rải đều trong ngày, thay vì dồn một cục lúc sáng sớm — nhìn tự nhiên như người thật dùng.",
-      "Sửa luôn một lỗi im lặng: từ hôm dọn máy chủ về nhà mới, mấy kho ấy thật ra chưa hề được nuôi lần nào.",
-      "Số lượt mỗi ngày vẫn y như cũ, chỉ đổi giờ. Đạo hữu không phải làm gì cả.",
     ],
   },
 ];

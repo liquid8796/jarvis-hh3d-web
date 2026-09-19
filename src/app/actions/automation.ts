@@ -57,11 +57,10 @@ const COOKIE_MAX_LENGTH = 8000;
 /**
  * Một nơi duy nhất soát chuỗi cookie cho cả nút thêm tài khoản lẫn nút thay cookie.
  *
- * `baseUrl` phải là tên miền ĐANG SỐNG do trưởng môn đặt, không phải hằng số trong mã nguồn:
- * bản xuất JSON của extension mang sẵn `domain`, và `parseCookieString` LOẠI mọi cookie
- * không thuộc tên miền đang nhắm tới. Đối chiếu với tên miền cũ sau một cú dời TLD nghĩa là
- * cookie mới dán đúng lại bị vứt sạch, rồi người dán nhận đúng câu「không đọc được」cho một
- * chuỗi hoàn toàn hợp lệ.
+ * `baseUrl` vẫn là hàng rào mặc định, nhưng wrapper JSON mới mang cả `url` nguồn.
+ * `parseCookieString` chỉ nhận URL ấy khi nó vẫn thuộc cùng họ `hoathinh3d.*`; nhờ vậy một
+ * cookie vừa export từ TLD mới không bị cấu hình TLD cũ vứt sạch, còn export của site khác
+ * vẫn không thể nới bộ lọc domain.
  */
 function inspectCookie(pastedCookie: string, baseUrl: string): CookieInspection {
   const jar = parseCookieString(pastedCookie, baseUrl) as Array<{ name: string; value: string }>;

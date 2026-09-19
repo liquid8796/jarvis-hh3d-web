@@ -19,7 +19,7 @@
  */
 
 /**
- * Tên miền game. Site đổi TLD định kỳ (…mx → …am → …one), nên đây phải là cấu hình chứ
+ * Tên miền game. Site đổi TLD định kỳ (…mx → …am → …one → …so → …de), nên đây phải là cấu hình chứ
  * không phải hằng số — biến môi trường `GAME_BASE_URL` đè lên được, để một cú dời tên miền
  * chỉ tốn một lần sửa env thay vì một lần deploy.
  *
@@ -33,7 +33,7 @@
  * đã lưu chết theo, và đạo hữu BẮT BUỘC phải dán lại chuỗi cookie lấy từ tên miền mới. Cổng
  * sẵn sàng giờ tự nhận ra cú 301 và nói thẳng điều đó (xem `movedTo` trong runCycle).
  */
-export const DEFAULT_GAME_BASE_URL = "https://hoathinh3d.so";
+export const DEFAULT_GAME_BASE_URL = "https://hoathinh3d.de";
 
 /**
  * Chuẩn hoá thứ trưởng môn gõ vào ô tên miền thành một ORIGIN sạch, hoặc nói rõ vì sao không.
@@ -117,6 +117,29 @@ export function parseCookieString(raw, url) {
           : null;
 
       if (list) {
+        // Wrapper mới của Cookie-Editor/J2TEAM mang URL nguồn ở gốc. Khi site vừa đổi TLD,
+        // cấu hình server có thể vẫn là hoathinh3d.<cũ>; nếu cứ lọc domain theo URL cũ thì một
+        // export hoàn toàn đúng từ hoathinh3d.<mới> bị vứt sạch. Chỉ tin URL nguồn khi nó vẫn
+        // thuộc CÙNG họ second-level-domain với target; export của site khác không được phép
+        // nới hàng rào này.
+        let cookieHost = host;
+        let cookieUrl = url;
+        const targetLabels = host.split(".").filter(Boolean);
+        const targetSld = targetLabels.length >= 2 ? targetLabels.at(-2)?.toLowerCase() : "";
+        if (!Array.isArray(parsed) && typeof parsed?.url === "string" && parsed.url.trim()) {
+          try {
+            const exported = new URL(parsed.url.trim());
+            const sourceLabels = exported.hostname.split(".").filter(Boolean);
+            const sourceSld = sourceLabels.length >= 2 ? sourceLabels.at(-2)?.toLowerCase() : "";
+            if (!targetSld || sourceSld === targetSld) {
+              cookieHost = exported.hostname;
+              cookieUrl = exported.origin;
+            }
+          } catch {
+            // URL nguồn hỏng thì giữ hàng rào theo target mà caller đưa vào.
+          }
+        }
+
         const cookies = [];
         for (const c of list) {
           if (!c || typeof c.name !== "string" || !c.name || typeof c.value !== "string") continue;
@@ -125,14 +148,14 @@ export function parseCookieString(raw, url) {
           // không được phép tiêm cookie của site khác vào phiên game.
           const domain = typeof c.domain === "string" && c.domain ? c.domain : "";
           const bare = domain.replace(/^\./, "");
-          if (bare && host && !host.endsWith(bare) && !bare.endsWith(host)) continue;
+          if (bare && cookieHost && !cookieHost.endsWith(bare) && !bare.endsWith(cookieHost)) continue;
 
           const cookie = { name: c.name, value: c.value };
           if (domain) {
             cookie.domain = domain;
             cookie.path = typeof c.path === "string" && c.path ? c.path : "/";
           } else {
-            cookie.url = url;
+            cookie.url = cookieUrl;
           }
 
           const expires = Number(c.expirationDate ?? c.expires);

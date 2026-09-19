@@ -29,7 +29,7 @@ Không phải mật khẩu. Bạn không đưa mật khẩu cho ai cả.
 1. Đăng nhập hoathinh3d như bình thường.
 2. Nhấn `F12` để mở bảng công cụ.
 3. Chọn tab **Application** (hoặc **Ứng dụng**).
-4. Cột trái, mở **Cookies** → bấm vào dòng `https://hoathinh3d.am`.
+4. Cột trái, mở **Cookies** → bấm vào dòng tên miền game đang dùng (hiện tại là `https://hoathinh3d.de`).
 5. Tìm dòng có tên bắt đầu bằng `wordpress_logged_in_`. Đây là dòng quan trọng nhất.
 6. Copy cả **Name** và **Value** của nó, ghép lại theo dạng `tên=giá_trị`.
 
@@ -48,7 +48,7 @@ Nếu nó báo *không thấy cookie đăng nhập*, nghĩa là bạn copy thi�
 - Đăng nhập game ở máy khác, trình duyệt khác: **không sao**.
 - **Bấm Đăng xuất** trong game thì cookie chết, phải lấy lại chuỗi mới.
 - Cookie cũng tự hết hạn sau một thời gian. Khi auto báo hết phiên, lấy lại là xong.
-- **hoathinh3d đổi tên miền** (ví dụ `.am` → `.one`) thì cookie cũ cũng chết theo — cookie
+- **hoathinh3d đổi tên miền** (ví dụ `.so` → `.de`) thì cookie cũ cũng chết theo — cookie
   gắn chặt vào tên miền, không đi theo được. Lúc ấy vào tên miền MỚI lấy chuỗi mới rồi dán
   lại. Tông chủ sẽ cập nhật tên miền cho cả tông môn; việc của bạn chỉ là dán lại cookie.
 

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.87",
+    date: "2026-09-20",
+    lines: [
+      "Tab Auto nay hẹn được từng quest theo giờ, phút, giây mỗi ngày; tới đúng mốc quest mới bắt đầu chạy.",
+      "Khai Đàn và chỉ tiêu ngày vẫn giữ nguyên luật cũ: Thu Đàn là dừng, còn hub đủ lượt rồi thì lịch không chạy lại.",
+    ],
+  },
+  {
     version: "1.3.86",
     date: "2026-09-20",
     lines: [
@@ -471,13 +479,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Thông báo của Tông Môn nay có thời hạn riêng: người phát đặt nó sống mấy giờ hay mấy ngày, thay vì bảy ngày cho mọi lời nhắn.",
       "Hết hạn là popup thôi hiện — tin bảo trì tối nay không còn nhảy ra chặn màn hình suốt một tuần sau đó.",
-    ],
-  },
-  {
-    version: "1.3.37",
-    date: "2026-08-22",
-    lines: [
-      "Icon chat: vào sảnh xem hết tin là số tin chưa đọc tự biến mất, kể cả khi tin ít tới mức không cần cuộn.",
     ],
   },
 ];

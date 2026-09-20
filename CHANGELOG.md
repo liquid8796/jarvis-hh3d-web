@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.87 — Hẹn giờ từng quest theo giờ Việt Nam mỗi ngày (20/09/2026)
+
+- Tab Auto có thêm khối **Hẹn giờ quest**: bấm Thêm hẹn giờ, chọn quest, nhập giờ/phút/giây rồi lưu. Mỗi quest có tối đa một mốc mỗi ngày; cùng một mốc áp cho cả flow VIP và thường, còn quest đang tắt trong Ngọc Giản vẫn giữ trạng thái tắt — lịch không tự bật nó.
+- Trước mốc hẹn, riêng quest ấy bị gác; từ đúng HH:MM:SS tới hết ngày nó chạy lại bằng flow/cooldown cũ. Server ghim `next_run_at` vào mốc tuyệt đối gần nhất nên lịch không phụ thuộc jitter hay múi giờ của máy worker. Sửa/xoá lịch đánh thức job đang queued một lần để cấu hình mới có hiệu lực ngay; job đang chạy không bị cắt giữa chừng.
+- Hẹn giờ không thay luật ngày: hub quest vẫn đi qua `daily_done`/daily-cap như cũ, đủ chỉ tiêu rồi thì bị bỏ khỏi các vòng sau dù mốc hẹn còn mở. Khi hub đã đủ nhưng một quest hẹn khác còn chờ trong ngày, job thức ở mốc hẹn ấy thay vì ngủ thẳng tới nửa đêm. Có verifier riêng đóng đinh UTC+7, đúng giây, twin VIP/thường, quest tắt và daily-cap.
+
 ## 1.3.86 — Hoang Vực hiểu component hồi chiêu mới `g/p/s` (20/09/2026)
 
 - Recording `hoang-vuc-20260920-133800` cho thấy các control chính vẫn còn nguyên cho cả flow VIP và thường: nút Khiêu Chiến, Đổi hệ, hộp xác nhận mới, màn Tấn Công, bảng tổng kết và nút Trở Lại đều giữ selector hiện tại. Lỗi tương thích thật nằm ở component hồi chiêu mới: trang đổi từ câu đầy đủ sang dạng `Hồi chiêu 14p 50s` (và có thể `1g ...`).

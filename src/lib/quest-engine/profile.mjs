@@ -14,6 +14,7 @@
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { applyQuestTimerGates } from "./questTimers.mjs";
 
 // Đọc bằng fs chứ không `import ... with { type: "json" }`: cùng một tệp này chạy ở nhiều
 // nơi — worker trên VM tông môn, worker máy nhà (từ gói cài), smoke trên máy dev — mà mỗi
@@ -198,7 +199,7 @@ export function countPhuDailyMarks(marksToday) {
  *   đã làm xong hôm nay. Vắng mặt = sổ trắng, đúng nghĩa cho mọi người gọi chỉ muốn dịch cấu
  *   hình (smoke test, lưới kiểm chứng) chứ không chạy một vòng thật.
  */
-export function profileForConfig(config, say, marksToday) {
+export function profileForConfig(config, say, marksToday, at = new Date()) {
   const doneToday = marksToday instanceof Set ? marksToday : new Set(marksToday ?? []);
   const profile = loadProfile();
 
@@ -408,6 +409,12 @@ export function profileForConfig(config, say, marksToday) {
     const enabled = config.quests?.[key]?.enabled === true;
     for (const quest of quests) quest.enabled = enabled;
   }
+
+  // ---- Hẹn giờ theo ngày ---------------------------------------------------------------
+  // Lịch chỉ GÁC một quest vốn đã bật; nó không tự bật quest và không đổi option. Sau mốc
+  // HH:MM:SS tới hết ngày, quest trở lại đúng flow cũ. Cùng tên quest nên twin VIP/thường
+  // nhận chung một mốc, còn bước lọc hạng phía runCycle vẫn chọn đúng twin cho từng account.
+  applyQuestTimerGates(profile, config, at);
 
   // ---- Khi ngọc giản đi TRƯỚC engine ----------------------------------------------------
   // Lớp dịch chỉ biết những khoá nó tự liệt kê ở trên; một khoá lạ trước nay rơi ra ngoài mà

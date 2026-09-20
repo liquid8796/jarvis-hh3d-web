@@ -9,6 +9,8 @@ import { ConfigForm } from "./ConfigForm";
 import { ControlPanel } from "./ControlPanel";
 import { DashboardLiveProvider } from "./DashboardLiveProvider";
 import { LinhSuPanel } from "./LinhSuPanel";
+import { QuestTimerPanel } from "./QuestTimerPanel";
+import { isTimerQuestEnabled, QUEST_TIMER_KEYS } from "@/lib/questTimers";
 
 export const metadata = { title: "Auto" };
 
@@ -24,6 +26,8 @@ export default async function DashboardPage() {
     getActiveJobs(user.id),
     hasWorkerToken(user.id),
   ]);
+
+  const enabledQuestKeys = QUEST_TIMER_KEYS.filter((key) => isTimerQuestEnabled(config, key));
 
   return (
     <>
@@ -58,6 +62,10 @@ export default async function DashboardPage() {
               <ControlPanel
                 initiallyRunning={activeJobs.length > 0}
                 initialWorkerPref={config.workerPref}
+              />
+              <QuestTimerPanel
+                initialTimers={config.questTimers}
+                enabledQuestKeys={enabledQuestKeys}
               />
               <LinhSuPanel hasToken={tokenIssued} isAdmin={isAdminUser(user)} />
             </div>

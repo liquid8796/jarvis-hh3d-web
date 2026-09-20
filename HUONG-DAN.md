@@ -102,6 +102,17 @@ khác nên vẫn chạy tiếp; còn khôi lỗi cài trên máy bạn thì tắ
 Mở lại trang lúc nào cũng thấy auto đang làm tới đâu, trong khung **Nhật ký tu luyện**.
 Muốn dừng hẳn thì bấm **Thu Đàn** — auto dừng ở điểm an toàn gần nhất, không cắt ngang trận.
 
+#### Hẹn giờ một quest mỗi ngày
+
+Trong cột Auto, mở khối **Hẹn giờ quest** rồi bấm **+ Thêm hẹn giờ**. Chọn quest và nhập đúng
+**giờ / phút / giây theo giờ Việt Nam**, sau đó bấm **Lưu lịch hẹn**. Trước mốc đó riêng quest
+được chọn sẽ chờ; từ đúng mốc tới hết ngày nó chạy theo cooldown bình thường. Muốn hẹn quest
+khác thì thêm một khối khác; mỗi quest chỉ có một mốc trong ngày.
+
+Lịch hẹn **không tự bật quest** — quest vẫn phải được bật trong Ngọc Giản. **Khai Đàn** vẫn phải
+đang hoạt động; bấm **Thu Đàn** thì mọi lịch dừng theo. Với các nhiệm vụ hub, lịch không bỏ qua
+sổ chỉ tiêu ngày: đủ lượt rồi thì khôi lỗi tiếp tục bỏ qua quest đó như trước.
+
 Khi cạnh tiêu đề nhật ký hiện **● Trực tiếp**, trạng thái và từng dòng khôi lỗi kể được đẩy lên
 ngay, không phải chờ trang hỏi lại. Mạng chập chờn thì nó tự hiện **Đang nối lại…** và dùng nhịp
 dự phòng; bạn không cần F5. Cài đè khôi lỗi v0.19.0 một lần để nút Thu Đàn được máy đang bận

@@ -4,6 +4,7 @@ import { listAccountsWithEnvelope } from "./accounts";
 import {
   getEditableConfig,
   getStoredConfigForSnapshot,
+  seedLuyenDanThuong,
   storedConfigSchema,
   type WorkerPref,
 } from "./configs";
@@ -22,6 +23,7 @@ import type { WorkerScope } from "@/lib/auth/worker";
 import type { DailyQuotaMemory, JobEventRow, JobRow } from "@/lib/db/schema";
 import type { CycleProgress } from "@/lib/realtime/dashboardTypes";
 import { notifyDashboard } from "@/lib/realtime/dashboardChannel";
+import { enabledQuestTimers, nextQuestTimerActivationAt } from "@/lib/questTimers";
 
 /**
  * The automation job lifecycle — the heart of "bấm Start rồi đóng browser vẫn chạy".
@@ -318,6 +320,24 @@ export async function requestStopForAccount(userId: string, accountId: string): 
   const rows = changed.rows as Array<Record<string, unknown>>;
   await announceStops(rows);
   return rows.length > 0;
+}
+
+/**
+ * Sau khi user sửa lịch, đánh thức ĐÚNG những đàn đang NGỦ để chúng nạp cấu hình mới ngay.
+ * Đàn đang chạy không bị cắt ngang; completeWorkerCycle đọc lại lịch ở ranh giới an toàn.
+ *
+ * Luôn đánh thức, kể cả lúc user vừa XOÁ lịch: nếu giữ next_run_at của lịch cũ, một quest vừa
+ * trở lại chế độ liên tục vẫn có thể ngủ hàng giờ vì chiếc đồng hồ đã không còn tồn tại.
+ */
+export async function rescheduleQueuedJobsForQuestTimers(userId: string): Promise<number> {
+  const changed = await db().execute(sql`
+    update automation_jobs set next_run_at = now()
+    where user_id = ${userId}
+      and status = 'queued'
+    returning id
+  `);
+
+  return changed.rows?.length ?? 0;
 }
 
 /**
@@ -982,6 +1002,24 @@ async function trimJobEvents(jobId: string, keep = 1000): Promise<void> {
   `);
 }
 
+/** Mốc hẹn tuyệt đối kế tiếp của các quest đang bật trong cấu hình HIỆN TẠI của job. */
+async function nextTimerActivationForJob(jobId: string, at: Date): Promise<Date | null> {
+  const rows = await db().execute(sql`
+    select uc.config
+    from automation_jobs as job
+    join user_configs as uc on uc.user_id = job.user_id
+    where job.id = ${jobId}
+      and jsonb_typeof(uc.config->'questTimers') = 'array'
+      and jsonb_array_length(uc.config->'questTimers') > 0
+    limit 1
+  `);
+  const raw = (rows.rows?.[0] as { config?: unknown } | undefined)?.config;
+  if (raw == null) return null;
+  const parsed = storedConfigSchema.safeParse(seedLuyenDanThuong(raw));
+  if (!parsed.success) return null;
+  return nextQuestTimerActivationAt(enabledQuestTimers(parsed.data), at);
+}
+
 /**
  * Kết thúc MỘT VÒNG, không kết thúc ý định auto.
  *
@@ -996,8 +1034,11 @@ export async function completeWorkerCycle(
   proposedDelaySeconds?: number,
   dailyReport?: { day: string; questIds: string[] },
 ): Promise<WorkerCycleTransition | null> {
+  const now = new Date();
   const delaySeconds = normalizeNextDelay(outcome, proposedDelaySeconds);
-  const nextRunAt = new Date(Date.now() + delaySeconds * 1000);
+  const normalNextRunAt = new Date(now.getTime() + delaySeconds * 1000);
+  const timerNextRunAt = await nextTimerActivationForJob(jobId, now);
+  const nextRunAt = timerNextRunAt && timerNextRunAt < normalNextRunAt ? timerNextRunAt : normalNextRunAt;
   const stopFromWorker = outcome === "stopped";
 
   // Tài khoản đã tắt (hoặc job đời cũ mà tài khoản không còn) thì vòng này là vòng cuối:
@@ -1082,6 +1123,10 @@ export async function completeWorkerCycle(
 
   const status = String(row.status) as WorkerCycleTransition["status"];
   const actualNextRunAt = new Date(String(row.next_run_at));
+  const actualDelaySeconds = Math.max(
+    0,
+    Math.round((actualNextRunAt.getTime() - Date.now()) / 1000),
+  );
 
   /**
    * Ghi sổ đủ lượt — sau khi biết chắc job còn sống, và chỉ khi lời khai còn thuộc về HÔM NAY.
@@ -1114,7 +1159,7 @@ export async function completeWorkerCycle(
     await addEvent(
       jobId,
       "info",
-      `Tự chạy vòng ${Number(row.attempts ?? 0) + 1} sau khoảng ${formatDelay(delaySeconds)} — chỉ Thu Đàn mới dừng hẳn.`,
+      `Tự chạy vòng ${Number(row.attempts ?? 0) + 1} sau khoảng ${formatDelay(actualDelaySeconds)} — chỉ Thu Đàn mới dừng hẳn.`,
     );
   }
 

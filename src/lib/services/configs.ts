@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { z } from "zod";
+import { QUEST_TIMER_KEYS, type QuestTimer } from "@/lib/questTimers";
 
 /**
  * The per-user automation config. Stored as one JSONB document (see schema.ts for why) but
@@ -151,6 +152,31 @@ export const WORKER_PREFS = ["any", "sect", "mine"] as const;
 export const workerPrefSchema = z.enum(WORKER_PREFS);
 export type WorkerPref = z.infer<typeof workerPrefSchema>;
 
+/** Một quest chỉ có một mốc mỗi ngày; trùng key là cấu hình mơ hồ nên chặn ngay ở biên. */
+export const questTimerSchema = z.object({
+  questKey: z.enum(QUEST_TIMER_KEYS),
+  hour: z.number().int().min(0).max(23),
+  minute: z.number().int().min(0).max(59),
+  second: z.number().int().min(0).max(59),
+});
+
+export const questTimersSchema = z
+  .array(questTimerSchema)
+  .max(QUEST_TIMER_KEYS.length)
+  .superRefine((timers, ctx) => {
+    const seen = new Set<string>();
+    timers.forEach((timer, index) => {
+      if (seen.has(timer.questKey)) {
+        ctx.addIssue({
+          code: "custom",
+          path: [index, "questKey"],
+          message: "Mỗi quest chỉ được hẹn một mốc trong ngày.",
+        });
+      }
+      seen.add(timer.questKey);
+    });
+  });
+
 export const configSchema = z.object({
   /**
    * Cookie đăng nhập của TÀI KHOẢN mà lượt chạy phục vụ.
@@ -201,6 +227,8 @@ export const configSchema = z.object({
    * lựa chọn này lặng lẽ về `any`.
    */
   workerPref: workerPrefSchema.default("any"),
+  /** Hẹn giờ theo ngày; rỗng = mọi quest bật chạy theo nhịp vòng liên tục như trước. */
+  questTimers: questTimersSchema.default([]),
   quests: z
     .object({
       meCung: z
@@ -438,6 +466,8 @@ export async function saveConfig(userId: string, config: UserConfig): Promise<vo
     // `clean` luôn mang giá trị mặc định `any`. Ghi thẳng `clean` xuống là mỗi lần Khắc Ngọc
     // Giản lại âm thầm trả đàn về cho「ai rảnh cũng được」.
     workerPref: previous.workerPref,
+    // Lịch hẹn có panel/action riêng trên tab Auto; Khắc Ngọc Giản không được xoá nó.
+    questTimers: previous.questTimers,
   });
 
   await db()
@@ -465,6 +495,21 @@ export async function setWorkerPref(userId: string, pref: WorkerPref): Promise<v
     values (${userId}, jsonb_build_object('workerPref', ${pref}::text), now())
     on conflict (user_id) do update set
       config = jsonb_set(user_configs.config, '{workerPref}', to_jsonb(${pref}::text), true),
+      updated_at = now()
+  `);
+}
+
+/**
+ * Ghi riêng danh sách lịch hẹn, không đọc-rồi-ghi cả document. Panel lịch và Ngọc Giản là
+ * hai form độc lập trên cùng trang; jsonb_set giữ một cú lưu lịch khỏi nuốt cấu hình quest vừa lưu.
+ */
+export async function setQuestTimers(userId: string, timers: QuestTimer[]): Promise<void> {
+  const clean = questTimersSchema.parse(timers);
+  await db().execute(sql`
+    insert into user_configs (user_id, config, updated_at)
+    values (${userId}, jsonb_build_object('questTimers', ${JSON.stringify(clean)}::jsonb), now())
+    on conflict (user_id) do update set
+      config = jsonb_set(user_configs.config, '{questTimers}', ${JSON.stringify(clean)}::jsonb, true),
       updated_at = now()
   `);
 }

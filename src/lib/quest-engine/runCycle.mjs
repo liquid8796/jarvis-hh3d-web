@@ -19,6 +19,7 @@ import {
 } from "./obscuraBrowser.mjs";
 import { profileForConfig } from "./profile.mjs";
 import { acquireQuestSlot, isDedicatedPageQuest } from "./questGate.mjs";
+import { secondsUntilNextQuestTimer } from "./questTimers.mjs";
 import { createReferenceQuiz, DEFAULT_QUIZ_REFERENCE_URL } from "./quizReference.mjs";
 import { createSession } from "./session.mjs";
 
@@ -737,10 +738,19 @@ export async function runCycle(deps) {
   // Sổ ngày đi CÙNG lúc dịch cấu hình, không phải một phép kiểm rời rạc ở đâu đó sau này:
   // một tuỳ chọn đã hết suất hôm nay thì phải TẮT ngay trong hồ sơ, để không script nào còn
   // nhánh cân nhắc nó. Xem `PHU_DAILY_MARK`.
-  const profile = profileForConfig(config, (m) => translationNotes.push(m), dailyDone?.questIds);
+  const cycleNow = new Date();
+  const profile = profileForConfig(config, (m) => translationNotes.push(m), dailyDone?.questIds, cycleNow);
   const enabled = enabledQuestsInOrder(profile);
 
   if (enabled.length === 0) {
+    const timerDelay = secondsUntilNextQuestTimer(config, cycleNow);
+    if (timerDelay != null) {
+      return {
+        outcome: "done",
+        message: "Các quest có lịch chưa tới giờ — khôi lỗi sẽ thức đúng mốc hẹn gần nhất.",
+        nextDelaySeconds: Math.max(30, timerDelay),
+      };
+    }
     return scheduledCycleResult("done", "Không có nhiệm vụ nào được bật — sẽ kiểm tra lại ở vòng kế.");
   }
 
@@ -763,17 +773,26 @@ export async function runCycle(deps) {
     return { keep, skipped };
   };
 
-  /** Vòng không còn gì để làm — ngủ tới sau mốc sang ngày thay vì ghé lại mỗi năm phút. */
-  const nothingLeftToday = (skipped) => ({
-    outcome: "done",
-    message:
-      `Cả ${skipped.length} nhiệm vụ đều đã đủ lượt hôm nay — vòng này không đụng tới cái nào. ` +
-      "Sẽ kiểm lại sau khi sang ngày mới; muốn kiểm ngay thì Thu Đàn rồi Khai Đàn lại.",
-    nextDelaySeconds: delayUntilDailyReset(dailyDone?.resetsInSeconds),
-    // Không khai gì mới: những cái này đã nằm sẵn trong sổ, và một lượt ghi lặp chỉ tốn một
-    // câu UPDATE để viết lại đúng thứ đang có.
-    dailyCapQuestIds: [],
-  });
+  /**
+   * Vòng hiện tại không còn gì để làm. Nếu một quest khác đang bị lịch hẹn gác tới LÁT NỮA
+   * trong cùng ngày thì phải thức ở mốc ấy; chỉ khi không còn mốc nào sớm hơn mới ngủ tới reset.
+   */
+  const nothingLeftToday = (skipped) => {
+    const resetDelay = delayUntilDailyReset(dailyDone?.resetsInSeconds);
+    const timerDelay = secondsUntilNextQuestTimer(config, cycleNow);
+    const nextDelaySeconds =
+      timerDelay == null ? resetDelay : Math.min(resetDelay, Math.max(30, timerDelay));
+    return {
+      outcome: "done",
+      message:
+        `Cả ${skipped.length} nhiệm vụ đang mở đều đã đủ lượt hôm nay — vòng này không đụng tới cái nào. ` +
+        (timerDelay != null && timerDelay < resetDelay
+          ? "Sẽ thức lại ở mốc hẹn quest gần nhất."
+          : "Sẽ kiểm lại sau khi sang ngày mới; muốn kiểm ngay thì Thu Đàn rồi Khai Đàn lại."),
+      nextDelaySeconds,
+      dailyCapQuestIds: [],
+    };
+  };
 
   /**
    * KHÔNG mở trình duyệt cho một vòng chẳng có gì để làm — phần tiết kiệm lớn nhất của cả

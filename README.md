@@ -36,6 +36,12 @@ cả đàn quay nóng. Khi các nhiệm vụ ngày đã đủ, sàn ấy tự b�
 trước. Chỉ Thu Đàn mới biến job thành trạng thái kết thúc. Worker đời cũ không gửi được cooldown
 vẫn tương thích: server dùng 5 phút cho vòng thường, 30 phút cho vòng chỉ có lỗi.
 
+Ngay trên tab **Auto** có thể thêm **Hẹn giờ quest** theo giờ Việt Nam `HH:MM:SS`. Lịch chỉ
+gác đúng quest được chọn: trước mốc thì chưa chạy, từ mốc tới hết ngày quest trở lại flow/cooldown
+bình thường. Một lịch áp cho cả twin VIP/thường của cùng quest. **Khai Đàn / Thu Đàn vẫn là công
+tắc tổng**, và lịch không tự bật quest đang tắt. Với hub quest, sổ `daily_done` vẫn thắng: đủ chỉ
+tiêu ngày rồi thì không chạy lại chỉ vì đồng hồ hẹn vẫn đang mở.
+
 Mọi khôi lỗi đều là **một tiến trình `worker.mjs` sống dai** — khác nhau ở *ai nuôi nó* và
 *chìa nó cầm*:
 

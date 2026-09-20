@@ -14,7 +14,9 @@ import {
   configSchema,
   enforceMazeCapPolicy,
   enforceUnavailableQuestPolicy,
+  questTimersSchema,
   saveConfig,
+  setQuestTimers,
   setWorkerPref,
   workerPrefSchema,
 } from "@/lib/services/configs";
@@ -24,6 +26,7 @@ import {
   getActiveJobs,
   requestStop,
   requestStopForAccount,
+  rescheduleQueuedJobsForQuestTimers,
   startJob,
 } from "@/lib/services/jobs";
 // Import từ module LÁ, KHÔNG phải từ runCycle.mjs. runCycle kéo theo profile.mjs, mà module
@@ -395,6 +398,41 @@ export async function setWorkerPrefAction(pref: string): Promise<ActionResult> {
   // dưới nhóm nút vẫn luôn tả đúng lựa chọn đang chọn. Một câu xác nhận nhắc lại điều mắt vừa
   // thấy chỉ là tiếng ồn — nên chỉ nhánh HỎNG ở trên mới mang lời nhắn.
   return { ok: true, message: "" };
+}
+
+export async function saveQuestTimersAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const user = await requireActiveUser();
+  const raw = String(formData.get("questTimersJson") ?? "[]");
+
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(raw);
+  } catch {
+    return { ok: false, message: "Danh sách hẹn giờ không đọc được — chưa lưu gì cả." };
+  }
+
+  const parsed = questTimersSchema.safeParse(decoded);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: parsed.error.issues[0]?.message ?? "Lịch hẹn không hợp lệ — chưa lưu gì cả.",
+    };
+  }
+
+  await setQuestTimers(user.id, parsed.data);
+  const pulled = await rescheduleQueuedJobsForQuestTimers(user.id);
+  revalidatePath("/dashboard");
+
+  return {
+    ok: true,
+    message:
+      parsed.data.length === 0
+        ? "Đã xoá toàn bộ lịch hẹn quest."
+        : `Đã lưu ${parsed.data.length} lịch hẹn mỗi ngày${pulled > 0 ? ` — ${pulled} đàn đang ngủ đã được đánh thức để áp lịch mới.` : "."}`,
+  };
 }
 
 export async function startAction(): Promise<ActionResult> {

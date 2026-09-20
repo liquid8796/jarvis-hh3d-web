@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.86",
+    date: "2026-09-20",
+    lines: [
+      "Hoang Vực nay đọc đúng đồng hồ Hồi chiêu mới của trang, nên 14p 50s không còn bị hiểu thành 50 giây.",
+      "Cả tài khoản VIP lẫn thường vẫn dùng chung flow; các nút Đổi hệ, Khiêu Chiến và Tấn Công hiện tại đều được giữ nguyên.",
+    ],
+  },
+  {
     version: "1.3.85",
     date: "2026-09-20",
     lines: [
@@ -470,15 +478,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-22",
     lines: [
       "Icon chat: vào sảnh xem hết tin là số tin chưa đọc tự biến mất, kể cả khi tin ít tới mức không cần cuộn.",
-    ],
-  },
-  {
-    version: "1.3.36",
-    date: "2026-08-22",
-    lines: [
-      "Khôi lỗi của tông môn nay chỉ đánh một trận Mê Cung tại một thời điểm, dù đang cày cho nhiều tài khoản — trận thứ hai xếp hàng chờ trận trước xong.",
-      "Các nhiệm vụ khác không phải chờ theo: còn chỗ trống thì việc khác cứ chạy như thường.",
-      "Khôi lỗi chạy trên máy nhà của đạo hữu không bị luật này chạm tới.",
     ],
   },
 ];

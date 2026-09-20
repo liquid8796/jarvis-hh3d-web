@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.86 — Hoang Vực hiểu component hồi chiêu mới `g/p/s` (20/09/2026)
+
+- Recording `hoang-vuc-20260920-133800` cho thấy các control chính vẫn còn nguyên cho cả flow VIP và thường: nút Khiêu Chiến, Đổi hệ, hộp xác nhận mới, màn Tấn Công, bảng tổng kết và nút Trở Lại đều giữ selector hiện tại. Lỗi tương thích thật nằm ở component hồi chiêu mới: trang đổi từ câu đầy đủ sang dạng `Hồi chiêu 14p 50s` (và có thể `1g ...`).
+- Parser cooldown ở worker Web và parser chạy ngay trong trang nay cùng hiểu `g = giờ`, `p = phút`, `s = giây`. Trước bản này `14p 50s` bị bỏ mất phần phút và thành 50 giây — đủ để làm vòng chạy quay lại quá sớm dù server thật đang khoá gần 15 phút.
+- Request/response trong record xác nhận cú đánh được server ghi nhận ngay và số lượt giảm, còn summary/cooldown chỉ hiện sau hoạt ảnh khoảng 12 giây. Vì vậy flow vẫn giữ cửa chờ/tải lại hiện có thay vì thêm một đường đánh thứ hai; fixture Chromium được đổi sang đúng markup `Hồi chiêu · 7p 19s` để lần sau parser trôi lệch sẽ đỏ ngay.
+
 ## 1.3.85 — Nhiệm vụ ngày còn dở thì vòng kế nghỉ ít nhất 10 phút (20/09/2026)
 
 - Nhật ký production cho thấy Phần Thưởng Hoạt Động đang hẹn 30 phút nhưng vòng kế vẫn thức sau 31–58 giây. Timer hub không sai: Mê Cung cố ý tự khai 60 giây sau một lượt thành công, còn bộ lập lịch lấy cooldown nhỏ nhất của cả vòng, nên 60 giây lấn át mọi nhịp khác.

@@ -721,8 +721,13 @@ const bossConfirm = (text, confirmLabel, onYes) => {
   c.querySelector('.hh3d-confirm__btn--confirm').onclick = () => { c.remove(); onYes(); };
 };
 const startCooldown = () => {
-  $('#countdown-timer').textContent = 'Chờ 7 phút 19 giây để tấn công lần tiếp theo.';
-  $('#countdown-timer').style.display = 'block';
+  // Bản ghi 20/09/2026 + boss.min.js mới: timer không còn viết «7 phút 19 giây».
+  // Component thật là «Hồi chiêu» + các đơn vị rút gọn g/p/s. Giữ đúng markup này để
+  // parser quên chữ p sẽ đọc 7p 19s thành 19 giây và ca Hoang Vực đỏ ngay.
+  $('#countdown-timer').innerHTML = '<span class="cd-label">Hồi chiêu</span>'
+    + '<span class="cd-time"><b>7</b>p <b>19</b>s</span>';
+  $('#countdown-timer').classList.add('is-visible');
+  $('#countdown-timer').style.display = 'inline-flex';
   $('#battle-button').style.display = 'none';
 };
 // XHR trạng thái tới MUỘN, và nó chỉ biết LẤY ĐI lời mời — đúng như trang thật: vỏ trang
@@ -1173,6 +1178,16 @@ async function main() {
     `nhận ${parseCooldownSeconds("01:23:45")}`,
   );
   check("'2 giờ 5 phút' → 7500s", parseCooldownSeconds("còn 2 giờ 5 phút") === 7500);
+  check(
+    'Hoang Vực mới: "Hồi chiêu 14p 50s" → 890s, không phải 50s',
+    parseCooldownSeconds("Hồi chiêu 14p 50s") === 890,
+    `nhận ${parseCooldownSeconds("Hồi chiêu 14p 50s")}`,
+  );
+  check(
+    'Hoang Vực mới có giờ: "1g 02p 03s" → 3723s',
+    parseCooldownSeconds("Hồi chiêu 1g 02p 03s") === 3723,
+    `nhận ${parseCooldownSeconds("Hồi chiêu 1g 02p 03s")}`,
+  );
   check("chữ không có thời gian → null", parseCooldownSeconds("chưa tới lượt") === null);
 
   console.log("\nLịch nhiều vòng");

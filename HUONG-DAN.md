@@ -61,7 +61,7 @@ Tick những cái bạn muốn auto làm.
 | **Mê Cung** | Auto tự lập phòng, chờ đủ 5 người, rồi đánh. Đây là nhiệm vụ dài nhất. |
 | **Luyện Đan Đường** | Thu đan → phân giải → khai lò mẻ mới → giữ lửa. Ghé lại mỗi ~26 phút. |
 | **Khoáng Mạch** | Chọn mỏ, ngưỡng bonus và cách đoạt mỏ riêng cho tab VIP/Thường. Nếu bật mua Linh Quang Phù, đặt tối đa 1–3 lá/ngày; mặc định là 1. |
-| **Nhiệm vụ ngày** | Điểm Danh, Hoang Vực, Phúc Lợi Đường, Thí Luyện, Bí Cảnh, Tế Lễ, Phúc Lợi VIP, Vòng Quay, Vấn Đáp. Tick là xong, không phải chỉnh gì. Các nhiệm vụ có bản thường nằm trong tab **Tài khoản thường**; Mê Cung dùng chung một bộ tuỳ chọn cho cả hai hạng. |
+| **Nhiệm vụ ngày** | Điểm Danh, Hoang Vực, Phúc Lợi Đường, Thí Luyện, Bí Cảnh, Tế Lễ, Phúc Lợi VIP, Vòng Quay, Vấn Đáp. Tick là xong, không phải chỉnh gì. Các nhiệm vụ có bản thường nằm trong tab **Tài khoản thường**; Mê Cung dùng chung một bộ tuỳ chọn cho cả hai hạng. Hoang Vực tự hiểu component **Hồi chiêu** mới dạng `g/p/s` cho cả VIP và thường. |
 
 Riêng **Vấn Đáp**, khôi lỗi tra danh sách đáp án cộng đồng (hiện đọc được 255 câu).
 Nó chỉ trả lời khi đáp án trong danh sách khớp đúng một lựa chọn đang hiện; câu lạ hoặc nguồn

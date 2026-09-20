@@ -1,6 +1,7 @@
 /**
  * Đọc thời gian còn lại ra giây từ chữ tự do: "01:23:45", "12:30", "còn 2 giờ 5 phút",
- * "30 giây". Trả về null khi không tìm thấy khoảng thời gian nào.
+ * "30 giây", hoặc component Hoang Vực mới "Hồi chiêu 1g 14p 50s". Trả về null khi không
+ * tìm thấy khoảng thời gian nào.
  *
  * Port từ `CooldownTextParser.cs`. Thứ tự thử là phần quan trọng: dạng đồng hồ được ưu tiên
  * tuyệt đối, và "hh:mm:ss" phải thử TRƯỚC "mm:ss" — nếu không, "01:23:45" sẽ khớp "01:23"
@@ -37,13 +38,13 @@ export function parseCooldownSeconds(text) {
   let total = 0;
   let matched = false;
 
-  const hours = t.match(unit("giờ|gio|hour|hrs|hr|h"));
+  const hours = t.match(unit("giờ|gio|hour|hrs|hr|h|g"));
   if (hours) {
     total += Number(hours[1]) * 3600;
     matched = true;
   }
 
-  const minutes = t.match(unit("phút|phut|minutes|minute|mins|min|m"));
+  const minutes = t.match(unit("phút|phut|minutes|minute|mins|min|m|p"));
   if (minutes) {
     total += Number(minutes[1]) * 60;
     matched = true;

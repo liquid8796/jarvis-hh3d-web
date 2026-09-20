@@ -116,7 +116,7 @@
           "action": "readCooldownSeconds",
           "selector": "#countdown-timer",
           "timeoutMs": 15000,
-          "note": "\u0022Ch\u1EDD 7 ph\u00FAt 19 gi\u00E2y \u0111\u1EC3 t\u1EA5n c\u00F4ng l\u1EA7n ti\u1EBFp theo.\u0022 \u2014 \u0111\u1ECDc TR\u01AF\u1EDAC khi d\u1EEBng, \u0111\u1EC3 c\u00E1i d\u1EEBng mang theo th\u1EDDi gian th\u1EADt thay v\u00EC im l\u1EB7ng"
+          "note": "\u0022H\u1ED3i chi\u00EAu 7p 19s\u0022 \u2014 component m\u1EDBi ghi g/p/s; \u0111\u1ECDc TR\u01AF\u1EDAC khi d\u1EEBng, \u0111\u1EC3 c\u00E1i d\u1EEBng mang theo th\u1EDDi gian th\u1EADt thay v\u00EC im l\u1EB7ng"
         },
         {
           "action": "stopIf",
@@ -1770,7 +1770,7 @@
           "action": "readCooldownSeconds",
           "selector": "#countdown-timer",
           "timeoutMs": 15000,
-          "note": "\u0022Ch\u1EDD 7 ph\u00FAt 19 gi\u00E2y \u0111\u1EC3 t\u1EA5n c\u00F4ng l\u1EA7n ti\u1EBFp theo.\u0022 \u2014 \u0111\u1ECDc TR\u01AF\u1EDAC khi d\u1EEBng, \u0111\u1EC3 c\u00E1i d\u1EEBng mang theo th\u1EDDi gian th\u1EADt thay v\u00EC im l\u1EB7ng"
+          "note": "\u0022H\u1ED3i chi\u00EAu 7p 19s\u0022 \u2014 component m\u1EDBi ghi g/p/s; \u0111\u1ECDc TR\u01AF\u1EDAC khi d\u1EEBng, \u0111\u1EC3 c\u00E1i d\u1EEBng mang theo th\u1EDDi gian th\u1EADt thay v\u00EC im l\u1EB7ng"
         },
         {
           "action": "stopIf",

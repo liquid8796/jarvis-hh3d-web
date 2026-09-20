@@ -42,10 +42,11 @@ export async function labelMatchSweep(args) {
     // Lookahead chứ không `\b`: `\b` của JavaScript chỉ biết [A-Za-z0-9_], nên sau "giờ" —
     // kết thúc bằng "ờ" — nó không thấy ranh giới nào, và "còn 2 giờ 5 phút" đọc ra 5 phút.
     // Bản C# dùng `\b` mà vẫn đúng vì `\w` của .NET nhận cả chữ Unicode; chỗ này là JS nên
-    // phải nói ra điều đó bằng tay. (Bản in-page của desktop vẫn còn lỗi này.)
-    const h = t.match(/(\d+)\s*(?:giờ|gio|hour|hrs|hr|h)(?![\p{L}\p{N}])/u);
+    // phải nói ra điều đó bằng tay. Các bản Web + desktop phải giữ cùng bảng đơn vị, gồm cả
+    // `g/p/s` mà component Hoang Vực bắt đầu render ngày 20/09/2026.
+    const h = t.match(/(\d+)\s*(?:giờ|gio|hour|hrs|hr|h|g)(?![\p{L}\p{N}])/u);
     if (h) { s += +h[1] * 3600; any = true; }
-    const mn = t.match(/(\d+)\s*(?:phút|phut|minutes|minute|mins|min|m)(?![\p{L}\p{N}])/u);
+    const mn = t.match(/(\d+)\s*(?:phút|phut|minutes|minute|mins|min|m|p)(?![\p{L}\p{N}])/u);
     if (mn) { s += +mn[1] * 60; any = true; }
     const sc = t.match(/(\d+)\s*(?:giây|giay|seconds|second|secs|sec|s)(?![\p{L}\p{N}])/u);
     if (sc) { s += +sc[1]; any = true; }

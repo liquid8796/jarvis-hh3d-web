@@ -57,15 +57,17 @@ export default async function DashboardPage() {
             thường không chạy tới được dòng code này. */}
         <DashboardLiveProvider initialAccounts={accounts}>
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] xl:gap-8">
-            <ConfigForm config={config} isAdmin={isAdminUser(user)} />
+            <div className="flex min-w-0 flex-col gap-6 xl:gap-8">
+              <ConfigForm config={config} isAdmin={isAdminUser(user)} />
+              <QuestTimerPanel
+                initialTimers={config.questTimers}
+                enabledQuestKeys={enabledQuestKeys}
+              />
+            </div>
             <div className="flex min-w-0 flex-col gap-6 xl:gap-8">
               <ControlPanel
                 initiallyRunning={activeJobs.length > 0}
                 initialWorkerPref={config.workerPref}
-              />
-              <QuestTimerPanel
-                initialTimers={config.questTimers}
-                enabledQuestKeys={enabledQuestKeys}
               />
               <LinhSuPanel hasToken={tokenIssued} isAdmin={isAdminUser(user)} />
             </div>

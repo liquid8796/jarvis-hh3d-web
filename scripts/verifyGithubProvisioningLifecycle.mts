@@ -62,6 +62,47 @@ assert.deepEqual(await provisionGithubStation(input, happy.deps), {
 assert.deepEqual(happy.events, ["whoami", "scope", "khoiloi-names", "worker-id", "local-preflight", "settings-check", "worker-check", "repo-404", "lease", "repo-404", "stage", "create", "push", "secret", "register", "dispatch", "ping", "nurture"]);
 assert.deepEqual(happy.state(), { registered: true, created: true, deleted: false, leased: false });
 assert.ok(!happy.events.includes("llm-name"), "explicit repo never calls the model");
+
+{
+  const deferred = fixture();
+  deferred.deps.registerDeferred = async () => {
+    deferred.events.push("register-deferred");
+  };
+  deferred.deps.enrichProfile = async () => {
+    deferred.events.push("profile");
+    return [];
+  };
+  const result = await provisionGithubStation({ ...input, deferPrimary: true }, deferred.deps);
+  assert.equal(result.ok, true);
+  assert.match(result.message, /repo phụ/);
+  assert.ok(deferred.events.includes("register-deferred"));
+  assert.ok(deferred.events.includes("profile"));
+  assert.ok(deferred.events.includes("nurture"));
+  for (const forbidden of ["stage", "create", "push", "secret", "dispatch", "ping"]) {
+    assert.equal(deferred.events.includes(forbidden), false, `deferred mode must skip ${forbidden}`);
+  }
+}
+
+{
+  const activation = fixture();
+  activation.deps.generateWorkerId = async () => {
+    throw new Error("activation must reuse reserved worker ID");
+  };
+  let received: GithubProvisionContext | undefined;
+  const create = activation.deps.create;
+  activation.deps.create = async (ctx) => {
+    received = ctx;
+    return create(ctx);
+  };
+  const result = await provisionGithubStation({
+    ...input,
+    workerId: "reserved-worker",
+    activateDeferredSlug: "Owner/small-project",
+  }, activation.deps);
+  assert.equal(result.ok, true);
+  assert.equal(received?.workerId, "reserved-worker");
+  assert.equal(activation.events.includes("worker-id"), false);
+}
 for (const chosen of ["Prism", "notes_engine", "garden.v2"]) {
   const f = fixture(); let received: Parameters<GithubProvisioningDependencies["create"]>[0] | undefined;
   f.deps.generateRepoName = async (owner, budget) => {
@@ -228,7 +269,7 @@ const results = await Promise.all([provisionGithubStation(input, twice.deps), pr
 assert.equal(results.filter(r => r.ok).length, 1);
 assert.equal(twice.events.filter(e => e === "create").length, 1);
 assert.equal(twice.state().leased, false);
-for (const scope of [null, "", "repo, workflow", "public_repo, workflow, delete_repo"]) {
+for (const scope of [null, "", "repo, workflow", "repo, workflow, delete_repo", "public_repo, workflow, delete_repo, user"]) {
   await assert.rejects(
     productionGithubProvisionDependencies.checkScopes(scope),
     (error: unknown) => error instanceof GithubProvisionSafeError &&
@@ -236,7 +277,7 @@ for (const scope of [null, "", "repo, workflow", "public_repo, workflow, delete_
       /Classic PAT còn thiếu scope/.test(error.safeMessage ?? ""),
   );
 }
-await productionGithubProvisionDependencies.checkScopes("repo, workflow, delete_repo");
+await productionGithubProvisionDependencies.checkScopes("repo, workflow, delete_repo, user");
 {
   const originalFetch = globalThis.fetch;
   try {

@@ -97,6 +97,10 @@ export type GithubProvisioningDependencies = {
   push: (context: GithubProvisionContext, prepared: Prepared) => Promise<void>;
   setSecret: (context: GithubProvisionContext, prepared: Prepared) => Promise<void>;
   register: (context: GithubProvisionContext, prepared: Prepared, proof: Staged & { githubId: number }) => Promise<void>;
+  /** Deferred create registers the account/station without creating the primary repo yet. */
+  registerDeferred?: (context: GithubProvisionContext, prepared: Prepared) => Promise<void>;
+  /** Best-effort public profile enrichment; warnings never roll back provisioning. */
+  enrichProfile?: (context: GithubProvisionContext) => Promise<string[]>;
   cleanupSnapshot: (context: GithubProvisionContext) => Promise<{ githubId: number; head: string | null; referenced: boolean }>;
   deleteRepo: (context: GithubProvisionContext) => Promise<void>;
   dispatch: (context: GithubProvisionContext) => Promise<void>;
@@ -162,7 +166,7 @@ export async function removeGithubProvisioningTemp(candidate: string): Promise<v
 }
 
 const messages = {
-  preflight: "Không thể chuẩn bị kho GitHub. Kiểm tra PAT, quyền repo/workflow/delete_repo, cấu hình máy chủ và tên kho chưa được sử dụng.",
+  preflight: "Không thể chuẩn bị kho GitHub. Kiểm tra PAT, quyền repo/workflow/delete_repo/user, cấu hình máy chủ và tên kho chưa được sử dụng.",
   create: "GitHub từ chối tạo kho. Không có kho nào được nhận làm mục tiêu rollback.",
   publish: "Không thể đẩy gói khôi lỗi lên kho GitHub.",
   secret: "Không thể cài WORKER_TOKEN cho kho GitHub.",
@@ -174,7 +178,7 @@ const messages = {
 const failureMessages: Record<GithubProvisionFailureCode, string> = {
   invalid_input: "Dữ liệu tạo kho không hợp lệ. Kiểm tra tên kho, tên workflow và giới hạn lượt đẩy.",
   github_identity_unavailable: "Không xác minh được PAT với GitHub. Kiểm tra token còn hiệu lực rồi thử lại.",
-  github_scopes_missing: "PAT thiếu ít nhất một quyền bắt buộc: repo, workflow hoặc delete_repo.",
+  github_scopes_missing: "PAT thiếu ít nhất một quyền bắt buộc: repo, workflow, delete_repo hoặc user.",
   registry_unavailable: "Không đọc được sổ GitHub trên máy chủ. Thử lại sau.",
   repository_name_unavailable: "Không chọn được tên kho hợp lệ. Nhập tên kho cụ thể rồi thử lại.",
   worker_identity_unavailable: "Không tạo được WORKER_ID riêng cho kho. Thử lại sau.",
@@ -299,7 +303,9 @@ export async function provisionGithubStation(input: GithubProvisionInput, deps: 
       throw new GithubProvisionSafeError("invalid_input");
     }
     step = "worker_identity";
-    normalized.workerId = await work(() => deps.generateWorkerId(identity.login, normalized.repo, budget, khoiloiNames));
+    if (!normalized.workerId) {
+      normalized.workerId = await work(() => deps.generateWorkerId(identity.login, normalized.repo, budget, khoiloiNames));
+    }
     const workerComplaint = reviewProvisionWorkerId(normalized.workerId, normalized.repo);
     if (workerComplaint) {
       safeMessage = workerComplaint;
@@ -325,44 +331,70 @@ export async function provisionGithubStation(input: GithubProvisionInput, deps: 
     step = "repository_probe";
     await requireAbsent(ctx);
     const local = prepared;
-    step = "local_stage";
-    staged = await work(() => deps.stage(ctx, local));
-    step = "lease";
-    await work(() => lease!.assertHeld(budget));
-    stage = "create";
-    step = "github_create";
-    createUncertain = true;
-    const created = await work(() => deps.create(ctx));
-    // A 4xx rejection is definitive. A 5xx/malformed success may have created the repository.
-    if (created.status >= 400 && created.status < 500) createUncertain = false;
-    if (created.status !== 201 || !Number.isSafeInteger(created.githubId) || created.githubId! <= 0) throw Error("create not confirmed");
-    githubId = created.githubId;
-    createUncertain = false;
-    stage = "publish";
-    step = "lease";
-    await work(() => lease!.assertHeld(budget));
-    step = "git_push";
-    await work(() => deps.push(ctx, local));
-    stage = "secret";
-    step = "lease";
-    await work(() => lease!.assertHeld(budget));
-    step = "github_secret";
-    await work(() => deps.setSecret(ctx, local));
-    stage = "register";
-    step = "lease";
-    await work(() => lease!.assertHeld(budget));
-    const proof = { ...staged, githubId: githubId! };
-    step = "registry_register";
-    await work(() => deps.register(ctx, local, proof));
-    registered = true;
-    for (const [operation, warning] of [
-      [deps.dispatch, "Kho đã đăng ký; chưa khởi chạy được workflow."],
-      [deps.ping, "Kho đã đăng ký; chưa xác minh được trạng thái workflow."],
-      [deps.nurture, "Kho đã đăng ký; vòng tạo kho phụ Ollama cần chạy lại sau."],
-    ] as const) {
-      try { await work(() => operation(ctx)); } catch { warnings.push(warning); }
+    if (normalized.deferPrimary) {
+      if (!deps.registerDeferred) throw new GithubProvisionSafeError("unexpected_failure");
+      stage = "register";
+      step = "lease";
+      await work(() => lease!.assertHeld(budget));
+      step = "registry_register";
+      await work(() => deps.registerDeferred!(ctx, local));
+      registered = true;
+      try { await work(() => deps.nurture(ctx)); }
+      catch { warnings.push("Đã đăng ký chế độ chỉ nuôi repo phụ; vòng tạo repo phụ Ollama sẽ tiếp tục ở cron kế."); }
+      if (deps.enrichProfile) {
+        try { warnings.push(...await work(() => deps.enrichProfile!(ctx))); }
+        catch { warnings.push("Đã đăng ký tài khoản nhưng chưa hoàn tất cập nhật profile GitHub."); }
+      }
+      result = {
+        ok: true,
+        stage: "complete",
+        slug: context.slug,
+        message: "Đã đăng ký tài khoản để nuôi repo phụ; repo chính và workflow đang được tạm hoãn.",
+        warnings,
+      };
+    } else {
+      step = "local_stage";
+      staged = await work(() => deps.stage(ctx, local));
+      step = "lease";
+      await work(() => lease!.assertHeld(budget));
+      stage = "create";
+      step = "github_create";
+      createUncertain = true;
+      const created = await work(() => deps.create(ctx));
+      if (created.status >= 400 && created.status < 500) createUncertain = false;
+      if (created.status !== 201 || !Number.isSafeInteger(created.githubId) || created.githubId! <= 0) throw Error("create not confirmed");
+      githubId = created.githubId;
+      createUncertain = false;
+      stage = "publish";
+      step = "lease";
+      await work(() => lease!.assertHeld(budget));
+      step = "git_push";
+      await work(() => deps.push(ctx, local));
+      stage = "secret";
+      step = "lease";
+      await work(() => lease!.assertHeld(budget));
+      step = "github_secret";
+      await work(() => deps.setSecret(ctx, local));
+      stage = "register";
+      step = "lease";
+      await work(() => lease!.assertHeld(budget));
+      const proof = { ...staged, githubId: githubId! };
+      step = "registry_register";
+      await work(() => deps.register(ctx, local, proof));
+      registered = true;
+      for (const [operation, warning] of [
+        [deps.dispatch, "Kho đã đăng ký; chưa khởi chạy được workflow."],
+        [deps.ping, "Kho đã đăng ký; chưa xác minh được trạng thái workflow."],
+        [deps.nurture, "Kho đã đăng ký; vòng tạo kho phụ Ollama cần chạy lại sau."],
+      ] as const) {
+        try { await work(() => operation(ctx)); } catch { warnings.push(warning); }
+      }
+      if (!normalized.activateDeferredSlug && deps.enrichProfile) {
+        try { warnings.push(...await work(() => deps.enrichProfile!(ctx))); }
+        catch { warnings.push("Kho đã đăng ký nhưng chưa hoàn tất cập nhật profile GitHub."); }
+      }
+      result = { ok: true, stage: "complete", slug: context.slug, message: messages.complete, warnings };
     }
-    result = { ok: true, stage: "complete", slug: context.slug, message: messages.complete, warnings };
   } catch (error) {
     if (error instanceof GithubProvisionCollisionError) {
       safeFailureCode = error.kind === "station" ? "station_conflict" : "worker_conflict";
@@ -435,12 +467,29 @@ const repoEndpoint = (ctx: GithubProvisionContext) => `/repos/${encodeURICompone
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 type Settings = import("./settings").AppSettings;
 function references(settings: Settings, ctx: GithubProvisionContext): boolean {
-  return settings.githubStations.some(s =>
-    same(s.workerId, ctx.workerId)
-    || same(s.workerId, ctx.repo)
-    || same(s.repo, ctx.workerId)
-    || (same(s.owner, ctx.owner) && (same(s.repo, ctx.repo) || s.companionRepos.some(c => same(c.repo, ctx.repo)) || same(s.nurturePending?.repo ?? "", ctx.repo)))
-  );
+  return settings.githubStations.some((s) => {
+    const slug = `${s.owner}/${s.repo}`;
+    const deferredSelf =
+      !!ctx.activateDeferredSlug
+      && s.primaryDeferred === true
+      && same(slug, ctx.activateDeferredSlug)
+      && same(s.owner, ctx.owner)
+      && same(s.repo, ctx.repo)
+      && same(s.workerId, ctx.workerId);
+    if (deferredSelf) return false;
+
+    return same(s.workerId, ctx.workerId)
+      || same(s.workerId, ctx.repo)
+      || same(s.repo, ctx.workerId)
+      || (
+        same(s.owner, ctx.owner)
+        && (
+          same(s.repo, ctx.repo)
+          || s.companionRepos.some((c) => same(c.repo, ctx.repo))
+          || same(s.nurturePending?.repo ?? "", ctx.repo)
+        )
+      );
+  });
 }
 async function readFreshGithubSettings(deadlineAt: number): Promise<Settings> {
   // Do not use getAppSettings' display fallback: a malformed register must fail closed here.
@@ -549,7 +598,7 @@ export const productionGithubProvisionDependencies: GithubProvisioningDependenci
   },
   async checkScopes(scopes) {
     const granted = new Set(scopes?.split(",").map(value => value.trim()));
-    const missing = ["repo", "workflow", "delete_repo"].filter(scope => !granted.has(scope));
+    const missing = ["repo", "workflow", "delete_repo", "user"].filter(scope => !granted.has(scope));
     if (missing.length > 0) {
       throw new GithubProvisionSafeError(
         "github_scopes_missing",
@@ -601,12 +650,82 @@ export const productionGithubProvisionDependencies: GithubProvisioningDependenci
     await assertWorkerFree(ctx);
     await mutateGithubState(settings => {
       remaining(ctx);
+      if (ctx.activateDeferredSlug) {
+        const station = settings.githubStations.find((entry) =>
+          entry.primaryDeferred === true
+          && same(`${entry.owner}/${entry.repo}`, ctx.activateDeferredSlug!)
+          && same(entry.owner, ctx.owner)
+          && same(entry.repo, ctx.repo)
+          && same(entry.workerId, ctx.workerId)
+        );
+        if (!station || references(settings, ctx)) throw new GithubProvisionCollisionError("station");
+        // Materialize IN PLACE: every companion repo/runtime trace stays attached to the same station.
+        station.pat = prepared.encryptedPat;
+        station.primaryDeferred = false;
+        station.enabled = true;
+        station.dailyPushes = ctx.dailyPushes;
+        station.githubId = proof.githubId;
+        station.initialCommitSha = proof.initialCommitSha;
+        station.lastPingAt = null;
+        station.lastCommitAt = null;
+        station.lastPingOk = null;
+        station.lastPingNote = "";
+        station.workflowState = "";
+        return;
+      }
+
       if (references(settings, ctx)) throw new GithubProvisionCollisionError("station");
-      settings.githubStations.push({ owner: ctx.owner, repo: ctx.repo, workflowFile: ctx.workflowFile, workerId: ctx.workerId, pat: prepared.encryptedPat,
-        enabled: true, companionRepos: [], companionCountOverride: null, dailyPushes: ctx.dailyPushes,
-        lastPingAt: null, lastCommitAt: null, lastPingOk: null, lastPingNote: "", workflowState: "",
-        provisionedBy: "jarvis", githubId: proof.githubId, initialCommitSha: proof.initialCommitSha });
+      settings.githubStations.push({
+        owner: ctx.owner,
+        repo: ctx.repo,
+        workflowFile: ctx.workflowFile,
+        workerId: ctx.workerId,
+        pat: prepared.encryptedPat,
+        primaryDeferred: false,
+        enabled: true,
+        companionRepos: [],
+        companionCountOverride: null,
+        dailyPushes: ctx.dailyPushes,
+        lastPingAt: null,
+        lastCommitAt: null,
+        lastPingOk: null,
+        lastPingNote: "",
+        workflowState: "",
+        provisionedBy: "jarvis",
+        githubId: proof.githubId,
+        initialCommitSha: proof.initialCommitSha,
+      });
     }, { deadlineAt: ctx.deadlineAt });
+  },
+  async registerDeferred(ctx, prepared) {
+    const { mutateGithubState } = await import("./companionState");
+    await assertWorkerFree(ctx);
+    await mutateGithubState(settings => {
+      remaining(ctx);
+      if (references(settings, ctx)) throw new GithubProvisionCollisionError("station");
+      settings.githubStations.push({
+        owner: ctx.owner,
+        repo: ctx.repo,
+        workflowFile: ctx.workflowFile,
+        workerId: ctx.workerId,
+        pat: prepared.encryptedPat,
+        primaryDeferred: true,
+        enabled: true,
+        companionRepos: [],
+        companionCountOverride: null,
+        dailyPushes: ctx.dailyPushes,
+        lastPingAt: null,
+        lastCommitAt: null,
+        lastPingOk: null,
+        lastPingNote: "Repo chính đang tạm hoãn; chỉ nuôi repo phụ.",
+        workflowState: "",
+        provisionedBy: "jarvis",
+      });
+    }, { deadlineAt: ctx.deadlineAt });
+  },
+  async enrichProfile(ctx) {
+    const { enrichNewGithubProfile } = await import("./githubProfileEnrichment");
+    return enrichNewGithubProfile({ pat: ctx.pat, login: ctx.owner, deadlineAt: ctx.deadlineAt });
   },
   async cleanupSnapshot(ctx) {
     const referenced = references(await freshSettings(ctx), ctx);

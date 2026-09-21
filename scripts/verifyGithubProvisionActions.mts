@@ -12,7 +12,7 @@ const mocks: Record<string, string> = {
   "next/cache": "export const revalidatePath = path => globalThis.__stationFixture.events.push('invalidate:' + path);",
   "@/lib/auth/guards": "export const requireAdmin = async () => { globalThis.__stationFixture.events.push('auth'); return {}; };",
   "@/lib/auth/permissions": "export const hasPermission = (_user, permission) => { if(permission !== 'github_station.manage') throw Error('wrong permission'); globalThis.__stationFixture.events.push('permission'); return globalThis.__stationFixture.allowed; };",
-  "@/lib/crypto/secretBox": "export const encryptSecret = pat => globalThis.__stationFixture.deps.encrypt(pat); export const isEncrypted = pat => globalThis.__stationFixture.deps.isEncrypted(pat); export const decryptSecret = () => {throw Error('not used');};",
+  "@/lib/crypto/secretBox": "export const encryptSecret = pat => globalThis.__stationFixture.deps.encrypt(pat); export const isEncrypted = pat => globalThis.__stationFixture.deps.isEncrypted(pat); export const decryptSecret = value => value === \"encrypted:old\" ? \"offline-fixture-pat-never-log\" : \"decoded\";",
   "@/lib/services/settings": "export const getAppSettings = () => globalThis.__stationFixture.deps.getSettings();",
   "@/lib/services/companionState": "export const mutateGithubState = change => globalThis.__stationFixture.deps.mutate(change);",
   "@/lib/services/githubProvisioning": "export const provisionGithubStation = input => globalThis.__stationFixture.deps.provision(input); export const productionGithubProvisionDependencies = { whoami: (pat,budget) => globalThis.__stationFixture.deps.whoami(pat,budget) };",
@@ -35,18 +35,18 @@ new Function("require", "module", "exports", bundle.outputFiles[0].text)(createR
 const actions = module.exports;
 const pat = "offline-fixture-pat-never-log";
 function form(values: Record<string, string | undefined>) { const data = new FormData(); for (const [key, value] of Object.entries(values)) if (value !== undefined) data.set(key, value); return data; }
-function station(provisionedBy?: "jarvis"): AppSettings["githubStations"][number] {
+function station(provisionedBy?: "jarvis", primaryDeferred = false): AppSettings["githubStations"][number] {
   return { owner: "FixtureOwner", repo: "existing-repo", workflowFile: "linh-su.yml", workerId: "existing-repo", pat: "encrypted:old",
-    provisionedBy, githubId: provisionedBy ? 42 : undefined, initialCommitSha: provisionedBy ? "initial-sha" : undefined,
+    provisionedBy, primaryDeferred, githubId: provisionedBy && !primaryDeferred ? 42 : undefined, initialCommitSha: provisionedBy && !primaryDeferred ? "initial-sha" : undefined,
     enabled: true, dailyPushes: 7, lastPingAt: null, lastCommitAt: "2026-09-01T00:00:00Z", lastPingOk: null, lastPingNote: "old", workflowState: "active",
     companionRepos: [{ repo: "software-one", lastNurtureDay: "2026-09-11", pushesToday: 2, lastPushAt: null, lastPushOk: true, lastPushNote: "saved", managedBy: "ollama", topic: "kept" }],
     companionCountOverride: 3, allowCompanionFork: true, allowCompanionDelete: false, nurtureNextAt: "2026-09-12T00:00:00Z", nurtureLastNote: "runtime", nurturePending: undefined,
   };
 }
-function fixture(provisionedBy?: "jarvis") {
+function fixture(provisionedBy?: "jarvis", primaryDeferred = false) {
   const events: string[] = [];
   const f = {
-    allowed: true, events, settings: { githubStations: [station(provisionedBy)] } as AppSettings,
+    allowed: true, events, settings: { githubStations: [station(provisionedBy, primaryDeferred)] } as AppSettings,
     beforeMutation: () => {}, normalized: undefined as GithubProvisionContext | undefined, submitted: undefined as Parameters<GithubStationFormDependencies["provision"]>[0] | undefined,
     probeStatus: 404, warning: false,
     deps: {} as GithubStationFormDependencies,
@@ -61,6 +61,7 @@ function fixture(provisionedBy?: "jarvis") {
     acquireLease: async () => ({ assertHeld: async () => {}, release: async () => {} }),
     stage: async () => ({ initialCommitSha: "test-sha" }), create: async () => { events.push("create"); return { status: 201, githubId: 123 }; },
     push: async () => {}, setSecret: async () => {}, register: async () => { events.push("register"); },
+    registerDeferred: async () => { events.push("register-deferred"); },
     cleanupSnapshot: async () => ({ githubId: 123, head: "test-sha", referenced: false }), deleteRepo: async () => { events.push("delete"); },
     dispatch: async () => { if (f.warning) throw Error(pat + " child stderr"); }, ping: async () => {}, nurture: async () => {}, dispose: async () => {},
   };
@@ -105,10 +106,24 @@ for (const name of ["provisionGithubStationAction", "updateGithubStationAction",
   const result = await actions.provisionGithubStationAction(null, form({ pat, repo: "", workflowFile: "", dailyPushes: "", owner: "forged-owner", workerId: "forged-worker", companionRepos: "forged-companion" }));
   assert.equal(result.ok, true);
   assert.equal(result.slug, "FixtureOwner/random-project");
-  assert.deepEqual(f.submitted, { pat, repo: "", workflowFile: "", dailyPushes: "" });
+  assert.deepEqual(f.submitted, { pat, repo: "", workflowFile: "", dailyPushes: "", deferPrimary: false });
   assert.equal(f.normalized?.dailyPushes, 5); assert.equal(f.normalized?.workflowFile, "linh-su.yml"); assert.equal(f.normalized?.workerId, "worker-identity");
   assert.equal(f.events.filter(event => event === "llm-name").length, 1);
   assert.deepEqual(f.events.slice(0, 7), ["auth", "permission", "provision", "whoami-create", "khoiloi-names", "llm-name", "worker-id"]);
+}
+{
+  const f = fixture();
+  const result = await actions.provisionGithubStationAction(null, form({
+    pat,
+    repo: "future-primary",
+    dailyPushes: "3",
+    deferPrimary: "on",
+  }));
+  assert.equal(result.ok, true);
+  assert.match(result.message, /repo phụ/);
+  assert.equal(f.submitted?.deferPrimary, true);
+  assert.ok(f.events.includes("register-deferred"));
+  assert.ok(!f.events.includes("create") && !f.events.includes("register"));
 }
 {
   const f = fixture(); f.probeStatus = 200;
@@ -155,6 +170,36 @@ for (const values of [{ pat: "" }, { pat: "has whitespace" }, { pat, dailyPushes
   const f = fixture();
   assert.equal((await actions.provisionGithubStationAction(null, form(values))).ok, false);
   assert.ok(!f.events.includes("whoami-create") && !f.events.includes("create"));
+}
+{
+  const f = fixture("jarvis", true);
+  f.settings.githubStations[0].workerId = "reserved-worker";
+  const result = await actions.updateGithubStationAction(null, form({
+    slug: "FixtureOwner/existing-repo",
+    deferPrimaryPresent: "1",
+    dailyPushes: "4",
+  }));
+  assert.equal(result.ok, true);
+  assert.equal(f.submitted?.activateDeferredSlug, "FixtureOwner/existing-repo");
+  assert.equal(f.submitted?.workerId, "reserved-worker");
+  assert.equal(f.submitted?.pat, pat);
+  assert.ok(f.events.includes("provision") && f.events.includes("create") && f.events.includes("register"));
+  assert.ok(!f.events.includes("mutate"));
+}
+{
+  const f = fixture("jarvis", true);
+  f.settings.githubStations[0].workerId = "reserved-worker";
+  const result = await actions.updateGithubStationAction(null, form({
+    slug: "FixtureOwner/existing-repo",
+    deferPrimaryPresent: "1",
+    deferPrimary: "on",
+    dailyPushes: "6",
+  }));
+  assert.equal(result.ok, true);
+  assert.equal(f.settings.githubStations[0].primaryDeferred, true);
+  assert.equal(f.settings.githubStations[0].dailyPushes, 6);
+  assert.ok(f.events.includes("mutate"));
+  assert.ok(!f.events.includes("provision"));
 }
 {
   const f = fixture("jarvis");

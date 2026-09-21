@@ -283,8 +283,10 @@ if (!process.argv.includes("--check")) {
         await page.getByRole("dialog").waitFor();
         const createForm = page.locator("form").filter({ has: page.locator("#station-pat") });
         assert.equal(await createForm.locator("input[name=owner],input[name=workerId],textarea[name=companionRepos],input[name=enabled]").count(), 0);
-        assert.equal(await createForm.locator("input").count(), 4);
+        assert.equal(await createForm.locator("input").count(), 6);
         assert.equal(await page.locator("#station-pat").getAttribute("type"), "password");
+        assert.equal(await page.locator("#station-defer-primary").isChecked(), false);
+        assert.equal(await createForm.locator('input[name="deferPrimaryPresent"]').inputValue(), "1");
         assert.notEqual(await page.locator("#station-pat").getAttribute("required"), null);
         for (const selector of ["#station-repo", "#station-workflow", "#station-daily-pushes"]) {
           assert.equal(await page.locator(selector).inputValue(), "");
@@ -316,7 +318,7 @@ if (!process.argv.includes("--check")) {
         await page.getByRole("button", { name: "Tạo repo + workflow", exact: true }).waitFor();
         const submitted = await page.evaluate(() => (window as typeof window & { __fixtureSubmitted: { label: string; values: Record<string, string> } }).__fixtureSubmitted);
         assert.equal(submitted.label, "provisionGithubStationAction");
-        assert.deepEqual(submitted.values, { pat: "offline-fixture-pat", repo: "", workflowFile: "", dailyPushes: "" });
+        assert.deepEqual(submitted.values, { pat: "offline-fixture-pat", repo: "", deferPrimaryPresent: "1", workflowFile: "", dailyPushes: "" });
         const status = page.locator("section[aria-labelledby=station-form-title]").getByRole("status");
         assert.match(await status.innerText(), outcome === "error" ? /Classic PAT còn thiếu scope: delete_repo/ : /Đã tạo và đăng ký/);
         if (outcome === "error") assert.ok(!(await status.innerText()).includes("sample-owner/"));
@@ -331,6 +333,22 @@ if (!process.argv.includes("--check")) {
         report.push({ view: `create-${outcome}`, width, scrollWidth, screenshot });
         if (scrollWidth > width + 1) failures.push(`create-${outcome}/${width} overflow: ${scrollWidth}`);
       }
+
+      await page.goto(`${origin}/?view=workspace&outcome=success`);
+      await page.getByRole("button", { name: "Tạo kho mới", exact: true }).click();
+      await page.getByRole("dialog").waitFor();
+      const deferredForm = page.locator("form").filter({ has: page.locator("#station-pat") });
+      await page.locator("#station-pat").fill("offline-fixture-pat");
+      await page.locator("#station-defer-primary").check();
+      assert.equal(await deferredForm.locator("#station-defer-primary").isChecked(), true);
+      await page.getByRole("button", { name: "Chỉ nuôi repo phụ trước", exact: true }).click();
+      await page.getByRole("button", { name: "Đang đăng ký + tạo repo phụ…", exact: true }).waitFor();
+      await page.getByRole("button", { name: "Chỉ nuôi repo phụ trước", exact: true }).waitFor();
+      const deferredSubmitted = await page.evaluate(() => (window as typeof window & { __fixtureSubmitted: { label: string; values: Record<string, string> } }).__fixtureSubmitted);
+      assert.equal(deferredSubmitted.label, "provisionGithubStationAction");
+      assert.equal(deferredSubmitted.values.deferPrimary, "on");
+      assert.equal(deferredSubmitted.values.deferPrimaryPresent, "1");
+
       for (const managed of [false, true]) {
         await page.goto(`${origin}/?view=workspace&managed=${managed ? "1" : "0"}`);
         assert.equal(await page.getByRole("dialog").count(), 0);

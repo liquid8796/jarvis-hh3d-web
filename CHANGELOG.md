@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.89 — Nuôi repo phụ trước, profile GitHub gọn hơn, Auto dễ bấm hơn (21/09/2026)
+
+- Form **Tạo kho GitHub mới** có thêm chế độ **Tạm thời chưa tạo repo chính / chưa chạy workflow khôi lỗi**. Ở chế độ này Jarvis chỉ đăng ký PAT + danh tính station, giữ chỗ tên repo/WORKER_ID và cho vòng Ollama tạo/nuôi repo phụ; cron primary keepalive bỏ qua station đó. Khi admin mở lại station, bỏ tick rồi lưu, Jarvis materialize repo chính **in-place**, giữ nguyên toàn bộ companion repos/runtime trace, cài secret, push workflow và dispatch khôi lỗi.
+- Provisioning mới yêu cầu classic PAT có thêm scope `user` để có thể cập nhật profile. Sau khi repo phụ được nurture, Ollama tạo một profile pseudonymous dev ngắn gọn rồi PATCH các field GitHub hỗ trợ như name/bio/company/location. Hệ thống không bịa công ty/trường/địa điểm thật. GitHub PAT không có API upload avatar nên avatar được giữ nguyên/default và trả warning rõ — không dùng browser bypass hay giả báo thành công.
+- Account-wide primary deletion hiểu deferred row là **tên repo dự kiến**, không phải repo GitHub thật: DELETE chỉ gửi tới primary đã materialize; deferred station chỉ rời registry còn companion repos vẫn được giữ đúng contract cũ. Có regression riêng cho ca 1 primary thật + 1 deferred.
+- Trên Auto, khối **Hẹn giờ quest** chuyển sang cột trái ngay dưới Ngọc Giản và có collapse riêng. Các collapse quest tăng hit-area tối thiểu 44px, rộng hơn với nhãn **Mở/Gấp**, giúp bấm dễ hơn thay vì phải chọt đúng tam giác nhỏ.
+
 ## 1.3.88 — Bấm khung reply để nhảy tới tin gốc (21/09/2026)
 
 - Khung trích dẫn trong một tin trả lời nay là vùng bấm thật: click vào là Phòng Chat tự cuộn tới message gốc và làm bong bóng gốc sáng nhẹ để mắt bắt được vị trí.

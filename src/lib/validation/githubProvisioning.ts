@@ -11,6 +11,12 @@ export type GithubProvisionInput = {
   repo?: string;
   workflowFile?: string;
   dailyPushes?: string | number;
+  /** Chỉ đăng ký tài khoản + nuôi repo phụ; repo chính/workflow chờ user mở lại sau. */
+  deferPrimary?: boolean;
+  /** Internal-only: materialize a previously deferred station without losing companion repos. */
+  activateDeferredSlug?: string;
+  /** Internal-only: keep the worker identity reserved by a deferred station. */
+  workerId?: string;
   dryRun?: boolean;
   ownerForDryRun?: string;
 };
@@ -23,6 +29,8 @@ export type NormalizedGithubProvisionInput = {
   /** Filled after the owner and repository name are known. */
   workerId: string;
   generatedRepo: boolean;
+  deferPrimary: boolean;
+  activateDeferredSlug?: string;
 };
 
 const SAFE_WORKFLOW_BASENAME = /^[A-Za-z0-9][A-Za-z0-9._-]*\.(?:ya?ml)$/;
@@ -69,8 +77,10 @@ export function normalizeGithubProvisionInput(
     repo,
     workflowFile,
     dailyPushes: normalizedDailyPushes(input.dailyPushes),
-    workerId: "",
+    workerId: input.workerId?.trim() ?? "",
     generatedRepo,
+    deferPrimary: input.deferPrimary === true,
+    ...(input.activateDeferredSlug?.trim() ? { activateDeferredSlug: input.activateDeferredSlug.trim() } : {}),
   };
 }
 

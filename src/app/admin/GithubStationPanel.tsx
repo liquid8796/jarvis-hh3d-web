@@ -324,13 +324,16 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
             )}
             <div className="mt-4 flex flex-col gap-2">
               {paged.items.map((station) => {
-                const countdown = countdownTone(station.daysToDisable);
+                const countdown = station.primaryDeferred
+                  ? { text: "repo chính đang hoãn", className: "text-[var(--color-gold-300)]" }
+                  : countdownTone(station.daysToDisable);
                 const companionIssues = station.companionRepos.filter(
                   (companion) => companion.lastPushOk === false || companion.pendingDelete,
                 ).length;
                 const accountStations = stations.filter(
                   (candidate) => candidate.owner.toLowerCase() === station.owner.toLowerCase(),
                 );
+                const activePrimaryCount = accountStations.filter((candidate) => !candidate.primaryDeferred).length;
                 const retainedCompanions = accountStations.reduce(
                   (total, candidate) => total + candidate.companionRepos.length,
                   0,
@@ -344,6 +347,11 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                       <p className="flex flex-wrap items-baseline gap-x-2 font-semibold">
                         <Link href={`/admin/github/${encodeURIComponent(station.owner)}/${encodeURIComponent(station.repo)}`} className="truncate font-mono hover:text-[var(--color-gold-300)] hover:underline">{station.slug}</Link>
                         <span className={`text-sm font-normal ${countdown.className}`}>{countdown.text}</span>
+                        {station.primaryDeferred && (
+                          <span className="rounded-full border border-[rgba(232,194,92,0.5)] px-2 py-0.5 text-xs font-normal text-[var(--color-gold-300)]">
+                            chỉ nuôi repo phụ
+                          </span>
+                        )}
                         {!station.enabled && (
                           <span className="rounded-full border border-[rgba(155,150,190,0.5)] px-2 py-0.5 text-xs font-normal text-[var(--color-mist)]">
                             đang tắt
@@ -351,7 +359,7 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                         )}
                       </p>
                       <p className={`mt-0.5 text-xs ${companionIssues > 0 ? "text-[var(--color-gold-300)]" : "text-[var(--color-mist)]"}`}>
-                        {workflowStateLabel(station.workflowState)} · {station.companionRepos.length} kho phụ
+                        {station.primaryDeferred ? "chưa tạo workflow chính" : workflowStateLabel(station.workflowState)} · {station.companionRepos.length} kho phụ
                         {companionIssues > 0 && <> · {companionIssues} cần xem</>}
                         {station.dailyPushes === 0 ? " · đã dừng nuôi" : ` · ${station.dailyPushes} lượt/kho/ngày`}
                       </p>
@@ -368,8 +376,13 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                       <form action={pingAction}>
                         <input type="hidden" name="slug" value={station.slug} />
                         <input type="hidden" name="expectedGroup" value={githubPrimaryOwnerGroupFingerprint(accountStations, station.owner)} />
-                        <button type="submit" className="btn btn-ghost px-3 py-1.5 text-xs" disabled={pinging}>
-                          {pinging ? "Đang nuôi…" : "Nuôi ngay"}
+                        <button
+                          type="submit"
+                          className="btn btn-ghost px-3 py-1.5 text-xs"
+                          disabled={pinging || station.primaryDeferred}
+                          title={station.primaryDeferred ? "Repo chính đang hoãn; dùng Chạy vòng nuôi để chăm repo phụ." : undefined}
+                        >
+                          {station.primaryDeferred ? "Repo chính hoãn" : pinging ? "Đang nuôi…" : "Nuôi ngay"}
                         </button>
                       </form>
                       <button type="button" className="btn btn-ghost px-3 py-1.5 text-xs" onClick={(event) => openEditor(station, event.currentTarget)}>
@@ -379,7 +392,7 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                         action={deleteAction}
                         onSubmit={(e) => {
                           if (!confirm(
-                            `XÓA VĨNH VIỄN ${accountStations.length} REPO CHÍNH của tài khoản GitHub「${station.owner}」?\n\n` +
+                            `XÓA VĨNH VIỄN ${activePrimaryCount} REPO CHÍNH của tài khoản GitHub「${station.owner}」?\n\n` +
                               `${retainedCompanions} repo phụ đã đăng ký sẽ được GIỮ NGUYÊN trên GitHub.\n\n` +
                               "Nếu tài khoản không còn truy cập được, chẳng hạn bị đình chỉ, hệ thống chỉ xoá " +
                               "các station khỏi sổ.",
@@ -438,6 +451,7 @@ function StationEditor({
     null,
   );
   const managed = station?.provisionedBy === "jarvis";
+  const [deferPrimary, setDeferPrimary] = useState(station?.primaryDeferred ?? false);
   return (
     <section
       id="station-editor-dialog"
@@ -491,17 +505,38 @@ function StationEditor({
             <p className="mt-1 text-xs text-[var(--color-mist)]">
               {station
                 ? "PAT mới phải thuộc đúng tài khoản và đủ quyền GitHub."
-                : <>Classic PAT cần <code>repo</code> · <code>workflow</code> · <code>delete_repo</code>.</>}
+                : <>Classic PAT cần <code>repo</code> · <code>workflow</code> · <code>delete_repo</code> · <code>user</code>.</>}
             </p>
             {station && <PatVault key={station.slug} slug={station.slug} />}
           </div>
           {!station && (
             <div>
-              <label className="label" htmlFor="station-repo">Tên repo (tuỳ chọn)</label>
+              <label className="label" htmlFor="station-repo">Tên repo chính dự kiến (tuỳ chọn)</label>
               <input id="station-repo" name="repo" className="input w-full font-mono" maxLength={100}
                 pattern={"[A-Za-z0-9._\\-]+"} title="Chỉ dùng chữ, số, dấu chấm, gạch ngang hoặc gạch dưới."
                 placeholder="Để trống để Ollama tự đặt tên" />
-              <p className="mt-1 text-xs text-[var(--color-mist)]">Để trống để Ollama đặt tên.</p>
+              <p className="mt-1 text-xs text-[var(--color-mist)]">Để trống để Ollama đặt tên. Nếu hoãn repo chính, tên này được giữ chỗ trong sổ để tạo sau.</p>
+            </div>
+          )}
+          {(!station || station.primaryDeferred) && (
+            <div className="rounded-xl border border-[rgba(232,194,92,0.24)] bg-[rgba(232,194,92,0.04)] p-4">
+              <input type="hidden" name="deferPrimaryPresent" value="1" />
+              <label className="flex cursor-pointer items-start gap-3 text-sm" htmlFor="station-defer-primary">
+                <input
+                  id="station-defer-primary"
+                  name="deferPrimary"
+                  type="checkbox"
+                  checked={deferPrimary}
+                  onChange={(event) => setDeferPrimary(event.target.checked)}
+                  className="mt-1 h-5 w-5 shrink-0"
+                />
+                <span>
+                  <b className="text-[var(--color-parchment)]">Tạm thời chưa tạo repo chính / chưa chạy workflow khôi lỗi</b>
+                  <span className="mt-1 block text-xs leading-relaxed text-[var(--color-mist)]">
+                    Hệ thống vẫn đăng ký tài khoản và nuôi các repo phụ bằng Ollama. Khi bỏ tick rồi lưu, Jarvis mới tạo repo chính, cài WORKER_TOKEN và khởi chạy workflow.
+                  </span>
+                </span>
+              </label>
             </div>
           )}
           {managed ? (
@@ -553,12 +588,18 @@ function StationEditor({
           )}
           <div className="flex flex-wrap gap-3">
             <button type="submit" className="btn btn-gold" disabled={pending}>
-              {pending ? station ? "Đang cập nhật…" : "Đang tạo repo + workflow…" : station ? "Cập nhật kho" : "Tạo repo + workflow"}
+              {pending
+                ? station
+                  ? station.primaryDeferred && !deferPrimary ? "Đang tạo repo chính + workflow…" : "Đang cập nhật…"
+                  : deferPrimary ? "Đang đăng ký + tạo repo phụ…" : "Đang tạo repo + workflow…"
+                : station
+                  ? station.primaryDeferred && !deferPrimary ? "Tạo repo chính + chạy khôi lỗi" : "Cập nhật kho"
+                  : deferPrimary ? "Chỉ nuôi repo phụ trước" : "Tạo repo + workflow"}
             </button>
             {station && <button type="button" className="btn btn-ghost" onClick={onNew}>Tạo kho mới</button>}
           </div>
         </fieldset>
-        {pending && <p role="status" className="mt-3 text-sm text-[var(--color-mist)]">{station ? "Đang lưu và kiểm tra workflow…" : "Đang tạo repo và workflow; có thể mất đến 4 phút."}</p>}
+        {pending && <p role="status" className="mt-3 text-sm text-[var(--color-mist)]">{station ? station.primaryDeferred && !deferPrimary ? "Đang tạo repo chính và khởi chạy workflow…" : "Đang lưu cấu hình…" : deferPrimary ? "Đang đăng ký tài khoản, cập nhật profile và khởi tạo vòng nuôi repo phụ…" : "Đang tạo repo, workflow và cập nhật profile; có thể mất đến 4 phút."}</p>}
       </form>
     </section>
   );

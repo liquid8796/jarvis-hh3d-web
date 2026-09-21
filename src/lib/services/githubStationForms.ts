@@ -17,6 +17,10 @@ export type GithubStationFormResult = {
 export type GithubStationFormDependencies = {
   requireManage: () => Promise<unknown>;
   provision: (input: GithubProvisionInput) => Promise<GithubProvisionResult>;
+  activateDeferred?: (
+    station: AppSettings["githubStations"][number],
+    options: { pat?: string; dailyPushes?: number },
+  ) => Promise<GithubProvisionResult>;
   getSettings: () => Promise<AppSettings>;
   mutate: (change: (settings: AppSettings) => void) => Promise<void>;
   whoami: (pat: string, budget: GithubProvisionBudget) => Promise<{ login: string }>;
@@ -52,7 +56,13 @@ export function createGithubStationFormHandlers(deps: GithubStationFormDependenc
     const pat = read(form, "pat");
     try {
       // No owner, workerId, enabled, or companion fields cross the create boundary.
-      const result = await deps.provision({ pat, repo: read(form, "repo"), workflowFile: read(form, "workflowFile"), dailyPushes: read(form, "dailyPushes") });
+      const result = await deps.provision({
+        pat,
+        repo: read(form, "repo"),
+        workflowFile: read(form, "workflowFile"),
+        dailyPushes: read(form, "dailyPushes"),
+        deferPrimary: read(form, "deferPrimary") === "on",
+      });
       const slug = safeSlug(result.slug);
       const response = {
         ...result,
@@ -88,6 +98,29 @@ export function createGithubStationFormHandlers(deps: GithubStationFormDependenc
         return { ok: false, slug, message: `Giới hạn lượt đẩy phải là số nguyên từ ${MIN_DAILY_PUSHES} đến ${MAX_DAILY_PUSHES}.` };
       }
     }
+    const deferPrimary = form.has("deferPrimaryPresent")
+      ? read(form, "deferPrimary") === "on"
+      : existing.primaryDeferred;
+    if (!existing.primaryDeferred && deferPrimary) {
+      return { ok: false, slug, message: "Repo chính đã tồn tại; không thể quay ngược station về chế độ chưa tạo repo chính." };
+    }
+    if (existing.primaryDeferred && !deferPrimary) {
+      if (!deps.activateDeferred) return { ok: false, slug, message: "Máy chủ chưa hỗ trợ mở repo chính cho station đang tạm hoãn." };
+      try {
+        const result = await deps.activateDeferred(existing, { pat: pat || undefined, dailyPushes });
+        const response = {
+          ...result,
+          slug: safeSlug(result.slug) ?? slug,
+          message: redact(result.message, pat),
+          warnings: result.warnings.map((warning) => redact(warning, pat)),
+        };
+        if (result.ok) invalidate(slug);
+        return response;
+      } catch {
+        return { ok: false, slug, stage: "attention", message: "Không mở được repo chính an toàn. Station vẫn giữ nguyên chế độ chỉ nuôi repo phụ.", warnings: [] };
+      }
+    }
+
     const workflowFile = form.has("workflowFile") ? read(form, "workflowFile").trim() : undefined;
     const workerId = form.has("workerId") ? read(form, "workerId").trim() : undefined;
     function reviewEditable(station: AppSettings["githubStations"][number]): string | null {

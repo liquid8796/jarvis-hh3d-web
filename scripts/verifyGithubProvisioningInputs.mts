@@ -24,6 +24,7 @@ assert.deepEqual(defaults, {
   dailyPushes: 5,
   workerId: "",
   generatedRepo: true,
+  deferPrimary: false,
 });
 assert.deepEqual(normalize({ repo: "  " }), { ...normalize(), repo: "", workerId: "", generatedRepo: true });
 
@@ -33,6 +34,20 @@ const supplied = normalizeGithubProvisionInput(
 assert.equal(supplied.repo, "given-worker", "explicit repository names are only trimmed");
 assert.equal(supplied.workerId, "", "worker identity is assigned after the repository name is accepted");
 assert.equal(supplied.generatedRepo, false);
+assert.equal(supplied.deferPrimary, false);
+
+const deferred = normalizeGithubProvisionInput({
+  pat: fixturePat,
+  repo: "planned-primary",
+  workflowFile: "worker.yml",
+  dailyPushes: 5,
+  deferPrimary: true,
+  workerId: "reserved-worker",
+  activateDeferredSlug: "Owner/planned-primary",
+});
+assert.equal(deferred.deferPrimary, true);
+assert.equal(deferred.workerId, "reserved-worker");
+assert.equal(deferred.activateDeferredSlug, "Owner/planned-primary");
 
 for (const good of ["0", "24"]) {
   assert.doesNotThrow(() => normalize({ dailyPushes: good }), `dailyPushes=${good} should be accepted`);

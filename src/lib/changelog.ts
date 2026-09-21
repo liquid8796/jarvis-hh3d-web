@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.89",
+    date: "2026-09-21",
+    lines: [
+      "Nuôi kho GitHub nay có thể chỉ tạo/nuôi repo phụ trước; khi bỏ chế độ hoãn, repo chính và khôi lỗi chính mới được mở mà không mất các repo phụ.",
+      "Auto chuyển Hẹn giờ quest sang cột trái, có thể gấp/mở; các nút Mở/Gấp của quest cũng lớn và dễ bấm hơn.",
+      "Profile GitHub mới được Ollama điền bio/name an toàn khi PAT có quyền user; avatar vẫn giữ nguyên vì PAT không hỗ trợ đổi ảnh tự động.",
+    ],
+  },
+  {
     version: "1.3.88",
     date: "2026-09-21",
     lines: [
@@ -470,15 +479,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Mê Cung thôi đuổi nhầm cả đội ngay sau khi đánh xong một lượt — trước đây phòng vì thế không bao giờ đủ người lại.",
       "Ai vào phòng rồi ngồi im quá lâu thì vẫn bị mời ra như cũ; đồng hồ chỉ thôi tính cả thời gian đang đánh.",
       "Và nếu hai lượt liền không gom đủ đội, auto trả phòng lại rồi đi làm việc khác thay vì ôm chỗ nửa tiếng.",
-    ],
-  },
-  {
-    version: "1.3.39",
-    date: "2026-08-22",
-    lines: [
-      "Hỷ Sự Đường nay bấm thêm nút「Mở Lì Xì Nhanh」sau khi đã ghé các phòng, nên không còn sót lì xì nữa.",
-      "Chỗ sót là những lì xì của tiệc đã tan — phòng không còn trong danh sách để mà ghé vào nhận.",
-      "Nhật ký kể luôn mở được mấy cái và nhận về những gì.",
     ],
   },
 ];

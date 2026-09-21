@@ -28,6 +28,7 @@ export function QuestTimerPanel({
   const [rows, setRows] = useState<TimerRow[]>(() =>
     initialTimers.map((timer, index) => ({ ...timer, rowId: "saved-" + index })),
   );
+  const [collapsed, setCollapsed] = useState(false);
   const enabled = new Set(enabledQuestKeys);
   const used = new Set(rows.map((row) => row.questKey));
   const canAdd = rows.length < QUEST_TIMER_OPTIONS.length;
@@ -47,26 +48,49 @@ export function QuestTimerPanel({
   };
 
   return (
-    <section className="card card-hairline p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="h-display text-lg font-bold text-gilded">Hẹn giờ quest</h2>
+    <section className="card card-hairline overflow-hidden p-0">
+      <button
+        type="button"
+        className="flex min-h-16 w-full items-center justify-between gap-4 px-6 py-5 text-left transition hover:bg-[rgba(232,194,92,0.04)]"
+        onClick={() => setCollapsed((value) => !value)}
+        aria-expanded={!collapsed}
+        aria-controls="quest-timer-body"
+      >
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="h-display text-lg font-bold text-gilded">Hẹn giờ quest</h2>
+            <span className="rounded-full border border-[var(--color-ink-600)] px-2 py-0.5 text-[11px] text-[var(--color-mist)]">
+              {rows.length} lịch
+            </span>
+          </div>
           <p className="mt-1 max-w-xl text-xs leading-relaxed text-[var(--color-mist)]">
             Mỗi quest có một mốc giờ Việt Nam mỗi ngày. Trước mốc này quest được gác lại; từ đúng
             mốc tới hết ngày nó chạy theo flow/cooldown bình thường. Khai Đàn vẫn là công tắc tổng.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost shrink-0"
-          onClick={addTimer}
-          disabled={!canAdd || pending}
+        <span
+          aria-hidden="true"
+          className={`shrink-0 text-base text-[var(--color-gold-300)] transition-transform duration-200 ${
+            collapsed ? "-rotate-90" : ""
+          }`}
         >
-          + Thêm hẹn giờ
-        </button>
-      </div>
+          ▼
+        </span>
+      </button>
 
-      <form action={action} className="mt-5 space-y-3">
+      <div id="quest-timer-body" hidden={collapsed} className="border-t border-[var(--color-ink-600)]/50 px-6 pb-6 pt-5">
+        <div className="mb-4 flex justify-start">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={addTimer}
+            disabled={!canAdd || pending}
+          >
+            + Thêm hẹn giờ
+          </button>
+        </div>
+
+        <form action={action} className="space-y-3">
         <input
           type="hidden"
           name="questTimersJson"
@@ -169,7 +193,8 @@ export function QuestTimerPanel({
             {state.message}
           </p>
         )}
-      </form>
+        </form>
+      </div>
     </section>
   );
 }

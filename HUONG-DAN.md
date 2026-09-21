@@ -104,10 +104,12 @@ Muốn dừng hẳn thì bấm **Thu Đàn** — auto dừng ở điểm an toà
 
 #### Hẹn giờ một quest mỗi ngày
 
-Trong cột Auto, mở khối **Hẹn giờ quest** rồi bấm **+ Thêm hẹn giờ**. Chọn quest và nhập đúng
-**giờ / phút / giây theo giờ Việt Nam**, sau đó bấm **Lưu lịch hẹn**. Trước mốc đó riêng quest
-được chọn sẽ chờ; từ đúng mốc tới hết ngày nó chạy theo cooldown bình thường. Muốn hẹn quest
-khác thì thêm một khối khác; mỗi quest chỉ có một mốc trong ngày.
+Trong **cột trái của Auto**, ngay dưới Ngọc Giản, mở khối **Hẹn giờ quest** rồi bấm
+**+ Thêm hẹn giờ**. Chọn quest và nhập đúng **giờ / phút / giây theo giờ Việt Nam**, sau đó bấm
+**Lưu lịch hẹn**. Trước mốc đó riêng quest được chọn sẽ chờ; từ đúng mốc tới hết ngày nó chạy
+theo cooldown bình thường. Muốn hẹn quest khác thì thêm một khối khác; mỗi quest chỉ có một mốc
+trong ngày. Khối Hẹn giờ và các khối quest đều có nút **Mở/Gấp** lớn hơn để dễ bấm, không cần
+chạm đúng tam giác nhỏ.
 
 Lịch hẹn **không tự bật quest** — quest vẫn phải được bật trong Ngọc Giản. **Khai Đàn** vẫn phải
 đang hoạt động; bấm **Thu Đàn** thì mọi lịch dừng theo. Với các nhiệm vụ hub, lịch không bỏ qua

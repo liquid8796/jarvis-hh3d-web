@@ -81,14 +81,19 @@ function resolveGroup(settings: AppSettings, selectedSlug: string): Resolution {
 
   const owner = selected[0].owner;
   const ownerStations = settings.githubStations.filter((station) => same(station.owner, owner));
-  const targets: PrimaryTarget[] = ownerStations.map((station) => ({
-    owner: station.owner,
-    repo: station.repo,
-    slug: `${station.owner}/${station.repo}`,
-    githubId: station.githubId,
-    workerId: station.workerId,
-    verifiedDeletedGithubId: station.primaryDeleteVerifiedGithubId,
-  }));
+  // Deferred rows reserve a future primary name but DO NOT represent a GitHub repository yet.
+  // Never send DELETE for them; account-wide removal still drops their registry row later while
+  // companion repos remain untouched exactly like the existing deletion contract.
+  const targets: PrimaryTarget[] = ownerStations
+    .filter((station) => !station.primaryDeferred)
+    .map((station) => ({
+      owner: station.owner,
+      repo: station.repo,
+      slug: `${station.owner}/${station.repo}`,
+      githubId: station.githubId,
+      workerId: station.workerId,
+      verifiedDeletedGithubId: station.primaryDeleteVerifiedGithubId,
+    }));
   const primaryNames = new Set(targets.map((target) => target.repo.toLowerCase()));
   if (primaryNames.size !== targets.length) {
     throw new SafeDeletionError("preflight", `Sổ tài khoản「${owner}」có tên repo chính bị trùng; chưa xóa gì.`);

@@ -193,16 +193,17 @@ function CollapseToggle({
       aria-expanded={!collapsed}
       aria-controls={bodyId}
       title={collapsed ? `Mở ${label}` : `Gấp ${label}`}
-      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--color-mist)] transition hover:text-[var(--color-parchment)]"
+      className="flex min-h-11 min-w-[5.5rem] shrink-0 items-center justify-center gap-2 rounded-lg border border-transparent px-3 text-[var(--color-mist)] transition hover:border-[var(--color-ink-500)] hover:bg-[rgba(232,194,92,0.06)] hover:text-[var(--color-parchment)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-gold-300)]"
     >
       <span
         aria-hidden="true"
-        className={`text-[10px] leading-none transition-transform duration-200 ${
+        className={`text-sm leading-none transition-transform duration-200 ${
           collapsed ? "-rotate-90" : ""
         }`}
       >
         ▼
       </span>
+      <span className="text-xs font-medium">{collapsed ? "Mở" : "Gấp"}</span>
       <span className="sr-only">{collapsed ? `Mở khối ${label}` : `Gấp khối ${label}`}</span>
     </button>
   );

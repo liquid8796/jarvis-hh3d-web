@@ -133,6 +133,13 @@ try {
     const toggle = toggleOf(key);
 
     check(`${label}: có nút gấp`, (await toggle.count()) === 1, `đếm được ${await toggle.count()}`);
+    const hit = await toggle.boundingBox();
+    check(
+      `${label}: vùng bấm Mở/Gấp đủ rộng cho chuột/touch`,
+      !!hit && hit.height >= 44 && hit.width >= 80,
+      hit ? `${Math.round(hit.width)}×${Math.round(hit.height)}px` : "không đo được",
+    );
+    check(`${label}: nút có nhãn Mở/Gấp nhìn thấy được`, /Mở|Gấp/.test(await toggle.innerText()));
     check(`${label}: thân khối đang mở`, await body.isVisible());
     check(`${label}: nút khai đang mở`, (await toggle.getAttribute("aria-expanded")) === "true");
 
@@ -211,6 +218,26 @@ try {
       () => document.querySelectorAll('#simpleVip-body input[type="checkbox"]').length,
     );
     check("lưới đang gấp nhưng ô tick vẫn nằm nguyên trong DOM", boxes > 0, `${boxes} ô tick`);
+  }
+
+  // ---- Hẹn giờ quest: khối riêng ở cột trái cũng phải gấp được mà không submit ---------------
+  {
+    const timerToggle = page.locator('[aria-controls="quest-timer-body"]');
+    const timerBody = page.locator("#quest-timer-body");
+    check("Hẹn giờ quest: có collapse riêng", (await timerToggle.count()) === 1);
+    const hit = await timerToggle.boundingBox();
+    check(
+      "Hẹn giờ quest: cả header là vùng bấm rộng",
+      !!hit && hit.height >= 60 && hit.width >= 300,
+      hit ? `${Math.round(hit.width)}×${Math.round(hit.height)}px` : "không đo được",
+    );
+    posts.length = 0;
+    const wasOpen = await timerBody.isVisible();
+    await timerToggle.click();
+    await page.waitForTimeout(100);
+    check("Hẹn giờ quest: bấm header đổi trạng thái gấp/mở", (await timerBody.isVisible()) !== wasOpen);
+    check("Hẹn giờ quest: gấp/mở không nộp form", posts.length === 0, posts.join(" · ") || "không POST nào");
+    await timerToggle.click();
   }
 
   // ---- Khối của tab Thường ------------------------------------------------------------------

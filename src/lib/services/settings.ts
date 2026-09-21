@@ -443,6 +443,8 @@ export const appSettingsSchema = z.object({
         /** PAT của tài khoản giữ kho, phong bì secretBox `v1.…`. */
         pat: z.string().min(1),
         provisionedBy: z.literal("jarvis").optional(),
+        /** Chỉ giữ station/PAT để nuôi repo phụ; repo chính/workflow chưa được tạo. */
+        primaryDeferred: z.boolean().catch(false).default(false),
         githubId: z.number().int().positive().optional(),
         initialCommitSha: z.string().max(100).optional(),
         primaryDeleteVerifiedGithubId: z.number().int().positive().optional(),

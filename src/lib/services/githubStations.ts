@@ -611,6 +611,16 @@ export async function pingStation(
 ): Promise<StationPing> {
   const slug = stationSlug(station);
 
+  if (station.primaryDeferred) {
+    return {
+      slug,
+      ok: true,
+      note: "Repo chính đang tạm hoãn; lượt này chỉ dành cho vòng nuôi repo phụ.",
+      committed: false,
+      workflowState: "unknown",
+    };
+  }
+
   if (!isEncrypted(station.pat)) {
     // Phong bì hỏng (sửa tay JSONB, hoặc đổi ENCRYPTION_KEY mà quên nhập lại PAT). Chết ở đây
     // với một câu chỉ đúng việc phải làm, đừng để `decryptSecret` ném một câu về mã hoá.
@@ -869,7 +879,7 @@ export async function runKeepalive(options: { force?: boolean; deadlineAt?: numb
   // Thứ tự lặp là thứ tự ƯU TIÊN, không phải thứ tự sổ — xem `keepaliveOrder`. Từ lượt gỡ trần
   // số kho (18/08/2026) đây là thứ giữ cho một sổ dài hơn ngân sách không bỏ rơi mãi mãi đúng
   // mấy kho cuối danh sách.
-  const due = keepaliveOrder(settings.githubStations.filter((s) => s.enabled));
+  const due = keepaliveOrder(settings.githubStations.filter((s) => s.enabled && !s.primaryDeferred));
   const startedAt = Date.now();
   const cutoff = Math.min(startedAt + LOOP_BUDGET_MS, options.deadlineAt ?? Number.POSITIVE_INFINITY);
   const results: StationPing[] = [];

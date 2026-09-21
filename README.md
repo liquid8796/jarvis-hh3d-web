@@ -599,6 +599,14 @@ lần. Cách dùng: đặt workflow `schedule` gọi `npm run worker` với mộ
 tự thoát, rồi nó tự khởi động lại ở nhịp sau. Được việc và thật sự miễn phí, đổi lại có
 khoảng trống giữa các phiên và cron của Actions hay bị trễ vài phút.
 
+Ở tab **Nuôi kho GitHub**, khi provision một account mới có thể chọn **chưa tạo repo chính**.
+Jarvis vẫn giữ PAT + tên repo/WORKER_ID dự kiến và cho Ollama tạo/nuôi repo phụ, nhưng không tạo
+primary repo, không cài secret và không dispatch workflow. Bỏ lựa chọn ấy ở lần sửa sau sẽ tạo
+repo chính trên đúng station đang có, nên repo phụ không bị mất khỏi sổ. Provision mới cần classic
+PAT có `repo`, `workflow`, `delete_repo`, `user`; scope `user` dùng để cập nhật profile pseudonymous
+(name/bio/company/location) sau khi account được đăng ký. Avatar không đổi tự động vì GitHub PAT
+không có API upload avatar; hệ thống báo warning thay vì dùng browser bypass.
+
 ### Những chỗ KHÔNG nên dùng
 
 - **Render free** — web service tự ngủ sau ~15 phút không có request, mà worker thì không

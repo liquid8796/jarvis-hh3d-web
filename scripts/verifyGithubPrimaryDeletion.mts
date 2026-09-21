@@ -124,6 +124,21 @@ await check("selected row deletes every same-owner primary and never requests co
   assert.match(result.message, /3 repo phụ không nhận yêu cầu xóa/);
 });
 
+await check("deferred primary rows are removed from the register without ever reaching GitHub DELETE", async () => {
+  const live = station("Owner", "main-live", 101, "pat-a", ["companion-a"]);
+  const deferred = station("owner", "future-main", 102, "pat-b", ["companion-b"]);
+  deferred.primaryDeferred = true;
+  delete deferred.githubId;
+  const f = fixture({ stations: [live, deferred] });
+  const result = await remove(f, "Owner/future-main");
+  assert.equal(result.ok, true);
+  assert.equal(result.matched, 1, "only the materialized primary is a remote deletion target");
+  assert.deepEqual([...f.deleted], ["owner/main-live"]);
+  assert.ok(!f.calls.some((call) => call.path.toLowerCase().includes("future-main")));
+  assert.equal(f.state().githubStations.length, 0, "both station rows leave the local register");
+  assert.match(result.message, /2 repo phụ không nhận yêu cầu xóa/);
+});
+
 await check("missing, duplicate and primary-companion collision registers stop before GitHub", async () => {
   for (const stations of [
     [station("Owner", "one", 1, "pat")],

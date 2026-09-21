@@ -41,6 +41,7 @@ export type StationView = {
   workflowFile: string;
   workerId: string;
   provisionedBy?: "jarvis";
+  primaryDeferred: boolean;
   enabled: boolean;
   lastPingAt: string | null;
   lastCommitAt: string | null;
@@ -98,6 +99,7 @@ function viewOf(station: AppSettings["githubStations"][number], now: number): St
     workflowFile: station.workflowFile,
     workerId: station.workerId,
     provisionedBy: station.provisionedBy,
+    primaryDeferred: station.primaryDeferred,
     enabled: station.enabled,
     lastPingAt: station.lastPingAt,
     lastCommitAt: station.lastCommitAt,
@@ -181,6 +183,21 @@ export async function revealGithubStationPatAction(slug: string): Promise<Statio
 const stationForms = createGithubStationFormHandlers({
   requireManage: requireStationManage,
   provision: provisionGithubStation,
+  activateDeferred: async (station, options) => {
+    let pat = options.pat?.trim() ?? "";
+    if (!pat) {
+      if (!isEncrypted(station.pat)) throw new Error("stored PAT is not encrypted");
+      pat = decryptSecret(station.pat);
+    }
+    return provisionGithubStation({
+      pat,
+      repo: station.repo,
+      workflowFile: station.workflowFile,
+      dailyPushes: options.dailyPushes ?? station.dailyPushes,
+      workerId: station.workerId,
+      activateDeferredSlug: stationSlug(station),
+    });
+  },
   getSettings: getAppSettings,
   mutate: mutateGithubState,
   whoami: productionGithubProvisionDependencies.whoami,

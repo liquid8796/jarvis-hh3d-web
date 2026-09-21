@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.88",
+    date: "2026-09-21",
+    lines: [
+      "Trong Phòng Chat, bấm khung tin được trả lời nay tự đưa bạn về đúng tin gốc và làm nó sáng nhẹ để dễ nhận ra.",
+      "Tin gốc nằm ở lịch sử cũ thì sảnh tự lật tới đúng chỗ; tin đã hết hạn sẽ báo rõ thay vì bấm mà không có phản hồi.",
+    ],
+  },
+  {
     version: "1.3.87",
     date: "2026-09-20",
     lines: [
@@ -471,14 +479,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Hỷ Sự Đường nay bấm thêm nút「Mở Lì Xì Nhanh」sau khi đã ghé các phòng, nên không còn sót lì xì nữa.",
       "Chỗ sót là những lì xì của tiệc đã tan — phòng không còn trong danh sách để mà ghé vào nhận.",
       "Nhật ký kể luôn mở được mấy cái và nhận về những gì.",
-    ],
-  },
-  {
-    version: "1.3.38",
-    date: "2026-08-22",
-    lines: [
-      "Thông báo của Tông Môn nay có thời hạn riêng: người phát đặt nó sống mấy giờ hay mấy ngày, thay vì bảy ngày cho mọi lời nhắn.",
-      "Hết hạn là popup thôi hiện — tin bảo trì tối nay không còn nhảy ra chặn màn hình suốt một tuần sau đó.",
     ],
   },
 ];

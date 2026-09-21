@@ -80,6 +80,15 @@ const NEAR_BOTTOM_PX = 60;
  */
 const RESTORE_MAX_HOPS = 4;
 
+/**
+ * Một cú bấm quote được phép lật sâu hơn bootstrap chưa-đọc: đây là hành động CÓ CHỦ Ý của người
+ * dùng, và reply có thể trỏ về một cuộc trò chuyện cách vài trăm tin. 20 trang = tối đa 1000 tin,
+ * đủ sâu để hữu dụng mà vẫn có trần cứng nếu một thread cực cũ.
+ */
+const REPLY_JUMP_MAX_HOPS = 20;
+/** Target sáng nhẹ ngần này để mắt bắt được vị trí vừa nhảy tới. */
+const REPLY_JUMP_FLASH_MS = 1600;
+
 /** Vạch chưa-đọc đứng cách mép trên chừng này khi mở sảnh — đủ hở để thấy mình đang ở giữa dòng. */
 const RESTORE_TOP_GAP_PX = 24;
 
@@ -243,6 +252,8 @@ export function ChatRoom({
   const [stuck, setStuck] = useState(true);
   const [unseen, setUnseen] = useState(0);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [replyJumpLoading, setReplyJumpLoading] = useState<string | null>(null);
+  const [jumpHighlightId, setJumpHighlightId] = useState<string | null>(null);
   const [reachedTop, setReachedTop] = useState(false);
   /** Bao nhiêu tin ở cuối kho đang được dựng thẻ — xem RENDER_WINDOW. */
   const [windowSize, setWindowSize] = useState(RENDER_WINDOW);
@@ -282,6 +293,11 @@ export function ChatRoom({
   const growAnchorHeight = useRef<number | null>(null);
   /** Tin cần neo cuộn tới sau lượt vẽ đầu — tiêu thụ đúng một lần trong `useBeforePaint` dưới. */
   const restoreAnchor = useRef<string | null>(null);
+  /** Reply jump cũng có thể phải chờ React dựng thêm hàng cũ rồi mới có DOM target để cuộn tới. */
+  const pendingReplyJump = useRef<string | null>(null);
+  /** Trong lúc code đang tự cuộn, `onScroll` không được hiểu nhầm là người dùng muốn lật thêm trang. */
+  const replyJumpActive = useRef(false);
+  const replyJumpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Mốc đã-đọc lớn nhất ĐÃ GỬI lên server (ms) — chặn việc lặp lại cùng một cú POST mỗi nhịp. */
   const lastMarkSent = useRef(0);
 
@@ -337,6 +353,45 @@ export function ChatRoom({
 
   /** Cửa sổ đã trùm hết kho chưa — quyết định cuộn lên nữa thì nới cửa sổ hay đi xin trang cũ. */
   const windowCoversStore = visible.length >= messages.length;
+
+  /**
+   * Đưa target đang có DOM vào khoảng 1/3 vùng nhìn rồi chớp nhẹ bong bóng của nó.
+   * Dùng scroll của CHÍNH `.chat-scroll`, không `scrollIntoView`: hàm sau có thể kéo cả trang
+   * phía sau cùng đi, nhất là lúc sảnh chưa ở chế độ full-screen.
+   *
+   * NHẢY TỨC THÌ, không smooth: target có thể cách hơn mười nghìn pixel khi reply rất cũ.
+   * Animation qua quãng ấy vừa chậm vừa phát hàng loạt `scroll` trung gian — chính lớp sự kiện
+   * từng làm cửa sổ chat co lại nhầm. Highlight 1,6s là tín hiệu định hướng cho mắt thay thế.
+   */
+  const scrollAndFlashReplyTarget = useCallback((id: string) => {
+    const el = scrollRef.current;
+    if (!el) return false;
+    const row = el.querySelector(`[data-msg-id="${CSS.escape(id)}"]`);
+    if (!(row instanceof HTMLElement)) return false;
+
+    const rowTop = row.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+    const rowHeight = row.getBoundingClientRect().height;
+    const top = Math.max(0, rowTop - Math.max(RESTORE_TOP_GAP_PX, (el.clientHeight - rowHeight) / 3));
+
+    replyJumpActive.current = true;
+    setStuck(false);
+    jumpScrollTo(el, top);
+    setJumpHighlightId(id);
+    // `instant` chỉ phát một nhịp scroll. Giữ cờ qua đúng lượt vẽ hiện tại rồi trả lại quyền
+    // cuộn cho người dùng; highlight sống lâu hơn nhưng không được khoá thao tác tay.
+    requestAnimationFrame(() => { replyJumpActive.current = false; });
+
+    if (replyJumpTimer.current) clearTimeout(replyJumpTimer.current);
+    replyJumpTimer.current = setTimeout(() => {
+      setJumpHighlightId((current) => (current === id ? null : current));
+      replyJumpTimer.current = null;
+    }, REPLY_JUMP_FLASH_MS);
+    return true;
+  }, []);
+
+  useEffect(() => () => {
+    if (replyJumpTimer.current) clearTimeout(replyJumpTimer.current);
+  }, []);
 
   const merge = useCallback((incoming: Message[], incomingAvatars: AvatarMap = {}) => {
     // Bản đồ ảnh vẫn phải được hoà kể cả khi trang tin RỖNG? Không — trang rỗng thì không có
@@ -556,10 +611,18 @@ export function ChatRoom({
   const onScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
+
+    // Cú cuộn do quote vừa phát KHÔNG phải ý định của người dùng. Đặc biệt phải chặn TRƯỚC
+    // phép đo "đang ở đáy": frame đầu của smooth-scroll vẫn đứng ở đáy cũ; nếu nâng stuck=true
+    // ở frame ấy, effect ghim-đáy co cửa sổ về 60 tin và gỡ chính target khỏi DOM giữa cú nhảy.
+    if (replyJumpActive.current) {
+      setStuck(false);
+      return;
+    }
+
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
     setStuck(atBottom);
     if (atBottom) setUnseen(0);
-
     if (el.scrollTop >= NEAR_TOP_PX || messages.length === 0) return;
 
     // Còn tin ĐÃ NẰM SẴN trong kho mà chưa dựng thẻ thì nới cửa sổ trước — tức thì, không một
@@ -622,6 +685,14 @@ export function ChatRoom({
      */
     if (el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX) setStuck(true);
   }, [visible]);
+
+  /** Reply jump chờ tới lượt vẽ mà target thật sự có mặt trong DOM rồi mới cuộn. */
+  useBeforePaint(() => {
+    const id = pendingReplyJump.current;
+    if (!id || visible.length === 0) return;
+    if (!visible.some(({ msg }) => msg.id === id)) return;
+    if (scrollAndFlashReplyTarget(id)) pendingReplyJump.current = null;
+  }, [visible, scrollAndFlashReplyTarget]);
 
   /**
    * Đẩy mốc đã-đọc khi đang DÍNH ĐÁY và tab đang HIỆN — hai điều kiện, thiếu cái nào cũng
@@ -734,6 +805,81 @@ export function ChatRoom({
       });
     } finally {
       setLoadingOlder(false);
+    }
+  };
+
+  /**
+   * Bấm vào khung reply → tìm và nhảy tới tin gốc.
+   *
+   * Ba tầng, theo giá rẻ → đắt:
+   *   1) Target đang có DOM: cuộn ngay.
+   *   2) Target đã nằm trong kho nhưng bị cửa sổ render cắt: nới cửa sổ rồi neo.
+   *   3) Target còn ở Mongo page cũ: lật tuần tự từ trang cổ nhất đang có tới khi gặp target,
+   *      để timeline giữa chỗ đang đọc và tin gốc vẫn LIÊN TỤC chứ không ghép hai đoạn rời nhau.
+   */
+  const jumpToReply = async (id: string) => {
+    if (replyJumpLoading) return;
+    if (scrollAndFlashReplyTarget(id)) return;
+
+    const inStore = messages.findIndex((message) => message.id === id);
+    if (inStore >= 0) {
+      pendingReplyJump.current = id;
+      setStuck(false);
+      setWindowSize((current) => Math.max(current, messages.length - inStore));
+      return;
+    }
+
+    const oldest = messages[0];
+    if (!oldest) return;
+    setReplyJumpLoading(id);
+
+    let cursor = oldest;
+    const fetched: Message[] = [];
+    let fetchedAvatars: AvatarMap = {};
+    let found = false;
+    let exhausted = false;
+
+    try {
+      for (let hop = 0; hop < REPLY_JUMP_MAX_HOPS; hop += 1) {
+        const res = await fetch(
+          `/api/chat?beforeAt=${encodeURIComponent(cursor.createdAt)}&beforeId=${cursor.id}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) break;
+        const page: { messages: Message[]; avatars?: AvatarMap } = await res.json();
+        if (page.messages.length === 0) {
+          exhausted = true;
+          break;
+        }
+
+        for (const message of page.messages) knownIds.current.add(message.id);
+        fetched.push(...page.messages);
+        fetchedAvatars = { ...fetchedAvatars, ...(page.avatars ?? {}) };
+        if (page.messages.some((message) => message.id === id)) {
+          found = true;
+          break;
+        }
+        cursor = page.messages[0];
+      }
+
+      if (found) {
+        pendingReplyJump.current = id;
+        setStuck(false);
+        // Các page vừa lấy nối LIỀN vào đầu kho hiện tại, nên vẽ đủ toàn đoạn là target chắc chắn có DOM.
+        setWindowSize((current) => Math.max(current, messages.length + fetched.length));
+        merge(fetched, fetchedAvatars);
+        return;
+      }
+
+      if (exhausted) setReachedTop(true);
+      setNotice(
+        exhausted
+          ? "Tin gốc không còn trong lịch sử của sảnh."
+          : "Tin gốc ở quá xa — hãy cuộn lên thêm rồi thử lại.",
+      );
+      setTimeout(() => setNotice(""), 3500);
+    } finally {
+      setReplyJumpLoading(null);
     }
   };
 
@@ -959,7 +1105,11 @@ export function ChatRoom({
           const own = msg.userId === me.id;
 
           return (
-            <div key={msg.id} data-msg-id={msg.id}>
+            <div
+              key={msg.id}
+              data-msg-id={msg.id}
+              className={jumpHighlightId === msg.id ? "chat-message-jump" : undefined}
+            >
               {showDay && <div className="chat-day"><span>{fmtDay(msg.createdAt)}</span></div>}
               {/* Vạch nằm SAU mốc ngày: mốc ngày kể「hôm nào」, vạch kể「từ đây là phần bạn
                   chưa xem」— đảo lại thì vạch chỉ vào cả cái mốc ngày, một thứ không ai cần
@@ -1032,10 +1182,16 @@ export function ChatRoom({
 
                   <div className={`chat-bubble ${msg.sticker ? "sticker" : ""}`}>
                     {msg.replyTo && (
-                      <div className="chat-quote">
+                      <button
+                        type="button"
+                        className="chat-quote"
+                        onClick={() => void jumpToReply(msg.replyTo!.id)}
+                        aria-label={`Đi tới tin gốc của ${msg.replyTo.author}`}
+                        aria-busy={replyJumpLoading === msg.replyTo.id}
+                      >
                         <b>{msg.replyTo.author}</b>
                         <span>{msg.replyTo.excerpt || "…"}</span>
-                      </div>
+                      </button>
                     )}
 
                     {msg.deleted ? (

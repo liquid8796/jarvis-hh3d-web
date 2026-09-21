@@ -121,6 +121,11 @@ JOIN với ai, nên nhét chung là bắt bản backup của danh tính gánh c�
 chưa". Từ 02/08 tới 08/08/2026 kho ấy là Upstash Redis; xem [CHANGELOG](CHANGELOG.md) mục
 0.40.0 để biết vì sao đổi sang Mongo. Cách dựng kho: [deploy/mongodb.md](deploy/mongodb.md).
 
+Tin **reply** giữ id của message gốc. Khung trích dẫn trong bong bóng là một nút điều hướng:
+bấm vào thì client nới cửa sổ/lật page cũ nếu cần, cuộn tới message gốc trong chính vùng chat
+và chớp nhẹ target. Vì lật tuần tự từ page hiện tại tới target, timeline không bị ghép hai đoạn
+rời nhau chỉ để thực hiện cú nhảy.
+
 **Còn BYTES của file đính kèm thì không nằm ở database nào cả** — chúng ở **OCI Object
 Storage** (bucket `jarvis-media`), và Mongo chỉ giữ URL. Kho media là thứ duy nhất trong hệ
 thống có nhu cầu phục vụ tải xuống công khai với dung lượng lớn, tức đúng thứ mà cả Postgres

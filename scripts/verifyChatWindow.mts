@@ -79,8 +79,24 @@ const token = await new SignJWT({
   .setExpirationTime("10m")
   .sign(new TextEncoder().encode(process.env.AUTH_SECRET));
 
+type FakeMessage = {
+  id: string;
+  userId: string;
+  author: string;
+  isAdmin: boolean;
+  tags: string[];
+  text: string;
+  sticker: string | null;
+  attachments: Array<{ url: string; name: string; size: number; type: string }>;
+  replyTo: { id: string; author: string; excerpt: string } | null;
+  reactions: Array<{ emoji: string; count: number; mine: boolean }>;
+  createdAt: string;
+  editedAt: string | null;
+  deleted: boolean;
+};
+
 /** Tin giả — đúng hình dạng `/api/chat` trả về. `n` càng lớn càng mới. */
-const fakeMessage = (n: number) => ({
+const fakeMessage = (n: number): FakeMessage => ({
   id: `fake-${n}`,
   userId: n % 3 === 0 ? user.id : "nguoi-khac",
   author: n % 3 === 0 ? "Kiểm Thử" : "Đạo Hữu Khác",
@@ -274,6 +290,75 @@ try {
   await page.close();
 
   /**
+   * ── REPLY JUMP: quote ở trang mới nhất, tin gốc nằm sâu ba trang cũ ─────────────────────────
+   *
+   * Không chỉ soi `onClick` tồn tại. Cảnh này bắt browser THẬT bấm quote, đếm request lật trang,
+   * rồi đo target có thật sự lọt vào viewport và mang lớp chớp định vị. Nếu sau này cửa sổ render
+   * co lại mà ai chỉ `scrollIntoView` target chưa có DOM, phép thử sẽ đỏ đúng chỗ.
+   */
+  const replyPage = await context.newPage();
+  replyPage.on("console", (m) => {
+    if (m.type() === "error" || m.type() === "warning") noise.push(`${m.type()}: ${m.text().slice(0, 160)}`);
+  });
+  let replyOlderServed = 0;
+  await replyPage.route("**/api/chat**", async (route) => {
+    const request = route.request();
+    if (request.method() !== "GET") return route.fulfill({ json: { ok: true } });
+
+    const wantsOlder = new URL(request.url()).searchParams.has("beforeAt");
+    if (!wantsOlder) {
+      const messages = Array.from({ length: 50 }, (_, i) => fakeMessage(350 + i));
+      messages[messages.length - 1] = {
+        ...messages[messages.length - 1],
+        replyTo: { id: "fake-240", author: "Đạo Hữu Khác", excerpt: "Tin thử số 240" },
+      };
+      return route.fulfill({ json: { messages, typing: [], avatars: {} } });
+    }
+
+    replyOlderServed += 1;
+    const start = replyOlderServed === 1 ? 300 : replyOlderServed === 2 ? 250 : 200;
+    const messages =
+      replyOlderServed <= 3
+        ? Array.from({ length: 50 }, (_, i) => fakeMessage(start + i))
+        : [];
+    return route.fulfill({ json: { messages, typing: [], avatars: {} } });
+  });
+
+  await replyPage.goto(`${ORIGIN}/chat`, { waitUntil: "domcontentloaded" });
+  await replyPage.waitForSelector(".chat-quote", { timeout: 30_000 });
+  check(
+    "khung reply là button thật để click/keyboard đều dùng được",
+    (await replyPage.locator(".chat-quote").last().evaluate((el) => el.tagName)) === "BUTTON",
+  );
+  await replyPage.locator(".chat-quote").last().click();
+  await replyPage.waitForSelector('[data-msg-id="fake-240"].chat-message-jump', { timeout: 15_000 });
+
+  const replyJump = (await replyPage.evaluate(`(() => {
+    const scroller = document.querySelector(".chat-scroll");
+    const target = document.querySelector('[data-msg-id="fake-240"]');
+    if (!scroller || !target) return null;
+    const s = scroller.getBoundingClientRect();
+    const t = target.getBoundingClientRect();
+    return {
+      visible: t.bottom > s.top && t.top < s.bottom,
+      topGap: Math.round(t.top - s.top),
+      highlighted: target.classList.contains("chat-message-jump"),
+    };
+  })()`)) as { visible: boolean; topGap: number; highlighted: boolean } | null;
+
+  check(
+    "bấm reply tự lật liên tục tới đúng page chứa tin gốc",
+    replyOlderServed === 3,
+    `đã lật ${replyOlderServed} page`,
+  );
+  check(
+    "tin gốc được cuộn vào vùng nhìn và chớp định vị",
+    replyJump?.visible === true && replyJump.highlighted === true,
+    replyJump ? `topGap=${replyJump.topGap}px` : "không thấy target",
+  );
+  await replyPage.close();
+
+  /**
    * ── MỐC ĐÃ-ĐỌC: hai cảnh mở sảnh với tin chưa đọc ──────────────────────────────────────────
    *
    * Cảnh A canh đúng lỗi đã ship 22/08: cả phần chưa đọc lọt MỘT màn hình. Cú neo lúc mở sảnh
@@ -390,3 +475,7 @@ try {
 } finally {
   await browser.close();
 }
+
+// `sqlTag` giữ pool Postgres sống; verifier là tiến trình một-lượt nên kết thúc rõ ràng sau khi
+// đã đóng Chromium, nếu không terminal/MCP nhìn nó như đang treo dù mọi assertion đã in xong.
+process.exit(process.exitCode ?? 0);

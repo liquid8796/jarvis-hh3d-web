@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.88 — Bấm khung reply để nhảy tới tin gốc (21/09/2026)
+
+- Khung trích dẫn trong một tin trả lời nay là vùng bấm thật: click vào là Phòng Chat tự cuộn tới message gốc và làm bong bóng gốc sáng nhẹ để mắt bắt được vị trí.
+- Nếu tin gốc đã tải nhưng đang nằm ngoài cửa sổ render, chat tự nới cửa sổ trước khi cuộn. Nếu tin gốc còn ở page cũ hơn, client tự lật tuần tự tối đa 20 page để giữ timeline liên tục rồi mới nhảy; tin đã hết hạn thì báo rõ thay vì im lặng.
+- Regression Chromium dựng reply ở trang mới nhất nhưng target nằm sâu ba page cũ, rồi kiểm đúng ba việc: quote là button thật, client tự tải tới target, target thực sự nằm trong viewport và được highlight.
+
 ## 1.3.87 — Hẹn giờ từng quest theo giờ Việt Nam mỗi ngày (20/09/2026)
 
 - Tab Auto có thêm khối **Hẹn giờ quest**: bấm Thêm hẹn giờ, chọn quest, nhập giờ/phút/giây rồi lưu. Mỗi quest có tối đa một mốc mỗi ngày; cùng một mốc áp cho cả flow VIP và thường, còn quest đang tắt trong Ngọc Giản vẫn giữ trạng thái tắt — lịch không tự bật nó.

@@ -162,6 +162,11 @@ Hệ thống nhận ra ảnh động bằng cách đọc bên trong tệp, khôn
 Đổi ảnh là ảnh cũ bị xoá khỏi kho — không có chỗ nào giữ lại tấm trước đó. Ảnh không bị đóng
 băng vào từng tin nhắn: đổi một lần là mọi tin cũ của bạn trong sảnh cũng mang mặt mới.
 
+Trong **Phòng Chat**, nếu một tin đang trả lời một tin khác thì phần trích dẫn ở đầu bong bóng
+có thể bấm được. Bấm vào đó, sảnh sẽ tự cuộn về **tin gốc** và làm nó sáng nhẹ trong chốc lát.
+Tin gốc nằm ở trang cũ thì chat tự lật lịch sử tới đúng chỗ; nếu tin đã hết hạn khỏi kho thì
+sảnh sẽ báo thay vì bấm mà không có phản hồi.
+
 ---
 
 ## 3. "Khôi lỗi" là gì, và khi nào bạn phải quan tâm

@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.90 — Xóa được kho khi tài khoản GitHub đã biến mất (21/09/2026)
+
+- Nút **Xoá** trong Nuôi kho GitHub trước đây không gửi `expectedGroup` dù server bắt buộc phải có. Field này bị đặt nhầm trong form **Nuôi ngay**, nên mọi lượt xóa dừng ngay ở cảnh báo “Danh sách repo chính của tài khoản đã thay đổi” và chưa bao giờ tới nhánh kiểm account đã bị xoá/đình chỉ.
+- `expectedGroup` nay nằm đúng trong form Xoá và bị gỡ khỏi form Nuôi ngay. Hàng rào stale-list vẫn giữ nguyên: nếu danh sách primary thật sự đổi giữa lúc trang mở và lúc xác nhận, server vẫn từ chối an toàn.
+- Khi PAT đã chết và public GitHub trả 404/451 cho account, luồng xóa cũ nay thực sự được chạm tới: hệ thống chỉ gỡ các station của account khỏi registry local, không gửi DELETE mù tới repo không còn tồn tại; companion repos vẫn theo đúng thông báo xác nhận hiện tại.
+- Regression UI giờ kiểm fingerprint nằm trong **chính form Xoá**, tránh kiểu test cũ chỉ tìm field cùng tên ở bất kỳ form nào rồi đậu suông. State-machine account deletion tiếp tục đóng đinh ca PAT 401 + account 404 → local-only removal.
+
 ## 1.3.89 — Nuôi repo phụ trước, profile GitHub gọn hơn, Auto dễ bấm hơn (21/09/2026)
 
 - Form **Tạo kho GitHub mới** có thêm chế độ **Tạm thời chưa tạo repo chính / chưa chạy workflow khôi lỗi**. Ở chế độ này Jarvis chỉ đăng ký PAT + danh tính station, giữ chỗ tên repo/WORKER_ID và cho vòng Ollama tạo/nuôi repo phụ; cron primary keepalive bỏ qua station đó. Khi admin mở lại station, bỏ tick rồi lưu, Jarvis materialize repo chính **in-place**, giữ nguyên toàn bộ companion repos/runtime trace, cài secret, push workflow và dispatch khôi lỗi.

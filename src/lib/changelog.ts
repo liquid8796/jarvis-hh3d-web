@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.90",
+    date: "2026-09-21",
+    lines: [
+      "Nuôi kho GitHub nay gỡ được kho trong sổ ngay cả khi tài khoản GitHub đã bị xoá bên ngoài.",
+      "Nút Xoá gửi đúng thông tin xác nhận danh sách repo chính; repo phụ vẫn không nhận lệnh xoá.",
+    ],
+  },
+  {
     version: "1.3.89",
     date: "2026-09-21",
     lines: [
@@ -470,15 +478,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-23",
     lines: [
       "Máy chạy tự động của tông môn nay tự gọi ca sau trước khi hết ca, nên không còn khoảng trống hàng giờ giữa hai ca như trước.",
-    ],
-  },
-  {
-    version: "1.3.40",
-    date: "2026-08-23",
-    lines: [
-      "Mê Cung thôi đuổi nhầm cả đội ngay sau khi đánh xong một lượt — trước đây phòng vì thế không bao giờ đủ người lại.",
-      "Ai vào phòng rồi ngồi im quá lâu thì vẫn bị mời ra như cũ; đồng hồ chỉ thôi tính cả thời gian đang đánh.",
-      "Và nếu hai lượt liền không gom đủ đội, auto trả phòng lại rồi đi làm việc khác thay vì ôm chỗ nửa tiếng.",
     ],
   },
 ];

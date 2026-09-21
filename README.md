@@ -607,6 +607,11 @@ PAT có `repo`, `workflow`, `delete_repo`, `user`; scope `user` dùng để cậ
 (name/bio/company/location) sau khi account được đăng ký. Avatar không đổi tự động vì GitHub PAT
 không có API upload avatar; hệ thống báo warning thay vì dùng browser bypass.
 
+Khi một **tài khoản GitHub đã bị xoá/đình chỉ ngoài hệ thống**, nút **Xoá** ở Nuôi kho vẫn phải
+gỡ được station local: form xóa gửi kèm ảnh chụp danh sách repo chính lúc user bấm để chống stale
+confirmation; nếu PAT đã chết và GitHub public xác nhận account không còn tồn tại, service chuyển
+sang local-only removal thay vì cố DELETE một repo không còn. Repo phụ không được nhận lệnh xóa.
+
 ### Những chỗ KHÔNG nên dùng
 
 - **Render free** — web service tự ngủ sau ~15 phút không có request, mà worker thì không

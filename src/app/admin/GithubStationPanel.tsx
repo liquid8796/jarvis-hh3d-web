@@ -375,7 +375,6 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                       <Link href={`/admin/github/${encodeURIComponent(station.owner)}/${encodeURIComponent(station.repo)}`} className="btn btn-ghost px-3 py-1.5 text-xs">Chi tiết</Link>
                       <form action={pingAction}>
                         <input type="hidden" name="slug" value={station.slug} />
-                        <input type="hidden" name="expectedGroup" value={githubPrimaryOwnerGroupFingerprint(accountStations, station.owner)} />
                         <button
                           type="submit"
                           className="btn btn-ghost px-3 py-1.5 text-xs"
@@ -404,6 +403,11 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                         }}
                       >
                         <input type="hidden" name="slug" value={station.slug} />
+                        <input
+                          type="hidden"
+                          name="expectedGroup"
+                          value={githubPrimaryOwnerGroupFingerprint(accountStations, station.owner)}
+                        />
                         <button type="submit" className="btn btn-danger px-3 py-1.5 text-xs" disabled={deleting}>
                           {deleting && deletingSlug === station.slug ? "Đang xoá…" : "Xoá"}
                         </button>

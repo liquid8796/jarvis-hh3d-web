@@ -403,8 +403,12 @@ if (!process.argv.includes("--check")) {
       assert.match(accountDeleteConfirmation, /5 repo phụ đã đăng ký sẽ được GIỮ NGUYÊN trên GitHub/);
       assert.match(accountDeleteConfirmation, /tài khoản không còn truy cập được/);
       assert.match(accountDeleteConfirmation, /chỉ xoá các station khỏi sổ/);
-      const expectedGroup = await page.locator('input[name="expectedGroup"]').first().inputValue();
+      const deleteForm = page.locator("form").filter({ has: page.getByRole("button", { name: "Xoá", exact: true }) }).first();
+      assert.equal(await deleteForm.locator('input[name="expectedGroup"]').count(), 1, "delete form must carry the stale-list fingerprint");
+      const expectedGroup = await deleteForm.locator('input[name="expectedGroup"]').inputValue();
       assert.equal(expectedGroup, "sample-owner/primary-repo#101\nsample-owner/second-primary#102");
+      const pingForm = page.locator("form").filter({ has: page.getByRole("button", { name: "Nuôi ngay", exact: true }) }).first();
+      assert.equal(await pingForm.locator('input[name="expectedGroup"]').count(), 0, "ping form must not accidentally own the deletion fingerprint");
       assert.equal(await page.getByRole("button", { name: "Đang xoá kho chính…", exact: true }).count(), 0);
       assert.equal(await page.evaluate(() => (globalThis as typeof globalThis & { __fixtureSubmitted?: unknown }).__fixtureSubmitted ?? null), null);
       const deleteScreenshot = join(output, `primary-delete-confirm-cancel-${width}.png`);

@@ -61,6 +61,34 @@ export async function acquireGithubOwnerDeletionLease(
   ], deadlineAt, "GitHub deletion lease unavailable");
 }
 
+/**
+ * Freeze the old station identity, its future identity and both companion runners while a repo
+ * changes role. Without the NEW slug lock, a same-owner create could claim the promoted name
+ * between the GitHub cutover and the settings transaction.
+ */
+export async function acquireGithubPrimaryPromotionLease(
+  owner: string,
+  oldSlug: string,
+  newSlug: string,
+  workerId: string,
+  deadlineAt = Date.now() + 240_000,
+): Promise<GithubSessionLease | null> {
+  const normalizedOwner = owner.toLowerCase();
+  const slugs = [oldSlug, newSlug].map((slug) => slug.toLowerCase());
+  if (!normalizedOwner || !workerId || slugs.some((slug) => slug.split("/")[0] !== normalizedOwner || !slug.split("/")[1])) {
+    throw new Error("Invalid GitHub promotion lease targets");
+  }
+  return acquireGithubSessionLease([
+    `provision-owner:${normalizedOwner}`,
+    ...slugs.flatMap((slug) => [
+      `provision:${slug}`,
+      `provision-worker:${slug.split("/")[1]}`,
+      `companion:${slug}`,
+    ]),
+    `provision-worker:${workerId.toLowerCase()}`,
+  ], deadlineAt, "GitHub promotion lease unavailable");
+}
+
 /** Keep network operations outside the row lock; merge each checkpoint into fresh settings. */
 export async function mutateGithubState(change: (settings: AppSettings) => void, options: { deadlineAt?: number } = {}): Promise<void> {
   const mutate = (database: NodePgDatabase<typeof schema>) => database.transaction(async (tx) => {

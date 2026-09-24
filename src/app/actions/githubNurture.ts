@@ -2,11 +2,13 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
 import { decryptSecret, encryptSecret } from "@/lib/crypto/secretBox";
 import { mutateGithubState } from "@/lib/services/companionState";
 import { deleteManagedCompanion } from "@/lib/services/companionNurture";
+import { promoteGithubCompanionToPrimary } from "@/lib/services/githubPrimaryPromotion";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
 import { githubStationsForAdmin, type StationResult, type StationView } from "@/app/actions/githubStations";
 import { stationSlug } from "@/lib/validation/githubStations";
@@ -231,6 +233,28 @@ export async function saveGithubCompanionSettingsAction(
   });
   refresh(slug);
   return { ok: found, message: found ? "Đã lưu cấu hình riêng của kho. Giảm số lượng không tự xoá repo; quyền xoá chỉ áp dụng cho quyết định tiếp theo của model." : "Kho này không còn trong sổ." };
+}
+
+export async function promoteGithubCompanionAction(
+  _prev: StationResult | null, formData: FormData,
+): Promise<StationResult> {
+  await requireManage();
+  const slug = String(formData.get("slug") ?? "");
+  const repo = String(formData.get("repo") ?? "");
+  if (!slug || !repo) return { ok: false, message: "Thiếu định danh kho cần promote." };
+
+  const result = await promoteGithubCompanionToPrimary(slug, repo);
+  if (!result.ok || !result.newSlug) {
+    return {
+      ok: false,
+      message: [result.message, ...result.warnings].filter(Boolean).join(" "),
+    };
+  }
+
+  refresh(result.oldSlug);
+  refresh(result.newSlug);
+  const [owner, nextRepo] = result.newSlug.split("/");
+  redirect(`/admin/github/${encodeURIComponent(owner)}/${encodeURIComponent(nextRepo)}`);
 }
 
 export async function deleteGithubCompanionAction(

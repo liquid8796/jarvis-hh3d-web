@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.91",
+    date: "2026-09-24",
+    lines: [
+      "Nuôi kho GitHub nay có nút Promote trên từng repo phụ để đổi repo ấy thành repo chính mà vẫn giữ lịch sử mã.",
+      "Nếu đã có repo chính, repo cũ tự chuyển thành repo phụ và ngừng chạy khôi lỗi; nếu đang hoãn repo chính thì không tạo thêm repo cũ.",
+      "Lượt đổi vai trò tự khóa các thao tác liên quan và hoàn tác an toàn khi lỗi, tránh hai khôi lỗi cùng chạy một danh tính.",
+    ],
+  },
+  {
     version: "1.3.90",
     date: "2026-09-21",
     lines: [
@@ -471,13 +480,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Ngọc Giản Cấu Hình bớt chữ thừa: hai khối Luyện Đan Đường và Khoáng Mạch thôi nhắc lại câu「bản này không đụng tab kia」.",
       "Dòng mô tả Hỷ Sự Đường cũng gọn lại còn một câu.",
-    ],
-  },
-  {
-    version: "1.3.41",
-    date: "2026-08-23",
-    lines: [
-      "Máy chạy tự động của tông môn nay tự gọi ca sau trước khi hết ca, nên không còn khoảng trống hàng giờ giữa hai ca như trước.",
     ],
   },
 ];

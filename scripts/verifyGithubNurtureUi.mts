@@ -64,6 +64,7 @@ const mockActions = `
   export const deleteGithubNurtureKeyAction = complete("deleteGithubNurtureKeyAction");
   export const setGithubNurtureKeyDisabledAction = complete("setGithubNurtureKeyDisabledAction");
   export const saveGithubCompanionSettingsAction = complete("saveGithubCompanionSettingsAction");
+  export const promoteGithubCompanionAction = complete("promoteGithubCompanionAction");
   export const deleteGithubCompanionAction = complete("deleteGithubCompanionAction");
   export const saveGithubStationAction = complete("saveGithubStationAction");
   export const provisionGithubStationAction = complete("provisionGithubStationAction");
@@ -467,6 +468,15 @@ if (!process.argv.includes("--check")) {
     await page.getByRole("button", { name: "Đang lưu…", exact: true }).waitFor();
     assert.ok(await page.getByRole("button", { name: "Đang lưu…", exact: true }).isDisabled());
     await page.getByRole("button", { name: "Lưu cấu hình kho", exact: true }).waitFor();
+    let promoteConfirmation = "";
+    page.once("dialog", async (dialog) => { promoteConfirmation = dialog.message(); await dialog.dismiss(); });
+    await page.getByRole("button", { name: "Promote làm repo chính", exact: true }).first().click();
+    assert.match(promoteConfirmation, /weather-data-workbench/);
+    assert.match(promoteConfirmation, /primary-repo sẽ thành repo phụ/);
+    assert.match(promoteConfirmation, /Lịch sử Git của cả hai repo được giữ lại/);
+    const promoteButtons = page.getByRole("button", { name: "Promote làm repo chính", exact: true });
+    assert.equal(await promoteButtons.count(), 2, "pending-delete companion must not expose a promote action");
+    assert.equal(await page.getByRole("button", { name: "Đang promote…", exact: true }).count(), 0);
     let confirmation = "";
     page.once("dialog", async (dialog) => { confirmation = dialog.message(); await dialog.dismiss(); });
     await page.locator('input[name="confirmedRepo"]').first().fill("weather-data-workbench");

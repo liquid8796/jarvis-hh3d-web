@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import {
   deleteGithubCompanionAction,
+  promoteGithubCompanionAction,
   saveGithubCompanionSettingsAction,
   type GithubStationDetailView,
 } from "@/app/actions/githubNurture";
@@ -12,7 +13,11 @@ import { MAX_COMPANION_COUNT } from "@/lib/validation/githubNurture";
 const when = (value: string | null | undefined) => value ? new Date(value).toLocaleString("vi-VN") : "chưa có";
 
 function CompanionCard({ station, companion }: { station: StationView; companion: StationView["companionRepos"][number] }) {
-  const [result, action, pending] = useActionState<StationResult | null, FormData>(deleteGithubCompanionAction, null);
+  const [promoteResult, promoteAction, promoting] = useActionState<StationResult | null, FormData>(promoteGithubCompanionAction, null);
+  const [deleteResult, deleteAction, deleting] = useActionState<StationResult | null, FormData>(deleteGithubCompanionAction, null);
+  const promotionNote = station.primaryDeferred
+    ? `Promote ${station.owner}/${companion.repo} thành repo chính? Station hiện chưa có repo chính thật, nên không có repo cũ để hạ xuống. Repo này sẽ được cài workflow khôi lỗi, WORKER_TOKEN và bật Actions.`
+    : `Promote ${station.owner}/${companion.repo} thành repo chính? ${station.owner}/${station.repo} sẽ thành repo phụ và Actions của repo cũ sẽ bị tắt. Lịch sử Git của cả hai repo được giữ lại.`;
   return (
     <article className="min-w-0 rounded-xl border border-[rgba(232,194,92,0.18)] p-4">
       <a href={`https://github.com/${station.owner}/${companion.repo}`} target="_blank" rel="noreferrer" className="font-mono text-sm break-all text-[var(--color-gold-300)] hover:underline">{station.owner}/{companion.repo} ↗</a>
@@ -24,7 +29,22 @@ function CompanionCard({ station, companion }: { station: StationView; companion
         {companion.lastPushNote && <p className={companion.lastPushOk === false ? "text-[#f2a0a0]" : ""}>{companion.lastPushNote}</p>}
         {companion.pendingDelete && <p className="text-[#f2a0a0]">Đang hoàn tất yêu cầu xoá kho này.</p>}
       </div>
-      <form action={action} className="mt-4 border-t border-[var(--color-ink-600)]/60 pt-3" onSubmit={(event) => {
+
+      {!companion.pendingDelete && (
+        <form action={promoteAction} className="mt-4 border-t border-[var(--color-ink-600)]/60 pt-3" onSubmit={(event) => {
+          if (!confirm(promotionNote)) event.preventDefault();
+        }}>
+          <input type="hidden" name="slug" value={station.slug} />
+          <input type="hidden" name="repo" value={companion.repo} />
+          <p className="mb-2 text-xs text-[var(--color-mist)]">Đổi vai trò không xoá lịch sử Git. Các tệp thuộc gói khôi lỗi sẽ được cập nhật trên repo mới; tệp khác vẫn được giữ.</p>
+          <button type="submit" className="btn btn-gold text-sm" disabled={promoting || deleting}>
+            {promoting ? "Đang promote…" : "Promote làm repo chính"}
+          </button>
+          {promoteResult && <p role="status" className={`mt-2 text-xs ${promoteResult.ok ? "text-[var(--color-jade-300)]" : "text-[#f2a0a0]"}`}>{promoteResult.message}</p>}
+        </form>
+      )}
+
+      <form action={deleteAction} className="mt-4 border-t border-[var(--color-ink-600)]/60 pt-3" onSubmit={(event) => {
         if (!confirm(`Xoá VĨNH VIỄN ${station.owner}/${companion.repo} trên GitHub? Toàn bộ mã và lịch sử sẽ bị xoá. Nếu còn thiếu số kho đã cấu hình, model có thể tự tạo kho thay thế ở vòng tiếp theo.`)) event.preventDefault();
       }}>
         <input type="hidden" name="slug" value={station.slug} />
@@ -32,9 +52,9 @@ function CompanionCard({ station, companion }: { station: StationView; companion
         <label className="label text-xs" htmlFor={`delete-companion-${companion.repo}`}>Nhập tên kho để xoá vĩnh viễn</label>
         <div className="flex flex-wrap gap-2">
           <input id={`delete-companion-${companion.repo}`} name="confirmedRepo" required autoComplete="off" placeholder={companion.repo} className="input w-full min-w-0 font-mono text-sm sm:w-auto sm:flex-1" />
-          <button type="submit" className="btn btn-danger text-sm" disabled={pending}>{pending ? "Đang xoá…" : "Xoá kho phụ"}</button>
+          <button type="submit" className="btn btn-danger text-sm" disabled={deleting || promoting}>{deleting ? "Đang xoá…" : "Xoá kho phụ"}</button>
         </div>
-        {result && <p role="status" className={`mt-2 text-xs ${result.ok ? "text-[var(--color-jade-300)]" : "text-[#f2a0a0]"}`}>{result.message}</p>}
+        {deleteResult && <p role="status" className={`mt-2 text-xs ${deleteResult.ok ? "text-[var(--color-jade-300)]" : "text-[#f2a0a0]"}`}>{deleteResult.message}</p>}
       </form>
     </article>
   );

@@ -515,8 +515,27 @@ khoẻ xong trong dưới một giây, tức ~0,12s một kho.
 Tab **Kho GitHub** trong trang Tông Môn. Mỗi dòng hiện đếm ngược tới mốc tắt lịch của kho chính,
 các repo phần mềm, tiến độ dự án và kết quả push gần nhất. **Nuôi ngay** ép
 heartbeat của kho chính; **Chạy vòng nuôi** diễn tập cả hai vòng đúng như cron; **Sửa** cho đổi
-số kho phụ riêng hoặc dùng mặc định toàn cục; **Xoá** chỉ bỏ station/PAT khỏi sổ, không xoá repo nào trên GitHub.
+số kho phụ riêng hoặc dùng mặc định toàn cục; **Xoá** xử lý nhóm primary theo luật xoá ở §8.
 
+### Promote một repo phụ thành repo chính (24/09/2026)
+
+Trong trang chi tiết station, nút **Promote làm repo chính** đổi vai trò mà không xoá repo. Repo
+phụ được chọn phải còn đúng GitHub ID đã ghi sổ và không ở trạng thái `pendingDelete`. Backend
+đóng Actions của repo đích trong lúc staging, dựng payload khôi lỗi hiện hành lên nhánh `main`,
+đặt `WORKER_TOKEN`, rồi mới tắt Actions của primary cũ và bật repo mới. Nếu primary cũ tồn tại,
+nó được đưa vào `companionRepos` với `actionsDisabled: true`; station deferred thì không sinh một
+repo cũ giả.
+
+Lịch sử được giữ: nếu repo đích đã có `main`, cây của `main` là base; nếu default branch khác
+`main`, commit đầu nhánh ấy vẫn nằm trong parents của commit promote. Payload chỉ ghi/đè các path
+nó sở hữu, không dọn source riêng của dự án. Sau cutover station giữ nguyên PAT, WORKER_ID, quota và
+cấu hình Ollama nhưng đổi `repo`, `githubId`, `initialCommitSha` sang primary mới.
+
+Khóa session giữ đồng thời `provision-owner`, slug cũ, slug mới, WORKER_ID và hai khóa companion,
+nên provisioning/xoá/nuôi không chen vào giữa. Nếu lỗi xảy ra trước khi registry commit, backend
+ưu tiên fail-safe: tắt Actions của repo mới và bật lại primary cũ nếu nó vốn đang bật. Vì vậy trạng
+thái lỗi có thể cần kiểm tra tay, nhưng không được phép kết thúc với hai repo cùng chạy một worker.
+Regression: `npm run verify:github-primary-promotion` và `npm run verify:github-nurture-ui`.
 Lượt **Ghi vào sổ** tự ngó kho ngay sau khi lưu, nên một PAT dán nhầm chết trước mặt người vừa
 dán chứ không phải trong một lượt cron lúc ba giờ sáng. Với kho mới, lượt ấy ghi luôn một commit
 thật — tức chứng minh trọn đường「PAT này push được mã vào kho này」.

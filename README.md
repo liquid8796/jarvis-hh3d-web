@@ -607,6 +607,13 @@ PAT có `repo`, `workflow`, `delete_repo`, `user`; scope `user` dùng để cậ
 (name/bio/company/location) sau khi account được đăng ký. Avatar không đổi tự động vì GitHub PAT
 không có API upload avatar; hệ thống báo warning thay vì dùng browser bypass.
 
+Trong trang chi tiết station, bất kỳ repo phụ nào không đang chờ xoá đều có thể **Promote làm repo
+chính**. Jarvis giữ lịch sử Git của repo được chọn, cài payload/workflow + `WORKER_TOKEN`, chuẩn hoá
+nhánh chính về `main`, rồi đổi vai trò trong sổ. Nếu primary cũ có thật, nó trở thành repo phụ và
+Actions bị tắt; nếu primary cũ đang hoãn thì không có repo giả nào được thêm. Cutover giữ khoá cho
+cả danh tính cũ/mới và rollback trạng thái Actions nếu ghi sổ thất bại để tránh hai worker chạy cùng
+`WORKER_ID`.
+
 Khi một **tài khoản GitHub đã bị xoá/đình chỉ ngoài hệ thống**, nút **Xoá** ở Nuôi kho vẫn phải
 gỡ được station local: form xóa gửi kèm ảnh chụp danh sách repo chính lúc user bấm để chống stale
 confirmation; nếu PAT đã chết và GitHub public xác nhận account không còn tồn tại, service chuyển

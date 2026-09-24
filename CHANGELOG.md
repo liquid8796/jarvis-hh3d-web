@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.91 — Promote repo phụ thành repo chính ngay trong Kho GitHub (24/09/2026)
+
+- Trang chi tiết của từng station nay có nút **Promote làm repo chính** trên mọi repo phụ hợp lệ. Repo được chọn giữ nguyên lịch sử Git, nhận payload/workflow khôi lỗi hiện hành, `WORKER_TOKEN`, nhánh mặc định `main` và trở thành primary của chính station đó.
+- Nếu station đang có repo chính thật, repo chính cũ được hạ xuống `companionRepos` thay vì bị xoá; Actions của nó bị tắt trước khi repo mới được nhận vai trò chính. Nếu station đang ở chế độ hoãn primary thì promote chỉ materialize repo phụ thành primary, không bịa ra một repo cũ để hạ vai trò.
+- Cutover có advisory lock cho cả slug cũ, slug mới, WORKER_ID và vòng companion. GitHub ID được kiểm trước khi chạm repo; repo đang `pendingDelete` không có thao tác Promote. Khi registry mutation hỏng sau lúc staging, repo mới bị tắt Actions và repo chính cũ được bật lại nếu trước đó đang chạy, ưu tiên tránh hai worker cùng chạy một danh tính.
+- Khi repo phụ đã có nhánh `main`, payload được chồng lên cây `main` hiện tại; nếu default branch khác `main`, lịch sử nhánh cũ được giữ làm parent của commit promote. Các file ngoài payload khôi lỗi không bị xoá. Regression mới đóng đinh swap thường, deferred primary, ID mismatch, rollback Actions và UI 390/1366 px.
+
 ## 1.3.90 — Xóa được kho khi tài khoản GitHub đã biến mất (21/09/2026)
 
 - Nút **Xoá** trong Nuôi kho GitHub trước đây không gửi `expectedGroup` dù server bắt buộc phải có. Field này bị đặt nhầm trong form **Nuôi ngay**, nên mọi lượt xóa dừng ngay ở cảnh báo “Danh sách repo chính của tài khoản đã thay đổi” và chưa bao giờ tới nhánh kiểm account đã bị xoá/đình chỉ.

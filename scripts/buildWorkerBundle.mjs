@@ -52,6 +52,10 @@ try {
       'import { createWorkerCall } from "./controlFollow.mjs";',
     ],
     [
+      'import { createMirrorDnsCachedFetch } from "../src/lib/worker/dnsCache.mjs";',
+      'import { createMirrorDnsCachedFetch } from "./dnsCache.mjs";',
+    ],
+    [
       'import { UPDATE_EXIT_CODE, selfUpdateEnabled, shouldSelfUpdate } from "../src/lib/worker/selfUpdate.mjs";',
       'import { UPDATE_EXIT_CODE, selfUpdateEnabled, shouldSelfUpdate } from "./selfUpdate.mjs";',
     ],
@@ -79,7 +83,14 @@ try {
     path.join(staging, "controlFollow.mjs"),
   );
 
-  // 2b. Luật tự thay gói. Cùng lẽ với controlFollow.mjs, và cùng bài học: worker.mjs `import`
+  // 2b. Cache DNS của gương trạm. Đây là một module Node thuần, không dependency, và worker
+  //     import trực tiếp; phải đi cùng cả gói máy nhà lẫn runtime GitHub.
+  cpSync(
+    path.join(root, "src", "lib", "worker", "dnsCache.mjs"),
+    path.join(staging, "dnsCache.mjs"),
+  );
+
+  // 2c. Luật tự thay gói. Cùng lẽ với controlFollow.mjs, và cùng bài học: worker.mjs `import`
   //     nó, nên thiếu nó là gói giải nén ra chết ngay giây đầu bằng ERR_MODULE_NOT_FOUND —
   //     mà vòng nuôi thì cứ dựng lại mỗi 10 giây để chết tiếp. Xem chốt ở mục 4b.
   cpSync(
@@ -87,13 +98,13 @@ try {
     path.join(staging, "selfUpdate.mjs"),
   );
 
-  // 2. Toàn bộ quest-engine — engine + profile.json là MỘT khối, thiếu profile là engine
+  // 3. Toàn bộ quest-engine — engine + profile.json là MỘT khối, thiếu profile là engine
   //    lên đường mà không mang theo nhiệm vụ nào.
   cpSync(path.join(root, "src", "lib", "quest-engine"), path.join(staging, "quest-engine"), {
     recursive: true,
   });
 
-  // 3. playwright-core, nguyên vẹn vào node_modules/ của gói. Node phân giải
+  // 4. playwright-core, nguyên vẹn vào node_modules/ của gói. Node phân giải
   //    `import "playwright-core"` bằng cách đi ngược cây thư mục tìm node_modules, nên đặt
   //    ở đây là worker.mjs cạnh nó tìm thấy ngay — không cần npm, không cần cài đặt gì.
   const pwcSource = path.join(root, "node_modules", "playwright-core");
@@ -102,7 +113,7 @@ try {
     readFileSync(path.join(pwcSource, "package.json"), "utf8"),
   ).version;
 
-  // 4. package.json tối thiểu. KHÔNG khai `dependencies`: mọi thứ đã nằm trong gói, và một
+  // 5. package.json tối thiểu. KHÔNG khai `dependencies`: mọi thứ đã nằm trong gói, và một
   //    dòng dependency ở đây chỉ mời gọi ai đó chạy `npm install` rồi ghi đè bản đã ghim.
   const repoPkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
   writeFileSync(
@@ -121,7 +132,7 @@ try {
     ) + "\n",
   );
 
-  // 4b. CHỐT: mọi `import` tương đối trong gói phải trỏ tới một tệp CÓ THẬT trong gói.
+  // 5b. CHỐT: mọi `import` tương đối trong gói phải trỏ tới một tệp CÓ THẬT trong gói.
   //
   //     Bài học này kho mã đã trả giá MỘT LẦN ở phía tông môn — xem khối bình chú của
   //     `COPIED_PATHS` trong khoiloiPayload.mjs: một commit thêm import thứ ba mà quên chép,
@@ -162,7 +173,7 @@ try {
     }
   }
 
-  // 5. Nén, gói phẳng — giải nén ra là thấy worker.mjs ngay, không có thư mục bọc ngoài.
+  // 6. Nén, gói phẳng — giải nén ra là thấy worker.mjs ngay, không có thư mục bọc ngoài.
   //    tar chạy với cwd = staging và ghi ra ĐƯỜNG DẪN TƯƠNG ĐỐI, rồi fs copy về đích: GNU
   //    tar (Git Bash trên Windows) đọc "D:\…" thành hostname remote, nên tuyệt đối không
   //    đưa đường dẫn có dấu hai chấm cho nó.

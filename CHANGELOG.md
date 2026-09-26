@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.96 — Cache DNS gương trạm một ngày (27/09/2026)
+
+- Worker nay giữ kết quả phân giải dương của `auto-hh3d.vercel.app` trong RAM đúng 24 giờ (86.400.000 ms), nên vòng poll/heartbeat không phải hỏi resolver lại mỗi khi mở socket HTTPS mới.
+- Cache chỉ áp dụng cho đúng hostname gương; URL chính, `activeUrl` động và mọi host khác vẫn dùng fetch chuẩn. URL gốc không bị đổi sang IP, vì vậy Host, TLS SNI và kiểm tra chứng thư vẫn mang đúng danh tính gương Vercel.
+- Các lookup lạnh đồng thời dùng chung một lượt hỏi DNS; IPv4/IPv6 hợp lệ được quay vòng, còn lỗi resolver hoặc danh sách rỗng không được cache. Module đi kèm bundle worker và không thêm dependency npm.
+
 ## 1.3.95 — Khóa đủ hai cổng runtime trong workflow lai (26/09/2026)
 
 - Workflow lai của repo chính dùng `WEB_URL` và `WORKER_FALLBACK_URL` ở hai chỗ độc lập: lượt tải bundle runtime và tiến trình worker sau khi tải. Hàng rào render trước đây chỉ cần thấy mỗi biến ít nhất một lần, nên một lần chỉnh template có thể vô tình làm mất một cổng mà gói vẫn được phát hành.

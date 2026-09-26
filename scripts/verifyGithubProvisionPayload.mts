@@ -79,6 +79,7 @@ try {
   );
   write("scripts/worker.mjs", "export const worker = true;\n");
   write("src/lib/worker/controlFollow.mjs", "export const follow = true;\n");
+  write("src/lib/worker/dnsCache.mjs", "export const dnsCache = true;\n");
   write("src/lib/worker/selfUpdate.mjs", "export const update = true;\n");
   write("src/lib/quest-engine/z-last.mjs", "export const z = true;\n");
   write("src/lib/quest-engine/a-first.mjs", "export const a = true;\n");
@@ -138,6 +139,7 @@ try {
   assert.doesNotMatch(customWorkflow, /__PUBLIC_(?:WORKFLOW|JOB)_NAME__/);
   assert.match(customWorkflow, /^jobs:\r?\n  linh-su:\r?\n    name: "[A-Za-z0-9 '&-]+"$/m, "public job label changes without renaming the internal job key");
   assert.deepEqual(payload.get("src/lib/quest-engine/exact-bytes.bin"), binaryBytes);
+  assert.equal(payload.get("src/lib/worker/dnsCache.mjs")!.toString("utf8"), "export const dnsCache = true;\n");
 
   const stationBase = buildKhoiloiPayload({
     source,

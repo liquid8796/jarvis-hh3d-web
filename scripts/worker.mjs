@@ -32,6 +32,7 @@ import { readFileSync } from "node:fs";
 import { runCycle } from "../src/lib/quest-engine/runCycle.mjs";
 import { profileDirForJob, sweepStaleProfiles } from "../src/lib/quest-engine/browserProfile.mjs";
 import { createWorkerCall } from "../src/lib/worker/controlFollow.mjs";
+import { createMirrorDnsCachedFetch } from "../src/lib/worker/dnsCache.mjs";
 import { UPDATE_EXIT_CODE, selfUpdateEnabled, shouldSelfUpdate } from "../src/lib/worker/selfUpdate.mjs";
 
 /**
@@ -119,7 +120,16 @@ if (!TOKEN || TOKEN === "change-me") {
 // mang thêm một trách nhiệm không hiển nhiên: ĐI THEO trạm hoạt động khi bảng điều phối lật.
 // Trạm đã nghỉ trả 409 kèm `activeUrl`; thiếu đoạn ấy thì mỗi lượt chuyển trạm bỏ lại toàn bộ
 // đàn ở trạm cũ — đúng chuyện đã xảy ra ngày 10/08/2026.
-const { call, currentUrl } = createWorkerCall({ webUrl: WEB_URL, fallbackUrl: FALLBACK_URL, token: TOKEN });
+// Chỉ origin gương cố định auto-hh3d.vercel.app đi qua decorator DNS cache 1 ngày. URL khác,
+// kể cả activeUrl động từ bảng điều phối, vẫn dùng fetch gốc. Lookup chỉ thay IP ở tầng socket;
+// URL/TLS SNI/Host header giữ nguyên hostname nên không hạ hàng rào HTTPS.
+const WORKER_FETCH = createMirrorDnsCachedFetch();
+const { call, currentUrl } = createWorkerCall({
+  webUrl: WEB_URL,
+  fallbackUrl: FALLBACK_URL,
+  token: TOKEN,
+  fetchImpl: WORKER_FETCH,
+});
 
 const say = (jobId, message, level = "info") =>
   // Engine nói "warn", giao thức nói "warning" — dịch ở đây, một chỗ duy nhất. Không dịch

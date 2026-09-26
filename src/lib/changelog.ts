@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.96",
+    date: "2026-09-27",
+    lines: [
+      "Đường dự phòng của khôi lỗi nay ghi nhớ địa chỉ trạm gương trong một ngày, giảm các lượt hỏi mạng lặp lại.",
+      "Nếu lần phân giải bị lỗi, khôi lỗi sẽ thử lại ở lượt kế thay vì giữ một kết quả hỏng suốt ngày.",
+    ],
+  },
+  {
     version: "1.3.95",
     date: "2026-09-26",
     lines: [
@@ -475,13 +483,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Mỗi khối nhiệm vụ trong Ngọc Giản Cấu Hình nay gấp lại được — bấm mũi tên cạnh tên khối.",
       "Trang nhớ khối nào bạn đã gấp, lần sau mở lại vẫn y như bạn để.",
       "Gấp chỉ là giấu cho gọn mắt: mọi lựa chọn bên trong vẫn được lưu đủ khi bấm Khắc Ngọc Giản.",
-    ],
-  },
-  {
-    version: "1.3.46",
-    date: "2026-08-24",
-    lines: [
-      "Sửa một việc thừa vừa phát hiện: lượt kiểm nửa đêm đi hỏi cả mấy kho phần mềm nuôi kèm, dù không ai nhờ.",
     ],
   },
 ];

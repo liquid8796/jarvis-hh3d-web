@@ -66,13 +66,15 @@ import {
  * theo trạm」thêm một import thứ ba — `src/lib/worker/controlFollow.mjs` — mà không ai nghĩ tới
  * việc script phát hành phải chép thêm. Kho sinh ra chết ngay giây đầu bằng `ERR_MODULE_NOT_FOUND`.
  *
- * CHỈ `controlFollow.mjs`, không cả thư mục `src/lib/worker/`: bên ấy còn `version.ts`, thứ Node
- * không chạy được và worker.mjs cũng không cần (nó tự đọc bản qua `readOwnVersion`).
+ * Chỉ chép các module `.mjs` worker import trực tiếp, không cả thư mục `src/lib/worker/`: bên ấy
+ * còn `version.ts`, thứ Node không chạy được và worker.mjs cũng không cần (nó tự đọc bản qua
+ * `readOwnVersion`).
  */
 export const COPIED_PATHS = Object.freeze([
   "scripts/worker.mjs",
   "src/lib/quest-engine",
   "src/lib/worker/controlFollow.mjs",
+  "src/lib/worker/dnsCache.mjs",
   "src/lib/worker/selfUpdate.mjs",
 ]);
 

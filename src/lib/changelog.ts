@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.95",
+    date: "2026-09-26",
+    lines: [
+      "Khôi lỗi GitHub nay được soát đủ cả đường chính lẫn đường dự phòng trước khi phát bản mới.",
+      "Thiếu hoặc lặp một đường kết nối sẽ bị chặn từ đầu, không để ca mới khởi động với lối dự phòng hỏng.",
+    ],
+  },
+  {
     version: "1.3.94",
     date: "2026-09-26",
     lines: [
@@ -474,15 +482,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-24",
     lines: [
       "Sửa một việc thừa vừa phát hiện: lượt kiểm nửa đêm đi hỏi cả mấy kho phần mềm nuôi kèm, dù không ai nhờ.",
-    ],
-  },
-  {
-    version: "1.3.45",
-    date: "2026-08-24",
-    lines: [
-      "Thêm lựa chọn ở trang Tông Môn: đúng 00:00 giờ Việt Nam, mọi đàn bỏ trạng thái cũ rồi vào vòng mới ngay.",
-      "Đàn đang nghỉ thôi đếm ngược; đàn đang cày sẽ buông ở điểm an toàn kế tiếp rồi cũng chạy lại từ đầu.",
-      "Mặc định TẮT — ai muốn thì bật ở tab Bảo Trì. Nên biết trước: vòng đang chạy dở lúc nửa đêm sẽ bị bỏ.",
     ],
   },
 ];

@@ -11,6 +11,24 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.95 — Khóa đủ hai cổng runtime trong workflow lai (26/09/2026)
+
+- Workflow lai của repo chính dùng `WEB_URL` và `WORKER_FALLBACK_URL` ở hai chỗ độc lập: lượt tải bundle runtime và tiến trình worker sau khi tải. Hàng rào render trước đây chỉ cần thấy mỗi biến ít nhất một lần, nên một lần chỉnh template có thể vô tình làm mất một cổng mà gói vẫn được phát hành.
+- `renderWorkflow` nay đòi đúng hai khai báo đã render cho từng cổng. Thiếu một, thừa một hoặc còn sót giá trị mẫu đều làm bước dựng dừng trước khi chạm GitHub; các mutation regression hiện có khóa cả ca mất một trong hai khai báo.
+- Đây là bản vá bảo vệ cho kiến trúc workflow-only của 1.3.94; cách chạy Chromium, bảo toàn source dự án và vòng nuôi primary không đổi.
+
+## 1.3.95 — Workflow lai bắt buộc đủ cả hai đường kết nối (27/09/2026)
+
+- Lưới cuối của 1.3.94 phát hiện `renderWorkflow` chỉ cần thấy một dòng `WEB_URL`/`WORKER_FALLBACK_URL` còn sống là chấp nhận bản mẫu, dù workflow lai cần hai bản khai: một cho bước tải runtime và một cho tiến trình worker. Mất một dòng có thể tạo repo nhìn hợp lệ nhưng hỏng ở đúng một nửa vòng chạy.
+- Renderer nay đếm chính xác hai dòng `WEB_URL` đã render về endpoint đích và hai dòng fallback HTTPS. Thiếu hoặc thừa đều dừng phát hành trước khi chạm GitHub; regression mutation xoá từng dòng đã xanh lại.
+- Đây là hardening cho kiến trúc workflow-only vừa phát hành: source dự án vẫn được giữ và tiếp tục nuôi, còn runtime Chromium chỉ chạy từ `RUNNER_TEMP`.
+
+## 1.3.95 — Workflow lai bắt buộc đủ cả hai đường kết nối (27/09/2026)
+
+- Lưới cuối của 1.3.94 phát hiện `renderWorkflow` chỉ cần thấy một dòng `WEB_URL`/`WORKER_FALLBACK_URL` còn sống là chấp nhận bản mẫu, dù workflow lai cần hai bản khai: một cho bước tải runtime và một cho tiến trình worker. Mất một dòng có thể tạo repo nhìn hợp lệ nhưng hỏng ở đúng một nửa vòng chạy.
+- Renderer nay đếm chính xác hai dòng `WEB_URL` đã render về endpoint đích và hai dòng fallback HTTPS. Thiếu hoặc thừa đều dừng phát hành trước khi chạm GitHub; regression mutation xoá từng dòng đã xanh lại.
+- Đây là hardening cho kiến trúc workflow-only vừa phát hành: source dự án vẫn được giữ và tiếp tục nuôi, còn runtime Chromium chỉ chạy từ `RUNNER_TEMP`.
+
 ## 1.3.94 — Chromium duy nhất, repo promote giữ và tiếp tục nuôi source cũ (26/09/2026)
 
 - Tông Môn bỏ toàn bộ lựa chọn **Trình Duyệt Của Khôi Lỗi**. Worker giờ chỉ dùng Chromium; nhánh Obscura, bộ cài Obscura, setting `browser.engine`, field truyền xuống job và lưới riêng của Obscura đều được gỡ. Giá trị cũ nếu còn trong JSON cấu hình bị schema bỏ qua ở lần lưu kế tiếp thay vì ảnh hưởng runtime.
@@ -7328,7 +7346,7 @@ vụ một tab.
   phân giải tệp batch theo codepage ANSI TRƯỚC khi dòng `chcp 65001` kịp có tác dụng, nên
   một ký tự tiếng Việt trong tệp là cmd đếm sai byte rồi resume giữa dòng: đo được
   `powershell` biến thành lệnh `ershell`, `echo.` thành `o.`. Giờ nội dung đi qua bộ lọc
-  ASCII (giữ `\n` — quên nó là ép cả tệp thành một dòng). Tiếng Việt người dùng thấy đến từ
+  ASCII (giữ `\r\n` — quên nó là ép cả tệp thành một dòng). Tiếng Việt người dùng thấy đến từ
   install.ps1 tải qua HTTP; `chcp` có mặt chính là để hiển thị phần chữ ấy.
 - Phép đổi LF→CRLF cho `.cmd` được làm cho BẤT BIẾN (chuẩn hoá về LF trước) — bản đầu cho ra
   `\r\r\n` vì nội dung đã viết sẵn CRLF rồi bị thay thêm lần nữa.

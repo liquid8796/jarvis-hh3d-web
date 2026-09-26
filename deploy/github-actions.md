@@ -111,6 +111,10 @@ Chromium bằng `playwright-core` trong gói rồi chạy worker ngoài cây sou
 manifest và README của repo không còn bị payload khôi lỗi ghi đè. Một bản mẫu, nhiều kho — bộ số
 290/50/350/360 và cổng cứu hộ không có cơ hội trôi khỏi nhau.
 
+Từ 1.3.95, phép vẽ workflow còn đòi **đúng hai** khai báo `WEB_URL` và **đúng hai** khai báo
+`WORKER_FALLBACK_URL`: một cặp cho bước tải bundle vào `RUNNER_TEMP`, một cặp cho tiến trình worker.
+Mất một dòng là lỗi preflight và không repo nào nhận một workflow chỉ hoạt động được nửa vòng.
+
 Hàng rào này là **một tệp KHÔNG có mặt**, mà loại hàng rào ấy không tự giữ được mình: một cú
 `git mv` ngược lại, hay một bản chép để「chạy thử một lượt rồi xoá」, dựng lại nó mà chẳng ai thấy.
 Vì thế `npm run verify:github-removal` canh rằng **không workflow nào của kho gốc gọi

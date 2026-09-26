@@ -315,10 +315,14 @@ export function renderWorkflow({ template, workerId, webUrl, workflowFile = "lin
         "`renderWorkflow`, đừng phát ra một kho mang id trùng máy khác.",
     );
   }
-  if (!workflow.includes(`vars.WEB_URL || '${webUrl}'`)) {
+  const renderedPrimaryEndpoint = `WEB_URL: \${{ vars.WEB_URL || '${webUrl}' }}`;
+  const primaryEndpointDeclarations = workflow
+    .split(/\r?\n/)
+    .filter((line) => line.trim() === renderedPrimaryEndpoint);
+  if (primaryEndpointDeclarations.length !== 2) {
     throw new Error(
-      `Không thay được WEB_URL trong workflow — hình dạng bản mẫu đã đổi. Kho sẽ gọi về địa chỉ ` +
-        `mặc định của bản mẫu thay vì ${webUrl}.`,
+      `Workflow phải có đúng hai WEB_URL đã render thành ${webUrl}: một cho lượt tải runtime ` +
+        "và một cho tiến trình khôi lỗi.",
     );
   }
   if (!workflow.includes(renderedDispatchTarget) || (workflowFile !== "linh-su.yml" && workflow.includes(templateDispatchTarget))) {
@@ -332,10 +336,13 @@ export function renderWorkflow({ template, workerId, webUrl, workflowFile = "lin
   ) {
     throw new Error("Workflow public display identity was not rendered exactly once.");
   }
-  if (!/^\s*WORKER_FALLBACK_URL:\s*\$\{\{\s*vars\.WORKER_FALLBACK_URL\s*\|\|\s*'https:\/\/[^']+'\s*\}\}\s*$/m.test(workflow)) {
+  const fallbackDeclarations = workflow.match(
+    /^\s*WORKER_FALLBACK_URL:\s*\$\{\{\s*vars\.WORKER_FALLBACK_URL\s*\|\|\s*'https:\/\/[^']+'\s*\}\}\s*$/gm,
+  ) ?? [];
+  if (fallbackDeclarations.length !== 2) {
     throw new Error(
-      "Workflow thiếu WORKER_FALLBACK_URL HTTPS đáng tin — một cổng WEB_URL chết ở mép nền tảng " +
-        "sẽ bỏ lại khôi lỗi gõ vào xác ấy mãi mãi.",
+      "Workflow phải có đúng hai WORKER_FALLBACK_URL HTTPS đáng tin: một cho lượt tải runtime " +
+        "và một cho tiến trình khôi lỗi. Thiếu một cổng sẽ khiến endpoint chính chết mà ca không tự hồi phục.",
     );
   }
   return workflow;

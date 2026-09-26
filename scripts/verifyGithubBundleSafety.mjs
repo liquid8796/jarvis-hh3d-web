@@ -104,9 +104,15 @@ check(
   "split git push authenticates through gh without exposing PAT or opening an interactive prompt",
 );
 check(
-  /buildKhoiloiPayload\(\{[^}]*workflowFile/s.test(creator) &&
+  /buildWorkflowOnlyPayload\(\{[^}]*workflowFile/s.test(creator) &&
     /\["workflow", "run", workflowFile,/.test(creator),
-  "custom workflow filename reaches both the payload and initial dispatch",
+  "custom workflow filename reaches the workflow-only payload and initial dispatch",
+);
+check(
+  !creator.includes("buildKhoiloiPayload({") &&
+    creator.includes("gitHeadPayloadSource(repoRoot)") &&
+    creator.includes("buildWorkflowOnlyPayload"),
+  "new primary repositories receive only workflow infrastructure, never a frozen copy of worker source",
 );
 check(
   creator.includes('publicIdentityForWorker } from "./githubPublicIdentity.mjs"') &&

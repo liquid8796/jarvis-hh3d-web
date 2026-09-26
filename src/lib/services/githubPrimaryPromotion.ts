@@ -19,6 +19,7 @@ const PROMOTION_COMMIT_MESSAGE = "feat(khoiloi): promote repository to primary";
 
 type Station = AppSettings["githubStations"][number];
 type Companion = Station["companionRepos"][number];
+type PrimarySource = NonNullable<Station["primarySource"]>;
 type PromotionLease = Pick<GithubSessionLease, "assertHeld" | "release">;
 type PreparedPayload = {
   files: ReadonlyMap<string, Buffer>;
@@ -63,6 +64,57 @@ type ResolvedPromotion = {
 
 const same = (left: string, right: string) => left.toLowerCase() === right.toLowerCase();
 const repoPath = (owner: string, repo: string) => `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+
+
+function primarySourceFromCompanion(
+  companion: Companion,
+  promotedAt: string,
+  promotedFrom: string,
+): PrimarySource {
+  return {
+    lastNurtureDay: companion.lastNurtureDay,
+    pushesToday: companion.pushesToday,
+    lastPushAt: companion.lastPushAt,
+    lastPushOk: companion.lastPushOk,
+    lastPushNote: "Đã promote thành repo chính; source dự án cũ được giữ nguyên và tiếp tục được nuôi.",
+    managedBy: companion.managedBy,
+    createdAt: companion.createdAt,
+    nextDecisionAt: null,
+    lastCommitSha: companion.lastCommitSha,
+    topic: companion.topic,
+    language: companion.language,
+    sourcePaths: companion.sourcePaths,
+    forkedFrom: companion.forkedFrom,
+    promotedAt,
+    promotedFrom,
+  };
+}
+
+function demotedPrimaryCompanion(
+  station: Station,
+  oldInfo: RepoInfo,
+  promotionTarget: string,
+): Companion {
+  const retained = station.primarySource;
+  return {
+    repo: station.repo,
+    lastNurtureDay: retained?.lastNurtureDay ?? null,
+    pushesToday: retained?.pushesToday ?? 0,
+    lastPushAt: retained?.lastPushAt ?? null,
+    lastPushOk: retained?.lastPushOk ?? null,
+    lastPushNote: retained?.lastPushNote || `Được hạ từ repo chính khi promote ${promotionTarget}.`,
+    managedBy: retained?.managedBy,
+    githubId: oldInfo.id,
+    createdAt: retained?.createdAt ?? oldInfo.created_at,
+    nextDecisionAt: retained?.nextDecisionAt ?? null,
+    lastCommitSha: retained?.lastCommitSha,
+    topic: retained?.topic,
+    language: retained?.language,
+    sourcePaths: retained?.sourcePaths,
+    forkedFrom: retained?.forkedFrom,
+    actionsDisabled: true,
+  };
+}
 
 export function planGithubPromotionHistory(
   defaultHead: string | null,
@@ -161,8 +213,9 @@ async function prepareProductionPayload(station: Station, deadlineAt: number): P
       }),
     });
     const files = await collectFiles(directory);
-    if (files.size === 0 || !files.has(`.github/workflows/${station.workflowFile}`)) {
-      throw new Error("payload-incomplete");
+    const workflowPath = ".github/workflows/" + station.workflowFile;
+    if (files.size !== 1 || !files.has(workflowPath)) {
+      throw new Error("promotion-payload-must-be-workflow-only");
     }
     return {
       files,
@@ -386,21 +439,13 @@ export async function promoteGithubCompanionToPrimary(
       if (!freshTarget || (freshTarget.githubId && freshTarget.githubId !== targetInfo.id)) throw new Error("target-changed");
 
       const nextCompanions = fresh.station.companionRepos.filter((entry) => !same(entry.repo, companion.repo));
-      if (oldInfo) {
-        nextCompanions.push({
-          repo: station.repo,
-          lastNurtureDay: null,
-          pushesToday: 0,
-          lastPushAt: null,
-          lastPushOk: null,
-          lastPushNote: `Được hạ từ repo chính khi promote ${companion.repo}.`,
-          githubId: oldInfo.id,
-          createdAt: oldInfo.created_at,
-          nextDecisionAt: null,
-          actionsDisabled: true,
-        });
-      }
+      if (oldInfo) nextCompanions.push(demotedPrimaryCompanion(fresh.station, oldInfo, companion.repo));
 
+      fresh.station.primarySource = primarySourceFromCompanion(
+        freshTarget,
+        promotedAt,
+        owner + "/" + freshTarget.repo,
+      );
       fresh.station.repo = companion.repo;
       fresh.station.primaryDeferred = false;
       fresh.station.provisionedBy = "jarvis";
@@ -412,7 +457,9 @@ export async function promoteGithubCompanionToPrimary(
       fresh.station.lastPingAt = null;
       fresh.station.lastCommitAt = promotedAt;
       fresh.station.lastPingOk = null;
-      fresh.station.lastPingNote = `Vừa promote từ kho phụ; repo chính cũ${oldInfo ? ` ${station.repo} đã thành repo phụ` : " đang tạm hoãn nên không có repo để hạ"}.`;
+      fresh.station.lastPingNote =
+        `Vừa promote từ kho phụ; source dự án cũ được giữ nguyên, chỉ workflow khôi lỗi được thêm hoặc cập nhật. ` +
+        (oldInfo ? `Repo chính cũ ${station.repo} đã thành repo phụ.` : "Station trước đó tạm hoãn nên không có repo cũ để hạ.");
       fresh.station.workflowState = "";
       fresh.station.nurtureNextAt = null;
       fresh.station.nurtureLastNote = oldInfo

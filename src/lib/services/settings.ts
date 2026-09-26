@@ -59,15 +59,13 @@ const backdropImageSchema = z.object({
  * là DẤU VẾT quan sát; ledger trên GitHub mới là nguồn sự thật về ordinal trong ngày, nên mọi
  * trường đều có fallback để một document cũ/rác không làm mất cả station.
  */
-const githubCompanionRepoSchema = z.object({
-  repo: z.string().min(1).max(100),
+const githubNurtureTraceSchema = z.object({
   lastNurtureDay: z.string().max(10).nullable().catch(null).default(null),
   pushesToday: z.number().int().min(0).max(MAX_DAILY_PUSHES).catch(0).default(0),
   lastPushAt: z.string().nullable().catch(null).default(null),
   lastPushOk: z.boolean().nullable().catch(null).default(null),
   lastPushNote: z.string().max(500).catch("").default(""),
   managedBy: z.literal("ollama").optional(),
-  githubId: z.number().int().positive().optional(),
   createdAt: z.string().optional(),
   nextDecisionAt: z.string().nullable().optional(),
   lastCommitSha: z.string().max(100).optional(),
@@ -75,8 +73,25 @@ const githubCompanionRepoSchema = z.object({
   language: z.string().max(80).optional(),
   sourcePaths: z.array(z.string().min(1).max(240)).max(256).optional(),
   forkedFrom: z.string().max(141).optional(),
+});
+
+const githubCompanionRepoSchema = githubNurtureTraceSchema.extend({
+  repo: z.string().min(1).max(100),
+  githubId: z.number().int().positive().optional(),
   pendingDelete: z.boolean().optional(),
   actionsDisabled: z.boolean().optional(),
+});
+
+/**
+ * Source project retained when a companion becomes the primary repository.
+ *
+ * Presence also marks a hybrid primary: Jarvis owns only its worker workflow, while Ollama keeps
+ * maintaining the repository's pre-existing application source. That durable distinction prevents
+ * a later force-deploy from overwriting package files or source code with the frozen worker bundle.
+ */
+const githubPrimarySourceSchema = githubNurtureTraceSchema.extend({
+  promotedAt: z.string().optional(),
+  promotedFrom: z.string().max(141).optional(),
 });
 
 export const appSettingsSchema = z.object({
@@ -238,28 +253,6 @@ export const appSettingsSchema = z.object({
       lastRunDay: z.string().nullable().catch(null),
     })
     .prefault({ enabled: false, lastRunDay: null }),
-
-  browser: z
-    .object({
-      /**
-       * TRÌNH DUYỆT mà khôi lỗi mở để cày — lựa chọn của Gia chủ, áp cho MỌI khôi lỗi cùng lúc
-       * (tông môn lẫn máy nhà từng đạo hữu).
-       *
-       * `chromium` là nếp cũ và là mặc định: Chromium đầy đủ, chạy headless, kèm phép đè client
-       * hints (xem runCycle.mjs). `obscura` là trình duyệt headless viết bằng Rust với bản dựng
-       * stealth — thứ sinh ra để không mang cái tật「HeadlessChrome」mà Cloudflare soi.
-       *
-       * Nằm ở app_settings chứ không phải env, đúng lẽ của `game.baseUrl` ngay trên: đổi trình
-       * duyệt là chuyện của một ô chọn và vòng chạy KẾ, không phải một lượt phát hành gói cho
-       * chín kho khôi lỗi đông lạnh.
-       *
-       * `.catch("chromium")` — một giá trị rác (sửa tay JSONB) phải rơi về đường đã chạy suốt
-       * bấy lâu, không phải về đường mới. Và máy nào chưa cài obscura thì chính engine tự lui về
-       * Chromium: lựa chọn này không bao giờ được phép biến thành một vòng chạy chết.
-       */
-      engine: z.enum(["chromium", "obscura"]).catch("chromium"),
-    })
-    .prefault({ engine: "chromium" }),
 
   /**
    * Sổ gương trạm — danh mục trạm dự phòng cho hệ chuyển trạm (deploy/mirror/README.md §4).
@@ -453,6 +446,11 @@ export const appSettingsSchema = z.object({
         enabled: z.boolean().catch(true).default(true),
         /** Registered companion repos retain their identity and activity history. */
         companionRepos: z.array(githubCompanionRepoSchema).max(MAX_COMPANION_COUNT).catch([]).default([]),
+        /**
+         * Software source retained inside a promoted primary. The workflow is infrastructure;
+         * this trace lets the nurture loop keep developing the old code without touching .github.
+         */
+        primarySource: githubPrimarySourceSchema.optional(),
         companionCountOverride: z.number().int().min(0).max(MAX_COMPANION_COUNT).nullable().optional(),
         allowCompanionFork: z.boolean().optional(),
         allowCompanionDelete: z.boolean().optional(),
@@ -603,6 +601,7 @@ export function parseGithubSettingsForMutation(value: unknown): AppSettings {
       const station = stations[index] as Record<string, unknown>;
       if (!station || typeof station !== "object" || (station.workerId !== undefined && typeof station.workerId !== "string")) throw new Error("Invalid worker identity");
       if (station.companionRepos !== undefined && (!Array.isArray(station.companionRepos) || station.companionRepos.length !== parsed.githubStations[index].companionRepos.length)) throw new Error("Invalid companion ownership");
+      if (station.primarySource !== undefined && (!station.primarySource || typeof station.primarySource !== "object" || !parsed.githubStations[index].primarySource)) throw new Error("Invalid primary source ownership");
     }
   }
   return parsed;

@@ -1,11 +1,9 @@
 # KHÔI LỖI TÔNG MÔN THỨ HAI — chạy trên runner của GitHub, song song với khôi lỗi trên VM.
 #
-# CHỖ ĐẶT TỆP NÀY LÀ MỘT LUẬT, không phải một chỗ tuỳ tiện (13/08/2026): **kho nào giữ MÃ NGUỒN
-# thì không chạy nó.** Workflow này nằm trong `.github/workflows/` của một kho khôi lỗi dùng rồi
-# bỏ, và chỉ ở đó. Lý do: nó đòi `WORKER_TOKEN` — chìa TOÀN CỤC, mở cookie của MỌI thành viên —
-# nằm trong Secrets của kho chạy nó, và nó đổ nhật ký vĩnh viễn, ai cũng đọc được, của một tiến
-# trình chuyên cầm cookie đã giải mã. Đặt cả hai thứ ấy lên một kho dùng rồi bỏ thì mất một kho
-# dùng rồi bỏ; đặt lên kho mã nguồn thì mất kho mã nguồn.
+# WORKFLOW CÓ THỂ SỐNG CÙNG MÃ NGUỒN DỰ ÁN. Từ 26/09/2026, repo phụ được promote giữ nguyên toàn
+# bộ code cũ; Jarvis chỉ chồng tệp workflow này lên. Runner tải gói khôi lỗi hiện hành vào
+# `RUNNER_TEMP`, không cài đè package/source của repo. `WORKER_TOKEN` vẫn là secret toàn cục,
+# vì vậy chỉ repo chính đã được tông môn xác nhận mới được bật workflow; repo phụ luôn tắt Actions.
 #
 # PHỐI HỢP VỚI VM: không có cơ chế điều phối nào ở đây, và đó là chủ ý — Postgres đã phân xử
 # sẵn. `claimNextJob` là MỘT câu UPDATE nguyên tử: hai khôi lỗi giành nhau thì nhận hai dòng
@@ -72,7 +70,7 @@ jobs:
     timeout-minutes: 350
     steps:
       # Mốc giờ cho phanh chống vòng lặp ở bước cuối. Đặt TRƯỚC mọi thứ để nó tính cả thời
-      # gian cài đặt — một lượt chết ngay lúc `npm ci` cũng phải bị phanh giữ lại.
+      # gian cài đặt — một lượt chết ngay lúc tải runtime cũng phải bị phanh giữ lại.
       - name: Đánh dấu giờ bắt đầu
         run: echo "BAT_DAU_LUC=$(date +%s)" >> "$GITHUB_ENV"
 
@@ -81,93 +79,61 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
 
-      - run: npm ci
-
-      # Chỉ Chromium — cùng lý do với workflow usage: mặc định Playwright kéo cả Firefox lẫn
-      # WebKit, tức vài phút mỗi lượt cho hai thứ không ai dùng. `--with-deps` cài thư viện hệ
-      # thống mà Chromium cần trên runner sạch.
-      - run: npx playwright install --with-deps chromium
-
-      # ── OBSCURA: trình duyệt thứ hai, dùng khi trang Tông Môn chọn nó ─────────────────────
-      #
-      # Tải mỗi lượt thay vì đóng vào kho: kho khôi lỗi là bản sao ĐÔNG LẠNH của mã nguồn, nhét
-      # 82 MB binary vào đó là mỗi lượt `github:deploy` phải đẩy lại từng ấy byte qua Git Data API.
-      # Runner tải nó trong khoảng chục giây, một lần cho cả ca trực 290 phút.
-      #
-      # `continue-on-error` KHÔNG phải sự cẩu thả: lựa chọn trình duyệt nằm ở app_settings và có
-      # thể đang là「chromium」, lúc ấy binary này không ai dùng tới. Một lượt tải trượt (GitHub
-      # release đứt mạng, đổi tag) mà giết cả ca trực là đổi một tiện nghi lấy nguyên một đội hình.
-      # Thiếu nó thì engine tự lui về Chromium và nói rõ trong nhật ký.
-      - name: Lấy Obscura
-        continue-on-error: true
+      # Repository source stays owned by the project. The worker runtime is downloaded into
+      # RUNNER_TEMP, so promoting or updating a primary repository only touches this workflow.
+      - name: Download current worker runtime
         env:
-          # Ghim tag: một bản mới lặng lẽ đổi cờ dòng lệnh sẽ làm mọi khôi lỗi hỏng cùng lúc, ở
-          # chỗ không ai nhìn. Nâng bản là một lượt sửa có chủ ý, đi kèm một lượt đo.
-          OBSCURA_VERSION: v0.2.1
+          WEB_URL: ${{ vars.WEB_URL || 'https://158.180.59.36.sslip.io' }}
+          WORKER_FALLBACK_URL: ${{ vars.WORKER_FALLBACK_URL || 'https://auto-hh3d.vercel.app' }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/linh-su-runtime"
+          rm -rf "$dir"
+          mkdir -p "$dir"
+
+          download_runtime() {
+            local base="${1%/}"
+            curl -fsSL --retry 3 --retry-delay 2 "$base/linh-su/goi-linh-su.tgz" | tar -xz -C "$dir"
+          }
+
+          if ! download_runtime "$WEB_URL"; then
+            echo "::warning::Primary runtime endpoint failed; trying the trusted fallback."
+            rm -rf "$dir"
+            mkdir -p "$dir"
+            download_runtime "$WORKER_FALLBACK_URL"
+          fi
+
+          test -f "$dir/worker.mjs"
+          test -f "$dir/package.json"
+          test -f "$dir/node_modules/playwright-core/cli.js"
+          echo "LINH_SU_RUNTIME=$dir" >> "$GITHUB_ENV"
+
+      - name: Install Chromium for worker runtime
         run: |
           set -eu
-          # Runner GitHub là x86_64; VM tông môn thì aarch64 — hai kiến trúc khác nhau, và tải
-          # nhầm thì binary nằm im cho tới lúc chạy mới nổ「Exec format error」.
-          asset="obscura-x86_64-linux-stealth.tar.gz"
-          dir="$RUNNER_TEMP/obscura"
-          mkdir -p "$dir"
-          curl -fsSL --retry 3 --retry-delay 2 -o "$dir/obscura.tar.gz"             "https://github.com/h4ckf0r0day/obscura/releases/download/$OBSCURA_VERSION/$asset"
-          tar -xzf "$dir/obscura.tar.gz" -C "$dir"
-          # Hỏi chính nó một câu trước khi tin: tệp đúng tên mà sai kiến trúc vẫn giải nén ngon lành.
-          "$dir/obscura" --version
-          echo "OBSCURA_BIN=$dir/obscura" >> "$GITHUB_ENV"
+          cd "$LINH_SU_RUNTIME"
+          node node_modules/playwright-core/cli.js install --with-deps chromium
 
       - name: Trực ca
         env:
-          # Khôi lỗi là nguồn request dày nhất (mỗi 5 giây), nên đi thẳng backend thay vì đốt
-          # Edge Requests của một tài khoản Vercel Hobby. Ngày 08/09/2026 tám kho cùng bị kẹt
-          # khi auto-hh3d-4 chạm trần và mép Vercel trả 402 trước khi app kịp phát 409.
           WEB_URL: ${{ vars.WEB_URL || 'https://158.180.59.36.sslip.io' }}
-          # Cổng thứ hai do operator tin cậy và nướng sẵn — worker KHÔNG lấy target từ Location
-          # hay thân lỗi. Nếu đường thẳng gặp lỗi mạng/gateway, lượt kế mới thử qua proxy này.
           WORKER_FALLBACK_URL: ${{ vars.WORKER_FALLBACK_URL || 'https://auto-hh3d.vercel.app' }}
           WORKER_TOKEN: ${{ secrets.WORKER_TOKEN }}
-          # Danh tính riêng — xem điều 1.
           WORKER_ID: github-khoiloi
           WORKER_MAX_JOBS: "2"
           WORKER_QUEST_TABS: "3"
-          # 290 phút / 50 phút — xem điều 2. Viết bằng mili giây vì worker.mjs đọc thẳng.
           WORKER_MAX_LIFETIME_MS: ${{ inputs.tuoi_tho_ms || '17400000' }}
           WORKER_DRAIN_TIMEOUT_MS: "3000000"
-          # Tự bấm ô Turnstile khi vấp màn kiểm tra. Bật ở ĐÂY (chứ không đổi mặc định trong mã)
-          # vì cân nhắc đã đổi: đo 20/08/2026 thì cả bốn khôi lỗi tông môn đều bị chặn, `việc
-          # xong = 0` suốt ba giờ — không còn gì để mất. Lượt ghé cổng nay tự kể đã bấm mấy lần,
-          # nên bật xong là ĐO ĐƯỢC ngay trên Hoạt động chứ không phải đoán.
           WORKER_SOLVE_TURNSTILE: "1"
         run: |
           set -eu
           if [ -z "${WORKER_TOKEN:-}" ]; then
-            echo "::error::Thiếu secret WORKER_TOKEN — khôi lỗi không xác thực được với /api/worker."
+            echo "::error::Missing WORKER_TOKEN secret."
             exit 1
           fi
-          node scripts/worker.mjs
-      # ── NỐI CHUỖI: lượt này tự phát lượt kế ────────────────────────────────────────────────
-      #
-      # Vì sao có bước này. Cron của GitHub KHÔNG mất nhịp (đo 22/08/2026: đủ 6 lượt/ngày) nhưng
-      # trễ 52–211 phút, tức dao động 159 phút. Ngân sách gối đầu chỉ là `tuổi thọ − chu kỳ cron`
-      # = 290 − 240 = 50 phút. Một dao động 159 phút không thể lọt qua khe 50 phút, nên đội hở
-      # lỗ đều đặn — đo được một lỗ 84 phút hôm 22/08.
-      #
-      # `GITHUB_TOKEN` DÙNG ĐƯỢC, không cần PAT. Luật chống đệ quy của GitHub chừa đúng hai cửa:
-      # "events triggered by the GITHUB_TOKEN will not create a new workflow run, with the
-      # following exceptions: workflow_dispatch and repository_dispatch events always create
-      # workflow runs". Nhờ vậy không phải nhét chìa `repo`+`workflow`+`delete_repo` vào kho.
-      #
-      # PHANH CHỐNG VÒNG LẶP — phần quan trọng nhất của bước này. Luật chống đệ quy kia sinh ra
-      # để chặn cảnh một lượt chết yểu lại phát lượt kế, chết yểu tiếp, đốt sạch phút Actions.
-      # Ta tự đi vòng qua luật ấy thì phải tự dựng phanh: CHỈ nối chuỗi khi lượt đã sống quá NỬA
-      # tuổi thọ. Ngưỡng suy từ chính `WORKER_MAX_LIFETIME_MS` chứ không gõ tay, nên hạ tuổi thọ
-      # xuống để thử là phanh tự hạ theo — không có hằng số nào trôi khỏi cấu hình.
-      #
-      # Cron ở trên GIỮ NGUYÊN làm lưới đỡ: chuỗi đứt (phát hỏng, lượt bị huỷ, lượt chết yểu) thì
-      # tối đa 4 giờ sau cron dựng lại đội. Bỏ cron đi là đổi một lỗ 84 phút lấy một lỗ vĩnh viễn.
+          node "$LINH_SU_RUNTIME/worker.mjs"
+
       - name: Phát lượt kế
         if: always()
         env:

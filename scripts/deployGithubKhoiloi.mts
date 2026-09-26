@@ -65,15 +65,10 @@ import {
   workerIdFromWorkflow,
 } from "./githubKhoiloi.mts";
 import {
-  OWNED_PREFIXES,
   WORKFLOW_TARGET_PATH,
-  WORKFLOW_TEMPLATE_PATH,
-  buildKhoiloiPayload,
-  generateLockfile,
+  buildWorkflowOnlyPayload,
   gitHeadPayloadSource,
   gitBlobSha,
-  renderPackageJsonForSource,
-  stationKhoiloiPayload,
   uncommittedPayloadPaths,
   workflowTargetPath,
 } from "./khoiloiPayload.mjs";
@@ -309,28 +304,8 @@ console.log(`  sẽ đụng tới  : ${targets.length}`);
 if (rejected.length > 0) {
   console.log(`  dòng hỏng    : ${rejected.length} — ${rejected.join(" · ")}`);
 }
-console.log("\n── Giải cây phụ thuộc một lần cho mọi kho…");
-
-/**
- * Lockfile giải MỘT LẦN rồi dùng lại: nó chỉ phụ thuộc bản `playwright-core`, giống hệt nhau ở
- * mọi kho, mà mỗi lượt gọi npm là vài giây.
- */
+console.log("\n── Chuẩn bị workflow dùng chung cho mọi kho…");
 const payloadSource = gitHeadPayloadSource(repoRoot);
-const lockfile = generateLockfile(renderPackageJsonForSource(payloadSource));
-
-/**
- * Gói NỀN dựng một lần với một `workerId` giả. Hai tệp mang danh tính riêng của từng kho —
- * workflow và README — được vẽ đè lên bản sao ở mỗi vòng, nên phần đọc blob (18 lượt gọi `git`)
- * chỉ chạy đúng một lần thay vì một lần cho mỗi kho.
- */
-const basePayload = buildKhoiloiPayload({
-  source: payloadSource,
-  repoRoot,
-  workerId: "khoiloi-mau",
-  webUrl: "https://mau.invalid",
-  lockfile,
-});
-const workflowTemplate = payloadSource.read(WORKFLOW_TEMPLATE_PATH).toString("utf8");
 
 // ---- 4. Cửa gọi GitHub ------------------------------------------------------------------------
 
@@ -662,9 +637,8 @@ async function deployOne(station: Station): Promise<Outcome> {
     }
 
     // 5.4 — Kế hoạch.
-    const files = stationKhoiloiPayload({
-      basePayload,
-      template: workflowTemplate,
+    const files = buildWorkflowOnlyPayload({
+      source: payloadSource,
       workerId,
       webUrl,
       workflowFile: station.workflowFile,
@@ -672,7 +646,7 @@ async function deployOne(station: Station): Promise<Outcome> {
     const localShas = new Map<string, string>();
     for (const [path, bytes] of files) localShas.set(path, gitBlobSha(bytes));
 
-    const plan = planKhoiloiTree({ payload: localShas, remote, ownedPrefixes: OWNED_PREFIXES });
+    const plan = planKhoiloiTree({ payload: localShas, remote, ownedPrefixes: [] });
 
     if (plan.changed.length === 0 && plan.removed.length === 0) {
       // Kho đã đúng bản VẪN có thể đang chạy mã cũ: mã trong kho là một chuyện, mã mà lượt Actions

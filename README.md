@@ -84,6 +84,10 @@ Mọi khôi lỗi đều là **một tiến trình `worker.mjs` sống dai** —
 Hai worker cùng đủ điều kiện tranh một job thì Postgres phân xử bằng một câu UPDATE nguyên
 tử — không bao giờ có hai khôi lỗi ôm cùng một lượt.
 
+Mọi khôi lỗi nay dùng **Chromium**. Trang Tông Môn không còn lựa chọn trình duyệt thứ hai; worker
+không tải, cài hay nhận cấu hình Obscura nữa. Trên GitHub Actions, workflow tải gói worker hiện hành
+vào `RUNNER_TEMP`, cài Chromium từ chính `playwright-core` đi kèm gói rồi chạy tách khỏi source repo.
+
 Khi cần ép toàn bộ khôi lỗi GitHub sang bản mới, dùng `force-github-khoiloi.bat`. Từ 1.3.93,
 một station 404, repo đã mất hoặc PAT hỏng chỉ bị báo riêng; các repo còn truy cập được vẫn tiếp
 tục nhận gói mới và được phát lại Actions. Chỉ khi không còn repo lành nào, hoặc preflight chung
@@ -619,8 +623,11 @@ PAT có `repo`, `workflow`, `delete_repo`, `user`; scope `user` dùng để cậ
 không có API upload avatar; hệ thống báo warning thay vì dùng browser bypass.
 
 Trong trang chi tiết station, bất kỳ repo phụ nào không đang chờ xoá đều có thể **Promote làm repo
-chính**. Jarvis giữ lịch sử Git của repo được chọn, cài payload/workflow + `WORKER_TOKEN`, chuẩn hoá
-nhánh chính về `main`, rồi đổi vai trò trong sổ. Nếu primary cũ có thật, nó trở thành repo phụ và
+chính**. Jarvis giữ nguyên toàn bộ lịch sử và source của dự án, chỉ chồng thêm/cập nhật đúng tệp
+workflow + `WORKER_TOKEN`, chuẩn hoá nhánh chính về `main`, rồi đổi vai trò trong sổ. Runtime worker
+được tải ở mỗi lượt Actions nên không còn cần chép `scripts/`, `src/`, package manifest hay README
+vào repo. Sau promote, Ollama vẫn tiếp tục phát triển source cũ ngay trên repo chính; `.github/**`
+thuộc hạ tầng, model không được sửa hoặc xoá. Nếu primary cũ có thật, nó trở thành repo phụ và
 Actions bị tắt; nếu primary cũ đang hoãn thì không có repo giả nào được thêm. Cutover giữ khoá cho
 cả danh tính cũ/mới và rollback trạng thái Actions nếu ghi sổ thất bại để tránh hai worker chạy cùng
 `WORKER_ID`.
@@ -679,7 +686,7 @@ File SQL sinh ra **được commit** — lịch sử schema nằm trong git, kh�
 
 ## 6. Lịch sử phát hành
 
-Bản hiện tại: **1.3.93**.
+Bản hiện tại: **1.3.94**.
 
 Lịch sử nằm ở [CHANGELOG.md](CHANGELOG.md), tách riêng khỏi file này — hai tài liệu trả lời
 hai câu hỏi khác nhau: README nói *hệ thống chạy thế nào*, changelog nói *vì sao nó thành ra

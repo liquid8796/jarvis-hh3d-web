@@ -12,7 +12,11 @@
  * ta có thật sự đòi Chromium đầy đủ không, và khi máy không có nó thì có LUI ĐƯỢC không — nhánh
  * lui mới là chỗ nguy hiểm, vì hỏng ở đó nghĩa là mọi vòng chạy chết ngay từ cú mở trình duyệt.
  */
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { launchProfile, openBrowserPreferringFullChromium } from "../src/lib/quest-engine/runCycle.mjs";
+
+const repoRoot = path.join(import.meta.dirname, "..");
 
 let passed = 0;
 const failures: string[] = [];
@@ -50,6 +54,34 @@ function fakeChromium(failOn: (channel: string | undefined) => boolean) {
 }
 
 async function main() {
+  console.log("Chromium là lựa chọn duy nhất trong control plane và runtime");
+  {
+    const adminPage = readFileSync(path.join(repoRoot, "src/app/admin/page.tsx"), "utf8");
+    const adminActions = readFileSync(path.join(repoRoot, "src/app/actions/admin.ts"), "utf8");
+    const settings = readFileSync(path.join(repoRoot, "src/lib/services/settings.ts"), "utf8");
+    const runCycle = readFileSync(path.join(repoRoot, "src/lib/quest-engine/runCycle.mjs"), "utf8");
+    const workflow = readFileSync(path.join(repoRoot, "deploy/github/linh-su.yml"), "utf8");
+    check(
+      "trang Tông Môn không còn form chọn trình duyệt",
+      !adminPage.includes("BrowserEngineForm") && !adminPage.includes("Trình Duyệt Của Khôi Lỗi"),
+    );
+    check("server action đổi browser đã bị gỡ", !adminActions.includes("saveBrowserEngineAction"));
+    check("settings không còn browser.engine", !settings.includes("browser: z") && !settings.includes("settings.browser"));
+    check(
+      "runtime không còn nhánh Obscura/browserEngine",
+      !runCycle.includes("obscuraBrowser") && !runCycle.includes("browserEngine"),
+    );
+    check(
+      "workflow chỉ cài Chromium",
+      workflow.includes("playwright-core/cli.js install --with-deps chromium") && !/obscura/i.test(workflow),
+    );
+    check(
+      "module Obscura và UI selector đã bị xóa",
+      !existsSync(path.join(repoRoot, "src/lib/quest-engine/obscuraBrowser.mjs")) &&
+        !existsSync(path.join(repoRoot, "src/app/admin/BrowserEngineForm.tsx")),
+    );
+  }
+
   console.log("launchProfile — khai kênh Chromium đầy đủ");
   const fp = launchProfile(true) as { channel?: string; headless: boolean };
   check('có channel: "chromium"', fp.channel === "chromium", String(fp.channel));

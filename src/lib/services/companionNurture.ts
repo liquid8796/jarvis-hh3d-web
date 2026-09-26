@@ -12,6 +12,11 @@ import type { CompanionNurtureResult, CompanionNurtureSummary } from "./githubSt
 
 type Station = AppSettings["githubStations"][number];
 type Companion = Station["companionRepos"][number];
+type PrimarySource = NonNullable<Station["primarySource"]>;
+type NurtureTrace = Companion | PrimarySource;
+type NurtureTarget =
+  | { kind: "primary"; repo: string; trace: PrimarySource }
+  | { kind: "companion"; repo: string; trace: Companion };
 type Options = { deadlineAt?: number; stationSlug?: string };
 type Dependencies = {
   read: typeof getAppSettings;
@@ -36,9 +41,11 @@ function entryOf(info: RepoInfo, decision?: CompanionDecision): Companion {
 }
 function resultOf(station: Station, repo: string, note: string, ok = true, pushed = 0): CompanionNurtureResult {
   const day = nurtureDayKey(new Date());
-  const companion = station.companionRepos.find((c) => same(c.repo, repo));
+  const trace = same(station.repo, repo) && station.primarySource
+    ? station.primarySource
+    : station.companionRepos.find((c) => same(c.repo, repo));
   return { stationSlug: stationSlug(station), repo, slug: `${station.owner}/${repo}`, day, target: station.dailyPushes, dueNow: 0,
-    ordinal: (companion?.lastNurtureDay === day ? companion.pushesToday : 0) + pushed, pushed, ok, note: note.slice(0, 500), worthRecording: true };
+    ordinal: (trace?.lastNurtureDay === day ? trace.pushesToday : 0) + pushed, pushed, ok, note: note.slice(0, 500), worthRecording: true };
 }
 
 /** Dependencies make destructive/lifecycle behavior testable without credentials or a database. */
@@ -64,16 +71,24 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
     });
   }
 
-  async function plan(all: AppSettings, station: Station, mode: "create" | "maintain", deadlineAt: number, snapshot?: RepoSnapshot, companion?: Companion) {
+  async function plan(
+    all: AppSettings,
+    station: Station,
+    mode: "create" | "maintain",
+    deadlineAt: number,
+    snapshot?: RepoSnapshot,
+    target?: NurtureTarget,
+  ) {
     const healthBefore = structuredClone(all.githubNurture.apiKeys);
     try {
-      return await deps.plan({ config: all.githubNurture, station: { owner: station.owner, repo: station.repo, allowCompanionFork: station.allowCompanionFork, allowCompanionDelete: station.allowCompanionDelete },
+      const trace = target?.trace;
+      return await deps.plan({ config: all.githubNurture, station: { owner: station.owner, repo: station.repo, allowCompanionFork: station.allowCompanionFork, allowCompanionDelete: target?.kind === "primary" ? false : station.allowCompanionDelete },
         existingRepos: all.githubStations.filter((s) => same(s.owner, station.owner)).flatMap((s) => [s.repo, ...s.companionRepos.map((c) => c.repo)]),
-        languageHistory: all.githubStations.flatMap((s) => s.companionRepos).filter((c) => c.language?.trim())
+        languageHistory: all.githubStations.flatMap((row): NurtureTrace[] => [...row.companionRepos, ...(row.primarySource ? [row.primarySource] : [])]).filter((c) => c.language?.trim())
           .sort((a, b) => (Date.parse(b.createdAt ?? "") || 0) - (Date.parse(a.createdAt ?? "") || 0)).map((c) => c.language!).slice(0, 8),
-        language: companion?.language || snapshot?.language, declaredSourcePaths: companion?.sourcePaths,
-        mode, repo: companion?.repo, context: snapshot ? `${snapshot.context}\nExisting primary language: ${companion?.language || snapshot.language || inferCompanionLanguages([...snapshot.files.keys()])[0] || "inspect the source"}. Preserve the project's existing language and architecture. Declared implementation paths: ${JSON.stringify(companion?.sourcePaths ?? [])}.`
-          : `Creative seed: ${randomUUID()}. Independently choose an original useful software project in any benign subject. Existing topics: ${station.companionRepos.map((c) => `${c.repo}: ${stripCompanionMarker(c.topic ?? "")}`).join("; ")}. Choose a language distinct from the most recent and dominant languages in languageHistory, then its subject, name, architecture and initial files yourself; do not use the seed in names, code, or commits.`,
+        language: trace?.language || snapshot?.language, declaredSourcePaths: trace?.sourcePaths,
+        mode, targetKind: target?.kind, repo: target?.repo, context: snapshot ? `${snapshot.context}\nRepository role: ${target?.kind === "primary" ? "primary worker plus preserved software project" : "companion software project"}. The .github worker workflow is infrastructure and must remain untouched. Existing primary language: ${trace?.language || snapshot.language || inferCompanionLanguages([...snapshot.files.keys()])[0] || "inspect the source"}. Preserve the project's existing language and architecture. Declared implementation paths: ${JSON.stringify(trace?.sourcePaths ?? [])}.`
+          : `Creative seed: ${randomUUID()}. Independently choose an original useful software project in any benign subject. Existing topics: ${[...(station.primarySource ? [`${station.repo}: ${stripCompanionMarker(station.primarySource.topic ?? "")}`] : []), ...station.companionRepos.map((c) => `${c.repo}: ${stripCompanionMarker(c.topic ?? "")}`)].join("; ")}. Choose a language distinct from the most recent and dominant languages in languageHistory, then its subject, name, architecture and initial files yourself; do not use the seed in names, code, or commits.`,
         contextFiles: snapshot ? Object.fromEntries([...snapshot.files].filter(([, file]) => file.content !== undefined).map(([path, file]) => [path, file.content!])) : undefined, deadlineAt });
     } finally { await persistKeyHealth(all.githubNurture, healthBefore); }
   }
@@ -162,78 +177,138 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
     if (decision.action === "fork") return resultOf(station, decision.repo, `Đã fork ${decision.forkFrom}; lượt tiếp theo đọc source để phát triển.`);
     const snapshot: RepoSnapshot = { branch: info.default_branch || "main", head: null, tree: null, files: new Map(), context: "", githubId: info.id };
     const commit = await github.commit(current.owner, decision.repo, snapshot, decision.files, decision.commitMessage, decision.readPaths, current.dailyPushes, decision.sourcePaths);
-    await recordCommit(slug, decision.repo, decision, commit);
+    const createdTarget: NurtureTarget = {
+      kind: "companion",
+      repo: decision.repo,
+      trace: entryOf(info, decision),
+    };
+    await recordCommit(slug, createdTarget, decision, commit);
     return resultOf(station, decision.repo, `Đã tạo repo và ghi ${commit.pushed} commit source${current.dailyPushes === 1 && decision.files.length > 1 ? "; phần còn lại chờ lượt phát triển tiếp theo do giới hạn 1 commit/ngày" : ""}: ${decision.reason}`, true, commit.pushed);
   }
 
-  async function recordCommit(slug: string, repo: string, decision: CompanionDecision, commit: { pushed: number; sha: string; partial?: boolean }) {
+  function traceFor(fresh: Station, target: NurtureTarget): PrimarySource | Companion | null {
+    if (target.kind === "primary") {
+      return same(fresh.repo, target.repo) ? fresh.primarySource ?? null : null;
+    }
+    return fresh.companionRepos.find((item) => same(item.repo, target.repo)) ?? null;
+  }
+
+  async function recordCommit(
+    slug: string,
+    target: NurtureTarget,
+    decision: CompanionDecision,
+    commit: { pushed: number; sha: string; partial?: boolean },
+  ) {
     await patchStation(slug, (fresh) => {
-      const c = fresh.companionRepos.find((item) => same(item.repo, repo));
-      if (!c) return;
+      const trace = traceFor(fresh, target);
+      if (!trace) return;
       const day = nurtureDayKey(new Date());
-      c.pushesToday = Math.min(24, (c.lastNurtureDay === day ? c.pushesToday : 0) + commit.pushed);
-      c.lastNurtureDay = day;
-      if (commit.pushed) c.lastPushAt = new Date().toISOString();
-      c.lastCommitSha = commit.sha;
-      c.lastPushOk = true;
-      c.lastPushNote = (commit.partial ? "Đã khởi tạo một tệp source. Phần còn lại chờ lượt phát triển tiếp theo vì giới hạn commit/ngày. " : "") + decision.reason.slice(0, commit.partial ? 350 : 500);
-      c.nextDecisionAt = later(decision.nextCheckMinutes);
+      trace.pushesToday = Math.min(24, (trace.lastNurtureDay === day ? trace.pushesToday : 0) + commit.pushed);
+      trace.lastNurtureDay = day;
+      if (commit.pushed) trace.lastPushAt = new Date().toISOString();
+      trace.lastCommitSha = commit.sha;
+      trace.lastPushOk = true;
+      trace.lastPushNote = (commit.partial ? "Đã khởi tạo một tệp source. Phần còn lại chờ lượt phát triển tiếp theo vì giới hạn commit/ngày. " : "") + decision.reason.slice(0, commit.partial ? 350 : 500);
+      trace.nextDecisionAt = later(decision.nextCheckMinutes);
       if (decision.action === "create" || decision.action === "commit") {
-        c.language ||= decision.language || inferCompanionLanguages(decision.files)[0];
+        trace.language ||= decision.language || inferCompanionLanguages(decision.files)[0];
         const deleted = new Set(decision.files.filter((file) => file.content === null).map((file) => file.path));
-        c.sourcePaths = [...new Set([...(c.sourcePaths ?? []), ...(decision.sourcePaths ?? [])])].filter((path) => !deleted.has(path)).slice(-256);
+        trace.sourcePaths = [...new Set([...(trace.sourcePaths ?? []), ...(decision.sourcePaths ?? [])])].filter((path) => !deleted.has(path)).slice(-256);
       }
     });
   }
 
-  async function maintainOne(all: AppSettings, station: Station, companion: Companion, deadline: number): Promise<CompanionNurtureResult> {
+  async function maintainOne(
+    all: AppSettings,
+    station: Station,
+    target: NurtureTarget,
+    deadline: number,
+  ): Promise<CompanionNurtureResult> {
     const slug = stationSlug(station);
-    assertCompanionTarget(all.githubStations, station, companion.repo);
-    if (companion.pendingDelete) {
-      await deleteInside(slug, companion.repo, false, deadline);
-      return resultOf(station, companion.repo, "Hoàn tất lượt xóa đã được yêu cầu trước đó.");
+    const trace = target.trace;
+    if (target.kind === "companion") {
+      assertCompanionTarget(all.githubStations, station, target.repo);
+      if (target.trace.pendingDelete) {
+        await deleteInside(slug, target.repo, false, deadline);
+        return resultOf(station, target.repo, "Hoàn tất lượt xóa đã được yêu cầu trước đó.");
+      }
+    } else if (!same(station.repo, target.repo) || !station.primarySource) {
+      throw new Error("Repo chính đã đổi vai trò; bỏ lượt nuôi source cũ.");
     }
+
     const github = deps.github(patOf(station), deadline);
-    const snapshot = await github.snapshot(station.owner, companion.repo, all.githubNurture.contextWindow, companion.sourcePaths);
+    const snapshot = await github.snapshot(station.owner, target.repo, all.githubNurture.contextWindow, trace.sourcePaths);
     if (!snapshot) throw new Error("Không đọc được repo; kiểm tra quyền PAT hoặc repo bị xóa ngoài hệ thống.");
-    if (companion.githubId && companion.githubId !== snapshot.githubId) throw new Error("ID repo đã đổi; không ghi vào một repo thay thế cùng tên.");
-    const observedLanguage = companion.language || snapshot.language || inferCompanionLanguages([...snapshot.files].map(([path, file]) => ({ path, content: file.content })))[0];
-    if (!companion.language && observedLanguage) {
-      await patchStation(slug, (fresh) => { const c = fresh.companionRepos.find((item) => same(item.repo, companion.repo))!; c.language ||= observedLanguage; });
-      companion.language = observedLanguage;
+    const expectedGithubId = target.kind === "primary" ? station.githubId : target.trace.githubId;
+    if (expectedGithubId && expectedGithubId !== snapshot.githubId) throw new Error("ID repo đã đổi; không ghi vào một repo thay thế cùng tên.");
+
+    const observedLanguage = trace.language || snapshot.language || inferCompanionLanguages([...snapshot.files].map(([path, file]) => ({ path, content: file.content })))[0];
+    if (!trace.language && observedLanguage) {
+      await patchStation(slug, (fresh) => {
+        const current = traceFor(fresh, target);
+        if (current) current.language ||= observedLanguage;
+      });
+      trace.language = observedLanguage;
     }
+
     const today = nurtureDayKey(new Date());
-    const used = Math.max(companion.lastNurtureDay === today ? companion.pushesToday : 0, snapshot.todayCommits ?? 0);
+    const used = Math.max(trace.lastNurtureDay === today ? trace.pushesToday : 0, snapshot.todayCommits ?? 0);
     if (used >= station.dailyPushes) {
-      await patchStation(slug, (fresh) => { const c = fresh.companionRepos.find((item) => same(item.repo, companion.repo))!; c.lastNurtureDay = today; c.pushesToday = Math.min(24, used); });
-      return resultOf(station, companion.repo, "Đã đạt giới hạn commit trong ngày; chờ ngày sau.");
+      await patchStation(slug, (fresh) => {
+        const current = traceFor(fresh, target);
+        if (current) { current.lastNurtureDay = today; current.pushesToday = Math.min(24, used); }
+      });
+      return resultOf(station, target.repo, "Đã đạt giới hạn commit trong ngày; chờ ngày sau.");
     }
-    await patchStation(slug, (fresh) => { const c = fresh.companionRepos.find((item) => same(item.repo, companion.repo))!; c.githubId = snapshot.githubId; c.nextDecisionAt = later(15); });
-    if ((companion.managedBy === "ollama" || companion.forkedFrom) && !companion.actionsDisabled) {
-      await github.disableActions(station.owner, companion.repo);
-      await patchStation(slug, (fresh) => { fresh.companionRepos.find((c) => same(c.repo, companion.repo))!.actionsDisabled = true; });
+
+    await patchStation(slug, (fresh) => {
+      const current = traceFor(fresh, target);
+      if (!current) return;
+      current.nextDecisionAt = later(15);
+      if (target.kind === "primary") fresh.githubId = snapshot.githubId;
+      else (current as Companion).githubId = snapshot.githubId;
+    });
+
+    // A primary repository must keep Actions enabled for its worker workflow. Companion projects
+    // remain non-executable and have Actions disabled as before.
+    if (target.kind === "companion" && (target.trace.managedBy === "ollama" || target.trace.forkedFrom) && !(target.trace as Companion).actionsDisabled) {
+      await github.disableActions(station.owner, target.repo);
+      await patchStation(slug, (fresh) => {
+        const current = fresh.companionRepos.find((item) => same(item.repo, target.repo));
+        if (current) current.actionsDisabled = true;
+      });
     }
-    const decision = await plan(all, station, "maintain", deadline, snapshot, companion);
-    if (!same(decision.repo, companion.repo)) throw new Error("Model chọn sai repo cho lượt cập nhật.");
+
+    const decision = await plan(all, station, "maintain", deadline, snapshot, target);
+    if (!same(decision.repo, target.repo)) throw new Error("Model chọn sai repo cho lượt cập nhật.");
     const updated = await deps.read();
     const current = findStation(updated, slug);
-    if (!current?.enabled || current.dailyPushes === 0) return resultOf(station, companion.repo, "Kho đã tạm dừng trong lúc model suy nghĩ.");
-    assertCompanionTarget(updated.githubStations, current, companion.repo);
+    if (!current?.enabled || current.dailyPushes === 0) return resultOf(station, target.repo, "Kho đã tạm dừng trong lúc model suy nghĩ.");
+    if (target.kind === "primary") {
+      if (!same(current.repo, target.repo) || !current.primarySource) return resultOf(station, target.repo, "Repo chính đã đổi vai trò trong lúc model suy nghĩ.");
+    } else {
+      assertCompanionTarget(updated.githubStations, current, target.repo);
+    }
+
     if (decision.action === "delete") {
-      await deleteInside(slug, companion.repo, true, deadline);
-      return resultOf(station, companion.repo, `Model đã xóa repo: ${decision.reason}`);
+      if (target.kind === "primary") {
+        await recordCommit(slug, target, decision, { pushed: 0, sha: snapshot.head ?? "" });
+        return resultOf(station, target.repo, "Repo chính không được tự xóa; giữ nguyên source và chờ lượt phát triển sau.");
+      }
+      await deleteInside(slug, target.repo, true, deadline);
+      return resultOf(station, target.repo, `Model đã xóa repo: ${decision.reason}`);
     }
     if (decision.action === "wait") {
-      await recordCommit(slug, companion.repo, decision, { pushed: 0, sha: snapshot.head ?? "" });
-      return resultOf(station, companion.repo, decision.reason);
+      await recordCommit(slug, target, decision, { pushed: 0, sha: snapshot.head ?? "" });
+      return resultOf(station, target.repo, decision.reason);
     }
     if (decision.action !== "commit") throw new Error("Hành động không hợp lệ khi cập nhật repo.");
     const available = current.dailyPushes - used;
-    if (available <= 0) return resultOf(station, companion.repo, "Giới hạn commit vừa được giảm; chờ ngày sau.");
-    const declaredChanges = [...new Set([...(companion.sourcePaths ?? []), ...(decision.sourcePaths ?? [])])].filter((path) => decision.files.some((file) => file.path === path));
-    const commit = await github.commit(station.owner, companion.repo, snapshot, decision.files, decision.commitMessage, decision.readPaths, available, declaredChanges);
-    await recordCommit(slug, companion.repo, decision, commit);
-    return resultOf(station, companion.repo, decision.reason, true, commit.pushed);
+    if (available <= 0) return resultOf(station, target.repo, "Giới hạn commit vừa được giảm; chờ ngày sau.");
+    const declaredChanges = [...new Set([...(trace.sourcePaths ?? []), ...(decision.sourcePaths ?? [])])].filter((path) => decision.files.some((file) => file.path === path));
+    const commit = await github.commit(station.owner, target.repo, snapshot, decision.files, decision.commitMessage, decision.readPaths, available, declaredChanges);
+    await recordCommit(slug, target, decision, commit);
+    return resultOf(station, target.repo, decision.reason, true, commit.pushed);
   }
 
   async function run(options: Options = {}): Promise<CompanionNurtureSummary> {
@@ -263,13 +338,22 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
             }
             if (!all.githubNurture.apiKeys.some((k) => !k.disabled && due(k.cooldownUntil))) throw new Error("Chưa có API key Ollama sẵn sàng; nhập key hoặc chờ hết thời gian nghỉ.");
             let result: CompanionNurtureResult | undefined;
-            if (station.companionRepos.length < effectiveCompanionCount(station, all.githubNurture) && due(station.nurtureNextAt)) {
+            const day = nurtureDayKey(new Date());
+            const primaryDue = station.primarySource
+              && due(station.primarySource.nextDecisionAt)
+              && (station.primarySource.lastNurtureDay !== day || station.primarySource.pushesToday < station.dailyPushes);
+            if (primaryDue && station.primarySource) {
+              workRepo = station.repo;
+              result = await maintainOne(all, station, { kind: "primary", repo: station.repo, trace: station.primarySource }, deadline);
+            } else if (station.companionRepos.length < effectiveCompanionCount(station, all.githubNurture) && due(station.nurtureNextAt)) {
               result = await createOne(all, station, deadline);
             } else {
-              const day = nurtureDayKey(new Date());
               const c = [...station.companionRepos].filter((item) => item.pendingDelete || (due(item.nextDecisionAt) && (item.lastNurtureDay !== day || item.pushesToday < station.dailyPushes)))
                 .sort((a, b) => (Date.parse(a.nextDecisionAt ?? "") || 0) - (Date.parse(b.nextDecisionAt ?? "") || 0))[0];
-              if (c) { workRepo = c.repo; result = await maintainOne(all, station, c, deadline); }
+              if (c) {
+                workRepo = c.repo;
+                result = await maintainOne(all, station, { kind: "companion", repo: c.repo, trace: c }, deadline);
+              }
             }
             if (result) summary.results.push(result); else summary.skipped++;
           } catch (error) {
@@ -284,8 +368,10 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
                 if (!row) return;
                 row.nurtureLastNote = note;
                 row.nurtureNextAt = later(15);
-                const c = row.companionRepos.find((item) => same(item.repo, workRepo));
-                if (c) { c.lastPushOk = false; c.lastPushNote = note; c.nextDecisionAt = later(15); }
+                const trace = same(row.repo, workRepo) && row.primarySource
+                  ? row.primarySource
+                  : row.companionRepos.find((item) => same(item.repo, workRepo));
+                if (trace) { trace.lastPushOk = false; trace.lastPushNote = note; trace.nextDecisionAt = later(15); }
               });
             } catch { /* The next run recovers durable operation intent from the last checkpoint. */ }
             summary.results.push(resultOf(candidate, workRepo, note, false));

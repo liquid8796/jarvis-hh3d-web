@@ -151,7 +151,6 @@ async function runQuest({
   config,
   dailyDone,
   soloQuestNames,
-  browserEngine,
   say,
   reportAccountTier,
   reportPillBagCaps,
@@ -184,7 +183,6 @@ async function runQuest({
     config,
     dailyDone,
     soloQuestNames,
-    browserEngine,
     say,
     reportAccountTier,
     reportPillBagCaps,
@@ -240,7 +238,6 @@ async function handle(job) {
       config: job.config,
       dailyDone: job.dailyDone,
       soloQuestNames: job.soloQuestNames,
-      browserEngine: job.browserEngine,
       say: (message, level) => say(job.id, message, level),
       reportAccountTier: (tier) =>
         call("accountTier", { jobId: job.id, tier }).catch((err) => {

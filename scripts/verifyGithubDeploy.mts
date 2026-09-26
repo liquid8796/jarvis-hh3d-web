@@ -245,6 +245,7 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
   console.log("\n4. Bản mẫu thật của kho này");
 
   const template = readCommittedFile(repoRoot, WORKFLOW_TEMPLATE_PATH).toString("utf8");
+  const workingTemplate = readFileSync(path.join(repoRoot, WORKFLOW_TEMPLATE_PATH), "utf8");
 
   check("moi được WORKER_ID khỏi bản mẫu", workerIdFromWorkflow(template) !== null);
   check("WEB_URL mặc định của bản mẫu đi thẳng backend", webUrlFromWorkflow(template) === EXPECTED_DIRECT_WORKER_URL);
@@ -270,6 +271,22 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
   check(
     "id của bản mẫu KHÔNG còn sót lại đâu trong tệp đã vẽ",
     !rendered.includes(`WORKER_ID: ${workerIdFromWorkflow(template)}`),
+  );
+  check(
+    "workflow hiện hành tải runtime ra RUNNER_TEMP thay vì chạy source của repo",
+    workingTemplate.includes("/linh-su/goi-linh-su.tgz") &&
+      workingTemplate.includes('LINH_SU_RUNTIME=$dir') &&
+      workingTemplate.includes('node "$LINH_SU_RUNTIME/worker.mjs"') &&
+      !workingTemplate.includes("node scripts/worker.mjs"),
+  );
+  check(
+    "workflow chỉ cài Chromium từ playwright-core đi kèm gói",
+    workingTemplate.includes("node node_modules/playwright-core/cli.js install --with-deps chromium") &&
+      !/obscura/i.test(workingTemplate),
+  );
+  check(
+    "workflow không npm ci vào source dự án được promote",
+    !workingTemplate.includes("npm ci") && !workingTemplate.includes("package-lock.json"),
   );
 
   // Hai ca ĐỘT BIẾN: bản mẫu đổi hình dạng thì phép thay hỏng LẶNG LẼ — nó không thay gì cả, và

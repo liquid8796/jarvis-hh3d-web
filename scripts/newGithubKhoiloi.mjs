@@ -30,7 +30,8 @@ import {
 import { looksTransient } from "./githubTransient.mjs";
 import { publicIdentityForWorker } from "./githubPublicIdentity.mjs";
 import {
-  buildKhoiloiPayload,
+  buildWorkflowOnlyPayload,
+  gitHeadPayloadSource,
   playwrightVersionOf,
   uncommittedPayloadPaths,
 } from "./khoiloiPayload.mjs";
@@ -421,10 +422,15 @@ try {
     );
   }
 
-  // Lượt giải cây phụ thuộc nằm bên trong `buildKhoiloiPayload`; báo trước vì nó là bước lâu nhất
-  // của cả lượt dựng — npm phải hỏi registry.
-  console.log("── Dựng gói + giải cây phụ thuộc (package-lock.json)…");
-  const payload = buildKhoiloiPayload({ repoRoot, workerId, webUrl, workflowFile });
+  // Kho chính mới chỉ nhận workflow. Mã runtime được tải vào RUNNER_TEMP ở mỗi lượt Actions, nên
+  // repo vẫn rỗng ngoài hạ tầng cần thiết và sau này có thể nuôi source dự án mà không bị ghi đè.
+  console.log("── Dựng workflow khôi lỗi, không chạm source dự án…");
+  const payload = buildWorkflowOnlyPayload({
+    source: gitHeadPayloadSource(repoRoot),
+    workerId,
+    webUrl,
+    workflowFile,
+  });
 
   for (const [rel, bytes] of payload) {
     const full = path.join(staging, rel);

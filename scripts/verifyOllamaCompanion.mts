@@ -63,6 +63,33 @@ try {
     respond = () => reply({ ...decision(), action: "wait", language: undefined, sourcePaths: undefined, files: [] });
     assert.equal((await planCompanion(input())).action, "wait");
   });
+  await check("promoted primary converts a model delete request into a safe wait", async () => {
+    const request = input();
+    request.mode = "maintain";
+    request.targetKind = "primary";
+    request.repo = request.station.repo;
+    request.language = "TypeScript";
+    request.declaredSourcePaths = ["src/main.ts"];
+    request.contextFiles = { "src/main.ts": "export const answer = 42;\n" };
+    respond = () => reply({
+      ...decision(),
+      action: "delete",
+      repo: request.station.repo,
+      language: undefined,
+      sourcePaths: undefined,
+      files: [],
+      nextCheckMinutes: 60,
+    });
+    const result = await planCompanion(request);
+    assert.equal(result.action, "wait");
+    assert.equal(result.repo, request.station.repo);
+    assert.equal(calls.length, 1);
+    const messages = calls[0].body.messages as Array<{ role: string; content: string }>;
+    const metadata = JSON.parse(messages.find((entry) => entry.role === "user")!.content);
+    assert.equal(metadata.targetKind, "primary");
+    assert.equal(metadata.allowDelete, false);
+  });
+
   await check("maintenance reuses trusted unfamiliar source declarations but new source needs its own declaration", async () => {
     const request = input(); request.mode = "maintain"; request.repo = decision().repo; request.language = "Janet";
     request.declaredSourcePaths = ["src/math.janet", ...Array.from({ length: 255 }, (_, index) => `src/module-${index}.janet`)];
@@ -200,7 +227,7 @@ try {
     assert.equal((await planCompanion(input())).action, "create");
     assert.equal(calls.length, 2);
     respond = () => reply("{invalid"); calls = [];
-    await assert.rejects(planCompanion(input()), /decision|quyết định|JSON/i);
+    await assert.rejects(planCompanion(input()), /decision|quyáº¿t Ä‘á»‹nh|JSON/i);
     assert.equal(calls.length, 2);
   });
   await check("extracts a single decision from prose, fences and private think blocks", async () => {
@@ -280,7 +307,7 @@ try {
     assert.equal(calls.length, 2);
   });
   await check("context budget includes repair history and reserves output", async () => {
-    const request = input(); request.config.contextWindow = 8192; request.context = "漢🙂".repeat(100000);
+    const request = input(); request.config.contextWindow = 8192; request.context = "æ¼¢ðŸ™‚".repeat(100000);
     respond = () => calls.length === 1 ? reply("not JSON") : reply(decision());
     await planCompanion(request);
     for (const call of calls) {
@@ -315,7 +342,7 @@ try {
   await check("429 honors Retry-After and each failed key is attempted only once", async () => {
     const request = input(); const before = Date.now();
     respond = () => new Response("rate limited", { status: 429, headers: { "Retry-After": "120" } });
-    await assert.rejects(planCompanion(request), /key|khóa|khoá|Ollama/i);
+    await assert.rejects(planCompanion(request), /key|khÃ³a|khoÃ¡|Ollama/i);
     assert.equal(calls.length, 2);
     assert(Date.parse(request.config.apiKeys[0].cooldownUntil!) >= before + 120000);
     calls = [];

@@ -59,8 +59,8 @@ const MAC_DINH_DA_BANG: Record<string, string> = { WORKER_MAX_JOBS: "2" };
 // regex đọc .env cũ, nên lưới sẽ tưởng đã khai trong khi thật ra chưa.
 
 function bienCuaTongMon(src: string): string[] {
-  // Workflow còn một khối env của bước tải Obscura đứng trước. Phải neo vào TÊN bước Trực ca;
-  // quét env đầu tiên từng khiến lưới đọc đúng một biến OBSCURA_VERSION rồi báo hai lỗi giả.
+  // Workflow có khối env tải runtime đứng trước. Phải neo vào TÊN bước Trực ca;
+  // quét env đầu tiên sẽ chỉ thấy cổng tải gói và báo thiếu token/id giả.
   const step = src.indexOf("\n      - name: Trực ca");
   if (step < 0) throw new Error(`${YML}: không thấy bước Trực ca`);
   const start = src.indexOf("\n        env:", step);

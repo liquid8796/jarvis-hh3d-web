@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
+  existsSync,
   readFileSync,
   realpathSync,
   readdirSync,
@@ -17,6 +18,7 @@ import path from "node:path";
 import {
   WORKFLOW_TARGET_PATH,
   buildKhoiloiPayload,
+  buildWorkflowOnlyPayload,
   filesystemPayloadSource,
   gitHeadPayloadSource,
   renderPackageJsonForSource,
@@ -162,6 +164,17 @@ try {
   assert.match(deployedWorkflow, /\/actions\/workflows\/nightly\.yaml\/dispatches/);
   assert.doesNotMatch(deployedWorkflow, /\/actions\/workflows\/linh-su\.yml\/dispatches/);
 
+  const workflowOnly = buildWorkflowOnlyPayload({
+    source,
+    workerId: "hybrid-primary-worker",
+    webUrl: "https://backend.example.invalid",
+    workflowFile: "nightly.yaml",
+  });
+  assert.deepEqual([...workflowOnly.keys()], [".github/workflows/nightly.yaml"]);
+  assert(!workflowOnly.has("package.json"));
+  assert(!workflowOnly.has("README.md"));
+  assert(!workflowOnly.has("src/lib/quest-engine/a-first.mjs"));
+
   write(
     "package.json",
     JSON.stringify({
@@ -180,27 +193,34 @@ try {
       sourceMode: "git-head",
     }),
   });
-  const stagedPackage = JSON.parse(readFileSync(path.join(provisionOutputRoot, "package.json"), "utf8"));
-  const stagedLock = JSON.parse(readFileSync(path.join(provisionOutputRoot, "package-lock.json"), "utf8"));
-  assert.equal(stagedPackage.version, fixtureVersion, "git-head helper stages the committed package without a prebuilt artifact");
-  assert.equal(stagedPackage.dependencies["playwright-core"], "^1.2.3", "dirty dependency changes do not enter git-head payload");
-  assert.equal(stagedLock.packages[""].version, fixtureVersion, "generated lock and package use the same committed version");
-  assert.throws(
-    () => execFileSync(process.execPath, [path.join(repoRoot, "scripts", "githubProvisioningPayload.mjs")], {
-      cwd: repoRoot,
-      input: JSON.stringify({
-        root: fixtureRoot,
-        directory: filesystemOutputRoot,
-        workerId: "filesystem-worker",
-        workflowFile: "linh-su.yml",
-        sourceMode: "filesystem",
-      }),
-      stdio: ["pipe", "pipe", "pipe"],
-    }),
-    /Command failed/,
-    "filesystem mode requires the prebuilt lock artifact instead of generating one during a request",
+  const stagedWorkflow = readFileSync(
+    path.join(provisionOutputRoot, ".github", "workflows", "nightly.yaml"),
+    "utf8",
   );
-  assert.deepEqual(readdirSync(filesystemOutputRoot), [], "missing filesystem artifact fails before staging any payload files");
+  assert.match(stagedWorkflow, /WORKER_ID: head-worker/);
+  assert.match(stagedWorkflow, /\/actions\/workflows\/nightly\.yaml\/dispatches/);
+  assert(!existsSync(path.join(provisionOutputRoot, "package.json")));
+  assert.deepEqual(
+    readdirSync(provisionOutputRoot),
+    [".github"],
+    "git-head provisioning stages only the workflow so project source remains untouched",
+  );
+
+  execFileSync(process.execPath, [path.join(repoRoot, "scripts", "githubProvisioningPayload.mjs")], {
+    cwd: repoRoot,
+    input: JSON.stringify({
+      root: fixtureRoot,
+      directory: filesystemOutputRoot,
+      workerId: "filesystem-worker",
+      workflowFile: "linh-su.yml",
+      sourceMode: "filesystem",
+    }),
+  });
+  assert.deepEqual(readdirSync(filesystemOutputRoot), [".github"]);
+  assert.match(
+    readFileSync(path.join(filesystemOutputRoot, WORKFLOW_TARGET_PATH), "utf8"),
+    /WORKER_ID: filesystem-worker/,
+  );
 
   writeFileSync(path.join(symlinkTarget, "escaped.mjs"), "export const escaped = true;\n");
   symlinkSync(
@@ -214,20 +234,15 @@ try {
   );
 
   const headSource = gitHeadPayloadSource(repoRoot);
-  const headVersion = JSON.parse(headSource.read("package.json").toString("utf8")).version;
-  const deployPayload = buildKhoiloiPayload({
+  const deployPayload = buildWorkflowOnlyPayload({
     source: headSource,
-    repoRoot,
     workerId: "deployed-night-worker",
     webUrl: "https://backend.example.invalid",
     workflowFile: "nightly.yaml",
-    lockfile: Buffer.from(
-      JSON.stringify({ version: headVersion, packages: { "": { version: headVersion } } }),
-      "utf8",
-    ),
   });
   assert(deployPayload.has(".github/workflows/nightly.yaml"));
   assert(!deployPayload.has(WORKFLOW_TARGET_PATH));
+  assert.equal(deployPayload.size, 1);
 
   writeFileSync(
     path.join(gitFixtureRoot, "package.json"),

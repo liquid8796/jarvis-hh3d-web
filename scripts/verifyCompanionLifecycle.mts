@@ -63,6 +63,14 @@ function harness(options: {
   const remote = new Map<string, RepoInfo>();
   const storedFiles = new Map<string, SourceFile[]>();
   for (const station of state.githubStations) {
+    if (station.primarySource) {
+      const slug = `${station.owner}/${station.repo}`.toLowerCase();
+      remote.set(slug, { id: station.githubId ?? 202, full_name: `${station.owner}/${station.repo}`, default_branch: "main", private: false });
+      storedFiles.set(slug, [
+        { path: "src/catalog.py", content: "def find_titles(titles, query):\n    return []\n" },
+        { path: ".github/workflows/linh-su.yml", content: "name: worker infrastructure\n" },
+      ]);
+    }
     for (const c of station.companionRepos) {
       const slug = `${station.owner}/${c.repo}`.toLowerCase();
       remote.set(slug, { id: c.githubId ?? 101, full_name: `${station.owner}/${c.repo}`, default_branch: "main", private: false });
@@ -105,7 +113,12 @@ function harness(options: {
     async commit(owner: string, repo: string, _snapshot: RepoSnapshot, files: SourceFile[], message: string, _readPaths?: string[], _maxCommits?: number, sourcePaths?: readonly string[]) {
       const slug = `${owner}/${repo}`.toLowerCase();
       events.push({ method: "commit", slug, files: structuredClone(files), message, sourcePaths });
-      storedFiles.set(slug, structuredClone(files));
+      const merged = new Map((storedFiles.get(slug) ?? []).map((file) => [file.path, structuredClone(file)]));
+      for (const file of files) {
+        if (file.content === null) merged.delete(file.path);
+        else merged.set(file.path, structuredClone(file));
+      }
+      storedFiles.set(slug, [...merged.values()]);
       return { pushed: 1, sha: `fixture-commit-${++serial}` };
     },
     async delete(owner: string, repo: string) {
@@ -233,6 +246,81 @@ try {
     assert.deepEqual(h.storedFiles, filesBefore);
     await h.engine.run();
     assert.equal(h.plans.length, 1);
+  });
+
+  await test("promoted primary keeps its old source under nurture while the worker workflow stays untouched", async () => {
+    const improved = "def find_titles(titles, query):\n    needle = query.casefold()\n    return [title for title in titles if needle in title.casefold()]\n";
+    const h = harness({
+      station: {
+        githubId: 202,
+        companionCountOverride: 0,
+        primarySource: {
+          managedBy: "ollama",
+          language: "Python",
+          sourcePaths: ["src/catalog.py"],
+          lastNurtureDay: null,
+          pushesToday: 0,
+          lastPushAt: null,
+          lastPushOk: null,
+          lastPushNote: "Promoted project source retained.",
+          nextDecisionAt: null,
+          promotedAt: "2026-09-26T00:00:00.000Z",
+          promotedFrom: "fixture/worker-main",
+        },
+      },
+      decisions: [decision("commit", "worker-main", {
+        files: [{ path: "src/catalog.py", content: improved }],
+        sourcePaths: ["src/catalog.py"],
+      })],
+    });
+    const result = await h.engine.run({ stationSlug: SLUG });
+    assert.equal(result.failed, 0);
+    assert.equal(result.pushed, 1);
+    assert.equal(h.plans.length, 1);
+    assert.equal(h.plans[0].targetKind, "primary");
+    assert.equal(h.plans[0].repo, "worker-main");
+    assert.equal(h.plans[0].station.allowCompanionDelete, false);
+    assert.match(h.plans[0].context, /workflow is infrastructure/i);
+    assert.deepEqual(
+      h.events.filter((event) => ["commit", "disableActions", "delete"].includes(event.method)).map((event) => [event.method, event.slug]),
+      [["commit", "fixture/worker-main"]],
+    );
+    const files = h.storedFiles.get("fixture/worker-main")!;
+    assert.equal(files.find((file) => file.path === "src/catalog.py")?.content, improved);
+    assert.equal(files.find((file) => file.path === ".github/workflows/linh-su.yml")?.content, "name: worker infrastructure\n");
+    const primary = h.state().githubStations[0].primarySource!;
+    assert.equal(primary.lastPushOk, true);
+    assert.equal(primary.pushesToday, 1);
+    assert.equal(primary.lastCommitSha?.startsWith("fixture-commit-"), true);
+  });
+
+  await test("promoted primary ignores a model delete decision and never disables its worker Actions", async () => {
+    const h = harness({
+      station: {
+        githubId: 202,
+        companionCountOverride: 0,
+        allowCompanionDelete: true,
+        primarySource: {
+          managedBy: "ollama",
+          language: "Python",
+          sourcePaths: ["src/catalog.py"],
+          lastNurtureDay: null,
+          pushesToday: 0,
+          lastPushAt: null,
+          lastPushOk: null,
+          lastPushNote: "Promoted project source retained.",
+          nextDecisionAt: null,
+        },
+      },
+      decisions: [decision("delete", "worker-main")],
+    });
+    const result = await h.engine.run({ stationSlug: SLUG });
+    assert.equal(result.failed, 0);
+    assert.equal(result.pushed, 0);
+    assert.equal(h.events.some((event) => event.method === "delete"), false);
+    assert.equal(h.events.some((event) => event.method === "disableActions"), false);
+    assert.ok(h.remote.has("fixture/worker-main"));
+    assert.match(result.results[0].note, /không được tự xóa/);
   });
 
   await test("manual deletion removes only the registered companion and schedules replenishment", async () => {

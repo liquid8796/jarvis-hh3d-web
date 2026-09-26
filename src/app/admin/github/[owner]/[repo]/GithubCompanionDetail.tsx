@@ -16,8 +16,8 @@ function CompanionCard({ station, companion }: { station: StationView; companion
   const [promoteResult, promoteAction, promoting] = useActionState<StationResult | null, FormData>(promoteGithubCompanionAction, null);
   const [deleteResult, deleteAction, deleting] = useActionState<StationResult | null, FormData>(deleteGithubCompanionAction, null);
   const promotionNote = station.primaryDeferred
-    ? `Promote ${station.owner}/${companion.repo} thành repo chính? Station hiện chưa có repo chính thật, nên không có repo cũ để hạ xuống. Repo này sẽ được cài workflow khôi lỗi, WORKER_TOKEN và bật Actions.`
-    : `Promote ${station.owner}/${companion.repo} thành repo chính? ${station.owner}/${station.repo} sẽ thành repo phụ và Actions của repo cũ sẽ bị tắt. Lịch sử Git của cả hai repo được giữ lại.`;
+    ? `Promote ${station.owner}/${companion.repo} thành repo chính? Toàn bộ code dự án hiện có sẽ được giữ nguyên. Jarvis chỉ thêm hoặc cập nhật workflow khôi lỗi, cài WORKER_TOKEN và bật Actions; Ollama vẫn tiếp tục phát triển source cũ.`
+    : `Promote ${station.owner}/${companion.repo} thành repo chính? Toàn bộ code dự án hiện có sẽ được giữ nguyên; Jarvis chỉ thêm hoặc cập nhật workflow khôi lỗi. ${station.owner}/${station.repo} sẽ thành repo phụ và Actions của repo cũ sẽ bị tắt. Lịch sử Git của cả hai repo được giữ lại.`;
   return (
     <article className="min-w-0 rounded-xl border border-[rgba(232,194,92,0.18)] p-4">
       <a href={`https://github.com/${station.owner}/${companion.repo}`} target="_blank" rel="noreferrer" className="font-mono text-sm break-all text-[var(--color-gold-300)] hover:underline">{station.owner}/{companion.repo} ↗</a>
@@ -36,7 +36,7 @@ function CompanionCard({ station, companion }: { station: StationView; companion
         }}>
           <input type="hidden" name="slug" value={station.slug} />
           <input type="hidden" name="repo" value={companion.repo} />
-          <p className="mb-2 text-xs text-[var(--color-mist)]">Đổi vai trò không xoá lịch sử Git. Các tệp thuộc gói khôi lỗi sẽ được cập nhật trên repo mới; tệp khác vẫn được giữ.</p>
+          <p className="mb-2 text-xs text-[var(--color-mist)]">Đổi vai trò không xoá code hay lịch sử Git. Jarvis chỉ chồng tệp workflow vào <code>.github/workflows/</code>; worker tải runtime riêng khi Actions chạy, còn Ollama tiếp tục cập nhật source dự án cũ.</p>
           <button type="submit" className="btn btn-gold text-sm" disabled={promoting || deleting}>
             {promoting ? "Đang promote…" : "Promote làm repo chính"}
           </button>
@@ -57,6 +57,26 @@ function CompanionCard({ station, companion }: { station: StationView; companion
         {deleteResult && <p role="status" className={`mt-2 text-xs ${deleteResult.ok ? "text-[var(--color-jade-300)]" : "text-[#f2a0a0]"}`}>{deleteResult.message}</p>}
       </form>
     </article>
+  );
+}
+
+function PrimarySourceCard({ station }: { station: StationView }) {
+  const source = station.primarySource;
+  if (!source) return null;
+  return (
+    <section className="card card-hairline p-6" data-primary-source>
+      <h2 className="h-display text-lg font-semibold text-gilded">Source cũ trong repo chính</h2>
+      <p className="mt-2 text-sm text-[var(--color-parchment)]">
+        Repo <span className="font-mono break-all">{station.owner}/{station.repo}</span> vẫn giữ nguyên dự án trước lúc promote. Jarvis chỉ quản lý workflow khôi lỗi trong <code>.github/workflows/</code>; Ollama tiếp tục phát triển các tệp source cũ và không được sửa workflow.
+      </p>
+      <div className="mt-3 space-y-1 text-xs text-[var(--color-mist)]">
+        {source.topic && <p>{source.topic}</p>}
+        <p>Ngôn ngữ: {source.language || "đang nhận diện"} · Đã đẩy {source.pushesToday} lượt{source.lastNurtureDay ? " ngày " + source.lastNurtureDay : ""} · Giới hạn {station.dailyPushes} lượt/ngày</p>
+        <p>Promote: {when(source.promotedAt)}{source.promotedFrom ? <> · Từ <span className="font-mono break-all">{source.promotedFrom}</span></> : null}</p>
+        <p>Đẩy source gần nhất: {when(source.lastPushAt)} · Quyết định tiếp theo: {when(source.nextDecisionAt)}</p>
+        {source.lastPushNote && <p className={source.lastPushOk === false ? "text-[#f2a0a0]" : ""}>{source.lastPushNote}</p>}
+      </div>
+    </section>
   );
 }
 
@@ -88,6 +108,7 @@ export function GithubCompanionDetail({ detail }: { detail: GithubStationDetailV
           {station.nurturePending && <p>Đang hoàn tất {station.nurturePending.kind === "fork" ? "fork" : "tạo"} kho {station.nurturePending.repo}.</p>}
         </div>
       </section>
+      <PrimarySourceCard station={station} />
       <section className="card card-hairline p-6">
         <h2 className="h-display mb-4 text-lg font-semibold text-gilded">Kho phụ hiện có ({station.companionRepos.length})</h2>
         {station.companionRepos.length === 0 ? <p className="text-sm text-[var(--color-mist)]">Chưa có kho phụ. Model sẽ tạo ở vòng nuôi khi có API key khả dụng và số lượng cấu hình lớn hơn 0.</p> : <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">{station.companionRepos.map((companion) => <CompanionCard key={companion.repo} station={station} companion={companion} />)}</div>}

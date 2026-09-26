@@ -12,8 +12,13 @@ function makeSettings(deferred = false): AppSettings {
       owner, repo: oldRepo, workflowFile: "linh-su.yml", workerId: "worker-sample", pat: "fixture",
       provisionedBy: "jarvis", primaryDeferred: deferred, githubId: deferred ? undefined : 101,
       enabled: true, dailyPushes: 5,
+      primarySource: deferred ? undefined : {
+        managedBy: "ollama", language: "TypeScript", sourcePaths: ["src/old-primary.ts"],
+        lastNurtureDay: "2026-09-23", pushesToday: 2, lastPushAt: "2026-09-23T10:00:00.000Z",
+        lastPushOk: true, lastPushNote: "Old primary project was maintained.", nextDecisionAt: "2026-09-25T00:00:00.000Z",
+      },
       companionRepos: [
-        { repo: nextRepo, githubId: 202, actionsDisabled: true, lastNurtureDay: null, pushesToday: 0, lastPushAt: null, lastPushOk: null, lastPushNote: "" },
+        { repo: nextRepo, githubId: 202, actionsDisabled: true, managedBy: "ollama", language: "Python", sourcePaths: ["src/weather.py"], topic: "Weather project", lastNurtureDay: "2026-09-24", pushesToday: 1, lastPushAt: "2026-09-24T03:00:00.000Z", lastPushOk: true, lastPushNote: "Project source updated." },
         { repo: "keep-repo", githubId: 303, lastNurtureDay: null, pushesToday: 0, lastPushAt: null, lastPushOk: null, lastPushNote: "" },
       ],
       lastPingAt: null, lastCommitAt: null, lastPingOk: null, lastPingNote: "", workflowState: "",
@@ -77,8 +82,17 @@ assert.deepEqual(planGithubPromotionHistory("default-only", null), {
   assert.equal(station.repo, nextRepo);
   assert.equal(station.githubId, 202);
   assert.equal(station.initialCommitSha, "f".repeat(40));
+  assert.equal(station.primarySource?.managedBy, "ollama");
+  assert.equal(station.primarySource?.language, "Python");
+  assert.deepEqual(station.primarySource?.sourcePaths, ["src/weather.py"]);
+  assert.equal(station.primarySource?.nextDecisionAt, null);
+  assert.match(station.primarySource?.lastPushNote ?? "", /source dự án cũ được giữ nguyên/);
   assert.deepEqual(station.companionRepos.map(item => item.repo).sort(), ["keep-repo", oldRepo].sort());
-  assert.equal(station.companionRepos.find(item => item.repo === oldRepo)?.actionsDisabled, true);
+  const oldPrimary = station.companionRepos.find(item => item.repo === oldRepo);
+  assert.equal(oldPrimary?.actionsDisabled, true);
+  assert.equal(oldPrimary?.language, "TypeScript");
+  assert.deepEqual(oldPrimary?.sourcePaths, ["src/old-primary.ts"]);
+  assert.equal(h.events.includes("install:" + nextRepo + ":1"), true, "promotion overlays exactly one workflow file");
   assert.equal(h.enabled.get(oldRepo), false);
   assert.equal(h.enabled.get(nextRepo), true);
   assert.ok(h.events.indexOf("off:" + oldRepo) < h.events.indexOf("on:" + nextRepo));

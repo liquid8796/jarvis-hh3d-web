@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.94",
+    date: "2026-09-26",
+    lines: [
+      "Khôi lỗi nay chỉ dùng Chromium; lựa chọn trình duyệt thứ hai và phần cài đặt liên quan đã được gỡ khỏi Tông Môn.",
+      "Promote repo phụ giờ giữ nguyên toàn bộ dự án, chỉ thêm phần vận hành khôi lỗi và không chép đè các tệp sẵn có.",
+      "Repo chính sau promote vẫn được nuôi tiếp phần dự án cũ; phần vận hành tự động được bảo vệ riêng và kho không thể bị xoá nhầm.",
+    ],
+  },
+  {
     version: "1.3.93",
     date: "2026-09-26",
     lines: [
@@ -476,16 +485,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Mặc định TẮT — ai muốn thì bật ở tab Bảo Trì. Nên biết trước: vòng đang chạy dở lúc nửa đêm sẽ bị bỏ.",
     ],
   },
-  {
-    version: "1.3.44",
-    date: "2026-08-23",
-    lines: [
-      "Trang Tông Môn thêm ô chọn trình duyệt cho auto: giữ trình duyệt cũ, hoặc đổi sang Obscura — loại ẩn mình, đỡ bị trang game nghi là máy.",
-      "Đổi là auto dùng ngay từ vòng kế, không ai phải cài lại. Máy của tông môn đã có sẵn Obscura.",
-      "Máy nhà muốn dùng thì cài lại auto một lần theo hướng dẫn ngay dưới ô chọn; chưa cài thì vẫn chạy như cũ.",
-    ],
-  },
-
 ];
 
 

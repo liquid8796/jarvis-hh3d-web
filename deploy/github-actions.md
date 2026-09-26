@@ -105,10 +105,11 @@ kho gốc.
 Nên khôi lỗi GitHub **chỉ sống trên các tài khoản khác**, trong kho do `github:new` dựng:
 `newGithubKhoiloi.mjs` đọc bản mẫu rồi ghi vào `.github/workflows/linh-su.yml` **của kho ấy**,
 thay `WORKER_ID`, `WEB_URL` và hai nhãn công khai của workflow/job; `WORKER_FALLBACK_URL` đi
-nguyên từ bản mẫu và bị lưới phát hành bắt buộc phải còn. README, About và hai nhãn công khai
-được chọn ổn định theo `WORKER_ID` từ nhiều chủ đề đời thường, còn tên tệp workflow, job key và
-danh tính điểm danh không đổi. Một bản mẫu, nhiều kho — bộ số 290/50/350/360 và cổng cứu hộ không
-có cơ hội trôi khỏi nhau.
+nguyên từ bản mẫu và bị lưới phát hành bắt buộc phải còn. Từ 1.3.94, đây cũng là **tệp runtime duy
+nhất Jarvis sở hữu trong repo**: workflow tải `/linh-su/goi-linh-su.tgz` vào `RUNNER_TEMP`, cài
+Chromium bằng `playwright-core` trong gói rồi chạy worker ngoài cây source. Project code, package
+manifest và README của repo không còn bị payload khôi lỗi ghi đè. Một bản mẫu, nhiều kho — bộ số
+290/50/350/360 và cổng cứu hộ không có cơ hội trôi khỏi nhau.
 
 Hàng rào này là **một tệp KHÔNG có mặt**, mà loại hàng rào ấy không tự giữ được mình: một cú
 `git mv` ngược lại, hay một bản chép để「chạy thử một lượt rồi xoá」, dựng lại nó mà chẳng ai thấy.
@@ -223,10 +224,14 @@ vết), lượt ghi mới là thứ đếm với GitHub. Tách hai nhịp ấy g
 hỏng **ngay trong ngày**, mà chỉ ~18 commit rác một năm thay vì 365. 20 ngày cũng để lại **40
 ngày dự phòng** trước mốc 60 — phải trượt liên tiếp hai lượt tới hạn thì lịch mới thật sự tắt.
 
-Đó là luật của **repo khôi lỗi chính**. Kho phần mềm đi kèm dùng runtime Ollama tại
+Đó là luật heartbeat của **repo khôi lỗi chính**. Kho phần mềm đi kèm dùng runtime Ollama tại
 `src/lib/services/companionNurture.ts`. Model tạo dự án và đề xuất các thay đổi source theo tiến
 độ dự án; lỗi model được báo trong trạng thái kho, không chuyển sang template hay generator cũ.
-`src/generated/revision-ledger.ts` của các kho cũ không còn là nội dung được sinh định kỳ.
+Khi một repo phần mềm được promote thành primary, trace source được chuyển sang `primarySource` và
+vẫn vào chính vòng này: source tiếp tục phát triển, nhưng `.github/**` bị khóa, repo chính không
+được model xoá, Actions không bị tắt. Workflow khôi lỗi và source dự án vì thế sống chung mà không
+giành quyền sở hữu tệp của nhau. `src/generated/revision-ledger.ts` của các kho cũ không còn là nội
+dung được sinh định kỳ.
 
 **Số kho phụ cấu hình được (10/09/2026).** `githubNurture.defaultCompanionCount` mặc định **3**,
 cho phép `0..20`; `githubStations[].companionCountOverride` đặt riêng cho một trạm, `null` kế
@@ -369,7 +374,9 @@ kho」kế tiếp sẽ đẩy ngược chính bí mật vừa xem lên máy ch�
 ### Tạo kho GitHub từ admin hoặc `new-github-khoiloi.bat`
 
 Từ **1.3.72**, **Tông Môn → Kho GitHub → Tạo kho GitHub mới** tạo repo công khai thật,
-đẩy source/workflow, đặt secret, ghi sổ rồi khởi chạy. Tài khoản được lấy từ PAT; không nhập
+đẩy workflow, đặt secret, ghi sổ rồi khởi chạy. Từ 1.3.94, repo khởi tạo không nhận bản đông lạnh
+của worker; workflow tải runtime hiện hành khi lên ca, để source dự án trong repo hoàn toàn độc lập.
+Tài khoản được lấy từ PAT; không nhập
 owner hoặc WORKER_ID. Nếu repo đã tồn tại hoặc không xác minh được trạng thái, lượt tạo dừng
 trước mọi thay đổi trên GitHub.
 
@@ -408,9 +415,9 @@ chỉnh để khớp repo đang có. Thay PAT khi sửa phải dùng token của
 
 Launcher hỏi PAT ở chế độ ẩn rồi hỏi ba mục tùy chọn, kể cả khi PAT đã có trong environment.
 Giá trị được kiểm tra trước khi đưa sang VM. UI và `github:new` dùng chung service
-`src/lib/services/githubProvisioning.ts`; UI đọc source từ release đang phục vụ, CLI đọc Git
-HEAD. UI dùng lockfile dựng sẵn khi build; CLI tự sinh từ cùng source HEAD, kể cả khi ops-repo
-chưa từng được build. Xem trước mà không tạo repo:
+`src/lib/services/githubProvisioning.ts`; UI đọc workflow từ release đang phục vụ, CLI đọc Git
+HEAD. Cả hai chỉ stage đúng workflow, không còn cần sinh package/lockfile cho repo. Xem trước mà
+không tạo repo:
 
 ```sh
 npm run github:new -- --dry-run --owner example-owner --repo example-repo --workflow-file nightly.yaml --daily-pushes 7
@@ -521,15 +528,17 @@ số kho phụ riêng hoặc dùng mặc định toàn cục; **Xoá** xử lý 
 
 Trong trang chi tiết station, nút **Promote làm repo chính** đổi vai trò mà không xoá repo. Repo
 phụ được chọn phải còn đúng GitHub ID đã ghi sổ và không ở trạng thái `pendingDelete`. Backend
-đóng Actions của repo đích trong lúc staging, dựng payload khôi lỗi hiện hành lên nhánh `main`,
-đặt `WORKER_TOKEN`, rồi mới tắt Actions của primary cũ và bật repo mới. Nếu primary cũ tồn tại,
-nó được đưa vào `companionRepos` với `actionsDisabled: true`; station deferred thì không sinh một
-repo cũ giả.
+đóng Actions của repo đích trong lúc staging, chỉ ghi/cập nhật đúng workflow khôi lỗi lên nhánh
+`main`, đặt `WORKER_TOKEN`, rồi mới tắt Actions của primary cũ và bật repo mới. Toàn bộ source,
+package manifest, README và file dự án cũ giữ nguyên. Nếu primary cũ tồn tại, nó được đưa vào
+`companionRepos` với `actionsDisabled: true`; station deferred thì không sinh một repo cũ giả.
 
 Lịch sử được giữ: nếu repo đích đã có `main`, cây của `main` là base; nếu default branch khác
-`main`, commit đầu nhánh ấy vẫn nằm trong parents của commit promote. Payload chỉ ghi/đè các path
-nó sở hữu, không dọn source riêng của dự án. Sau cutover station giữ nguyên PAT, WORKER_ID, quota và
-cấu hình Ollama nhưng đổi `repo`, `githubId`, `initialCommitSha` sang primary mới.
+`main`, commit đầu nhánh ấy vẫn nằm trong parents của commit promote. Payload có đúng một path
+workflow nên không dọn hoặc ghi đè source riêng của dự án. Sau cutover station giữ nguyên PAT,
+WORKER_ID, quota và cấu hình Ollama, đổi `repo`, `githubId`, `initialCommitSha` sang primary mới,
+đồng thời chuyển trace phát triển của repo ấy vào `primarySource` để vòng nuôi tiếp tục cập nhật code
+cũ. Repo chính cũ khi hạ vai trò cũng mang theo trace source trước đó thay vì bị coi là repo trắng.
 
 Khóa session giữ đồng thời `provision-owner`, slug cũ, slug mới, WORKER_ID và hai khóa companion,
 nên provisioning/xoá/nuôi không chen vào giữa. Nếu lỗi xảy ra trước khi registry commit, backend

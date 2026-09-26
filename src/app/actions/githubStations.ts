@@ -63,6 +63,22 @@ export type StationView = {
     nextDecisionAt?: string | null;
     pendingDelete?: boolean;
   }>;
+  /** Source project retained inside a promoted primary; never contains PAT or workflow secret. */
+  primarySource: {
+    lastNurtureDay: string | null;
+    pushesToday: number;
+    lastPushAt: string | null;
+    lastPushOk: boolean | null;
+    lastPushNote: string;
+    managedBy?: "ollama";
+    topic?: string;
+    language?: string;
+    forkedFrom?: string;
+    createdAt?: string;
+    nextDecisionAt?: string | null;
+    promotedAt?: string;
+    promotedFrom?: string;
+  } | null;
   companionCountOverride: number | null;
   allowCompanionFork: boolean;
   allowCompanionDelete: boolean;
@@ -120,6 +136,21 @@ function viewOf(station: AppSettings["githubStations"][number], now: number): St
       nextDecisionAt: companion.nextDecisionAt,
       pendingDelete: companion.pendingDelete,
     })),
+    primarySource: station.primarySource ? {
+      lastNurtureDay: station.primarySource.lastNurtureDay,
+      pushesToday: station.primarySource.pushesToday,
+      lastPushAt: station.primarySource.lastPushAt,
+      lastPushOk: station.primarySource.lastPushOk,
+      lastPushNote: station.primarySource.lastPushNote,
+      managedBy: station.primarySource.managedBy,
+      topic: station.primarySource.topic,
+      language: station.primarySource.language,
+      forkedFrom: station.primarySource.forkedFrom,
+      createdAt: station.primarySource.createdAt,
+      nextDecisionAt: station.primarySource.nextDecisionAt,
+      promotedAt: station.primarySource.promotedAt,
+      promotedFrom: station.primarySource.promotedFrom,
+    } : null,
     companionCountOverride: station.companionCountOverride ?? null,
     allowCompanionFork: station.allowCompanionFork ?? false,
     allowCompanionDelete: station.allowCompanionDelete ?? false,

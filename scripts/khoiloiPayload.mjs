@@ -93,10 +93,6 @@ export const OWNED_PREFIXES = Object.freeze(["scripts/", "src/"]);
 export const WORKFLOW_TEMPLATE_PATH = "deploy/github/linh-su.yml";
 const PUBLIC_IDENTITY_SOURCE_PATH = "scripts/githubPublicIdentity.mjs";
 
-/** Lockfile dựng sẵn cho lối tạo kho từ immutable web release. */
-export const GITHUB_PROVISIONING_LOCK_ARTIFACT_PATH =
-  "public/linh-su/github-provisioning-lock.json";
-
 /**
  * Chỗ workflow nằm trong kho khôi lỗi.
  *
@@ -308,7 +304,7 @@ export function renderWorkflow({ template, workerId, webUrl, workflowFile = "lin
   }
   const workflow = template
     .replace(/^(\s*WORKER_ID:\s*).*$/m, `$1${workerId}`)
-    .replace(/\$\{\{ vars\.WEB_URL \|\| '[^']*' \}\}/, `\${{ vars.WEB_URL || '${webUrl}' }}`)
+    .replaceAll(/\$\{\{ vars\.WEB_URL \|\| '[^']*' \}\}/g, `\${{ vars.WEB_URL || '${webUrl}' }}`)
     .replaceAll(templateDispatchTarget, renderedDispatchTarget)
     .replace(PUBLIC_WORKFLOW_NAME_PLACEHOLDER, publicIdentity.workflowName)
     .replace(PUBLIC_JOB_NAME_PLACEHOLDER, publicIdentity.jobName);
@@ -351,6 +347,26 @@ export function renderWorkflow({ template, workerId, webUrl, workflowFile = "lin
  */
 export function renderReadme({ workerId, webUrl: _webUrl }) {
   return publicIdentityForWorker(workerId).readme;
+}
+
+/**
+ * Build the only payload that belongs inside a GitHub project repository: its worker workflow.
+ * The workflow downloads the immutable runtime bundle on each run, so project source, package
+ * manifests, README, and every non-workflow file stay owned by that repository and by nurture.
+ */
+export function buildWorkflowOnlyPayload({
+  source,
+  workerId,
+  webUrl,
+  workflowFile = "linh-su.yml",
+}) {
+  const template = source.read(WORKFLOW_TEMPLATE_PATH).toString("utf8");
+  return new Map([
+    [
+      workflowTargetPath(workflowFile),
+      Buffer.from(renderWorkflow({ template, workerId, webUrl, workflowFile }), "utf8"),
+    ],
+  ]);
 }
 
 /**

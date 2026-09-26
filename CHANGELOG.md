@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.94 — Chromium duy nhất, repo promote giữ và tiếp tục nuôi source cũ (26/09/2026)
+
+- Tông Môn bỏ toàn bộ lựa chọn **Trình Duyệt Của Khôi Lỗi**. Worker giờ chỉ dùng Chromium; nhánh Obscura, bộ cài Obscura, setting `browser.engine`, field truyền xuống job và lưới riêng của Obscura đều được gỡ. Giá trị cũ nếu còn trong JSON cấu hình bị schema bỏ qua ở lần lưu kế tiếp thay vì ảnh hưởng runtime.
+- Repo GitHub chính chuyển sang kiến trúc lai: trong repo chỉ quản lý `.github/workflows/<workflowFile>`. Mỗi lượt Actions tải gói runtime hiện hành vào `RUNNER_TEMP`, cài Chromium bằng `playwright-core` nằm sẵn trong gói rồi chạy worker từ thư mục tạm. Vì vậy promote/deploy không còn ghi `package.json`, README, `scripts/` hay `src/` của dự án.
+- Khi promote repo phụ, toàn bộ source và metadata phát triển của dự án được giữ thành `primarySource`; repo chính cũ khi hạ vai trò cũng giữ lại metadata source trước đó. Vòng Ollama tiếp tục phát triển source trên repo chính mới, nhưng cấm sửa `.github/**`, cấm tự xoá repo chính và không tắt Actions của workflow khôi lỗi.
+- Regression mới khóa payload đúng một workflow, runtime tải từ bundle, Chromium-only UI/runtime, bảo toàn source khi promote và hai ca nuôi primary: commit source không đụng workflow, cùng quyết định delete bị chặn an toàn.
+
 ## 1.3.93 — Ép khôi lỗi không còn bị một repo hỏng chặn cả tông môn (26/09/2026)
 
 - `force-github-khoiloi.bat` trước đây chạy một dry-run toàn cục rồi coi bất kỳ exit `1` nào là lỗi chết người. Hai station mồ côi trả GitHub `404 Not Found` vì vậy làm wrapper dừng trước bước thật, dù năm repo còn lại hoàn toàn khỏe; nhìn từ ngoài, bấm script đúng là “không có tác dụng”.

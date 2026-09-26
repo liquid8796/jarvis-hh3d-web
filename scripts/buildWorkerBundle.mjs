@@ -28,11 +28,6 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import {
-  GITHUB_PROVISIONING_LOCK_ARTIFACT_PATH,
-  generateLockfile,
-  renderPackageJsonFor,
-} from "./khoiloiPayload.mjs";
 
 const root = path.join(import.meta.dirname, "..");
 const outDir = path.join(root, "public", "linh-su");
@@ -177,27 +172,8 @@ try {
   cpSync(path.join(staging, "..", tmpTgz), outFile);
   rmSync(path.join(staging, "..", tmpTgz), { force: true });
 
-  // 6. Lockfile tối thiểu cho lối tạo kho ngay từ web release. Artifact này chỉ chứa số bản và
-  //    cây npm công khai; WORKER_TOKEN và địa chỉ backend chỉ được ghép ở lúc nhận yêu cầu.
-  const provisioningPackageJson = renderPackageJsonFor(root);
-  const provisioningLockfile = generateLockfile(provisioningPackageJson);
-  const provisioningPackageVersion = JSON.parse(provisioningPackageJson).version;
-  const provisioningArtifact = {
-    schemaVersion: 1,
-    packageVersion: provisioningPackageVersion,
-    lockfile: JSON.parse(provisioningLockfile.toString("utf8")),
-  };
-  const provisioningArtifactPath = path.join(
-    root,
-    ...GITHUB_PROVISIONING_LOCK_ARTIFACT_PATH.split("/"),
-  );
-  writeFileSync(provisioningArtifactPath, `${JSON.stringify(provisioningArtifact, null, 2)}\n`);
-
   const mb = (statSync(outFile).size / 1024 / 1024).toFixed(1);
-  console.log(
-    `✔ gói khôi lỗi v${repoPkg.version} (playwright-core ${playwrightVersion}, ${mb}MB) → ${path.relative(root, outFile)}` +
-      `; lock provisioning → ${GITHUB_PROVISIONING_LOCK_ARTIFACT_PATH}`,
-  );
+  console.log(`✔ gói khôi lỗi v${repoPkg.version} (playwright-core ${playwrightVersion}, ${mb}MB) → ${path.relative(root, outFile)}`);
 } finally {
   const resolved = realpathSync(staging);
   if (path.dirname(resolved) !== realpathSync(tmpdir()) || !path.basename(resolved).startsWith("linh-su-")) {

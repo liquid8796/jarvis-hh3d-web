@@ -5,8 +5,7 @@ REM
 REM  DUNG KHI NAO: sau mot luot `deploy-github-khoiloi.bat --restart`, nhung kho
 REM  dang GIU DAN bi CHUA lai co y - huy luot Actions la giet runner tuc khac,
 REM  roi reapStaleJobs ket lieu dan ay sau 3 phut. Nhung khoi loi do se con mang
-REM  ma cu cho toi luot Actions ke, toi da ~4 gio (lich 0 */4 * * *). Vi du da
-REM  gap 16/08/2026: khoiloi-tro-20260813-233056 duoc chua ba luot lien tiep.
+REM  ma cu cho toi luot Actions ke, toi da ~4 gio (lich 0 */4 * * *).
 REM  Script nay tra dung cai gia ay de co ban moi ngay.
 REM
 REM  CAI GIA, doc ky: dan dang chay tren nhung khoi loi bi cat SE HONG va phai
@@ -25,10 +24,8 @@ REM  cat CA luot dang chay dung ban, roi phat luot moi.
 REM
 REM  DUNG KHI NAO: khi runner con tho, con diem danh, chay dung ban moi nhat MA
 REM  VONG NAO CUNG GAY - vi du trang game dung man kiem tra Cloudflare va cai IP
-REM  trung tam du lieu ay khong qua noi (do 19/08/2026: 9 khoi loi song, moi vong
-REM  deu 0 thuan). Luc do thu can la mot RUNNER khac (may khac, IP khac), khong
-REM  phai mot ban ma khac. `github:revive` khong voi toi canh nay vi no hoi so
-REM  diem danh, ma khoi loi ay van diem danh deu.
+REM  trung tam du lieu ay khong qua noi. Luc do thu can la mot RUNNER khac
+REM  (may khac, IP khac), khong phai mot ban ma khac.
 REM
 REM  KHONG NOI HANG RAO DAN-DANG-GIU: van phai them --force neu chap nhan cat
 REM  ngang dan nguoi khac. Script nay von da truyen --force san.
@@ -47,6 +44,10 @@ REM  linh-su-20260813-233056-6143 la kho cua khoiloi-tro-20260813-233056.
 REM
 REM  CHAY TREN VM (`npm run vm --`) vi so Kho GitHub nam trong Postgres cua VM,
 REM  thu chi nghe 127.0.0.1 - y het deploy-github-khoiloi.bat.
+REM
+REM  MOT KHO HONG KHONG CON CHAN CA TONG MON: --allow-partial cho phep dry-run
+REM  tiep tuc neu van con it nhat mot kho lanh. Luot that xu ly tung kho doc lap:
+REM  kho lanh van duoc ep; kho 404/PAT hong duoc bo qua va bao rieng o cuoi.
 REM ============================================================================
 setlocal
 chcp 65001 >nul
@@ -57,7 +58,7 @@ echo %* | findstr /i /c:"--even-if-current" >nul && set "BATCHAP=1"
 
 echo [1/2] Xem truoc - buoc nay chi DOC, khong huy gi ca...
 echo.
-call npm run vm -- npm run github:deploy -- --dry-run --restart --force %*
+call npm run vm -- npm run github:deploy -- --dry-run --restart --force --allow-partial %*
 set "EXITCODE=%ERRORLEVEL%"
 if not "%EXITCODE%"=="0" goto :loi_xem
 
@@ -69,6 +70,7 @@ if defined BATCHAP echo    "... cat N luot dang chay DUNG ban"     = kho NAY dan
 if not defined BATCHAP echo    "khoi dong lai: khong can"              = kho NAY da chay dung ban moi
 if defined BATCHAP echo    "khoi dong lai: khong can"              = kho NAY chi con luot dang xep hang
 echo  Dan dang chay tren nhung kho bi cat se hong va phai khai lai.
+echo  Kho HONG/404 chi bi bo qua; no KHONG con chan cac kho lanh.
 if defined BATCHAP echo.
 if defined BATCHAP echo  MODE BAT CHAP DANG BAT: kho da dung ban CUNG bi cat va phat lai.
 echo ============================================================================
@@ -80,14 +82,21 @@ if errorlevel 2 goto :thoi
 
 :lam_that
 echo.
-echo [2/2] Dang ep...
+echo [2/2] Dang ep tung kho doc lap...
 echo.
-call npm run vm -- npm run github:deploy -- --restart --force %*
+call npm run vm -- npm run github:deploy -- --restart --force --allow-partial %*
 set "EXITCODE=%ERRORLEVEL%"
 echo.
+if "%EXITCODE%"=="3" goto :mot_phan
 if not "%EXITCODE%"=="0" goto :loi_ep
 echo [OK] Xong - nhung kho o tren da duoc phat lai luot Actions voi ma moi.
 echo      Khoi loi len ca sau ~30 giay; xem tab Khoi Loi de doc lai so hieu ban.
+goto :xong
+
+:mot_phan
+echo [OK MOT PHAN] Cac kho truy cap duoc DA duoc ep sang ban moi.
+echo                Kho HONG trong bang TONG KET da bi bo qua, khong chan ca tong mon.
+echo                Sua repo/PAT cua tung kho hong roi chay lai; kho da xong se tu bo qua.
 goto :xong
 
 :thoi
@@ -98,13 +107,14 @@ goto :xong
 
 :loi_xem
 echo.
-echo [!!] Buoc xem truoc that bai - KHONG ep gi ca. Doc dong loi o tren.
-echo      Hay gap nhat: khong vao duoc VM, hoac PAT cua mot kho da het han.
+echo [!!] Buoc xem truoc that bai va KHONG con kho lanh nao de ep.
+echo      Hay gap nhat: khong vao duoc VM, tham so sai, hoac moi repo/PAT deu hong.
 goto :xong
 
 :loi_ep
-echo [!!] Luot ep ket thuc voi loi. Doc bang TONG KET: kho nao dang LECH MA.
-echo      Chay lai chinh script nay - nhung kho da xong se duoc bo qua.
+echo [!!] Luot ep that bai TRUOC KHI co ket qua an toan.
+echo      Neu bang TONG KET khong co dong thanh cong, khong kho nao duoc ep.
+echo      Soi ket noi VM, DATABASE_URL/ENCRYPTION_KEY va tham so roi chay lai.
 
 :xong
 echo %* | findstr /i /c:"--no-pause" >nul || pause

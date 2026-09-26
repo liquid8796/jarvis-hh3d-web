@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.93",
+    date: "2026-09-26",
+    lines: [
+      "Nút ép khôi lỗi lên bản mới nay vẫn cập nhật các kho khỏe dù một kho khác đã mất hoặc hết quyền truy cập.",
+      "Kho lỗi được báo riêng để sửa sau; chỉ khi không còn kho nào làm được thì lượt ép mới dừng toàn bộ.",
+      "Kết quả một phần được nói rõ, nên không còn cảnh bấm script rồi mọi kho đều đứng nguyên vì một dòng 404.",
+    ],
+  },
+  {
     version: "1.3.92",
     date: "2026-09-26",
     lines: [
@@ -476,13 +485,7 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Máy nhà muốn dùng thì cài lại auto một lần theo hướng dẫn ngay dưới ô chọn; chưa cài thì vẫn chạy như cũ.",
     ],
   },
-  {
-    version: "1.3.43",
-    date: "2026-08-23",
-    lines: [
-      "Dòng nhật ký đầu mỗi vòng chạy nói rõ hơn: auto đang khởi động tế đàn, thay cho chữ「khởi lư」khó đoán.",
-    ],
-  },
+
 ];
 
 

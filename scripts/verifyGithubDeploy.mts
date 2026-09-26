@@ -28,9 +28,11 @@ import { looksTransient } from "./githubTransient.mjs";
 import {
   activeRunIds,
   activeRuns,
+  PARTIAL_DEPLOY_EXIT_CODE,
   planKhoiloiTree,
   resolveDeployWorkerId,
   REVIVE_AWAY_MS,
+  reviewDeployExit,
   reviewRestart,
   reviewRevive,
   webUrlFromWorkflow,
@@ -635,6 +637,67 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
     lockfile: Buffer.from("{}"),
   });
   check("lockfile không khai số bản → không chặn lượt dựng", quiet.has("package-lock.json"));
+}
+
+// ---- Exit contract của force-github-khoiloi.bat -------------------------------------------
+{
+  console.log("\nForce wrapper — một kho hỏng không còn chặn các kho lành");
+
+  check(
+    "không có lỗi → exit 0",
+    reviewDeployExit({ broken: 0, rejected: 0, healthy: 5, dryRun: false, allowPartial: true }) === 0,
+  );
+  check(
+    "mixed dry-run + allow-partial → exit 0 để được phép bước sang lượt thật",
+    reviewDeployExit({ broken: 2, rejected: 0, healthy: 5, dryRun: true, allowPartial: true }) === 0,
+  );
+  check(
+    "mixed live + allow-partial → exit 3, phân biệt với fatal",
+    reviewDeployExit({ broken: 2, rejected: 0, healthy: 5, dryRun: false, allowPartial: true }) ===
+      PARTIAL_DEPLOY_EXIT_CODE,
+  );
+  check(
+    "dòng sổ bị từ chối + kho lành cũng là kết quả một phần",
+    reviewDeployExit({ broken: 0, rejected: 2, healthy: 5, dryRun: false, allowPartial: true }) ===
+      PARTIAL_DEPLOY_EXIT_CODE,
+  );
+  check(
+    "tất cả kho đều hỏng → vẫn exit 1, không giả vờ có việc an toàn để làm",
+    reviewDeployExit({ broken: 2, rejected: 0, healthy: 0, dryRun: true, allowPartial: true }) === 1,
+  );
+  check(
+    "CLI thường không bật allow-partial → giữ exit 1 cũ",
+    reviewDeployExit({ broken: 1, rejected: 0, healthy: 4, dryRun: true, allowPartial: false }) === 1,
+  );
+
+  const forcePath = path.join(repoRoot, "force-github-khoiloi.bat");
+  const forceBytes = readFileSync(forcePath);
+  const forceBat = forceBytes.toString("ascii");
+  check(
+    "batch truyền --allow-partial cho cả dry-run và lượt thật",
+    (forceBat.match(/^call .*--allow-partial.*$/gm) ?? []).length === 2,
+  );
+  check(
+    "batch nhận exit 3 là thành công một phần thay vì báo vô tác dụng",
+    forceBat.includes('if "%EXITCODE%"=="3" goto :mot_phan') && forceBat.includes(":mot_phan"),
+  );
+  check(
+    "batch vẫn chặn khi dry-run không còn kho lành",
+    forceBat.includes('if not "%EXITCODE%"=="0" goto :loi_xem'),
+  );
+  check(
+    "batch là ASCII, CRLF và có newline cuối file",
+    forceBytes.every((byte) => byte < 0x80) &&
+      forceBytes.every((byte, index) => byte !== 0x0a || (index > 0 && forceBytes[index - 1] === 0x0d)) &&
+      forceBat.endsWith("\r\n"),
+  );
+
+  const deploySource = readFileSync(path.join(repoRoot, "scripts", "deployGithubKhoiloi.mts"), "utf8");
+  check(
+    "deploy CLI chỉ đổi exit contract khi caller bật --allow-partial",
+    deploySource.includes('const allowPartial = argv.includes("--allow-partial")') &&
+      deploySource.includes("reviewDeployExit({"),
+  );
 }
 
 // ---- looksTransient: nhịp nấc của GitHub, và ranh giới không được nhích -------------------

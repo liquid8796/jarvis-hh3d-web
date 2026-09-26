@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.93 — Ép khôi lỗi không còn bị một repo hỏng chặn cả tông môn (26/09/2026)
+
+- `force-github-khoiloi.bat` trước đây chạy một dry-run toàn cục rồi coi bất kỳ exit `1` nào là lỗi chết người. Hai station mồ côi trả GitHub `404 Not Found` vì vậy làm wrapper dừng trước bước thật, dù năm repo còn lại hoàn toàn khỏe; nhìn từ ngoài, bấm script đúng là “không có tác dụng”.
+- CLI phát hành nay có contract tường minh `--allow-partial`: mixed dry-run trả `0` khi còn ít nhất một mục tiêu lành; lượt thật vẫn xử lý từng repo và trả `3` nếu chỉ thành công một phần. Batch hiểu mã `3`, báo repo lành đã xong và giữ nguyên danh sách repo/PAT hỏng để sửa sau. CLI thường không bật cờ này vẫn giữ hành vi nghiêm ngặt cũ.
+- Nếu mọi mục tiêu đều hỏng, hoặc lỗi xảy ra trước vòng từng repo như SSH/database/preflight chung, exit vẫn là `1` và không có thao tác nguy hiểm nào được giả nhận thành công. `--repo` vào đúng một repo hỏng cũng vẫn dừng như trước.
+- `verify:github-deploy` khóa bảng quyết định exit, hai lần truyền `--allow-partial`, nhánh batch xử lý exit `3`, cùng yêu cầu file `.bat` phải là ASCII + CRLF + newline cuối file.
+
 ## 1.3.92 — Hoang Vực nhận đúng hết lượt trên giao diện mới (26/09/2026)
 
 - Bản ghi `hoang-vuc-20260926-130504`, video `/watch`, DOM và network cùng chỉ ra thay đổi thật của trang: bộ đếm không còn là câu `Lượt đánh còn lại: 0`. Nó được tách thành `.ra-label` + `.ra-count` và mang giá trị máy đọc được ở `data-count="0"`; `boss.min.js` cũng cập nhật chính attribute này sau mỗi đòn.

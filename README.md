@@ -84,6 +84,11 @@ Mọi khôi lỗi đều là **một tiến trình `worker.mjs` sống dai** —
 Hai worker cùng đủ điều kiện tranh một job thì Postgres phân xử bằng một câu UPDATE nguyên
 tử — không bao giờ có hai khôi lỗi ôm cùng một lượt.
 
+Khi cần ép toàn bộ khôi lỗi GitHub sang bản mới, dùng `force-github-khoiloi.bat`. Từ 1.3.93,
+một station 404, repo đã mất hoặc PAT hỏng chỉ bị báo riêng; các repo còn truy cập được vẫn tiếp
+tục nhận gói mới và được phát lại Actions. Chỉ khi không còn repo lành nào, hoặc preflight chung
+như SSH/database hỏng, script mới dừng toàn bộ. Chi tiết ở [deploy/github-actions.md](deploy/github-actions.md) §9.
+
 > ### Ghi chú về gói Hobby của Vercel
 >
 > Gói Hobby **chỉ cho cron một lần mỗi ngày**; `vercel --prod` từ chối thẳng biểu thức
@@ -674,7 +679,7 @@ File SQL sinh ra **được commit** — lịch sử schema nằm trong git, kh�
 
 ## 6. Lịch sử phát hành
 
-Bản hiện tại: **0.15.2**.
+Bản hiện tại: **1.3.93**.
 
 Lịch sử nằm ở [CHANGELOG.md](CHANGELOG.md), tách riêng khỏi file này — hai tài liệu trả lời
 hai câu hỏi khác nhau: README nói *hệ thống chạy thế nào*, changelog nói *vì sao nó thành ra

@@ -761,6 +761,13 @@ thích, chứ không im lặng không làm gì.
 
 Cửa bấm đúp: `force-github-khoiloi.bat` (đã truyền sẵn `--restart --force`), thêm
 `--even-if-current` để bật mode bất chấp.
+
+Từ 1.3.93, cửa này còn bật `--allow-partial`. Vòng phát hành vốn đã cô lập từng repository,
+nhưng wrapper cũ lại dừng ngay sau dry-run nếu chỉ **một** station trả 404/PAT hỏng; vì thế các
+kho lành không bao giờ bước tới lượt thật. Nay dry-run hỗn hợp được phép đi tiếp khi còn ít nhất
+một kho lành. Lượt thật xử lý từng kho, trả exit `3` cho kết quả một phần, và batch in **OK MỘT
+PHẦN**: kho lành đã lên bản, kho hỏng được liệt kê để sửa sau. Exit `1` vẫn dành cho lỗi chung hoặc
+trường hợp không còn mục tiêu lành nào, nên hàng rào an toàn không bị nới.
 ### `WORKER_SOLVE_TURNSTILE`: tự bấm ô Turnstile (mặc định TẮT)
 
 Khi worker vấp màn Cloudflare「Just a moment」, nó vốn chỉ ĐỨNG CHỜ (tối đa 45s) cho màn tự qua.

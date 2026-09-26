@@ -759,3 +759,33 @@ export function reviewRemoval(input: {
 
   return { go: true };
 }
+/**
+ * Exit contract for a multi-repository deployment invoked by the resilient force wrapper.
+ *
+ * The deploy loop already isolates repositories: one missing repo/PAT never prevents later
+ * repositories from being inspected or updated. The old batch wrapper accidentally undid that
+ * property by aborting when its global dry-run returned 1 for any broken station. This helper
+ * keeps the three outcomes explicit and testable instead of teaching a `.bat` file to guess from
+ * localized console text:
+ *
+ *   0 — clean success, or a mixed DRY-RUN that still has at least one healthy target;
+ *   1 — fatal/all-broken result; there is no healthy target the wrapper can safely act on;
+ *   3 — live PARTIAL success: healthy targets were processed, broken rows remain to be repaired.
+ *
+ * Default CLI behavior stays strict. Only callers that opt into `allowPartial` receive the mixed
+ * preview/live distinction, so existing automation continues to treat any broken station as 1.
+ */
+export const PARTIAL_DEPLOY_EXIT_CODE = 3;
+
+export function reviewDeployExit(input: {
+  broken: number;
+  rejected: number;
+  healthy: number;
+  dryRun: boolean;
+  allowPartial: boolean;
+}): 0 | 1 | typeof PARTIAL_DEPLOY_EXIT_CODE {
+  const hasIssues = input.broken > 0 || input.rejected > 0;
+  if (!hasIssues) return 0;
+  if (!input.allowPartial || input.healthy <= 0) return 1;
+  return input.dryRun ? 0 : PARTIAL_DEPLOY_EXIT_CODE;
+}

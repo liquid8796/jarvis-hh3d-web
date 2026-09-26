@@ -56,8 +56,10 @@ import {
 } from "../src/lib/validation/githubStations";
 import {
   activeRuns,
+  PARTIAL_DEPLOY_EXIT_CODE,
   planKhoiloiTree,
   resolveDeployWorkerId,
+  reviewDeployExit,
   reviewRestart,
   webUrlFromWorkflow,
   workerIdFromWorkflow,
@@ -89,6 +91,14 @@ loadEnv();
 const repoRoot = path.join(import.meta.dirname, "..");
 const argv = process.argv.slice(2);
 const dryRun = argv.includes("--dry-run");
+/**
+ * Internal contract used by `force-github-khoiloi.bat`.
+ *
+ * The deployment loop already continues after a broken repository. This flag only changes the
+ * FINAL exit contract so a mixed dry-run may proceed to update healthy repositories, while a live
+ * mixed run exits 3 (partial success) instead of being indistinguishable from a fatal preflight.
+ */
+const allowPartial = argv.includes("--allow-partial");
 const arg = (name: string): string | undefined => {
   const at = argv.indexOf(`--${name}`);
   const value = argv[at + 1];
@@ -851,6 +861,24 @@ if (metadataOnly.length > 0 && !dryRun) {
 
 if (broken.length > 0) {
   console.log(`\n  ${broken.length} kho LỆCH MÃ — vẫn đang chạy bản cũ. Chữa xong thì chạy lại lệnh này.`);
-  process.exit(1);
 }
-if (rejected.length > 0) process.exit(1);
+if (rejected.length > 0) {
+  console.log(`  ${rejected.length} dòng sổ hỏng đã bị bỏ qua; sửa chúng ở tab Kho GitHub rồi chạy lại.`);
+}
+
+const exitCode = reviewDeployExit({
+  broken: broken.length,
+  rejected: rejected.length,
+  healthy: outcomes.length - broken.length,
+  dryRun,
+  allowPartial,
+});
+if (exitCode === 0 && allowPartial && dryRun && (broken.length > 0 || rejected.length > 0)) {
+  console.log("\n  CHẾ ĐỘ TỪNG KHO: bước xem trước vẫn cho phép tiếp tục vì còn kho lành để xử lý.");
+}
+if (exitCode === PARTIAL_DEPLOY_EXIT_CODE) {
+  console.log(
+    "\n  KẾT QUẢ MỘT PHẦN: các kho lành đã được xử lý; kho HỎNG ở trên không chặn phần còn lại.",
+  );
+}
+process.exit(exitCode);

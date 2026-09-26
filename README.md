@@ -245,7 +245,7 @@ Vercel, code dùng `PGHOST_UNPOOLED` và giữ nguyên path/credentials; hạ t�
 #### Bộ thông dịch nhiệm vụ, và vì sao nó dùng chung với bản desktop
 
 `quest-engine/` là bản JavaScript của `QuestEngine.cs` bên bản desktop, và nó đọc **cùng một
-tệp hồ sơ** (`profile.json`, schema 46) mà bản desktop dùng. Đó là điểm mấu chốt: hồ sơ ấy
+tệp hồ sơ** (`profile.json`, schema 84) mà bản desktop dùng. Đó là điểm mấu chốt: hồ sơ ấy
 không phải cấu hình, nó là **tri thức về site** — mỗi selector trong đó là một buổi tối ngồi
 xem trang thật, và vài cái là cả một đêm hỏng việc mới rút ra. Nếu web chép lại tri thức đó
 thành mã riêng thì hai bản sẽ trôi khỏi nhau ngay lần site đổi marker đầu tiên, và người sửa
@@ -269,6 +269,11 @@ Nên chia thế này:
 - **Khoáng Mạch đếm hạn mức mua phù theo tài khoản.** Hai tab VIP/Thường có ô riêng để đặt
   tối đa 1–3 Linh Quang Phù mỗi ngày (mặc định 1). Mỗi lần mua được ghi vào sổ ngày của đàn,
   nên đổi khôi lỗi giữa các vòng không làm bộ đếm quay lại từ đầu.
+- **Hoang Vực đọc lượt từ trạng thái máy của trang, không dò câu chữ hay đoán theo nút.** Từ
+  26/09/2026, trang tách nhãn/số thành `.ra-label` và `.ra-count`, còn số thật nằm ở
+  `.remaining-attacks[data-count]`. Lượt 1–4 được xác nhận bằng đồng hồ có `.is-visible`; lượt
+  thứ năm được xác nhận bằng `data-count="0"`, vì lúc đó trang có thể hiện lại nút Khiêu Chiến.
+  Hai flow VIP/thường dùng chung luật này và cùng chốt sổ ngày ngay sau đòn cuối.
 - **Nhiệm vụ ngày đã đủ lượt thì thôi mở lại.** Mỗi đàn giữ một *sổ đủ lượt hôm nay*
   (`automation_jobs.daily_done`, ngày theo giờ Việt Nam): vòng nào thấy một trong chín nhiệm
   vụ ngày tự báo hết lượt thì vòng sau không mở trang ấy nữa, và khi cả kế hoạch đã đủ lượt
@@ -280,6 +285,7 @@ Lưới hồi quy chạy trên Chromium thật, trước một trang thật:
 
 ```bash
 npm run smoke
+npm run verify:hoang-vuc-daily-cap
 npm run verify:profile
 npm run verify:daily-quota   # chạm database thật, tự dọn theo tiền tố __quota_
 ```

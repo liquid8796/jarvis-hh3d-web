@@ -654,7 +654,7 @@ const bossControls = (turnsLeft, elementGood = true) =>
   `<div id="element-status" class="${elementGood ? "increase-damage" : "decrease-damage"}">` +
   `${elementGood ? "Đạo hữu được tăng" : "Đạo hữu bị giảm"} 15% sát thương</div>` +
   '<button class="change-element-container change-element-button" id="change-element-button">Thay đổi</button>' +
-  `<div class="remaining-attacks">Lượt đánh còn lại: <span id="luot">${turnsLeft}</span></div>`;
+  `<div class="remaining-attacks" data-count="${turnsLeft}"><span class="ra-label">Lượt đánh</span><span class="ra-count">${turnsLeft}</span></div>`;
 
 /**
  * Khối boss ở trạng thái「boss đã bị hạ, thưởng còn treo」— chép từ `dom/01-load.html` của bản
@@ -790,10 +790,23 @@ document.addEventListener('click', (e) => {
     // qua đúng vào khoảnh khắc nó sai nhất — fixture hoá ra lại tha bổng chính cái bug.
     if (${cooling ? "true" : "false"}) { document.body.dataset.refused = '1'; fetch('/hv-refused'); return; }
     setTimeout(() => {
-      $('#luot').textContent = String(Math.max(0, +$('#luot').textContent - 1));
+      const remaining = $('.remaining-attacks');
+      const next = Math.max(0, +(remaining?.getAttribute('data-count') || 0) - 1);
+      remaining?.setAttribute('data-count', String(next));
+      const count = $('.ra-count');
+      if (count) count.textContent = String(next);
       $('#damage-summary-container').style.display = 'block';
       document.body.dataset.attacked = String(+(document.body.dataset.attacked || 0) + 1);
-      startCooldown();
+      if (next > 0) {
+        startCooldown();
+      } else {
+        // 26/09 boss.min.js: no next timestamp => timer hidden, battle button visible again.
+        const timer = $('#countdown-timer');
+        timer.classList.remove('is-visible');
+        timer.style.display = 'none';
+        timer.innerHTML = '';
+        $('#battle-button').style.display = '';
+      }
     }, 200);`
   }
   } else if (t.classList.contains('close-button')) {
@@ -2365,8 +2378,10 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // 83 = Hoang Vực + Khoáng Mạch bỏ selector SweetAlert2 đã chết, theo hai bản ghi 13/09.
     // Hoang Vực phải đóng được hộp Đổi trước khi bấm #battle-button; Khoáng Mạch dùng cùng hộp
     // nhà cho cả ba chỗ vào mỏ, đoạt mỏ và mua phù. Cả hai twin VIP/thường cùng đổi.
-    "hồ sơ đang ở schema 83",
-    loadProfileForSchema().schemaVersion === 83,
+    // 84 = Hoang Vực page 26/09: remaining-attacks became data-count + ra-count; at zero
+    // attempts the site can show #battle-button again, so completion/witness logic must ignore it.
+    "profile schema is 84",
+    loadProfileForSchema().schemaVersion === 84,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -2379,6 +2394,36 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       all.some((s) => s.action === "waitForCondition" && s.condition?.selector === houseYes) &&
         all.some((s) => s.action === "click" && s.selector === houseYes) &&
         !all.some((s) => String(s.selector ?? s.condition?.selector ?? "").includes("swal2")),
+    );
+
+    const hvZero = '#boss-info .remaining-attacks[data-count="0"]';
+    const hvSpent = `#countdown-timer.is-visible, ${hvZero}`;
+    const zeroStops = all.filter(
+      (s) => s.action === "stopIf" && s.condition?.kind === "visible" && s.condition?.selector === hvZero,
+    );
+    check(
+      `${bossId}: daily cap reads server data-count=0 both before fighting and after the fifth hit`,
+      zeroStops.length === 2,
+      `stops=${zeroStops.length}`,
+    );
+    check(
+      `${bossId}: old visible-prose matcher is gone`,
+      !all.some(
+        (s) =>
+          s.condition?.kind === "textMatches" &&
+          String(s.condition?.selector ?? "").includes("remaining-attacks"),
+      ),
+    );
+    check(
+      `${bossId}: attack acceptance is countdown-visible OR data-count=0`,
+      all.some((s) => s.action === "repeat" && s.until?.kind === "visible" && s.until?.selector === hvSpent) &&
+        all.some(
+          (s) =>
+            s.action === "waitForCondition" &&
+            s.optional !== true &&
+            s.condition?.kind === "visible" &&
+            s.condition?.selector === hvSpent,
+        ),
     );
   }
   for (const mineId of ["khoang-mach", "khoang-mach-thuong"]) {
@@ -2878,53 +2923,52 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   // cú bấm rơi vào hư không cho ra y hệt một trận đánh thật.
   for (const bossId of ["hoang-vuc", "hoang-vuc-thuong"]) {
     const boss = loadProfileForSchema().quests.find((q) => q.id === bossId);
+    const hvZero = '#boss-info .remaining-attacks[data-count="0"]';
+    const hvSpent = `#countdown-timer.is-visible, ${hvZero}`;
     const attackAt = flatSteps(boss.steps).findIndex(
       (s) => s.action === "click" && s.selector === "#boss-damage-screen .attack-button",
     );
-    // Từ schema 76 nhân chứng KHÔNG còn đứng ngay sau cú bấm: giữa hai thứ ấy là cụm tải lại
-    // của bản vá 28/08. Nên hỏi theo Ý NGHĨA — "có một nhân chứng bắt buộc ở đâu đó SAU cú bấm"
-    // — chứ đừng ghim số thứ tự, bằng không phép kiểm này đỏ mỗi lần chèn thêm một bước.
+    // Since schema 76 the required witness lives after the stale-session reload branch. Schema 84
+    // changes the witness itself: accepted means countdown visible OR data-count=0 on the final hit.
     const after = flatSteps(boss.steps).slice(attackAt + 1);
     const witnessAt = after.findIndex(
       (s) =>
         s.action === "waitForCondition" &&
-        s.condition?.kind === "hidden" &&
-        s.condition?.selector === "#battle-button" &&
+        s.condition?.kind === "visible" &&
+        s.condition?.selector === hvSpent &&
         s.optional !== true,
     );
     check(
-      `${bossId}: sau cú bấm Tấn Công có một bước xác nhận, và nó KHÔNG optional`,
+      `${bossId}: after attack there is a required server-backed acceptance witness`,
       attackAt >= 0 && witnessAt >= 0,
       JSON.stringify(after[witnessAt]?.condition ?? after[witnessAt]),
     );
-    // Nhật ký 07/08 01:03:55: 45s không sống nổi cạnh một trận Mê Cung đủ đội trên VM hai
-    // nhân — hoạt ảnh của tab bị bỏ đói CPU chạy chưa xong thì bằng chứng chưa xuất hiện.
-    // 120s = 10× mốc 12s đo trên tab rảnh. Ngân sách ấy KHÔNG mất đi ở schema 76, nó dời lên
-    // bước optional đứng trước lượt tải lại — nên sàn của nó vẫn bị đóng đinh, chỉ là đóng ở
-    // đúng bước đang gánh việc chờ.
+    // The 120s starvation budget still exists in the optional pre-reload wait; only its positive
+    // condition changed from presentation state to the two server-backed accepted states.
     const budget = after.find(
       (s) =>
         s.action === "waitForCondition" &&
-        s.condition?.kind === "hidden" &&
-        s.condition?.selector === "#battle-button" &&
-        s.optional === true,
+        s.condition?.kind === "visible" &&
+        s.condition?.selector === hvSpent &&
+        s.optional === true &&
+        (s.timeoutMs ?? 0) >= 120000,
     );
     check(
-      `${bossId}: ngân sách chờ hoạt ảnh vẫn >= 120s (nay ở bước optional trước nhân chứng)`,
+      `${bossId}: animation/state budget remains >= 120s on the optional acceptance wait`,
       (budget?.timeoutMs ?? 0) >= 120000,
       `timeoutMs=${budget?.timeoutMs}`,
     );
-    // Bản vá 28/08. Không có lượt tải lại này thì một trang ăn đòn rồi đứng hình sẽ mãi mãi
-    // giữ #battle-button trên màn, và nhân chứng — dù đúng — không bao giờ được thoả.
+    // Reload only while NEITHER accepted-state witness exists. A fifth hit has data-count=0 even
+    // though #battle-button is visible, so it must never enter this stale-page recovery branch.
     const reloadAt = after.findIndex(
       (s) =>
         s.action === "navigate" &&
         s.text === "/hoang-vuc" &&
-        s.when?.kind === "visible" &&
-        s.when?.selector === "#battle-button",
+        s.when?.kind === "hidden" &&
+        s.when?.selector === hvSpent,
     );
     check(
-      `${bossId}: giữa cú bấm và nhân chứng có lượt TẢI LẠI, gác bằng "nút vẫn còn"`,
+      `${bossId}: stale-page reload is guarded by absence of BOTH accepted-state witnesses`,
       reloadAt >= 0 && witnessAt >= 0 && reloadAt < witnessAt,
       `reload@${reloadAt} · witness@${witnessAt}`,
     );
@@ -3197,7 +3241,11 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     else if (path === "/hv-claim") { hvClaims.push(new Date().toISOString()); bossReward = false; res.end("ok"); }
     // Đòn ĐÃ ăn ở phía server, dù trang sắp đứng hình: trừ lượt và mở cooldown ngay tại đây.
     else if (path === "/hv-refused") { hvRefused += 1; res.end("ok"); }
-    else if (path === "/hv-attack-stale") { bossTurnsLeft = Math.max(0, bossTurnsLeft - 1); bossCooling = true; res.end("ok"); }
+    else if (path === "/hv-attack-stale") {
+      bossTurnsLeft = Math.max(0, bossTurnsLeft - 1);
+      bossCooling = bossTurnsLeft > 0;
+      res.end("ok");
+    }
     else if (path === "/hoang-vuc") {
       hvPageHits += 1;
       res.end(bossPage(bossBroken, {
@@ -4101,6 +4149,19 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     console.log("\nHoang Vực — vỏ trang mời gọi KHÔNG phải lời mời thật");
 
     const bossQuest = exportedProfile.quests.find((q) => q.id === "hoang-vuc");
+    const bossFreeQuest = exportedProfile.quests.find((q) => q.id === "hoang-vuc-thuong");
+    const hvDailyZeroSelector = '#boss-info .remaining-attacks[data-count="0"]';
+    const hvAttackSpentSelector = `#countdown-timer.is-visible, ${hvDailyZeroSelector}`;
+    const quickBossDailyClone = (quest) => {
+      const copy = structuredClone(quest);
+      eachStep(copy.steps, (s) => {
+        if (s.action === "waitForCondition" && s.optional === true && s.condition?.selector === "#countdown-timer") {
+          s.timeoutMs = 100;
+        }
+        if (s.action === "waitMilliseconds" && s.timeoutMs === 2500) s.timeoutMs = 300;
+      });
+      return copy;
+    };
     const resetBoss = async () => {
       bossBroken = false;
       bossStale = false;
@@ -4143,16 +4204,19 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     const noBuffer = structuredClone(bossQuest);
     // Gỡ vòng lặp của schema 78 ra trước: đối chứng phải là flow ĐỜI TRƯỚC, và vòng lặp ấy
     // chính là thứ bản vá thêm vào.
-    noBuffer.steps = unwrapRepeat(noBuffer.steps, (s) => s.until?.selector === "#battle-button");
+    noBuffer.steps = unwrapRepeat(noBuffer.steps, (s) => s.until?.selector === hvAttackSpentSelector);
     noBuffer.steps = dropSteps(noBuffer.steps,
-      (s) => (s.action === "waitForCondition" && s.optional === true && s.condition?.selector === "#countdown-timer"),
+      (s) =>
+        s.action === "waitForCondition" &&
+        s.optional === true &&
+        (s.condition?.selector === "#countdown-timer" || s.condition?.selector === hvAttackSpentSelector),
     );
     // Rút ngắn MỌI cửa sổ chờ `#battle-button`, không riêng cái bắt buộc. Từ schema 76 có
     // HAI: một optional gánh ngân sách hoạt ảnh 120s, một bắt buộc làm nhân chứng. Chỉ rút cái
     // thứ hai thì cái thứ nhất vẫn đứng chờ trọn hai phút — thừa sức để đồng hồ 6000ms kịp hiện
     // và ẩn nút GIÚP, và phép đối chứng ăn may thành "xong" đúng lúc nó phải có răng nhất.
     eachStep(noBuffer.steps, (s) => {
-      if (s.action === "waitForCondition" && s.condition?.selector === "#battle-button") s.timeoutMs = 3000;
+      if (s.action === "waitForCondition" && s.condition?.selector === hvAttackSpentSelector) s.timeoutMs = 3000;
     });
     await page.goto(`${baseUrl}/hoang-vuc`, { waitUntil: "domcontentloaded" });
     const bossOld = await run(noBuffer);
@@ -4189,8 +4253,9 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       "đọc được đồng hồ tới lượt kế (7 phút 19 giây) và tiêu ĐÚNG một lượt (5 → 4)",
       bossHit.cooldownSeconds === 439 &&
         (await page.getAttribute("body", "data-attacked")) === "1" &&
-        (await page.locator("#luot").innerText()) === "4",
-      `${bossHit.cooldownSeconds} · ${await page.locator("#luot").innerText()}`,
+        (await page.locator(".remaining-attacks").getAttribute("data-count")) === "4" &&
+        (await page.locator(".ra-count").innerText()) === "4",
+      `${bossHit.cooldownSeconds} · data-count=${await page.locator(".remaining-attacks").getAttribute("data-count")}`,
     );
 
     // Hết lượt hôm nay: bộ đếm do server render sẵn nói ngay từ nét vẽ đầu, nên lượt dừng
@@ -4211,17 +4276,42 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       `${spentMs}ms`,
     );
 
+    // 26/09/2026 regression: both VIP and free flows share this script. The fifth accepted hit
+    // leaves #battle-button visible because there is no next-attack timestamp, so only data-count=0
+    // can close the day correctly. Run the real engine for BOTH tier definitions.
+    for (const tierQuest of [bossQuest, bossFreeQuest]) {
+      await resetBoss();
+      bossTurnsLeft = 1;
+      const lastHit = await run(quickBossDailyClone(tierQuest));
+      check(
+        `${tierQuest.id}: fifth hit is recorded as daily cap even though battle button is visible`,
+        lastHit.outcome === "alreadyDone" &&
+          lastHit.dailyCapReached === true &&
+          lastHit.message === "đã hết 5 lượt hôm nay" &&
+          (await page.getAttribute("body", "data-attacked")) === "1" &&
+          (await page.locator(".remaining-attacks").getAttribute("data-count")) === "0" &&
+          (await page.locator(".ra-count").innerText()) === "0" &&
+          (await page.locator("#battle-button").isVisible()) === true &&
+          (await page.locator("#countdown-timer").isVisible()) === false,
+        `${lastHit.outcome}; cap=${lastHit.dailyCapReached}; data=${await page.locator(".remaining-attacks").getAttribute("data-count")}; button=${await page.locator("#battle-button").isVisible()}`,
+      );
+    }
+
     // Cú bấm rơi vào hư không vẫn phải kêu to — bản vá 0.29.0, giữ nguyên giá trị.
     await resetBoss();
     bossBroken = true;
     const shortConfirm = structuredClone(bossQuest);
-    shortConfirm.steps.find(
-      (s) => s.action === "waitForCondition" && s.condition?.selector === "#battle-button" && !s.optional,
-    ).timeoutMs = 3000;
+    eachStep(shortConfirm.steps, (s) => {
+      if (s.action === "waitForCondition" && s.condition?.selector === hvAttackSpentSelector) s.timeoutMs = 3000;
+      if (s.action === "waitForCondition" && s.optional === true && s.condition?.selector === "#countdown-timer") {
+        s.timeoutMs = 100;
+      }
+      if (s.action === "waitMilliseconds" && s.timeoutMs === 2500) s.timeoutMs = 300;
+    });
     const bossMiss = await run(shortConfirm);
     check(
       "cú bấm rơi vào hư không → HỎNG, không nhận vơ là xong",
-      bossMiss.outcome === "failed" && String(bossMiss.message ?? "").includes("#battle-button"),
+      bossMiss.outcome === "failed" && String(bossMiss.message ?? "").includes("remaining-attacks"),
       `${bossMiss.outcome}: ${bossMiss.message}`,
     );
     await resetBoss();
@@ -4256,15 +4346,19 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     bossStale = true;
     const noReload = structuredClone(bossQuest);
     noReload.steps = dropSteps(noReload.steps,
-      (s) => (s.action === "navigate" && s.text === "/hoang-vuc" && s.when?.selector === "#battle-button"),
+      (s) => (s.action === "navigate" && s.text === "/hoang-vuc" && s.when?.selector === hvAttackSpentSelector),
     );
-    noReload.steps.find(
-      (s) => s.action === "waitForCondition" && s.condition?.selector === "#battle-button" && !s.optional,
-    ).timeoutMs = 3000; // hỏng thì hỏng nhanh — đang thử HÀNH VI, không thử con số
+    eachStep(noReload.steps, (s) => {
+      if (s.action === "waitForCondition" && s.condition?.selector === hvAttackSpentSelector) s.timeoutMs = 3000;
+      if (s.action === "waitForCondition" && s.optional === true && s.condition?.selector === "#countdown-timer") {
+        s.timeoutMs = 100;
+      }
+      if (s.action === "waitMilliseconds" && s.timeoutMs === 2500) s.timeoutMs = 300;
+    });
     const bossOldStuck = await run(noReload);
     check(
       "flow KHÔNG tải lại trên cùng cái bẫy: chờ tới hết giờ rồi báo hỏng",
-      bossOldStuck.outcome === "failed" && String(bossOldStuck.message ?? "").includes("#battle-button"),
+      bossOldStuck.outcome === "failed" && String(bossOldStuck.message ?? "").includes("remaining-attacks"),
       `${bossOldStuck.outcome}: ${bossOldStuck.message}`,
     );
     await resetBoss();

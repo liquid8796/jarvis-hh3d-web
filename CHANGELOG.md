@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.92 — Hoang Vực nhận đúng hết lượt trên giao diện mới (26/09/2026)
+
+- Bản ghi `hoang-vuc-20260926-130504`, video `/watch`, DOM và network cùng chỉ ra thay đổi thật của trang: bộ đếm không còn là câu `Lượt đánh còn lại: 0`. Nó được tách thành `.ra-label` + `.ra-count` và mang giá trị máy đọc được ở `data-count="0"`; `boss.min.js` cũng cập nhật chính attribute này sau mỗi đòn.
+- Flow cũ vì vậy bỏ lọt trạng thái đã đủ 5 lượt. Tệ hơn, khi đòn thứ năm không còn `next_attack_time`, script của trang chạy nhánh không-cooldown và hiện lại `#battle-button`; dùng “nút Khiêu Chiến đã ẩn” làm nhân chứng chung có thể khiến flow tưởng đòn cuối chưa được ghi rồi thử lại hoặc báo hỏng.
+- Cả twin VIP `hoang-vuc` và tài khoản thường `hoang-vuc-thuong` nay dùng hai nhân chứng server-backed: `#countdown-timer.is-visible` cho lượt 1–4, hoặc `.remaining-attacks[data-count="0"]` cho lượt cuối. Trạng thái 0 được chặn ngay khi mở trang và được chốt lại ngay sau đòn thứ năm, nên sổ ngày nhận `dailyCapReached` trong chính lượt chạy đó.
+- Quest profile tăng schema **83 → 84** để desktop thay hồ sơ đã lưu. Regression Chromium riêng chạy engine thật cho cả hai hạng, khóa ba ca: vào trang đã 0 lượt, đánh lượt thứ năm khi nút vẫn hiện, và một đòn thường còn cooldown. Lưới smoke dùng đúng markup/behavior ngày 26/09 thay cho câu chữ cũ.
+
 ## 1.3.91 — Promote repo phụ thành repo chính ngay trong Kho GitHub (24/09/2026)
 
 - Trang chi tiết của từng station nay có nút **Promote làm repo chính** trên mọi repo phụ hợp lệ. Repo được chọn giữ nguyên lịch sử Git, nhận payload/workflow khôi lỗi hiện hành, `WORKER_TOKEN`, nhánh mặc định `main` và trở thành primary của chính station đó.

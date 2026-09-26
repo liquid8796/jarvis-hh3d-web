@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.92",
+    date: "2026-09-26",
+    lines: [
+      "Hoang Vực nay nhận đúng trạng thái hết 5 lượt từ bộ đếm của trang, kể cả khi nút Khiêu Chiến vẫn còn hiện.",
+      "Bản VIP và thường cùng dùng flow mới; lượt thứ năm được chốt ngay trong lượt chạy và không bị đánh lại.",
+      "Lưới Chromium khóa cả trang đã hết lượt, đòn thứ năm và đòn thường còn hồi chiêu.",
+    ],
+  },
+  {
     version: "1.3.91",
     date: "2026-09-24",
     lines: [
@@ -472,14 +481,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-23",
     lines: [
       "Dòng nhật ký đầu mỗi vòng chạy nói rõ hơn: auto đang khởi động tế đàn, thay cho chữ「khởi lư」khó đoán.",
-    ],
-  },
-  {
-    version: "1.3.42",
-    date: "2026-08-23",
-    lines: [
-      "Ngọc Giản Cấu Hình bớt chữ thừa: hai khối Luyện Đan Đường và Khoáng Mạch thôi nhắc lại câu「bản này không đụng tab kia」.",
-      "Dòng mô tả Hỷ Sự Đường cũng gọn lại còn một câu.",
     ],
   },
 ];

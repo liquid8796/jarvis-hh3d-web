@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.101",
+    date: "2026-09-27",
+    lines: [
+      "Web đã sẵn sàng cho Google AdSense bằng mã nhà xuất bản ca-pub, ads.txt và trang quyền riêng tư công khai.",
+      "Quảng cáo chỉ bật trên tên miền chính thức; phiên quản trị được miễn để giảm nguy cơ bấm nhầm quảng cáo của chính mình.",
+      "Khoá Google do người dùng cung cấp không được đưa vào mã nguồn; quảng cáo chỉ dùng mã nhà xuất bản công khai.",
+    ],
+  },
+  {
     version: "1.3.100",
     date: "2026-09-27",
     lines: [
@@ -474,15 +483,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Phòng Chat trên điện thoại: mỗi khoảnh tin nay thu lại cho vừa khung — trước chỉ chứa vừa hai tin rưỡi, giờ được hơn ba tin rưỡi.",
       "Thêm nút ở góc trên bên phải khung để trải sảnh kín màn hình; bấm lần nữa hoặc bấm Esc là thu về.",
       "Lúc trải kín màn hình thì chữ trở lại cỡ thường và ô nhập rộng ra, đọc và gõ đều dễ hơn.",
-    ],
-  },
-  {
-    version: "1.3.51",
-    date: "2026-08-28",
-    lines: [
-      "Hoang Vực: trang game dạo này có lúc nhận đòn đánh rồi đứng hình — vẫn hiện nút KHIÊU CHIẾN như chưa đánh gì, kèm dòng nhắc tải lại trang.",
-      "Auto nay tải lại rồi đọc lại lượt đánh và đồng hồ, thay vì đứng chờ hai phút rồi báo hỏng cho một trận thật ra đã đánh xong.",
-      "Đòn nào thật sự không ăn thì vẫn báo hỏng như cũ — chỗ này không nhận vơ.",
     ],
   },
 ];

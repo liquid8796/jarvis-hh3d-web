@@ -27,6 +27,14 @@ sang đúng path/query trên `auto-hh3d.online`. Mục **Tên Miền** nằm tr�
 `/ten-mien`, nên khách, tài khoản chờ duyệt, thành viên và quản trị đều xem được. Trang này cố ý giữ giao diện ngắn gọn: mỗi tên miền chỉ hiện vai trò, trạng thái, địa chỉ và nút mở; không có khối giải thích chuyển tiếp/khuyến nghị riêng. Catalog này không còn nằm trong trang Tông Môn; worker, bộ cài và workflow không còn gọi hostname Vercel cũ.
 Next.js 16 Proxy xử lý bia chỉ đường trước auth và routing trạm, nên trang đóng cửa vẫn hiện ngay cả khi database lỗi.
 
+Google AdSense dùng publisher/client ID công khai của tài khoản, được quản lý tập trung trong
+`src/lib/adsense/config.ts`; khóa Google dạng API không tham gia vào mã quảng cáo. Auto ads và meta
+xác minh chỉ xuất hiện trên `auto-hh3d.online`/`www`, không xuất hiện trên localhost, preview hay
+gương Vercel đã chết. Phiên quản trị chỉ giữ meta xác minh nhưng không tải script quảng cáo để giảm
+nguy cơ bấm nhầm; `GOOGLE_ADSENSE_DISABLED=1` trong `/opt/jarvis/shared/.env` là nút dừng khẩn cấp.
+Seller record tĩnh nằm ở `/ads.txt`, còn chính sách dữ liệu quảng cáo ở `/quyen-rieng-tu` và được
+liên kết trong footer. Google AdSense vẫn quyết định thời điểm xét duyệt và thời điểm quảng cáo bắt đầu phân phối.
+
 ---
 
 ## 1. Kiến trúc — và vì sao lại thế

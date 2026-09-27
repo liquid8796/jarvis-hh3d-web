@@ -5,6 +5,7 @@ import { NoticePopup } from "@/components/NoticePopup";
 import { ChatFab } from "@/components/ChatFab";
 import { BackdropPeek } from "@/components/BackdropPeek";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
+import { GoogleAdSense } from "@/components/GoogleAdSense";
 import { getRenderSettings } from "@/lib/services/settings";
 import { backdropCss } from "@/lib/validation/backdrops";
 import "./globals.css";
@@ -82,6 +83,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="vi" className={`${display.variable} ${body.variable}`}>
+      <head><GoogleAdSense /></head>
       <body>
         {/*
           Nền của từng trang, rót từ cấu hình.
@@ -117,7 +119,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             trang nằm NGOÀI cửa: chúng là cái vỏ, và bảng bế quan cũng cần được đứng trên tấm
             tranh ấy. Xem components/MaintenanceGate.tsx cho toàn bộ lý lẽ. */}
         <MaintenanceGate>{children}</MaintenanceGate>
-        <footer className="site-footer">© 2026 Nam Cung Bình. All rights reserved.</footer>
+        <footer className="site-footer">
+          <span>© 2026 Nam Cung Bình. All rights reserved.</span>
+          <span aria-hidden="true"> · </span>
+          <a href="/quyen-rieng-tu">Quyền riêng tư</a>
+        </footer>
         {/* Dấu bản đứng NGOÀI cửa bế quan, cùng lẽ với tấm nền: lúc web đang bế quan là đúng
             lúc người ta cần biết trạm mình đang gõ cửa mang bản nào. Đứng cuối trong DOM để
             trình đọc màn hình đọc nó sau cùng — nó là chú thích, không phải nội dung. */}

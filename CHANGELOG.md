@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.101 — Google AdSense trên tên miền chính thức (27/09/2026)
+
+- Tích hợp Auto ads và meta xác minh bằng publisher/client ID công khai của tài khoản AdSense. Script chỉ tải trên `auto-hh3d.online`/`www`; localhost, preview và gương Vercel đã chết luôn sạch quảng cáo.
+- Phiên quản trị không tải script quảng cáo để giảm nguy cơ chủ website bấm nhầm quảng cáo của chính mình; `GOOGLE_ADSENSE_DISABLED=1` là nút dừng khẩn cấp.
+- Thêm seller record tĩnh `/ads.txt`, trang công khai `/quyen-rieng-tu` và liên kết ở footer. Trang quyền riêng tư nói rõ cookie, web beacon, địa chỉ IP, thiết bị và lựa chọn quảng cáo Google.
+- Khóa Google do người dùng cung cấp không được dùng hoặc commit: AdSense browser code chỉ cần publisher ID công khai. Regression quét file Git để chặn khóa Google bị đưa vào source về sau.
+
 ## 1.3.100 — Rút gọn trang Tên Miền (27/09/2026)
 
 - Trang `/ten-mien` bỏ phần mô tả dài dưới tiêu đề và dưới từng tên miền; hai thẻ giờ tập trung vào tên, vai trò, trạng thái và hành động mở.

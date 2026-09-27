@@ -135,6 +135,16 @@ body {
   background: linear-gradient(180deg, transparent, rgba(6, 11, 26, 0.72) 45%);
 }
 
+.site-footer a {
+  color: var(--color-gold-300);
+  text-decoration: none;
+}
+
+.site-footer a:hover,
+.site-footer a:focus-visible {
+  text-decoration: underline;
+}
+
 /* Dấu bản — ghim ở góc dưới bên trái MÀN HÌNH, không phải cuối trang. Câu hỏi "web đang chạy
    bản nào" luôn được hỏi giữa lúc đang đứng ở một trang nào đó, thường là giữa một lượt báo
    lỗi — chứ không phải lúc rảnh rỗi cuộn xuống chân trang tìm.

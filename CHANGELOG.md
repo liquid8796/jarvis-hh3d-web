@@ -11,6 +11,11 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.97 — Gắn auto-hh3d.online vào backend OCI (27/09/2026)
+
+- Tên miền sở hữu riêng `auto-hh3d.online` nay trỏ thẳng bằng GoDaddy DNS tới reserved IP `158.180.59.36` của backend OCI; `www.auto-hh3d.online` giữ CNAME về apex. Caddy phục vụ cả hai hostname và tự cấp/renew TLS, còn `158.180.59.36.sslip.io` vẫn tồn tại làm đường fallback vận hành.
+- Script dựng backend nay tạo `/etc/caddy/conf.d/auto-hh3d.caddy` và Caddyfile gốc import `conf.d/*.caddy`. Đây cũng sửa một nợ phục hồi: chạy lại `setup-backend.sh` trước đây có thể ghi đè Caddyfile live rồi làm mất vhost của Jarvis MCP, Astra Nexus và Racing Bois.
+- Runbook OCI và README ghi rõ nguồn sự thật DNS/Caddy. Không đổi endpoint nội bộ của khôi lỗi hay game domain; patch này chỉ thêm hostname public cho web production.
 ## 1.3.96 — Cache DNS gương trạm một ngày (27/09/2026)
 
 - Worker nay giữ kết quả phân giải dương của `auto-hh3d.vercel.app` trong RAM đúng 24 giờ (86.400.000 ms), nên vòng poll/heartbeat không phải hỏi resolver lại mỗi khi mở socket HTTPS mới.

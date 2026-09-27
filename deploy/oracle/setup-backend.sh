@@ -158,9 +158,24 @@ if [ ! -f /etc/caddy/upstream.conf ]; then
   echo "reverse_proxy 127.0.0.1:3000" > /etc/caddy/upstream.conf
 fi
 
-# sslip.io là đường TLS chính (Let's Encrypt HTTP-01 qua cổng 80); khối IP trần
-# thử thêm chứng chỉ IP shortlived — hỏng cũng không kéo khối kia theo.
+# Tên miền chính do mình sở hữu. Giữ thành một vhost trong conf.d để Caddyfile gốc còn import
+# được các service khác trên cùng VM (Jarvis MCP, Astra, Racing Bois). DNS GoDaddy:
+#   A     @    -> 158.180.59.36
+#   CNAME www  -> @
+# IP là OCI RESERVED nên không đổi khi dựng lại instance.
+install -d -m 0755 /etc/caddy/conf.d
+cat > /etc/caddy/conf.d/auto-hh3d.caddy <<'CADDY'
+auto-hh3d.online, www.auto-hh3d.online {
+	import /etc/caddy/upstream.conf
+	encode zstd gzip
+}
+CADDY
+
+# sslip.io vẫn là đường fallback vận hành; IP trần giữ để chẩn đoán khi DNS riêng có sự cố.
+# Caddy tự xin/renew TLS cho domain riêng qua ACME sau khi DNS trỏ về VM.
 cat > /etc/caddy/Caddyfile <<'CADDY'
+import /etc/caddy/conf.d/*.caddy
+
 158.180.59.36.sslip.io {
 	import /etc/caddy/upstream.conf
 	encode zstd gzip

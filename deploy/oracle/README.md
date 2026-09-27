@@ -115,12 +115,19 @@ Cùng ngày dựng lại máy, tông chủ quyết: **backend + database rời h
 | app | **hai chỗ chạy**: systemd `jarvis-web@3000` + `jarvis-web@3001`, mỗi chỗ có `/opt/jarvis/slot-<cổng>` (symlink → `/opt/jarvis/releases/<sha>`) |
 | bản đang phục vụ | `/etc/caddy/upstream.conf` — MỘT dòng, nguồn sự thật duy nhất; đổi nó rồi `caddy reload` là chuyển bản |
 | env | `/opt/jarvis/shared/.env` (jarvis-only 600; mỗi release symlink `.env` về đây) |
-| TLS | Caddy, `https://158.180.59.36.sslip.io` (Let's Encrypt HTTP-01 qua sslip.io) |
+| TLS | Caddy, **`https://auto-hh3d.online`** + `https://www.auto-hh3d.online`; `https://158.180.59.36.sslip.io` giữ làm fallback vận hành |
 | Postgres 17 | localhost:5432, db/role `jarvis`, mật khẩu `/etc/jarvis/pg-password` (root-only) |
 | MongoDB 8.0 | localhost:27017, db `jarvis` (tên theo nấc mặc định của `dbName.ts`) |
 | cron | systemd `jarvis-cron.timer` 03:00 UTC → `/api/cron` (quét dọn + ngó kho chính) — thay Vercel Cron |
 | cron kho phụ | systemd `jarvis-companions.timer` mỗi 5 phút + độ trễ ngẫu nhiên 0–30 giây → `/api/cron?only=companions`; runtime Ollama chỉ xử lý kho đã tới `nextDecisionAt` |
 | media | vẫn Object Storage `jarvis-media` (mục 3) — không đổi |
+
+Tên miền production `auto-hh3d.online` nằm trên nameserver GoDaddy. Apex dùng bản ghi
+`A @ → 158.180.59.36` (OCI **RESERVED public IP**), còn `www` là `CNAME → @`; không tạo `AAAA`
+khi VM chưa có IPv6 public tương ứng. Caddy giữ vhost này ở `/etc/caddy/conf.d/auto-hh3d.caddy`
+và `Caddyfile` bắt buộc import `conf.d/*.caddy`, vì cùng máy còn phục vụ Jarvis MCP, Astra Nexus
+và Racing Bois. `setup-backend.sh` dựng lại cả hai phần nên chạy idempotent không làm mất domain
+hay các vhost service khác. Caddy tự xin/renew chứng chỉ ACME sau khi DNS trỏ về VM.
 
 ### Cập nhật lịch Ollama trên VM
 

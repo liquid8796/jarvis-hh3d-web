@@ -16,6 +16,11 @@ một mô hình nhiệm vụ — Mê Cung, Luyện Đan Đường, cùng những
 > **Người dùng cuối đọc [HUONG-DAN.md](HUONG-DAN.md)** — hướng dẫn cày auto, viết cho
 > người mới, không nhắc gì tới hạ tầng. File này thì dành cho người vận hành.
 
+Web production có tên miền sở hữu riêng **`https://auto-hh3d.online`**; `www.auto-hh3d.online`
+trỏ cùng backend. DNS do GoDaddy quản lý (`A @ → 158.180.59.36`, `CNAME www → @`), còn Caddy trên
+OCI tự cấp/renew TLS. `158.180.59.36.sslip.io` vẫn được giữ làm lối fallback vận hành, không phải
+địa chỉ công khai chính.
+
 ---
 
 ## 1. Kiến trúc — và vì sao lại thế

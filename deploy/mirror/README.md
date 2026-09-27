@@ -419,6 +419,18 @@ khai ở hai biến — đoán sai ở đây là phát hành mã của tông mô
 5. **Diễn tập** ✔ xong 10/08/2026 — chuyển đi rồi chuyển về trên hai trạm sống. Số đo, ba lỗi
    nó lôi ra, và hai bài học vận hành nằm ở §14.
 
+### Tình trạng tên miền hiện tại (27/09/2026)
+
+`auto-hh3d.vercel.app` **không còn là trạm hoạt động**. Deployment Vercel ấy được giữ lại đúng
+một mục đích: trả trang `410 Gone` bám prototype `docs/prototypes/domain-retirement-prototype.html`,
+giải thích tên miền đã đóng, đếm ngược 8 giây rồi chuyển người dùng sang đúng path/query tại
+`https://auto-hh3d.online`. Request không phải GET/HEAD nhận JSON `410` cùng `activeUrl` mới; cron
+Vercel đã bị gỡ và worker/bộ cài/workflow đều dùng tên miền chính thức thay cho Vercel cũ.
+
+Tab **Tên miền** trong Tông Môn là nguồn hiển thị trạng thái: `auto-hh3d.online` = **hoạt động**,
+`auto-hh3d.vercel.app` = **đã chết**. Bảng số đo bên dưới là lịch sử diễn tập ngày 10/08, không
+phải mô tả routing hiện tại.
+
 ## 13. Đo thật trên hai trạm sống (10/08/2026)
 
 Trạm gương `auto-hh3d-1` (tài khoản `zhangyu4`, Neon `jarvis-hh3d` + Atlas `atlas-jarvis-chat`,

@@ -21,6 +21,12 @@ trỏ cùng backend. DNS do GoDaddy quản lý (`A @ → 158.180.59.36`, `CNAME 
 OCI tự cấp/renew TLS. `158.180.59.36.sslip.io` vẫn được giữ làm lối fallback vận hành, không phải
 địa chỉ công khai chính.
 
+`auto-hh3d.vercel.app` đã chính thức đóng. Deployment ấy chỉ còn phục vụ trang `410 Gone` theo
+prototype trong `docs/prototypes/`, giải thích việc đổi tên miền và chuyển người dùng sau 8 giây
+sang đúng path/query trên `auto-hh3d.online`. Tab **Tên miền** ở Tông Môn là sổ trạng thái công khai
+cho hai địa chỉ; worker, bộ cài và workflow không còn gọi hostname Vercel cũ.
+Next.js 16 Proxy x? l? bia ch? ???ng tr??c auth v? routing tr?m, n?n trang ??ng c?a v?n hi?n ngay c? khi database l?i.
+
 ---
 
 ## 1. Kiến trúc — và vì sao lại thế
@@ -398,8 +404,8 @@ WEB_URL='https://158.180.59.36.sslip.io' WORKER_TOKEN='<token của backend>' su
 
 Script tải **gói khôi lỗi** từ chính web (`/linh-su/goi-linh-su.tgz` — đóng lại ở mỗi deploy
 từ đúng engine đang chạy), dựng systemd service, và từ đó "cập nhật" nghĩa là chạy lại đúng
-một lệnh ấy. Bộ cài còn ghi `WORKER_FALLBACK_URL=https://auto-hh3d.vercel.app`; đường cứu hộ
-chỉ mở khi cổng chính lỗi, không gánh nhịp poll thường. Riêng hostname gương này được worker
+một lệnh ấy. Bộ cài còn ghi `WORKER_FALLBACK_URL=https://auto-hh3d.online`; đường cứu hộ
+chỉ mở khi cổng chính lỗi, không gánh nhịp poll thường. Tên miền chính thức này được worker
 cache DNS dương đúng **24 giờ**; lookup lỗi không được cache và sẽ thử lại ở lượt kế.
 
 ### Bước 3 — Deploy
@@ -547,7 +553,7 @@ Dev muốn chạy worker thô từ repo thì vẫn được:
 
 ```bash
 WEB_URL=https://158.180.59.36.sslip.io \
-WORKER_FALLBACK_URL=https://auto-hh3d.vercel.app \
+WORKER_FALLBACK_URL=https://auto-hh3d.online \
 WORKER_TOKEN=<token> npm run worker
 ```
 
@@ -692,7 +698,7 @@ File SQL sinh ra **được commit** — lịch sử schema nằm trong git, kh�
 
 ## 6. Lịch sử phát hành
 
-Bản hiện tại: **1.3.96**.
+Bản hiện tại: **1.3.98**.
 
 Lịch sử nằm ở [CHANGELOG.md](CHANGELOG.md), tách riêng khỏi file này — hai tài liệu trả lời
 hai câu hỏi khác nhau: README nói *hệ thống chạy thế nào*, changelog nói *vì sao nó thành ra

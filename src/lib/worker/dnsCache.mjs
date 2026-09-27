@@ -1,5 +1,5 @@
 /**
- * DNS cache dành riêng cho gương trạm cố định `auto-hh3d.vercel.app`.
+ * DNS cache dành riêng cho gương trạm cố định `auto-hh3d.online`.
  *
  * Worker gõ cửa `/api/worker` liên tục trong nhiều giờ. `fetch` mặc định của Node để việc phân
  * giải tên cho tầng socket, nên mỗi lần pool phải mở kết nối mới có thể lại hỏi DNS. Gương trạm
@@ -8,14 +8,14 @@
  *
  * Hai lớp được tách rõ:
  *   1. `createCachedDnsLookup` là Strategy thuần cho `https.request`, dễ kiểm thử không mạng.
- *   2. `createMirrorDnsCachedFetch` là Decorator quanh `fetch`: chỉ chặn đúng hostname gương,
+ *   2. `createOfficialDnsCachedFetch` là Decorator quanh `fetch`: chỉ chặn đúng hostname gương,
  *      mọi URL khác đi nguyên đường fetch cũ. Nhờ vậy activeUrl động vẫn hoạt động như trước.
  */
 import { lookup as systemLookup } from "node:dns";
 import { request as systemHttpsRequest } from "node:https";
 
-export const MIRROR_DNS_HOSTNAME = "auto-hh3d.vercel.app";
-export const MIRROR_DNS_CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
+export const OFFICIAL_DNS_HOSTNAME = "auto-hh3d.online";
+export const OFFICIAL_DNS_CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
 
 const normalizeHostname = (value) => String(value ?? "").trim().replace(/\.$/, "").toLowerCase();
 
@@ -68,13 +68,13 @@ function resolveAll(lookupImpl, hostname) {
  * - Giữ cả IPv4 lẫn IPv6 rồi quay vòng địa chỉ trên mỗi socket mới, không ghim một IP duy nhất.
  */
 export function createCachedDnsLookup({
-  hostname = MIRROR_DNS_HOSTNAME,
-  ttlMs = MIRROR_DNS_CACHE_TTL_MS,
+  hostname = OFFICIAL_DNS_HOSTNAME,
+  ttlMs = OFFICIAL_DNS_CACHE_TTL_MS,
   lookupImpl = systemLookup,
   nowImpl = Date.now,
 } = {}) {
   const target = normalizeHostname(hostname);
-  const ttl = Math.max(1_000, Number(ttlMs) || MIRROR_DNS_CACHE_TTL_MS);
+  const ttl = Math.max(1_000, Number(ttlMs) || OFFICIAL_DNS_CACHE_TTL_MS);
   let records = [];
   let expiresAt = 0;
   let refreshInFlight = null;
@@ -166,11 +166,11 @@ function responseHeaders(raw) {
 /**
  * Decorator tương thích phần Response mà worker dùng (`ok/status/headers/text/json/body.cancel`).
  * URL vẫn mang hostname gốc, chỉ callback `lookup` trả IP cache; vì vậy Host header, chứng thư và
- * TLS SNI vẫn là `auto-hh3d.vercel.app`, không có cú rewrite URL sang IP trần.
+ * TLS SNI vẫn là `auto-hh3d.online`, không có cú rewrite URL sang IP trần.
  */
-export function createMirrorDnsCachedFetch({
-  hostname = MIRROR_DNS_HOSTNAME,
-  ttlMs = MIRROR_DNS_CACHE_TTL_MS,
+export function createOfficialDnsCachedFetch({
+  hostname = OFFICIAL_DNS_HOSTNAME,
+  ttlMs = OFFICIAL_DNS_CACHE_TTL_MS,
   fetchImpl = fetch,
   lookupImpl = systemLookup,
   requestImpl = systemHttpsRequest,

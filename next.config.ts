@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       allowedOrigins: [
-        "auto-hh3d.vercel.app",
+        "auto-hh3d.online",
         "auto-hh3d-1.vercel.app",
         "auto-hh3d-2.vercel.app",
         "auto-hh3d-3.vercel.app",

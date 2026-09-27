@@ -265,9 +265,10 @@ tàng khố — không bao giờ đưa cho người dùng (họ có linh phù ri
 | env | `/opt/auto-hh3d/linh-su/.env` (`WEB_URL`, `WORKER_FALLBACK_URL`, `WORKER_TOKEN`, `WORKER_ID=tong-mon-khoiloi`) |
 | drop-in | `/etc/systemd/system/auto-hh3d-linh-su.service.d/override.conf` — `MemoryMax=18G`, `WORKER_MAX_JOBS=2`, `TimeoutStopSec=2400`, `WORKER_DRAIN_TIMEOUT_MS=2100000`. **Không** có trong `.env` và **không** có trong `setup.sh` (script chỉ viết lại unit chính), nên soi hai chỗ ấy sẽ tưởng nhầm là 4G. Tệp ấy mang sẵn một khối bình chú dài kèm số đo — đọc nó trước khi vặn. |
 
-`auto-hh3d.vercel.app` là hostname fallback duy nhất có cache DNS trong tiến trình: kết quả dương
-được giữ 24 giờ, nhiều request lạnh dùng chung một lookup, còn lỗi DNS không được giữ. Cache chỉ
-giảm lần hỏi resolver; HTTPS vẫn kết nối bằng hostname thật để giữ nguyên TLS/SNI và `Host`.
+`auto-hh3d.online` là hostname fallback chính thức và có cache DNS dương 24 giờ trong tiến trình;
+nhiều request lạnh dùng chung một lookup, còn lỗi DNS không được giữ. `auto-hh3d.vercel.app` đã
+đóng và chỉ phục vụ trang thông báo `410 Gone`, tuyệt đối không dùng làm worker/API fallback nữa.
+HTTPS vẫn kết nối bằng hostname thật để giữ nguyên TLS/SNI và `Host`.
 
 **Mức song song, hai tầng:** 2 đàn cùng lúc (`WORKER_MAX_JOBS`), mỗi đàn chạy nhiệm vụ TUẦN TỰ
 (nhánh song song trong một đàn đã gỡ 12/08/2026 để Mê Cung luôn là nhiệm vụ cuối), nên trần thật

@@ -48,7 +48,7 @@ jobs:
     steps:
       - name: Gõ cửa quét
         env:
-          WEB_URL: ${{ vars.WEB_URL || 'https://auto-hh3d.vercel.app' }}
+          WEB_URL: ${{ vars.WEB_URL || 'https://auto-hh3d.online' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -u

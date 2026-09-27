@@ -52,8 +52,8 @@ try {
       'import { createWorkerCall } from "./controlFollow.mjs";',
     ],
     [
-      'import { createMirrorDnsCachedFetch } from "../src/lib/worker/dnsCache.mjs";',
-      'import { createMirrorDnsCachedFetch } from "./dnsCache.mjs";',
+      'import { createOfficialDnsCachedFetch } from "../src/lib/worker/dnsCache.mjs";',
+      'import { createOfficialDnsCachedFetch } from "./dnsCache.mjs";',
     ],
     [
       'import { UPDATE_EXIT_CODE, selfUpdateEnabled, shouldSelfUpdate } from "../src/lib/worker/selfUpdate.mjs";',

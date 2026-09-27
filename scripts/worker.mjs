@@ -19,7 +19,7 @@
  *   • WORKER_TOKEN của deployment (khôi lỗi tông môn) → nhận job của mọi thành viên.
  *   • Linh phù cá nhân phát ở mục Khôi Lỗi           → chỉ nhận job của chính chủ.
  *
- *   WEB_URL=https://158.180.59.36.sslip.io WORKER_FALLBACK_URL=https://auto-hh3d.vercel.app WORKER_TOKEN=... node scripts/worker.mjs
+ *   WEB_URL=https://158.180.59.36.sslip.io WORKER_FALLBACK_URL=https://auto-hh3d.online WORKER_TOKEN=... node scripts/worker.mjs
  *
  * WORKER_SOLVE_TURNSTILE=1 bật cú tự bấm ô Turnstile khi vấp màn Cloudflare (mặc định TẮT).
  * Chỉ giúp màn tương tác, và KHÔNG chữa được gốc IP trung tâm dữ liệu — bật cho máy IP dân dụng.
@@ -32,7 +32,7 @@ import { readFileSync } from "node:fs";
 import { runCycle } from "../src/lib/quest-engine/runCycle.mjs";
 import { profileDirForJob, sweepStaleProfiles } from "../src/lib/quest-engine/browserProfile.mjs";
 import { createWorkerCall } from "../src/lib/worker/controlFollow.mjs";
-import { createMirrorDnsCachedFetch } from "../src/lib/worker/dnsCache.mjs";
+import { createOfficialDnsCachedFetch } from "../src/lib/worker/dnsCache.mjs";
 import { UPDATE_EXIT_CODE, selfUpdateEnabled, shouldSelfUpdate } from "../src/lib/worker/selfUpdate.mjs";
 
 /**
@@ -120,10 +120,10 @@ if (!TOKEN || TOKEN === "change-me") {
 // mang thêm một trách nhiệm không hiển nhiên: ĐI THEO trạm hoạt động khi bảng điều phối lật.
 // Trạm đã nghỉ trả 409 kèm `activeUrl`; thiếu đoạn ấy thì mỗi lượt chuyển trạm bỏ lại toàn bộ
 // đàn ở trạm cũ — đúng chuyện đã xảy ra ngày 10/08/2026.
-// Chỉ origin gương cố định auto-hh3d.vercel.app đi qua decorator DNS cache 1 ngày. URL khác,
+// Chỉ origin gương cố định auto-hh3d.online đi qua decorator DNS cache 1 ngày. URL khác,
 // kể cả activeUrl động từ bảng điều phối, vẫn dùng fetch gốc. Lookup chỉ thay IP ở tầng socket;
 // URL/TLS SNI/Host header giữ nguyên hostname nên không hạ hàng rào HTTPS.
-const WORKER_FETCH = createMirrorDnsCachedFetch();
+const WORKER_FETCH = createOfficialDnsCachedFetch();
 const { call, currentUrl } = createWorkerCall({
   webUrl: WEB_URL,
   fallbackUrl: FALLBACK_URL,

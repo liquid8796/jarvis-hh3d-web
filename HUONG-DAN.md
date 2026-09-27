@@ -3,7 +3,7 @@
 Auto này cày hộ bạn ở hoathinh3d: Mê Cung, Luyện Đan Đường, và các nhiệm vụ ngày.
 Bấm nút một lần rồi tắt trình duyệt đi làm việc khác, auto vẫn chạy tiếp.
 
-Web: <https://auto-hh3d.vercel.app>
+Web: <https://auto-hh3d.online>
 
 ---
 

@@ -12,7 +12,7 @@
 set -euo pipefail
 
 DIRECT_WORKER_URL="https://158.180.59.36.sslip.io"
-FALLBACK_WORKER_URL="https://auto-hh3d.vercel.app"
+FALLBACK_WORKER_URL="https://auto-hh3d.online"
 WEB_URL="${WEB_URL:-$DIRECT_WORKER_URL}"
 WORKER_TOKEN="${WORKER_TOKEN:-}"
 APP_DIR="/opt/auto-hh3d/linh-su"

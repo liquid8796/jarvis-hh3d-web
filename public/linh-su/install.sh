@@ -21,7 +21,7 @@ set -euo pipefail
 NODE_VERSION="v24.18.1"   # LTS "Krypton"
 
 TOKEN="${LINH_PHU:-}"
-BASE="${LINH_SU_URL:-https://auto-hh3d.vercel.app}"
+BASE="${LINH_SU_URL:-https://auto-hh3d.online}"
 BASE="${BASE%/}"
 DIR="$HOME/.local/share/auto-hh3d/linh-su"
 NODE_DIR="$DIR/node"

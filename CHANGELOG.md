@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.98 — Tên miền chính thức và trang tiễn gương Vercel (27/09/2026)
+
+- Tông Môn có tab **Tên miền** mới, liệt kê rõ `auto-hh3d.online` là **hoạt động** và `auto-hh3d.vercel.app` là **đã chết**, kèm vai trò, đường mở và hướng dẫn cập nhật dấu trang.
+- Mọi GET/HEAD tới hostname Vercel cũ nay nhận trang đóng cửa dựng đúng prototype đã duyệt: thông báo thân thiện, so sánh hai tên miền, bảo đảm dữ liệu không đổi, đếm ngược 8 giây, nút sao chép và chuyển sang đúng path/query trên tên miền mới. API cũ trả `410 Gone` cùng `activeUrl` thay vì giả làm trạm sống.
+- Khôi lỗi, bộ cài, workflow và cron nội bộ ngừng gọi Vercel cũ; fallback chuyển sang `auto-hh3d.online`. Cache DNS một ngày của 1.3.96 cũng đi theo tên miền chính thức. Deployment Vercel chỉ còn nhiệm vụ hiển thị bia chỉ đường, không chạy cron worker.
+- Prototype nguồn và ảnh desktop được lưu trong `docs/prototypes/`; regression khóa catalog, status, redirect an toàn, Next.js 16 Proxy 410 và các endpoint vận hành không còn gọi tên miền đã chết.
 ## 1.3.97 — Gắn auto-hh3d.online vào backend OCI (27/09/2026)
 
 - Tên miền sở hữu riêng `auto-hh3d.online` nay trỏ thẳng bằng GoDaddy DNS tới reserved IP `158.180.59.36` của backend OCI; `www.auto-hh3d.online` giữ CNAME về apex. Caddy phục vụ cả hai hostname và tự cấp/renew TLS, còn `158.180.59.36.sslip.io` vẫn tồn tại làm đường fallback vận hành.

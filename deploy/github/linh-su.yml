@@ -85,7 +85,7 @@ jobs:
       - name: Download current worker runtime
         env:
           WEB_URL: ${{ vars.WEB_URL || 'https://158.180.59.36.sslip.io' }}
-          WORKER_FALLBACK_URL: ${{ vars.WORKER_FALLBACK_URL || 'https://auto-hh3d.vercel.app' }}
+          WORKER_FALLBACK_URL: ${{ vars.WORKER_FALLBACK_URL || 'https://auto-hh3d.online' }}
         run: |
           set -euo pipefail
           dir="$RUNNER_TEMP/linh-su-runtime"
@@ -118,7 +118,7 @@ jobs:
       - name: Trực ca
         env:
           WEB_URL: ${{ vars.WEB_URL || 'https://158.180.59.36.sslip.io' }}
-          WORKER_FALLBACK_URL: ${{ vars.WORKER_FALLBACK_URL || 'https://auto-hh3d.vercel.app' }}
+          WORKER_FALLBACK_URL: ${{ vars.WORKER_FALLBACK_URL || 'https://auto-hh3d.online' }}
           WORKER_TOKEN: ${{ secrets.WORKER_TOKEN }}
           WORKER_ID: github-khoiloi
           WORKER_MAX_JOBS: "2"

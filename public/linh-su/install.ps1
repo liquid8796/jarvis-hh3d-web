@@ -29,7 +29,7 @@ try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 $NODE_VERSION = "v24.18.1"                 # LTS "Krypton"
 
 $token = $env:LINH_PHU
-$base = if ($env:LINH_SU_URL) { $env:LINH_SU_URL.TrimEnd("/") } else { "https://auto-hh3d.vercel.app" }
+$base = if ($env:LINH_SU_URL) { $env:LINH_SU_URL.TrimEnd("/") } else { "https://auto-hh3d.online" }
 
 $dir = Join-Path $env:LOCALAPPDATA "AutoHH3D\LinhSu"
 

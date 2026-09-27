@@ -58,7 +58,7 @@ import {
 
 const repoRoot = path.join(import.meta.dirname, "..");
 const EXPECTED_DIRECT_WORKER_URL = "https://158.180.59.36.sslip.io";
-const EXPECTED_WORKER_FALLBACK = "https://auto-hh3d.vercel.app";
+const EXPECTED_WORKER_FALLBACK = "https://auto-hh3d.online";
 
 let checks = 0;
 const check = (label: string, condition: unknown, detail = "") => {

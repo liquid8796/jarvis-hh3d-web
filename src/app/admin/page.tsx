@@ -19,6 +19,7 @@ import { ChatPurgePanel } from "./ChatPurgePanel";
 import { ChatSettingsForm } from "./ChatSettingsForm";
 import { TagFrameManager } from "./TagFrameManager";
 import { DailyResetForm } from "./DailyResetForm";
+import { DomainsPanel } from "./DomainsPanel";
 import { GameDomainForm } from "./GameDomainForm";
 import { GithubAdminWorkspace } from "./GithubAdminWorkspace";
 import { JobEventRetentionForm } from "./JobEventRetentionForm";
@@ -157,6 +158,11 @@ export default async function AdminPage({
                   pageBackdrops={settings.appearance.pageBackdrops}
                 />
               ),
+            },
+            {
+              key: "tenMien",
+              label: "Tên miền",
+              pane: <DomainsPanel />,
             },
             {
               key: "baoTri",

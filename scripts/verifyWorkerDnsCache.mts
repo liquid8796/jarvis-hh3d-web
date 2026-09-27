@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import {
   createCachedDnsLookup,
-  createMirrorDnsCachedFetch,
-  MIRROR_DNS_CACHE_TTL_MS,
-  MIRROR_DNS_HOSTNAME,
+  createOfficialDnsCachedFetch,
+  OFFICIAL_DNS_CACHE_TTL_MS,
+  OFFICIAL_DNS_HOSTNAME,
 } from "../src/lib/worker/dnsCache.mjs";
 
 type Lookup = (hostname: string, options: any, callback: (error: any, ...values: any[]) => void) => void;
@@ -15,8 +15,8 @@ function lookupAsync(lookup: Lookup, hostname: string, options: any): Promise<an
   });
 }
 
-assert.equal(MIRROR_DNS_CACHE_TTL_MS, 86_400_000, "mirror DNS TTL must be exactly one day");
-assert.equal(MIRROR_DNS_HOSTNAME, "auto-hh3d.vercel.app");
+assert.equal(OFFICIAL_DNS_CACHE_TTL_MS, 86_400_000, "official-domain DNS TTL must be exactly one day");
+assert.equal(OFFICIAL_DNS_HOSTNAME, "auto-hh3d.online");
 
 {
   let now = 10_000;
@@ -24,7 +24,7 @@ assert.equal(MIRROR_DNS_HOSTNAME, "auto-hh3d.vercel.app");
   let releaseColdLookup: (() => void) | undefined;
   const coldGate = new Promise<void>((resolve) => { releaseColdLookup = resolve; });
   const lookupImpl = (hostname: string, options: any, callback: (error: any, rows?: any[]) => void) => {
-    assert.equal(hostname, MIRROR_DNS_HOSTNAME);
+    assert.equal(hostname, OFFICIAL_DNS_HOSTNAME);
     assert.equal(options.all, true);
     lookupCount += 1;
     coldGate.then(() => callback(null, [
@@ -34,13 +34,13 @@ assert.equal(MIRROR_DNS_HOSTNAME, "auto-hh3d.vercel.app");
     ]));
   };
   const lookup = createCachedDnsLookup({
-    ttlMs: MIRROR_DNS_CACHE_TTL_MS,
+    ttlMs: OFFICIAL_DNS_CACHE_TTL_MS,
     nowImpl: () => now,
     lookupImpl: lookupImpl as any,
   } as any) as Lookup;
 
-  const first = lookupAsync(lookup, MIRROR_DNS_HOSTNAME, { all: true });
-  const second = lookupAsync(lookup, MIRROR_DNS_HOSTNAME, { family: 4 });
+  const first = lookupAsync(lookup, OFFICIAL_DNS_HOSTNAME, { all: true });
+  const second = lookupAsync(lookup, OFFICIAL_DNS_HOSTNAME, { family: 4 });
   releaseColdLookup?.();
   const [allValues, ipv4Values] = await Promise.all([first, second]);
   assert.equal(lookupCount, 1, "concurrent cold lookups must be coalesced");
@@ -50,12 +50,12 @@ assert.equal(MIRROR_DNS_HOSTNAME, "auto-hh3d.vercel.app");
   ]);
   assert.deepEqual(ipv4Values, ["203.0.113.10", 4]);
 
-  now += MIRROR_DNS_CACHE_TTL_MS - 1;
-  await lookupAsync(lookup, MIRROR_DNS_HOSTNAME, {});
+  now += OFFICIAL_DNS_CACHE_TTL_MS - 1;
+  await lookupAsync(lookup, OFFICIAL_DNS_HOSTNAME, {});
   assert.equal(lookupCount, 1, "an unexpired answer must not trigger another DNS query");
 
   now += 1;
-  await lookupAsync(lookup, MIRROR_DNS_HOSTNAME, {});
+  await lookupAsync(lookup, OFFICIAL_DNS_HOSTNAME, {});
   assert.equal(lookupCount, 2, "the answer must refresh exactly at one day");
 }
 
@@ -68,7 +68,7 @@ assert.equal(MIRROR_DNS_HOSTNAME, "auto-hh3d.vercel.app");
     }) as any,
   } as any) as Lookup;
   assert.deepEqual(await lookupAsync(delegatedLookup, "example.com", { family: 4 }), ["192.0.2.55", 4]);
-  assert.equal(delegated, 1, "non-mirror DNS names must use the original resolver");
+  assert.equal(delegated, 1, "non-official-domain DNS names must use the original resolver");
 }
 
 {
@@ -80,8 +80,8 @@ assert.equal(MIRROR_DNS_HOSTNAME, "auto-hh3d.vercel.app");
       else callback(null, [{ address: "203.0.113.30", family: 4 }]);
     }) as any,
   } as any) as Lookup;
-  await assert.rejects(lookupAsync(lookup, MIRROR_DNS_HOSTNAME, {}), /temporary resolver failure/);
-  assert.deepEqual(await lookupAsync(lookup, MIRROR_DNS_HOSTNAME, {}), ["203.0.113.30", 4]);
+  await assert.rejects(lookupAsync(lookup, OFFICIAL_DNS_HOSTNAME, {}), /temporary resolver failure/);
+  assert.deepEqual(await lookupAsync(lookup, OFFICIAL_DNS_HOSTNAME, {}), ["203.0.113.30", 4]);
   assert.equal(attempts, 2, "DNS failures must not be cached");
 }
 
@@ -124,8 +124,8 @@ assert.equal(MIRROR_DNS_HOSTNAME, "auto-hh3d.vercel.app");
     return request;
   };
 
-  const cachedFetch = createMirrorDnsCachedFetch({
-    ttlMs: MIRROR_DNS_CACHE_TTL_MS,
+  const cachedFetch = createOfficialDnsCachedFetch({
+    ttlMs: OFFICIAL_DNS_CACHE_TTL_MS,
     nowImpl: () => now,
     lookupImpl: lookupImpl as any,
     requestImpl,
@@ -136,7 +136,7 @@ assert.equal(MIRROR_DNS_HOSTNAME, "auto-hh3d.vercel.app");
   } as any);
 
   for (let index = 0; index < 2; index += 1) {
-    const response = await cachedFetch(`https://${MIRROR_DNS_HOSTNAME}/api/worker`, {
+    const response = await cachedFetch(`https://${OFFICIAL_DNS_HOSTNAME}/api/worker`, {
       method: "POST",
       headers: { authorization: "Bearer token", "content-type": "application/json" },
       body: JSON.stringify({ op: "heartbeat", index }),
@@ -147,7 +147,7 @@ assert.equal(MIRROR_DNS_HOSTNAME, "auto-hh3d.vercel.app");
   }
   assert.equal(lookupCount, 1, "two mirror HTTPS requests inside the TTL must share one DNS answer");
   assert.equal(requests.length, 2, "DNS caching must not cache HTTP responses");
-  assert.ok(requests.every((request) => request.hostname === MIRROR_DNS_HOSTNAME));
+  assert.ok(requests.every((request) => request.hostname === OFFICIAL_DNS_HOSTNAME));
   assert.ok(requests.every((request) => request.method === "POST"));
   assert.ok(requests.every((request) => request.authorization === "Bearer token"));
   assert.match(requests[0].body, /heartbeat/);
@@ -156,9 +156,9 @@ assert.equal(MIRROR_DNS_HOSTNAME, "auto-hh3d.vercel.app");
   assert.equal(await delegatedResponse.text(), "delegated");
   assert.equal(delegatedFetch, 1, "non-mirror hosts must use the original fetch");
 
-  now += MIRROR_DNS_CACHE_TTL_MS;
-  await cachedFetch(`https://${MIRROR_DNS_HOSTNAME}/api/maintenance`);
+  now += OFFICIAL_DNS_CACHE_TTL_MS;
+  await cachedFetch(`https://${OFFICIAL_DNS_HOSTNAME}/api/maintenance`);
   assert.equal(lookupCount, 2, "the mirror HTTPS path must refresh DNS after one day");
 }
 
-console.log("OK: mirror DNS uses a one-day positive cache, cold lookup coalescing, and failure retry");
+console.log("OK: official-domain DNS uses a one-day positive cache, cold lookup coalescing, and failure retry");

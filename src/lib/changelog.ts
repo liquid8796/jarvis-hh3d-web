@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.98",
+    date: "2026-09-27",
+    lines: [
+      "Tông Môn có tab Tên miền mới, cho biết rõ địa chỉ nào đang hoạt động và địa chỉ nào đã đóng.",
+      "Người mở địa chỉ cũ sẽ thấy trang hướng dẫn thân thiện rồi được chuyển sau 8 giây tới đúng đường dẫn trên tên miền mới.",
+      "Khôi lỗi và bộ cài không còn gọi địa chỉ đã đóng; mọi đường dự phòng nay dùng tên miền chính thức.",
+    ],
+  },
+  {
     version: "1.3.97",
     date: "2026-09-27",
     lines: [
@@ -475,13 +484,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Phúc Lợi Đường (tài khoản thường): auto nay nhận cả rương mốc — hàng rương tích điểm theo tháng nằm dưới bốn rương ngày.",
       "Trước đây bảng nhắc「Còn rương mốc chưa nhận!」che kín trang, làm auto không bấm nổi rương ngày nào; nay nó được đóng trước rồi mới làm tiếp.",
       "Mốc nào chưa đủ điểm thì bỏ qua, và nhật ký kể rõ nhận được mấy rương mốc.",
-    ],
-  },
-  {
-    version: "1.3.48",
-    date: "2026-08-23",
-    lines: [
-      "Khối nhiệm vụ gấp lại nay xếp gọn hẳn, thôi để lại một ô trống dưới tên khối.",
     ],
   },
 ];

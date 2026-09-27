@@ -76,7 +76,7 @@ jobs:
           # đi theo chuyển hướng ấy có gắn lại chìa (scripts/usagePush.mts). Trước 12/08/2026
           # thì không: `fetch` đi theo nhưng vứt header `Authorization` vì đổi origin, nên cả
           # hai trạm cùng báo `401 unauthorized` trong khi bí mật hoàn toàn đúng.
-          WEB_URL: ${{ vars.WEB_URL || 'https://auto-hh3d.vercel.app' }}
+          WEB_URL: ${{ vars.WEB_URL || 'https://auto-hh3d.online' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           VERCEL_COOKIE_MAIN: ${{ secrets.VERCEL_COOKIE_MAIN }}
           VERCEL_COOKIE_AUTO_HH3D_1: ${{ secrets.VERCEL_COOKIE_AUTO_HH3D_1 }}

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.100",
+    date: "2026-09-27",
+    lines: [
+      "Trang Tên Miền nay gọn hơn, chỉ giữ tên miền, trạng thái, vai trò và nút mở cần thiết.",
+      "Các đoạn giải thích dài, Luồng chuyển tiếp và Khuyến nghị đã được bỏ khỏi trang.",
+    ],
+  },
+  {
     version: "1.3.99",
     date: "2026-09-27",
     lines: [
@@ -475,15 +483,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Hoang Vực: trang game dạo này có lúc nhận đòn đánh rồi đứng hình — vẫn hiện nút KHIÊU CHIẾN như chưa đánh gì, kèm dòng nhắc tải lại trang.",
       "Auto nay tải lại rồi đọc lại lượt đánh và đồng hồ, thay vì đứng chờ hai phút rồi báo hỏng cho một trận thật ra đã đánh xong.",
       "Đòn nào thật sự không ăn thì vẫn báo hỏng như cũ — chỗ này không nhận vơ.",
-    ],
-  },
-  {
-    version: "1.3.50",
-    date: "2026-08-26",
-    lines: [
-      "Luyện Đan Đường: chọn giữ đan từ mấy sao trở lên thì nay đặt thêm được số lượng muốn giữ.",
-      "Đủ số rồi, chọn một trong hai: phân giải viên dư để lấy lại dược liệu, hoặc giữ nguyên và thôi khai lô mới.",
-      "Chọn cách thứ hai thì mỗi lượt ghé vẫn thu mẻ đang chín rồi đếm lại, nên không luyện thừa.",
     ],
   },
 ];

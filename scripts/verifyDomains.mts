@@ -86,6 +86,11 @@ assert.match(siteHeader, /href="\/ten-mien"/);
 assert.equal((siteHeader.match(/<DomainsLink \/>/g) ?? []).length, 2, "signed-in users and guests must both see the domain menu item");
 assert.doesNotMatch(proxy, /PROTECTED_PREFIXES[^;]*ten-mien/s, "the public domain page must not require a session");
 assert.match(panel, /1 hoạt động · 1 đã chết/);
+assert.doesNotMatch(panel, /Một địa chỉ chính thức đang phục vụ Auto HH3D/);
+assert.doesNotMatch(panel, /Địa chỉ ổn định dành cho người dùng/);
+assert.doesNotMatch(panel, /Không còn phục vụ ứng dụng/);
+assert.doesNotMatch(panel, /Luồng chuyển tiếp/);
+assert.doesNotMatch(panel, /Khuyến nghị/);
 for (const [label, text] of [
   ["GitHub workflow", workflow],
   ["OCI setup", setup],

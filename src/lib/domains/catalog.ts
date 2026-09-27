@@ -11,7 +11,6 @@ export type ManagedDomain = Readonly<{
   status: DomainLifecycle;
   statusLabel: "hoạt động" | "đã chết";
   title: string;
-  description: string;
   role: string;
 }>;
 
@@ -27,7 +26,6 @@ export const DOMAIN_CATALOG: readonly ManagedDomain[] = Object.freeze([
     statusLabel: "hoạt động",
     title: "Tên miền chính thức",
     role: "Cổng truy cập chính",
-    description: "Địa chỉ ổn định dành cho người dùng, dấu trang và mọi liên kết được chia sẻ từ nay về sau.",
   }),
   Object.freeze({
     hostname: RETIRED_DOMAIN,
@@ -36,7 +34,6 @@ export const DOMAIN_CATALOG: readonly ManagedDomain[] = Object.freeze([
     statusLabel: "đã chết",
     title: "Gương trạm đã đóng",
     role: "Chỉ còn trang thông báo",
-    description: "Không còn phục vụ ứng dụng. Người truy cập được giải thích rõ và chuyển an toàn sang tên miền chính thức.",
   }),
 ]);
 

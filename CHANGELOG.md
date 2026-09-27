@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.100 — Rút gọn trang Tên Miền (27/09/2026)
+
+- Trang `/ten-mien` bỏ phần mô tả dài dưới tiêu đề và dưới từng tên miền; hai thẻ giờ tập trung vào tên, vai trò, trạng thái và hành động mở.
+- Hai khối **Luồng chuyển tiếp** và **Khuyến nghị** ở cuối trang được gỡ hoàn toàn để trang ngắn, trực diện hơn.
+- Regression khóa các đoạn copy đã gỡ để chúng không vô tình quay lại ở lần chỉnh UI sau.
+
 ## 1.3.99 — Đưa Tên Miền ra menu chung (27/09/2026)
 
 - Mục **Tên Miền** rời khỏi trang quản trị Tông Môn và chuyển lên top menu. Khách chưa đăng nhập, tài khoản chờ duyệt, thành viên và quản trị đều nhìn thấy cùng một lối vào.

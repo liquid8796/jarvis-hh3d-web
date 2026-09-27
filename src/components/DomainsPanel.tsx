@@ -1,4 +1,4 @@
-import { DOMAIN_CATALOG, OFFICIAL_DOMAIN, RETIRED_DOMAIN } from "@/lib/domains/catalog";
+import { DOMAIN_CATALOG } from "@/lib/domains/catalog";
 
 function GlobeIcon() {
   return (
@@ -23,9 +23,6 @@ export function DomainsPanel() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-[.16em] text-[var(--color-gold-300)]">Danh bạ truy cập</p>
                 <h1 id="domains-heading" className="h-display mt-1 text-2xl font-bold text-gilded">Tên miền</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-mist)]">
-                  Một địa chỉ chính thức đang phục vụ Auto HH3D. Tên miền Vercel cũ đã đóng và chỉ còn trang hướng dẫn chuyển sang địa chỉ mới.
-                </p>
               </div>
             </div>
             <div className="rounded-xl border border-[rgba(126,224,184,.24)] bg-[rgba(33,109,81,.16)] px-4 py-3 text-right">
@@ -51,7 +48,6 @@ export function DomainsPanel() {
                   </span>
                 </div>
                 <p className={`mt-5 break-all font-mono text-base font-bold sm:text-lg ${active ? "text-[#dff8ec]" : "text-[#b7afc8] line-through decoration-[#f2a0a0]"}`}>{domain.hostname}</p>
-                <p className="mt-3 min-h-16 text-sm leading-6 text-[var(--color-mist)]">{domain.description}</p>
                 <div className="mt-5 border-t border-[rgba(155,150,190,.12)] pt-4">
                   {active ? (
                     <a className="btn btn-gold w-full justify-center" href={domain.origin} target="_blank" rel="noreferrer">Mở tên miền chính thức ↗</a>
@@ -65,19 +61,6 @@ export function DomainsPanel() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="card p-5 md:col-span-2">
-          <p className="text-xs font-bold uppercase tracking-[.12em] text-[var(--color-gold-300)]">Luồng chuyển tiếp</p>
-          <h3 className="mt-2 text-lg font-bold text-[var(--color-parchment)]">Người dùng cũ không bị bỏ lại</h3>
-          <p className="mt-2 text-sm leading-6 text-[var(--color-mist)]">
-            Khi mở <code className="rounded bg-black/25 px-1.5 py-0.5 text-[#ffc0c0]">{RETIRED_DOMAIN}</code>, người dùng sẽ thấy thông báo rõ ràng, đếm ngược 8 giây và được đưa tới đúng path/query trên <code className="rounded bg-black/25 px-1.5 py-0.5 text-[#9ff2cf]">{OFFICIAL_DOMAIN}</code>.
-          </p>
-        </div>
-        <div className="card p-5">
-          <p className="text-xs font-bold uppercase tracking-[.12em] text-[var(--color-gold-300)]">Khuyến nghị</p>
-          <p className="mt-2 text-sm leading-6 text-[var(--color-mist)]">Cập nhật dấu trang, tài liệu và link chia sẻ sang tên miền chính thức. Không dùng Vercel cũ cho worker hoặc API.</p>
-        </div>
-      </div>
     </section>
   );
 }

@@ -27,15 +27,26 @@ h1{margin:15px 0 12px;font-family:Georgia,"Times New Roman",serif;font-size:46px
 @media(prefers-reduced-motion:reduce){.bar>i{transition:none}}
 </style>
 </head>
-<body><div class="scene"><main class="shell"><div class="brand"><span class="brand-mark">A</span> Auto HH3D · Thông báo tên miền</div><section class="card" aria-labelledby="retirement-title"><div class="top"><div class="icon" aria-hidden="true"></div><div><span class="eyebrow"><i class="eyebrow-dot"></i>Tên miền đã đóng</span><h1>Gương trạm đã khép cửa</h1><p class="lead"><strong>auto-hh3d.vercel.app</strong> không còn được sử dụng. Hệ thống đã chuyển sang tên miền chính thức để mang lại đường truy cập ổn định và dễ nhớ hơn.</p></div></div><div class="route"><div class="domain old"><div class="domain-label"><span>Tên miền cũ</span><span class="status"><i></i>đã chết</span></div><span class="host">auto-hh3d.vercel.app</span></div><div class="arrow">→</div><div class="domain new"><div class="domain-label"><span>Tên miền chính thức</span><span class="status"><i></i>hoạt động</span></div><span class="host">auto-hh3d.online</span></div></div><div class="safe"><span class="shield">✓</span><span><b>Mọi tài khoản, dữ liệu và cấu hình vẫn được giữ nguyên.</b> Bạn sẽ được chuyển tới đúng đường dẫn đang mở trên tên miền mới.</span></div><div class="redirect"><div><div class="count-title"><span>Đang chuẩn bị chuyển tiếp an toàn…</span><span id="countdown">Tự động chuyển sau 8 giây</span></div><div class="bar"><i id="progress" style="width:100%"></i></div></div><div class="actions"><button id="copy" type="button" class="btn secondary">Sao chép địa chỉ</button><a class="btn primary" href="https://auto-hh3d.online/">Đi tới auto-hh3d.online&nbsp; ↗</a></div></div><div class="foot"><span>Có thể bấm nút để chuyển ngay.</span><span id="copy-note"><strong>Đích đến:</strong> https://auto-hh3d.online/</span></div></section></main></div><script>
+<body><div class="scene"><main class="shell"><div class="brand"><span class="brand-mark">A</span> Auto HH3D · Thông báo tên miền</div><section class="card" aria-labelledby="retirement-title"><div class="top"><div class="icon" aria-hidden="true"></div><div><span class="eyebrow"><i class="eyebrow-dot"></i>Tên miền đã đóng</span><h1>Gương trạm đã khép cửa</h1><p class="lead"><strong>auto-hh3d.vercel.app</strong> không còn được sử dụng. Hệ thống đã chuyển sang tên miền chính thức để mang lại đường truy cập ổn định và dễ nhớ hơn.</p></div></div><div class="route"><div class="domain old"><div class="domain-label"><span>Tên miền cũ</span><span class="status"><i></i>đã chết</span></div><span class="host">auto-hh3d.vercel.app</span></div><div class="arrow">→</div><div class="domain new"><div class="domain-label"><span>Tên miền chính thức</span><span class="status"><i></i>hoạt động</span></div><span class="host">auto-hh3d.online</span></div></div><div class="safe"><span class="shield">✓</span><span><b>Mọi tài khoản, dữ liệu và cấu hình vẫn được giữ nguyên.</b> Bạn sẽ được chuyển tới đúng đường dẫn đang mở trên tên miền mới.</span></div><div class="redirect"><div><div class="count-title"><span>Đang chuẩn bị chuyển tiếp an toàn…</span><span id="countdown">Tự động chuyển sau 8 giây</span></div><div class="bar"><i id="progress" style="width:100%"></i></div></div><div class="actions"><button id="copy" type="button" class="btn secondary">Sao chép địa chỉ</button><a id="continue-link" class="btn primary" href="https://auto-hh3d.online/">Đi tới auto-hh3d.online&nbsp; ↗</a></div></div><div class="foot"><span>Có thể bấm nút để chuyển ngay.</span><span id="copy-note"><strong>Đích đến:</strong> https://auto-hh3d.online/</span></div></section></main></div><script>
 (() => {
-  const target = "https://auto-hh3d.online/";
+  const fallbackTarget = "https://auto-hh3d.online/";
+  const target = new URL(location.pathname + location.search, fallbackTarget).toString();
   const total = 8;
   let left = total;
   const label = document.getElementById("countdown");
   const bar = document.getElementById("progress");
   const copy = document.getElementById("copy");
   const note = document.getElementById("copy-note");
+  const continueLink = document.getElementById("continue-link");
+  const refresh = document.querySelector("meta[http-equiv=refresh]");
+  if (continueLink) continueLink.href = target;
+  if (refresh) refresh.setAttribute("content", String(total) + ";url=" + target);
+  if (note) {
+    note.textContent = "";
+    const strong = document.createElement("strong");
+    strong.textContent = "Đích đến:";
+    note.append(strong, " " + target);
+  }
   const paint = () => {
     if (label) label.textContent = left > 0 ? "T\u1ef1 \u0111\u1ed9ng chuy\u1ec3n sau " + left + " gi\u00e2y" : "\u0110ang chuy\u1ec3n t\u1edbi t\u00ean mi\u1ec1n m\u1edbi\u2026";
     if (bar) bar.style.width = String(Math.max(0, left / total * 100)) + "%";

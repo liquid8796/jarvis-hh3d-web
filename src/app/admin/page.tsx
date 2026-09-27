@@ -19,7 +19,6 @@ import { ChatPurgePanel } from "./ChatPurgePanel";
 import { ChatSettingsForm } from "./ChatSettingsForm";
 import { TagFrameManager } from "./TagFrameManager";
 import { DailyResetForm } from "./DailyResetForm";
-import { DomainsPanel } from "./DomainsPanel";
 import { GameDomainForm } from "./GameDomainForm";
 import { GithubAdminWorkspace } from "./GithubAdminWorkspace";
 import { JobEventRetentionForm } from "./JobEventRetentionForm";
@@ -160,15 +159,9 @@ export default async function AdminPage({
               ),
             },
             {
-              key: "tenMien",
-              label: "Tên miền",
-              pane: <DomainsPanel />,
-            },
-            {
               key: "baoTri",
               label: settings.maintenance.active ? "Bảo Trì ●" : "Bảo Trì",
-              // Tên miền đứng chung tab với bảo trì: cùng là thứ trưởng môn chạm vào khi hệ
-              // thống trục trặc, và một cú dời tên miền thường là dịp nên bế quan.
+              // Tên miền game là cấu hình vận hành do trưởng môn quản lý.
               pane: (
                 <div className="flex max-w-2xl flex-col gap-6">
                   <GameDomainForm baseUrl={settings.game.baseUrl} />

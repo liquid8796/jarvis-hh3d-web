@@ -23,6 +23,18 @@ import { SectSeal } from "./SectSeal";
 export const SHELL_WIDTH = "max-w-[100rem]";
 
 /**
+ * Lối vào danh bạ tên miền dùng chung cho cả khách và thành viên. Tách thành một component
+ * nhỏ để hai nhánh menu không phải chép lại href/nhãn rồi vô tình lệch nhau ở lần sửa sau.
+ */
+function DomainsLink() {
+  return (
+    <Link href="/ten-mien" className="btn btn-ghost">
+      Tên Miền
+    </Link>
+  );
+}
+
+/**
  * Thanh trên cùng: ấn + tên môn phái bên trái, danh tính + lối đi bên phải.
  *
  * Bề rộng của nó là HẰNG SỐ, không phải tham số của trang. Trước đây nó nhận `maxWidth` để
@@ -74,6 +86,7 @@ export async function SiteHeader() {
                 Tông Môn
               </Link>
             )}
+            <DomainsLink />
             <Link href={user.status === "active" ? "/dashboard" : "/pending"} className="btn btn-ghost">
               Auto
             </Link>
@@ -95,6 +108,7 @@ export async function SiteHeader() {
           </>
         ) : (
           <>
+            <DomainsLink />
             <Link href="/login" className="btn btn-ghost">
               Nhập Môn
             </Link>

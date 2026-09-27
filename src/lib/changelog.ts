@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.99",
+    date: "2026-09-27",
+    lines: [
+      "Tên Miền nay nằm ngay trên thanh menu; khách, tài khoản chờ duyệt, thành viên và quản trị đều xem được.",
+      "Trang Tông Môn không còn chứa mục này; thông tin tên miền được mở ở một trang chung riêng.",
+      "Địa chỉ cũ vẫn giữ đúng đường dẫn đang mở khi chuyển sang tên miền chính thức.",
+    ],
+  },
+  {
     version: "1.3.98",
     date: "2026-09-27",
     lines: [
@@ -475,15 +484,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Luyện Đan Đường: chọn giữ đan từ mấy sao trở lên thì nay đặt thêm được số lượng muốn giữ.",
       "Đủ số rồi, chọn một trong hai: phân giải viên dư để lấy lại dược liệu, hoặc giữ nguyên và thôi khai lô mới.",
       "Chọn cách thứ hai thì mỗi lượt ghé vẫn thu mẻ đang chín rồi đếm lại, nên không luyện thừa.",
-    ],
-  },
-  {
-    version: "1.3.49",
-    date: "2026-08-25",
-    lines: [
-      "Phúc Lợi Đường (tài khoản thường): auto nay nhận cả rương mốc — hàng rương tích điểm theo tháng nằm dưới bốn rương ngày.",
-      "Trước đây bảng nhắc「Còn rương mốc chưa nhận!」che kín trang, làm auto không bấm nổi rương ngày nào; nay nó được đóng trước rồi mới làm tiếp.",
-      "Mốc nào chưa đủ điểm thì bỏ qua, và nhật ký kể rõ nhận được mấy rương mốc.",
     ],
   },
 ];

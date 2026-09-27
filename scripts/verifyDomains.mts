@@ -45,8 +45,12 @@ assert.match(html, />đã chết</);
 assert.match(html, />hoạt động</);
 assert.ok(html.includes(`content="${RETIRED_DOMAIN_REDIRECT_SECONDS};url=${target}"`));
 assert.match(html, /Tự động chuyển sau 8 giây/);
-assert.match(html, /location\.replace\(target\)/);
-assert.match(html, /navigator\.clipboard\.writeText\(target\)/);
+assert.match(html, /const fallbackTarget =/);
+assert.ok(html.includes("new URL(location.pathname + location.search, fallbackTarget)"));
+assert.ok(html.includes('id="continue-link"'));
+assert.ok(html.includes('refresh.setAttribute("content"'));
+assert.ok(html.includes("location.replace(target)"));
+assert.ok(html.includes("navigator.clipboard.writeText(target)"));
 assert.doesNotMatch(html, /<unsafe>/);
 
 const prototypeHtml = await read("docs/prototypes/domain-retirement-prototype.html");
@@ -56,10 +60,12 @@ assert.equal(
   "the committed HTML prototype must remain byte-for-byte equivalent to the runtime page",
 );
 
-const [proxy, adminPage, panel, workflow, setup, installerSh, installerPs1, vercel] = await Promise.all([
+const [proxy, adminPage, domainsPage, siteHeader, panel, workflow, setup, installerSh, installerPs1, vercel] = await Promise.all([
   read("src/proxy.ts"),
   read("src/app/admin/page.tsx"),
-  read("src/app/admin/DomainsPanel.tsx"),
+  read("src/app/ten-mien/page.tsx"),
+  read("src/components/SiteHeader.tsx"),
+  read("src/components/DomainsPanel.tsx"),
   read("deploy/github/linh-su.yml"),
   read("deploy/oracle/setup.sh"),
   read("public/linh-su/install.sh"),
@@ -72,8 +78,13 @@ assert.match(proxy, /renderRetiredDomainPage/);
 assert.match(proxy, /PROTECTED_PREFIXES/);
 assert.match(proxy, /decideRequest/);
 assert.match(proxy, /message: "Tên miền này đã đóng\. Vui lòng truy cập auto-hh3d\.online\."/);
-assert.match(adminPage, /key: "tenMien"/);
-assert.match(adminPage, /label: "Tên miền"/);
+assert.doesNotMatch(adminPage, /key: "tenMien"/, "the domain catalog must not be an admin tab");
+assert.doesNotMatch(adminPage, /DomainsPanel/, "the admin page must not own the public domain panel");
+assert.match(domainsPage, /<SiteHeader \/>/);
+assert.match(domainsPage, /<DomainsPanel \/>/);
+assert.match(siteHeader, /href="\/ten-mien"/);
+assert.equal((siteHeader.match(/<DomainsLink \/>/g) ?? []).length, 2, "signed-in users and guests must both see the domain menu item");
+assert.doesNotMatch(proxy, /PROTECTED_PREFIXES[^;]*ten-mien/s, "the public domain page must not require a session");
 assert.match(panel, /1 hoạt động · 1 đã chết/);
 for (const [label, text] of [
   ["GitHub workflow", workflow],
@@ -86,4 +97,4 @@ for (const [label, text] of [
 }
 assert.doesNotMatch(vercel, /"crons"/, "the retired Vercel deployment must not run worker cron");
 
-console.log("PASS: domain catalog, prototype-based tombstone, safe redirect, and official worker endpoints are consistent.");
+console.log("PASS: public domain navigation, catalog, prototype tombstone, safe redirect, and official worker endpoints are consistent.");

@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.99 — Đưa Tên Miền ra menu chung (27/09/2026)
+
+- Mục **Tên Miền** rời khỏi trang quản trị Tông Môn và chuyển lên top menu. Khách chưa đăng nhập, tài khoản chờ duyệt, thành viên và quản trị đều nhìn thấy cùng một lối vào.
+- Trang công khai `/ten-mien` hiển thị lại catalog tên miền hiện có, không yêu cầu session và không làm lộ cấu hình quản trị.
+- Panel tên miền được chuyển thành component dùng chung; regression khóa việc menu xuất hiện cho cả hai nhóm đăng nhập/khách và cấm đưa catalog trở lại admin tab.
+- Trang đóng cửa Vercel còn tự dựng đích từ path/query thật của trình duyệt, nên vẫn giữ đúng đường dẫn khi proxy hạ tầng không chuyển đủ URL cho ứng dụng.
+
 ## 1.3.98 — Tên miền chính thức và trang tiễn gương Vercel (27/09/2026)
 
 - Tông Môn có tab **Tên miền** mới, liệt kê rõ `auto-hh3d.online` là **hoạt động** và `auto-hh3d.vercel.app` là **đã chết**, kèm vai trò, đường mở và hướng dẫn cập nhật dấu trang.

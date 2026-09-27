@@ -22,9 +22,9 @@ export function DomainsPanel() {
               </span>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[.16em] text-[var(--color-gold-300)]">Danh bạ truy cập</p>
-                <h2 id="domains-heading" className="h-display mt-1 text-2xl font-bold text-gilded">Tên miền</h2>
+                <h1 id="domains-heading" className="h-display mt-1 text-2xl font-bold text-gilded">Tên miền</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-mist)]">
-                  Một địa chỉ chính thức đang phục vụ Tông Môn. Tên miền Vercel cũ đã đóng và chỉ còn trang hướng dẫn chuyển sang địa chỉ mới.
+                  Một địa chỉ chính thức đang phục vụ Auto HH3D. Tên miền Vercel cũ đã đóng và chỉ còn trang hướng dẫn chuyển sang địa chỉ mới.
                 </p>
               </div>
             </div>

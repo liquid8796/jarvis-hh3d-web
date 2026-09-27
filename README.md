@@ -23,9 +23,9 @@ OCI tự cấp/renew TLS. `158.180.59.36.sslip.io` vẫn được giữ làm l�
 
 `auto-hh3d.vercel.app` đã chính thức đóng. Deployment ấy chỉ còn phục vụ trang `410 Gone` theo
 prototype trong `docs/prototypes/`, giải thích việc đổi tên miền và chuyển người dùng sau 8 giây
-sang đúng path/query trên `auto-hh3d.online`. Tab **Tên miền** ở Tông Môn là sổ trạng thái công khai
-cho hai địa chỉ; worker, bộ cài và workflow không còn gọi hostname Vercel cũ.
-Next.js 16 Proxy x? l? bia ch? ???ng tr??c auth v? routing tr?m, n?n trang ??ng c?a v?n hi?n ngay c? khi database l?i.
+sang đúng path/query trên `auto-hh3d.online`. Mục **Tên Miền** nằm trên top menu và mở trang công khai
+`/ten-mien`, nên khách, tài khoản chờ duyệt, thành viên và quản trị đều xem được. Catalog này không còn nằm trong trang Tông Môn; worker, bộ cài và workflow không còn gọi hostname Vercel cũ.
+Next.js 16 Proxy xử lý bia chỉ đường trước auth và routing trạm, nên trang đóng cửa vẫn hiện ngay cả khi database lỗi.
 
 ---
 

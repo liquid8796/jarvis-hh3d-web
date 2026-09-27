@@ -16,7 +16,7 @@ export type ManagedDomain = Readonly<{
 }>;
 
 /**
- * Sổ tên miền dùng chung cho tab Tông Môn và middleware đóng gương trạm. Một nguồn duy nhất
+ * Sổ tên miền dùng chung cho trang Tên Miền công khai và Proxy đóng gương trạm. Một nguồn duy nhất
  * tránh tình trạng UI bảo một tên miền đã chết trong khi routing vẫn gửi worker tới đó.
  */
 export const DOMAIN_CATALOG: readonly ManagedDomain[] = Object.freeze([

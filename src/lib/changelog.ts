@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.102",
+    date: "2026-09-29",
+    lines: [
+      "Điểm Danh tài khoản thường nay nhận diện lịch mới, con dấu điểm danh và trạng thái ô hôm nay đã nhận.",
+      "Phúc Lợi Đường và Thí Luyện Tông Môn đã chuyển sang bộ đếm, data-state và đồng hồ mới của trang.",
+      "Hồ sơ nhiệm vụ được nâng cấp để tự thay cách chạy cũ; ba flow mới có kiểm thử Chromium và không dùng dấu mốc giao diện đã mất.",
+    ],
+  },
+  {
     version: "1.3.101",
     date: "2026-09-27",
     lines: [
@@ -474,15 +483,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-28",
     lines: [
       "Sảnh toàn màn hình: dòng chữ mời trong ô nhập thôi bị cắt mất chữ cuối, và ô nhập nay cao dần theo tin đang gõ.",
-    ],
-  },
-  {
-    version: "1.3.52",
-    date: "2026-08-28",
-    lines: [
-      "Phòng Chat trên điện thoại: mỗi khoảnh tin nay thu lại cho vừa khung — trước chỉ chứa vừa hai tin rưỡi, giờ được hơn ba tin rưỡi.",
-      "Thêm nút ở góc trên bên phải khung để trải sảnh kín màn hình; bấm lần nữa hoặc bấm Esc là thu về.",
-      "Lúc trải kín màn hình thì chữ trở lại cỡ thường và ô nhập rộng ra, đọc và gõ đều dễ hơn.",
     ],
   },
 ];

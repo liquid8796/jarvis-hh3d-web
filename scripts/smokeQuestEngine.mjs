@@ -154,14 +154,13 @@ const PAGE = `<!doctype html>
 // Ba trang giả dưới đây giữ đúng các selector/state transition nhìn thấy trong recording
 // 02/08. Chúng không mock Playwright: profile schema 44 vẫn điều khiển Chromium thật.
 const FREE_CHECKIN_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
-<button id="checkInButton">Điểm Danh</button>
-<script>checkInButton.onclick=()=>setTimeout(()=>{checkInButton.textContent='Đã Điểm Danh';checkInButton.dataset.claimed='1'},30)</script>`;
+<div id="ddPage" data-mode="normal"><div id="ddGrid"><button id="ddDay8" class="dd-tile is-today">Ngày 8</button></div>
+<button id="ddStamp">Điểm Danh</button></div>
+<script>ddStamp.onclick=()=>setTimeout(()=>{ddDay8.classList.add('is-claimed');ddStamp.dataset.claimed='1';ddStamp.textContent='Đã Điểm Danh'},30)</script>`;
 
-// Cùng trang ấy ở trạng thái SITE ĐÃ NHỚ: ghé lại trong ngày là nút render sẵn chữ "Đã Điểm
-// Danh". Phải là một trang riêng chứ không phải trạng thái còn sót của ca trước — ca kia kiểm
-// đường bấm được, và hai ca dùng chung một trạng thái là hai ca ràng buộc nhau vô cớ.
 const FREE_CHECKIN_DONE_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
-<button id="checkInButton">Đã Điểm Danh</button>`;
+<div id="ddPage" data-mode="normal"><div id="ddGrid"><button id="ddDay8" class="dd-tile is-today is-claimed">Ngày 8</button></div>
+<button id="ddStamp">Đã Điểm Danh</button></div>`;
 
 // Chữ "Thí Luyện" hiện THÀNH VĂN BẢN chứ không chỉ nằm trong href: vipProbe đọc innerText và
 // trả null chừng nào chưa thấy tên một nhiệm vụ nào — null nghĩa là "hub chưa render xong",
@@ -175,7 +174,7 @@ const FREE_CHECKIN_DONE_PAGE = `<!doctype html><html lang="vi"><meta charset="ut
  * lượt, hàng đổi sang đúng hình dạng mà bản ghi chụp được ở hàng Tế Lễ đã xong: `.nv-quest done`
  * với `<span class="btn-done-label">`, KHÔNG còn thẻ `a.btn-go` nào.
  */
-const freeHubRows = (biCanhSpent) => `<div class="nv-quest"><a class="btn-go" onclick="location.href='/phuc-loi-duong'">Làm Ngay ›</a></div>
+const freeHubRows = (biCanhSpent) => `<div class="nv-quest"><a class="btn-go" href="/phuc-loi-duong/">Làm Ngay ›</a></div>
 <div class="nv-quest"><span>Thí Luyện Tông Môn</span><a class="btn-go" href="/thi-luyen-tong-mon-hh3d/?nv_embed=1">Làm Ngay ›</a></div>
 ${biCanhSpent
     ? `<div class="nv-quest done "><div class="nv-qb"><h4>Bí Cảnh Tông Môn</h4><div class="nv-prog-row"><span class="nv-prog-txt">5/5</span></div></div><div class="nv-quest-action"><span class="btn-done-label">Xong</span></div></div>`
@@ -263,15 +262,18 @@ for (const [i, card] of PT.cards.entries()) {
 </script>`;
 
 const FREE_WELFARE_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
-<div id="countdown-timer">00:00</div>
-<div id="chest-1"><img alt="Rương 1" style="width:40px;height:40px"></div>
-<div id="chest-2"><img alt="Rương 2" style="width:40px;height:40px"></div>
-<div id="chest-3"><img alt="Rương 3" style="width:40px;height:40px"></div>
-<div id="chest-4"><img alt="Rương 4" style="width:40px;height:40px"></div>
-<script>document.querySelectorAll('[id^=chest-] img').forEach((img,i)=>img.onclick=()=>{
-  if(countdown.textContent!=='00:00')return;
-  setTimeout(()=>{countdown.textContent='30:00';countdown.dataset.claimed=String(i+1)},30)
-});const countdown=document.getElementById('countdown-timer')</script>`;
+<div id="plPage" data-day-count="0"><span id="plDayCount">0</span>
+<div id="plMiles"><button class="pl-mile" data-state="locked"><span class="pl-mile__btn">Mốc tháng</span></button></div>
+<div id="plChests">
+  <button id="plChest1" class="pl-chest" data-state="ready">Mở ngay</button>
+  <button id="plChest2" class="pl-chest" data-state="locked">Chưa mở</button>
+  <button id="plChest3" class="pl-chest" data-state="locked">Chưa mở</button>
+  <button id="plChest4" class="pl-chest" data-state="locked">Chưa mở</button>
+</div></div>
+<script>plChest1.onclick=()=>setTimeout(()=>{
+  plChest1.dataset.state='opened';plChest1.dataset.claimed='1';plDayCount.textContent='1';plPage.dataset.dayCount='1';
+  plChest2.dataset.state='cooldown';plChest2.innerHTML='<span class="pl-chest__timer">30:00</span>';
+},30)</script>`;
 
 /**
  * Trang Bí Cảnh Tông Môn, dựng theo bản ghi bi-canh-tong-mon-20260818-013136.
@@ -403,14 +405,13 @@ document.addEventListener('click', (e) => {
 });
 </script>`;
 
-// Trang thí luyện theo recording 05/08: một rương (#chestImage) + đồng hồ chung
-// #countdown-timer; mở rương lúc 00:00 là đồng hồ nhảy 29:59 trong ~2s.
+// Trang thí luyện 29/09: #tlPage[data-state], #tlScroll, #tlLeft và #tlClock.
 const FREE_TRIAL_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
-<div id="countdown-timer">00:00</div>
-<img id="chestImage" class="chest-close" alt="Rương thí luyện" style="width:60px;height:60px">
-<script>const timer=document.getElementById('countdown-timer');
-chestImage.onclick=()=>{if(timer.textContent!=='00:00')return;
-  setTimeout(()=>{timer.textContent='29:59';timer.dataset.claimed='1'},30)}</script>`;
+<div id="tlPage" data-state="ready"><span id="tlLeft">3</span><span id="tlLimit">3</span><span id="tlClock"></span>
+<button id="tlScroll" aria-label="Mở Thí Luyện">Mở Thí Luyện</button><div id="tlStage"></div></div>
+<script>tlScroll.onclick=()=>{tlStage.classList.add('is-revealed');setTimeout(()=>{
+  tlLeft.textContent='2';tlPage.dataset.state='cooldown';tlClock.textContent='29:59';tlPage.dataset.claimed='1';tlScroll.disabled=true;
+},30)}</script>`;
 
 // Trang tế lễ theo bản ghi 13/08 (te-le-tong-mon-20260813-001731), markup chép từ `dom/*.html`.
 // Ba chỗ CỐ Ý giữ đúng như trang thật, vì cả ba đều đủ sức giấu một lỗi thật:
@@ -2380,8 +2381,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // nhà cho cả ba chỗ vào mỏ, đoạt mỏ và mua phù. Cả hai twin VIP/thường cùng đổi.
     // 84 = Hoang Vực page 26/09: remaining-attacks became data-count + ra-count; at zero
     // attempts the site can show #battle-button again, so completion/witness logic must ignore it.
-    "profile schema is 84",
-    loadProfileForSchema().schemaVersion === 84,
+    "profile schema is 85",
+    loadProfileForSchema().schemaVersion === 85,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -3380,21 +3381,22 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     const quizEngine = createQuestEngine({ log, quiz: referenceQuiz });
     const runQuiz = (quest) => quizEngine.run(session, { dailyQuestPath: "/" }, quest);
 
-    console.log("\nBa flow tài khoản thường từ recording 02/08");
+    console.log("\nBa flow tài khoản thường theo component 29/09");
     const exportedProfile = loadProfileForSchema();
 
     const checkinFree = exportedProfile.quests.find((q) => q.id === "diem-danh-thuong");
     const checkinResult = await run(checkinFree);
-    check("Điểm Danh mở trang riêng và chờ server đổi nhãn", checkinResult.outcome === "completed", checkinResult.outcome);
-    check("Điểm Danh đã phát claim thật", (await page.locator("#checkInButton").getAttribute("data-claimed")) === "1");
+    check("Điểm Danh dùng lịch dd và chờ ô hôm nay nhận .is-claimed", checkinResult.outcome === "completed", checkinResult.outcome);
+    check("Điểm Danh đã phát claim thật", await page.locator("#ddGrid .dd-tile.is-today").evaluate((el) => el.classList.contains("is-claimed")));
 
     const welfareFree = exportedProfile.quests.find((q) => q.id === "phuc-loi-duong-thuong");
     const welfareResult = await run(welfareFree);
-    check("Phúc Lợi Đường nhận đúng một rương mỗi lượt", welfareResult.outcome === "completed", welfareResult.outcome);
+    check("Phúc Lợi Đường mở đúng rương data-state=ready", welfareResult.outcome === "completed", welfareResult.outcome);
     check(
-      "Phúc Lợi Đường đọc lại cooldown 30 phút",
+      "Phúc Lợi Đường đọc cooldown từ .pl-chest__timer",
       welfareResult.cooldownSeconds === 1800 &&
-        (await page.locator("#countdown-timer").getAttribute("data-claimed")) === "1",
+        (await page.locator("#plChest1").getAttribute("data-claimed")) === "1" &&
+        (await page.locator("#plChest2").getAttribute("data-state")) === "cooldown",
       String(welfareResult.cooldownSeconds),
     );
 
@@ -3407,15 +3409,16 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         (await page.locator("#userTurns").textContent()) === "0",
     );
 
-    console.log("\nHai flow tài khoản thường từ recording 05/08");
+    console.log("\nHai flow tài khoản thường có component riêng");
 
     const trialFree = exportedProfile.quests.find((q) => q.id === "thi-luyen-tong-mon-thuong");
     const trialResult = await run(trialFree);
-    check("Thí Luyện qua cổng hub rồi mở rương lúc 00:00", trialResult.outcome === "completed", trialResult.outcome);
+    check("Thí Luyện bấm #tlScroll và rời data-state=ready", trialResult.outcome === "completed", trialResult.outcome);
     check(
-      "Thí Luyện đọc lại cooldown ~30 phút từ đồng hồ vừa khởi động",
+      "Thí Luyện đọc lại cooldown ~30 phút từ #tlClock",
       trialResult.cooldownSeconds === 29 * 60 + 59 &&
-        (await page.locator("#countdown-timer").getAttribute("data-claimed")) === "1",
+        (await page.locator("#tlPage").getAttribute("data-claimed")) === "1" &&
+        (await page.locator("#tlPage").getAttribute("data-state")) === "cooldown",
       String(trialResult.cooldownSeconds),
     );
 

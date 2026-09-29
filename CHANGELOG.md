@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.102 — Theo component mới của ba quest tài khoản thường (29/09/2026)
+
+- **Điểm Danh** bỏ selector cũ `#checkInButton`: flow chờ `#ddPage`, đọc ô `.dd-tile.is-today`, bấm `#ddStamp` và chỉ nhận thành công khi ô hôm nay có `.is-claimed`.
+- **Phúc Lợi Đường** dùng `.pl-chest[data-state]`, `#plDayCount`, `.pl-chest__timer` và `.pl-mile[data-state]`; selector rương/đồng hồ cũ cùng bộ quét `.gift-box` đã được gỡ.
+- **Thí Luyện Tông Môn** dùng `#tlPage[data-state]`, `#tlScroll`, `#tlLeft` và `#tlClock`; lượt thứ ba chốt bằng `left=0` thay vì đòi một đồng hồ không còn tồn tại.
+- Quest schema tăng lên **85** để hồ sơ cũ được thay ở lần tải kế; regression Chromium và kiểm tra tĩnh khóa cả selector mới lẫn việc loại selector cũ.
+
 ## 1.3.101 — Google AdSense trên tên miền chính thức (27/09/2026)
 
 - Tích hợp Auto ads và meta xác minh bằng publisher/client ID công khai của tài khoản AdSense. Script chỉ tải trên `auto-hh3d.online`/`www`; localhost, preview và gương Vercel đã chết luôn sạch quảng cáo.

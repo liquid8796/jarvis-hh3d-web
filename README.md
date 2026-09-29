@@ -302,6 +302,11 @@ Nên chia thế này:
   `.remaining-attacks[data-count]`. Lượt 1–4 được xác nhận bằng đồng hồ có `.is-visible`; lượt
   thứ năm được xác nhận bằng `data-count="0"`, vì lúc đó trang có thể hiện lại nút Khiêu Chiến.
   Hai flow VIP/thường dùng chung luật này và cùng chốt sổ ngày ngay sau đòn cuối.
+- **Ba quest tài khoản thường theo component mới ngày 29/09/2026.** Điểm Danh dùng lịch
+  `#ddPage/#ddGrid`, nút `#ddStamp` và `.is-claimed`; Phúc Lợi Đường dùng
+  `.pl-chest[data-state]`, `#plDayCount`, `.pl-chest__timer` cùng mốc tháng `.pl-mile[data-state]`;
+  Thí Luyện Tông Môn dùng `#tlPage[data-state]`, `#tlScroll`, `#tlLeft` và `#tlClock`. Các flow
+  không còn đọc `#checkInButton`, `#countdown-timer`, `#chestImage` hay `#chest-N`.
 - **Nhiệm vụ ngày đã đủ lượt thì thôi mở lại.** Mỗi đàn giữ một *sổ đủ lượt hôm nay*
   (`automation_jobs.daily_done`, ngày theo giờ Việt Nam): vòng nào thấy một trong chín nhiệm
   vụ ngày tự báo hết lượt thì vòng sau không mở trang ấy nữa, và khi cả kế hoạch đã đủ lượt
@@ -314,6 +319,7 @@ Lưới hồi quy chạy trên Chromium thật, trước một trang thật:
 ```bash
 npm run smoke
 npm run verify:hoang-vuc-daily-cap
+npm run verify:free-quest-components
 npm run verify:profile
 npm run verify:daily-quota   # chạm database thật, tự dọn theo tiền tố __quota_
 ```

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.104",
+    date: "2026-09-29",
+    lines: [
+      "Repo phụ nay có thể được đưa lên làm repo chính từ giao diện web hoặc một tệp BAT chạy trên máy Windows bất kỳ.",
+      "Khi promote có thể giữ nguyên, chuyển công khai hoặc chuyển riêng tư; source và lịch sử Git vẫn được giữ nguyên.",
+      "Nếu lượt đổi vai trò hỏng giữa chừng, hệ thống trả lại quyền truy cập và trạng thái chạy cũ trước khi báo lỗi.",
+    ],
+  },
+  {
     version: "1.3.103",
     date: "2026-09-29",
     lines: [
@@ -478,15 +487,7 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Bỏ một dòng nhắc thừa vẫn hiện ra dù đạo hữu chưa tự đặt gì.",
     ],
   },
-  {
-    version: "1.3.54",
-    date: "2026-08-29",
-    lines: [
-      "Mê Cung: tài khoản đang bế quan Trợ Chiến thì auto bỏ qua lượt ấy và ghé lại sau, thay vì đứng bấm Lập Đội rồi báo hỏng.",
-      "Hộp mừng vượt 5 ải không còn che nút Bắt Đầu của lượt kế.",
-      "Ô chọn độ khó nay nói rõ: mỗi ải chỉ thưởng một lần mỗi ngày, và đi Thường trước là mất phần thưởng thêm của Khó/Ác Mộng.",
-    ],
-  },
+
 ];
 
 

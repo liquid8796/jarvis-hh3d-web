@@ -24,6 +24,7 @@ assert.deepEqual(defaults, {
   dailyPushes: 5,
   workerId: "",
   generatedRepo: true,
+  visibility: "public",
   deferPrimary: false,
 });
 assert.deepEqual(normalize({ repo: "  " }), { ...normalize(), repo: "", workerId: "", generatedRepo: true });
@@ -34,7 +35,11 @@ const supplied = normalizeGithubProvisionInput(
 assert.equal(supplied.repo, "given-worker", "explicit repository names are only trimmed");
 assert.equal(supplied.workerId, "", "worker identity is assigned after the repository name is accepted");
 assert.equal(supplied.generatedRepo, false);
+assert.equal(supplied.visibility, "public", "legacy/create callers default to public repositories");
 assert.equal(supplied.deferPrimary, false);
+assert.equal(normalize({ visibility: "private" }).visibility, "private");
+assert.equal(normalize({ visibility: "public" }).visibility, "public");
+assert.throws(() => normalize({ visibility: "internal" }), "unknown visibility must be rejected");
 
 const deferred = normalizeGithubProvisionInput({
   pat: fixturePat,

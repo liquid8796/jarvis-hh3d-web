@@ -8,7 +8,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { decryptSecret, encryptSecret } from "@/lib/crypto/secretBox";
 import { mutateGithubState } from "@/lib/services/companionState";
 import { deleteManagedCompanion } from "@/lib/services/companionNurture";
-import { promoteGithubCompanionToPrimary } from "@/lib/services/githubPrimaryPromotion";
+import { parseGithubRepositoryVisibility, promoteGithubCompanionToPrimary } from "@/lib/services/githubPrimaryPromotion";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
 import { githubStationsForAdmin, type StationResult, type StationView } from "@/app/actions/githubStations";
 import { stationSlug } from "@/lib/validation/githubStations";
@@ -241,9 +241,11 @@ export async function promoteGithubCompanionAction(
   await requireManage();
   const slug = String(formData.get("slug") ?? "");
   const repo = String(formData.get("repo") ?? "");
+  const visibility = parseGithubRepositoryVisibility(formData.get("visibility") ?? "keep");
   if (!slug || !repo) return { ok: false, message: "Thiếu định danh kho cần promote." };
+  if (!visibility) return { ok: false, message: "Quyền truy cập repo phải là giữ nguyên, public hoặc private." };
 
-  const result = await promoteGithubCompanionToPrimary(slug, repo);
+  const result = await promoteGithubCompanionToPrimary(slug, repo, { visibility });
   if (!result.ok || !result.newSlug) {
     return {
       ok: false,

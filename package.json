@@ -1,6 +1,6 @@
 {
   "name": "jarvis-hh3d-web",
-  "version": "1.3.103",
+  "version": "1.3.104",
   "private": true,
   "description": "Auto HH3D — control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn tự động chạy trên server.",
   "scripts": {
@@ -98,6 +98,7 @@
     "mirror:remove": "tsx scripts/removeMirrorStation.mts",
     "mirror:reset-db": "tsx scripts/resetMirrorDb.mts",
     "github:new": "tsx scripts/newGithubStation.mts",
+    "github:promote": "tsx scripts/promoteGithubPrimary.mts",
     "github:remove": "tsx scripts/removeGithubKhoiloi.mts",
     "github:deploy": "tsx scripts/deployGithubKhoiloi.mts",
     "github:revive": "tsx scripts/reviveGithubKhoiloi.mts",
@@ -110,6 +111,7 @@
     "verify:github-provision-actions": "tsx scripts/verifyGithubProvisionActions.mts",
     "verify:github-primary-deletion": "tsx scripts/verifyGithubPrimaryDeletion.mts",
     "verify:github-primary-promotion": "tsx scripts/verifyGithubPrimaryPromotion.mts",
+    "verify:github-promotion-cli": "tsx scripts/verifyGithubPromotionCli.mts",
     "verify:github-workflow-parity": "tsx scripts/verifyGithubWorkflowParity.mts",
     "verify:hoang-vuc-daily-cap": "node scripts/verifyHoangVucDailyCap.mjs",
     "verify:github-provisioning-lifecycle": "tsx scripts/verifyGithubProvisioningLifecycle.mts",

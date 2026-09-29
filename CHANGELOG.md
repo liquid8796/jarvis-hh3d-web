@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.104 — Promote repo từ mọi máy và chọn public/private (29/09/2026)
+
+- Thêm promote-github-primary.bat: có thể chép sang bất kỳ máy Windows nào có OpenSSH + khóa OCI, xem dry-run trên server rồi promote mà không cần clone source, Node.js, npm hoặc kết nối database cục bộ.
+- CLI server github:promote dùng đúng service transaction của UI; cả BAT và UI cho chọn giữ nguyên, chuyển public hoặc chuyển private. GitHub ID, source, lịch sử và workflow-only ownership vẫn được bảo vệ.
+- Nếu ghi sổ thất bại sau khi đổi visibility, service trả repo về public/private ban đầu trước khi khôi phục Actions của primary cũ. Regression khóa CLI, CRLF/ASCII của BAT, UI và rollback visibility.
+- Flow tạo repo chính trên UI cũng có lựa chọn public/private; station tạm hoãn ghi nhớ lựa chọn tới lúc materialize primary.
 ## 1.3.103 — Đồng nhất workflow tạo mới, promote và đội GitHub đang trực (29/09/2026)
 
 - Đối chiếu thực tế phát hiện năm repo đang trực vẫn dùng workflow đời trước: chưa bật `WORKER_SELF_UPDATE`, chưa giữ mã thoát 90 và chưa nối ngay một lượt mới sau khi worker thu đàn để thay runtime.

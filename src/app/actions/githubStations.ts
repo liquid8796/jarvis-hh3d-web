@@ -42,6 +42,7 @@ export type StationView = {
   workerId: string;
   provisionedBy?: "jarvis";
   primaryDeferred: boolean;
+  primaryVisibility: "public" | "private";
   enabled: boolean;
   lastPingAt: string | null;
   lastCommitAt: string | null;
@@ -116,6 +117,7 @@ function viewOf(station: AppSettings["githubStations"][number], now: number): St
     workerId: station.workerId,
     provisionedBy: station.provisionedBy,
     primaryDeferred: station.primaryDeferred,
+    primaryVisibility: station.primaryVisibility,
     enabled: station.enabled,
     lastPingAt: station.lastPingAt,
     lastCommitAt: station.lastCommitAt,
@@ -225,6 +227,7 @@ const stationForms = createGithubStationFormHandlers({
       repo: station.repo,
       workflowFile: station.workflowFile,
       dailyPushes: options.dailyPushes ?? station.dailyPushes,
+      visibility: options.visibility ?? station.primaryVisibility,
       workerId: station.workerId,
       activateDeferredSlug: stationSlug(station),
     });

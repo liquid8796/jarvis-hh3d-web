@@ -19,7 +19,7 @@ export type GithubStationFormDependencies = {
   provision: (input: GithubProvisionInput) => Promise<GithubProvisionResult>;
   activateDeferred?: (
     station: AppSettings["githubStations"][number],
-    options: { pat?: string; dailyPushes?: number },
+    options: { pat?: string; dailyPushes?: number; visibility?: "public" | "private" },
   ) => Promise<GithubProvisionResult>;
   getSettings: () => Promise<AppSettings>;
   mutate: (change: (settings: AppSettings) => void) => Promise<void>;
@@ -61,6 +61,7 @@ export function createGithubStationFormHandlers(deps: GithubStationFormDependenc
         repo: read(form, "repo"),
         workflowFile: read(form, "workflowFile"),
         dailyPushes: read(form, "dailyPushes"),
+        visibility: read(form, "visibility"),
         deferPrimary: read(form, "deferPrimary") === "on",
       });
       const slug = safeSlug(result.slug);
@@ -101,13 +102,17 @@ export function createGithubStationFormHandlers(deps: GithubStationFormDependenc
     const deferPrimary = form.has("deferPrimaryPresent")
       ? read(form, "deferPrimary") === "on"
       : existing.primaryDeferred;
+    const visibility = form.has("visibility") ? read(form, "visibility") : existing.primaryVisibility;
+    if (visibility !== "public" && visibility !== "private") {
+      return { ok: false, slug, message: "Chế độ kho phải là Công khai hoặc Riêng tư." };
+    }
     if (!existing.primaryDeferred && deferPrimary) {
       return { ok: false, slug, message: "Repo chính đã tồn tại; không thể quay ngược station về chế độ chưa tạo repo chính." };
     }
     if (existing.primaryDeferred && !deferPrimary) {
       if (!deps.activateDeferred) return { ok: false, slug, message: "Máy chủ chưa hỗ trợ mở repo chính cho station đang tạm hoãn." };
       try {
-        const result = await deps.activateDeferred(existing, { pat: pat || undefined, dailyPushes });
+        const result = await deps.activateDeferred(existing, { pat: pat || undefined, dailyPushes, visibility });
         const response = {
           ...result,
           slug: safeSlug(result.slug) ?? slug,
@@ -160,6 +165,7 @@ export function createGithubStationFormHandlers(deps: GithubStationFormDependenc
           workerId: nextWorkerId,
           pat: encryptedPat ?? current.pat,
           enabled: hasEnabled ? enabled : current.enabled,
+          primaryVisibility: current.primaryDeferred ? visibility : current.primaryVisibility,
           dailyPushes: dailyPushes ?? current.dailyPushes,
         };
         currentSettings.githubStations = currentSettings.githubStations.map((station) => stationSlug(station) === slug ? updated : station);

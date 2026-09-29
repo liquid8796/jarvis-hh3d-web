@@ -548,7 +548,19 @@ Khóa session giữ đồng thời `provision-owner`, slug cũ, slug mới, WORK
 nên provisioning/xoá/nuôi không chen vào giữa. Nếu lỗi xảy ra trước khi registry commit, backend
 ưu tiên fail-safe: tắt Actions của repo mới và bật lại primary cũ nếu nó vốn đang bật. Vì vậy trạng
 thái lỗi có thể cần kiểm tra tay, nhưng không được phép kết thúc với hai repo cùng chạy một worker.
-Regression: `npm run verify:github-primary-promotion` và `npm run verify:github-nurture-ui`.
+Regression: npm run verify:github-primary-promotion và npm run verify:github-nurture-ui.
+
+### Promote từ máy Windows bất kỳ
+
+promote-github-primary.bat chỉ cần Windows OpenSSH Client và private key OCI. Nó không chạy logic promote dưới máy gọi: BAT SSH vào /opt/jarvis/ops-repo, nạp /opt/jarvis/shared/.env, chạy npm run github:promote cùng service với web UI. Bởi vậy PAT/WORKER_TOKEN/database URL không đi qua máy gọi hoặc command line SSH.
+
+Ví dụ:
+
+    promote-github-primary.bat --station owner/primary-cu --repo project-phu --visibility private
+    promote-github-primary.bat --station owner/primary-cu --repo project-phu --visibility public --yes --no-pause
+    promote-github-primary.bat --station owner/primary-cu --repo project-phu --dry-run
+
+Visibility nhận keep, public, private; mặc định keep. Lượt đầu luôn là dry-run đọc GitHub ID, visibility hiện tại, primary cũ và target. Chỉ lượt thứ hai mới ghi workflow, secret, visibility, Actions và registry. Nếu registry commit lỗi, service tắt target, trả visibility cũ và bật lại Actions primary cũ khi cần.
 
 ### Một cấu trúc workflow cho mọi lối vào (29/09/2026)
 

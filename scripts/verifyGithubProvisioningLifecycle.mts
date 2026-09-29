@@ -366,6 +366,7 @@ for (const locked of [false, true]) {
     dailyPushes: input.dailyPushes,
     workerId: "worker-identity",
     generatedRepo: false,
+    visibility: "private",
     now: Date.now,
     deadlineAt: Date.now() + 30_000,
   };
@@ -383,6 +384,7 @@ for (const locked of [false, true]) {
     globalThis.fetch = originalFetch;
   }
   assert.equal(requestBody?.description, publicIdentityForWorker(context.workerId).aboutDescription);
+  assert.equal(requestBody?.private, true, "private create selection reaches the GitHub repository API");
   assert.ok(!JSON.stringify(requestBody).includes(context.workerId));
 }
 console.log("PASS: GitHub provisioning lifecycle, shared deadline/reserved cleanup, verified rollback, distinct repo states, warnings and double submission (no external calls).");

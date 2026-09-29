@@ -319,7 +319,7 @@ if (!process.argv.includes("--check")) {
         await page.getByRole("button", { name: "Tạo repo + workflow", exact: true }).waitFor();
         const submitted = await page.evaluate(() => (window as typeof window & { __fixtureSubmitted: { label: string; values: Record<string, string> } }).__fixtureSubmitted);
         assert.equal(submitted.label, "provisionGithubStationAction");
-        assert.deepEqual(submitted.values, { pat: "offline-fixture-pat", repo: "", deferPrimaryPresent: "1", workflowFile: "", dailyPushes: "" });
+        assert.deepEqual(submitted.values, { pat: "offline-fixture-pat", repo: "", visibility: "public", deferPrimaryPresent: "1", workflowFile: "", dailyPushes: "" });
         const status = page.locator("section[aria-labelledby=station-form-title]").getByRole("status");
         assert.match(await status.innerText(), outcome === "error" ? /Classic PAT còn thiếu scope: delete_repo/ : /Đã tạo và đăng ký/);
         if (outcome === "error") assert.ok(!(await status.innerText()).includes("sample-owner/"));
@@ -349,6 +349,7 @@ if (!process.argv.includes("--check")) {
       assert.equal(deferredSubmitted.label, "provisionGithubStationAction");
       assert.equal(deferredSubmitted.values.deferPrimary, "on");
       assert.equal(deferredSubmitted.values.deferPrimaryPresent, "1");
+      assert.equal(deferredSubmitted.values.visibility, "public");
 
       for (const managed of [false, true]) {
         await page.goto(`${origin}/?view=workspace&managed=${managed ? "1" : "0"}`);
@@ -468,12 +469,17 @@ if (!process.argv.includes("--check")) {
     await page.getByRole("button", { name: "Đang lưu…", exact: true }).waitFor();
     assert.ok(await page.getByRole("button", { name: "Đang lưu…", exact: true }).isDisabled());
     await page.getByRole("button", { name: "Lưu cấu hình kho", exact: true }).waitFor();
+    const visibilitySelectors = page.locator('select[name="visibility"]');
+    assert.equal(await visibilitySelectors.count(), 2, "pending-delete companion must not expose visibility or promote controls");
+    assert.equal(await visibilitySelectors.first().inputValue(), "keep");
+    await visibilitySelectors.first().selectOption("private");
     let promoteConfirmation = "";
     page.once("dialog", async (dialog) => { promoteConfirmation = dialog.message(); await dialog.dismiss(); });
     await page.getByRole("button", { name: "Promote làm repo chính", exact: true }).first().click();
     assert.match(promoteConfirmation, /weather-data-workbench/);
     assert.match(promoteConfirmation, /primary-repo sẽ thành repo phụ/);
     assert.match(promoteConfirmation, /Lịch sử Git của cả hai repo được giữ lại/);
+    assert.match(promoteConfirmation, /chuyển sang private/);
     const promoteButtons = page.getByRole("button", { name: "Promote làm repo chính", exact: true });
     assert.equal(await promoteButtons.count(), 2, "pending-delete companion must not expose a promote action");
     assert.equal(await page.getByRole("button", { name: "Đang promote…", exact: true }).count(), 0);

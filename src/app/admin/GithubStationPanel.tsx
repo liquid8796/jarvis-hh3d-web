@@ -523,6 +523,23 @@ function StationEditor({
             </div>
           )}
           {(!station || station.primaryDeferred) && (
+            <div>
+              <label className="label" htmlFor="station-visibility">Chế độ repo chính</label>
+              <select
+                id="station-visibility"
+                name="visibility"
+                className="input w-full max-w-xs"
+                defaultValue={station?.primaryVisibility ?? "public"}
+              >
+                <option value="public">Công khai</option>
+                <option value="private">Riêng tư</option>
+              </select>
+              <p className="mt-1 text-xs text-[var(--color-mist)]">
+                Áp dụng khi Jarvis tạo repo chính. Station đang hoãn sẽ ghi nhớ lựa chọn này tới lúc mở repo.
+              </p>
+            </div>
+          )}
+          {(!station || station.primaryDeferred) && (
             <div className="rounded-xl border border-[rgba(232,194,92,0.24)] bg-[rgba(232,194,92,0.04)] p-4">
               <input type="hidden" name="deferPrimaryPresent" value="1" />
               <label className="flex cursor-pointer items-start gap-3 text-sm" htmlFor="station-defer-primary">

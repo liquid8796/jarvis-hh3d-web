@@ -438,6 +438,8 @@ export const appSettingsSchema = z.object({
         provisionedBy: z.literal("jarvis").optional(),
         /** Chỉ giữ station/PAT để nuôi repo phụ; repo chính/workflow chưa được tạo. */
         primaryDeferred: z.boolean().catch(false).default(false),
+        /** Desired/current visibility of the primary repository. Legacy rows were public. */
+        primaryVisibility: z.enum(["public", "private"]).catch("public").default("public"),
         githubId: z.number().int().positive().optional(),
         initialCommitSha: z.string().max(100).optional(),
         primaryDeleteVerifiedGithubId: z.number().int().positive().optional(),

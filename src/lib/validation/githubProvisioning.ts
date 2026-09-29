@@ -11,6 +11,8 @@ export type GithubProvisionInput = {
   repo?: string;
   workflowFile?: string;
   dailyPushes?: string | number;
+  /** Visibility of the primary GitHub repository. Defaults to public for backward compatibility. */
+  visibility?: GithubRepoVisibility | string;
   /** Chỉ đăng ký tài khoản + nuôi repo phụ; repo chính/workflow chờ user mở lại sau. */
   deferPrimary?: boolean;
   /** Internal-only: materialize a previously deferred station without losing companion repos. */
@@ -29,9 +31,13 @@ export type NormalizedGithubProvisionInput = {
   /** Filled after the owner and repository name are known. */
   workerId: string;
   generatedRepo: boolean;
+  visibility: GithubRepoVisibility;
   deferPrimary: boolean;
   activateDeferredSlug?: string;
 };
+
+export const GITHUB_REPO_VISIBILITIES = ["public", "private"] as const;
+export type GithubRepoVisibility = typeof GITHUB_REPO_VISIBILITIES[number];
 
 const SAFE_WORKFLOW_BASENAME = /^[A-Za-z0-9][A-Za-z0-9._-]*\.(?:ya?ml)$/;
 const WORKER_ID_RE = /^[A-Za-z0-9._-]+$/;
@@ -54,6 +60,12 @@ function normalizedWorkflowFile(value: string | undefined): string {
     throw new Error("workflowFile must be a safe .yml or .yaml basename.");
   }
   return workflowFile;
+}
+
+export function normalizeGithubRepoVisibility(value: unknown): GithubRepoVisibility {
+  if (value === undefined || value === null || value === "") return "public";
+  if (value === "public" || value === "private") return value;
+  throw new Error("visibility must be public or private.");
 }
 
 /**
@@ -79,6 +91,7 @@ export function normalizeGithubProvisionInput(
     dailyPushes: normalizedDailyPushes(input.dailyPushes),
     workerId: input.workerId?.trim() ?? "",
     generatedRepo,
+    visibility: normalizeGithubRepoVisibility(input.visibility),
     deferPrimary: input.deferPrimary === true,
     ...(input.activateDeferredSlug?.trim() ? { activateDeferredSlug: input.activateDeferredSlug.trim() } : {}),
   };

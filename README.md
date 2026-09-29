@@ -661,6 +661,8 @@ cả danh tính cũ/mới và rollback trạng thái Actions nếu ghi sổ th�
 `WORKER_ID`. Tạo mới, promote và phát hành cả đội dùng cùng một renderer workflow-only, nên cấu trúc
 Actions không còn trôi giữa repo vừa tạo và năm repo đang trực.
 
+Có thể chạy cùng flow ngoài UI bằng promote-github-primary.bat. Tệp BAT là portable: chép sang máy Windows bất kỳ, cung cấp khóa SSH OCI và chọn --station owner/repo-chinh, --repo repo-phu, --visibility keep|public|private. Script luôn chạy dry-run từ /opt/jarvis/ops-repo trước, rồi mới hỏi xác nhận; máy gọi không cần clone source, Node.js, npm hoặc quyền truy cập database. UI Promote có cùng lựa chọn visibility. Đổi visibility chỉ áp dụng cho repo được promote; repo chính cũ giữ nguyên quyền truy cập.
+
 Khi một **tài khoản GitHub đã bị xoá/đình chỉ ngoài hệ thống**, nút **Xoá** ở Nuôi kho vẫn phải
 gỡ được station local: form xóa gửi kèm ảnh chụp danh sách repo chính lúc user bấm để chống stale
 confirmation; nếu PAT đã chết và GitHub public xác nhận account không còn tồn tại, service chuyển

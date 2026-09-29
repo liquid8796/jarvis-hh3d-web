@@ -17,6 +17,17 @@ const DEFAULT_BUDGET_MS = 180_000;
 const MAX_BUDGET_MS = 240_000;
 const PROMOTION_COMMIT_MESSAGE = "feat(khoiloi): promote repository to primary";
 
+export const GITHUB_REPOSITORY_VISIBILITIES = ["keep", "public", "private"] as const;
+export type GithubRepositoryVisibility = typeof GITHUB_REPOSITORY_VISIBILITIES[number];
+export type GithubPrimaryPromotionOptions = { visibility?: GithubRepositoryVisibility };
+type ConcreteGithubRepositoryVisibility = Exclude<GithubRepositoryVisibility, "keep">;
+
+export function parseGithubRepositoryVisibility(value: unknown): GithubRepositoryVisibility | null {
+  return typeof value === "string" && GITHUB_REPOSITORY_VISIBILITIES.includes(value as GithubRepositoryVisibility)
+    ? value as GithubRepositoryVisibility
+    : null;
+}
+
 type Station = AppSettings["githubStations"][number];
 type Companion = Station["companionRepos"][number];
 type PrimarySource = NonNullable<Station["primarySource"]>;
@@ -32,7 +43,18 @@ export type GithubPrimaryPromotionResult = {
   message: string;
   oldSlug: string;
   newSlug?: string;
+  visibility?: ConcreteGithubRepositoryVisibility;
   warnings: string[];
+};
+
+export type GithubPrimaryPromotionPreview = {
+  oldSlug: string;
+  newSlug: string;
+  targetRepo: string;
+  currentVisibility: ConcreteGithubRepositoryVisibility;
+  desiredVisibility: ConcreteGithubRepositoryVisibility;
+  oldPrimaryRepo: string | null;
+  sourcePreserved: true;
 };
 
 export type GithubPrimaryPromotionRemote = {
@@ -40,6 +62,7 @@ export type GithubPrimaryPromotionRemote = {
   actionsEnabled(owner: string, repo: string): Promise<boolean>;
   disableActions(owner: string, repo: string): Promise<void>;
   enableActions(owner: string, repo: string): Promise<void>;
+  setVisibility(owner: string, repo: string, visibility: ConcreteGithubRepositoryVisibility): Promise<void>;
   installPayload(owner: string, repo: string, payload: ReadonlyMap<string, Buffer>): Promise<{ sha: string }>;
   setWorkerSecret(owner: string, repo: string, workerToken: string): Promise<void>;
   dispatch(owner: string, repo: string, workflowFile: string): Promise<void>;
@@ -64,6 +87,10 @@ type ResolvedPromotion = {
 
 const same = (left: string, right: string) => left.toLowerCase() === right.toLowerCase();
 const repoPath = (owner: string, repo: string) => `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+const concreteVisibility = (isPrivate: boolean): ConcreteGithubRepositoryVisibility => isPrivate ? "private" : "public";
+const isPromotionDependencies = (
+  value: GithubPrimaryPromotionOptions | GithubPrimaryPromotionDependencies,
+): value is GithubPrimaryPromotionDependencies => "read" in value && "remote" in value;
 
 
 function primarySourceFromCompanion(
@@ -267,6 +294,16 @@ class ProductionPromotionRemote implements GithubPrimaryPromotionRemote {
     await this.client.call("PUT", `${repoPath(owner, repo)}/actions/permissions`, { enabled: true }, [204]);
   }
 
+  async setVisibility(
+    owner: string,
+    repo: string,
+    visibility: ConcreteGithubRepositoryVisibility,
+  ): Promise<void> {
+    const desiredPrivate = visibility === "private";
+    await this.client.call("PATCH", repoPath(owner, repo), { private: desiredPrivate });
+    const verified = await this.client.info(owner, repo);
+    if (!verified || verified.private !== desiredPrivate) throw new Error("repository-visibility-not-verified");
+  }
   async installPayload(owner: string, repo: string, payload: ReadonlyMap<string, Buffer>): Promise<{ sha: string }> {
     const base = repoPath(owner, repo);
     const info = await this.client.info(owner, repo);
@@ -357,11 +394,57 @@ export const productionGithubPrimaryPromotionDependencies: GithubPrimaryPromotio
   remote: (pat, deadlineAt) => new ProductionPromotionRemote(pat, deadlineAt),
 };
 
+export async function previewGithubCompanionPromotion(
+  slug: string,
+  repo: string,
+  options: GithubPrimaryPromotionOptions = {},
+  deps: GithubPrimaryPromotionDependencies = productionGithubPrimaryPromotionDependencies,
+): Promise<GithubPrimaryPromotionPreview> {
+  const visibility = parseGithubRepositoryVisibility(options.visibility ?? "keep");
+  if (!visibility) throw new Error("invalid-repository-visibility");
+  const now = deps.now ?? Date.now;
+  const deadlineAt = now() + 30_000;
+  const resolved = resolvePromotion(await deps.read(), slug, repo);
+  const remote = deps.remote(deps.openPat(resolved.station.pat), deadlineAt);
+  const targetInfo = await remote.info(resolved.station.owner, resolved.companion.repo);
+  if (!targetInfo) throw new Error("target-missing");
+  if (resolved.companion.githubId && resolved.companion.githubId !== targetInfo.id) {
+    throw new Error("target-id-changed");
+  }
+  let oldPrimaryRepo: string | null = null;
+  if (!resolved.station.primaryDeferred) {
+    const oldInfo = await remote.info(resolved.station.owner, resolved.station.repo);
+    if (!oldInfo) throw new Error("old-primary-missing");
+    if (resolved.station.githubId && resolved.station.githubId !== oldInfo.id) {
+      throw new Error("old-primary-id-changed");
+    }
+    oldPrimaryRepo = resolved.station.repo;
+  }
+  const currentVisibility = concreteVisibility(targetInfo.private);
+  return {
+    oldSlug: resolved.oldSlug,
+    newSlug: resolved.newSlug,
+    targetRepo: resolved.companion.repo,
+    currentVisibility,
+    desiredVisibility: visibility === "keep" ? currentVisibility : visibility,
+    oldPrimaryRepo,
+    sourcePreserved: true,
+  };
+}
 export async function promoteGithubCompanionToPrimary(
   slug: string,
   repo: string,
-  deps: GithubPrimaryPromotionDependencies = productionGithubPrimaryPromotionDependencies,
+  optionsOrDeps: GithubPrimaryPromotionOptions | GithubPrimaryPromotionDependencies = {},
+  maybeDeps?: GithubPrimaryPromotionDependencies,
 ): Promise<GithubPrimaryPromotionResult> {
+  const deps = isPromotionDependencies(optionsOrDeps)
+    ? optionsOrDeps
+    : maybeDeps ?? productionGithubPrimaryPromotionDependencies;
+  const options = isPromotionDependencies(optionsOrDeps) ? {} : optionsOrDeps;
+  const visibility = parseGithubRepositoryVisibility(options.visibility ?? "keep");
+  if (!visibility) {
+    return { ok: false, oldSlug: slug, warnings: [], message: "Quyền truy cập repo phải là keep, public hoặc private." };
+  }
   const now = deps.now ?? Date.now;
   const startedAt = now();
   const deadlineAt = Math.min(startedAt + DEFAULT_BUDGET_MS, startedAt + MAX_BUDGET_MS);
@@ -374,6 +457,9 @@ export async function promoteGithubCompanionToPrimary(
   let oldActionsWereEnabled = false;
   let oldPaused = false;
   let targetEnabledForCutover = false;
+  let targetOriginalVisibility: ConcreteGithubRepositoryVisibility | null = null;
+  let desiredVisibility: ConcreteGithubRepositoryVisibility | null = null;
+  let targetVisibilityChanged = false;
   let registered = false;
 
   try {
@@ -397,6 +483,8 @@ export async function promoteGithubCompanionToPrimary(
     const targetInfo = await remote.info(owner, companion.repo);
     if (!targetInfo) throw new Error("target-missing");
     if (companion.githubId && companion.githubId !== targetInfo.id) throw new Error("target-id-changed");
+    targetOriginalVisibility = concreteVisibility(targetInfo.private);
+    desiredVisibility = visibility === "keep" ? targetOriginalVisibility : visibility;
 
     let oldInfo: RepoInfo | null = null;
     if (!station.primaryDeferred) {
@@ -415,6 +503,12 @@ export async function promoteGithubCompanionToPrimary(
     await lease.assertHeld({ deadlineAt });
     const installed = await remote.installPayload(owner, companion.repo, prepared.files);
     await remote.setWorkerSecret(owner, companion.repo, prepared.workerToken);
+    if (desiredVisibility !== targetOriginalVisibility) {
+      // Mark before the request: GitHub may apply PATCH even if its response is lost.
+      // Any later failure must still attempt to restore the user's original visibility.
+      targetVisibilityChanged = true;
+      await remote.setVisibility(owner, companion.repo, desiredVisibility);
+    }
 
     if (oldInfo) {
       oldActionsWereEnabled = await remote.actionsEnabled(owner, station.repo);
@@ -448,6 +542,7 @@ export async function promoteGithubCompanionToPrimary(
       );
       fresh.station.repo = companion.repo;
       fresh.station.primaryDeferred = false;
+      fresh.station.primaryVisibility = desiredVisibility ?? concreteVisibility(targetInfo.private);
       fresh.station.provisionedBy = "jarvis";
       fresh.station.githubId = targetInfo.id;
       fresh.station.initialCommitSha = installed.sha;
@@ -478,6 +573,7 @@ export async function promoteGithubCompanionToPrimary(
       ok: true,
       oldSlug,
       newSlug,
+      visibility: desiredVisibility ?? undefined,
       warnings,
       message: oldInfo
         ? `Đã promote ${owner}/${companion.repo} thành repo chính; ${owner}/${station.repo} đã thành repo phụ và Actions đã tắt.`
@@ -496,6 +592,10 @@ export async function promoteGithubCompanionToPrimary(
           } catch {
             warnings.push("Không xác nhận được repo được chọn đã dừng Actions sau lỗi; cần kiểm tra GitHub trước khi thử lại.");
           }
+        }
+        if (targetVisibilityChanged && targetOriginalVisibility) {
+          try { await remote.setVisibility(resolved.station.owner, resolved.companion.repo, targetOriginalVisibility); }
+          catch { warnings.push("Không khôi phục được quyền truy cập cũ của repo được chọn sau lỗi; cần kiểm tra GitHub trước khi thử lại."); }
         }
         if (oldPaused && oldActionsWereEnabled) {
           try { await remote.enableActions(resolved.station.owner, resolved.station.repo); }

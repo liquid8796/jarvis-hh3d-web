@@ -32,11 +32,26 @@ function CompanionCard({ station, companion }: { station: StationView; companion
 
       {!companion.pendingDelete && (
         <form action={promoteAction} className="mt-4 border-t border-[var(--color-ink-600)]/60 pt-3" onSubmit={(event) => {
-          if (!confirm(promotionNote)) event.preventDefault();
+          const visibility = String(new FormData(event.currentTarget).get("visibility") ?? "keep");
+          const visibilityNote = visibility === "private"
+            ? "Repo được promote sẽ chuyển sang private."
+            : visibility === "public"
+              ? "Repo được promote sẽ chuyển sang public."
+              : "Repo được promote sẽ giữ nguyên quyền truy cập hiện tại.";
+          if (!confirm(promotionNote + "\n\n" + visibilityNote)) event.preventDefault();
         }}>
           <input type="hidden" name="slug" value={station.slug} />
           <input type="hidden" name="repo" value={companion.repo} />
           <p className="mb-2 text-xs text-[var(--color-mist)]">Đổi vai trò không xoá code hay lịch sử Git. Jarvis chỉ chồng tệp workflow vào <code>.github/workflows/</code>; worker tải runtime riêng khi Actions chạy, còn Ollama tiếp tục cập nhật source dự án cũ.</p>
+          <label className="mb-3 block text-xs text-[var(--color-mist)]" htmlFor={"promote-visibility-" + companion.repo}>
+            <span className="label text-xs">Quyền truy cập sau promote</span>
+            <select id={"promote-visibility-" + companion.repo} name="visibility" defaultValue="keep" className="input mt-1 w-full text-sm">
+              <option value="keep">Giữ nguyên quyền truy cập hiện tại</option>
+              <option value="public">Public — mọi người có thể xem repo</option>
+              <option value="private">Private — chỉ người được cấp quyền có thể xem</option>
+            </select>
+            <span className="mt-1 block">Đổi public/private chỉ áp dụng cho repo được promote; repo chính cũ vẫn giữ quyền truy cập hiện tại.</span>
+          </label>
           <button type="submit" className="btn btn-gold text-sm" disabled={promoting || deleting}>
             {promoting ? "Đang promote…" : "Promote làm repo chính"}
           </button>

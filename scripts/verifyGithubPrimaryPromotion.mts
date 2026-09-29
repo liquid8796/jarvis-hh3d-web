@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { planGithubPromotionHistory, promoteGithubCompanionToPrimary, type GithubPrimaryPromotionDependencies, type GithubPrimaryPromotionRemote } from "../src/lib/services/githubPrimaryPromotion";
+import { parseGithubRepositoryVisibility, planGithubPromotionHistory, promoteGithubCompanionToPrimary, type GithubPrimaryPromotionDependencies, type GithubPrimaryPromotionRemote } from "../src/lib/services/githubPrimaryPromotion";
 import { appSettingsSchema, type AppSettings } from "../src/lib/services/settings";
 
 const owner = "sample-owner";
@@ -26,20 +26,25 @@ function makeSettings(deferred = false): AppSettings {
   });
 }
 
-function harness(options: { deferred?: boolean; targetId?: number; failMutation?: boolean; targetActions?: boolean } = {}) {
+function harness(options: { deferred?: boolean; targetId?: number; failMutation?: boolean; targetActions?: boolean; initialPrivate?: boolean } = {}) {
   let state = makeSettings(!!options.deferred);
   const events: string[] = [];
   const enabled = new Map([[oldRepo, true], [nextRepo, !!options.targetActions]]);
+  let targetPrivate = options.initialPrivate ?? false;
   const remote: GithubPrimaryPromotionRemote = {
     async info(_o, repo) {
       events.push("info:" + repo);
-      if (repo === nextRepo) return { id: options.targetId ?? 202, full_name: owner + "/" + nextRepo, default_branch: "main", private: false };
+      if (repo === nextRepo) return { id: options.targetId ?? 202, full_name: owner + "/" + nextRepo, default_branch: "main", private: targetPrivate };
       if (repo === oldRepo && !options.deferred) return { id: 101, full_name: owner + "/" + oldRepo, default_branch: "main", private: false };
       return null;
     },
     async actionsEnabled(_o, repo) { events.push("state:" + repo); return enabled.get(repo) ?? false; },
     async disableActions(_o, repo) { events.push("off:" + repo); enabled.set(repo, false); },
     async enableActions(_o, repo) { events.push("on:" + repo); enabled.set(repo, true); },
+    async setVisibility(_o, repo, visibility) {
+      events.push("visibility:" + repo + ":" + visibility);
+      targetPrivate = visibility === "private";
+    },
     async installPayload(_o, repo, files) { events.push("install:" + repo + ":" + files.size); return { sha: "f".repeat(40) }; },
     async setWorkerSecret(_o, repo) { events.push("secret:" + repo); },
     async dispatch(_o, repo) { events.push("dispatch:" + repo); },
@@ -57,9 +62,13 @@ function harness(options: { deferred?: boolean; targetId?: number; failMutation?
     preparePayload: async () => ({ files: new Map([[".github/workflows/linh-su.yml", Buffer.from("x")]]), workerToken: "fixture", dispose: async () => { events.push("dispose"); } }),
     remote: () => remote,
   };
-  return { deps, events, enabled, get state() { return state; } };
+  return { deps, events, enabled, get state() { return state; }, get targetPrivate() { return targetPrivate; } };
 }
 
+assert.equal(parseGithubRepositoryVisibility("keep"), "keep");
+assert.equal(parseGithubRepositoryVisibility("public"), "public");
+assert.equal(parseGithubRepositoryVisibility("private"), "private");
+assert.equal(parseGithubRepositoryVisibility("secret"), null);
 assert.deepEqual(planGithubPromotionHistory("default-sha", "main-sha"), {
   baseHead: "main-sha",
   parents: ["main-sha", "default-sha"],
@@ -131,4 +140,30 @@ assert.deepEqual(planGithubPromotionHistory("default-only", null), {
   assert.ok(h.events.indexOf("off:" + nextRepo) < h.events.indexOf("install:" + nextRepo + ":1"));
 }
 
+{
+  const h = harness({ initialPrivate: false });
+  const result = await promoteGithubCompanionToPrimary(owner + "/" + oldRepo, nextRepo, { visibility: "private" }, h.deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.visibility, "private");
+  assert.equal(h.targetPrivate, true);
+  assert.equal(h.state.githubStations[0]!.primaryVisibility, "private");
+  assert.ok(h.events.includes("visibility:" + nextRepo + ":private"));
+}
+
+{
+  const h = harness({ initialPrivate: false, failMutation: true });
+  const result = await promoteGithubCompanionToPrimary(owner + "/" + oldRepo, nextRepo, { visibility: "private" }, h.deps);
+  assert.equal(result.ok, false);
+  assert.equal(h.targetPrivate, false, "registry failure restores the target's original public visibility");
+  assert.ok(h.events.indexOf("visibility:" + nextRepo + ":private") < h.events.lastIndexOf("visibility:" + nextRepo + ":public"));
+}
+
+{
+  const h = harness({ initialPrivate: true });
+  const result = await promoteGithubCompanionToPrimary(owner + "/" + oldRepo, nextRepo, { visibility: "keep" }, h.deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.visibility, "private");
+  assert.equal(h.state.githubStations[0]!.primaryVisibility, "private");
+  assert.equal(h.events.some(event => event.startsWith("visibility:")), false, "keep leaves GitHub visibility untouched");
+}
 console.log("PASS: GitHub companion promotion swaps roles, handles deferred primary, checks identity, and restores the old primary on registry failure.");

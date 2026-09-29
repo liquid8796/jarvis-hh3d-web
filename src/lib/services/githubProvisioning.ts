@@ -626,7 +626,7 @@ export const productionGithubProvisionDependencies: GithubProvisioningDependenci
   async create(ctx) {
     const response = await request(ctx.pat, ctx, "/user/repos", "POST", {
       name: ctx.repo,
-      private: false,
+      private: ctx.visibility === "private",
       auto_init: false,
       description: publicIdentityForWorker(ctx.workerId).aboutDescription,
     });
@@ -662,6 +662,7 @@ export const productionGithubProvisionDependencies: GithubProvisioningDependenci
         // Materialize IN PLACE: every companion repo/runtime trace stays attached to the same station.
         station.pat = prepared.encryptedPat;
         station.primaryDeferred = false;
+        station.primaryVisibility = ctx.visibility;
         station.enabled = true;
         station.dailyPushes = ctx.dailyPushes;
         station.githubId = proof.githubId;
@@ -682,6 +683,7 @@ export const productionGithubProvisionDependencies: GithubProvisioningDependenci
         workerId: ctx.workerId,
         pat: prepared.encryptedPat,
         primaryDeferred: false,
+        primaryVisibility: ctx.visibility,
         enabled: true,
         companionRepos: [],
         companionCountOverride: null,
@@ -710,6 +712,7 @@ export const productionGithubProvisionDependencies: GithubProvisioningDependenci
         workerId: ctx.workerId,
         pat: prepared.encryptedPat,
         primaryDeferred: true,
+        primaryVisibility: ctx.visibility,
         enabled: true,
         companionRepos: [],
         companionCountOverride: null,

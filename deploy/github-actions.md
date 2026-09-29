@@ -549,6 +549,20 @@ nên provisioning/xoá/nuôi không chen vào giữa. Nếu lỗi xảy ra trư�
 ưu tiên fail-safe: tắt Actions của repo mới và bật lại primary cũ nếu nó vốn đang bật. Vì vậy trạng
 thái lỗi có thể cần kiểm tra tay, nhưng không được phép kết thúc với hai repo cùng chạy một worker.
 Regression: `npm run verify:github-primary-promotion` và `npm run verify:github-nurture-ui`.
+
+### Một cấu trúc workflow cho mọi lối vào (29/09/2026)
+
+Tạo repo chính trên UI, promote repo phụ trên UI, CLI `github:new` và lượt phát hành cả đội đều
+render qua `buildWorkflowOnlyPayload`. Contract của Jarvis trong repo là đúng một path
+`.github/workflows/<workflowFile>`; source, package manifest và README của dự án không thuộc payload
+này. `verify:github-workflow-parity` dựng cùng một worker bằng helper UI và builder trực tiếp rồi so
+byte, đồng thời khóa cả bốn call-site để chúng không trôi về full source bundle.
+
+Workflow từ 1.3.103 bật `WORKER_SELF_UPDATE=1`. Khi runtime thấy web sang bản khác, nó ngừng nhận
+việc, chờ đàn đang giữ kết thúc rồi thoát mã 90. Bước `Trực ca` giữ mã ấy trong `LINH_SU_EXIT`, coi
+90 là kết thúc sạch; bước `Phát lượt kế` chỉ với mã 90 được bỏ phanh chết-yểu và dispatch ngay một
+run mới. Run mới tải bundle hiện hành vào `RUNNER_TEMP`, nên repo dự án vẫn không bị sửa source.
+
 Lượt **Ghi vào sổ** tự ngó kho ngay sau khi lưu, nên một PAT dán nhầm chết trước mặt người vừa
 dán chứ không phải trong một lượt cron lúc ba giờ sáng. Với kho mới, lượt ấy ghi luôn một commit
 thật — tức chứng minh trọn đường「PAT này push được mã vào kho này」.

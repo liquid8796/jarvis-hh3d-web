@@ -40,10 +40,10 @@ export const UPDATE_EXIT_CODE = 90;
  * phải sự dè dặt.
  *
  * Thoát-để-thay-gói chỉ có nghĩa khi có MỘT AI ĐÓ đứng ngoài nhặt mã thoát lên rồi đi lấy gói.
- * Trên máy nhà đó là `run.ps1`/`run.sh`, và bộ cài bật cờ này cho chúng. Khôi lỗi tông môn thì
- * chạy trong GitHub Actions, KHÔNG có vòng nuôi: nó thoát ra là lượt chạy kết thúc, gói chẳng ai
- * thay, và ta đổi một cú lệch bản vô hại lấy thời gian chết có thật. Bật sẵn cho mọi người là
- * bật cho cả những chỗ không dùng được.
+ * Trên máy nhà đó là `run.ps1`/`run.sh`. Từ 1.3.103, workflow GitHub cũng là một vòng nuôi:
+ * nó ghi lại mã 90, bỏ riêng phanh「chết-yểu」cho mã ấy, phát lượt kế và lượt mới tải runtime hiện
+ * hành vào `RUNNER_TEMP`. Những nơi không có một trong hai vòng ấy vẫn phải để cờ tắt; bật sẵn
+ * toàn cục sẽ đổi một cú lệch bản vô hại thành thời gian chết có thật.
  *
  * Vòng nuôi cũng dùng chính cờ này theo chiều ngược lại: đặt `0` ở lượt dựng kế tiếp để bảo
  *「thôi hỏi nữa」khi một lượt thay gói đã chạy mà số bản không đổi.

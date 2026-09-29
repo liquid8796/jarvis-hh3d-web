@@ -117,7 +117,8 @@ assert.match(bat, /npm run vm -- --env GITHUB_PAT -- npm run github:new/, "PAT r
 assert.ok(!/github:new[^\r\n]*%\*/i.test(bat), "raw launcher arguments are never forwarded to vmRun");
 
 const lowLevel = readFileSync(path.join(repoRoot, "scripts", "newGithubKhoiloi.mjs"), "utf8");
-assert.match(lowLevel, /buildKhoiloiPayload\(\{[^}]*workflowFile/s, "low-level payload uses the chosen workflow");
+assert.match(lowLevel, /buildWorkflowOnlyPayload\(\{[^}]*workflowFile/s, "low-level payload uses the chosen workflow-only source");
+assert.doesNotMatch(lowLevel, /buildKhoiloiPayload\(/, "direct create never freezes worker/project source into the repository");
 assert.match(lowLevel, /\["workflow", "run", workflowFile,/s, "low-level dispatch uses the chosen workflow");
 assert.match(lowLevel, /randomSoftwareName/, "direct builder draws a separate default worker identity");
 assert.match(lowLevel, /Tên repo chính không được trùng WORKER_ID/, "direct builder rejects repo/worker identity collisions");

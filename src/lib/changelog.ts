@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.103",
+    date: "2026-09-29",
+    lines: [
+      "Kho Github tạo mới, kho vừa đổi vai trò và các khôi lỗi đang trực nay dùng cùng một khuôn vận hành.",
+      "Khôi lỗi trên Github thấy trạm đổi bản sẽ chờ việc đang làm xong rồi tự mở ca mới, không phải chờ lịch bốn giờ.",
+      "Mã dự án cũ vẫn được giữ nguyên; Jarvis chỉ quản lý phần điều khiển khôi lỗi.",
+    ],
+  },
+  {
     version: "1.3.102",
     date: "2026-09-29",
     lines: [
@@ -476,13 +485,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Mê Cung: tài khoản đang bế quan Trợ Chiến thì auto bỏ qua lượt ấy và ghé lại sau, thay vì đứng bấm Lập Đội rồi báo hỏng.",
       "Hộp mừng vượt 5 ải không còn che nút Bắt Đầu của lượt kế.",
       "Ô chọn độ khó nay nói rõ: mỗi ải chỉ thưởng một lần mỗi ngày, và đi Thường trước là mất phần thưởng thêm của Khó/Ác Mộng.",
-    ],
-  },
-  {
-    version: "1.3.53",
-    date: "2026-08-28",
-    lines: [
-      "Sảnh toàn màn hình: dòng chữ mời trong ô nhập thôi bị cắt mất chữ cuối, và ô nhập nay cao dần theo tin đang gõ.",
     ],
   },
 ];

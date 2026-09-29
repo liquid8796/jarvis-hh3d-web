@@ -106,6 +106,8 @@ tử — không bao giờ có hai khôi lỗi ôm cùng một lượt.
 Mọi khôi lỗi nay dùng **Chromium**. Trang Tông Môn không còn lựa chọn trình duyệt thứ hai; worker
 không tải, cài hay nhận cấu hình Obscura nữa. Trên GitHub Actions, workflow tải gói worker hiện hành
 vào `RUNNER_TEMP`, cài Chromium từ chính `playwright-core` đi kèm gói rồi chạy tách khỏi source repo.
+Từ 1.3.103, worker GitHub tự thu đàn khi thấy web sang bản khác và thoát mã 90; workflow coi đó là
+kết thúc sạch rồi dispatch ngay lượt kế để tải runtime mới, thay vì phải chờ cron hoặc ép tay.
 
 Khi cần ép toàn bộ khôi lỗi GitHub sang bản mới, dùng `force-github-khoiloi.bat`. Từ 1.3.93,
 một station 404, repo đã mất hoặc PAT hỏng chỉ bị báo riêng; các repo còn truy cập được vẫn tiếp
@@ -656,7 +658,8 @@ vào repo. Sau promote, Ollama vẫn tiếp tục phát triển source cũ ngay 
 thuộc hạ tầng, model không được sửa hoặc xoá. Nếu primary cũ có thật, nó trở thành repo phụ và
 Actions bị tắt; nếu primary cũ đang hoãn thì không có repo giả nào được thêm. Cutover giữ khoá cho
 cả danh tính cũ/mới và rollback trạng thái Actions nếu ghi sổ thất bại để tránh hai worker chạy cùng
-`WORKER_ID`.
+`WORKER_ID`. Tạo mới, promote và phát hành cả đội dùng cùng một renderer workflow-only, nên cấu trúc
+Actions không còn trôi giữa repo vừa tạo và năm repo đang trực.
 
 Khi một **tài khoản GitHub đã bị xoá/đình chỉ ngoài hệ thống**, nút **Xoá** ở Nuôi kho vẫn phải
 gỡ được station local: form xóa gửi kèm ảnh chụp danh sách repo chính lúc user bấm để chống stale

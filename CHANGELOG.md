@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.103 — Đồng nhất workflow tạo mới, promote và đội GitHub đang trực (29/09/2026)
+
+- Đối chiếu thực tế phát hiện năm repo đang trực vẫn dùng workflow đời trước: chưa bật `WORKER_SELF_UPDATE`, chưa giữ mã thoát 90 và chưa nối ngay một lượt mới sau khi worker thu đàn để thay runtime.
+- Template chung nay biến GitHub Actions thành vòng nuôi thật: worker lệch bản thu đàn sạch rồi thoát 90; workflow ghi nhận đây là kết thúc hợp lệ và dispatch lượt mới tải runtime hiện hành vào `RUNNER_TEMP`.
+- Flow tạo repo trên UI, flow promote repo phụ trên UI, CLI tạo kho và lượt phát hành cả đội đều dùng đúng `buildWorkflowOnlyPayload`; source dự án cũ vẫn thuộc repo và không bị xoá/ghi đè.
+- Thêm regression `verify:github-workflow-parity` khóa byte workflow được stage bởi helper UI với cùng builder dùng cho deploy, đồng thời sửa kiểm tra CLI cũ còn đòi full worker payload.
+
 ## 1.3.102 — Theo component mới của ba quest tài khoản thường (29/09/2026)
 
 - **Điểm Danh** bỏ selector cũ `#checkInButton`: flow chờ `#ddPage`, đọc ô `.dd-tile.is-today`, bấm `#ddStamp` và chỉ nhận thành công khi ô hôm nay có `.is-claimed`.

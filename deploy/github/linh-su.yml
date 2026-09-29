@@ -126,13 +126,29 @@ jobs:
           WORKER_MAX_LIFETIME_MS: ${{ inputs.tuoi_tho_ms || '17400000' }}
           WORKER_DRAIN_TIMEOUT_MS: "3000000"
           WORKER_SOLVE_TURNSTILE: "1"
+          # GitHub Actions chính là vòng nuôi bên ngoài: khi worker thấy web đã sang bản khác,
+          # nó thu đàn sạch rồi thoát 90; bước kế đọc mã ấy và mở ngay một lượt tải runtime mới.
+          WORKER_SELF_UPDATE: "1"
         run: |
-          set -eu
+          set -u
           if [ -z "${WORKER_TOKEN:-}" ]; then
             echo "::error::Missing WORKER_TOKEN secret."
             exit 1
           fi
+
+          set +e
           node "$LINH_SU_RUNTIME/worker.mjs"
+          ma=$?
+          set -e
+          echo "LINH_SU_EXIT=$ma" >> "$GITHUB_ENV"
+
+          # 90 không phải lỗi: worker đã thôi nhận việc mới và chờ mọi đàn đang chạy đi nốt.
+          # Đổi nó thành kết quả xanh để lịch sử Actions không báo hỏng cho một lượt nâng bản sạch.
+          if [ "$ma" -eq 90 ]; then
+            echo "::notice::Worker đã thu đàn để thay runtime; lượt kế sẽ được phát ngay."
+            exit 0
+          fi
+          exit "$ma"
 
       - name: Phát lượt kế
         if: always()
@@ -145,17 +161,21 @@ jobs:
           set -eu
           troi=$(( $(date +%s) - BAT_DAU_LUC ))
 
-          if [ "${TUOI_THO_MS:-0}" -le 0 ]; then
-            echo "::warning::Không đọc được tuổi thọ (TUOI_THO_MS='${TUOI_THO_MS:-}') — không nối chuỗi, để cron đỡ."
-            exit 0
-          fi
+          if [ "${LINH_SU_EXIT:-}" = "90" ]; then
+            echo "Worker chủ động xin thay runtime (mã 90) — bỏ phanh chết-yểu và nối chuỗi ngay."
+          else
+            if [ "${TUOI_THO_MS:-0}" -le 0 ]; then
+              echo "::warning::Không đọc được tuổi thọ (TUOI_THO_MS='${TUOI_THO_MS:-}') — không nối chuỗi, để cron đỡ."
+              exit 0
+            fi
 
-          nguong=$(( TUOI_THO_MS / 2000 ))
-          if [ "$troi" -lt "$nguong" ]; then
-            echo "Lượt này mới sống ${troi}s, chưa quá nửa tuổi thọ (${nguong}s) — KHÔNG nối chuỗi."
-            echo "Đây là phanh: một lượt chết yểu mà vẫn phát lượt kế là đốt phút Actions vô tận."
-            echo "Cron sẽ dựng lại đội trong tối đa 4 giờ."
-            exit 0
+            nguong=$(( TUOI_THO_MS / 2000 ))
+            if [ "$troi" -lt "$nguong" ]; then
+              echo "Lượt này mới sống ${troi}s, chưa quá nửa tuổi thọ (${nguong}s) — KHÔNG nối chuỗi."
+              echo "Đây là phanh: một lượt chết yểu mà vẫn phát lượt kế là đốt phút Actions vô tận."
+              echo "Cron sẽ dựng lại đội trong tối đa 4 giờ."
+              exit 0
+            fi
           fi
 
           # Tệp workflow trong kho khôi lỗi — khớp WORKFLOW_TARGET_PATH của scripts/githubKhoiloi.mts.

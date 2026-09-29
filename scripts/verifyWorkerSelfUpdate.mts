@@ -1,5 +1,5 @@
 /**
- * Phép tự thay gói của khôi lỗi máy nhà — luật thuần, và những mối nối phải còn nguyên.
+ * Phép tự thay gói của khôi lỗi máy nhà lẫn GitHub — luật thuần, và những mối nối phải còn nguyên.
  *
  * Tính năng này có hai nửa: một nửa là JavaScript (kiểm được ở đây), nửa kia là PowerShell/sh
  * trong vòng nuôi (chỉ chạy trên một cái máy thật mới biết). Lưới này giữ nửa kiểm được, và
@@ -157,6 +157,21 @@ for (const [ten, src, batMa, hamThay] of [
 check(
   "vòng nuôi KHÔNG gọi lại bộ cài (bộ cài giết trước tải sau — mất mạng là máy chết)",
   !/install\.ps1[^\n]*\| iex/.test(ps1.slice(ps1.indexOf("function Thay-Goi"))),
+);
+
+console.log("\nMối nối phía GitHub Actions (đọc workflow — KHÔNG gọi GitHub)");
+const workflow = read("deploy/github/linh-su.yml");
+check("workflow bật phép tự thay runtime", /WORKER_SELF_UPDATE:\s*["']1["']/.test(workflow));
+check("bước Trực ca giữ mã thoát vào GITHUB_ENV", /LINH_SU_EXIT=\$ma/.test(workflow));
+check("mã 90 được coi là một lượt thu đàn sạch", /if \[ "\$ma" -eq 90 \]/.test(workflow));
+check(
+  "chỉ mã 90 được bỏ phanh chết-yểu",
+  /if \[ "\$\{LINH_SU_EXIT:-\}" = "90" \]/.test(workflow) &&
+    /if \[ "\$troi" -lt "\$nguong" \]/.test(workflow),
+);
+check(
+  "lượt kế vẫn dispatch đúng workflow linh-su.yml",
+  /actions\/workflows\/linh-su\.yml\/dispatches/.test(workflow),
 );
 
 console.log(`\n${passed} thuận, ${failures.length} nghịch.`);

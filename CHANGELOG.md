@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.106 -- Vấn Đáp theo component 29/09 (schema 86, 30/09/2026)
+
+- Flow VIP và tài khoản thường chuyển sang `#vdStart`, `#vdQuestion`, `#vdAnswers .vd-opt` và `#quiz-wrapper[data-state]`, không còn phụ thuộc cây quiz cũ đã bị gỡ.
+- Khôi lỗi chỉ đọc `.vd-opt__text`, bỏ huy hiệu A/B/C/D; phản hồi server theo `.is-right` / `.is-wrong`, hoàn thành bắt buộc `data-state=done`.
+- Smoke test dựng đúng markup lồng và click Playwright tin cậy từ hai record thường/VIP; version worker tăng lên `1.3.106`.
+
 ## 1.3.105 — Mở tuỳ chọn huyền tinh cho khôi lỗi máy nhà (29/09/2026)
 
 - Tài khoản thường có thể bỏ **Dừng khi đã đủ huyền tinh trong ngày** khi **Giao đàn cho → Máy nhà của tôi**; đây là tài nguyên riêng nên không chiếm ghế chung của tông môn.

@@ -291,6 +291,7 @@ Nên chia thế này:
   Thường tương ứng.
 - **Trình duyệt được TIÊM VÀO.** `runCycle` nhận `chromium` từ người gọi, nên `quest-engine/`
   không phụ thuộc Playwright và bundle của Next không kéo theo thư viện nó không dùng.
+- **Vấn Đáp theo component 29/09.** Cả VIP và tài khoản thường dùng `#vdStart`, `#vdQuestion`, `#vdAnswers .vd-opt` và `#quiz-wrapper[data-state]`; nhãn A/B/C/D không còn làm lệch phép khớp đáp án.
 - **Vấn Đáp dùng cùng danh sách tham khảo với PC.** Worker tải toàn bộ bảng cộng đồng về máy,
   cache 12 giờ rồi so câu/đáp án cục bộ. Parser chịu được thẻ có thuộc tính/thiếu đóng và thử
   tải lại một lần nếu nguồn tạm rỗng. Nó bỏ dấu, số thứ tự và ghi chú cuối, nhưng chỉ chấp nhận

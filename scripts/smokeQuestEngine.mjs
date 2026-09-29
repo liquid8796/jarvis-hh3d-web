@@ -114,12 +114,14 @@ const PAGE = `<!doctype html>
 
   <button id="btn-disabled" class="btn-disabled">Đã nhận</button>
 
-  <div id="quiz-fixture">
-    <div id="question">Vũ hồn thứ hai của Đường Tam là gì?</div>
-    <button class="quiz-option">Lam Ngân Thảo</button>
-    <button class="quiz-option">Nhu Cốt Thỏ</button>
-    <button class="quiz-option">Hạo Thiên Chùy</button>
-    <button class="quiz-option">Thất Bảo Lưu Ly Tháp</button>
+  <div id="quiz-wrapper" data-state="quiz">
+    <h2 id="vdQuestion">Vũ hồn thứ hai của Đường Tam là gì?</h2>
+    <div id="vdAnswers">
+      <button class="vd-opt"><span class="vd-opt__key">A</span><span class="vd-opt__text">Lam Ngân Thảo</span></button>
+      <button class="vd-opt"><span class="vd-opt__key">B</span><span class="vd-opt__text">Nhu Cốt Thỏ</span></button>
+      <button class="vd-opt"><span class="vd-opt__key">C</span><span class="vd-opt__text">Hạo Thiên Chùy</span></button>
+      <button class="vd-opt"><span class="vd-opt__key">D</span><span class="vd-opt__text">Thất Bảo Lưu Ly Tháp</span></button>
+    </div>
   </div>
 
   <div id="mode-normal" class="is-normal">phòng thường</div>
@@ -139,12 +141,17 @@ const PAGE = `<!doctype html>
       const el = document.getElementById('tally');
       el.textContent = String(Number(el.textContent) + 1);
     });
-    document.querySelectorAll('#quiz-fixture .quiz-option').forEach((option) => {
+    document.querySelectorAll('#vdAnswers .vd-opt').forEach((option) => {
       option.addEventListener('click', (event) => {
         if (!event.isTrusted) return;
-        document.getElementById('quiz-fixture').dataset.chosen = option.textContent.trim();
-        document.querySelectorAll('#quiz-fixture .quiz-option').forEach((item) => {
-          item.classList.toggle('correct', item.textContent.trim() === 'Hạo Thiên Chùy');
+        const answer = option.querySelector('.vd-opt__text').textContent.trim();
+        document.getElementById('quiz-wrapper').dataset.chosen = answer;
+        document.querySelectorAll('#vdAnswers .vd-opt').forEach((item) => {
+          const text = item.querySelector('.vd-opt__text').textContent.trim();
+          item.classList.toggle('is-right', text === 'Hạo Thiên Chùy');
+          item.classList.toggle('is-wrong', item === option && text !== 'H\u1ea1o Thi\u00ean Ch\u00f9y');
+          item.classList.toggle('is-dim', item !== option);
+          item.disabled = true;
         });
       });
     });
@@ -2389,10 +2396,46 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // nhà cho cả ba chỗ vào mỏ, đoạt mỏ và mua phù. Cả hai twin VIP/thường cùng đổi.
     // 84 = Hoang Vực page 26/09: remaining-attacks became data-count + ra-count; at zero
     // attempts the site can show #battle-button again, so completion/witness logic must ignore it.
-    "profile schema is 85",
-    loadProfileForSchema().schemaVersion === 85,
+    "profile schema is 86",
+    loadProfileForSchema().schemaVersion === 86,
     String(loadProfileForSchema().schemaVersion),
   );
+
+  for (const quizId of ["van-dap", "van-dap-thuong"]) {
+    const quiz = loadProfileForSchema().quests.find((q) => q.id === quizId);
+    const all = flatSteps(quiz.steps);
+    const repeat = quiz.steps.find((step) => step.action === "repeat");
+    const raw = JSON.stringify(quiz);
+
+    check(
+      `${quizId}: refreshed component uses #vdStart, #vdQuestion and #vdAnswers .vd-opt`,
+      all.some((step) => step.action === "click" && step.selector === "#vdStart") &&
+        all.some((step) => step.action === "answerQuiz" && step.selector === "#vdQuestion") &&
+        all.some((step) => step.action === "answerQuiz" && String(step.optionsSelector).includes("#vdAnswers .vd-opt")),
+    );
+    check(
+      `${quizId}: completion uses data-state=done at entry, repeat exit and final witness`,
+      quiz.steps.some(
+        (step) => step.action === "stopIf" && step.condition?.selector === "#quiz-wrapper[data-state='done']",
+      ) &&
+        repeat?.until?.selector === "#quiz-wrapper[data-state='done']" &&
+        quiz.steps.some(
+          (step) => step.action === "waitForCondition" && step.condition?.selector === "#quiz-wrapper[data-state='done']",
+        ),
+    );
+    check(
+      `${quizId}: server feedback uses is-right/is-wrong instead of old correct class`,
+      all.some((step) => String(step.condition?.selector ?? "").includes(".vd-opt.is-right")) &&
+        all.some((step) => String(step.condition?.selector ?? "").includes(".vd-opt.is-wrong")),
+    );
+    check(
+      `${quizId}: obsolete quiz selectors are absent from the profile`,
+      !raw.includes("#start-quiz-button") &&
+        !raw.includes("#quiz-container .option") &&
+        !raw.includes('"#question"'),
+      raw.match(/#(?:start-quiz-button|quiz-container|question)/g)?.join(", ") ?? "clean",
+    );
+  }
 
   const housePanel = "#hh3d-confirm-layer .hh3d-confirm__panel";
   const houseYes = "#hh3d-confirm-layer .hh3d-confirm__btn--confirm";
@@ -4850,15 +4893,15 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     const quizResult = await runQuiz(questOf([
       {
         action: "answerQuiz",
-        selector: "#question",
-        optionsSelector: "#quiz-fixture .quiz-option",
+        selector: "#vdQuestion",
+        optionsSelector: "#vdAnswers .vd-opt",
         timeoutMs: 5000,
       },
     ]));
     check("engine dùng danh sách và hoàn tất bước answerQuiz", quizResult.outcome === "completed", quizResult.outcome);
     check(
       "đáp án đi qua click Playwright thật và được trang ghi nhận",
-      (await page.evaluate(() => document.getElementById("quiz-fixture").dataset.chosen)) === "Hạo Thiên Chùy",
+      (await page.evaluate(() => document.getElementById("quiz-wrapper").dataset.chosen)) === "Hạo Thiên Chùy",
     );
     check(
       "nhật ký flow ghi nguồn danh sách tham khảo",
@@ -4867,15 +4910,18 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     );
 
     await page.evaluate(() => {
-      document.getElementById("question").textContent = "Câu chưa hề có trong danh sách?";
-      delete document.getElementById("quiz-fixture").dataset.chosen;
-      document.querySelectorAll("#quiz-fixture .quiz-option").forEach((item) => item.classList.remove("correct"));
+      document.getElementById("vdQuestion").textContent = "Câu chưa hề có trong danh sách?";
+      delete document.getElementById("quiz-wrapper").dataset.chosen;
+      document.querySelectorAll("#vdAnswers .vd-opt").forEach((item) => {
+        item.classList.remove("is-right", "is-wrong", "is-dim");
+        item.disabled = false;
+      });
     });
     const unknownQuiz = await runQuiz(questOf([
       {
         action: "answerQuiz",
-        selector: "#question",
-        optionsSelector: "#quiz-fixture .quiz-option",
+        selector: "#vdQuestion",
+        optionsSelector: "#vdAnswers .vd-opt",
         timeoutMs: 5000,
       },
     ]));
@@ -4886,7 +4932,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     );
     check(
       "câu lạ không bấm đại lựa chọn nào",
-      (await page.evaluate(() => document.getElementById("quiz-fixture").dataset.chosen)) === undefined,
+      (await page.evaluate(() => document.getElementById("quiz-wrapper").dataset.chosen)) === undefined,
     );
 
     console.log("\nGuard, stopIf, kênh tường thuật");
@@ -5781,8 +5827,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         asDailyQuest([
           {
             action: "answerQuiz",
-            selector: "#question",
-            optionsSelector: "#quiz-fixture .quiz-option",
+            selector: "#vdQuestion",
+            optionsSelector: "#vdAnswers .vd-opt",
             timeoutMs: 5000,
           },
         ]),

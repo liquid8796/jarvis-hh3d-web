@@ -203,7 +203,10 @@ export function createSession(page, options) {
 
         const readOption = async (index) => {
           try {
-            return await options.nth(index).innerText({ timeout: 2000 });
+            const option = options.nth(index);
+            const text = option.locator(".vd-opt__text");
+            if (await text.count()) return await text.first().innerText({ timeout: 2000 });
+            return await option.innerText({ timeout: 2000 });
           } catch {
             return null;
           }

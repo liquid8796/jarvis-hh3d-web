@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 85,
+  "schemaVersion": 86,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -841,9 +841,9 @@
         },
         {
           "action": "waitForSelector",
-          "selector": "#quiz-wrapper, #start-quiz-button",
+          "selector": "#quiz-wrapper, #vdStart",
           "timeoutMs": 25000,
-          "note": "ch\u1EDD trang v\u1EA5n \u0111\u00E1p render \u2014 ng\u00E0y m\u1EDBi c\u00F3 #start-quiz-button, ng\u00E0y \u0111\u00E3 xong ch\u1EC9 c\u00F2n #quiz-wrapper v\u1EDBi c\u00E2u ch\u00FAc m\u1EEBng"
+          "note": "ch\u1EDD V\u1EA5n T\u00E2m \u0110\u00E0i render \u2014 component m\u1EDBi lu\u00F4n c\u00F3 #quiz-wrapper; n\u00FAt b\u1EAFt \u0111\u1EA7u/ti\u1EBFp t\u1EE5c l\u00E0 #vdStart"
         },
         {
           "action": "stopIf",
@@ -851,20 +851,19 @@
           "timeoutMs": 15000,
           "note": "trang t\u1EF1 b\u00E1o \u0022\u0110\u1EA1o h\u1EEFu \u0111\u00E3 ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p h\u00F4m nay!\u0022 ngay khi m\u1EDF \u2014 kh\u00F4ng c\u00F2n g\u00EC \u0111\u1EC3 l\u00E0m",
           "condition": {
-            "kind": "textMatches",
-            "selector": "#quiz-wrapper",
-            "text": "ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p"
+            "kind": "visible",
+            "selector": "#quiz-wrapper[data-state='done']"
           }
         },
         {
           "action": "click",
-          "selector": "#start-quiz-button",
+          "selector": "#vdStart",
           "timeoutMs": 8000,
           "note": "B\u1EAET \u0110\u1EA6U V\u1EA4N \u0110\u00C1P \u2014 m\u1ED9t c\u00FA b\u1EA5m t\u1EA3i c\u1EA3 5 c\u00E2u c\u1EE7a ng\u00E0y (API 7cfa6143)",
           "optional": true,
           "when": {
             "kind": "visible",
-            "selector": "#start-quiz-button"
+            "selector": "#vdStart"
           }
         },
         {
@@ -874,7 +873,7 @@
           "optional": true,
           "condition": {
             "kind": "visible",
-            "selector": "#quiz-container .option"
+            "selector": "#quiz-wrapper[data-state='quiz'] #vdAnswers .vd-opt"
           }
         },
         {
@@ -889,19 +888,19 @@
               "optional": true,
               "condition": {
                 "kind": "enabled",
-                "selector": "#quiz-container .option"
+                "selector": "#quiz-wrapper[data-state='quiz'] #vdAnswers .vd-opt"
               }
             },
             {
               "action": "answerQuiz",
-              "selector": "#question",
+              "selector": "#vdQuestion",
               "timeoutMs": 15000,
               "note": "\u0111\u1ECDc c\u00E2u h\u1ECFi \u002B 4 l\u1EF1a ch\u1ECDn, tra \u0111\u00E1p \u00E1n r\u1ED3i click theo TEXT \u2014 b\u1ECF qua \u00EAm n\u1EBFu l\u01B0\u1EE3t n\u00E0y kh\u00F4ng c\u00F2n c\u00E2u n\u00E0o (v\u1EEBa xong c\u00E2u cu\u1ED1i)",
               "when": {
                 "kind": "visible",
-                "selector": "#quiz-container .option"
+                "selector": "#quiz-wrapper[data-state='quiz'] #vdAnswers .vd-opt"
               },
-              "optionsSelector": "#quiz-container .option"
+              "optionsSelector": "#quiz-wrapper[data-state='quiz'] #vdAnswers .vd-opt"
             },
             {
               "action": "waitForCondition",
@@ -910,11 +909,11 @@
               "optional": true,
               "condition": {
                 "kind": "visible",
-                "selector": "#quiz-container .option.correct"
+                "selector": "#vdAnswers .vd-opt.is-right, #vdAnswers .vd-opt.is-wrong"
               },
               "when": {
                 "kind": "visible",
-                "selector": "#quiz-container .option"
+                "selector": "#quiz-wrapper[data-state='quiz'] #vdAnswers .vd-opt"
               }
             },
             {
@@ -924,18 +923,17 @@
               "optional": true,
               "condition": {
                 "kind": "hidden",
-                "selector": "#quiz-container .option.correct"
+                "selector": "#vdAnswers .vd-opt.is-right, #vdAnswers .vd-opt.is-wrong"
               },
               "when": {
                 "kind": "visible",
-                "selector": "#quiz-container .option.correct"
+                "selector": "#vdAnswers .vd-opt.is-right, #vdAnswers .vd-opt.is-wrong"
               }
             }
           ],
           "until": {
-            "kind": "textMatches",
-            "selector": "#quiz-wrapper",
-            "text": "ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p"
+            "kind": "visible",
+            "selector": "#quiz-wrapper[data-state='done']"
           },
           "maxIterations": 6,
           "maxSeconds": 300
@@ -945,9 +943,8 @@
           "timeoutMs": 10000,
           "note": "l\u01B0\u1EDBi an to\u00E0n: h\u1EBFt v\u00F2ng m\u00E0 trang KH\u00D4NG t\u1EF1 b\u00E1o ho\u00E0n th\u00E0nh th\u00EC b\u00E1o l\u1ED7i r\u00F5 r\u00E0ng \u2014 kh\u00F4ng nh\u1EADn v\u01A1 l\u00E0 xong nh\u01B0 modal hub \u0111\u00E3 l\u1EEBa \u0111\u01B0\u1EE3c flow c\u0169",
           "condition": {
-            "kind": "textMatches",
-            "selector": "#quiz-wrapper",
-            "text": "ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p"
+            "kind": "visible",
+            "selector": "#quiz-wrapper[data-state='done']"
           }
         }
       ],
@@ -2640,9 +2637,9 @@
         },
         {
           "action": "waitForSelector",
-          "selector": "#quiz-wrapper, #start-quiz-button",
+          "selector": "#quiz-wrapper, #vdStart",
           "timeoutMs": 25000,
-          "note": "ch\u1EDD trang v\u1EA5n \u0111\u00E1p render \u2014 ng\u00E0y m\u1EDBi c\u00F3 #start-quiz-button, ng\u00E0y \u0111\u00E3 xong ch\u1EC9 c\u00F2n #quiz-wrapper v\u1EDBi c\u00E2u ch\u00FAc m\u1EEBng"
+          "note": "ch\u1EDD V\u1EA5n T\u00E2m \u0110\u00E0i render \u2014 component m\u1EDBi lu\u00F4n c\u00F3 #quiz-wrapper; n\u00FAt b\u1EAFt \u0111\u1EA7u/ti\u1EBFp t\u1EE5c l\u00E0 #vdStart"
         },
         {
           "action": "stopIf",
@@ -2650,20 +2647,19 @@
           "timeoutMs": 15000,
           "note": "trang t\u1EF1 b\u00E1o \u0022\u0110\u1EA1o h\u1EEFu \u0111\u00E3 ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p h\u00F4m nay!\u0022 ngay khi m\u1EDF \u2014 kh\u00F4ng c\u00F2n g\u00EC \u0111\u1EC3 l\u00E0m",
           "condition": {
-            "kind": "textMatches",
-            "selector": "#quiz-wrapper",
-            "text": "ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p"
+            "kind": "visible",
+            "selector": "#quiz-wrapper[data-state='done']"
           }
         },
         {
           "action": "click",
-          "selector": "#start-quiz-button",
+          "selector": "#vdStart",
           "timeoutMs": 8000,
           "note": "B\u1EAET \u0110\u1EA6U V\u1EA4N \u0110\u00C1P \u2014 m\u1ED9t c\u00FA b\u1EA5m t\u1EA3i c\u1EA3 5 c\u00E2u c\u1EE7a ng\u00E0y (API 7cfa6143)",
           "optional": true,
           "when": {
             "kind": "visible",
-            "selector": "#start-quiz-button"
+            "selector": "#vdStart"
           }
         },
         {
@@ -2673,7 +2669,7 @@
           "optional": true,
           "condition": {
             "kind": "visible",
-            "selector": "#quiz-container .option"
+            "selector": "#quiz-wrapper[data-state='quiz'] #vdAnswers .vd-opt"
           }
         },
         {
@@ -2688,19 +2684,19 @@
               "optional": true,
               "condition": {
                 "kind": "enabled",
-                "selector": "#quiz-container .option"
+                "selector": "#quiz-wrapper[data-state='quiz'] #vdAnswers .vd-opt"
               }
             },
             {
               "action": "answerQuiz",
-              "selector": "#question",
+              "selector": "#vdQuestion",
               "timeoutMs": 15000,
               "note": "\u0111\u1ECDc c\u00E2u h\u1ECFi \u002B 4 l\u1EF1a ch\u1ECDn, tra \u0111\u00E1p \u00E1n r\u1ED3i click theo TEXT \u2014 b\u1ECF qua \u00EAm n\u1EBFu l\u01B0\u1EE3t n\u00E0y kh\u00F4ng c\u00F2n c\u00E2u n\u00E0o (v\u1EEBa xong c\u00E2u cu\u1ED1i)",
               "when": {
                 "kind": "visible",
-                "selector": "#quiz-container .option"
+                "selector": "#quiz-wrapper[data-state='quiz'] #vdAnswers .vd-opt"
               },
-              "optionsSelector": "#quiz-container .option"
+              "optionsSelector": "#quiz-wrapper[data-state='quiz'] #vdAnswers .vd-opt"
             },
             {
               "action": "waitForCondition",
@@ -2709,11 +2705,11 @@
               "optional": true,
               "condition": {
                 "kind": "visible",
-                "selector": "#quiz-container .option.correct"
+                "selector": "#vdAnswers .vd-opt.is-right, #vdAnswers .vd-opt.is-wrong"
               },
               "when": {
                 "kind": "visible",
-                "selector": "#quiz-container .option"
+                "selector": "#quiz-wrapper[data-state='quiz'] #vdAnswers .vd-opt"
               }
             },
             {
@@ -2723,18 +2719,17 @@
               "optional": true,
               "condition": {
                 "kind": "hidden",
-                "selector": "#quiz-container .option.correct"
+                "selector": "#vdAnswers .vd-opt.is-right, #vdAnswers .vd-opt.is-wrong"
               },
               "when": {
                 "kind": "visible",
-                "selector": "#quiz-container .option.correct"
+                "selector": "#vdAnswers .vd-opt.is-right, #vdAnswers .vd-opt.is-wrong"
               }
             }
           ],
           "until": {
-            "kind": "textMatches",
-            "selector": "#quiz-wrapper",
-            "text": "ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p"
+            "kind": "visible",
+            "selector": "#quiz-wrapper[data-state='done']"
           },
           "maxIterations": 6,
           "maxSeconds": 300
@@ -2744,9 +2739,8 @@
           "timeoutMs": 10000,
           "note": "l\u01B0\u1EDBi an to\u00E0n: h\u1EBFt v\u00F2ng m\u00E0 trang KH\u00D4NG t\u1EF1 b\u00E1o ho\u00E0n th\u00E0nh th\u00EC b\u00E1o l\u1ED7i r\u00F5 r\u00E0ng \u2014 kh\u00F4ng nh\u1EADn v\u01A1 l\u00E0 xong nh\u01B0 modal hub \u0111\u00E3 l\u1EEBa \u0111\u01B0\u1EE3c flow c\u0169",
           "condition": {
-            "kind": "textMatches",
-            "selector": "#quiz-wrapper",
-            "text": "ho\u00E0n th\u00E0nh V\u1EA5n \u0110\u00E1p"
+            "kind": "visible",
+            "selector": "#quiz-wrapper[data-state='done']"
           }
         }
       ],

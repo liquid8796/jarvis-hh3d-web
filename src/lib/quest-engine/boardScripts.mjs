@@ -589,6 +589,14 @@ export function quizProbe(arg) {
     return /(^|[\s_-])(disabled|is-disabled|locked|inactive)([\s_-]|$)/.test(cls);
   };
 
+  // The refreshed quiz keeps A/B/C/D in `.vd-opt__key` and the semantic answer in
+  // `.vd-opt__text`. Reading the whole button would turn "Bach Ho" into "B Bach Ho" and
+  // make an otherwise exact directory match fail. Older markup falls back to innerText.
+  const optionText = (el) => {
+    const text = el && el.querySelector ? el.querySelector(".vd-opt__text") : null;
+    return ((text || el)?.innerText || "").trim();
+  };
+
   const qs = arg && arg.question ? String(arg.question) : "";
   const os = arg && arg.options ? String(arg.options) : "";
   const out = { question: "", options: [], enabled: [] };
@@ -600,7 +608,7 @@ export function quizProbe(arg) {
     const opts = os ? Array.from(document.querySelectorAll(os)) : [];
     for (const el of opts) {
       if (!rendered(el)) continue;
-      out.options.push((el.innerText || "").trim());
+      out.options.push(optionText(el));
       out.enabled.push(!blocked(el));
     }
   } catch (e) {
@@ -611,9 +619,9 @@ export function quizProbe(arg) {
 }
 
 /**
- * Sau khi trả lời, site đánh dấu đáp án đúng. Đọc lại nó là cách DUY NHẤT để kho đáp án lớn
- * lên — và nó đúng bất kể câu vừa trả lời sai hay đúng, vì dấu ấy rơi vào đáp án đúng trong
- * cả hai trường hợp.
+ * Sau khi trả lời đúng, site đánh dấu chính lựa chọn ấy bằng `is-right`; đọc lại nó cho phép
+ * kho đáp án học thêm. Một câu trả lời sai chỉ có `is-wrong`, đủ xác nhận server đã xử lý nhưng
+ * không tiết lộ đáp án đúng, nên tuyệt đối không học từ trạng thái đó.
  */
 export function quizCorrectAnswer(arg) {
   const os = arg && arg.options ? String(arg.options) : "";
@@ -624,12 +632,17 @@ export function quizCorrectAnswer(arg) {
     return "";
   }
 
+  const optionText = (el) => {
+    const text = el && el.querySelector ? el.querySelector(".vd-opt__text") : null;
+    return ((text || el)?.innerText || "").trim();
+  };
+
   for (const el of opts) {
     const cls = (el.getAttribute("class") || "").toLowerCase();
-    // Word-boundary match: "incorrect" and "correct-answer" must not be confused, and a
-    // class named exactly "incorrect" would otherwise contain "correct".
-    if (/(^|[\s_-])correct([\s_-]|$)/.test(cls)) {
-      return (el.innerText || "").trim();
+    // Older quiz pages used `correct`; the refreshed component uses `is-right`. Keep
+    // token boundaries so `incorrect` and `is-wrong` can never be mistaken for success.
+    if (/(^|[\s_-])(correct|is-right)([\s_-]|$)/.test(cls)) {
+      return optionText(el);
     }
   }
 

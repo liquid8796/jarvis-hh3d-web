@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.106",
+    date: "2026-09-30",
+    lines: [
+      "Vấn Đáp nay nhận diện giao diện mới cho cả tài khoản VIP và thường.",
+      "Khôi lỗi đọc đúng nội dung đáp án, không còn nhầm chữ A, B, C, D vào tên lựa chọn.",
+      "Trạng thái trả lời và hoàn thành được chờ theo trang thật thay vì bộ chọn cũ.",
+    ],
+  },
+  {
     version: "1.3.105",
     date: "2026-09-29",
     lines: [

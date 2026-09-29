@@ -5,7 +5,7 @@ import { saveConfigAction, type ActionResult } from "@/app/actions/automation";
 import type { DashboardAccount } from "@/lib/realtime/dashboardTypes";
 import type { EditableConfig } from "@/lib/services/configs";
 import { AccountManager } from "./AccountManager";
-import { useDashboardAccountLive } from "./DashboardLiveProvider";
+import { useDashboardAccountLive, useDashboardWorkerPref } from "./DashboardLiveProvider";
 import { PillBagCapacitySummary } from "./PillBagCapacitySummary";
 
 /**
@@ -775,7 +775,8 @@ function SimpleQuestGrid({
 }
 
 /**
- * Hộp cảnh báo khi đạo hữu thường thử gỡ khoá「Dừng khi đã đủ huyền tinh」.
+ * Hộp cảnh báo khi đạo hữu thường thử gỡ khoá「Dừng khi đã đủ huyền tinh」trong lúc đàn vẫn
+ * có thể đi qua khôi lỗi tông môn.
  *
  * Là một hộp thật chứ không phải một dòng chữ đỏ nhỏ bên dưới: hành động vừa rồi ĐÃ BỊ TỪ
  * CHỐI, và một lời từ chối trôi qua trong ngoại vi tầm mắt sẽ bị đọc thành "tôi bấm hụt" —
@@ -809,8 +810,9 @@ function CapLockDialog({ onClose }: { onClose: () => void }) {
           lượt chiếm sạch chỗ — những đạo hữu còn lại xếp hàng cả ngày mà không hiểu vì sao.
         </p>
         <p className="mb-5 text-sm leading-relaxed text-[var(--color-mist)]">
-          Vì vậy「Dừng khi đã đủ huyền tinh trong ngày」luôn được bật. Chỉ tông chủ mới gỡ
-          được khoá này.
+          Với「Khôi lỗi tông môn」hoặc「Ai rảnh cũng được」, tuỳ chọn này luôn được bật. Chọn
+          「Máy nhà của tôi」ở mục Giao đàn cho nếu muốn tự bỏ tick và đánh hết lượt bằng tài
+          nguyên riêng của mình.
         </p>
         {/* type="button" là bắt buộc: hộp này nằm TRONG <form>, mà một <button> trần mặc
             định là submit — bấm "Đã hiểu" sẽ khắc luôn ngọc giản. */}
@@ -862,6 +864,7 @@ function QuestLockedDialog({ quest, onClose }: { quest: SimpleQuest; onClose: ()
 
 export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmin: boolean }) {
   const { accounts } = useDashboardAccountLive();
+  const { workerPref } = useDashboardWorkerPref();
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
     saveConfigAction,
     null,
@@ -869,11 +872,13 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
   const [meCung, setMeCung] = useState(config.quests.meCung.enabled);
   /**
    * Ô「Dừng khi đã đủ huyền tinh」là ô DUY NHẤT có kiểm soát trong khối này, vì nó là ô duy
-   * nhất có luật. Với đạo hữu thường nó khởi đầu bằng `true` bất kể trong ngọc giản đang ghi
-   * gì: document cũ có thể còn mang `false` từ trước khi có luật, và vẽ ra một ô chưa tick
-   * là hứa một điều mà cửa phát việc sẽ không giữ.
+   * nhất có luật. Với đạo hữu thường, `false` chỉ được vẽ thật khi họ chọn `mine`; ở `sect`
+   * hoặc `any` nó khởi đầu bằng true bất kể document cũ ghi gì, vì cửa phát việc tông môn vẫn
+   * sẽ bật lại để giữ ghế chung.
    */
-  const [capCheck, setCapCheck] = useState(isAdmin ? config.quests.meCung.capCheck : true);
+  const capEditable = isAdmin || workerPref === "mine";
+  const [capCheck, setCapCheck] = useState(config.quests.meCung.capCheck);
+  const effectiveCapCheck = capEditable ? capCheck : true;
   const [capLocked, setCapLocked] = useState(false);
   const [luyenDan, setLuyenDan] = useState(config.quests.luyenDan.enabled);
   const [luyenDanThuong, setLuyenDanThuong] = useState(config.quests.luyenDanThuong.enabled);
@@ -888,6 +893,7 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
   const { collapsed, toggle: toggleCollapsed } = useCollapsedBlocks();
   /** Nhiệm vụ đang khoá mà người dùng vừa bấm vào — `null` là không có popup nào. */
   const [lockedQuest, setLockedQuest] = useState<SimpleQuest | null>(null);
+
   const [simpleEnabled, setSimpleEnabled] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(
       SIMPLE_QUESTS.map((quest) => [
@@ -1171,9 +1177,9 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
             <input
               type="checkbox"
               name="meCungCapCheck"
-              checked={capCheck}
+              checked={effectiveCapCheck}
               onChange={(event) => {
-                if (!isAdmin && !event.target.checked) {
+                if (!capEditable && !event.target.checked) {
                   setCapLocked(true);
                   return;
                 }
@@ -1185,7 +1191,9 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
             <span className="text-xs text-[var(--color-mist)]">
               {isAdmin
                 ? "(bỏ tick để đánh hết lượt)"
-                : "(khoá bật — Mê Cung giữ ghế khôi lỗi tông môn rất lâu)"}
+                : workerPref === "mine"
+                  ? "(máy nhà — có thể bỏ tick để đánh hết lượt)"
+                  : "(khoá bật — Mê Cung giữ ghế khôi lỗi tông môn rất lâu)"}
             </span>
           </label>
         </div>

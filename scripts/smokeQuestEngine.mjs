@@ -1903,7 +1903,7 @@ async function main() {
 
   // Mê Cung là nhiệm vụ duy nhất giữ một phiên trình duyệt hàng chục phút, và khôi lỗi tông
   // môn chỉ có vài ghế. Bỏ tick「dừng khi đủ huyền tinh」= đánh hết lượt = một đàn ngồi gần
-  // trọn ngày trong đó. Nên với đạo hữu thường, luật bật lại nó; tông chủ được miễn.
+  // trọn ngày trong đó. Đạo hữu thường chỉ được bỏ tick ở `mine`; `any` và `sect` vẫn khoá.
   const { enforceMazeCapPolicy } = await import("../src/lib/services/configs.ts");
   const uncapped = configSchema.parse({
     quests: {
@@ -1912,8 +1912,8 @@ async function main() {
     },
   });
 
-  const forced = enforceMazeCapPolicy(uncapped, { isAdmin: false });
-  check("đạo hữu thường: tick bị bật lại", forced.quests.meCung.capCheck === true);
+  const forced = enforceMazeCapPolicy(uncapped, { isAdmin: false, workerPref: "sect" });
+  check("đạo hữu thường trên ghế tông môn: tick bị bật lại", forced.quests.meCung.capCheck === true);
   check(
     "và luật KHÔNG đụng vào bất kỳ lựa chọn nào khác",
     forced.quests.meCung.mode === "is-nightmare" &&
@@ -1926,8 +1926,16 @@ async function main() {
   // sửa tại chỗ thì hai vế của phép so luôn là một.
   check("luật không sửa vật gốc", uncapped.quests.meCung.capCheck === false);
   check(
+    "đạo hữu thường dùng máy nhà được bỏ tick thật",
+    enforceMazeCapPolicy(uncapped, { isAdmin: false, workerPref: "mine" }) === uncapped,
+  );
+  check(
+    "lối ai rảnh cũng được vẫn khoá vì có thể rơi vào ghế tông môn",
+    enforceMazeCapPolicy(uncapped, { isAdmin: false, workerPref: "any" }).quests.meCung.capCheck === true,
+  );
+  check(
     "tông chủ được miễn — bỏ tick là thật",
-    enforceMazeCapPolicy(uncapped, { isAdmin: true }).quests.meCung.capCheck === false,
+    enforceMazeCapPolicy(uncapped, { isAdmin: true, workerPref: "sect" }).quests.meCung.capCheck === false,
   );
 
   // saveConfigAction phân biệt "đã ghi đè" với "không phải làm gì" bằng phép so THAM CHIẾU,
@@ -1936,15 +1944,15 @@ async function main() {
   const alreadyCapped = configSchema.parse({ quests: { meCung: { enabled: true, capCheck: true } } });
   check(
     "đã bật sẵn → trả về CHÍNH vật cũ (nơi gọi so tham chiếu để biết có ghi đè không)",
-    enforceMazeCapPolicy(alreadyCapped, { isAdmin: false }) === alreadyCapped,
+    enforceMazeCapPolicy(alreadyCapped, { isAdmin: false, workerPref: "sect" }) === alreadyCapped,
   );
   check(
     "tông chủ → cũng trả về chính vật cũ, không có gì để nói",
-    enforceMazeCapPolicy(uncapped, { isAdmin: true }) === uncapped,
+    enforceMazeCapPolicy(uncapped, { isAdmin: true, workerPref: "sect" }) === uncapped,
   );
   check(
     "và ca có ghi đè thì KHÁC tham chiếu",
-    enforceMazeCapPolicy(uncapped, { isAdmin: false }) !== uncapped,
+    enforceMazeCapPolicy(uncapped, { isAdmin: false, workerPref: "sect" }) !== uncapped,
   );
 
   // Hai cửa ghi/chạy phải cùng áp luật. Soát trên nguồn vì cả hai đều là route/action cần
@@ -1959,11 +1967,11 @@ async function main() {
   // nguyên văn nguồn phải được sửa cùng nhịp với nguồn, nếu không nó chỉ còn là tiếng ồn.
   check(
     "đường LƯU ngọc giản áp luật theo vai của người gọi",
-    /enforceMazeCapPolicy\(\s*parsed\.data,\s*\{\s*isAdmin: isAdminUser\(user\)/.test(automationSrc),
+    automationSrc.includes("workerPref: current.workerPref"),
   );
   check(
     "cửa PHÁT VIỆC của khôi lỗi tông môn cũng áp luật (phủ cả document cũ)",
-    /enforceMazeCapPolicy\(config, \{ isAdmin: owner !== null && isAdminUser\(owner\) \}\)/.test(workerRouteSrc) &&
+    workerRouteSrc.includes('workerPref: "sect"') &&
       workerRouteSrc.includes('scope.kind === "operator"'),
   );
   check(

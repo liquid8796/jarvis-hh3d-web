@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.105",
+    date: "2026-09-29",
+    lines: [
+      "Tài khoản thường nay có thể bỏ giới hạn huyền tinh khi giao đàn riêng cho khôi lỗi máy nhà.",
+      "Khôi lỗi tông môn và lựa chọn ai rảnh cũng được vẫn giữ giới hạn để không chiếm ghế chung quá lâu.",
+      "Đổi loại khôi lỗi trên màn hình sẽ mở hoặc khoá tuỳ chọn ngay, không cần tải lại trang.",
+    ],
+  },
+  {
     version: "1.3.104",
     date: "2026-09-29",
     lines: [
@@ -477,14 +486,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-30",
     lines: [
       "Hoang Vực: khi trang game báo hết phiên tấn công, máy chạy tự động nay tải lại rồi đánh lại ngay trong vòng đó, thay vì bỏ dở và chờ vòng sau.",
-    ],
-  },
-  {
-    version: "1.3.55",
-    date: "2026-08-25",
-    lines: [
-      "Bảng Hoạt động nay gọi đúng tên mục cài đặt như trên Ngọc Giản, thay vì mã nội bộ khó đoán.",
-      "Bỏ một dòng nhắc thừa vẫn hiện ra dù đạo hữu chưa tự đặt gì.",
     ],
   },
 

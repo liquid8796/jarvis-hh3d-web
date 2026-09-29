@@ -17,6 +17,7 @@ import type {
   DashboardLivePayload,
   DashboardPresence,
 } from "@/lib/realtime/dashboardTypes";
+import type { WorkerPref } from "@/lib/services/configs";
 
 type DashboardJobLiveValue = {
   /** Job mới nhất của từng tài khoản, theo thứ tự tạo tài khoản. */
@@ -36,9 +37,15 @@ type DashboardAccountLiveValue = {
   accounts: DashboardAccount[];
 };
 
+type DashboardWorkerPrefValue = {
+  workerPref: WorkerPref;
+  setWorkerPref: (pref: WorkerPref) => void;
+};
+
 const DashboardJobLiveContext = createContext<DashboardJobLiveValue | null>(null);
 const DashboardPresenceLiveContext = createContext<DashboardPresenceLiveValue | null>(null);
 const DashboardAccountLiveContext = createContext<DashboardAccountLiveValue | null>(null);
+const DashboardWorkerPrefContext = createContext<DashboardWorkerPrefValue | null>(null);
 
 export function useDashboardJobLive(): DashboardJobLiveValue {
   const value = useContext(DashboardJobLiveContext);
@@ -55,6 +62,17 @@ export function useDashboardPresenceLive(): DashboardPresenceLiveValue {
 export function useDashboardAccountLive(): DashboardAccountLiveValue {
   const value = useContext(DashboardAccountLiveContext);
   if (!value) throw new Error("useDashboardAccountLive must be used inside DashboardLiveProvider");
+  return value;
+}
+
+/**
+ * Lựa chọn「Giao đàn cho」được dùng ở cả ControlPanel lẫn ConfigForm. Để hai sibling tự giữ
+ * state riêng sẽ tạo một cửa sổ sai sự thật: người dùng vừa chọn Máy nhà nhưng ô huyền tinh
+ * vẫn khoá cho tới khi F5. Một context nhỏ là nguồn duy nhất cho cả hai.
+ */
+export function useDashboardWorkerPref(): DashboardWorkerPrefValue {
+  const value = useContext(DashboardWorkerPrefContext);
+  if (!value) throw new Error("useDashboardWorkerPref must be used inside DashboardLiveProvider");
   return value;
 }
 
@@ -85,14 +103,17 @@ function sameVisiblePresence(left: DashboardPresence | null, right: DashboardPre
 export function DashboardLiveProvider({
   children,
   initialAccounts = [],
+  initialWorkerPref,
 }: {
   children: ReactNode;
   initialAccounts?: DashboardAccount[];
+  initialWorkerPref: WorkerPref;
 }) {
   const [jobs, setJobs] = useState<DashboardJob[]>([]);
   const [events, setEvents] = useState<DashboardEvent[]>([]);
   const [presence, setPresence] = useState<DashboardPresence | null>(null);
   const [accounts, setAccounts] = useState<DashboardAccount[]>(initialAccounts);
+  const [workerPref, setWorkerPref] = useState<WorkerPref>(initialWorkerPref);
   const [connected, setConnected] = useState(false);
   const cursor = useRef(0);
   const refreshing = useRef(false);
@@ -180,13 +201,16 @@ export function DashboardLiveProvider({
   );
   const presenceValue = useMemo(() => ({ presence, refresh }), [presence, refresh]);
   const accountValue = useMemo(() => ({ accounts }), [accounts]);
+  const workerPrefValue = useMemo(() => ({ workerPref, setWorkerPref }), [workerPref]);
 
   return (
     <DashboardJobLiveContext.Provider value={jobValue}>
       <DashboardPresenceLiveContext.Provider value={presenceValue}>
-        <DashboardAccountLiveContext.Provider value={accountValue}>
-          {children}
-        </DashboardAccountLiveContext.Provider>
+        <DashboardWorkerPrefContext.Provider value={workerPrefValue}>
+          <DashboardAccountLiveContext.Provider value={accountValue}>
+            {children}
+          </DashboardAccountLiveContext.Provider>
+        </DashboardWorkerPrefContext.Provider>
       </DashboardPresenceLiveContext.Provider>
     </DashboardJobLiveContext.Provider>
   );

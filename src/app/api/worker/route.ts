@@ -288,7 +288,12 @@ export async function POST(request: Request) {
       let guarded = config;
       if (scope.kind === "operator") {
         const owner = await findById(job.userId);
-        guarded = enforceMazeCapPolicy(config, { isAdmin: owner !== null && isAdminUser(owner) });
+        guarded = enforceMazeCapPolicy(config, {
+          isAdmin: owner !== null && isAdminUser(owner),
+          // Luật theo MÁY đang nhận việc. Dù snapshot còn ghi `mine` từ một cấu hình cũ,
+          // một operator đã claim được việc thì đây vẫn là ghế chung và phải giữ cap.
+          workerPref: "sect",
+        });
       }
 
       // Nhiệm vụ chưa hiệu chỉnh thì tắt cho MỌI scope, không riêng ghế chung: luật này không

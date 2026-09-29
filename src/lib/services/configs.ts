@@ -312,26 +312,26 @@ export type UserConfig = z.infer<typeof configSchema>;
 export type AccountTier = NonNullable<UserConfig["accountTier"]>;
 
 /**
- * Luật tài nguyên chung: Mê Cung của đạo hữu thường LUÔN dừng khi đã đủ huyền tinh trong ngày.
+ * Luật tài nguyên chung cho Mê Cung.
  *
- * Vì sao đúng một tuỳ chọn này bị khoá, giữa cả chục tuỳ chọn tự do khác: Mê Cung là nhiệm vụ
- * duy nhất giữ một phiên trình duyệt HÀNG CHỤC PHÚT (~35 phút một lượt, xem chú thích ở
- * runCycle) và nó cần bốn người khác. Bỏ tick「dừng khi đủ huyền tinh」nghĩa là đánh hết lượt,
- * tức một đàn có thể ngồi trong Mê Cung gần như cả ngày. Khôi lỗi tông môn chỉ có vài ghế
- * (WORKER_MAX_JOBS), nên vài đàn như vậy là cả tông môn hết chỗ chạy — người khác xếp hàng
- * sau lưng mà không hiểu vì sao mãi không tới lượt.
+ * Khôi lỗi tông môn chỉ có vài ghế, trong khi một lượt Mê Cung giữ trình duyệt hàng chục phút.
+ * Vì vậy đạo hữu thường chỉ được bỏ「Dừng khi đã đủ huyền tinh」khi đã chọn `mine` — tức toàn bộ
+ * đàn chỉ chạy trên khôi lỗi máy nhà của chính họ. `any` vẫn bị khoá vì một lượt có thể rơi vào
+ * ghế tông môn; `sect` hiển nhiên cũng bị khoá. Tông chủ vẫn được miễn như trước.
  *
- * Tông chủ được miễn: người vận hành cái VM ấy phải có đường tự quyết định dùng nó thế nào.
+ * Ở cửa claim của khôi lỗi tông môn, nơi gọi truyền thẳng `workerPref: "sect"` theo CÁI MÁY
+ * thực tế đang nhận việc, không tin lựa chọn cũ trong snapshot. Nhờ vậy một document lưu
+ * `capCheck: false` lúc đang dùng máy nhà cũng không thể chiếm ghế chung nếu sau đó đổi lối giao
+ * đàn mà chưa khắc lại ngọc giản.
  *
  * Hàm THUẦN và không đụng vào bản gốc — trả về chính `config` khi không phải sửa gì, nên nơi
- * gọi so tham chiếu được để biết luật có ra tay hay không (saveConfigAction dùng đúng mẹo đó
- * để nói thật với người dùng rằng lựa chọn của họ đã bị ghi đè).
+ * gọi so tham chiếu được để biết luật có ra tay hay không.
  */
 export function enforceMazeCapPolicy<T extends UserConfig>(
   config: T,
-  { isAdmin }: { isAdmin: boolean },
+  { isAdmin, workerPref }: { isAdmin: boolean; workerPref: WorkerPref },
 ): T {
-  if (isAdmin || config.quests.meCung.capCheck) {
+  if (isAdmin || workerPref === "mine" || config.quests.meCung.capCheck) {
     return config;
   }
 

@@ -74,7 +74,7 @@ Mê Cung có vài tuỳ chọn đáng để ý:
 - **Trục xuất theo HP** — ai yếu hơn mức này thì mời ra để nhường chỗ. Để `0` là không đuổi ai.
 - **Trục xuất nếu không sẵn sàng sau (giây)** — ai vào phòng mà ngồi lì không bấm sẵn sàng
   thì mời ra, kẻo kẹt phòng. Để `0` là không giục.
-- **Dừng khi đã đủ huyền tinh** — bỏ tick nếu muốn đánh hết lượt trong ngày.
+- **Dừng khi đã đủ huyền tinh** — tài khoản thường chỉ bỏ tick được khi **Giao đàn cho → Máy nhà của tôi**. Với **Khôi lỗi tông môn** hoặc **Ai rảnh cũng được**, ô này luôn bật để một đàn Mê Cung không giữ ghế chung cả ngày.
 
 Auto tự biết tài khoản bạn là VIP hay thường, rồi chọn đúng flow của hạng đó. Với tài khoản
 thường: Phúc Lợi Đường mở một rương mỗi lượt rồi tự quay lại sau 30 phút, Thí Luyện mở rương

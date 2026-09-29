@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.105 — Mở tuỳ chọn huyền tinh cho khôi lỗi máy nhà (29/09/2026)
+
+- Tài khoản thường có thể bỏ **Dừng khi đã đủ huyền tinh trong ngày** khi **Giao đàn cho → Máy nhà của tôi**; đây là tài nguyên riêng nên không chiếm ghế chung của tông môn.
+- **Khôi lỗi tông môn** và **Ai rảnh cũng được** vẫn ép bật giới hạn như cũ. Nhánh `any` bị giữ khoá vì đàn vẫn có thể được một khôi lỗi tông môn nhận.
+- UI dùng chung trạng thái lựa chọn khôi lỗi giữa Tế đàn và Ngọc Giản, nên đổi sang Máy nhà sẽ mở tuỳ chọn ngay; đổi về lối có ghế chung sẽ tick lại ngay. Cửa claim của operator vẫn ép giới hạn để bảo vệ cả snapshot cũ.
+
 ## 1.3.104 — Promote repo từ mọi máy và chọn public/private (29/09/2026)
 
 - Thêm promote-github-primary.bat: có thể chép sang bất kỳ máy Windows nào có OpenSSH + khóa OCI, xem dry-run trên server rồi promote mà không cần clone source, Node.js, npm hoặc kết nối database cục bộ.

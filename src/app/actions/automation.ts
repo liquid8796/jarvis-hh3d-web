@@ -14,6 +14,7 @@ import {
   configSchema,
   enforceMazeCapPolicy,
   enforceUnavailableQuestPolicy,
+  getStoredConfigForSnapshot,
   questTimersSchema,
   saveConfig,
   setQuestTimers,
@@ -221,11 +222,16 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Cấu hình không hợp lệ." };
   }
 
-  // Luật tài nguyên chung, áp ở SERVER chứ không tin ô tick: giao diện đã khoá tuỳ chọn
-  // này lại cho đạo hữu thường, nhưng `disabled` chỉ là một thuộc tính HTML và một POST
-  // dựng tay chẳng đi qua form lần nào (cùng lý do `runner` bị ép ở trên).
+  // Luật tài nguyên chung, áp ở SERVER chứ không tin ô tick. Đạo hữu thường chỉ được bỏ tick
+  // khi lựa chọn Giao đàn cho đang là `mine`; `any` vẫn có thể rơi vào ghế tông môn nên bị
+  // khoá như `sect`. Đọc preference đang lưu ở thời điểm POST thay vì tin configSchema mặc định
+  // (`any`) hoặc một hidden field có thể bị dựng tay.
+  const current = await getStoredConfigForSnapshot(user.id);
   const guarded = enforceUnavailableQuestPolicy(
-    enforceMazeCapPolicy(parsed.data, { isAdmin: isAdminUser(user) }),
+    enforceMazeCapPolicy(parsed.data, {
+      isAdmin: isAdminUser(user),
+      workerPref: current.workerPref,
+    }),
   );
   await saveConfig(user.id, guarded);
   revalidatePath("/dashboard");
@@ -238,7 +244,8 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
     ok: true,
     message: overridden
       ? "Đã khắc cấu hình vào ngọc giản. Riêng「Dừng khi đã đủ huyền tinh」của Mê Cung được " +
-        "bật lại: khôi lỗi tông môn là tài nguyên chung, chỉ tông chủ mới gỡ khoá ấy được."
+        "bật lại: lựa chọn hiện tại vẫn có thể dùng ghế khôi lỗi tông môn. Chọn Máy nhà của tôi " +
+        "nếu muốn bỏ tick bằng tài nguyên riêng."
       : "Đã khắc cấu hình vào ngọc giản. Nếu đàn đang chạy, vòng kế tiếp sẽ dùng bản này.",
   };
 }

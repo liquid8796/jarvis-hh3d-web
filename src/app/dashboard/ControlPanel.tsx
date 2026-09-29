@@ -7,7 +7,11 @@ import {
   startAction,
   stopAction,
 } from "@/app/actions/automation";
-import { useDashboardJobLive, useDashboardPresenceLive } from "./DashboardLiveProvider";
+import {
+  useDashboardJobLive,
+  useDashboardPresenceLive,
+  useDashboardWorkerPref,
+} from "./DashboardLiveProvider";
 import type { WorkerPref } from "@/lib/services/configs";
 import type { DashboardJob, DashboardPresence, JobStatus } from "@/lib/realtime/dashboardTypes";
 
@@ -100,16 +104,13 @@ function statusDotClass(job: DashboardJob): string {
 
 export function ControlPanel({
   initiallyRunning,
-  initialWorkerPref,
 }: {
   initiallyRunning: boolean;
-  /** Lựa chọn đang lưu trong ngọc giản — server đọc, đây chỉ vẽ lại. */
-  initialWorkerPref: WorkerPref;
 }) {
   const { jobs, events, connected, refresh, clearEvents } = useDashboardJobLive();
   const { presence } = useDashboardPresenceLive();
+  const { workerPref, setWorkerPref } = useDashboardWorkerPref();
   const [notice, setNotice] = useState<string | null>(null);
-  const [workerPref, setWorkerPref] = useState<WorkerPref>(initialWorkerPref);
   const [pending, startTransition] = useTransition();
 
   const logRef = useRef<HTMLDivElement>(null);

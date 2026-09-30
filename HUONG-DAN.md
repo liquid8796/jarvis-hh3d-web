@@ -140,7 +140,9 @@ Cụm ba nút ở góc phải dưới luôn đi cùng bạn trên các trang đ�
 - **Trò chuyện** mở tin nhắn riêng. Gõ danh xưng hoặc đạo hiệu vào ô tìm kiếm, chọn một người rồi
   nhắn trực tiếp; cuộc trò chuyện và số tin chưa đọc của mỗi người được giữ tách riêng.
 - **Phòng chat** mở ngay **Sảnh đàm đạo chung** trong box nổi. Bạn đọc và gửi tin tại chỗ, không
-  bị chuyển sang trang khác; trang Phòng Chat đầy đủ vẫn còn cho lúc cần xem rộng hơn.
+  bị chuyển sang trang khác; trang Phòng Chat đầy đủ vẫn còn cho lúc cần xem rộng hơn. Khi cuộn
+  lên đọc tin cũ, box giữ nguyên chỗ đang đọc; tin mới sẽ tăng số đỏ trên icon và chỉ hết số khi
+  bạn trở lại cuối sảnh.
 - **Thành viên** liệt kê toàn bộ tài khoản đang hoạt động, kể cả quản trị viên. Chấm xanh là
   online, chấm vàng là đang bận, chấm xám là offline.
 

@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { PresenceStatus } from "@/lib/validation/presence";
+import { fabBadge } from "@/lib/validation/chatRead";
 import { DirectPanel } from "./DirectPanel";
 import { MembersPanel } from "./MembersPanel";
 import { DirectIcon, MembersIcon, RoomIcon } from "./Icons";
@@ -10,6 +11,7 @@ import { RoomPanel } from "./RoomPanel";
 import type { CommunicationSnapshot, DockTab } from "./types";
 
 const SNAPSHOT_POLL_MS = 25_000;
+const ROOM_UNREAD_POLL_MS = 6_000;
 
 /** Ba lối giao tiếp ở góc màn hình, không điều hướng người dùng khỏi trang đang làm việc. */
 export function CommunicationDock() {
@@ -36,18 +38,46 @@ export function CommunicationDock() {
     }
   }, []);
 
+  const refreshRoomUnread = useCallback(async () => {
+    if (document.visibilityState === "hidden") return;
+    try {
+      const response = await fetch("/api/chat?unread=1", { cache: "no-store" });
+      if (response.status === 401 || response.status === 403) {
+        setSnapshot(null);
+        setTab(null);
+        return;
+      }
+      if (!response.ok) return;
+      const payload = (await response.json()) as { unread?: number };
+      const unread = typeof payload.unread === "number" && Number.isFinite(payload.unread)
+        ? Math.max(0, payload.unread)
+        : 0;
+      setSnapshot((current) => current
+        ? { ...current, unread: { ...current.unread, room: unread } }
+        : current);
+    } catch {
+      /* Giữ badge gần nhất; nhịp sau tự thử lại khi đường truyền ổn định. */
+    }
+  }, []);
+
   useEffect(() => {
     void refreshSnapshot();
-    const timer = window.setInterval(refreshSnapshot, SNAPSHOT_POLL_MS);
+    void refreshRoomUnread();
+    const snapshotTimer = window.setInterval(refreshSnapshot, SNAPSHOT_POLL_MS);
+    const roomUnreadTimer = window.setInterval(refreshRoomUnread, ROOM_UNREAD_POLL_MS);
     const onVisible = () => {
-      if (document.visibilityState === "visible") void refreshSnapshot();
+      if (document.visibilityState === "visible") {
+        void refreshSnapshot();
+        void refreshRoomUnread();
+      }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
-      window.clearInterval(timer);
+      window.clearInterval(snapshotTimer);
+      window.clearInterval(roomUnreadTimer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refreshSnapshot]);
+  }, [refreshRoomUnread, refreshSnapshot]);
 
   useEffect(() => {
     if (!tab) return;
@@ -114,10 +144,10 @@ export function CommunicationDock() {
 
   if (pathname.startsWith("/chat") || !snapshot) return null;
 
-  const tabs: Array<{ id: DockTab; label: string; icon: React.ReactNode; badge: number }> = [
-    { id: "direct", label: "Trò chuyện", icon: <DirectIcon />, badge: snapshot.unread.direct },
-    { id: "room", label: "Phòng chat", icon: <RoomIcon />, badge: snapshot.unread.room },
-    { id: "members", label: "Thành viên", icon: <MembersIcon />, badge: 0 },
+  const tabs: Array<{ id: DockTab; label: string; icon: React.ReactNode; badge: string | null; unread: number }> = [
+    { id: "direct", label: "Trò chuyện", icon: <DirectIcon />, badge: fabBadge(snapshot.unread.direct), unread: snapshot.unread.direct },
+    { id: "room", label: "Phòng chat", icon: <RoomIcon />, badge: fabBadge(snapshot.unread.room), unread: snapshot.unread.room },
+    { id: "members", label: "Thành viên", icon: <MembersIcon />, badge: null, unread: 0 },
   ];
 
   return (
@@ -128,7 +158,7 @@ export function CommunicationDock() {
             <RoomPanel
               meId={snapshot.me.id}
               unread={snapshot.unread.room}
-              onChanged={() => void refreshSnapshot()}
+              onChanged={() => void refreshRoomUnread()}
             />
           )}
           {tab === "direct" && (
@@ -160,12 +190,11 @@ export function CommunicationDock() {
             onClick={() => setTab((current) => current === item.id ? null : item.id)}
             aria-expanded={tab === item.id}
             aria-controls="communication-panel"
+            aria-label={item.unread > 0 ? `${item.label} — ${item.unread} tin chưa đọc` : item.label}
           >
             <span className="communication-tab-icon">{item.icon}</span>
             <span>{item.label}</span>
-            {item.badge > 0 && (
-              <b aria-label={`${item.badge} tin chưa đọc`}>{item.badge > 99 ? "99+" : item.badge}</b>
-            )}
+            {item.badge && <b aria-hidden="true">{item.badge}</b>}
           </button>
         ))}
       </nav>

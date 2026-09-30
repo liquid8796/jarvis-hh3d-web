@@ -52,6 +52,20 @@ export function fabBadge(unread: number): string | null {
 }
 
 /**
+ * Một vùng chat chỉ được coi là đang đứng ở cuối khi khoảng trống dưới tầm nhìn đủ nhỏ.
+ * Tách thành hàm thuần để cả sảnh đầy đủ lẫn box nổi không tự bịa hai ngưỡng khác nhau.
+ */
+export function isNearChatBottom(
+  scrollHeight: number,
+  scrollTop: number,
+  clientHeight: number,
+  threshold = 72,
+): boolean {
+  if (![scrollHeight, scrollTop, clientHeight, threshold].every(Number.isFinite)) return false;
+  return scrollHeight - Math.max(0, scrollTop) - Math.max(0, clientHeight) <= Math.max(0, threshold);
+}
+
+/**
  * Gác `at` mà client khai khi đẩy mốc — biên tin cậy phía server.
  *
  * Chuỗi hỏng thành `null` (bỏ qua, không phải lỗi 500). Mốc TƯƠNG LAI bị kẹp về `nowMs`:

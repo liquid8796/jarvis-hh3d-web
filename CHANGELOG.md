@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.108 — Giữ vị trí đọc và khôi phục huy hiệu Phòng chat (30/09/2026)
+
+- Box **Phòng chat** chỉ tự bám tin mới khi người dùng còn đứng sát cuối; cuộn lên đọc lịch sử thì nhịp poll 2,5 giây giữ nguyên vị trí thay vì kéo ngược xuống.
+- Mốc đã đọc chỉ được đẩy khi tin mới nhất thực sự nằm trong tầm nhìn. Tin đến trong lúc đang đọc phía trên vẫn ở trạng thái chưa xem và cập nhật số đỏ ngay trên icon **Phòng chat**.
+- Huy hiệu dùng lại cùng luật `fabBadge` của icon cũ (`1…99`, sau đó `99+`); regression thuần khóa ngưỡng bám cuối và regression component cấm `scrollIntoView` quay lại RoomPanel.
+
 ## 1.3.107 — Trung tâm giao tiếp nổi và đổi mật khẩu (30/09/2026)
 
 - Icon chat đơn được thay bằng cụm ba tab **Trò chuyện · Phòng chat · Thành viên** ở góc phải; cả tin riêng lẫn Sảnh đàm đạo mở ngay trong box nổi, không đẩy người dùng khỏi trang đang dùng.

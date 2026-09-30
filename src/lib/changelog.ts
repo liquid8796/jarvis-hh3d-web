@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.108",
+    date: "2026-09-30",
+    lines: [
+      "Phòng chat nổi không còn kéo bạn về tin mới nhất khi đang đọc lại những lời cũ.",
+      "Tin mới đến lúc bạn đang ở phía trên sẽ hiện số chưa đọc trên biểu tượng; về cuối mới tính là đã xem.",
+    ],
+  },
+  {
     version: "1.3.107",
     date: "2026-09-30",
     lines: [
@@ -482,16 +490,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Trận có đứng hình đi nữa thì cứ vài phút vẫn có một dòng báo đang ở đâu, nên liếc nhật ký là biết còn chạy hay đã kẹt.",
     ],
   },
-  {
-    version: "1.3.58",
-    date: "2026-08-31",
-    lines: [
-      "Mê Cung có thêm ô «Đủ mấy người thì đánh»: nhập 3 thì 3 người bấm sẵn sàng là vào ải luôn, khỏi ngồi chờ cho đủ 5.",
-      "Trang vẫn đòi mọi người đang trong phòng phải bấm sẵn sàng, nên ô này hạ mức tối thiểu chứ không bỏ qua người còn ngồi im.",
-      "Để nguyên 5 là chạy y như trước; ai không chỉnh gì thì không đổi gì cả.",
-    ],
-  },
-
 ];
 
 

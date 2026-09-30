@@ -156,6 +156,9 @@ tiếp nổi ở góc phải có ba tab: Sảnh chung dùng nguyên `/api/chat`,
 session-only `/api/direct-messages`, và Thành viên lấy danh bạ active đã lược bỏ email/dữ liệu
 quản trị. Presence do người dùng chọn nằm ở Postgres (`presence_status`), còn nhịp tab đang mở
 nằm ở `presence_seen_at`; server chỉ coi online/busy là thật trong 90 giây sau nhịp cuối.
+Box Sảnh chung chỉ bám đáy khi người đọc còn ở gần tin mới nhất. Cuộn lên đọc lịch sử sẽ giữ
+nguyên vị trí; tin mới vẫn tăng huy hiệu đỏ trên icon **Phòng chat** và chỉ được đánh dấu đã đọc
+khi người dùng trở lại cuối sảnh.
 
 Trang **Hồ Sơ** cũng có đổi mật khẩu tự phục vụ. Server kiểm mật khẩu hiện tại rồi cập nhật bằng
 điều kiện `password_hash = hash_cũ`; hai tab đổi cùng lúc vì thế không thể âm thầm ghi đè nhau.

@@ -10,7 +10,13 @@
  * nằm trong Mongo nên đo ở `verify:chat` (chạy trên VM); phía client đo tại đây, và bình chú
  * hai bên trỏ vào nhau.
  */
-import { clampReadAt, fabBadge, firstUnreadIndex, parseMarkMs } from "../src/lib/validation/chatRead";
+import {
+  clampReadAt,
+  fabBadge,
+  firstUnreadIndex,
+  isNearChatBottom,
+  parseMarkMs,
+} from "../src/lib/validation/chatRead";
 
 class Failed extends Error {}
 
@@ -64,6 +70,12 @@ function main(): void {
   ok(fabBadge(99) === "99", "99 → 「99」");
   ok(fabBadge(100) === "99+", "100 → 「99+」— bốn chữ số trên vòng tròn 3rem chỉ là vệt mực");
 
+  console.log("\n── isNearChatBottom: chỉ tự cuộn khi thật sự ở cuối ───────────");
+  ok(isNearChatBottom(1000, 500, 500), "đúng đáy → tiếp tục bám tin mới");
+  ok(isNearChatBottom(1000, 430, 500), "cách đáy 70px → vẫn là vùng đệm thao tác");
+  ok(!isNearChatBottom(1000, 300, 500), "đang đọc tin cũ → không được giật về cuối");
+  ok(!isNearChatBottom(Number.NaN, 0, 0), "số đo DOM hỏng → không tự cuộn");
+
   console.log("\n── clampReadAt: biên tin cậy của op read ─────────────────────");
   const NOW = 1_000_000;
   ok(clampReadAt(at(500_000), NOW) === 500_000, "mốc quá khứ hợp lệ → giữ nguyên");
@@ -76,7 +88,7 @@ function main(): void {
 
 try {
   main();
-  console.log(`\n✔ ${passed} phép kiểm — luật mốc đã-đọc của sảnh và icon nổi cùng một giọng.`);
+  console.log(`\n✔ ${passed} phép kiểm — luật mốc đã-đọc, huy hiệu và bám cuối cùng một giọng.`);
 } catch (err) {
   console.error(err instanceof Failed ? `\n✗ ${err.message}` : `\n✖ ${err instanceof Error ? err.stack : err}`);
   process.exitCode = 1;

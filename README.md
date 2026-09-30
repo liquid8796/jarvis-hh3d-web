@@ -151,6 +151,15 @@ JOIN với ai, nên nhét chung là bắt bản backup của danh tính gánh c�
 chưa". Từ 02/08 tới 08/08/2026 kho ấy là Upstash Redis; xem [CHANGELOG](CHANGELOG.md) mục
 0.40.0 để biết vì sao đổi sang Mongo. Cách dựng kho: [deploy/mongodb.md](deploy/mongodb.md).
 
+Từ 1.3.107, `direct_messages` ở cùng MongoDB phục vụ **tin nhắn riêng theo từng cặp**. Cụm giao
+tiếp nổi ở góc phải có ba tab: Sảnh chung dùng nguyên `/api/chat`, Trò chuyện dùng endpoint
+session-only `/api/direct-messages`, và Thành viên lấy danh bạ active đã lược bỏ email/dữ liệu
+quản trị. Presence do người dùng chọn nằm ở Postgres (`presence_status`), còn nhịp tab đang mở
+nằm ở `presence_seen_at`; server chỉ coi online/busy là thật trong 90 giây sau nhịp cuối.
+
+Trang **Hồ Sơ** cũng có đổi mật khẩu tự phục vụ. Server kiểm mật khẩu hiện tại rồi cập nhật bằng
+điều kiện `password_hash = hash_cũ`; hai tab đổi cùng lúc vì thế không thể âm thầm ghi đè nhau.
+
 Tin **reply** giữ id của message gốc. Khung trích dẫn trong bong bóng là một nút điều hướng:
 bấm vào thì client nới cửa sổ/lật page cũ nếu cần, cuộn tới message gốc trong chính vùng chat
 và chớp nhẹ target. Vì lật tuần tự từ page hiện tại tới target, timeline không bị ghép hai đoạn

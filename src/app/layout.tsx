@@ -9,6 +9,7 @@ import { GoogleAdSense } from "@/components/GoogleAdSense";
 import { getRenderSettings } from "@/lib/services/settings";
 import { backdropCss } from "@/lib/validation/backdrops";
 import "./globals.css";
+import "./communication.css";
 import "./peek.css";
 
 /**
@@ -132,8 +133,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             lời nhắn「phát lúc này」mà chỉ một trang thấy thì không phải là thông báo. Với khách
             vãng lai nó tự nằm im (một cú 401 rồi thôi hẳn) — xem components/NoticePopup.tsx. */}
         <NoticePopup />
-        {/* Icon Phòng Chat nổi — cũng ngoài cửa bế quan như popup trên, và cùng phép im lặng
-            với khách (một cú 401 rồi thôi). Trên chính /chat nó tự lặn. Xem ChatFab.tsx. */}
+        {/* Cụm giao tiếp nổi ba tab — Trò chuyện riêng, Sảnh chung và Thành viên. Nó tự im
+            với khách/pending qua API 401 và lặn trên trang /chat đầy đủ. Xem ChatFab.tsx. */}
         <ChatFab />
       </body>
     </html>

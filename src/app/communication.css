@@ -1,0 +1,466 @@
+/* Cụm giao tiếp nổi — ba lối vào theo prototype, giữ người dùng ở nguyên trang. */
+.communication-shell {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 55;
+  width: min(368px, calc(100vw - 2rem));
+  font-family: var(--font-body);
+}
+
+.communication-dock {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-height: 58px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 11px;
+  background: rgba(20, 21, 24, 0.96);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(16px);
+}
+
+.communication-dock > button {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 7px 4px 6px;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.045);
+  background: transparent;
+  color: rgba(244, 241, 235, 0.72);
+  font-size: 0.72rem;
+  line-height: 1.15;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.communication-dock > button:last-child { border-right: 0; }
+.communication-dock > button:hover,
+.communication-dock > button.is-active {
+  background: rgba(232, 194, 92, 0.09);
+  color: var(--color-parchment);
+}
+.communication-dock > button.is-active::after {
+  content: "";
+  position: absolute;
+  inset: auto 20% 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--color-gold-300);
+}
+.communication-tab-icon { display: grid; width: 21px; height: 21px; place-items: center; }
+.communication-tab-icon svg,
+.communication-back svg,
+.communication-composer button svg {
+  width: 100%;
+  height: 100%;
+}
+.communication-dock > button > b {
+  position: absolute;
+  top: 4px;
+  left: calc(50% + 9px);
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  place-items: center;
+  border: 1px solid rgba(12, 14, 23, 0.95);
+  border-radius: 999px;
+  background: #c24f58;
+  color: #fff;
+  font-size: 0.62rem;
+}
+
+.communication-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  display: flex;
+  width: 100%;
+  height: min(570px, calc(100dvh - 96px));
+  min-height: 360px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(232, 194, 92, 0.2);
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(99, 76, 139, 0.18), transparent 34%),
+    rgba(10, 12, 25, 0.97);
+  box-shadow: 0 22px 58px rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(20px);
+  animation: communication-rise 0.18s ease-out;
+}
+
+.communication-panel-head {
+  display: flex;
+  min-height: 68px;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(232, 194, 92, 0.12);
+  background: rgba(21, 20, 43, 0.75);
+}
+.communication-panel-head > span { display: grid; min-width: 0; gap: 2px; }
+.communication-panel-head small {
+  color: var(--color-gold-300);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.communication-panel-head strong {
+  overflow: hidden;
+  color: var(--color-parchment);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.communication-back {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  border: 0;
+  background: none;
+  color: rgba(213, 207, 225, 0.72);
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+.communication-back:hover { color: var(--color-gold-300); }
+.communication-back svg { width: 16px; height: 16px; }
+.communication-count {
+  display: grid;
+  min-width: 29px;
+  height: 29px;
+  padding: 0 7px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(232, 194, 92, 0.12);
+  color: var(--color-gold-300);
+  font-size: 0.75rem;
+}
+
+.communication-search-wrap { flex: none; padding: 11px 12px 8px; }
+.communication-search-wrap input,
+.communication-composer input {
+  width: 100%;
+  border: 1px solid rgba(155, 150, 190, 0.2);
+  border-radius: 10px;
+  background: rgba(4, 6, 16, 0.72);
+  color: var(--color-parchment);
+  font-size: 0.78rem;
+}
+.communication-search-wrap input { height: 38px; padding: 0 12px; }
+.communication-search-wrap input::placeholder,
+.communication-composer input::placeholder { color: rgba(169, 164, 190, 0.6); }
+.communication-search-wrap input:focus,
+.communication-composer input:focus {
+  border-color: rgba(232, 194, 92, 0.55);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(232, 194, 92, 0.08);
+}
+
+.communication-list,
+.communication-messages,
+.communication-direct-messages {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(232, 194, 92, 0.28) transparent;
+}
+.communication-list { padding: 4px 8px 10px; }
+.communication-list-label {
+  margin: 5px 7px 7px;
+  color: rgba(169, 164, 190, 0.72);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.communication-member-row,
+.communication-thread-row {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-parchment);
+  text-align: left;
+  cursor: pointer;
+}
+.communication-member-row:hover,
+.communication-thread-row:hover { background: rgba(119, 105, 161, 0.12); }
+.communication-member-row:disabled { cursor: default; opacity: 1; }
+.communication-member-copy,
+.communication-thread-row > span { display: grid; min-width: 0; flex: 1; gap: 3px; }
+.communication-member-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.79rem;
+  font-weight: 700;
+}
+.communication-member-name em,
+.communication-message-meta em {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(232, 194, 92, 0.12);
+  color: var(--color-gold-300);
+  font-size: 0.58rem;
+  font-style: normal;
+  font-weight: 700;
+}
+.communication-member-name em.is-admin,
+.communication-message-meta em { background: rgba(133, 96, 176, 0.2); color: #cfb8ed; }
+.communication-member-meta {
+  display: flex;
+  overflow: hidden;
+  align-items: center;
+  gap: 5px;
+  color: rgba(169, 164, 190, 0.75);
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.communication-member-action { flex: none; color: rgba(232, 194, 92, 0.72); font-size: 0.64rem; }
+.communication-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px rgba(6, 8, 18, 0.8);
+}
+.communication-status-dot.is-online { background: #4ed39b; }
+.communication-status-dot.is-busy { background: #efac52; }
+.communication-status-dot.is-offline { background: #757887; }
+
+.communication-thread-row > span strong,
+.communication-thread-row > span small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.communication-thread-row > span strong { font-size: 0.79rem; }
+.communication-thread-row > span small { color: rgba(169, 164, 190, 0.76); font-size: 0.68rem; }
+.communication-thread-row > time { align-self: flex-start; color: rgba(169, 164, 190, 0.55); font-size: 0.6rem; }
+.communication-thread-row > b {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  min-width: 18px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #c24f58;
+  color: #fff;
+  font-size: 0.58rem;
+  text-align: center;
+}
+
+.communication-presence-picker { flex: none; padding: 11px 12px 3px; }
+.communication-presence-picker > span {
+  display: block;
+  margin-bottom: 7px;
+  color: rgba(213, 207, 225, 0.75);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.communication-presence-picker > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.communication-presence-picker button {
+  display: flex;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(155, 150, 190, 0.16);
+  border-radius: 9px;
+  background: rgba(5, 7, 17, 0.5);
+  color: rgba(213, 207, 225, 0.75);
+  font-size: 0.65rem;
+  cursor: pointer;
+}
+.communication-presence-picker button.is-active {
+  border-color: rgba(232, 194, 92, 0.45);
+  background: rgba(232, 194, 92, 0.1);
+  color: var(--color-parchment);
+}
+
+.communication-peer-strip {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 9px;
+  margin: 0 12px 7px;
+  padding: 8px 10px;
+  border: 1px solid rgba(155, 150, 190, 0.13);
+  border-radius: 10px;
+  background: rgba(25, 23, 49, 0.55);
+}
+.communication-peer-strip > span { display: grid; gap: 2px; }
+.communication-peer-strip strong { color: var(--color-parchment); font-size: 0.78rem; }
+.communication-peer-strip small { display: flex; align-items: center; gap: 6px; color: rgba(169, 164, 190, 0.7); font-size: 0.64rem; }
+
+.communication-messages { padding: 10px 11px 5px; }
+.communication-room-message { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
+.communication-room-message > div { min-width: 0; max-width: calc(100% - 38px); }
+.communication-message-meta { display: flex; align-items: center; gap: 5px; margin: 0 2px 3px; }
+.communication-message-meta strong {
+  overflow: hidden;
+  color: rgba(244, 241, 235, 0.9);
+  font-size: 0.67rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.communication-message-meta time { color: rgba(169, 164, 190, 0.52); font-size: 0.58rem; }
+.communication-message-bubble {
+  display: inline-block;
+  max-width: 100%;
+  padding: 7px 9px;
+  border: 1px solid rgba(155, 150, 190, 0.12);
+  border-radius: 5px 11px 11px;
+  background: rgba(31, 29, 58, 0.72);
+  color: rgba(244, 241, 235, 0.88);
+  font-size: 0.73rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+.communication-room-message.is-mine .communication-message-bubble {
+  border-color: rgba(232, 194, 92, 0.18);
+  background: rgba(79, 61, 36, 0.34);
+}
+.communication-message-bubble p { white-space: pre-wrap; }
+.communication-message-bubble > i { color: rgba(169, 164, 190, 0.68); font-size: 0.68rem; }
+.communication-message-bubble blockquote {
+  margin-bottom: 5px;
+  padding-left: 7px;
+  border-left: 2px solid rgba(232, 194, 92, 0.45);
+  color: rgba(213, 207, 225, 0.68);
+  font-size: 0.65rem;
+}
+.communication-message-bubble img {
+  display: block;
+  max-width: 210px;
+  max-height: 160px;
+  margin-top: 6px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.communication-message-bubble > small { display: block; margin-top: 3px; color: rgba(169, 164, 190, 0.56); font-size: 0.57rem; }
+.communication-sticker { display: block; font-size: 1.65rem; }
+.communication-typing { min-height: 20px; flex: none; padding: 2px 13px; color: rgba(169, 164, 190, 0.67); font-size: 0.62rem; font-style: italic; }
+
+.communication-direct-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px 10px;
+}
+.communication-direct-message { max-width: 82%; align-self: flex-start; }
+.communication-direct-message.is-mine { align-self: flex-end; text-align: right; }
+.communication-direct-message p {
+  padding: 8px 10px;
+  border: 1px solid rgba(155, 150, 190, 0.14);
+  border-radius: 4px 12px 12px;
+  background: rgba(31, 29, 58, 0.78);
+  color: rgba(244, 241, 235, 0.92);
+  font-size: 0.74rem;
+  line-height: 1.45;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.communication-direct-message.is-mine p {
+  border-color: rgba(232, 194, 92, 0.2);
+  border-radius: 12px 4px 12px 12px;
+  background: rgba(91, 68, 32, 0.45);
+}
+.communication-direct-message time { display: block; margin-top: 2px; color: rgba(169, 164, 190, 0.5); font-size: 0.56rem; }
+
+.communication-composer {
+  display: flex;
+  flex: none;
+  gap: 7px;
+  padding: 9px 10px 11px;
+  border-top: 1px solid rgba(155, 150, 190, 0.12);
+  background: rgba(9, 10, 23, 0.88);
+}
+.communication-composer input { min-width: 0; height: 39px; flex: 1; padding: 0 11px; }
+.communication-composer button {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  flex: none;
+  place-items: center;
+  border: 1px solid rgba(232, 194, 92, 0.35);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #e9c45a, #b98720);
+  color: #211704;
+  cursor: pointer;
+}
+.communication-composer button svg { width: 19px; height: 19px; }
+.communication-composer button:disabled { cursor: not-allowed; filter: grayscale(0.6); opacity: 0.45; }
+.communication-error {
+  flex: none;
+  margin: 0 10px 5px;
+  padding: 6px 8px;
+  border: 1px solid rgba(242, 120, 120, 0.25);
+  border-radius: 8px;
+  background: rgba(150, 40, 50, 0.12);
+  color: #f0a5aa;
+  font-size: 0.65rem;
+}
+.communication-empty {
+  display: grid;
+  min-height: 155px;
+  align-content: center;
+  padding: 24px;
+  place-items: center;
+  color: rgba(169, 164, 190, 0.68);
+  text-align: center;
+}
+.communication-empty > span { margin-bottom: 7px; color: rgba(232, 194, 92, 0.6); font-size: 1.25rem; }
+.communication-empty strong { color: rgba(244, 241, 235, 0.83); font-size: 0.78rem; }
+.communication-empty p { max-width: 240px; margin-top: 4px; font-size: 0.66rem; line-height: 1.5; }
+
+.communication-dock > button:focus-visible,
+.communication-panel button:focus-visible,
+.communication-panel input:focus-visible {
+  outline: 2px solid var(--color-gold-300);
+  outline-offset: -2px;
+}
+
+@keyframes communication-rise {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 520px) {
+  .communication-shell { right: 8px; bottom: 8px; width: calc(100vw - 16px); }
+  .communication-panel { height: min(590px, calc(100dvh - 82px)); border-radius: 13px; }
+  .communication-dock { min-height: 56px; }
+  .communication-dock > button { font-size: 0.67rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .communication-panel { animation: none; }
+  .communication-dock > button { transition: none; }
+}

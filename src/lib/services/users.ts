@@ -4,12 +4,14 @@ import {
   ROLE_AWAITING,
   ROLE_DISCIPLE,
   ROLE_OWNER,
+  isAdminUser,
   normalizeRoles,
   type Role,
 } from "@/lib/auth/permissions";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { getAppSettings } from "@/lib/services/settings";
 import type { UserRow } from "@/lib/db/schema";
+import { effectivePresence, type PresenceStatus } from "@/lib/validation/presence";
 
 /**
  * Every rule about WHO may exist and WHAT state they are in lives here, behind plain
@@ -29,7 +31,17 @@ type WithRoles = { roles: string[] };
 
 export type PublicUser = Pick<
   UserRow,
-  "id" | "username" | "displayName" | "email" | "tags" | "avatarUrl" | "status" | "createdAt" | "updatedAt"
+  | "id"
+  | "username"
+  | "displayName"
+  | "email"
+  | "tags"
+  | "avatarUrl"
+  | "status"
+  | "presenceStatus"
+  | "presenceSeenAt"
+  | "createdAt"
+  | "updatedAt"
 > &
   WithRoles;
 
@@ -68,6 +80,8 @@ const publicColumns = {
   tags: schema.users.tags,
   avatarUrl: schema.users.avatarUrl,
   status: schema.users.status,
+  presenceStatus: schema.users.presenceStatus,
+  presenceSeenAt: schema.users.presenceSeenAt,
   createdAt: schema.users.createdAt,
   updatedAt: schema.users.updatedAt,
 } as const;
@@ -195,6 +209,100 @@ export async function verifyCredentials(
   }
 
   return user;
+}
+
+/**
+ * Đổi mật khẩu tự phục vụ. Mật khẩu hiện tại được kiểm lại ngay sát phép ghi; điều kiện
+ * `password_hash = oldHash` khiến hai tab đổi cùng lúc chỉ có một tab thắng, không có tab nào
+ * âm thầm ghi đè một mật khẩu vừa đổi ở nơi khác.
+ */
+export async function changePassword(
+  id: string,
+  currentPassword: string,
+  nextPassword: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const rows = await db()
+    .select({ passwordHash: schema.users.passwordHash })
+    .from(schema.users)
+    .where(eq(schema.users.id, id))
+    .limit(1);
+  const currentHash = rows[0]?.passwordHash;
+  if (!currentHash || !verifyPassword(currentPassword, currentHash)) {
+    return { ok: false, error: "Mật khẩu hiện tại không đúng." };
+  }
+  if (verifyPassword(nextPassword, currentHash)) {
+    return { ok: false, error: "Mật khẩu mới phải khác mật khẩu hiện tại." };
+  }
+
+  const updated = await db()
+    .update(schema.users)
+    .set({ passwordHash: hashPassword(nextPassword), updatedAt: new Date() })
+    .where(and(eq(schema.users.id, id), eq(schema.users.passwordHash, currentHash)))
+    .returning({ id: schema.users.id });
+  return updated.length === 1
+    ? { ok: true }
+    : { ok: false, error: "Mật khẩu vừa được đổi ở nơi khác — tải lại trang rồi thử lại." };
+}
+
+export type CommunicationMember = {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  roles: string[];
+  isAdmin: boolean;
+  roleLabel: string;
+  presenceMode: PresenceStatus;
+  presence: PresenceStatus;
+  lastSeenAt: string | null;
+};
+
+/**
+ * Danh bạ giao tiếp chỉ gồm tài khoản đang hoạt động. Email, tag và dữ liệu quản trị không rời
+ * tầng service; API thành viên chỉ nhận đúng những trường cần để tìm người và vẽ trạng thái.
+ */
+export async function listCommunicationMembers(): Promise<CommunicationMember[]> {
+  const users = await listUsers({ status: "active" });
+  const now = Date.now();
+  const rank = (value: PresenceStatus) => value === "online" ? 0 : value === "busy" ? 1 : 2;
+  return users
+    .map((user) => {
+      const admin = isAdminUser(user);
+      return {
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        roles: user.roles,
+        isAdmin: admin,
+        roleLabel: admin ? "Quản trị" : "Thành viên",
+        presenceMode: user.presenceStatus,
+        presence: effectivePresence(user.presenceStatus, user.presenceSeenAt, now),
+        lastSeenAt: user.presenceSeenAt?.toISOString() ?? null,
+      };
+    })
+    .sort((left, right) =>
+      rank(left.presence) - rank(right.presence) ||
+      left.displayName.localeCompare(right.displayName, "vi"),
+    );
+}
+
+/** Nhịp tim của tab đang mở; lựa chọn offline vẫn được giữ nguyên offline. */
+export async function heartbeatPresence(id: string): Promise<void> {
+  await db().execute(sql`
+    update users set presence_seen_at = now()
+     where id = ${id}
+       and status = 'active'
+       and (presence_seen_at is null or presence_seen_at < now() - interval '15 seconds')
+  `);
+}
+
+/** Người dùng chỉ được đổi trạng thái của chính mình; route lấy id từ session. */
+export async function setPresenceStatus(id: string, status: PresenceStatus): Promise<void> {
+  await db()
+    .update(schema.users)
+    .set({ presenceStatus: status, presenceSeenAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(schema.users.id, id), eq(schema.users.status, "active")));
 }
 
 // ---------------------------------------------------------------------------
@@ -441,7 +549,7 @@ export async function adminUpdate(
   return { ok: true };
 }
 
-/** Self-service profile update; role, status, username and password remain out of reach. */
+/** Self-service identity update; password đi qua changePassword có kiểm mật khẩu cũ. */
 export async function updateProfile(
   id: string,
   input: { displayName: string; email: string },

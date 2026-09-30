@@ -123,11 +123,30 @@ nhận trong khoảng 5 giây thay vì nhịp 20 giây của bản cũ.
 Nếu khôi lỗi máy nhà được cài trước v0.20.0, hãy tạo lại bộ cài và cài đè một lần để nhận ba
 flow tài khoản thường mới. Cài đè giữ nguyên thư mục hồ sơ trình duyệt và không cần gỡ trước.
 
-### Sửa hồ sơ và bổ sung email
+### Sửa hồ sơ, email và mật khẩu
 
 Bấm **Hồ Sơ** trên thanh đầu trang để đổi danh xưng hiển thị hoặc email. Đạo hiệu đăng nhập
 không đổi ở đây. Tài khoản tạo từ bản cũ có thể chưa có email; chỉ cần điền một lần rồi bấm
 **Lưu Hồ Sơ**. Mỗi email chỉ dùng được cho một đạo hiệu.
+
+Ở khối **Đổi mật khẩu**, nhập mật khẩu đang dùng, mật khẩu mới và nhập lại mật khẩu mới. Mật
+khẩu mới phải dài ít nhất 8 ký tự và khác mật khẩu hiện tại. Đổi thành công không đá bạn khỏi
+phiên đang mở; lần đăng nhập kế tiếp dùng mật khẩu mới.
+
+### Trò chuyện ngay ở góc màn hình
+
+Cụm ba nút ở góc phải dưới luôn đi cùng bạn trên các trang đã đăng nhập:
+
+- **Trò chuyện** mở tin nhắn riêng. Gõ danh xưng hoặc đạo hiệu vào ô tìm kiếm, chọn một người rồi
+  nhắn trực tiếp; cuộc trò chuyện và số tin chưa đọc của mỗi người được giữ tách riêng.
+- **Phòng chat** mở ngay **Sảnh đàm đạo chung** trong box nổi. Bạn đọc và gửi tin tại chỗ, không
+  bị chuyển sang trang khác; trang Phòng Chat đầy đủ vẫn còn cho lúc cần xem rộng hơn.
+- **Thành viên** liệt kê toàn bộ tài khoản đang hoạt động, kể cả quản trị viên. Chấm xanh là
+  online, chấm vàng là đang bận, chấm xám là offline.
+
+Ngay đầu tab **Thành viên**, chọn **Online · Đang bận · Offline** cho chính mình. Đóng website
+hoặc mất nhịp quá khoảng 90 giây thì online/đang bận tự hiện offline; chọn Offline thì luôn ẩn
+trạng thái hoạt động cho tới khi bạn đổi lại.
 
 ### Khi tông môn bế quan trùng tu
 

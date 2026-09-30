@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.107",
+    date: "2026-09-30",
+    lines: [
+      "Góc phải nay có Trò chuyện, Phòng chat và Thành viên; mọi box mở ngay tại trang đang xem.",
+      "Bạn có thể nhắn riêng, tìm đạo hữu, xem ai online hoặc đang bận và tự chọn trạng thái của mình.",
+      "Trang Hồ Sơ nay cho đổi mật khẩu sau khi xác nhận mật khẩu hiện tại.",
+    ],
+  },
+  {
     version: "1.3.106",
     date: "2026-09-30",
     lines: [
@@ -480,21 +489,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Mê Cung có thêm ô «Đủ mấy người thì đánh»: nhập 3 thì 3 người bấm sẵn sàng là vào ải luôn, khỏi ngồi chờ cho đủ 5.",
       "Trang vẫn đòi mọi người đang trong phòng phải bấm sẵn sàng, nên ô này hạ mức tối thiểu chứ không bỏ qua người còn ngồi im.",
       "Để nguyên 5 là chạy y như trước; ai không chỉnh gì thì không đổi gì cả.",
-    ],
-  },
-  {
-    version: "1.3.57",
-    date: "2026-08-28",
-    lines: [
-      "Tab Khôi lỗi nay nói rõ từng máy đang làm gì: đang rảnh, đang bận, hay đã chết — thay vì chỉ một chữ đang trực cho cả hai trường hợp đầu.",
-      "Máy đã chết còn kể luôn nó vắng từ bao giờ, nên nhìn là biết vừa tắt hay tắt đã lâu.",
-    ],
-  },
-  {
-    version: "1.3.56",
-    date: "2026-08-30",
-    lines: [
-      "Hoang Vực: khi trang game báo hết phiên tấn công, máy chạy tự động nay tải lại rồi đánh lại ngay trong vòng đó, thay vì bỏ dở và chờ vòng sau.",
     ],
   },
 

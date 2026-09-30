@@ -38,6 +38,9 @@ import type { PillBagCaps } from "@/lib/validation/pillBagCaps";
  */
 export const userStatus = pgEnum("user_status", ["pending", "active", "disabled"]);
 
+/** Trạng thái giao tiếp do chính đạo hữu chọn; heartbeat quyết định nó còn tươi hay không. */
+export const presenceStatus = pgEnum("presence_status", ["online", "busy", "offline"]);
+
 /**
  * VAI TRÒ: một người giữ được nhiều vai, và từ 09/08/2026 quan hệ ấy là một BẢNG THẬT
  * (`user_roles`) chứ không còn là một cột mảng.
@@ -104,6 +107,9 @@ export const users = pgTable(
     avatarUrl: text("avatar_url"),
     avatarKey: text("avatar_key"),
     status: userStatus("status").notNull().default("pending"),
+    /** Lựa chọn công khai; online/busy chỉ hiện khi presence_seen_at còn tươi. */
+    presenceStatus: presenceStatus("presence_status").notNull().default("online"),
+    presenceSeenAt: timestamp("presence_seen_at", { withTimezone: true }),
     /**
      * LINH PHÙ — token riêng cho khôi lỗi máy nhà của đạo hữu này, lưu dạng SHA-256.
      *
@@ -120,7 +126,10 @@ export const users = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("users_status_idx").on(t.status)],
+  (t) => [
+    index("users_status_idx").on(t.status),
+    index("users_presence_idx").on(t.presenceStatus, t.presenceSeenAt),
+  ],
 );
 
 /**

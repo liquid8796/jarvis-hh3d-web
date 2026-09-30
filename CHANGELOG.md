@@ -11,6 +11,14 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.107 — Trung tâm giao tiếp nổi và đổi mật khẩu (30/09/2026)
+
+- Icon chat đơn được thay bằng cụm ba tab **Trò chuyện · Phòng chat · Thành viên** ở góc phải; cả tin riêng lẫn Sảnh đàm đạo mở ngay trong box nổi, không đẩy người dùng khỏi trang đang dùng.
+- **Trò chuyện** có tìm thành viên và hộp thư riêng theo từng cặp; số tin chưa đọc và mốc đã đọc được tách riêng cho từng cuộc hội thoại. Tin riêng dùng MongoDB cùng chính sách hết hạn với Sảnh đàm đạo.
+- **Thành viên** liệt kê mọi tài khoản đang hoạt động, gồm quản trị viên, kèm trạng thái online/đang bận/offline. Trạng thái online/busy tự rơi về offline khi nhịp trình duyệt quá 90 giây; người dùng có thể chủ động chọn offline.
+- Trang **Hồ Sơ** có form đổi mật khẩu, bắt buộc xác minh mật khẩu hiện tại và ghi theo điều kiện hash cũ để hai tab không âm thầm ghi đè nhau.
+- Migration `0033_user_presence` thêm enum/trường/index hiện diện; regression khóa session-only API, privacy của danh bạ, unread theo luồng, responsive dock và flow đổi mật khẩu.
+
 ## 1.3.106 -- Vấn Đáp theo component 29/09 (schema 86, 30/09/2026)
 
 - Flow VIP và tài khoản thường chuyển sang `#vdStart`, `#vdQuestion`, `#vdAnswers .vd-opt` và `#quiz-wrapper[data-state]`, không còn phụ thuộc cây quiz cũ đã bị gỡ.

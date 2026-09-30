@@ -2,6 +2,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { requireUser } from "@/lib/auth/guards";
 import { AvatarPicker } from "./AvatarPicker";
 import { ProfileForm } from "./ProfileForm";
+import { PasswordForm } from "./PasswordForm";
 
 export const metadata = { title: "Hồ Sơ" };
 
@@ -20,6 +21,7 @@ export default async function ProfilePage() {
             displayName={user.displayName}
             email={user.email}
           />
+          <PasswordForm />
         </div>
       </main>
     </>

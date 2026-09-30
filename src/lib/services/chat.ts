@@ -54,6 +54,35 @@ export const messageBodySchema = z.object({
 
 const reactionSchema = z.object({ emoji: z.string(), userId: z.string() });
 
+const directMessageSchema = z.object({
+  _id: z.string(),
+  threadKey: z.string(),
+  senderId: z.string(),
+  recipientId: z.string(),
+  senderName: z.string().default("?"),
+  text: z.string().min(1).max(4000),
+  createdAt: z.number(),
+  readAt: z.number().nullable().default(null),
+});
+
+type DirectMessageDoc = z.infer<typeof directMessageSchema>;
+
+export type DirectMessageView = {
+  id: string;
+  senderId: string;
+  recipientId: string;
+  senderName: string;
+  text: string;
+  createdAt: string;
+  readAt: string | null;
+};
+
+export type DirectConversationView = {
+  peerId: string;
+  latest: DirectMessageView;
+  unread: number;
+};
+
 /**
  * Document một tin như nó nằm trong kho. Zod gác cả hai chiều — y như mọi document khác.
  *
@@ -103,6 +132,7 @@ const TYPING_FRESH_MS = 5000;
 /** Lưới dọn cuối cho `chat_typing`. Chỉ là dọn rác — phép lọc lúc đọc mới quyết ai "đang gõ". */
 const TYPING_TTL_SECONDS = 60;
 const MESSAGES = "chat_messages";
+const DIRECT_MESSAGES = "direct_messages";
 const TYPING = "chat_typing";
 /**
  * Mốc ĐÃ ĐỌC TỚI ĐÂU của từng người — `_id` là userId nên collection này, y như `chat_typing`,
@@ -133,6 +163,7 @@ type ChatStore = {
   client: MongoClient;
   db: Db;
   messages: Collection<StoredMessage>;
+  directMessages: Collection<DirectMessageDoc>;
   typing: Collection<TypingDoc>;
   reads: Collection<ReadDoc>;
 };
@@ -153,6 +184,7 @@ async function connect(uri: string): Promise<ChatStore> {
   await client.connect();
   const db = client.db(databaseName(uri));
   const messages = db.collection<StoredMessage>(MESSAGES);
+  const directMessages = db.collection<DirectMessageDoc>(DIRECT_MESSAGES);
   const typing = db.collection<TypingDoc>(TYPING);
   const reads = db.collection<ReadDoc>(READS);
 
@@ -160,10 +192,18 @@ async function connect(uri: string): Promise<ChatStore> {
   // giờ chạy trên đường đi nóng của một request thứ hai. `createIndex` là idempotent.
   await Promise.all([
     messages.createIndex({ createdAt: -1 }, { name: "chat_createdAt_desc" }),
+    directMessages.createIndex(
+      { threadKey: 1, createdAt: -1 },
+      { name: "direct_thread_createdAt_desc" },
+    ),
+    directMessages.createIndex(
+      { recipientId: 1, readAt: 1, createdAt: -1 },
+      { name: "direct_unread_recipient" },
+    ),
     typing.createIndex({ at: 1 }, { name: "chat_typing_ttl", expireAfterSeconds: TYPING_TTL_SECONDS }),
   ]);
 
-  return { client, db, messages, typing, reads };
+  return { client, db, messages, directMessages, typing, reads };
 }
 
 /**
@@ -475,6 +515,132 @@ export async function toggleReaction(
   return { ok: added.matchedCount === 1 };
 }
 
+function directThreadKey(left: string, right: string): string {
+  return [left, right].sort().join(":");
+}
+
+function parseDirect(raw: unknown): DirectMessageDoc | null {
+  const parsed = directMessageSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+function directView(message: DirectMessageDoc): DirectMessageView {
+  return {
+    id: message._id,
+    senderId: message.senderId,
+    recipientId: message.recipientId,
+    senderName: message.senderName,
+    text: message.text,
+    createdAt: new Date(message.createdAt).toISOString(),
+    readAt: message.readAt === null ? null : new Date(message.readAt).toISOString(),
+  };
+}
+
+/** Gửi một tin riêng; người nhận đã được route xác minh là thành viên active. */
+export async function sendDirectMessage(
+  sender: { id: string; name: string },
+  recipientId: string,
+  rawText: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const opened = store();
+  if (!opened) return { ok: false, error: STORE_CLOSED_MESSAGE };
+  const text = String(rawText ?? "").trim();
+  if (!text) return { ok: false, error: "Tin nhắn không được để trống." };
+  if (text.length > 4000) return { ok: false, error: "Tin nhắn tối đa 4.000 ký tự." };
+  if (!recipientId || recipientId === sender.id) {
+    return { ok: false, error: "Hãy chọn một thành viên khác để trò chuyện." };
+  }
+
+  const document: DirectMessageDoc = {
+    _id: crypto.randomUUID(),
+    threadKey: directThreadKey(sender.id, recipientId),
+    senderId: sender.id,
+    recipientId,
+    senderName: sender.name,
+    text,
+    createdAt: Date.now(),
+    readAt: null,
+  };
+  await (await opened).directMessages.insertOne(document);
+  return { ok: true };
+}
+
+export async function getDirectMessages(
+  viewerId: string,
+  peerId: string,
+): Promise<{ storeClosed: true } | { storeClosed?: false; messages: DirectMessageView[] }> {
+  const opened = store();
+  if (!opened) return { storeClosed: true };
+  const page = await (await opened).directMessages
+    .find({ threadKey: directThreadKey(viewerId, peerId) })
+    .sort({ createdAt: -1 })
+    .limit(80)
+    .toArray();
+  page.reverse();
+  return {
+    messages: page
+      .map(parseDirect)
+      .filter((message): message is DirectMessageDoc => message !== null)
+      .map(directView),
+  };
+}
+
+/** Chỉ tin GỬI TỚI người xem trong đúng luồng này được đánh dấu đã đọc. */
+export async function markDirectMessagesRead(viewerId: string, peerId: string): Promise<number> {
+  const opened = store();
+  if (!opened) return 0;
+  const result = await (await opened).directMessages.updateMany(
+    {
+      threadKey: directThreadKey(viewerId, peerId),
+      recipientId: viewerId,
+      readAt: null,
+    },
+    { $set: { readAt: Date.now() } },
+  );
+  return result.modifiedCount ?? 0;
+}
+
+/**
+ * Một dòng cho mỗi người đã từng trò chuyện. Đọc tối đa 2.000 tin gần nhất rồi gộp trong tiến
+ * trình: số thành viên thực tế nhỏ, còn cách này tránh pipeline khó kiểm kiểu và vẫn chặn bộ nhớ.
+ */
+export async function listDirectConversations(
+  userId: string,
+): Promise<
+  | { storeClosed: true }
+  | { storeClosed?: false; conversations: DirectConversationView[]; unread: number }
+> {
+  const opened = store();
+  if (!opened) return { storeClosed: true };
+  const rows = await (await opened).directMessages
+    .find({ $or: [{ senderId: userId }, { recipientId: userId }] })
+    .sort({ createdAt: -1 })
+    .limit(2000)
+    .toArray();
+
+  const grouped = new Map<string, { latest: DirectMessageDoc; unread: number }>();
+  let unread = 0;
+  for (const raw of rows) {
+    const message = parseDirect(raw);
+    if (!message) continue;
+    const peerId = message.senderId === userId ? message.recipientId : message.senderId;
+    const incomingUnread = message.recipientId === userId && message.readAt === null;
+    if (incomingUnread) unread++;
+    const current = grouped.get(peerId);
+    if (!current) grouped.set(peerId, { latest: message, unread: incomingUnread ? 1 : 0 });
+    else if (incomingUnread) current.unread++;
+  }
+
+  return {
+    conversations: [...grouped.entries()].map(([peerId, value]) => ({
+      peerId,
+      latest: directView(value.latest),
+      unread: value.unread,
+    })),
+    unread,
+  };
+}
+
 export async function markTyping(
   user: { id: string; name: string },
   typing: boolean,
@@ -509,9 +675,12 @@ export async function purgeExpiredChat(): Promise<{ purged: number }> {
   const { chat } = await getAppSettings();
   const cutoff = Date.now() - chat.retentionDays * 24 * 3600 * 1000;
 
-  const { messages } = await opened;
-  const res = await messages.deleteMany({ createdAt: { $lt: cutoff } });
-  return { purged: res.deletedCount ?? 0 };
+  const { messages, directMessages } = await opened;
+  const [room, direct] = await Promise.all([
+    messages.deleteMany({ createdAt: { $lt: cutoff } }),
+    directMessages.deleteMany({ createdAt: { $lt: cutoff } }),
+  ]);
+  return { purged: (room.deletedCount ?? 0) + (direct.deletedCount ?? 0) };
 }
 
 export type PurgeAllResult = { storeClosed: true } | { storeClosed?: false; messages: number };

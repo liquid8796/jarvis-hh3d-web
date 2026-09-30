@@ -213,6 +213,67 @@ try {
   await chat.markTyping({ id: member.id, name: "Đạo hữu" }, false);
   console.log("✔ Đang gõ: thấy người khác, không thấy chính mình, và mỗi người chỉ một dòng.");
 
+  // ---- Tin nhắn riêng -------------------------------------------------------------
+  const third = { id: "u-third", name: "Đạo hữu thứ ba" };
+  assert(
+    !(await chat.sendDirectMessage(member, member.id, "tự nói với mình")).ok,
+    "không được mở tin riêng với chính mình",
+  );
+  assert(
+    !(await chat.sendDirectMessage(member, admin.id, "   ")).ok,
+    "tin riêng trắng phải bị từ chối",
+  );
+  assert(
+    (await chat.sendDirectMessage(member, admin.id, "xin chào riêng")).ok,
+    "gửi tin riêng phải được",
+  );
+  assert(
+    (await chat.sendDirectMessage(third, admin.id, "tin từ người thứ ba")).ok,
+    "luồng thứ hai phải gửi được",
+  );
+
+  let adminInbox = await chat.listDirectConversations(admin.id);
+  assert(!adminInbox.storeClosed, "kho tin riêng phải dùng cùng Mongo đã mở");
+  if (adminInbox.storeClosed) throw new Error("unreachable");
+  assert(adminInbox.unread === 2, `admin phải có 2 tin riêng chưa đọc, có ${adminInbox.unread}`);
+  assert(
+    adminInbox.conversations.length === 2,
+    `hai người gửi phải thành hai cuộc trò chuyện, có ${adminInbox.conversations.length}`,
+  );
+
+  const memberThread = await chat.getDirectMessages(admin.id, member.id);
+  assert(!memberThread.storeClosed, "đọc luồng riêng phải được");
+  if (memberThread.storeClosed) throw new Error("unreachable");
+  assert(
+    memberThread.messages.length === 1 && memberThread.messages[0].text === "xin chào riêng",
+    "luồng với thành viên không được lẫn tin của người thứ ba",
+  );
+
+  await chat.markDirectMessagesRead(admin.id, member.id);
+  adminInbox = await chat.listDirectConversations(admin.id);
+  if (adminInbox.storeClosed) throw new Error("unreachable");
+  assert(adminInbox.unread === 1, "đọc một luồng chỉ được xoá huy hiệu của đúng luồng ấy");
+  assert(
+    adminInbox.conversations.find((item) => item.peerId === member.id)?.unread === 0 &&
+      adminInbox.conversations.find((item) => item.peerId === third.id)?.unread === 1,
+    "mốc đã đọc phải tách riêng từng người",
+  );
+
+  assert(
+    (await chat.sendDirectMessage(admin, member.id, "chào lại")).ok,
+    "trả lời trong luồng riêng phải được",
+  );
+  const memberInbox = await chat.listDirectConversations(member.id);
+  if (memberInbox.storeClosed) throw new Error("unreachable");
+  assert(memberInbox.unread === 1, "người nhận phải thấy đúng một tin chưa đọc");
+  const roundTrip = await chat.getDirectMessages(member.id, admin.id);
+  if (roundTrip.storeClosed) throw new Error("unreachable");
+  assert(
+    roundTrip.messages.map((message) => message.text).join("|") === "xin chào riêng|chào lại",
+    "tin riêng hai chiều phải giữ đúng thứ tự thời gian",
+  );
+  console.log("✔ Tin riêng: tách luồng, đếm chưa đọc và đánh dấu đọc theo từng người.");
+
   // ---- Phân trang ----------------------------------------------------------------
   const bulkClient = client.db(process.env.MONGODB_DB!).collection("chat_messages");
   const base = Date.now();
@@ -269,13 +330,26 @@ try {
     reactions: [],
   } as never);
 
+  const directClient = client.db(process.env.MONGODB_DB!).collection("direct_messages");
+  await directClient.insertOne({
+    _id: "direct-qua-han",
+    threadKey: [admin.id, member.id].sort().join(":"),
+    senderId: admin.id,
+    recipientId: member.id,
+    senderName: admin.name,
+    text: "tin riêng từ đời trước",
+    createdAt: Date.now() - (RETENTION_DAYS + 1) * 24 * 3600 * 1000,
+    readAt: null,
+  });
+
   const before = await bulkClient.countDocuments({});
   const purged = await chat.purgeExpiredChat();
   const after = await bulkClient.countDocuments({});
-  assert(purged.purged === 1, `phải quét đúng 1 tin quá hạn, quét ${purged.purged}`);
+  assert(purged.purged === 2, "phải quét đúng 2 tin quá hạn (sảnh + riêng), quét " + purged.purged);
   assert(after === before - 1, "chỉ tin quá hạn bị xoá, tin trong hạn phải còn nguyên");
-  assert((await bulkClient.findOne({ _id: "qua-han" as never })) === null, "tin quá hạn phải biến mất thật");
-  console.log("✔ Hạn lưu: chỉ tin quá hạn bị xoá, đếm đúng, tin trong hạn còn nguyên.");
+  assert((await bulkClient.findOne({ _id: "qua-han" as never })) === null, "tin sảnh quá hạn phải biến mất thật");
+  assert((await directClient.findOne({ _id: "direct-qua-han" })) === null, "tin riêng quá hạn cũng phải biến mất thật");
+  console.log("✔ Hạn lưu: quét cả sảnh chung lẫn tin riêng, tin trong hạn còn nguyên.");
 
   // ---- Index đã dựng -------------------------------------------------------------
   const idx = await bulkClient.indexes();
@@ -283,7 +357,13 @@ try {
   const typingIdx = await typingCol.indexes();
   const ttl = typingIdx.find((i) => i.name === "chat_typing_ttl");
   assert(ttl?.expireAfterSeconds === 60, `index TTL của typing phải đặt 60s, có ${ttl?.expireAfterSeconds}`);
-  console.log("✔ Index: createdAt cho tin, TTL cho typing — dựng tự động lúc kết nối.");
+  const directIdx = await directClient.indexes();
+  assert(
+    directIdx.some((i) => i.name === "direct_thread_createdAt_desc") &&
+      directIdx.some((i) => i.name === "direct_unread_recipient"),
+    "tin riêng phải có index theo luồng và theo người nhận/chưa đọc",
+  );
+  console.log("✔ Index: sảnh, typing và hai đường nóng của tin riêng đều được dựng tự động.");
 
   // ---- Mốc đã-đọc (chat_reads) ----------------------------------------------------------
   //

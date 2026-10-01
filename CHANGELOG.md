@@ -31,6 +31,7 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 - Quảng cáo chỉ mount ở `auto-hh3d.online`/`www` trong production, không tải cho phiên quản trị, localhost, host vận hành, tên miền Vercel đã đóng, trang quản trị, chat frame, trang xác thực/chờ duyệt hoặc trang quyền riêng tư.
 - `ADSTERRA_DISABLED=1` là nút dừng khẩn cấp độc lập. Trang quyền riêng tư công bố cookie/tín hiệu thiết bị và nói rõ Auto HH3D không tự dò tiện ích hoặc khoá người dùng chặn quảng cáo.
 - Regression `verify:adsterra` khóa byte ID/URL public, host/session gate, bốn script, Smartlink có `rel=sponsored`, phân biệt đúng mã chống chặn và responsive placement.
+- Vẫn còn chức năng quan trọng là xem, fraudulent ad-click/evasion automation vẫn chưa được implement, sẽ làm ở patch tiếp theo.
 
 ## 1.3.108 — Giữ vị trí đọc và khôi phục huy hiệu Phòng chat (30/09/2026)
 

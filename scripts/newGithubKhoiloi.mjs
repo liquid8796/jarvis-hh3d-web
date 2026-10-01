@@ -66,7 +66,9 @@ const repoName = suppliedRepo || "preview-only";
 if (!suppliedRepo) {
   console.log("--dry-run: preview-only chỉ là tên tạm để kiểm tra payload. Ollama chọn tên thật khi tạo qua npm run github:new; lượt này không gọi Ollama.");
 }
-const workflowFile = arg("workflow-file", "linh-su.yml");
+const purpose = arg("purpose", "worker") === "adViewer" ? "adViewer" : "worker";
+const defaultWorkflow = purpose === "adViewer" ? "xem-quang-cao.yml" : "linh-su.yml";
+const workflowFile = arg("workflow-file", defaultWorkflow);
 function drawWorkerId(repo) {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     const candidate = randomSoftwareName();
@@ -430,6 +432,7 @@ try {
     workerId,
     webUrl,
     workflowFile,
+    purpose,
   });
 
   for (const [rel, bytes] of payload) {

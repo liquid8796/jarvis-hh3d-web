@@ -93,6 +93,7 @@ export const OWNED_PREFIXES = Object.freeze(["scripts/", "src/"]);
 
 /** Bản mẫu workflow trong kho gốc — NGOÀI `.github/workflows/`, xem `deploy/github-actions.md` §4. */
 export const WORKFLOW_TEMPLATE_PATH = "deploy/github/linh-su.yml";
+export const AD_VIEWER_WORKFLOW_TEMPLATE_PATH = "deploy/github/xem-quang-cao.yml";
 const PUBLIC_IDENTITY_SOURCE_PATH = "scripts/githubPublicIdentity.mjs";
 
 /**
@@ -172,6 +173,7 @@ export function gitHeadPayloadSource(repoRoot) {
 const FILESYSTEM_SOURCE_INPUTS = Object.freeze([
   ...COPIED_PATHS,
   WORKFLOW_TEMPLATE_PATH,
+  AD_VIEWER_WORKFLOW_TEMPLATE_PATH,
   "package.json",
 ]);
 
@@ -292,8 +294,8 @@ export function uncommittedPayloadPaths(repoRoot) {
  * phép thay bằng biểu thức chính quy hỏng LẶNG LẼ khi hình dạng bản mẫu đổi: nó chỉ đơn giản là
  * không thay gì cả, và kho phát ra mang `WORKER_ID` của bản mẫu — tức trùng id với một kho khác.
  */
-export function renderWorkflow({ template, workerId, webUrl, workflowFile = "linh-su.yml" }) {
-  const isAdViewer = workflowFile === "xem-quang-cao.yml";
+export function renderWorkflow({ template, workerId, webUrl, workflowFile = "linh-su.yml", purpose = "worker" }) {
+  const isAdViewer = purpose === "adViewer" || workflowFile === "xem-quang-cao.yml";
   const templateDispatchTarget = isAdViewer
     ? "/actions/workflows/xem-quang-cao.yml/dispatches"
     : "/actions/workflows/linh-su.yml/dispatches";
@@ -371,13 +373,15 @@ export function buildWorkflowOnlyPayload({
   workerId,
   webUrl,
   workflowFile = "linh-su.yml",
+  purpose = "worker",
 }) {
-  const templatePath = workflowFile === "xem-quang-cao.yml" ? "deploy/github/xem-quang-cao.yml" : WORKFLOW_TEMPLATE_PATH;
+  const isAdViewer = purpose === "adViewer" || workflowFile === "xem-quang-cao.yml";
+  const templatePath = isAdViewer ? AD_VIEWER_WORKFLOW_TEMPLATE_PATH : WORKFLOW_TEMPLATE_PATH;
   const template = source.read(templatePath).toString("utf8");
   return new Map([
     [
       workflowTargetPath(workflowFile),
-      Buffer.from(renderWorkflow({ template, workerId, webUrl, workflowFile }), "utf8"),
+      Buffer.from(renderWorkflow({ template, workerId, webUrl, workflowFile, purpose }), "utf8"),
     ],
   ]);
 }

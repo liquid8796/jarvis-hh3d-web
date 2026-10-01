@@ -71,4 +71,35 @@ try {
   rmSync(resolved, { recursive: true, force: true });
 }
 
-console.log("OK: create, promote, CLI, and fleet deploy share one workflow-only source structure.");
+// Verify purpose: "adViewer" with an arbitrary workflow filename (e.g., promoted companion repo)
+const adWorkflowFile = "check-exist.yml";
+const adTarget = workflowTargetPath(adWorkflowFile);
+const expectedAdViewer = buildWorkflowOnlyPayload({
+  source: filesystemPayloadSource(repoRoot),
+  workerId,
+  workflowFile: adWorkflowFile,
+  purpose: "adViewer",
+  webUrl: "https://158.180.59.36.sslip.io",
+});
+const adWorkflowContent = expectedAdViewer.get(adTarget)!.toString("utf8");
+assert.ok(adWorkflowContent.includes("ad-viewer.mjs"), "adViewer purpose must render ad-viewer template");
+assert.ok(adWorkflowContent.includes("/actions/workflows/check-exist.yml/dispatches"), "must self-dispatch to configured workflow file");
+assert.ok(!adWorkflowContent.includes("worker.mjs"), "must not contain worker.mjs");
+
+const adOutput = mkdtempSync(path.join(realpathSync(tmpdir()), "github-workflow-ad-parity-"));
+try {
+  execFileSync(process.execPath, [path.join(repoRoot, "scripts", "githubProvisioningPayload.mjs")], {
+    cwd: repoRoot,
+    input: JSON.stringify({ root: repoRoot, directory: adOutput, workerId, workflowFile: adWorkflowFile, purpose: "adViewer", sourceMode: "filesystem" }),
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const stagedAd = readFileSync(path.join(adOutput, adTarget));
+  assert.deepEqual(stagedAd, expectedAdViewer.get(adTarget));
+} finally {
+  const resolvedAd = realpathSync(adOutput);
+  assert.equal(path.dirname(resolvedAd), realpathSync(tmpdir()));
+  assert(path.basename(resolvedAd).startsWith("github-workflow-ad-parity-"));
+  rmSync(resolvedAd, { recursive: true, force: true });
+}
+
+console.log("OK: create, promote, CLI, and fleet deploy share one workflow-only source structure (worker and adViewer).");

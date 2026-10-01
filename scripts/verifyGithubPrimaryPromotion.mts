@@ -166,4 +166,22 @@ assert.deepEqual(planGithubPromotionHistory("default-only", null), {
   assert.equal(h.state.githubStations[0]!.primaryVisibility, "private");
   assert.equal(h.events.some(event => event.startsWith("visibility:")), false, "keep leaves GitHub visibility untouched");
 }
+
+{
+  const h = harness();
+  h.state.githubStations[0]!.purpose = "adViewer";
+  h.deps.preparePayload = async (st) => {
+    assert.equal(st.purpose, "adViewer");
+    return {
+      files: new Map([[".github/workflows/" + st.workflowFile, Buffer.from("xem-qc")]]),
+      workerToken: "",
+      dispose: async () => { h.events.push("dispose"); },
+    };
+  };
+  const result = await promoteGithubCompanionToPrimary(owner + "/" + oldRepo, nextRepo, h.deps);
+  assert.equal(result.ok, true);
+  assert.equal(h.events.some(e => e.startsWith("secret:")), false, "adViewer without worker token skips secret");
+  assert.equal(h.state.githubStations[0]!.purpose, "adViewer", "promoted station preserves purpose adViewer");
+}
+
 console.log("PASS: GitHub companion promotion swaps roles, handles deferred primary, checks identity, and restores the old primary on registry failure.");

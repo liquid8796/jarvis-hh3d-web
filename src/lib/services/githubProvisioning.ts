@@ -545,8 +545,8 @@ async function productionLocalPreflight(ctx: GithubProvisionContext, sourceMode:
     } catch (error) {
       rethrowSafe(error, "server_configuration_missing");
     }
-    const workerToken = process.env.WORKER_TOKEN?.trim();
-    if (!workerToken || !process.env.DATABASE_URL) throw new GithubProvisionSafeError("server_configuration_missing");
+    const workerToken = process.env.WORKER_TOKEN?.trim() || "";
+    if ((!workerToken && ctx.purpose !== "adViewer") || !process.env.DATABASE_URL) throw new GithubProvisionSafeError("server_configuration_missing");
     const root = process.cwd();
     try { await run("git", ["--version"], { budget: ctx }); }
     catch (error) { rethrowSafe(error, "server_git_unavailable"); }
@@ -558,7 +558,7 @@ async function productionLocalPreflight(ctx: GithubProvisionContext, sourceMode:
     try {
       await run(process.execPath, [path.join(root, "scripts", "githubProvisioningPayload.mjs")], {
         budget: ctx,
-        input: JSON.stringify({ root, directory, workerId: ctx.workerId, workflowFile: ctx.workflowFile, sourceMode }),
+        input: JSON.stringify({ root, directory, workerId: ctx.workerId, workflowFile: ctx.workflowFile, purpose: ctx.purpose, sourceMode }),
         // The payload helper needs no credentials, only source bytes.
         env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, NODE_ENV: process.env.NODE_ENV },
       });
@@ -643,6 +643,7 @@ export const productionGithubProvisionDependencies: GithubProvisioningDependenci
     });
   },
   async setSecret(ctx, prepared) {
+    if (ctx.purpose === "adViewer" && !prepared.workerToken) return;
     await run("gh", ["secret", "set", "WORKER_TOKEN", "--repo", ctx.slug], { budget: ctx, input: prepared.workerToken, env: { ...process.env, GH_TOKEN: ctx.pat, GH_HOST: "github.com", GH_PROMPT_DISABLED: "1" } });
   },
   async register(ctx, prepared, proof) {

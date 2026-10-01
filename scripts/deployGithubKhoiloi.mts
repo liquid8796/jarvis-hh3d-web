@@ -207,6 +207,7 @@ type Station = {
   workerId: string;
   pat: string;
   enabled: boolean;
+  purpose: "worker" | "adViewer";
 };
 
 // pg thay neon-http (16/08/2026 — DB nay là Postgres local trên VM; neon() gặp 127.0.0.1
@@ -227,7 +228,8 @@ const rejected: string[] = [];
 for (const row of (rawStations ?? []) as Array<Record<string, unknown>>) {
   const owner = String(row?.owner ?? "");
   const repo = String(row?.repo ?? "");
-  const defaultWorkflow = row?.purpose === "adViewer" ? DEFAULT_AD_VIEWER_WORKFLOW_FILE : DEFAULT_WORKFLOW_FILE;
+  const purpose = (row?.purpose === "adViewer" ? "adViewer" : "worker") as "worker" | "adViewer";
+  const defaultWorkflow = purpose === "adViewer" ? DEFAULT_AD_VIEWER_WORKFLOW_FILE : DEFAULT_WORKFLOW_FILE;
   const workflowFile = String(row?.workflowFile ?? defaultWorkflow) || defaultWorkflow;
   const complaint = reviewStationIdentity(owner, repo, workflowFile);
   if (complaint) {
@@ -241,6 +243,7 @@ for (const row of (rawStations ?? []) as Array<Record<string, unknown>>) {
     workerId: String(row?.workerId ?? ""),
     pat: String(row?.pat ?? ""),
     enabled: row?.enabled !== false,
+    purpose,
   });
 }
 
@@ -644,6 +647,7 @@ async function deployOne(station: Station): Promise<Outcome> {
       workerId,
       webUrl,
       workflowFile: station.workflowFile,
+      purpose: station.purpose,
     });
     const localShas = new Map<string, string>();
     for (const [path, bytes] of files) localShas.set(path, gitBlobSha(bytes));

@@ -11,6 +11,15 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.113 — Sửa lỗi kho Xem Quảng Cáo chạy sai workflow Khôi Lỗi (02/10/2026)
+
+- Sửa lỗi nghiêm trọng khiến kho ở tab Xem Quảng Cáo (và repo phụ được promote lên thành repo chính) chạy nhầm workflow `linh-su.yml` (khôi lỗi tông môn) thay vì `xem-quang-cao.yml` (xem quảng cáo).
+- `khoiloiPayload.mjs`: `renderWorkflow` và `buildWorkflowOnlyPayload` nay nhận tham số `purpose` (`worker` | `adViewer`), thay vì chỉ so cứng tên tệp `workflowFile === "xem-quang-cao.yml"`. Mọi tệp workflow được đặt tên tuỳ biến/đổi tên khi promote từ repo phụ đều render đúng bản mẫu `deploy/github/xem-quang-cao.yml` khi `purpose === "adViewer"`.
+- `githubProvisioningPayload.mjs`: Parse và truyền `purpose` từ JSON stdin vào `buildWorkflowOnlyPayload`. Đưa `deploy/github/xem-quang-cao.yml` vào `FILESYSTEM_SOURCE_INPUTS` để luồng filesystem payload staging cho phép đọc bản mẫu xem quảng cáo.
+- `githubPrimaryPromotion.ts`: Khi promote repo phụ của trạm Xem Quảng Cáo thành repo chính, truyền `purpose: station.purpose` vào child process staging payload; cho phép `WORKER_TOKEN` để trống khi purpose là `adViewer` và bỏ qua bước set secret nếu không có token.
+- `githubProvisioning.ts`: Khi provision kho qua giao diện/API, truyền `purpose: ctx.purpose` vào `githubProvisioningPayload.mjs` và bỏ qua yêu cầu `WORKER_TOKEN` đối với `adViewer`.
+- `deployGithubKhoiloi.mts`: Đọc `purpose` từ trường sổ kho trong database và truyền `purpose: station.purpose` vào `buildWorkflowOnlyPayload` trong vòng phát hành toàn bộ trạm.
+
 ## 1.3.112 — Thêm phân loại kho Xem Quảng Cáo và kịch bản tự động xem ads (02/10/2026)
 
 - Tab Kho GitHub phân loại hai mục đích: **Khôi Lỗi** (chạy worker tông môn) và **Xem Quảng Cáo** (xem ads trên website chính thức). Cả hai dùng chung cơ chế tạo kho, nuôi repo phụ bằng Ollama và promote repo.

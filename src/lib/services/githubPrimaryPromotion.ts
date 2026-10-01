@@ -225,8 +225,9 @@ async function collectFiles(root: string): Promise<Map<string, Buffer>> {
 }
 
 async function prepareProductionPayload(station: Station, deadlineAt: number): Promise<PreparedPayload> {
-  const workerToken = process.env.WORKER_TOKEN?.trim();
-  if (!workerToken) throw new Error("worker-token-missing");
+  const isAdViewer = station.purpose === "adViewer";
+  const workerToken = process.env.WORKER_TOKEN?.trim() || "";
+  if (!workerToken && !isAdViewer) throw new Error("worker-token-missing");
   const directory = await mkdtemp(path.join(await realpath(tmpdir()), "github-promotion-"));
   try {
     await runChild(process.execPath, [path.join(process.cwd(), "scripts", "githubProvisioningPayload.mjs")], {
@@ -236,6 +237,7 @@ async function prepareProductionPayload(station: Station, deadlineAt: number): P
         directory,
         workerId: station.workerId,
         workflowFile: station.workflowFile,
+        purpose: station.purpose,
         sourceMode: "filesystem",
       }),
     });
@@ -262,6 +264,7 @@ async function setProductionWorkerSecret(
   workerToken: string,
   deadlineAt: number,
 ): Promise<void> {
+  if (!workerToken) return;
   await runChild("gh", ["secret", "set", "WORKER_TOKEN", "--repo", `${owner}/${repo}`], {
     deadlineAt,
     input: workerToken,
@@ -502,7 +505,9 @@ export async function promoteGithubCompanionToPrimary(
     prepared = await deps.preparePayload(station, deadlineAt);
     await lease.assertHeld({ deadlineAt });
     const installed = await remote.installPayload(owner, companion.repo, prepared.files);
-    await remote.setWorkerSecret(owner, companion.repo, prepared.workerToken);
+    if (prepared.workerToken) {
+      await remote.setWorkerSecret(owner, companion.repo, prepared.workerToken);
+    }
     if (desiredVisibility !== targetOriginalVisibility) {
       // Mark before the request: GitHub may apply PATCH even if its response is lost.
       // Any later failure must still attempt to restore the user's original visibility.

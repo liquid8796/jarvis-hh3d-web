@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.113",
+    date: "2026-10-02",
+    lines: [
+      "Sửa lỗi kho ở mục Xem Quảng Cáo và repo phụ được đưa lên làm kho chính bị chạy nhầm nhiệm vụ tông môn.",
+      "Cơ chế thiết lập nay nhận diện chính xác mục đích từng kho, đảm bảo tự động chạy đúng kịch bản xem trang.",
+    ],
+  },
+  {
     version: "1.3.112",
     date: "2026-10-02",
     lines: [
@@ -479,14 +487,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Ba nút kẹp tệp, cảm xúc và gửi trong Phòng Chat đã tròn cân đối trở lại, không còn bị bè ngang sau lượt hạ khung.",
       "Bề ngang và chiều cao khung vừa chỉnh vẫn giữ nguyên; giao diện điện thoại không đổi.",
-    ],
-  },
-  {
-    version: "1.3.63",
-    date: "2026-09-01",
-    lines: [
-      "Khung Phòng Chat trên máy tính nay thấp xuống đúng một phần tư, còn bề ngang rộng vừa chỉnh vẫn giữ nguyên.",
-      "Điện thoại giữ nguyên kích thước cũ để ô nhập và các nút không bị ép quá nhỏ.",
     ],
   },
 ];

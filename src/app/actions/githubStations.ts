@@ -231,6 +231,7 @@ const stationForms = createGithubStationFormHandlers({
       dailyPushes: options.dailyPushes ?? station.dailyPushes,
       visibility: options.visibility ?? station.primaryVisibility,
       workerId: station.workerId,
+      purpose: station.purpose,
       activateDeferredSlug: stationSlug(station),
     });
   },

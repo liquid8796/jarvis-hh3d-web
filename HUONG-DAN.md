@@ -150,6 +150,13 @@ Ngay đầu tab **Thành viên**, chọn **Online · Đang bận · Offline** ch
 hoặc mất nhịp quá khoảng 90 giây thì online/đang bận tự hiện offline; chọn Offline thì luôn ẩn
 trạng thái hoạt động cho tới khi bạn đổi lại.
 
+### Quảng cáo tài trợ
+
+Trên tên miền chính thức, website có thể hiển thị quảng cáo Google AdSense và Adsterra. Adsterra gồm
+biểu ngữ, nội dung đề xuất, Social Bar và Popunder; liên kết nội dung tài trợ chỉ mở khi bạn tự bấm.
+Nếu trình duyệt chặn quảng cáo, các chức năng đăng nhập, Auto, hàng đợi và trò chuyện vẫn dùng bình
+thường. Phiên quản trị, máy local, tên miền cũ và trang quyền riêng tư không tải quảng cáo.
+
 ### Khi tông môn bế quan trùng tu
 
 Lúc trưởng môn khai bảo trì, **mọi trang đều đóng**: đạo hữu thấy một bảng「Tông môn đang bế quan

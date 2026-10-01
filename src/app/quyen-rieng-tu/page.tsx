@@ -2,7 +2,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 
 export const metadata = {
   title: "Quyền Riêng Tư",
-  description: "Cách Auto HH3D xử lý dữ liệu tài khoản, nhật ký vận hành và quảng cáo Google AdSense.",
+  description: "Cách Auto HH3D xử lý dữ liệu tài khoản, nhật ký vận hành và quảng cáo Google AdSense/Adsterra.",
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -14,7 +14,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-/** Public disclosure for first-party account data and Google AdSense advertising data. */
+/** Public disclosure for first-party account data and third-party advertising data. */
 export default function PrivacyPage() {
   return (
     <>
@@ -24,7 +24,7 @@ export default function PrivacyPage() {
           <header className="border-b border-[rgba(155,150,190,.14)] px-5 py-6 sm:px-8">
             <p className="text-xs font-bold uppercase tracking-[.16em] text-[var(--color-gold-300)]">Minh bạch dữ liệu</p>
             <h1 className="h-display mt-1 text-2xl font-bold text-gilded sm:text-3xl">Quyền riêng tư</h1>
-            <p className="mt-3 text-sm leading-6 text-[var(--color-mist)]">Cập nhật ngày 27/09/2026.</p>
+            <p className="mt-3 text-sm leading-6 text-[var(--color-mist)]">Cập nhật ngày 01/10/2026.</p>
           </header>
 
           <div className="space-y-6 px-5 py-6 sm:px-8 sm:py-8">
@@ -59,6 +59,17 @@ export default function PrivacyPage() {
               </p>
             </Section>
 
+            <Section title="Adsterra và định dạng quảng cáo">
+              <p>
+                Website có thể tải quảng cáo Adsterra gồm biểu ngữ, đề xuất nội dung, Social Bar và Popunder trên tên miền chính thức.
+                Adsterra và các đối tác phân phối của họ có thể xử lý địa chỉ IP, thông tin trình duyệt/thiết bị, cookie và tín hiệu chống gian lận để phân phối và đo lường quảng cáo.
+              </p>
+              <p>
+                Hai mã Social Bar và Popunder dùng phiên bản chống chặn quảng cáo do chính Adsterra cung cấp. Auto HH3D không tự kiểm tra tiện ích trình duyệt,
+                không khoá quyền truy cập khi bạn chặn quảng cáo và không thêm cơ chế vượt chặn riêng ngoài mã nhà cung cấp.
+              </p>
+            </Section>
+
             <Section title="Chia sẻ và thời gian lưu">
               <p>
                 Auto HH3D không bán thông tin đăng nhập hoặc cấu hình nhiệm vụ của bạn. Dữ liệu chỉ được chia sẻ với nhà cung cấp
@@ -72,7 +83,7 @@ export default function PrivacyPage() {
 
             <Section title="Quyền lựa chọn và liên hệ">
               <p>
-                Bạn có thể chặn hoặc xoá cookie trong trình duyệt, thay đổi cài đặt quảng cáo Google, hoặc ngừng sử dụng dịch vụ.
+                Bạn có thể chặn hoặc xoá cookie trong trình duyệt, thay đổi cài đặt quảng cáo Google, chặn nội dung quảng cáo bên thứ ba, hoặc ngừng sử dụng dịch vụ.
                 Việc chặn cookie có thể làm một số chức năng đăng nhập hoặc quảng cáo hoạt động không đầy đủ.
               </p>
               <p>Khi cần hỏi về dữ liệu tài khoản, hãy liên hệ quản trị viên qua Phòng Chat sau khi đăng nhập.</p>

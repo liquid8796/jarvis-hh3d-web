@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.109 — Tích hợp mạng quảng cáo Adsterra (01/10/2026)
+
+- Thêm bốn tag Adsterra từ publisher site `6090351`: banner 728×90, Native Banner, Popunder anti-adblock và Social Bar anti-adblock; Smartlink chỉ mở sau hành động bấm rõ ràng của người dùng.
+- Quảng cáo chỉ mount ở `auto-hh3d.online`/`www` trong production, không tải cho phiên quản trị, localhost, host vận hành, tên miền Vercel đã đóng, trang quản trị, chat frame hoặc trang quyền riêng tư.
+- `ADSTERRA_DISABLED=1` là nút dừng khẩn cấp độc lập. Trang quyền riêng tư công bố cookie/tín hiệu thiết bị và nói rõ Auto HH3D không tự dò tiện ích hoặc khoá người dùng chặn quảng cáo.
+- Regression `verify:adsterra` khóa byte ID/URL public, host/session gate, bốn script, Smartlink có `rel=sponsored`, disclosure và responsive placement.
+
 ## 1.3.108 — Giữ vị trí đọc và khôi phục huy hiệu Phòng chat (30/09/2026)
 
 - Box **Phòng chat** chỉ tự bám tin mới khi người dùng còn đứng sát cuối; cuộn lên đọc lịch sử thì nhịp poll 2,5 giây giữ nguyên vị trí thay vì kéo ngược xuống.

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.109",
+    date: "2026-10-01",
+    lines: [
+      "Website nay có thêm quảng cáo Adsterra gồm biểu ngữ, đề xuất nội dung, Social Bar và Popunder trên tên miền chính thức.",
+      "Quản trị viên, máy local và tên miền cũ vẫn không tải quảng cáo; mọi định dạng có thể dừng khẩn cấp từ cấu hình máy chủ.",
+    ],
+  },
+  {
     version: "1.3.108",
     date: "2026-09-30",
     lines: [
@@ -479,15 +487,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Phòng Chat nay nở theo màn hình: trước đây sảnh đứng yên một cỡ dù màn có lớn tới đâu, giờ màn càng cao sảnh càng rộng.",
       "Chữ, ảnh đại diện và bài vị trong sảnh thu lại một bậc, nên mỗi màn hình chứa thêm chừng hai lượt trò chuyện mà vẫn đọc thoải mái.",
       "Trên điện thoại chữ giữ nguyên cỡ cũ — lượt thu này chỉ đụng tới máy tính.",
-    ],
-  },
-  {
-    version: "1.3.59",
-    date: "2026-08-31",
-    lines: [
-      "Mê Cung kể lại từng ải trong lúc đánh — «Đang đánh ải 3/5» kèm tên boss — thay vì im lặng suốt cả trận rồi mới báo một dòng kết quả.",
-      "Phòng bị xoá giữa trận thì nay nói thẳng là đã ra khỏi phòng và lập phòng mới ở lượt ghé sau, thay vì đứng dò mười mấy phút không một dòng chữ nào.",
-      "Trận có đứng hình đi nữa thì cứ vài phút vẫn có một dòng báo đang ở đâu, nên liếc nhật ký là biết còn chạy hay đã kẹt.",
     ],
   },
 ];

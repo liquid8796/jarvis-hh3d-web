@@ -35,6 +35,13 @@ nguy cơ bấm nhầm; `GOOGLE_ADSENSE_DISABLED=1` trong `/opt/jarvis/shared/.en
 Seller record tĩnh nằm ở `/ads.txt`, còn chính sách dữ liệu quảng cáo ở `/quyen-rieng-tu` và được
 liên kết trong footer. Google AdSense vẫn quyết định thời điểm xét duyệt và thời điểm quảng cáo bắt đầu phân phối.
 
+Adsterra dùng các tag công khai của publisher site `6090351`: banner 728×90, Native Banner, Popunder,
+Social Bar và một Smartlink chỉ mở khi người dùng chủ động bấm. Hai tag Popunder/Social Bar là bản
+anti-adblock do chính Adsterra cấp; ứng dụng không tự dò extension, không chặn chức năng khi quảng cáo
+bị chặn và không thêm bypass riêng. Cùng luật với AdSense, tag chỉ mount trên production chính thức và
+không mount cho phiên quản trị; `/admin`, `/chat-frame`, `/quyen-rieng-tu`, localhost, sslip và Vercel cũ
+đều ad-free. `ADSTERRA_DISABLED=1` trong shared env dừng riêng mạng này mà không cần rollback.
+
 ---
 
 ## 1. Kiến trúc — và vì sao lại thế

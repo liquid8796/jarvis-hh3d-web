@@ -6,11 +6,13 @@ import { ChatFab } from "@/components/ChatFab";
 import { BackdropPeek } from "@/components/BackdropPeek";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { GoogleAdSense } from "@/components/GoogleAdSense";
+import { AdsterraAds } from "@/components/AdsterraAds";
 import { getRenderSettings } from "@/lib/services/settings";
 import { backdropCss } from "@/lib/validation/backdrops";
 import "./globals.css";
 import "./communication.css";
 import "./peek.css";
+import "./adsterra.css";
 
 /**
  * `minimumScale: 1` là một nửa của tính năng pan tranh trên mobile (nửa kia là `.backdrop`
@@ -120,6 +122,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             trang nằm NGOÀI cửa: chúng là cái vỏ, và bảng bế quan cũng cần được đứng trên tấm
             tranh ấy. Xem components/MaintenanceGate.tsx cho toàn bộ lý lẽ. */}
         <MaintenanceGate>{children}</MaintenanceGate>
+        <AdsterraAds />
         <footer className="site-footer">
           <span>© 2026 Nam Cung Bình. All rights reserved.</span>
           <span aria-hidden="true"> · </span>

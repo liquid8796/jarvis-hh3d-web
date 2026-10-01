@@ -505,7 +505,9 @@ Hai thứ luật này **không** với tới, vì chúng không phải tên do s
 `scripts/worker.mjs` (chép nguyên từ kho web, dùng chung với VM) và hai origin nướng vào workflow.
 `WEB_URL` của worker đi thẳng `https://158.180.59.36.sslip.io` để nhịp poll năm giây không đốt
 Edge Requests Vercel; `WORKER_FALLBACK_URL=https://auto-hh3d.online` chỉ mở khi đường trực tiếp
-hỏng. Tên miền Vercel cũ đã đóng và chỉ còn trang hướng dẫn chuyển tiếp; workflow không được gọi nó nữa.
+hỏng. Riêng workflow **Xem Quảng Cáo** mặc định dùng `https://auto-hh3d.online` làm `WEB_URL`, vì
+các zone quảng cáo chỉ được bật trên hostname production chính thức. Tên miền Vercel cũ đã đóng và chỉ
+còn trang hướng dẫn chuyển tiếp; workflow không được gọi nó nữa.
 
 Vẫn cần `gh` (chỉ vì lượt đặt secret — sealed-box, xem đầu `newGithubKhoiloi.mjs`), nhưng **không
 cần `gh auth login`**: PAT đi qua biến `GH_TOKEN` của riêng lượt chạy ấy. Cài `gh`:

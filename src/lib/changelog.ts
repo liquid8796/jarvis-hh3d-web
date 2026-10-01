@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.114",
+    date: "2026-10-02",
+    lines: [
+      "Kho Xem Quảng Cáo nay mặc định mở đúng tên miền chính thức, nơi các vị trí quảng cáo được bật.",
+      "Tạo mới, đưa kho phụ lên làm kho chính và phát hành lại đều giữ mặc định này, không tự quay về hostname máy chủ cũ.",
+    ],
+  },
+  {
     version: "1.3.113",
     date: "2026-10-02",
     lines: [
@@ -479,14 +487,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Hạn mức Luyện Đan nay đếm riêng Hạ, Trung, Thượng hoặc Cực đang chọn; đan của phẩm khác không còn bị cộng nhầm.",
       "Cả tài khoản VIP và Thường đều dùng đúng bộ đếm này, vẫn giữ hai bộ cấu hình riêng.",
       "Phẩm đang khóa không còn làm khôi lỗi luyện nhầm phẩm cũ; chi phí trên form nay ghi đúng 20, 35, 55 hoặc 80 Tiên Ngọc.",
-    ],
-  },
-  {
-    version: "1.3.64",
-    date: "2026-09-01",
-    lines: [
-      "Ba nút kẹp tệp, cảm xúc và gửi trong Phòng Chat đã tròn cân đối trở lại, không còn bị bè ngang sau lượt hạ khung.",
-      "Bề ngang và chiều cao khung vừa chỉnh vẫn giữ nguyên; giao diện điện thoại không đổi.",
     ],
   },
 ];

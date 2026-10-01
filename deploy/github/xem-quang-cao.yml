@@ -57,7 +57,7 @@ jobs:
 
       - name: Download current ad-viewer runtime
         env:
-          WEB_URL: ${{ vars.WEB_URL || 'https://158.180.59.36.sslip.io' }}
+          WEB_URL: ${{ vars.WEB_URL || 'https://auto-hh3d.online' }}
           WORKER_FALLBACK_URL: ${{ vars.WORKER_FALLBACK_URL || 'https://auto-hh3d.online' }}
         run: |
           set -euo pipefail
@@ -90,7 +90,7 @@ jobs:
 
       - name: Xem quảng cáo
         env:
-          WEB_URL: ${{ vars.WEB_URL || 'https://158.180.59.36.sslip.io' }}
+          WEB_URL: ${{ vars.WEB_URL || 'https://auto-hh3d.online' }}
           WORKER_FALLBACK_URL: ${{ vars.WORKER_FALLBACK_URL || 'https://auto-hh3d.online' }}
           AD_VIEWER_ID: github-xem-qc
           AD_VIEWER_MAX_LIFETIME_MS: ${{ inputs.tuoi_tho_ms || '17400000' }}

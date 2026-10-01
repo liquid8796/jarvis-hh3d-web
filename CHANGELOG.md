@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.114 — Workflow Xem Quảng Cáo dùng đúng tên miền production (02/10/2026)
+
+- Đổi cả hai khai báo `WEB_URL` trong `deploy/github/xem-quang-cao.yml` từ hostname backend trực tiếp sang `https://auto-hh3d.online`, để trình duyệt mở đúng hostname đang bật Adsterra/AdSense.
+- `khoiloiPayload.mjs` nay giữ URL mặc định của mọi workflow có `purpose: "adViewer"` ở tên miền production chính thức. Vì vậy các đường tạo kho, promote repo phụ và phát hành toàn bộ trạm không còn vô tình ghi đè URL quảng cáo bằng URL worker `sslip.io` dùng chung trong payload.
+- Bổ sung hồi quy cho bản mẫu, renderer và parity của payload: workflow quảng cáo phải có đúng hai khai báo URL production và không được chứa hostname backend trực tiếp.
+
 ## 1.3.113 — Sửa lỗi kho Xem Quảng Cáo chạy sai workflow Khôi Lỗi (02/10/2026)
 
 - Sửa lỗi nghiêm trọng khiến kho ở tab Xem Quảng Cáo (và repo phụ được promote lên thành repo chính) chạy nhầm workflow `linh-su.yml` (khôi lỗi tông môn) thay vì `xem-quang-cao.yml` (xem quảng cáo).

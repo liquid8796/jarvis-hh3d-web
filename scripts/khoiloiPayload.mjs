@@ -94,6 +94,7 @@ export const OWNED_PREFIXES = Object.freeze(["scripts/", "src/"]);
 /** Bản mẫu workflow trong kho gốc — NGOÀI `.github/workflows/`, xem `deploy/github-actions.md` §4. */
 export const WORKFLOW_TEMPLATE_PATH = "deploy/github/linh-su.yml";
 export const AD_VIEWER_WORKFLOW_TEMPLATE_PATH = "deploy/github/xem-quang-cao.yml";
+export const AD_VIEWER_WEB_URL = "https://auto-hh3d.online";
 const PUBLIC_IDENTITY_SOURCE_PATH = "scripts/githubPublicIdentity.mjs";
 
 /**
@@ -296,6 +297,9 @@ export function uncommittedPayloadPaths(repoRoot) {
  */
 export function renderWorkflow({ template, workerId, webUrl, workflowFile = "linh-su.yml", purpose = "worker" }) {
   const isAdViewer = purpose === "adViewer" || workflowFile === "xem-quang-cao.yml";
+  // Quảng cáo chỉ được bật trên hostname production chính thức. Không để URL backend trực tiếp
+  // của worker trở thành giá trị mặc định của adViewer qua các đường tạo/promote/deploy dùng chung.
+  const renderedWebUrl = isAdViewer ? AD_VIEWER_WEB_URL : webUrl;
   const templateDispatchTarget = isAdViewer
     ? "/actions/workflows/xem-quang-cao.yml/dispatches"
     : "/actions/workflows/linh-su.yml/dispatches";
@@ -311,7 +315,7 @@ export function renderWorkflow({ template, workerId, webUrl, workflowFile = "lin
   }
   const workflow = template
     .replace(/^(\s*(?:WORKER_ID|AD_VIEWER_ID):\s*).*$/m, `$1${workerId}`)
-    .replaceAll(/\$\{\{ vars\.WEB_URL \|\| '[^']*' \}\}/g, `\${{ vars.WEB_URL || '${webUrl}' }}`)
+    .replaceAll(/\$\{\{ vars\.WEB_URL \|\| '[^']*' \}\}/g, `\${{ vars.WEB_URL || '${renderedWebUrl}' }}`)
     .replaceAll(templateDispatchTarget, renderedDispatchTarget)
     .replace(PUBLIC_WORKFLOW_NAME_PLACEHOLDER, publicIdentity.workflowName)
     .replace(PUBLIC_JOB_NAME_PLACEHOLDER, publicIdentity.jobName);
@@ -322,13 +326,13 @@ export function renderWorkflow({ template, workerId, webUrl, workflowFile = "lin
         "`renderWorkflow`, đừng phát ra một kho mang id trùng máy khác.",
     );
   }
-  const renderedPrimaryEndpoint = `WEB_URL: \${{ vars.WEB_URL || '${webUrl}' }}`;
+  const renderedPrimaryEndpoint = `WEB_URL: \${{ vars.WEB_URL || '${renderedWebUrl}' }}`;
   const primaryEndpointDeclarations = workflow
     .split(/\r?\n/)
     .filter((line) => line.trim() === renderedPrimaryEndpoint);
   if (primaryEndpointDeclarations.length !== 2) {
     throw new Error(
-      `Workflow phải có đúng hai WEB_URL đã render thành ${webUrl}: một cho lượt tải runtime ` +
+      `Workflow phải có đúng hai WEB_URL đã render thành ${renderedWebUrl}: một cho lượt tải runtime ` +
         "và một cho tiến trình khôi lỗi.",
     );
   }

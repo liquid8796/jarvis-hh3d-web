@@ -12,6 +12,7 @@ import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
+  AD_VIEWER_WEB_URL,
   buildWorkflowOnlyPayload,
   filesystemPayloadSource,
   workflowTargetPath,
@@ -83,6 +84,9 @@ const expectedAdViewer = buildWorkflowOnlyPayload({
 });
 const adWorkflowContent = expectedAdViewer.get(adTarget)!.toString("utf8");
 assert.ok(adWorkflowContent.includes("ad-viewer.mjs"), "adViewer purpose must render ad-viewer template");
+const adViewerEndpoint = `WEB_URL: \${{ vars.WEB_URL || '${AD_VIEWER_WEB_URL}' }}`;
+assert.equal(adWorkflowContent.split(adViewerEndpoint).length - 1, 2, "adViewer must target the official production hostname twice");
+assert.ok(!adWorkflowContent.includes("158.180.59.36.sslip.io"), "adViewer must not inherit the worker backend hostname");
 assert.ok(adWorkflowContent.includes("/actions/workflows/check-exist.yml/dispatches"), "must self-dispatch to configured workflow file");
 assert.ok(!adWorkflowContent.includes("worker.mjs"), "must not contain worker.mjs");
 

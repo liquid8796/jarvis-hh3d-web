@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.116 — Đo đủ thời gian chờ creative trong health-check quảng cáo (02/10/2026)
+
+- `adViewer.mjs` nay chốt `renderMs` sau khi đã chờ và kiểm tra creative thật trong iframe banner cùng container native. Số đo không còn dừng sớm ngay khi thuộc tính DOM vừa chuyển sang `ready`.
+- Tên bước cuối của workflow được đổi thành “Phát lượt thay runtime khi cần” và chú thích nói rõ chỉ mã thoát `90` mới tự dispatch lại; mọi lượt health-check bình thường dừng và chờ cron bốn giờ.
+- Regression khóa thứ tự tính thời gian sau bằng chứng creative và tên bước tự dispatch, tránh việc lần sửa sau vô tình biến số đo thành thời gian chỉ tới trạng thái DOM.
+
 ## 1.3.115 — Health-check xác nhận creative Adsterra trước khi báo ready (02/10/2026)
 
 - Workflow Xem Quảng Cáo nay chờ chính xác `.adsterra-leaderboard[data-status="ready"]` và `.adsterra-native[data-status="ready"]`, thay vì coi mọi liên kết mở tab mới là quảng cáo đã tải.

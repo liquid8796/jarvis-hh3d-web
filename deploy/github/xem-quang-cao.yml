@@ -10,8 +10,8 @@
 #
 #   2. Mỗi lượt chỉ chạy một health-check, chờ placement tối đa 15 giây rồi thoát.
 #
-#   3. Cron 4 giờ là nguồn chạy thường. Bước nối chuỗi chỉ dùng khi runtime cũ chủ động thoát mã 90
-#      để nhận bản mới; phanh tuổi thọ ở cuối ngăn một lượt ngắn tự nhân bản vô hạn.
+#   3. Cron 4 giờ là nguồn chạy thường. Chỉ mã 90 mới được nối ngay để tải runtime mới; mọi mã
+#      khác đều dừng tại đó nên một lượt ngắn không thể tự nhân bản vô hạn.
 
 name: "__PUBLIC_WORKFLOW_NAME__"
 
@@ -93,14 +93,14 @@ jobs:
           set -e
           echo "XEM_QC_EXIT=$ma" >> "$GITHUB_ENV"
 
-          # 90 không phải lỗi: worker đã thôi nhận việc mới để chuẩn bị nâng bản.
+          # 90 không phải lỗi: runtime chủ động xin kết thúc để chuẩn bị nâng bản.
           if [ "$ma" -eq 90 ]; then
             echo "::notice::Health-check xin kết thúc để thay runtime; lượt kế sẽ được phát ngay."
             exit 0
           fi
           exit "$ma"
 
-      - name: Phát lượt kế
+      - name: Phát lượt thay runtime khi cần
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

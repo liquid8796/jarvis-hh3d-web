@@ -121,7 +121,6 @@ async function inspectAdsterraPlacements(page, startedAt = Date.now()) {
       .catch(() => {});
   }
 
-  const renderMs = Date.now() - startedAt;
   const bannerSlot = page.locator(BANNER_SLOT_SELECTOR).first();
   const nativeSlot = page.locator(NATIVE_SLOT_SELECTOR).first();
   const bannerSlotFound = (await bannerSlot.count()) > 0;
@@ -190,7 +189,7 @@ async function inspectAdsterraPlacements(page, startedAt = Date.now()) {
   };
 
   return {
-    renderMs,
+    renderMs: Date.now() - startedAt,
     banner,
     native,
     allReady: banner.status === "ready" && native.status === "ready",

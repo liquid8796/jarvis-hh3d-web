@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.116",
+    date: "2026-10-02",
+    lines: [
+      "Thời gian render quảng cáo nay được đo tới lúc banner và native thực sự có creative, không dừng sớm ở trạng thái DOM.",
+      "Lượt kiểm tra chỉ tự chạy lại khi cần tải runtime mới; hoàn tất bình thường sẽ chờ lịch bốn giờ.",
+    ],
+  },
+  {
     version: "1.3.115",
     date: "2026-10-02",
     lines: [
@@ -477,15 +485,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Bí Cảnh Tông Môn: khi boss đã bị hạ mà phần thưởng còn treo, khôi lỗi nay tự nhận thưởng rồi mới khiêu chiến tiếp.",
       "Trước đây gặp màn nhận thưởng thì lượt ghé đứng chờ vô ích cho tới khi hết giờ, và phần thưởng chặn luôn boss kế.",
       "Áp dụng cho cả tài khoản VIP lẫn Thường. Ngày đã hết lượt vẫn dừng sớm như cũ, không tốn thêm lượt tải trang nào.",
-    ],
-  },
-  {
-    version: "1.3.66",
-    date: "2026-09-02",
-    lines: [
-      "Sức chứa túi đan nay hiển thị riêng theo từng tài khoản VIP và Thường, không còn dùng chung một bộ số cố định.",
-      "Số liệu tự cập nhật sau mỗi lượt Luyện Đan, có thời điểm dò gần nhất; tài khoản chưa dò sẽ được ghi rõ.",
-      "Hạn mức giữ đan đã chọn vẫn được giữ nguyên. Khi đổi thông tin đăng nhập, sức chứa cũ được xóa để chờ dò lại.",
     ],
   },
 ];

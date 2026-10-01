@@ -23,6 +23,9 @@ const EXCLUDED_PATH_PREFIXES = [
 
 type AdSlotStatus = "loading" | "ready" | "blocked";
 
+const LEADERBOARD_WIDTH = 728;
+const LEADERBOARD_HEIGHT = 90;
+
 function pathAllowsAds(pathname: string): boolean {
   return !EXCLUDED_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
@@ -69,6 +72,26 @@ function watchForRenderedAd(
   };
 }
 
+function fitLeaderboardToSlot(slot: HTMLElement): () => void {
+  const update = () => {
+    const scale = Math.min(1, Math.max(0, slot.clientWidth / LEADERBOARD_WIDTH));
+    slot.style.setProperty("--adsterra-leaderboard-scale", scale.toFixed(4));
+    slot.style.height = `${Math.ceil(LEADERBOARD_HEIGHT * scale)}px`;
+  };
+
+  const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+  observer?.observe(slot);
+  window.addEventListener("resize", update);
+  update();
+
+  return () => {
+    observer?.disconnect();
+    window.removeEventListener("resize", update);
+    slot.style.removeProperty("--adsterra-leaderboard-scale");
+    slot.style.removeProperty("height");
+  };
+}
+
 /**
  * Mounts the exact publisher tags supplied by Adsterra. The Popunder tag and Smartlink came from
  * Adsterra's custom-domain/anti-adblock response; the Social Bar, banner and native tags came from
@@ -92,11 +115,14 @@ export function AdsterraClientAds() {
 
   useEffect(() => {
     const slot = leaderboardRef.current;
-    if (!allowed || !slot || !window.matchMedia("(min-width: 760px)").matches) return;
+    if (!allowed || !slot) return;
 
     let active = true;
     setLeaderboardStatus("loading");
-    slot.replaceChildren();
+    const canvas = document.createElement("div");
+    canvas.className = "adsterra-leaderboard-canvas";
+    slot.replaceChildren(canvas);
+    const stopFitting = fitLeaderboardToSlot(slot);
 
     const markBlocked = () => {
       if (active) setLeaderboardStatus("blocked");
@@ -105,8 +131,8 @@ export function AdsterraClientAds() {
     options.text = `window.atOptions = ${JSON.stringify({
       key: ADSTERRA_LEADERBOARD_KEY,
       format: "iframe",
-      height: 90,
-      width: 728,
+      height: LEADERBOARD_HEIGHT,
+      width: LEADERBOARD_WIDTH,
       params: {},
     })};`;
     const invoke = document.createElement("script");
@@ -114,11 +140,11 @@ export function AdsterraClientAds() {
     invoke.async = false;
     invoke.dataset.adsterraPlacement = "leaderboard";
     invoke.addEventListener("error", markBlocked, { once: true });
-    slot.append(options, invoke);
+    canvas.append(options, invoke);
 
     const stopWatching = watchForRenderedAd(
-      slot,
-      () => Boolean(slot.querySelector("iframe")),
+      canvas,
+      () => Boolean(canvas.querySelector("iframe")),
       () => {
         if (active) setLeaderboardStatus("ready");
       },
@@ -128,6 +154,7 @@ export function AdsterraClientAds() {
     return () => {
       active = false;
       stopWatching();
+      stopFitting();
       invoke.removeEventListener("error", markBlocked);
       slot.replaceChildren();
     };

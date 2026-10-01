@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.111 — Hiển thị quảng cáo trên mobile (01/10/2026)
+
+- Banner Adsterra `728×90` không còn bị tắt dưới `760px`; một canvas cố định được scale theo đúng chiều rộng khả dụng để quảng cáo hiện trên điện thoại mà không làm tràn ngang trang.
+- Native Banner, Social Bar, Popunder và Smartlink tiếp tục hoạt động trên mobile theo cùng host/session gate; slot bị chặn hoặc rỗng vẫn tự thu sau 8 giây.
+- Regression khóa việc không được đưa media-query ẩn banner mobile quay lại và yêu cầu có bộ co banner bằng `ResizeObserver`.
+
 ## 1.3.110 — Gọn khu quảng cáo và xử lý slot bị chặn (01/10/2026)
 
 - Bỏ nhãn chữ **Quảng cáo** phía trên cụm Adsterra; các định dạng tài trợ và liên kết Smartlink giữ nguyên.

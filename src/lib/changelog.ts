@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.111",
+    date: "2026-10-01",
+    lines: [
+      "Biểu ngữ Adsterra nay hiện cả trên điện thoại và tự co theo bề ngang màn hình, không tạo cuộn ngang.",
+      "Native Banner, Social Bar, Popunder và liên kết tài trợ vẫn dùng cùng luật route, tài khoản và xử lý slot bị chặn như bản máy tính.",
+    ],
+  },
+  {
     version: "1.3.110",
     date: "2026-10-01",
     lines: [
@@ -479,13 +487,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khung Phòng Chat trên máy tính nay rộng thêm đúng một phần tư, cho dòng trò chuyện thoáng và ít xuống hàng hơn.",
       "Trên điện thoại, sảnh vẫn ôm vừa màn hình như trước và không sinh phần tràn ngang.",
-    ],
-  },
-  {
-    version: "1.3.61",
-    date: "2026-08-31",
-    lines: [
-      "Mốc giờ trong Phòng Chat sáng lên và to lại một chút — lượt thu gọn ban nãy đã làm nó mờ quá mức đọc thoải mái.",
     ],
   },
 ];

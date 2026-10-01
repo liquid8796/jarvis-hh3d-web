@@ -45,6 +45,8 @@ mount trên production chính thức và không mount cho phiên quản trị; `
 `ADSTERRA_DISABLED=1` trong shared env dừng riêng mạng này mà không cần rollback. Giao diện không
 hiện nhãn chữ “Quảng cáo” phía trên cụm tài trợ. Banner/Native bị chặn, lỗi hoặc không có inventory
 sẽ tự thu sau 8 giây để không để lại khung trống; đây là xử lý hiển thị, không phải cơ chế vượt ad blocker.
+Banner `728×90` cũng được mount trên mobile: nội dung giữ nguyên tỷ lệ nhưng được scale theo chiều rộng
+khả dụng bằng `ResizeObserver`, vì vậy không sinh thanh cuộn ngang và tự nở lại khi xoay màn hình.
 
 ---
 

@@ -160,6 +160,8 @@ không tải quảng cáo. Mã chống chặn do Adsterra cung cấp chỉ đư�
 không tự dò tiện ích hoặc khoá chức năng khi quảng cáo bị chặn. Dòng nhãn **Quảng cáo** phía trên
 cụm tài trợ đã được bỏ; nếu Cốc Cốc hoặc trình duyệt chặn zone thì khung trống sẽ tự thu lại, không ảnh
 hưởng các chức năng khác và website không cố vượt lựa chọn chặn của trình duyệt.
+Trên điện thoại, banner lớn sẽ tự thu theo bề ngang màn hình và nở lại khi xoay máy; Native Banner,
+Social Bar, Popunder và liên kết tài trợ cũng dùng được trên mobile theo cùng các giới hạn ở trên.
 
 ### Khi tông môn bế quan trùng tu
 

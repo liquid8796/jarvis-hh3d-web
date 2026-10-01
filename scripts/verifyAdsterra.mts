@@ -57,7 +57,12 @@ assert.match(client, /rel="sponsored noopener noreferrer"/);
 for (const excludedPath of ["/admin", "/chat-frame", "/login", "/pending", "/quyen-rieng-tu", "/register"]) {
   assert.match(client, new RegExp(JSON.stringify(excludedPath).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 }
-assert.match(client, /matchMedia\("\(min-width: 760px\)"\)/);
+assert.doesNotMatch(client, /matchMedia\("\(min-width: 760px\)"\)/);
+assert.match(client, /const LEADERBOARD_WIDTH = 728/);
+assert.match(client, /const LEADERBOARD_HEIGHT = 90/);
+assert.match(client, /fitLeaderboardToSlot/);
+assert.match(client, /ResizeObserver/);
+assert.match(client, /className = "adsterra-leaderboard-canvas"/);
 assert.match(client, /MutationObserver/);
 assert.match(client, /setTimeout\(\(\) => settle\("blocked"\), 8_000\)/);
 assert.match(client, /data-status=\{leaderboardStatus\}/);
@@ -70,8 +75,11 @@ assert.doesNotMatch(privacy, /Social Bar và Popunder dùng phiên bản chống
 assert.match(css, /\.adsterra-stack/);
 assert.match(css, /\.adsterra-unit\[data-status="blocked"\]/);
 assert.doesNotMatch(css, /\.adsterra-label/);
+assert.match(css, /\.adsterra-leaderboard-canvas/);
+assert.match(css, /transform: scale\(var\(--adsterra-leaderboard-scale\)\)/);
+assert.doesNotMatch(css, /@media \(max-width: 759px\)[\s\S]*\.adsterra-leaderboard\s*\{\s*display:\s*none;/);
 assert.match(css, /@media \(max-width: 759px\)/);
 assert.match(envExample, /ADSTERRA_DISABLED="0"/);
 assert.equal(JSON.parse(packageJson).scripts["verify:adsterra"], "tsx scripts/verifyAdsterra.mts");
 
-console.log("PASS: Adsterra placements, hidden label, blocked-slot collapse, vendor tags, gates and privacy disclosure are consistent.");
+console.log("PASS: Adsterra desktop/mobile placements, responsive banner scaling, blocked-slot collapse, vendor tags, gates and privacy disclosure are consistent.");

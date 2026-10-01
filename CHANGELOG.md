@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.115 — Health-check xác nhận creative Adsterra trước khi báo ready (02/10/2026)
+
+- Workflow Xem Quảng Cáo nay chờ chính xác `.adsterra-leaderboard[data-status="ready"]` và `.adsterra-native[data-status="ready"]`, thay vì coi mọi liên kết mở tab mới là quảng cáo đã tải.
+- Banner chỉ được ghi `ready` khi có iframe `728×90` và có liên kết/ảnh creative bên trong. Native chỉ được ghi `ready` khi container `container-5e6634da84f8f263d7ab34ae152f1c8d` thực sự có card hoặc liên kết creative.
+- Mỗi lượt ghi riêng `ready`, `blocked` hoặc `no-fill`, thời gian render, kích thước slot/iframe và số creative. Runtime trở thành health-check một lượt theo lịch và bỏ toàn bộ click selector, click ngẫu nhiên, Popunder tự động cùng click đệ quy trên quảng cáo production.
+- Thêm `verify:ad-viewer-health` khóa các selector, bằng chứng creative, log chẩn đoán và hàng rào không click; workflow truyền timeout chờ placement 15 giây.
+
 ## 1.3.114 — Workflow Xem Quảng Cáo dùng đúng tên miền production (02/10/2026)
 
 - Đổi cả hai khai báo `WEB_URL` trong `deploy/github/xem-quang-cao.yml` từ hostname backend trực tiếp sang `https://auto-hh3d.online`, để trình duyệt mở đúng hostname đang bật Adsterra/AdSense.

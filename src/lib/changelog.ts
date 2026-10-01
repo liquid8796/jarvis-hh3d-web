@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.115",
+    date: "2026-10-02",
+    lines: [
+      "Kho Xem Quảng Cáo nay báo rõ banner và native là ready, blocked hay no-fill, kèm số creative, thời gian render và kích thước.",
+      "Mỗi lượt chỉ kiểm tra một lần và không tự bấm quảng cáo production, giúp phân biệt lỗi tải tag với trường hợp thiếu fill.",
+    ],
+  },
+  {
     version: "1.3.114",
     date: "2026-10-02",
     lines: [
@@ -478,15 +486,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Sức chứa túi đan nay hiển thị riêng theo từng tài khoản VIP và Thường, không còn dùng chung một bộ số cố định.",
       "Số liệu tự cập nhật sau mỗi lượt Luyện Đan, có thời điểm dò gần nhất; tài khoản chưa dò sẽ được ghi rõ.",
       "Hạn mức giữ đan đã chọn vẫn được giữ nguyên. Khi đổi thông tin đăng nhập, sức chứa cũ được xóa để chờ dò lại.",
-    ],
-  },
-  {
-    version: "1.3.65",
-    date: "2026-09-01",
-    lines: [
-      "Hạn mức Luyện Đan nay đếm riêng Hạ, Trung, Thượng hoặc Cực đang chọn; đan của phẩm khác không còn bị cộng nhầm.",
-      "Cả tài khoản VIP và Thường đều dùng đúng bộ đếm này, vẫn giữ hai bộ cấu hình riêng.",
-      "Phẩm đang khóa không còn làm khôi lỗi luyện nhầm phẩm cũ; chi phí trên form nay ghi đúng 20, 35, 55 hoặc 80 Tiên Ngọc.",
     ],
   },
 ];

@@ -1,35 +1,28 @@
-# XEM QUẢNG CÁO TỰ ĐỘNG — chạy trên runner của GitHub để xem quảng cáo trên trang web dự án.
+# HEALTH-CHECK QUẢNG CÁO — chạy trên runner của GitHub để kiểm tra placement trên website dự án.
 #
 # WORKFLOW CÓ THỂ SỐNG CÙNG MÃ NGUỒN DỰ ÁN. Tương tự như khôi lỗi, workflow này tải gói
-# chạy xem quảng cáo hiện hành vào `RUNNER_TEMP`, không cài đè package/source của repo.
-# Không yêu cầu token vì chỉ là xem quảng cáo trên web.
+# chạy health-check hiện hành vào `RUNNER_TEMP`, không cài đè package/source của repo.
+# Không yêu cầu token và không tự động click quảng cáo production.
 #
-# BA THỨ PHẢI ĐÚNG, và cả ba đều nằm ở dưới dạng con số:
+# BA THỨ PHẢI ĐÚNG:
 #
 #   1. AD_VIEWER_ID phải là định danh duy nhất.
 #
-#   2. Tuổi thọ phải NGẮN HƠN trần của nền tảng. Runner bị giết cứng ở 6 giờ.
-#      thôi nhận việc ở phút 290 → chờ đóng trình duyệt tối đa 50 phút → 340 < 350 (timeout của job)
-#      < 360 (trần nền tảng). Hai lớp đệm, mỗi lớp 10 phút.
+#   2. Mỗi lượt chỉ chạy một health-check, chờ placement tối đa 15 giây rồi thoát.
 #
-#   3. Lịch phải DÀY HƠN tuổi thọ. 4 giờ một lần trong khi một lượt sống ~4,8 giờ, nên lượt kế
-#      đã nằm chờ sẵn trong hàng đợi lúc lượt cũ rút — `concurrency` giữ đúng một lượt chạy
-#      và một lượt chờ, nên hai lượt không bao giờ chồng nhau.
+#   3. Cron 4 giờ là nguồn chạy thường. Bước nối chuỗi chỉ dùng khi runtime cũ chủ động thoát mã 90
+#      để nhận bản mới; phanh tuổi thọ ở cuối ngăn một lượt ngắn tự nhân bản vô hạn.
 
 name: "__PUBLIC_WORKFLOW_NAME__"
 
 on:
   schedule:
-    # Lịch dày hơn tuổi thọ để lượt kế chờ sẵn
+    # Health-check thường kỳ; runtime mới chỉ tự nối chuỗi khi chủ động thoát mã 90 để nâng bản.
     - cron: "0 */4 * * *"
   workflow_dispatch:
-    inputs:
-      tuoi_tho_ms:
-        description: "Tuổi thọ (ms) — để trống là dùng mặc định 290 phút"
-        required: false
-        default: ""
 
-# Đúng MỘT lượt xem quảng cáo tại một thời điểm. `cancel-in-progress: false` bắt buộc.
+# Đúng MỘT lượt health-check tại một thời điểm. `cancel-in-progress: false` giữ lượt thủ công/cron
+# không cắt ngang nhau.
 concurrency:
   group: xem-quang-cao-github
   cancel-in-progress: false
@@ -43,12 +36,8 @@ jobs:
   xem-quang-cao:
     name: "__PUBLIC_JOB_NAME__"
     runs-on: ubuntu-latest
-    # 350 phút timeout
-    timeout-minutes: 350
+    timeout-minutes: 30
     steps:
-      - name: Đánh dấu giờ bắt đầu
-        run: echo "BAT_DAU_LUC=$(date +%s)" >> "$GITHUB_ENV"
-
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -88,15 +77,12 @@ jobs:
           cd "$XEM_QC_RUNTIME"
           node node_modules/playwright-core/cli.js install --with-deps chromium
 
-      - name: Xem quảng cáo
+      - name: Kiểm tra hiển thị quảng cáo
         env:
           WEB_URL: ${{ vars.WEB_URL || 'https://auto-hh3d.online' }}
           WORKER_FALLBACK_URL: ${{ vars.WORKER_FALLBACK_URL || 'https://auto-hh3d.online' }}
           AD_VIEWER_ID: github-xem-qc
-          AD_VIEWER_MAX_LIFETIME_MS: ${{ inputs.tuoi_tho_ms || '17400000' }}
-          AD_VIEWER_DELAY_MIN_MS: "5000"
-          AD_VIEWER_DELAY_MAX_MS: "10000"
-          AD_VIEWER_MAX_RECURSIVE_CLICKS: "2"
+          AD_VIEWER_AD_READY_TIMEOUT_MS: "15000"
           AD_VIEWER_SELF_UPDATE: "1"
         run: |
           set -u
@@ -109,7 +95,7 @@ jobs:
 
           # 90 không phải lỗi: worker đã thôi nhận việc mới để chuẩn bị nâng bản.
           if [ "$ma" -eq 90 ]; then
-            echo "::notice::Chương trình xem quảng cáo xin kết thúc để thay runtime; lượt kế sẽ được phát ngay."
+            echo "::notice::Health-check xin kết thúc để thay runtime; lượt kế sẽ được phát ngay."
             exit 0
           fi
           exit "$ma"
@@ -118,27 +104,13 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TUOI_THO_MS: ${{ inputs.tuoi_tho_ms || '17400000' }}
         run: |
           set -eu
-          troi=$(( $(date +%s) - BAT_DAU_LUC ))
-
-          if [ "${XEM_QC_EXIT:-}" = "90" ]; then
-            echo "Chương trình chủ động xin thay runtime (mã 90) — bỏ phanh chết-yểu và nối chuỗi ngay."
-          else
-            if [ "${TUOI_THO_MS:-0}" -le 0 ]; then
-              echo "::warning::Không đọc được tuổi thọ (TUOI_THO_MS='${TUOI_THO_MS:-}') — không nối chuỗi, để cron đỡ."
-              exit 0
-            fi
-
-            nguong=$(( TUOI_THO_MS / 2000 ))
-            if [ "$troi" -lt "$nguong" ]; then
-              echo "Lượt này mới sống ${troi}s, chưa quá nửa tuổi thọ (${nguong}s) — KHÔNG nối chuỗi."
-              echo "Đây là phanh: một lượt chết yểu mà vẫn phát lượt kế là đốt phút Actions vô tận."
-              echo "Cron sẽ dựng lại đội trong tối đa 4 giờ."
-              exit 0
-            fi
+          if [ "${XEM_QC_EXIT:-}" != "90" ]; then
+            echo "Health-check kết thúc mã ${XEM_QC_EXIT:-chưa-rõ}; không nối chuỗi. Cron sẽ chạy lượt thường kỳ kế tiếp."
+            exit 0
           fi
+          echo "Runtime chủ động xin thay bản (mã 90) — phát ngay một lượt để tải gói mới."
 
           ma=$(curl -sS -o /tmp/noi-chuoi.out -w '%{http_code}' -X POST \
             -H "Authorization: Bearer $GH_TOKEN" \
@@ -148,7 +120,7 @@ jobs:
             -d "{\"ref\":\"$GITHUB_REF_NAME\"}") || ma=000
 
           if [ "$ma" = "204" ]; then
-            echo "Đã phát lượt kế trên nhánh $GITHUB_REF_NAME (lượt này sống ${troi}s)."
+            echo "Đã phát lượt thay runtime trên nhánh $GITHUB_REF_NAME."
           else
             echo "::error::Phát lượt kế HỎNG (HTTP $ma): $(head -c 300 /tmp/noi-chuoi.out 2>/dev/null || true)"
             echo "::error::Chuỗi đứt — đội phải chờ cron tới 4 giờ. Soi quyền actions:write của GITHUB_TOKEN."

@@ -155,7 +155,11 @@ trạng thái hoạt động cho tới khi bạn đổi lại.
 Trên tên miền chính thức, website có thể hiển thị quảng cáo Google AdSense và Adsterra. Adsterra gồm
 biểu ngữ, nội dung đề xuất, Social Bar và Popunder; liên kết nội dung tài trợ chỉ mở khi bạn tự bấm.
 Nếu trình duyệt chặn quảng cáo, các chức năng đăng nhập, Auto, hàng đợi và trò chuyện vẫn dùng bình
-thường. Phiên quản trị, máy local, tên miền cũ và trang quyền riêng tư không tải quảng cáo.
+thường. Phiên quản trị, máy local, tên miền cũ, trang đăng nhập/đăng ký/chờ duyệt và trang quyền riêng tư
+không tải quảng cáo. Mã chống chặn do Adsterra cung cấp chỉ được dùng cho Popunder/Smartlink; website
+không tự dò tiện ích hoặc khoá chức năng khi quảng cáo bị chặn. Dòng nhãn **Quảng cáo** phía trên
+cụm tài trợ đã được bỏ; nếu Cốc Cốc hoặc trình duyệt chặn zone thì khung trống sẽ tự thu lại, không ảnh
+hưởng các chức năng khác và website không cố vượt lựa chọn chặn của trình duyệt.
 
 ### Khi tông môn bế quan trùng tu
 

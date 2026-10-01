@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.110",
+    date: "2026-10-01",
+    lines: [
+      "Dòng chữ Quảng cáo phía trên khu tài trợ đã được bỏ để trang gọn và liền mạch hơn.",
+      "Nếu trình duyệt chặn hoặc zone không có nội dung, khung trống tự thu lại; website không tự vượt cơ chế chặn của trình duyệt.",
+    ],
+  },
+  {
     version: "1.3.109",
     date: "2026-10-01",
     lines: [
@@ -478,15 +486,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-08-31",
     lines: [
       "Mốc giờ trong Phòng Chat sáng lên và to lại một chút — lượt thu gọn ban nãy đã làm nó mờ quá mức đọc thoải mái.",
-    ],
-  },
-  {
-    version: "1.3.60",
-    date: "2026-08-31",
-    lines: [
-      "Phòng Chat nay nở theo màn hình: trước đây sảnh đứng yên một cỡ dù màn có lớn tới đâu, giờ màn càng cao sảnh càng rộng.",
-      "Chữ, ảnh đại diện và bài vị trong sảnh thu lại một bậc, nên mỗi màn hình chứa thêm chừng hai lượt trò chuyện mà vẫn đọc thoải mái.",
-      "Trên điện thoại chữ giữ nguyên cỡ cũ — lượt thu này chỉ đụng tới máy tính.",
     ],
   },
 ];

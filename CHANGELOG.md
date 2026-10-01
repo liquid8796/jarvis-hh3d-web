@@ -11,12 +11,20 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.110 — Gọn khu quảng cáo và xử lý slot bị chặn (01/10/2026)
+
+- Bỏ nhãn chữ **Quảng cáo** phía trên cụm Adsterra; các định dạng tài trợ và liên kết Smartlink giữ nguyên.
+- Banner/Native theo dõi kết quả render bằng `MutationObserver`; script lỗi, bị trình duyệt chặn hoặc zone rỗng quá 8 giây sẽ thu slot thay vì để khung đen trống.
+- Tiếp tục chỉ dùng mã miền tuỳ chỉnh/chống chặn chính thức mà Adsterra đã cấp cho Popunder/Smartlink. Không thêm proxy, obfuscation hoặc cơ chế tự vượt bộ chặn của Cốc Cốc/trình duyệt.
+- Regression khóa việc nhãn không quay lại, trạng thái slot `loading/ready/blocked` và CSS thu slot lỗi.
+
 ## 1.3.109 — Tích hợp mạng quảng cáo Adsterra (01/10/2026)
 
-- Thêm bốn tag Adsterra từ publisher site `6090351`: banner 728×90, Native Banner, Popunder anti-adblock và Social Bar anti-adblock; Smartlink chỉ mở sau hành động bấm rõ ràng của người dùng.
-- Quảng cáo chỉ mount ở `auto-hh3d.online`/`www` trong production, không tải cho phiên quản trị, localhost, host vận hành, tên miền Vercel đã đóng, trang quản trị, chat frame hoặc trang quyền riêng tư.
+- Thêm bốn tag Adsterra từ publisher site `6090351`: banner 728×90, Native Banner, Popunder miền tuỳ chỉnh và Social Bar tiêu chuẩn; Smartlink miền tuỳ chỉnh chỉ mở sau hành động bấm rõ ràng của người dùng.
+- API chống chặn trả placement cho ad unit `28` nhưng ad unit `44` rỗng, nên source không gắn nhãn Social Bar là anti-adblock khi Adsterra chưa cấp mã tương ứng.
+- Quảng cáo chỉ mount ở `auto-hh3d.online`/`www` trong production, không tải cho phiên quản trị, localhost, host vận hành, tên miền Vercel đã đóng, trang quản trị, chat frame, trang xác thực/chờ duyệt hoặc trang quyền riêng tư.
 - `ADSTERRA_DISABLED=1` là nút dừng khẩn cấp độc lập. Trang quyền riêng tư công bố cookie/tín hiệu thiết bị và nói rõ Auto HH3D không tự dò tiện ích hoặc khoá người dùng chặn quảng cáo.
-- Regression `verify:adsterra` khóa byte ID/URL public, host/session gate, bốn script, Smartlink có `rel=sponsored`, disclosure và responsive placement.
+- Regression `verify:adsterra` khóa byte ID/URL public, host/session gate, bốn script, Smartlink có `rel=sponsored`, phân biệt đúng mã chống chặn và responsive placement.
 
 ## 1.3.108 — Giữ vị trí đọc và khôi phục huy hiệu Phòng chat (30/09/2026)
 

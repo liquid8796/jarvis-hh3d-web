@@ -54,14 +54,24 @@ assert.match(client, /ADSTERRA_SMARTLINK_URL/);
 assert.match(client, /data-adsterra-global/);
 assert.match(client, /dataset\.cfasync = "false"/);
 assert.match(client, /rel="sponsored noopener noreferrer"/);
-assert.match(client, /EXCLUDED_PATH_PREFIXES = \["\/admin", "\/chat-frame", "\/quyen-rieng-tu"\]/);
+for (const excludedPath of ["/admin", "/chat-frame", "/login", "/pending", "/quyen-rieng-tu", "/register"]) {
+  assert.match(client, new RegExp(JSON.stringify(excludedPath).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+}
 assert.match(client, /matchMedia\("\(min-width: 760px\)"\)/);
+assert.match(client, /MutationObserver/);
+assert.match(client, /setTimeout\(\(\) => settle\("blocked"\), 8_000\)/);
+assert.match(client, /data-status=\{leaderboardStatus\}/);
+assert.match(client, /data-status=\{nativeStatus\}/);
+assert.doesNotMatch(client, /adsterra-label/);
 assert.match(privacy, /Adsterra và định dạng quảng cáo/);
-assert.match(privacy, /Social Bar và Popunder/);
-assert.match(privacy, /chống chặn quảng cáo do chính Adsterra cung cấp/);
+assert.match(privacy, /Popunder và liên kết tài trợ dùng miền tuỳ chỉnh\/chống chặn/);
+assert.match(privacy, /Social Bar là tag tiêu chuẩn/);
+assert.doesNotMatch(privacy, /Social Bar và Popunder dùng phiên bản chống chặn/);
 assert.match(css, /\.adsterra-stack/);
+assert.match(css, /\.adsterra-unit\[data-status="blocked"\]/);
+assert.doesNotMatch(css, /\.adsterra-label/);
 assert.match(css, /@media \(max-width: 759px\)/);
 assert.match(envExample, /ADSTERRA_DISABLED="0"/);
 assert.equal(JSON.parse(packageJson).scripts["verify:adsterra"], "tsx scripts/verifyAdsterra.mts");
 
-console.log("PASS: Adsterra placements, anti-adblock vendor tags, host/session gates and privacy disclosure are consistent.");
+console.log("PASS: Adsterra placements, hidden label, blocked-slot collapse, vendor tags, gates and privacy disclosure are consistent.");

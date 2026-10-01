@@ -36,11 +36,15 @@ Seller record tĩnh nằm ở `/ads.txt`, còn chính sách dữ liệu quảng 
 liên kết trong footer. Google AdSense vẫn quyết định thời điểm xét duyệt và thời điểm quảng cáo bắt đầu phân phối.
 
 Adsterra dùng các tag công khai của publisher site `6090351`: banner 728×90, Native Banner, Popunder,
-Social Bar và một Smartlink chỉ mở khi người dùng chủ động bấm. Hai tag Popunder/Social Bar là bản
-anti-adblock do chính Adsterra cấp; ứng dụng không tự dò extension, không chặn chức năng khi quảng cáo
-bị chặn và không thêm bypass riêng. Cùng luật với AdSense, tag chỉ mount trên production chính thức và
-không mount cho phiên quản trị; `/admin`, `/chat-frame`, `/quyen-rieng-tu`, localhost, sslip và Vercel cũ
-đều ad-free. `ADSTERRA_DISABLED=1` trong shared env dừng riêng mạng này mà không cần rollback.
+Social Bar và một Smartlink chỉ mở khi người dùng chủ động bấm. Endpoint miền tuỳ chỉnh/chống chặn
+Adsterra trả mã cho Popunder và Smartlink; truy vấn ad unit `44` không trả placement nào, nên Social Bar
+dùng tag tiêu chuẩn ở trang zone chứ không được mô tả sai là anti-adblock. Ứng dụng không tự dò extension,
+không chặn chức năng khi quảng cáo bị chặn và không thêm bypass riêng. Cùng luật với AdSense, tag chỉ
+mount trên production chính thức và không mount cho phiên quản trị; `/admin`, `/chat-frame`, các trang
+đăng nhập/đăng ký/chờ duyệt, `/quyen-rieng-tu`, localhost, sslip và Vercel cũ đều ad-free.
+`ADSTERRA_DISABLED=1` trong shared env dừng riêng mạng này mà không cần rollback. Giao diện không
+hiện nhãn chữ “Quảng cáo” phía trên cụm tài trợ. Banner/Native bị chặn, lỗi hoặc không có inventory
+sẽ tự thu sau 8 giây để không để lại khung trống; đây là xử lý hiển thị, không phải cơ chế vượt ad blocker.
 
 ---
 

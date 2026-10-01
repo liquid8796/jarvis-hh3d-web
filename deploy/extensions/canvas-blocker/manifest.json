@@ -1,0 +1,67 @@
+{
+	"manifest_version": 3,
+	"name": "CanvasBlocker",
+	"description": "__MSG_addon_description__",
+	"version": "1.12",
+	"default_locale": "en",
+	"minimum_chrome_version": "119",
+
+	"icons": {
+		"16": "icons/png/icon-16.png",
+		"32": "icons/png/icon-32.png",
+		"48": "icons/png/icon-48.png",
+		"128": "icons/png/icon-128.png"
+	},
+
+	"background": {
+		"service_worker": "background/background.js"
+	},
+
+	"action": {
+		"default_icon": {
+			"16": "icons/png/browserAction-notPrinted-16.png",
+			"32": "icons/png/browserAction-notPrinted-32.png",
+			"48": "icons/png/browserAction-notPrinted-48.png"
+		},
+		"default_title": "__MSG_browserAction_title_default__",
+		"default_popup": "browserAction/browserAction.html"
+	},
+
+	"options_ui": {
+		"page": "options/options.html",
+		"open_in_tab": true
+	},
+
+	"content_scripts": [
+		{
+			"matches": ["http://*/*", "https://*/*", "file:///*"],
+			"all_frames": true,
+			"match_origin_as_fallback": true,
+			"run_at": "document_start",
+			"world": "ISOLATED",
+			"js": [
+				"content/messageKeys.js",
+				"content/bridge.js"
+			]
+		},
+		{
+			"matches": ["http://*/*", "https://*/*", "file:///*"],
+			"all_frames": true,
+			"match_origin_as_fallback": true,
+			"run_at": "document_start",
+			"world": "MAIN",
+			"js": [
+				"content/injected.js"
+			]
+		}
+	],
+
+	"permissions": [
+		"storage",
+		"tabs",
+		"alarms",
+		"declarativeNetRequestWithHostAccess"
+	],
+
+	"host_permissions": ["<all_urls>"]
+}

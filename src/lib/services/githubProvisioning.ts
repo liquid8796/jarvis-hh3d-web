@@ -661,6 +661,7 @@ export const productionGithubProvisionDependencies: GithubProvisioningDependenci
         if (!station || references(settings, ctx)) throw new GithubProvisionCollisionError("station");
         // Materialize IN PLACE: every companion repo/runtime trace stays attached to the same station.
         station.pat = prepared.encryptedPat;
+        station.purpose = ctx.purpose ?? "worker";
         station.primaryDeferred = false;
         station.primaryVisibility = ctx.visibility;
         station.enabled = true;
@@ -681,6 +682,7 @@ export const productionGithubProvisionDependencies: GithubProvisioningDependenci
         repo: ctx.repo,
         workflowFile: ctx.workflowFile,
         workerId: ctx.workerId,
+        purpose: ctx.purpose ?? "worker",
         pat: prepared.encryptedPat,
         primaryDeferred: false,
         primaryVisibility: ctx.visibility,
@@ -710,6 +712,7 @@ export const productionGithubProvisionDependencies: GithubProvisioningDependenci
         repo: ctx.repo,
         workflowFile: ctx.workflowFile,
         workerId: ctx.workerId,
+        purpose: ctx.purpose ?? "worker",
         pat: prepared.encryptedPat,
         primaryDeferred: true,
         primaryVisibility: ctx.visibility,

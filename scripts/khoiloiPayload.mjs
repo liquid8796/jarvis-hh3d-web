@@ -275,7 +275,7 @@ export function filesystemPayloadSource(repoRoot) {
  */
 export function uncommittedPayloadPaths(repoRoot) {
   const out = git(repoRoot, [
-    "status", "--porcelain", "--", ...COPIED_PATHS, WORKFLOW_TEMPLATE_PATH,
+    "status", "--porcelain", "--", ...COPIED_PATHS, WORKFLOW_TEMPLATE_PATH, "deploy/github/xem-quang-cao.yml",
     PUBLIC_IDENTITY_SOURCE_PATH,
   ]);
   return out
@@ -293,7 +293,10 @@ export function uncommittedPayloadPaths(repoRoot) {
  * không thay gì cả, và kho phát ra mang `WORKER_ID` của bản mẫu — tức trùng id với một kho khác.
  */
 export function renderWorkflow({ template, workerId, webUrl, workflowFile = "linh-su.yml" }) {
-  const templateDispatchTarget = "/actions/workflows/linh-su.yml/dispatches";
+  const isAdViewer = workflowFile === "xem-quang-cao.yml";
+  const templateDispatchTarget = isAdViewer
+    ? "/actions/workflows/xem-quang-cao.yml/dispatches"
+    : "/actions/workflows/linh-su.yml/dispatches";
   const renderedDispatchTarget = `/actions/workflows/${workflowFile}/dispatches`;
   const publicIdentity = publicIdentityForWorker(workerId);
   if (!template.includes(templateDispatchTarget)) {
@@ -305,15 +308,15 @@ export function renderWorkflow({ template, workerId, webUrl, workflowFile = "lin
     }
   }
   const workflow = template
-    .replace(/^(\s*WORKER_ID:\s*).*$/m, `$1${workerId}`)
+    .replace(/^(\s*(?:WORKER_ID|AD_VIEWER_ID):\s*).*$/m, `$1${workerId}`)
     .replaceAll(/\$\{\{ vars\.WEB_URL \|\| '[^']*' \}\}/g, `\${{ vars.WEB_URL || '${webUrl}' }}`)
     .replaceAll(templateDispatchTarget, renderedDispatchTarget)
     .replace(PUBLIC_WORKFLOW_NAME_PLACEHOLDER, publicIdentity.workflowName)
     .replace(PUBLIC_JOB_NAME_PLACEHOLDER, publicIdentity.jobName);
 
-  if (!workflow.includes(`WORKER_ID: ${workerId}`)) {
+  if (!workflow.includes(`WORKER_ID: ${workerId}`) && !workflow.includes(`AD_VIEWER_ID: ${workerId}`)) {
     throw new Error(
-      "Không thay được WORKER_ID trong workflow — hình dạng bản mẫu đã đổi. Sửa phép thay ở " +
+      "Không thay được WORKER_ID/AD_VIEWER_ID trong workflow — hình dạng bản mẫu đã đổi. Sửa phép thay ở " +
         "`renderWorkflow`, đừng phát ra một kho mang id trùng máy khác.",
     );
   }
@@ -327,7 +330,7 @@ export function renderWorkflow({ template, workerId, webUrl, workflowFile = "lin
         "và một cho tiến trình khôi lỗi.",
     );
   }
-  if (!workflow.includes(renderedDispatchTarget) || (workflowFile !== "linh-su.yml" && workflow.includes(templateDispatchTarget))) {
+  if (!workflow.includes(renderedDispatchTarget) || (workflowFile !== "linh-su.yml" && workflowFile !== "xem-quang-cao.yml" && workflow.includes(templateDispatchTarget))) {
     throw new Error("Workflow self-dispatch target does not match the configured workflow filename.");
   }
   if (
@@ -369,7 +372,8 @@ export function buildWorkflowOnlyPayload({
   webUrl,
   workflowFile = "linh-su.yml",
 }) {
-  const template = source.read(WORKFLOW_TEMPLATE_PATH).toString("utf8");
+  const templatePath = workflowFile === "xem-quang-cao.yml" ? "deploy/github/xem-quang-cao.yml" : WORKFLOW_TEMPLATE_PATH;
+  const template = source.read(templatePath).toString("utf8");
   return new Map([
     [
       workflowTargetPath(workflowFile),

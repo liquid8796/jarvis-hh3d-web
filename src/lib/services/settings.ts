@@ -426,6 +426,7 @@ export const appSettingsSchema = z.object({
         repo: z.string().min(1).max(100),
         /** Tệp workflow trong `.github/workflows/` — cần tên để hỏi trạng thái và bật lại lịch. */
         workflowFile: z.string().min(1).max(100).catch(DEFAULT_WORKFLOW_FILE).default(DEFAULT_WORKFLOW_FILE),
+        purpose: z.enum(["worker", "adViewer"]).catch("worker").default("worker"),
         /**
          * `WORKER_ID` mà workflow của kho này khai. Chỉ để ĐỐI CHIẾU bằng mắt với mục Khôi Lỗi
          * trên dashboard — sổ này không dùng nó để quyết định gì, nên một giá trị rỗng hay lệch

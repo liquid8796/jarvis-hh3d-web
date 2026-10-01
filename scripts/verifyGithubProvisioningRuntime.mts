@@ -17,7 +17,7 @@ try {
   process.env.WORKER_TOKEN = "fixture-worker-token";
   process.env.DATABASE_URL = "postgresql://unused.invalid/fixture";
   process.chdir(release);
-  const ctx = { pat: "fixture-pat", repo: "fixture-project", workerId: "fixture-worker", owner: "Fixture", slug: "Fixture/fixture-project", workflowFile: "custom.yaml", dailyPushes: 4, generatedRepo: false, now: Date.now, deadlineAt: Date.now() + 210_000 };
+  const ctx = { pat: "fixture-pat", repo: "fixture-project", workerId: "fixture-worker", owner: "Fixture", slug: "Fixture/fixture-project", workflowFile: "custom.yaml", dailyPushes: 4, generatedRepo: false, visibility: "public" as const, deferPrimary: false, now: Date.now, deadlineAt: Date.now() + 210_000 };
   prepared = await production.localPreflight(ctx);
   const tempRoot = await realpath(tmpdir());
   for (const rejected of [tempRoot, root, release, path.join(root, "github-provision-Outside"), path.join(tempRoot, "github-provision-x", "nested"), "github-provision-relative"]) await assert.rejects(resolveGithubProvisioningTemp(rejected));

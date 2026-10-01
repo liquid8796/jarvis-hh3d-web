@@ -1,0 +1,143 @@
+.actions {
+	display: block;
+}
+
+/* Matches the action menu so the popup keeps its size when the user opens
+   the notification list. The 1em compensates for the body margin, which
+   sits outside the border box. The list may still grow wider than this for
+   long URLs - only the lower bound is pinned. */
+body {
+	box-sizing: border-box;
+	min-width: calc(var(--popup-width) - 1em);
+	margin: 0.5em;
+	padding: 2px;
+	white-space: nowrap;
+	position: relative;
+}
+
+#prints {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	margin-bottom: 2em;
+	float: left;
+}
+
+button.action.isIcon {
+	border: none;
+	cursor: pointer;
+	padding: 0;
+	margin: 0;
+	line-height: 0;
+	background-color: transparent;
+	background-image: none;
+	min-width: 0;
+}
+* + button.action.isIcon {
+	margin-left: 1px;
+}
+button.action img {
+	max-height: 19px;
+	margin: 0;
+}
+
+.hasHiddenActions {
+	position: relative;
+	display: inline-block;
+}
+.hasHiddenActions:hover {
+	padding: 3px;
+	margin: -3px;
+	z-index: 10;
+}
+.hasHiddenActions .actions {
+	display: none;
+	position: absolute;
+	top: 100%;
+	left: 0px;
+	border-top-width: 0;
+	padding: 2px 1px 1px 1px;
+	line-height: 0;
+	white-space: nowrap;
+}
+.hasHiddenActions:hover .actions{
+	display: block;
+}
+
+
+#globalActions {
+	float: right;
+	width: 23px;
+	text-align: right;
+	line-height: 0;
+}
+
+#globalActions .action img {
+	margin-bottom: 4px;
+}
+
+.notifications .fakedCanvasContent {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	image-rendering: -moz-crisp-edges;
+}
+
+.notifications {
+	margin: 0;
+	padding: 0 0 20px 1em;
+}
+
+.collapsible {
+	position: relative;
+	margin: 0;
+}
+.collapsible.empty .collapser {
+	display: none;
+}
+.collapsible.collapsed .collapser {
+	display: inline-block;
+	width: 20px;
+	height: 20px;
+	line-height: 20px;
+	box-sizing: border-box;
+}
+.collapsible .collapser {
+	cursor: pointer;
+	text-decoration: underline;
+}
+.collapsible .collapser .more {
+	display: none;
+}
+.collapsible.collapsed .collapser .more {
+	display: inline;
+}
+.collapsible.collapsed .collapser .less {
+	display: none;
+}
+.collapsible .collapser .less {
+	display: inline;
+}
+.collapsible.empty .collapser, .collapsible.collapsed.empty .collapser {
+	display: none;
+}
+.collapsible.collapsed .collapsing {
+	height: 0px;
+	overflow: hidden;
+	padding: 0;
+}
+.collapsible .collapsing {
+	height: initial;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+/* modal display*/
+
+body.modal {
+	padding: 2px;
+}
+
+body.modal .stackedInputs {
+	margin-top: 0.5em;
+}

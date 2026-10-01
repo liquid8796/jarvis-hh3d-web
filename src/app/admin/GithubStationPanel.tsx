@@ -17,11 +17,13 @@ import { PageSizeSelect, Pager, usePageSize, usePaged } from "@/components/Pager
 import {
   countdownLevel,
   countUrgent,
+  DEFAULT_AD_VIEWER_WORKFLOW_FILE,
   DEFAULT_DAILY_PUSHES,
   DEFAULT_WORKFLOW_FILE,
   MAX_DAILY_PUSHES,
   MIN_DAILY_PUSHES,
   type CountdownLevel,
+  type StationPurpose,
 } from "@/lib/validation/githubStations";
 import { githubPrimaryOwnerGroupFingerprint } from "@/lib/validation/githubPrimaryDeletion";
 
@@ -187,7 +189,8 @@ function PatVault({ slug }: { slug: string }) {
   );
 }
 
-export function GithubStationPanel({ stations }: { stations: StationView[] }) {
+export function GithubStationPanel({ stations, purpose = "worker" }: { stations: StationView[]; purpose?: StationPurpose }) {
+  const isAdViewer = purpose === "adViewer";
   const [pingState, pingAction, pinging] = useActionState<StationResult | null, FormData>(pingGithubStationAction, null);
   const [deleteState, deleteAction, deleting] = useActionState<StationResult | null, FormData>(deleteGithubStationAction, null);
   const [loopState, loopAction, looping] = useActionState<StationResult | null, FormData>(runKeepaliveAction, null);
@@ -287,11 +290,11 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
       <section className="card card-hairline p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="h-display text-lg font-semibold text-gilded">Kho chính</h2>
+            <h2 className="h-display text-lg font-semibold text-gilded">{isAdViewer ? "Kho xem quảng cáo" : "Kho chính"}</h2>
             <p className="mt-0.5 text-xs text-[var(--color-mist)]">
               {urgentInBook.critical > 0 || urgentInBook.warn > 0
                 ? `${urgentInBook.critical} sắp tắt lịch · ${urgentInBook.warn} cần ghi mốc`
-                : "Workflow và repo phụ đang được theo dõi"}
+                : isAdViewer ? "Workflow xem quảng cáo và repo phụ đang được theo dõi" : "Workflow và repo phụ đang được theo dõi"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -308,7 +311,7 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
         </div>
 
         {stations.length === 0 ? (
-          <p className="py-10 text-center text-sm text-[var(--color-mist)]">Chưa có kho GitHub.</p>
+          <p className="py-10 text-center text-sm text-[var(--color-mist)]">{isAdViewer ? "Chưa có kho xem quảng cáo." : "Chưa có kho GitHub."}</p>
         ) : (
           <>
             {offPageParts && (
@@ -430,6 +433,7 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
           <StationEditor
             key={editing?.slug ?? "new"}
             station={editing}
+            purpose={purpose}
             onNew={() => setEditing(null)}
             onClose={closeEditor}
           />
@@ -443,13 +447,17 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
 /** A keyed editor keeps create/update action state and secret input isolated per station. */
 function StationEditor({
   station,
+  purpose = "worker",
   onNew,
   onClose,
 }: {
   station: StationView | null;
+  purpose?: StationPurpose;
   onNew: () => void;
   onClose: () => void;
 }) {
+  const isAdViewer = (station ? station.purpose : purpose) === "adViewer";
+  const defaultWorkflow = isAdViewer ? DEFAULT_AD_VIEWER_WORKFLOW_FILE : DEFAULT_WORKFLOW_FILE;
   const [state, action, pending] = useActionState<StationResult | null, FormData>(
     station ? updateGithubStationAction : provisionGithubStationAction,
     null,
@@ -467,7 +475,7 @@ function StationEditor({
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2 id="station-form-title" tabIndex={-1} className="h-display text-lg font-semibold text-gilded">
-            {station ? "Sửa kho GitHub" : "Tạo kho GitHub mới"}
+            {station ? "Sửa kho GitHub" : isAdViewer ? "Tạo kho xem quảng cáo mới" : "Tạo kho GitHub mới"}
           </h2>
           <p className="mt-1 text-xs text-[var(--color-mist)]">{station ? "Tên kho và tài khoản được giữ nguyên." : "Tài khoản được xác định từ PAT."}</p>
         </div>
@@ -491,6 +499,7 @@ function StationEditor({
       )}
       <form action={action} aria-busy={pending}>
         <fieldset disabled={pending} className="flex min-w-0 flex-col gap-4">
+          {!station && <input type="hidden" name="purpose" value={purpose} />}
           {station && (
             <>
               <input type="hidden" name="slug" value={station.slug} />
@@ -552,7 +561,11 @@ function StationEditor({
                   className="mt-1 h-5 w-5 shrink-0"
                 />
                 <span>
-                  <b className="text-[var(--color-parchment)]">Tạm thời chưa tạo repo chính / chưa chạy workflow khôi lỗi</b>
+                  <b className="text-[var(--color-parchment)]">
+                    {isAdViewer
+                      ? "Tạm thời chưa tạo repo chính / chưa chạy workflow xem quảng cáo"
+                      : "Tạm thời chưa tạo repo chính / chưa chạy workflow khôi lỗi"}
+                  </b>
                   <span className="mt-1 block text-xs leading-relaxed text-[var(--color-mist)]">
                     Hệ thống vẫn đăng ký tài khoản và nuôi các repo phụ bằng Ollama. Khi bỏ tick rồi lưu, Jarvis mới tạo repo chính, cài WORKER_TOKEN và khởi chạy workflow.
                   </span>
@@ -573,9 +586,9 @@ function StationEditor({
                 <input id="station-workflow" name="workflowFile" className="input w-full font-mono" maxLength={100}
                   pattern={"[A-Za-z0-9][A-Za-z0-9._\\-]*\\.(?:ya?ml)"}
                   title="Nhập một tên tệp .yml hoặc .yaml, không kèm đường dẫn."
-                  defaultValue={station?.workflowFile ?? ""} placeholder={DEFAULT_WORKFLOW_FILE} required={!!station} />
+                  defaultValue={station?.workflowFile ?? ""} placeholder={defaultWorkflow} required={!!station} />
                 <p className="mt-1 text-xs text-[var(--color-mist)]">
-                  {station ? "Tên workflow đang chạy." : `Mặc định: ${DEFAULT_WORKFLOW_FILE}.`}
+                  {station ? "Tên workflow đang chạy." : `Mặc định: ${defaultWorkflow}.`}
                 </p>
               </div>
               {station && (
@@ -614,8 +627,8 @@ function StationEditor({
                   ? station.primaryDeferred && !deferPrimary ? "Đang tạo repo chính + workflow…" : "Đang cập nhật…"
                   : deferPrimary ? "Đang đăng ký + tạo repo phụ…" : "Đang tạo repo + workflow…"
                 : station
-                  ? station.primaryDeferred && !deferPrimary ? "Tạo repo chính + chạy khôi lỗi" : "Cập nhật kho"
-                  : deferPrimary ? "Chỉ nuôi repo phụ trước" : "Tạo repo + workflow"}
+                  ? station.primaryDeferred && !deferPrimary ? (isAdViewer ? "Tạo repo chính + chạy xem quảng cáo" : "Tạo repo chính + chạy khôi lỗi") : "Cập nhật kho"
+                  : deferPrimary ? "Chỉ nuôi repo phụ trước" : (isAdViewer ? "Tạo repo + workflow xem QC" : "Tạo repo + workflow")}
             </button>
             {station && <button type="button" className="btn btn-ghost" onClick={onNew}>Tạo kho mới</button>}
           </div>

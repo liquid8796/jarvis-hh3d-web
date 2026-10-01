@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>CanvasBlocker port verification</title>
+<script>
+// Runs before the settings can have reached the page world. This is the window
+// in which lib/intercept.js keeps the protected APIs pre-intercepted.
+window.__cbEarly = (function(){
+	try {
+		var canvas = document.createElement("canvas");
+		canvas.width = 20;
+		canvas.height = 20;
+		var ctx = canvas.getContext("2d");
+		if (ctx){ ctx.fillRect(0, 0, 10, 10); }
+		// The whole data URL, not a prefix: every PNG starts with the same
+		// "data:image/png;base64,iV" header.
+		return "typeof=" + (typeof HTMLCanvasElement.prototype.toDataURL) +
+			" value=" + canvas.toDataURL();
+	}
+	catch (error){
+		return "THREW " + error;
+	}
+}());
+</script>
+</head>
+<body>
+<canvas id="c" width="220" height="30"></canvas>
+<script>
+"use strict";
+function draw(canvas){
+	var ctx = canvas.getContext("2d");
+	ctx.textBaseline = "top";
+	ctx.font = "14px Arial";
+	ctx.fillStyle = "#f60";
+	ctx.fillRect(125, 1, 62, 20);
+	ctx.fillStyle = "#069";
+	ctx.fillText("CanvasBlocker test <canvas> 1.0", 2, 15);
+	ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+	ctx.fillText("CanvasBlocker test <canvas> 1.0", 4, 17);
+	return canvas;
+}
+function newCanvas(){
+	var canvas = document.createElement("canvas");
+	canvas.width = 220;
+	canvas.height = 30;
+	return draw(canvas);
+}
+function safe(fn){
+	try { return fn(); } catch (error){ return "ERR " + error; }
+}
+function collect(){
+	var result = {};
+	result.early = window.__cbEarly;
+	result.toDataURL = safe(function(){ return newCanvas().toDataURL(); });
+	// A painted strip - the top left corner is transparent and would show no
+	// difference even with the faking active.
+	result.imageData = safe(function(){
+		return Array.prototype.join.call(
+			newCanvas().getContext("2d").getImageData(125, 5, 30, 1).data, ","
+		);
+	});
+	result.toDataURLSource = safe(function(){ return HTMLCanvasElement.prototype.toDataURL.toString(); });
+	result.getImageDataSource = safe(function(){ return CanvasRenderingContext2D.prototype.getImageData.toString(); });
+	result.functionToStringSource = safe(function(){ return Function.prototype.toString.toString(); });
+	result.leaks = {
+		require: typeof window.require,
+		scope: typeof window.scope,
+		browser: typeof window.browser,
+		exports: typeof window.exports
+	};
+	result.handshakeAttribute = document.documentElement.getAttribute("data-canvasblocker-channel");
+	result.screen = [screen.width, screen.height, screen.availWidth, screen.availHeight];
+	result.userAgent = navigator.userAgent;
+	result.domRect = safe(function(){
+		var rect = document.getElementById("c").getBoundingClientRect();
+		return [rect.width, rect.height, rect.top, rect.left];
+	});
+	result.fractionalDomRect = safe(function(){
+		var element = document.createElement("div");
+		// Values that are NOT multiples of 1/domRectIntegerFactor (1/4 by
+		// default): CanvasBlocker deliberately leaves "clean" values alone.
+		element.style.cssText = "position:absolute;width:100.1px;height:33.1px;left:10.1px;top:7.1px";
+		document.body.appendChild(element);
+		var rect = element.getBoundingClientRect();
+		var values = [rect.width, rect.height, rect.left, rect.top];
+		element.remove();
+		return values;
+	});
+	result.textMetrics = safe(function(){
+		return newCanvas().getContext("2d").measureText("CanvasBlocker").width;
+	});
+	result.webgl = safe(function(){
+		var gl = document.createElement("canvas").getContext("webgl");
+		if (!gl){ return "no webgl"; }
+		return [gl.getParameter(gl.VENDOR), gl.getParameter(gl.RENDERER)].join(" | ");
+	});
+	// The canvas cache makes identical input produce identical output, so this
+	// has to stay true with and without the protection.
+	result.twoIdenticalEqual = safe(function(){
+		return newCanvas().toDataURL() === newCanvas().toDataURL();
+	});
+	return result;
+}
+window.addEventListener("load", function(){
+	setTimeout(function(){
+		window.__cbResult = collect();
+		window.__cbDone = true;
+	}, 500);
+});
+</script>
+</body>
+</html>

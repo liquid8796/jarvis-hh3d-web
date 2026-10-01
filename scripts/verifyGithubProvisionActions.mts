@@ -36,8 +36,8 @@ const actions = module.exports;
 const pat = "offline-fixture-pat-never-log";
 function form(values: Record<string, string | undefined>) { const data = new FormData(); for (const [key, value] of Object.entries(values)) if (value !== undefined) data.set(key, value); return data; }
 function station(provisionedBy?: "jarvis", primaryDeferred = false): AppSettings["githubStations"][number] {
-  return { owner: "FixtureOwner", repo: "existing-repo", workflowFile: "linh-su.yml", workerId: "existing-repo", pat: "encrypted:old",
-    provisionedBy, primaryDeferred, githubId: provisionedBy && !primaryDeferred ? 42 : undefined, initialCommitSha: provisionedBy && !primaryDeferred ? "initial-sha" : undefined,
+  return { owner: "FixtureOwner", repo: "existing-repo", workflowFile: "linh-su.yml", purpose: "worker", workerId: "existing-repo", pat: "encrypted:old",
+    provisionedBy, primaryDeferred, primaryVisibility: "public", githubId: provisionedBy && !primaryDeferred ? 42 : undefined, initialCommitSha: provisionedBy && !primaryDeferred ? "initial-sha" : undefined,
     enabled: true, dailyPushes: 7, lastPingAt: null, lastCommitAt: "2026-09-01T00:00:00Z", lastPingOk: null, lastPingNote: "old", workflowState: "active",
     companionRepos: [{ repo: "software-one", lastNurtureDay: "2026-09-11", pushesToday: 2, lastPushAt: null, lastPushOk: true, lastPushNote: "saved", managedBy: "ollama", topic: "kept" }],
     companionCountOverride: 3, allowCompanionFork: true, allowCompanionDelete: false, nurtureNextAt: "2026-09-12T00:00:00Z", nurtureLastNote: "runtime", nurturePending: undefined,

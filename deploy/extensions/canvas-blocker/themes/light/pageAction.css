@@ -1,0 +1,11 @@
+.collapsible .collapser {
+	color: blue;
+}
+
+.hasHiddenActions {
+	color: darkblue;
+}
+
+.hasHiddenActions:hover, .hasHiddenActions .actions {
+	background-color: rgb(240, 240, 240);
+}

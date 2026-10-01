@@ -63,6 +63,7 @@ export function createGithubStationFormHandlers(deps: GithubStationFormDependenc
         dailyPushes: read(form, "dailyPushes"),
         visibility: read(form, "visibility"),
         deferPrimary: read(form, "deferPrimary") === "on",
+        purpose: read(form, "purpose") === "adViewer" ? "adViewer" : "worker",
       });
       const slug = safeSlug(result.slug);
       const response = {

@@ -81,7 +81,7 @@ export function looksLikeKhoiloiRepoName(repo: string): boolean {
  * không lọt được: `^[ \t]*` không nuốt dấu `#`.
  */
 export function workerIdFromWorkflow(yaml: string): string | null {
-  const found = /^[ \t]*WORKER_ID:[ \t]*(?:"([^"\r\n]*)"|'([^'\r\n]*)'|([^\s#]+))/m.exec(yaml);
+  const found = /^[ \t]*(?:WORKER_ID|AD_VIEWER_ID):[ \t]*(?:"([^"\r\n]*)"|'([^'\r\n]*)'|([^\s#]+))/m.exec(yaml);
   if (!found) return null;
   const value = (found[1] ?? found[2] ?? found[3] ?? "").trim();
   return value.length > 0 ? value : null;

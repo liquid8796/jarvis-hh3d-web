@@ -1,0 +1,1674 @@
+{
+  "addon_title": {
+    "message": "CanvasBlocker",
+    "description": ""
+  },
+  "addon_description": {
+    "message": "一部のJS APIを改変し、フィンガープリントを防ぎます。",
+    "description": ""
+  },
+  "browserAction_title_default": {
+    "message": "CanvasBlocker",
+    "description": ""
+  },
+  "browserAction_title_notified": {
+    "message": " \n\n保護に成功:",
+    "description": ""
+  },
+  "browserAction_title_whitelisted": {
+    "message": " ({url} のホワイトリストに登録されたAPI)",
+    "description": ""
+  },
+  "browserAction_title_protectedAPIs": {
+    "message": "\n  · {api}",
+    "description": ""
+  },
+  "browserAction_status_on": {
+    "message": "CanvasBlocker オン",
+    "description": ""
+  },
+  "browserAction_status_off": {
+    "message": "CanvasBlocker オフ",
+    "description": ""
+  },
+  "more": {
+    "message": "さらに表示",
+    "description": ""
+  },
+  "less": {
+    "message": "元に戻す",
+    "description": ""
+  },
+  "pleaseWait": {
+    "message": "お待ちください...",
+    "description": ""
+  },
+  "search": {
+    "message": "検索",
+    "description": ""
+  },
+  "ok": {
+    "message": "OK",
+    "description": ""
+  },
+  "apply": {
+    "message": "適用",
+    "description": ""
+  },
+  "cancel": {
+    "message": "キャンセル",
+    "description": ""
+  },
+  "input": {
+    "message": "入力",
+    "description": ""
+  },
+  "readout": {
+    "message": "読み取り",
+    "description": ""
+  },
+  "options": {
+    "message": "設定",
+    "description": ""
+  },
+  "options_title": {
+    "message": "CanvasBlockerの設定",
+    "description": ""
+  },
+  "optionsIntroduction": {
+    "message": "このページでは、CanvasBlockerの設定を調整できます。",
+    "description": ""
+  },
+  "installNotice": {
+    "message": "CanvasBlockerがインストールされました。将来的にこのページにアクセスしたい場合、ブックマークしてください。",
+    "description": ""
+  },
+  "updateNotice": {
+    "message": "CanvasBlockerが更新されました。将来的にこのページにアクセスしたいがまだブックマークしていない場合、ブックマークしてください。",
+    "description": ""
+  },
+  "dontShowOptionsOnUpdate": {
+    "message": "更新後に再び表示しない。",
+    "description": ""
+  },
+  "resistFingerprintingNotice": {
+    "message": "privacy.resistFingerprintが有効になっています。これはCanvasBlockerの動作をわずかに変更します。詳細は {link:ここ:https://github.com/kkapsner/CanvasBlocker/issues/158} と {link:ここ:https://github.com/ghacksuserjs/ghacks-user.js/issues/767} を参照してください。",
+    "description": ""
+  },
+  "settingsNotice_dom_webAudio_enabled": {
+    "message": "dom.webAudioが無効になっています。これを無効にする人はほとんどいないため、より追跡されやすくなります。",
+    "description": ""
+  },
+  "openInTab": {
+    "message": "別のタブで開く",
+    "description": ""
+  },
+  "labelForDefaultOption": {
+    "message": " (デフォルト)",
+    "description": ""
+  },
+  "group_general": {
+    "message": "一般",
+    "description": ""
+  },
+  "group_APIs": {
+    "message": "API",
+    "description": ""
+  },
+  "group_misc": {
+    "message": "その他",
+    "description": ""
+  },
+  "section_asking": {
+    "message": "確認",
+    "description": ""
+  },
+  "section_faking": {
+    "message": "偽装",
+    "description": ""
+  },
+  "section_notifications": {
+    "message": "通知",
+    "description": ""
+  },
+  "section_lists": {
+    "message": "リスト",
+    "description": ""
+  },
+  "section_misc": {
+    "message": "その他",
+    "description": ""
+  },
+  "section_settings": {
+    "message": "設定",
+    "description": ""
+  },
+  "section_canvas_api": {
+    "message": "Canvas API",
+    "description": ""
+  },
+  "section_audio_api": {
+    "message": "Audio API",
+    "description": ""
+  },
+  "section_history_api": {
+    "message": "History API",
+    "description": ""
+  },
+  "section_window_api": {
+    "message": "Window API",
+    "description": ""
+  },
+  "section_DOMRect_api": {
+    "message": "DOMRect API",
+    "description": ""
+  },
+  "section_SVG_api": {
+    "message": "SVG API",
+    "description": ""
+  },
+  "section_TextMetrics_api": {
+    "message": "TextMetrics API",
+    "description": ""
+  },
+  "section_Navigator_api": {
+    "message": "Navigator API",
+    "description": ""
+  },
+  "section_Screen_api": {
+    "message": "Screen API",
+    "description": ""
+  },
+  "displayAdvancedSettings_title": {
+    "message": "上級者モード",
+    "description": ""
+  },
+  "displayAdvancedSettings_description": {
+    "message": "追加の設定を表示します。",
+    "description": ""
+  },
+  "displayDescriptions_title": {
+    "message": "説明文を表示する",
+    "description": ""
+  },
+  "displayDescriptions_description": {
+    "message": "設定の説明文を表示します。",
+    "description": ""
+  },
+  "disruptSessionOnUpdate_title": {
+    "message": "更新時にセッションを中断する",
+    "description": ""
+  },
+  "disruptSessionOnUpdate_description": {
+    "message": "チェックを入れると、アップデートが利用可能になるとすぐに拡張機能が更新されます。現在開いているタブが壊れる可能性があります。",
+    "description": ""
+  },
+  "reloadExtension_title": {
+    "message": "拡張機能を再読み込みする",
+    "description": ""
+  },
+  "reloadExtension_description": {
+    "message": "保留中の更新を実行します。",
+    "description": ""
+  },
+  "reloadExtension_label": {
+    "message": "再読み込みする",
+    "description": ""
+  },
+  "hideSetting": {
+    "message": "ここをクリックしてこの設定を隠します。",
+    "description": ""
+  },
+  "displayHiddenSettings_title": {
+    "message": "隠されている設定を表示する",
+    "description": ""
+  },
+  "displayHiddenSettings_description": {
+    "message": "有効にすると隠されている設定が表示されます。",
+    "description": ""
+  },
+  "askForInvisiblePermission": {
+    "message": "見えない<canvas>を許可しますか？",
+    "description": ""
+  },
+  "askForInvisibleInputPermission": {
+    "message": "見えない<canvas>入力を許可しますか？",
+    "description": ""
+  },
+  "askForInvisibleReadoutPermission": {
+    "message": "見えない<canvas>読み取りを許可しますか？",
+    "description": ""
+  },
+  "askForPermission": {
+    "message": "<canvas>を許可しますか？",
+    "description": ""
+  },
+  "askForInputPermission": {
+    "message": "<canvas>入力を許可しますか？",
+    "description": ""
+  },
+  "askForReadoutPermission": {
+    "message": "<canvas>読み取りを許可しますか？",
+    "description": ""
+  },
+  "askForVisiblePermission": {
+    "message": "赤く囲った<canvas>を許可しますか？",
+    "description": ""
+  },
+  "askForVisibleInputPermission": {
+    "message": "赤く囲った<canvas>入力を許可しますか？",
+    "description": ""
+  },
+  "askForVisibleReadoutPermission": {
+    "message": "赤く囲った<canvas>読み取りを許可しますか？",
+    "description": ""
+  },
+  "askForAudioPermission": {
+    "message": "audio APIを許可しますか？",
+    "description": ""
+  },
+  "askForAudioInputPermission": {
+    "message": "audio API入力を許可しますか？",
+    "description": ""
+  },
+  "askForAudioReadoutPermission": {
+    "message": "audio API読み取りを許可しますか？",
+    "description": ""
+  },
+  "askForHistoryPermission": {
+    "message": "history APIを許可しますか？",
+    "description": ""
+  },
+  "askForHistoryInputPermission": {
+    "message": "history API入力を許可しますか？",
+    "description": ""
+  },
+  "askForHistoryReadoutPermission": {
+    "message": "history API読み取りを許可しますか？",
+    "description": ""
+  },
+  "askForWindowPermission": {
+    "message": "window APIを許可しますか？",
+    "description": ""
+  },
+  "askForWindowInputPermission": {
+    "message": "window API入力を許可しますか？",
+    "description": ""
+  },
+  "askForWindowReadoutPermission": {
+    "message": "window API読み取りを許可しますか？",
+    "description": ""
+  },
+  "askForDOMRectPermission": {
+    "message": "DOMRect APIを許可しますか？",
+    "description": ""
+  },
+  "askForDOMRectInputPermission": {
+    "message": "DOMRect API入力を許可しますか？",
+    "description": ""
+  },
+  "askForDOMRectReadoutPermission": {
+    "message": "DOMRect API読み取りを許可しますか？",
+    "description": ""
+  },
+  "askForSVGPermission": {
+    "message": "SVG APIを許可しますか？",
+    "description": ""
+  },
+  "askForSVGInputPermission": {
+    "message": "SVG API入力を許可しますか？",
+    "description": ""
+  },
+  "askForSVGReadoutPermission": {
+    "message": "SVG API読み取りを許可しますか？",
+    "description": ""
+  },
+  "askForTextMetricsPermission": {
+    "message": "TextMetrics APIを許可しますか？",
+    "description": ""
+  },
+  "askForTextMetricsInputPermission": {
+    "message": "TextMetrics API入力を許可しますか？",
+    "description": ""
+  },
+  "askForTextMetricsReadoutPermission": {
+    "message": "TextMetrics API読み取りを許可しますか？",
+    "description": ""
+  },
+  "askForNavigatorPermission": {
+    "message": "navigator APIを許可しますか？",
+    "description": ""
+  },
+  "askForNavigatorInputPermission": {
+    "message": "navigator API入力を許可しますか？",
+    "description": ""
+  },
+  "askForNavigatorReadoutPermission": {
+    "message": "navigator API読み取りを許可しますか？",
+    "description": ""
+  },
+  "askForScreenPermission": {
+    "message": "screen APIを許可しますか？",
+    "description": ""
+  },
+  "askForScreenInputPermission": {
+    "message": "screen API入力を許可しますか？",
+    "description": ""
+  },
+  "askForScreenReadoutPermission": {
+    "message": "screen API読み取りを許可しますか？",
+    "description": ""
+  },
+  "askOnlyOnce_title": {
+    "message": "一度だけ確認する",
+    "description": ""
+  },
+  "askOnlyOnce_description": {
+    "message": "CanvasBlockerのブロックモードが「権限を求める」または「APIの読み取りの権限を求める」にセットされている場合、ページがAPIやAPI読み取りにアクセスしようとするたびに毎回確認メッセージが表示されます。この設定は、ページが何回APIにアクセスしようとしているかにかかわらず、各ページにつき一度のみ確認メッセージを表示しようとします。ただし、一部のページでは依然として複数の確認メッセージが表示される場合があります。\n\nなし: 毎回確認します\n\n個別: それぞれのAPIタイプ(内容、入力、読み取り) の確認は分離されます。\n\n共通: 全てのAPIが一緒に承認されます。",
+    "description": ""
+  },
+  "askOnlyOnce_options_no": {
+    "message": "なし",
+    "description": ""
+  },
+  "askOnlyOnce_options_individual": {
+    "message": "個別",
+    "description": ""
+  },
+  "askOnlyOnce_options_combined": {
+    "message": "共通",
+    "description": ""
+  },
+  "askDenyMode_title": {
+    "message": "要求拒否モード",
+    "description": ""
+  },
+  "askDenyMode_description": {
+    "message": "権限が拒否された場合、どのモードを使用するかを選択します。",
+    "description": ""
+  },
+  "askDenyMode_options_block": {
+    "message": "ブロック",
+    "description": ""
+  },
+  "askDenyMode_options_fake": {
+    "message": "偽装",
+    "description": ""
+  },
+  "showCanvasWhileAsking_title": {
+    "message": "canvasの内容を表示",
+    "description": ""
+  },
+  "showCanvasWhileAsking_description": {
+    "message": "可能な場合に、許可を求められているcanvasの内容を表示します。",
+    "description": ""
+  },
+  "showCanvasWhileAsking_message": {
+    "message": "このウェブページは以下のcanvasの内容を読み取ろうとしています:",
+    "description": ""
+  },
+  "blackList_description": {
+    "message": "常に全てのAPIをブロックしたいドメイン/URL。複数追加するには、コンマで区切ってください。",
+    "description": ""
+  },
+  "blackList_title": {
+    "message": "ブラックリスト",
+    "description": ""
+  },
+  "blockMode_description": {
+    "message": "",
+    "description": ""
+  },
+  "blockMode_urlSpecific": {
+    "message": "特定のウェブサイトに個別のブロックモードを設定するには、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、目的のブロックモードを選んでください。",
+    "description": ""
+  },
+  "blockMode_options_allowEverything": {
+    "message": "全て許可する",
+    "description": ""
+  },
+  "blockMode_options_block": {
+    "message": "ホワイトリストのみ許可する",
+    "description": ""
+  },
+  "blockMode_options_ask": {
+    "message": "権限を求める",
+    "description": ""
+  },
+  "blockMode_options_blockEverything": {
+    "message": "全てブロックする",
+    "description": ""
+  },
+  "blockMode_options_allow": {
+    "message": "ブラックリストのみブロックする",
+    "description": ""
+  },
+  "blockMode_options_fake": {
+    "message": "偽装",
+    "description": ""
+  },
+  "blockMode_title": {
+    "message": "ブロックモード",
+    "description": ""
+  },
+  "protectedCanvasPart_title": {
+    "message": "canvas APIの保護された部分",
+    "description": ""
+  },
+  "protectedCanvasPart_description": {
+    "message": "何もしない: canvas APIの機能は保護されません。\n\n読み取り: canvas APIの読み取り機能が保護されます。\n\n入力: canvas APIの入力機能が保護されます。ブロックモードが「偽装」の場合、文字を表示するときに描かれたピクセルはわずかに改変されます。これによりアドオンの検知が難しくなりますが、セキュリティは低下します。WebGL canvasの場合、挙動は「読み取り」モードと同じです。\n\n全て: 読み取りと入力の両方の機能が保護されます。ブロックモードが「偽装」の場合、検知される可能性が上がるためおすすめしません。",
+    "description": ""
+  },
+  "protectedCanvasPart_urlSpecific": {
+    "message": "特定のウェブサイトで個別のパーツを保護するには、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、目的のパーツを選んでください。",
+    "description": ""
+  },
+  "protectedCanvasPart_options_nothing": {
+    "message": "何もしない",
+    "description": ""
+  },
+  "protectedCanvasPart_options_input": {
+    "message": "入力",
+    "description": ""
+  },
+  "protectedCanvasPart_options_readout": {
+    "message": "読み取り",
+    "description": ""
+  },
+  "protectedCanvasPart_options_everything": {
+    "message": "全て",
+    "description": ""
+  },
+  "urlSettings_title": {
+    "message": "サイト固有の設定",
+    "description": ""
+  },
+  "urlSettings_description": {
+    "message": "",
+    "description": ""
+  },
+  "inputURL": {
+    "message": "ドメインまたは「正規表現」URLを入力",
+    "description": ""
+  },
+  "minFakeSize_description": {
+    "message": "この数値以下の範囲のcanvasは偽造されません。これは検知を防ぐためのパラメータです。\n注意: アドオンの安全性を低下させないよう、100を超える値にしないことを強く推奨します。",
+    "description": ""
+  },
+  "minFakeSize_title": {
+    "message": "最低偽装サイズ",
+    "description": ""
+  },
+  "maxFakeSize_description": {
+    "message": "この数値より大きい範囲のcanvasは偽造されません。(0にした場合は無効になります。) これはブラウザのフリーズを防ぐためのパフォーマンスパラメーターで、端末の計算能力に応じて調整してください。\n注意: アドオンの安全性を低下させないよう、1,000,000未満にしないことを強く推奨します。",
+    "description": ""
+  },
+  "maxFakeSize_title": {
+    "message": "最大偽装サイズ",
+    "description": ""
+  },
+  "rng_description": {
+    "message": "無し(真っ白): 真っ白な画像が返されます。「アルファチャンネルを偽装」オプションも同時に有効にしてください。注意: 「入力を偽装」モードと一緒に使用しないでください。\n\n非永続的: 偽装のたびに乱数が生成されます。多くのAPI保護では、検知を防ぐためにキャッシュが用意されていることに注意してください。\n\n定数: 「非永続的」とほとんど同じですが、canvasデータを変更すると、その後同じ色のピクセルが同じ色を共有します。\n\n永続: 乱数は各ドメインにつき一度だけ生成されます。",
+    "description": ""
+  },
+  "rng_options_persistent": {
+    "message": "永続",
+    "description": ""
+  },
+  "rng_options_constant": {
+    "message": "定数",
+    "description": ""
+  },
+  "rng_options_nonPersistent": {
+    "message": "非永続的",
+    "description": ""
+  },
+  "rng_options_white": {
+    "message": "無し(真っ白)",
+    "description": ""
+  },
+  "rng_title": {
+    "message": "乱数生成器",
+    "description": ""
+  },
+  "persistentRndStorage_title": {
+    "message": "永続ストレージ",
+    "description": ""
+  },
+  "persistentRndStorage_description": {
+    "message": "再起動後に使用するために、永続の乱数生成器のデータを保存します。",
+    "description": ""
+  },
+  "storePersistentRnd_title": {
+    "message": "永続データを保存する",
+    "description": ""
+  },
+  "storePersistentRnd_description": {
+    "message": "永続の乱数生成器のデータを保存するかどうか。オフの場合、ブラウザのシャットダウン時に破棄されます。",
+    "description": ""
+  },
+  "persistentRndClearInterval_title": {
+    "message": "永続データの削除間隔",
+    "description": ""
+  },
+  "persistentRndClearInterval_description": {
+    "message": "指定された間隔の後、永続データは自動で消去されます。(0にすると無効になります。)",
+    "description": ""
+  },
+  "persistentRndClearIntervalUnit_options_seconds": {
+    "message": "秒",
+    "description": ""
+  },
+  "persistentRndClearIntervalUnit_options_minutes": {
+    "message": "分",
+    "description": ""
+  },
+  "persistentRndClearIntervalUnit_options_hours": {
+    "message": "時間",
+    "description": ""
+  },
+  "persistentRndClearIntervalUnit_options_days": {
+    "message": "日",
+    "description": ""
+  },
+  "persistentRndClearIntervalUnit_options_weeks": {
+    "message": "週間",
+    "description": ""
+  },
+  "persistentRndClearIntervalUnit_options_months": {
+    "message": "ヶ月",
+    "description": ""
+  },
+  "persistentRndClearIntervalUnit_options_years": {
+    "message": "年",
+    "description": ""
+  },
+  "clearPersistentRnd_title": {
+    "message": "永続のランダムストレージを消去する",
+    "description": ""
+  },
+  "clearPersistentRnd_description": {
+    "message": "永続の乱数生成器のデータを全て削除します。",
+    "description": ""
+  },
+  "clearPersistentRnd_label": {
+    "message": "消去する",
+    "description": ""
+  },
+  "clearPersistentRndForContainer_label": {
+    "message": "コンテナを消去する",
+    "description": ""
+  },
+  "clearPersistentRndForContainer_title": {
+    "message": "コンテナを選択する",
+    "description": ""
+  },
+  "sharePersistentRndBetweenDomains_title": {
+    "message": "ドメイン間で永続のランダムを共有する",
+    "description": ""
+  },
+  "sharePersistentRndBetweenDomains_description": {
+    "message": "注意: この設定により、ブラウザは100%追跡可能になり、あなたのプライバシーの脅威となります。",
+    "description": ""
+  },
+  "sharePersistentRndBetweenDomains_confirmMessage": {
+    "message": "本当にドメイン間で永続のランダムを共有してもよろしいですか？\n注意: これはブラウザを100%追跡可能にするため、プライバシーの脅威になります。",
+    "description": ""
+  },
+  "ignoreFrequentColors_title": {
+    "message": "最も頻繁な色を無視する",
+    "description": ""
+  },
+  "ignoreFrequentColors_description": {
+    "message": "キャンバスごとに偽装しない色の数。検知を防ぐためのパラメータです。\n注意: 画像ごとに色統計を計算する必要があるため、アドオンのパフォーマンスが低下することがあります。また、アドオンの安全性も低下することがあるので、この値を3より上に設定しないことを強くお勧めします。",
+    "description": ""
+  },
+  "minColors_title": {
+    "message": "最小色数",
+    "description": ""
+  },
+  "minColors_description": {
+    "message": "キャンバスを偽造する必要がある色の数。\n注意: アドオンの安全性が低下することがあるので、この値を10より上に設定しないことを強くお勧めします。",
+    "description": ""
+  },
+  "fakeAlphaChannel_title": {
+    "message": "アルファチャンネルを偽装する",
+    "description": ""
+  },
+  "fakeAlphaChannel_description": {
+    "message": "アルファチャンネル(透明度)の偽装を有効にします。",
+    "description": ""
+  },
+  "webGLVendor_title": {
+    "message": "報告されたwebGLベンダー",
+    "description": ""
+  },
+  "webGLVendor_description": {
+    "message": "「ベンダー」のwebGL関数「getParameter」で報告される値。特別な値:\n元の値を使用する場合は空のままにしておいてください。\n\n{undefined}: 未定義を返します (#508)\n\n{false}: booleanの値falseを返します (#508)\n\n{empty}: 空文字列を返します (#508)\n\n{disabled}: nullを返します (#508)\n\n{random vendor}: 組み込みリストからランダムなベンダーを返します (#493)\n\n{random renderer}: 組み込みリストからランダムなレンダラーを返します (#493)\n\n<xxx|yyy|zzz>: 与えられた選択肢xxx、yyy、zzzの中から1つ選びます (任意の個数のオプション) (#493)",
+    "description": ""
+  },
+  "webGLRenderer_title": {
+    "message": "報告されたwebGLレンダラー",
+    "description": ""
+  },
+  "webGLRenderer_description": {
+    "message": "「レンダラー」のwebGL関数「getParameter」で報告される値。特別な値:\n元の値を使用する場合は空のままにしておいてください。\n\n{undefined}: 未定義を返します (#508)\n\n{false}: booleanの値falseを返します (#508)\n\n{empty}: 空文字列を返します (#508)\n\n{disabled}: nullを返します (#508)\n\n{random vendor}: 組み込みリストからランダムなベンダーを返します (#493)\n\n{random renderer}: 組み込みリストからランダムなレンダラーを返します (#493)\n\n<xxx|yyy|zzz>: 与えられた選択肢xxx、yyy、zzzの中から1つ選びます (任意の個数のオプション) (#493)",
+    "description": ""
+  },
+  "webGLUnmaskedVendor_title": {
+    "message": "報告されたwebGLのマスクされていないベンダー",
+    "description": ""
+  },
+  "webGLUnmaskedVendor_description": {
+    "message": "「マスクされていないベンダー」のwebGL関数「getParameter」で報告される値。特別な値:\n元の値を使用する場合は空のままにしておいてください。\n\n{undefined}: 未定義を返します (#508)\n\n{false}: booleanの値falseを返します (#508)\n\n{empty}: 空文字列を返します (#508)\n\n{disabled}: nullを返します (#508)\n\n{random vendor}: 組み込みリストからランダムなベンダーを返します (#493)\n\n{random renderer}: 組み込みリストからランダムなレンダラーを返します (#493)\n\n<xxx|yyy|zzz>: 与えられた選択肢xxx、yyy、zzzの中から1つ選びます (任意の個数のオプション) (#493)",
+    "description": ""
+  },
+  "webGLUnmaskedRenderer_title": {
+    "message": "報告されたwebGLのマスクされていないレンダラー",
+    "description": ""
+  },
+  "webGLUnmaskedRenderer_description": {
+    "message": "「マスクされていないレンダラー」のwebGL関数「getParameter」で報告される値。特別な値:\n元の値を使用する場合は空のままにしておいてください。\n\n{undefined}: 未定義を返します (#508)\n\n{false}: booleanの値falseを返します (#508)\n\n{empty}: 空文字列を返します (#508)\n\n{disabled}: nullを返します (#508)\n\n{random vendor}: 組み込みリストからランダムなベンダーを返します (#493)\n\n{random renderer}: 組み込みリストからランダムなレンダラーを返します (#493)\n\n<xxx|yyy|zzz>: 与えられた選択肢xxx、yyy、zzzの中から1つ選びます (任意の個数のオプション) (#493)",
+    "description": ""
+  },
+  "useCanvasCache_title": {
+    "message": "canvasのキャッシュを使用",
+    "description": ""
+  },
+  "useCanvasCache_description": {
+    "message": "Canvasのキャッシュを有効にします。これにより検知を防ぎ、小さなcanvasが複数回読み取られたときのパフォーマンスが向上しますが、大きなcanvasの場合はパフォーマンスが低下します。",
+    "description": ""
+  },
+  "protectedAPIFeatures_title": {
+    "message": "保護されたAPI機能",
+    "description": ""
+  },
+  "protectedAPIFeatures_description": {
+    "message": "保護されたAPI機能の一覧。チェックボックスをオフにすると、APIの機能は保護されなくなります。",
+    "description": ""
+  },
+  "disableNotifications": {
+    "message": "通知を無効にする",
+    "description": ""
+  },
+  "showOptions": {
+    "message": "表示設定",
+    "description": ""
+  },
+  "displayCallingStack": {
+    "message": "コールスタックを表示する",
+    "description": ""
+  },
+  "displayFullURL": {
+    "message": "フルURLを表示する",
+    "description": ""
+  },
+  "enableStackList_description": {
+    "message": "",
+    "description": ""
+  },
+  "enableStackList_title": {
+    "message": "ファイル固有のホワイトリストを使う",
+    "description": ""
+  },
+  "preBlock": {
+    "message": "CanvasBlockerの設定が時間内にロードされなかったため、 APIが{url} でブロックされました。",
+    "description": ""
+  },
+  "blocked": {
+    "message": "{url} でAPIがブロックされました。",
+    "description": ""
+  },
+  "fakedReadout": {
+    "message": "{url} でcanvasの読み取りを偽装しました",
+    "description": ""
+  },
+  "fakedAudioReadout": {
+    "message": "{url} でaudioの読み取りを偽装しました",
+    "description": ""
+  },
+  "fakedHistoryReadout": {
+    "message": "{url} でhistoryの読み取りを偽装しました",
+    "description": ""
+  },
+  "fakedWindowReadout": {
+    "message": "{url} でwindowの読み取りを偽装しました",
+    "description": ""
+  },
+  "fakedDOMRectReadout": {
+    "message": "{url} でDOMRectの読み取りを偽装しました",
+    "description": ""
+  },
+  "fakedSVGReadout": {
+    "message": "{url} でSVGの読み取りを偽装しました",
+    "description": ""
+  },
+  "fakedTextMetricsReadout": {
+    "message": "{url} でTextMetricsの読み取りを偽装しました",
+    "description": ""
+  },
+  "fakedNavigatorReadout": {
+    "message": "{url} でnavigatorの読み取りを偽装しました",
+    "description": ""
+  },
+  "fakedScreenReadout": {
+    "message": "{url} でscreenの読み取りを偽装しました",
+    "description": ""
+  },
+  "fakedInput": {
+    "message": "{url} で入力を偽装しました",
+    "description": ""
+  },
+  "ignoreList_description": {
+    "message": "通知を表示しないドメイン/URL。複数追加するには、コンマで区切ってください。",
+    "description": ""
+  },
+  "ignoreList_title": {
+    "message": "無視リスト",
+    "description": ""
+  },
+  "ignoredAPIs_title": {
+    "message": "無視されるAPI",
+    "description": ""
+  },
+  "ignoredAPIs_description": {
+    "message": "選択したAPIに対する通知は表示されません。",
+    "description": ""
+  },
+  "localFile": {
+    "message": "ローカルファイル",
+    "description": ""
+  },
+  "ignorelistDomain": {
+    "message": "サイレントドメイン",
+    "description": ""
+  },
+  "ignorelistURL": {
+    "message": "URLを無視する",
+    "description": ""
+  },
+  "selectIgnore": {
+    "message": "無視リストに追加するドメインまたはURLを選択:",
+    "description": ""
+  },
+  "inputIgnore": {
+    "message": "無視リストに追加するドメインまたは「正規表現」URLを入力:",
+    "description": ""
+  },
+  "inputIgnoreDomain": {
+    "message": "無視リストに追加するドメインを入力:",
+    "description": ""
+  },
+  "inputIgnoreURL": {
+    "message": "無視リストに追加する「正規表現」URLを入力",
+    "description": ""
+  },
+  "selectWhitelist": {
+    "message": "ホワイトリストに追加するドメインまたはURLを選択:",
+    "description": ""
+  },
+  "inputWhitelist": {
+    "message": "ホワイトリストに追加するドメインまたは「正規表現」URLを入力:",
+    "description": ""
+  },
+  "inputWhitelistDomain": {
+    "message": "ホワイトリストに追加するドメインを入力:",
+    "description": ""
+  },
+  "inputWhitelistURL": {
+    "message": "ホワイトリストに追加する「正規表現」URLを入力",
+    "description": ""
+  },
+  "selectSessionWhitelist": {
+    "message": "セッションホワイトリストに追加するドメインまたはURLを選択",
+    "description": ""
+  },
+  "inputSessionWhitelist": {
+    "message": "セッションホワイトリストに追加するドメインまたは「正規表現」URLを入力:",
+    "description": ""
+  },
+  "inputSessionWhitelistDomain": {
+    "message": "セッションホワイトリストに追加するドメインを入力:",
+    "description": ""
+  },
+  "inputSessionWhitelistURL": {
+    "message": "セッションホワイトリストに追加する「正規表現」URLを入力:",
+    "description": ""
+  },
+  "selectWhitelistScope": {
+    "message": "ホワイトリストの有効範囲は？",
+    "description": ""
+  },
+  "selectWhitelistType": {
+    "message": "ホワイトリストのタイプは？",
+    "description": ""
+  },
+  "whitelistOnlyAPI": {
+    "message": "{api} のみホワイトリスト",
+    "description": ""
+  },
+  "whitelistAllAPIs": {
+    "message": "全てのAPIをホワイトリストに入れる",
+    "description": ""
+  },
+  "settings": {
+    "message": "設定",
+    "description": ""
+  },
+  "showCallingFile_description": {
+    "message": "",
+    "description": ""
+  },
+  "showCallingFile_title": {
+    "message": "コール中のファイルを表示",
+    "description": ""
+  },
+  "showCompleteCallingStack_description": {
+    "message": "",
+    "description": ""
+  },
+  "showCompleteCallingStack_title": {
+    "message": "完全なコールスタックを表示",
+    "description": ""
+  },
+  "showNotifications_description": {
+    "message": "何かがブロック/偽装されたときに、アドレスバーに通知アイコンを表示します。",
+    "description": ""
+  },
+  "showNotifications_urlSpecific": {
+    "message": "特定のウェブサイトで通知を無効にするには、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、チェックマークを外してください。",
+    "description": ""
+  },
+  "showNotifications_title": {
+    "message": "通知アイコンを表示する",
+    "description": ""
+  },
+  "highlightPageAction_description": {
+    "message": "視認性を向上させるため、ページアクションアイコンを強調表示します。",
+    "description": ""
+  },
+  "highlightPageAction_urlSpecific": {
+    "message": "",
+    "description": ""
+  },
+  "highlightPageAction_title": {
+    "message": "ページアクションアイコンを強調表示する",
+    "description": ""
+  },
+  "highlightPageAction_options_none": {
+    "message": "ハイライトなし",
+    "description": ""
+  },
+  "highlightPageAction_options_color": {
+    "message": "色",
+    "description": ""
+  },
+  "highlightPageAction_options_blink": {
+    "message": "点滅する",
+    "description": ""
+  },
+  "displayBadge_description": {
+    "message": "",
+    "description": ""
+  },
+  "displayBadge_title": {
+    "message": "バッジを表示する",
+    "description": ""
+  },
+  "highlightBrowserAction_description": {
+    "message": "",
+    "description": ""
+  },
+  "highlightBrowserAction_urlSpecific": {
+    "message": "",
+    "description": ""
+  },
+  "highlightBrowserAction_title": {
+    "message": "通知時にツールバーのアイコンを変更",
+    "description": ""
+  },
+  "highlightBrowserAction_options_none": {
+    "message": "何も変更しない",
+    "description": ""
+  },
+  "highlightBrowserAction_options_color": {
+    "message": "色を変更する",
+    "description": ""
+  },
+  "highlightBrowserAction_options_blink": {
+    "message": "点滅する",
+    "description": ""
+  },
+  "sourceOutput": {
+    "message": "コール中のファイル",
+    "description": ""
+  },
+  "stackEntryOutput": {
+    "message": "{url}, {line}行, {column}列",
+    "description": ""
+  },
+  "stackList_description": {
+    "message": "全てのAPIの使用が許可されたJSファイル。入力はJSON形式である必要があります。例: [{\"url\": \"http://domain/file1.js\"}, {\"url\": \"http://domain/file2.js\", \"line\": 1, \"column\": 4, \"stackPosition\": -3}]",
+    "description": ""
+  },
+  "stackList_title": {
+    "message": "ファイル固有のホワイトリスト",
+    "description": ""
+  },
+  "whiteList_title": {
+    "message": "ホワイトリスト",
+    "description": ""
+  },
+  "whiteList_description": {
+    "message": "全てのAPIの使用を許可するドメイン/URL。複数追加するには、コンマで区切ってください。",
+    "description": ""
+  },
+  "whitelist": {
+    "message": "ホワイトリスト",
+    "description": ""
+  },
+  "whitelistDomain": {
+    "message": "ホワイトリストドメイン",
+    "description": ""
+  },
+  "whitelistURL": {
+    "message": "ホワイトリストURL",
+    "description": ""
+  },
+  "ignorelist": {
+    "message": "無視する",
+    "description": ""
+  },
+  "whitelistTemporarily": {
+    "message": "一時的なホワイトリスト",
+    "description": ""
+  },
+  "inspectWhitelist": {
+    "message": "ホワイトリストを調査する",
+    "description": ""
+  },
+  "sessionWhiteList_title": {
+    "message": "セッションのホワイトリスト",
+    "description": ""
+  },
+  "sessionWhiteList_description": {
+    "message": "このセッションの間、全てのAPIの使用を許可するドメイン/URL (つまり、一時的なホワイトリスト)。複数追加するには、コンマで区切ってください。",
+    "description": ""
+  },
+  "sessionWhiteList_search": {
+    "message": "一時的",
+    "description": ""
+  },
+  "whitelistDomainTemporarily": {
+    "message": "一時的なドメインのホワイトリスト",
+    "description": ""
+  },
+  "whitelistURLTemporarily": {
+    "message": "一時的なURLのホワイトリスト",
+    "description": ""
+  },
+  "storeNotificationData_title": {
+    "message": "通知の詳細データを保存する",
+    "description": ""
+  },
+  "storeNotificationData_description": {
+    "message": "",
+    "description": ""
+  },
+  "storeImageForInspection_title": {
+    "message": "調査用に画像を保存する",
+    "description": ""
+  },
+  "storeImageForInspection_description": {
+    "message": "偽装されたcanvasの内容の保存を有効にします。\n注意: メモリ消費量が多くなる可能性があります。",
+    "description": ""
+  },
+  "protectAudio_title": {
+    "message": "audio APIを保護する",
+    "description": ""
+  },
+  "protectAudio_description": {
+    "message": "audio APIを保護するかどうか",
+    "description": ""
+  },
+  "protectAudio_urlSpecific": {
+    "message": "特定のウェブサイトを保護から除外するには、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、チェックマークを外してください。",
+    "description": ""
+  },
+  "audioFakeRate_title": {
+    "message": "バッファ偽装率",
+    "description": ""
+  },
+  "audioFakeRate_description": {
+    "message": "読み取りリクエスト1回あたり、いくつの値を偽装するか。",
+    "description": ""
+  },
+  "audioFakeRate_options_1": {
+    "message": "1個の値",
+    "description": ""
+  },
+  "audioFakeRate_options_10": {
+    "message": "10個の値",
+    "description": ""
+  },
+  "audioFakeRate_options_100": {
+    "message": "100個の値",
+    "description": ""
+  },
+  "audioFakeRate_options_1000": {
+    "message": "1000個の値",
+    "description": ""
+  },
+  "audioFakeRate_options_0_1_": {
+    "message": "0.1%の値",
+    "description": ""
+  },
+  "audioFakeRate_options_1_": {
+    "message": "1%の値",
+    "description": ""
+  },
+  "audioFakeRate_options_10_": {
+    "message": "10%の値",
+    "description": ""
+  },
+  "audioFakeRate_options_100_": {
+    "message": "100%の値",
+    "description": ""
+  },
+  "audioNoiseLevel_title": {
+    "message": "ノイズレベル",
+    "description": ""
+  },
+  "audioNoiseLevel_description": {
+    "message": "",
+    "description": ""
+  },
+  "audioNoiseLevel_options_minimal": {
+    "message": "最小",
+    "description": ""
+  },
+  "audioNoiseLevel_options_low": {
+    "message": "低",
+    "description": ""
+  },
+  "audioNoiseLevel_options_medium": {
+    "message": "中",
+    "description": ""
+  },
+  "audioNoiseLevel_options_high": {
+    "message": "高",
+    "description": ""
+  },
+  "audioNoiseLevel_options_maximal": {
+    "message": "最大",
+    "description": ""
+  },
+  "useAudioCache_title": {
+    "message": "オーディオキャッシュを使用する",
+    "description": ""
+  },
+  "useAudioCache_description": {
+    "message": "オーディオキャッシュを有効にします。これにより検知を防げますが、パフォーマンスが低下する可能性があります。",
+    "description": ""
+  },
+  "useAudioCache_urlSpecific": {
+    "message": "一部のページでは、Firefoxの動作が遅くなるような、非常に不十分な書き込みのオーディオフィンガープリンティングスクリプトが使われています。 特定のウェブサイトのキャッシュを無効にするには、黒い矢印をクリックしてメニューを開き、 「+」をクリックしてドメイン/URLを追加し、チェックマークを外してください。",
+    "description": ""
+  },
+  "audioUseFixedIndices_title": {
+    "message": "固定のインデックスを使用する",
+    "description": ""
+  },
+  "audioUseFixedIndices_description": {
+    "message": "使用されるインデックスの一部を常に偽装するかどうか。",
+    "description": ""
+  },
+  "audioFixedIndices_title": {
+    "message": "固定のインデックス",
+    "description": ""
+  },
+  "audioFixedIndices_description": {
+    "message": "常に偽装されるインデックス。複数のエントリを追加するには、コンマで区切ってください。",
+    "description": ""
+  },
+  "historyLengthThreshold_title": {
+    "message": "履歴の長さの閾値",
+    "description": ""
+  },
+  "historyLengthThreshold_description": {
+    "message": "ウェブサイトに報告される履歴の最大の長さ。",
+    "description": ""
+  },
+  "historyLengthThreshold_urlSpecific": {
+    "message": "特定のウェブサイトでこの値を変更するには、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、異なる値をセットしてください。",
+    "description": ""
+  },
+  "protectWindow_title": {
+    "message": "window APIを保護する",
+    "description": ""
+  },
+  "protectWindow_description": {
+    "message": "window.openerとwindow.nameが保護されます。一部のWebページは使用できなくなる可能性があります。",
+    "description": ""
+  },
+  "protectWindow_urlSpecific": {
+    "message": "特定のウェブサイトを保護から除外するには、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、チェックマークを外してください。",
+    "description": ""
+  },
+  "protectWindow_askReCaptchaException": {
+    "message": "window APIを保護するとreCAPTHCAが動作しなくなります。再び機能させるため、埋め込まれたページでwindow.name APIを許可しますか？",
+    "description": ""
+  },
+  "allowWindowNameInFrames_title": {
+    "message": "フレーム内のwindow.nameを許可する",
+    "description": ""
+  },
+  "allowWindowNameInFrames_description": {
+    "message": "window.name APIは埋め込まれたページのコンテキストではそれほど危険ではなく、正当な理由で使用されます(reCAPTCHAなど)。この設定では、これらの使用が許可されます。",
+    "description": ""
+  },
+  "allowWindowNameInFrames_urlSpecific": {
+    "message": "特定のウェブサイトでのみこれを許可するには、、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、チェックマークをつけてください。",
+    "description": ""
+  },
+  "protectDOMRect_title": {
+    "message": "DOMRect APIを保護する",
+    "description": ""
+  },
+  "protectDOMRect_description": {
+    "message": "これにより、\"getClientRects()\"フィンガープリンティングおよびいくつかの類似した手法から保護されます。",
+    "description": ""
+  },
+  "protectDOMRect_urlSpecific": {
+    "message": "特定のウェブサイトを保護から除外するには、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、チェックマークを外してください。",
+    "description": ""
+  },
+  "domRectIntegerFactor_title": {
+    "message": "DOMRect 整数係数",
+    "description": ""
+  },
+  "domRectIntegerFactor_description": {
+    "message": "ピクセルの一部をCSSで制御することができます。 検知を防ぐために、この係数に掛け算したDOMRectの値が整数である場合は変更されません。",
+    "description": ""
+  },
+  "protectSVG_title": {
+    "message": "SVG APIを保護する",
+    "description": ""
+  },
+  "protectSVG_description": {
+    "message": "SVG を使用したフィンガープリントから保護します。",
+    "description": ""
+  },
+  "protectSVG_urlSpecific": {
+    "message": "特定のウェブサイトを保護から除外するには、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、チェックマークを外してください。",
+    "description": ""
+  },
+  "protectTextMetrics_title": {
+    "message": "TextMetrics APIを保護する",
+    "description": ""
+  },
+  "protectTextMetrics_description": {
+    "message": "DOMRectの値を検証するために使用できる「measureText()」フィンガープリントから保護します。",
+    "description": ""
+  },
+  "protectTextMetrics_urlSpecific": {
+    "message": "特定のウェブサイトを保護から除外するには、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、チェックマークを外してください。",
+    "description": ""
+  },
+  "protectNavigator_title": {
+    "message": "navigator APIを保護する",
+    "description": ""
+  },
+  "protectNavigator_description": {
+    "message": "このページではnavigator APIの変更が許可されています。この保護を有効にしても、デフォルトでは何も変更されません。navigatorの設定を開き、そこで必要な変更を指定してください。",
+    "description": ""
+  },
+  "protectNavigator_urlSpecific": {
+    "message": "特定のウェブサイトを保護から除外するには、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、チェックマークを外してください。",
+    "description": ""
+  },
+  "openNavigatorSettings_title": {
+    "message": "Navigatorの設定",
+    "description": ""
+  },
+  "openNavigatorSettings_description": {
+    "message": "",
+    "description": ""
+  },
+  "openNavigatorSettings_label": {
+    "message": "開く",
+    "description": ""
+  },
+  "navigatorSettings_title": {
+    "message": "CanvasBlocker navigatorの設定",
+    "description": ""
+  },
+  "navigatorSettings_description": {
+    "message": "このページでnavigatorの設定ができます。プリセットを使用する場合は、常にオペレーティングシステムとブラウザーのプリセットを使用する必要があります。 後からも変更できます。",
+    "description": ""
+  },
+  "navigatorSettings_disclaimer": {
+    "message": "注意: 使用している実際のブラウザは、それを検出する多くの方法があるため、完全に偽造することはできません。 例えば、機能テストやブラウザ固有のHTML要素のレンダリングでは常に情報漏れが発生します。",
+    "description": ""
+  },
+  "navigatorSettings_contextualIdentities": {
+    "message": "コンテナ {select} の設定が表示されています。",
+    "description": ""
+  },
+  "navigatorSettings_presetSection_os": {
+    "message": "オペレーティングシステムのプリセット",
+    "description": ""
+  },
+  "navigatorSettings_presetSection_browser": {
+    "message": "ブラウザーのプリセット",
+    "description": ""
+  },
+  "navigatorSettings_values": {
+    "message": "Navigatorの値",
+    "description": ""
+  },
+  "navigatorSettings_reset": {
+    "message": "リセットする",
+    "description": ""
+  },
+  "protectScreen_title": {
+    "message": "screen APIを保護する",
+    "description": ""
+  },
+  "protectScreen_description": {
+    "message": "画面サイズを含むフィンガープリントの試みから保護します。",
+    "description": ""
+  },
+  "protectScreen_urlSpecific": {
+    "message": "特定のウェブサイトを保護から除外するには、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、チェックマークを外してください。",
+    "description": ""
+  },
+  "screenSize_title": {
+    "message": "画面サイズ",
+    "description": ""
+  },
+  "screenSize_description": {
+    "message": "これが 「...x...」 という値で設定されている場合、指定された寸法が画面サイズとして報告されます。",
+    "description": ""
+  },
+  "screenSize_urlSpecific": {
+    "message": "特定のウェブサイトに特定のサイズを提供するには、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、希望する値を入力してください。",
+    "description": ""
+  },
+  "fakeMinimalScreenSize_title": {
+    "message": "画面サイズの偽装の最低値",
+    "description": ""
+  },
+  "fakeMinimalScreenSize_description": {
+    "message": "次のセットの中で、ウィンドウの内側の寸法にフィットする最小のスクリーンサイズを使用します。画面サイズ: 1366x768, 1440x900, 1600x900, 1920x1080, 4096x2160, 8192x4320",
+    "description": ""
+  },
+  "fakeMinimalScreenSize_urlSpecific": {
+    "message": "特定のウェブサイトを偽装から除外するには、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、チェックマークを外してください。",
+    "description": ""
+  },
+  "theme_title": {
+    "message": "テーマ",
+    "description": ""
+  },
+  "theme_description": {
+    "message": "システムがダークテーマを使用している場合、自動的にダークテーマに切り替わります。(Firefox 67以降が必要です)",
+    "description": ""
+  },
+  "theme_options_auto": {
+    "message": "自動",
+    "description": ""
+  },
+  "theme_options_default": {
+    "message": "デフォルト",
+    "description": ""
+  },
+  "theme_options_light": {
+    "message": "ライト",
+    "description": ""
+  },
+  "theme_options_dark": {
+    "message": "ダーク",
+    "description": ""
+  },
+  "theme_options_colorful": {
+    "message": "カラフル",
+    "description": ""
+  },
+  "theme_options_none": {
+    "message": "なし",
+    "description": ""
+  },
+  "blockDataURLs_title": {
+    "message": "データURLページをブロックする",
+    "description": ""
+  },
+  "blockDataURLs_description": {
+    "message": "データ URL ページをフィンガープリンティングから保護することはできません (https://bugzilla.mozilla.org/show_bug.cgi?id=1475831を参照してください) 。それらをブロックすると、本物のフィンガープリントがサーバーに到達するのを防ぎます。",
+    "description": ""
+  },
+  "blockDataURLs_urlSpecific": {
+    "message": "特定のウェブサイトを保護から除外するには、黒い矢印をクリックしてメニューを開き、「+」をクリックしてドメイン/URLを追加して、チェックマークを外してください。",
+    "description": ""
+  },
+  "showReleaseNotes_title": {
+    "message": "リリースノート",
+    "description": ""
+  },
+  "showReleaseNotes_description": {
+    "message": "",
+    "description": ""
+  },
+  "showReleaseNotes_label": {
+    "message": "表示する",
+    "description": ""
+  },
+  "logLevel_title": {
+    "message": "ログレベル",
+    "description": ""
+  },
+  "logLevel_description": {
+    "message": "エラーの原因を見つけるためには、アドオンのアクティビティの詳細な記録が役に立ちます。このパラメータは記録の詳細さを制御します。\n\nログはブラウザコンソール(Ctrl+Shift+J) およびウェブコンソール(Ctrl+Shift+K) で確認できます。",
+    "description": ""
+  },
+  "logLevel_options_0": {
+    "message": "なし",
+    "description": ""
+  },
+  "logLevel_options_1": {
+    "message": "エラー",
+    "description": ""
+  },
+  "logLevel_options_25": {
+    "message": "警告",
+    "description": ""
+  },
+  "logLevel_options_50": {
+    "message": "メッセージ",
+    "description": ""
+  },
+  "logLevel_options_75": {
+    "message": "通知",
+    "description": ""
+  },
+  "logLevel_options_100": {
+    "message": "詳細",
+    "description": ""
+  },
+  "exportSettings_title": {
+    "message": "CanvasBlockerの設定をエクスポート",
+    "description": ""
+  },
+  "exportSettings_description": {
+    "message": "これにより、現在の設定をコピーできます。ここに貼り付けて変更することもできます。不正なデータがある場合、テキストエリアの背景が赤くなり、変更は保存されません。",
+    "description": ""
+  },
+  "settingControlling_title": {
+    "message": "設定のコントロール",
+    "description": ""
+  },
+  "settingControlling_description": {
+    "message": "",
+    "description": ""
+  },
+  "openSettingSanitation_label": {
+    "message": "設定の整理",
+    "description": ""
+  },
+  "inspectWhitelist_label": {
+    "message": "ホワイトリストを調査する",
+    "description": ""
+  },
+  "openSettingPresets_title": {
+    "message": "プリセット",
+    "description": ""
+  },
+  "openSettingPresets_description": {
+    "message": "インストール時に表示されたプリセットページを開きます。プリセットは、CanvasBlockerの一般的なユースケースの設定値のコレクションです。",
+    "description": ""
+  },
+  "openSettingPresets_label": {
+    "message": "開く",
+    "description": ""
+  },
+  "inspectSettings_label": {
+    "message": "調査する",
+    "description": ""
+  },
+  "saveSettings_label": {
+    "message": "保存する",
+    "description": ""
+  },
+  "loadSettings_label": {
+    "message": "読み込む",
+    "description": ""
+  },
+  "resetSettings_title": {
+    "message": "設定をリセットする",
+    "description": ""
+  },
+  "resetSettings_description": {
+    "message": "",
+    "description": ""
+  },
+  "resetSettings_label": {
+    "message": "リセットする",
+    "description": ""
+  },
+  "resetSettings_confirm": {
+    "message": "すべての設定をリセットしてもよろしいですか？",
+    "description": ""
+  },
+  "browserAction_settings": {
+    "message": "設定",
+    "description": ""
+  },
+  "browserAction_faq": {
+    "message": "FAQ",
+    "description": ""
+  },
+  "browserAction_test": {
+    "message": "テスト",
+    "description": ""
+  },
+  "browserAction_review": {
+    "message": "レビュー",
+    "description": ""
+  },
+  "browserAction_reportIssue": {
+    "message": "問題を報告する",
+    "description": ""
+  },
+  "sanitation_title": {
+    "message": "設定の整理",
+    "description": ""
+  },
+  "sanitation_description": {
+    "message": "このページは、CanvasBlockerの設定の間違いを見つけるのに役立ちます。最適でない設定についてもアドバイスを提供しますが、すべての提案を盲目的に修正することは推奨されません。",
+    "description": ""
+  },
+  "sanitation_nothingToComplain": {
+    "message": "文句なし。",
+    "description": ""
+  },
+  "sanitation_ruleset_unnecessaryURLValue": {
+    "message": "不要なURL値",
+    "description": ""
+  },
+  "sanitation_ruleset_disabledFeatures": {
+    "message": "無効な機能",
+    "description": ""
+  },
+  "sanitation_ruleset_blockMode": {
+    "message": "ブロックモード",
+    "description": ""
+  },
+  "sanitation_ruleset_thresholds": {
+    "message": "閾値",
+    "description": ""
+  },
+  "sanitation_ruleset_performance": {
+    "message": "パフォーマンス",
+    "description": ""
+  },
+  "sanitation_ruleset_privacy": {
+    "message": "プライバシー",
+    "description": ""
+  },
+  "sanitation_error_unnecessaryURLValue": {
+    "message": "「{url}」のURL値は、「{setting-title}」のグローバル設定と同じです。",
+    "description": ""
+  },
+  "sanitation_resolution_removeURLValue": {
+    "message": "URL値を削除する",
+    "description": ""
+  },
+  "sanitation_error_disabledFeatures": {
+    "message": "{api}の全ての機能は無効になっていますが、保護は有効です。",
+    "description": ""
+  },
+  "sanitation_error_disabledSomeFeatures": {
+    "message": "{api}のいくつかの機能が無効になっています。これはテストのためか、あるいはその機能が何をしているか本当に理解している場合にのみ行うべきです。",
+    "description": ""
+  },
+  "sanitation_resolution_disableMainFlag": {
+    "message": "メインフラグを無効にする",
+    "description": ""
+  },
+  "sanitation_resolution_enableFeatures": {
+    "message": "機能を有効にする",
+    "description": ""
+  },
+  "sanitation_error_badBlockMode": {
+    "message": "「偽装」または「確認」ブロックモードを使用することをお勧めします。",
+    "description": ""
+  },
+  "sanitation_resolution_switchToFake": {
+    "message": "「偽装」に切り替える",
+    "description": ""
+  },
+  "sanitation_error_blockModeVsProtection": {
+    "message": "ブロッキングモード「{blockMode}」では、{api}保護が機能しません。",
+    "description": ""
+  },
+  "sanitation_resolution_disableFlag": {
+    "message": "「{flag}」を無効にする",
+    "description": ""
+  },
+  "sanitation_error_fakeInputWithWhiteRng": {
+    "message": "「{blockMode}」や「{protectedCanvasPart}」保護と一緒に白色乱数生成器を使用しないでください。",
+    "description": ""
+  },
+  "sanitation_resolution_switchToProtectReadout": {
+    "message": "読み取りの保護に切り替える",
+    "description": ""
+  },
+  "sanitation_resolution_switchToNonPersistentRng": {
+    "message": "「非永続的」乱数生成器に切り替える",
+    "description": ""
+  },
+  "sanitation_error_fakeEverythingInCanvas": {
+    "message": "ブロックモード「{protectedCanvasPart}」で保護「{blockMode}」を使用しないでください。",
+    "description": ""
+  },
+  "sanitation_resolution_switchToProtectInput": {
+    "message": "入力の保護に切り替える",
+    "description": ""
+  },
+  "sanitation_error_valueTooLow": {
+    "message": "「{setting}」は、{value}より小さくすべきではありません。",
+    "description": ""
+  },
+  "sanitation_error_valueTooHigh": {
+    "message": "「{setting}」は、{value}より大きくすべきではありません。",
+    "description": ""
+  },
+  "sanitation_resolution_setTo": {
+    "message": "{value}に設定する",
+    "description": ""
+  },
+  "sanitation_error_storeNotificationData": {
+    "message": "通知データを保存すると、パフォーマンスが低下することがあります。",
+    "description": ""
+  },
+  "sanitation_error_storeImage": {
+    "message": "調査用の画像を保存すると、RAMのフットプリントが増加します。",
+    "description": ""
+  },
+  "sanitation_error_doNotSharePersistentRndBetweenDomains": {
+    "message": "ドメイン間で永続のランダムを共有しないでください。これはブラウザを100%追跡可能にします。",
+    "description": ""
+  },
+  "sanitation_error_customScreenSize": {
+    "message": "カスタムスクリーンサイズを使用しないでください。これはブラウザをトラッキングしやすくします。",
+    "description": ""
+  },
+  "whitelist_inspection_title": {
+    "message": "CanvasBlockerのホワイトリスト調査",
+    "description": ""
+  },
+  "whitelist_inspection_description": {
+    "message": "特定のサイトでどのフィンガープリント保護が有効であるかを表示します。{newline}{newline}チェックが入っていない場合は、サイトがその機能を改変されていない方法で使用できることを示します。つまり、それを使用して(部分的に)あなたのブラウザーのフィンガープリントを作成することができます。{newline}チェックが入っている場合は、CanvasBlockerが保護を提供しており、サイトがあなたを一意に識別することが難しくなっていることを示します。",
+    "description": ""
+  },
+  "whitelist_all_apis": {
+    "message": "全てのAPI",
+    "description": ""
+  },
+  "presets": {
+    "message": "プリセット",
+    "description": ""
+  },
+  "presets_title": {
+    "message": "CanvasBlockerのプリセット",
+    "description": ""
+  },
+  "presets_installNotice": {
+    "message": "{image:../icons/icon.svg}CanvasBlockerをインストールしていただき、ありがとうございます。ニーズに合わせるため、プリセットを適用できます。さらにカスタマイズするためには、{link:オプション:options.html} ページを開いてください。このプリセットページは後からでも開けます。",
+    "description": ""
+  },
+  "presets_introduction": {
+    "message": "これらは、さまざまな人のニーズに合わせた設定プリセットです。かっこ内の値は、現在の設定の状態です。 複数のプリセットを同時に適用することはできますが、いくつかの設定は後で適用されることによって上書きされる可能性があります。",
+    "description": ""
+  },
+  "preset_default_title": {
+    "message": "デフォルト設定",
+    "description": ""
+  },
+  "preset_default_description": {
+    "message": "特別な設定は適用されません。",
+    "description": ""
+  },
+  "preset_convenience_title": {
+    "message": "便利な設定",
+    "description": ""
+  },
+  "preset_convenience_description": {
+    "message": "いくつかの設定を適用してブラウジング体験をできるだけ便利にします。これにはいくつかのサイトをホワイトリストに登録することが含まれます。",
+    "description": ""
+  },
+  "preset_stealth_title": {
+    "message": "ステルス設定",
+    "description": ""
+  },
+  "preset_stealth_description": {
+    "message": "CanvasBlockerを検知するのが難しいように設定します。これによりCPU使用率が高くなったり、ブラウザが遅くなったりするかもしれません。",
+    "description": ""
+  },
+  "preset_max_protection_title": {
+    "message": "最大限の保護",
+    "description": ""
+  },
+  "preset_max_protection_description": {
+    "message": "フィンガープリント採取に対する保護を最大化します。これらの設定は、一部のページを破壊したり、ブラウザを少し遅くしたり、サイトがCanvasBlockerの使用を検知することを可能にしたりするかもしれません。このプリセットを適用した後、reCAPTCHA プリセットも適用することを検討する必要があります。",
+    "description": ""
+  },
+  "preset_recaptcha_title": {
+    "message": "reCAPTCHAの例外",
+    "description": ""
+  },
+  "preset_recaptcha_description": {
+    "message": "Window APIを保護するとreCAPTHCAが動作しなくなります。このプリセットを使用すると、埋め込まれたページで window.name API を使用することができ、再び機能します。",
+    "description": ""
+  }
+}

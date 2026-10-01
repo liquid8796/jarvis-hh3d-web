@@ -332,7 +332,7 @@ try {
 
   const directClient = client.db(process.env.MONGODB_DB!).collection("direct_messages");
   await directClient.insertOne({
-    _id: "direct-qua-han",
+    _id: "direct-qua-han" as never,
     threadKey: [admin.id, member.id].sort().join(":"),
     senderId: admin.id,
     recipientId: member.id,
@@ -348,7 +348,7 @@ try {
   assert(purged.purged === 2, "phải quét đúng 2 tin quá hạn (sảnh + riêng), quét " + purged.purged);
   assert(after === before - 1, "chỉ tin quá hạn bị xoá, tin trong hạn phải còn nguyên");
   assert((await bulkClient.findOne({ _id: "qua-han" as never })) === null, "tin sảnh quá hạn phải biến mất thật");
-  assert((await directClient.findOne({ _id: "direct-qua-han" })) === null, "tin riêng quá hạn cũng phải biến mất thật");
+  assert((await directClient.findOne({ _id: "direct-qua-han" as never })) === null, "tin riêng quá hạn cũng phải biến mất thật");
   console.log("✔ Hạn lưu: quét cả sảnh chung lẫn tin riêng, tin trong hạn còn nguyên.");
 
   // ---- Index đã dựng -------------------------------------------------------------

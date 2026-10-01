@@ -1,0 +1,17 @@
+{
+  "name": "canvasblocker-chrome",
+  "version": "1.12.0",
+  "private": true,
+  "description": "Chrome (manifest V3) port of the CanvasBlocker Firefox extension by Korbinian Kapsner",
+  "license": "MPL-2.0",
+  "scripts": {
+    "build": "node build/locales.js && node build/icons.js && node build/bundle.js",
+    "build:bundle": "node build/bundle.js",
+    "build:icons": "node build/icons.js",
+    "build:locales": "node build/locales.js",
+    "verify": "node build/verify.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

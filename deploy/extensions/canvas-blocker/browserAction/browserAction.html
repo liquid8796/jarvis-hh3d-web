@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>CanvasBlocker browser action</title>
+		<link href="../themes/base/popup.css" rel="stylesheet" type="text/css">
+		<link href="browserAction.css" rel="stylesheet" type="text/css">
+		<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	</head>
+	<body>
+		<div id="headerActions">
+			<button id="addonStatus" class="undefined"></button>
+			<div id="reload" class="hidden"></div>
+		</div>
+		<div id="actions" class="stackedInputs"></div>
+		<div id="version" class="versionDisplay"></div>
+		<script src="../lib/browserShim.js"></script>
+		<script src="../lib/require.js"></script>
+		<script src="../lib/logging.js"></script>
+		<script src="../lib/extension.js"></script>
+		<script src="../lib/settingDefinitions.js"></script>
+		<script src="../lib/settingContainers.js"></script>
+		<script src="../lib/settings.js"></script>
+		<script src="../lib/lists.js"></script>
+		<script src="../lib/theme.js"></script>
+		<script src="browserAction.js"></script>
+	</body>
+</html>

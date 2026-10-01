@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.112",
+    date: "2026-10-02",
+    lines: [
+      "Kho GitHub nay hỗ trợ phân loại Khôi Lỗi và Xem Quảng Cáo, dùng chung cơ chế nuôi và tạo kho.",
+      "Thêm chu kỳ xem quảng cáo tự động kèm tiện ích CanvasBlocker, dọn sạch dữ liệu duyệt sau mỗi lượt.",
+    ],
+  },
+  {
     version: "1.3.111",
     date: "2026-10-01",
     lines: [
@@ -479,14 +487,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khung Phòng Chat trên máy tính nay thấp xuống đúng một phần tư, còn bề ngang rộng vừa chỉnh vẫn giữ nguyên.",
       "Điện thoại giữ nguyên kích thước cũ để ô nhập và các nút không bị ép quá nhỏ.",
-    ],
-  },
-  {
-    version: "1.3.62",
-    date: "2026-09-01",
-    lines: [
-      "Khung Phòng Chat trên máy tính nay rộng thêm đúng một phần tư, cho dòng trò chuyện thoáng và ít xuống hàng hơn.",
-      "Trên điện thoại, sảnh vẫn ôm vừa màn hình như trước và không sinh phần tràn ngang.",
     ],
   },
 ];

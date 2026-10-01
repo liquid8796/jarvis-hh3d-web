@@ -42,7 +42,7 @@ export const maxDuration = 300;
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; tab?: string; githubPanel?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; tab?: string; githubPanel?: string; githubPurpose?: string }>;
 }) {
   const viewer = await requireAdmin();
 
@@ -231,6 +231,7 @@ export default async function AdminPage({
                       config={await githubNurtureForAdmin()}
                       stations={await githubStationsForAdmin()}
                       initialSection={params.githubPanel}
+                      initialPurposeParam={params.githubPurpose}
                     />
                   ),
                 }]

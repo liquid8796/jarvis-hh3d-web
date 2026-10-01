@@ -40,6 +40,7 @@ export type StationView = {
   githubId?: number;
   workflowFile: string;
   workerId: string;
+  purpose: "worker" | "adViewer";
   provisionedBy?: "jarvis";
   primaryDeferred: boolean;
   primaryVisibility: "public" | "private";
@@ -115,6 +116,7 @@ function viewOf(station: AppSettings["githubStations"][number], now: number): St
     githubId: station.githubId,
     workflowFile: station.workflowFile,
     workerId: station.workerId,
+    purpose: station.purpose,
     provisionedBy: station.provisionedBy,
     primaryDeferred: station.primaryDeferred,
     primaryVisibility: station.primaryVisibility,

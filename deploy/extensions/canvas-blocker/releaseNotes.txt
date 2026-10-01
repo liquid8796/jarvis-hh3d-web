@@ -1,0 +1,803 @@
+Version 1.12:
+	changes:
+		- 
+	
+	new features:
+		- new translations
+	
+	fixes:
+		- improve compatibility with google services (e.g. YouTube)
+		- highlighted entry in whitelist inspection not working
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+		- canvas and navigator APIs in workers are not protected
+
+Version 1.11:
+	changes:
+		- added jnn-pa.googleapis.com to the convenience preset for YouTube
+		- improve whitelist inspection
+		- improve settings export
+	
+	new features:
+		- added search for setting values and urls
+		- added search specific keywords
+		- new translations
+	
+	fixes:
+		- proxy behaviour broke some websites
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+		- canvas and navigator APIs in workers are not protected
+
+Version 1.10.1:
+	new features:
+		- added tag search
+		- added :changed tag
+		- mark default value in drop downs settings
+	
+	fixes:
+		- lag and functionality loss on google sites 
+		- fix function tampering detection via prototype
+		- isPointInPath and isPointInStroke return undefined with persistent rng
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+		- canvas and navigator APIs in workers are not protected
+
+Version 1.10:
+	changes:
+		- added eBay to the convenience preset
+		- do not use proxy for Function.prototype.toString (causes weird problems sometimes)
+	
+	new features:
+		- added setting showPresetsOnInstallation to be able to not show the presets page upon installation
+		- display version in page and browser action
+		- added protection for navigator.storage.estimate()
+	
+	fixes:
+		- always protect about:blank
+		- persistent rng not working in Firefox for Android
+		- mobile default settings were not used in Firefox for Android
+		- settings export page did not show whole content in Firefox for Android
+		- new tabs opened from within the extension did not open properly in Firefox for Android
+		- settings reset confirmation dialog was not properly visible in Firefox for Android
+		- reload after changing the whitelist state in the browser action has to be done without cache
+		- data URL blocking was not affected by when changing the whitelist state in the browser action
+		- prevent unnecessary scroll bars in popups
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+		- canvas and navigator APIs in workers are not protected
+
+Version 1.9:
+	changes:
+		- update setting descriptions
+		- added dhl.de to the convenience preset
+		- updated browser presets
+		- screen API: use inner of top window for all outer computations
+	
+	new features:
+		- added support for wildcards (*) in domains
+		- added {real Firefox version - rv} to Firefox navigator preset
+	
+	fixes:
+		- errors in URL regular expressions broke CB
+		- use correct tab in browserAction (private browsing)
+		- respect RFP in offscreenToBlobCallback
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+		- canvas and navigator APIs in workers are not protected
+
+Version 1.8:
+	new features:
+		- added SVG protection
+		- added notice when dom.webAudio.enabled is set to false
+		- added {random vendor} and {random renderer} to UNMASKED_VENDOR_WEBGL and UNMASKED_RENDERER_WEBGL to use a random value from a given list
+		- added <option1|option2|...> syntax to UNMASKED_VENDOR_WEBGL and UNMASKED_RENDERER_WEBGL
+	
+	fixes:
+		- errors in URL regular expressions broke CB
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 1.7:
+	changes:
+		- Auto close browser action
+	
+	fixes:
+		- CSP headers broken on 304 requests
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 1.6.1:
+	fixes:
+		- Google login and account creation did not work
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 1.6:
+	changes:
+		- periodical persistent rnd clearing does not clear in active tabs
+		- added paypal.com to the convenience preset
+		- improved whitelist inspection
+		- use proxy to hide changed functions
+		- whitelisting now uses "allowEverything" instead of "allow"
+	
+	new features:
+		- try to not break tabs when updating
+		- setting to postpone updates until browser restart or extension is reloaded
+		- added status button in browser action to see and set the whitelist status
+		- if the current block mode is set to blocking you can chose between faking and allowing if you whitelist an URL
+	
+	fixes:
+		- fix message canvasBlocker-unload
+		- convenience preset did not work properly
+		- random supply was not set properly on a fresh new tab
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 1.5:
+	new features:
+		- added {empty}, {false} and {undefined} to webGL preference parameters (i.e. VENDOR, RENDERER, UNMASKED_VENDOR_WEBGL and UNMASKED_RENDERER_WEBGL)
+		- added {disabled} to UNMASKED_VENDOR_WEBGL and UNMASKED_RENDERER_WEBGL to disabled the WEBGL_debug_renderer_info extension
+		- improved performance for protected canvas part "input"
+	
+	fixes:
+		- protection of DOM manipulations on unloaded windows may break websites
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 1.4:
+	changes:
+		- updated DOMRect protection
+	
+	new features:
+		- new translations
+	
+	fixes:
+		- Fix stuck Fenix
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 1.3:
+	changes:
+		- added canvas cache to isPointInPath and isPointInStroke
+	
+	new features:
+		- added link to FAQ
+		- added offscreen canvas protection
+		- new translations
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 1.2:
+	changes:
+		- removed unnecessary activeTab permission
+		- always open options page in new tab
+	
+	new features:
+		- added warning if some features of a API are disabled
+		- added TextMetrics protection
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 1.1:
+	new features:
+		- added notice for privacy.resistFingerprinting
+		- added container specific navigator settings
+	
+	fixes:
+		- error when exporting function with name "top"
+		- tabs opened with window.open broke when the parent tab was reloaded/closed
+		- importing settings file with an very old storage version did not work at all
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 1.0:
+	changes:
+		- improved storage of protected API features
+		- code cleanup
+		- added mail.google.com to the convenience preset
+		- added reCAPTCHA preset
+		- the reCAPTCHA whitelisting entry is changed to "allow window.name in frames"
+	
+	new features:
+		- added screen protection
+		- added default values for mobile
+	
+	fixes:
+		- background color of the textarea in the settings export was not readable in the dark theme when the value was invalid
+		- settings sanitation: added missing APIs
+		- navigator.oscpu and navigator.buildID are undefined in non Gecko browsers
+		- resetting the settings had undesired side effects
+		- added window.open protection
+		- cross origin DOM manipulations
+		- window.name protection was detectable
+		- importing settings file with an older storage version did not work properly
+		- fields hosted on braintree not working when window API was protected
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.14:
+	changes:
+		- reevaluated logging message levels
+	
+	new features:
+		- remove iframe protection from whitelisted pages
+		- added protection for getParameter (webGL)
+	
+	fixes:
+		- improved option pages on mobile
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.13:
+	new features:
+		- added setting presets
+	
+	fixes:
+		- display of url specific settings did not work properly
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.12:
+	changes:
+		- rearranged some settings
+	
+	new features:
+		- enabled whitelisting of local files
+		- added tabs in options page
+	
+	fixes:
+		- detect when browser.contextualIdentities.onRemoved is not supported
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.11:
+	new features:
+		- added auto update for beta versions
+		- options: made sections collapsible
+		- clear persistent rng data if a container is deleted
+		- added tool to clear persistent rng for a specific container
+	
+	fixes:
+		- improved protection of (i)frame properties
+		- document.write and document.writeln protection broke pages
+		- race condition causes persistent rnd separation between containers to leak
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.10:
+	changes:
+		- min version is now 57 to remove the amount of warnings on submission
+	
+	new features:
+		- added date and time to the settings export file
+		- persistent rng is no longer shared between containers (different cookieStoreId)
+	
+	fixes:
+		- setter for innerHTML broke pages
+		- protection for document.write and document.writeln broke in Firefox 69
+		- not connected iFrame threw error with persistent rng
+		- detection over document.write and document.writeln was possible
+		- google docs were broken in Waterfox
+		- MutationObserver failed in some instances
+		- server-site navigator protection did not respect whitelisting
+		- confirm messages were broken in Firefox 67
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.9:
+	changes:
+		- code cleanup
+		- made history length threshold url specific
+		- made navigator protection url specific
+		- uniform themes
+		- simplified the "display hidden settings" UI
+	
+	new features:
+		- added protection for navigator properties
+		- added support to import older storage versions
+		- protection for data URLs can now be url specific
+		- changed input of lists to textarea
+		- added option to protect no part of the canvas API
+		- apply themes to all extension pages (options, page action, browser action, setting sanitation, setting inspection, navigator settings)
+		- theme for automatic detection of dark mode (only works with Firefox >= 67)
+		- within the page action the used API can be whitelisted alone
+		- added overview page for whitelist
+	
+	fixes:
+		- search could show hidden settings
+		- faking audio did not work with white random generator
+		- enabled copying from settings description when they are "hidden"
+		- fixed description for "show notifications"
+		- improved DOMRect performance
+		- improved general performance when stack list is disabled
+		- preventing double interception (increased performance and reduced detectability)
+		- detection over navigator and DOMRect getters was possible
+		- audio cache could break readout
+		- improved iFrame protection
+		- SOP detection did not work all the time
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.8:
+	changes:
+		- audio faking will not alter buffers with only zero values
+	
+	new features:
+		- added combined cache for getChannelData and copyFromChannel:
+			- better performance
+			- prevent double faking => prevent detection
+	
+	fixes:
+		- after reset the hidden settings and expanded views were not reset
+		- audio cache did not work properly
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.7:
+	changes:
+		- reset settings no longer only available in expert mode
+	
+	fixes:
+		- protection for history length did not work
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.6:
+	changes:
+		- removed *Readout and *Input block modes (use protectedCanvasPart instead)
+	
+	new features:
+		- options gui improvements
+			- url specific values can be added by hitting enter in the input
+			- highlight "hide" icon when "tabbing" to it
+			- made url specific values manageable with "tabbing"
+		- added setting "protected canvas part" to decouple block mode from part
+		- added "share persistent randomness between domains"
+	
+	fixes:
+		- constant rng did not work properly when protecting input
+		- some display inconsistencies
+		- optional parameter on isPointInPath and isPointInStroke were broken
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.5:
+	changes:
+		- DOMRect uses double cache (value and complete DOMRect)
+	
+	new features:
+		- added settings sanitation page
+		- added search field to browser action popup
+	
+	fixes:
+		- Google images did not work for some users
+		- page action was not showing on Firefox Android
+		- wrong content script does no longer trigger the settings load forcing
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.4:
+	changes:
+		- converted "API whitelist" to "protected API features" (automatic settings migration)
+		- notification details are not stored by default
+		- settings page reorganized
+		- audio API notifies on every call
+		- made audio cache url specific
+	
+	new features:
+		- added save/load directly to/from file option
+		- added protection for DOMRect (getClientRects)
+		- added setting to control if notification details should be stored
+		- state of the arrow for url specific values is saved
+		- browser action icon gets grayed out if the page is whitelisted
+		- added search to options page
+	
+	fixes:
+		- window and audio API were always blocked when using any of the "block ..." modes
+		- canvas content was not stored to be displayed when wanted
+		- hovering over toolbar icon created error in the browser console
+		- canvas content was not shown in ask mode any more
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.3:
+	changes:
+		- removed active support for Firefox < 60
+		- maximal 250 notifications per domain and type will be rendered
+	
+	new features:
+		- display version in options page
+		- added link to open options page in separate tab
+		- added option "Don't show again on update." for options page
+		- added option to highlight page action icon
+		- added option to control browser action icon on notifications
+		- added theme for browser and page action popup
+		- added badge
+		- added option to ignore APIs
+		- added protection for history length
+		- added protection for window name and opener
+	
+	fixes:
+		- CSP did not work properly for worker-src
+		- detection if the options page was displayed in a separate tab did not work reliably
+		- popup text not readable in some dark themes
+		- display conditions for notification settings
+		- page action not useable with a lot of notifications
+		- blocking of blob-worker broke some pages
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.2b:
+	known issues:
+		- force setting loadings may result in non working plugins or not opening direct image links. Use 0.5.2a instead or use Firefox >= 59 which provides the required API to solve this issue once and for all
+	
+	changes:
+		- if settings are not loaded fast enough the loading is forced
+
+Version 0.5.2a:
+	known issues:
+		- due to API blocking some web pages may break. Use 0.5.2b instead.
+	
+	changes:
+		- if settings are not loaded fast enough the loading is not forced but all APIs are blocked
+
+Version 0.5.2:
+	new features:
+		- separate persistent random numbers for incognito windows
+			(resets when closing all incognito windows - like cookies do)
+		- added toolbar icon
+	
+	fixes:
+		- optimized CSP
+		- in Firefox ESR (52) iFrames with a blob-URL cannot be protected -> they have to be blocked there as well
+		- broken when using with Random Agent Spoofer
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.1.1b:
+	known issues:
+		- force setting loadings may result in non working plugins or not opening direct image links. Use 0.5.1.1a instead or use Firefox >= 59 which provides the required API to solve this issue once and for all
+	
+	changes:
+		- if settings are not loaded fast enough the loading is forced
+
+Version 0.5.1.1a:
+	known issues:
+		- due to API blocking some web pages may break. Use 0.5.1.1b instead.
+	
+	changes:
+		- if settings are not loaded fast enough the loading is not forced but all APIs are blocked
+
+Version 0.5.1.1:
+	fixes:
+		- blocking blob: scheme broke some pages unnecessarily
+
+Version 0.5.1b:
+	known issues:
+		- force setting loadings may result in non working plugins or not opening direct image links. Use 0.5.1a instead or use Firefox >= 59 which provides the required API to solve this issue once and for all
+	
+	changes:
+		- if settings are not loaded fast enough the loading is forced
+
+Version 0.5.1a:
+	known issues:
+		- due to API blocking some web pages may break. Use 0.5.1b instead.
+	
+	changes:
+		- if settings are not loaded fast enough the loading is not forced but all APIs are blocked
+
+Version 0.5.1:
+	changes:
+		- instead of blocking requests from data URLs they are blocked themselves
+	
+	new features:
+		- new setting: session white list that is cleared on addon load (= browser start)
+	
+	fixes:
+		- Changes made in the page action were not saved in all Firefox versions
+		- Blocking requests data URLs blocked too much
+	
+	known issues:
+		- if a data URL is blocked the page action button does not appear
+
+Version 0.5.0.1b:
+	known issues:
+		- force setting loadings may result in non working plugins or not opening direct image links. Use 0.5.0a instead or use Firefox >= 59 which provides the required API to solve this issue once and for all
+	
+	changes:
+		- if settings are not loaded fast enough the loading is forced
+
+Version 0.5.0a:
+	known issues:
+		- due to API blocking some web pages may break. Use 0.5.0.1b instead.
+	
+	changes:
+		- if settings are not loaded fast enough the loading is not forced but all APIs are blocked
+
+Version 0.5.0:
+	changes:
+		- Changes in the random supply API
+		- Added grouping to API white list
+		- Show page action when API is blocked
+	
+	new features:
+		- Can protect Audio API
+		- Settings can be hidden
+	
+	fixes:
+		- make function replacements not detectable
+		- "protect" data URL pages by blocking all requests from them
+	
+	removed fixes:
+		- display of about:blank broken in Waterfox
+		  reason: it should help protect data URL pages in the future
+	
+	known issues:
+		- if a data URL request is blocked the page action button appears but shows no content
+
+Version 0.4.5c:
+	new features:
+		- Added setting to whitelist parts of the canvas API
+	
+	fixes:
+		- respect resistFingerPrinting setting in isPointInPath and isPointInStroke
+
+Version 0.4.5b:
+	known issues:
+		- force setting loadings may result in non working plugins or not opening direct image links. Use 0.4.4a instead or use Firefox >= 59 which provides the required API to solve this issue once and for all
+	
+	changes:
+		- if settings are not loaded fast enough the loading is forced
+
+Version 0.4.5a:
+	known issues:
+		- due to API blocking some web pages may break. Use 0.4.5b instead.
+	
+	changes:
+		- if settings are not loaded fast enough the loading is not forced but all APIs are blocked
+
+Version 0.4.5:
+	changes:
+		- added isPointInPath and isPointInStroke to the readout-API list 
+	
+	new features:
+		- Options page can be opened from page action
+		- Added way to inspect canvas content in ask mode while being asked
+		- Open options page on install or update if the options page cannot be accessed in another way
+		- Added sections in options
+	
+	fixes:
+		- long clearing periods did not work
+		- prevent possible double faking
+		- asking did not work in some cases (auto deny)
+
+Version 0.4.4b:
+	known issues:
+		- force setting loadings may result in non working plugins or not opening direct image links. Use 0.4.4a instead or wait for Firefox 59 which provides the required API to solve this issue once and for all
+	
+	changes:
+		- if settings are not loaded fast enough the loading is forced
+
+Version 0.4.4a:
+	known issues:
+		- due to API blocking some web pages may break. Use 0.4.4 instead.
+	
+	changes:
+		- if settings are not loaded fast enough the loading is not forced but all APIs are blocked
+
+Version 0.4.4:
+	known issues:
+		- force setting loadings may result in non working plugins or not opening direct image links. Use 0.4.3a instead or wait for Firefox 59 which provides the required API to solve this issue once and for all
+	
+	changes:
+		- show white, black and ignore list again, but only in expert mode
+	
+	fixes:
+		- Firefox consumed 100% CPU and could not be closed
+		- Unknown setting breaks Firefox completely
+
+Version 0.4.3c:
+	known issues:
+		- force setting loadings may result in non working plugins or not opening direct image links. Use 0.4.3a instead or wait for Firefox 59 which provides the required API to solve this issue once and for all
+	
+	fixes:
+		- display of about:blank broken in Waterfox
+		- pinned tabs were not loaded and JS not executed in some cases
+	
+Version 0.4.3b:
+	known issues:
+		- force setting loadings may result in non working plugins or not opening direct image links. Use 0.4.3a instead or wait for Firefox 59 which provides the required API to solve this issue once and for all
+	
+	changes:
+		- if settings are not loaded fast enough the loading is forced
+	
+Version 0.4.3a:
+	known issues:
+		- due to API blocking some web pages may break. Use 0.4.3b instead.
+	
+	changes:
+		- hide white, black and ignore list as they can be done with the url specific settings. They are still present and working in the background.
+		- if settings are not loaded fast enough the loading is not forced but all APIs are blocked
+	
+	new features:
+		- reset settings
+		- new white random generator - creates output similar to Tor browser
+		- blockMode and showNotifications can now be chosen url specific
+		- new setting to ignore canvas with only few colors
+	
+	fixes:
+		- page action was not always showing
+		- waiting for settings created error messages in browser console
+		- do not show notifications when canvas faking was aborted
+
+Version 0.4.2
+	new features:
+		- added settings export and import
+	
+	fixes:
+		- settings are sometimes not fast enough loaded
+
+Version 0.4.1:
+	changes:
+		- improved design of the page action display
+		- Enabled Firefox ESR
+		- persistent random generator data is always stored in the settings but cleared on restart if the store flag is not set
+		- cleaned up the options page
+	
+	new features:
+		- setting to set an interval to clear the persistent random generator data
+		- setting for the ask deny mode
+		- ask only once can now also combine the API-types
+	
+	fixes:
+		- unnecessary check for context type in getImageData broke websites
+		- getContext was not asked in ask mode.
+
+Version 0.4.0.2:
+	fixes:
+		- some web pages were still broken with specific settings (e.g. twitch.tv)
+		- webGl was not faked any more
+
+Version 0.4.0.1:
+	fixes:
+		- some web pages are broken (e.g. twitch.tv)
+
+Version 0.4.0:
+	changes:
+		- switched to webExtension
+		- notifications are now done via page action
+		- minimal and maximal fake size are now respected in all fakeable functions
+		- fake readout now fakes one pixel at once and no longer one single channel
+		- new icon (special thanks to Thorin-Oakenpants)
+	
+	new features:
+		- information of all fake events in one tab are visible
+		- settings page now only shows settings that are useful within the given settings set
+		- new preferences:
+			* minimal fake size
+			* setting to enable the inspection of the content of the faked canvas
+			* new random number generator "constant"
+			* setting to not fake the most frequent colors in a canvas
+			* setting to enable canvas cache
+			* setting to hide expert settings
+			* setting to control if the alpha channel should be faked as well
+	
+	fixes:
+		- ask mode did not work for input types
+		- allow page scripts to overwrite the faked functions
+		- getImageData also faked when using fakeInput mode
+
+Version 0.3.8:
+	new features:
+		- added embedded WebExtension to store the preferences for the transition
+	
+	fixes:
+		- prevented error when canvas has size zero
+		- frame script was not loaded in the first tab that was restored from the last session
+		- prevented error when wrong object is passed to the faked functions
+
+Version 0.3.7:
+	new features:
+		- data for persistent random number generator can be stored
+	
+	fixes:
+		- fake at input was broken
+		- did not work at all in Firefox 45.7.0 (ESR)
+		- disabled WebGL created error
+		- ask for permission was broken
+
+Version 0.3.6:
+	changes:
+		- only last bit of image values are changes also in non persistent mode
+		- removed default entry in white list
+	
+	fixes:
+		- faking webGL
+		- added readPixels for webGL2
+		- removed error message when notification can not be closed
+		- about:blank pages are treated with respect to the opening page
+		- removed memory leak
+		- persistent rnd same for all tabs/windows with e10s enabled
+
+Version 0.3.5
+	new features:
+		- improved performance when canvas bigger than maxSize.
+	
+	fixes:
+		- German translations
+		- Fennec stopped working in version 50
+
+Version 0.3.4:
+	changes:
+		- different fake modes show independent notifications
+	
+	fixes:
+		- bug in readPixels (prevented Google Street View to work)
+		- performance issues
+		- German translations
+
+Version 0.3.3:
+	changes:
+		- switching of the mode, white- and black-listing only affects new loaded pages
+	
+	new features:
+		- auto close of the notifications (preference)
+		- button to show the release notes
+	
+	fixes:
+		- "about:"-tabs could not be dragged
+		- performance issues
+
+Version 0.3.2:
+	new features:
+		- "fake at input" mode
+		- fake notifications only show up when something is faked
+	
+	fixes:
+		- fake notifications did not show always when something was faked
+		- ECMA 2016 compliant
+		- function signature for faked functions could not be read
+
+Version 0.3.1:
+	new features:
+		- added fennec support
+		- faster faking performance
+		- new preferences:
+			* disabling faking in getImageData for big canvas
+			* persistent random number supply
+	
+	fixes:
+		- ask for permission failed on prototype
+
+Version 0.3.0:
+	new features:
+		- e10s ready

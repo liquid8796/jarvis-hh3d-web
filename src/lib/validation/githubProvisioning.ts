@@ -1,4 +1,5 @@
 import {
+  DEFAULT_AD_VIEWER_WORKFLOW_FILE,
   DEFAULT_DAILY_PUSHES,
   DEFAULT_WORKFLOW_FILE,
   MAX_DAILY_PUSHES,
@@ -11,6 +12,7 @@ export type GithubProvisionInput = {
   repo?: string;
   workflowFile?: string;
   dailyPushes?: string | number;
+  purpose?: "worker" | "adViewer";
   /** Visibility of the primary GitHub repository. Defaults to public for backward compatibility. */
   visibility?: GithubRepoVisibility | string;
   /** Chỉ đăng ký tài khoản + nuôi repo phụ; repo chính/workflow chờ user mở lại sau. */
@@ -30,6 +32,7 @@ export type NormalizedGithubProvisionInput = {
   dailyPushes: number;
   /** Filled after the owner and repository name are known. */
   workerId: string;
+  purpose?: "worker" | "adViewer";
   generatedRepo: boolean;
   visibility: GithubRepoVisibility;
   deferPrimary: boolean;
@@ -54,8 +57,9 @@ function normalizedDailyPushes(value: GithubProvisionInput["dailyPushes"]): numb
   return parsed;
 }
 
-function normalizedWorkflowFile(value: string | undefined): string {
-  const workflowFile = value?.trim() || DEFAULT_WORKFLOW_FILE;
+function normalizedWorkflowFile(value: string | undefined, purpose?: "worker" | "adViewer"): string {
+  const defaultFile = purpose === "adViewer" ? DEFAULT_AD_VIEWER_WORKFLOW_FILE : DEFAULT_WORKFLOW_FILE;
+  const workflowFile = value?.trim() || defaultFile;
   if (workflowFile.includes("/") || workflowFile.includes("\\") || !SAFE_WORKFLOW_BASENAME.test(workflowFile)) {
     throw new Error("workflowFile must be a safe .yml or .yaml basename.");
   }
@@ -82,7 +86,8 @@ export function normalizeGithubProvisionInput(
   const suppliedRepo = input.repo?.trim() ?? "";
   const generatedRepo = suppliedRepo.length === 0;
   const repo = suppliedRepo;
-  const workflowFile = normalizedWorkflowFile(input.workflowFile);
+  const purpose = input.purpose === "adViewer" ? "adViewer" : "worker";
+  const workflowFile = normalizedWorkflowFile(input.workflowFile, purpose);
 
   return {
     pat: input.pat,
@@ -90,6 +95,7 @@ export function normalizeGithubProvisionInput(
     workflowFile,
     dailyPushes: normalizedDailyPushes(input.dailyPushes),
     workerId: input.workerId?.trim() ?? "",
+    purpose: input.purpose === "adViewer" ? "adViewer" : "worker",
     generatedRepo,
     visibility: normalizeGithubRepoVisibility(input.visibility),
     deferPrimary: input.deferPrimary === true,

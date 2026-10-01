@@ -1,0 +1,75 @@
+/* Width comes from ../themes/base/popup.css - border-box so the padding
+   stays inside it and the popup is exactly --popup-width wide. */
+body {
+	box-sizing: border-box;
+	width: var(--popup-width);
+	padding: 0.5em;
+	margin: 0;
+}
+
+div {
+	display: block;
+}
+
+.action .icon {
+	vertical-align: text-bottom;
+	height: 19px;
+	width: 19px;
+	margin-right: 0.25em;
+	background-color: currentColor;
+	mask-size: 100%;
+	display: inline-block;
+}
+
+.action.search {
+	padding-left: calc(0.5em + 19px + 0.25em);
+}
+
+#headerActions {
+	display: grid;
+	grid-template-columns: 0.5fr 50px 0.5fr;
+	grid-template-rows: auto;
+}
+
+#addonStatus {
+	grid-row: 1 / 2;
+	grid-column: 2 / 3;
+	border: none;
+	display: block;
+	margin: 5px auto;
+	width: 40px;
+	min-width: 0;
+	height: 40px;
+	background: none;
+	background-position: 50%;
+	background-size: 100%;
+	cursor: pointer;
+}
+
+#addonStatus.unknown {
+	background-image: radial-gradient(black, rgba(0, 0, 0, 0), transparent);;
+}
+#addonStatus.off {
+	background-image: url(../icons/browserAction-CBoff.svg);
+}
+#addonStatus.on {
+	background-image: url(../icons/browserAction-CBon.svg);
+}
+
+#reload {
+	grid-row: 1 / 2;
+	grid-column: 3 / 4;
+	cursor: pointer;
+	height: 19px;
+	width: 19px;
+	align-self: center;
+	justify-self: left;
+	margin-left: 1em;
+	background-color: currentColor;
+	mask-size: 100%;
+	mask-image: url(../icons/browserAction-reload.svg);
+}
+
+#reload.hidden {
+	display: none;
+}

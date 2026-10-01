@@ -367,6 +367,7 @@ for (const locked of [false, true]) {
     workerId: "worker-identity",
     generatedRepo: false,
     visibility: "private",
+    deferPrimary: false,
     now: Date.now,
     deadlineAt: Date.now() + 30_000,
   };

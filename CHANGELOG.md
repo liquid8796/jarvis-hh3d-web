@@ -11,6 +11,13 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.112 — Thêm phân loại kho Xem Quảng Cáo và kịch bản tự động xem ads (02/10/2026)
+
+- Tab Kho GitHub phân loại hai mục đích: **Khôi Lỗi** (chạy worker tông môn) và **Xem Quảng Cáo** (xem ads trên website chính thức). Cả hai dùng chung cơ chế tạo kho, nuôi repo phụ bằng Ollama và promote repo.
+- Thêm workflow `deploy/github/xem-quang-cao.yml` và script tự động `scripts/adViewer.mjs` chạy trên Chromium nạp tiện ích Chrome CanvasBlocker từ `D:\Backup\Chrome\CanvasBlocker` (đã bundle vào `public/xem-qc/goi-xem-qc.tgz`).
+- Mỗi chu kỳ xem ads: mở trình duyệt mới → tải trang chủ → đợi ads render → click chuyển tab trang đích → đọc 5–10 giây → đệ quy click tiếp tối đa 2 lần nếu có ads → đóng trình duyệt và xoá sạch cache/cookies.
+- Sổ kho GitHub thêm trường `purpose` (`worker` | `adViewer`) với fallback `worker` cho kho cũ; form tạo kho và deploy hỗ trợ đầy đủ nhận diện mục đích và workflow tương ứng.
+
 ## 1.3.111 — Hiển thị quảng cáo trên mobile (01/10/2026)
 
 - Banner Adsterra `728×90` không còn bị tắt dưới `760px`; một canvas cố định được scale theo đúng chiều rộng khả dụng để quảng cáo hiện trên điện thoại mà không làm tràn ngang trang.

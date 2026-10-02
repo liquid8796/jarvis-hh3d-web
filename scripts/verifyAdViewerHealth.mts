@@ -8,24 +8,6 @@ const read = (relative: string) => readFileSync(path.join(root, relative), "utf8
 const runtime = read("scripts/adViewer.mjs");
 const workflow = read("deploy/github/xem-quang-cao.yml");
 const bundle = read("scripts/buildAdViewerBundle.mjs");
-const blocker = read("scripts/obscuraCanvasBlocker.mjs");
-
-// 1. Module CanvasBlocker cho Obscura
-assert.match(blocker, /__obscura_canvas_blocker__/);
-assert.match(blocker, /getCanvasBlockerInitScript/);
-assert.match(blocker, /getImageData/);
-assert.match(blocker, /toDataURL/);
-assert.match(blocker, /toBlob/);
-assert.match(blocker, /readPixels/);
-assert.match(blocker, /\[native code\]/);
-
-// 2. Runtime adViewer với Obscura CDP Server
-assert.match(runtime, /resolveObscuraBin/);
-assert.match(runtime, /startObscuraServer/);
-assert.match(runtime, /connectOverCDP/);
-assert.match(runtime, /getCanvasBlockerInitScript/);
-assert.match(runtime, /killProcessTree/);
-assert.match(runtime, /safeQueryAll/);
 
 assert.match(runtime, /\.adsterra-leaderboard\[data-status="ready"\]/);
 assert.match(runtime, /\.adsterra-native\[data-status="ready"\]/);
@@ -48,22 +30,17 @@ assert.match(runtime, /MAX_RECURSIVE_CLICKS/, "ad-viewer must support recursive 
 assert.match(runtime, /handleRecursiveAdClicks/, "ad-viewer must handle recursive ad clicks");
 assert.match(runtime, /while \(Date\.now\(\) - startTime < MAX_LIFETIME_MS\)/, "ad-viewer must loop across lifetime cycles");
 
-// 3. Workflow GitHub Actions tải Obscura Linux
 assert.match(workflow, /name: Xem quảng cáo/);
-assert.match(workflow, /Download and install Obscura browser binary/);
-assert.match(workflow, /obscura-x86_64-linux\.tar\.gz/);
-assert.match(workflow, /OBSCURA_BIN=/);
-assert.match(workflow, /test -f "\$dir\/obscuraCanvasBlocker\.mjs"/);
 assert.match(workflow, /AD_VIEWER_AD_READY_TIMEOUT_MS: "15000"/);
 assert.match(workflow, /AD_VIEWER_MAX_RECURSIVE_CLICKS: "2"/);
 assert.match(workflow, /AD_VIEWER_MAX_LIFETIME_MS:/);
 assert.match(workflow, /timeout-minutes: 350/);
 assert.match(workflow, /name: Phát lượt kế/);
-
-// 4. Đóng gói bundle
-assert.match(bundle, /obscuraCanvasBlocker\.mjs/);
 assert.match(bundle, /xem và click quảng cáo Adsterra với CanvasBlocker/);
+assert.match(runtime, /developer_mode:\s*true/, "ad-viewer must configure developer_mode in Chrome profile preferences");
+assert.match(runtime, /prepareExtensionProfile/, "ad-viewer must prepare extension profile");
+assert.match(workflow, /AD_VIEWER_ENABLE_DEV_MODE:\s*"1"/, "workflow must pass AD_VIEWER_ENABLE_DEV_MODE to ad viewer step");
 
 console.log(
-  "PASS: ad-viewer uses Obscura CDP server, CanvasBlocker init script, verifies banner/native creatives, logs render evidence, clicks ads safely, and downloads Obscura v0.2.3 in workflow.",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, enables extension developer mode, and runs continuous cycles.",
 );

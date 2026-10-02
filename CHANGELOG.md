@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.121 — Khôi phục Chromium và tiện ích CanvasBlocker cho Xem Quảng Cáo (02/10/2026)
+
+- Huỷ tích hợp trình duyệt Obscura và quay trở lại sử dụng Chromium tiêu chuẩn kết hợp tiện ích mở rộng CanvasBlocker.
+- Workflow `deploy/github/xem-quang-cao.yml` khôi phục bước cài đặt Chromium qua Playwright CLI và kích hoạt chế độ Developer Mode cho tiện ích.
+- Gói xem quảng cáo (`public/xem-qc/goi-xem-qc.tgz`) đóng gói thư mục tiện ích CanvasBlocker nguyên bản từ `deploy/extensions/canvas-blocker`.
+
 ## 1.3.120 — Tích hợp trình duyệt Obscura và CanvasBlocker CDP init script cho Xem Quảng Cáo (02/10/2026)
 
 - Chuyển đổi engine trình duyệt xem quảng cáo từ Chromium sang Obscura CDP server (`h4ckf0r0day/obscura`), khởi chạy không bật `--stealth` để bảo đảm Adsterra ads load bình thường không bị chặn bởi bộ lọc tracker tích hợp của Obscura.

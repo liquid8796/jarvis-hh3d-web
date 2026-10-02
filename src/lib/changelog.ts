@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.121",
+    date: "2026-10-02",
+    lines: [
+      "Kho Xem Quảng Cáo chuyển về trình duyệt Chromium tiêu chuẩn cùng tiện ích mở rộng chống nhận diện dấu vân tay.",
+      "Tự động chuẩn bị môi trường và kích hoạt chế độ mở rộng an toàn cho các phiên xem trên máy.",
+    ],
+  },
+  {
     version: "1.3.120",
     date: "2026-10-02",
     lines: [
@@ -471,16 +479,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Có thể tạo kho GitHub và tệp chạy ngay tại Tông Môn, tài khoản được xác định tự động từ PAT.",
       "Form trên web và tệp chạy nhanh cùng cho nhập tên kho, tên tệp chạy và giới hạn lượt đẩy; bỏ trống sẽ dùng mặc định.",
       "Tên kho đã có sẽ được báo rõ và dừng trước khi tạo. Đổi tên tệp chạy lúc tạo cũng được giữ đúng ở các lượt sau.",
-    ],
-  },
-  {
-    version: "1.3.71",
-    date: "2026-09-10",
-    lines: [
-      "Kho GitHub có trang chi tiết để đặt số kho phụ, chọn quyền tạo lại và quản lý từng kho.",
-      "Mặc định mỗi kho có ba kho phụ. Gia chủ có thể đổi số lượng, chọn model và nhập danh sách khóa Ollama.",
-      "Ollama có thể tra cứu tài liệu trên web trước khi viết mã và tự chọn thời điểm phát triển tiếp.",
-      "Tài liệu công khai của các kho khôi lỗi không còn ghi địa chỉ máy chủ.",
     ],
   },
 ];

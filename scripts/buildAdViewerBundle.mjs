@@ -3,12 +3,12 @@
  * Đóng GÓI XEM QUẢNG CÁO — public/xem-qc/goi-xem-qc.tgz — cho GitHub Actions runner tải về.
  *
  * Gói gồm:
- *   - ad-viewer.mjs (xem và click quảng cáo Adsterra với CanvasBlocker trên Obscura)
- *   - obscuraCanvasBlocker.mjs (module CDP init script chống fingerprinting cho Obscura)
- *   - node_modules/playwright-core (thư viện điều khiển trình duyệt qua CDP)
+ *   - ad-viewer.mjs (xem và click quảng cáo Adsterra với CanvasBlocker)
+ *   - canvas-blocker/ (tiện ích Chrome CanvasBlocker từ deploy/extensions hoặc D:\Backup\Chrome\CanvasBlocker)
+ *   - node_modules/playwright-core (thư viện điều khiển Chromium)
  *   - package.json tối thiểu
  */
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -23,8 +23,22 @@ try {
   // 1. ad-viewer.mjs
   cpSync(path.join(root, "scripts", "adViewer.mjs"), path.join(staging, "ad-viewer.mjs"));
 
-  // 2. Module CanvasBlocker cho Obscura
-  cpSync(path.join(root, "scripts", "obscuraCanvasBlocker.mjs"), path.join(staging, "obscuraCanvasBlocker.mjs"));
+  // 2. Tiện ích CanvasBlocker
+  const extSources = [
+    path.join(root, "deploy", "extensions", "canvas-blocker"),
+    "D:\\Backup\\Chrome\\CanvasBlocker",
+  ];
+  let foundExt = false;
+  for (const src of extSources) {
+    if (existsSync(path.join(src, "manifest.json"))) {
+      cpSync(src, path.join(staging, "canvas-blocker"), { recursive: true });
+      foundExt = true;
+      break;
+    }
+  }
+  if (!foundExt) {
+    throw new Error("buildAdViewerBundle: không tìm thấy thư mục tiện ích CanvasBlocker hợp lệ!");
+  }
 
   // 3. playwright-core vào node_modules/
   const pwcSource = path.join(root, "node_modules", "playwright-core");

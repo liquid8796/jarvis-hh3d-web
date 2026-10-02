@@ -1,35 +1,25 @@
 #!/usr/bin/env node
 /**
- * XEM QUẢNG CÁO TỰ ĐỘNG — trình duyệt Obscura tự động xem và tương tác quảng cáo trên website.
+ * XEM QUẢNG CÁO TỰ ĐỘNG — trình duyệt tự động xem và tương tác quảng cáo trên website.
  *
- * Chạy trên GitHub Actions runner và máy cục bộ sử dụng Obscura headless browser (Rust/V8)
- * kết nối qua giao thức Chrome DevTools Protocol (CDP).
- *
- * Điểm cốt lõi:
- *   1. Không bật cờ `--stealth` trên Obscura để tránh cơ chế Tracker Blocking chặn mất quảng cáo Adsterra.
- *   2. Tích hợp module CanvasBlocker qua CDP Init Script (`page.addInitScript`) gieo nhiễu canvas/webgl
- *      chống theo dõi fingerprinting xuyên chu kỳ mà không cần Chrome extension.
- *   3. Mỗi chu kỳ:
- *      - Khởi động Obscura CDP server (`obscura serve --port <port> --allow-private-network`)
- *      - Kết nối Playwright qua `chromium.connectOverCDP`
- *      - Nạp CanvasBlocker init script
- *      - Tải trang chủ website (`WEB_URL`)
- *      - Chờ các vị trí quảng cáo (Adsterra banner 728x90, native ads, Smartlink, popunder) tải đầy đủ
- *      - Kiểm tra và xác nhận trạng thái hiển thị của banner và native creative
- *      - Click vào quảng cáo / Smartlink để điều hướng tới trang đích
- *      - Dừng ngẫu nhiên 5-10s để đọc trang quảng cáo chính
- *      - Nếu trang quảng cáo có quảng cáo tiếp, click đệ quy tối đa 2 lần nữa
- *      - Đóng kết nối browser và tắt tiến trình Obscura server bằng killProcessTree
- *      - Bắt đầu chu kỳ mới cho đến khi hết tuổi thọ ca trực
+ * Chạy trên GitHub Actions runner theo kiến trúc hybrid giống khôi lỗi linh-su.
+ * Mỗi chu kỳ:
+ *   1. Mở Chromium với profile tạm thời và nạp tiện ích CanvasBlocker
+ *   2. Vào trang chủ website (WEB_URL)
+ *   3. Đợi các vị trí quảng cáo (Adsterra banner 728x90, native ads, popunder) tải đầy đủ
+ *   4. Kiểm tra và xác nhận trạng thái hiển thị của banner và native creative
+ *   5. Click vào quảng cáo để mở trang đích trên tab mới
+ *   6. Dừng ngẫu nhiên 5-10s để đọc trang quảng cáo chính
+ *   7. Nếu trang quảng cáo có quảng cáo tiếp, click đệ quy tối đa 2 lần nữa
+ *   8. Đóng trình duyệt, xoá sạch cache và cookies
+ *   9. Bắt đầu chu kỳ mới cho đến khi hết tuổi thọ ca trực
  */
 
-import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
-import { getCanvasBlockerInitScript } from "./obscuraCanvasBlocker.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -48,6 +38,7 @@ const AD_READY_TIMEOUT_MS = Math.max(
   Number(process.env.AD_VIEWER_AD_READY_TIMEOUT_MS ?? 15_000) || 15_000,
 );
 const SELF_UPDATE = process.env.AD_VIEWER_SELF_UPDATE === "1";
+const ENABLE_DEV_MODE = process.env.AD_VIEWER_ENABLE_DEV_MODE !== "0";
 
 const BANNER_SLOT_SELECTOR = ".adsterra-leaderboard";
 const BANNER_READY_SELECTOR = '.adsterra-leaderboard[data-status="ready"]';
@@ -68,50 +59,18 @@ function log(msg) {
   console.log(`[${ts}] [${VIEWER_ID}] ${msg}`);
 }
 
-function killProcessTree(proc) {
-  if (!proc) return;
-  try {
-    if (process.platform === "win32" && proc.pid) {
-      spawn("taskkill", ["/F", "/T", "/PID", String(proc.pid)], { stdio: "ignore" });
-    } else {
-      proc.kill("SIGKILL");
-    }
-  } catch {}
-}
-
-async function safeQueryAll(page, selector, timeoutMs = 3000) {
-  try {
-    return await Promise.race([
-      page.$$(selector),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("query timeout")), timeoutMs)),
-    ]);
-  } catch {
-    return [];
-  }
-}
-
-export function resolveObscuraBin() {
-  const isWindows = process.platform === "win32";
-  const binaryName = isWindows ? "obscura.exe" : "obscura";
-
+function resolveExtensionPath() {
   const candidates = [
-    process.env.OBSCURA_BIN,
-    path.join(__dirname, binaryName),
-    path.join(__dirname, "bin", binaryName),
-    path.join(__dirname, "obscura", binaryName),
-    path.join(process.env.RUNNER_TEMP || tmpdir(), "xem-qc-runtime", "bin", binaryName),
-    path.join(process.env.RUNNER_TEMP || tmpdir(), "xem-qc-runtime", binaryName),
-    path.join(tmpdir(), "obscura-spike", "bin", binaryName),
-  ].filter(Boolean);
-
+    path.join(__dirname, "canvas-blocker"),
+    path.join(__dirname, "../deploy/extensions/canvas-blocker"),
+    "D:\\Backup\\Chrome\\CanvasBlocker",
+  ];
   for (const c of candidates) {
-    if (existsSync(c)) {
+    if (existsSync(path.join(c, "manifest.json"))) {
       return c;
     }
   }
-
-  // Thử gọi trực tiếp từ PATH nếu có
-  return binaryName;
+  return null;
 }
 
 function readOwnVersion() {
@@ -159,79 +118,91 @@ function classifyPlacement(rawStatus, readySelectorFound, creativeCount) {
 }
 
 async function inspectAdsterraPlacements(page, startedAt = Date.now()) {
-  const [bannerReadyFound, nativeReadyFound] = await Promise.all([
-    page
-      .waitForSelector(BANNER_READY_SELECTOR, { timeout: AD_READY_TIMEOUT_MS })
-      .then(() => true)
-      .catch(() => false),
-    page
-      .waitForSelector(NATIVE_READY_SELECTOR, { timeout: AD_READY_TIMEOUT_MS })
-      .then(() => true)
-      .catch(() => false),
-  ]);
+  const terminalWaitMs = Math.max(0, AD_READY_TIMEOUT_MS - (Date.now() - startedAt));
 
-  const bannerSlot = page.locator(BANNER_SLOT_SELECTOR);
-  const nativeSlot = page.locator(NATIVE_SLOT_SELECTOR);
+  // Đợi cả hai slot rời trạng thái loading. Selector ready được kiểm tra lại bên dưới cùng
+  // creative thật; chỉ một thuộc tính data-status không đủ để kết luận quảng cáo đã render.
+  if (terminalWaitMs > 0) {
+    await page
+      .waitForFunction(
+        ({ bannerSelector, nativeSelector }) => {
+          const terminal = (selector) => {
+            const status = document.querySelector(selector)?.getAttribute("data-status") ?? "";
+            return status === "ready" || status === "blocked";
+          };
+          return terminal(bannerSelector) && terminal(nativeSelector);
+        },
+        { bannerSelector: BANNER_SLOT_SELECTOR, nativeSelector: NATIVE_SLOT_SELECTOR },
+        { timeout: terminalWaitMs },
+      )
+      .catch(() => {});
+  }
 
-  const bannerSlotBox = await bannerSlot.boundingBox().catch(() => null);
-  const nativeSlotBox = await nativeSlot.boundingBox().catch(() => null);
+  const bannerSlot = page.locator(BANNER_SLOT_SELECTOR).first();
+  const nativeSlot = page.locator(NATIVE_SLOT_SELECTOR).first();
+  const bannerSlotFound = (await bannerSlot.count()) > 0;
+  const nativeSlotFound = (await nativeSlot.count()) > 0;
+  const bannerRawStatus = bannerSlotFound
+    ? (await bannerSlot.getAttribute("data-status").catch(() => null)) ?? "loading"
+    : "missing";
+  const nativeRawStatus = nativeSlotFound
+    ? (await nativeSlot.getAttribute("data-status").catch(() => null)) ?? "loading"
+    : "missing";
 
-  const bannerRawStatus =
-    (await bannerSlot.getAttribute("data-status").catch(() => null)) ?? "missing";
-  const nativeRawStatus =
-    (await nativeSlot.getAttribute("data-status").catch(() => null)) ?? "missing";
-
-  const bannerIframe = page.locator(`${BANNER_SLOT_SELECTOR} iframe[width="728"][height="90"], ${BANNER_SLOT_SELECTOR} iframe`).first();
-  const bannerIframeFound = (await bannerIframe.count().catch(() => 0)) > 0;
-  const bannerIframeBox = bannerIframeFound ? await bannerIframe.boundingBox().catch(() => null) : null;
-
+  const bannerReady = page.locator(BANNER_READY_SELECTOR).first();
+  const bannerReadyFound = (await bannerReady.count()) > 0;
+  const bannerIframe = page
+    .locator(`${BANNER_READY_SELECTOR} iframe[width="728"][height="90"]`)
+    .first();
+  const bannerIframeFound = (await bannerIframe.count()) > 0;
   let bannerCreativeCount = 0;
+
   if (bannerIframeFound) {
-    const handle = await bannerIframe.elementHandle().catch(() => null);
-    const frame = handle ? await handle.contentFrame().catch(() => null) : null;
+    const iframeHandle = await bannerIframe.elementHandle().catch(() => null);
+    const frame = iframeHandle ? await iframeHandle.contentFrame().catch(() => null) : null;
     if (frame) {
-      await frame.waitForSelector("a[href], a[href] img", { timeout: 3000 }).catch(() => {});
-      bannerCreativeCount = await frame.locator("a[href], a[href] img").count().catch(() => 0);
+      const creativeWaitMs = Math.max(0, AD_READY_TIMEOUT_MS - (Date.now() - startedAt));
+      if (creativeWaitMs > 0) {
+        await frame.locator("a[href] img, a[href]").first().waitFor({
+          state: "attached",
+          timeout: creativeWaitMs,
+        }).catch(() => {});
+      }
+      const linkedImages = await frame.locator("a[href] img").count().catch(() => 0);
+      const linkedCreatives = await frame.locator("a[href]").count().catch(() => 0);
+      bannerCreativeCount = linkedImages > 0 ? linkedImages : linkedCreatives;
     }
   }
 
-  const nativeContainer = page.locator(`${NATIVE_SLOT_SELECTOR} #${NATIVE_CONTAINER_ID}, ${NATIVE_SLOT_SELECTOR} [id*="container-"]`);
-  const nativeContainerFound = (await nativeContainer.count().catch(() => 0)) > 0;
-
-  let nativeCount = 0;
-  if (nativeContainerFound) {
-    await page
-      .waitForSelector(
-        `${NATIVE_SLOT_SELECTOR} #${NATIVE_CONTAINER_ID} a[href], ${NATIVE_SLOT_SELECTOR} [class*="__bn-container"]`,
-        { timeout: 3000 },
-      )
-      .catch(() => {});
-    nativeCount = await page
-      .locator(
-        `${NATIVE_SLOT_SELECTOR} #${NATIVE_CONTAINER_ID} a[href], ${NATIVE_SLOT_SELECTOR} [class*="__bn-container"], ${NATIVE_SLOT_SELECTOR} a[href]`,
-      )
-      .count()
-      .catch(() => 0);
+  const nativeReady = page.locator(NATIVE_READY_SELECTOR).first();
+  const nativeReadyFound = (await nativeReady.count()) > 0;
+  const nativeContainer = page
+    .locator(`${NATIVE_READY_SELECTOR} #${NATIVE_CONTAINER_ID}`)
+    .first();
+  const nativeWaitMs = Math.max(0, AD_READY_TIMEOUT_MS - (Date.now() - startedAt));
+  if (nativeReadyFound && nativeWaitMs > 0) {
+    await nativeContainer.locator('[class*="__bn-container"], a[target="_blank"]').first().waitFor({
+      state: "attached",
+      timeout: nativeWaitMs,
+    }).catch(() => {});
   }
-  const nativeCreativeCount = nativeCount;
+  const nativeCards = await nativeContainer.locator('[class*="__bn-container"]').count().catch(() => 0);
+  const nativeLinks = await nativeContainer.locator('a[target="_blank"]').count().catch(() => 0);
+  const nativeCreativeCount = Math.max(nativeCards, nativeLinks);
 
   const banner = {
-    status: classifyPlacement(bannerRawStatus, bannerReadyFound, bannerCreativeCount),
+    status: classifyPlacement(bannerRawStatus, bannerReadyFound && bannerIframeFound, bannerCreativeCount),
     rawStatus: bannerRawStatus,
-    readySelectorFound: bannerReadyFound,
-    creativeCount: bannerCreativeCount,
     iframe728x90: bannerIframeFound,
-    slotBox: bannerSlotBox,
-    iframeBox: bannerIframeBox,
+    creativeCount: bannerCreativeCount,
+    slotBox: bannerSlotFound ? await bannerSlot.boundingBox().catch(() => null) : null,
+    iframeBox: bannerIframeFound ? await bannerIframe.boundingBox().catch(() => null) : null,
   };
-
   const native = {
     status: classifyPlacement(nativeRawStatus, nativeReadyFound, nativeCreativeCount),
     rawStatus: nativeRawStatus,
-    readySelectorFound: nativeReadyFound,
     creativeCount: nativeCreativeCount,
-    containerFound: nativeContainerFound,
-    slotBox: nativeSlotBox,
+    slotBox: nativeSlotFound ? await nativeSlot.boundingBox().catch(() => null) : null,
   };
 
   return {
@@ -241,7 +212,6 @@ async function inspectAdsterraPlacements(page, startedAt = Date.now()) {
     allReady: banner.status === "ready" && native.status === "ready",
     bannerIframeFound,
     bannerIframe,
-    nativeContainerFound,
   };
 }
 
@@ -249,128 +219,148 @@ async function handleRecursiveAdClicks(targetPage, depth, maxDepth) {
   if (depth >= maxDepth) return;
 
   try {
-    const nextAdSelectors = [
-      'a[href*="google"]',
-      'a[href*="doubleclick"]',
-      'a[href*="adsterra"]',
-      'a[href*="alwingulla"]',
-      'a[href*="deliberatewatchful.com"]',
-      'a[href*="smartlink"]',
+    const waitMs = rand(DELAY_MIN_MS, DELAY_MAX_MS);
+    log(`  [Đệ quy cấp ${depth + 1}/${maxDepth}] Đọc trang quảng cáo trong ${Math.round(waitMs / 1000)}s...`);
+    await sleep(waitMs);
+
+    // Tìm quảng cáo hoặc liên kết ngoài trên trang quảng cáo
+    const adSelectors = [
       'iframe[src*="ad"]',
+      'iframe[src*="banner"]',
+      'a[href*="googleads"]',
+      'a[href*="doubleclick"]',
       'a[target="_blank"]',
+      'button[type="submit"]',
+      'a.btn',
+      'a.button',
     ];
 
     let clicked = false;
-    for (const sel of nextAdSelectors) {
-      const candidates = await safeQueryAll(targetPage, sel, 2500);
-      for (const cand of candidates) {
+    for (const sel of adSelectors) {
+      const handles = await targetPage.$$(sel);
+      for (const handle of handles) {
         try {
-          const visible = await Promise.race([
-            cand.isVisible().catch(() => false),
-            sleep(1500).then(() => false),
-          ]);
+          const visible = await handle.isVisible().catch(() => false);
           if (visible) {
-            log(`  [Đệ quy cấp ${depth + 1}/${maxDepth}] Tìm thấy quảng cáo khớp [${sel}], click tiếp...`);
-            await Promise.race([
-              cand.click({ timeout: 4000, force: true }).catch(() => null),
-              sleep(4500),
+            log(`  [Đệ quy cấp ${depth + 1}] Tìm thấy phần tử (${sel}), đang click...`);
+            const [newPage] = await Promise.all([
+              targetPage.context().waitForEvent("page", { timeout: 8000 }).catch(() => null),
+              handle.click({ timeout: 5000, force: true }).catch(() => null),
             ]);
+
             clicked = true;
+            if (newPage) {
+              await newPage.waitForLoadState("domcontentloaded", { timeout: 20000 }).catch(() => {});
+              await handleRecursiveAdClicks(newPage, depth + 1, maxDepth);
+              await newPage.close().catch(() => {});
+            } else {
+              await sleep(rand(DELAY_MIN_MS, DELAY_MAX_MS));
+            }
             break;
           }
         } catch {
-          // thử tiếp
+          // Bỏ qua phần tử lỗi
         }
       }
       if (clicked) break;
-    }
-
-    if (clicked) {
-      await targetPage.waitForLoadState("domcontentloaded", { timeout: 10000 }).catch(() => {});
-      const dwell = rand(DELAY_MIN_MS, DELAY_MAX_MS);
-      log(`  [Đệ quy cấp ${depth + 1}/${maxDepth}] Dừng xem trang quảng cáo kế tiếp trong ${Math.round(dwell / 1000)}s...`);
-      await sleep(dwell);
-      await handleRecursiveAdClicks(targetPage, depth + 1, maxDepth);
-    } else {
-      log(`  [Đệ quy cấp ${depth + 1}/${maxDepth}] Không tìm thấy liên kết quảng cáo tiếp theo.`);
     }
   } catch (err) {
     log(`  Lỗi trong bước đệ quy click: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
-async function startObscuraServer(binPath, port) {
-  log(`Khởi động Obscura CDP server (port ${port}, --allow-private-network)...`);
-  const server = spawn(binPath, ["serve", "--port", String(port), "--allow-private-network", "--quiet"], {
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+function prepareExtensionProfile(profileDir) {
+  if (!ENABLE_DEV_MODE) return;
+  try {
+    const defaultDir = path.join(profileDir, "Default");
+    mkdirSync(defaultDir, { recursive: true });
+    const prefs = {
+      extensions: {
+        ui: {
+          developer_mode: true,
+        },
+        alerts: {
+          initialized: true,
+        },
+      },
+    };
+    writeFileSync(path.join(defaultDir, "Preferences"), JSON.stringify(prefs, null, 2), "utf8");
 
-  server.stdout?.on("data", (d) => {
-    const text = d.toString().trim();
-    if (text) log(`[obscura] ${text}`);
-  });
-  server.stderr?.on("data", (d) => {
-    const text = d.toString().trim();
-    if (text && !text.includes("DEBUG") && !text.includes("WARN")) {
-      log(`[obscura err] ${text}`);
-    }
-  });
-
-  const versionUrl = `http://127.0.0.1:${port}/json/version`;
-  const startedAt = Date.now();
-  let ready = false;
-
-  while (Date.now() - startedAt < 15000) {
-    try {
-      const res = await fetch(versionUrl, { signal: AbortSignal.timeout(1000) });
-      if (res.ok) {
-        ready = true;
-        break;
-      }
-    } catch {
-      // chờ server khởi động
-    }
-    await sleep(300);
+    const localState = {
+      extensions: {
+        ui: {
+          developer_mode: true,
+        },
+      },
+    };
+    writeFileSync(path.join(profileDir, "Local State"), JSON.stringify(localState, null, 2), "utf8");
+  } catch {
+    // không chặn nếu ghi preferences thất bại
   }
-
-  if (!ready) {
-    killProcessTree(server);
-    throw new Error(`Obscura CDP server trên port ${port} không phản hồi sau 15s.`);
-  }
-
-  log(`✓ Obscura CDP server đã sẵn sàng trên cổng ${port}.`);
-  return server;
 }
 
-async function runOneCycle(obscuraBin) {
-  const port = 9222 + rand(0, 50);
-  let server = null;
-  let browser = null;
+async function runOneCycle(extensionPath) {
+  const profileDir = mkdtempSync(path.join(tmpdir(), "ad-viewer-profile-"));
+  prepareExtensionProfile(profileDir);
+  let context = null;
 
   try {
-    server = await startObscuraServer(obscuraBin, port);
-    log(`Kết nối Playwright tới Obscura qua CDP ws://127.0.0.1:${port}...`);
-    browser = await chromium.connectOverCDP(`ws://127.0.0.1:${port}`);
-    const context = browser.contexts()[0] || (await browser.newContext());
-    const page = context.pages()[0] || (await context.newPage());
+    const args = [
+      "--disable-blink-features=AutomationControlled",
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--window-size=1366,768",
+      "--enable-experimental-extension-apis",
+      "--extensions-on-chrome-urls",
+      "--silent-debugger-extension-api",
+      "--no-default-browser-check",
+      "--no-first-run",
+    ];
 
-    // Nạp CanvasBlocker CDP init script
-    const cycleSeed = Date.now();
-    await page.addInitScript(getCanvasBlockerInitScript(cycleSeed));
-    log("✓ Đã nạp CDP CanvasBlocker init script chống fingerprinting cho Obscura.");
+    if (extensionPath) {
+      args.push(`--disable-extensions-except=${extensionPath}`);
+      args.push(`--load-extension=${extensionPath}`);
+      if (ENABLE_DEV_MODE) {
+        log("✓ Đã bật chế độ Developer Mode cho tiện ích CanvasBlocker trong profile.");
+      }
+    }
+
+    const isHeadless = !process.argv.includes("--head") && !process.argv.includes("--visible") && process.env.HEADLESS !== "0";
+    const launchArgs = isHeadless ? [...args, "--headless=new"] : args;
+
+    const launchOptions = {
+      headless: false,
+      args: launchArgs,
+      viewport: { width: 1366, height: 768 },
+      locale: "vi-VN",
+      timezoneId: "Asia/Ho_Chi_Minh",
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+    };
+
+    try {
+      context = await chromium.launchPersistentContext(profileDir, {
+        ...launchOptions,
+        channel: "chromium",
+      });
+    } catch {
+      context = await chromium.launchPersistentContext(profileDir, launchOptions);
+    }
+
+    const page = context.pages()[0] || (await context.newPage());
 
     const renderStartedAt = Date.now();
     log(`Mở trang chủ ${WEB_URL}...`);
     await page.goto(WEB_URL, {
       waitUntil: "domcontentloaded",
-      timeout: 45000,
+      timeout: 60000,
     });
 
     // Cuộn nhẹ trang để kích hoạt các script lazy-load quảng cáo
     await page.evaluate(() => {
       window.scrollBy({ top: 300, behavior: "smooth" });
     });
-    await sleep(1000);
 
     // Cuộn tiếp xuống phần thân trang
     await page.evaluate(() => {
@@ -395,7 +385,6 @@ async function runOneCycle(obscuraBin) {
 
     let adClicked = false;
     let openedPage = null;
-    const initialUrl = page.url();
 
     // 1. Thử click native ads nếu ready
     if (diagnostic.native.status === "ready") {
@@ -405,7 +394,7 @@ async function runOneCycle(obscuraBin) {
         if (count > 0) {
           log("Tìm thấy native ad card, đang click chuyển trang...");
           const [newPage] = await Promise.all([
-            context.waitForEvent("page", { timeout: 6000 }).catch(() => null),
+            context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
             nativeLinks.first().click({ timeout: 5000, force: true }).catch(() => null),
           ]);
           if (newPage) {
@@ -413,16 +402,12 @@ async function runOneCycle(obscuraBin) {
             adClicked = true;
             log("✓ Đã mở tab quảng cáo native thành công.");
           } else {
-            await sleep(2000);
+            await sleep(3000);
             const allPages = context.pages();
             if (allPages.length > 1) {
               openedPage = allPages[allPages.length - 1];
               adClicked = true;
               log("✓ Đã bắt được trang quảng cáo native từ tab phụ.");
-            } else if (page.url() !== initialUrl && !page.url().includes("auto-hh3d.online")) {
-              openedPage = page;
-              adClicked = true;
-              log("✓ Trình duyệt Obscura đã chuyển hướng tới trang đích native.");
             }
           }
         }
@@ -441,7 +426,7 @@ async function runOneCycle(obscuraBin) {
           if ((await bannerLink.count().catch(() => 0)) > 0) {
             log("Tìm thấy banner ad creative trong iframe, đang click chuyển trang...");
             const [newPage] = await Promise.all([
-              context.waitForEvent("page", { timeout: 6000 }).catch(() => null),
+              context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
               bannerLink.click({ timeout: 5000, force: true }).catch(() => null),
             ]);
             if (newPage) {
@@ -449,16 +434,12 @@ async function runOneCycle(obscuraBin) {
               adClicked = true;
               log("✓ Đã mở tab quảng cáo banner thành công.");
             } else {
-              await sleep(2000);
+              await sleep(3000);
               const allPages = context.pages();
               if (allPages.length > 1) {
                 openedPage = allPages[allPages.length - 1];
                 adClicked = true;
                 log("✓ Đã bắt được trang quảng cáo banner từ tab phụ.");
-              } else if (page.url() !== initialUrl && !page.url().includes("auto-hh3d.online")) {
-                openedPage = page;
-                adClicked = true;
-                log("✓ Trình duyệt Obscura đã chuyển hướng tới trang đích banner.");
               }
             }
           }
@@ -476,7 +457,7 @@ async function runOneCycle(obscuraBin) {
         if (smartlinkFound) {
           log("Tìm thấy Adsterra Smartlink, đang click chuyển trang...");
           const [newPage] = await Promise.all([
-            context.waitForEvent("page", { timeout: 6000 }).catch(() => null),
+            context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
             smartlink.click({ timeout: 5000, force: true }).catch(() => null),
           ]);
           if (newPage) {
@@ -484,16 +465,12 @@ async function runOneCycle(obscuraBin) {
             adClicked = true;
             log("✓ Đã mở tab quảng cáo Smartlink thành công.");
           } else {
-            await sleep(2000);
+            await sleep(3000);
             const allPages = context.pages();
             if (allPages.length > 1) {
               openedPage = allPages[allPages.length - 1];
               adClicked = true;
               log("✓ Đã bắt được trang quảng cáo Smartlink từ tab phụ.");
-            } else if (page.url() !== initialUrl && !page.url().includes("auto-hh3d.online")) {
-              openedPage = page;
-              adClicked = true;
-              log("✓ Trình duyệt Obscura đã chuyển hướng tới trang đích Smartlink.");
             }
           }
         }
@@ -524,17 +501,14 @@ async function runOneCycle(obscuraBin) {
 
     if (!adClicked) {
       for (const selector of candidateSelectors) {
-        const elements = await safeQueryAll(page, selector, 2000);
+        const elements = await page.$$(selector);
         for (const el of elements) {
           try {
-            const visible = await Promise.race([
-              el.isVisible().catch(() => false),
-              sleep(1500).then(() => false),
-            ]);
+            const visible = await el.isVisible().catch(() => false);
             if (visible) {
               log(`Tìm thấy quảng cáo khớp [${selector}], đang click chuyển trang...`);
               const [newPage] = await Promise.all([
-                context.waitForEvent("page", { timeout: 6000 }).catch(() => null),
+                context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
                 el.click({ timeout: 5000, force: true }).catch(() => null),
               ]);
               if (newPage) {
@@ -543,17 +517,12 @@ async function runOneCycle(obscuraBin) {
                 log("✓ Đã mở tab quảng cáo đích thành công.");
                 break;
               } else {
-                await sleep(2000);
+                await sleep(3000);
                 const allPages = context.pages();
                 if (allPages.length > 1) {
                   openedPage = allPages[allPages.length - 1];
                   adClicked = true;
                   log("✓ Đã bắt được trang quảng cáo từ tab phụ.");
-                  break;
-                } else if (page.url() !== initialUrl && !page.url().includes("auto-hh3d.online")) {
-                  openedPage = page;
-                  adClicked = true;
-                  log("✓ Trình duyệt Obscura đã chuyển hướng tới trang đích dự phòng.");
                   break;
                 }
               }
@@ -566,28 +535,23 @@ async function runOneCycle(obscuraBin) {
       }
     }
 
-    // 5. Click ngẫu nhiên để kích hoạt popunder nếu chưa click được
+    // 4. Click ngẫu nhiên để kích hoạt popunder nếu chưa click được
     if (!adClicked) {
       log("Không click được quảng cáo cụ thể bằng selector; kích hoạt click mô phỏng trên trang...");
       const [popup] = await Promise.all([
-        context.waitForEvent("page", { timeout: 5000 }).catch(() => null),
+        context.waitForEvent("page", { timeout: 8000 }).catch(() => null),
         page.mouse.click(rand(200, 600), rand(200, 500)).catch(() => null),
       ]);
       if (popup) {
         openedPage = popup;
         adClicked = true;
         log("✓ Popunder đã được kích hoạt.");
-      } else if (page.url() !== initialUrl && !page.url().includes("auto-hh3d.online")) {
-        openedPage = page;
-        adClicked = true;
-        log("✓ Popunder đã chuyển hướng trên trang hiện tại.");
       }
     }
 
-    // 6. Đọc trang quảng cáo chính và đệ quy click nếu có
+    // 5. Đọc trang quảng cáo chính và đệ quy click nếu có
     if (openedPage) {
-      log(`✓ Đang tương tác trên trang đích quảng cáo: ${openedPage.url()}`);
-      await openedPage.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});
+      await openedPage.waitForLoadState("domcontentloaded", { timeout: 25000 }).catch(() => {});
       const readingMs = rand(DELAY_MIN_MS, DELAY_MAX_MS);
       log(`Dừng đọc trang quảng cáo chính trong ${Math.round(readingMs / 1000)}s...`);
       await sleep(readingMs);
@@ -597,31 +561,38 @@ async function runOneCycle(obscuraBin) {
         await handleRecursiveAdClicks(openedPage, 0, MAX_RECURSIVE_CLICKS);
       }
 
-      if (openedPage !== page) {
-        await openedPage.close().catch(() => {});
-      }
+      await openedPage.close().catch(() => {});
     } else {
       log("Chu kỳ này chỉ xem quảng cáo trên trang, không có tab chuyển hướng mới.");
     }
   } catch (err) {
     log(`Lỗi trong chu kỳ xem quảng cáo: ${err instanceof Error ? err.message : String(err)}`);
   } finally {
-    if (browser) {
-      await Promise.race([browser.close(), sleep(2000)]).catch(() => {});
+    if (context) {
+      await context.close().catch(() => {});
     }
-    killProcessTree(server);
-    await sleep(1000);
+    // Dọn dẹp triệt để thư mục profile (xoá sạch cache + cookies)
+    try {
+      rmSync(profileDir, { recursive: true, force: true });
+      log("✓ Đã dọn dẹp cache và cookies.");
+    } catch {
+      // bỏ qua lỗi dọn temp
+    }
   }
 }
 
 async function main() {
-  log(`Bắt đầu tiến trình xem quảng cáo Obscura ID=${VIEWER_ID}`);
-  log(`Mục tiêu: ${WEB_URL}, Tuổi thọ tối đa: ${Math.round(MAX_LIFETIME_MS / 60000)} phút`);
-  log(`Browser engine: Obscura CDP server (chạy không bật --stealth để xem ads)`);
+  log(`Khởi động tiến trình xem quảng cáo (bản: ${currentVersion ?? "chưa rõ"})`);
+  log(`Website đích: ${WEB_URL}`);
+  log(`Tuổi thọ tối đa: ${Math.round(MAX_LIFETIME_MS / 60000)} phút`);
+  log(`Thời gian chờ placement ready tối đa: ${Math.round(AD_READY_TIMEOUT_MS / 1000)} giây`);
 
-  const obscuraBin = resolveObscuraBin();
-  log(`✓ Nhận diện đường dẫn binary Obscura: ${obscuraBin}`);
-  log(`✓ Tích hợp module chống fingerprinting CanvasBlocker qua CDP init script.`);
+  const extPath = resolveExtensionPath();
+  if (extPath) {
+    log(`✓ Đã nạp tiện ích CanvasBlocker từ: ${extPath}`);
+  } else {
+    log("⚠ Không tìm thấy thư mục tiện ích CanvasBlocker; chạy Chromium tiêu chuẩn.");
+  }
 
   const startTime = Date.now();
   let cycle = 0;
@@ -629,7 +600,7 @@ async function main() {
   while (Date.now() - startTime < MAX_LIFETIME_MS) {
     cycle++;
     log(`\n=================== BẮT ĐẦU CHU KỲ ${cycle} ===================`);
-    await runOneCycle(obscuraBin);
+    await runOneCycle(extPath);
 
     const elapsedMs = Date.now() - startTime;
     const remainingMs = MAX_LIFETIME_MS - elapsedMs;

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.118",
+    date: "2026-10-02",
+    lines: [
+      "Kho Xem Quảng Cáo bổ sung hỗ trợ click trực tiếp Adsterra Smartlink và bộ chọn dự phòng mở rộng.",
+      "Tự động chuyển đổi linh hoạt kênh trình duyệt khi khởi chạy, bảo đảm không bị gián đoạn giữa chừng.",
+    ],
+  },
+  {
     version: "1.3.117",
     date: "2026-10-02",
     lines: [
@@ -475,15 +483,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Vấn Đáp nay đọc được cả bảng tham khảo có thẻ lỗi hoặc đổi thuộc tính, và tự thử lại khi nguồn tạm trả trang rỗng.",
       "Khoáng Mạch có ô đặt tối đa 1–3 Linh Quang Phù mỗi ngày; mặc định vẫn là 1 để giữ nguyên mức chi tiêu cũ.",
       "Hạn mức được đếm chung theo tài khoản qua mọi khôi lỗi, áp dụng riêng cho cấu hình VIP lẫn Thường.",
-    ],
-  },
-  {
-    version: "1.3.68",
-    date: "2026-09-02",
-    lines: [
-      "Phòng Chat: bấm vào ảnh trong tin nhắn hoặc ảnh đại diện nay phóng to ngay tại chỗ, không mở tab mới nữa.",
-      "Bấm ra ngoài hoặc bấm phím Esc để đóng; giữ Ctrl hoặc bấm chuột giữa vẫn mở ảnh ở tab mới như trước.",
-      "Ảnh đại diện chưa đặt vẫn là vòng tròn chữ cái như cũ, không bấm được.",
     ],
   },
 ];

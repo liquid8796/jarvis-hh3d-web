@@ -9,7 +9,11 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
----
+## 1.3.118 — Bổ sung click Smartlink và tự động lui kênh trình duyệt khi mở persistent context (02/10/2026)
+
+- `adViewer.mjs` nay hỗ trợ click trực tiếp Adsterra Smartlink (`.adsterra-smartlink`) nếu banner hoặc native gặp tình trạng no-fill hoặc chưa kịp render, bảo đảm mọi chu kỳ luôn kích hoạt liên kết quảng cáo được tài trợ.
+- Mở rộng danh sách bộ chọn quảng cáo dự phòng bao gồm tên miền phân phối của Adsterra (`deliberatewatchful.com`) và toàn bộ liên kết trong stack quảng cáo.
+- Bổ sung cơ chế tự động lui (fallback) khi mở persistent context: thử trước kênh Chromium hệ thống (`channel: "chromium"`), nếu môi trường thiếu thì tự động lui về Chromium đóng gói mà không làm ngắt ca trực.
 
 ## 1.3.117 — Khôi phục tương tác xem và click quảng cáo Adsterra (02/10/2026)
 

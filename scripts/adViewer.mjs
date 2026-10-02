@@ -286,17 +286,24 @@ async function runOneCycle(extensionPath) {
       args.push(`--load-extension=${extensionPath}`);
     }
 
-    // Playwright persistent context nạp extension
-    context = await chromium.launchPersistentContext(profileDir, {
+    const launchOptions = {
       headless: false,
-      channel: "chromium",
       args: [...args, "--headless=new"],
       viewport: { width: 1366, height: 768 },
       locale: "vi-VN",
       timezoneId: "Asia/Ho_Chi_Minh",
       userAgent:
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
-    });
+    };
+
+    try {
+      context = await chromium.launchPersistentContext(profileDir, {
+        ...launchOptions,
+        channel: "chromium",
+      });
+    } catch {
+      context = await chromium.launchPersistentContext(profileDir, launchOptions);
+    }
 
     const page = context.pages()[0] || (await context.newPage());
 
@@ -399,8 +406,40 @@ async function runOneCycle(extensionPath) {
       }
     }
 
-    // 3. Danh sách bộ chọn quảng cáo dự phòng cần tương tác
+    // 3. Thử click Adsterra Smartlink nếu chưa click được
+    if (!adClicked) {
+      try {
+        const smartlink = page.locator('.adsterra-smartlink, a[href*="deliberatewatchful.com"], a[href*="f06720140b3b11ad092d96fa65ca5110"]').first();
+        const smartlinkFound = (await smartlink.count().catch(() => 0)) > 0;
+        if (smartlinkFound) {
+          log("Tìm thấy Adsterra Smartlink, đang click chuyển trang...");
+          const [newPage] = await Promise.all([
+            context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
+            smartlink.click({ timeout: 5000, force: true }).catch(() => null),
+          ]);
+          if (newPage) {
+            openedPage = newPage;
+            adClicked = true;
+            log("✓ Đã mở tab quảng cáo Smartlink thành công.");
+          } else {
+            await sleep(3000);
+            const allPages = context.pages();
+            if (allPages.length > 1) {
+              openedPage = allPages[allPages.length - 1];
+              adClicked = true;
+              log("✓ Đã bắt được trang quảng cáo Smartlink từ tab phụ.");
+            }
+          }
+        }
+      } catch (err) {
+        log(`Thử click Smartlink gặp lỗi: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    // 4. Danh sách bộ chọn quảng cáo dự phòng cần tương tác
     const candidateSelectors = [
+      '.adsterra-smartlink',
+      'a[href*="deliberatewatchful.com"]',
       '#container-5e6634da84f8f263d7ab34ae152f1c8d a[target="_blank"]',
       '#container-5e6634da84f8f263d7ab34ae152f1c8d a',
       '.adsterra-native a[target="_blank"]',
@@ -408,8 +447,10 @@ async function runOneCycle(extensionPath) {
       'iframe[width="728"]',
       'iframe[src*="alwingulla"]',
       'iframe[src*="adsterra"]',
+      'iframe[src*="deliberatewatchful.com"]',
       'a[href*="alwingulla"]',
       'a[href*="smartlink"]',
+      'aside.adsterra-stack a',
       '[class*="adsterra"] iframe',
       '[id*="container-"] a',
       'a[target="_blank"]',

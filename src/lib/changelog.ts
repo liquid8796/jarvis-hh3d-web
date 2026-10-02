@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.137",
+    date: "2026-10-03",
+    lines: [
+      "Rút ngắn thời gian đọc nội dung bài viết và lướt xem trang web trước khi click quảng cáo xuống tối đa 3 giây.",
+      "Bổ sung tham số cấu hình thời gian đọc bài giúp linh hoạt điều chỉnh nhịp tương tác tự nhiên theo nhu cầu.",
+    ],
+  },
+  {
     version: "1.3.136",
     date: "2026-10-03",
     lines: [
@@ -469,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Trong Phòng Chat, bấm khung tin được trả lời nay tự đưa bạn về đúng tin gốc và làm nó sáng nhẹ để dễ nhận ra.",
       "Tin gốc nằm ở lịch sử cũ thì sảnh tự lật tới đúng chỗ; tin đã hết hạn sẽ báo rõ thay vì bấm mà không có phản hồi.",
-    ],
-  },
-  {
-    version: "1.3.87",
-    date: "2026-09-20",
-    lines: [
-      "Tab Auto nay hẹn được từng quest theo giờ, phút, giây mỗi ngày; tới đúng mốc quest mới bắt đầu chạy.",
-      "Khai Đàn và chỉ tiêu ngày vẫn giữ nguyên luật cũ: Thu Đàn là dừng, còn hub đủ lượt rồi thì lịch không chạy lại.",
     ],
   },
 ];

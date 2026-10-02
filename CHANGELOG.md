@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.137 — Rút ngắn thời gian lướt đọc bài viết trước khi click quảng cáo tối đa 3 giây (03/10/2026)
+
+- Giới hạn thời gian mô phỏng người dùng lướt và đọc bài viết trước khi bấm quảng cáo (`simulateHumanReading`) xuống tối đa 3 giây (`rand(1500, 3000)` thay vì 6–12 giây).
+- Bổ sung cờ cấu hình `--reading-timeout` và biến môi trường `AD_VIEWER_READING_TIMEOUT_MS` để tuỳ biến trần thời gian đọc nội dung bài viết.
+- Tối ưu các bước di chuyển chuột vi mô và khoảng nghỉ ngắn trong `simulateHumanReading` bảo đảm tiến trình không bao giờ vượt quá thời lượng định mức.
+
 ## 1.3.136 — Sửa lỗi cú pháp toán tử adViewer và escape ký tự batch run-ad-viewer (03/10/2026)
 
 - Khắc phục lỗi cú pháp `SyntaxError: missing ) after argument list` trong `scripts/adViewer.mjs` do kết hợp trực tiếp toán tử `||` và `??` tại biểu thức khởi tạo `PAGE_GOTO_TIMEOUT_MS`.

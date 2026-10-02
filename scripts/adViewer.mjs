@@ -86,6 +86,12 @@ const PAGE_GOTO_TIMEOUT_MS = Math.max(
   10_000,
   Number.isNaN(parsedPageTimeout) ? 25_000 : parsedPageTimeout,
 );
+const rawReadingTimeout = process.argv.find((a) => a.startsWith("--reading-timeout="))?.split("=")[1];
+const parsedReadingTimeout = Number(rawReadingTimeout || process.env.AD_VIEWER_READING_TIMEOUT_MS || 3_000);
+const MAX_READING_BEFORE_CLICK_MS = Math.max(
+  1_000,
+  Number.isNaN(parsedReadingTimeout) ? 3_000 : parsedReadingTimeout,
+);
 const SELF_UPDATE = process.env.AD_VIEWER_SELF_UPDATE === "1";
 const ENABLE_DEV_MODE = process.env.AD_VIEWER_ENABLE_DEV_MODE !== "0";
 
@@ -1107,28 +1113,36 @@ async function simulateHumanReading(page, durationMs) {
   if (!page || durationMs <= 0) return;
   const started = Date.now();
   while (Date.now() - started < durationMs) {
-    const remaining = durationMs - (Date.now() - started);
-    if (remaining < 800) break;
+    const elapsed = Date.now() - started;
+    const remaining = durationMs - elapsed;
+    if (remaining < 250) break;
 
     // Rê chuột vi mô theo dòng đọc (drift)
     const driftX = Math.max(100, Math.min(1200, lastMouseX + rand(-150, 150)));
     const driftY = Math.max(80, Math.min(700, lastMouseY + rand(-80, 80)));
-    const path = generateBezierPath(lastMouseX, lastMouseY, driftX, driftY, rand(8, 16));
+    const path = generateBezierPath(lastMouseX, lastMouseY, driftX, driftY, rand(6, 10));
     for (const pt of path) {
+      if (Date.now() - started >= durationMs) break;
       await page.mouse.move(pt.x, pt.y).catch(() => {});
-      await sleep(rand(10, 25));
+      await sleep(rand(10, 20));
     }
     lastMouseX = driftX;
     lastMouseY = driftY;
 
-    // Dừng đọc đoạn văn bản
-    await sleep(rand(700, 1900));
+    // Dừng đọc đoạn văn bản (không vượt quá thời gian còn lại)
+    const pauseRemaining = durationMs - (Date.now() - started);
+    if (pauseRemaining <= 100) break;
+    await sleep(Math.min(rand(300, 600), pauseRemaining));
 
     // Thao tác cuộn nhẹ mô phỏng mắt đọc xuống
-    if (Math.random() < 0.4) {
-      const scrollDistance = rand(-80, 200);
+    const scrollRemaining = durationMs - (Date.now() - started);
+    if (scrollRemaining > 300 && Math.random() < 0.5) {
+      const scrollDistance = rand(-50, 120);
       await organicScroll(page, scrollDistance);
-      await sleep(rand(400, 1200));
+      const postScrollRemaining = durationMs - (Date.now() - started);
+      if (postScrollRemaining > 100) {
+        await sleep(Math.min(rand(200, 400), postScrollRemaining));
+      }
     }
   }
 }
@@ -1980,9 +1994,10 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
     );
     log(`Thời gian chờ render Adsterra: ${diagnostic.renderMs}ms.`);
 
-    // Dừng đọc nội dung trang web tự nhiên trước khi click (chống cờ click tức thì của mạng quảng cáo)
-    const readingBeforeClickMs = rand(6000, 12000);
-    log(`Đang đọc nội dung bài viết và lướt xem trang web trong ${Math.round(readingBeforeClickMs / 1000)}s...`);
+    // Dừng đọc nội dung trang web tự nhiên trước khi click (tối đa 3 giây)
+    const minReadingMs = Math.min(1500, MAX_READING_BEFORE_CLICK_MS);
+    const readingBeforeClickMs = rand(minReadingMs, MAX_READING_BEFORE_CLICK_MS);
+    log(`Đang đọc nội dung bài viết và lướt xem trang web trong ${(readingBeforeClickMs / 1000).toFixed(1)}s...`);
     await simulateHumanReading(page, readingBeforeClickMs);
 
     let adClicked = false;

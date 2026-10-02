@@ -119,6 +119,13 @@ if (rawClickMode === "mouse") {
   process.argv.includes("--semi-auto")
 ) {
   CLICK_MODE = "manual";
+} else if (rawClickMode === "cdp") {
+  CLICK_MODE = "cdp";
+} else if (
+  process.platform === "win32" &&
+  (process.argv.includes("--my-chrome") || process.env.USE_MY_CHROME === "1")
+) {
+  CLICK_MODE = "os-mouse";
 }
 
 const USE_CANVAS_BLOCKER =
@@ -940,19 +947,20 @@ async function humanClickOs(page, ctx, targetX, targetY) {
     const desktopX = Math.round((metrics.screenX + borderLeft + targetX) * dpr);
     const desktopY = Math.round((metrics.screenY + borderTop + targetY) * dpr);
 
-    log(`[OS-Mouse] Di chuyển chuột vật lý Windows tới toạ độ Desktop (${desktopX}, ${desktopY})...`);
+    log(`[OS-Mouse] Di chuyển chuột phần cứng Windows tới toạ độ Desktop (${desktopX}, ${desktopY}) & rê lượn tương tác...`);
 
     const psScript = path.join(__dirname, "winMouse.ps1");
     if (!existsSync(psScript)) {
       throw new Error(`Không tìm thấy tệp kịch bản: ${psScript}`);
     }
 
-    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${desktopX} -targetY ${desktopY} -steps 25 -click 1`;
-    execSync(cmd, { stdio: "ignore", timeout: 15000 });
+    const hoverMs = rand(1200, 2000);
+    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${desktopX} -targetY ${desktopY} -steps 25 -hoverMs ${hoverMs} -click 1`;
+    execSync(cmd, { stdio: "ignore", timeout: 20000 });
 
     lastMouseX = targetX;
     lastMouseY = targetY;
-    log("[OS-Mouse] ✓ Thao tác click chuột vật lý Windows hoàn tất (SendInput / mouse_event).");
+    log("[OS-Mouse] ✓ Thao tác rê chuột phần cứng & click Windows hoàn tất (MOUSEEVENTF_MOVE stream).");
   } catch (err) {
     log(`[OS-Mouse] ⚠ Lỗi khi điều khiển chuột Windows (${err.message}); dùng fallback CDP click.`);
     return humanClickCdp(page, ctx, targetX, targetY);
@@ -1036,7 +1044,7 @@ async function preClickEngagement(page, ctx, targetX, targetY) {
 
       const psScript = path.join(__dirname, "winMouse.ps1");
       if (existsSync(psScript)) {
-        execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${nearDesktopX} -targetY ${nearDesktopY} -steps 18 -click 0`, { stdio: "ignore", timeout: 8000 });
+        execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${nearDesktopX} -targetY ${nearDesktopY} -steps 18 -hoverMs 500 -click 0`, { stdio: "ignore", timeout: 10000 });
       }
       lastMouseX = nearX;
       lastMouseY = nearY;

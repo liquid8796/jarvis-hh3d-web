@@ -15,24 +15,24 @@ echo.
 
 REM 1. Che do click
 echo [1] Che do tuong tac / click quang cao:
-echo     1. CDP Input Dispatch [Playwright CDP Bezier curve, isTrusted: true - mac dinh]
-echo     2. OS Physical Mouse [Tu dong di chuot THAT cap Windows qua SendInput / SetCursorPos]
-echo     3. Thu cong / Ban tu dong [Auto chuan bi moi thu, dung cho ban click tay roi tu chay tiep]
+echo     1. OS Hardware Mouse [Tu dong re chuot phan cung Windows qua MOUSEEVENTF_MOVE & Hover - KHUYEN NGHI]
+echo     2. Thu cong / Ban tu dong [Auto chuan bi moi thu, dung cho ban click tay roi tu chay tiep]
+echo     3. CDP Input Dispatch [Playwright CDP Bezier curve, isTrusted: true]
 echo     4. Playwright Mouse API
 set "INPUT_CLICK_MODE="
 set /p "INPUT_CLICK_MODE=    Chon [1-4, Enter = 1]: "
-set "ARG_CLICK_MODE=--click-mode=cdp"
+set "ARG_CLICK_MODE=--click-mode=os-mouse"
 if "%INPUT_CLICK_MODE%"=="2" (
-    set "ARG_CLICK_MODE=--click-mode=os-mouse"
-    echo     -^> Che do: OS Physical Mouse [Chuot vat ly Windows]
-) else if "%INPUT_CLICK_MODE%"=="3" (
     set "ARG_CLICK_MODE=--click-mode=manual"
     echo     -^> Che do: Thu cong / Ban tu dong [Manual Assist]
+) else if "%INPUT_CLICK_MODE%"=="3" (
+    set "ARG_CLICK_MODE=--click-mode=cdp"
+    echo     -^> Che do: CDP Input Dispatch
 ) else if "%INPUT_CLICK_MODE%"=="4" (
     set "ARG_CLICK_MODE=--click-mode=mouse"
     echo     -^> Che do: Playwright Mouse API
 ) else (
-    echo     -^> Che do: CDP Input Dispatch
+    echo     -^> Che do: OS Hardware Mouse [Chuot phan cung Windows + Re chuot Hover]
 )
 echo.
 

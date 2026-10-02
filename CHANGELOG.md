@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.135 — Nâng cấp bộ giả lập Chuột phần cứng Windows (True Hardware Stream) & Rê chuột tương tác (03/10/2026)
+
+- Tái thiết kế toàn diện bộ điều khiển chuột cấp Hệ điều hành `scripts/winMouse.ps1`, thay thế lệnh `SetCursorPos` (vốn không tạo thông điệp di chuyển chuột) bằng chuỗi phát sự kiện phần cứng `MOUSEEVENTF_MOVE` chuẩn hoá ($0..65535$) kết hợp tọa độ màn hình thực tế.
+- Bổ sung pha "Rê chuột lượn trên quảng cáo" (Hover Engagement): chuột tự động lướt và dao động vi mô trên vùng quảng cáo trong 1.2–2.0 giây, kích hoạt đầy đủ các sự kiện `mouseenter`, `mouseover`, `pointermove` cấp phần cứng vào Chrome và iframe quảng cáo, tái lập chính xác hành vi người dùng thật.
+- Bổ sung cơ chế tự động kích hoạt cửa sổ Chrome lên hàng đầu (`SetForegroundWindow` / `ShowWindow`) trước khi phát luồng sự kiện phần cứng, đảm bảo Chrome luôn nhận 100% thông điệp chuột từ hệ điều hành.
+- Cập nhật menu `run-ad-viewer.bat` đặt chế độ OS Hardware Mouse làm chế độ mặc định ưu tiên (Enter = 1).
+
 ## 1.3.134 — Khắc phục lỗi treo chu kỳ khi Proxy timeout và tối ưu đóng Chrome an toàn (03/10/2026)
 
 - Khắc phục sự cố tiến trình bị treo vĩnh viễn trong khối `finally` của `scripts/adViewer.mjs` khi `page.goto` gặp proxy bị nghẽn mạng hoặc quá thời gian tải trang (`Timeout exceeded`).

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.135",
+    date: "2026-10-03",
+    lines: [
+      "Nâng cấp bộ giả lập chuột phần cứng Windows phát chuỗi sự kiện di chuyển và rê lượn tương tác.",
+      "Tối ưu kích hoạt cửa sổ trình duyệt và bổ sung pha rê chuột tự nhiên trước khi click quảng cáo.",
+    ],
+  },
+  {
     version: "1.3.134",
     date: "2026-10-03",
     lines: [
@@ -469,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Hoang Vực nay đọc đúng đồng hồ Hồi chiêu mới của trang, nên 14p 50s không còn bị hiểu thành 50 giây.",
       "Cả tài khoản VIP lẫn thường vẫn dùng chung flow; các nút Đổi hệ, Khiêu Chiến và Tấn Công hiện tại đều được giữ nguyên.",
-    ],
-  },
-  {
-    version: "1.3.85",
-    date: "2026-09-20",
-    lines: [
-      "Auto nay nghỉ ít nhất khoảng 10 phút giữa hai vòng khi nhiệm vụ ngày vẫn còn dở, thay vì có lúc quay lại sau vài chục giây.",
-      "Khi nhiệm vụ ngày đã đủ lượt, auto lại theo thời gian chờ thật của những việc còn lại như trước.",
     ],
   },
 ];

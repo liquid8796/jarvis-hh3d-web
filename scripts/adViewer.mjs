@@ -15,6 +15,7 @@
  *   9. Bắt đầu chu kỳ mới cho đến khi hết tuổi thọ ca trực
  */
 
+import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -299,56 +300,169 @@ function prepareExtensionProfile(profileDir) {
   }
 }
 
+async function ensureCdpServer(cdpPort, extensionPath) {
+  const isListening = await fetch(`http://127.0.0.1:${cdpPort}/json/version`, {
+    signal: AbortSignal.timeout(1000),
+  })
+    .then((r) => r.ok)
+    .catch(() => false);
+
+  if (isListening) {
+    log(`✓ Phát hiện Chrome đang lắng nghe trên cổng CDP ${cdpPort}.`);
+    return;
+  }
+
+  log(`Chưa thấy Chrome mở cổng CDP ${cdpPort}; tự động khởi chạy Chrome với cổng gỡ lỗi...`);
+  const chromePaths = [
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    path.join(process.env.LOCALAPPDATA || "", "Google", "Chrome", "Application", "chrome.exe"),
+    "google-chrome",
+    "chrome",
+  ];
+  const chromeBin = chromePaths.find((p) => existsSync(p)) || "chrome";
+
+  const debugProfileDir = path.join(tmpdir(), "chrome-cdp-profile");
+  prepareExtensionProfile(debugProfileDir);
+
+  const args = [
+    `--remote-debugging-port=${cdpPort}`,
+    `--user-data-dir=${debugProfileDir}`,
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--window-size=1366,768",
+    "--enable-experimental-extension-apis",
+    "--extensions-on-chrome-urls",
+    "--silent-debugger-extension-api",
+  ];
+
+  if (extensionPath) {
+    args.push(`--disable-extensions-except=${extensionPath}`);
+    args.push(`--load-extension=${extensionPath}`);
+  }
+
+  const child = spawn(chromeBin, args, { detached: true, stdio: "ignore" });
+  child.unref();
+
+  // Đợi cổng sẵn sàng (tối đa 10s)
+  for (let i = 0; i < 20; i++) {
+    await sleep(500);
+    const ok = await fetch(`http://127.0.0.1:${cdpPort}/json/version`, {
+      signal: AbortSignal.timeout(500),
+    })
+      .then((r) => r.ok)
+      .catch(() => false);
+    if (ok) {
+      log(`✓ Chrome đã sẵn sàng trên cổng CDP ${cdpPort}.`);
+      return;
+    }
+  }
+
+  throw new Error(`Không thể khởi động Chrome trên cổng CDP ${cdpPort} sau 10 giây.`);
+}
+
 async function runOneCycle(extensionPath) {
-  const profileDir = mkdtempSync(path.join(tmpdir(), "ad-viewer-profile-"));
-  prepareExtensionProfile(profileDir);
+  const cdpArg = process.argv.find((a) => a.startsWith("--cdp"));
+  const cdpPort = cdpArg && cdpArg.includes("=") ? cdpArg.split("=")[1] : "9222";
+  const cdpUrl =
+    process.env.CDP_URL ||
+    (cdpArg ? (cdpPort.startsWith("http") ? cdpPort : `http://127.0.0.1:${cdpPort}`) : null);
+
+  const useMyChrome =
+    process.argv.includes("--my-chrome") ||
+    process.argv.includes("--my-profile") ||
+    process.env.USE_MY_CHROME === "1";
+
   let context = null;
+  let browser = null;
+  let profileDir = null;
+  let isTempProfile = false;
+  let page = null;
 
   try {
-    const args = [
-      "--disable-blink-features=AutomationControlled",
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--window-size=1366,768",
-      "--enable-experimental-extension-apis",
-      "--extensions-on-chrome-urls",
-      "--silent-debugger-extension-api",
-      "--no-default-browser-check",
-      "--no-first-run",
-    ];
+    if (cdpUrl) {
+      log(`Kết nối tới Chrome hiện tại qua CDP: ${cdpUrl}...`);
+      try {
+        if (cdpUrl.includes("127.0.0.1") || cdpUrl.includes("localhost")) {
+          await ensureCdpServer(cdpPort, extensionPath);
+        }
+        browser = await chromium.connectOverCDP(cdpUrl);
+        context = browser.contexts()[0] || (await browser.newContext());
+        log("✓ Đã kết nối thành công tới Chrome qua CDP.");
+      } catch (err) {
+        log(`✗ Không thể kết nối tới Chrome tại ${cdpUrl}: ${err.message}`);
+        log(`  Gợi ý: Mở Chrome bằng lệnh: & "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=${cdpPort}`);
+        process.exit(1);
+      }
+    } else if (useMyChrome) {
+      const localAppData =
+        process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || "", "AppData", "Local");
+      profileDir = path.join(localAppData, "Google", "Chrome", "User Data");
+      log(`Sử dụng trực tiếp profile Chrome hiện tại: ${profileDir}`);
+    } else {
+      profileDir = mkdtempSync(path.join(tmpdir(), "ad-viewer-profile-"));
+      isTempProfile = true;
+      prepareExtensionProfile(profileDir);
+    }
 
-    if (extensionPath) {
-      args.push(`--disable-extensions-except=${extensionPath}`);
-      args.push(`--load-extension=${extensionPath}`);
-      if (ENABLE_DEV_MODE) {
-        log("✓ Đã bật chế độ Developer Mode cho tiện ích CanvasBlocker trong profile.");
+    if (!cdpUrl) {
+      const args = [
+        "--disable-blink-features=AutomationControlled",
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--window-size=1366,768",
+        "--enable-experimental-extension-apis",
+        "--extensions-on-chrome-urls",
+        "--silent-debugger-extension-api",
+        "--no-default-browser-check",
+        "--no-first-run",
+      ];
+
+      if (extensionPath && isTempProfile) {
+        args.push(`--disable-extensions-except=${extensionPath}`);
+        args.push(`--load-extension=${extensionPath}`);
+        if (ENABLE_DEV_MODE) {
+          log("✓ Đã bật chế độ Developer Mode cho tiện ích CanvasBlocker trong profile.");
+        }
+      }
+
+      const isHeadless =
+        !useMyChrome &&
+        !process.argv.includes("--head") &&
+        !process.argv.includes("--visible") &&
+        process.env.HEADLESS !== "0";
+      const launchArgs = isHeadless ? [...args, "--headless=new"] : args;
+
+      const launchOptions = {
+        headless: false,
+        args: launchArgs,
+        viewport: { width: 1366, height: 768 },
+        locale: "vi-VN",
+        timezoneId: "Asia/Ho_Chi_Minh",
+        userAgent:
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+      };
+
+      const channel = useMyChrome ? "chrome" : "chromium";
+
+      try {
+        context = await chromium.launchPersistentContext(profileDir, {
+          ...launchOptions,
+          channel,
+        });
+      } catch (err) {
+        if (useMyChrome) {
+          log("⚠ Không thể mở trực tiếp profile Chrome (có thể do Chrome đang mở sẵn trên máy).");
+          log(`  Gợi ý: Mở Chrome bằng: & "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222`);
+          log("  Sau đó chạy: npm run ad-viewer -- --cdp");
+          throw err;
+        }
+        context = await chromium.launchPersistentContext(profileDir, launchOptions);
       }
     }
 
-    const isHeadless = !process.argv.includes("--head") && !process.argv.includes("--visible") && process.env.HEADLESS !== "0";
-    const launchArgs = isHeadless ? [...args, "--headless=new"] : args;
-
-    const launchOptions = {
-      headless: false,
-      args: launchArgs,
-      viewport: { width: 1366, height: 768 },
-      locale: "vi-VN",
-      timezoneId: "Asia/Ho_Chi_Minh",
-      userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
-    };
-
-    try {
-      context = await chromium.launchPersistentContext(profileDir, {
-        ...launchOptions,
-        channel: "chromium",
-      });
-    } catch {
-      context = await chromium.launchPersistentContext(profileDir, launchOptions);
-    }
-
-    const page = context.pages()[0] || (await context.newPage());
+    page = context.pages()[0] || (await context.newPage());
 
     const renderStartedAt = Date.now();
     log(`Mở trang chủ ${WEB_URL}...`);
@@ -386,96 +500,92 @@ async function runOneCycle(extensionPath) {
     let adClicked = false;
     let openedPage = null;
 
-    // 1. Thử click native ads nếu ready
+    // Thu thập tất cả các quảng cáo khả dụng trên trang để chọn ngẫu nhiên
+    const adCandidates = [];
+
+    // 1. Toàn bộ các thẻ Native Ads (nếu ready)
     if (diagnostic.native.status === "ready") {
       try {
-        const nativeLinks = page.locator(`${NATIVE_READY_SELECTOR} #${NATIVE_CONTAINER_ID} a[target="_blank"], ${NATIVE_READY_SELECTOR} a`);
+        const nativeLinks = page.locator(
+          `${NATIVE_READY_SELECTOR} #${NATIVE_CONTAINER_ID} a[target="_blank"], ${NATIVE_READY_SELECTOR} a`,
+        );
         const count = await nativeLinks.count().catch(() => 0);
-        if (count > 0) {
-          log("Tìm thấy native ad card, đang click chuyển trang...");
-          const [newPage] = await Promise.all([
-            context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
-            nativeLinks.first().click({ timeout: 5000, force: true }).catch(() => null),
-          ]);
-          if (newPage) {
-            openedPage = newPage;
-            adClicked = true;
-            log("✓ Đã mở tab quảng cáo native thành công.");
-          } else {
-            await sleep(3000);
-            const allPages = context.pages();
-            if (allPages.length > 1) {
-              openedPage = allPages[allPages.length - 1];
-              adClicked = true;
-              log("✓ Đã bắt được trang quảng cáo native từ tab phụ.");
-            }
-          }
+        for (let i = 0; i < count; i++) {
+          adCandidates.push({
+            name: `Native ad card ${i + 1}/${count}`,
+            locator: nativeLinks.nth(i),
+          });
         }
       } catch (err) {
-        log(`Thử click native ad gặp lỗi: ${err instanceof Error ? err.message : String(err)}`);
+        log(`Lỗi khi quét native ads: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
-    // 2. Thử click banner ad trong iframe nếu ready
-    if (!adClicked && diagnostic.banner.status === "ready" && diagnostic.bannerIframeFound) {
+    // 2. Banner ad creative trong iframe 728x90 (nếu ready)
+    if (diagnostic.banner.status === "ready" && diagnostic.bannerIframeFound) {
       try {
         const iframeHandle = await diagnostic.bannerIframe.elementHandle().catch(() => null);
         const frame = iframeHandle ? await iframeHandle.contentFrame().catch(() => null) : null;
         if (frame) {
-          const bannerLink = frame.locator("a[href]").first();
-          if ((await bannerLink.count().catch(() => 0)) > 0) {
-            log("Tìm thấy banner ad creative trong iframe, đang click chuyển trang...");
-            const [newPage] = await Promise.all([
-              context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
-              bannerLink.click({ timeout: 5000, force: true }).catch(() => null),
-            ]);
-            if (newPage) {
-              openedPage = newPage;
-              adClicked = true;
-              log("✓ Đã mở tab quảng cáo banner thành công.");
-            } else {
-              await sleep(3000);
-              const allPages = context.pages();
-              if (allPages.length > 1) {
-                openedPage = allPages[allPages.length - 1];
-                adClicked = true;
-                log("✓ Đã bắt được trang quảng cáo banner từ tab phụ.");
-              }
-            }
+          const bannerLinks = frame.locator("a[href]");
+          const bannerCount = await bannerLinks.count().catch(() => 0);
+          for (let i = 0; i < bannerCount; i++) {
+            adCandidates.push({
+              name: `Banner 728×90 iframe link ${i + 1}/${bannerCount}`,
+              locator: bannerLinks.nth(i),
+            });
           }
         }
       } catch (err) {
-        log(`Thử click banner ad gặp lỗi: ${err instanceof Error ? err.message : String(err)}`);
+        log(`Lỗi khi quét banner ad: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
-    // 3. Thử click Adsterra Smartlink nếu chưa click được
-    if (!adClicked) {
-      try {
-        const smartlink = page.locator('.adsterra-smartlink, a[href*="deliberatewatchful.com"], a[href*="f06720140b3b11ad092d96fa65ca5110"]').first();
-        const smartlinkFound = (await smartlink.count().catch(() => 0)) > 0;
-        if (smartlinkFound) {
-          log("Tìm thấy Adsterra Smartlink, đang click chuyển trang...");
-          const [newPage] = await Promise.all([
-            context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
-            smartlink.click({ timeout: 5000, force: true }).catch(() => null),
-          ]);
-          if (newPage) {
-            openedPage = newPage;
+    // 3. Adsterra Smartlink
+    try {
+      const smartlink = page.locator(
+        '.adsterra-smartlink, a[href*="deliberatewatchful.com"], a[href*="f06720140b3b11ad092d96fa65ca5110"]',
+      );
+      const smartCount = await smartlink.count().catch(() => 0);
+      for (let i = 0; i < smartCount; i++) {
+        adCandidates.push({
+          name: `Adsterra Smartlink ${i + 1}/${smartCount}`,
+          locator: smartlink.nth(i),
+        });
+      }
+    } catch {
+      // bỏ qua
+    }
+
+    // Xáo trộn ngẫu nhiên toàn bộ danh sách quảng cáo tìm thấy (Fisher-Yates)
+    for (let i = adCandidates.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [adCandidates[i], adCandidates[j]] = [adCandidates[j], adCandidates[i]];
+    }
+
+    if (adCandidates.length > 0) {
+      log(`Tìm thấy tổng cộng ${adCandidates.length} vị trí quảng cáo khả dụng. Đang chọn ngẫu nhiên để click...`);
+      for (const candidate of adCandidates) {
+        log(`-> Click ngẫu nhiên quảng cáo [${candidate.name}]...`);
+        const [newPage] = await Promise.all([
+          context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
+          candidate.locator.click({ timeout: 5000, force: true }).catch(() => null),
+        ]);
+        if (newPage) {
+          openedPage = newPage;
+          adClicked = true;
+          log(`✓ Đã mở tab quảng cáo thành công từ [${candidate.name}].`);
+          break;
+        } else {
+          await sleep(2500);
+          const allPages = context.pages();
+          if (allPages.length > 1) {
+            openedPage = allPages[allPages.length - 1];
             adClicked = true;
-            log("✓ Đã mở tab quảng cáo Smartlink thành công.");
-          } else {
-            await sleep(3000);
-            const allPages = context.pages();
-            if (allPages.length > 1) {
-              openedPage = allPages[allPages.length - 1];
-              adClicked = true;
-              log("✓ Đã bắt được trang quảng cáo Smartlink từ tab phụ.");
-            }
+            log(`✓ Đã bắt được trang quảng cáo từ tab phụ [${candidate.name}].`);
+            break;
           }
         }
-      } catch (err) {
-        log(`Thử click Smartlink gặp lỗi: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -500,9 +610,12 @@ async function runOneCycle(extensionPath) {
     ];
 
     if (!adClicked) {
-      for (const selector of candidateSelectors) {
+      // Xáo trộn ngẫu nhiên thứ tự selector dự phòng
+      const shuffledSelectors = [...candidateSelectors].sort(() => Math.random() - 0.5);
+      for (const selector of shuffledSelectors) {
         const elements = await page.$$(selector);
-        for (const el of elements) {
+        const shuffledElements = [...elements].sort(() => Math.random() - 0.5);
+        for (const el of shuffledElements) {
           try {
             const visible = await el.isVisible().catch(() => false);
             if (visible) {
@@ -566,17 +679,49 @@ async function runOneCycle(extensionPath) {
       log("Chu kỳ này chỉ xem quảng cáo trên trang, không có tab chuyển hướng mới.");
     }
   } catch (err) {
-    log(`Lỗi trong chu kỳ xem quảng cáo: ${err instanceof Error ? err.message : String(err)}`);
-  } finally {
-    if (context) {
-      await context.close().catch(() => {});
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log(`Lỗi trong chu kỳ xem quảng cáo: ${errMsg}`);
+    if (useMyChrome && errMsg.includes("Opening in existing browser session")) {
+      log("⚠ Dừng tiến trình: Profile Chrome đang bị tiến trình Chrome chạy ngầm chiếm giữ.");
+      log("  Gợi ý: Chạy `Stop-Process -Name chrome -Force` để tắt sạch Chrome ngầm, hoặc chạy `npm run ad-viewer:head` để chạy cửa sổ độc lập không bị xung đột.");
+      process.exit(1);
     }
-    // Dọn dẹp triệt để thư mục profile (xoá sạch cache + cookies)
-    try {
-      rmSync(profileDir, { recursive: true, force: true });
-      log("✓ Đã dọn dẹp cache và cookies.");
-    } catch {
-      // bỏ qua lỗi dọn temp
+  } finally {
+    // 1. Dọn dẹp sạch cache và cookies sau mỗi chu kỳ (áp dụng cho mọi chế độ, kể cả CDP)
+    if (context) {
+      try {
+        await context.clearCookies().catch(() => {});
+        if (page && !page.isClosed()) {
+          const client = await context.newCDPSession(page).catch(() => null);
+          if (client) {
+            await client.send("Network.clearBrowserCookies").catch(() => {});
+            await client.send("Network.clearBrowserCache").catch(() => {});
+            await client.detach().catch(() => {});
+          }
+        }
+        log("✓ Đã dọn dẹp sạch cache và cookies của trình duyệt.");
+      } catch {
+        // bỏ qua lỗi CDP session
+      }
+    }
+
+    if (cdpUrl) {
+      // Trong chế độ CDP, không đóng context/browser của người dùng, chỉ đóng tab do chu kỳ mở
+      if (page && !page.isClosed()) {
+        await page.close().catch(() => {});
+      }
+    } else {
+      if (context) {
+        await context.close().catch(() => {});
+      }
+      if (isTempProfile && profileDir) {
+        try {
+          rmSync(profileDir, { recursive: true, force: true });
+          log("✓ Đã dọn dẹp thư mục profile tạm thời.");
+        } catch {
+          // bỏ qua lỗi dọn temp
+        }
+      }
     }
   }
 }

@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.122 — Dọn dẹp cache và cookies triệt để, ngẫu nhiên hoá click quảng cáo cho Xem Quảng Cáo (02/10/2026)
+
+- Dọn dẹp sạch cache và cookies sau mỗi chu kỳ thông qua Playwright API (`context.clearCookies()`) và CDP network commands (`Network.clearBrowserCookies`, `Network.clearBrowserCache`), đồng thời giải phóng thư mục profile tạm thời.
+- Ngẫu nhiên hoá vị trí click quảng cáo (Fisher-Yates shuffle): Thu thập toàn bộ ứng viên quảng cáo sẵn sàng trên trang (tất cả các thẻ Native Ad, liên kết banner iframe 728×90, Smartlink) và xáo trộn ngẫu nhiên trước khi click thay vì cố định vào thẻ đầu tiên.
+- Xáo trộn ngẫu nhiên thứ tự selector và danh sách phần tử trong cơ chế click dự phòng (fallback).
+- Bổ sung script chạy `ad-viewer:cdp` và `ad-viewer:my-chrome`, tự động khởi chạy Chrome với cổng 9222 (`ensureCdpServer`) và tiện ích CanvasBlocker nếu cổng chưa được mở sẵn, tránh lỗi kết nối hoặc xung đột tiến trình ngầm.
+
 ## 1.3.121 — Khôi phục Chromium và tiện ích CanvasBlocker cho Xem Quảng Cáo (02/10/2026)
 
 - Huỷ tích hợp trình duyệt Obscura và quay trở lại sử dụng Chromium tiêu chuẩn kết hợp tiện ích mở rộng CanvasBlocker.

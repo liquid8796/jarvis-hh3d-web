@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.122",
+    date: "2026-10-02",
+    lines: [
+      "Kho Xem Quảng Cáo tự động dọn dẹp sạch sẽ bộ nhớ đệm và dữ liệu duyệt web sau mỗi chu kỳ hoạt động.",
+      "Lựa chọn ngẫu nhiên vị trí và liên kết quảng cáo để tương tác, tăng cường tính tự nhiên cho phiên xem.",
+    ],
+  },
+  {
     version: "1.3.121",
     date: "2026-10-02",
     lines: [
@@ -470,15 +478,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Mô tả kho phụ không còn kèm mã nhận diện nội bộ; mô tả cũ cũng được làm sạch.",
       "Ollama tự chọn nhiều ngôn ngữ lập trình khi tạo kho mới, tránh lặp lại một ngôn ngữ liên tục.",
       "Kho đang có được tiếp tục phát triển theo ngôn ngữ riêng, kể cả các ngôn ngữ ít phổ biến.",
-    ],
-  },
-  {
-    version: "1.3.72",
-    date: "2026-09-11",
-    lines: [
-      "Có thể tạo kho GitHub và tệp chạy ngay tại Tông Môn, tài khoản được xác định tự động từ PAT.",
-      "Form trên web và tệp chạy nhanh cùng cho nhập tên kho, tên tệp chạy và giới hạn lượt đẩy; bỏ trống sẽ dùng mặc định.",
-      "Tên kho đã có sẽ được báo rõ và dừng trước khi tạo. Đổi tên tệp chạy lúc tạo cũng được giữ đúng ở các lượt sau.",
     ],
   },
 ];

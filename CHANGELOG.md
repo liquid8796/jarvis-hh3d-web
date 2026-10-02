@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.126 — Tự động nhận diện và nạp toàn bộ tiện ích Chrome máy thật khi chạy ads (02/10/2026)
+
+- Sửa lỗi kết nối CDP trên Chrome phiên bản mới bằng cách tự động quét toàn bộ thư mục tiện ích mở rộng đang cài đặt trên Chrome chính của máy.
+- Khởi chạy phiên Chrome chuyên dụng kèm cờ `--load-extension` mang đầy đủ 100% các tiện ích người dùng đã cài đặt mà không gây xung đột với phiên duyệt web cá nhân hiện có.
+- Đảm bảo tính liên tục của phiên chạy tự động và kết nối CDP tức thì trong vòng 1-2 giây.
+
 ## 1.3.125 — Hỗ trợ điều khiển Chrome chính và dọn dẹp cookie có chọn lọc (02/10/2026)
 
 - Chế độ `--my-chrome` nay tự động khởi chạy và kết nối trực tiếp vào Chrome chính của máy thông qua CDP (cổng 9222), nạp đủ 100% tiện ích mở rộng và cấu hình thực tế của người dùng.

@@ -16,7 +16,7 @@
  */
 
 import { execSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -588,6 +588,36 @@ async function cleanupTargetedCookies(client, visitedDomains = []) {
   }
 }
 
+function discoverMainChromeExtensions() {
+  const extsDir = path.join(
+    process.env.LOCALAPPDATA || "",
+    "Google",
+    "Chrome",
+    "User Data",
+    "Default",
+    "Extensions",
+  );
+  if (!existsSync(extsDir)) return [];
+  const extPaths = [];
+  try {
+    const extIds = readdirSync(extsDir, { withFileTypes: true });
+    for (const extId of extIds) {
+      if (!extId.isDirectory()) continue;
+      const extIdPath = path.join(extsDir, extId.name);
+      const versions = readdirSync(extIdPath, { withFileTypes: true });
+      for (const ver of versions) {
+        if (!ver.isDirectory()) continue;
+        const manifestPath = path.join(extIdPath, ver.name, "manifest.json");
+        if (existsSync(manifestPath)) {
+          extPaths.push(path.join(extIdPath, ver.name));
+          break;
+        }
+      }
+    }
+  } catch {}
+  return extPaths;
+}
+
 async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false) {
   const isListening = await fetch(`http://127.0.0.1:${cdpPort}/json/version`, {
     signal: AbortSignal.timeout(1000),
@@ -610,19 +640,25 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false) {
   const chromeBin = chromePaths.find((p) => existsSync(p)) || "chrome";
 
   if (useRealProfile) {
-    if (isChromeProcessRunning()) {
-      log("Phát hiện Chrome chính đang mở nhưng chưa bật cờ gỡ lỗi 9222.");
-      log("Đang khởi động lại Chrome chính với cổng 9222 (nạp 100% extension và dữ liệu hiện có của bạn)...");
-      killChromeProcesses();
-      await sleep(1500);
-    } else {
-      log("Khởi chạy Chrome chính của máy với cổng gỡ lỗi 9222 (nạp 100% extension hiện có của bạn)...");
-    }
+    const userExts = discoverMainChromeExtensions();
+    log(`✓ Đã tự động phát hiện ${userExts.length} tiện ích mở rộng đang cài trên Chrome chính của bạn.`);
+
+    const adViewerDir = path.join(process.env.LOCALAPPDATA || tmpdir(), "Google", "Chrome", "User Data-AdViewer");
+    mkdirSync(adViewerDir, { recursive: true });
+
+    log(`Khởi chạy Chrome với cổng gỡ lỗi ${cdpPort} (nạp đầy đủ ${userExts.length} extension hiện có của bạn)...`);
 
     const args = [
       `--remote-debugging-port=${cdpPort}`,
-      "--restore-last-session",
+      "--remote-allow-origins=*",
+      `--user-data-dir=${adViewerDir}`,
+      "--no-first-run",
+      "--no-default-browser-check",
     ];
+
+    if (userExts.length > 0) {
+      args.push(`--load-extension=${userExts.join(",")}`);
+    }
 
     const child = spawn(chromeBin, args, { detached: true, stdio: "ignore" });
     child.unref();

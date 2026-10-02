@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.126",
+    date: "2026-10-02",
+    lines: [
+      "Tự động phát hiện và nạp toàn bộ tiện ích mở rộng đang cài trên Chrome chính của máy khi chạy xem quảng cáo.",
+      "Kết nối nhanh qua cổng gỡ lỗi mà không gây xung đột với phiên duyệt web cá nhân đang mở.",
+    ],
+  },
+  {
     version: "1.3.125",
     date: "2026-10-02",
     lines: [
@@ -469,15 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Tên repo chính nay luôn khác tên khôi lỗi, kể cả khi tự nhập hoặc để Ollama đặt tên.",
       "WORKER_ID được tạo riêng và giữ riêng, nên đổi tên repo chính không đổi danh tính điểm danh.",
       "Có công cụ đổi các repo chính cũ còn trùng tên khôi lỗi sang tên mới do Ollama chọn.",
-    ],
-  },
-  {
-    version: "1.3.76",
-    date: "2026-09-11",
-    lines: [
-      "Nút Xóa kho GitHub nay xóa toàn bộ repo chính cùng tài khoản; các repo phụ vẫn được giữ nguyên trên GitHub.",
-      "Nếu tài khoản đã bị đình chỉ hoặc không còn tồn tại, hệ thống chỉ gỡ các station khỏi sổ.",
-      "Lỗi quyền, giới hạn hoặc kết nối sẽ dừng an toàn và giữ sổ để thử lại.",
     ],
   },
 ];

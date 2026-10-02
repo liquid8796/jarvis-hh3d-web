@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.132",
+    date: "2026-10-03",
+    lines: [
+      "Tự động loại bỏ proxy chết khỏi danh sách và cập nhật tệp trên đĩa ngay khi phát hiện lỗi kết nối.",
+      "Thêm cơ chế kiểm tra kết nối mạng chủ để bảo vệ danh sách proxy không bị xoá nhầm khi mất mạng.",
+    ],
+  },
+  {
     version: "1.3.131",
     date: "2026-10-03",
     lines: [
@@ -469,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khi tạo kho GitHub lỗi, màn hình nay nói rõ PAT bị từ chối, còn thiếu quyền nào hoặc trường nào chưa hợp lệ.",
       "Mỗi lỗi có mã để tra cứu an toàn; bộ dựng kho cũng giữ đúng định dạng tệp khi phát hành từ Windows.",
-    ],
-  },
-  {
-    version: "1.3.82",
-    date: "2026-09-13",
-    lines: [
-      "Mỗi kho GitHub chính nay có README, About và tên hiển thị theo một chủ đề đời thường riêng.",
-      "Danh tính điểm danh bên trong vẫn được giữ nguyên, nên diện mạo mới không làm gián đoạn công việc đang chạy.",
     ],
   },
 ];

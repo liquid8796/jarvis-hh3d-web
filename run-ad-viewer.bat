@@ -92,6 +92,7 @@ if /i "%SHUFFLE_CHOICE%"=="N" (
 )
 set ARG_PROXY=--proxy-file="%CUSTOM_FILE%" %ARG_SHUFFLE%
 echo     -^> Nguon file: %CUSTOM_FILE%
+echo     -^> Tu dong loai bo proxy chet khoi file: BAT [Tu dong lam sach danh sach]
 goto :after_proxy
 
 :after_proxy

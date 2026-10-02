@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.132 — Tự động loại bỏ Proxy chết khỏi tệp danh sách và cơ chế an toàn mạng (03/10/2026)
+
+- Bổ sung cơ chế tự động xoá proxy hỏng (`pruneDead` / `markDead`) trong `scripts/adViewer.mjs`: khi kiểm tra proxy theo lô (`probeBatch`) hoặc khi proxy phát sinh lỗi kết nối trong phiên duyệt web, proxy chết sẽ lập tức bị loại bỏ khỏi bộ nhớ và đồng bộ làm sạch tệp trên đĩa (`list-proxies.txt`).
+- Tích hợp bộ ghi hoãn (`persistTimer` debounce) và đồng bộ an toàn khi tiến trình chuẩn bị thoát (`beforeExit` / `flush`), giúp tránh ghi đĩa dồn dập khi nhiều proxy cùng hết hạn kết nối đồng thời.
+- Thêm tầng bảo vệ kiểm tra kết nối mạng chủ (`checkConnectivity`): nếu máy chủ mất kết nối Internet, hệ thống sẽ tạm dừng xoá proxy để tránh làm sạch nhầm danh sách gốc.
+- Cập nhật thông báo trực quan trạng thái làm sạch danh sách trong `run-ad-viewer.bat` và hỗ trợ cờ tắt tuỳ chọn `--no-prune-proxy`.
+
 ## 1.3.131 — Quét song song siêu tốc danh sách Proxy và sửa cấu hình đệ quy click (03/10/2026)
 
 - Nâng cấp cơ chế thăm dò proxy trong `scripts/adViewer.mjs` sang dạng quét song song theo lô (`probeBatch`): kiểm tra đồng thời 35 proxy cùng lúc qua HTTP CONNECT tunnel, tự động chọn ngay proxy phản hồi tốt đầu tiên chỉ trong vài trăm mili-giây thay vì kiểm tra tuần tự chậm chạp.

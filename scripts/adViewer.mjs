@@ -271,7 +271,19 @@ class ProxyManager {
     this.proxyFile = options.proxyFile || PROXY_FILE;
     this.noProxy = options.noProxy || NO_PROXY;
     this.shuffle = options.shuffle || PROXY_SHUFFLE;
+    this.pruneDead = options.pruneDead !== undefined ? options.pruneDead : !process.argv.includes("--no-prune-proxy");
+    this.loadedFilePath = null;
+    this.deadKeys = new Set();
+    this.pendingDeadKeys = new Set();
+    this.persistTimer = null;
+    this.initialCount = 0;
+    this.lastConnectivityCheck = 0;
+    this.isOnline = true;
     this.initialized = false;
+
+    if (typeof process !== "undefined" && process.on) {
+      process.on("beforeExit", () => this.flush());
+    }
   }
 
   init() {
@@ -303,6 +315,7 @@ class ProxyManager {
     const defaultListPath = "D:\\Project\\lobby\\proxies\\list-proxies.txt";
     const fileToLoad = this.proxyFile || (existsSync(defaultListPath) ? defaultListPath : "");
     if (fileToLoad && existsSync(fileToLoad)) {
+      this.loadedFilePath = fileToLoad;
       try {
         const content = readFileSync(fileToLoad, "utf8");
         const lines = content.split(/\r?\n/);
@@ -310,11 +323,15 @@ class ProxyManager {
           const p = parseProxyItem(line);
           if (p) this.proxyList.push(p);
         }
+        this.initialCount = this.proxyList.length;
         if (this.shuffle) {
           this.proxyList.sort(() => Math.random() - 0.5);
           log(`[ProxyManager] Đã xáo trộn ngẫu nhiên danh sách proxy.`);
         }
-        log(`[ProxyManager] Đã tải ${this.proxyList.length} proxy từ: ${fileToLoad}`);
+        log(
+          `[ProxyManager] Đã tải ${this.proxyList.length} proxy từ: ${fileToLoad}` +
+            (this.pruneDead ? " (Tự động xoá proxy chết khỏi file: BẬT)" : "")
+        );
       } catch (err) {
         log(`[ProxyManager] ⚠ Lỗi khi đọc tệp proxy: ${err.message}`);
       }
@@ -398,8 +415,124 @@ class ProxyManager {
   }
 
   /**
+   * Kiểm tra nhanh trạng thái kết nối mạng của máy chủ để tránh xoá nhầm khi đứt cáp / mất mạng.
+   */
+  async checkConnectivity() {
+    const now = Date.now();
+    if (now - this.lastConnectivityCheck < 10000) {
+      return this.isOnline;
+    }
+    this.lastConnectivityCheck = now;
+    return new Promise((resolve) => {
+      let settled = false;
+      const done = (val) => {
+        if (!settled) {
+          settled = true;
+          this.isOnline = val;
+          resolve(val);
+        }
+      };
+
+      try {
+        const socket = net.createConnection({ host: "1.1.1.1", port: 53, timeout: 1500 });
+        socket.on("connect", () => {
+          try { socket.destroy(); } catch {}
+          done(true);
+        });
+        socket.on("error", () => {
+          try { socket.destroy(); } catch {}
+          try {
+            const s2 = net.createConnection({ host: "8.8.8.8", port: 53, timeout: 1500 });
+            s2.on("connect", () => { try { s2.destroy(); } catch {} done(true); });
+            s2.on("error", () => { try { s2.destroy(); } catch {} done(false); });
+            s2.on("timeout", () => { try { s2.destroy(); } catch {} done(false); });
+          } catch {
+            done(false);
+          }
+        });
+        socket.on("timeout", () => {
+          try { socket.destroy(); } catch {}
+          done(false);
+        });
+      } catch {
+        done(false);
+      }
+    });
+  }
+
+  /**
+   * Đánh dấu proxy đã chết, loại bỏ khỏi bộ nhớ và lên lịch lưu lại tệp trên đĩa.
+   */
+  markDead(proxy) {
+    if (!this.pruneDead || !proxy || !proxy.host || !proxy.port) return;
+    const key = `${proxy.host}:${proxy.port}`;
+    if (this.deadKeys.has(key)) return;
+    this.deadKeys.add(key);
+    this.pendingDeadKeys.add(key);
+
+    this.proxyList = this.proxyList.filter((p) => `${p.host}:${p.port}` !== key);
+
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer);
+    }
+    this.persistTimer = setTimeout(() => {
+      this.persistTimer = null;
+      this.persistProxyList();
+    }, 400);
+    if (this.persistTimer && typeof this.persistTimer.unref === "function") {
+      this.persistTimer.unref();
+    }
+  }
+
+  /**
+   * Ghi nhận và xoá các proxy chết khỏi danh sách bộ nhớ và tệp trên đĩa.
+   */
+  removeDeadProxies(deadProxies) {
+    if (!this.pruneDead || !deadProxies || deadProxies.length === 0) return;
+    for (const p of deadProxies) {
+      this.markDead(p);
+    }
+    this.flush();
+  }
+
+  /**
+   * Ghi đè danh sách proxy còn hoạt động trở lại tệp trên đĩa để lần sau không phải gặp lại proxy chết.
+   */
+  persistProxyList() {
+    if (!this.pruneDead || !this.loadedFilePath || !existsSync(this.loadedFilePath)) return;
+    if (this.pendingDeadKeys.size === 0) return;
+
+    try {
+      if (this.proxyList.length === 0 && this.initialCount > 0) {
+        log(`[ProxyManager] ⚠ Cảnh báo: Toàn bộ proxy trong danh sách đều không phản hồi; bảo vệ tệp gốc, không xoá trắng.`);
+        return;
+      }
+      const lines = this.proxyList.map((p) => p.raw || `${p.host}:${p.port}`);
+      const uniqueLines = Array.from(new Set(lines));
+      writeFileSync(this.loadedFilePath, uniqueLines.join("\r\n") + (uniqueLines.length > 0 ? "\r\n" : ""), "utf8");
+      const removedCount = this.pendingDeadKeys.size;
+      log(`[ProxyManager] 🗑 Đã loại bỏ ${removedCount} proxy chết khỏi tệp: ${this.loadedFilePath} (còn lại: ${uniqueLines.length} proxy).`);
+      this.pendingDeadKeys.clear();
+    } catch (err) {
+      log(`[ProxyManager] ⚠ Không thể cập nhật tệp proxy trên đĩa: ${err.message}`);
+    }
+  }
+
+  /**
+   * Đồng bộ ngay lập tức các proxy chết chưa lưu vào tệp trên đĩa.
+   */
+  flush() {
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer);
+      this.persistTimer = null;
+    }
+    this.persistProxyList();
+  }
+
+  /**
    * Thăm dò song song đồng thời một nhóm (batch) proxy qua HTTP CONNECT tunnel.
    * Ngay khi có bất kỳ proxy nào phản hồi thành công (HTTP 200), lập tức trả về proxy đó.
+   * Các kết nối còn lại tiếp tục chạy nền và tự động bị đánh dấu chết nếu thất bại/timeout.
    */
   async probeBatch(candidates, timeoutMs = 2500) {
     if (!candidates || candidates.length === 0) return null;
@@ -410,19 +543,27 @@ class ProxyManager {
       for (const candidate of candidates) {
         this.probe(candidate, timeoutMs)
           .then((alive) => {
-            if (resolved) return;
             if (alive) {
-              resolved = true;
-              resolve(candidate);
+              if (!resolved) {
+                resolved = true;
+                resolve(candidate);
+              }
             } else {
+              this.markDead(candidate);
               remaining--;
-              if (remaining <= 0) resolve(null);
+              if (remaining <= 0 && !resolved) {
+                resolved = true;
+                resolve(null);
+              }
             }
           })
           .catch(() => {
-            if (resolved) return;
+            this.markDead(candidate);
             remaining--;
-            if (remaining <= 0) resolve(null);
+            if (remaining <= 0 && !resolved) {
+              resolved = true;
+              resolve(null);
+            }
           });
       }
     });
@@ -504,44 +645,68 @@ class ProxyManager {
     const total = this.proxyList.length;
     if (total === 1) {
       const single = this.proxyList[0];
+      const isAlive = await this.probe(single, 2500);
+      if (!isAlive) {
+        log(`[ProxyManager] ⚠ Proxy duy nhất (${single.server}) không phản hồi kết nối.`);
+        this.markDead(single);
+        this.flush();
+        return null;
+      }
       if (!single.geo) single.geo = await this.resolveGeo(single);
       return single;
     }
 
     const batchSize = 35;
-    const maxScan = Math.min(total, 500);
+    const maxScan = Math.min(this.proxyList.length, 500);
     const batchesCount = Math.ceil(maxScan / batchSize);
 
-    log(`[ProxyManager] Quét song song siêu tốc danh sách proxy (đang dò tối đa ${maxScan}/${total} proxy theo từng lô ${batchSize} kết nối đồng thời)...`);
+    log(
+      `[ProxyManager] Quét song song siêu tốc danh sách proxy (đang dò tối đa ${maxScan}/${this.proxyList.length} proxy ` +
+      `theo từng lô ${batchSize} kết nối đồng thời${this.pruneDead ? ", tự động loại bỏ proxy chết" : ""})...`
+    );
 
+    const visitedKeys = new Set();
     let checkedSoFar = 0;
+    const scanStartIndex = this.currentIndex;
+
     for (let b = 0; b < batchesCount; b++) {
+      if (this.proxyList.length === 0) break;
+
       const currentBatch = [];
-      const batchStartIndex = this.currentIndex;
-      for (let i = 0; i < batchSize && checkedSoFar < maxScan; i++) {
-        const candidate = this.proxyList[this.currentIndex % total];
-        this.currentIndex = (this.currentIndex + 1) % total;
-        currentBatch.push(candidate);
-        checkedSoFar++;
+      for (let i = 0; i < this.proxyList.length && currentBatch.length < batchSize && checkedSoFar < maxScan; i++) {
+        const candidate = this.proxyList[(scanStartIndex + checkedSoFar) % this.proxyList.length];
+        const key = `${candidate.host}:${candidate.port}`;
+        if (!visitedKeys.has(key)) {
+          visitedKeys.add(key);
+          currentBatch.push(candidate);
+          checkedSoFar++;
+        }
       }
 
-      const displayFrom = (batchStartIndex % total) + 1;
-      const displayTo = displayFrom + currentBatch.length - 1;
+      if (currentBatch.length === 0) break;
+
+      const displayFrom = checkedSoFar - currentBatch.length + 1;
+      const displayTo = checkedSoFar;
       log(`[ProxyManager] Đang kiểm tra đồng thời lô ${b + 1}/${batchesCount} (${currentBatch.length} proxy, vị trí #${displayFrom} - #${displayTo})...`);
 
-      const aliveProxy = await this.probeBatch(currentBatch, 2500);
-      if (aliveProxy) {
-        aliveProxy.geo = await this.resolveGeo(aliveProxy);
+      const alive = await this.probeBatch(currentBatch, 2500);
+      if (alive) {
+        alive.geo = await this.resolveGeo(alive);
+        const aliveIdx = this.proxyList.findIndex((p) => p.host === alive.host && p.port === alive.port);
+        if (aliveIdx !== -1) {
+          this.currentIndex = (aliveIdx + 1) % Math.max(1, this.proxyList.length);
+        }
         log(
-          `[ProxyManager] ✓ Đã tìm thấy Proxy kết nối tốt siêu tốc: ${aliveProxy.server} | ` +
-          `Vị trí: ${aliveProxy.geo?.city}, ${aliveProxy.geo?.country} (${aliveProxy.geo?.countryCode}) | ` +
-          `Timezone: ${aliveProxy.geo?.timezoneId} | Locale: ${aliveProxy.geo?.locale}`
+          `[ProxyManager] ✓ Đã tìm thấy Proxy kết nối tốt siêu tốc: ${alive.server} | ` +
+          `Vị trí: ${alive.geo?.city}, ${alive.geo?.country} (${alive.geo?.countryCode}) | ` +
+          `Timezone: ${alive.geo?.timezoneId} | Locale: ${alive.geo?.locale}`
         );
-        return aliveProxy;
+        return alive;
       }
       log(`[ProxyManager] ⚠ Lô ${b + 1} (${currentBatch.length} proxy) không có proxy nào phản hồi; chuyển sang lô kế tiếp...`);
     }
 
+    this.flush();
     log(`[ProxyManager] ⚠ Đã quét qua ${checkedSoFar} proxy nhưng không có proxy nào phản hồi. Chạy chu kỳ này bằng IP máy.`);
     return null;
   }
@@ -1845,6 +2010,19 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
       log("  Gợi ý: Chạy `Stop-Process -Name chrome -Force` để tắt sạch Chrome ngầm, hoặc chạy `npm run ad-viewer:head` để chạy cửa sổ độc lập không bị xung đột.");
       process.exit(1);
     }
+    if (
+      currentProxy &&
+      (errMsg.includes("ERR_PROXY") ||
+        errMsg.includes("ERR_TUNNEL") ||
+        errMsg.includes("ECONNRESET") ||
+        errMsg.includes("ETIMEDOUT") ||
+        errMsg.includes("ERR_CONNECTION") ||
+        errMsg.includes("ERR_NAME_NOT_RESOLVED"))
+    ) {
+      log(`[ProxyManager] ⚠ Proxy ${currentProxy.server} phát sinh lỗi kết nối trong phiên duyệt web; tiến hành loại bỏ khỏi danh sách.`);
+      proxyManager?.markDead(currentProxy);
+      proxyManager?.flush();
+    }
   } finally {
     // 1. Dọn dẹp cache và cookies sau mỗi chu kỳ
     if (context) {
@@ -1955,7 +2133,17 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((err) => {
-  console.error("Lỗi chí mạng:", err);
-  process.exit(1);
-});
+const isDirectExecution =
+  process.argv[1] &&
+  (path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url)) ||
+    process.argv[1].endsWith("adViewer.mjs") ||
+    process.argv[1].endsWith("ad-viewer.mjs"));
+
+if (isDirectExecution) {
+  main().catch((err) => {
+    console.error("Lỗi chí mạng:", err);
+    process.exit(1);
+  });
+}
+
+export { ProxyManager, parseProxyItem };

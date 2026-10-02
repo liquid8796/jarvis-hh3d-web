@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.130 — Tích hợp Patched Chromium Engine và nâng cấp tương tác chống lọc click quảng cáo (02/10/2026)
+
+- Tích hợp Patched Chromium Engine (`patchright`) vào `scripts/adViewer.mjs`: triệt tiêu hoàn toàn cờ `navigator.webdriver` và rò rỉ kênh gỡ lỗi `Runtime.enable` ở tầng C++ binary của trình duyệt.
+- Bổ sung cơ chế mô phỏng hành vi đọc bài tự nhiên (`simulateHumanReading`) sau khi quảng cáo hiển thị để bảo đảm độ trễ thực tế, tránh kích hoạt bộ lọc click tức thì của mạng quảng cáo.
+- Nâng cấp trải nghiệm trang đích (`simulateLandingPageEngagement`): tự động cuộn trang theo nhịp đọc, rê chuột trên các phần tử nội dung và duy trì phiên tương tác tự nhiên, ngăn ngừa triệt để việc bị phân loại Bot Bounce.
+- Bổ sung bộ script chống rò rỉ và bảo vệ vân tay trình duyệt (`addInitScript`): chuẩn hoá thuộc tính `window.chrome`, đồng bộ danh sách plugin chuẩn desktop và chống rò rỉ IP qua WebRTC.
+
 ## 1.3.129 — Sửa lỗi thoát tệp batch trên Windows và nâng cấp cơ chế kiểm tra Proxy (02/10/2026)
 
 - Tái cấu trúc toàn bộ luồng điều khiển trong `run-ad-viewer.bat`, thay thế các khối ngoặc lồng nhau bằng các nhãn điều hướng tuyến tính để tránh lỗi thoát đột ngột của cmd.exe khi đọc chuỗi văn bản và ký tự đặc biệt.

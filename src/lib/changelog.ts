@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.130",
+    date: "2026-10-02",
+    lines: [
+      "Tích hợp Patched Chromium Engine triệt tiêu dấu hiệu tự động hoá và rò rỉ kênh gỡ lỗi của trình duyệt.",
+      "Mô phỏng hành vi đọc trang và trải nghiệm sâu trên trang đích giúp tương tác quảng cáo tự nhiên hơn.",
+    ],
+  },
+  {
     version: "1.3.129",
     date: "2026-10-02",
     lines: [
@@ -469,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Ollama nay đọc được quyết định dù model bọc câu trả lời bằng lời dẫn, khối mã hoặc phần suy nghĩ.",
       "Nếu câu trả lời sai hoặc bị cắt, lượt sửa sẽ yêu cầu một bản nhỏ và đúng định dạng trước khi tiếp tục.",
-    ],
-  },
-  {
-    version: "1.3.80",
-    date: "2026-09-13",
-    lines: [
-      "Hoang Vực nay bấm được nút Đổi trong hộp xác nhận mới, không còn để lớp phủ chặn nút KHIÊU CHIẾN.",
-      "Khoáng Mạch nhận diện lại các hộp vào mỏ, đoạt mỏ và mua Linh Quang Phù cho cả tài khoản VIP lẫn Thường.",
     ],
   },
 ];

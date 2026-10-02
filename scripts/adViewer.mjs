@@ -21,7 +21,19 @@ import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium } from "playwright-core";
+import { chromium as vanillaChromium } from "playwright-core";
+
+let chromium = vanillaChromium;
+let isPatchedEngine = false;
+try {
+  const patchModule = await import("patchright");
+  if (patchModule?.chromium) {
+    chromium = patchModule.chromium;
+    isPatchedEngine = true;
+  }
+} catch {
+  // Dùng fallback playwright-core nếu không có patchright
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -652,10 +664,10 @@ async function humanClick(page, ctx, x, y) {
  * dừng lại như đang nhìn, rồi từ từ rê vào vị trí đích.
  */
 async function preClickEngagement(page, ctx, targetX, targetY) {
-  // Di chuyển đến vùng lân cận trước (lệch 30-60px)
-  const nearX = targetX + rand(-60, 60);
-  const nearY = targetY + rand(-40, 40);
-  const approachPath = generateBezierPath(lastMouseX, lastMouseY, nearX, nearY, rand(10, 18));
+  // 1. Di chuyển đến vùng lân cận trước (lệch 35-70px) như ánh mắt vừa lướt qua
+  const nearX = targetX + rand(-70, 70);
+  const nearY = targetY + rand(-50, 50);
+  const approachPath = generateBezierPath(lastMouseX, lastMouseY, nearX, nearY, rand(12, 22));
   if (CLICK_MODE === "cdp") {
     const client = await ctx.newCDPSession(page);
     for (const pt of approachPath) {
@@ -671,8 +683,108 @@ async function preClickEngagement(page, ctx, targetX, targetY) {
   }
   lastMouseX = nearX;
   lastMouseY = nearY;
-  // Dừng đọc nội dung gần đó
-  await sleep(rand(250, 700));
+
+  // 2. Dừng lại như đang đọc tiêu đề quảng cáo và quyết định bấm
+  await sleep(rand(1200, 2500));
+
+  // 3. Rê chuột nhẹ nhàng từ vị trí lân cận vào đúng vị trí click đích
+  const finalGlide = generateBezierPath(lastMouseX, lastMouseY, targetX, targetY, rand(8, 14));
+  if (CLICK_MODE === "cdp") {
+    const client = await ctx.newCDPSession(page);
+    for (const pt of finalGlide) {
+      await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: pt.x, y: pt.y });
+      await sleep(rand(10, 22));
+    }
+    await client.detach().catch(() => {});
+  } else {
+    for (const pt of finalGlide) {
+      await page.mouse.move(pt.x, pt.y);
+      await sleep(rand(10, 22));
+    }
+  }
+  lastMouseX = targetX;
+  lastMouseY = targetY;
+  await sleep(rand(150, 450));
+}
+
+/**
+ * Mô phỏng người dùng dừng lại đọc nội dung trang web:
+ * - Cuộn nhẹ lên xuống theo nhịp đọc.
+ * - Rê chuột vi mô ngẫu nhiên theo dòng chữ hoặc khối bài viết.
+ * - Dừng lại ngẫu nhiên để mắt đọc thông tin trước khi chuyển sang xem quảng cáo.
+ */
+async function simulateHumanReading(page, durationMs) {
+  if (!page || durationMs <= 0) return;
+  const started = Date.now();
+  while (Date.now() - started < durationMs) {
+    const remaining = durationMs - (Date.now() - started);
+    if (remaining < 800) break;
+
+    // Rê chuột vi mô theo dòng đọc (drift)
+    const driftX = Math.max(100, Math.min(1200, lastMouseX + rand(-150, 150)));
+    const driftY = Math.max(80, Math.min(700, lastMouseY + rand(-80, 80)));
+    const path = generateBezierPath(lastMouseX, lastMouseY, driftX, driftY, rand(8, 16));
+    for (const pt of path) {
+      await page.mouse.move(pt.x, pt.y).catch(() => {});
+      await sleep(rand(10, 25));
+    }
+    lastMouseX = driftX;
+    lastMouseY = driftY;
+
+    // Dừng đọc đoạn văn bản
+    await sleep(rand(700, 1900));
+
+    // Thao tác cuộn nhẹ mô phỏng mắt đọc xuống
+    if (Math.random() < 0.4) {
+      const scrollDistance = rand(-80, 200);
+      await organicScroll(page, scrollDistance);
+      await sleep(rand(400, 1200));
+    }
+  }
+}
+
+/**
+ * Mô phỏng người dùng trải nghiệm trang đích (Landing Page):
+ * - Cuộn qua các phân đoạn trang (150px - 350px).
+ * - Rê chuột lên các phần tử nội dung, nút bấm, tiêu đề.
+ * - Dừng đọc từ 20 đến 45 giây (ngăn chặn triệt để gắn cờ Bot Bounce / Accidental Click).
+ */
+async function simulateLandingPageEngagement(page, durationMs) {
+  if (!page || durationMs <= 0) return;
+  const started = Date.now();
+  log(`  Đang trải nghiệm nội dung trang đích tự nhiên trong ${Math.round(durationMs / 1000)}s...`);
+
+  let scrolledDown = 0;
+  while (Date.now() - started < durationMs) {
+    const remaining = durationMs - (Date.now() - started);
+    if (remaining < 1500) break;
+
+    // Cuộn xuống nhịp 150 - 350px
+    const scrollStep = rand(150, 350);
+    await organicScroll(page, scrollStep);
+    scrolledDown += scrollStep;
+    await sleep(rand(1000, 2500));
+
+    // Rê chuột tự nhiên trên trang đích
+    const targetX = rand(200, 1000);
+    const targetY = rand(150, 650);
+    const movePath = generateBezierPath(lastMouseX, lastMouseY, targetX, targetY, rand(10, 18));
+    for (const pt of movePath) {
+      await page.mouse.move(pt.x, pt.y).catch(() => {});
+      await sleep(rand(12, 26));
+    }
+    lastMouseX = targetX;
+    lastMouseY = targetY;
+
+    // Dừng đọc
+    await sleep(rand(1500, 3500));
+
+    // Nếu đã cuộn sâu (> 800px), thỉnh thoảng cuộn nhẹ lên 80-160px để xem lại
+    if (scrolledDown > 800 && Math.random() < 0.35) {
+      await organicScroll(page, -rand(80, 160));
+      await sleep(rand(800, 1800));
+    }
+  }
 }
 
 function resolveExtensionPath() {
@@ -836,8 +948,8 @@ async function handleRecursiveAdClicks(targetPage, depth, maxDepth, ctx) {
 
   try {
     const waitMs = rand(DELAY_MIN_MS, DELAY_MAX_MS);
-    log(`  [Đệ quy cấp ${depth + 1}/${maxDepth}] Đọc trang quảng cáo trong ${Math.round(waitMs / 1000)}s...`);
-    await sleep(waitMs);
+    log(`  [Đệ quy cấp ${depth + 1}/${maxDepth}] Trải nghiệm và đọc trang quảng cáo trong ${Math.round(waitMs / 1000)}s...`);
+    await simulateLandingPageEngagement(targetPage, waitMs);
 
     // Tìm quảng cáo hoặc liên kết ngoài trên trang quảng cáo
     const adSelectors = [
@@ -877,7 +989,7 @@ async function handleRecursiveAdClicks(targetPage, depth, maxDepth, ctx) {
             await handleRecursiveAdClicks(newPage, depth + 1, maxDepth, resolvedCtx);
             await newPage.close().catch(() => {});
           } else {
-            await sleep(rand(DELAY_MIN_MS, DELAY_MAX_MS));
+            await simulateLandingPageEngagement(targetPage, rand(DELAY_MIN_MS, DELAY_MAX_MS));
           }
           break;
         } catch {
@@ -1183,6 +1295,11 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
   const visitedDomains = [];
 
   try {
+    log(
+      isPatchedEngine
+        ? "[AntiDetect] ✓ Kích hoạt Patched Chromium Engine (Patchright) — triệt tiêu rò rỉ CDP, Runtime.enable và cờ tự động hoá cấp trình duyệt."
+        : "[AntiDetect] Chạy với Playwright Core mặc định."
+    );
     if (cdpUrl) {
       log(`Kết nối tới Chrome ${useMyChrome ? "chính " : ""}qua CDP: ${cdpUrl}...`);
       try {
@@ -1235,14 +1352,16 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
         process.env.HEADLESS !== "0";
       const launchArgs = isHeadless ? [...args, "--headless=new"] : args;
 
+      const defaultDesktopUA =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
+
       const launchOptions = {
         headless: false,
         args: launchArgs,
         viewport: { width: 1366, height: 768 },
         locale: currentProxy?.geo?.locale || "vi-VN",
         timezoneId: currentProxy?.geo?.timezoneId || "Asia/Ho_Chi_Minh",
-        userAgent:
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+        userAgent: defaultDesktopUA,
       };
 
       if (currentProxy) {
@@ -1323,9 +1442,10 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
           if (currentProxy.geo.locale) {
             const lang = currentProxy.geo.locale;
             const baseLang = lang.split("-")[0];
+            const liveVer = (context.browser()?.version() || "134.0.0.0").split(".")[0] || "134";
             await cdpClient.send("Network.setUserAgentOverride", {
               userAgent:
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+                `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${liveVer}.0.0.0 Safari/537.36`,
               acceptLanguage: `${lang},${baseLang};q=0.9,en;q=0.8`,
             }).catch(() => {});
           }
@@ -1335,8 +1455,9 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
       log(`[AntiDetect] ⚠ Không thể cấu hình CDP overrides: ${err.message}`);
     }
 
-    // Tiêm script ngăn chặn rò rỉ IP qua WebRTC STUN request
+    // Tiêm các lớp bảo vệ chống phát hiện và rò rỉ (Stealth Anti-Tracker Injections)
     await context.addInitScript(() => {
+      // 1. Chống rò rỉ IP qua WebRTC STUN request
       if (window.RTCPeerConnection) {
         const origSetConfiguration = RTCPeerConnection.prototype.setConfiguration;
         if (origSetConfiguration) {
@@ -1346,6 +1467,94 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
           };
         }
       }
+
+      // 2. Ẩn hoàn toàn cờ tự động hoá navigator.webdriver
+      try {
+        Object.defineProperty(navigator, "webdriver", {
+          get: () => undefined,
+          configurable: true,
+        });
+      } catch {}
+
+      // 3. Chuẩn hoá đối tượng window.chrome theo đúng chuẩn Chrome desktop thương mại
+      try {
+        if (!window.chrome) {
+          window.chrome = {};
+        }
+        if (!window.chrome.app) {
+          window.chrome.app = {
+            isInstalled: false,
+            InstallState: { DISABLED: "disabled", INSTALLED: "installed", NOT_INSTALLED: "not_installed" },
+            RunningState: { CANNOT_RUN: "cannot_run", READY_TO_RUN: "ready_to_run", RUNNING: "running" },
+          };
+        }
+        if (!window.chrome.runtime) {
+          window.chrome.runtime = {
+            OnInstalledReason: {
+              CHROME_UPDATE: "chrome_update",
+              INSTALL: "install",
+              SHARED_MODULE_UPDATE: "shared_module_update",
+              UPDATE: "update",
+            },
+            PlatformArch: { ARM: "arm", ARM64: "arm64", MIPS: "mips", MIPS64: "mips64", X86_32: "x86-32", X86_64: "x86-64" },
+            PlatformNaclArch: { ARM: "arm", MIPS: "mips", MIPS64: "mips64", X86_32: "x86-32", X86_64: "x86-64" },
+            PlatformOs: { ANDROID: "android", CROS: "cros", LINUX: "linux", MAC: "mac", OPENBSD: "openbsd", WIN: "win" },
+            RequestUpdateCheckStatus: { NO_UPDATE: "no_update", THROTTLED: "throttled", UPDATE_AVAILABLE: "update_available" },
+          };
+        }
+        if (!window.chrome.loadTimes) {
+          window.chrome.loadTimes = function () {
+            const now = Date.now() / 1000;
+            return {
+              commitLoadTime: now,
+              connectionInfo: "http/1.1",
+              finishDocumentLoadTime: now,
+              finishLoadTime: now,
+              firstPaintAfterLoadTime: 0,
+              firstPaintTime: now,
+              navigationType: "Other",
+              npnNegotiatedProtocol: "unknown",
+              requestTime: now - 0.35,
+              startLoadTime: now - 0.35,
+              wasAlternateProtocolAvailable: false,
+              wasFetchedViaSpdy: false,
+              wasNpnNegotiated: false,
+            };
+          };
+        }
+        if (!window.chrome.csi) {
+          window.chrome.csi = function () {
+            const now = Math.floor(Date.now());
+            return { onloadT: now, pageT: now - 350, startE: now - 350, tran: 15 };
+          };
+        }
+      } catch {}
+
+      // 4. Chuẩn hoá plugins/mimeTypes nếu bị trống (đặc trưng của bot headless)
+      try {
+        if (!navigator.plugins || navigator.plugins.length === 0) {
+          const fakePlugins = [
+            { name: "PDF Viewer", filename: "internal-pdf-viewer", description: "Portable Document Format" },
+            { name: "Chrome PDF Viewer", filename: "internal-pdf-viewer", description: "Portable Document Format" },
+            { name: "Chromium PDF Viewer", filename: "internal-pdf-viewer", description: "Portable Document Format" },
+            { name: "Microsoft Edge PDF Viewer", filename: "internal-pdf-viewer", description: "Portable Document Format" },
+            { name: "WebKit built-in PDF", filename: "internal-pdf-viewer", description: "Portable Document Format" },
+          ];
+          Object.defineProperty(navigator, "plugins", {
+            get: () => fakePlugins,
+            configurable: true,
+          });
+        }
+      } catch {}
+
+      // 5. Quét và triệt tiêu các thuộc tính tự động hoá nội bộ (cdc_...)
+      try {
+        for (const k of Object.keys(window)) {
+          if (k.startsWith("cdc_") || k.includes("cdc_")) {
+            delete window[k];
+          }
+        }
+      } catch {}
     }).catch(() => {});
 
     const renderStartedAt = Date.now();
@@ -1375,6 +1584,11 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
         `slot=${formatBox(diagnostic.native.slotBox)})`,
     );
     log(`Thời gian chờ render Adsterra: ${diagnostic.renderMs}ms.`);
+
+    // Dừng đọc nội dung trang web tự nhiên trước khi click (chống cờ click tức thì của mạng quảng cáo)
+    const readingBeforeClickMs = rand(6000, 12000);
+    log(`Đang đọc nội dung bài viết và lướt xem trang web trong ${Math.round(readingBeforeClickMs / 1000)}s...`);
+    await simulateHumanReading(page, readingBeforeClickMs);
 
     let adClicked = false;
     let openedPage = null;
@@ -1560,8 +1774,8 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
         if (u.hostname) visitedDomains.push(u.hostname);
       } catch {}
       const readingMs = rand(DELAY_MIN_MS, DELAY_MAX_MS);
-      log(`Dừng đọc trang quảng cáo chính trong ${Math.round(readingMs / 1000)}s...`);
-      await sleep(readingMs);
+      log(`Trải nghiệm và tương tác tự nhiên trên trang đích trong ${Math.round(readingMs / 1000)}s...`);
+      await simulateLandingPageEngagement(openedPage, readingMs);
 
       // Đệ quy click thêm nếu còn quảng cáo trên trang đích (tối đa MAX_RECURSIVE_CLICKS)
       if (MAX_RECURSIVE_CLICKS > 0) {

@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.131 — Quét song song siêu tốc danh sách Proxy và sửa cấu hình đệ quy click (03/10/2026)
+
+- Nâng cấp cơ chế thăm dò proxy trong `scripts/adViewer.mjs` sang dạng quét song song theo lô (`probeBatch`): kiểm tra đồng thời 35 proxy cùng lúc qua HTTP CONNECT tunnel, tự động chọn ngay proxy phản hồi tốt đầu tiên chỉ trong vài trăm mili-giây thay vì kiểm tra tuần tự chậm chạp.
+- Mở rộng phạm vi dò proxy lên đến 500 mục trong danh sách mỗi chu kỳ, giúp nhanh chóng tìm ra proxy sống từ các tệp danh sách lớn mà không làm gián đoạn hay kéo dài thời gian chờ.
+- Sửa lỗi toán tử logic OR khiến tham số `--max-recursive-clicks=0` bị hiểu nhầm thành giá trị mặc định 2 khi người dùng nhập số 0.
+- Bổ sung thông tin cấu hình số lượt đệ quy click ngay tại màn hình khởi động chu kỳ xem quảng cáo.
+
 ## 1.3.130 — Tích hợp Patched Chromium Engine và nâng cấp tương tác chống lọc click quảng cáo (02/10/2026)
 
 - Tích hợp Patched Chromium Engine (`patchright`) vào `scripts/adViewer.mjs`: triệt tiêu hoàn toàn cờ `navigator.webdriver` và rò rỉ kênh gỡ lỗi `Runtime.enable` ở tầng C++ binary của trình duyệt.

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.131",
+    date: "2026-10-03",
+    lines: [
+      "Quét song song đồng thời nhiều proxy giúp tìm ra địa chỉ sống siêu tốc trong vài trăm mili-giây.",
+      "Sửa lỗi nhận diện số lượt click đệ quy trên trang đích khi người dùng nhập số 0.",
+    ],
+  },
+  {
     version: "1.3.130",
     date: "2026-10-02",
     lines: [
@@ -469,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Mỗi kho GitHub chính nay có README, About và tên hiển thị theo một chủ đề đời thường riêng.",
       "Danh tính điểm danh bên trong vẫn được giữ nguyên, nên diện mạo mới không làm gián đoạn công việc đang chạy.",
-    ],
-  },
-  {
-    version: "1.3.81",
-    date: "2026-09-13",
-    lines: [
-      "Ollama nay đọc được quyết định dù model bọc câu trả lời bằng lời dẫn, khối mã hoặc phần suy nghĩ.",
-      "Nếu câu trả lời sai hoặc bị cắt, lượt sửa sẽ yêu cầu một bản nhỏ và đúng định dạng trước khi tiếp tục.",
     ],
   },
 ];

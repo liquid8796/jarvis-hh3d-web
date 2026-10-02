@@ -68,10 +68,14 @@ const DELAY_MAX_MS = Math.max(
 );
 
 const rawRecursive = process.argv.find((a) => a.startsWith("--max-recursive-clicks="))?.split("=")[1];
-const MAX_RECURSIVE_CLICKS = Math.max(
-  0,
-  Math.min(5, Number(rawRecursive || process.env.AD_VIEWER_MAX_RECURSIVE_CLICKS || 2) || 2),
-);
+const envRecursive = process.env.AD_VIEWER_MAX_RECURSIVE_CLICKS;
+const parsedRecursive =
+  rawRecursive !== undefined && rawRecursive !== ""
+    ? Number(rawRecursive)
+    : envRecursive !== undefined && envRecursive !== ""
+    ? Number(envRecursive)
+    : 2;
+const MAX_RECURSIVE_CLICKS = Math.max(0, Math.min(5, Number.isNaN(parsedRecursive) ? 2 : parsedRecursive));
 const AD_READY_TIMEOUT_MS = Math.max(
   5000,
   Number(process.env.AD_VIEWER_AD_READY_TIMEOUT_MS ?? 15_000) || 15_000,
@@ -394,6 +398,37 @@ class ProxyManager {
   }
 
   /**
+   * Thăm dò song song đồng thời một nhóm (batch) proxy qua HTTP CONNECT tunnel.
+   * Ngay khi có bất kỳ proxy nào phản hồi thành công (HTTP 200), lập tức trả về proxy đó.
+   */
+  async probeBatch(candidates, timeoutMs = 2500) {
+    if (!candidates || candidates.length === 0) return null;
+    return new Promise((resolve) => {
+      let resolved = false;
+      let remaining = candidates.length;
+
+      for (const candidate of candidates) {
+        this.probe(candidate, timeoutMs)
+          .then((alive) => {
+            if (resolved) return;
+            if (alive) {
+              resolved = true;
+              resolve(candidate);
+            } else {
+              remaining--;
+              if (remaining <= 0) resolve(null);
+            }
+          })
+          .catch(() => {
+            if (resolved) return;
+            remaining--;
+            if (remaining <= 0) resolve(null);
+          });
+      }
+    });
+  }
+
+  /**
    * Tra cứu thông tin Geolocation, Timezone, và Locale theo IP của proxy.
    */
   async resolveGeo(proxy) {
@@ -473,26 +508,41 @@ class ProxyManager {
       return single;
     }
 
-    const maxTries = Math.min(total, 25);
-    for (let i = 0; i < maxTries; i++) {
-      const candidate = this.proxyList[this.currentIndex % total];
-      this.currentIndex = (this.currentIndex + 1) % total;
+    const batchSize = 35;
+    const maxScan = Math.min(total, 500);
+    const batchesCount = Math.ceil(maxScan / batchSize);
 
-      log(`[ProxyManager] Kiểm tra proxy [${candidate.host}:${candidate.port}] (thử ${i + 1}/${maxTries})...`);
-      const alive = await this.probe(candidate, 2500);
-      if (alive) {
-        candidate.geo = await this.resolveGeo(candidate);
-        log(
-          `[ProxyManager] ✓ Proxy kết nối tốt: ${candidate.server} | ` +
-          `Vị trí: ${candidate.geo.city}, ${candidate.geo.country} (${candidate.geo.countryCode}) | ` +
-          `Timezone: ${candidate.geo.timezoneId} | Locale: ${candidate.geo.locale}`
-        );
-        return candidate;
+    log(`[ProxyManager] Quét song song siêu tốc danh sách proxy (đang dò tối đa ${maxScan}/${total} proxy theo từng lô ${batchSize} kết nối đồng thời)...`);
+
+    let checkedSoFar = 0;
+    for (let b = 0; b < batchesCount; b++) {
+      const currentBatch = [];
+      const batchStartIndex = this.currentIndex;
+      for (let i = 0; i < batchSize && checkedSoFar < maxScan; i++) {
+        const candidate = this.proxyList[this.currentIndex % total];
+        this.currentIndex = (this.currentIndex + 1) % total;
+        currentBatch.push(candidate);
+        checkedSoFar++;
       }
-      log(`[ProxyManager] ⚠ Proxy ${candidate.host}:${candidate.port} không phản hồi; tự động bỏ qua...`);
+
+      const displayFrom = (batchStartIndex % total) + 1;
+      const displayTo = displayFrom + currentBatch.length - 1;
+      log(`[ProxyManager] Đang kiểm tra đồng thời lô ${b + 1}/${batchesCount} (${currentBatch.length} proxy, vị trí #${displayFrom} - #${displayTo})...`);
+
+      const aliveProxy = await this.probeBatch(currentBatch, 2500);
+      if (aliveProxy) {
+        aliveProxy.geo = await this.resolveGeo(aliveProxy);
+        log(
+          `[ProxyManager] ✓ Đã tìm thấy Proxy kết nối tốt siêu tốc: ${aliveProxy.server} | ` +
+          `Vị trí: ${aliveProxy.geo?.city}, ${aliveProxy.geo?.country} (${aliveProxy.geo?.countryCode}) | ` +
+          `Timezone: ${aliveProxy.geo?.timezoneId} | Locale: ${aliveProxy.geo?.locale}`
+        );
+        return aliveProxy;
+      }
+      log(`[ProxyManager] ⚠ Lô ${b + 1} (${currentBatch.length} proxy) không có proxy nào phản hồi; chuyển sang lô kế tiếp...`);
     }
 
-    log(`[ProxyManager] ⚠ Đã kiểm tra ${maxTries} proxy nhưng không có proxy nào phản hồi. Chạy chu kỳ này bằng IP máy.`);
+    log(`[ProxyManager] ⚠ Đã quét qua ${checkedSoFar} proxy nhưng không có proxy nào phản hồi. Chạy chu kỳ này bằng IP máy.`);
     return null;
   }
 }
@@ -1300,6 +1350,7 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
         ? "[AntiDetect] ✓ Kích hoạt Patched Chromium Engine (Patchright) — triệt tiêu rò rỉ CDP, Runtime.enable và cờ tự động hoá cấp trình duyệt."
         : "[AntiDetect] Chạy với Playwright Core mặc định."
     );
+    log(`[AntiDetect] Cấu hình đệ quy click: ${MAX_RECURSIVE_CLICKS > 0 ? `Tối đa ${MAX_RECURSIVE_CLICKS} lần` : "Tắt (0 lần)"}`);
     if (cdpUrl) {
       log(`Kết nối tới Chrome ${useMyChrome ? "chính " : ""}qua CDP: ${cdpUrl}...`);
       try {

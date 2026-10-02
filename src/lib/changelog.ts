@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.134",
+    date: "2026-10-03",
+    lines: [
+      "Khắc phục sự cố tiến trình bị treo khi gặp proxy bị nghẽn mạng hoặc quá thời gian tải trang.",
+      "Tối ưu cơ chế đóng tab an toàn và tự động loại bỏ proxy quá hạn để tiếp tục chu kỳ mới mượt mà.",
+    ],
+  },
+  {
     version: "1.3.133",
     date: "2026-10-03",
     lines: [
@@ -469,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Auto nay nghỉ ít nhất khoảng 10 phút giữa hai vòng khi nhiệm vụ ngày vẫn còn dở, thay vì có lúc quay lại sau vài chục giây.",
       "Khi nhiệm vụ ngày đã đủ lượt, auto lại theo thời gian chờ thật của những việc còn lại như trước.",
-    ],
-  },
-  {
-    version: "1.3.84",
-    date: "2026-09-19",
-    lines: [
-      "Phiên đăng nhập mới lấy từ hoathinh3d.de nay dùng được ngay cả khi cấu hình tông môn vẫn còn tên miền .so.",
-      "Bản xuất từ trang khác vẫn bị chặn, nên việc tự theo tên miền mới không làm lỏng lớp bảo vệ đăng nhập.",
     ],
   },
 ];

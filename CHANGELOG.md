@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.134 — Khắc phục lỗi treo chu kỳ khi Proxy timeout và tối ưu đóng Chrome an toàn (03/10/2026)
+
+- Khắc phục sự cố tiến trình bị treo vĩnh viễn trong khối `finally` của `scripts/adViewer.mjs` khi `page.goto` gặp proxy bị nghẽn mạng hoặc quá thời gian tải trang (`Timeout exceeded`).
+- Bổ sung hàm tiện ích `withTimeout` bọc quanh toàn bộ các tác vụ dọn dẹp CDP cookies, đóng trang đích (`openedPage.close()`), đóng tab con (`newPage.close()`) và đóng trình duyệt, ngăn chặn triệt để trường hợp Chrome renderer bị đóng băng làm phong toả tiến trình Node.js.
+- Bổ sung nhận diện lỗi timeout và vượt quá thời gian chờ (`timeout` / `exceeded`) vào bộ lọc lỗi mạng của `ProxyManager`: tự động đánh dấu proxy chết (`markDead`) và loại bỏ ngay lập tức khỏi tệp cấu hình trên đĩa (`list-proxies.txt`).
+- Tối ưu thời gian chờ tải trang mặc định (`PAGE_GOTO_TIMEOUT_MS`) xuống 25 giây (có thể tuỳ biến qua tham số `--page-timeout`), đồng thời đảm bảo dứt điểm cưỡng bức các tiến trình Chrome chạy ngầm khi chu kỳ bị lỗi để giải phóng socket và sẵn sàng xoay sang proxy mới.
+
 ## 1.3.133 — Bổ sung chế độ Chuột thật OS (SendInput) và Bán tự động (Manual Assist) (03/10/2026)
 
 - Bổ sung chế độ điều khiển chuột vật lý cấp Hệ điều hành Windows (`--click-mode=os-mouse` / `winMouse.ps1`): tự động quy đổi toạ độ viewport sang toạ độ desktop vật lý kèm bù trừ thanh tiêu đề và DPI scaling (`devicePixelRatio`), sử dụng Windows User32 API (`SetCursorPos` & `mouse_event`) di chuyển con trỏ chuột thật trên desktop và phát tín hiệu phần cứng trực tiếp vào Chrome.

@@ -80,6 +80,11 @@ const AD_READY_TIMEOUT_MS = Math.max(
   5000,
   Number(process.env.AD_VIEWER_AD_READY_TIMEOUT_MS ?? 15_000) || 15_000,
 );
+const rawPageTimeout = process.argv.find((a) => a.startsWith("--page-timeout="))?.split("=")[1];
+const PAGE_GOTO_TIMEOUT_MS = Math.max(
+  10_000,
+  Number(rawPageTimeout || process.env.AD_VIEWER_PAGE_TIMEOUT_MS ?? 25_000) || 25_000,
+);
 const SELF_UPDATE = process.env.AD_VIEWER_SELF_UPDATE === "1";
 const ENABLE_DEV_MODE = process.env.AD_VIEWER_ENABLE_DEV_MODE !== "0";
 
@@ -153,6 +158,25 @@ function rand(min, max) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withTimeout(promise, ms, fallbackValue = null) {
+  let timer;
+  const timeoutPromise = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(fallbackValue), ms);
+  });
+  return Promise.race([
+    Promise.resolve(promise)
+      .then((val) => {
+        clearTimeout(timer);
+        return val;
+      })
+      .catch(() => {
+        clearTimeout(timer);
+        return fallbackValue;
+      }),
+    timeoutPromise,
+  ]);
 }
 
 function log(msg) {
@@ -1344,7 +1368,7 @@ async function handleRecursiveAdClicks(targetPage, depth, maxDepth, ctx) {
           if (newPage) {
             await newPage.waitForLoadState("domcontentloaded", { timeout: 20000 }).catch(() => {});
             await handleRecursiveAdClicks(newPage, depth + 1, maxDepth, resolvedCtx);
-            await newPage.close().catch(() => {});
+            await withTimeout(newPage.close().catch(() => {}), 2500);
           } else {
             await simulateLandingPageEngagement(targetPage, rand(DELAY_MIN_MS, DELAY_MAX_MS));
           }
@@ -1649,6 +1673,7 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
   let profileDir = null;
   let isTempProfile = false;
   let page = null;
+  let navigationSucceeded = false;
   const visitedDomains = [];
 
   try {
@@ -1921,8 +1946,9 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
     log(`Mở trang chủ ${WEB_URL}...`);
     await page.goto(WEB_URL, {
       waitUntil: "domcontentloaded",
-      timeout: 60000,
+      timeout: PAGE_GOTO_TIMEOUT_MS,
     });
+    navigationSucceeded = true;
 
     // Cuộn trang tự nhiên để kích hoạt lazy-load quảng cáo (từng nhịp, có quán tính)
     await organicScroll(page, rand(250, 400));
@@ -2189,7 +2215,7 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
         await handleRecursiveAdClicks(openedPage, 0, MAX_RECURSIVE_CLICKS, context);
       }
 
-      await openedPage.close().catch(() => {});
+      await withTimeout(openedPage.close().catch(() => {}), 2500);
     } else {
       log("Chu kỳ này chỉ xem quảng cáo trên trang, không có tab chuyển hướng mới.");
     }
@@ -2201,42 +2227,55 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
       log("  Gợi ý: Chạy `Stop-Process -Name chrome -Force` để tắt sạch Chrome ngầm, hoặc chạy `npm run ad-viewer:head` để chạy cửa sổ độc lập không bị xung đột.");
       process.exit(1);
     }
-    if (
-      currentProxy &&
-      (errMsg.includes("ERR_PROXY") ||
-        errMsg.includes("ERR_TUNNEL") ||
-        errMsg.includes("ECONNRESET") ||
-        errMsg.includes("ETIMEDOUT") ||
-        errMsg.includes("ERR_CONNECTION") ||
-        errMsg.includes("ERR_NAME_NOT_RESOLVED"))
-    ) {
-      log(`[ProxyManager] ⚠ Proxy ${currentProxy.server} phát sinh lỗi kết nối trong phiên duyệt web; tiến hành loại bỏ khỏi danh sách.`);
+    const isProxyNetworkError =
+      errMsg.includes("ERR_PROXY") ||
+      errMsg.includes("ERR_TUNNEL") ||
+      errMsg.includes("ECONNRESET") ||
+      errMsg.includes("ETIMEDOUT") ||
+      errMsg.includes("ERR_TIMED_OUT") ||
+      errMsg.includes("ERR_CONNECTION") ||
+      errMsg.includes("ERR_NAME_NOT_RESOLVED") ||
+      errMsg.includes("ERR_EMPTY_RESPONSE") ||
+      errMsg.toLowerCase().includes("timeout") ||
+      errMsg.toLowerCase().includes("exceeded");
+    if (currentProxy && isProxyNetworkError) {
+      log(`[ProxyManager] ⚠ Proxy ${currentProxy.server} phát sinh lỗi kết nối / timeout trong phiên duyệt web; tiến hành loại bỏ khỏi danh sách.`);
       proxyManager?.markDead(currentProxy);
       proxyManager?.flush();
     }
   } finally {
-    // 1. Dọn dẹp cache và cookies sau mỗi chu kỳ
-    if (context) {
+    // 1. Dọn dẹp cache và cookies sau mỗi chu kỳ (chỉ chạy khi điều hướng thành công để tránh treo trên phiên lỗi)
+    if (context && navigationSucceeded) {
       try {
         if (useMyChrome) {
           // Xoá cookie có chọn lọc cho website và các domain quảng cáo — bảo vệ tài khoản cá nhân
           if (page && !page.isClosed()) {
-            const client = await context.newCDPSession(page).catch(() => null);
-            if (client) {
-              await cleanupTargetedCookies(client, visitedDomains);
-              await client.detach().catch(() => {});
-            }
+            await withTimeout(
+              (async () => {
+                const client = await context.newCDPSession(page).catch(() => null);
+                if (client) {
+                  await cleanupTargetedCookies(client, visitedDomains).catch(() => {});
+                  await client.detach().catch(() => {});
+                }
+              })(),
+              3500,
+            );
           }
         } else {
-          await context.clearCookies().catch(() => {});
-          if (page && !page.isClosed()) {
-            const client = await context.newCDPSession(page).catch(() => null);
-            if (client) {
-              await client.send("Network.clearBrowserCookies").catch(() => {});
-              await client.send("Network.clearBrowserCache").catch(() => {});
-              await client.detach().catch(() => {});
-            }
-          }
+          await withTimeout(
+            (async () => {
+              await context.clearCookies().catch(() => {});
+              if (page && !page.isClosed()) {
+                const client = await context.newCDPSession(page).catch(() => null);
+                if (client) {
+                  await client.send("Network.clearBrowserCookies").catch(() => {});
+                  await client.send("Network.clearBrowserCache").catch(() => {});
+                  await client.detach().catch(() => {});
+                }
+              }
+            })(),
+            3500,
+          );
           log("✓ Đã dọn dẹp sạch cache và cookies của trình duyệt.");
         }
       } catch {
@@ -2245,18 +2284,18 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
     }
 
     if (cdpUrl) {
-      // Trong chế độ CDP, không đóng context/browser của người dùng, chỉ đóng tab do chu kỳ mở
+      // Trong chế độ CDP, đóng tab chu kỳ với timeout bảo vệ
       if (page && !page.isClosed()) {
-        await page.close().catch(() => {});
+        await withTimeout(page.close().catch(() => {}), 2000);
       }
-      if (useMyChrome && proxyManager?.hasMultipleProxies()) {
-        log("✓ Hoàn thành chu kỳ. Tắt Chrome để chuẩn bị xoay sang Proxy mới cho chu kỳ tiếp theo...");
+      if (useMyChrome && (proxyManager?.hasMultipleProxies() || currentProxy || !navigationSucceeded)) {
+        log("✓ Tắt Chrome để làm mới socket mạng và chuẩn bị chu kỳ tiếp theo...");
         killChromeProcesses();
         await sleep(1500);
       }
     } else {
       if (context) {
-        await context.close().catch(() => {});
+        await withTimeout(context.close().catch(() => {}), 3500);
       }
       if (isTempProfile && profileDir) {
         try {

@@ -53,6 +53,11 @@ const CLICK_MODE = (
   "cdp"
 ).toLowerCase();
 
+const USE_CANVAS_BLOCKER =
+  process.argv.includes("--canvas-blocker") ||
+  process.argv.includes("--with-canvas-blocker") ||
+  process.env.AD_VIEWER_CANVAS_BLOCKER === "1";
+
 function rand(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -941,11 +946,13 @@ async function main() {
   log(`Thời gian chờ placement ready tối đa: ${Math.round(AD_READY_TIMEOUT_MS / 1000)} giây`);
   log(`Chế độ click: ${CLICK_MODE} (${CLICK_MODE === "cdp" ? "CDP Input.dispatchMouseEvent — isTrusted:true" : "Playwright Mouse API — Bézier trajectory"})`);
 
-  const extPath = resolveExtensionPath();
+  const extPath = USE_CANVAS_BLOCKER ? resolveExtensionPath() : null;
   if (extPath) {
     log(`✓ Đã nạp tiện ích CanvasBlocker từ: ${extPath}`);
+  } else if (USE_CANVAS_BLOCKER) {
+    log("⚠ Bật cờ CanvasBlocker nhưng không tìm thấy thư mục tiện ích; chạy Chromium tiêu chuẩn.");
   } else {
-    log("⚠ Không tìm thấy thư mục tiện ích CanvasBlocker; chạy Chromium tiêu chuẩn.");
+    log("Tiện ích CanvasBlocker: tắt (mặc định). Dùng --canvas-blocker để bật.");
   }
 
   const startTime = Date.now();

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.124",
+    date: "2026-10-02",
+    lines: [
+      "Kho Xem Quảng Cáo chuyển tiện ích chống nhận diện dấu vân tay thành tuỳ chọn linh hoạt qua cờ dòng lệnh.",
+      "Mặc định chạy trên trình duyệt tiêu chuẩn sạch, giúp giảm thiểu các dấu hiệu bất thường khi tương tác.",
+    ],
+  },
+  {
     version: "1.3.123",
     date: "2026-10-02",
     lines: [
@@ -469,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-09-11",
     lines: [
       "Sửa lỗi báo thất bại khi Gemma trả tên kho hợp lệ nhưng kèm định dạng trình bày.",
-    ],
-  },
-  {
-    version: "1.3.74",
-    date: "2026-09-11",
-    lines: [
-      "Để trống tên kho GitHub chính thì Ollama tự đặt tên, không còn ghép từ và đuôi mã theo khuôn cố định.",
-      "Tên tự nhập được giữ nguyên. Nếu Ollama lỗi hoặc tên kho đã tồn tại, hệ thống báo lỗi và dừng trước khi tạo.",
     ],
   },
 ];

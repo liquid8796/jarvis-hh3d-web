@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.124 — Tùy chọn tiện ích CanvasBlocker qua cờ cấu hình (02/10/2026)
+
+- Chuyển việc nạp tiện ích CanvasBlocker thành tuỳ chọn (optional) thông qua cờ `--canvas-blocker` hoặc biến môi trường `AD_VIEWER_CANVAS_BLOCKER=1`.
+- Mặc định trình duyệt chạy ở chế độ Chromium tiêu chuẩn không nạp tiện ích mở rộng ngoài, giúp giảm thiểu fingerprint bất thường từ tiện ích.
+- Bổ sung lệnh chạy nhanh `npm run ad-viewer:cb` để tiện kiểm thử khi muốn bật kèm CanvasBlocker.
+
 ## 1.3.123 — Human Behavior & Anti-Bot Click Engine cho Xem Quảng Cáo (02/10/2026)
 
 - Thay thế hoàn toàn `locator.click({ force: true })` bằng hai engine mô phỏng hành vi người dùng tự nhiên: CDP `Input.dispatchMouseEvent` (mặc định, sinh sự kiện `isTrusted: true`) và Playwright `page.mouse` API.

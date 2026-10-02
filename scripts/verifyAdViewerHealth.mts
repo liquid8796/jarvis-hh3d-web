@@ -37,7 +37,10 @@ assert.match(workflow, /AD_VIEWER_MAX_LIFETIME_MS:/);
 assert.match(workflow, /timeout-minutes: 350/);
 assert.match(workflow, /name: Phát lượt kế/);
 assert.match(bundle, /xem và click quảng cáo Adsterra với CanvasBlocker/);
+assert.match(runtime, /developer_mode:\s*true/, "ad-viewer must configure developer_mode in Chrome profile preferences");
+assert.match(runtime, /prepareExtensionProfile/, "ad-viewer must prepare extension profile");
+assert.match(workflow, /AD_VIEWER_ENABLE_DEV_MODE:\s*"1"/, "workflow must pass AD_VIEWER_ENABLE_DEV_MODE to ad viewer step");
 
 console.log(
-  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, and runs continuous cycles.",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, enables extension developer mode, and runs continuous cycles.",
 );

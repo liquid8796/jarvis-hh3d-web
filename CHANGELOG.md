@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.119 — Bật chế độ Developer Mode cho tiện ích CanvasBlocker trong profile và workflow (02/10/2026)
+
+- Thiết lập cấu hình `Default/Preferences` và `Local State` trong profile Chromium với `extensions.ui.developer_mode = true` trước khi khởi chạy, bảo đảm tiện ích mở rộng CanvasBlocker hoạt động đầy đủ quyền hạn.
+- Bổ sung các cờ mở rộng Chromium `--enable-experimental-extension-apis`, `--extensions-on-chrome-urls`, `--silent-debugger-extension-api` khi khởi chạy profile.
+- Thêm biến môi trường `AD_VIEWER_ENABLE_DEV_MODE: "1"` vào workflow `deploy/github/xem-quang-cao.yml` và kiểm chứng hồi quy trong `verify:ad-viewer-health`.
+- Bổ sung lệnh chạy trực quan `npm run ad-viewer:head` hỗ trợ kiểm tra và gỡ lỗi hiển thị trực tiếp trên máy cục bộ.
+
 ## 1.3.118 — Bổ sung click Smartlink và tự động lui kênh trình duyệt khi mở persistent context (02/10/2026)
 
 - `adViewer.mjs` nay hỗ trợ click trực tiếp Adsterra Smartlink (`.adsterra-smartlink`) nếu banner hoặc native gặp tình trạng no-fill hoặc chưa kịp render, bảo đảm mọi chu kỳ luôn kích hoạt liên kết quảng cáo được tài trợ.

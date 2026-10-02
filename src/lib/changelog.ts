@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.119",
+    date: "2026-10-02",
+    lines: [
+      "Bật chế độ Developer Mode cho tiện ích CanvasBlocker trong profile và cờ khởi chạy trình duyệt của kho Xem Quảng Cáo.",
+      "Kho Xem Quảng Cáo tự động kích hoạt chế độ nhà phát triển và bổ sung lệnh chạy trực quan trên màn hình máy tính.",
+    ],
+  },
+  {
     version: "1.3.118",
     date: "2026-10-02",
     lines: [
@@ -474,15 +482,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Khôi lỗi tông môn nay đi thẳng tới máy chủ, không còn đốt hạn lượt gọi của một trạm trung gian mỗi năm giây.",
       "Nếu cổng đang dùng bị khóa hoặc tạm mất kết nối, khôi lỗi tự chuyển sang cổng cứu hộ đã được tông môn tin cậy.",
       "Tám khôi lỗi bị kẹt sáng 08/09 đã được chuyển đường; việc đang chạy được giữ nguyên khi phát hành.",
-    ],
-  },
-  {
-    version: "1.3.69",
-    date: "2026-09-06",
-    lines: [
-      "Vấn Đáp nay đọc được cả bảng tham khảo có thẻ lỗi hoặc đổi thuộc tính, và tự thử lại khi nguồn tạm trả trang rỗng.",
-      "Khoáng Mạch có ô đặt tối đa 1–3 Linh Quang Phù mỗi ngày; mặc định vẫn là 1 để giữ nguyên mức chi tiêu cũ.",
-      "Hạn mức được đếm chung theo tài khoản qua mọi khôi lỗi, áp dụng riêng cho cấu hình VIP lẫn Thường.",
     ],
   },
 ];

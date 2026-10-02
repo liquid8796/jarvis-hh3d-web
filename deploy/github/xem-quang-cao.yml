@@ -88,7 +88,7 @@ jobs:
           cd "$XEM_QC_RUNTIME"
           node node_modules/playwright-core/cli.js install --with-deps chromium
 
-      - name: Xem quảng cáo
+      - name: Xem quảng cáo (bật Developer Mode cho tiện ích)
         env:
           WEB_URL: ${{ vars.WEB_URL || 'https://auto-hh3d.online' }}
           WORKER_FALLBACK_URL: ${{ vars.WORKER_FALLBACK_URL || 'https://auto-hh3d.online' }}
@@ -99,6 +99,7 @@ jobs:
           AD_VIEWER_MAX_RECURSIVE_CLICKS: "2"
           AD_VIEWER_AD_READY_TIMEOUT_MS: "15000"
           AD_VIEWER_SELF_UPDATE: "1"
+          AD_VIEWER_ENABLE_DEV_MODE: "1"
         run: |
           set -u
           

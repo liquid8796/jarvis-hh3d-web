@@ -15,7 +15,7 @@
  *   9. Bắt đầu chu kỳ mới cho đến khi hết tuổi thọ ca trực
  */
 
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,6 +38,7 @@ const AD_READY_TIMEOUT_MS = Math.max(
   Number(process.env.AD_VIEWER_AD_READY_TIMEOUT_MS ?? 15_000) || 15_000,
 );
 const SELF_UPDATE = process.env.AD_VIEWER_SELF_UPDATE === "1";
+const ENABLE_DEV_MODE = process.env.AD_VIEWER_ENABLE_DEV_MODE !== "0";
 
 const BANNER_SLOT_SELECTOR = ".adsterra-leaderboard";
 const BANNER_READY_SELECTOR = '.adsterra-leaderboard[data-status="ready"]';
@@ -268,8 +269,39 @@ async function handleRecursiveAdClicks(targetPage, depth, maxDepth) {
   }
 }
 
+function prepareExtensionProfile(profileDir) {
+  if (!ENABLE_DEV_MODE) return;
+  try {
+    const defaultDir = path.join(profileDir, "Default");
+    mkdirSync(defaultDir, { recursive: true });
+    const prefs = {
+      extensions: {
+        ui: {
+          developer_mode: true,
+        },
+        alerts: {
+          initialized: true,
+        },
+      },
+    };
+    writeFileSync(path.join(defaultDir, "Preferences"), JSON.stringify(prefs, null, 2), "utf8");
+
+    const localState = {
+      extensions: {
+        ui: {
+          developer_mode: true,
+        },
+      },
+    };
+    writeFileSync(path.join(profileDir, "Local State"), JSON.stringify(localState, null, 2), "utf8");
+  } catch {
+    // không chặn nếu ghi preferences thất bại
+  }
+}
+
 async function runOneCycle(extensionPath) {
   const profileDir = mkdtempSync(path.join(tmpdir(), "ad-viewer-profile-"));
+  prepareExtensionProfile(profileDir);
   let context = null;
 
   try {
@@ -279,16 +311,27 @@ async function runOneCycle(extensionPath) {
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--window-size=1366,768",
+      "--enable-experimental-extension-apis",
+      "--extensions-on-chrome-urls",
+      "--silent-debugger-extension-api",
+      "--no-default-browser-check",
+      "--no-first-run",
     ];
 
     if (extensionPath) {
       args.push(`--disable-extensions-except=${extensionPath}`);
       args.push(`--load-extension=${extensionPath}`);
+      if (ENABLE_DEV_MODE) {
+        log("✓ Đã bật chế độ Developer Mode cho tiện ích CanvasBlocker trong profile.");
+      }
     }
+
+    const isHeadless = !process.argv.includes("--head") && !process.argv.includes("--visible") && process.env.HEADLESS !== "0";
+    const launchArgs = isHeadless ? [...args, "--headless=new"] : args;
 
     const launchOptions = {
       headless: false,
-      args: [...args, "--headless=new"],
+      args: launchArgs,
       viewport: { width: 1366, height: 768 },
       locale: "vi-VN",
       timezoneId: "Asia/Ho_Chi_Minh",

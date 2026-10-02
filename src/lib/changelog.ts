@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.120",
+    date: "2026-10-02",
+    lines: [
+      "Kho Xem Quảng Cáo chuyển sang trình duyệt Obscura độc lập, kết nối điều khiển trực tiếp qua giao thức mở.",
+      "Tích hợp giải pháp chống nhận diện dấu vân tay CanvasBlocker trực tiếp vào phiên duyệt web của trình duyệt mới.",
+    ],
+  },
+  {
     version: "1.3.119",
     date: "2026-10-02",
     lines: [
@@ -473,15 +481,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Mặc định mỗi kho có ba kho phụ. Gia chủ có thể đổi số lượng, chọn model và nhập danh sách khóa Ollama.",
       "Ollama có thể tra cứu tài liệu trên web trước khi viết mã và tự chọn thời điểm phát triển tiếp.",
       "Tài liệu công khai của các kho khôi lỗi không còn ghi địa chỉ máy chủ.",
-    ],
-  },
-  {
-    version: "1.3.70",
-    date: "2026-09-08",
-    lines: [
-      "Khôi lỗi tông môn nay đi thẳng tới máy chủ, không còn đốt hạn lượt gọi của một trạm trung gian mỗi năm giây.",
-      "Nếu cổng đang dùng bị khóa hoặc tạm mất kết nối, khôi lỗi tự chuyển sang cổng cứu hộ đã được tông môn tin cậy.",
-      "Tám khôi lỗi bị kẹt sáng 08/09 đã được chuyển đường; việc đang chạy được giữ nguyên khi phát hành.",
     ],
   },
 ];

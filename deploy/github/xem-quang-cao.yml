@@ -78,17 +78,21 @@ jobs:
           fi
 
           test -f "$dir/ad-viewer.mjs"
+          test -f "$dir/obscuraCanvasBlocker.mjs"
           test -f "$dir/package.json"
-          test -f "$dir/node_modules/playwright-core/cli.js"
           echo "XEM_QC_RUNTIME=$dir" >> "$GITHUB_ENV"
 
-      - name: Install Chromium for ad-viewer runtime
+      - name: Download and install Obscura browser binary
         run: |
-          set -eu
-          cd "$XEM_QC_RUNTIME"
-          node node_modules/playwright-core/cli.js install --with-deps chromium
+          set -euo pipefail
+          bin_dir="$XEM_QC_RUNTIME/bin"
+          mkdir -p "$bin_dir"
+          curl -fsSL --retry 3 --retry-delay 2 "https://github.com/h4ckf0r0day/obscura/releases/download/v0.2.3/obscura-x86_64-linux.tar.gz" | tar -xz -C "$bin_dir"
+          chmod +x "$bin_dir/obscura"
+          test -x "$bin_dir/obscura"
+          echo "OBSCURA_BIN=$bin_dir/obscura" >> "$GITHUB_ENV"
 
-      - name: Xem quảng cáo (bật Developer Mode cho tiện ích)
+      - name: Xem quảng cáo (trình duyệt Obscura)
         env:
           WEB_URL: ${{ vars.WEB_URL || 'https://auto-hh3d.online' }}
           WORKER_FALLBACK_URL: ${{ vars.WORKER_FALLBACK_URL || 'https://auto-hh3d.online' }}
@@ -99,7 +103,6 @@ jobs:
           AD_VIEWER_MAX_RECURSIVE_CLICKS: "2"
           AD_VIEWER_AD_READY_TIMEOUT_MS: "15000"
           AD_VIEWER_SELF_UPDATE: "1"
-          AD_VIEWER_ENABLE_DEV_MODE: "1"
         run: |
           set -u
           

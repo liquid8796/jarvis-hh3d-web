@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.120 — Tích hợp trình duyệt Obscura và CanvasBlocker CDP init script cho Xem Quảng Cáo (02/10/2026)
+
+- Chuyển đổi engine trình duyệt xem quảng cáo từ Chromium sang Obscura CDP server (`h4ckf0r0day/obscura`), khởi chạy không bật `--stealth` để bảo đảm Adsterra ads load bình thường không bị chặn bởi bộ lọc tracker tích hợp của Obscura.
+- Tái hiện giải pháp CanvasBlocker dưới dạng CDP init script (`scripts/obscuraCanvasBlocker.mjs`) inject trước khi trang web chạy mã, làm giả canvas fingerprinting (`toDataURL`, `toBlob`, `getImageData`, `readPixels`) một cách nhất quán và bảo vệ danh tính phiên duyệt.
+- Bổ sung cơ chế `safeQueryAll` với giới hạn thời gian (Promise.race) khi tìm kiếm phần tử quảng cáo trên trang đích bên ngoài, ngăn chặn hoàn toàn hiện tượng kẹt tiến trình khi trang đích liên tục chuyển hướng hoặc tải tài nguyên ngầm.
+- Cập nhật workflow `deploy/github/xem-quang-cao.yml` tự động tải binary Obscura x86_64 Linux v0.2.3 khi chạy ca trực trên GitHub Actions runner.
+- Dọn dẹp tiến trình triệt để giữa các chu kỳ với hàm ngắt cây tiến trình (`killProcessTree`).
+
 ## 1.3.119 — Bật chế độ Developer Mode cho tiện ích CanvasBlocker trong profile và workflow (02/10/2026)
 
 - Thiết lập cấu hình `Default/Preferences` và `Local State` trong profile Chromium với `extensions.ui.developer_mode = true` trước khi khởi chạy, bảo đảm tiện ích mở rộng CanvasBlocker hoạt động đầy đủ quyền hạn.

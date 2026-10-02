@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.117",
+    date: "2026-10-02",
+    lines: [
+      "Kho Xem Quảng Cáo khôi phục đầy đủ tính năng tương tác: click vào creative banner và native để mở trang đích.",
+      "Tự động đọc trang quảng cáo chính, click tiếp đệ quy tối đa 2 lần, dọn sạch dữ liệu duyệt web sau mỗi chu kỳ và chạy liên tục.",
+    ],
+  },
+  {
     version: "1.3.116",
     date: "2026-10-02",
     lines: [
@@ -476,15 +484,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Phòng Chat: bấm vào ảnh trong tin nhắn hoặc ảnh đại diện nay phóng to ngay tại chỗ, không mở tab mới nữa.",
       "Bấm ra ngoài hoặc bấm phím Esc để đóng; giữ Ctrl hoặc bấm chuột giữa vẫn mở ảnh ở tab mới như trước.",
       "Ảnh đại diện chưa đặt vẫn là vòng tròn chữ cái như cũ, không bấm được.",
-    ],
-  },
-  {
-    version: "1.3.67",
-    date: "2026-09-02",
-    lines: [
-      "Bí Cảnh Tông Môn: khi boss đã bị hạ mà phần thưởng còn treo, khôi lỗi nay tự nhận thưởng rồi mới khiêu chiến tiếp.",
-      "Trước đây gặp màn nhận thưởng thì lượt ghé đứng chờ vô ích cho tới khi hết giờ, và phần thưởng chặn luôn boss kế.",
-      "Áp dụng cho cả tài khoản VIP lẫn Thường. Ngày đã hết lượt vẫn dừng sớm như cũ, không tốn thêm lượt tải trang nào.",
     ],
   },
 ];

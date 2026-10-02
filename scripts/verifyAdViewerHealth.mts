@@ -24,19 +24,20 @@ const nativeCreativeIndex = runtime.indexOf("const nativeCreativeCount");
 const renderResultIndex = runtime.indexOf("renderMs: Date.now() - startedAt");
 assert.ok(nativeCreativeIndex >= 0 && renderResultIndex > nativeCreativeIndex, "renderMs must include creative verification time");
 
-assert.doesNotMatch(runtime, /\.click\s*\(/, "health-check must not click production ad elements");
-assert.doesNotMatch(runtime, /mouse\.click\s*\(/, "health-check must not synthesize page clicks");
-assert.doesNotMatch(runtime, /MAX_RECURSIVE_CLICKS|handleRecursiveAdClicks/);
-assert.doesNotMatch(runtime, /while \(Date\.now\(\) - startTime/);
+assert.match(runtime, /\.click\s*\(/, "ad-viewer must click ad elements to navigate to landing page");
+assert.match(runtime, /mouse\.click\s*\(/, "ad-viewer must synthesize clicks for popunders when needed");
+assert.match(runtime, /MAX_RECURSIVE_CLICKS/, "ad-viewer must support recursive ad clicks");
+assert.match(runtime, /handleRecursiveAdClicks/, "ad-viewer must handle recursive ad clicks");
+assert.match(runtime, /while \(Date\.now\(\) - startTime < MAX_LIFETIME_MS\)/, "ad-viewer must loop across lifetime cycles");
 
-assert.match(workflow, /name: Kiểm tra hiển thị quảng cáo/);
+assert.match(workflow, /name: Xem quảng cáo/);
 assert.match(workflow, /AD_VIEWER_AD_READY_TIMEOUT_MS: "15000"/);
-assert.doesNotMatch(workflow, /AD_VIEWER_MAX_RECURSIVE_CLICKS/);
-assert.doesNotMatch(workflow, /AD_VIEWER_MAX_LIFETIME_MS|TUOI_THO_MS|tuoi_tho_ms/);
-assert.match(workflow, /XEM_QC_EXIT:-}" != "90"/);
-assert.match(workflow, /name: Phát lượt thay runtime khi cần/);
-assert.match(bundle, /health-check banner\/native Adsterra, không click quảng cáo production/);
+assert.match(workflow, /AD_VIEWER_MAX_RECURSIVE_CLICKS: "2"/);
+assert.match(workflow, /AD_VIEWER_MAX_LIFETIME_MS:/);
+assert.match(workflow, /timeout-minutes: 350/);
+assert.match(workflow, /name: Phát lượt kế/);
+assert.match(bundle, /xem và click quảng cáo Adsterra với CanvasBlocker/);
 
 console.log(
-  "PASS: ad-viewer waits for exact ready selectors, verifies banner/native creatives, logs render evidence, and never clicks production ads.",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, and runs continuous cycles.",
 );

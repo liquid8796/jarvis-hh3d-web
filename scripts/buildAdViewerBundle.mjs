@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Đóng GÓI HEALTH-CHECK QUẢNG CÁO — public/xem-qc/goi-xem-qc.tgz — cho GitHub Actions runner tải về.
+ * Đóng GÓI XEM QUẢNG CÁO — public/xem-qc/goi-xem-qc.tgz — cho GitHub Actions runner tải về.
  *
  * Gói gồm:
- *   - ad-viewer.mjs (health-check banner/native Adsterra, không click quảng cáo production)
+ *   - ad-viewer.mjs (xem và click quảng cáo Adsterra với CanvasBlocker)
  *   - canvas-blocker/ (tiện ích Chrome CanvasBlocker từ deploy/extensions hoặc D:\Backup\Chrome\CanvasBlocker)
  *   - node_modules/playwright-core (thư viện điều khiển Chromium)
  *   - package.json tối thiểu

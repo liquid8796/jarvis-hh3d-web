@@ -11,6 +11,12 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
 ---
 
+## 1.3.117 — Khôi phục tương tác xem và click quảng cáo Adsterra (02/10/2026)
+
+- `adViewer.mjs` nay kết hợp xác nhận creative ready của Adsterra với hành động click mở tab quảng cáo đích, dừng đọc trang và click đệ quy tiếp tối đa 2 lần.
+- Sau mỗi lượt xem và click quảng cáo, Chromium tự đóng context, xoá sạch cache và cookie trước khi mở chu kỳ mới trong suốt ca trực.
+- Workflow `deploy/github/xem-quang-cao.yml` khôi phục thời gian ca trực 290 phút, phanh chuỗi và tự nối lượt kế tiếp.
+
 ## 1.3.116 — Đo đủ thời gian chờ creative trong health-check quảng cáo (02/10/2026)
 
 - `adViewer.mjs` nay chốt `renderMs` sau khi đã chờ và kiểm tra creative thật trong iframe banner cùng container native. Số đo không còn dừng sớm ngay khi thuộc tính DOM vừa chuyển sang `ready`.

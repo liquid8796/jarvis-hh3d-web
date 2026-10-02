@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.125",
+    date: "2026-10-02",
+    lines: [
+      "Hỗ trợ kết nối và điều khiển trực tiếp Chrome chính của máy, bảo toàn toàn bộ tiện ích mở rộng đang cài đặt.",
+      "Cơ chế dọn dẹp dữ liệu có chọn lọc bảo vệ an toàn các phiên đăng nhập cá nhân sau mỗi chu kỳ xem quảng cáo.",
+    ],
+  },
+  {
     version: "1.3.124",
     date: "2026-10-02",
     lines: [
@@ -470,13 +478,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Nút Xóa kho GitHub nay xóa toàn bộ repo chính cùng tài khoản; các repo phụ vẫn được giữ nguyên trên GitHub.",
       "Nếu tài khoản đã bị đình chỉ hoặc không còn tồn tại, hệ thống chỉ gỡ các station khỏi sổ.",
       "Lỗi quyền, giới hạn hoặc kết nối sẽ dừng an toàn và giữ sổ để thử lại.",
-    ],
-  },
-  {
-    version: "1.3.75",
-    date: "2026-09-11",
-    lines: [
-      "Sửa lỗi báo thất bại khi Gemma trả tên kho hợp lệ nhưng kèm định dạng trình bày.",
     ],
   },
 ];

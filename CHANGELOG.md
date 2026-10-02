@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.125 — Hỗ trợ điều khiển Chrome chính và dọn dẹp cookie có chọn lọc (02/10/2026)
+
+- Chế độ `--my-chrome` nay tự động khởi chạy và kết nối trực tiếp vào Chrome chính của máy thông qua CDP (cổng 9222), nạp đủ 100% tiện ích mở rộng và cấu hình thực tế của người dùng.
+- Tự động đóng tiến trình Chrome chạy ngầm và mở lại với cổng gỡ lỗi nếu Chrome chưa được bật sẵn cờ `--remote-debugging-port`.
+- Cơ chế dọn dẹp cookie có chọn lọc (targeted cleanup): chỉ xoá cookie/cache của website xem quảng cáo và các mạng quảng cáo (Adsterra, smartlink...), bảo vệ an toàn tuyệt đối các phiên đăng nhập cá nhân (Google, Facebook, YouTube, Zalo).
+- Mở tab riêng cho chu kỳ xem quảng cáo và tự đóng tab khi hoàn thành mà không can thiệp vào các tab cá nhân đang mở.
+- Bổ sung lệnh `npm run chrome:debug` hỗ trợ mở nhanh Chrome chính kèm cờ gỡ lỗi bất kỳ lúc nào.
+
 ## 1.3.124 — Tùy chọn tiện ích CanvasBlocker qua cờ cấu hình (02/10/2026)
 
 - Chuyển việc nạp tiện ích CanvasBlocker thành tuỳ chọn (optional) thông qua cờ `--canvas-blocker` hoặc biến môi trường `AD_VIEWER_CANVAS_BLOCKER=1`.

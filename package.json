@@ -1,6 +1,6 @@
 {
   "name": "jarvis-hh3d-web",
-  "version": "1.3.124",
+  "version": "1.3.125",
   "private": true,
   "description": "Auto HH3D — control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn tự động chạy trên server.",
   "scripts": {
@@ -29,6 +29,7 @@
     "ad-viewer:cdp": "node scripts/adViewer.mjs --cdp=9222 --head",
     "ad-viewer:cb": "node scripts/adViewer.mjs --head --canvas-blocker",
     "ad-viewer:my-chrome": "node scripts/adViewer.mjs --my-chrome",
+    "chrome:debug": "powershell -Command \"Start-Process 'chrome.exe' -ArgumentList '--remote-debugging-port=9222'\"",
     "smoke": "tsx scripts/smokeQuestEngine.mjs",
     "verify:continuous": "tsx scripts/verifyContinuousJob.mts",
     "verify:daily-quota": "tsx scripts/verifyDailyQuota.mts",

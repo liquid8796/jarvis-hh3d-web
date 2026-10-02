@@ -15,7 +15,7 @@
  *   9. Bắt đầu chu kỳ mới cho đến khi hết tuổi thọ ca trực
  */
 
-import { spawn } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -507,7 +507,88 @@ function prepareExtensionProfile(profileDir) {
   }
 }
 
-async function ensureCdpServer(cdpPort, extensionPath) {
+function isChromeProcessRunning() {
+  try {
+    if (process.platform === "win32") {
+      const out = execSync('tasklist /FI "IMAGENAME eq chrome.exe"', {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      return out.toLowerCase().includes("chrome.exe");
+    } else {
+      const out = execSync("pgrep -f chrome", {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      return Boolean(out.trim());
+    }
+  } catch {
+    return false;
+  }
+}
+
+function killChromeProcesses() {
+  try {
+    if (process.platform === "win32") {
+      execSync("taskkill /F /IM chrome.exe /T", { stdio: "ignore" });
+    } else {
+      execSync("pkill -9 -f chrome", { stdio: "ignore" });
+    }
+  } catch {}
+}
+
+async function cleanupTargetedCookies(client, visitedDomains = []) {
+  if (!client) return;
+  try {
+    const { cookies } = await client.send("Network.getCookies").catch(() => ({ cookies: [] }));
+    if (!Array.isArray(cookies) || cookies.length === 0) return;
+
+    let targetHost = "";
+    try {
+      targetHost = new URL(WEB_URL).hostname.toLowerCase();
+    } catch {}
+
+    const adKeywords = [
+      targetHost,
+      "auto-hh3d",
+      "deliberatewatchful",
+      "alwingulla",
+      "adsterra",
+      "profitablecpmrate",
+      "highcpmgate",
+      "ad-score",
+      "doubleclick",
+      "googleads",
+      "adnxs",
+      "popads",
+      "onclick",
+      "syndication",
+      ...visitedDomains.map((d) => String(d).toLowerCase()),
+    ].filter(Boolean);
+
+    let deletedCount = 0;
+    for (const c of cookies) {
+      const domain = (c.domain || "").toLowerCase().replace(/^\./, "");
+      const isTarget = adKeywords.some((kw) => domain.includes(kw));
+      if (isTarget) {
+        await client
+          .send("Network.deleteCookies", {
+            name: c.name,
+            domain: c.domain,
+            path: c.path,
+          })
+          .catch(() => {});
+        deletedCount++;
+      }
+    }
+    await client.send("Network.clearBrowserCache").catch(() => {});
+    log(`✓ Đã dọn dẹp có chọn lọc ${deletedCount} cookie quảng cáo và cache (bảo vệ an toàn tài khoản cá nhân).`);
+  } catch (err) {
+    log(`Lỗi khi dọn dẹp cookie có chọn lọc: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false) {
   const isListening = await fetch(`http://127.0.0.1:${cdpPort}/json/version`, {
     signal: AbortSignal.timeout(1000),
   })
@@ -519,7 +600,6 @@ async function ensureCdpServer(cdpPort, extensionPath) {
     return;
   }
 
-  log(`Chưa thấy Chrome mở cổng CDP ${cdpPort}; tự động khởi chạy Chrome với cổng gỡ lỗi...`);
   const chromePaths = [
     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
@@ -529,30 +609,50 @@ async function ensureCdpServer(cdpPort, extensionPath) {
   ];
   const chromeBin = chromePaths.find((p) => existsSync(p)) || "chrome";
 
-  const debugProfileDir = path.join(tmpdir(), "chrome-cdp-profile");
-  prepareExtensionProfile(debugProfileDir);
+  if (useRealProfile) {
+    if (isChromeProcessRunning()) {
+      log("Phát hiện Chrome chính đang mở nhưng chưa bật cờ gỡ lỗi 9222.");
+      log("Đang khởi động lại Chrome chính với cổng 9222 (nạp 100% extension và dữ liệu hiện có của bạn)...");
+      killChromeProcesses();
+      await sleep(1500);
+    } else {
+      log("Khởi chạy Chrome chính của máy với cổng gỡ lỗi 9222 (nạp 100% extension hiện có của bạn)...");
+    }
 
-  const args = [
-    `--remote-debugging-port=${cdpPort}`,
-    `--user-data-dir=${debugProfileDir}`,
-    "--no-first-run",
-    "--no-default-browser-check",
-    "--window-size=1366,768",
-    "--enable-experimental-extension-apis",
-    "--extensions-on-chrome-urls",
-    "--silent-debugger-extension-api",
-  ];
+    const args = [
+      `--remote-debugging-port=${cdpPort}`,
+      "--restore-last-session",
+    ];
 
-  if (extensionPath) {
-    args.push(`--disable-extensions-except=${extensionPath}`);
-    args.push(`--load-extension=${extensionPath}`);
+    const child = spawn(chromeBin, args, { detached: true, stdio: "ignore" });
+    child.unref();
+  } else {
+    log(`Chưa thấy Chrome mở cổng CDP ${cdpPort}; tự động khởi chạy Chrome với cổng gỡ lỗi...`);
+    const debugProfileDir = path.join(tmpdir(), "chrome-cdp-profile");
+    prepareExtensionProfile(debugProfileDir);
+
+    const args = [
+      `--remote-debugging-port=${cdpPort}`,
+      `--user-data-dir=${debugProfileDir}`,
+      "--no-first-run",
+      "--no-default-browser-check",
+      "--window-size=1366,768",
+      "--enable-experimental-extension-apis",
+      "--extensions-on-chrome-urls",
+      "--silent-debugger-extension-api",
+    ];
+
+    if (extensionPath) {
+      args.push(`--disable-extensions-except=${extensionPath}`);
+      args.push(`--load-extension=${extensionPath}`);
+    }
+
+    const child = spawn(chromeBin, args, { detached: true, stdio: "ignore" });
+    child.unref();
   }
 
-  const child = spawn(chromeBin, args, { detached: true, stdio: "ignore" });
-  child.unref();
-
-  // Đợi cổng sẵn sàng (tối đa 10s)
-  for (let i = 0; i < 20; i++) {
+  // Đợi cổng sẵn sàng (tối đa 15s)
+  for (let i = 0; i < 30; i++) {
     await sleep(500);
     const ok = await fetch(`http://127.0.0.1:${cdpPort}/json/version`, {
       signal: AbortSignal.timeout(500),
@@ -565,47 +665,49 @@ async function ensureCdpServer(cdpPort, extensionPath) {
     }
   }
 
-  throw new Error(`Không thể khởi động Chrome trên cổng CDP ${cdpPort} sau 10 giây.`);
+  throw new Error(`Không thể khởi động Chrome trên cổng CDP ${cdpPort} sau 15 giây.`);
 }
 
 async function runOneCycle(extensionPath) {
-  const cdpArg = process.argv.find((a) => a.startsWith("--cdp"));
-  const cdpPort = cdpArg && cdpArg.includes("=") ? cdpArg.split("=")[1] : "9222";
-  const cdpUrl =
-    process.env.CDP_URL ||
-    (cdpArg ? (cdpPort.startsWith("http") ? cdpPort : `http://127.0.0.1:${cdpPort}`) : null);
-
   const useMyChrome =
     process.argv.includes("--my-chrome") ||
     process.argv.includes("--my-profile") ||
     process.env.USE_MY_CHROME === "1";
+
+  const cdpArg = process.argv.find((a) => a.startsWith("--cdp"));
+  const cdpPort = cdpArg && cdpArg.includes("=") ? cdpArg.split("=")[1] : "9222";
+  const cdpUrl =
+    process.env.CDP_URL ||
+    (cdpArg
+      ? cdpPort.startsWith("http")
+        ? cdpPort
+        : `http://127.0.0.1:${cdpPort}`
+      : useMyChrome
+      ? `http://127.0.0.1:${cdpPort}`
+      : null);
 
   let context = null;
   let browser = null;
   let profileDir = null;
   let isTempProfile = false;
   let page = null;
+  const visitedDomains = [];
 
   try {
     if (cdpUrl) {
-      log(`Kết nối tới Chrome hiện tại qua CDP: ${cdpUrl}...`);
+      log(`Kết nối tới Chrome ${useMyChrome ? "chính " : ""}qua CDP: ${cdpUrl}...`);
       try {
         if (cdpUrl.includes("127.0.0.1") || cdpUrl.includes("localhost")) {
-          await ensureCdpServer(cdpPort, extensionPath);
+          await ensureCdpServer(cdpPort, extensionPath, useMyChrome);
         }
         browser = await chromium.connectOverCDP(cdpUrl);
         context = browser.contexts()[0] || (await browser.newContext());
-        log("✓ Đã kết nối thành công tới Chrome qua CDP.");
+        log(`✓ Đã kết nối thành công tới Chrome ${useMyChrome ? "chính (đầy đủ extension) " : ""}qua CDP.`);
       } catch (err) {
         log(`✗ Không thể kết nối tới Chrome tại ${cdpUrl}: ${err.message}`);
         log(`  Gợi ý: Mở Chrome bằng lệnh: & "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=${cdpPort}`);
         process.exit(1);
       }
-    } else if (useMyChrome) {
-      const localAppData =
-        process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || "", "AppData", "Local");
-      profileDir = path.join(localAppData, "Google", "Chrome", "User Data");
-      log(`Sử dụng trực tiếp profile Chrome hiện tại: ${profileDir}`);
     } else {
       profileDir = mkdtempSync(path.join(tmpdir(), "ad-viewer-profile-"));
       isTempProfile = true;
@@ -669,7 +771,7 @@ async function runOneCycle(extensionPath) {
       }
     }
 
-    page = context.pages()[0] || (await context.newPage());
+    page = useMyChrome || cdpUrl ? await context.newPage() : context.pages()[0] || (await context.newPage());
 
     const renderStartedAt = Date.now();
     log(`Mở trang chủ ${WEB_URL}...`);
@@ -878,6 +980,10 @@ async function runOneCycle(extensionPath) {
     // 5. Đọc trang quảng cáo chính và đệ quy click nếu có
     if (openedPage) {
       await openedPage.waitForLoadState("domcontentloaded", { timeout: 25000 }).catch(() => {});
+      try {
+        const u = new URL(openedPage.url());
+        if (u.hostname) visitedDomains.push(u.hostname);
+      } catch {}
       const readingMs = rand(DELAY_MIN_MS, DELAY_MAX_MS);
       log(`Dừng đọc trang quảng cáo chính trong ${Math.round(readingMs / 1000)}s...`);
       await sleep(readingMs);
@@ -900,19 +1006,30 @@ async function runOneCycle(extensionPath) {
       process.exit(1);
     }
   } finally {
-    // 1. Dọn dẹp sạch cache và cookies sau mỗi chu kỳ (áp dụng cho mọi chế độ, kể cả CDP)
+    // 1. Dọn dẹp cache và cookies sau mỗi chu kỳ
     if (context) {
       try {
-        await context.clearCookies().catch(() => {});
-        if (page && !page.isClosed()) {
-          const client = await context.newCDPSession(page).catch(() => null);
-          if (client) {
-            await client.send("Network.clearBrowserCookies").catch(() => {});
-            await client.send("Network.clearBrowserCache").catch(() => {});
-            await client.detach().catch(() => {});
+        if (useMyChrome) {
+          // Xoá cookie có chọn lọc cho website và các domain quảng cáo — bảo vệ tài khoản cá nhân
+          if (page && !page.isClosed()) {
+            const client = await context.newCDPSession(page).catch(() => null);
+            if (client) {
+              await cleanupTargetedCookies(client, visitedDomains);
+              await client.detach().catch(() => {});
+            }
           }
+        } else {
+          await context.clearCookies().catch(() => {});
+          if (page && !page.isClosed()) {
+            const client = await context.newCDPSession(page).catch(() => null);
+            if (client) {
+              await client.send("Network.clearBrowserCookies").catch(() => {});
+              await client.send("Network.clearBrowserCache").catch(() => {});
+              await client.detach().catch(() => {});
+            }
+          }
+          log("✓ Đã dọn dẹp sạch cache và cookies của trình duyệt.");
         }
-        log("✓ Đã dọn dẹp sạch cache và cookies của trình duyệt.");
       } catch {
         // bỏ qua lỗi CDP session
       }

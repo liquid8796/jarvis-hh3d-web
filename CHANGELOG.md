@@ -9,6 +9,11 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.136 — Sửa lỗi cú pháp toán tử adViewer và escape ký tự batch run-ad-viewer (03/10/2026)
+
+- Khắc phục lỗi cú pháp `SyntaxError: missing ) after argument list` trong `scripts/adViewer.mjs` do kết hợp trực tiếp toán tử `||` và `??` tại biểu thức khởi tạo `PAGE_GOTO_TIMEOUT_MS`.
+- Sửa lỗi cmd `'Hover' is not recognized as an internal or external command` trong `run-ad-viewer.bat` bằng cách thay thế ký tự `&` trong nhãn menu bằng `+`, tránh việc cmd.exe hiểu nhầm là toán tử ngắt lệnh.
+
 ## 1.3.135 — Nâng cấp bộ giả lập Chuột phần cứng Windows (True Hardware Stream) & Rê chuột tương tác (03/10/2026)
 
 - Tái thiết kế toàn diện bộ điều khiển chuột cấp Hệ điều hành `scripts/winMouse.ps1`, thay thế lệnh `SetCursorPos` (vốn không tạo thông điệp di chuyển chuột) bằng chuỗi phát sự kiện phần cứng `MOUSEEVENTF_MOVE` chuẩn hoá ($0..65535$) kết hợp tọa độ màn hình thực tế.

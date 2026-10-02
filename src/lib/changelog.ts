@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.136",
+    date: "2026-10-03",
+    lines: [
+      "Sửa lỗi cú pháp toán tử gom nhóm trong bộ cấu hình thời gian tải trang của trình xem quảng cáo.",
+      "Khắc phục sự cố xung đột ký tự lệnh trong menu khởi chạy tệp batch trên môi trường Windows.",
+    ],
+  },
+  {
     version: "1.3.135",
     date: "2026-10-03",
     lines: [
@@ -469,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Tab Auto nay hẹn được từng quest theo giờ, phút, giây mỗi ngày; tới đúng mốc quest mới bắt đầu chạy.",
       "Khai Đàn và chỉ tiêu ngày vẫn giữ nguyên luật cũ: Thu Đàn là dừng, còn hub đủ lượt rồi thì lịch không chạy lại.",
-    ],
-  },
-  {
-    version: "1.3.86",
-    date: "2026-09-20",
-    lines: [
-      "Hoang Vực nay đọc đúng đồng hồ Hồi chiêu mới của trang, nên 14p 50s không còn bị hiểu thành 50 giây.",
-      "Cả tài khoản VIP lẫn thường vẫn dùng chung flow; các nút Đổi hệ, Khiêu Chiến và Tấn Công hiện tại đều được giữ nguyên.",
     ],
   },
 ];

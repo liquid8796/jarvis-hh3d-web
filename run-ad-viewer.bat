@@ -15,7 +15,7 @@ echo.
 
 REM 1. Che do click
 echo [1] Che do tuong tac / click quang cao:
-echo     1. OS Hardware Mouse [Tu dong re chuot phan cung Windows qua MOUSEEVENTF_MOVE & Hover - KHUYEN NGHI]
+echo     1. OS Hardware Mouse [Tu dong re chuot phan cung Windows qua MOUSEEVENTF_MOVE + Hover - KHUYEN NGHI]
 echo     2. Thu cong / Ban tu dong [Auto chuan bi moi thu, dung cho ban click tay roi tu chay tiep]
 echo     3. CDP Input Dispatch [Playwright CDP Bezier curve, isTrusted: true]
 echo     4. Playwright Mouse API

@@ -81,9 +81,10 @@ const AD_READY_TIMEOUT_MS = Math.max(
   Number(process.env.AD_VIEWER_AD_READY_TIMEOUT_MS ?? 15_000) || 15_000,
 );
 const rawPageTimeout = process.argv.find((a) => a.startsWith("--page-timeout="))?.split("=")[1];
+const parsedPageTimeout = Number(rawPageTimeout || process.env.AD_VIEWER_PAGE_TIMEOUT_MS || 25_000);
 const PAGE_GOTO_TIMEOUT_MS = Math.max(
   10_000,
-  Number(rawPageTimeout || process.env.AD_VIEWER_PAGE_TIMEOUT_MS ?? 25_000) || 25_000,
+  Number.isNaN(parsedPageTimeout) ? 25_000 : parsedPageTimeout,
 );
 const SELF_UPDATE = process.env.AD_VIEWER_SELF_UPDATE === "1";
 const ENABLE_DEV_MODE = process.env.AD_VIEWER_ENABLE_DEV_MODE !== "0";

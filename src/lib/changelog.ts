@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.123",
+    date: "2026-10-02",
+    lines: [
+      "Kho Xem Quảng Cáo nâng cấp cơ chế tương tác quảng cáo bằng mô phỏng hành vi người dùng tự nhiên, chống phát hiện tự động hoá.",
+      "Di chuyển chuột theo đường cong mượt mà và click tại vị trí lệch ngẫu nhiên, có thể chọn chế độ tương tác khác nhau.",
+    ],
+  },
+  {
     version: "1.3.122",
     date: "2026-10-02",
     lines: [
@@ -469,15 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Để trống tên kho GitHub chính thì Ollama tự đặt tên, không còn ghép từ và đuôi mã theo khuôn cố định.",
       "Tên tự nhập được giữ nguyên. Nếu Ollama lỗi hoặc tên kho đã tồn tại, hệ thống báo lỗi và dừng trước khi tạo.",
-    ],
-  },
-  {
-    version: "1.3.73",
-    date: "2026-09-11",
-    lines: [
-      "Mô tả kho phụ không còn kèm mã nhận diện nội bộ; mô tả cũ cũng được làm sạch.",
-      "Ollama tự chọn nhiều ngôn ngữ lập trình khi tạo kho mới, tránh lặp lại một ngôn ngữ liên tục.",
-      "Kho đang có được tiếp tục phát triển theo ngôn ngữ riêng, kể cả các ngôn ngữ ít phổ biến.",
     ],
   },
 ];

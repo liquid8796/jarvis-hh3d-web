@@ -9,6 +9,15 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.123 — Human Behavior & Anti-Bot Click Engine cho Xem Quảng Cáo (02/10/2026)
+
+- Thay thế hoàn toàn `locator.click({ force: true })` bằng hai engine mô phỏng hành vi người dùng tự nhiên: CDP `Input.dispatchMouseEvent` (mặc định, sinh sự kiện `isTrusted: true`) và Playwright `page.mouse` API.
+- Di chuyển chuột theo đường cong Cubic Bézier với gia tốc/giảm tốc sinh học (easeInOutCubic), rung lắc vi mô (micro-tremor ±1.5px), và toạ độ click lệch tâm Gaussian.
+- Mô phỏng tiếp cận tự nhiên trước khi click (pre-click engagement): di chuột đến vùng lân cận → dừng đọc → rê vào phần tử đích.
+- Cuộn trang từng nhịp nhỏ có quán tính (organic scroll) với khoảng dừng mắt đọc nội dung thay vì `scrollBy()` tức thì.
+- Thời gian giữ nút chuột 70-160ms và khoảng dừng chú ý 400-1200ms phân phối log-normal, xáo trộn ngẫu nhiên cả selector đệ quy trên trang đích.
+- Chọn chế độ click bằng `--click-mode=cdp` hoặc `--click-mode=mouse` (hoặc biến `AD_VIEWER_CLICK_MODE`).
+
 ## 1.3.122 — Dọn dẹp cache và cookies triệt để, ngẫu nhiên hoá click quảng cáo cho Xem Quảng Cáo (02/10/2026)
 
 - Dọn dẹp sạch cache và cookies sau mỗi chu kỳ thông qua Playwright API (`context.clearCookies()`) và CDP network commands (`Network.clearBrowserCookies`, `Network.clearBrowserCache`), đồng thời giải phóng thư mục profile tạm thời.

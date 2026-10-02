@@ -47,6 +47,12 @@ const NATIVE_SLOT_SELECTOR = ".adsterra-native";
 const NATIVE_READY_SELECTOR = '.adsterra-native[data-status="ready"]';
 const NATIVE_CONTAINER_ID = "container-5e6634da84f8f263d7ab34ae152f1c8d";
 
+const CLICK_MODE = (
+  process.argv.find((a) => a.startsWith("--click-mode="))?.split("=")[1] ||
+  process.env.AD_VIEWER_CLICK_MODE ||
+  "cdp"
+).toLowerCase();
+
 function rand(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -58,6 +64,196 @@ function sleep(ms) {
 function log(msg) {
   const ts = new Date().toLocaleTimeString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
   console.log(`[${ts}] [${VIEWER_ID}] ${msg}`);
+}
+
+// ============================================================
+//  HUMAN BEHAVIOR & CLICK SIMULATION ENGINE
+//  Mô phỏng hành vi người dùng tự nhiên khi tương tác quảng cáo.
+//  Hai chế độ: "cdp" (Input.dispatchMouseEvent) và "mouse" (page.mouse API).
+// ============================================================
+
+/** Vị trí chuột ảo hiện tại — dùng để bắt đầu đường cong Bézier liên tục giữa các thao tác. */
+let lastMouseX = 300;
+let lastMouseY = 250;
+
+/** Nội suy một điểm trên đường Cubic Bézier. */
+function cubicBezier(t, p0, p1, p2, p3) {
+  const u = 1 - t;
+  return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
+}
+
+/** Hàm easing sinh học — chậm đầu, nhanh giữa, chậm cuối. */
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+/**
+ * Sinh chuỗi toạ độ di chuyển chuột theo đường Bézier với rung lắc tự nhiên (micro-tremor).
+ * @returns {{ x: number, y: number }[]}
+ */
+function generateBezierPath(fromX, fromY, toX, toY, steps) {
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+  // Vector pháp tuyến vuông góc với đường nối — dùng để tạo độ cong ngẫu nhiên
+  const nx = -dy / dist;
+  const ny = dx / dist;
+
+  // Hai điểm điều khiển Bézier lệch ngẫu nhiên tạo đường cong tự nhiên
+  const cp1x = fromX + dx * 0.25 + nx * (Math.random() - 0.5) * dist * 0.5;
+  const cp1y = fromY + dy * 0.25 + ny * (Math.random() - 0.5) * dist * 0.5;
+  const cp2x = fromX + dx * 0.75 + nx * (Math.random() - 0.5) * dist * 0.35;
+  const cp2y = fromY + dy * 0.75 + ny * (Math.random() - 0.5) * dist * 0.35;
+
+  const n = steps ?? rand(22, 38);
+  const points = [];
+  for (let i = 0; i <= n; i++) {
+    const t = easeInOutCubic(i / n);
+    let x = cubicBezier(t, fromX, cp1x, cp2x, toX);
+    let y = cubicBezier(t, fromY, cp1y, cp2y, toY);
+    // Rung lắc vi mô (micro-tremor) ±1.5px — bỏ qua điểm đầu và cuối
+    if (i > 0 && i < n) {
+      x += (Math.random() - 0.5) * 3;
+      y += (Math.random() - 0.5) * 3;
+    }
+    points.push({ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 });
+  }
+  return points;
+}
+
+/** Sinh số ngẫu nhiên phân phối xấp xỉ Gaussian (Box-Muller transform). */
+function gaussianRand() {
+  const u1 = Math.random() || 0.0001;
+  const u2 = Math.random();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+
+/**
+ * Tính toạ độ click lệch tâm theo phân phối Gaussian.
+ * Người thật không bao giờ click chính xác tâm hình học — toạ độ rải trong vùng 15%-85%.
+ */
+function computeClickTarget(box) {
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  const spreadX = box.width * 0.15;
+  const spreadY = box.height * 0.15;
+  const tx = Math.max(box.x + box.width * 0.15, Math.min(box.x + box.width * 0.85, cx + gaussianRand() * spreadX));
+  const ty = Math.max(box.y + box.height * 0.15, Math.min(box.y + box.height * 0.85, cy + gaussianRand() * spreadY));
+  return { x: Math.round(tx * 10) / 10, y: Math.round(ty * 10) / 10 };
+}
+
+/** Giải toạ độ viewport cho phần tử bất kỳ (kể cả trong iframe). Trả null nếu không xác định. */
+async function resolveAdClickTarget(locator) {
+  const box = await locator.boundingBox().catch(() => null);
+  if (!box || box.width < 2 || box.height < 2) return null;
+  return computeClickTarget(box);
+}
+
+/** Sinh khoảng delay theo phân phối log-normal — giống thời gian phản ứng người thật. */
+function logNormalDelay(medianMs, sigma) {
+  const z = gaussianRand();
+  return Math.max(medianMs * 0.3, Math.round(medianMs * Math.exp(z * (sigma ?? 0.5))));
+}
+
+/**
+ * Cuộn trang tự nhiên — từng nhịp nhỏ có quán tính và khoảng dừng mắt đọc nội dung.
+ */
+async function organicScroll(page, totalDistance) {
+  if (Math.abs(totalDistance) < 30) return;
+  const dir = totalDistance > 0 ? 1 : -1;
+  let remaining = Math.abs(totalDistance);
+  while (remaining > 0) {
+    const chunk = Math.min(remaining, rand(60, 200));
+    await page.mouse.wheel(0, chunk * dir);
+    remaining -= chunk;
+    await sleep(rand(120, 450));
+  }
+}
+
+/**
+ * Di chuột dọc đường Bézier và click bằng CDP Input.dispatchMouseEvent.
+ * Chuỗi sự kiện: mouseMoved×N → dwell → mousePressed → hold → mouseReleased.
+ * Sự kiện do CDP phát có isTrusted = true trong Chrome renderer.
+ */
+async function humanClickCdp(page, ctx, targetX, targetY) {
+  const client = await ctx.newCDPSession(page);
+  try {
+    const movePath = generateBezierPath(lastMouseX, lastMouseY, targetX, targetY);
+    for (const pt of movePath) {
+      await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: pt.x, y: pt.y });
+      await sleep(rand(8, 22));
+    }
+    // Dwell — dừng lại như đang đọc nội dung quảng cáo
+    await sleep(logNormalDelay(600, 0.4));
+    // Press
+    await client.send("Input.dispatchMouseEvent", {
+      type: "mousePressed", button: "left", clickCount: 1, x: targetX, y: targetY,
+    });
+    // Hold — giữ nút chuột 70-160ms như bàn tay người thật
+    await sleep(rand(70, 160));
+    // Release
+    await client.send("Input.dispatchMouseEvent", {
+      type: "mouseReleased", button: "left", clickCount: 1, x: targetX, y: targetY,
+    });
+    lastMouseX = targetX;
+    lastMouseY = targetY;
+  } finally {
+    await client.detach().catch(() => {});
+  }
+}
+
+/**
+ * Di chuột dọc đường Bézier và click bằng Playwright page.mouse API.
+ */
+async function humanClickMouse(page, targetX, targetY) {
+  const movePath = generateBezierPath(lastMouseX, lastMouseY, targetX, targetY);
+  for (const pt of movePath) {
+    await page.mouse.move(pt.x, pt.y);
+    await sleep(rand(8, 22));
+  }
+  await sleep(logNormalDelay(600, 0.4));
+  await page.mouse.down({ button: "left" });
+  await sleep(rand(70, 160));
+  await page.mouse.up({ button: "left" });
+  lastMouseX = targetX;
+  lastMouseY = targetY;
+}
+
+/** Dispatcher thống nhất — chọn engine theo CLICK_MODE. */
+async function humanClick(page, ctx, x, y) {
+  if (CLICK_MODE === "cdp") {
+    return humanClickCdp(page, ctx, x, y);
+  }
+  return humanClickMouse(page, x, y);
+}
+
+/**
+ * Mô phỏng tiếp cận tự nhiên trước khi click: di chuột đến vùng lân cận quảng cáo,
+ * dừng lại như đang nhìn, rồi từ từ rê vào vị trí đích.
+ */
+async function preClickEngagement(page, ctx, targetX, targetY) {
+  // Di chuyển đến vùng lân cận trước (lệch 30-60px)
+  const nearX = targetX + rand(-60, 60);
+  const nearY = targetY + rand(-40, 40);
+  const approachPath = generateBezierPath(lastMouseX, lastMouseY, nearX, nearY, rand(10, 18));
+  if (CLICK_MODE === "cdp") {
+    const client = await ctx.newCDPSession(page);
+    for (const pt of approachPath) {
+      await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: pt.x, y: pt.y });
+      await sleep(rand(12, 28));
+    }
+    await client.detach().catch(() => {});
+  } else {
+    for (const pt of approachPath) {
+      await page.mouse.move(pt.x, pt.y);
+      await sleep(rand(12, 28));
+    }
+  }
+  lastMouseX = nearX;
+  lastMouseY = nearY;
+  // Dừng đọc nội dung gần đó
+  await sleep(rand(250, 700));
 }
 
 function resolveExtensionPath() {
@@ -216,7 +412,7 @@ async function inspectAdsterraPlacements(page, startedAt = Date.now()) {
   };
 }
 
-async function handleRecursiveAdClicks(targetPage, depth, maxDepth) {
+async function handleRecursiveAdClicks(targetPage, depth, maxDepth, ctx) {
   if (depth >= maxDepth) return;
 
   try {
@@ -237,28 +433,34 @@ async function handleRecursiveAdClicks(targetPage, depth, maxDepth) {
     ];
 
     let clicked = false;
-    for (const sel of adSelectors) {
+    const shuffled = [...adSelectors].sort(() => Math.random() - 0.5);
+    for (const sel of shuffled) {
       const handles = await targetPage.$$(sel);
-      for (const handle of handles) {
+      const shuffledHandles = [...handles].sort(() => Math.random() - 0.5);
+      for (const handle of shuffledHandles) {
         try {
           const visible = await handle.isVisible().catch(() => false);
-          if (visible) {
-            log(`  [Đệ quy cấp ${depth + 1}] Tìm thấy phần tử (${sel}), đang click...`);
-            const [newPage] = await Promise.all([
-              targetPage.context().waitForEvent("page", { timeout: 8000 }).catch(() => null),
-              handle.click({ timeout: 5000, force: true }).catch(() => null),
-            ]);
+          if (!visible) continue;
+          const elBox = await handle.boundingBox().catch(() => null);
+          if (!elBox || elBox.width < 2 || elBox.height < 2) continue;
+          const target = computeClickTarget(elBox);
+          log(`  [Đệ quy cấp ${depth + 1}] Tìm thấy phần tử (${sel}), click tại (${Math.round(target.x)}, ${Math.round(target.y)})...`);
+          const resolvedCtx = ctx || targetPage.context();
+          await preClickEngagement(targetPage, resolvedCtx, target.x, target.y);
+          const [newPage] = await Promise.all([
+            resolvedCtx.waitForEvent("page", { timeout: 8000 }).catch(() => null),
+            humanClick(targetPage, resolvedCtx, target.x, target.y).catch(() => null),
+          ]);
 
-            clicked = true;
-            if (newPage) {
-              await newPage.waitForLoadState("domcontentloaded", { timeout: 20000 }).catch(() => {});
-              await handleRecursiveAdClicks(newPage, depth + 1, maxDepth);
-              await newPage.close().catch(() => {});
-            } else {
-              await sleep(rand(DELAY_MIN_MS, DELAY_MAX_MS));
-            }
-            break;
+          clicked = true;
+          if (newPage) {
+            await newPage.waitForLoadState("domcontentloaded", { timeout: 20000 }).catch(() => {});
+            await handleRecursiveAdClicks(newPage, depth + 1, maxDepth, resolvedCtx);
+            await newPage.close().catch(() => {});
+          } else {
+            await sleep(rand(DELAY_MIN_MS, DELAY_MAX_MS));
           }
+          break;
         } catch {
           // Bỏ qua phần tử lỗi
         }
@@ -471,15 +673,10 @@ async function runOneCycle(extensionPath) {
       timeout: 60000,
     });
 
-    // Cuộn nhẹ trang để kích hoạt các script lazy-load quảng cáo
-    await page.evaluate(() => {
-      window.scrollBy({ top: 300, behavior: "smooth" });
-    });
-
-    // Cuộn tiếp xuống phần thân trang
-    await page.evaluate(() => {
-      window.scrollBy({ top: 500, behavior: "smooth" });
-    });
+    // Cuộn trang tự nhiên để kích hoạt lazy-load quảng cáo (từng nhịp, có quán tính)
+    await organicScroll(page, rand(250, 400));
+    await sleep(rand(300, 600));
+    await organicScroll(page, rand(350, 550));
 
     await page.locator(".adsterra-stack").scrollIntoViewIfNeeded().catch(() => {});
     const diagnostic = await inspectAdsterraPlacements(page, renderStartedAt);
@@ -564,12 +761,18 @@ async function runOneCycle(extensionPath) {
     }
 
     if (adCandidates.length > 0) {
-      log(`Tìm thấy tổng cộng ${adCandidates.length} vị trí quảng cáo khả dụng. Đang chọn ngẫu nhiên để click...`);
+      log(`Tìm thấy tổng cộng ${adCandidates.length} vị trí quảng cáo khả dụng. Đang chọn ngẫu nhiên để click (${CLICK_MODE} mode)...`);
       for (const candidate of adCandidates) {
-        log(`-> Click ngẫu nhiên quảng cáo [${candidate.name}]...`);
+        const clickTarget = await resolveAdClickTarget(candidate.locator);
+        if (!clickTarget) {
+          log(`  Bỏ qua [${candidate.name}] — không xác định được toạ độ.`);
+          continue;
+        }
+        log(`-> Click ngẫu nhiên quảng cáo [${candidate.name}] tại (${Math.round(clickTarget.x)}, ${Math.round(clickTarget.y)})...`);
+        await preClickEngagement(page, context, clickTarget.x, clickTarget.y);
         const [newPage] = await Promise.all([
           context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
-          candidate.locator.click({ timeout: 5000, force: true }).catch(() => null),
+          humanClick(page, context, clickTarget.x, clickTarget.y).catch(() => null),
         ]);
         if (newPage) {
           openedPage = newPage;
@@ -618,26 +821,29 @@ async function runOneCycle(extensionPath) {
         for (const el of shuffledElements) {
           try {
             const visible = await el.isVisible().catch(() => false);
-            if (visible) {
-              log(`Tìm thấy quảng cáo khớp [${selector}], đang click chuyển trang...`);
-              const [newPage] = await Promise.all([
-                context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
-                el.click({ timeout: 5000, force: true }).catch(() => null),
-              ]);
-              if (newPage) {
-                openedPage = newPage;
+            if (!visible) continue;
+            const elBox = await el.boundingBox().catch(() => null);
+            if (!elBox || elBox.width < 2 || elBox.height < 2) continue;
+            const target = computeClickTarget(elBox);
+            log(`Tìm thấy quảng cáo khớp [${selector}], click tại (${Math.round(target.x)}, ${Math.round(target.y)})...`);
+            await preClickEngagement(page, context, target.x, target.y);
+            const [newPage] = await Promise.all([
+              context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
+              humanClick(page, context, target.x, target.y).catch(() => null),
+            ]);
+            if (newPage) {
+              openedPage = newPage;
+              adClicked = true;
+              log("✓ Đã mở tab quảng cáo đích thành công.");
+              break;
+            } else {
+              await sleep(3000);
+              const allPages = context.pages();
+              if (allPages.length > 1) {
+                openedPage = allPages[allPages.length - 1];
                 adClicked = true;
-                log("✓ Đã mở tab quảng cáo đích thành công.");
+                log("✓ Đã bắt được trang quảng cáo từ tab phụ.");
                 break;
-              } else {
-                await sleep(3000);
-                const allPages = context.pages();
-                if (allPages.length > 1) {
-                  openedPage = allPages[allPages.length - 1];
-                  adClicked = true;
-                  log("✓ Đã bắt được trang quảng cáo từ tab phụ.");
-                  break;
-                }
               }
             }
           } catch {
@@ -648,12 +854,14 @@ async function runOneCycle(extensionPath) {
       }
     }
 
-    // 4. Click ngẫu nhiên để kích hoạt popunder nếu chưa click được
+    // 4. Click tự nhiên để kích hoạt popunder nếu chưa click được
     if (!adClicked) {
-      log("Không click được quảng cáo cụ thể bằng selector; kích hoạt click mô phỏng trên trang...");
+      log("Không click được quảng cáo cụ thể bằng selector; kích hoạt click mô phỏng tự nhiên trên trang...");
+      const popTarget = { x: rand(200, 600), y: rand(200, 500) };
+      await preClickEngagement(page, context, popTarget.x, popTarget.y);
       const [popup] = await Promise.all([
         context.waitForEvent("page", { timeout: 8000 }).catch(() => null),
-        page.mouse.click(rand(200, 600), rand(200, 500)).catch(() => null),
+        humanClick(page, context, popTarget.x, popTarget.y).catch(() => null),
       ]);
       if (popup) {
         openedPage = popup;
@@ -671,7 +879,7 @@ async function runOneCycle(extensionPath) {
 
       // Đệ quy click thêm nếu còn quảng cáo trên trang đích (tối đa MAX_RECURSIVE_CLICKS)
       if (MAX_RECURSIVE_CLICKS > 0) {
-        await handleRecursiveAdClicks(openedPage, 0, MAX_RECURSIVE_CLICKS);
+        await handleRecursiveAdClicks(openedPage, 0, MAX_RECURSIVE_CLICKS, context);
       }
 
       await openedPage.close().catch(() => {});
@@ -731,6 +939,7 @@ async function main() {
   log(`Website đích: ${WEB_URL}`);
   log(`Tuổi thọ tối đa: ${Math.round(MAX_LIFETIME_MS / 60000)} phút`);
   log(`Thời gian chờ placement ready tối đa: ${Math.round(AD_READY_TIMEOUT_MS / 1000)} giây`);
+  log(`Chế độ click: ${CLICK_MODE} (${CLICK_MODE === "cdp" ? "CDP Input.dispatchMouseEvent — isTrusted:true" : "Playwright Mouse API — Bézier trajectory"})`);
 
   const extPath = resolveExtensionPath();
   if (extPath) {

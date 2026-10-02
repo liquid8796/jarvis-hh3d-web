@@ -24,8 +24,10 @@ const nativeCreativeIndex = runtime.indexOf("const nativeCreativeCount");
 const renderResultIndex = runtime.indexOf("renderMs: Date.now() - startedAt");
 assert.ok(nativeCreativeIndex >= 0 && renderResultIndex > nativeCreativeIndex, "renderMs must include creative verification time");
 
-assert.match(runtime, /\.click\s*\(/, "ad-viewer must click ad elements to navigate to landing page");
-assert.match(runtime, /mouse\.click\s*\(/, "ad-viewer must synthesize clicks for popunders when needed");
+assert.match(runtime, /humanClick\s*\(/, "ad-viewer must use human-like click simulation to navigate to landing page");
+assert.match(runtime, /preClickEngagement\s*\(/, "ad-viewer must simulate pre-click engagement before clicking ads");
+assert.match(runtime, /humanClickCdp|humanClickMouse/, "ad-viewer must implement CDP and/or Playwright mouse click engines");
+assert.match(runtime, /generateBezierPath\s*\(/, "ad-viewer must generate Bézier curve mouse trajectories");
 assert.match(runtime, /MAX_RECURSIVE_CLICKS/, "ad-viewer must support recursive ad clicks");
 assert.match(runtime, /handleRecursiveAdClicks/, "ad-viewer must handle recursive ad clicks");
 assert.match(runtime, /while \(Date\.now\(\) - startTime < MAX_LIFETIME_MS\)/, "ad-viewer must loop across lifetime cycles");

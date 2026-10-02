@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.129",
+    date: "2026-10-02",
+    lines: [
+      "Khắc phục sự cố tệp kịch bản batch bị đóng đột ngột khi nhập thông tin cấu hình trên Windows.",
+      "Tăng cường khả năng nhận diện proxy hợp lệ qua cơ chế thử nghiệm đường truyền HTTP CONNECT.",
+    ],
+  },
+  {
     version: "1.3.128",
     date: "2026-10-02",
     lines: [
@@ -469,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Hoang Vực nay bấm được nút Đổi trong hộp xác nhận mới, không còn để lớp phủ chặn nút KHIÊU CHIẾN.",
       "Khoáng Mạch nhận diện lại các hộp vào mỏ, đoạt mỏ và mua Linh Quang Phù cho cả tài khoản VIP lẫn Thường.",
-    ],
-  },
-  {
-    version: "1.3.79",
-    date: "2026-09-12",
-    lines: [
-      "Kho GitHub nay chia thành ba mục gọn; mở vào thấy ngay danh sách kho chính mà không phải cuộn qua cấu hình.",
-      "Mỗi kho chỉ hiện trạng thái cần thiết; form tạo hoặc sửa mở riêng và dễ dùng hơn trên điện thoại.",
     ],
   },
 ];

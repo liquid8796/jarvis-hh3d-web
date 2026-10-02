@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.129 — Sửa lỗi thoát tệp batch trên Windows và nâng cấp cơ chế kiểm tra Proxy (02/10/2026)
+
+- Tái cấu trúc toàn bộ luồng điều khiển trong `run-ad-viewer.bat`, thay thế các khối ngoặc lồng nhau bằng các nhãn điều hướng tuyến tính để tránh lỗi thoát đột ngột của cmd.exe khi đọc chuỗi văn bản và ký tự đặc biệt.
+- Thay thế các ký tự xung đột cú pháp cmd (`&`, dấu ngoặc lồng) để terminal không bị đóng bất thường khi chọn nguồn proxy.
+- Nâng cấp phương thức `probe` trong `scripts/adViewer.mjs`: bổ sung kiểm tra bắt tay đường truyền HTTP CONNECT giả lập tới trang đích, tự động phát hiện và loại bỏ các proxy đòi hỏi mật khẩu (HTTP 407) hoặc trả về mã lỗi trước khi khởi động trình duyệt.
+
 ## 1.3.128 — Anti-Detect Proxy Engine, xoay proxy tự động và công cụ chạy cục bộ (02/10/2026)
 
 - Tách hoàn toàn tính năng xem quảng cáo khỏi bảng điều khiển web và các kho GitHub worker; web nay chỉ quản lý duy nhất trạm khôi lỗi tự động làm nhiệm vụ.

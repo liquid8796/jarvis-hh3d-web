@@ -319,27 +319,65 @@ class ProxyManager {
 
   /**
    * Kiểm tra khả năng kết nối tới proxy trong 2.5 giây.
+   * Thử nghiệm HTTP CONNECT tunnel để phát hiện proxy sống thật và tự động loại bỏ proxy đòi hỏi mật khẩu (407) hoặc lỗi (400/403/502).
    */
   async probe(proxy, timeoutMs = 2500) {
     if (!proxy || !proxy.host || !proxy.port) return false;
     return new Promise((resolve) => {
-      const socket = net.createConnection({
-        host: proxy.host,
-        port: Number(proxy.port),
-        timeout: timeoutMs,
-      });
+      let settled = false;
+      let socket = null;
+      const done = (val) => {
+        if (!settled) {
+          settled = true;
+          if (socket) {
+            try { socket.destroy(); } catch {}
+          }
+          resolve(val);
+        }
+      };
+
+      try {
+        socket = net.createConnection({
+          host: proxy.host,
+          port: Number(proxy.port),
+          timeout: timeoutMs,
+        });
+      } catch {
+        return resolve(false);
+      }
+
       socket.on("connect", () => {
-        socket.destroy();
-        resolve(true);
+        let req = `CONNECT auto-hh3d.online:443 HTTP/1.1\r\nHost: auto-hh3d.online:443\r\n`;
+        if (proxy.username && proxy.password) {
+          const auth = Buffer.from(`${proxy.username}:${proxy.password}`).toString("base64");
+          req += `Proxy-Authorization: Basic ${auth}\r\n`;
+        }
+        req += `\r\n`;
+        try {
+          socket.write(req);
+        } catch {
+          done(true);
+        }
       });
-      socket.on("timeout", () => {
-        socket.destroy();
-        resolve(false);
+
+      socket.on("data", (chunk) => {
+        const str = chunk.toString("latin1");
+        if (str.startsWith("HTTP/1.") || str.startsWith("HTTP/2.")) {
+          if (str.includes(" 200 ") || str.includes(" 200\r\n")) {
+            done(true);
+          } else {
+            // Loại bỏ 407 (đòi mật khẩu), 400 (web server thường), 403, 502, 503...
+            done(false);
+          }
+        } else {
+          // Giao thức khác (SOCKS hoặc stream)
+          done(true);
+        }
       });
-      socket.on("error", () => {
-        socket.destroy();
-        resolve(false);
-      });
+
+      socket.on("timeout", () => done(false));
+      socket.on("error", () => done(false));
+      socket.on("close", () => done(false));
     });
   }
 

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.133",
+    date: "2026-10-03",
+    lines: [
+      "Bổ sung chế độ di chuyển chuột vật lý thật cấp hệ điều hành qua cổng gửi tín hiệu Windows.",
+      "Thêm chế độ bán tự động dừng lại chờ bạn click tay rồi tự động tiếp quản tương tác trang đích.",
+    ],
+  },
+  {
     version: "1.3.132",
     date: "2026-10-03",
     lines: [
@@ -469,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Phiên đăng nhập mới lấy từ hoathinh3d.de nay dùng được ngay cả khi cấu hình tông môn vẫn còn tên miền .so.",
       "Bản xuất từ trang khác vẫn bị chặn, nên việc tự theo tên miền mới không làm lỏng lớp bảo vệ đăng nhập.",
-    ],
-  },
-  {
-    version: "1.3.83",
-    date: "2026-09-14",
-    lines: [
-      "Khi tạo kho GitHub lỗi, màn hình nay nói rõ PAT bị từ chối, còn thiếu quyền nào hoặc trường nào chưa hợp lệ.",
-      "Mỗi lỗi có mã để tra cứu an toàn; bộ dựng kho cũng giữ đúng định dạng tệp khi phát hành từ Windows.",
     ],
   },
 ];

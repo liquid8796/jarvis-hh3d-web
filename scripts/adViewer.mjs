@@ -89,11 +89,32 @@ const NATIVE_SLOT_SELECTOR = ".adsterra-native";
 const NATIVE_READY_SELECTOR = '.adsterra-native[data-status="ready"]';
 const NATIVE_CONTAINER_ID = "container-5e6634da84f8f263d7ab34ae152f1c8d";
 
-const CLICK_MODE = (
+const rawClickMode = (
   process.argv.find((a) => a.startsWith("--click-mode="))?.split("=")[1] ||
   process.env.AD_VIEWER_CLICK_MODE ||
-  "cdp"
+  ""
 ).toLowerCase();
+
+let CLICK_MODE = "cdp";
+if (rawClickMode === "mouse") {
+  CLICK_MODE = "mouse";
+} else if (
+  rawClickMode === "os" ||
+  rawClickMode === "os-mouse" ||
+  rawClickMode === "win32" ||
+  process.argv.includes("--os-mouse") ||
+  process.argv.includes("--win32-mouse")
+) {
+  CLICK_MODE = "os-mouse";
+} else if (
+  rawClickMode === "manual" ||
+  rawClickMode === "hand" ||
+  rawClickMode === "semi-auto" ||
+  process.argv.includes("--manual") ||
+  process.argv.includes("--semi-auto")
+) {
+  CLICK_MODE = "manual";
+}
 
 const USE_CANVAS_BLOCKER =
   process.argv.includes("--canvas-blocker") ||
@@ -866,8 +887,99 @@ async function humanClickMouse(page, targetX, targetY) {
   lastMouseY = targetY;
 }
 
+/**
+ * Di chuột vật lý cấp Hệ điều hành Windows (OS Physical Mouse) qua PowerShell và user32.dll SendInput/mouse_event.
+ * Di chuyển con trỏ chuột thật của Windows trên màn hình Desktop và click thật vào cửa sổ Chrome.
+ */
+async function humanClickOs(page, ctx, targetX, targetY) {
+  if (process.platform !== "win32") {
+    log("[OS-Mouse] ⚠ Hệ điều hành không phải Windows; tự động chuyển sang CDP Input.dispatchMouseEvent.");
+    return humanClickCdp(page, ctx, targetX, targetY);
+  }
+
+  try {
+    await page.bringToFront().catch(() => {});
+    const metrics = await page.evaluate(() => ({
+      screenX: window.screenX,
+      screenY: window.screenY,
+      outerWidth: window.outerWidth,
+      innerWidth: window.innerWidth,
+      outerHeight: window.outerHeight,
+      innerHeight: window.innerHeight,
+      dpr: window.devicePixelRatio || 1,
+    }));
+
+    const borderLeft = Math.max(0, (metrics.outerWidth - metrics.innerWidth) / 2);
+    const borderTop = Math.max(0, metrics.outerHeight - metrics.innerHeight - borderLeft);
+    const dpr = metrics.dpr || 1;
+
+    const desktopX = Math.round((metrics.screenX + borderLeft + targetX) * dpr);
+    const desktopY = Math.round((metrics.screenY + borderTop + targetY) * dpr);
+
+    log(`[OS-Mouse] Di chuyển chuột vật lý Windows tới toạ độ Desktop (${desktopX}, ${desktopY})...`);
+
+    const psScript = path.join(__dirname, "winMouse.ps1");
+    if (!existsSync(psScript)) {
+      throw new Error(`Không tìm thấy tệp kịch bản: ${psScript}`);
+    }
+
+    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${desktopX} -targetY ${desktopY} -steps 25 -click 1`;
+    execSync(cmd, { stdio: "ignore", timeout: 15000 });
+
+    lastMouseX = targetX;
+    lastMouseY = targetY;
+    log("[OS-Mouse] ✓ Thao tác click chuột vật lý Windows hoàn tất (SendInput / mouse_event).");
+  } catch (err) {
+    log(`[OS-Mouse] ⚠ Lỗi khi điều khiển chuột Windows (${err.message}); dùng fallback CDP click.`);
+    return humanClickCdp(page, ctx, targetX, targetY);
+  }
+}
+
+/**
+ * Đợi thao tác click chuột thật của người dùng trong chế độ bán tự động (Manual Assist).
+ * Tự động phát hiện khi có tab mới mở ra hoặc tab hiện tại chuyển hướng sang trang quảng cáo.
+ */
+async function waitForManualUserClick(context, page, timeoutMs = 45000) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve(null);
+      }
+    }, timeoutMs);
+
+    const onNewPage = (newPage) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        context.off("page", onNewPage);
+        resolve(newPage);
+      }
+    };
+    context.on("page", onNewPage);
+
+    const onNavigated = (frame) => {
+      if (!settled && frame === page.mainFrame()) {
+        const u = frame.url();
+        if (u && !u.includes(WEB_URL) && u !== "about:blank") {
+          settled = true;
+          clearTimeout(timer);
+          page.off("framenavigated", onNavigated);
+          context.off("page", onNewPage);
+          resolve(page);
+        }
+      }
+    };
+    page.on("framenavigated", onNavigated);
+  });
+}
+
 /** Dispatcher thống nhất — chọn engine theo CLICK_MODE. */
 async function humanClick(page, ctx, x, y) {
+  if (CLICK_MODE === "os-mouse") {
+    return humanClickOs(page, ctx, x, y);
+  }
   if (CLICK_MODE === "cdp") {
     return humanClickCdp(page, ctx, x, y);
   }
@@ -879,6 +991,36 @@ async function humanClick(page, ctx, x, y) {
  * dừng lại như đang nhìn, rồi từ từ rê vào vị trí đích.
  */
 async function preClickEngagement(page, ctx, targetX, targetY) {
+  if (CLICK_MODE === "os-mouse" && process.platform === "win32") {
+    try {
+      const nearX = targetX + rand(-60, 60);
+      const nearY = targetY + rand(-40, 40);
+      const metrics = await page.evaluate(() => ({
+        screenX: window.screenX,
+        screenY: window.screenY,
+        outerWidth: window.outerWidth,
+        innerWidth: window.innerWidth,
+        outerHeight: window.outerHeight,
+        innerHeight: window.innerHeight,
+        dpr: window.devicePixelRatio || 1,
+      }));
+      const borderLeft = Math.max(0, (metrics.outerWidth - metrics.innerWidth) / 2);
+      const borderTop = Math.max(0, metrics.outerHeight - metrics.innerHeight - borderLeft);
+      const dpr = metrics.dpr || 1;
+      const nearDesktopX = Math.round((metrics.screenX + borderLeft + nearX) * dpr);
+      const nearDesktopY = Math.round((metrics.screenY + borderTop + nearY) * dpr);
+
+      const psScript = path.join(__dirname, "winMouse.ps1");
+      if (existsSync(psScript)) {
+        execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${nearDesktopX} -targetY ${nearDesktopY} -steps 18 -click 0`, { stdio: "ignore", timeout: 8000 });
+      }
+      lastMouseX = nearX;
+      lastMouseY = nearY;
+      await sleep(rand(1200, 2200));
+      return;
+    } catch {}
+  }
+
   // 1. Di chuyển đến vùng lân cận trước (lệch 35-70px) như ánh mắt vừa lướt qua
   const nearX = targetX + rand(-70, 70);
   const nearY = targetY + rand(-50, 50);
@@ -1563,6 +1705,8 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
 
       const isHeadless =
         !useMyChrome &&
+        CLICK_MODE !== "manual" &&
+        CLICK_MODE !== "os-mouse" &&
         !process.argv.includes("--head") &&
         !process.argv.includes("--visible") &&
         process.env.HEADLESS !== "0";
@@ -1872,7 +2016,54 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
       [adCandidates[i], adCandidates[j]] = [adCandidates[j], adCandidates[i]];
     }
 
-    if (adCandidates.length > 0) {
+    if (CLICK_MODE === "manual") {
+      const targetCandidate = adCandidates.length > 0 ? adCandidates[0] : null;
+      const targetDesc = targetCandidate ? targetCandidate.name : "Vùng quảng cáo / Trang web";
+      log("\n" + "=".repeat(64));
+      log("🔔 [CHẾ ĐỘ BÁN TỰ ĐỘNG - THỦ CÔNG]");
+      log(`👉 Đã định vị mục tiêu: "${targetDesc}"`);
+      log("👉 Vui lòng dùng CHUỘT THẬT click vào khung quảng cáo viền đỏ trên màn hình Chrome!");
+      log("⏳ Auto đang đếm ngược chờ bạn click (tối đa 45 giây)...");
+      log("=".repeat(64) + "\n");
+      try { process.stdout.write("\x07"); } catch {}
+
+      if (targetCandidate?.locator) {
+        await targetCandidate.locator.scrollIntoViewIfNeeded().catch(() => {});
+        await targetCandidate.locator.evaluate((el) => {
+          el.style.outline = "4px dashed #ff0055";
+          el.style.outlineOffset = "4px";
+          el.style.boxShadow = "0 0 30px #ff0055";
+          const badge = document.createElement("div");
+          badge.id = "manual-ad-badge";
+          badge.innerText = "👉 DÙNG CHUỘT THẬT CLICK VÀO ĐÂY!";
+          badge.style.position = "absolute";
+          badge.style.top = "-38px";
+          badge.style.left = "50%";
+          badge.style.transform = "translateX(-50%)";
+          badge.style.background = "#ff0055";
+          badge.style.color = "#ffffff";
+          badge.style.padding = "6px 14px";
+          badge.style.borderRadius = "20px";
+          badge.style.fontWeight = "bold";
+          badge.style.fontSize = "13px";
+          badge.style.zIndex = "2147483647";
+          badge.style.boxShadow = "0 4px 12px rgba(0,0,0,0.5)";
+          badge.style.pointerEvents = "none";
+          el.parentElement?.appendChild(badge);
+        }).catch(() => {});
+      }
+      await page.bringToFront().catch(() => {});
+
+      const manualPage = await waitForManualUserClick(context, page, 45000);
+      if (manualPage) {
+        openedPage = manualPage;
+        adClicked = true;
+        log("✓ Đã nhận diện thao tác click chuột thật thành công từ người dùng!");
+        log("🤖 Auto tự động tiếp quản: Bắt đầu đọc bài và tương tác trang đích...");
+      } else {
+        log("⚠ Đã hết thời gian 45s chờ click thủ công; chuyển sang chu kỳ tiếp theo.");
+      }
+    } else if (adCandidates.length > 0) {
       log(`Tìm thấy tổng cộng ${adCandidates.length} vị trí quảng cáo khả dụng. Đang chọn ngẫu nhiên để click (${CLICK_MODE} mode)...`);
       for (const candidate of adCandidates) {
         const clickTarget = await resolveAdClickTarget(candidate.locator);
@@ -1924,7 +2115,7 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
       'a[target="_blank"]',
     ];
 
-    if (!adClicked) {
+    if (!adClicked && CLICK_MODE !== "manual") {
       // Xáo trộn ngẫu nhiên thứ tự selector dự phòng
       const shuffledSelectors = [...candidateSelectors].sort(() => Math.random() - 0.5);
       for (const selector of shuffledSelectors) {
@@ -1967,7 +2158,7 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
     }
 
     // 4. Click tự nhiên để kích hoạt popunder nếu chưa click được
-    if (!adClicked) {
+    if (!adClicked && CLICK_MODE !== "manual") {
       log("Không click được quảng cáo cụ thể bằng selector; kích hoạt click mô phỏng tự nhiên trên trang...");
       const popTarget = { x: rand(200, 600), y: rand(200, 500) };
       await preClickEngagement(page, context, popTarget.x, popTarget.y);
@@ -2083,8 +2274,15 @@ async function main() {
   log(`Khởi động tiến trình xem quảng cáo (bản: ${currentVersion ?? "chưa rõ"})`);
   log(`Website đích: ${WEB_URL}`);
   log(`Tuổi thọ tối đa: ${Math.round(MAX_LIFETIME_MS / 60000)} phút`);
-  log(`Thời gian chờ placement ready tối đa: ${Math.round(AD_READY_TIMEOUT_MS / 1000)} giây`);
-  log(`Chế độ click: ${CLICK_MODE} (${CLICK_MODE === "cdp" ? "CDP Input.dispatchMouseEvent — isTrusted:true" : "Playwright Mouse API — Bézier trajectory"})`);
+  const clickModeDesc =
+    CLICK_MODE === "os-mouse"
+      ? "OS Physical Mouse — Windows SendInput/mouse_event phần cứng"
+      : CLICK_MODE === "manual"
+      ? "Bán tự động / Thủ công — Dừng chờ bạn click tay rồi tự động chạy tiếp"
+      : CLICK_MODE === "mouse"
+      ? "Playwright Mouse API — Quỹ đạo cong Bézier"
+      : "CDP Input.dispatchMouseEvent — isTrusted:true";
+  log(`Chế độ click: ${CLICK_MODE} (${clickModeDesc})`);
 
   const extPath = USE_CANVAS_BLOCKER ? resolveExtensionPath() : null;
   if (extPath) {

@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.133 — Bổ sung chế độ Chuột thật OS (SendInput) và Bán tự động (Manual Assist) (03/10/2026)
+
+- Bổ sung chế độ điều khiển chuột vật lý cấp Hệ điều hành Windows (`--click-mode=os-mouse` / `winMouse.ps1`): tự động quy đổi toạ độ viewport sang toạ độ desktop vật lý kèm bù trừ thanh tiêu đề và DPI scaling (`devicePixelRatio`), sử dụng Windows User32 API (`SetCursorPos` & `mouse_event`) di chuyển con trỏ chuột thật trên desktop và phát tín hiệu phần cứng trực tiếp vào Chrome.
+- Bổ sung chế độ Bán tự động (`--click-mode=manual`): tự động tải trang, cuộn trang đọc bài và chuẩn bị quảng cáo, sau đó phát tín hiệu âm báo, làm nổi bật vùng quảng cáo với viền sáng nhấp nháy và phù hiệu hướng dẫn, dừng 45 giây để người dùng dùng chuột thật click; ngay khi tab đích mở ra, auto tự động nhận diện và tiếp quản quy trình đọc bài và dọn dẹp.
+- Tự động cưỡng bức hiển thị cửa sổ Chrome (bỏ chế độ headless) khi chạy các chế độ yêu cầu tương tác chuột vật lý (`os-mouse`, `manual`).
+- Cập nhật menu khởi động `run-ad-viewer.bat` với 4 chế độ click tuỳ chọn trực quan (CDP, OS Mouse, Manual, Playwright Mouse).
+
 ## 1.3.132 — Tự động loại bỏ Proxy chết khỏi tệp danh sách và cơ chế an toàn mạng (03/10/2026)
 
 - Bổ sung cơ chế tự động xoá proxy hỏng (`pruneDead` / `markDead`) trong `scripts/adViewer.mjs`: khi kiểm tra proxy theo lô (`probeBatch`) hoặc khi proxy phát sinh lỗi kết nối trong phiên duyệt web, proxy chết sẽ lập tức bị loại bỏ khỏi bộ nhớ và đồng bộ làm sạch tệp trên đĩa (`list-proxies.txt`).

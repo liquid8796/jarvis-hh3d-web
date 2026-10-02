@@ -1,5 +1,4 @@
 import {
-  DEFAULT_AD_VIEWER_WORKFLOW_FILE,
   DEFAULT_DAILY_PUSHES,
   DEFAULT_WORKFLOW_FILE,
   MAX_DAILY_PUSHES,
@@ -57,8 +56,8 @@ function normalizedDailyPushes(value: GithubProvisionInput["dailyPushes"]): numb
   return parsed;
 }
 
-function normalizedWorkflowFile(value: string | undefined, purpose?: "worker" | "adViewer"): string {
-  const defaultFile = purpose === "adViewer" ? DEFAULT_AD_VIEWER_WORKFLOW_FILE : DEFAULT_WORKFLOW_FILE;
+function normalizedWorkflowFile(value: string | undefined): string {
+  const defaultFile = DEFAULT_WORKFLOW_FILE;
   const workflowFile = value?.trim() || defaultFile;
   if (workflowFile.includes("/") || workflowFile.includes("\\") || !SAFE_WORKFLOW_BASENAME.test(workflowFile)) {
     throw new Error("workflowFile must be a safe .yml or .yaml basename.");
@@ -86,8 +85,7 @@ export function normalizeGithubProvisionInput(
   const suppliedRepo = input.repo?.trim() ?? "";
   const generatedRepo = suppliedRepo.length === 0;
   const repo = suppliedRepo;
-  const purpose = input.purpose === "adViewer" ? "adViewer" : "worker";
-  const workflowFile = normalizedWorkflowFile(input.workflowFile, purpose);
+  const workflowFile = normalizedWorkflowFile(input.workflowFile);
 
   return {
     pat: input.pat,

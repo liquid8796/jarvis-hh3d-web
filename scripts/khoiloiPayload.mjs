@@ -93,8 +93,6 @@ export const OWNED_PREFIXES = Object.freeze(["scripts/", "src/"]);
 
 /** Bản mẫu workflow trong kho gốc — NGOÀI `.github/workflows/`, xem `deploy/github-actions.md` §4. */
 export const WORKFLOW_TEMPLATE_PATH = "deploy/github/linh-su.yml";
-export const AD_VIEWER_WORKFLOW_TEMPLATE_PATH = "deploy/github/xem-quang-cao.yml";
-export const AD_VIEWER_WEB_URL = "https://auto-hh3d.online";
 const PUBLIC_IDENTITY_SOURCE_PATH = "scripts/githubPublicIdentity.mjs";
 
 /**
@@ -174,7 +172,6 @@ export function gitHeadPayloadSource(repoRoot) {
 const FILESYSTEM_SOURCE_INPUTS = Object.freeze([
   ...COPIED_PATHS,
   WORKFLOW_TEMPLATE_PATH,
-  AD_VIEWER_WORKFLOW_TEMPLATE_PATH,
   "package.json",
 ]);
 
@@ -278,7 +275,7 @@ export function filesystemPayloadSource(repoRoot) {
  */
 export function uncommittedPayloadPaths(repoRoot) {
   const out = git(repoRoot, [
-    "status", "--porcelain", "--", ...COPIED_PATHS, WORKFLOW_TEMPLATE_PATH, "deploy/github/xem-quang-cao.yml",
+    "status", "--porcelain", "--", ...COPIED_PATHS, WORKFLOW_TEMPLATE_PATH,
     PUBLIC_IDENTITY_SOURCE_PATH,
   ]);
   return out
@@ -295,14 +292,9 @@ export function uncommittedPayloadPaths(repoRoot) {
  * phép thay bằng biểu thức chính quy hỏng LẶNG LẼ khi hình dạng bản mẫu đổi: nó chỉ đơn giản là
  * không thay gì cả, và kho phát ra mang `WORKER_ID` của bản mẫu — tức trùng id với một kho khác.
  */
-export function renderWorkflow({ template, workerId, webUrl, workflowFile = "linh-su.yml", purpose = "worker" }) {
-  const isAdViewer = purpose === "adViewer" || workflowFile === "xem-quang-cao.yml";
-  // Quảng cáo chỉ được bật trên hostname production chính thức. Không để URL backend trực tiếp
-  // của worker trở thành giá trị mặc định của adViewer qua các đường tạo/promote/deploy dùng chung.
-  const renderedWebUrl = isAdViewer ? AD_VIEWER_WEB_URL : webUrl;
-  const templateDispatchTarget = isAdViewer
-    ? "/actions/workflows/xem-quang-cao.yml/dispatches"
-    : "/actions/workflows/linh-su.yml/dispatches";
+export function renderWorkflow({ template, workerId, webUrl, workflowFile = "linh-su.yml", purpose: _purpose = "worker" }) {
+  const renderedWebUrl = webUrl;
+  const templateDispatchTarget = "/actions/workflows/linh-su.yml/dispatches";
   const renderedDispatchTarget = `/actions/workflows/${workflowFile}/dispatches`;
   const publicIdentity = publicIdentityForWorker(workerId);
   if (!template.includes(templateDispatchTarget)) {
@@ -314,15 +306,15 @@ export function renderWorkflow({ template, workerId, webUrl, workflowFile = "lin
     }
   }
   const workflow = template
-    .replace(/^(\s*(?:WORKER_ID|AD_VIEWER_ID):\s*).*$/m, `$1${workerId}`)
+    .replace(/^(\s*WORKER_ID:\s*).*$/m, `$1${workerId}`)
     .replaceAll(/\$\{\{ vars\.WEB_URL \|\| '[^']*' \}\}/g, `\${{ vars.WEB_URL || '${renderedWebUrl}' }}`)
     .replaceAll(templateDispatchTarget, renderedDispatchTarget)
     .replace(PUBLIC_WORKFLOW_NAME_PLACEHOLDER, publicIdentity.workflowName)
     .replace(PUBLIC_JOB_NAME_PLACEHOLDER, publicIdentity.jobName);
 
-  if (!workflow.includes(`WORKER_ID: ${workerId}`) && !workflow.includes(`AD_VIEWER_ID: ${workerId}`)) {
+  if (!workflow.includes(`WORKER_ID: ${workerId}`)) {
     throw new Error(
-      "Không thay được WORKER_ID/AD_VIEWER_ID trong workflow — hình dạng bản mẫu đã đổi. Sửa phép thay ở " +
+      "Không thay được WORKER_ID trong workflow — hình dạng bản mẫu đã đổi. Sửa phép thay ở " +
         "`renderWorkflow`, đừng phát ra một kho mang id trùng máy khác.",
     );
   }
@@ -336,7 +328,7 @@ export function renderWorkflow({ template, workerId, webUrl, workflowFile = "lin
         "và một cho tiến trình khôi lỗi.",
     );
   }
-  if (!workflow.includes(renderedDispatchTarget) || (workflowFile !== "linh-su.yml" && workflowFile !== "xem-quang-cao.yml" && workflow.includes(templateDispatchTarget))) {
+  if (!workflow.includes(renderedDispatchTarget) || (workflowFile !== "linh-su.yml" && workflow.includes(templateDispatchTarget))) {
     throw new Error("Workflow self-dispatch target does not match the configured workflow filename.");
   }
   if (
@@ -379,8 +371,7 @@ export function buildWorkflowOnlyPayload({
   workflowFile = "linh-su.yml",
   purpose = "worker",
 }) {
-  const isAdViewer = purpose === "adViewer" || workflowFile === "xem-quang-cao.yml";
-  const templatePath = isAdViewer ? AD_VIEWER_WORKFLOW_TEMPLATE_PATH : WORKFLOW_TEMPLATE_PATH;
+  const templatePath = WORKFLOW_TEMPLATE_PATH;
   const template = source.read(templatePath).toString("utf8");
   return new Map([
     [

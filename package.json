@@ -1,12 +1,12 @@
 {
   "name": "jarvis-hh3d-web",
-  "version": "1.3.127",
+  "version": "1.3.128",
   "private": true,
   "description": "Auto HH3D — control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn tự động chạy trên server.",
   "scripts": {
-    "predev": "node scripts/buildWorkerBundle.mjs && node scripts/buildAdViewerBundle.mjs",
+    "predev": "node scripts/buildWorkerBundle.mjs",
     "dev": "next dev",
-    "prebuild": "node scripts/buildWorkerBundle.mjs && node scripts/buildAdViewerBundle.mjs",
+    "prebuild": "node scripts/buildWorkerBundle.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

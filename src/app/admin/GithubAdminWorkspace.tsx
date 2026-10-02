@@ -5,22 +5,6 @@ import type { GithubNurtureView } from "@/app/actions/githubNurture";
 import type { StationView } from "@/app/actions/githubStations";
 import { GithubNurtureSettings } from "./GithubNurtureSettings";
 import { GithubStationPanel } from "./GithubStationPanel";
-import type { StationPurpose } from "@/lib/validation/githubStations";
-
-/**
- * HAI LOẠI KHO — cùng cơ chế tạo/nuôi/promote, khác mục đích:
- *
- *   worker    — kho đang giữ khôi lỗi chạy trên Actions (bản gốc, từ đầu).
- *   adViewer  — kho chạy workflow xem quảng cáo trên chính website của tông môn.
- *
- * `PURPOSES` là thanh lựa chọn TRÊN CÙNG — khi đổi mục đích, danh sách kho chính bên dưới
- * được lọc theo `station.purpose`, nhưng Ollama và API key vẫn CHUNG (hạ tầng nuôi repo phụ
- * không phân biệt mục đích).
- */
-const PURPOSES: { id: StationPurpose; label: string }[] = [
-  { id: "worker", label: "Khôi Lỗi" },
-  { id: "adViewer", label: "Xem Quảng Cáo" },
-];
 
 const SECTIONS = [
   { id: "stations", label: "Kho chính" },
@@ -34,15 +18,10 @@ function initialGithubSection(value: string | undefined): GithubSection {
   return SECTIONS.some((section) => section.id === value) ? (value as GithubSection) : "stations";
 }
 
-function initialPurpose(value: string | undefined): StationPurpose {
-  return PURPOSES.some((p) => p.id === value) ? (value as StationPurpose) : "worker";
-}
-
 export function GithubAdminWorkspace({
   stations,
   config,
   initialSection,
-  initialPurposeParam,
 }: {
   stations: StationView[];
   config: GithubNurtureView;
@@ -50,13 +29,8 @@ export function GithubAdminWorkspace({
   initialPurposeParam?: string;
 }) {
   const [section, setSection] = useState(() => initialGithubSection(initialSection));
-  const [purpose, setPurpose] = useState(() => initialPurpose(initialPurposeParam));
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  /** Kho chính lọc theo mục đích đang chọn. Ollama/API key không lọc. */
-  const filteredStations = stations.filter((station) => (station.purpose ?? "worker") === purpose);
-  const workerCount = stations.filter((s) => (s.purpose ?? "worker") === "worker").length;
-  const adViewerCount = stations.filter((s) => s.purpose === "adViewer").length;
   const totalCompanions = stations.reduce((total, station) => total + station.companionRepos.length, 0);
   const enabledKeys = config.apiKeys.filter((key) => !key.disabled).length;
 
@@ -65,16 +39,6 @@ export function GithubAdminWorkspace({
     const url = new URL(window.location.href);
     if (next === "stations") url.searchParams.delete("githubPanel");
     else url.searchParams.set("githubPanel", next);
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-  }
-
-  function switchPurpose(next: StationPurpose) {
-    setPurpose(next);
-    // Khi đổi mục đích mà đang xem Ollama/keys thì giữ nguyên tab; nếu đang xem kho chính
-    // thì vẫn ở kho chính nhưng sổ được lọc lại.
-    const url = new URL(window.location.href);
-    if (next === "worker") url.searchParams.delete("githubPurpose");
-    else url.searchParams.set("githubPurpose", next);
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
@@ -93,10 +57,7 @@ export function GithubAdminWorkspace({
   }
 
   const countFor = (id: GithubSection) =>
-    id === "stations" ? filteredStations.length : id === "keys" ? config.apiKeys.length : null;
-
-  const purposeCountFor = (id: StationPurpose) =>
-    id === "worker" ? workerCount : adViewerCount;
+    id === "stations" ? stations.length : id === "keys" ? config.apiKeys.length : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -105,8 +66,7 @@ export function GithubAdminWorkspace({
           <div className="min-w-0">
             <h2 id="github-workspace-title" className="h-display text-lg font-semibold text-gilded">Kho GitHub</h2>
             <p className="mt-1 flex flex-wrap gap-x-2 text-xs text-[var(--color-mist)]">
-              <span>{workerCount} khôi lỗi</span>
-              <span>· {adViewerCount} xem QC</span>
+              <span>{stations.length} khôi lỗi</span>
               <span>· {totalCompanions} kho phụ</span>
               <span>· {enabledKeys}/{config.apiKeys.length} API key bật</span>
               <span className="max-w-full truncate font-mono" title={config.model}>· {config.model}</span>
@@ -141,33 +101,6 @@ export function GithubAdminWorkspace({
             })}
           </div>
         </div>
-
-        {/* Thanh chọn mục đích — chỉ hiện khi đang xem tab Kho chính, vì Ollama/API key là chung. */}
-        {section === "stations" && (
-          <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Loại kho GitHub">
-            {PURPOSES.map((p) => {
-              const active = p.id === purpose;
-              const count = purposeCountFor(p.id);
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                    active
-                      ? "border-[rgba(232,194,92,0.6)] bg-[rgba(232,194,92,0.12)] text-[var(--color-gold-300)]"
-                      : "border-[var(--color-ink-600)] text-[var(--color-mist)] hover:border-[rgba(232,194,92,0.3)] hover:text-[var(--color-parchment)]"
-                  }`}
-                  onClick={() => switchPurpose(p.id)}
-                >
-                  {p.label}
-                  <span className="ml-1.5 opacity-70">{count}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
       </section>
 
       <div
@@ -177,7 +110,7 @@ export function GithubAdminWorkspace({
         tabIndex={0}
         hidden={section !== "stations"}
       >
-        <GithubStationPanel stations={filteredStations} purpose={purpose} />
+        <GithubStationPanel stations={stations} />
       </div>
       <div
         role="tabpanel"

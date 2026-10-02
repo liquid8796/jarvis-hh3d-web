@@ -17,6 +17,7 @@
 
 import { execSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,13 +28,38 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_URL = (process.env.WEB_URL ?? "https://auto-hh3d.online").replace(/\/$/, "");
 const FALLBACK_URL = (process.env.WORKER_FALLBACK_URL ?? "").replace(/\/$/, "");
 const VIEWER_ID = process.env.AD_VIEWER_ID ?? "github-xem-qc";
+const rawLifetimeMin = process.argv.find((a) => a.startsWith("--max-lifetime-min="))?.split("=")[1];
+const rawLifetimeMs = process.argv.find((a) => a.startsWith("--max-lifetime-ms="))?.split("=")[1];
 const MAX_LIFETIME_MS = Math.max(
   60_000,
-  Number(process.env.AD_VIEWER_MAX_LIFETIME_MS ?? 17_400_000) || 17_400_000,
+  rawLifetimeMin
+    ? Number(rawLifetimeMin) * 60_000
+    : Number(rawLifetimeMs || process.env.AD_VIEWER_MAX_LIFETIME_MS || 17_400_000) || 17_400_000,
 );
-const DELAY_MIN_MS = Math.max(1000, Number(process.env.AD_VIEWER_DELAY_MIN_MS ?? 5000) || 5000);
-const DELAY_MAX_MS = Math.max(DELAY_MIN_MS, Number(process.env.AD_VIEWER_DELAY_MAX_MS ?? 10000) || 10000);
-const MAX_RECURSIVE_CLICKS = Math.max(0, Math.min(5, Number(process.env.AD_VIEWER_MAX_RECURSIVE_CLICKS ?? 2) || 2));
+
+const rawDelayMin = process.argv.find((a) => a.startsWith("--delay-min="))?.split("=")[1];
+const rawDelayMinMs = process.argv.find((a) => a.startsWith("--delay-min-ms="))?.split("=")[1];
+const DELAY_MIN_MS = Math.max(
+  1000,
+  rawDelayMin
+    ? Number(rawDelayMin) * 1000
+    : Number(rawDelayMinMs || process.env.AD_VIEWER_DELAY_MIN_MS || 5000) || 5000,
+);
+
+const rawDelayMax = process.argv.find((a) => a.startsWith("--delay-max="))?.split("=")[1];
+const rawDelayMaxMs = process.argv.find((a) => a.startsWith("--delay-max-ms="))?.split("=")[1];
+const DELAY_MAX_MS = Math.max(
+  DELAY_MIN_MS,
+  rawDelayMax
+    ? Number(rawDelayMax) * 1000
+    : Number(rawDelayMaxMs || process.env.AD_VIEWER_DELAY_MAX_MS || 10000) || 10000,
+);
+
+const rawRecursive = process.argv.find((a) => a.startsWith("--max-recursive-clicks="))?.split("=")[1];
+const MAX_RECURSIVE_CLICKS = Math.max(
+  0,
+  Math.min(5, Number(rawRecursive || process.env.AD_VIEWER_MAX_RECURSIVE_CLICKS || 2) || 2),
+);
 const AD_READY_TIMEOUT_MS = Math.max(
   5000,
   Number(process.env.AD_VIEWER_AD_READY_TIMEOUT_MS ?? 15_000) || 15_000,
@@ -58,6 +84,32 @@ const USE_CANVAS_BLOCKER =
   process.argv.includes("--with-canvas-blocker") ||
   process.env.AD_VIEWER_CANVAS_BLOCKER === "1";
 
+const PROXY_FILE = (
+  process.argv.find((a) => a.startsWith("--proxy-file="))?.split("=")[1] ||
+  process.env.AD_VIEWER_PROXY_FILE ||
+  ""
+).trim();
+
+const DIRECT_PROXY = (
+  process.argv.find((a) => a.startsWith("--proxy="))?.split("=")[1] ||
+  process.env.AD_VIEWER_PROXY ||
+  ""
+).trim();
+
+const ROTATE_URL = (
+  process.argv.find((a) => a.startsWith("--rotate-url="))?.split("=")[1] ||
+  process.env.AD_VIEWER_ROTATE_URL ||
+  ""
+).trim();
+
+const NO_PROXY =
+  process.argv.includes("--no-proxy") ||
+  process.env.AD_VIEWER_NO_PROXY === "1";
+
+const PROXY_SHUFFLE =
+  process.argv.includes("--proxy-shuffle") ||
+  process.env.AD_VIEWER_PROXY_SHUFFLE === "1";
+
 function rand(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -69,6 +121,330 @@ function sleep(ms) {
 function log(msg) {
   const ts = new Date().toLocaleTimeString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
   console.log(`[${ts}] [${VIEWER_ID}] ${msg}`);
+}
+
+// ============================================================
+//  ANTI-DETECT PROXY ENGINE & AUTO-ROTATION MANAGER
+//  Quản lý danh sách proxy, xoay proxy mỗi chu kỳ, chống phát hiện
+//  và đồng bộ địa lý (Zero-Mismatch Triad: Geo + Timezone + Locale).
+// ============================================================
+
+const COUNTRY_TO_LOCALE = {
+  VN: "vi-VN",
+  US: "en-US",
+  GB: "en-GB",
+  DE: "de-DE",
+  FR: "fr-FR",
+  JP: "ja-JP",
+  KR: "ko-KR",
+  RU: "ru-RU",
+  CN: "zh-CN",
+  TW: "zh-TW",
+  HK: "zh-HK",
+  ES: "es-ES",
+  MX: "es-MX",
+  AR: "es-AR",
+  BR: "pt-BR",
+  IN: "en-IN",
+  ID: "id-ID",
+  TH: "th-TH",
+  PH: "en-PH",
+  SG: "en-SG",
+  AU: "en-AU",
+  CA: "en-CA",
+  IT: "it-IT",
+  NL: "nl-NL",
+  PL: "pl-PL",
+  TR: "tr-TR",
+};
+
+/**
+ * Phân tích chuỗi proxy theo các định dạng phổ biến:
+ * 1. host:port (như D:\Project\lobby\proxies\list-proxies.txt)
+ * 2. host:port:username:password
+ * 3. protocol://username:password@host:port
+ * 4. username:password@host:port
+ */
+function parseProxyItem(rawStr) {
+  if (!rawStr) return null;
+  const str = rawStr.trim();
+  if (!str || str.startsWith("#") || str.startsWith("//")) return null;
+
+  // 1. URL format: protocol://user:pass@host:port
+  if (str.includes("://")) {
+    try {
+      const u = new URL(str);
+      const protocol = u.protocol.replace(":", "").toLowerCase();
+      const port = Number(u.port) || (protocol === "https" ? 443 : 80);
+      return {
+        protocol,
+        host: u.hostname,
+        port,
+        username: decodeURIComponent(u.username || ""),
+        password: decodeURIComponent(u.password || ""),
+        server: `${protocol}://${u.hostname}:${port}`,
+        raw: str,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  // 2. Format: user:pass@host:port
+  if (str.includes("@")) {
+    const atIndex = str.lastIndexOf("@");
+    const authPart = str.slice(0, atIndex);
+    const hostPart = str.slice(atIndex + 1);
+    const authColon = authPart.indexOf(":");
+    const username = authColon >= 0 ? authPart.slice(0, authColon) : authPart;
+    const password = authColon >= 0 ? authPart.slice(authColon + 1) : "";
+    const [host, port] = hostPart.split(":");
+    const p = Number(port) || 80;
+    return {
+      protocol: "http",
+      host: host.trim(),
+      port: p,
+      username: username.trim(),
+      password: password.trim(),
+      server: `http://${host.trim()}:${p}`,
+      raw: str,
+    };
+  }
+
+  // 3. Format: host:port:user:pass or host:port
+  const parts = str.split(":");
+  if (parts.length >= 4) {
+    const host = parts[0].trim();
+    const port = Number(parts[1].trim()) || 80;
+    const username = parts[2].trim();
+    const password = parts.slice(3).join(":").trim();
+    return {
+      protocol: "http",
+      host,
+      port,
+      username,
+      password,
+      server: `http://${host}:${port}`,
+      raw: str,
+    };
+  }
+
+  if (parts.length === 2) {
+    const host = parts[0].trim();
+    const port = Number(parts[1].trim()) || 80;
+    return {
+      protocol: "http",
+      host,
+      port,
+      username: "",
+      password: "",
+      server: `http://${host}:${port}`,
+      raw: str,
+    };
+  }
+
+  return null;
+}
+
+class ProxyManager {
+  constructor(options = {}) {
+    this.proxyList = [];
+    this.currentIndex = 0;
+    this.rotateUrl = options.rotateUrl || ROTATE_URL;
+    this.directProxy = options.directProxy || DIRECT_PROXY;
+    this.proxyFile = options.proxyFile || PROXY_FILE;
+    this.noProxy = options.noProxy || NO_PROXY;
+    this.shuffle = options.shuffle || PROXY_SHUFFLE;
+    this.initialized = false;
+  }
+
+  init() {
+    if (this.initialized) return;
+    this.initialized = true;
+
+    if (this.noProxy) {
+      log("[ProxyManager] Chế độ: Không dùng proxy (Direct IP của máy).");
+      return;
+    }
+
+    if (this.rotateUrl) {
+      log(`[ProxyManager] Chế độ: API xoay proxy động (${this.rotateUrl}).`);
+      return;
+    }
+
+    if (this.directProxy) {
+      const p = parseProxyItem(this.directProxy);
+      if (p) {
+        this.proxyList.push(p);
+        log(`[ProxyManager] Chế độ: 1 Proxy cố định (${p.server}).`);
+      } else {
+        log(`[ProxyManager] ⚠ Chuỗi proxy không hợp lệ: "${this.directProxy}"`);
+      }
+      return;
+    }
+
+    // Default proxy file path if none specified
+    const defaultListPath = "D:\\Project\\lobby\\proxies\\list-proxies.txt";
+    const fileToLoad = this.proxyFile || (existsSync(defaultListPath) ? defaultListPath : "");
+    if (fileToLoad && existsSync(fileToLoad)) {
+      try {
+        const content = readFileSync(fileToLoad, "utf8");
+        const lines = content.split(/\r?\n/);
+        for (const line of lines) {
+          const p = parseProxyItem(line);
+          if (p) this.proxyList.push(p);
+        }
+        if (this.shuffle) {
+          this.proxyList.sort(() => Math.random() - 0.5);
+          log(`[ProxyManager] Đã xáo trộn ngẫu nhiên danh sách proxy.`);
+        }
+        log(`[ProxyManager] Đã tải ${this.proxyList.length} proxy từ: ${fileToLoad}`);
+      } catch (err) {
+        log(`[ProxyManager] ⚠ Lỗi khi đọc tệp proxy: ${err.message}`);
+      }
+    } else if (this.proxyFile) {
+      log(`[ProxyManager] ⚠ Không tìm thấy tệp proxy tại: ${this.proxyFile}`);
+    } else {
+      log("[ProxyManager] Không chỉ định proxy. Chạy bằng IP trực tiếp của máy.");
+    }
+  }
+
+  hasActiveProxy() {
+    return !this.noProxy && (Boolean(this.rotateUrl) || this.proxyList.length > 0);
+  }
+
+  hasMultipleProxies() {
+    return Boolean(this.rotateUrl || this.proxyList.length > 1);
+  }
+
+  /**
+   * Kiểm tra khả năng kết nối tới proxy trong 2.5 giây.
+   */
+  async probe(proxy, timeoutMs = 2500) {
+    if (!proxy || !proxy.host || !proxy.port) return false;
+    return new Promise((resolve) => {
+      const socket = net.createConnection({
+        host: proxy.host,
+        port: Number(proxy.port),
+        timeout: timeoutMs,
+      });
+      socket.on("connect", () => {
+        socket.destroy();
+        resolve(true);
+      });
+      socket.on("timeout", () => {
+        socket.destroy();
+        resolve(false);
+      });
+      socket.on("error", () => {
+        socket.destroy();
+        resolve(false);
+      });
+    });
+  }
+
+  /**
+   * Tra cứu thông tin Geolocation, Timezone, và Locale theo IP của proxy.
+   */
+  async resolveGeo(proxy) {
+    if (!proxy || !proxy.host) return null;
+    try {
+      const res = await fetch(
+        `http://ip-api.com/json/${proxy.host}?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,query`,
+        { signal: AbortSignal.timeout(3000) },
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === "success") {
+          const locale = COUNTRY_TO_LOCALE[data.countryCode] || "en-US";
+          return {
+            country: data.country || "United States",
+            countryCode: data.countryCode || "US",
+            region: data.regionName || "",
+            city: data.city || "",
+            lat: Number(data.lat) || 40.7128,
+            lon: Number(data.lon) || -74.006,
+            timezoneId: data.timezone || "America/New_York",
+            locale,
+            query: data.query || proxy.host,
+          };
+        }
+      }
+    } catch {}
+
+    return {
+      country: "United States",
+      countryCode: "US",
+      region: "New York",
+      city: "New York",
+      lat: 40.7128,
+      lon: -74.006,
+      timezoneId: "America/New_York",
+      locale: "en-US",
+      query: proxy.host,
+    };
+  }
+
+  async getNextWorkingProxy() {
+    this.init();
+    if (!this.hasActiveProxy()) return null;
+
+    if (this.rotateUrl) {
+      try {
+        log(`[ProxyManager] Đang lấy proxy mới từ rotate URL: ${this.rotateUrl}...`);
+        const res = await fetch(this.rotateUrl, { signal: AbortSignal.timeout(5000) });
+        if (res.ok) {
+          const text = (await res.text()).trim();
+          let proxyStr = text;
+          try {
+            const json = JSON.parse(text);
+            proxyStr = json.proxy || json.data?.proxy || json.ip || text;
+          } catch {}
+          const p = parseProxyItem(proxyStr);
+          if (p) {
+            p.geo = await this.resolveGeo(p);
+            log(
+              `[ProxyManager] ✓ Đã nhận proxy mới từ API: ${p.server} | ` +
+              `Vị trí: ${p.geo?.city}, ${p.geo?.country} | Timezone: ${p.geo?.timezoneId} | Locale: ${p.geo?.locale}`
+            );
+            return p;
+          }
+        }
+      } catch (err) {
+        log(`[ProxyManager] ⚠ Lỗi khi lấy proxy từ rotate URL: ${err.message}`);
+      }
+      return null;
+    }
+
+    const total = this.proxyList.length;
+    if (total === 1) {
+      const single = this.proxyList[0];
+      if (!single.geo) single.geo = await this.resolveGeo(single);
+      return single;
+    }
+
+    const maxTries = Math.min(total, 25);
+    for (let i = 0; i < maxTries; i++) {
+      const candidate = this.proxyList[this.currentIndex % total];
+      this.currentIndex = (this.currentIndex + 1) % total;
+
+      log(`[ProxyManager] Kiểm tra proxy [${candidate.host}:${candidate.port}] (thử ${i + 1}/${maxTries})...`);
+      const alive = await this.probe(candidate, 2500);
+      if (alive) {
+        candidate.geo = await this.resolveGeo(candidate);
+        log(
+          `[ProxyManager] ✓ Proxy kết nối tốt: ${candidate.server} | ` +
+          `Vị trí: ${candidate.geo.city}, ${candidate.geo.country} (${candidate.geo.countryCode}) | ` +
+          `Timezone: ${candidate.geo.timezoneId} | Locale: ${candidate.geo.locale}`
+        );
+        return candidate;
+      }
+      log(`[ProxyManager] ⚠ Proxy ${candidate.host}:${candidate.port} không phản hồi; tự động bỏ qua...`);
+    }
+
+    log(`[ProxyManager] ⚠ Đã kiểm tra ${maxTries} proxy nhưng không có proxy nào phản hồi. Chạy chu kỳ này bằng IP máy.`);
+    return null;
+  }
 }
 
 // ============================================================
@@ -618,16 +994,21 @@ function discoverMainChromeExtensions() {
   return extPaths;
 }
 
-async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false) {
+async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false, proxy = null) {
   const isListening = await fetch(`http://127.0.0.1:${cdpPort}/json/version`, {
     signal: AbortSignal.timeout(1000),
   })
     .then((r) => r.ok)
     .catch(() => false);
 
-  if (isListening) {
+  if (isListening && !proxy) {
     log(`✓ Phát hiện Chrome đang lắng nghe trên cổng CDP ${cdpPort}.`);
     return;
+  }
+  if (isListening && proxy) {
+    log(`Khởi động lại Chrome trên cổng CDP ${cdpPort} để áp dụng Proxy mới...`);
+    killChromeProcesses();
+    await sleep(1500);
   }
 
   const chromePaths = [
@@ -638,6 +1019,16 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false) {
     "chrome",
   ];
   const chromeBin = chromePaths.find((p) => existsSync(p)) || "chrome";
+
+  const webrtcAntiLeakFlags = [
+    "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+    "--enforce-webrtc-ip-permission-check",
+    "--webrtc-ip-handling-policy=disable_non_proxied_udp",
+  ];
+
+  const proxyFlags = proxy
+    ? [`--proxy-server=${proxy.server}`, "--proxy-bypass-list=<-loopback>"]
+    : [];
 
   if (useRealProfile) {
     if (isChromeProcessRunning()) {
@@ -678,6 +1069,8 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false) {
       "--remote-allow-origins=*",
       `--user-data-dir=${userDataDir}`,
       "--restore-last-session",
+      ...webrtcAntiLeakFlags,
+      ...proxyFlags,
     ];
 
     const child = spawn(chromeBin, args, { detached: true, stdio: "ignore" });
@@ -696,6 +1089,8 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false) {
       "--enable-experimental-extension-apis",
       "--extensions-on-chrome-urls",
       "--silent-debugger-extension-api",
+      ...webrtcAntiLeakFlags,
+      ...proxyFlags,
     ];
 
     if (extensionPath) {
@@ -716,7 +1111,7 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false) {
       .then((r) => r.ok)
       .catch(() => false);
     if (ok) {
-      log(`✓ Chrome đã sẵn sàng trên cổng CDP ${cdpPort}.`);
+      log(`✓ Chrome đã sẵn sàng trên cổng CDP ${cdpPort}${proxy ? ` (Proxy: ${proxy.server})` : ""}.`);
       return;
     }
   }
@@ -724,7 +1119,7 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false) {
   throw new Error(`Không thể khởi động Chrome trên cổng CDP ${cdpPort} sau 15 giây.`);
 }
 
-async function runOneCycle(extensionPath) {
+async function runOneCycle(extensionPath, currentProxy = null, proxyManager = null) {
   const useMyChrome =
     process.argv.includes("--my-chrome") ||
     process.argv.includes("--my-profile") ||
@@ -754,7 +1149,7 @@ async function runOneCycle(extensionPath) {
       log(`Kết nối tới Chrome ${useMyChrome ? "chính " : ""}qua CDP: ${cdpUrl}...`);
       try {
         if (cdpUrl.includes("127.0.0.1") || cdpUrl.includes("localhost")) {
-          await ensureCdpServer(cdpPort, extensionPath, useMyChrome);
+          await ensureCdpServer(cdpPort, extensionPath, useMyChrome, currentProxy);
         }
         browser = await chromium.connectOverCDP(cdpUrl);
         context = browser.contexts()[0] || (await browser.newContext());
@@ -782,6 +1177,9 @@ async function runOneCycle(extensionPath) {
         "--silent-debugger-extension-api",
         "--no-default-browser-check",
         "--no-first-run",
+        "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+        "--enforce-webrtc-ip-permission-check",
+        "--webrtc-ip-handling-policy=disable_non_proxied_udp",
       ];
 
       if (extensionPath && isTempProfile) {
@@ -803,11 +1201,27 @@ async function runOneCycle(extensionPath) {
         headless: false,
         args: launchArgs,
         viewport: { width: 1366, height: 768 },
-        locale: "vi-VN",
-        timezoneId: "Asia/Ho_Chi_Minh",
+        locale: currentProxy?.geo?.locale || "vi-VN",
+        timezoneId: currentProxy?.geo?.timezoneId || "Asia/Ho_Chi_Minh",
         userAgent:
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
       };
+
+      if (currentProxy) {
+        launchOptions.proxy = {
+          server: currentProxy.server,
+          username: currentProxy.username || undefined,
+          password: currentProxy.password || undefined,
+        };
+        if (currentProxy.geo?.lat !== undefined && currentProxy.geo?.lon !== undefined) {
+          launchOptions.geolocation = {
+            latitude: currentProxy.geo.lat,
+            longitude: currentProxy.geo.lon,
+            accuracy: 10,
+          };
+          launchOptions.permissions = ["geolocation"];
+        }
+      }
 
       const channel = useMyChrome ? "chrome" : "chromium";
 
@@ -828,6 +1242,73 @@ async function runOneCycle(extensionPath) {
     }
 
     page = useMyChrome || cdpUrl ? await context.newPage() : context.pages()[0] || (await context.newPage());
+
+    // Cài đặt Anti-Detect overrides và xác thực Proxy qua CDP
+    try {
+      const cdpClient = await context.newCDPSession(page).catch(() => null);
+      if (cdpClient) {
+        if (currentProxy?.username && currentProxy?.password) {
+          await cdpClient.send("Fetch.enable", { handleAuthRequests: true }).catch(() => {});
+          cdpClient.on("Fetch.authRequired", async (event) => {
+            if (event.authChallenge?.source === "Proxy") {
+              await cdpClient.send("Fetch.continueWithAuth", {
+                requestId: event.requestId,
+                authChallengeResponse: {
+                  response: "ProvideCredentials",
+                  username: currentProxy.username,
+                  password: currentProxy.password,
+                },
+              }).catch(() => {});
+            } else {
+              await cdpClient.send("Fetch.continueWithAuth", {
+                requestId: event.requestId,
+                authChallengeResponse: { response: "Default" },
+              }).catch(() => {});
+            }
+          });
+        }
+
+        if (currentProxy?.geo) {
+          if (currentProxy.geo.timezoneId) {
+            await cdpClient.send("Emulation.setTimezoneOverride", {
+              timezoneId: currentProxy.geo.timezoneId,
+            }).catch(() => {});
+          }
+          if (currentProxy.geo.lat !== undefined && currentProxy.geo.lon !== undefined) {
+            await cdpClient.send("Emulation.setGeolocationOverride", {
+              latitude: currentProxy.geo.lat,
+              longitude: currentProxy.geo.lon,
+              accuracy: 10,
+            }).catch(() => {});
+            await context.grantPermissions(["geolocation"], { origin: WEB_URL }).catch(() => {});
+          }
+          if (currentProxy.geo.locale) {
+            const lang = currentProxy.geo.locale;
+            const baseLang = lang.split("-")[0];
+            await cdpClient.send("Network.setUserAgentOverride", {
+              userAgent:
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+              acceptLanguage: `${lang},${baseLang};q=0.9,en;q=0.8`,
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch (err) {
+      log(`[AntiDetect] ⚠ Không thể cấu hình CDP overrides: ${err.message}`);
+    }
+
+    // Tiêm script ngăn chặn rò rỉ IP qua WebRTC STUN request
+    await context.addInitScript(() => {
+      if (window.RTCPeerConnection) {
+        const origSetConfiguration = RTCPeerConnection.prototype.setConfiguration;
+        if (origSetConfiguration) {
+          RTCPeerConnection.prototype.setConfiguration = function (config) {
+            if (config && config.iceCandidatePoolSize) config.iceCandidatePoolSize = 0;
+            return origSetConfiguration.call(this, config);
+          };
+        }
+      }
+    }).catch(() => {});
 
     const renderStartedAt = Date.now();
     log(`Mở trang chủ ${WEB_URL}...`);
@@ -1096,6 +1577,11 @@ async function runOneCycle(extensionPath) {
       if (page && !page.isClosed()) {
         await page.close().catch(() => {});
       }
+      if (useMyChrome && proxyManager?.hasMultipleProxies()) {
+        log("✓ Hoàn thành chu kỳ. Tắt Chrome để chuẩn bị xoay sang Proxy mới cho chu kỳ tiếp theo...");
+        killChromeProcesses();
+        await sleep(1500);
+      }
     } else {
       if (context) {
         await context.close().catch(() => {});
@@ -1128,13 +1614,17 @@ async function main() {
     log("Tiện ích CanvasBlocker: tắt (mặc định). Dùng --canvas-blocker để bật.");
   }
 
+  const proxyManager = new ProxyManager();
+  proxyManager.init();
+
   const startTime = Date.now();
   let cycle = 0;
 
   while (Date.now() - startTime < MAX_LIFETIME_MS) {
     cycle++;
     log(`\n=================== BẮT ĐẦU CHU KỲ ${cycle} ===================`);
-    await runOneCycle(extPath);
+    const currentProxy = await proxyManager.getNextWorkingProxy();
+    await runOneCycle(extPath, currentProxy, proxyManager);
 
     const elapsedMs = Date.now() - startTime;
     const remainingMs = MAX_LIFETIME_MS - elapsedMs;

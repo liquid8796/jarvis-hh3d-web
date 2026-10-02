@@ -6,8 +6,6 @@ const root = path.join(import.meta.dirname, "..");
 const read = (relative: string) => readFileSync(path.join(root, relative), "utf8");
 
 const runtime = read("scripts/adViewer.mjs");
-const workflow = read("deploy/github/xem-quang-cao.yml");
-const bundle = read("scripts/buildAdViewerBundle.mjs");
 
 assert.match(runtime, /\.adsterra-leaderboard\[data-status="ready"\]/);
 assert.match(runtime, /\.adsterra-native\[data-status="ready"\]/);
@@ -31,18 +29,8 @@ assert.match(runtime, /generateBezierPath\s*\(/, "ad-viewer must generate Bézie
 assert.match(runtime, /MAX_RECURSIVE_CLICKS/, "ad-viewer must support recursive ad clicks");
 assert.match(runtime, /handleRecursiveAdClicks/, "ad-viewer must handle recursive ad clicks");
 assert.match(runtime, /while \(Date\.now\(\) - startTime < MAX_LIFETIME_MS\)/, "ad-viewer must loop across lifetime cycles");
-
-assert.match(workflow, /name: Xem quảng cáo/);
-assert.match(workflow, /AD_VIEWER_AD_READY_TIMEOUT_MS: "15000"/);
-assert.match(workflow, /AD_VIEWER_MAX_RECURSIVE_CLICKS: "2"/);
-assert.match(workflow, /AD_VIEWER_MAX_LIFETIME_MS:/);
-assert.match(workflow, /timeout-minutes: 350/);
-assert.match(workflow, /name: Phát lượt kế/);
-assert.match(bundle, /xem và click quảng cáo Adsterra với CanvasBlocker/);
-assert.match(runtime, /developer_mode:\s*true/, "ad-viewer must configure developer_mode in Chrome profile preferences");
 assert.match(runtime, /prepareExtensionProfile/, "ad-viewer must prepare extension profile");
-assert.match(workflow, /AD_VIEWER_ENABLE_DEV_MODE:\s*"1"/, "workflow must pass AD_VIEWER_ENABLE_DEV_MODE to ad viewer step");
 
 console.log(
-  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, enables extension developer mode, and runs continuous cycles.",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, and runs continuous cycles locally.",
 );

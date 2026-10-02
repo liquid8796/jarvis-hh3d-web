@@ -40,7 +40,6 @@ import {
   type ActiveRun,
 } from "./githubKhoiloi.mts";
 import {
-  AD_VIEWER_WEB_URL,
   OWNED_PREFIXES,
   WORKFLOW_TARGET_PATH,
   WORKFLOW_TEMPLATE_PATH,
@@ -314,22 +313,6 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
 
   check("moi WEB_URL từ chuỗi rác → null", webUrlFromWorkflow("khong co gi o day") === null);
   check("moi WEB_URL từ giá trị rỗng → null", webUrlFromWorkflow("vars.WEB_URL || ''") === null);
-
-  const adTemplate = readFileSync(path.join(repoRoot, "deploy/github/xem-quang-cao.yml"), "utf8");
-  check("moi được AD_VIEWER_ID khỏi bản mẫu quảng cáo", workerIdFromWorkflow(adTemplate) !== null);
-  check("bản mẫu quảng cáo mở đúng tên miền production", webUrlFromWorkflow(adTemplate) === AD_VIEWER_WEB_URL);
-  const renderedAd = renderWorkflow({
-    template: adTemplate,
-    workerId: "xem-qc-tro-kiem-chung",
-    webUrl: "https://vi-du.invalid",
-    workflowFile: "check-exist.yml",
-    purpose: "adViewer",
-  });
-  check("vẽ xong thì AD_VIEWER_ID là id mới", workerIdFromWorkflow(renderedAd) === "xem-qc-tro-kiem-chung");
-  check("đường dựng chung không ghi đè URL quảng cáo bằng URL worker", webUrlFromWorkflow(renderedAd) === AD_VIEWER_WEB_URL);
-  check("workflow quảng cáo riêng tự phát lại đúng tệp", renderedAd.includes("/actions/workflows/check-exist.yml/dispatches"));
-  check("workflow quảng cáo riêng không còn tự phát vào xem-quang-cao.yml", !renderedAd.includes("/actions/workflows/xem-quang-cao.yml/dispatches"));
-  check("workflow quảng cáo gọi ad-viewer.mjs", renderedAd.includes('node "$XEM_QC_RUNTIME/ad-viewer.mjs"'));
 }
 
 // ---- 5. Hai hằng số song sinh + phép soi đường import ---------------------------------------------

@@ -9,6 +9,15 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.128 — Anti-Detect Proxy Engine, xoay proxy tự động và công cụ chạy cục bộ (02/10/2026)
+
+- Tách hoàn toàn tính năng xem quảng cáo khỏi bảng điều khiển web và các kho GitHub worker; web nay chỉ quản lý duy nhất trạm khôi lỗi tự động làm nhiệm vụ.
+- Tích hợp Anti-Detect Proxy Engine vào `scripts/adViewer.mjs` hỗ trợ tự động xoay proxy mỗi chu kỳ, đọc danh sách proxy nhiều định dạng (host:port, user:pass, API rotate URL).
+- Cơ chế Zero-Mismatch Triad: tự động tra cứu Geo-IP, đồng bộ múi giờ IANA (`Emulation.setTimezoneOverride`), toạ độ GPS (`Emulation.setGeolocationOverride`), ngôn ngữ và Accept-Language theo quốc gia proxy.
+- Chống rò rỉ WebRTC qua proxy bằng các cờ mạng Chromium (`--force-webrtc-ip-handling-policy=disable_non_proxied_udp`, `--enforce-webrtc-ip-permission-check`) kết hợp script bảo vệ kết nối cục bộ.
+- Thử kết nối nhanh socket TCP (2.5s) để tự động bỏ qua proxy chết mà không làm gián đoạn chu kỳ.
+- Bổ sung công cụ tương tác `run-ad-viewer.bat` cho phép người dùng chạy chế độ `--my-chrome` và tuỳ chỉnh toàn bộ tham số qua giao diện dòng lệnh.
+
 ## 1.3.127 — Chạy trực tiếp trên thư mục User Data mặc định qua liên kết NTFS Junction (02/10/2026)
 
 - Tạo liên kết trực tiếp (NTFS Junction) trỏ thẳng vào thư mục User Data mặc định của người dùng (`%LOCALAPPDATA%\Google\Chrome\User Data`).

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.128",
+    date: "2026-10-02",
+    lines: [
+      "Bảng điều khiển web tập trung toàn bộ cho trạm khôi lỗi; tính năng xem quảng cáo chuyển sang chạy cục bộ.",
+      "Tự động xoay proxy mỗi chu kỳ kèm đồng bộ múi giờ, vị trí địa lý và chống rò rỉ kết nối trình duyệt.",
+    ],
+  },
+  {
     version: "1.3.127",
     date: "2026-10-02",
     lines: [
@@ -469,13 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Kho GitHub nay chia thành ba mục gọn; mở vào thấy ngay danh sách kho chính mà không phải cuộn qua cấu hình.",
       "Mỗi kho chỉ hiện trạng thái cần thiết; form tạo hoặc sửa mở riêng và dễ dùng hơn trên điện thoại.",
-    ],
-  },
-  {
-    version: "1.3.78",
-    date: "2026-09-12",
-    lines: [
-      "Trang Tông Môn nay nhớ tab đang mở, nên tải lại trang vẫn trở về đúng khu đang làm việc.",
     ],
   },
 ];

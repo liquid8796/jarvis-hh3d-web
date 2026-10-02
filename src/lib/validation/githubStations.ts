@@ -46,7 +46,6 @@ export const DEFAULT_WORKFLOW_FILE = "linh-su.yml";
 
 export type StationPurpose = "worker" | "adViewer";
 export const STATION_PURPOSES = ["worker", "adViewer"] as const;
-export const DEFAULT_AD_VIEWER_WORKFLOW_FILE = "xem-quang-cao.yml";
 
 /**
  * GitHub tắt lịch `schedule` sau ngần này ngày không có hoạt động commit. Con số của GitHub,

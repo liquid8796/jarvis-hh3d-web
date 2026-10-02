@@ -49,7 +49,6 @@ import path from "node:path";
 import { sqlTag } from "./pgTag.mjs";
 import { decryptSecret, isEncrypted } from "../src/lib/crypto/secretBox";
 import {
-  DEFAULT_AD_VIEWER_WORKFLOW_FILE,
   DEFAULT_WORKFLOW_FILE,
   explainFailure,
   reviewStationIdentity,
@@ -228,8 +227,8 @@ const rejected: string[] = [];
 for (const row of (rawStations ?? []) as Array<Record<string, unknown>>) {
   const owner = String(row?.owner ?? "");
   const repo = String(row?.repo ?? "");
-  const purpose = (row?.purpose === "adViewer" ? "adViewer" : "worker") as "worker" | "adViewer";
-  const defaultWorkflow = purpose === "adViewer" ? DEFAULT_AD_VIEWER_WORKFLOW_FILE : DEFAULT_WORKFLOW_FILE;
+  const purpose = "worker" as const;
+  const defaultWorkflow = DEFAULT_WORKFLOW_FILE;
   const workflowFile = String(row?.workflowFile ?? defaultWorkflow) || defaultWorkflow;
   const complaint = reviewStationIdentity(owner, repo, workflowFile);
   if (complaint) {

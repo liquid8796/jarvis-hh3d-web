@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.127 — Chạy trực tiếp trên thư mục User Data mặc định qua liên kết NTFS Junction (02/10/2026)
+
+- Tạo liên kết trực tiếp (NTFS Junction) trỏ thẳng vào thư mục User Data mặc định của người dùng (`%LOCALAPPDATA%\Google\Chrome\User Data`).
+- Vượt qua kiểm tra chuỗi đường dẫn bảo mật của Chromium khi bật remote debugging, cho phép Chrome khởi chạy trên toàn bộ dữ liệu thật của trình duyệt mặc định.
+- Tự động nạp sẵn toàn bộ tiện ích, lịch sử và cấu hình gốc của máy mà không cần sao chép dữ liệu.
+
 ## 1.3.126 — Tự động nhận diện và nạp toàn bộ tiện ích Chrome máy thật khi chạy ads (02/10/2026)
 
 - Sửa lỗi kết nối CDP trên Chrome phiên bản mới bằng cách tự động quét toàn bộ thư mục tiện ích mở rộng đang cài đặt trên Chrome chính của máy.

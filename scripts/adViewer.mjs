@@ -16,7 +16,7 @@
  */
 
 import { execSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -640,25 +640,45 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false) {
   const chromeBin = chromePaths.find((p) => existsSync(p)) || "chrome";
 
   if (useRealProfile) {
-    const userExts = discoverMainChromeExtensions();
-    log(`✓ Đã tự động phát hiện ${userExts.length} tiện ích mở rộng đang cài trên Chrome chính của bạn.`);
+    if (isChromeProcessRunning()) {
+      log("Phát hiện Chrome đang mở. Đang khởi động lại Chrome với cổng gỡ lỗi 9222...");
+      killChromeProcesses();
+      await sleep(1500);
+    } else {
+      log(`Khởi chạy Chrome chính trên thư mục User Data mặc định với cổng gỡ lỗi ${cdpPort}...`);
+    }
 
-    const adViewerDir = path.join(process.env.LOCALAPPDATA || tmpdir(), "Google", "Chrome", "User Data-AdViewer");
-    mkdirSync(adViewerDir, { recursive: true });
+    const realUserData = path.join(
+      process.env.LOCALAPPDATA || "",
+      "Google",
+      "Chrome",
+      "User Data"
+    );
+    const junctionPath = path.join(
+      process.env.LOCALAPPDATA || tmpdir(),
+      "Google",
+      "Chrome",
+      "User Data-Direct"
+    );
 
-    log(`Khởi chạy Chrome với cổng gỡ lỗi ${cdpPort} (nạp đầy đủ ${userExts.length} extension hiện có của bạn)...`);
+    try {
+      if (existsSync(junctionPath)) {
+        rmSync(junctionPath, { recursive: true, force: true });
+      }
+      symlinkSync(realUserData, junctionPath, "junction");
+      log("✓ Đã tạo liên kết trực tiếp (NTFS Junction) vào thư mục User Data mặc định của máy.");
+    } catch {
+      // nếu không tạo được junction, dùng trực tiếp realUserData
+    }
+
+    const userDataDir = existsSync(junctionPath) ? junctionPath : realUserData;
 
     const args = [
       `--remote-debugging-port=${cdpPort}`,
       "--remote-allow-origins=*",
-      `--user-data-dir=${adViewerDir}`,
-      "--no-first-run",
-      "--no-default-browser-check",
+      `--user-data-dir=${userDataDir}`,
+      "--restore-last-session",
     ];
-
-    if (userExts.length > 0) {
-      args.push(`--load-extension=${userExts.join(",")}`);
-    }
 
     const child = spawn(chromeBin, args, { detached: true, stdio: "ignore" });
     child.unref();

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.127",
+    date: "2026-10-02",
+    lines: [
+      "Hỗ trợ liên kết trực tiếp vào thư mục hồ sơ duyệt web mặc định của người dùng trên máy.",
+      "Vượt qua kiểm tra bảo mật của trình duyệt để sử dụng đầy đủ cấu hình và tiện ích gốc.",
+    ],
+  },
+  {
     version: "1.3.126",
     date: "2026-10-02",
     lines: [
@@ -468,15 +476,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     date: "2026-09-12",
     lines: [
       "Trang Tông Môn nay nhớ tab đang mở, nên tải lại trang vẫn trở về đúng khu đang làm việc.",
-    ],
-  },
-  {
-    version: "1.3.77",
-    date: "2026-09-11",
-    lines: [
-      "Tên repo chính nay luôn khác tên khôi lỗi, kể cả khi tự nhập hoặc để Ollama đặt tên.",
-      "WORKER_ID được tạo riêng và giữ riêng, nên đổi tên repo chính không đổi danh tính điểm danh.",
-      "Có công cụ đổi các repo chính cũ còn trùng tên khôi lỗi sang tên mới do Ollama chọn.",
     ],
   },
 ];

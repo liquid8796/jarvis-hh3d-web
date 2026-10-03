@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.159",
+    date: "2026-10-03",
+    lines: [
+      "Khôi phục quảng cáo dạng đề xuất nội dung NativeBanner trên website để đa dạng hoá hiển thị.",
+      "Khu vực tài trợ trung tâm kết hợp hài hoà giữa biểu ngữ chữ nhật và khối đề xuất tự nhiên.",
+    ],
+  },
+  {
     version: "1.3.158",
     date: "2026-10-03",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Dòng chữ Quảng cáo phía trên khu tài trợ đã được bỏ để trang gọn và liền mạch hơn.",
       "Nếu trình duyệt chặn hoặc zone không có nội dung, khung trống tự thu lại; website không tự vượt cơ chế chặn của trình duyệt.",
-    ],
-  },
-  {
-    version: "1.3.109",
-    date: "2026-10-01",
-    lines: [
-      "Website nay có thêm quảng cáo Adsterra gồm biểu ngữ, đề xuất nội dung, Social Bar và Popunder trên tên miền chính thức.",
-      "Quản trị viên, máy local và tên miền cũ vẫn không tải quảng cáo; mọi định dạng có thể dừng khẩn cấp từ cấu hình máy chủ.",
     ],
   },
 ];

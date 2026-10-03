@@ -85,6 +85,11 @@
   gap: 0.75rem;
 }
 
+.adsterra-native {
+  min-height: 96px;
+  padding: 0.65rem;
+}
+
 .adsterra-smartlink {
   justify-self: center;
   color: rgba(232, 194, 92, 0.9);

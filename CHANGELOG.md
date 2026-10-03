@@ -9,6 +9,16 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.159 — Khôi phục quảng cáo đề xuất nội dung NativeBanner trên website (03/10/2026)
+
+- Khôi phục định dạng quảng cáo NativeBanner (tỷ lệ 4:1) trong khu vực tài trợ của website:
+  - Cập nhật [src/components/adsterra/AdsterraClientAds.tsx](src/components/adsterra/AdsterraClientAds.tsx):
+    - Tái nhập container ID `ADSTERRA_NATIVE_CONTAINER_ID` và script nhúng `ADSTERRA_NATIVE_SCRIPT_SRC`.
+    - Tái lập trạng thái `nativeStatus` và ref `nativeRef`, lắng nghe sự kiện render và kích hoạt `watchForRenderedAd` để giám sát trạng thái tải.
+    - Đặt lại vùng chứa thẻ `<div className="adsterra-unit adsterra-native" />` tại cột trung tâm bên dưới banner 300x250.
+  - Cập nhật [src/app/adsterra.css](src/app/adsterra.css): Khôi phục định dạng chiều cao tối thiểu (`min-height: 96px`) và padding cho lớp `.adsterra-native`.
+  - Cập nhật [scripts/verifyAdsterra.mts](scripts/verifyAdsterra.mts): Kiểm chứng script nạp NativeBanner, cờ `dataset.cfasync = "false"`, trạng thái DOM và CSS liên quan.
+
 ## 1.3.158 — Tối ưu hoá SEO toàn diện, chuẩn hoá Schema JSON-LD và sơ đồ trang (03/10/2026)
 
 - Triển khai tối ưu hoá SEO toàn diện nhằm tăng chất lượng xếp hạng trang web và hưởng lợi cho doanh thu quảng cáo (Google AdSense, Adsterra):

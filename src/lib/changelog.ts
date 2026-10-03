@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.148",
+    date: "2026-10-03",
+    lines: [
+      "Khắc phục sự cố tiện ích CanvasBlocker không xuất hiện khi khởi chạy trình xem quảng cáo.",
+      "Tự động kích hoạt chế độ nhà phát triển (Developer Mode) cho toàn bộ phiên duyệt web đơn và đa luồng.",
+      "Hỗ trợ cấu hình đường dẫn tiện ích tuỳ chỉnh linh hoạt và tương thích tuyệt đối với Chromium.",
+    ],
+  },
+  {
     version: "1.3.147",
     date: "2026-10-03",
     lines: [
@@ -465,15 +474,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Tên Miền nay nằm ngay trên thanh menu; khách, tài khoản chờ duyệt, thành viên và quản trị đều xem được.",
       "Trang Tông Môn không còn chứa mục này; thông tin tên miền được mở ở một trang chung riêng.",
       "Địa chỉ cũ vẫn giữ đúng đường dẫn đang mở khi chuyển sang tên miền chính thức.",
-    ],
-  },
-  {
-    version: "1.3.98",
-    date: "2026-09-27",
-    lines: [
-      "Tông Môn có tab Tên miền mới, cho biết rõ địa chỉ nào đang hoạt động và địa chỉ nào đã đóng.",
-      "Người mở địa chỉ cũ sẽ thấy trang hướng dẫn thân thiện rồi được chuyển sau 8 giây tới đúng đường dẫn trên tên miền mới.",
-      "Khôi lỗi và bộ cài không còn gọi địa chỉ đã đóng; mọi đường dự phòng nay dùng tên miền chính thức.",
     ],
   },
 ];

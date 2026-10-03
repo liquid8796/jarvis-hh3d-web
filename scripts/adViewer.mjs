@@ -1496,14 +1496,16 @@ async function simulateLandingPageEngagement(page, durationMs) {
 }
 
 function resolveExtensionPath() {
+  const custom = getCliArg("--canvas-blocker-path") || process.env.CANVAS_BLOCKER_PATH || "";
   const candidates = [
+    ...(custom ? [custom] : []),
     path.join(__dirname, "canvas-blocker"),
     path.join(__dirname, "../deploy/extensions/canvas-blocker"),
     "D:\\Backup\\Chrome\\CanvasBlocker",
   ];
   for (const c of candidates) {
     if (existsSync(path.join(c, "manifest.json"))) {
-      return c;
+      return path.resolve(c);
     }
   }
   return null;
@@ -1710,32 +1712,72 @@ async function handleRecursiveAdClicks(targetPage, depth, maxDepth, ctx, instanc
 }
 
 function prepareExtensionProfile(profileDir) {
-  if (!ENABLE_DEV_MODE) return;
+  if (!ENABLE_DEV_MODE || !profileDir) return;
   try {
     const defaultDir = path.join(profileDir, "Default");
     mkdirSync(defaultDir, { recursive: true });
-    const prefs = {
-      extensions: {
-        ui: {
-          developer_mode: true,
-        },
-        alerts: {
-          initialized: true,
-        },
-      },
-    };
-    writeFileSync(path.join(defaultDir, "Preferences"), JSON.stringify(prefs, null, 2), "utf8");
 
-    const localState = {
-      extensions: {
-        ui: {
-          developer_mode: true,
-        },
-      },
-    };
-    writeFileSync(path.join(profileDir, "Local State"), JSON.stringify(localState, null, 2), "utf8");
+    const prefsPath = path.join(defaultDir, "Preferences");
+    let prefs = {};
+    if (existsSync(prefsPath)) {
+      try {
+        prefs = JSON.parse(readFileSync(prefsPath, "utf8")) || {};
+      } catch {}
+    }
+    prefs.extensions = prefs.extensions || {};
+    prefs.extensions.ui = prefs.extensions.ui || {};
+    prefs.extensions.ui.developer_mode = true;
+    prefs.extensions.alerts = prefs.extensions.alerts || {};
+    prefs.extensions.alerts.initialized = true;
+    writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), "utf8");
+
+    const secPrefsPath = path.join(defaultDir, "Secure Preferences");
+    let secPrefs = {};
+    if (existsSync(secPrefsPath)) {
+      try {
+        secPrefs = JSON.parse(readFileSync(secPrefsPath, "utf8")) || {};
+      } catch {}
+    }
+    secPrefs.extensions = secPrefs.extensions || {};
+    secPrefs.extensions.ui = secPrefs.extensions.ui || {};
+    secPrefs.extensions.ui.developer_mode = true;
+    writeFileSync(secPrefsPath, JSON.stringify(secPrefs, null, 2), "utf8");
+
+    const localStatePath = path.join(profileDir, "Local State");
+    let localState = {};
+    if (existsSync(localStatePath)) {
+      try {
+        localState = JSON.parse(readFileSync(localStatePath, "utf8")) || {};
+      } catch {}
+    }
+    localState.extensions = localState.extensions || {};
+    localState.extensions.ui = localState.extensions.ui || {};
+    localState.extensions.ui.developer_mode = true;
+    writeFileSync(localStatePath, JSON.stringify(localState, null, 2), "utf8");
   } catch {
     // không chặn nếu ghi preferences thất bại
+  }
+}
+
+async function ensureDeveloperMode(context) {
+  if (!ENABLE_DEV_MODE || !context) return;
+  try {
+    const hadExistingPages = context.pages().length > 0;
+    const devPage = await context.newPage();
+    await devPage.goto("chrome://extensions", { timeout: 4000, waitUntil: "domcontentloaded" });
+    await devPage.evaluate(() => {
+      const m = document.querySelector("extensions-manager");
+      const t = m?.shadowRoot?.querySelector("extensions-toolbar");
+      const dev = t?.shadowRoot?.querySelector("#devMode");
+      if (dev && dev.getAttribute("aria-pressed") !== "true") {
+        dev.click();
+      }
+    }).catch(() => {});
+    if (hadExistingPages) {
+      await devPage.close().catch(() => {});
+    }
+  } catch {
+    // Không chặn tiến trình nếu WebUI chrome://extensions không khả dụng
   }
 }
 
@@ -1916,6 +1958,10 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false, p
 
     const userDataDir = existsSync(junctionPath) ? junctionPath : realUserData;
 
+    if (ENABLE_DEV_MODE) {
+      prepareExtensionProfile(userDataDir);
+    }
+
     const args = [
       `--remote-debugging-port=${cdpPort}`,
       "--remote-allow-origins=*",
@@ -1925,6 +1971,19 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false, p
       ...webrtcAntiLeakFlags,
       ...proxyFlags,
     ];
+
+    if (ENABLE_DEV_MODE) {
+      args.push(
+        "--enable-experimental-extension-apis",
+        "--extensions-on-chrome-urls",
+        "--silent-debugger-extension-api"
+      );
+    }
+
+    if (extensionPath) {
+      args.push(`--disable-extensions-except=${extensionPath}`);
+      args.push(`--load-extension=${extensionPath}`);
+    }
 
     const child = spawn(chromeBin, args, { detached: true, stdio: "ignore" });
     child.unref();
@@ -1939,12 +1998,17 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false, p
       "--no-first-run",
       "--no-default-browser-check",
       "--start-maximized",
-      "--enable-experimental-extension-apis",
-      "--extensions-on-chrome-urls",
-      "--silent-debugger-extension-api",
       ...webrtcAntiLeakFlags,
       ...proxyFlags,
     ];
+
+    if (ENABLE_DEV_MODE) {
+      args.push(
+        "--enable-experimental-extension-apis",
+        "--extensions-on-chrome-urls",
+        "--silent-debugger-extension-api"
+      );
+    }
 
     if (extensionPath) {
       args.push(`--disable-extensions-except=${extensionPath}`);
@@ -2142,6 +2206,9 @@ async function runOneCycle(
         }
         browser = await chromium.connectOverCDP(cdpUrl);
         context = browser.contexts()[0] || (await browser.newContext());
+        if (ENABLE_DEV_MODE && context) {
+          await ensureDeveloperMode(context);
+        }
         if (currentProxy?.username && currentProxy?.password) {
           for (const ctx of browser.contexts()) {
             await ctx.setHTTPCredentials({
@@ -2167,6 +2234,7 @@ async function runOneCycle(
       if (sharedProfileDir) {
         profileDir = sharedProfileDir;
         isTempProfile = false;
+        prepareExtensionProfile(profileDir);
       } else {
         profileDir = mkdtempSync(path.join(tmpdir(), "ad-viewer-profile-"));
         isTempProfile = true;
@@ -2191,11 +2259,11 @@ async function runOneCycle(
         "--webrtc-ip-handling-policy=disable_non_proxied_udp",
       ];
 
-      if (extensionPath && isTempProfile) {
+      if (extensionPath) {
         args.push(`--disable-extensions-except=${extensionPath}`);
         args.push(`--load-extension=${extensionPath}`);
         if (ENABLE_DEV_MODE) {
-          log("✓ Đã bật chế độ Developer Mode cho tiện ích CanvasBlocker trong profile.");
+          log("✓ Đã nạp tiện ích CanvasBlocker và kích hoạt Developer Mode cho profile.");
         }
       }
 
@@ -2275,6 +2343,9 @@ async function runOneCycle(
           throw err;
         }
         context = await chromium.launchPersistentContext(profileDir, launchOptions);
+      }
+      if (ENABLE_DEV_MODE && context) {
+        await ensureDeveloperMode(context);
       }
       if (context && currentProxy?.username && currentProxy?.password) {
         await context.setHTTPCredentials({

@@ -37,6 +37,11 @@ assert.match(runtime, /mouseMutex/, "ad-viewer must coordinate physical mouse cl
 assert.match(runtime, /inUseProxyKeys/, "ad-viewer must isolate proxies across instances");
 assert.match(runtime, /performEngageAndClick/, "ad-viewer must synchronize physical engagement and clicks");
 assert.match(runtime, /runInstanceLoop/, "ad-viewer must support concurrent instance loops");
+assert.match(runtime, /resolveExtensionPath/, "ad-viewer must resolve CanvasBlocker extension path");
+assert.match(runtime, /prepareExtensionProfile/, "ad-viewer must prepare extension profile preferences");
+assert.match(runtime, /ensureDeveloperMode/, "ad-viewer must enforce developer mode via WebUI");
+assert.match(runtime, /--disable-extensions-except=/, "ad-viewer must allow extension through disable-extensions-except");
+assert.match(runtime, /--load-extension=/, "ad-viewer must load extension into chromium");
 
 // ---- Vân tay thiết bị + trình duyệt ----
 assert.match(runtime, /identityWindowStart/, "a new device/browser identity must only start with a new cookie window");

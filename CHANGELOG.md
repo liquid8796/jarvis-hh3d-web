@@ -9,6 +9,18 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.148 — Sửa nạp tiện ích CanvasBlocker và kích hoạt Developer Mode trên toàn bộ chế độ (03/10/2026)
+
+- Sửa lỗi nạp tiện ích CanvasBlocker trong `scripts/adViewer.mjs`:
+  - Trước đây trong `runOneCycle()`, điều kiện nạp tiện ích bị ràng buộc bởi `if (extensionPath && isTempProfile)`. Khi chạy bình thường hoặc chạy đa instance, hệ thống sử dụng thư mục hồ sơ cố định theo phiên (`sharedProfileDir`) khiến `isTempProfile` bằng `false`, dẫn tới việc Chromium hoàn toàn không nhận được cờ `--load-extension` và `--disable-extensions-except`. Đã chuyển điều kiện thành `if (extensionPath)` để tiện ích luôn luôn được nạp khi người dùng bật CanvasBlocker trên cả chế độ 1 instance lẫn nhiều instance.
+  - Chuẩn hoá hàm `resolveExtensionPath()` để luôn trả về đường dẫn tuyệt đối chuẩn hoá thông qua `path.resolve()`, đồng thời bổ sung cờ `--canvas-blocker-path` và biến môi trường `CANVAS_BLOCKER_PATH`.
+  - Cập nhật `ensureCdpServer()` khi khởi chạy profile Chrome thật (`useRealProfile`): bổ sung cờ `--load-extension` và cấu hình tiện ích thay vì chỉ hỗ trợ profile tạm thời.
+- Kích hoạt chế độ Developer Mode cho trình duyệt:
+  - Cải tiến `prepareExtensionProfile()` ghi nhận `extensions.ui.developer_mode: true` vào cả `Preferences`, `Secure Preferences` và `Local State`.
+  - Bổ sung hàm `ensureDeveloperMode()` tự động điều hướng qua WebUI `chrome://extensions` để kích hoạt switch `#devMode`, đảm bảo trình duyệt lưu trạng thái bảo mật của Developer Mode mà không gây cản trở người dùng.
+  - Tự động bổ sung các cờ phát triển `--enable-experimental-extension-apis`, `--extensions-on-chrome-urls` và `--silent-debugger-extension-api` khi khởi chạy Chromium.
+- Cập nhật kiểm thử `scripts/verifyAdViewerHealth.mts`: Bổ sung kiểm tra độ toàn vẹn của `resolveExtensionPath`, `prepareExtensionProfile`, `ensureDeveloperMode` và các cờ nạp tiện ích Chromium.
+
 ## 1.3.147 — Hỗ trợ chạy đồng thời nhiều instance độc lập cho trình xem quảng cáo (03/10/2026)
 
 - Thêm tính năng chạy song song nhiều instance (`--instances=N`, `--instance-count=N`, `AD_VIEWER_INSTANCES`, tối đa 10) trong `scripts/adViewer.mjs`:

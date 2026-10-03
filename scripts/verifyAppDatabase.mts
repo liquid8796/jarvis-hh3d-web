@@ -42,7 +42,7 @@ function main(): void {
     "localhost cũng là loopback — VM có thể đổi cách viết mà luật không lung lay",
   );
 
-  const ném = (env: NodeJS.ProcessEnv): KhongPhaiDatabaseCuaApp => {
+  const ném = (env: Record<string, string | undefined>): KhongPhaiDatabaseCuaApp => {
     try {
       appDatabaseUrl(env, []);
     } catch (err) {

@@ -9,6 +9,22 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.158 — Tối ưu hoá SEO toàn diện, chuẩn hoá Schema JSON-LD và sơ đồ trang (03/10/2026)
+
+- Triển khai tối ưu hoá SEO toàn diện nhằm tăng chất lượng xếp hạng trang web và hưởng lợi cho doanh thu quảng cáo (Google AdSense, Adsterra):
+  - Khởi tạo module quản trị SEO tập trung [src/lib/seo/site.ts](src/lib/seo/site.ts): Đóng gói nguồn chân lý duy nhất cho danh tính website, canonical URL, từ khoá meta, danh sách route sitemap, tiền tố loại trừ cho robots.txt, nội dung FAQ và bộ sinh Schema.org JSON-LD.
+  - Tạo [src/app/robots.ts](src/app/robots.ts): Khai báo tệp `robots.txt` chuẩn Next.js App Router, mở quyền crawl cho các trang công khai (`/`, `/quyen-rieng-tu`, `/ten-mien`, `/login`, `/register`) và chặn triệt để các đường dẫn nội bộ/riêng tư (`/api/`, `/admin`, `/dashboard`, `/hang-doi`, `/be-quan`, `/chat`, `/chat-frame`) nhằm bảo vệ crawl budget và tránh đánh giá trang rỗng.
+  - Tạo [src/app/sitemap.ts](src/app/sitemap.ts): Tự động phát hành `sitemap.xml` tiêu chuẩn chứa các trang công khai kèm tần suất cập nhật và mức ưu tiên (`priority`), hỗ trợ bot tìm kiếm lập chỉ mục nhanh chóng.
+  - Cập nhật [src/app/layout.tsx](src/app/layout.tsx): Bổ sung `metadataBase`, URL canonical, OpenGraph metadata, thẻ Twitter Card (`summary_large_image`), chỉ dẫn robots Googlebot và danh mục icon/favicon cho trang.
+  - Cập nhật [src/app/page.tsx](src/app/page.tsx):
+    - Tích hợp dữ liệu có cấu trúc Schema.org JSON-LD dạng `@graph` kết hợp các thực thể `Organization`, `WebSite`, `WebApplication`, và `FAQPage`.
+    - Mở rộng nội dung ngữ nghĩa phong phú giải quyết triệt để cảnh báo thin content từ các mạng quảng cáo: bổ sung 6 khối tính năng chi tiết (`LANDING_FEATURES`), 4 bước nhập môn (`LANDING_STEPS`), và khu vực hỏi đáp tương tác (`LANDING_FAQ`) với các thẻ `<details>`/`<summary>` khớp 100% nội dung Schema JSON-LD.
+  - Tạo công cụ đồ hoạ [scripts/generateSeoAssets.mjs](scripts/generateSeoAssets.mjs) dùng `sharp`:
+    - Tạo ảnh mạng xã hội OpenGraph [public/og-image.jpg](public/og-image.jpg) (1200x630) chất lượng cao tối ưu dung lượng (~102KB).
+    - Tạo biểu tượng ứng dụng [public/icon.png](public/icon.png) (512x512) và [public/favicon.ico](public/favicon.ico).
+  - Bổ sung bộ kiểm tra toàn diện [scripts/verifySeo.mts](scripts/verifySeo.mts) và tích hợp lệnh `npm run verify:seo` trong [package.json](package.json).
+  - Tinh chỉnh chữ ký môi trường trong [scripts/activeStationPg.mts](scripts/activeStationPg.mts) và [scripts/newGithubStation.mts](scripts/newGithubStation.mts) để bảo đảm `npm run typecheck:scripts` luôn xanh sạch.
+
 ## 1.3.157 — Khắc phục sự cố ngắt kết nối CDP khi dọn dẹp cache và đóng tab (03/10/2026)
 
 - Khắc phục triệt để lỗi ngoại lệ `ProtocolError: Protocol error (Network.setCacheDisabled): Internal server error, session closed`:

@@ -112,7 +112,7 @@ export function offVmRefusal(url: string | undefined, script: string | undefined
  * mà không phải bịa `process.env` toàn cục — thứ sẽ rò sang mọi phép đo sau nó.
  */
 export function appDatabaseUrl(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
   argv: readonly string[] = process.argv.slice(2),
 ): string {
   const url = env.DATABASE_URL;

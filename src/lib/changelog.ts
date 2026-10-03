@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.158",
+    date: "2026-10-03",
+    lines: [
+      "Tối ưu hoá SEO toàn diện website: bổ sung sơ đồ trang sitemap.xml, chỉ dẫn bot robots.txt và thẻ mạng xã hội chuẩn mực.",
+      "Làm giàu nội dung trang chủ với mục hỏi đáp thực tế, câu hỏi thường gặp và giới thiệu chi tiết pháp bảo tự động.",
+    ],
+  },
+  {
     version: "1.3.157",
     date: "2026-10-03",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Website nay có thêm quảng cáo Adsterra gồm biểu ngữ, đề xuất nội dung, Social Bar và Popunder trên tên miền chính thức.",
       "Quản trị viên, máy local và tên miền cũ vẫn không tải quảng cáo; mọi định dạng có thể dừng khẩn cấp từ cấu hình máy chủ.",
-    ],
-  },
-  {
-    version: "1.3.108",
-    date: "2026-09-30",
-    lines: [
-      "Phòng chat nổi không còn kéo bạn về tin mới nhất khi đang đọc lại những lời cũ.",
-      "Tin mới đến lúc bạn đang ở phía trên sẽ hiện số chưa đọc trên biểu tượng; về cuối mới tính là đã xem.",
     ],
   },
 ];

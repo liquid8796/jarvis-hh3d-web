@@ -40,7 +40,7 @@ const valueFlags = new Map([
 /** Parse only the documented CLI surface. Blank values remain blank for the shared normalizer. */
 export function parseGithubProvisionArgs(
   argv: string[],
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
 ): GithubProvisionCliOptions {
   const values: Partial<Record<"repo" | "workflowFile" | "dailyPushes" | "ownerForDryRun", string>> = {};
   let dryRun = false;
@@ -172,7 +172,7 @@ function printResult(result: GithubProvisionResult, io: GithubProvisionCliIo): v
 
 export async function runGithubProvisionCli(
   argv: string[],
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
   dependencies: GithubProvisionCliDependencies = productionDependencies,
   io: GithubProvisionCliIo = console,
 ): Promise<number> {

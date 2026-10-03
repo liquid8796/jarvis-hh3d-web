@@ -7,6 +7,14 @@ import { BackdropPeek } from "@/components/BackdropPeek";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { GoogleAdSense } from "@/components/GoogleAdSense";
 import { AdsterraAds } from "@/components/AdsterraAds";
+import {
+  SITE_URL,
+  SITE_NAME,
+  SITE_TITLE,
+  SITE_DESCRIPTION,
+  SITE_KEYWORDS,
+  OG_IMAGE,
+} from "@/lib/seo/site";
 import { getRenderSettings } from "@/lib/services/settings";
 import { backdropCss } from "@/lib/validation/backdrops";
 import "./globals.css";
@@ -71,12 +79,56 @@ const body = Be_Vietnam_Pro({
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "Auto HH3D — Linh Đài Tự Động",
-    template: "%s · Auto HH3D",
+    default: SITE_TITLE,
+    template: `%s · ${SITE_NAME}`,
   },
-  description:
-    "Control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn là khôi lỗi tự vận hành trên server.",
+  description: SITE_DESCRIPTION,
+  keywords: [...SITE_KEYWORDS],
+  alternates: {
+    canonical: "./",
+  },
+  openGraph: {
+    type: "website",
+    locale: "vi_VN",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [
+      {
+        url: OG_IMAGE.url,
+        width: OG_IMAGE.width,
+        height: OG_IMAGE.height,
+        alt: OG_IMAGE.alt,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [OG_IMAGE.url],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png" },
+    ],
+    apple: [{ url: "/icon.png", type: "image/png" }],
+  },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

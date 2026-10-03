@@ -2392,10 +2392,20 @@ async function runOneCycle(
   fingerprintProfile = null,
   instanceId = 1
 ) {
-  const useMyChrome =
+  const explicitCdp = process.argv.some((a) => a.startsWith("--cdp")) || Boolean(process.env.CDP_URL);
+  const wantsMyChrome =
     process.argv.includes("--my-chrome") ||
     process.argv.includes("--my-profile") ||
     process.env.USE_MY_CHROME === "1";
+
+  // Khi nạp tiện ích mở rộng (CanvasBlocker), Google Chrome bảo vệ thư mục User Data thật
+  // bằng cách chặn --load-extension. Đồng thời phiên kết nối CDP có sẵn cũng không thể nạp thêm extension.
+  // Do đó, khi có extensionPath, ad-viewer tự động sử dụng profile độc lập với launchPersistentContext
+  // để tiện ích luôn được nạp đầy đủ và Developer Mode luôn được kích hoạt.
+  const useMyChrome = !extensionPath && wantsMyChrome;
+  if (extensionPath && wantsMyChrome && !explicitCdp) {
+    log("[AntiDetect] ⚠ Tiện ích CanvasBlocker yêu cầu profile độc lập để nạp extension; tự động chuyển sang profile riêng thay vì --my-chrome.");
+  }
 
   const cdpArg = process.argv.find((a) => a.startsWith("--cdp"));
   const defaultCdpPort = instanceId > 1 ? String(9222 + (instanceId - 1)) : "9222";
@@ -3382,13 +3392,16 @@ async function runInstanceLoop(instanceId, proxyManager, extPath, startTime) {
           log(`[Fingerprint] Danh tính mới cho ${CLEAR_CACHE_CYCLES > 0 ? `${CLEAR_CACHE_CYCLES} chu kỳ tới` : "cả ca trực"}.`);
         }
 
-        if (
-          !process.argv.some((a) => a.startsWith("--cdp")) &&
-          !process.env.CDP_URL &&
-          !process.argv.includes("--my-chrome") &&
-          !process.argv.includes("--my-profile") &&
-          process.env.USE_MY_CHROME !== "1"
-        ) {
+        const requiresIsolatedProfile = Boolean(extPath);
+        const bypassSharedProfile =
+          !requiresIsolatedProfile &&
+          (process.argv.some((a) => a.startsWith("--cdp")) ||
+           Boolean(process.env.CDP_URL) ||
+           process.argv.includes("--my-chrome") ||
+           process.argv.includes("--my-profile") ||
+           process.env.USE_MY_CHROME === "1");
+
+        if (!bypassSharedProfile) {
           if (!sharedProfileDir) {
             sharedProfileDir = mkdtempSync(path.join(tmpdir(), `ad-viewer-profile-inst${instanceId}-`));
             prepareExtensionProfile(sharedProfileDir);

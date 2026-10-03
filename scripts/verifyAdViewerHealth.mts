@@ -46,6 +46,11 @@ assert.match(runtime, /prepareExtensionProfile/, "ad-viewer must prepare extensi
 assert.match(runtime, /ensureDeveloperMode/, "ad-viewer must enforce developer mode via WebUI");
 assert.match(runtime, /--disable-extensions-except=/, "ad-viewer must allow extension through disable-extensions-except");
 assert.match(runtime, /--load-extension=/, "ad-viewer must load extension into chromium");
+assert.match(runtime, /useMyChrome\s*=\s*!extensionPath && wantsMyChrome/, "ad-viewer must bypass --my-chrome when CanvasBlocker is requested to ensure extension loads in isolated profile");
+assert.match(runtime, /requiresIsolatedProfile\s*=\s*Boolean\(extPath\)/, "runWorkerLoop must prepare isolated profile when extPath is present");
+
+const batContent = read("run-ad-viewer.bat");
+assert.match(batContent, /else if defined ARG_CB/, "run-ad-viewer.bat must clear ARG_MY_CHROME when CanvasBlocker is enabled even for 1 instance");
 
 // ---- Vân tay thiết bị + trình duyệt ----
 assert.match(runtime, /identityWindowStart/, "a new device/browser identity must only start with a new cookie window");

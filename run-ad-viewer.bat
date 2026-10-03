@@ -246,6 +246,10 @@ if not "%INPUT_INSTANCES%"=="1" (
     set "ARG_MY_CHROME="
     echo     [*] Che do da instance: Tu dong su dung profile doc lap cho tung instance thay vi --my-chrome.
     echo.
+) else if defined ARG_CB (
+    set "ARG_MY_CHROME="
+    echo     [*] Tien ich CanvasBlocker: Tu dong su dung profile doc lap de nap day du tien ich va bat Developer Mode.
+    echo.
 )
 
 REM 12. Thoi gian hover re chuot tren quang cao truoc khi click

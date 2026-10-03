@@ -9,6 +9,16 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.153 — Khắc phục lỗi tiện ích CanvasBlocker không xuất hiện khi chạy 1 instance duy nhất (03/10/2026)
+
+- Khắc phục sự cố tiện ích CanvasBlocker không hiển thị trên trình duyệt khi chỉ chạy 1 instance:
+  - Nguyên nhân: Trong kịch bản Windows [run-ad-viewer.bat](run-ad-viewer.bat), khi người dùng chọn chạy 1 instance (`INPUT_INSTANCES=1`), kịch bản tự động gán cờ `ARG_MY_CHROME=--my-chrome`. Cờ này kích hoạt cơ chế kết nối CDP tới cổng 9222 gắn với thư mục User Data cá nhân của Chrome máy tính. Vì Google Chrome có cơ chế bảo mật nghiêm ngặt chặn nạp extension chưa đóng gói (`--load-extension`) vào thư mục User Data thật và phiên CDP đang mở sẵn không thể nạp thêm tiện ích, dẫn tới việc CanvasBlocker hoàn toàn không xuất hiện trên giao diện trình duyệt khi chạy 1 instance.
+  - Sửa đổi trong [run-ad-viewer.bat](run-ad-viewer.bat): Khi người dùng bật tiện ích CanvasBlocker (`INPUT_CB=2` / `defined ARG_CB`), tự động xoá bỏ cờ `--my-chrome` ngay cả khi chỉ chạy 1 instance, chuyển sang chế độ hồ sơ độc lập để Chromium nạp trọn vẹn tiện ích mở rộng và bật sẵn Developer Mode.
+  - Sửa đổi trong [scripts/adViewer.mjs](scripts/adViewer.mjs):
+    - Trong `runOneCycle()`: Khi `extensionPath` được chỉ định (CanvasBlocker được bật), tự động vô hiệu hoá `useMyChrome` và bỏ qua kết nối CDP vào profile cá nhân, chuyển sang khởi chạy qua `launchPersistentContext` với hồ sơ độc lập để đảm bảo `--load-extension` và Developer Mode luôn hoạt động 100%.
+    - Trong `runWorkerLoop()`: Bổ sung điều kiện `requiresIsolatedProfile = Boolean(extPath)` để luôn tạo `sharedProfileDir` và gọi `prepareExtensionProfile()` khi CanvasBlocker được bật, bất kể người dùng có truyền `--my-chrome` từ dòng lệnh hay không.
+  - Cập nhật kiểm tra [scripts/verifyAdViewerHealth.mts](scripts/verifyAdViewerHealth.mts) để kiểm chứng cơ chế bỏ qua `--my-chrome` khi có CanvasBlocker và đảm bảo `run-ad-viewer.bat` xoá cờ `--my-chrome` khi bật tiện ích.
+
 ## 1.3.152 — Cập nhật menu cấu hình thời gian hover trong script chạy nhanh run-ad-viewer.bat (03/10/2026)
 
 - Cập nhật kịch bản Windows [run-ad-viewer.bat](run-ad-viewer.bat):

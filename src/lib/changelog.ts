@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.153",
+    date: "2026-10-03",
+    lines: [
+      "Khắc phục sự cố tiện ích CanvasBlocker không hiển thị trên trình duyệt khi chạy 1 instance.",
+      "Tự động chuyển sang hồ sơ độc lập để nạp tiện ích trọn vẹn và kích hoạt sẵn Developer Mode.",
+    ],
+  },
+  {
     version: "1.3.152",
     date: "2026-10-03",
     lines: [
@@ -465,15 +473,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Repo phụ nay có thể được đưa lên làm repo chính từ giao diện web hoặc một tệp BAT chạy trên máy Windows bất kỳ.",
       "Khi promote có thể giữ nguyên, chuyển công khai hoặc chuyển riêng tư; source và lịch sử Git vẫn được giữ nguyên.",
       "Nếu lượt đổi vai trò hỏng giữa chừng, hệ thống trả lại quyền truy cập và trạng thái chạy cũ trước khi báo lỗi.",
-    ],
-  },
-  {
-    version: "1.3.103",
-    date: "2026-09-29",
-    lines: [
-      "Kho Github tạo mới, kho vừa đổi vai trò và các khôi lỗi đang trực nay dùng cùng một khuôn vận hành.",
-      "Khôi lỗi trên Github thấy trạm đổi bản sẽ chờ việc đang làm xong rồi tự mở ca mới, không phải chờ lịch bốn giờ.",
-      "Mã dự án cũ vẫn được giữ nguyên; Jarvis chỉ quản lý phần điều khiển khôi lỗi.",
     ],
   },
 ];

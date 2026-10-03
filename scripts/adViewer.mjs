@@ -15,6 +15,7 @@
  *   9. Bắt đầu chu kỳ mới cho đến khi hết tuổi thọ ca trực
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { execSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import net from "node:net";
@@ -109,6 +110,16 @@ const CLEAR_CACHE_CYCLES = Math.max(
   0,
   Number.isNaN(parsedClearCacheCycles) ? 1 : Math.floor(parsedClearCacheCycles),
 );
+
+const rawInstances =
+  getCliArg("--instances") ||
+  getCliArg("--instance-count") ||
+  getCliArg("--threads") ||
+  process.argv.find((a) => a.startsWith("--instances="))?.split("=")[1] ||
+  process.argv.find((a) => a.startsWith("--instance-count="))?.split("=")[1];
+const envInstances = process.env.AD_VIEWER_INSTANCES || process.env.AD_VIEWER_INSTANCE_COUNT;
+const parsedInstances = Number(rawInstances || envInstances || 1);
+const INSTANCE_COUNT = Math.max(1, Math.min(10, Number.isNaN(parsedInstances) ? 1 : Math.floor(parsedInstances)));
 
 // Vân tay thiết bị + trình duyệt ngẫu nhiên. Một danh tính sống đúng bằng một cửa sổ cookie
 // (CLEAR_CACHE_CYCLES chu kỳ): khách quay lại với cùng cookie mà đổi máy/trình duyệt mỗi vòng
@@ -241,10 +252,55 @@ async function withTimeout(promise, ms, fallbackValue = null) {
   ]);
 }
 
+const logContext = new AsyncLocalStorage();
+
 function log(msg) {
   const ts = new Date().toLocaleTimeString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-  console.log(`[${ts}] [${VIEWER_ID}] ${msg}`);
+  const instId = logContext.getStore()?.instanceId;
+  const tag = INSTANCE_COUNT > 1 && instId ? `[${VIEWER_ID}#${instId}]` : `[${VIEWER_ID}]`;
+  console.log(`[${ts}] ${tag} ${msg}`);
 }
+
+class AsyncMutex {
+  constructor() {
+    this._queue = [];
+    this._locked = false;
+  }
+
+  async acquire(tag = "") {
+    return new Promise((resolve) => {
+      const ticket = () => {
+        this._locked = true;
+        resolve(() => this.release());
+      };
+      if (!this._locked) {
+        this._locked = true;
+        resolve(() => this.release());
+      } else {
+        this._queue.push(ticket);
+      }
+    });
+  }
+
+  release() {
+    if (this._queue.length > 0) {
+      const next = this._queue.shift();
+      next();
+    } else {
+      this._locked = false;
+    }
+  }
+
+  get isLocked() {
+    return this._locked;
+  }
+
+  get queueLength() {
+    return this._queue.length;
+  }
+}
+
+const mouseMutex = new AsyncMutex();
 
 // ============================================================
 //  ANTI-DETECT PROXY ENGINE & AUTO-ROTATION MANAGER
@@ -445,9 +501,18 @@ class ProxyManager {
     this.lastConnectivityCheck = 0;
     this.isOnline = true;
     this.initialized = false;
+    this.inUseProxyKeys = new Set();
 
     if (typeof process !== "undefined" && process.on) {
       process.on("beforeExit", () => this.flush());
+    }
+  }
+
+  releaseProxy(proxy) {
+    if (!proxy) return;
+    const key = proxy._inUseKey || (proxy.host && proxy.port ? `${proxy.host}:${proxy.port}` : null);
+    if (key) {
+      this.inUseProxyKeys.delete(key);
     }
   }
 
@@ -780,8 +845,11 @@ class ProxyManager {
     };
   }
 
-  async getNextWorkingProxy() {
+  async getNextWorkingProxy(instanceId = 1, previousProxy = null) {
     this.init();
+    if (previousProxy) {
+      this.releaseProxy(previousProxy);
+    }
     if (!this.hasActiveProxy()) return null;
 
     if (this.rotateUrl) {
@@ -799,7 +867,7 @@ class ProxyManager {
           if (p) {
             p.geo = await this.resolveGeo(p);
             log(
-              `[ProxyManager] ✓ Đã nhận proxy mới từ API: ${p.server} | ` +
+              `[ProxyManager] ✓ Đã nhận proxy mới từ API cho instance #${instanceId}: ${p.server} | ` +
               `Vị trí: ${p.geo?.city}, ${p.geo?.country} | Timezone: ${p.geo?.timezoneId} | Locale: ${p.geo?.locale}`
             );
             return p;
@@ -829,9 +897,11 @@ class ProxyManager {
     const maxScan = Math.min(this.proxyList.length, 500);
     const batchesCount = Math.ceil(maxScan / batchSize);
 
+    // Khi danh sách có nhiều proxy hơn số instance đang dùng, ưu tiên chọn proxy chưa bị chiếm
+    const canIsolate = this.proxyList.length > this.inUseProxyKeys.size;
     log(
       `[ProxyManager] Quét song song siêu tốc danh sách proxy (đang dò tối đa ${maxScan}/${this.proxyList.length} proxy ` +
-      `theo từng lô ${batchSize} kết nối đồng thời${this.pruneDead ? ", tự động loại bỏ proxy chết" : ""})...`
+      `theo từng lô ${batchSize} kết nối đồng thời${this.pruneDead ? ", tự động loại bỏ proxy chết" : ""}${canIsolate ? ", lọc trùng instance" : ""})...`
     );
 
     const visitedKeys = new Set();
@@ -847,26 +917,31 @@ class ProxyManager {
         const key = `${candidate.host}:${candidate.port}`;
         if (!visitedKeys.has(key)) {
           visitedKeys.add(key);
-          currentBatch.push(candidate);
           checkedSoFar++;
+          if (!canIsolate || !this.inUseProxyKeys.has(key)) {
+            currentBatch.push(candidate);
+          }
         }
       }
 
-      if (currentBatch.length === 0) break;
+      if (currentBatch.length === 0) continue;
 
       const displayFrom = checkedSoFar - currentBatch.length + 1;
       const displayTo = checkedSoFar;
-      log(`[ProxyManager] Đang kiểm tra đồng thời lô ${b + 1}/${batchesCount} (${currentBatch.length} proxy, vị trí #${displayFrom} - #${displayTo})...`);
+      log(`[ProxyManager] Đang kiểm tra đồng thời lô ${b + 1}/${batchesCount} (${currentBatch.length} proxy khả dụng, vị trí #${displayFrom} - #${displayTo})...`);
 
       const alive = await this.probeBatch(currentBatch, 4000);
       if (alive) {
+        const aliveKey = `${alive.host}:${alive.port}`;
+        this.inUseProxyKeys.add(aliveKey);
+        alive._inUseKey = aliveKey;
         alive.geo = await this.resolveGeo(alive);
         const aliveIdx = this.proxyList.findIndex((p) => p.host === alive.host && p.port === alive.port);
         if (aliveIdx !== -1) {
           this.currentIndex = (aliveIdx + 1) % Math.max(1, this.proxyList.length);
         }
         log(
-          `[ProxyManager] ✓ Đã tìm thấy Proxy kết nối tốt siêu tốc: ${alive.server} | ` +
+          `[ProxyManager] ✓ Đã tìm thấy Proxy kết nối tốt cho instance #${instanceId}: ${alive.server} | ` +
           `Vị trí: ${alive.geo?.city}, ${alive.geo?.country} (${alive.geo?.countryCode}) | ` +
           `Timezone: ${alive.geo?.timezoneId} | Locale: ${alive.geo?.locale}`
         );
@@ -1041,7 +1116,7 @@ async function humanClickMouse(page, targetX, targetY) {
  * Di chuột vật lý cấp Hệ điều hành Windows (OS Physical Mouse) qua PowerShell và user32.dll SendInput/mouse_event.
  * Di chuyển con trỏ chuột thật của Windows trên màn hình Desktop và click thật vào cửa sổ Chrome.
  */
-async function humanClickOs(page, ctx, targetX, targetY) {
+async function humanClickOs(page, ctx, targetX, targetY, instanceId = 0) {
   if (process.platform !== "win32") {
     log("[OS-Mouse] ⚠ Hệ điều hành không phải Windows; tự động chuyển sang CDP Input.dispatchMouseEvent.");
     return humanClickCdp(page, ctx, targetX, targetY);
@@ -1079,7 +1154,8 @@ async function humanClickOs(page, ctx, targetX, targetY) {
     }
 
     const hoverMs = rand(1200, 2000);
-    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${desktopX} -targetY ${desktopY} -steps 25 -hoverMs ${hoverMs} -click 1`;
+    const instArg = instanceId > 0 ? ` -instanceId ${instanceId}` : "";
+    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${desktopX} -targetY ${desktopY} -steps 25 -hoverMs ${hoverMs} -click 1${instArg}`;
     execSync(cmd, { stdio: "ignore", timeout: 20000 });
 
     lastMouseX = safeTargetX;
@@ -1136,7 +1212,7 @@ async function waitForManualUserClick(context, page, timeoutMs = 45000) {
  * để người dùng bấm nút hông G4/G5 trên chuột Logitech G304 nhằm kích hoạt click từ driver Logitech.
  * Nếu không thấy phản hồi sau 25s, tự động click fallback bằng OS Hardware Mouse.
  */
-async function humanClickGhub(page, ctx, targetX, targetY) {
+async function humanClickGhub(page, ctx, targetX, targetY, instanceId = 0) {
   if (process.platform !== "win32") {
     return humanClickCdp(page, ctx, targetX, targetY);
   }
@@ -1166,8 +1242,9 @@ async function humanClickGhub(page, ctx, targetX, targetY) {
     const psScript = path.join(__dirname, "winMouse.ps1");
     if (existsSync(psScript)) {
       const hoverMs = rand(800, 1500);
+      const instArg = instanceId > 0 ? ` -instanceId ${instanceId}` : "";
       execSync(
-        `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${desktopX} -targetY ${desktopY} -steps 20 -hoverMs ${hoverMs} -click 0`,
+        `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${desktopX} -targetY ${desktopY} -steps 20 -hoverMs ${hoverMs} -click 0${instArg}`,
         { stdio: "ignore", timeout: 15000 },
       );
     }
@@ -1188,19 +1265,19 @@ async function humanClickGhub(page, ctx, targetX, targetY) {
   }
 
   log("⚠ Hết thời gian chờ click từ chuột G304; tự động click bằng OS Mouse.");
-  return humanClickOs(page, ctx, targetX, targetY);
+  return humanClickOs(page, ctx, targetX, targetY, instanceId);
 }
 
 /** Dispatcher thống nhất — chọn engine theo CLICK_MODE. */
-async function humanClick(page, ctx, x, y) {
+async function humanClick(page, ctx, x, y, instanceId = 0, clickMode = CLICK_MODE) {
   await page.bringToFront().catch(() => {});
-  if (CLICK_MODE === "ghub") {
-    return humanClickGhub(page, ctx, x, y);
+  if (clickMode === "ghub") {
+    return humanClickGhub(page, ctx, x, y, instanceId);
   }
-  if (CLICK_MODE === "os-mouse") {
-    return humanClickOs(page, ctx, x, y);
+  if (clickMode === "os-mouse") {
+    return humanClickOs(page, ctx, x, y, instanceId);
   }
-  if (CLICK_MODE === "cdp") {
+  if (clickMode === "cdp") {
     return humanClickCdp(page, ctx, x, y);
   }
   return humanClickMouse(page, x, y);
@@ -1210,9 +1287,9 @@ async function humanClick(page, ctx, x, y) {
  * Mô phỏng tiếp cận tự nhiên trước khi click: di chuột đến vùng lân cận quảng cáo,
  * dừng lại như đang nhìn, rồi từ từ rê vào vị trí đích.
  */
-async function preClickEngagement(page, ctx, targetX, targetY) {
+async function preClickEngagement(page, ctx, targetX, targetY, instanceId = 0, clickMode = CLICK_MODE) {
   await page.bringToFront().catch(() => {});
-  if ((CLICK_MODE === "os-mouse" || CLICK_MODE === "ghub") && process.platform === "win32") {
+  if ((clickMode === "os-mouse" || clickMode === "ghub") && process.platform === "win32") {
     try {
       const nearX = targetX + rand(-60, 60);
       const nearY = targetY + rand(-40, 40);
@@ -1235,7 +1312,8 @@ async function preClickEngagement(page, ctx, targetX, targetY) {
 
       const psScript = path.join(__dirname, "winMouse.ps1");
       if (existsSync(psScript)) {
-        execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${nearDesktopX} -targetY ${nearDesktopY} -steps 18 -hoverMs 500 -click 0`, { stdio: "ignore", timeout: 10000 });
+        const instArg = instanceId > 0 ? ` -instanceId ${instanceId}` : "";
+        execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${nearDesktopX} -targetY ${nearDesktopY} -steps 18 -hoverMs 500 -click 0${instArg}`, { stdio: "ignore", timeout: 10000 });
       }
       lastMouseX = safeNearX;
       lastMouseY = safeNearY;
@@ -1248,7 +1326,7 @@ async function preClickEngagement(page, ctx, targetX, targetY) {
   const nearX = targetX + rand(-70, 70);
   const nearY = targetY + rand(-50, 50);
   const approachPath = generateBezierPath(lastMouseX, lastMouseY, nearX, nearY, rand(12, 22));
-  if (CLICK_MODE === "cdp") {
+  if (clickMode === "cdp") {
     const client = await ctx.newCDPSession(page);
     for (const pt of approachPath) {
       await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: pt.x, y: pt.y });
@@ -1269,7 +1347,7 @@ async function preClickEngagement(page, ctx, targetX, targetY) {
 
   // 3. Rê chuột nhẹ nhàng từ vị trí lân cận vào đúng vị trí click đích
   const finalGlide = generateBezierPath(lastMouseX, lastMouseY, targetX, targetY, rand(8, 14));
-  if (CLICK_MODE === "cdp") {
+  if (clickMode === "cdp") {
     const client = await ctx.newCDPSession(page);
     for (const pt of finalGlide) {
       await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: pt.x, y: pt.y });
@@ -1285,6 +1363,48 @@ async function preClickEngagement(page, ctx, targetX, targetY) {
   lastMouseX = targetX;
   lastMouseY = targetY;
   await sleep(rand(150, 450));
+}
+
+/**
+ * Chuỗi tương tác hoàn chỉnh (tiếp cận + click) kết hợp Mutex chuột vật lý:
+ * Điều phối độc quyền chuột vật lý khi nhiều instance chạy đồng thời,
+ * gắn tag tiêu đề cửa sổ để winMouse.ps1 phóng to đúng cửa sổ trước khi click.
+ */
+async function performEngageAndClick(page, ctx, targetX, targetY, instanceId = 0, clickMode = CLICK_MODE) {
+  const isPhysical = (clickMode === "os-mouse" || clickMode === "ghub" || clickMode === "manual") && process.platform === "win32";
+  if (isPhysical) {
+    const qLen = mouseMutex.queueLength;
+    if (mouseMutex.isLocked) {
+      log(`[MouseMutex] Đang chờ giải phóng chuột vật lý (hàng đợi: ${qLen + 1})...`);
+    }
+    const unlock = await mouseMutex.acquire(`inst-${instanceId}`);
+    try {
+      if (instanceId > 0) {
+        await page.evaluate((tag) => {
+          if (!document.title.includes(tag)) {
+            document.title = `${tag} ${document.title}`;
+          }
+        }, `[AdViewer-Inst-${instanceId}]`).catch(() => {});
+      }
+      await page.bringToFront().catch(() => {});
+
+      await preClickEngagement(page, ctx, targetX, targetY, instanceId, clickMode);
+      const [newPage] = await Promise.all([
+        ctx.waitForEvent("page", { timeout: 10000 }).catch(() => null),
+        humanClick(page, ctx, targetX, targetY, instanceId, clickMode).catch(() => null),
+      ]);
+      return newPage;
+    } finally {
+      unlock();
+    }
+  } else {
+    await preClickEngagement(page, ctx, targetX, targetY, instanceId, clickMode);
+    const [newPage] = await Promise.all([
+      ctx.waitForEvent("page", { timeout: 10000 }).catch(() => null),
+      humanClick(page, ctx, targetX, targetY, instanceId, clickMode).catch(() => null),
+    ]);
+    return newPage;
+  }
 }
 
 /**
@@ -1531,7 +1651,7 @@ async function inspectAdsterraPlacements(page, startedAt = Date.now()) {
   };
 }
 
-async function handleRecursiveAdClicks(targetPage, depth, maxDepth, ctx) {
+async function handleRecursiveAdClicks(targetPage, depth, maxDepth, ctx, instanceId = 0, clickMode = CLICK_MODE) {
   if (depth >= maxDepth) return;
 
   try {
@@ -1567,16 +1687,12 @@ async function handleRecursiveAdClicks(targetPage, depth, maxDepth, ctx) {
           const target = computeClickTarget(elBox);
           log(`  [Đệ quy cấp ${depth + 1}] Tìm thấy phần tử (${sel}), click tại (${Math.round(target.x)}, ${Math.round(target.y)})...`);
           const resolvedCtx = ctx || targetPage.context();
-          await preClickEngagement(targetPage, resolvedCtx, target.x, target.y);
-          const [newPage] = await Promise.all([
-            resolvedCtx.waitForEvent("page", { timeout: 8000 }).catch(() => null),
-            humanClick(targetPage, resolvedCtx, target.x, target.y).catch(() => null),
-          ]);
+          const newPage = await performEngageAndClick(targetPage, resolvedCtx, target.x, target.y, instanceId, clickMode);
 
           clicked = true;
           if (newPage) {
             await newPage.waitForLoadState("domcontentloaded", { timeout: 20000 }).catch(() => {});
-            await handleRecursiveAdClicks(newPage, depth + 1, maxDepth, resolvedCtx);
+            await handleRecursiveAdClicks(newPage, depth + 1, maxDepth, resolvedCtx, instanceId, clickMode);
             await withTimeout(newPage.close().catch(() => {}), 2500);
           } else {
             await simulateLandingPageEngagement(targetPage, rand(DELAY_MIN_MS, DELAY_MAX_MS));
@@ -1643,7 +1759,10 @@ function isChromeProcessRunning() {
   }
 }
 
-function killChromeProcesses() {
+function killChromeProcesses(force = false) {
+  if (INSTANCE_COUNT > 1 && !force) {
+    return;
+  }
   try {
     if (process.platform === "win32") {
       execSync("taskkill /F /IM chrome.exe /T", { stdio: "ignore" });
@@ -1966,7 +2085,8 @@ async function runOneCycle(
   proxyManager = null,
   cycleIndex = 1,
   sharedProfileDir = null,
-  fingerprintProfile = null
+  fingerprintProfile = null,
+  instanceId = 1
 ) {
   const useMyChrome =
     process.argv.includes("--my-chrome") ||
@@ -1974,7 +2094,8 @@ async function runOneCycle(
     process.env.USE_MY_CHROME === "1";
 
   const cdpArg = process.argv.find((a) => a.startsWith("--cdp"));
-  const cdpPort = cdpArg && cdpArg.includes("=") ? cdpArg.split("=")[1] : "9222";
+  const defaultCdpPort = instanceId > 1 ? String(9222 + (instanceId - 1)) : "9222";
+  const cdpPort = cdpArg && cdpArg.includes("=") ? cdpArg.split("=")[1] : defaultCdpPort;
   const cdpUrl =
     process.env.CDP_URL ||
     (cdpArg
@@ -2002,7 +2123,8 @@ async function runOneCycle(
     : null;
   const fpSessions = [];
   let onFingerprintPage = null;
-  const baseClickMode = CLICK_MODE;
+  let cycleClickMode = CLICK_MODE;
+  const baseClickMode = cycleClickMode;
   const visitedDomains = [];
 
   try {
@@ -2079,9 +2201,9 @@ async function runOneCycle(
 
       const isHeadless =
         !useMyChrome &&
-        CLICK_MODE !== "manual" &&
-        CLICK_MODE !== "os-mouse" &&
-        CLICK_MODE !== "ghub" &&
+        cycleClickMode !== "manual" &&
+        cycleClickMode !== "os-mouse" &&
+        cycleClickMode !== "ghub" &&
         !process.argv.includes("--head") &&
         !process.argv.includes("--visible") &&
         process.env.HEADLESS !== "0";
@@ -2093,7 +2215,7 @@ async function runOneCycle(
       // Chuột phần cứng tính toạ độ từ cửa sổ THẬT, nên desktop ở các chế độ ấy không được giả lập
       // viewport (viewport: null = trang lấp đúng cửa sổ). Mobile luôn giả lập — chu kỳ mobile tự
       // chuyển sang click CDP ở dưới.
-      const physicalMouse = CLICK_MODE === "os-mouse" || CLICK_MODE === "ghub" || CLICK_MODE === "manual";
+      const physicalMouse = cycleClickMode === "os-mouse" || cycleClickMode === "ghub" || cycleClickMode === "manual";
       const launchOptions = {
         headless: false,
         args: launchArgs,
@@ -2190,11 +2312,11 @@ async function runOneCycle(
       };
       context.on("page", onFingerprintPage);
 
-      if (fp.isMobile && (CLICK_MODE === "os-mouse" || CLICK_MODE === "ghub")) {
+      if (fp.isMobile && (cycleClickMode === "os-mouse" || cycleClickMode === "ghub")) {
         // Chuột phần cứng không ánh xạ được lên màn hình di động giả lập (viewport + DPR bị co
         // giãn trong cửa sổ). Chu kỳ này dùng CDP — vẫn là sự kiện isTrusted, và được Chromium
         // đổi thành chạm (touch) nhờ setEmitTouchEventsForMouse.
-        CLICK_MODE = "cdp";
+        cycleClickMode = "cdp";
         log(`[Fingerprint] Chu kỳ mobile: tạm chuyển chế độ click ${baseClickMode} → cdp (chạm cảm ứng).`);
       }
       log(`[Fingerprint] ${fp.summary}`);
@@ -2499,7 +2621,7 @@ async function runOneCycle(
         log("⚠ Đã hết thời gian 45s chờ click thủ công; chuyển sang chu kỳ tiếp theo.");
       }
     } else if (adCandidates.length > 0) {
-      log(`Tìm thấy tổng cộng ${adCandidates.length} vị trí quảng cáo khả dụng. Đang chọn ngẫu nhiên để click (${CLICK_MODE} mode)...`);
+      log(`Tìm thấy tổng cộng ${adCandidates.length} vị trí quảng cáo khả dụng. Đang chọn ngẫu nhiên để click (${cycleClickMode} mode)...`);
       for (const candidate of adCandidates) {
         const clickTarget = await resolveAdClickTarget(candidate.locator);
         if (!clickTarget) {
@@ -2507,11 +2629,7 @@ async function runOneCycle(
           continue;
         }
         log(`-> Click ngẫu nhiên quảng cáo [${candidate.name}] tại (${Math.round(clickTarget.x)}, ${Math.round(clickTarget.y)})...`);
-        await preClickEngagement(page, context, clickTarget.x, clickTarget.y);
-        const [newPage] = await Promise.all([
-          context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
-          humanClick(page, context, clickTarget.x, clickTarget.y).catch(() => null),
-        ]);
+        const newPage = await performEngageAndClick(page, context, clickTarget.x, clickTarget.y, instanceId, cycleClickMode);
         if (newPage) {
           openedPage = newPage;
           adClicked = true;
@@ -2550,7 +2668,7 @@ async function runOneCycle(
       'a[target="_blank"]',
     ];
 
-    if (!adClicked && CLICK_MODE !== "manual") {
+    if (!adClicked && cycleClickMode !== "manual") {
       // Xáo trộn ngẫu nhiên thứ tự selector dự phòng
       const shuffledSelectors = [...candidateSelectors].sort(() => Math.random() - 0.5);
       for (const selector of shuffledSelectors) {
@@ -2566,11 +2684,7 @@ async function runOneCycle(
             if (!elBox || elBox.width < 2 || elBox.height < 2) continue;
             const target = computeClickTarget(elBox);
             log(`Tìm thấy quảng cáo khớp [${selector}], click tại (${Math.round(target.x)}, ${Math.round(target.y)})...`);
-            await preClickEngagement(page, context, target.x, target.y);
-            const [newPage] = await Promise.all([
-              context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
-              humanClick(page, context, target.x, target.y).catch(() => null),
-            ]);
+            const newPage = await performEngageAndClick(page, context, target.x, target.y, instanceId, cycleClickMode);
             if (newPage) {
               openedPage = newPage;
               adClicked = true;
@@ -2595,14 +2709,10 @@ async function runOneCycle(
     }
 
     // 4. Click tự nhiên để kích hoạt popunder nếu chưa click được
-    if (!adClicked && CLICK_MODE !== "manual") {
+    if (!adClicked && cycleClickMode !== "manual") {
       log("Không click được quảng cáo cụ thể bằng selector; kích hoạt click mô phỏng tự nhiên trên trang...");
       const popTarget = { x: rand(200, 600), y: rand(200, 500) };
-      await preClickEngagement(page, context, popTarget.x, popTarget.y);
-      const [popup] = await Promise.all([
-        context.waitForEvent("page", { timeout: 8000 }).catch(() => null),
-        humanClick(page, context, popTarget.x, popTarget.y).catch(() => null),
-      ]);
+      const popup = await performEngageAndClick(page, context, popTarget.x, popTarget.y, instanceId, cycleClickMode);
       if (popup) {
         openedPage = popup;
         adClicked = true;
@@ -2623,7 +2733,7 @@ async function runOneCycle(
 
       // Đệ quy click thêm nếu còn quảng cáo trên trang đích (tối đa MAX_RECURSIVE_CLICKS)
       if (MAX_RECURSIVE_CLICKS > 0) {
-        await handleRecursiveAdClicks(openedPage, 0, MAX_RECURSIVE_CLICKS, context);
+        await handleRecursiveAdClicks(openedPage, 0, MAX_RECURSIVE_CLICKS, context, instanceId, cycleClickMode);
       }
 
       await withTimeout(openedPage.close().catch(() => {}), 2500);
@@ -2680,10 +2790,9 @@ async function runOneCycle(
       log("[Cache & Cookies] Bảo lưu cache và cookies toàn thời gian (tắt tự động xoá định kỳ).");
     }
 
-    // Gỡ vân tay của chu kỳ: listener popup, các phiên CDP giữ override, và chế độ click tạm.
+    // Gỡ vân tay của chu kỳ: listener popup và các phiên CDP giữ override.
     if (onFingerprintPage && context) context.off("page", onFingerprintPage);
     for (const session of fpSessions) await session.detach().catch(() => {});
-    CLICK_MODE = baseClickMode;
 
     if (cdpUrl) {
       // Trong chế độ CDP, đóng tất cả tab quảng cáo phụ nếu còn mở, và đóng tab chu kỳ với timeout bảo vệ
@@ -2769,86 +2878,133 @@ async function main() {
     log("Vân tay thiết bị: tắt (--no-fingerprint) — dùng UA Chrome Windows cố định.");
   }
 
+  log(`Số lượng instance: ${INSTANCE_COUNT}${INSTANCE_COUNT > 1 ? " (Chế độ chạy song song đa instance)" : " (Chế độ đơn lẻ)"}`);
+
   const proxyManager = new ProxyManager();
   proxyManager.init();
 
   const startTime = Date.now();
-  let cycle = 0;
-  let sharedProfileDir = null;
-  let fingerprintProfile = null;
 
-  try {
-    while (Date.now() - startTime < MAX_LIFETIME_MS) {
-      cycle++;
-      log(`\n=================== BẮT ĐẦU CHU KỲ ${cycle} ===================`);
-      const currentProxy = await proxyManager.getNextWorkingProxy();
-
-      // Danh tính mới chỉ ra đời ở đầu một cửa sổ cookie (ngay sau lượt xoá cache) — n = 0 thì
-      // giữ một danh tính cho cả ca trực.
-      const identityWindowStart = CLEAR_CACHE_CYCLES > 0 && (cycle - 1) % CLEAR_CACHE_CYCLES === 0;
-      if (FINGERPRINT_ENABLED && (!fingerprintProfile || identityWindowStart)) {
-        fingerprintProfile = pickFingerprintProfile({
-          device: DEVICE_MODE,
-          browsers: BROWSER_SELECTION.browsers,
-          mobileRatio: MOBILE_RATIO,
-        });
-        for (const note of fingerprintProfile.notes) log(`[Fingerprint] ⚠ ${note}`);
-        log(`[Fingerprint] Danh tính mới cho ${CLEAR_CACHE_CYCLES > 0 ? `${CLEAR_CACHE_CYCLES} chu kỳ tới` : "cả ca trực"}.`);
-      }
-
-      if (
-        !process.argv.some((a) => a.startsWith("--cdp")) &&
-        !process.env.CDP_URL &&
-        !process.argv.includes("--my-chrome") &&
-        !process.argv.includes("--my-profile") &&
-        process.env.USE_MY_CHROME !== "1"
-      ) {
-        if (!sharedProfileDir) {
-          sharedProfileDir = mkdtempSync(path.join(tmpdir(), "ad-viewer-profile-"));
-          prepareExtensionProfile(sharedProfileDir);
-        }
-      }
-
-      await runOneCycle(extPath, currentProxy, proxyManager, cycle, sharedProfileDir, fingerprintProfile);
-
-      if (sharedProfileDir && CLEAR_CACHE_CYCLES > 0 && cycle % CLEAR_CACHE_CYCLES === 0) {
-        try {
-          rmSync(sharedProfileDir, { recursive: true, force: true });
-        } catch {}
-        sharedProfileDir = null;
-      }
-
-      const elapsedMs = Date.now() - startTime;
-      const remainingMs = MAX_LIFETIME_MS - elapsedMs;
-      log(`Hoàn thành chu kỳ ${cycle}. Thời gian đã chạy: ${Math.round(elapsedMs / 60000)}m (còn ${Math.round(remainingMs / 60000)}m)`);
-
-      // Kiểm tra nâng cấp runtime nếu bật
-      if (SELF_UPDATE && currentVersion && cycle % 5 === 0) {
-        const remoteVer = (await checkRemoteVersion(WEB_URL)) || (FALLBACK_URL ? await checkRemoteVersion(FALLBACK_URL) : null);
-        if (remoteVer && remoteVer !== currentVersion) {
-          log(`Phát hiện bản phát hành mới (${remoteVer} != ${currentVersion}). Kết thúc với mã 90 để nhận bản mới.`);
-          process.exit(90);
-        }
-      }
-
-      if (remainingMs <= 30_000) {
-        log("Hết thời gian tuổi thọ ca trực. Đóng ca an toàn.");
-        break;
-      }
-
-      const restMs = rand(2000, 5000);
-      await sleep(restMs);
+  if (INSTANCE_COUNT === 1) {
+    await runInstanceLoop(1, proxyManager, extPath, startTime);
+  } else {
+    log(`Khởi chạy đồng thời ${INSTANCE_COUNT} instance (Mỗi instance độc lập profile, proxy, fingerprint và điều phối mutex chuột)...`);
+    const instancePromises = [];
+    for (let id = 1; id <= INSTANCE_COUNT; id++) {
+      instancePromises.push(runInstanceLoop(id, proxyManager, extPath, startTime));
     }
-  } finally {
-    if (sharedProfileDir) {
-      try {
-        rmSync(sharedProfileDir, { recursive: true, force: true });
-      } catch {}
+    const results = await Promise.allSettled(instancePromises);
+    for (let i = 0; i < results.length; i++) {
+      const res = results[i];
+      if (res.status === "rejected") {
+        log(`⚠ Instance #${i + 1} kết thúc với lỗi: ${res.reason?.message || res.reason}`);
+      }
     }
   }
 
   log("Ca trực hoàn tất bình thường. Thoát mã 0.");
   process.exit(0);
+}
+
+async function runInstanceLoop(instanceId, proxyManager, extPath, startTime) {
+  return logContext.run({ instanceId }, async () => {
+    if (instanceId > 1) {
+      const staggerDelayMs = (instanceId - 1) * 6000;
+      log(`Khởi động so le (Staggered start): Chờ ${staggerDelayMs / 1000}s trước khi mở instance #${instanceId}...`);
+      await sleep(staggerDelayMs);
+    }
+
+    let cycle = 0;
+    let sharedProfileDir = null;
+    let fingerprintProfile = null;
+    let currentProxy = null;
+
+    try {
+      while (Date.now() - startTime < MAX_LIFETIME_MS) {
+        cycle++;
+        log(`\n=================== BẮT ĐẦU CHU KỲ ${cycle} ===================`);
+        currentProxy = await proxyManager.getNextWorkingProxy(instanceId, currentProxy);
+
+        // Danh tính mới chỉ ra đời ở đầu một cửa sổ cookie (ngay sau lượt xoá cache) — n = 0 thì
+        // giữ một danh tính cho cả ca trực.
+        const identityWindowStart = CLEAR_CACHE_CYCLES > 0 && (cycle - 1) % CLEAR_CACHE_CYCLES === 0;
+        if (FINGERPRINT_ENABLED && (!fingerprintProfile || identityWindowStart)) {
+          fingerprintProfile = pickFingerprintProfile({
+            device: DEVICE_MODE,
+            browsers: BROWSER_SELECTION.browsers,
+            mobileRatio: MOBILE_RATIO,
+          });
+          for (const note of fingerprintProfile.notes) log(`[Fingerprint] ⚠ ${note}`);
+          log(`[Fingerprint] Danh tính mới cho ${CLEAR_CACHE_CYCLES > 0 ? `${CLEAR_CACHE_CYCLES} chu kỳ tới` : "cả ca trực"}.`);
+        }
+
+        if (
+          !process.argv.some((a) => a.startsWith("--cdp")) &&
+          !process.env.CDP_URL &&
+          !process.argv.includes("--my-chrome") &&
+          !process.argv.includes("--my-profile") &&
+          process.env.USE_MY_CHROME !== "1"
+        ) {
+          if (!sharedProfileDir) {
+            sharedProfileDir = mkdtempSync(path.join(tmpdir(), `ad-viewer-profile-inst${instanceId}-`));
+            prepareExtensionProfile(sharedProfileDir);
+          }
+        }
+
+        try {
+          await runOneCycle(
+            extPath,
+            currentProxy,
+            proxyManager,
+            cycle,
+            sharedProfileDir,
+            fingerprintProfile,
+            instanceId
+          );
+        } finally {
+          proxyManager.releaseProxy(currentProxy);
+          currentProxy = null;
+        }
+
+        if (sharedProfileDir && CLEAR_CACHE_CYCLES > 0 && cycle % CLEAR_CACHE_CYCLES === 0) {
+          try {
+            rmSync(sharedProfileDir, { recursive: true, force: true });
+          } catch {}
+          sharedProfileDir = null;
+        }
+
+        const elapsedMs = Date.now() - startTime;
+        const remainingMs = MAX_LIFETIME_MS - elapsedMs;
+        log(`Hoàn thành chu kỳ ${cycle}. Thời gian đã chạy: ${Math.round(elapsedMs / 60000)}m (còn ${Math.round(remainingMs / 60000)}m)`);
+
+        // Kiểm tra nâng cấp runtime nếu bật
+        if (SELF_UPDATE && currentVersion && cycle % 5 === 0) {
+          const remoteVer = (await checkRemoteVersion(WEB_URL)) || (FALLBACK_URL ? await checkRemoteVersion(FALLBACK_URL) : null);
+          if (remoteVer && remoteVer !== currentVersion) {
+            log(`Phát hiện bản phát hành mới (${remoteVer} != ${currentVersion}). Kết thúc với mã 90 để nhận bản mới.`);
+            process.exit(90);
+          }
+        }
+
+        if (remainingMs <= 30_000) {
+          log("Hết thời gian tuổi thọ ca trực. Đóng instance an toàn.");
+          break;
+        }
+
+        const restMs = rand(2000, 5000);
+        await sleep(restMs);
+      }
+    } finally {
+      if (sharedProfileDir) {
+        try {
+          rmSync(sharedProfileDir, { recursive: true, force: true });
+        } catch {}
+      }
+      if (currentProxy) {
+        proxyManager.releaseProxy(currentProxy);
+      }
+    }
+  });
 }
 
 const isDirectExecution =

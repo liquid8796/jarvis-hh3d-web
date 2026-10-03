@@ -5,7 +5,8 @@ param(
     [int]$targetY = 0,
     [int]$steps = 25,
     [int]$hoverMs = 1200,
-    [int]$click = 1
+    [int]$click = 1,
+    [int]$instanceId = 0
 )
 
 Add-Type -MemberDefinition @'
@@ -32,12 +33,22 @@ public static extern int GetSystemMetrics(int nIndex);
 '@ -Name 'NativeMethods' -Namespace 'WinMouse' -ReferencedAssemblies System.Drawing
 
 # 1. Kích hoạt và luôn phóng to tối đa cửa sổ Chrome lên hàng đầu
-try {
-    $wshell = New-Object -ComObject WScript.Shell
-    $wshell.AppActivate("Chrome") | Out-Null
-} catch {}
+$chromeProc = $null
+if ($instanceId -gt 0) {
+    # Nếu chỉ định instanceId, tìm chính xác cửa sổ Chrome có MainWindowTitle chứa tag [AdViewer-Inst-$instanceId]
+    $chromeProc = Get-Process -Name chrome, chromium -ErrorAction SilentlyContinue | Where-Object { 
+        $_.MainWindowHandle -ne [IntPtr]::Zero -and $_.MainWindowTitle -like "*[AdViewer-Inst-$instanceId]*"
+    } | Select-Object -First 1
+}
 
-$chromeProc = Get-Process -Name chrome, chromium -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
+if (-not $chromeProc) {
+    try {
+        $wshell = New-Object -ComObject WScript.Shell
+        $wshell.AppActivate("Chrome") | Out-Null
+    } catch {}
+    $chromeProc = Get-Process -Name chrome, chromium -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
+}
+
 if ($chromeProc) {
     # Luôn phóng to tối đa cửa sổ Chrome (SW_MAXIMIZE = 3) và đưa lên foreground để chuột không click tràn ra ngoài
     [void][WinMouse.NativeMethods]::ShowWindow($chromeProc.MainWindowHandle, 3)

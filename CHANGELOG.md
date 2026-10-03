@@ -9,6 +9,19 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.147 — Hỗ trợ chạy đồng thời nhiều instance độc lập cho trình xem quảng cáo (03/10/2026)
+
+- Thêm tính năng chạy song song nhiều instance (`--instances=N`, `--instance-count=N`, `AD_VIEWER_INSTANCES`, tối đa 10) trong `scripts/adViewer.mjs`:
+  - Cô lập hoàn toàn: Mỗi instance sở hữu thư mục user data profile riêng biệt, dấu vân tay thiết bị/trình duyệt độc lập và proxy mạng trung gian riêng biệt.
+  - Điều phối chuột vật lý an toàn (`AsyncMutex`): Do Windows chỉ có duy nhất một con trỏ chuột thật, `mouseMutex` đảm bảo các instance xếp hàng sử dụng chuột vật lý khi tiếp cận và click quảng cáo (`os-mouse`, `ghub`, `manual`), không xảy ra tranh chấp toạ độ; các giai đoạn tải trang, cuộn trang bằng CDP và đọc trang đích vẫn diễn ra song song 100%.
+  - Quản lý proxy đa instance (`inUseProxyKeys`): `ProxyManager` ghi nhận proxy đang sử dụng và lọc trùng theo thời gian thực, đảm bảo không có hai instance nào dùng chung một địa chỉ IP tại cùng một thời điểm.
+  - Định vị chính xác cửa sổ Chrome theo instance: Trước khi tương tác chuột vật lý, instance gắn thẻ nhận diện `[AdViewer-Inst-N]` vào tiêu đề tài liệu (`document.title`); `scripts/winMouse.ps1` nhận tham số `-instanceId` và định vị chính xác cửa sổ qua Windows Process `MainWindowTitle` để phóng to tối đa và đưa lên hàng đầu (`SetForegroundWindow`).
+  - Khởi động so le (Staggered start): Tự động giãn cách thời điểm mở instance kế tiếp 6 giây (`(instanceId - 1) * 6000ms`) để tránh đột biến tải CPU và triệt tiêu dấu hiệu bùng nổ lưu lượng mạng đồng thời.
+  - Phân tách nhật ký tự động (`AsyncLocalStorage`): Tự động gắn tiền tố `[github-xem-qc#N]` tương ứng theo từng instance mà không làm xáo trộn luồng log gốc khi chạy 1 instance.
+  - Bảo vệ tiến trình song song: `killChromeProcesses` được chuyển thành chế độ an toàn khi chạy nhiều instance, ngăn chặn việc đóng nhầm các tiến trình Chrome của instance khác.
+- Cập nhật `run-ad-viewer.bat`: Thêm bước cấu hình [11] chọn số lượng instance chạy đồng thời (1-10); khi chọn > 1 instance, tự động kích hoạt chế độ hồ sơ độc lập cách ly cho từng instance thay vì dùng chung hồ sơ `--my-chrome`.
+- Cập nhật kiểm thử `scripts/verifyAdViewerHealth.mts`: Bổ sung kiểm tra cấu trúc đa instance, `INSTANCE_COUNT`, `mouseMutex`, `inUseProxyKeys`, `performEngageAndClick` và vòng lặp `runInstanceLoop`.
+
 ## 1.3.146 — Luôn phóng to và focus cửa sổ Chrome, khoá toạ độ chuột không trượt ra ngoài (03/10/2026)
 
 - `scripts/adViewer.mjs`: Thêm cờ `--start-maximized` khi khởi chạy Chrome (cả chế độ `--my-chrome`, CDP debug profile lẫn Persistent Context); loại bỏ các cờ áp kích thước cửa sổ cố định (`--window-size`) làm thu nhỏ Chrome.
@@ -273,7 +286,6 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 - Quảng cáo chỉ mount ở `auto-hh3d.online`/`www` trong production, không tải cho phiên quản trị, localhost, host vận hành, tên miền Vercel đã đóng, trang quản trị, chat frame, trang xác thực/chờ duyệt hoặc trang quyền riêng tư.
 - `ADSTERRA_DISABLED=1` là nút dừng khẩn cấp độc lập. Trang quyền riêng tư công bố cookie/tín hiệu thiết bị và nói rõ Auto HH3D không tự dò tiện ích hoặc khoá người dùng chặn quảng cáo.
 - Regression `verify:adsterra` khóa byte ID/URL public, host/session gate, bốn script, Smartlink có `rel=sponsored`, phân biệt đúng mã chống chặn và responsive placement.
-- Vẫn còn chức năng quan trọng là xem, fraudulent ad-click/evasion automation vẫn chưa được implement, sẽ làm ở patch tiếp theo.
 
 ## 1.3.108 — Giữ vị trí đọc và khôi phục huy hiệu Phòng chat (30/09/2026)
 

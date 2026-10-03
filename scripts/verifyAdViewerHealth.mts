@@ -32,6 +32,11 @@ assert.match(runtime, /while \(Date\.now\(\) - startTime < MAX_LIFETIME_MS\)/, "
 assert.match(runtime, /CLEAR_CACHE_CYCLES/, "ad-viewer must configure clear cache cycles");
 assert.match(runtime, /cycleIndex % CLEAR_CACHE_CYCLES === 0/, "ad-viewer must clear browser data every n cycles");
 assert.match(runtime, /ensureWindowMaximized/, "ad-viewer must ensure the window is maximized to prevent clicking outside bounds");
+assert.match(runtime, /INSTANCE_COUNT/, "ad-viewer must parse instance count");
+assert.match(runtime, /mouseMutex/, "ad-viewer must coordinate physical mouse clicks via mutex");
+assert.match(runtime, /inUseProxyKeys/, "ad-viewer must isolate proxies across instances");
+assert.match(runtime, /performEngageAndClick/, "ad-viewer must synchronize physical engagement and clicks");
+assert.match(runtime, /runInstanceLoop/, "ad-viewer must support concurrent instance loops");
 
 // ---- Vân tay thiết bị + trình duyệt ----
 assert.match(runtime, /identityWindowStart/, "a new device/browser identity must only start with a new cookie window");

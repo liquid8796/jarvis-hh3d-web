@@ -230,8 +230,26 @@ echo     -^> Trinh duyet: %CUSTOM_BROWSERS%
 :after_browsers
 echo.
 
+REM 11. So luong instance chay dong thoi
+echo [11] So luong instance chay dong thoi [Multi-Instance]:
+echo      Nhap so luong instance muon chay dong thoi (1-10, Enter = 1).
+echo      Moi instance co lap hoan toan profile, proxy va fingerprint, tu dong dieu phoi mutex chuot.
+set "INPUT_INSTANCES="
+set /p "INPUT_INSTANCES=    So luong instance [1-10, Enter = 1]: "
+if not defined INPUT_INSTANCES set "INPUT_INSTANCES=1"
+set "ARG_INSTANCES=--instances=%INPUT_INSTANCES%"
+echo     -^> So luong instance: %INPUT_INSTANCES%
+echo.
+
+set "ARG_MY_CHROME=--my-chrome"
+if not "%INPUT_INSTANCES%"=="1" (
+    set "ARG_MY_CHROME="
+    echo     [*] Che do da instance: Tu dong su dung profile doc lap cho tung instance thay vi --my-chrome.
+    echo.
+)
+
 REM Tong hop lenh thuc thi
-set FINAL_ARGS=--my-chrome %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS%
+set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES%
 
 echo ============================================================================
 echo   TONG HOP CAU HINH CHAY:

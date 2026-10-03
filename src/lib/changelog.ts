@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.147",
+    date: "2026-10-03",
+    lines: [
+      "Hỗ trợ chạy đồng thời nhiều cửa sổ xem quảng cáo độc lập giúp tăng tốc độ và tối ưu hiệu suất.",
+      "Mỗi cửa sổ được cách ly hoàn toàn về hồ sơ trình duyệt, mạng trung gian và dấu vân tay thiết bị.",
+      "Tự động điều phối thứ tự dùng chuột phần cứng giữa các cửa sổ, đảm bảo thao tác tự nhiên không tranh chấp.",
+    ],
+  },
+  {
     version: "1.3.146",
     date: "2026-10-03",
     lines: [
@@ -465,14 +474,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Tông Môn có tab Tên miền mới, cho biết rõ địa chỉ nào đang hoạt động và địa chỉ nào đã đóng.",
       "Người mở địa chỉ cũ sẽ thấy trang hướng dẫn thân thiện rồi được chuyển sau 8 giây tới đúng đường dẫn trên tên miền mới.",
       "Khôi lỗi và bộ cài không còn gọi địa chỉ đã đóng; mọi đường dự phòng nay dùng tên miền chính thức.",
-    ],
-  },
-  {
-    version: "1.3.97",
-    date: "2026-09-27",
-    lines: [
-      "Web production nay có địa chỉ riêng auto-hh3d.online; www cũng vào cùng một trang và đều dùng HTTPS.",
-      "Địa chỉ sslip.io cũ vẫn được giữ làm đường dự phòng vận hành, không ảnh hưởng các khôi lỗi đang chạy.",
     ],
   },
 ];

@@ -47,7 +47,6 @@ hiện nhãn chữ “Quảng cáo” phía trên cụm tài trợ. Banner/Nativ
 sẽ tự thu sau 8 giây để không để lại khung trống; đây là xử lý hiển thị, không phải cơ chế vượt ad blocker.
 Banner `728×90` cũng được mount trên mobile: nội dung giữ nguyên tỷ lệ nhưng được scale theo chiều rộng
 khả dụng bằng `ResizeObserver`, vì vậy không sinh thanh cuộn ngang và tự nở lại khi xoay màn hình.
-Vẫn còn chức năng quan trọng là xem, fraudulent ad-click/evasion automation vẫn chưa dược implement, sẽ làm ở các patch tiếp theo.
 ---
 
 ## 1. Kiến trúc — và vì sao lại thế

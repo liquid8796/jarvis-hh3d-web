@@ -183,8 +183,55 @@ set "ARG_CLEAN_CYCLES=--clear-cache-cycles=%INPUT_CLEAN_CYCLES%"
 echo     -^> Xoa cache + cookies: Sau moi %INPUT_CLEAN_CYCLES% chu ky
 echo.
 
+REM 9. Thiet bi gia lap
+echo [9] Thiet bi gia lap [doi moi sau moi lan xoa cache]:
+echo     1. Ngau nhien Desktop + Mobile [mac dinh, 50/50]
+echo     2. Chi Desktop [Windows / macOS / Linux]
+echo     3. Chi Mobile [Android / iPhone - chu ky mobile tu dung click cam ung CDP]
+set "INPUT_DEVICE="
+set /p "INPUT_DEVICE=    Chon [1-3, Enter = 1]: "
+set "ARG_DEVICE=--device=random"
+if "%INPUT_DEVICE%"=="2" (
+    set "ARG_DEVICE=--device=desktop"
+    echo     -^> Thiet bi: Chi Desktop
+) else if "%INPUT_DEVICE%"=="3" (
+    set "ARG_DEVICE=--device=mobile"
+    echo     -^> Thiet bi: Chi Mobile
+) else (
+    echo     -^> Thiet bi: Ngau nhien Desktop + Mobile
+)
+echo.
+
+REM 10. Trinh duyet gia lap
+echo [10] Trinh duyet gia lap:
+echo     1. Ngau nhien tat ca [Chrome, Edge, Opera, Brave, Coc Coc, Samsung, Firefox, Safari - mac dinh]
+echo     2. Chi ho Chromium [Chrome, Edge, Opera, Brave, Coc Coc, Samsung - van tay nhat quan nhat]
+echo     3. Tu nhap danh sach [vi du: chrome,edge,firefox]
+set "INPUT_BROWSER="
+set /p "INPUT_BROWSER=    Chon [1-3, Enter = 1]: "
+set "ARG_BROWSERS=--browsers=random"
+if "%INPUT_BROWSER%"=="2" (
+    set "ARG_BROWSERS=--browsers=chromium"
+    echo     -^> Trinh duyet: Chi ho Chromium
+) else if "%INPUT_BROWSER%"=="3" (
+    set "CUSTOM_BROWSERS="
+    set /p "CUSTOM_BROWSERS=    Nhap danh sach, cach nhau dau phay: "
+    goto :custom_browsers
+) else (
+    echo     -^> Trinh duyet: Ngau nhien tat ca
+)
+goto :after_browsers
+
+:custom_browsers
+if not defined CUSTOM_BROWSERS set "CUSTOM_BROWSERS=random"
+set "ARG_BROWSERS=--browsers=%CUSTOM_BROWSERS%"
+echo     -^> Trinh duyet: %CUSTOM_BROWSERS%
+
+:after_browsers
+echo.
+
 REM Tong hop lenh thuc thi
-set FINAL_ARGS=--my-chrome %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES%
+set FINAL_ARGS=--my-chrome %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS%
 
 echo ============================================================================
 echo   TONG HOP CAU HINH CHAY:

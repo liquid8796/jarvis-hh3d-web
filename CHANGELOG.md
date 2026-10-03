@@ -9,6 +9,17 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.145 — Random thiết bị (desktop/mobile) và trình duyệt cho trình xem quảng cáo (03/10/2026)
+
+- Module mới `scripts/adViewerFingerprint.mjs`: `pickFingerprintProfile` chọn trình duyệt theo trọng số (Chrome, Edge, Opera, Brave, Firefox, Safari, Samsung Internet, Cốc Cốc…) → hệ điều hành hợp lệ → màn hình/thiết bị/GPU/số nhân; `materializeFingerprint` dựng UA, UA-CH metadata (chỉ họ Chromium), viewport/DPR/touch, `navigator.platform`; `fingerprintInitScript` vá `navigator.*`, WebGL unmasked vendor/renderer, xoá `userAgentData`/`window.chrome` cho Firefox/Safari, thêm `navigator.brave`/`window.opr`.
+- `scripts/adViewer.mjs`: cờ `--device=random|desktop|mobile` (`AD_VIEWER_DEVICE`), `--browsers=random|chromium|danh sách` (`AD_VIEWER_BROWSERS`), `--mobile-ratio=%` (mặc định 50), `--no-fingerprint` (`AD_VIEWER_FINGERPRINT=0`). Phiên bản engine thật được đọc (VersionInfo của exe hoặc CDP `Browser.getVersion`) để số Chrome trong UA khớp engine.
+- Override UA qua CDP `Emulation.setUserAgentOverride` trên session được GIỮ suốt chu kỳ (detach là override mất); popup mới cũng nhận cùng danh tính qua `context.on("page")`. Init script vân tay chạy SAU stealth script vì stealth dựng lại `window.chrome`.
+- Danh tính gắn với cửa sổ cookies: chỉ đổi khi tới mốc `CLEAR_CACHE_CYCLES` — cùng cookies mà mỗi vòng một thiết bị khác là dấu hiệu bot.
+- Chu kỳ mobile ở chế độ `os-mouse`/`ghub` tạm chuyển sang click CDP (giả lập metrics mobile làm sai toạ độ chuột vật lý); desktop ở CDP đổi kích thước cửa sổ thật bằng `Browser.setWindowBounds`.
+- `run-ad-viewer.bat` thêm bước [9] chọn thiết bị và [10] chọn trình duyệt (ngẫu nhiên / chỉ Chromium / tự nhập).
+- Giới hạn đã biết: Firefox/Safari/iOS chỉ là giả lập bề mặt JS trên engine Chromium; vân tay TLS/HTTP2 vẫn là Chromium. `--browsers=chromium` cho vân tay nhất quán nhất.
+- `verify:ad-viewer-health` kiểm 400 hồ sơ ngẫu nhiên có seed (UA-CH chỉ cho Chromium, Samsung chỉ Android, Safari chỉ Apple, iOS luôn WebKit, mobile có touch, đủ mọi trình duyệt/thiết bị).
+
 ## 1.3.144 — Xoá cache + cookies trình duyệt theo chu kỳ n do người dùng nhập (03/10/2026)
 
 - Thêm cấu hình `CLEAR_CACHE_CYCLES` cho `scripts/adViewer.mjs` (cờ `--clear-cache-cycles=N`, bí danh `--clean-cycles`, biến môi trường `AD_VIEWER_CLEAR_CACHE_CYCLES`). Mặc định `1` giữ nguyên hành vi cũ (xoá sau mỗi chu kỳ); `0` tắt hẳn việc xoá định kỳ.

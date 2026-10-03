@@ -22,6 +22,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium as vanillaChromium } from "playwright-core";
+import {
+  fingerprintInitScript,
+  materializeFingerprint,
+  parseBrowserList,
+  parseDeviceMode,
+  pickFingerprintProfile,
+} from "./adViewerFingerprint.mjs";
 
 let chromium = vanillaChromium;
 let isPatchedEngine = false;
@@ -102,6 +109,16 @@ const CLEAR_CACHE_CYCLES = Math.max(
   0,
   Number.isNaN(parsedClearCacheCycles) ? 1 : Math.floor(parsedClearCacheCycles),
 );
+
+// Vân tay thiết bị + trình duyệt ngẫu nhiên. Một danh tính sống đúng bằng một cửa sổ cookie
+// (CLEAR_CACHE_CYCLES chu kỳ): khách quay lại với cùng cookie mà đổi máy/trình duyệt mỗi vòng
+// là một dấu hiệu bất thường rõ hơn cả việc không đổi gì.
+const FINGERPRINT_ENABLED =
+  !process.argv.includes("--no-fingerprint") && process.env.AD_VIEWER_FINGERPRINT !== "0";
+const DEVICE_MODE = parseDeviceMode(getCliArg("--device") || process.env.AD_VIEWER_DEVICE);
+const BROWSER_SELECTION = parseBrowserList(getCliArg("--browsers") || getCliArg("--browser") || process.env.AD_VIEWER_BROWSERS);
+const rawMobileRatio = Number(getCliArg("--mobile-ratio") || process.env.AD_VIEWER_MOBILE_RATIO || 50);
+const MOBILE_RATIO = Math.min(1, Math.max(0, (Number.isNaN(rawMobileRatio) ? 50 : rawMobileRatio) / 100));
 
 const rawPageTimeout = getCliArg("--page-timeout");
 const defaultPageTimeout = process.argv.some((a) => a.includes("proxy")) || process.env.AD_VIEWER_PROXY ? 35_000 : 25_000;
@@ -1819,12 +1836,106 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false, p
   throw new Error(`Không thể khởi động Chrome trên cổng CDP ${cdpPort} sau 15 giây.`);
 }
 
+// ---- Vân tay thiết bị / trình duyệt ---------------------------------------------------------
+
+let cachedEngineMajor = null;
+
+function parseMajor(text) {
+  const match = /(\d{2,3})\.\d+\.\d+/.exec(String(text ?? ""));
+  return match ? Number(match[1]) : null;
+}
+
+/**
+ * Đọc major của Chromium TRƯỚC khi mở (cho chế độ tự khởi chạy): UA truyền lúc launch phải khớp
+ * engine thật, bằng không request đầu của tab popup quảng cáo sẽ khai sai số bản.
+ */
+function detectEngineMajorFromExecutable() {
+  if (cachedEngineMajor) return cachedEngineMajor;
+  try {
+    const exe = chromium.executablePath();
+    if (!exe || !existsSync(exe)) return null;
+    const out =
+      process.platform === "win32"
+        ? execSync(`powershell -NoProfile -Command "(Get-Item '${exe.replace(/'/g, "''")}').VersionInfo.ProductVersion"`, {
+            encoding: "utf8",
+            timeout: 8000,
+          })
+        : execSync(`"${exe}" --version`, { encoding: "utf8", timeout: 8000 });
+    return parseMajor(out);
+  } catch {
+    return null;
+  }
+}
+
+async function detectEngineMajorFromPage(context, page) {
+  try {
+    const session = await context.newCDPSession(page);
+    const info = await session.send("Browser.getVersion");
+    await session.detach().catch(() => {});
+    return parseMajor(info?.product);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Áp vân tay lên MỘT tab qua phiên CDP riêng. Phiên phải được GIỮ suốt chu kỳ: Chromium gỡ mọi
+ * override Emulation ngay khi phiên đặt nó tách ra.
+ */
+async function applyFingerprintToPage(context, page, fp, { emulateMobileMetrics }) {
+  const session = await context.newCDPSession(page);
+  const override = {
+    userAgent: fp.userAgent,
+    acceptLanguage: fp.acceptLanguage,
+    platform: fp.navigatorPlatform,
+  };
+  if (fp.userAgentMetadata) override.userAgentMetadata = fp.userAgentMetadata;
+  await session
+    .send("Emulation.setUserAgentOverride", override)
+    .catch(() => session.send("Network.setUserAgentOverride", override).catch(() => {}));
+
+  if (fp.isMobile) {
+    if (emulateMobileMetrics) {
+      await session
+        .send("Emulation.setDeviceMetricsOverride", {
+          width: fp.viewport.width,
+          height: fp.viewport.height,
+          deviceScaleFactor: fp.deviceScaleFactor,
+          mobile: true,
+          screenWidth: fp.screen.width,
+          screenHeight: fp.screen.height,
+        })
+        .catch(() => {});
+      await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 }).catch(() => {});
+    }
+    // Chuột → cảm ứng: trang di động nhận touchstart/touchend/click như ngón tay thật.
+    await session.send("Emulation.setEmitTouchEventsForMouse", { enabled: true, configuration: "mobile" }).catch(() => {});
+  }
+  return session;
+}
+
+/** Desktop qua CDP: đổi KÍCH THƯỚC CỬA SỔ THẬT (không giả lập) để toạ độ chuột phần cứng vẫn đúng. */
+async function resizeWindowForFingerprint(session, page, fp) {
+  if (!fp.windowSize) return;
+  try {
+    const avail = await page.evaluate(() => ({ w: screen.availWidth, h: screen.availHeight }));
+    const width = Math.min(fp.windowSize.width, avail.w || fp.windowSize.width);
+    const height = Math.min(fp.windowSize.height, avail.h || fp.windowSize.height);
+    const { windowId } = await session.send("Browser.getWindowForTarget");
+    await session.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "normal" } });
+    await session.send("Browser.setWindowBounds", { windowId, bounds: { left: 0, top: 0, width, height } });
+  } catch {
+    // Không đổi được cửa sổ thì giữ nguyên — UA/navigator vẫn đã được áp.
+  }
+}
+
 async function runOneCycle(
   extensionPath,
   currentProxy = null,
   proxyManager = null,
   cycleIndex = 1,
-  sharedProfileDir = null
+  sharedProfileDir = null,
+  fingerprintProfile = null
 ) {
   const useMyChrome =
     process.argv.includes("--my-chrome") ||
@@ -1849,6 +1960,18 @@ async function runOneCycle(
   let isTempProfile = false;
   let page = null;
   let navigationSucceeded = false;
+  // Vân tay của chu kỳ này. Dựng sớm bằng số bản ước lượng (cần cho UA lúc launch), dựng lại
+  // ngay khi đọc được engine thật nếu hai số lệch nhau.
+  const fpLocale = currentProxy?.geo?.locale || "vi-VN";
+  let fp = fingerprintProfile
+    ? materializeFingerprint(fingerprintProfile, {
+        engineMajor: cdpUrl ? cachedEngineMajor : cachedEngineMajor ?? detectEngineMajorFromExecutable(),
+        locale: fpLocale,
+      })
+    : null;
+  const fpSessions = [];
+  let onFingerprintPage = null;
+  const baseClickMode = CLICK_MODE;
   const visitedDomains = [];
 
   try {
@@ -1899,12 +2022,18 @@ async function runOneCycle(
     }
 
     if (!cdpUrl) {
+      const launchWindow = fp
+        ? fp.isMobile
+          ? { width: fp.viewport.width + 16, height: fp.viewport.height + 140 }
+          : fp.windowSize
+        : { width: 1366, height: 768 };
+
       const args = [
         "--disable-blink-features=AutomationControlled",
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
-        "--window-size=1366,768",
+        `--window-size=${launchWindow.width},${launchWindow.height}`,
         "--enable-experimental-extension-apis",
         "--extensions-on-chrome-urls",
         "--silent-debugger-extension-api",
@@ -1936,14 +2065,37 @@ async function runOneCycle(
       const defaultDesktopUA =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
 
+      // Chuột phần cứng tính toạ độ từ cửa sổ THẬT, nên desktop ở các chế độ ấy không được giả lập
+      // viewport (viewport: null = trang lấp đúng cửa sổ). Mobile luôn giả lập — chu kỳ mobile tự
+      // chuyển sang click CDP ở dưới.
+      const physicalMouse = CLICK_MODE === "os-mouse" || CLICK_MODE === "ghub" || CLICK_MODE === "manual";
       const launchOptions = {
         headless: false,
         args: launchArgs,
         viewport: { width: 1366, height: 768 },
-        locale: currentProxy?.geo?.locale || "vi-VN",
+        locale: fpLocale,
         timezoneId: currentProxy?.geo?.timezoneId || "Asia/Ho_Chi_Minh",
-        userAgent: defaultDesktopUA,
+        userAgent: fp ? fp.userAgent : defaultDesktopUA,
       };
+      if (fp) {
+        if (fp.isMobile) {
+          Object.assign(launchOptions, {
+            viewport: fp.viewport,
+            screen: fp.screen,
+            deviceScaleFactor: fp.deviceScaleFactor,
+            isMobile: true,
+            hasTouch: true,
+          });
+        } else if (physicalMouse) {
+          launchOptions.viewport = null;
+        } else {
+          Object.assign(launchOptions, {
+            viewport: fp.viewport,
+            screen: fp.screen,
+            deviceScaleFactor: fp.deviceScaleFactor,
+          });
+        }
+      }
 
       if (currentProxy) {
         launchOptions.proxy = {
@@ -1987,6 +2139,39 @@ async function runOneCycle(
 
     page = useMyChrome || cdpUrl ? await context.newPage() : context.pages()[0] || (await context.newPage());
 
+    if (fp) {
+      const realMajor = await detectEngineMajorFromPage(context, page);
+      if (realMajor) {
+        cachedEngineMajor = realMajor;
+        fp = materializeFingerprint(fingerprintProfile, { engineMajor: realMajor, locale: fpLocale });
+      }
+      // Khi Chrome đã mở sẵn (CDP), không có tuỳ chọn launch nào áp được — mọi thứ đi qua CDP,
+      // kể cả kích thước màn hình di động.
+      const emulateMobileMetrics = Boolean(cdpUrl);
+      const mainSession = await applyFingerprintToPage(context, page, fp, { emulateMobileMetrics }).catch(() => null);
+      if (mainSession) {
+        fpSessions.push(mainSession);
+        if (cdpUrl && !fp.isMobile) await resizeWindowForFingerprint(mainSession, page, fp);
+      }
+      // Tab popup / popunder do quảng cáo mở ra cũng phải mang cùng danh tính.
+      onFingerprintPage = (newPage) => {
+        applyFingerprintToPage(context, newPage, fp, { emulateMobileMetrics })
+          .then((s) => fpSessions.push(s))
+          .catch(() => {});
+      };
+      context.on("page", onFingerprintPage);
+
+      if (fp.isMobile && (CLICK_MODE === "os-mouse" || CLICK_MODE === "ghub")) {
+        // Chuột phần cứng không ánh xạ được lên màn hình di động giả lập (viewport + DPR bị co
+        // giãn trong cửa sổ). Chu kỳ này dùng CDP — vẫn là sự kiện isTrusted, và được Chromium
+        // đổi thành chạm (touch) nhờ setEmitTouchEventsForMouse.
+        CLICK_MODE = "cdp";
+        log(`[Fingerprint] Chu kỳ mobile: tạm chuyển chế độ click ${baseClickMode} → cdp (chạm cảm ứng).`);
+      }
+      log(`[Fingerprint] ${fp.summary}`);
+      log(`[Fingerprint] UA: ${fp.userAgent}`);
+    }
+
     // Cài đặt Anti-Detect overrides qua CDP
     try {
       const cdpClient = await context.newCDPSession(page).catch(() => null);
@@ -2006,7 +2191,8 @@ async function runOneCycle(
             }).catch(() => {});
             await context.grantPermissions(["geolocation"], { origin: WEB_URL }).catch(() => {});
           }
-          if (currentProxy.geo.locale) {
+          // Khi bật vân tay, UA + ngôn ngữ đã được applyFingerprintToPage đặt theo locale của proxy.
+          if (currentProxy.geo.locale && !fp) {
             const lang = currentProxy.geo.locale;
             const baseLang = lang.split("-")[0];
             const liveVer = (context.browser()?.version() || "134.0.0.0").split(".")[0] || "134";
@@ -2123,6 +2309,10 @@ async function runOneCycle(
         }
       } catch {}
     }).catch(() => {});
+
+    // Vân tay chạy SAU lớp stealth: lớp stealth dựng lại window.chrome, mà hồ sơ Firefox/Safari
+    // phải xoá nó đi.
+    if (fp) await context.addInitScript(fingerprintInitScript, fp.inject).catch(() => {});
 
     const renderStartedAt = Date.now();
     log(`Mở trang chủ ${WEB_URL}...`);
@@ -2456,6 +2646,11 @@ async function runOneCycle(
       log("[Cache & Cookies] Bảo lưu cache và cookies toàn thời gian (tắt tự động xoá định kỳ).");
     }
 
+    // Gỡ vân tay của chu kỳ: listener popup, các phiên CDP giữ override, và chế độ click tạm.
+    if (onFingerprintPage && context) context.off("page", onFingerprintPage);
+    for (const session of fpSessions) await session.detach().catch(() => {});
+    CLICK_MODE = baseClickMode;
+
     if (cdpUrl) {
       // Trong chế độ CDP, đóng tất cả tab quảng cáo phụ nếu còn mở, và đóng tab chu kỳ với timeout bảo vệ
       try {
@@ -2470,6 +2665,12 @@ async function runOneCycle(
       } catch {}
       if (page && !page.isClosed()) {
         await withTimeout(page.close().catch(() => {}), 2000);
+      }
+      // Ngắt kết nối CDP của chu kỳ. Với connectOverCDP, browser.close() CHỈ đóng WebSocket (đã
+      // đọc mã Playwright: browserProcess.close = transport.closeAndWait) — Chrome thật vẫn chạy.
+      // Không ngắt thì init script của danh tính cũ vẫn tiêm vào tab của danh tính mới.
+      if (browser && fingerprintProfile) {
+        await withTimeout(browser.close().catch(() => {}), 3000).catch(() => {});
       }
       if ((useMyChrome || cdpUrl) && (proxyManager?.hasMultipleProxies() || !navigationSucceeded)) {
         log("✓ Tắt Chrome để làm mới socket mạng và chuẩn bị chu kỳ tiếp theo...");
@@ -2523,18 +2724,43 @@ async function main() {
       : `Sau mỗi ${CLEAR_CACHE_CYCLES} chu kỳ`;
   log(`Chu kỳ xoá cache & cookies: ${cleanCyclesDesc}`);
 
+  if (FINGERPRINT_ENABLED) {
+    const deviceDesc =
+      DEVICE_MODE === "desktop" ? "Chỉ desktop" : DEVICE_MODE === "mobile" ? "Chỉ mobile" : `Ngẫu nhiên (mobile ${Math.round(MOBILE_RATIO * 100)}%)`;
+    log(`Vân tay thiết bị: ${deviceDesc} · Trình duyệt: ${BROWSER_SELECTION.browsers.join(", ")}`);
+    if (BROWSER_SELECTION.unknown.length > 0) {
+      log(`⚠ Bỏ qua tên trình duyệt không nhận ra: ${BROWSER_SELECTION.unknown.join(", ")}`);
+    }
+  } else {
+    log("Vân tay thiết bị: tắt (--no-fingerprint) — dùng UA Chrome Windows cố định.");
+  }
+
   const proxyManager = new ProxyManager();
   proxyManager.init();
 
   const startTime = Date.now();
   let cycle = 0;
   let sharedProfileDir = null;
+  let fingerprintProfile = null;
 
   try {
     while (Date.now() - startTime < MAX_LIFETIME_MS) {
       cycle++;
       log(`\n=================== BẮT ĐẦU CHU KỲ ${cycle} ===================`);
       const currentProxy = await proxyManager.getNextWorkingProxy();
+
+      // Danh tính mới chỉ ra đời ở đầu một cửa sổ cookie (ngay sau lượt xoá cache) — n = 0 thì
+      // giữ một danh tính cho cả ca trực.
+      const identityWindowStart = CLEAR_CACHE_CYCLES > 0 && (cycle - 1) % CLEAR_CACHE_CYCLES === 0;
+      if (FINGERPRINT_ENABLED && (!fingerprintProfile || identityWindowStart)) {
+        fingerprintProfile = pickFingerprintProfile({
+          device: DEVICE_MODE,
+          browsers: BROWSER_SELECTION.browsers,
+          mobileRatio: MOBILE_RATIO,
+        });
+        for (const note of fingerprintProfile.notes) log(`[Fingerprint] ⚠ ${note}`);
+        log(`[Fingerprint] Danh tính mới cho ${CLEAR_CACHE_CYCLES > 0 ? `${CLEAR_CACHE_CYCLES} chu kỳ tới` : "cả ca trực"}.`);
+      }
 
       if (
         !process.argv.some((a) => a.startsWith("--cdp")) &&
@@ -2549,7 +2775,7 @@ async function main() {
         }
       }
 
-      await runOneCycle(extPath, currentProxy, proxyManager, cycle, sharedProfileDir);
+      await runOneCycle(extPath, currentProxy, proxyManager, cycle, sharedProfileDir, fingerprintProfile);
 
       if (sharedProfileDir && CLEAR_CACHE_CYCLES > 0 && cycle % CLEAR_CACHE_CYCLES === 0) {
         try {

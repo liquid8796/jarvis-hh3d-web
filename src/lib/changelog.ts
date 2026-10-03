@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.145",
+    date: "2026-10-03",
+    lines: [
+      "Trình xem quảng cáo nay đổi ngẫu nhiên thiết bị (máy tính, điện thoại) và trình duyệt cho mỗi lượt khách.",
+      "Có thể chọn chỉ máy tính, chỉ điện thoại, hoặc tự chọn danh sách trình duyệt như Chrome, Edge, Opera, Firefox.",
+      "Mỗi danh tính được giữ nguyên cho tới lần dọn dữ liệu duyệt web kế tiếp để trông như một người khách thật.",
+    ],
+  },
+  {
     version: "1.3.144",
     date: "2026-10-03",
     lines: [
@@ -464,14 +473,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Đường dự phòng của khôi lỗi nay ghi nhớ địa chỉ trạm gương trong một ngày, giảm các lượt hỏi mạng lặp lại.",
       "Nếu lần phân giải bị lỗi, khôi lỗi sẽ thử lại ở lượt kế thay vì giữ một kết quả hỏng suốt ngày.",
-    ],
-  },
-  {
-    version: "1.3.95",
-    date: "2026-09-26",
-    lines: [
-      "Khôi lỗi GitHub nay được soát đủ cả đường chính lẫn đường dự phòng trước khi phát bản mới.",
-      "Thiếu hoặc lặp một đường kết nối sẽ bị chặn từ đầu, không để ca mới khởi động với lối dự phòng hỏng.",
     ],
   },
 ];

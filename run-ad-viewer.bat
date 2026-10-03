@@ -248,8 +248,23 @@ if not "%INPUT_INSTANCES%"=="1" (
     echo.
 )
 
+REM 12. Thoi gian hover re chuot tren quang cao truoc khi click
+echo [12] Thoi gian re chuot tren quang cao truoc khi click [Hover Engagement]:
+echo      Nhap so giay (vi du: 3 hoac 4), khoang thoi gian (vi du: 2-5), hoac ms (vi du: 3000).
+echo      De trong de su dung mac dinh (tu 1.2 den 2.5 giay).
+set "INPUT_HOVER="
+set /p "INPUT_HOVER=    Thoi gian hover tren quang cao [Enter = mac dinh 1.2-2.5s]: "
+set "ARG_HOVER="
+if defined INPUT_HOVER (
+    set "ARG_HOVER=--hover=%INPUT_HOVER%"
+    echo     -^> Thoi gian hover: %INPUT_HOVER%
+) else (
+    echo     -^> Thoi gian hover: Mac dinh [1.2 - 2.5 giay]
+)
+echo.
+
 REM Tong hop lenh thuc thi
-set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES%
+set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER%
 
 echo ============================================================================
 echo   TONG HOP CAU HINH CHAY:

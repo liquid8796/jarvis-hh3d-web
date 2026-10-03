@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.152",
+    date: "2026-10-03",
+    lines: [
+      "Bổ sung mục cấu hình thời gian hover lượn chuột trực tiếp trong kịch bản chạy nhanh của Windows.",
+      "Người dùng có thể nhập trực tiếp số giây hoặc khoảng thời gian tuỳ ý khi mở bảng chọn.",
+    ],
+  },
+  {
     version: "1.3.151",
     date: "2026-10-03",
     lines: [
@@ -466,15 +474,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Kho Github tạo mới, kho vừa đổi vai trò và các khôi lỗi đang trực nay dùng cùng một khuôn vận hành.",
       "Khôi lỗi trên Github thấy trạm đổi bản sẽ chờ việc đang làm xong rồi tự mở ca mới, không phải chờ lịch bốn giờ.",
       "Mã dự án cũ vẫn được giữ nguyên; Jarvis chỉ quản lý phần điều khiển khôi lỗi.",
-    ],
-  },
-  {
-    version: "1.3.102",
-    date: "2026-09-29",
-    lines: [
-      "Điểm Danh tài khoản thường nay nhận diện lịch mới, con dấu điểm danh và trạng thái ô hôm nay đã nhận.",
-      "Phúc Lợi Đường và Thí Luyện Tông Môn đã chuyển sang bộ đếm, data-state và đồng hồ mới của trang.",
-      "Hồ sơ nhiệm vụ được nâng cấp để tự thay cách chạy cũ; ba flow mới có kiểm thử Chromium và không dùng dấu mốc giao diện đã mất.",
     ],
   },
 ];

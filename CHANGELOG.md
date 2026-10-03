@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.152 — Cập nhật menu cấu hình thời gian hover trong script chạy nhanh run-ad-viewer.bat (03/10/2026)
+
+- Cập nhật kịch bản Windows [run-ad-viewer.bat](run-ad-viewer.bat):
+  - Bổ sung mục lựa chọn `[12] Thoi gian re chuot tren quang cao truoc khi click [Hover Engagement]`, cho phép người dùng nhập trực tiếp số giây (ví dụ `3`, `4`), khoảng thời gian (ví dụ `2-5`), hoặc mili-giây (`3000`). Nếu để trống sẽ sử dụng mặc định (1.2 - 2.5s).
+  - Tự động truyền cờ `--hover=%INPUT_HOVER%` vào chuỗi tham số thực thi `FINAL_ARGS`.
+  - Đảm bảo kết dòng tệp batch chuẩn CRLF theo đúng quy chuẩn `verify:bat-eol`.
+
 ## 1.3.151 — Cấu hình thời gian hover quảng cáo tuỳ chọn và ngăn chặn che khuất cửa sổ đa instance (03/10/2026)
 
 - Bổ sung tính năng cho phép người dùng chỉ định thời gian rê chuột lượn (hover) trên quảng cáo trước khi click:

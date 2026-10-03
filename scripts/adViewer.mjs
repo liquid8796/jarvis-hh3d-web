@@ -1399,7 +1399,9 @@ async function inspectAdsterraPlacements(page, startedAt = Date.now()) {
       .waitForFunction(
         ({ bannerSelector, nativeSelector }) => {
           const terminal = (selector) => {
-            const status = document.querySelector(selector)?.getAttribute("data-status") ?? "";
+            const el = document.querySelector(selector);
+            if (!el) return true;
+            const status = el.getAttribute("data-status") ?? "";
             return status === "ready" || status === "blocked";
           };
           return terminal(bannerSelector) && terminal(nativeSelector);
@@ -1477,11 +1479,20 @@ async function inspectAdsterraPlacements(page, startedAt = Date.now()) {
     slotBox: nativeSlotFound ? await nativeSlot.boundingBox().catch(() => null) : null,
   };
 
+  const hasPopunder = await page.evaluate(() => {
+    return Boolean(document.querySelector('script[data-adsterra="popunder"], script[src*="430d4fbd8d66c3bb0f47cab838ef8a06"]'));
+  }).catch(() => false);
+  const hasSocialBar = await page.evaluate(() => {
+    return Boolean(document.querySelector('script[data-adsterra="social-bar"], script[src*="977a66f06e979e2830ee60ed1fa88533"]'));
+  }).catch(() => false);
+
   return {
     renderMs: Date.now() - startedAt,
+    hasPopunder,
+    hasSocialBar,
     banner,
     native,
-    allReady: banner.status === "ready" && native.status === "ready",
+    allReady: (hasPopunder || hasSocialBar) || (banner.status === "ready" && native.status === "ready"),
     bannerIframeFound,
     bannerIframe,
   };
@@ -2120,17 +2131,13 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
     const diagnostic = await inspectAdsterraPlacements(page, renderStartedAt);
 
     log(
-      `Adsterra banner: ${diagnostic.banner.status} ` +
-        `(DOM=${diagnostic.banner.rawStatus}, iframe 728×90=${diagnostic.banner.iframe728x90 ? "có" : "không"}, ` +
-        `creative=${diagnostic.banner.creativeCount}, slot=${formatBox(diagnostic.banner.slotBox)}, ` +
-        `iframe=${formatBox(diagnostic.banner.iframeBox)})`,
+      `Adsterra: Popunder=${diagnostic.hasPopunder ? "có" : "không"}, ` +
+      `Social Bar=${diagnostic.hasSocialBar ? "có" : "không"}`
     );
-    log(
-      `Adsterra native: ${diagnostic.native.status} ` +
-        `(DOM=${diagnostic.native.rawStatus}, creative=${diagnostic.native.creativeCount}, ` +
-        `slot=${formatBox(diagnostic.native.slotBox)})`,
-    );
-    log(`Thời gian chờ render Adsterra: ${diagnostic.renderMs}ms.`);
+    if (diagnostic.banner?.status === "ready" || diagnostic.native?.status === "ready") {
+      log(`Adsterra legacy banner/native: banner=${diagnostic.banner.status}, native=${diagnostic.native.status}`);
+    }
+    log(`Thời gian phân tích quảng cáo Adsterra: ${diagnostic.renderMs}ms.`);
 
     // Dừng đọc nội dung trang web tự nhiên trước khi click (tối đa 3 giây)
     const minReadingMs = Math.min(1500, MAX_READING_BEFORE_CLICK_MS);
@@ -2144,63 +2151,27 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
     // Thu thập tất cả các quảng cáo khả dụng trên trang để chọn ngẫu nhiên
     const adCandidates = [];
 
-    // 1. Toàn bộ các thẻ Native Ads (nếu ready)
-    if (diagnostic.native.status === "ready") {
-      try {
-        const nativeLinks = page.locator(
-          `${NATIVE_READY_SELECTOR} #${NATIVE_CONTAINER_ID} a[target="_blank"], ${NATIVE_READY_SELECTOR} a`,
-        );
-        const count = await nativeLinks.count().catch(() => 0);
-        for (let i = 0; i < count; i++) {
-          adCandidates.push({
-            name: `Native ad card ${i + 1}/${count}`,
-            locator: nativeLinks.nth(i),
-          });
-        }
-      } catch (err) {
-        log(`Lỗi khi quét native ads: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
-
-    // 2. Banner ad creative trong các iframe quảng cáo (728x90, 468x60, 320x50, 300x250, 160x600, 160x300)
+    // 1. Quét các phần tử Social Bar (thông báo / bong bóng / widget nổi do script tạo ra)
     try {
-      const bannerIframes = page.locator(
-        '.adsterra-banner[data-status="ready"] iframe, .adsterra-leaderboard[data-status="ready"] iframe, .adsterra-unit iframe',
+      const socialElements = page.locator(
+        'iframe[src*="deliberatewatchful.com"], iframe[src*="adsterra"], [class*="asg_"] a, [id*="asg_"] a, [class*="asg_"], [id*="asg_"], [class*="social"] a, div[style*="z-index: 214748364"]'
       );
-      const iframeCount = await bannerIframes.count().catch(() => 0);
-      for (let f = 0; f < iframeCount; f++) {
-        const iframeHandle = await bannerIframes.nth(f).elementHandle().catch(() => null);
-        const frame = iframeHandle ? await iframeHandle.contentFrame().catch(() => null) : null;
-        if (frame) {
-          const bannerLinks = frame.locator("a[href]");
-          const bannerCount = await bannerLinks.count().catch(() => 0);
-          for (let i = 0; i < bannerCount; i++) {
-            adCandidates.push({
-              name: `Banner iframe #${f + 1} link ${i + 1}/${bannerCount}`,
-              locator: bannerLinks.nth(i),
-            });
-          }
-        }
-      }
-    } catch (err) {
-      log(`Lỗi khi quét banner ads: ${err instanceof Error ? err.message : String(err)}`);
-    }
-
-    // 3. Adsterra Smartlink
-    try {
-      const smartlink = page.locator(
-        '.adsterra-smartlink, a[href*="deliberatewatchful.com"], a[href*="f06720140b3b11ad092d96fa65ca5110"]',
-      );
-      const smartCount = await smartlink.count().catch(() => 0);
-      for (let i = 0; i < smartCount; i++) {
+      const socialCount = await socialElements.count().catch(() => 0);
+      for (let i = 0; i < socialCount; i++) {
         adCandidates.push({
-          name: `Adsterra Smartlink ${i + 1}/${smartCount}`,
-          locator: smartlink.nth(i),
+          name: `Social Bar widget #${i + 1}/${socialCount}`,
+          locator: socialElements.nth(i),
         });
       }
-    } catch {
-      // bỏ qua
+    } catch (err) {
+      log(`Lỗi khi quét Social Bar: ${err instanceof Error ? err.message : String(err)}`);
     }
+
+    // 2. Adsterra Popunder: kích hoạt bằng tương tác tự nhiên trên trang web
+    adCandidates.push({
+      name: "Adsterra Popunder (tương tác tự nhiên trên trang)",
+      isPopunder: true,
+    });
 
     // Xáo trộn ngẫu nhiên toàn bộ danh sách quảng cáo tìm thấy (Fisher-Yates)
     for (let i = adCandidates.length - 1; i > 0; i--) {
@@ -2214,7 +2185,11 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
       log("\n" + "=".repeat(64));
       log("🔔 [CHẾ ĐỘ BÁN TỰ ĐỘNG - THỦ CÔNG]");
       log(`👉 Đã định vị mục tiêu: "${targetDesc}"`);
-      log("👉 Vui lòng dùng CHUỘT THẬT click vào khung quảng cáo viền đỏ trên màn hình Chrome!");
+      if (targetCandidate?.isPopunder) {
+        log("👉 Vui lòng dùng CHUỘT THẬT click vào bất kỳ vị trí nào trên trang web để mở quảng cáo Popunder!");
+      } else {
+        log("👉 Vui lòng dùng CHUỘT THẬT click vào khung quảng cáo Social Bar trên màn hình Chrome!");
+      }
       log("⏳ Auto đang đếm ngược chờ bạn click (tối đa 45 giây)...");
       log("=".repeat(64) + "\n");
       try { process.stdout.write("\x07"); } catch {}
@@ -2258,6 +2233,32 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
     } else if (adCandidates.length > 0) {
       log(`Tìm thấy tổng cộng ${adCandidates.length} vị trí quảng cáo khả dụng. Đang chọn ngẫu nhiên để click (${CLICK_MODE} mode)...`);
       for (const candidate of adCandidates) {
+        if (candidate.isPopunder) {
+          log(`-> Kích hoạt [${candidate.name}] tại toạ độ ngẫu nhiên trên trang...`);
+          const target = { x: rand(300, 700), y: rand(250, 550) };
+          await preClickEngagement(page, context, target.x, target.y);
+          const [newPage] = await Promise.all([
+            context.waitForEvent("page", { timeout: 10000 }).catch(() => null),
+            humanClick(page, context, target.x, target.y).catch(() => null),
+          ]);
+          if (newPage) {
+            openedPage = newPage;
+            adClicked = true;
+            log(`✓ Đã kích hoạt và mở tab quảng cáo Popunder thành công.`);
+            break;
+          } else {
+            await sleep(2500);
+            const allPages = context.pages();
+            if (allPages.length > 1) {
+              openedPage = allPages[allPages.length - 1];
+              adClicked = true;
+              log(`✓ Đã bắt được trang Popunder từ tab phụ.`);
+              break;
+            }
+          }
+          continue;
+        }
+
         const clickTarget = await resolveAdClickTarget(candidate.locator);
         if (!clickTarget) {
           log(`  Bỏ qua [${candidate.name}] — không xác định được toạ độ.`);
@@ -2289,21 +2290,12 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
 
     // 4. Danh sách bộ chọn quảng cáo dự phòng cần tương tác
     const candidateSelectors = [
-      '.adsterra-smartlink',
-      'a[href*="deliberatewatchful.com"]',
-      '#container-5e6634da84f8f263d7ab34ae152f1c8d a[target="_blank"]',
-      '#container-5e6634da84f8f263d7ab34ae152f1c8d a',
-      '.adsterra-native a[target="_blank"]',
-      '.adsterra-native a',
-      'iframe[width="728"]',
-      'iframe[src*="alwingulla"]',
-      'iframe[src*="adsterra"]',
       'iframe[src*="deliberatewatchful.com"]',
-      'a[href*="alwingulla"]',
-      'a[href*="smartlink"]',
-      'aside.adsterra-stack a',
-      '[class*="adsterra"] iframe',
-      '[id*="container-"] a',
+      'iframe[src*="adsterra"]',
+      '[class*="asg_"] a',
+      '[id*="asg_"] a',
+      '[class*="social"] a',
+      'div[style*="z-index: 214748364"] a',
       'a[target="_blank"]',
     ];
 

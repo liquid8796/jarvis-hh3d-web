@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.142",
+    date: "2026-10-03",
+    lines: [
+      "Tinh gọn hệ thống quảng cáo Adsterra chỉ giữ lại Popunder và Social Bar, loại bỏ toàn bộ biểu ngữ, native và smartlink không còn sử dụng.",
+      "Chuyển đổi cơ chế hiển thị quảng cáo từ phía trình duyệt sang kết xuất trực tiếp từ máy chủ, giảm đáng kể dung lượng tải trang.",
+    ],
+  },
+  {
     version: "1.3.141",
     date: "2026-10-03",
     lines: [
@@ -466,15 +474,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Nút ép khôi lỗi lên bản mới nay vẫn cập nhật các kho khỏe dù một kho khác đã mất hoặc hết quyền truy cập.",
       "Kho lỗi được báo riêng để sửa sau; chỉ khi không còn kho nào làm được thì lượt ép mới dừng toàn bộ.",
       "Kết quả một phần được nói rõ, nên không còn cảnh bấm script rồi mọi kho đều đứng nguyên vì một dòng 404.",
-    ],
-  },
-  {
-    version: "1.3.92",
-    date: "2026-09-26",
-    lines: [
-      "Hoang Vực nay nhận đúng trạng thái hết 5 lượt từ bộ đếm của trang, kể cả khi nút Khiêu Chiến vẫn còn hiện.",
-      "Bản VIP và thường cùng dùng flow mới; lượt thứ năm được chốt ngay trong lượt chạy và không bị đánh lại.",
-      "Lưới Chromium khóa cả trang đã hết lượt, đòn thứ năm và đòn thường còn hồi chiêu.",
     ],
   },
 ];

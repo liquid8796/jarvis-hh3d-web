@@ -61,11 +61,11 @@ export default function PrivacyPage() {
 
             <Section title="Adsterra và định dạng quảng cáo">
               <p>
-                Website có thể tải quảng cáo Adsterra gồm biểu ngữ, đề xuất nội dung, Social Bar và Popunder trên tên miền chính thức.
+                Website có thể tải quảng cáo Adsterra gồm Social Bar và Popunder trên tên miền chính thức.
                 Adsterra và các đối tác phân phối của họ có thể xử lý địa chỉ IP, thông tin trình duyệt/thiết bị, cookie và tín hiệu chống gian lận để phân phối và đo lường quảng cáo.
               </p>
               <p>
-                Mã Popunder và liên kết tài trợ dùng miền tuỳ chỉnh/chống chặn do chính Adsterra trả về; mã Social Bar là tag tiêu chuẩn của zone.
+                Mã Popunder và Social Bar do chính Adsterra trả về theo cấu hình zone của website.
                 Auto HH3D không tự kiểm tra tiện ích trình duyệt, không khoá quyền truy cập khi bạn chặn quảng cáo và không thêm cơ chế vượt chặn riêng ngoài mã nhà cung cấp.
               </p>
             </Section>

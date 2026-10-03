@@ -9,6 +9,16 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.142 — Tinh gọn Adsterra chỉ giữ Popunder và Social Bar (03/10/2026)
+
+- Loại bỏ toàn bộ 8 định dạng quảng cáo Adsterra không còn sử dụng (Leaderboard, 468x60, 320x50, 300x250, 160x600, 160x300, Native, Smartlink), chỉ giữ lại Popunder và Social Bar.
+- Xoá hoàn toàn `AdsterraClientAds.tsx` client component với hệ thống hàng đợi banner phức tạp (`window.atOptions`, `MutationObserver`, `ResizeObserver`) và tệp `adsterra.css` kèm theo.
+- Chuyển đổi sang hai server-rendered `<script>` tags đơn giản: `AdsterraPopunder` đặt trong `<head>` và `AdsterraSocialBar` đặt trước `</body>`, giảm đáng kể JavaScript bundle size.
+- Cập nhật `config.ts` chỉ export `ADSTERRA_POPUNDER_SCRIPT_SRC` và `ADSTERRA_SOCIAL_BAR_SCRIPT_SRC`.
+- Cập nhật trang chính sách quyền riêng tư chỉ đề cập Popunder và Social Bar.
+- Viết lại `verifyAdsterra.mts` kiểm tra đúng hai loại quảng cáo mới và xác nhận không còn dấu vết loại cũ.
+- Cập nhật `adViewer.mjs` nhận diện script Popunder/Social Bar và tương tác phù hợp.
+
 ## 1.3.141 — Tuỳ chọn không dùng ảnh nền trang admin & Tích hợp trọn bộ Adsterra (03/10/2026)
 
 - Bổ sung tuỳ chọn "— không dùng ảnh nền (tiết kiệm dữ liệu) —" (`NO_BACKDROP_KEY = "none"`) vào danh sách chọn nền mặc định và nền riêng của từng trang tại tab Giao diện của trang Tông môn (`/admin`).

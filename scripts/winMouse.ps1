@@ -16,6 +16,9 @@ public static extern void mouse_event(int flags, int dx, int dy, int buttons, in
 public static extern bool GetCursorPos(out System.Drawing.Point pt);
 
 [DllImport("user32.dll")]
+public static extern bool SetCursorPos(int X, int Y);
+
+[DllImport("user32.dll")]
 public static extern bool SetForegroundWindow(IntPtr hWnd);
 
 [DllImport("user32.dll")]
@@ -54,6 +57,7 @@ function MoveHardware([int]$x, [int]$y) {
     # 0x8001 = MOUSEEVENTF_MOVE (0x0001) | MOUSEEVENTF_ABSOLUTE (0x8000)
     # Windows Input Subsystem tạo thông điệp WM_MOUSEMOVE thật sự gửi tới Chrome
     [WinMouse.NativeMethods]::mouse_event(0x8001, $normX, $normY, 0, 0)
+    [void][WinMouse.NativeMethods]::SetCursorPos($clampedX, $clampedY)
 }
 
 # 3. Lấy toạ độ chuột hiện tại

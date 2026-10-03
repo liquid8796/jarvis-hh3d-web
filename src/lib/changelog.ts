@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.140",
+    date: "2026-10-03",
+    lines: [
+      "Hỗ trợ linh hoạt định dạng danh sách proxy IP:PORT@USER:PASS cùng các biến thể giao thức mạng phổ biến.",
+      "Chuẩn hoá bộ phân tích máy chủ mạng trung gian, đảm bảo tương thích mọi nhà cung cấp proxy trên thị trường.",
+    ],
+  },
+  {
     version: "1.3.139",
     date: "2026-10-03",
     lines: [
@@ -468,14 +476,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Nuôi kho GitHub nay có nút Promote trên từng repo phụ để đổi repo ấy thành repo chính mà vẫn giữ lịch sử mã.",
       "Nếu đã có repo chính, repo cũ tự chuyển thành repo phụ và ngừng chạy khôi lỗi; nếu đang hoãn repo chính thì không tạo thêm repo cũ.",
       "Lượt đổi vai trò tự khóa các thao tác liên quan và hoàn tác an toàn khi lỗi, tránh hai khôi lỗi cùng chạy một danh tính.",
-    ],
-  },
-  {
-    version: "1.3.90",
-    date: "2026-09-21",
-    lines: [
-      "Nuôi kho GitHub nay gỡ được kho trong sổ ngay cả khi tài khoản GitHub đã bị xoá bên ngoài.",
-      "Nút Xoá gửi đúng thông tin xác nhận danh sách repo chính; repo phụ vẫn không nhận lệnh xoá.",
     ],
   },
 ];

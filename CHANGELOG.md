@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.140 — Hỗ trợ định dạng danh sách Proxy IP:PORT@USER:PASS và tăng độ chính xác chuột (03/10/2026)
+
+- Bổ sung khả năng nhận diện và phân tích toàn diện định dạng proxy `IP:PORT@USER:PASS` và `HOST:PORT@USER:PASS` (kể cả có tiền tố `http://` hay `socks5://`) trong `parseProxyItem` của `scripts/adViewer.mjs`.
+- Bổ sung hàm kiểm tra `parseHostPort` thông minh tự động phân định ranh giới giữa cụm IP:Port và User:Pass dựa trên cấu trúc địa chỉ IPv4, IPv6, tên miền và cổng mạng, xử lý chính xác ngay cả khi mật khẩu có chứa ký tự `@`.
+- Bổ sung bộ kiểm thử tự động xác minh toàn diện các định dạng proxy vào `scripts/verifyAdViewerHealth.mts`.
+- Nâng cấp `scripts/winMouse.ps1` với lệnh `SetCursorPos` bổ trợ nhằm ghim toạ độ pixel tuyệt đối trước khi click chuột phần cứng.
+
 ## 1.3.139 — Xoá triệt để Cache, Cookies và Web Storage toàn trình duyệt sau mỗi chu kỳ (03/10/2026)
 
 - Thay thế hàm xoá cookie có chọn lọc (`cleanupTargetedCookies`) bằng quy trình làm sạch toàn diện `cleanupAllBrowserData`: dọn dẹp triệt để 100% cookies, disk/memory cache, LocalStorage, SessionStorage, IndexedDB, Service Workers và Cache Storage cho toàn bộ trình duyệt thông qua giao thức CDP (`Storage.clearDataForOrigin`, `Network.clearBrowserCookies`, `Network.clearBrowserCache`).

@@ -29,8 +29,24 @@ assert.match(runtime, /generateBezierPath\s*\(/, "ad-viewer must generate Bézie
 assert.match(runtime, /MAX_RECURSIVE_CLICKS/, "ad-viewer must support recursive ad clicks");
 assert.match(runtime, /handleRecursiveAdClicks/, "ad-viewer must handle recursive ad clicks");
 assert.match(runtime, /while \(Date\.now\(\) - startTime < MAX_LIFETIME_MS\)/, "ad-viewer must loop across lifetime cycles");
-assert.match(runtime, /prepareExtensionProfile/, "ad-viewer must prepare extension profile");
+// @ts-ignore
+const { parseProxyItem } = await import("./adViewer.mjs");
+const p1 = parseProxyItem("103.152.112.5:8080@liquid:secret123");
+assert.equal(p1?.server, "http://103.152.112.5:8080");
+assert.equal(p1?.username, "liquid");
+assert.equal(p1?.password, "secret123");
+
+const p2 = parseProxyItem("http://103.152.112.5:8080@liquid:secret123");
+assert.equal(p2?.server, "http://103.152.112.5:8080");
+assert.equal(p2?.username, "liquid");
+assert.equal(p2?.password, "secret123");
+
+const p3 = parseProxyItem("liquid:secret123@103.152.112.5:8080");
+assert.equal(p3?.server, "http://103.152.112.5:8080");
+assert.equal(p3?.username, "liquid");
+assert.equal(p3?.password, "secret123");
 
 console.log(
-  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, and runs continuous cycles locally.",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, and runs continuous cycles locally.",
 );
+

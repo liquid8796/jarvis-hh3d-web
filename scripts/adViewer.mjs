@@ -241,87 +241,145 @@ const COUNTRY_TO_LOCALE = {
 };
 
 /**
+ * Trợ thủ phân tích host và port. Trả về { host, port, isIp } nếu hợp lệ.
+ */
+function parseHostPort(str) {
+  if (!str) return null;
+  const lastColon = str.lastIndexOf(":");
+  if (lastColon <= 0) return null;
+  const host = str.slice(0, lastColon).trim().replace(/^\[|\]$/g, "");
+  const portStr = str.slice(lastColon + 1).trim();
+  const port = Number(portStr);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
+  const isIpv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(host);
+  if (isIpv4) {
+    const octets = host.split(".").map(Number);
+    if (octets.every((o) => o >= 0 && o <= 255)) {
+      return { host, port, isIp: true };
+    }
+    return null;
+  }
+  const isIpv6 = host.includes(":") && /^[0-9a-fA-F:]+$/.test(host);
+  if (isIpv6) return { host, port, isIp: true };
+  const isDomain = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(host);
+  if (isDomain) return { host, port, isIp: false };
+  return null;
+}
+
+/**
  * Phân tích chuỗi proxy theo các định dạng phổ biến:
- * 1. host:port (như D:\Project\lobby\proxies\list-proxies.txt)
- * 2. host:port:username:password
- * 3. protocol://username:password@host:port
- * 4. username:password@host:port
+ * 1. IP:PORT@USER:PASS hoặc HOST:PORT@USER:PASS
+ * 2. USER:PASS@IP:PORT hoặc USER:PASS@HOST:PORT
+ * 3. protocol://IP:PORT@USER:PASS hoặc protocol://USER:PASS@HOST:PORT
+ * 4. IP:PORT:USER:PASS hoặc USER:PASS:IP:PORT
+ * 5. IP:PORT hoặc HOST:PORT (không xác thực)
  */
 function parseProxyItem(rawStr) {
   if (!rawStr) return null;
-  const str = rawStr.trim();
+  let str = rawStr.trim();
   if (!str || str.startsWith("#") || str.startsWith("//")) return null;
 
-  // 1. URL format: protocol://user:pass@host:port
+  let protocol = "http";
   if (str.includes("://")) {
-    try {
-      const u = new URL(str);
-      const protocol = u.protocol.replace(":", "").toLowerCase();
-      const port = Number(u.port) || (protocol === "https" ? 443 : 80);
-      return {
-        protocol,
-        host: u.hostname,
-        port,
-        username: decodeURIComponent(u.username || ""),
-        password: decodeURIComponent(u.password || ""),
-        server: `${protocol}://${u.hostname}:${port}`,
-        raw: str,
-      };
-    } catch {
-      return null;
+    const protoMatch = str.match(/^([a-zA-Z0-9+.-]+):\/\/(.*)$/);
+    if (protoMatch) {
+      protocol = protoMatch[1].toLowerCase();
+      str = protoMatch[2].trim();
     }
   }
 
-  // 2. Format: user:pass@host:port
+  // 1. Định dạng có dấu @: IP:PORT@USER:PASS hoặc USER:PASS@IP:PORT
   if (str.includes("@")) {
-    const atIndex = str.lastIndexOf("@");
-    const authPart = str.slice(0, atIndex);
-    const hostPart = str.slice(atIndex + 1);
-    const authColon = authPart.indexOf(":");
-    const username = authColon >= 0 ? authPart.slice(0, authColon) : authPart;
-    const password = authColon >= 0 ? authPart.slice(authColon + 1) : "";
-    const [host, port] = hostPart.split(":");
-    const p = Number(port) || 80;
+    const firstAt = str.indexOf("@");
+    const lastAt = str.lastIndexOf("@");
+    const hpFirst = parseHostPort(str.slice(0, firstAt));
+    const hpLast = parseHostPort(str.slice(lastAt + 1));
+
+    let host = "";
+    let port = 80;
+    let username = "";
+    let password = "";
+
+    if (hpFirst && (!hpLast || hpFirst.isIp)) {
+      // IP:PORT@USER:PASS
+      host = hpFirst.host;
+      port = hpFirst.port;
+      const auth = str.slice(firstAt + 1).trim();
+      const c = auth.indexOf(":");
+      username = c >= 0 ? auth.slice(0, c).trim() : auth;
+      password = c >= 0 ? auth.slice(c + 1).trim() : "";
+    } else if (hpLast) {
+      // USER:PASS@IP:PORT
+      host = hpLast.host;
+      port = hpLast.port;
+      const auth = str.slice(0, lastAt).trim();
+      const c = auth.indexOf(":");
+      username = c >= 0 ? auth.slice(0, c).trim() : auth;
+      password = c >= 0 ? auth.slice(c + 1).trim() : "";
+    } else {
+      // Fallback khi không đoán được IP: coi như USER:PASS@HOST:PORT
+      const auth = str.slice(0, lastAt).trim();
+      const hostPart = str.slice(lastAt + 1).trim();
+      const c = auth.indexOf(":");
+      username = c >= 0 ? auth.slice(0, c).trim() : auth;
+      password = c >= 0 ? auth.slice(c + 1).trim() : "";
+      const [h, p] = hostPart.split(":");
+      host = (h || "").trim();
+      port = Number(p) || 80;
+    }
+
     return {
-      protocol: "http",
-      host: host.trim(),
-      port: p,
-      username: username.trim(),
-      password: password.trim(),
-      server: `http://${host.trim()}:${p}`,
-      raw: str,
+      protocol,
+      host,
+      port,
+      username: decodeURIComponent(username),
+      password: decodeURIComponent(password),
+      server: `${protocol}://${host}:${port}`,
+      raw: rawStr,
     };
   }
 
-  // 3. Format: host:port:user:pass or host:port
+  // 2. Định dạng ngăn cách bằng dấu hai chấm (không có @)
   const parts = str.split(":");
   if (parts.length >= 4) {
-    const host = parts[0].trim();
-    const port = Number(parts[1].trim()) || 80;
-    const username = parts[2].trim();
-    const password = parts.slice(3).join(":").trim();
-    return {
-      protocol: "http",
-      host,
-      port,
-      username,
-      password,
-      server: `http://${host}:${port}`,
-      raw: str,
-    };
+    const hp0 = parseHostPort(`${parts[0]}:${parts[1]}`);
+    const hp2 = parseHostPort(`${parts[2]}:${parts[3]}`);
+    if (hp0 && (!hp2 || hp0.isIp)) {
+      // IP:PORT:USER:PASS
+      return {
+        protocol,
+        host: hp0.host,
+        port: hp0.port,
+        username: parts[2].trim(),
+        password: parts.slice(3).join(":").trim(),
+        server: `${protocol}://${hp0.host}:${hp0.port}`,
+        raw: rawStr,
+      };
+    } else if (hp2) {
+      // USER:PASS:IP:PORT
+      return {
+        protocol,
+        host: hp2.host,
+        port: hp2.port,
+        username: parts[0].trim(),
+        password: parts[1].trim(),
+        server: `${protocol}://${hp2.host}:${hp2.port}`,
+        raw: rawStr,
+      };
+    }
   }
 
   if (parts.length === 2) {
     const host = parts[0].trim();
     const port = Number(parts[1].trim()) || 80;
     return {
-      protocol: "http",
+      protocol,
       host,
       port,
       username: "",
       password: "",
-      server: `http://${host}:${port}`,
-      raw: str,
+      server: `${protocol}://${host}:${port}`,
+      raw: rawStr,
     };
   }
 

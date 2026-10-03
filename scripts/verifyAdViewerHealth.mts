@@ -31,6 +31,7 @@ assert.match(runtime, /handleRecursiveAdClicks/, "ad-viewer must handle recursiv
 assert.match(runtime, /while \(Date\.now\(\) - startTime < MAX_LIFETIME_MS\)/, "ad-viewer must loop across lifetime cycles");
 assert.match(runtime, /CLEAR_CACHE_CYCLES/, "ad-viewer must configure clear cache cycles");
 assert.match(runtime, /cycleIndex % CLEAR_CACHE_CYCLES === 0/, "ad-viewer must clear browser data every n cycles");
+assert.match(runtime, /ensureWindowMaximized/, "ad-viewer must ensure the window is maximized to prevent clicking outside bounds");
 
 // ---- Vân tay thiết bị + trình duyệt ----
 assert.match(runtime, /identityWindowStart/, "a new device/browser identity must only start with a new cookie window");

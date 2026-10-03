@@ -19,6 +19,9 @@ public static extern bool GetCursorPos(out System.Drawing.Point pt);
 public static extern bool SetCursorPos(int X, int Y);
 
 [DllImport("user32.dll")]
+public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+[DllImport("user32.dll")]
 public static extern bool SetForegroundWindow(IntPtr hWnd);
 
 [DllImport("user32.dll")]
@@ -28,15 +31,16 @@ public static extern void SwitchToThisWindow(IntPtr hWnd, bool fAltTab);
 public static extern int GetSystemMetrics(int nIndex);
 '@ -Name 'NativeMethods' -Namespace 'WinMouse' -ReferencedAssemblies System.Drawing
 
-# 1. Kích hoạt cửa sổ Chrome lên hàng đầu mà KHÔNG làm thay đổi kích thước hoặc trạng thái của cửa sổ
+# 1. Kích hoạt và luôn phóng to tối đa cửa sổ Chrome lên hàng đầu
 try {
     $wshell = New-Object -ComObject WScript.Shell
     $wshell.AppActivate("Chrome") | Out-Null
 } catch {}
 
-$chromeProc = Get-Process -Name chrome -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
+$chromeProc = Get-Process -Name chrome, chromium -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
 if ($chromeProc) {
-    # Giữ nguyên 100% kích thước và trạng thái toàn màn hình (Maximized), không dùng SW_RESTORE (9)
+    # Luôn phóng to tối đa cửa sổ Chrome (SW_MAXIMIZE = 3) và đưa lên foreground để chuột không click tràn ra ngoài
+    [void][WinMouse.NativeMethods]::ShowWindow($chromeProc.MainWindowHandle, 3)
     [void][WinMouse.NativeMethods]::SwitchToThisWindow($chromeProc.MainWindowHandle, $true)
     [void][WinMouse.NativeMethods]::SetForegroundWindow($chromeProc.MainWindowHandle)
     Start-Sleep -Milliseconds 60

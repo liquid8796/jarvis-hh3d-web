@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.146 — Luôn phóng to và focus cửa sổ Chrome, khoá toạ độ chuột không trượt ra ngoài (03/10/2026)
+
+- `scripts/adViewer.mjs`: Thêm cờ `--start-maximized` khi khởi chạy Chrome (cả chế độ `--my-chrome`, CDP debug profile lẫn Persistent Context); loại bỏ các cờ áp kích thước cửa sổ cố định (`--window-size`) làm thu nhỏ Chrome.
+- Bổ sung hàm `ensureWindowMaximized(session, page)` và `maximizeAndFocusWindow(context, page)` qua CDP `Browser.setWindowBounds` (`windowState: "maximized"`): tự động phóng to toàn màn hình và focus cửa sổ Chrome ngay khi mở trang, trước khi điều hướng, cũng như với mọi popup/tab mới mở từ quảng cáo; xoá bỏ việc co nhỏ kích thước cửa sổ theo kích thước màn hình vân tay.
+- `scripts/winMouse.ps1`: Tích hợp Windows API `ShowWindow(hWnd, 3)` (`SW_MAXIMIZE`) kết hợp `SwitchToThisWindow` và `SetForegroundWindow` để tự động phóng to tối đa và đưa cửa sổ Chrome lên lớp hiển thị hàng đầu trước khi di chuột vật lý.
+- `scripts/adViewer.mjs`: Trong `humanClickOs`, `humanClickGhub` và `preClickEngagement`, giới hạn an toàn `safeTargetX` và `safeTargetY` (cách mép nội dung trang `innerWidth` và `innerHeight` tối thiểu 12px) để chuột phần cứng tuyệt đối không click tràn ra màn hình desktop hay thanh tác vụ.
+- Cuộn phần tử vào tầm nhìn (`scrollIntoViewIfNeeded`) trước khi lấy toạ độ `boundingBox` trong `resolveAdClickTarget`, các lượt click đệ quy và bộ chọn dự phòng, tránh phát sinh toạ độ ngoài màn hình đối với các quảng cáo nằm phía dưới trang.
+
 ## 1.3.145 — Random thiết bị (desktop/mobile) và trình duyệt cho trình xem quảng cáo (03/10/2026)
 
 - Module mới `scripts/adViewerFingerprint.mjs`: `pickFingerprintProfile` chọn trình duyệt theo trọng số (Chrome, Edge, Opera, Brave, Firefox, Safari, Samsung Internet, Cốc Cốc…) → hệ điều hành hợp lệ → màn hình/thiết bị/GPU/số nhân; `materializeFingerprint` dựng UA, UA-CH metadata (chỉ họ Chromium), viewport/DPR/touch, `navigator.platform`; `fingerprintInitScript` vá `navigator.*`, WebGL unmasked vendor/renderer, xoá `userAgentData`/`window.chrome` cho Firefox/Safari, thêm `navigator.brave`/`window.opr`.

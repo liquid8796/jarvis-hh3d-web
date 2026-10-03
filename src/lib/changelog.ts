@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.146",
+    date: "2026-10-03",
+    lines: [
+      "Cửa sổ trình duyệt nay luôn được phóng to tối đa và tự động đưa lên hàng đầu khi tương tác.",
+      "Toạ độ bấm chuột được giới hạn chặt chẽ bên trong khung trang web, chấm dứt hoàn toàn tình trạng bấm trượt ra ngoài màn hình.",
+    ],
+  },
+  {
     version: "1.3.145",
     date: "2026-10-03",
     lines: [
@@ -465,14 +473,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Web production nay có địa chỉ riêng auto-hh3d.online; www cũng vào cùng một trang và đều dùng HTTPS.",
       "Địa chỉ sslip.io cũ vẫn được giữ làm đường dự phòng vận hành, không ảnh hưởng các khôi lỗi đang chạy.",
-    ],
-  },
-  {
-    version: "1.3.96",
-    date: "2026-09-27",
-    lines: [
-      "Đường dự phòng của khôi lỗi nay ghi nhớ địa chỉ trạm gương trong một ngày, giảm các lượt hỏi mạng lặp lại.",
-      "Nếu lần phân giải bị lỗi, khôi lỗi sẽ thử lại ở lượt kế thay vì giữ một kết quả hỏng suốt ngày.",
     ],
   },
 ];

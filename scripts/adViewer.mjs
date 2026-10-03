@@ -960,6 +960,8 @@ function computeClickTarget(box) {
 
 /** Giải toạ độ viewport cho phần tử bất kỳ (kể cả trong iframe). Trả null nếu không xác định. */
 async function resolveAdClickTarget(locator) {
+  await locator.scrollIntoViewIfNeeded({ timeout: 4000 }).catch(() => {});
+  await sleep(100);
   const box = await locator.boundingBox().catch(() => null);
   if (!box || box.width < 2 || box.height < 2) return null;
   return computeClickTarget(box);
@@ -1061,8 +1063,13 @@ async function humanClickOs(page, ctx, targetX, targetY) {
     const borderTop = Math.max(0, metrics.outerHeight - metrics.innerHeight - borderLeft);
     const dpr = metrics.dpr || 1;
 
-    const desktopX = Math.round((metrics.screenX + borderLeft + targetX) * dpr);
-    const desktopY = Math.round((metrics.screenY + borderTop + targetY) * dpr);
+    // Giới hạn an toàn trong vùng nội dung trang của Chrome (cách mép tối thiểu 12px)
+    // để chuột phần cứng không bao giờ bị văng ra ngoài khung cửa sổ Chrome
+    const safeTargetX = Math.max(12, Math.min(Math.max(12, metrics.innerWidth - 12), targetX));
+    const safeTargetY = Math.max(12, Math.min(Math.max(12, metrics.innerHeight - 12), targetY));
+
+    const desktopX = Math.round((metrics.screenX + borderLeft + safeTargetX) * dpr);
+    const desktopY = Math.round((metrics.screenY + borderTop + safeTargetY) * dpr);
 
     log(`[OS-Mouse] Di chuyển chuột phần cứng Windows tới toạ độ Desktop (${desktopX}, ${desktopY}) & rê lượn tương tác...`);
 
@@ -1075,8 +1082,8 @@ async function humanClickOs(page, ctx, targetX, targetY) {
     const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${desktopX} -targetY ${desktopY} -steps 25 -hoverMs ${hoverMs} -click 1`;
     execSync(cmd, { stdio: "ignore", timeout: 20000 });
 
-    lastMouseX = targetX;
-    lastMouseY = targetY;
+    lastMouseX = safeTargetX;
+    lastMouseY = safeTargetY;
     log("[OS-Mouse] ✓ Thao tác rê chuột phần cứng & click Windows hoàn tất (MOUSEEVENTF_MOVE stream).");
   } catch (err) {
     log(`[OS-Mouse] ⚠ Lỗi khi điều khiển chuột Windows (${err.message}); dùng fallback CDP click.`);
@@ -1150,8 +1157,11 @@ async function humanClickGhub(page, ctx, targetX, targetY) {
     const borderTop = Math.max(0, metrics.outerHeight - metrics.innerHeight - borderLeft);
     const dpr = metrics.dpr || 1;
 
-    const desktopX = Math.round((metrics.screenX + borderLeft + targetX) * dpr);
-    const desktopY = Math.round((metrics.screenY + borderTop + targetY) * dpr);
+    const safeTargetX = Math.max(12, Math.min(Math.max(12, metrics.innerWidth - 12), targetX));
+    const safeTargetY = Math.max(12, Math.min(Math.max(12, metrics.innerHeight - 12), targetY));
+
+    const desktopX = Math.round((metrics.screenX + borderLeft + safeTargetX) * dpr);
+    const desktopY = Math.round((metrics.screenY + borderTop + safeTargetY) * dpr);
 
     const psScript = path.join(__dirname, "winMouse.ps1");
     if (existsSync(psScript)) {
@@ -1183,6 +1193,7 @@ async function humanClickGhub(page, ctx, targetX, targetY) {
 
 /** Dispatcher thống nhất — chọn engine theo CLICK_MODE. */
 async function humanClick(page, ctx, x, y) {
+  await page.bringToFront().catch(() => {});
   if (CLICK_MODE === "ghub") {
     return humanClickGhub(page, ctx, x, y);
   }
@@ -1200,6 +1211,7 @@ async function humanClick(page, ctx, x, y) {
  * dừng lại như đang nhìn, rồi từ từ rê vào vị trí đích.
  */
 async function preClickEngagement(page, ctx, targetX, targetY) {
+  await page.bringToFront().catch(() => {});
   if ((CLICK_MODE === "os-mouse" || CLICK_MODE === "ghub") && process.platform === "win32") {
     try {
       const nearX = targetX + rand(-60, 60);
@@ -1216,15 +1228,17 @@ async function preClickEngagement(page, ctx, targetX, targetY) {
       const borderLeft = Math.max(0, (metrics.outerWidth - metrics.innerWidth) / 2);
       const borderTop = Math.max(0, metrics.outerHeight - metrics.innerHeight - borderLeft);
       const dpr = metrics.dpr || 1;
-      const nearDesktopX = Math.round((metrics.screenX + borderLeft + nearX) * dpr);
-      const nearDesktopY = Math.round((metrics.screenY + borderTop + nearY) * dpr);
+      const safeNearX = Math.max(12, Math.min(Math.max(12, metrics.innerWidth - 12), nearX));
+      const safeNearY = Math.max(12, Math.min(Math.max(12, metrics.innerHeight - 12), nearY));
+      const nearDesktopX = Math.round((metrics.screenX + borderLeft + safeNearX) * dpr);
+      const nearDesktopY = Math.round((metrics.screenY + borderTop + safeNearY) * dpr);
 
       const psScript = path.join(__dirname, "winMouse.ps1");
       if (existsSync(psScript)) {
         execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${nearDesktopX} -targetY ${nearDesktopY} -steps 18 -hoverMs 500 -click 0`, { stdio: "ignore", timeout: 10000 });
       }
-      lastMouseX = nearX;
-      lastMouseY = nearY;
+      lastMouseX = safeNearX;
+      lastMouseY = safeNearY;
       await sleep(rand(1200, 2200));
       return;
     } catch {}
@@ -1546,6 +1560,8 @@ async function handleRecursiveAdClicks(targetPage, depth, maxDepth, ctx) {
         try {
           const visible = await handle.isVisible().catch(() => false);
           if (!visible) continue;
+          await handle.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {});
+          await sleep(100);
           const elBox = await handle.boundingBox().catch(() => null);
           if (!elBox || elBox.width < 2 || elBox.height < 2) continue;
           const target = computeClickTarget(elBox);
@@ -1786,6 +1802,7 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false, p
       "--remote-allow-origins=*",
       `--user-data-dir=${userDataDir}`,
       "--restore-last-session",
+      "--start-maximized",
       ...webrtcAntiLeakFlags,
       ...proxyFlags,
     ];
@@ -1802,7 +1819,7 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false, p
       `--user-data-dir=${debugProfileDir}`,
       "--no-first-run",
       "--no-default-browser-check",
-      "--window-size=1366,768",
+      "--start-maximized",
       "--enable-experimental-extension-apis",
       "--extensions-on-chrome-urls",
       "--silent-debugger-extension-api",
@@ -1914,19 +1931,33 @@ async function applyFingerprintToPage(context, page, fp, { emulateMobileMetrics 
   return session;
 }
 
-/** Desktop qua CDP: đổi KÍCH THƯỚC CỬA SỔ THẬT (không giả lập) để toạ độ chuột phần cứng vẫn đúng. */
-async function resizeWindowForFingerprint(session, page, fp) {
-  if (!fp.windowSize) return;
+/**
+ * Phóng to tối đa cửa sổ Chrome (Maximized) và đưa lên foreground để giao diện rộng nhất
+ * và chuột phần cứng không bao giờ bị click tràn ra ngoài phạm vi cửa sổ.
+ */
+async function ensureWindowMaximized(session, page) {
   try {
-    const avail = await page.evaluate(() => ({ w: screen.availWidth, h: screen.availHeight }));
-    const width = Math.min(fp.windowSize.width, avail.w || fp.windowSize.width);
-    const height = Math.min(fp.windowSize.height, avail.h || fp.windowSize.height);
+    if (page) await page.bringToFront().catch(() => {});
     const { windowId } = await session.send("Browser.getWindowForTarget");
-    await session.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "normal" } });
-    await session.send("Browser.setWindowBounds", { windowId, bounds: { left: 0, top: 0, width, height } });
-  } catch {
-    // Không đổi được cửa sổ thì giữ nguyên — UA/navigator vẫn đã được áp.
-  }
+    if (windowId) {
+      await session.send("Browser.setWindowBounds", {
+        windowId,
+        bounds: { windowState: "maximized" },
+      });
+    }
+  } catch {}
+}
+
+async function maximizeAndFocusWindow(context, page) {
+  try {
+    if (page) await page.bringToFront().catch(() => {});
+    const session = await context.newCDPSession(page);
+    try {
+      await ensureWindowMaximized(session, page);
+    } finally {
+      await session.detach().catch(() => {});
+    }
+  } catch {}
 }
 
 async function runOneCycle(
@@ -2022,18 +2053,12 @@ async function runOneCycle(
     }
 
     if (!cdpUrl) {
-      const launchWindow = fp
-        ? fp.isMobile
-          ? { width: fp.viewport.width + 16, height: fp.viewport.height + 140 }
-          : fp.windowSize
-        : { width: 1366, height: 768 };
-
       const args = [
         "--disable-blink-features=AutomationControlled",
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
-        `--window-size=${launchWindow.width},${launchWindow.height}`,
+        "--start-maximized",
         "--enable-experimental-extension-apis",
         "--extensions-on-chrome-urls",
         "--silent-debugger-extension-api",
@@ -2072,7 +2097,7 @@ async function runOneCycle(
       const launchOptions = {
         headless: false,
         args: launchArgs,
-        viewport: { width: 1366, height: 768 },
+        viewport: physicalMouse || !isHeadless ? null : { width: 1366, height: 768 },
         locale: fpLocale,
         timezoneId: currentProxy?.geo?.timezoneId || "Asia/Ho_Chi_Minh",
         userAgent: fp ? fp.userAgent : defaultDesktopUA,
@@ -2080,13 +2105,13 @@ async function runOneCycle(
       if (fp) {
         if (fp.isMobile) {
           Object.assign(launchOptions, {
-            viewport: fp.viewport,
+            viewport: physicalMouse || !isHeadless ? null : fp.viewport,
             screen: fp.screen,
             deviceScaleFactor: fp.deviceScaleFactor,
             isMobile: true,
             hasTouch: true,
           });
-        } else if (physicalMouse) {
+        } else if (physicalMouse || !isHeadless) {
           launchOptions.viewport = null;
         } else {
           Object.assign(launchOptions, {
@@ -2138,6 +2163,7 @@ async function runOneCycle(
     }
 
     page = useMyChrome || cdpUrl ? await context.newPage() : context.pages()[0] || (await context.newPage());
+    await maximizeAndFocusWindow(context, page);
 
     if (fp) {
       const realMajor = await detectEngineMajorFromPage(context, page);
@@ -2151,12 +2177,15 @@ async function runOneCycle(
       const mainSession = await applyFingerprintToPage(context, page, fp, { emulateMobileMetrics }).catch(() => null);
       if (mainSession) {
         fpSessions.push(mainSession);
-        if (cdpUrl && !fp.isMobile) await resizeWindowForFingerprint(mainSession, page, fp);
+        await ensureWindowMaximized(mainSession, page);
       }
-      // Tab popup / popunder do quảng cáo mở ra cũng phải mang cùng danh tính.
+      // Tab popup / popunder do quảng cáo mở ra cũng phải mang cùng danh tính và được phóng to.
       onFingerprintPage = (newPage) => {
         applyFingerprintToPage(context, newPage, fp, { emulateMobileMetrics })
-          .then((s) => fpSessions.push(s))
+          .then((s) => {
+            fpSessions.push(s);
+            return ensureWindowMaximized(s, newPage);
+          })
           .catch(() => {});
       };
       context.on("page", onFingerprintPage);
@@ -2313,6 +2342,9 @@ async function runOneCycle(
     // Vân tay chạy SAU lớp stealth: lớp stealth dựng lại window.chrome, mà hồ sơ Firefox/Safari
     // phải xoá nó đi.
     if (fp) await context.addInitScript(fingerprintInitScript, fp.inject).catch(() => {});
+
+    await page.bringToFront().catch(() => {});
+    await maximizeAndFocusWindow(context, page);
 
     const renderStartedAt = Date.now();
     log(`Mở trang chủ ${WEB_URL}...`);
@@ -2528,6 +2560,8 @@ async function runOneCycle(
           try {
             const visible = await el.isVisible().catch(() => false);
             if (!visible) continue;
+            await el.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {});
+            await sleep(100);
             const elBox = await el.boundingBox().catch(() => null);
             if (!elBox || elBox.width < 2 || elBox.height < 2) continue;
             const target = computeClickTarget(elBox);

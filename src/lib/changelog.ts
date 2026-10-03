@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.151",
+    date: "2026-10-03",
+    lines: [
+      "Cho phép cấu hình tuỳ ý thời gian rê chuột lượn trên quảng cáo trước khi nhấn qua tham số dòng lệnh.",
+      "Cửa sổ đang làm việc luôn được đưa lên hàng đầu và phóng to toàn màn hình mà không bao giờ bị che khuất.",
+      "Tự động thu nhỏ các cửa sổ khác và đóng sạch tab cài đặt của tiện ích ngay khi khởi chạy.",
+    ],
+  },
+  {
     version: "1.3.150",
     date: "2026-10-03",
     lines: [
@@ -466,15 +475,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Điểm Danh tài khoản thường nay nhận diện lịch mới, con dấu điểm danh và trạng thái ô hôm nay đã nhận.",
       "Phúc Lợi Đường và Thí Luyện Tông Môn đã chuyển sang bộ đếm, data-state và đồng hồ mới của trang.",
       "Hồ sơ nhiệm vụ được nâng cấp để tự thay cách chạy cũ; ba flow mới có kiểm thử Chromium và không dùng dấu mốc giao diện đã mất.",
-    ],
-  },
-  {
-    version: "1.3.101",
-    date: "2026-09-27",
-    lines: [
-      "Web đã sẵn sàng cho Google AdSense bằng mã nhà xuất bản ca-pub, ads.txt và trang quyền riêng tư công khai.",
-      "Quảng cáo chỉ bật trên tên miền chính thức; phiên quản trị được miễn để giảm nguy cơ bấm nhầm quảng cáo của chính mình.",
-      "Khoá Google do người dùng cung cấp không được đưa vào mã nguồn; quảng cáo chỉ dùng mã nhà xuất bản công khai.",
     ],
   },
 ];

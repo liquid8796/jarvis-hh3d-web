@@ -6,7 +6,8 @@ param(
     [int]$steps = 25,
     [int]$hoverMs = 1200,
     [int]$click = 1,
-    [int]$instanceId = 0
+    [int]$instanceId = 0,
+    [int]$minimize = 0
 )
 
 Add-Type -MemberDefinition @'
@@ -26,23 +27,38 @@ public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 public static extern bool SetForegroundWindow(IntPtr hWnd);
 
 [DllImport("user32.dll")]
+public static extern bool BringWindowToTop(IntPtr hWnd);
+
+[DllImport("user32.dll")]
 public static extern void SwitchToThisWindow(IntPtr hWnd, bool fAltTab);
 
 [DllImport("user32.dll")]
 public static extern int GetSystemMetrics(int nIndex);
 '@ -Name 'NativeMethods' -Namespace 'WinMouse' -ReferencedAssemblies System.Drawing
 
+# 0. Yêu cầu thu nhỏ (minimize) cửa sổ của instanceId
+if ($minimize -eq 1 -and $instanceId -gt 0) {
+    $procsToMin = Get-Process -Name chrome, chromium -ErrorAction SilentlyContinue | Where-Object { 
+        $_.MainWindowHandle -ne [IntPtr]::Zero -and $_.MainWindowTitle -like "*[AdViewer-Inst-$instanceId]*"
+    }
+    foreach ($p in $procsToMin) {
+        [void][WinMouse.NativeMethods]::ShowWindow($p.MainWindowHandle, 7) # SW_SHOWMINNOACTIVE = 7
+    }
+    Write-Output "WIN_WINDOW_MINIMIZED_$instanceId"
+    exit 0
+}
+
 # 1. Kích hoạt và luôn phóng to tối đa cửa sổ Chrome lên hàng đầu
 $chromeProc = $null
 if ($instanceId -gt 0) {
     # Nếu chỉ định instanceId, tìm chính xác cửa sổ Chrome có MainWindowTitle chứa tag [AdViewer-Inst-$instanceId]
-    # Thử lại tối đa 10 lần (cách nhau 100ms) để đợi Windows OS cập nhật tiêu đề từ DOM
-    for ($attempt = 0; $attempt -lt 10; $attempt++) {
+    # Thử lại tối đa 15 lần (cách nhau 150ms) để đợi Windows OS cập nhật tiêu đề từ DOM
+    for ($attempt = 0; $attempt -lt 15; $attempt++) {
         $chromeProc = Get-Process -Name chrome, chromium -ErrorAction SilentlyContinue | Where-Object { 
             $_.MainWindowHandle -ne [IntPtr]::Zero -and $_.MainWindowTitle -like "*[AdViewer-Inst-$instanceId]*"
         } | Select-Object -First 1
         if ($chromeProc) { break }
-        Start-Sleep -Milliseconds 100
+        Start-Sleep -Milliseconds 150
     }
 }
 
@@ -56,11 +72,26 @@ if (-not $chromeProc -and $instanceId -eq 0) {
 }
 
 if ($chromeProc) {
+    # Thu nhỏ tất cả các cửa sổ Chrome của các instance KHÁC để không bao giờ che khuất cửa sổ hiện tại
+    if ($instanceId -gt 0) {
+        $otherProcs = Get-Process -Name chrome, chromium -ErrorAction SilentlyContinue | Where-Object { 
+            $_.MainWindowHandle -ne [IntPtr]::Zero -and 
+            $_.MainWindowHandle -ne $chromeProc.MainWindowHandle -and 
+            $_.MainWindowTitle -like "*[AdViewer-Inst-*" -and 
+            $_.MainWindowTitle -notlike "*[AdViewer-Inst-$instanceId]*"
+        }
+        foreach ($other in $otherProcs) {
+            # SW_SHOWMINNOACTIVE = 7 thu nhỏ cửa sổ xuống taskbar mà không cướp focus
+            [void][WinMouse.NativeMethods]::ShowWindow($other.MainWindowHandle, 7)
+        }
+    }
+
     # Luôn phóng to tối đa cửa sổ Chrome (SW_MAXIMIZE = 3) và đưa lên foreground để chuột không click tràn ra ngoài
     [void][WinMouse.NativeMethods]::ShowWindow($chromeProc.MainWindowHandle, 3)
+    [void][WinMouse.NativeMethods]::BringWindowToTop($chromeProc.MainWindowHandle)
     [void][WinMouse.NativeMethods]::SwitchToThisWindow($chromeProc.MainWindowHandle, $true)
     [void][WinMouse.NativeMethods]::SetForegroundWindow($chromeProc.MainWindowHandle)
-    Start-Sleep -Milliseconds 100
+    Start-Sleep -Milliseconds 150
 } elseif ($instanceId -gt 0) {
     Write-Warning "Không tìm thấy cửa sổ Chrome cho instance #$instanceId (tag: [AdViewer-Inst-$instanceId])"
 }

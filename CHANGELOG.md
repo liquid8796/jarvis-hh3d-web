@@ -9,6 +9,19 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.151 — Cấu hình thời gian hover quảng cáo tuỳ chọn và ngăn chặn che khuất cửa sổ đa instance (03/10/2026)
+
+- Bổ sung tính năng cho phép người dùng chỉ định thời gian rê chuột lượn (hover) trên quảng cáo trước khi click:
+  - Hỗ trợ cờ dòng lệnh `--hover=<giây|khoảng>`, `--hover-sec=<giây>`, `--hover-ms=<ms|khoảng>`, `--hover-min-ms` và `--hover-max-ms`, cùng các biến môi trường tương ứng (`AD_VIEWER_HOVER`, `AD_VIEWER_HOVER_SEC`, `AD_VIEWER_HOVER_MS`).
+  - Hỗ trợ chỉ định thời gian cố định (ví dụ `--hover=3` hoặc `--hover-ms=3000`) hoặc khoảng thời gian ngẫu nhiên (ví dụ `--hover=2-5` hoặc `--hover=1.5s`).
+  - Áp dụng thống nhất trên toàn bộ các engine click: chuột phần cứng OS (`scripts/winMouse.ps1`), hỗ trợ Logitech G-HUB, CDP và Playwright mouse API.
+  - Tự động điều chỉnh thời gian chờ (timeout) của tiến trình điều khiển chuột Windows để đảm bảo không bị ngắt quãng khi thời gian hover kéo dài.
+- Khắc phục triệt để hiện tượng cửa sổ đang click bị các cửa sổ instance khác hoặc tab tiện ích che khuất:
+  - Cập nhật `scripts/winMouse.ps1`: Bổ sung cờ `-minimize` và cơ chế tự động thu nhỏ (`SW_SHOWMINNOACTIVE = 7`) toàn bộ các cửa sổ Chrome của các instance khác xuống taskbar khi instance hiện tại kích hoạt tương tác, đồng thời sử dụng `BringWindowToTop`, `SwitchToThisWindow` và `SW_MAXIMIZE` để đảm bảo cửa sổ active luôn chiếm trọn màn hình.
+  - Tự động phát hiện và đóng ngay lập tức các tab giới thiệu/cài đặt do tiện ích CanvasBlocker tự ý mở (`presets.html`, `options.html`, `settings.html`) ngay từ khi khởi chạy trình duyệt và khi có sự kiện mở tab mới.
+  - Bổ sung cơ chế bảo vệ thẻ định danh instance (`[AdViewer-Inst-$instanceId]`) trong `document.title` thông qua việc can thiệp getter/setter của `document.title` và vòng lặp kiểm tra định kỳ trong `addInitScript`, ngăn chặn các trang web (như thông báo tin nhắn mới) xoá mất thẻ định danh.
+  - Bổ sung hàm `minimizeInstanceWindow()` trong `scripts/adViewer.mjs` để thu nhỏ ngay các instance phụ khi đang có instance khác nắm lượt tương tác.
+
 ## 1.3.150 — Ngăn chặn triệt để cửa sổ khởi động cướp focus và chuột khi chạy đa instance (03/10/2026)
 
 - Khắc phục triệt để hiện tượng instance khởi động (startup hoặc đầu chu kỳ mới) cướp tiêu điểm cửa sổ (OS window focus) và chuột vật lý từ instance đang trong lượt tương tác:

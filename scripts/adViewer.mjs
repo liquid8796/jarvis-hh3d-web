@@ -194,6 +194,106 @@ if (rawClickMode === "mouse") {
   CLICK_MODE = "os-mouse";
 }
 
+function parseHoverConfig() {
+  const cliHover = getCliArg("--hover");
+  const cliHoverSec = getCliArg("--hover-sec");
+  const cliHoverMs = getCliArg("--hover-ms");
+  const cliHoverMinMs = getCliArg("--hover-min-ms");
+  const cliHoverMaxMs = getCliArg("--hover-max-ms");
+
+  const envHover = process.env.AD_VIEWER_HOVER;
+  const envHoverSec = process.env.AD_VIEWER_HOVER_SEC;
+  const envHoverMs = process.env.AD_VIEWER_HOVER_MS;
+  const envHoverMinMs = process.env.AD_VIEWER_HOVER_MIN_MS;
+  const envHoverMaxMs = process.env.AD_VIEWER_HOVER_MAX_MS;
+
+  // 1. Min / Max rõ ràng
+  const minRaw = cliHoverMinMs || envHoverMinMs;
+  const maxRaw = cliHoverMaxMs || envHoverMaxMs;
+  if (minRaw || maxRaw) {
+    const minVal = Math.max(0, Number(minRaw || maxRaw || 1200));
+    const maxVal = Math.max(minVal, Number(maxRaw || minRaw || 2500));
+    return { minMs: minVal, maxMs: maxVal, userSpecified: true };
+  }
+
+  // 2. Tham số milli-giây (--hover-ms)
+  const msRaw = cliHoverMs || envHoverMs;
+  if (msRaw) {
+    const parts = String(msRaw).split(/[-–—]|(\.\.)/g).filter(Boolean).map((p) => Number(p.trim()));
+    const validParts = parts.filter((p) => Number.isFinite(p) && p >= 0);
+    if (validParts.length >= 2) {
+      return {
+        minMs: Math.min(validParts[0], validParts[validParts.length - 1]),
+        maxMs: Math.max(validParts[0], validParts[validParts.length - 1]),
+        userSpecified: true,
+      };
+    }
+    if (validParts.length === 1) {
+      return { minMs: validParts[0], maxMs: validParts[0], userSpecified: true };
+    }
+  }
+
+  // 3. Tham số giây (--hover-sec)
+  const secRaw = cliHoverSec || envHoverSec;
+  if (secRaw) {
+    const parts = String(secRaw).split(/[-–—]|(\.\.)/g).filter(Boolean).map((p) => Number(p.trim()));
+    const validParts = parts.filter((p) => Number.isFinite(p) && p >= 0);
+    if (validParts.length >= 2) {
+      const min = Math.round(Math.min(validParts[0], validParts[validParts.length - 1]) * 1000);
+      const max = Math.round(Math.max(validParts[0], validParts[validParts.length - 1]) * 1000);
+      return { minMs: min, maxMs: max, userSpecified: true };
+    }
+    if (validParts.length === 1) {
+      const ms = Math.round(validParts[0] * 1000);
+      return { minMs: ms, maxMs: ms, userSpecified: true };
+    }
+  }
+
+  // 4. Tham số tổng quát (--hover) — tự động phân biệt giây và ms
+  const generalRaw = cliHover || envHover;
+  if (generalRaw) {
+    const parseUnitVal = (valStr) => {
+      const s = String(valStr).trim().toLowerCase();
+      if (s.endsWith("ms")) {
+        const n = Number(s.slice(0, -2));
+        return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+      }
+      if (s.endsWith("s")) {
+        const n = Number(s.slice(0, -1));
+        return Number.isFinite(n) && n >= 0 ? Math.round(n * 1000) : null;
+      }
+      const n = Number(s);
+      if (!Number.isFinite(n) || n < 0) return null;
+      return n >= 100 ? Math.round(n) : Math.round(n * 1000);
+    };
+
+    const parts = String(generalRaw).split(/[-–—]|(\.\.)/g).filter(Boolean).map((p) => parseUnitVal(p.trim()));
+    const validParts = parts.filter((p) => p !== null);
+    if (validParts.length >= 2) {
+      return {
+        minMs: Math.min(validParts[0], validParts[validParts.length - 1]),
+        maxMs: Math.max(validParts[0], validParts[validParts.length - 1]),
+        userSpecified: true,
+      };
+    }
+    if (validParts.length === 1) {
+      return { minMs: validParts[0], maxMs: validParts[0], userSpecified: true };
+    }
+  }
+
+  // Mặc định: 1200ms - 2500ms
+  return { minMs: 1200, maxMs: 2500, userSpecified: false };
+}
+
+const HOVER_CONFIG = parseHoverConfig();
+
+function resolveHoverMs() {
+  if (HOVER_CONFIG.minMs === HOVER_CONFIG.maxMs) {
+    return HOVER_CONFIG.minMs;
+  }
+  return rand(HOVER_CONFIG.minMs, HOVER_CONFIG.maxMs);
+}
+
 const USE_CANVAS_BLOCKER =
   process.argv.includes("--canvas-blocker") ||
   process.argv.includes("--with-canvas-blocker") ||
@@ -327,15 +427,22 @@ async function tagInstancePage(page, instanceId = logContext.getStore()?.instanc
   const tag = `[AdViewer-Inst-${instanceId}]`;
   try {
     await page.evaluate((t) => {
-      if (!document.title.includes(t)) {
-        document.title = `${t} ${document.title || "AdViewer"}`;
-      }
+      try {
+        if (!document.title.includes(t)) {
+          document.title = `${t} ${document.title || "AdViewer"}`;
+        }
+        let el = document.querySelector("title");
+        if (el && !el.textContent.includes(t)) {
+          el.textContent = `${t} ${el.textContent}`;
+        }
+      } catch {}
     }, tag).catch(() => {});
   } catch {}
 }
 
 /**
- * Kích hoạt và phóng to chính xác cửa sổ Chrome thuộc instanceId lên hàng đầu trên Windows Desktop.
+ * Kích hoạt và phóng to chính xác cửa sổ Chrome thuộc instanceId lên hàng đầu trên Windows Desktop,
+ * đồng thời thu nhỏ các cửa sổ Chrome của các instance khác xuống taskbar để không che khuất.
  */
 function focusInstanceWindow(instanceId = logContext.getStore()?.instanceId) {
   if (process.platform !== "win32" || !instanceId || instanceId <= 0) return;
@@ -345,6 +452,21 @@ function focusInstanceWindow(instanceId = logContext.getStore()?.instanceId) {
     execSync(
       `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -instanceId ${instanceId} -targetX 0 -targetY 0 -click 0`,
       { stdio: "ignore", timeout: 8000 }
+    );
+  } catch {}
+}
+
+/**
+ * Thu nhỏ (minimize) cửa sổ Chrome của instanceId xuống taskbar để không che khuất instance đang tương tác.
+ */
+function minimizeInstanceWindow(instanceId = logContext.getStore()?.instanceId) {
+  if (process.platform !== "win32" || !instanceId || instanceId <= 0) return;
+  const psScript = path.join(__dirname, "winMouse.ps1");
+  if (!existsSync(psScript)) return;
+  try {
+    execSync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -instanceId ${instanceId} -minimize 1`,
+      { stdio: "ignore", timeout: 6000 }
     );
   } catch {}
 }
@@ -1198,8 +1320,8 @@ async function humanClickCdp(page, ctx, targetX, targetY) {
       await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: pt.x, y: pt.y });
       await sleep(rand(8, 22));
     }
-    // Dwell — dừng lại như đang đọc nội dung quảng cáo
-    await sleep(logNormalDelay(600, 0.4));
+    // Dwell / Hover — dừng lại như đang đọc nội dung quảng cáo trước khi nhấn
+    await sleep(resolveHoverMs());
     // Press
     await client.send("Input.dispatchMouseEvent", {
       type: "mousePressed", button: "left", clickCount: 1, x: targetX, y: targetY,
@@ -1226,7 +1348,7 @@ async function humanClickMouse(page, targetX, targetY) {
     await page.mouse.move(pt.x, pt.y);
     await sleep(rand(8, 22));
   }
-  await sleep(logNormalDelay(600, 0.4));
+  await sleep(resolveHoverMs());
   await page.mouse.down({ button: "left" });
   await sleep(rand(70, 160));
   await page.mouse.up({ button: "left" });
@@ -1275,10 +1397,10 @@ async function humanClickOs(page, ctx, targetX, targetY, instanceId = 0) {
       throw new Error(`Không tìm thấy tệp kịch bản: ${psScript}`);
     }
 
-    const hoverMs = rand(1200, 2000);
+    const hoverMs = resolveHoverMs();
     const instArg = instanceId > 0 ? ` -instanceId ${instanceId}` : "";
     const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${desktopX} -targetY ${desktopY} -steps 25 -hoverMs ${hoverMs} -click 1${instArg}`;
-    execSync(cmd, { stdio: "ignore", timeout: 20000 });
+    execSync(cmd, { stdio: "ignore", timeout: Math.max(25000, hoverMs + 15000) });
 
     lastMouseX = safeTargetX;
     lastMouseY = safeTargetY;
@@ -1363,11 +1485,11 @@ async function humanClickGhub(page, ctx, targetX, targetY, instanceId = 0) {
 
     const psScript = path.join(__dirname, "winMouse.ps1");
     if (existsSync(psScript)) {
-      const hoverMs = rand(800, 1500);
+      const hoverMs = resolveHoverMs();
       const instArg = instanceId > 0 ? ` -instanceId ${instanceId}` : "";
       execSync(
         `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${desktopX} -targetY ${desktopY} -steps 20 -hoverMs ${hoverMs} -click 0${instArg}`,
-        { stdio: "ignore", timeout: 15000 },
+        { stdio: "ignore", timeout: Math.max(20000, hoverMs + 10000) },
       );
     }
   } catch {}
@@ -1434,12 +1556,17 @@ async function preClickEngagement(page, ctx, targetX, targetY, instanceId = 0, c
 
       const psScript = path.join(__dirname, "winMouse.ps1");
       if (existsSync(psScript)) {
+        const hoverMs = resolveHoverMs();
+        const nearHoverMs = Math.min(1000, Math.round(hoverMs / 2));
         const instArg = instanceId > 0 ? ` -instanceId ${instanceId}` : "";
-        execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${nearDesktopX} -targetY ${nearDesktopY} -steps 18 -hoverMs 500 -click 0${instArg}`, { stdio: "ignore", timeout: 10000 });
+        execSync(
+          `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${nearDesktopX} -targetY ${nearDesktopY} -steps 18 -hoverMs ${nearHoverMs} -click 0${instArg}`,
+          { stdio: "ignore", timeout: Math.max(15000, nearHoverMs + 8000) }
+        );
       }
       lastMouseX = safeNearX;
       lastMouseY = safeNearY;
-      await sleep(rand(1200, 2200));
+      await sleep(Math.min(2500, Math.max(800, resolveHoverMs())));
       return;
     } catch {}
   }
@@ -1464,8 +1591,8 @@ async function preClickEngagement(page, ctx, targetX, targetY, instanceId = 0, c
   lastMouseX = nearX;
   lastMouseY = nearY;
 
-  // 2. Dừng lại như đang đọc tiêu đề quảng cáo và quyết định bấm
-  await sleep(rand(1200, 2500));
+  // 2. Dừng lại như đang đọc tiêu đề quảng cáo và quyết định bấm (áp dụng thời gian hover cấu hình)
+  await sleep(resolveHoverMs());
 
   // 3. Rê chuột nhẹ nhàng từ vị trí lân cận vào đúng vị trí click đích
   const finalGlide = generateBezierPath(lastMouseX, lastMouseY, targetX, targetY, rand(8, 14));
@@ -1501,6 +1628,10 @@ async function performEngageAndClick(page, ctx, targetX, targetY, instanceId = 0
       await tagInstancePage(page, instanceId);
     }
     await page.bringToFront().catch(() => {});
+    await maximizeAndFocusWindow(ctx, page, instanceId);
+    if (process.platform === "win32") {
+      focusInstanceWindow(instanceId);
+    }
   }
   await preClickEngagement(page, ctx, targetX, targetY, instanceId, clickMode);
   const [newPage] = await Promise.all([
@@ -2471,11 +2602,58 @@ async function runOneCycle(
       }
     }
 
-    page = useMyChrome || cdpUrl ? await context.newPage() : context.pages()[0] || (await context.newPage());
+    // Tự động phát hiện và đóng sạch các tab cài đặt/giới thiệu của tiện ích (CanvasBlocker options/presets.html...)
+    const closeExtensionPage = async (targetPage) => {
+      if (!targetPage) return false;
+      try {
+        const u = targetPage.url();
+        if (
+          u.startsWith("chrome-extension://") ||
+          u.includes("presets.html") ||
+          u.includes("settings.html") ||
+          u.includes("options.html") ||
+          u.includes("canvasblocker")
+        ) {
+          log(`[Extension] Tự động đóng tab cài đặt/giới thiệu tiện ích CanvasBlocker (${u})...`);
+          await targetPage.close().catch(() => {});
+          return true;
+        }
+      } catch {}
+      return false;
+    };
+
+    for (const p of context.pages()) {
+      await closeExtensionPage(p);
+    }
+
+    context.on("page", (newPage) => {
+      closeExtensionPage(newPage).catch(() => {});
+      newPage.on("domcontentloaded", () => { closeExtensionPage(newPage).catch(() => {}); });
+      newPage.on("framenavigated", (frame) => {
+        if (frame === newPage.mainFrame()) {
+          closeExtensionPage(newPage).catch(() => {});
+        }
+      });
+    });
+
+    const nonExtPages = context.pages().filter((p) => {
+      const u = p.url();
+      return (
+        !u.startsWith("chrome-extension://") &&
+        !u.includes("presets.html") &&
+        !u.includes("settings.html") &&
+        !u.includes("options.html")
+      );
+    });
+    page = useMyChrome || cdpUrl ? await context.newPage() : nonExtPages[0] || (await context.newPage());
+    await page.bringToFront().catch(() => {});
     await tagInstancePage(page, instanceId);
     page.on("domcontentloaded", () => { tagInstancePage(page, instanceId).catch(() => {}); });
     page.on("load", () => { tagInstancePage(page, instanceId).catch(() => {}); });
-    if (INSTANCE_COUNT <= 1) {
+
+    if (foregroundOwnedByOther(instanceId)) {
+      minimizeInstanceWindow(instanceId);
+    } else {
       await maximizeAndFocusWindow(context, page, instanceId);
     }
 
@@ -2491,12 +2669,21 @@ async function runOneCycle(
       const mainSession = await applyFingerprintToPage(context, page, fp, { emulateMobileMetrics }).catch(() => null);
       if (mainSession) {
         fpSessions.push(mainSession);
-        if (INSTANCE_COUNT <= 1) {
+        if (canInteractForeground(instanceId)) {
           await ensureWindowMaximized(mainSession, page, instanceId);
         }
       }
       // Tab popup / popunder do quảng cáo mở ra cũng phải mang cùng danh tính và được phóng to.
       onFingerprintPage = (newPage) => {
+        if (
+          newPage.url().startsWith("chrome-extension://") ||
+          newPage.url().includes("presets.html") ||
+          newPage.url().includes("settings.html") ||
+          newPage.url().includes("options.html")
+        ) {
+          newPage.close().catch(() => {});
+          return;
+        }
         tagInstancePage(newPage, instanceId).catch(() => {});
         applyFingerprintToPage(context, newPage, fp, { emulateMobileMetrics })
           .then((s) => {
@@ -2656,14 +2843,47 @@ async function runOneCycle(
           }
         }
       } catch {}
+
+      // 6. Cố định tag instance trên tiêu đề trang, ngăn chặn các script trang web (như thông báo tin nhắn mới) xoá mất tag
+      try {
+        const instTag = `[AdViewer-Inst-${instanceId}]`;
+        let _docTitle = document.title || "";
+        Object.defineProperty(document, "title", {
+          configurable: true,
+          enumerable: true,
+          get: () => _docTitle,
+          set: (val) => {
+            const str = String(val || "");
+            _docTitle = str.includes(instTag) ? str : `${instTag} ${str}`;
+            try {
+              let el = document.querySelector("title");
+              if (!el) {
+                el = document.createElement("title");
+                document.head?.appendChild(el);
+              }
+              el.textContent = _docTitle;
+            } catch {}
+          },
+        });
+        if (!_docTitle.includes(instTag)) {
+          document.title = `${instTag} ${_docTitle || "AdViewer"}`;
+        }
+        setInterval(() => {
+          try {
+            if (document.title && !document.title.includes(instTag)) {
+              document.title = `${instTag} ${document.title}`;
+            }
+          } catch {}
+        }, 500);
+      } catch {}
     }).catch(() => {});
 
     // Vân tay chạy SAU lớp stealth: lớp stealth dựng lại window.chrome, mà hồ sơ Firefox/Safari
     // phải xoá nó đi.
     if (fp) await context.addInitScript(fingerprintInitScript, fp.inject).catch(() => {});
 
-    if (INSTANCE_COUNT <= 1) {
-      if (!foregroundOwnedByOther(instanceId)) await page.bringToFront().catch(() => {});
+    if (!foregroundOwnedByOther(instanceId)) {
+      await page.bringToFront().catch(() => {});
       await maximizeAndFocusWindow(context, page, instanceId);
     }
 
@@ -3067,6 +3287,12 @@ async function main() {
       ? "Playwright Mouse API — Quỹ đạo cong Bézier"
       : "CDP Input.dispatchMouseEvent — isTrusted:true";
   log(`Chế độ click: ${CLICK_MODE} (${clickModeDesc})`);
+
+  const hoverDesc =
+    HOVER_CONFIG.minMs === HOVER_CONFIG.maxMs
+      ? `${HOVER_CONFIG.minMs}ms (${(HOVER_CONFIG.minMs / 1000).toFixed(1)}s)`
+      : `${HOVER_CONFIG.minMs}-${HOVER_CONFIG.maxMs}ms (${(HOVER_CONFIG.minMs / 1000).toFixed(1)}-${(HOVER_CONFIG.maxMs / 1000).toFixed(1)}s)`;
+  log(`Thời gian hover trên quảng cáo trước khi click: ${hoverDesc}${HOVER_CONFIG.userSpecified ? " (tuỳ chỉnh)" : " (mặc định)"}`);
 
   const extPath = USE_CANVAS_BLOCKER ? resolveExtensionPath() : null;
   if (extPath) {

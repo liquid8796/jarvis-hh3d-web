@@ -112,7 +112,20 @@ assert.equal(p3?.server, "http://103.152.112.5:8080");
 assert.equal(p3?.username, "liquid");
 assert.equal(p3?.password, "secret123");
 
+// ---- Cấu hình hover tuỳ biến & ngăn chặn che khuất cửa sổ đa instance ----
+assert.match(runtime, /parseHoverConfig/, "ad-viewer must parse arbitrary hover configuration from CLI and env");
+assert.match(runtime, /resolveHoverMs/, "ad-viewer must resolve hover duration before click");
+assert.match(runtime, /minimizeInstanceWindow/, "ad-viewer must support minimizing inactive instance windows");
+assert.match(runtime, /focusInstanceWindow/, "ad-viewer must support focusing and maximizing active instance window");
+assert.match(runtime, /closeExtensionPage/, "ad-viewer must automatically close extension onboarding and settings tabs");
+
+const winMousePs = read("scripts/winMouse.ps1");
+assert.match(winMousePs, /\[int\]\$minimize\s*=\s*0/, "winMouse.ps1 must accept -minimize flag");
+assert.match(winMousePs, /SW_SHOWMINNOACTIVE|ShowWindow\(\$other\.MainWindowHandle,\s*7\)/, "winMouse.ps1 must minimize other instance windows to prevent occlusion");
+assert.match(winMousePs, /BringWindowToTop/, "winMouse.ps1 must bring active instance window to top");
+
 console.log(
-  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, and runs continuous cycles locally.",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, and prevents window occlusion across instances.",
 );
+
 

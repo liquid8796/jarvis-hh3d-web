@@ -57,6 +57,54 @@ const MAX_LIFETIME_MS = Math.max(
     : Number(rawLifetimeMs || process.env.AD_VIEWER_MAX_LIFETIME_MS || 17_400_000) || 17_400_000,
 );
 
+function getCliArg(flag) {
+  const withEq = process.argv.find((a) => a.startsWith(`${flag}=`));
+  if (withEq) return withEq.slice(flag.length + 1).trim();
+  const idx = process.argv.indexOf(flag);
+  if (idx !== -1 && idx + 1 < process.argv.length && !process.argv[idx + 1].startsWith("--")) {
+    return process.argv[idx + 1].trim();
+  }
+  return "";
+}
+
+function parseRenderTimeoutConfig() {
+  const cli =
+    getCliArg("--render-timeout") ||
+    getCliArg("--ad-timeout") ||
+    getCliArg("--max-render-wait") ||
+    getCliArg("--ad-render-timeout") ||
+    process.argv.find((a) => a.startsWith("--render-timeout="))?.split("=")[1] ||
+    process.argv.find((a) => a.startsWith("--ad-timeout="))?.split("=")[1] ||
+    process.argv.find((a) => a.startsWith("--max-render-wait="))?.split("=")[1] ||
+    process.argv.find((a) => a.startsWith("--ad-render-timeout="))?.split("=")[1] ||
+    "";
+  const env =
+    process.env.AD_VIEWER_RENDER_TIMEOUT_MS ||
+    process.env.AD_VIEWER_RENDER_TIMEOUT ||
+    process.env.AD_VIEWER_AD_READY_TIMEOUT_MS ||
+    "";
+  const raw = (cli || env || "").trim().toLowerCase();
+  if (!raw) {
+    return { timeoutMs: 10_000, userSpecified: false };
+  }
+  let ms = 10_000;
+  if (raw.endsWith("ms")) {
+    ms = Number(raw.replace("ms", "").trim());
+  } else if (raw.endsWith("s")) {
+    ms = Number(raw.replace("s", "").trim()) * 1000;
+  } else {
+    const val = Number(raw);
+    if (!Number.isNaN(val)) {
+      ms = val < 100 ? val * 1000 : val;
+    }
+  }
+  ms = Math.max(1000, Number.isNaN(ms) ? 10_000 : Math.round(ms));
+  return { timeoutMs: ms, userSpecified: true };
+}
+
+const RENDER_TIMEOUT_CONFIG = parseRenderTimeoutConfig();
+const AD_READY_TIMEOUT_MS = RENDER_TIMEOUT_CONFIG.timeoutMs;
+
 const rawDelayMin = process.argv.find((a) => a.startsWith("--delay-min="))?.split("=")[1];
 const rawDelayMinMs = process.argv.find((a) => a.startsWith("--delay-min-ms="))?.split("=")[1];
 const DELAY_MIN_MS = Math.max(
@@ -84,19 +132,6 @@ const parsedRecursive =
     ? Number(envRecursive)
     : 2;
 const MAX_RECURSIVE_CLICKS = Math.max(0, Math.min(5, Number.isNaN(parsedRecursive) ? 2 : parsedRecursive));
-const AD_READY_TIMEOUT_MS = Math.max(
-  5000,
-  Number(process.env.AD_VIEWER_AD_READY_TIMEOUT_MS ?? 15_000) || 15_000,
-);
-function getCliArg(flag) {
-  const withEq = process.argv.find((a) => a.startsWith(`${flag}=`));
-  if (withEq) return withEq.slice(flag.length + 1).trim();
-  const idx = process.argv.indexOf(flag);
-  if (idx !== -1 && idx + 1 < process.argv.length && !process.argv[idx + 1].startsWith("--")) {
-    return process.argv[idx + 1].trim();
-  }
-  return "";
-}
 
 const rawClearCacheCycles =
   getCliArg("--clear-cache-cycles") ||
@@ -2927,11 +2962,25 @@ async function runOneCycle(
     );
     log(`Thời gian chờ render Adsterra: ${diagnostic.renderMs}ms.`);
 
-    // Dừng đọc nội dung trang web tự nhiên trước khi click (tối đa 3 giây)
-    const minReadingMs = Math.min(1500, MAX_READING_BEFORE_CLICK_MS);
-    const readingBeforeClickMs = rand(minReadingMs, MAX_READING_BEFORE_CLICK_MS);
-    log(`Đang đọc nội dung bài viết và lướt xem trang web trong ${(readingBeforeClickMs / 1000).toFixed(1)}s...`);
-    await simulateHumanReading(page, readingBeforeClickMs, instanceId);
+    const isRenderFinished =
+      diagnostic.allReady || (diagnostic.banner.status === "ready" && diagnostic.native.status === "ready");
+    const isForceClick = !isRenderFinished;
+    if (isForceClick) {
+      log(
+        `[ForceClick] ⚡ Quá thời gian chờ render Adsterra (${diagnostic.renderMs}ms / tối đa ${AD_READY_TIMEOUT_MS}ms) mà quảng cáo chưa hoàn tất tải (banner=${diagnostic.banner.status}, native=${diagnostic.native.status}) — KÍCH HOẠT CƯỠNG CHẾ (Force Click) 1 quảng cáo bất kỳ ngay lập tức!`,
+      );
+    }
+
+    if (!isForceClick) {
+      // Dừng đọc nội dung trang web tự nhiên trước khi click (tối đa 3 giây)
+      const minReadingMs = Math.min(1500, MAX_READING_BEFORE_CLICK_MS);
+      const readingBeforeClickMs = rand(minReadingMs, MAX_READING_BEFORE_CLICK_MS);
+      log(`Đang đọc nội dung bài viết và lướt xem trang web trong ${(readingBeforeClickMs / 1000).toFixed(1)}s...`);
+      await simulateHumanReading(page, readingBeforeClickMs, instanceId);
+    } else {
+      log("[ForceClick] Bỏ qua thời gian đọc bài viết; ưu tiên cưỡng chế click quảng cáo ngay!");
+      await sleep(rand(100, 300));
+    }
 
     // Nhận lượt độc quyền tương tác quảng cáo TRƯỚC khi quét quảng cáo: nếu phải chờ instance khác
     // xong chu kỳ, toạ độ và iframe banner quét từ trước có thể đã đổi — quét sau khi nhận lượt thì luôn mới.
@@ -2952,42 +3001,54 @@ async function runOneCycle(
     // Thu thập tất cả các quảng cáo khả dụng trên trang để chọn ngẫu nhiên
     const adCandidates = [];
 
-    // 1. Toàn bộ các thẻ Native Ads (nếu ready)
-    if (diagnostic.native.status === "ready") {
-      try {
-        const nativeLinks = page.locator(
-          `${NATIVE_READY_SELECTOR} #${NATIVE_CONTAINER_ID} a[target="_blank"], ${NATIVE_READY_SELECTOR} a`,
-        );
+    // 1. Toàn bộ các thẻ Native Ads (nếu ready, hoặc toàn bộ thẻ link native nếu ở chế độ Force Click)
+    try {
+      const nativeSelector = isForceClick
+        ? `${NATIVE_READY_SELECTOR} #${NATIVE_CONTAINER_ID} a, ${NATIVE_READY_SELECTOR} a, #${NATIVE_CONTAINER_ID} a, .adsterra-native a, [id*="container-"] a`
+        : diagnostic.native.status === "ready"
+        ? `${NATIVE_READY_SELECTOR} #${NATIVE_CONTAINER_ID} a[target="_blank"], ${NATIVE_READY_SELECTOR} a`
+        : null;
+      if (nativeSelector) {
+        const nativeLinks = page.locator(nativeSelector);
         const count = await nativeLinks.count().catch(() => 0);
         for (let i = 0; i < count; i++) {
           adCandidates.push({
-            name: `Native ad card ${i + 1}/${count}`,
+            name: `${isForceClick ? "[Force] " : ""}Native ad card ${i + 1}/${count}`,
             locator: nativeLinks.nth(i),
           });
         }
-      } catch (err) {
-        log(`Lỗi khi quét native ads: ${err instanceof Error ? err.message : String(err)}`);
       }
+    } catch (err) {
+      log(`Lỗi khi quét native ads: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     // 2. Banner ad creative trong các iframe quảng cáo (728x90, 468x60, 320x50, 300x250, 160x600, 160x300)
     try {
-      const bannerIframes = page.locator(
-        '.adsterra-banner[data-status="ready"] iframe, .adsterra-leaderboard[data-status="ready"] iframe, .adsterra-unit iframe',
-      );
+      const bannerSelector = isForceClick
+        ? '.adsterra-banner iframe, .adsterra-leaderboard iframe, .adsterra-unit iframe, .adsterra-stack iframe, iframe[width="728"], iframe[src*="adsterra"], iframe[src*="alwingulla"], iframe[src*="doubleclick"], iframe[src*="banner"]'
+        : '.adsterra-banner[data-status="ready"] iframe, .adsterra-leaderboard[data-status="ready"] iframe, .adsterra-unit iframe';
+      const bannerIframes = page.locator(bannerSelector);
       const iframeCount = await bannerIframes.count().catch(() => 0);
       for (let f = 0; f < iframeCount; f++) {
         const iframeHandle = await bannerIframes.nth(f).elementHandle().catch(() => null);
         const frame = iframeHandle ? await iframeHandle.contentFrame().catch(() => null) : null;
+        let foundFrameLinks = false;
         if (frame) {
           const bannerLinks = frame.locator("a[href]");
           const bannerCount = await bannerLinks.count().catch(() => 0);
           for (let i = 0; i < bannerCount; i++) {
+            foundFrameLinks = true;
             adCandidates.push({
-              name: `Banner iframe #${f + 1} link ${i + 1}/${bannerCount}`,
+              name: `${isForceClick ? "[Force] " : ""}Banner iframe #${f + 1} link ${i + 1}/${bannerCount}`,
               locator: bannerLinks.nth(i),
             });
           }
+        }
+        if (isForceClick && !foundFrameLinks) {
+          adCandidates.push({
+            name: `[Force] Banner iframe #${f + 1} element`,
+            locator: bannerIframes.nth(f),
+          });
         }
       }
     } catch (err) {
@@ -2997,17 +3058,33 @@ async function runOneCycle(
     // 3. Adsterra Smartlink
     try {
       const smartlink = page.locator(
-        '.adsterra-smartlink, a[href*="deliberatewatchful.com"], a[href*="f06720140b3b11ad092d96fa65ca5110"]',
+        '.adsterra-smartlink, a[href*="deliberatewatchful.com"], a[href*="alwingulla"], a[href*="f06720140b3b11ad092d96fa65ca5110"]',
       );
       const smartCount = await smartlink.count().catch(() => 0);
       for (let i = 0; i < smartCount; i++) {
         adCandidates.push({
-          name: `Adsterra Smartlink ${i + 1}/${smartCount}`,
+          name: `${isForceClick ? "[Force] " : ""}Adsterra Smartlink ${i + 1}/${smartCount}`,
           locator: smartlink.nth(i),
         });
       }
     } catch {
       // bỏ qua
+    }
+
+    // 4. Dự phòng cưỡng chế nếu trang tải quá chậm chưa có link nào
+    if (isForceClick && adCandidates.length === 0) {
+      const fallbackLocators = [
+        { name: "[Force] Adsterra Banner Slot", sel: ".adsterra-banner, .adsterra-leaderboard" },
+        { name: "[Force] Adsterra Native Slot", sel: ".adsterra-native, #container-5e6634da84f8f263d7ab34ae152f1c8d" },
+        { name: "[Force] Adsterra Stack Container", sel: ".adsterra-stack" },
+        { name: "[Force] External Link", sel: "a[target='_blank']" },
+      ];
+      for (const fb of fallbackLocators) {
+        const loc = page.locator(fb.sel).first();
+        if ((await loc.count().catch(() => 0)) > 0) {
+          adCandidates.push({ name: fb.name, locator: loc });
+        }
+      }
     }
 
     // Xáo trộn ngẫu nhiên toàn bộ danh sách quảng cáo tìm thấy (Fisher-Yates)
@@ -3020,7 +3097,7 @@ async function runOneCycle(
       const targetCandidate = adCandidates.length > 0 ? adCandidates[0] : null;
       const targetDesc = targetCandidate ? targetCandidate.name : "Vùng quảng cáo / Trang web";
       log("\n" + "=".repeat(64));
-      log("🔔 [CHẾ ĐỘ BÁN TỰ ĐỘNG - THỦ CÔNG]");
+      log(`🔔 [CHẾ ĐỘ BÁN TỰ ĐỘNG - THỦ CÔNG${isForceClick ? " - CƯỠNG CHẾ" : ""}]`);
       log(`👉 Đã định vị mục tiêu: "${targetDesc}"`);
       log("👉 Vui lòng dùng CHUỘT THẬT click vào khung quảng cáo viền đỏ trên màn hình Chrome!");
       log("⏳ Auto đang đếm ngược chờ bạn click (tối đa 45 giây)...");
@@ -3064,19 +3141,21 @@ async function runOneCycle(
         log("⚠ Đã hết thời gian 45s chờ click thủ công; chuyển sang chu kỳ tiếp theo.");
       }
     } else if (adCandidates.length > 0) {
-      log(`Tìm thấy tổng cộng ${adCandidates.length} vị trí quảng cáo khả dụng. Đang chọn ngẫu nhiên để click (${cycleClickMode} mode)...`);
+      log(
+        `${isForceClick ? "[ForceClick] " : ""}Tìm thấy tổng cộng ${adCandidates.length} vị trí quảng cáo khả dụng${isForceClick ? " (kể cả chưa ready)" : ""}. Đang chọn ngẫu nhiên để click (${cycleClickMode} mode)...`,
+      );
       for (const candidate of adCandidates) {
         const clickTarget = await resolveAdClickTarget(candidate.locator);
         if (!clickTarget) {
           log(`  Bỏ qua [${candidate.name}] — không xác định được toạ độ.`);
           continue;
         }
-        log(`-> Click ngẫu nhiên quảng cáo [${candidate.name}] tại (${Math.round(clickTarget.x)}, ${Math.round(clickTarget.y)})...`);
+        log(`-> ${isForceClick ? "[ForceClick] " : ""}Click ngẫu nhiên quảng cáo [${candidate.name}] tại (${Math.round(clickTarget.x)}, ${Math.round(clickTarget.y)})...`);
         const newPage = await performEngageAndClick(page, context, clickTarget.x, clickTarget.y, instanceId, cycleClickMode);
         if (newPage) {
           openedPage = newPage;
           adClicked = true;
-          log(`✓ Đã mở tab quảng cáo thành công từ [${candidate.name}].`);
+          log(`✓ ${isForceClick ? "[ForceClick] " : ""}Đã mở tab quảng cáo thành công từ [${candidate.name}].`);
           break;
         } else {
           await sleep(2500);
@@ -3084,7 +3163,7 @@ async function runOneCycle(
           if (allPages.length > 1) {
             openedPage = allPages[allPages.length - 1];
             adClicked = true;
-            log(`✓ Đã bắt được trang quảng cáo từ tab phụ [${candidate.name}].`);
+            log(`✓ ${isForceClick ? "[ForceClick] " : ""}Đã bắt được trang quảng cáo từ tab phụ [${candidate.name}].`);
             break;
           }
         }
@@ -3303,6 +3382,9 @@ async function main() {
       ? `${HOVER_CONFIG.minMs}ms (${(HOVER_CONFIG.minMs / 1000).toFixed(1)}s)`
       : `${HOVER_CONFIG.minMs}-${HOVER_CONFIG.maxMs}ms (${(HOVER_CONFIG.minMs / 1000).toFixed(1)}-${(HOVER_CONFIG.maxMs / 1000).toFixed(1)}s)`;
   log(`Thời gian hover trên quảng cáo trước khi click: ${hoverDesc}${HOVER_CONFIG.userSpecified ? " (tuỳ chỉnh)" : " (mặc định)"}`);
+
+  const renderTimeoutDesc = `${AD_READY_TIMEOUT_MS}ms (${(AD_READY_TIMEOUT_MS / 1000).toFixed(1)}s)`;
+  log(`Thời gian chờ render Adsterra tối đa: ${renderTimeoutDesc}${RENDER_TIMEOUT_CONFIG.userSpecified ? " (tuỳ chỉnh)" : " (mặc định)"} [Quá hạn sẽ cưỡng chế click ngay]`);
 
   const extPath = USE_CANVAS_BLOCKER ? resolveExtensionPath() : null;
   if (extPath) {

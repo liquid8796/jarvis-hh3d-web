@@ -9,6 +9,18 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.154 — Tuỳ chỉnh thời gian tối đa chờ render Adsterra và cơ chế cưỡng chế click quảng cáo ngay lập tức (03/10/2026)
+
+- Cho phép người dùng thiết lập thời gian tối đa chờ render quảng cáo Adsterra:
+  - Bổ sung cờ CLI `--render-timeout=<giây|ms>`, `--ad-timeout`, `--max-render-wait`, `--ad-render-timeout` và biến môi trường `AD_VIEWER_RENDER_TIMEOUT_MS`, `AD_VIEWER_RENDER_TIMEOUT`, `AD_VIEWER_AD_READY_TIMEOUT_MS` (mặc định 10 giây).
+  - Bổ sung mục lựa chọn `[13] Thoi gian toi da cho render quang cao Adsterra [Render Timeout]` trong kịch bản Windows [run-ad-viewer.bat](run-ad-viewer.bat), cho phép người dùng nhập trực tiếp số giây hoặc mili-giây mong muốn trước khi khởi chạy.
+- Cơ chế cưỡng chế click quảng cáo ngay lập tức (Force Click) khi quá hạn chờ:
+  - Khi Adsterra gặp mạng chậm hoặc render quá thời gian tối đa mà chưa sẵn sàng (`!isRenderFinished`), auto tự động kích hoạt chế độ cưỡng chế (`isForceClick = true`).
+  - Bỏ qua toàn bộ thời gian dừng đọc bài viết giả lập người thật để tiết kiệm thời gian, tiến hành tìm kiếm và click quảng cáo ngay lập tức.
+  - Quét toàn bộ các iframe banner chưa sẵn sàng (quét link bên trong hoặc click trực tiếp vào thẻ iframe), liên kết native trong container Adsterra, Smartlink và các vùng chứa slot quảng cáo dự phòng (`.adsterra-banner`, `.adsterra-native`, `.adsterra-stack`).
+  - Thông báo chi tiết trạng thái `[ForceClick]` trên nhật ký và chuyển ngay sang tương tác trang đích.
+- Cập nhật kiểm tra sức khoẻ [scripts/verifyAdViewerHealth.mts](scripts/verifyAdViewerHealth.mts) xác thực cơ chế phân tích cấu hình timeout render và cưỡng chế click khi quá hạn.
+
 ## 1.3.153 — Khắc phục lỗi tiện ích CanvasBlocker không xuất hiện khi chạy 1 instance duy nhất (03/10/2026)
 
 - Khắc phục sự cố tiện ích CanvasBlocker không hiển thị trên trình duyệt khi chỉ chạy 1 instance:

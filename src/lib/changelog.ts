@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.154",
+    date: "2026-10-03",
+    lines: [
+      "Cho phép người dùng thiết lập thời gian tối đa chờ render quảng cáo Adsterra qua giao diện và dòng lệnh.",
+      "Tự động cưỡng chế click quảng cáo ngay lập tức nếu quá thời gian chờ mà quảng cáo chưa render xong.",
+    ],
+  },
+  {
     version: "1.3.153",
     date: "2026-10-03",
     lines: [
@@ -464,15 +472,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Tài khoản thường nay có thể bỏ giới hạn huyền tinh khi giao đàn riêng cho khôi lỗi máy nhà.",
       "Khôi lỗi tông môn và lựa chọn ai rảnh cũng được vẫn giữ giới hạn để không chiếm ghế chung quá lâu.",
       "Đổi loại khôi lỗi trên màn hình sẽ mở hoặc khoá tuỳ chọn ngay, không cần tải lại trang.",
-    ],
-  },
-  {
-    version: "1.3.104",
-    date: "2026-09-29",
-    lines: [
-      "Repo phụ nay có thể được đưa lên làm repo chính từ giao diện web hoặc một tệp BAT chạy trên máy Windows bất kỳ.",
-      "Khi promote có thể giữ nguyên, chuyển công khai hoặc chuyển riêng tư; source và lịch sử Git vẫn được giữ nguyên.",
-      "Nếu lượt đổi vai trò hỏng giữa chừng, hệ thống trả lại quyền truy cập và trạng thái chạy cũ trước khi báo lỗi.",
     ],
   },
 ];

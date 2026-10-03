@@ -267,8 +267,24 @@ if defined INPUT_HOVER (
 )
 echo.
 
+REM 13. Thoi gian toi da cho render Adsterra
+echo [13] Thoi gian toi da cho render quang cao Adsterra [Render Timeout]:
+echo      Nhap so giay (vi du: 5, 8, 10), hoac ms (vi du: 6000, 8000).
+echo      Neu qua thoi gian nay ma quang cao chua tai xong thi auto se cuong che click 1 quang cao bat ky.
+echo      De trong de su dung mac dinh (10 giay).
+set "INPUT_RENDER_TIMEOUT="
+set /p "INPUT_RENDER_TIMEOUT=    Thoi gian cho render toi da [Enter = mac dinh 10s]: "
+set "ARG_RENDER_TIMEOUT="
+if defined INPUT_RENDER_TIMEOUT (
+    set "ARG_RENDER_TIMEOUT=--render-timeout=%INPUT_RENDER_TIMEOUT%"
+    echo     -^> Thoi gian cho render toi da: %INPUT_RENDER_TIMEOUT%
+) else (
+    echo     -^> Thoi gian cho render toi da: Mac dinh [10 giay]
+)
+echo.
+
 REM Tong hop lenh thuc thi
-set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER%
+set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT%
 
 echo ============================================================================
 echo   TONG HOP CAU HINH CHAY:

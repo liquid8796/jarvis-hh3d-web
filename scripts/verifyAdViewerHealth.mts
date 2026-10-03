@@ -124,13 +124,19 @@ assert.match(runtime, /minimizeInstanceWindow/, "ad-viewer must support minimizi
 assert.match(runtime, /focusInstanceWindow/, "ad-viewer must support focusing and maximizing active instance window");
 assert.match(runtime, /closeExtensionPage/, "ad-viewer must automatically close extension onboarding and settings tabs");
 
+// ---- Cấu hình timeout render Adsterra & Cưỡng chế click (Force Click) ----
+assert.match(runtime, /parseRenderTimeoutConfig/, "ad-viewer must parse render timeout from CLI and env");
+assert.match(runtime, /isForceClick\s*=/, "ad-viewer must determine isForceClick when render is not finished within timeout");
+assert.match(runtime, /\[ForceClick\]/, "ad-viewer must log and execute force click when render times out");
+assert.match(batContent, /--render-timeout=/, "run-ad-viewer.bat must support --render-timeout option [13]");
+
 const winMousePs = read("scripts/winMouse.ps1");
 assert.match(winMousePs, /\[int\]\$minimize\s*=\s*0/, "winMouse.ps1 must accept -minimize flag");
 assert.match(winMousePs, /SW_SHOWMINNOACTIVE|ShowWindow\(\$other\.MainWindowHandle,\s*7\)/, "winMouse.ps1 must minimize other instance windows to prevent occlusion");
 assert.match(winMousePs, /BringWindowToTop/, "winMouse.ps1 must bring active instance window to top");
 
 console.log(
-  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, and prevents window occlusion across instances.",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, and supports user-defined render timeout with force click fallback.",
 );
 
 

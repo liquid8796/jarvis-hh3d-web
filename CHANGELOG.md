@@ -9,6 +9,25 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.160 — Khắc phục chế độ chạy ẩn Headless trong kịch bản run-ad-viewer.bat (03/10/2026)
+
+- Khắc phục triệt để sự cố chế độ chạy ẩn (Headless) vẫn làm bật cửa sổ Google Chrome và cướp chuột trên Windows:
+  - Nguyên nhân:
+    1. Trong kịch bản [run-ad-viewer.bat](run-ad-viewer.bat), khi chạy 1 instance (`INPUT_INSTANCES=1`), kịch bản mặc định gán cờ `--my-chrome`. Cờ này kích hoạt kết nối CDP tới cổng 9222 mở trình duyệt Chrome thật trên máy tính với cửa sổ đồ hoạ toàn màn hình. Khi người dùng chọn chế độ chạy ẩn (`INPUT_HEAD=2`), cờ `--my-chrome` không được xoá bỏ và cờ `--head` chỉ bị bỏ trống thay vì truyền rõ ràng `--headless`.
+    2. Trong [scripts/adViewer.mjs](scripts/adViewer.mjs), điều kiện kiểm tra `isHeadless` phụ thuộc vào `cycleClickMode !== "os-mouse"`. Vì tuỳ chọn click mặc định trong file batch là `os-mouse` (chuột phần cứng Windows qua `winMouse.ps1`), `isHeadless` bị đánh giá thành `false`, vô hiệu hoá hoàn toàn chế độ chạy ẩn và buộc Chromium mở cửa sổ thật.
+    3. Các hàm điều phối giao diện (`ensureWindowMaximized`, `maximizeAndFocusWindow`, `focusInstanceWindow`, `page.bringToFront`) vẫn được gọi dẫn tới việc kích hoạt và cướp tiêu điểm cửa sổ.
+  - Sửa đổi trong [run-ad-viewer.bat](run-ad-viewer.bat):
+    - Khi chọn chế độ Chạy ẩn (`INPUT_HEAD=2`): Thiết lập `ARG_HEAD=--headless`.
+    - Tự động chuyển chế độ click sang CDP Input Dispatch (`ARG_CLICK_MODE=--click-mode=cdp`) nếu người dùng chọn hoặc để mặc định chuột phần cứng/thủ công (`os-mouse`, `ghub`, `manual`).
+    - Tự động xoá cờ `ARG_MY_CHROME` khi chạy ẩn để Chromium sử dụng profile độc lập chạy ngầm hoàn toàn mà không đụng tới Chrome desktop thật.
+  - Sửa đổi trong [scripts/adViewer.mjs](scripts/adViewer.mjs):
+    - Bổ sung nhận diện cờ `--headless` (`IS_EXPLICIT_HEADLESS`) từ CLI và biến môi trường.
+    - Trong `runOneCycle()`: Tự động vô hiệu hoá `useMyChrome` khi chạy ẩn và chuyển đổi an toàn các chế độ click chuột phần cứng sang `cdp` (Bézier curve trên CDP Input Dispatch).
+    - Thiết lập chuẩn xác `launchOptions.headless = isHeadless` kèm cờ `--headless=new` và bỏ cờ `--start-maximized` khi chạy ẩn.
+    - Bỏ qua các thao tác đưa cửa sổ lên foreground, phóng to toàn màn hình (`maximizeAndFocusWindow`), thu nhỏ cửa sổ (`minimizeInstanceWindow`) và chuyển tab khi `isHeadless` là `true`.
+    - Hiển thị rõ ràng trạng thái chế độ hiển thị (Chạy ẩn / Hiện cửa sổ) trên nhật ký khởi động `main()`.
+  - Cập nhật kiểm chứng [scripts/verifyAdViewerHealth.mts](scripts/verifyAdViewerHealth.mts) và kiểm tra kết dòng [scripts/verifyBatchEol.mjs](scripts/verifyBatchEol.mjs).
+
 ## 1.3.159 — Khôi phục quảng cáo đề xuất nội dung NativeBanner trên website (03/10/2026)
 
 - Khôi phục định dạng quảng cáo NativeBanner (tỷ lệ 4:1) trong khu vực tài trợ của website:

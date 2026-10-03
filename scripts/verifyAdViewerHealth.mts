@@ -197,9 +197,18 @@ const winMousePs = read("scripts/winMouse.ps1");
 assert.match(winMousePs, /\[int\]\$minimize\s*=\s*0/, "winMouse.ps1 must accept -minimize flag");
 assert.match(winMousePs, /SW_SHOWMINNOACTIVE|ShowWindow\(\$other\.MainWindowHandle,\s*7\)/, "winMouse.ps1 must minimize other instance windows to prevent occlusion");
 assert.match(winMousePs, /BringWindowToTop/, "winMouse.ps1 must bring active instance window to top");
+// ---- Chế độ chạy ẩn (Headless Mode) ----
+assert.match(batContent, /ARG_HEAD=--headless/, "run-ad-viewer.bat must set ARG_HEAD=--headless when headless mode is chosen");
+assert.match(batContent, /ARG_CLICK_MODE=--click-mode=cdp/, "run-ad-viewer.bat must auto-switch click mode to cdp when headless mode is chosen");
+assert.match(batContent, /else if "%INPUT_HEAD%"=="2"/, "run-ad-viewer.bat must clear ARG_MY_CHROME when headless mode is chosen");
+
+assert.match(runtime, /IS_EXPLICIT_HEADLESS/, "ad-viewer must parse IS_EXPLICIT_HEADLESS");
+assert.match(runtime, /useMyChrome\s*=\s*!extensionPath && wantsMyChrome && !IS_EXPLICIT_HEADLESS/, "ad-viewer must disable useMyChrome in headless mode");
+assert.match(runtime, /wantsHeadless\s*&&\s*\(cycleClickMode === "os-mouse" \|\| cycleClickMode === "ghub" \|\| cycleClickMode === "manual"\)/, "ad-viewer must detect incompatible hardware click modes in headless");
+assert.match(runtime, /cycleClickMode\s*=\s*"cdp"/, "ad-viewer must fallback incompatible click modes to cdp in headless");
 
 console.log(
-  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, and supports custom user-defined device emulation.",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, and fully supports headless mode without popping up windows.",
 );
 
 

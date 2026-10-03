@@ -118,8 +118,12 @@ set "INPUT_HEAD="
 set /p "INPUT_HEAD=    Chon [1-2, Enter = 1]: "
 set "ARG_HEAD=--head"
 if "%INPUT_HEAD%"=="2" (
-    set "ARG_HEAD="
+    set "ARG_HEAD=--headless"
     echo     -^> Che do: Chay an [Headless]
+    if not "%ARG_CLICK_MODE%"=="--click-mode=cdp" if not "%ARG_CLICK_MODE%"=="--click-mode=mouse" (
+        set "ARG_CLICK_MODE=--click-mode=cdp"
+        echo     [*] Che do chay an [Headless]: Tu dong chuyen sang CDP Input Dispatch [Bezier curve] vi chuot phan cung khong ap dung cho trinh duyet chay an.
+    )
 ) else (
     echo     -^> Che do: Hien cua so Chrome
 )
@@ -265,6 +269,10 @@ if not "%INPUT_INSTANCES%"=="1" (
 ) else if defined ARG_CB (
     set "ARG_MY_CHROME="
     echo     [*] Tien ich CanvasBlocker: Tu dong su dung profile doc lap de nap day du tien ich va bat Developer Mode.
+    echo.
+) else if "%INPUT_HEAD%"=="2" (
+    set "ARG_MY_CHROME="
+    echo     [*] Che do chay an [Headless]: Tu dong su dung profile doc lap thay vi --my-chrome de Chromium chay ngam.
     echo.
 )
 

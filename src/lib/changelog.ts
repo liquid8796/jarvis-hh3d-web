@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.160",
+    date: "2026-10-03",
+    lines: [
+      "Khắc phục sự cố chế độ chạy ẩn (Headless) trong kịch bản tự động xem quảng cáo.",
+      "Tự động dùng hồ sơ độc lập và chuyển thao tác sang chuột ảo CDP để trình duyệt chạy ngầm hoàn toàn.",
+    ],
+  },
+  {
     version: "1.3.159",
     date: "2026-10-03",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Biểu ngữ Adsterra nay hiện cả trên điện thoại và tự co theo bề ngang màn hình, không tạo cuộn ngang.",
       "Native Banner, Social Bar, Popunder và liên kết tài trợ vẫn dùng cùng luật route, tài khoản và xử lý slot bị chặn như bản máy tính.",
-    ],
-  },
-  {
-    version: "1.3.110",
-    date: "2026-10-01",
-    lines: [
-      "Dòng chữ Quảng cáo phía trên khu tài trợ đã được bỏ để trang gọn và liền mạch hơn.",
-      "Nếu trình duyệt chặn hoặc zone không có nội dung, khung trống tự thu lại; website không tự vượt cơ chế chặn của trình duyệt.",
     ],
   },
 ];

@@ -244,6 +244,15 @@ const rawClickMode = (
   ""
 ).toLowerCase();
 
+const IS_EXPLICIT_HEADLESS =
+  process.argv.includes("--headless") ||
+  process.argv.includes("--headless=new") ||
+  process.env.HEADLESS === "1";
+const IS_EXPLICIT_HEADED =
+  process.argv.includes("--head") ||
+  process.argv.includes("--visible") ||
+  process.env.HEADLESS === "0";
+
 let CLICK_MODE = "cdp";
 if (rawClickMode === "mouse") {
   CLICK_MODE = "mouse";
@@ -274,7 +283,8 @@ if (rawClickMode === "mouse") {
   CLICK_MODE = "cdp";
 } else if (
   process.platform === "win32" &&
-  (process.argv.includes("--my-chrome") || process.env.USE_MY_CHROME === "1")
+  (process.argv.includes("--my-chrome") || process.env.USE_MY_CHROME === "1") &&
+  !IS_EXPLICIT_HEADLESS
 ) {
   CLICK_MODE = "os-mouse";
 }
@@ -530,7 +540,7 @@ async function tagInstancePage(page, instanceId = logContext.getStore()?.instanc
  * đồng thời thu nhỏ các cửa sổ Chrome của các instance khác xuống taskbar để không che khuất.
  */
 function focusInstanceWindow(instanceId = logContext.getStore()?.instanceId) {
-  if (process.platform !== "win32" || !instanceId || instanceId <= 0) return;
+  if (IS_EXPLICIT_HEADLESS || process.platform !== "win32" || !instanceId || instanceId <= 0) return;
   const psScript = path.join(__dirname, "winMouse.ps1");
   if (!existsSync(psScript)) return;
   try {
@@ -545,7 +555,7 @@ function focusInstanceWindow(instanceId = logContext.getStore()?.instanceId) {
  * Thu nhỏ (minimize) cửa sổ Chrome của instanceId xuống taskbar để không che khuất instance đang tương tác.
  */
 function minimizeInstanceWindow(instanceId = logContext.getStore()?.instanceId) {
-  if (process.platform !== "win32" || !instanceId || instanceId <= 0) return;
+  if (IS_EXPLICIT_HEADLESS || process.platform !== "win32" || !instanceId || instanceId <= 0) return;
   const psScript = path.join(__dirname, "winMouse.ps1");
   if (!existsSync(psScript)) return;
   try {
@@ -1750,13 +1760,15 @@ async function resolvePopunderTarget(page) {
 async function performEngageAndClick(page, ctx, targetX, targetY, instanceId = 0, clickMode = CLICK_MODE) {
   if (isPhysicalClickMode(clickMode) || INSTANCE_COUNT > 1) {
     await acquireCycleTurn(instanceId);
-    if (instanceId > 0) {
-      await tagInstancePage(page, instanceId);
-    }
-    await page.bringToFront().catch(() => {});
-    await maximizeAndFocusWindow(ctx, page, instanceId);
-    if (process.platform === "win32") {
-      focusInstanceWindow(instanceId);
+    if (!IS_EXPLICIT_HEADLESS) {
+      if (instanceId > 0) {
+        await tagInstancePage(page, instanceId);
+      }
+      await page.bringToFront().catch(() => {});
+      await maximizeAndFocusWindow(ctx, page, instanceId);
+      if (process.platform === "win32") {
+        focusInstanceWindow(instanceId);
+      }
     }
   }
   await preClickEngagement(page, ctx, targetX, targetY, instanceId, clickMode);
@@ -2497,6 +2509,7 @@ async function applyFingerprintToPage(context, page, fp, { emulateMobileMetrics 
  * và chuột phần cứng không bao giờ bị click tràn ra ngoài phạm vi cửa sổ.
  */
 async function ensureWindowMaximized(session, page, instanceId = logContext.getStore()?.instanceId) {
+  if (IS_EXPLICIT_HEADLESS) return;
   // Instance khác đang giữ lượt chuột hoặc chưa đến lượt tương tác: không giành foreground
   if (foregroundOwnedByOther(instanceId) || !canInteractForeground(instanceId)) return;
   try {
@@ -2512,6 +2525,7 @@ async function ensureWindowMaximized(session, page, instanceId = logContext.getS
 }
 
 async function maximizeAndFocusWindow(context, page, instanceId = logContext.getStore()?.instanceId) {
+  if (IS_EXPLICIT_HEADLESS) return;
   if (foregroundOwnedByOther(instanceId) || !canInteractForeground(instanceId)) return;
   try {
     if (page) await page.bringToFront().catch(() => {});
@@ -2535,15 +2549,20 @@ async function runOneCycle(
 ) {
   const explicitCdp = process.argv.some((a) => a.startsWith("--cdp")) || Boolean(process.env.CDP_URL);
   const wantsMyChrome =
-    process.argv.includes("--my-chrome") ||
+    (process.argv.includes("--my-chrome") ||
     process.argv.includes("--my-profile") ||
-    process.env.USE_MY_CHROME === "1";
+    process.env.USE_MY_CHROME === "1") &&
+    !IS_EXPLICIT_HEADLESS;
+
+  if (IS_EXPLICIT_HEADLESS && (process.argv.includes("--my-chrome") || process.argv.includes("--my-profile") || process.env.USE_MY_CHROME === "1") && !explicitCdp) {
+    log("[AntiDetect] ⚠ Chế độ chạy ẩn (Headless) yêu cầu profile độc lập; tự động bỏ qua --my-chrome để Chromium chạy ngầm.");
+  }
 
   // Khi nạp tiện ích mở rộng (CanvasBlocker), Google Chrome bảo vệ thư mục User Data thật
   // bằng cách chặn --load-extension. Đồng thời phiên kết nối CDP có sẵn cũng không thể nạp thêm extension.
   // Do đó, khi có extensionPath, ad-viewer tự động sử dụng profile độc lập với launchPersistentContext
   // để tiện ích luôn được nạp đầy đủ và Developer Mode luôn được kích hoạt.
-  const useMyChrome = !extensionPath && wantsMyChrome;
+  const useMyChrome = !extensionPath && wantsMyChrome && !IS_EXPLICIT_HEADLESS;
   if (extensionPath && wantsMyChrome && !explicitCdp) {
     log("[AntiDetect] ⚠ Tiện ích CanvasBlocker yêu cầu profile độc lập để nạp extension; tự động chuyển sang profile riêng thay vì --my-chrome.");
   }
@@ -2579,6 +2598,21 @@ async function runOneCycle(
   const fpSessions = [];
   let onFingerprintPage = null;
   let cycleClickMode = CLICK_MODE;
+  const wantsHeadless =
+    IS_EXPLICIT_HEADLESS ||
+    (!IS_EXPLICIT_HEADED && !useMyChrome && !explicitCdp);
+
+  if (wantsHeadless && (cycleClickMode === "os-mouse" || cycleClickMode === "ghub" || cycleClickMode === "manual")) {
+    log(`[Headless] ⚠ Chế độ chạy ẩn không thể sử dụng chuột phần cứng/thao tác thủ công (${cycleClickMode}); tự động chuyển sang CDP Input Dispatch.`);
+    cycleClickMode = "cdp";
+  }
+  const isHeadless =
+    !useMyChrome &&
+    cycleClickMode !== "manual" &&
+    cycleClickMode !== "os-mouse" &&
+    cycleClickMode !== "ghub" &&
+    !IS_EXPLICIT_HEADED &&
+    (IS_EXPLICIT_HEADLESS || process.env.HEADLESS !== "0");
   const baseClickMode = cycleClickMode;
   const visitedDomains = [];
 
@@ -2648,7 +2682,7 @@ async function runOneCycle(
         "--enforce-webrtc-ip-permission-check",
         "--webrtc-ip-handling-policy=disable_non_proxied_udp",
       ];
-      if (INSTANCE_COUNT <= 1) {
+      if (INSTANCE_COUNT <= 1 && !isHeadless) {
         args.push("--start-maximized");
       }
 
@@ -2660,14 +2694,6 @@ async function runOneCycle(
         }
       }
 
-      const isHeadless =
-        !useMyChrome &&
-        cycleClickMode !== "manual" &&
-        cycleClickMode !== "os-mouse" &&
-        cycleClickMode !== "ghub" &&
-        !process.argv.includes("--head") &&
-        !process.argv.includes("--visible") &&
-        process.env.HEADLESS !== "0";
       const launchArgs = isHeadless ? [...args, "--headless=new"] : args;
 
       const defaultDesktopUA =
@@ -2676,9 +2702,9 @@ async function runOneCycle(
       // Chuột phần cứng tính toạ độ từ cửa sổ THẬT, nên desktop ở các chế độ ấy không được giả lập
       // viewport (viewport: null = trang lấp đúng cửa sổ). Mobile luôn giả lập — chu kỳ mobile tự
       // chuyển sang click CDP ở dưới.
-      const physicalMouse = cycleClickMode === "os-mouse" || cycleClickMode === "ghub" || cycleClickMode === "manual";
+      const physicalMouse = !isHeadless && (cycleClickMode === "os-mouse" || cycleClickMode === "ghub" || cycleClickMode === "manual");
       const launchOptions = {
-        headless: false,
+        headless: isHeadless,
         args: launchArgs,
         viewport: physicalMouse || !isHeadless ? null : { width: 1366, height: 768 },
         locale: fpLocale,
@@ -2797,15 +2823,19 @@ async function runOneCycle(
       );
     });
     page = useMyChrome || cdpUrl ? await context.newPage() : nonExtPages[0] || (await context.newPage());
-    await page.bringToFront().catch(() => {});
+    if (!isHeadless) {
+      await page.bringToFront().catch(() => {});
+    }
     await tagInstancePage(page, instanceId);
     page.on("domcontentloaded", () => { tagInstancePage(page, instanceId).catch(() => {}); });
     page.on("load", () => { tagInstancePage(page, instanceId).catch(() => {}); });
 
-    if (foregroundOwnedByOther(instanceId)) {
-      minimizeInstanceWindow(instanceId);
-    } else {
-      await maximizeAndFocusWindow(context, page, instanceId);
+    if (!isHeadless) {
+      if (foregroundOwnedByOther(instanceId)) {
+        minimizeInstanceWindow(instanceId);
+      } else {
+        await maximizeAndFocusWindow(context, page, instanceId);
+      }
     }
 
     if (fp) {
@@ -2820,7 +2850,7 @@ async function runOneCycle(
       const mainSession = await applyFingerprintToPage(context, page, fp, { emulateMobileMetrics }).catch(() => null);
       if (mainSession) {
         fpSessions.push(mainSession);
-        if (canInteractForeground(instanceId)) {
+        if (!isHeadless && canInteractForeground(instanceId)) {
           await ensureWindowMaximized(mainSession, page, instanceId);
         }
       }
@@ -2839,7 +2869,7 @@ async function runOneCycle(
         applyFingerprintToPage(context, newPage, fp, { emulateMobileMetrics })
           .then((s) => {
             fpSessions.push(s);
-            if (canInteractForeground(instanceId)) {
+            if (!isHeadless && canInteractForeground(instanceId)) {
               return ensureWindowMaximized(s, newPage, instanceId);
             }
           })
@@ -3033,7 +3063,7 @@ async function runOneCycle(
     // phải xoá nó đi.
     if (fp) await context.addInitScript(fingerprintInitScript, fp.inject).catch(() => {});
 
-    if (!foregroundOwnedByOther(instanceId)) {
+    if (!isHeadless && !foregroundOwnedByOther(instanceId)) {
       await page.bringToFront().catch(() => {});
       await maximizeAndFocusWindow(context, page, instanceId);
     }
@@ -3093,11 +3123,13 @@ async function runOneCycle(
     // Lượt được giữ tới cuối chu kỳ và nhả trong khối finally bên dưới.
     if (isPhysicalClickMode(cycleClickMode) || INSTANCE_COUNT > 1) {
       await acquireCycleTurn(instanceId);
-      await tagInstancePage(page, instanceId);
-      await page.bringToFront().catch(() => {});
-      await maximizeAndFocusWindow(context, page, instanceId);
-      if (process.platform === "win32") {
-        focusInstanceWindow(instanceId);
+      if (!isHeadless) {
+        await tagInstancePage(page, instanceId);
+        await page.bringToFront().catch(() => {});
+        await maximizeAndFocusWindow(context, page, instanceId);
+        if (process.platform === "win32") {
+          focusInstanceWindow(instanceId);
+        }
       }
     }
 
@@ -3380,7 +3412,7 @@ async function runOneCycle(
     // 5. Đọc trang quảng cáo chính và đệ quy click nếu có
     if (openedPage) {
       await tagInstancePage(openedPage, instanceId);
-      if (process.platform === "win32") {
+      if (process.platform === "win32" && !isHeadless) {
         focusInstanceWindow(instanceId);
       }
       await openedPage.waitForLoadState("domcontentloaded", { timeout: 25000 }).catch(() => {});
@@ -3520,6 +3552,12 @@ async function main() {
   log(`Khởi động tiến trình xem quảng cáo (bản: ${currentVersion ?? "chưa rõ"})`);
   log(`Website đích: ${WEB_URL}`);
   log(`Tuổi thọ tối đa: ${Math.round(MAX_LIFETIME_MS / 60000)} phút`);
+  const displayModeDesc = IS_EXPLICIT_HEADLESS
+    ? "Chạy ẩn (Headless - không mở cửa sổ)"
+    : IS_EXPLICIT_HEADED
+    ? "Hiện cửa sổ trình duyệt (Headed)"
+    : "Tự động (Headless nếu không dùng chuột phần cứng)";
+  log(`Chế độ hiển thị: ${displayModeDesc}`);
   const clickModeDesc =
     CLICK_MODE === "os-mouse"
       ? "OS Physical Mouse — Windows SendInput/mouse_event phần cứng"
@@ -3634,7 +3672,7 @@ async function runInstanceLoop(instanceId, proxyManager, extPath, startTime) {
           log(`[Fingerprint] Danh tính mới cho ${CLEAR_CACHE_CYCLES > 0 ? `${CLEAR_CACHE_CYCLES} chu kỳ tới` : "cả ca trực"}.`);
         }
 
-        const requiresIsolatedProfile = Boolean(extPath);
+        const requiresIsolatedProfile = Boolean(extPath) || IS_EXPLICIT_HEADLESS;
         const bypassSharedProfile =
           !requiresIsolatedProfile &&
           (process.argv.some((a) => a.startsWith("--cdp")) ||

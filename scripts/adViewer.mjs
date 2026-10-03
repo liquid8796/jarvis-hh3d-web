@@ -44,6 +44,35 @@ try {
   // Dùng fallback playwright-core nếu không có patchright
 }
 
+// Bắt các lỗi protocol không đồng bộ nội bộ của Patchright/Playwright (như session closed khi đóng tab/context)
+// để không làm sập toàn bộ tiến trình khi đóng tab quảng cáo hoặc dọn dẹp cache.
+function isIgnorableProtocolError(err) {
+  const msg = (err?.message || String(err || "")).toLowerCase();
+  const stack = (err?.stack || "").toLowerCase();
+  const hasClosedPattern =
+    msg.includes("session closed") ||
+    msg.includes("target closed") ||
+    msg.includes("browser has been closed") ||
+    msg.includes("connection closed") ||
+    msg.includes("target page, context or browser has been closed") ||
+    msg.includes("network.setcachedisabled") ||
+    msg.includes("internal server error, session closed");
+
+  return hasClosedPattern && (stack.includes("patchright") || stack.includes("playwright") || msg.includes("protocol error"));
+}
+
+process.on("unhandledRejection", (reason) => {
+  if (isIgnorableProtocolError(reason)) return;
+  const msg = reason?.message || String(reason || "");
+  console.warn(`[Cảnh báo UnhandledRejection]: ${msg}`);
+});
+
+process.on("uncaughtException", (err) => {
+  if (isIgnorableProtocolError(err)) return;
+  console.error("Lỗi chí mạng (Uncaught Exception):", err);
+  process.exit(1);
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const WEB_URL = (process.env.WEB_URL ?? "https://auto-hh3d.online").replace(/\/$/, "");
@@ -2031,9 +2060,17 @@ async function handleRecursiveAdClicks(targetPage, depth, maxDepth, ctx, instanc
           if (newPage) {
             await newPage.waitForLoadState("domcontentloaded", { timeout: 20000 }).catch(() => {});
             await handleRecursiveAdClicks(newPage, depth + 1, maxDepth, resolvedCtx, instanceId, clickMode);
-            await withTimeout(newPage.close().catch(() => {}), 2500);
+            await withTimeout(newPage.close().catch(() => {}), 2500).catch(() => {});
           } else {
-            await simulateLandingPageEngagement(targetPage, rand(DELAY_MIN_MS, DELAY_MAX_MS));
+            const allPages = resolvedCtx?.pages?.() || [];
+            const extraPage = allPages.find((p) => p !== targetPage && !p.isClosed());
+            if (extraPage) {
+              await extraPage.waitForLoadState("domcontentloaded", { timeout: 20000 }).catch(() => {});
+              await handleRecursiveAdClicks(extraPage, depth + 1, maxDepth, resolvedCtx, instanceId, clickMode);
+              await withTimeout(extraPage.close().catch(() => {}), 2500).catch(() => {});
+            } else {
+              await simulateLandingPageEngagement(targetPage, rand(DELAY_MIN_MS, DELAY_MAX_MS));
+            }
           }
           break;
         } catch {
@@ -2171,20 +2208,25 @@ async function cleanupAllBrowserData(context, page) {
         .catch(() => {});
     }
 
-    if (activePage && context) {
+    if (activePage && !activePage.isClosed() && context) {
       const client = await context.newCDPSession(activePage).catch(() => null);
       if (client) {
-        // 1. Xoá triệt để dữ liệu lưu trữ (LocalStorage, IndexedDB, CacheStorage, ServiceWorkers, v.v.) của mọi domain
-        await client
-          .send("Storage.clearDataForOrigin", { origin: "*", storageTypes: "all" })
-          .catch(async () => {
-            await client.send("Storage.clearDataForStorageKey", { storageKey: "*", storageTypes: "all" }).catch(() => {});
-          });
-        // 2. Xoá sạch toàn bộ cookies của toàn bộ trình duyệt
-        await client.send("Network.clearBrowserCookies").catch(() => {});
-        // 3. Xoá sạch toàn bộ HTTP disk và memory cache của toàn bộ trình duyệt
-        await client.send("Network.clearBrowserCache").catch(() => {});
-        await client.detach().catch(() => {});
+        try {
+          // 1. Xoá triệt để dữ liệu lưu trữ (LocalStorage, IndexedDB, CacheStorage, ServiceWorkers, v.v.) của mọi domain
+          await client
+            .send("Storage.clearDataForOrigin", { origin: "*", storageTypes: "all" })
+            .catch(async () => {
+              await client.send("Storage.clearDataForStorageKey", { storageKey: "*", storageTypes: "all" }).catch(() => {});
+            });
+          // 2. Xoá sạch toàn bộ cookies của toàn bộ trình duyệt
+          await client.send("Network.clearBrowserCookies").catch(() => {});
+          // 3. Xoá sạch toàn bộ HTTP disk và memory cache của toàn bộ trình duyệt
+          await client.send("Network.clearBrowserCache").catch(() => {});
+        } catch {
+          // bỏ qua lỗi protocol
+        } finally {
+          await client.detach().catch(() => {});
+        }
       }
     }
     log("✓ Đã dọn dẹp triệt để 100% cache, cookies và storage của toàn bộ trình duyệt.");
@@ -3384,6 +3426,16 @@ async function runOneCycle(
       proxyManager?.flush();
     }
   } finally {
+    // 0. Đóng tất cả tab popup phụ còn sót lại trước khi dọn dẹp cache hoặc kết thúc chu kỳ
+    try {
+      if (context) {
+        const extraTabs = context.pages().filter((p) => p !== page && !p.isClosed());
+        for (const tab of extraTabs) {
+          await withTimeout(tab.close().catch(() => {}), 1500).catch(() => {});
+        }
+      }
+    } catch {}
+
     // 1. Dọn dẹp triệt để 100% cache, cookies và storage của toàn bộ trình duyệt sau mỗi n chu kỳ
     const shouldCleanBrowserData =
       CLEAR_CACHE_CYCLES > 0 && cycleIndex % CLEAR_CACHE_CYCLES === 0;
@@ -3426,7 +3478,7 @@ async function runOneCycle(
         }
       } catch {}
       if (page && !page.isClosed()) {
-        await withTimeout(page.close().catch(() => {}), 2000);
+        await withTimeout(page.close().catch(() => {}), 2000).catch(() => {});
       }
       // Ngắt kết nối CDP của chu kỳ. Với connectOverCDP, browser.close() CHỈ đóng WebSocket (đã
       // đọc mã Playwright: browserProcess.close = transport.closeAndWait) — Chrome thật vẫn chạy.
@@ -3441,7 +3493,15 @@ async function runOneCycle(
       }
     } else {
       if (context) {
-        await withTimeout(context.close().catch(() => {}), 3500);
+        try {
+          const allTabs = context.pages();
+          for (const tab of allTabs) {
+            if (!tab.isClosed()) {
+              await withTimeout(tab.close().catch(() => {}), 1500).catch(() => {});
+            }
+          }
+        } catch {}
+        await withTimeout(context.close().catch(() => {}), 3500).catch(() => {});
       }
       if (isTempProfile && profileDir) {
         try {

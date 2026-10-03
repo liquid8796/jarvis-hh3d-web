@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.157",
+    date: "2026-10-03",
+    lines: [
+      "Khắc phục sự cố ngắt kết nối trình duyệt khi dọn dẹp bộ nhớ tạm và đóng tab xem quảng cáo.",
+      "Tự động đóng các tab phụ và bảo vệ tiến trình tự động chạy liên tục không bị gián đoạn.",
+    ],
+  },
+  {
     version: "1.3.156",
     date: "2026-10-03",
     lines: [
@@ -461,15 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Phòng chat nổi không còn kéo bạn về tin mới nhất khi đang đọc lại những lời cũ.",
       "Tin mới đến lúc bạn đang ở phía trên sẽ hiện số chưa đọc trên biểu tượng; về cuối mới tính là đã xem.",
-    ],
-  },
-  {
-    version: "1.3.107",
-    date: "2026-09-30",
-    lines: [
-      "Góc phải nay có Trò chuyện, Phòng chat và Thành viên; mọi box mở ngay tại trang đang xem.",
-      "Bạn có thể nhắn riêng, tìm đạo hữu, xem ai online hoặc đang bận và tự chọn trạng thái của mình.",
-      "Trang Hồ Sơ nay cho đổi mật khẩu sau khi xác nhận mật khẩu hiện tại.",
     ],
   },
 ];

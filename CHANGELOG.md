@@ -9,6 +9,18 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.157 — Khắc phục sự cố ngắt kết nối CDP khi dọn dẹp cache và đóng tab (03/10/2026)
+
+- Khắc phục triệt để lỗi ngoại lệ `ProtocolError: Protocol error (Network.setCacheDisabled): Internal server error, session closed`:
+  - Nguyên nhân: Trong động cơ Patchright (`patchright-core`), khi một tab/popup mới được khởi tạo (từ popup Popunder hoặc click đệ quy `a[target="_blank"]`), hàm khởi tạo tự động gọi `this._networkManager.setRequestInterception(true)` bất đồng bộ mà không thể await trong constructor. Khi tab đó hoặc browser context bị đóng lại ở cuối chu kỳ hoặc trong quá trình xoá cache, phiên CDP (session) đóng trước khi lệnh `Network.setCacheDisabled` ngầm hoàn tất, dẫn tới Promise nội bộ của thư viện bị reject với lỗi `session closed`. Khi Node.js v15+ gặp Promise rejection không bắt được, nó kích hoạt `triggerUncaughtException` làm dừng tiến trình auto.
+  - Sửa đổi trong [scripts/adViewer.mjs](scripts/adViewer.mjs):
+    - Đăng ký hàm `isIgnorableProtocolError` nhận diện chính xác các lỗi phiên CDP / socket / target bị đóng ngầm (`session closed`, `target closed`, `Network.setCacheDisabled`, `Network.clearBrowserCache`).
+    - Lắng nghe sự kiện `process.on("unhandledRejection")` và `process.on("uncaughtException")` toàn cục để nuốt an toàn các lỗi session closed nội bộ của Patchright/Playwright, ngăn chặn sập tiến trình auto đột ngột.
+    - Trong `handleRecursiveAdClicks`: Bảo vệ `withTimeout(newPage.close().catch(() => {}), 2500)` và tự động nhận diện, đóng mọi tab phụ rác do click đệ quy mở thêm trong context.
+    - Trong `cleanupAllBrowserData`: Bọc các lệnh gửi CDP qua `client.send` trong cấu trúc `try/catch/finally` và bảo đảm `client.detach().catch(() => {})` luôn được thực hiện an toàn.
+    - Trong khối `finally` của `runOneCycle()`: Tự động đóng tất cả các tab popup phụ còn sót lại trước khi gọi dọn dẹp cache, và đóng toàn bộ tab trước khi gọi `context.close()`.
+  - Cập nhật [scripts/verifyAdViewerHealth.mts](scripts/verifyAdViewerHealth.mts) kiểm chứng việc xử lý ngoại lệ bất đồng bộ và chống sập do protocol error.
+
 ## 1.3.156 — Gỡ bỏ quảng cáo NativeBanner và nâng xác suất click Popunder lên 80% (03/10/2026)
 
 - Gỡ bỏ hoàn toàn loại quảng cáo NativeBanner (4:1) khỏi website:

@@ -69,7 +69,20 @@ const remote = (script: string, quiet = false) => {
   for (let attempt = 1; ; attempt++) {
     const run = spawnSync(
       "ssh",
-      ["-i", SSH_KEY, "-o", "BatchMode=yes", "-o", "ConnectTimeout=25", `${VM_USER}@${VM_HOST}`, "bash -s"],
+      [
+        "-i",
+        SSH_KEY,
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=25",
+        "-o",
+        "ServerAliveInterval=15",
+        "-o",
+        "ServerAliveCountMax=8",
+        `${VM_USER}@${VM_HOST}`,
+        "bash -s",
+      ],
       { input: script, encoding: "utf8", stdio: ["pipe", quiet ? "pipe" : "inherit", "inherit"] },
     );
     if (run.status !== SSH_TRANSPORT_FAILURE || attempt >= SSH_ATTEMPTS) return run;
@@ -223,7 +236,6 @@ try {
       `REL=/opt/jarvis/releases/${sha}-$(date +%H%M%S)`,
       "sudo mkdir -p $REL /opt/jarvis/shared",
       "sudo tar -xzf /tmp/jarvis-app.tar.gz -C $REL",
-      "sudo rm -f /tmp/jarvis-app.tar.gz",
       // .env của release là symlink về shared — env sống lâu hơn mọi release
       "sudo ln -sfn /opt/jarvis/shared/.env $REL/.env",
       "sudo chown -R jarvis:jarvis $REL",
@@ -242,6 +254,7 @@ try {
       `for i in $(seq 1 45); do sleep 2; code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${state.idle}${HEALTH_PATH} || true); [ "$code" = 200 ] && break; done`,
       `echo "cổng ${state.idle}: $(systemctl is-active jarvis-web@${state.idle}) — ${HEALTH_PATH} trả $code"`,
       `[ "$code" = 200 ] || (sudo journalctl -u jarvis-web@${state.idle} -n 30 --no-pager && exit 1)`,
+      "sudo rm -f /tmp/jarvis-app.tar.gz",
     ].join("\n"),
     `Dựng bản mới ở cổng ${state.idle} không xong — bản ${state.versionActive} ở cổng ${state.active} VẪN đang phục vụ, chưa ai bị ảnh hưởng`,
   );

@@ -206,9 +206,12 @@ assert.match(runtime, /IS_EXPLICIT_HEADLESS/, "ad-viewer must parse IS_EXPLICIT_
 assert.match(runtime, /useMyChrome\s*=\s*!extensionPath && wantsMyChrome && !IS_EXPLICIT_HEADLESS/, "ad-viewer must disable useMyChrome in headless mode");
 assert.match(runtime, /wantsHeadless\s*&&\s*\(cycleClickMode === "os-mouse" \|\| cycleClickMode === "ghub" \|\| cycleClickMode === "manual"\)/, "ad-viewer must detect incompatible hardware click modes in headless");
 assert.match(runtime, /cycleClickMode\s*=\s*"cdp"/, "ad-viewer must fallback incompatible click modes to cdp in headless");
+assert.match(runtime, /--disable-features=UserAgentClientHint/, "ad-viewer must disable UserAgentClientHint in headless to prevent HeadlessChrome leak");
+assert.match(runtime, /--enable-unsafe-swiftshader/, "ad-viewer must enable WebGL swiftshader in headless mode");
+assert.match(runtime, /Emulation\.setFocusEmulationEnabled/, "ad-viewer must enable focus emulation via CDP");
 
 console.log(
-  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, and fully supports headless mode without popping up windows.",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, and fully supports headless mode without popping up windows or leaking headless signals.",
 );
 
 

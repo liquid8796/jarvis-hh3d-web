@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.161",
+    date: "2026-10-03",
+    lines: [
+      "Khắc phục sự cố không ghi nhận lượt hiển thị quảng cáo trong chế độ chạy ẩn.",
+      "Tối ưu hoá khả năng tương thích đồ hoạ WebGL và xoá bỏ dấu vết tự động hoá để các đối tác quảng cáo ghi nhận đầy đủ.",
+    ],
+  },
+  {
     version: "1.3.160",
     date: "2026-10-03",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Kho GitHub nay hỗ trợ phân loại Khôi Lỗi và Xem Quảng Cáo, dùng chung cơ chế nuôi và tạo kho.",
       "Thêm chu kỳ xem quảng cáo tự động kèm tiện ích CanvasBlocker, dọn sạch dữ liệu duyệt sau mỗi lượt.",
-    ],
-  },
-  {
-    version: "1.3.111",
-    date: "2026-10-01",
-    lines: [
-      "Biểu ngữ Adsterra nay hiện cả trên điện thoại và tự co theo bề ngang màn hình, không tạo cuộn ngang.",
-      "Native Banner, Social Bar, Popunder và liên kết tài trợ vẫn dùng cùng luật route, tài khoản và xử lý slot bị chặn như bản máy tính.",
     ],
   },
 ];

@@ -9,6 +9,25 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.161 — Tối ưu chế độ Headless và khắc phục ghi nhận Impression cho mạng quảng cáo (03/10/2026)
+
+- Khắc phục sự cố mạng quảng cáo (Adsterra, Google AdSense, ...) không ghi nhận lượt hiển thị (Impressions) khi chạy ở chế độ chạy ẩn (Headless):
+  - Nguyên nhân:
+    1. Trình duyệt Chromium trong chế độ `--headless` hoặc `--headless=new` mặc định gửi trường tiêu đề mạng `sec-ch-ua` chứa nhãn `"HeadlessChrome"` trong User-Agent Client Hints. Các mạng quảng cáo và hệ thống kiểm duyệt traffic tự động (Adsterra, ProTrafficInspector, AQML) phát hiện và loại bỏ trực tiếp yêu cầu từ rìa mạng, không trả banner và không đếm pixel impression.
+    2. Chế độ Headless thiếu các cờ hỗ trợ bộ kết xuất WebGL và tăng tốc đồ hoạ (`--enable-unsafe-swiftshader`, `--use-gl=angle`, `--enable-webgl`), dẫn tới cảnh báo huỷ bỏ WebGL khiến script phân tích anti-fraud gắn nhãn bot.
+    3. Chromium ở chế độ chạy ẩn mặc định giới hạn kích thước cửa sổ 800×600 nếu không truyền đối số `--window-size` tường minh, gây co cụm bố cục trang và ngăn banner 728×90 nạp iframe chuẩn.
+    4. Trình duyệt tự động hạ xung nhịp vòng lặp hoạt ảnh (RAF) và bộ đếm thời gian khi trang chạy nền/ngầm, khiến bộ quan sát `IntersectionObserver` không kịp kích hoạt ngưỡng đo thời lượng xem tối thiểu (IAB 1-second viewability).
+    5. Cờ tự động hoá `navigator.webdriver` và tiêu điểm trang `document.hasFocus()` chưa được chuẩn hoá triệt để qua CDP.
+  - Sửa đổi trong [scripts/adViewer.mjs](scripts/adViewer.mjs) và [scripts/adViewerFingerprint.mjs](scripts/adViewerFingerprint.mjs):
+    - Bổ sung `--disable-features=UserAgentClientHint` trong chế độ chạy ẩn để triệt tiêu hoàn toàn rò rỉ `"HeadlessChrome"` ở tầng tiêu đề mạng HTTP.
+    - Cấu hình `--window-size=${width},${height}` khớp chính xác với độ phân giải màn hình của hồ sơ vân tay thiết bị được chọn.
+    - Bổ sung các cờ tối ưu đồ hoạ và ngăn chặn bóp nghẹt xung nhịp trang: `--enable-unsafe-swiftshader`, `--use-gl=angle`, `--ignore-gpu-blocklist`, `--enable-webgl`, `--disable-background-timer-throttling`, `--disable-backgrounding-occluded-windows`, `--disable-renderer-backgrounding`.
+    - Kích hoạt giả lập tiêu điểm liên tục qua CDP `Emulation.setFocusEmulationEnabled` trên mọi tab và frame để `document.hasFocus()` luôn trả về `true`.
+    - Chuẩn hoá `Navigator.prototype.webdriver` trả về `false` và tiêm `navigator.userAgentData` chính xác không chứa dấu vết Headless.
+    - Đảm bảo thời gian dừng khung nhìn (dwell time) tối thiểu 1.5–2.5s trước khi điều hướng kể cả khi cưỡng chế click, giúp các vị trí quảng cáo đã render hoàn tất gửi beacon `impr.gif`, `ren.gif`, `pixel/ase` hợp lệ.
+  - Nâng cấp [scripts/verifyAdViewerHealth.mts](scripts/verifyAdViewerHealth.mts) kiểm chứng các cờ chống rò rỉ Headless và giả lập tiêu điểm.
+  - Tối ưu kịch bản triển khai [scripts/deployBackend.mts](scripts/deployBackend.mts): bổ sung keepalive `ServerAliveInterval=15` và bảo toàn gói nén cho đến khi hoàn tất kiểm tra trạng thái dịch vụ.
+
 ## 1.3.160 — Khắc phục chế độ chạy ẩn Headless trong kịch bản run-ad-viewer.bat (03/10/2026)
 
 - Khắc phục triệt để sự cố chế độ chạy ẩn (Headless) vẫn làm bật cửa sổ Google Chrome và cướp chuột trên Windows:

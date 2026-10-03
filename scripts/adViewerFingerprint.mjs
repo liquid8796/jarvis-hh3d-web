@@ -648,6 +648,7 @@ export function materializeFingerprint(profile, options = {}) {
       languages,
       webglVendor: webgl.vendor,
       webglRenderer: webgl.renderer,
+      userAgentMetadata,
       extra,
     },
   };
@@ -687,6 +688,10 @@ export function fingerprintInitScript(fp) {
     } catch {}
   };
   const nav = Navigator.prototype;
+  define(nav, "webdriver", false);
+  try {
+    delete navigator.webdriver;
+  } catch {}
   define(nav, "platform", fp.platform);
   define(nav, "vendor", fp.vendor);
   define(nav, "productSub", fp.productSub);
@@ -694,6 +699,22 @@ export function fingerprintInitScript(fp) {
   define(nav, "maxTouchPoints", fp.maxTouchPoints);
   define(nav, "languages", Object.freeze([...fp.languages]));
   define(nav, "language", fp.languages[0]);
+
+  if (fp.family === "chromium" && fp.userAgentMetadata) {
+    try {
+      define(nav, "userAgentData", {
+        brands: fp.userAgentMetadata.brands,
+        mobile: fp.userAgentMetadata.mobile,
+        platform: fp.userAgentMetadata.platform,
+        getHighEntropyValues: () => Promise.resolve(fp.userAgentMetadata),
+        toJSON: () => ({
+          brands: fp.userAgentMetadata.brands,
+          mobile: fp.userAgentMetadata.mobile,
+          platform: fp.userAgentMetadata.platform,
+        }),
+      });
+    } catch {}
+  }
 
   if (fp.deviceMemory) define(nav, "deviceMemory", fp.deviceMemory);
   else {

@@ -2483,6 +2483,7 @@ async function applyFingerprintToPage(context, page, fp, { emulateMobileMetrics 
   await session
     .send("Emulation.setUserAgentOverride", override)
     .catch(() => session.send("Network.setUserAgentOverride", override).catch(() => {}));
+  await session.send("Emulation.setFocusEmulationEnabled", { enabled: true }).catch(() => {});
 
   if (fp.isMobile) {
     if (emulateMobileMetrics) {
@@ -2694,7 +2695,24 @@ async function runOneCycle(
         }
       }
 
-      const launchArgs = isHeadless ? [...args, "--headless=new"] : args;
+      const launchWidth = fp?.screen?.width || (fp?.viewport?.width ? fp.viewport.width : 1920);
+      const launchHeight = fp?.screen?.height || (fp?.viewport?.height ? fp.viewport.height : 1080);
+      const headlessArgs = isHeadless
+        ? [
+            "--headless=new",
+            `--window-size=${launchWidth},${launchHeight}`,
+            "--disable-features=UserAgentClientHint",
+            "--enable-unsafe-swiftshader",
+            "--use-gl=angle",
+            "--ignore-gpu-blocklist",
+            "--enable-webgl",
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
+          ]
+        : [];
+
+      const launchArgs = [...args, ...headlessArgs];
 
       const defaultDesktopUA =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
@@ -2939,10 +2957,14 @@ async function runOneCycle(
 
       // 2. Ẩn hoàn toàn cờ tự động hoá navigator.webdriver
       try {
-        Object.defineProperty(navigator, "webdriver", {
-          get: () => undefined,
+        Object.defineProperty(Navigator.prototype, "webdriver", {
+          get: () => false,
           configurable: true,
+          enumerable: true,
         });
+      } catch {}
+      try {
+        delete navigator.webdriver;
       } catch {}
 
       // 3. Chuẩn hoá đối tượng window.chrome theo đúng chuẩn Chrome desktop thương mại
@@ -3114,8 +3136,8 @@ async function runOneCycle(
       log(`Đang đọc nội dung bài viết và lướt xem trang web trong ${(readingBeforeClickMs / 1000).toFixed(1)}s...`);
       await simulateHumanReading(page, readingBeforeClickMs, instanceId);
     } else {
-      log("[ForceClick] Bỏ qua thời gian đọc bài viết; ưu tiên cưỡng chế click quảng cáo ngay!");
-      await sleep(rand(100, 300));
+      log("[ForceClick] Bỏ qua thời gian đọc bài viết; giữ khung nhìn tối thiểu 1.5s để ghi nhận impression rồi click cưỡng chế!");
+      await sleep(rand(1500, 2500));
     }
 
     // Nhận lượt độc quyền tương tác quảng cáo TRƯỚC khi quét quảng cáo: nếu phải chờ instance khác

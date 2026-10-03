@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.162",
+    date: "2026-10-03",
+    lines: [
+      "Mở khoá khả năng chạy song song 100% không khoá Mutex chuột cho chế độ chạy ẩn (CDP Headless) đa tiến trình.",
+      "Phân lập hoàn toàn toạ độ chuột ảo và tối ưu hoá thời gian khởi động, giúp các phiên duyệt tự do tải trang và tương tác quảng cáo đồng thời.",
+    ],
+  },
+  {
     version: "1.3.161",
     date: "2026-10-03",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Sửa lỗi kho ở mục Xem Quảng Cáo và repo phụ được đưa lên làm kho chính bị chạy nhầm nhiệm vụ tông môn.",
       "Cơ chế thiết lập nay nhận diện chính xác mục đích từng kho, đảm bảo tự động chạy đúng kịch bản xem trang.",
-    ],
-  },
-  {
-    version: "1.3.112",
-    date: "2026-10-02",
-    lines: [
-      "Kho GitHub nay hỗ trợ phân loại Khôi Lỗi và Xem Quảng Cáo, dùng chung cơ chế nuôi và tạo kho.",
-      "Thêm chu kỳ xem quảng cáo tự động kèm tiện ích CanvasBlocker, dọn sạch dữ liệu duyệt sau mỗi lượt.",
     ],
   },
 ];

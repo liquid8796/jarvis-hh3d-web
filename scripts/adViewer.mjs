@@ -572,11 +572,13 @@ function minimizeInstanceWindow(instanceId = logContext.getStore()?.instanceId) 
  * - Nếu chạy nhiều instance: Chỉ instance đang nắm lượt tương tác (turnHolder) mới được phép.
  */
 function canInteractForeground(instanceId = logContext.getStore()?.instanceId) {
+  if (IS_EXPLICIT_HEADLESS) return true;
   if (INSTANCE_COUNT <= 1) return true;
   return turnHolder === instanceId;
 }
 
 async function acquireCycleTurn(instanceId, { quiet = false } = {}) {
+  if (IS_EXPLICIT_HEADLESS) return true;
   if (cycleTurns.has(instanceId)) return false;
   if (mouseMutex.isLocked && !quiet) {
     const holderDesc = turnHolder !== null ? `#${turnHolder}` : "khác";
@@ -592,6 +594,7 @@ async function acquireCycleTurn(instanceId, { quiet = false } = {}) {
 }
 
 function releaseCycleTurn(instanceId, { quiet = false } = {}) {
+  if (IS_EXPLICIT_HEADLESS) return;
   const unlock = cycleTurns.get(instanceId);
   if (!unlock) return;
   cycleTurns.delete(instanceId);
@@ -608,7 +611,7 @@ function releaseCycleTurn(instanceId, { quiet = false } = {}) {
  * làm cú click rơi sang cửa sổ khác.
  */
 async function withForegroundSlot(instanceId, enabled, fn) {
-  if (!enabled || cycleTurns.has(instanceId)) return fn();
+  if (IS_EXPLICIT_HEADLESS || !enabled || cycleTurns.has(instanceId)) return fn();
   await acquireCycleTurn(instanceId, { quiet: true });
   try {
     return await fn();
@@ -623,6 +626,7 @@ async function withForegroundSlot(instanceId, enabled, fn) {
  * AsyncLocalStorage không chắc còn mang ngữ cảnh của instance.
  */
 function foregroundOwnedByOther(instanceId = logContext.getStore()?.instanceId) {
+  if (IS_EXPLICIT_HEADLESS) return false;
   if (INSTANCE_COUNT <= 1 || turnHolder === null) return false;
   return turnHolder !== instanceId;
 }
@@ -1287,9 +1291,21 @@ class ProxyManager {
 //  Hai chế độ: "cdp" (Input.dispatchMouseEvent) và "mouse" (page.mouse API).
 // ============================================================
 
-/** Vị trí chuột ảo hiện tại — dùng để bắt đầu đường cong Bézier liên tục giữa các thao tác. */
-let lastMouseX = 300;
-let lastMouseY = 250;
+/** Vị trí chuột ảo theo từng instance — dùng để bắt đầu đường cong Bézier liên tục giữa các thao tác song song. */
+const instanceMousePositions = new Map();
+
+function getMousePos(instanceId = logContext.getStore()?.instanceId ?? 0) {
+  let pos = instanceMousePositions.get(instanceId);
+  if (!pos) {
+    pos = { x: 300, y: 250 };
+    instanceMousePositions.set(instanceId, pos);
+  }
+  return pos;
+}
+
+function setMousePos(instanceId = logContext.getStore()?.instanceId ?? 0, x, y) {
+  instanceMousePositions.set(instanceId, { x, y });
+}
 
 /** Nội suy một điểm trên đường Cubic Bézier. */
 function cubicBezier(t, p0, p1, p2, p3) {
@@ -1407,10 +1423,11 @@ async function organicScroll(page, totalDistance, instanceId = logContext.getSto
  * Chuỗi sự kiện: mouseMoved×N → dwell → mousePressed → hold → mouseReleased.
  * Sự kiện do CDP phát có isTrusted = true trong Chrome renderer.
  */
-async function humanClickCdp(page, ctx, targetX, targetY) {
+async function humanClickCdp(page, ctx, targetX, targetY, instanceId = logContext.getStore()?.instanceId ?? 0) {
   const client = await ctx.newCDPSession(page);
   try {
-    const movePath = generateBezierPath(lastMouseX, lastMouseY, targetX, targetY);
+    const mousePos = getMousePos(instanceId);
+    const movePath = generateBezierPath(mousePos.x, mousePos.y, targetX, targetY);
     for (const pt of movePath) {
       await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: pt.x, y: pt.y });
       await sleep(rand(8, 22));
@@ -1427,8 +1444,7 @@ async function humanClickCdp(page, ctx, targetX, targetY) {
     await client.send("Input.dispatchMouseEvent", {
       type: "mouseReleased", button: "left", clickCount: 1, x: targetX, y: targetY,
     });
-    lastMouseX = targetX;
-    lastMouseY = targetY;
+    setMousePos(instanceId, targetX, targetY);
   } finally {
     await client.detach().catch(() => {});
   }
@@ -1437,8 +1453,9 @@ async function humanClickCdp(page, ctx, targetX, targetY) {
 /**
  * Di chuột dọc đường Bézier và click bằng Playwright page.mouse API.
  */
-async function humanClickMouse(page, targetX, targetY) {
-  const movePath = generateBezierPath(lastMouseX, lastMouseY, targetX, targetY);
+async function humanClickMouse(page, targetX, targetY, instanceId = logContext.getStore()?.instanceId ?? 0) {
+  const mousePos = getMousePos(instanceId);
+  const movePath = generateBezierPath(mousePos.x, mousePos.y, targetX, targetY);
   for (const pt of movePath) {
     await page.mouse.move(pt.x, pt.y);
     await sleep(rand(8, 22));
@@ -1447,8 +1464,7 @@ async function humanClickMouse(page, targetX, targetY) {
   await page.mouse.down({ button: "left" });
   await sleep(rand(70, 160));
   await page.mouse.up({ button: "left" });
-  lastMouseX = targetX;
-  lastMouseY = targetY;
+  setMousePos(instanceId, targetX, targetY);
 }
 
 /**
@@ -1497,12 +1513,11 @@ async function humanClickOs(page, ctx, targetX, targetY, instanceId = 0) {
     const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${desktopX} -targetY ${desktopY} -steps 25 -hoverMs ${hoverMs} -click 1${instArg}`;
     execSync(cmd, { stdio: "ignore", timeout: Math.max(25000, hoverMs + 15000) });
 
-    lastMouseX = safeTargetX;
-    lastMouseY = safeTargetY;
+    setMousePos(instanceId, safeTargetX, safeTargetY);
     log("[OS-Mouse] ✓ Thao tác rê chuột phần cứng & click Windows hoàn tất (MOUSEEVENTF_MOVE stream).");
   } catch (err) {
     log(`[OS-Mouse] ⚠ Lỗi khi điều khiển chuột Windows (${err.message}); dùng fallback CDP click.`);
-    return humanClickCdp(page, ctx, targetX, targetY);
+    return humanClickCdp(page, ctx, targetX, targetY, instanceId);
   }
 }
 
@@ -1609,7 +1624,9 @@ async function humanClickGhub(page, ctx, targetX, targetY, instanceId = 0) {
 
 /** Dispatcher thống nhất — chọn engine theo CLICK_MODE. */
 async function humanClick(page, ctx, x, y, instanceId = 0, clickMode = CLICK_MODE) {
-  await page.bringToFront().catch(() => {});
+  if (!IS_EXPLICIT_HEADLESS) {
+    await page.bringToFront().catch(() => {});
+  }
   if (clickMode === "ghub") {
     return humanClickGhub(page, ctx, x, y, instanceId);
   }
@@ -1617,9 +1634,9 @@ async function humanClick(page, ctx, x, y, instanceId = 0, clickMode = CLICK_MOD
     return humanClickOs(page, ctx, x, y, instanceId);
   }
   if (clickMode === "cdp") {
-    return humanClickCdp(page, ctx, x, y);
+    return humanClickCdp(page, ctx, x, y, instanceId);
   }
-  return humanClickMouse(page, x, y);
+  return humanClickMouse(page, x, y, instanceId);
 }
 
 /**
@@ -1627,7 +1644,9 @@ async function humanClick(page, ctx, x, y, instanceId = 0, clickMode = CLICK_MOD
  * dừng lại như đang nhìn, rồi từ từ rê vào vị trí đích.
  */
 async function preClickEngagement(page, ctx, targetX, targetY, instanceId = 0, clickMode = CLICK_MODE) {
-  await page.bringToFront().catch(() => {});
+  if (!IS_EXPLICIT_HEADLESS) {
+    await page.bringToFront().catch(() => {});
+  }
   if ((clickMode === "os-mouse" || clickMode === "ghub") && process.platform === "win32") {
     try {
       const nearX = targetX + rand(-60, 60);
@@ -1659,8 +1678,7 @@ async function preClickEngagement(page, ctx, targetX, targetY, instanceId = 0, c
           { stdio: "ignore", timeout: Math.max(15000, nearHoverMs + 8000) }
         );
       }
-      lastMouseX = safeNearX;
-      lastMouseY = safeNearY;
+      setMousePos(instanceId, safeNearX, safeNearY);
       await sleep(Math.min(2500, Math.max(800, resolveHoverMs())));
       return;
     } catch {}
@@ -1669,7 +1687,8 @@ async function preClickEngagement(page, ctx, targetX, targetY, instanceId = 0, c
   // 1. Di chuyển đến vùng lân cận trước (lệch 35-70px) như ánh mắt vừa lướt qua
   const nearX = targetX + rand(-70, 70);
   const nearY = targetY + rand(-50, 50);
-  const approachPath = generateBezierPath(lastMouseX, lastMouseY, nearX, nearY, rand(12, 22));
+  const mousePos1 = getMousePos(instanceId);
+  const approachPath = generateBezierPath(mousePos1.x, mousePos1.y, nearX, nearY, rand(12, 22));
   if (clickMode === "cdp") {
     const client = await ctx.newCDPSession(page);
     for (const pt of approachPath) {
@@ -1683,14 +1702,14 @@ async function preClickEngagement(page, ctx, targetX, targetY, instanceId = 0, c
       await sleep(rand(12, 28));
     }
   }
-  lastMouseX = nearX;
-  lastMouseY = nearY;
+  setMousePos(instanceId, nearX, nearY);
 
   // 2. Dừng lại như đang đọc tiêu đề quảng cáo và quyết định bấm (áp dụng thời gian hover cấu hình)
   await sleep(resolveHoverMs());
 
   // 3. Rê chuột nhẹ nhàng từ vị trí lân cận vào đúng vị trí click đích
-  const finalGlide = generateBezierPath(lastMouseX, lastMouseY, targetX, targetY, rand(8, 14));
+  const mousePos2 = getMousePos(instanceId);
+  const finalGlide = generateBezierPath(mousePos2.x, mousePos2.y, targetX, targetY, rand(8, 14));
   if (clickMode === "cdp") {
     const client = await ctx.newCDPSession(page);
     for (const pt of finalGlide) {
@@ -1704,8 +1723,7 @@ async function preClickEngagement(page, ctx, targetX, targetY, instanceId = 0, c
       await sleep(rand(10, 22));
     }
   }
-  lastMouseX = targetX;
-  lastMouseY = targetY;
+  setMousePos(instanceId, targetX, targetY);
   await sleep(rand(150, 450));
 }
 
@@ -1758,17 +1776,15 @@ async function resolvePopunderTarget(page) {
  * cửa sổ trước khi click.
  */
 async function performEngageAndClick(page, ctx, targetX, targetY, instanceId = 0, clickMode = CLICK_MODE) {
-  if (isPhysicalClickMode(clickMode) || INSTANCE_COUNT > 1) {
+  if (!IS_EXPLICIT_HEADLESS && (isPhysicalClickMode(clickMode) || INSTANCE_COUNT > 1)) {
     await acquireCycleTurn(instanceId);
-    if (!IS_EXPLICIT_HEADLESS) {
-      if (instanceId > 0) {
-        await tagInstancePage(page, instanceId);
-      }
-      await page.bringToFront().catch(() => {});
-      await maximizeAndFocusWindow(ctx, page, instanceId);
-      if (process.platform === "win32") {
-        focusInstanceWindow(instanceId);
-      }
+    if (instanceId > 0) {
+      await tagInstancePage(page, instanceId);
+    }
+    await page.bringToFront().catch(() => {});
+    await maximizeAndFocusWindow(ctx, page, instanceId);
+    if (process.platform === "win32") {
+      focusInstanceWindow(instanceId);
     }
   }
   await preClickEngagement(page, ctx, targetX, targetY, instanceId, clickMode);
@@ -1796,16 +1812,16 @@ async function simulateHumanReading(page, durationMs, instanceId = logContext.ge
 
     if (canMoveMouse) {
       // Rê chuột vi mô theo dòng đọc (drift)
-      const driftX = Math.max(100, Math.min(1200, lastMouseX + rand(-150, 150)));
-      const driftY = Math.max(80, Math.min(700, lastMouseY + rand(-80, 80)));
-      const path = generateBezierPath(lastMouseX, lastMouseY, driftX, driftY, rand(6, 10));
+      const mousePos = getMousePos(instanceId);
+      const driftX = Math.max(100, Math.min(1200, mousePos.x + rand(-150, 150)));
+      const driftY = Math.max(80, Math.min(700, mousePos.y + rand(-80, 80)));
+      const path = generateBezierPath(mousePos.x, mousePos.y, driftX, driftY, rand(6, 10));
       for (const pt of path) {
         if (Date.now() - started >= durationMs) break;
         await page.mouse.move(pt.x, pt.y).catch(() => {});
         await sleep(rand(10, 20));
       }
-      lastMouseX = driftX;
-      lastMouseY = driftY;
+      setMousePos(instanceId, driftX, driftY);
     }
 
     // Dừng đọc đoạn văn bản (không vượt quá thời gian còn lại)
@@ -1832,7 +1848,7 @@ async function simulateHumanReading(page, durationMs, instanceId = logContext.ge
  * - Rê chuột lên các phần tử nội dung, nút bấm, tiêu đề.
  * - Dừng đọc từ 20 đến 45 giây (ngăn chặn triệt để gắn cờ Bot Bounce / Accidental Click).
  */
-async function simulateLandingPageEngagement(page, durationMs) {
+async function simulateLandingPageEngagement(page, durationMs, instanceId = logContext.getStore()?.instanceId) {
   if (!page || durationMs <= 0) return;
   const started = Date.now();
   log(`  Đang trải nghiệm nội dung trang đích tự nhiên trong ${Math.round(durationMs / 1000)}s...`);
@@ -1844,27 +1860,27 @@ async function simulateLandingPageEngagement(page, durationMs) {
 
     // Cuộn xuống nhịp 150 - 350px
     const scrollStep = rand(150, 350);
-    await organicScroll(page, scrollStep);
+    await organicScroll(page, scrollStep, instanceId);
     scrolledDown += scrollStep;
     await sleep(rand(1000, 2500));
 
     // Rê chuột tự nhiên trên trang đích
+    const mousePos = getMousePos(instanceId);
     const targetX = rand(200, 1000);
     const targetY = rand(150, 650);
-    const movePath = generateBezierPath(lastMouseX, lastMouseY, targetX, targetY, rand(10, 18));
+    const movePath = generateBezierPath(mousePos.x, mousePos.y, targetX, targetY, rand(10, 18));
     for (const pt of movePath) {
       await page.mouse.move(pt.x, pt.y).catch(() => {});
       await sleep(rand(12, 26));
     }
-    lastMouseX = targetX;
-    lastMouseY = targetY;
+    setMousePos(instanceId, targetX, targetY);
 
     // Dừng đọc
     await sleep(rand(1500, 3500));
 
     // Nếu đã cuộn sâu (> 800px), thỉnh thoảng cuộn nhẹ lên 80-160px để xem lại
     if (scrolledDown > 800 && Math.random() < 0.35) {
-      await organicScroll(page, -rand(80, 160));
+      await organicScroll(page, -rand(80, 160), instanceId);
       await sleep(rand(800, 1800));
     }
   }
@@ -2767,9 +2783,9 @@ async function runOneCycle(
 
       const channel = useMyChrome ? "chrome" : "chromium";
 
-      // Mở cửa sổ Chrome mới sẽ cướp foreground: khi nhiều instance, chỉ mở lúc
-      // không instance nào đang trong lượt chuột.
-      const guardLaunch = INSTANCE_COUNT > 1;
+      // Mở cửa sổ Chrome mới sẽ cướp foreground: khi nhiều instance và không phải headless,
+      // chỉ mở lúc không instance nào đang trong lượt chuột.
+      const guardLaunch = INSTANCE_COUNT > 1 && !isHeadless;
       await withForegroundSlot(instanceId, guardLaunch, async () => {
         try {
           context = await chromium.launchPersistentContext(profileDir, {
@@ -3140,18 +3156,17 @@ async function runOneCycle(
       await sleep(rand(1500, 2500));
     }
 
-    // Nhận lượt độc quyền tương tác quảng cáo TRƯỚC khi quét quảng cáo: nếu phải chờ instance khác
-    // xong chu kỳ, toạ độ và iframe banner quét từ trước có thể đã đổi — quét sau khi nhận lượt thì luôn mới.
+    // Nhận lượt độc quyền tương tác quảng cáo TRƯỚC khi quét quảng cáo: chỉ cần thiết khi có GUI/chuột vật lý.
+    // Trong Headless mode, các instance tương tác qua CDP độc lập hoàn toàn, không cần khoá lượt.
     // Lượt được giữ tới cuối chu kỳ và nhả trong khối finally bên dưới.
-    if (isPhysicalClickMode(cycleClickMode) || INSTANCE_COUNT > 1) {
+    const needsCycleLock = !isHeadless && (isPhysicalClickMode(cycleClickMode) || INSTANCE_COUNT > 1);
+    if (needsCycleLock) {
       await acquireCycleTurn(instanceId);
-      if (!isHeadless) {
-        await tagInstancePage(page, instanceId);
-        await page.bringToFront().catch(() => {});
-        await maximizeAndFocusWindow(context, page, instanceId);
-        if (process.platform === "win32") {
-          focusInstanceWindow(instanceId);
-        }
+      await tagInstancePage(page, instanceId);
+      await page.bringToFront().catch(() => {});
+      await maximizeAndFocusWindow(context, page, instanceId);
+      if (process.platform === "win32") {
+        focusInstanceWindow(instanceId);
       }
     }
 
@@ -3633,7 +3648,13 @@ async function main() {
     log("Vân tay thiết bị: tắt (--no-fingerprint) — dùng UA Chrome Windows cố định.");
   }
 
-  log(`Số lượng instance: ${INSTANCE_COUNT}${INSTANCE_COUNT > 1 ? " (Chế độ chạy song song đa instance)" : " (Chế độ đơn lẻ)"}`);
+  log(
+    `Số lượng instance: ${INSTANCE_COUNT}${
+      INSTANCE_COUNT > 1
+        ? ` (Chế độ chạy song song đa instance${IS_EXPLICIT_HEADLESS ? " — Chạy ngầm 100% không khoá Mutex" : ""})`
+        : " (Chế độ đơn lẻ)"
+    }`
+  );
   log(`Xác suất ưu tiên click Popunder: ${Math.round(POPUNDER_RATIO * 100)}% (tự nhiên hóa hành vi tương tác web)`);
 
   const proxyManager = new ProxyManager();
@@ -3644,7 +3665,13 @@ async function main() {
   if (INSTANCE_COUNT === 1) {
     await runInstanceLoop(1, proxyManager, extPath, startTime);
   } else {
-    log(`Khởi chạy đồng thời ${INSTANCE_COUNT} instance (Mỗi instance độc lập profile, proxy, fingerprint và điều phối mutex chuột)...`);
+    log(
+      `Khởi chạy đồng thời ${INSTANCE_COUNT} instance (${
+        IS_EXPLICIT_HEADLESS
+          ? "Mỗi instance độc lập profile, proxy, fingerprint và chạy song song 100% không khoá Mutex chuột"
+          : "Mỗi instance độc lập profile, proxy, fingerprint và điều phối mutex chuột"
+      })...`
+    );
     const instancePromises = [];
     for (let id = 1; id <= INSTANCE_COUNT; id++) {
       instancePromises.push(runInstanceLoop(id, proxyManager, extPath, startTime));
@@ -3665,7 +3692,8 @@ async function main() {
 async function runInstanceLoop(instanceId, proxyManager, extPath, startTime) {
   return logContext.run({ instanceId }, async () => {
     if (instanceId > 1) {
-      const staggerDelayMs = (instanceId - 1) * 8000;
+      const staggerStep = IS_EXPLICIT_HEADLESS ? 3000 : 8000;
+      const staggerDelayMs = (instanceId - 1) * staggerStep;
       log(`Khởi động so le (Staggered start): Chờ ${staggerDelayMs / 1000}s trước khi mở instance #${instanceId}...`);
       await sleep(staggerDelayMs);
     }

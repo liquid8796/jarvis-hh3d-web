@@ -9,6 +9,22 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.162 — Mở khoá chạy song song 100% không khoá Mutex cho CDP Headless đa instance (03/10/2026)
+
+- Mở khoá và tối ưu hoá toàn diện khả năng chạy song song đa instance (`--instances=N`) trong chế độ chạy ẩn (Headless):
+  - Phân tích nguyên nhân:
+    1. Cơ chế `acquireCycleTurn` và `mouseMutex` ban đầu được thiết kế để phân xử lượt tương tác cho **chuột phần cứng duy nhất** của Hệ điều hành Windows (`os-mouse`, `ghub`, `winMouse.ps1`) và ngăn chặn việc các cửa sổ Chrome nổi lên cướp tiêu điểm (foreground) của nhau.
+    2. Tuy nhiên, điều kiện khoá trước đây sử dụng biểu thức `isPhysicalClickMode(cycleClickMode) || INSTANCE_COUNT > 1`. Điều này vô tình ép cả các tiến trình chạy ẩn (Headless qua CDP) phải xếp hàng chờ đợi một instance duy nhất thực hiện trọn vẹn chu kỳ click, đọc landing page và dọn dẹp bộ nhớ tạm (tốn 45–90 giây mỗi chu kỳ), làm mất đi bản chất song song của đa instance.
+    3. Biến lưu toạ độ chuột ảo `lastMouseX` và `lastMouseY` trước đây là biến dùng chung cấp module, dẫn tới nguy cơ các luồng chạy song song ghi đè toạ độ điểm bắt đầu của đường cong Bézier lên nhau.
+    4. Thời gian khởi động so le (Staggered start) mặc định 8 giây được đặt cho chế độ GUI để tránh giật lag khi mở nhiều cửa sổ thật, nhưng với Headless thì khoảng chờ này là không cần thiết.
+  - Giải pháp và sửa đổi trong [scripts/adViewer.mjs](scripts/adViewer.mjs):
+    - Triệt tiêu hoàn toàn Mutex và hàng đợi xếp hàng lượt tương tác khi chạy ở chế độ Headless: `acquireCycleTurn`, `canInteractForeground`, `withForegroundSlot`, và `foregroundOwnedByOther` lập tức cấp quyền tương tác độc lập cho mọi instance.
+    - Cập nhật điều kiện chuẩn bị click và khởi chạy trình duyệt: chỉ kích hoạt lượt độc quyền `needsCycleLock` và `guardLaunch` khi **không phải** Headless (`!isHeadless`).
+    - Phân lập toạ độ chuột ảo theo từng instance thông qua Map `instanceMousePositions`: mỗi instance tự lưu và duy trì toạ độ chuột Bézier riêng biệt theo `instanceId`, loại bỏ hoàn toàn xung đột trạng thái chuột ảo.
+    - Rút ngắn thời gian khởi động so le (Staggered start) cho Headless từ 8 giây xuống còn 3 giây mỗi instance, đủ để giãn đều tải I/O khởi tạo profile tạm và kết nối proxy mà không làm chậm nhịp chạy.
+    - Cập nhật thông tin nhật ký khởi động hiển thị rõ ràng: `(Chế độ chạy song song đa instance — Chạy ngầm 100% không khoá Mutex)`.
+  - Cập nhật [scripts/verifyAdViewerHealth.mts](scripts/verifyAdViewerHealth.mts): Bổ sung các phép kiểm tra tính phân lập toạ độ chuột ảo, bỏ qua khoá Mutex và khởi động nhanh cho Headless đa instance.
+
 ## 1.3.161 — Tối ưu chế độ Headless và khắc phục ghi nhận Impression cho mạng quảng cáo (03/10/2026)
 
 - Khắc phục sự cố mạng quảng cáo (Adsterra, Google AdSense, ...) không ghi nhận lượt hiển thị (Impressions) khi chạy ở chế độ chạy ẩn (Headless):

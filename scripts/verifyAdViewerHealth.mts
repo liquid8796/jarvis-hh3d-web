@@ -210,8 +210,15 @@ assert.match(runtime, /--disable-features=UserAgentClientHint/, "ad-viewer must 
 assert.match(runtime, /--enable-unsafe-swiftshader/, "ad-viewer must enable WebGL swiftshader in headless mode");
 assert.match(runtime, /Emulation\.setFocusEmulationEnabled/, "ad-viewer must enable focus emulation via CDP");
 
+// ---- Tối ưu chạy song song Headless đa instance (Không khóa Mutex chuột) ----
+assert.match(runtime, /instanceMousePositions\s*=\s*new Map\(\)/, "ad-viewer must isolate virtual mouse coordinates per instance");
+assert.match(runtime, /if\s*\(IS_EXPLICIT_HEADLESS\)\s*return true;/, "ad-viewer must grant foreground interaction immediately in headless");
+assert.match(runtime, /const guardLaunch = INSTANCE_COUNT > 1 && !isHeadless;/, "ad-viewer must not block launch with foreground slot in headless");
+assert.match(runtime, /const needsCycleLock = !isHeadless && \(isPhysicalClickMode\(cycleClickMode\) \|\| INSTANCE_COUNT > 1\);/, "ad-viewer must not serialize cycle turns across headless instances");
+assert.match(runtime, /IS_EXPLICIT_HEADLESS \? 3000 : 8000/, "ad-viewer must shorten staggered start delay in headless mode");
+
 console.log(
-  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, and fully supports headless mode without popping up windows or leaking headless signals.",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, fully supports headless mode without popping up windows or leaking headless signals, and enables 100% lock-free parallel execution across multi-instance headless workers.",
 );
 
 

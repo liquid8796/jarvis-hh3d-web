@@ -80,13 +80,24 @@ const AD_READY_TIMEOUT_MS = Math.max(
   5000,
   Number(process.env.AD_VIEWER_AD_READY_TIMEOUT_MS ?? 15_000) || 15_000,
 );
-const rawPageTimeout = process.argv.find((a) => a.startsWith("--page-timeout="))?.split("=")[1];
-const parsedPageTimeout = Number(rawPageTimeout || process.env.AD_VIEWER_PAGE_TIMEOUT_MS || 25_000);
+function getCliArg(flag) {
+  const withEq = process.argv.find((a) => a.startsWith(`${flag}=`));
+  if (withEq) return withEq.slice(flag.length + 1).trim();
+  const idx = process.argv.indexOf(flag);
+  if (idx !== -1 && idx + 1 < process.argv.length && !process.argv[idx + 1].startsWith("--")) {
+    return process.argv[idx + 1].trim();
+  }
+  return "";
+}
+
+const rawPageTimeout = getCliArg("--page-timeout");
+const defaultPageTimeout = process.argv.some((a) => a.includes("proxy")) || process.env.AD_VIEWER_PROXY ? 35_000 : 25_000;
+const parsedPageTimeout = Number(rawPageTimeout || process.env.AD_VIEWER_PAGE_TIMEOUT_MS || defaultPageTimeout);
 const PAGE_GOTO_TIMEOUT_MS = Math.max(
   10_000,
-  Number.isNaN(parsedPageTimeout) ? 25_000 : parsedPageTimeout,
+  Number.isNaN(parsedPageTimeout) ? defaultPageTimeout : parsedPageTimeout,
 );
-const rawReadingTimeout = process.argv.find((a) => a.startsWith("--reading-timeout="))?.split("=")[1];
+const rawReadingTimeout = getCliArg("--reading-timeout");
 const parsedReadingTimeout = Number(rawReadingTimeout || process.env.AD_VIEWER_READING_TIMEOUT_MS || 3_000);
 const MAX_READING_BEFORE_CLICK_MS = Math.max(
   1_000,
@@ -148,19 +159,19 @@ const USE_CANVAS_BLOCKER =
   process.env.AD_VIEWER_CANVAS_BLOCKER === "1";
 
 const PROXY_FILE = (
-  process.argv.find((a) => a.startsWith("--proxy-file="))?.split("=")[1] ||
+  getCliArg("--proxy-file") ||
   process.env.AD_VIEWER_PROXY_FILE ||
   ""
 ).trim();
 
 const DIRECT_PROXY = (
-  process.argv.find((a) => a.startsWith("--proxy="))?.split("=")[1] ||
+  getCliArg("--proxy") ||
   process.env.AD_VIEWER_PROXY ||
   ""
 ).trim();
 
 const ROTATE_URL = (
-  process.argv.find((a) => a.startsWith("--rotate-url="))?.split("=")[1] ||
+  getCliArg("--rotate-url") ||
   process.env.AD_VIEWER_ROTATE_URL ||
   ""
 ).trim();
@@ -475,17 +486,19 @@ class ProxyManager {
   }
 
   /**
-   * Kiểm tra khả năng kết nối tới proxy trong 2.5 giây.
-   * Thử nghiệm HTTP CONNECT tunnel để phát hiện proxy sống thật và tự động loại bỏ proxy đòi hỏi mật khẩu (407) hoặc lỗi (400/403/502).
+   * Kiểm tra khả năng kết nối tới proxy qua HTTP CONNECT tunnel.
+   * Hỗ trợ xác thực Proxy Basic Auth và bảo đảm không loại bỏ nhầm proxy quốc tế có độ trễ cao.
    */
-  async probe(proxy, timeoutMs = 2500) {
+  async probe(proxy, timeoutMs = 6000) {
     if (!proxy || !proxy.host || !proxy.port) return false;
     return new Promise((resolve) => {
       let settled = false;
       let socket = null;
+      let timer = null;
       const done = (val) => {
         if (!settled) {
           settled = true;
+          if (timer) clearTimeout(timer);
           if (socket) {
             try { socket.destroy(); } catch {}
           }
@@ -493,14 +506,16 @@ class ProxyManager {
         }
       };
 
+      timer = setTimeout(() => done(false), timeoutMs);
+      if (typeof timer.unref === "function") timer.unref();
+
       try {
         socket = net.createConnection({
           host: proxy.host,
           port: Number(proxy.port),
-          timeout: timeoutMs,
         });
       } catch {
-        return resolve(false);
+        return done(false);
       }
 
       socket.on("connect", () => {
@@ -658,7 +673,7 @@ class ProxyManager {
    * Ngay khi có bất kỳ proxy nào phản hồi thành công (HTTP 200), lập tức trả về proxy đó.
    * Các kết nối còn lại tiếp tục chạy nền và tự động bị đánh dấu chết nếu thất bại/timeout.
    */
-  async probeBatch(candidates, timeoutMs = 2500) {
+  async probeBatch(candidates, timeoutMs = 4000) {
     if (!candidates || candidates.length === 0) return null;
     return new Promise((resolve) => {
       let resolved = false;
@@ -769,7 +784,7 @@ class ProxyManager {
     const total = this.proxyList.length;
     if (total === 1) {
       const single = this.proxyList[0];
-      const isAlive = await this.probe(single, 2500);
+      const isAlive = await this.probe(single, 6000);
       if (!isAlive) {
         log(`[ProxyManager] ⚠ Proxy duy nhất (${single.server}) không phản hồi kết nối.`);
         this.markDead(single);
@@ -813,7 +828,7 @@ class ProxyManager {
       const displayTo = checkedSoFar;
       log(`[ProxyManager] Đang kiểm tra đồng thời lô ${b + 1}/${batchesCount} (${currentBatch.length} proxy, vị trí #${displayFrom} - #${displayTo})...`);
 
-      const alive = await this.probeBatch(currentBatch, 2500);
+      const alive = await this.probeBatch(currentBatch, 4000);
       if (alive) {
         alive.geo = await this.resolveGeo(alive);
         const aliveIdx = this.proxyList.findIndex((p) => p.host === alive.host && p.port === alive.port);
@@ -1832,6 +1847,21 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
         }
         browser = await chromium.connectOverCDP(cdpUrl);
         context = browser.contexts()[0] || (await browser.newContext());
+        if (currentProxy?.username && currentProxy?.password) {
+          for (const ctx of browser.contexts()) {
+            await ctx.setHTTPCredentials({
+              username: currentProxy.username,
+              password: currentProxy.password,
+            }).catch(() => {});
+          }
+          browser.on("context", async (newCtx) => {
+            await newCtx.setHTTPCredentials({
+              username: currentProxy.username,
+              password: currentProxy.password,
+            }).catch(() => {});
+          });
+          log(`[Proxy] ✓ Đã cấu hình xác thực Proxy cho CDP Context (${currentProxy.username}).`);
+        }
         log(`✓ Đã kết nối thành công tới Chrome ${useMyChrome ? "chính (đầy đủ extension) " : ""}qua CDP.`);
       } catch (err) {
         log(`✗ Không thể kết nối tới Chrome tại ${cdpUrl}: ${err.message}`);
@@ -1923,6 +1953,12 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
         }
         context = await chromium.launchPersistentContext(profileDir, launchOptions);
       }
+      if (context && currentProxy?.username && currentProxy?.password) {
+        await context.setHTTPCredentials({
+          username: currentProxy.username,
+          password: currentProxy.password,
+        }).catch(() => {});
+      }
     }
 
     page = useMyChrome || cdpUrl ? await context.newPage() : context.pages()[0] || (await context.newPage());
@@ -1930,30 +1966,10 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
     // Dọn dẹp triệt để toàn bộ cache và cookies trước khi bắt đầu chu kỳ mới
     await cleanupAllBrowserData(context, page).catch(() => {});
 
-    // Cài đặt Anti-Detect overrides và xác thực Proxy qua CDP
+    // Cài đặt Anti-Detect overrides qua CDP
     try {
       const cdpClient = await context.newCDPSession(page).catch(() => null);
       if (cdpClient) {
-        if (currentProxy?.username && currentProxy?.password) {
-          await cdpClient.send("Fetch.enable", { handleAuthRequests: true }).catch(() => {});
-          cdpClient.on("Fetch.authRequired", async (event) => {
-            if (event.authChallenge?.source === "Proxy") {
-              await cdpClient.send("Fetch.continueWithAuth", {
-                requestId: event.requestId,
-                authChallengeResponse: {
-                  response: "ProvideCredentials",
-                  username: currentProxy.username,
-                  password: currentProxy.password,
-                },
-              }).catch(() => {});
-            } else {
-              await cdpClient.send("Fetch.continueWithAuth", {
-                requestId: event.requestId,
-                authChallengeResponse: { response: "Default" },
-              }).catch(() => {});
-            }
-          });
-        }
 
         if (currentProxy?.geo) {
           if (currentProxy.geo.timezoneId) {
@@ -2146,24 +2162,28 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
       }
     }
 
-    // 2. Banner ad creative trong iframe 728x90 (nếu ready)
-    if (diagnostic.banner.status === "ready" && diagnostic.bannerIframeFound) {
-      try {
-        const iframeHandle = await diagnostic.bannerIframe.elementHandle().catch(() => null);
+    // 2. Banner ad creative trong các iframe quảng cáo (728x90, 468x60, 320x50, 300x250, 160x600, 160x300)
+    try {
+      const bannerIframes = page.locator(
+        '.adsterra-banner[data-status="ready"] iframe, .adsterra-leaderboard[data-status="ready"] iframe, .adsterra-unit iframe',
+      );
+      const iframeCount = await bannerIframes.count().catch(() => 0);
+      for (let f = 0; f < iframeCount; f++) {
+        const iframeHandle = await bannerIframes.nth(f).elementHandle().catch(() => null);
         const frame = iframeHandle ? await iframeHandle.contentFrame().catch(() => null) : null;
         if (frame) {
           const bannerLinks = frame.locator("a[href]");
           const bannerCount = await bannerLinks.count().catch(() => 0);
           for (let i = 0; i < bannerCount; i++) {
             adCandidates.push({
-              name: `Banner 728×90 iframe link ${i + 1}/${bannerCount}`,
+              name: `Banner iframe #${f + 1} link ${i + 1}/${bannerCount}`,
               locator: bannerLinks.nth(i),
             });
           }
         }
-      } catch (err) {
-        log(`Lỗi khi quét banner ad: ${err instanceof Error ? err.message : String(err)}`);
       }
+    } catch (err) {
+      log(`Lỗi khi quét banner ads: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     // 3. Adsterra Smartlink
@@ -2417,7 +2437,7 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
       if (page && !page.isClosed()) {
         await withTimeout(page.close().catch(() => {}), 2000);
       }
-      if (useMyChrome && (proxyManager?.hasMultipleProxies() || currentProxy || !navigationSucceeded)) {
+      if ((useMyChrome || cdpUrl) && (proxyManager?.hasMultipleProxies() || !navigationSucceeded)) {
         log("✓ Tắt Chrome để làm mới socket mạng và chuẩn bị chu kỳ tiếp theo...");
         killChromeProcesses();
         await sleep(1500);

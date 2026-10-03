@@ -51,6 +51,19 @@ export type BackdropPageKey = (typeof BACKDROP_PAGES)[number]["key"];
  */
 export const DEFAULT_SLOT = "default";
 
+/**
+ * Khoá của lựa chọn "KHÔNG DÙNG ẢNH NỀN".
+ *
+ * Tiết kiệm dữ liệu mạng cho người dùng bằng cách không tải bất kỳ ảnh nền nặng ~2MB nào
+ * (cả ảnh OCI lẫn /backdrop.png trong repo), chỉ giữ nền màu tối trơn `#060b1a`.
+ */
+export const NO_BACKDROP_KEY = "none";
+
+/** Kiểm tra xem một tấm nền có phải là tuỳ chọn "không dùng ảnh nền" hay không. */
+export function isNoBackdrop(backdrop: BackdropImage | null | undefined): boolean {
+  return backdrop?.key === NO_BACKDROP_KEY || backdrop?.url === NO_BACKDROP_KEY;
+}
+
 const PAGE_KEYS: ReadonlySet<string> = new Set(BACKDROP_PAGES.map((page) => page.key));
 
 /** Mã trang này có thật trong sổ không — phép gán mồ côi (trang đã gỡ) bị bỏ qua nhờ nó. */
@@ -159,9 +172,13 @@ export function backdropCss(
 ): string {
   const rules: string[] = [];
 
-  const fallback = defaultBackdrop && safeBackdropUrl(defaultBackdrop.url);
-  if (fallback) {
-    rules.push(`.backdrop{background-image:url("${fallback}")}`);
+  if (isNoBackdrop(defaultBackdrop)) {
+    rules.push(".backdrop{background-image:none}");
+  } else {
+    const fallback = defaultBackdrop && safeBackdropUrl(defaultBackdrop.url);
+    if (fallback) {
+      rules.push(`.backdrop{background-image:url("${fallback}")}`);
+    }
   }
 
   // Duyệt theo SỔ TRANG chứ không theo khoá của `assignments`: một mã lạ trong document JSONB
@@ -170,6 +187,10 @@ export function backdropCss(
   for (const page of BACKDROP_PAGES) {
     const chosen = assignments[page.key];
     if (!chosen) continue;
+    if (isNoBackdrop(chosen)) {
+      rules.push(`body:has([data-backdrop="${page.key}"]) .backdrop{background-image:none}`);
+      continue;
+    }
     const url = safeBackdropUrl(chosen.url);
     if (!url) continue;
     rules.push(`body:has([data-backdrop="${page.key}"]) .backdrop{background-image:url("${url}")}`);

@@ -28,11 +28,13 @@ import { getAppSettings } from "../src/lib/services/settings";
 import {
   BACKDROP_PAGES,
   DEFAULT_SLOT,
+  NO_BACKDROP_KEY,
   RESCUE_BACKDROP_URL,
   backdropCss,
   backdropDisplayName,
   backdropDownloadName,
   isBackdropPageKey,
+  isNoBackdrop,
   safeBackdropUrl,
 } from "../src/lib/validation/backdrops";
 import { loadEnv } from "./loadEnv.mjs";
@@ -128,6 +130,18 @@ const withDefault = backdropCss({ key: "backdrops/d.png", url: "/d.png" }, {});
 assert(
   withDefault === '.backdrop{background-image:url("/d.png")}',
   `luật nền mặc định sai hình dạng: ${withDefault}`,
+);
+
+const noneDefault = backdropCss({ key: NO_BACKDROP_KEY, url: NO_BACKDROP_KEY }, {});
+assert(
+  noneDefault === ".backdrop{background-image:none}",
+  `luật không nền mặc định sai hình dạng: ${noneDefault}`,
+);
+
+const nonePage = backdropCss(null, { chat: { key: NO_BACKDROP_KEY, url: NO_BACKDROP_KEY } });
+assert(
+  nonePage === 'body:has([data-backdrop="chat"]) .backdrop{background-image:none}',
+  `luật không nền một trang sai hình dạng: ${nonePage}`,
 );
 
 // Nền mặc định phải đứng TRƯỚC luật của từng trang, nếu không nó đè lên chính chúng.
@@ -254,6 +268,7 @@ try {
     }),
   ];
   for (const [slot, image] of configured) {
+    if (isNoBackdrop(image)) continue;
     assert(safeBackdropUrl(image.url) !== null, `ô「${slot}」đang giữ một URL không qua nổi phép làm sạch: ${image.url}`);
     assert(
       (await statObject(image.key)) !== null,

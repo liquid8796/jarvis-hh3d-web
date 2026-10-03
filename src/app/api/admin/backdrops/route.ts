@@ -12,7 +12,7 @@ import {
   statObject,
 } from "@/lib/services/media";
 import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
-import { BACKDROP_PAGES, DEFAULT_SLOT, isBackdropPageKey } from "@/lib/validation/backdrops";
+import { BACKDROP_PAGES, DEFAULT_SLOT, NO_BACKDROP_KEY, isBackdropPageKey } from "@/lib/validation/backdrops";
 
 /**
  * Kho ẢNH NỀN: POST thêm một tấm (multipart — ảnh nền là thứ nặng nhất trong cả hệ thống,
@@ -140,6 +140,19 @@ export async function PUT(request: Request) {
     await saveAppSettings(settings);
     revalidatePath("/", "layout");
     return NextResponse.json({ ok: true, image: null });
+  }
+
+  if (rawKey === NO_BACKDROP_KEY) {
+    // Không dùng ảnh nền: chỉ giữ màu nền tối trơn, không tải ảnh nặng.
+    const image = { key: NO_BACKDROP_KEY, url: NO_BACKDROP_KEY };
+    if (slot === DEFAULT_SLOT) {
+      settings.appearance.defaultBackdrop = image;
+    } else {
+      settings.appearance.pageBackdrops[slot] = image;
+    }
+    await saveAppSettings(settings);
+    revalidatePath("/", "layout");
+    return NextResponse.json({ ok: true, image });
   }
 
   if (!rawKey.startsWith(`${BACKDROP_PREFIX}/`)) {

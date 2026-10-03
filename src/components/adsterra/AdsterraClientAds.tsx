@@ -4,7 +4,29 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   ADSTERRA_LEADERBOARD_KEY,
+  ADSTERRA_LEADERBOARD_WIDTH,
+  ADSTERRA_LEADERBOARD_HEIGHT,
   ADSTERRA_LEADERBOARD_SCRIPT_SRC,
+  ADSTERRA_BANNER_468X60_KEY,
+  ADSTERRA_BANNER_468X60_WIDTH,
+  ADSTERRA_BANNER_468X60_HEIGHT,
+  ADSTERRA_BANNER_468X60_SCRIPT_SRC,
+  ADSTERRA_BANNER_320X50_KEY,
+  ADSTERRA_BANNER_320X50_WIDTH,
+  ADSTERRA_BANNER_320X50_HEIGHT,
+  ADSTERRA_BANNER_320X50_SCRIPT_SRC,
+  ADSTERRA_BANNER_300X250_KEY,
+  ADSTERRA_BANNER_300X250_WIDTH,
+  ADSTERRA_BANNER_300X250_HEIGHT,
+  ADSTERRA_BANNER_300X250_SCRIPT_SRC,
+  ADSTERRA_BANNER_160X600_KEY,
+  ADSTERRA_BANNER_160X600_WIDTH,
+  ADSTERRA_BANNER_160X600_HEIGHT,
+  ADSTERRA_BANNER_160X600_SCRIPT_SRC,
+  ADSTERRA_BANNER_160X300_KEY,
+  ADSTERRA_BANNER_160X300_WIDTH,
+  ADSTERRA_BANNER_160X300_HEIGHT,
+  ADSTERRA_BANNER_160X300_SCRIPT_SRC,
   ADSTERRA_NATIVE_CONTAINER_ID,
   ADSTERRA_NATIVE_SCRIPT_SRC,
   ADSTERRA_POPUNDER_SCRIPT_SRC,
@@ -23,8 +45,75 @@ const EXCLUDED_PATH_PREFIXES = [
 
 type AdSlotStatus = "loading" | "ready" | "blocked";
 
-const LEADERBOARD_WIDTH = 728;
-const LEADERBOARD_HEIGHT = 90;
+interface BannerSpec {
+  id: string;
+  adKey: string;
+  width: number;
+  height: number;
+  scriptSrc: string;
+  className: string;
+  ariaLabel: string;
+}
+
+const BANNER_LEADERBOARD_SPEC: BannerSpec = {
+  id: "leaderboard",
+  adKey: ADSTERRA_LEADERBOARD_KEY,
+  width: ADSTERRA_LEADERBOARD_WIDTH,
+  height: ADSTERRA_LEADERBOARD_HEIGHT,
+  scriptSrc: ADSTERRA_LEADERBOARD_SCRIPT_SRC,
+  className: "adsterra-leaderboard",
+  ariaLabel: "Quảng cáo biểu ngữ 728×90",
+};
+
+const BANNER_468X60_SPEC: BannerSpec = {
+  id: "banner-468x60",
+  adKey: ADSTERRA_BANNER_468X60_KEY,
+  width: ADSTERRA_BANNER_468X60_WIDTH,
+  height: ADSTERRA_BANNER_468X60_HEIGHT,
+  scriptSrc: ADSTERRA_BANNER_468X60_SCRIPT_SRC,
+  className: "adsterra-banner-468x60",
+  ariaLabel: "Quảng cáo biểu ngữ 468×60",
+};
+
+const BANNER_320X50_SPEC: BannerSpec = {
+  id: "banner-320x50",
+  adKey: ADSTERRA_BANNER_320X50_KEY,
+  width: ADSTERRA_BANNER_320X50_WIDTH,
+  height: ADSTERRA_BANNER_320X50_HEIGHT,
+  scriptSrc: ADSTERRA_BANNER_320X50_SCRIPT_SRC,
+  className: "adsterra-banner-320x50",
+  ariaLabel: "Quảng cáo biểu ngữ 320×50",
+};
+
+const BANNER_300X250_SPEC: BannerSpec = {
+  id: "banner-300x250",
+  adKey: ADSTERRA_BANNER_300X250_KEY,
+  width: ADSTERRA_BANNER_300X250_WIDTH,
+  height: ADSTERRA_BANNER_300X250_HEIGHT,
+  scriptSrc: ADSTERRA_BANNER_300X250_SCRIPT_SRC,
+  className: "adsterra-banner-300x250",
+  ariaLabel: "Quảng cáo chữ nhật 300×250",
+};
+
+const BANNER_160X600_SPEC: BannerSpec = {
+  id: "banner-160x600",
+  adKey: ADSTERRA_BANNER_160X600_KEY,
+  width: ADSTERRA_BANNER_160X600_WIDTH,
+  height: ADSTERRA_BANNER_160X600_HEIGHT,
+  scriptSrc: ADSTERRA_BANNER_160X600_SCRIPT_SRC,
+  className: "adsterra-banner-160x600",
+  ariaLabel: "Quảng cáo dọc 160×600",
+};
+
+const BANNER_160X300_SPEC: BannerSpec = {
+  id: "banner-160x300",
+  adKey: ADSTERRA_BANNER_160X300_KEY,
+  width: ADSTERRA_BANNER_160X300_WIDTH,
+  height: ADSTERRA_BANNER_160X300_HEIGHT,
+  scriptSrc: ADSTERRA_BANNER_160X300_SCRIPT_SRC,
+  className: "adsterra-banner-160x300",
+  ariaLabel: "Quảng cáo dọc 160×300",
+};
 
 function pathAllowsAds(pathname: string): boolean {
   return !EXCLUDED_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -72,11 +161,12 @@ function watchForRenderedAd(
   };
 }
 
-function fitLeaderboardToSlot(slot: HTMLElement): () => void {
+function fitBannerToSlot(slot: HTMLElement, width: number, height: number): () => void {
   const update = () => {
-    const scale = Math.min(1, Math.max(0, slot.clientWidth / LEADERBOARD_WIDTH));
+    const scale = Math.min(1, Math.max(0, slot.clientWidth / width));
+    slot.style.setProperty("--adsterra-scale", scale.toFixed(4));
     slot.style.setProperty("--adsterra-leaderboard-scale", scale.toFixed(4));
-    slot.style.height = `${Math.ceil(LEADERBOARD_HEIGHT * scale)}px`;
+    slot.style.height = `${Math.ceil(height * scale)}px`;
   };
 
   const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
@@ -87,66 +177,95 @@ function fitLeaderboardToSlot(slot: HTMLElement): () => void {
   return () => {
     observer?.disconnect();
     window.removeEventListener("resize", update);
+    slot.style.removeProperty("--adsterra-scale");
     slot.style.removeProperty("--adsterra-leaderboard-scale");
     slot.style.removeProperty("height");
   };
 }
 
 /**
- * Mounts the exact publisher tags supplied by Adsterra. The Popunder tag and Smartlink came from
- * Adsterra's custom-domain/anti-adblock response; the Social Bar, banner and native tags came from
- * the normal zone page. Auto HH3D does not inspect extensions, block page access or add custom
- * bypass logic of its own. Browser-blocked or empty display slots collapse instead of leaving a
- * blank frame on the page.
+ * Hàng đợi nạp tuần tự script cho các banner iframe Adsterra để triệt tiêu
+ * hoàn toàn hiện tượng ghi đè biến toàn cục window.atOptions.
  */
-export function AdsterraClientAds() {
-  const pathname = usePathname();
-  const leaderboardRef = useRef<HTMLDivElement>(null);
-  const nativeRef = useRef<HTMLDivElement>(null);
-  const [leaderboardStatus, setLeaderboardStatus] = useState<AdSlotStatus>("loading");
-  const [nativeStatus, setNativeStatus] = useState<AdSlotStatus>("loading");
-  const allowed = pathAllowsAds(pathname);
+let bannerMountQueue = Promise.resolve();
+
+function enqueueBannerMount(loadFn: () => Promise<void>): Promise<void> {
+  const next = bannerMountQueue.then(loadFn, loadFn);
+  bannerMountQueue = next.catch(() => {});
+  return next;
+}
+
+function AdsterraBannerSlot({
+  spec,
+  allowed,
+  pathname,
+}: {
+  spec: BannerSpec;
+  allowed: boolean;
+  pathname: string;
+}) {
+  const slotRef = useRef<HTMLDivElement>(null);
+  const [status, setStatus] = useState<AdSlotStatus>("loading");
 
   useEffect(() => {
-    if (!allowed) return;
-    appendGlobalScriptOnce(ADSTERRA_POPUNDER_SCRIPT_SRC, "popunder");
-    appendGlobalScriptOnce(ADSTERRA_SOCIAL_BAR_SCRIPT_SRC, "social-bar");
-  }, [allowed]);
-
-  useEffect(() => {
-    const slot = leaderboardRef.current;
+    const slot = slotRef.current;
     if (!allowed || !slot) return;
 
     let active = true;
-    setLeaderboardStatus("loading");
+    setStatus("loading");
+
     const canvas = document.createElement("div");
-    canvas.className = "adsterra-leaderboard-canvas";
+    canvas.className = spec.id === "leaderboard"
+      ? "adsterra-leaderboard-canvas adsterra-banner-canvas"
+      : `adsterra-banner-canvas adsterra-canvas-${spec.id}`;
+    canvas.style.width = `${spec.width}px`;
+    canvas.style.height = `${spec.height}px`;
     slot.replaceChildren(canvas);
-    const stopFitting = fitLeaderboardToSlot(slot);
+
+    const stopFitting = fitBannerToSlot(slot, spec.width, spec.height);
 
     const markBlocked = () => {
-      if (active) setLeaderboardStatus("blocked");
+      if (active) setStatus("blocked");
     };
-    const options = document.createElement("script");
-    options.text = `window.atOptions = ${JSON.stringify({
-      key: ADSTERRA_LEADERBOARD_KEY,
-      format: "iframe",
-      height: LEADERBOARD_HEIGHT,
-      width: LEADERBOARD_WIDTH,
-      params: {},
-    })};`;
-    const invoke = document.createElement("script");
-    invoke.src = ADSTERRA_LEADERBOARD_SCRIPT_SRC;
-    invoke.async = false;
-    invoke.dataset.adsterraPlacement = "leaderboard";
-    invoke.addEventListener("error", markBlocked, { once: true });
-    canvas.append(options, invoke);
+
+    let invokeScript: HTMLScriptElement | null = null;
+
+    enqueueBannerMount(async () => {
+      if (!active || !canvas.isConnected) return;
+
+      const options = document.createElement("script");
+      options.text = `window.atOptions = ${JSON.stringify({
+        key: spec.adKey,
+        format: "iframe",
+        height: spec.height,
+        width: spec.width,
+        params: {},
+      })};`;
+
+      const invoke = document.createElement("script");
+      invoke.src = spec.scriptSrc;
+      invoke.async = false;
+      invoke.dataset.adsterraPlacement = spec.id;
+      invokeScript = invoke;
+
+      const loadedPromise = new Promise<void>((resolve) => {
+        invoke.addEventListener("load", () => resolve(), { once: true });
+        invoke.addEventListener("error", () => {
+          markBlocked();
+          resolve();
+        }, { once: true });
+        setTimeout(resolve, 2000);
+      });
+
+      canvas.append(options, invoke);
+      await loadedPromise;
+    });
 
     const stopWatching = watchForRenderedAd(
       canvas,
       () => Boolean(canvas.querySelector("iframe")),
       () => {
-        if (active) setLeaderboardStatus("ready");
+        if (active) setStatus("ready");
       },
       markBlocked,
     );
@@ -155,10 +274,48 @@ export function AdsterraClientAds() {
       active = false;
       stopWatching();
       stopFitting();
-      invoke.removeEventListener("error", markBlocked);
+      if (invokeScript) invokeScript.removeEventListener("error", markBlocked);
       slot.replaceChildren();
     };
-  }, [allowed, pathname]);
+  }, [allowed, pathname, spec]);
+
+  if (!allowed) return null;
+
+  return (
+    <div
+      ref={slotRef}
+      className={`adsterra-unit adsterra-banner ${spec.className}`}
+      data-status={status}
+      data-placement={spec.id}
+      aria-label={spec.ariaLabel}
+    />
+  );
+}
+
+/**
+ * Nhúng đầy đủ 10 định dạng quảng cáo chính thức từ Adsterra:
+ * 1. Popunder script (mở tab ngầm khi click)
+ * 2. Social Bar script (thông báo / bong bóng nổi)
+ * 3. Leaderboard 728×90 (biểu ngữ ngang desktop)
+ * 4. Classic Banner 468×60 (biểu ngữ ngang tablet / trung bình)
+ * 5. Mobile Banner 320×50 (biểu ngữ ngang mobile)
+ * 6. Medium Rectangle 300×250 (hình chữ nhật đa dụng)
+ * 7. Wide Skyscraper 160×600 (banner dọc cao)
+ * 8. Half Skyscraper 160×300 (banner dọc ngắn)
+ * 9. Native Banner 4:1 (đề xuất nội dung tự nhiên)
+ * 10. Smartlink (liên kết tài trợ trực tiếp)
+ */
+export function AdsterraClientAds() {
+  const pathname = usePathname();
+  const nativeRef = useRef<HTMLDivElement>(null);
+  const [nativeStatus, setNativeStatus] = useState<AdSlotStatus>("loading");
+  const allowed = pathAllowsAds(pathname);
+
+  useEffect(() => {
+    if (!allowed) return;
+    appendGlobalScriptOnce(ADSTERRA_POPUNDER_SCRIPT_SRC, "popunder");
+    appendGlobalScriptOnce(ADSTERRA_SOCIAL_BAR_SCRIPT_SRC, "social-bar");
+  }, [allowed]);
 
   useEffect(() => {
     const slot = nativeRef.current;
@@ -202,18 +359,32 @@ export function AdsterraClientAds() {
 
   return (
     <aside className="adsterra-stack" aria-label="Quảng cáo tài trợ">
-      <div
-        ref={leaderboardRef}
-        className="adsterra-unit adsterra-leaderboard"
-        data-status={leaderboardStatus}
-        aria-label="Quảng cáo biểu ngữ"
-      />
-      <div
-        ref={nativeRef}
-        className="adsterra-unit adsterra-native"
-        data-status={nativeStatus}
-        aria-label="Quảng cáo đề xuất"
-      />
+      {/* 1. Biểu ngữ chính 728×90 */}
+      <AdsterraBannerSlot spec={BANNER_LEADERBOARD_SPEC} allowed={allowed} pathname={pathname} />
+
+      {/* 2. Dãy biểu ngữ phụ 468×60 & 320×50 */}
+      <div className="adsterra-row-banners">
+        <AdsterraBannerSlot spec={BANNER_468X60_SPEC} allowed={allowed} pathname={pathname} />
+        <AdsterraBannerSlot spec={BANNER_320X50_SPEC} allowed={allowed} pathname={pathname} />
+      </div>
+
+      {/* 3. Lưới hiển thị đa tầng: Skyscraper 160×600 + Cột trung tâm (300×250 & Native) + Skyscraper 160×300 */}
+      <div className="adsterra-grid-banners">
+        <AdsterraBannerSlot spec={BANNER_160X600_SPEC} allowed={allowed} pathname={pathname} />
+        <div className="adsterra-center-column">
+          <AdsterraBannerSlot spec={BANNER_300X250_SPEC} allowed={allowed} pathname={pathname} />
+          {/* 4. Native Ads 4:1 */}
+          <div
+            ref={nativeRef}
+            className="adsterra-unit adsterra-native"
+            data-status={nativeStatus}
+            aria-label="Quảng cáo đề xuất"
+          />
+        </div>
+        <AdsterraBannerSlot spec={BANNER_160X300_SPEC} allowed={allowed} pathname={pathname} />
+      </div>
+
+      {/* 5. Smartlink */}
       <a
         className="adsterra-smartlink"
         href={ADSTERRA_SMARTLINK_URL}

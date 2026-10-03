@@ -17,7 +17,26 @@
 }
 
 .adsterra-unit[data-status="blocked"] {
-  display: none;
+  display: none !important;
+}
+
+.adsterra-banner {
+  --adsterra-scale: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 0;
+}
+
+.adsterra-banner-canvas {
+  transform: scale(var(--adsterra-scale, 1));
+  transform-origin: top center;
+}
+
+.adsterra-banner iframe {
+  display: block;
+  max-width: 100%;
+  border: 0;
 }
 
 .adsterra-leaderboard {
@@ -33,7 +52,7 @@
   flex: 0 0 728px;
   width: 728px;
   height: 90px;
-  transform: scale(var(--adsterra-leaderboard-scale));
+  transform: scale(var(--adsterra-leaderboard-scale, var(--adsterra-scale, 1)));
   transform-origin: top center;
 }
 
@@ -41,6 +60,29 @@
   display: block;
   max-width: 100%;
   border: 0;
+}
+
+.adsterra-row-banners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.adsterra-grid-banners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.adsterra-center-column {
+  flex: 1 1 320px;
+  max-width: 760px;
+  display: grid;
+  gap: 0.75rem;
 }
 
 .adsterra-native {
@@ -66,5 +108,4 @@
     width: min(100% - 1rem, 680px);
     margin-top: 1rem;
   }
-
 }

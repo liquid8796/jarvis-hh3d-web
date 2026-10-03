@@ -5,6 +5,7 @@ import { useRef, useState, useTransition } from "react";
 import {
   BACKDROP_PAGES,
   DEFAULT_SLOT,
+  NO_BACKDROP_KEY,
   type BackdropChoice,
   type BackdropImage,
   backdropDisplayName,
@@ -220,7 +221,12 @@ export function BackdropManager({
       }
       setNotice({
         ok: true,
-        message: key === null ? `${label} trở về nền mặc định.` : `Đã đổi nền cho ${label}.`,
+        message:
+          key === null
+            ? `${label} trở về nền mặc định.`
+            : key === NO_BACKDROP_KEY
+              ? `Đã tắt ảnh nền cho ${label}.`
+              : `Đã đổi nền cho ${label}.`,
       });
       startRefresh(() => router.refresh());
     } finally {
@@ -382,19 +388,22 @@ export function BackdropManager({
             <select
               className="input max-w-[18rem]"
               aria-label={`Nền của ${entry.label}`}
-              disabled={busy || storeClosed}
+              disabled={busy}
               value={entry.chosen?.key ?? ""}
               onChange={(e) => void assign(entry.slot, e.target.value || null, entry.label)}
             >
               <option value="">
                 {entry.slot === DEFAULT_SLOT ? "— tấm gốc đi kèm mã nguồn —" : "— theo nền mặc định —"}
               </option>
+              <option value={NO_BACKDROP_KEY}>— không dùng ảnh nền (tiết kiệm dữ liệu) —</option>
               {/* Tấm đang được chọn có thể KHÔNG còn trong lưới (bị xoá ngoài luồng, hoặc lưới
                   đã chạm trần). Thêm nó vào danh sách để ô select không lặng lẽ nhảy về "theo
                   mặc định" — thứ khiến người ta tưởng mình chưa từng chọn gì. */}
-              {entry.chosen && !images.some((image) => image.key === entry.chosen!.key) && (
-                <option value={entry.chosen.key}>{backdropDisplayName(entry.chosen.key)} (ngoài lưới)</option>
-              )}
+              {entry.chosen &&
+                entry.chosen.key !== NO_BACKDROP_KEY &&
+                !images.some((image) => image.key === entry.chosen!.key) && (
+                  <option value={entry.chosen.key}>{backdropDisplayName(entry.chosen.key)} (ngoài lưới)</option>
+                )}
               {images.map((image) => (
                 <option key={image.key} value={image.key}>
                   {backdropDisplayName(image.key)}

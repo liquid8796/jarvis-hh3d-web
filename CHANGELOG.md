@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.141 — Tuỳ chọn không dùng ảnh nền trang admin & Tích hợp trọn bộ Adsterra (03/10/2026)
+
+- Bổ sung tuỳ chọn "— không dùng ảnh nền (tiết kiệm dữ liệu) —" (`NO_BACKDROP_KEY = "none"`) vào danh sách chọn nền mặc định và nền riêng của từng trang tại tab Giao diện của trang Tông môn (`/admin`).
+- Cập nhật hàm sinh CSS `backdropCss` xuất luật `.backdrop{background-image:none}` và `body:has([data-backdrop="<slot>"]) .backdrop{background-image:none}` để triệt tiêu việc tải tệp ảnh nền nặng ~2MB (`/backdrop.png` và OCI Storage), giữ trang ở màu nền tối trơn siêu nhẹ.
+- Cho phép lưu cấu hình không dùng ảnh nền mà không phụ thuộc vào trạng thái mở/đóng của tàng khố media OCI Storage trong route `PUT /api/admin/backdrops`.
+- Nhúng đầy đủ 10/10 định dạng quảng cáo Adsterra từ gói mã nguồn vào website (`src/lib/adsterra/config.ts`, `src/components/adsterra/AdsterraClientAds.tsx`, `src/app/adsterra.css`) kèm cơ chế hàng đợi tải tuần tự tránh xung đột `window.atOptions`.
+- Nâng cấp `scripts/adViewer.mjs` nhận diện và tương tác với các iframe quảng cáo biểu ngữ mới.
+
 ## 1.3.140 — Hỗ trợ định dạng danh sách Proxy IP:PORT@USER:PASS và tăng độ chính xác chuột (03/10/2026)
 
 - Bổ sung khả năng nhận diện và phân tích toàn diện định dạng proxy `IP:PORT@USER:PASS` và `HOST:PORT@USER:PASS` (kể cả có tiền tố `http://` hay `socks5://`) trong `parseProxyItem` của `scripts/adViewer.mjs`.

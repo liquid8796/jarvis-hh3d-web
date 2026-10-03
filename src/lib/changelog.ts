@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.141",
+    date: "2026-10-03",
+    lines: [
+      "Bổ sung tuỳ chọn không dùng ảnh nền tại tab Giao diện của trang Tông môn, tối ưu tốc độ và tiết kiệm dữ liệu cho người dùng.",
+      "Tích hợp trọn bộ 10/10 định dạng quảng cáo Adsterra vào trang web với cơ chế nạp tuần tự triệt tiêu xung đột cấu hình.",
+    ],
+  },
+  {
     version: "1.3.140",
     date: "2026-10-03",
     lines: [
@@ -467,15 +475,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Hoang Vực nay nhận đúng trạng thái hết 5 lượt từ bộ đếm của trang, kể cả khi nút Khiêu Chiến vẫn còn hiện.",
       "Bản VIP và thường cùng dùng flow mới; lượt thứ năm được chốt ngay trong lượt chạy và không bị đánh lại.",
       "Lưới Chromium khóa cả trang đã hết lượt, đòn thứ năm và đòn thường còn hồi chiêu.",
-    ],
-  },
-  {
-    version: "1.3.91",
-    date: "2026-09-24",
-    lines: [
-      "Nuôi kho GitHub nay có nút Promote trên từng repo phụ để đổi repo ấy thành repo chính mà vẫn giữ lịch sử mã.",
-      "Nếu đã có repo chính, repo cũ tự chuyển thành repo phụ và ngừng chạy khôi lỗi; nếu đang hoãn repo chính thì không tạo thêm repo cũ.",
-      "Lượt đổi vai trò tự khóa các thao tác liên quan và hoàn tác an toàn khi lỗi, tránh hai khôi lỗi cùng chạy một danh tính.",
     ],
   },
 ];

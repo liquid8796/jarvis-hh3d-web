@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.155",
+    date: "2026-10-03",
+    lines: [
+      "Bổ sung tuỳ chọn cho phép người dùng tự nhập thiết bị giả lập mong muốn trong kịch bản chạy nhanh.",
+      "Hỗ trợ nhận diện các dòng iPhone, iPad, điện thoại Android, chip máy Mac và hệ điều hành chỉ định.",
+    ],
+  },
+  {
     version: "1.3.154",
     date: "2026-10-03",
     lines: [
@@ -463,15 +471,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Vấn Đáp nay nhận diện giao diện mới cho cả tài khoản VIP và thường.",
       "Khôi lỗi đọc đúng nội dung đáp án, không còn nhầm chữ A, B, C, D vào tên lựa chọn.",
       "Trạng thái trả lời và hoàn thành được chờ theo trang thật thay vì bộ chọn cũ.",
-    ],
-  },
-  {
-    version: "1.3.105",
-    date: "2026-09-29",
-    lines: [
-      "Tài khoản thường nay có thể bỏ giới hạn huyền tinh khi giao đàn riêng cho khôi lỗi máy nhà.",
-      "Khôi lỗi tông môn và lựa chọn ai rảnh cũng được vẫn giữ giới hạn để không chiếm ghế chung quá lâu.",
-      "Đổi loại khôi lỗi trên màn hình sẽ mở hoặc khoá tuỳ chọn ngay, không cần tải lại trang.",
     ],
   },
 ];

@@ -130,13 +130,54 @@ assert.match(runtime, /isForceClick\s*=/, "ad-viewer must determine isForceClick
 assert.match(runtime, /\[ForceClick\]/, "ad-viewer must log and execute force click when render times out");
 assert.match(batContent, /--render-timeout=/, "run-ad-viewer.bat must support --render-timeout option [13]");
 
+// ---- Thiết bị giả lập tuỳ chọn theo mong muốn (Custom Device Emulation) ----
+assert.equal(fpMod.parseDeviceMode("iPhone 15"), "iPhone 15");
+assert.equal(fpMod.parseDeviceMode("desktop"), "desktop");
+assert.equal(fpMod.parseDeviceMode("mobile"), "mobile");
+assert.equal(fpMod.parseDeviceMode("random"), "random");
+
+const devIphone15 = fpMod.resolveCustomDevice("iPhone 15");
+assert.equal(devIphone15?.deviceClass, "mobile");
+assert.equal(devIphone15?.os, "ios");
+assert.equal(devIphone15?.name, "iPhone 15");
+
+const devS24 = fpMod.resolveCustomDevice("Galaxy S24");
+assert.equal(devS24?.deviceClass, "mobile");
+assert.equal(devS24?.os, "android");
+assert.equal(devS24?.name, "Galaxy S24");
+
+const devWin = fpMod.resolveCustomDevice("Windows");
+assert.equal(devWin?.deviceClass, "desktop");
+assert.equal(devWin?.os, "windows");
+
+const devMac = fpMod.resolveCustomDevice("macOS");
+assert.equal(devMac?.deviceClass, "desktop");
+assert.equal(devMac?.os, "macos");
+
+const profileIphone = fpMod.pickFingerprintProfile({ device: "iPhone 15", rng });
+assert.equal(profileIphone.deviceClass, "mobile");
+assert.equal(profileIphone.os, "ios");
+assert.equal(profileIphone.device?.name, "iPhone 15");
+
+const profileS24 = fpMod.pickFingerprintProfile({ device: "Galaxy S24", rng });
+assert.equal(profileS24.deviceClass, "mobile");
+assert.equal(profileS24.os, "android");
+assert.equal(profileS24.device?.name, "Galaxy S24");
+
+const profileWin = fpMod.pickFingerprintProfile({ device: "Windows", rng });
+assert.equal(profileWin.deviceClass, "desktop");
+assert.equal(profileWin.os, "windows");
+
+assert.match(batContent, /Tu nhap thiet bi cu the/, "run-ad-viewer.bat must offer custom device option [4]");
+assert.match(batContent, /:custom_device/, "run-ad-viewer.bat must have :custom_device label");
+
 const winMousePs = read("scripts/winMouse.ps1");
 assert.match(winMousePs, /\[int\]\$minimize\s*=\s*0/, "winMouse.ps1 must accept -minimize flag");
 assert.match(winMousePs, /SW_SHOWMINNOACTIVE|ShowWindow\(\$other\.MainWindowHandle,\s*7\)/, "winMouse.ps1 must minimize other instance windows to prevent occlusion");
 assert.match(winMousePs, /BringWindowToTop/, "winMouse.ps1 must bring active instance window to top");
 
 console.log(
-  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, and supports user-defined render timeout with force click fallback.",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, and supports custom user-defined device emulation.",
 );
 
 

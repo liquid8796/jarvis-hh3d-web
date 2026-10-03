@@ -29,6 +29,7 @@ import {
   parseBrowserList,
   parseDeviceMode,
   pickFingerprintProfile,
+  resolveCustomDevice,
 } from "./adViewerFingerprint.mjs";
 
 let chromium = vanillaChromium;
@@ -59,10 +60,10 @@ const MAX_LIFETIME_MS = Math.max(
 
 function getCliArg(flag) {
   const withEq = process.argv.find((a) => a.startsWith(`${flag}=`));
-  if (withEq) return withEq.slice(flag.length + 1).trim();
+  if (withEq) return withEq.slice(flag.length + 1).replace(/^["']|["']$/g, "").trim();
   const idx = process.argv.indexOf(flag);
   if (idx !== -1 && idx + 1 < process.argv.length && !process.argv[idx + 1].startsWith("--")) {
-    return process.argv[idx + 1].trim();
+    return process.argv[idx + 1].replace(/^["']|["']$/g, "").trim();
   }
   return "";
 }
@@ -3405,7 +3406,13 @@ async function main() {
 
   if (FINGERPRINT_ENABLED) {
     const deviceDesc =
-      DEVICE_MODE === "desktop" ? "Chỉ desktop" : DEVICE_MODE === "mobile" ? "Chỉ mobile" : `Ngẫu nhiên (mobile ${Math.round(MOBILE_RATIO * 100)}%)`;
+      DEVICE_MODE === "desktop"
+        ? "Chỉ desktop"
+        : DEVICE_MODE === "mobile"
+        ? "Chỉ mobile"
+        : DEVICE_MODE === "random"
+        ? `Ngẫu nhiên (mobile ${Math.round(MOBILE_RATIO * 100)}%)`
+        : `Tuỳ chỉnh [${DEVICE_MODE}]`;
     log(`Vân tay thiết bị: ${deviceDesc} · Trình duyệt: ${BROWSER_SELECTION.browsers.join(", ")}`);
     if (BROWSER_SELECTION.unknown.length > 0) {
       log(`⚠ Bỏ qua tên trình duyệt không nhận ra: ${BROWSER_SELECTION.unknown.join(", ")}`);

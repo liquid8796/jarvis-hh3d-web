@@ -68,30 +68,47 @@ const LINUX_SCREENS = [
   { w: 2560, h: 1440, dpr: 1, weight: 15 },
 ];
 
-const ANDROID_DEVICES = [
+export const ANDROID_DEVICES = [
   { model: "SM-S928B", name: "Galaxy S24 Ultra", w: 384, h: 824, dpr: 3.75, gpuVendor: "Qualcomm", gpu: "Adreno (TM) 750", weight: 12 },
+  { model: "SM-S921B", name: "Galaxy S24", w: 360, h: 780, dpr: 3, gpuVendor: "Qualcomm", gpu: "Adreno (TM) 750", weight: 12 },
+  { model: "SM-S918B", name: "Galaxy S23 Ultra", w: 384, h: 824, dpr: 3.75, gpuVendor: "Qualcomm", gpu: "Adreno (TM) 740", weight: 10 },
   { model: "SM-A546E", name: "Galaxy A54", w: 384, h: 832, dpr: 2.8125, gpuVendor: "ARM", gpu: "Mali-G68 MC4", weight: 16 },
   { model: "SM-A155F", name: "Galaxy A15", w: 384, h: 832, dpr: 2.8125, gpuVendor: "ARM", gpu: "Mali-G57 MC2", weight: 14 },
+  { model: "SM-A556B", name: "Galaxy A55", w: 384, h: 832, dpr: 2.8125, gpuVendor: "Samsung", gpu: "Xclipse 530", weight: 12 },
+  { model: "Pixel 8 Pro", name: "Pixel 8 Pro", w: 412, h: 892, dpr: 3.5, gpuVendor: "ARM", gpu: "Mali-G715", weight: 8 },
   { model: "Pixel 8", name: "Pixel 8", w: 412, h: 915, dpr: 2.625, gpuVendor: "ARM", gpu: "Mali-G715", weight: 8 },
   { model: "Pixel 7a", name: "Pixel 7a", w: 412, h: 915, dpr: 2.625, gpuVendor: "ARM", gpu: "Mali-G710", weight: 6 },
+  { model: "Pixel 7", name: "Pixel 7", w: 412, h: 915, dpr: 2.625, gpuVendor: "ARM", gpu: "Mali-G710", weight: 6 },
+  { model: "Pixel 9 Pro", name: "Pixel 9 Pro", w: 412, h: 915, dpr: 3, gpuVendor: "ARM", gpu: "Mali-G715", weight: 8 },
+  { model: "Pixel 9", name: "Pixel 9", w: 412, h: 915, dpr: 2.625, gpuVendor: "ARM", gpu: "Mali-G715", weight: 8 },
   { model: "23129RAA4G", name: "Redmi Note 13", w: 393, h: 873, dpr: 2.75, gpuVendor: "Qualcomm", gpu: "Adreno (TM) 610", weight: 16 },
+  { model: "2311DRK48G", name: "Xiaomi 14", w: 393, h: 873, dpr: 3, gpuVendor: "Qualcomm", gpu: "Adreno (TM) 750", weight: 10 },
   { model: "CPH2591", name: "OPPO Reno11", w: 412, h: 915, dpr: 2.625, gpuVendor: "ARM", gpu: "Mali-G610 MC4", weight: 14 },
   { model: "V2250", name: "vivo V27", w: 388, h: 862, dpr: 2.75, gpuVendor: "Qualcomm", gpu: "Adreno (TM) 642L", weight: 14 },
 ];
-const ANDROID_VERSIONS = [
+export const ANDROID_VERSIONS = [
   { major: 13, weight: 25 },
   { major: 14, weight: 40 },
   { major: 15, weight: 35 },
 ];
-const IPHONES = [
+export const IPHONES = [
   { name: "iPhone 11", w: 414, h: 896, dpr: 2, weight: 8 },
   { name: "iPhone SE", w: 375, h: 667, dpr: 2, weight: 5 },
+  { name: "iPhone 12", w: 390, h: 844, dpr: 3, weight: 10 },
+  { name: "iPhone 12 Pro", w: 390, h: 844, dpr: 3, weight: 10 },
   { name: "iPhone 13", w: 390, h: 844, dpr: 3, weight: 16 },
+  { name: "iPhone 13 Pro", w: 390, h: 844, dpr: 3, weight: 12 },
   { name: "iPhone 14", w: 390, h: 844, dpr: 3, weight: 15 },
+  { name: "iPhone 14 Pro", w: 393, h: 852, dpr: 3, weight: 12 },
+  { name: "iPhone 14 Pro Max", w: 430, h: 932, dpr: 3, weight: 12 },
   { name: "iPhone 15", w: 393, h: 852, dpr: 3, weight: 18 },
+  { name: "iPhone 15 Pro", w: 393, h: 852, dpr: 3, weight: 15 },
   { name: "iPhone 15 Pro Max", w: 430, h: 932, dpr: 3, weight: 14 },
+  { name: "iPhone 16", w: 393, h: 852, dpr: 3, weight: 14 },
   { name: "iPhone 16 Pro", w: 402, h: 874, dpr: 3, weight: 13 },
   { name: "iPhone 16 Pro Max", w: 440, h: 956, dpr: 3, weight: 11 },
+  { name: "iPad Pro 11", w: 834, h: 1194, dpr: 2, weight: 5 },
+  { name: "iPad Air", w: 820, h: 1180, dpr: 2, weight: 5 },
 ];
 
 const WINDOWS_GPUS = [
@@ -156,21 +173,141 @@ export function parseBrowserList(raw) {
 }
 
 export function parseDeviceMode(raw) {
-  const text = String(raw ?? "").trim().toLowerCase();
-  if (["desktop", "pc", "laptop", "may-tinh"].includes(text)) return "desktop";
-  if (["mobile", "phone", "dien-thoai", "smartphone"].includes(text)) return "mobile";
-  return "random";
+  const text = String(raw ?? "").trim().replace(/^["']|["']$/g, "").trim();
+  const lower = text.toLowerCase();
+  if (!lower || ["random", "all", "auto", "ngau-nhien", "*"].includes(lower)) return "random";
+  if (["desktop", "pc", "laptop", "may-tinh"].includes(lower)) return "desktop";
+  if (["mobile", "phone", "dien-thoai", "smartphone"].includes(lower)) return "mobile";
+  return text;
+}
+
+/**
+ * Phân tích thiết bị hoặc hệ điều hành tuỳ chỉnh do người dùng nhập.
+ * @param {string} deviceInput
+ */
+export function resolveCustomDevice(deviceInput) {
+  if (!deviceInput || typeof deviceInput !== "string") return null;
+  const raw = deviceInput.trim().replace(/^["']|["']$/g, "").trim();
+  if (!raw) return null;
+  const lower = raw.toLowerCase().replace(/[-_]/g, " ");
+
+  if (["random", "all", "auto", "ngau-nhien", "*"].includes(lower)) return null;
+  if (["desktop", "pc", "laptop", "may-tinh"].includes(lower)) {
+    return { type: "class", deviceClass: "desktop", name: "Desktop" };
+  }
+  if (["mobile", "phone", "dien-thoai", "smartphone"].includes(lower)) {
+    return { type: "class", deviceClass: "mobile", name: "Mobile" };
+  }
+
+  // 1. Hệ điều hành máy tính (Desktop OS)
+  if (["windows", "win", "win10", "win11", "desktop-windows"].some((k) => lower === k || lower.startsWith(k + " "))) {
+    return { type: "os", os: "windows", deviceClass: "desktop", name: "Windows PC" };
+  }
+  if (["macos", "mac", "macbook", "osx", "apple mac", "desktop-mac"].some((k) => lower === k || lower.startsWith(k + " "))) {
+    return { type: "os", os: "macos", deviceClass: "desktop", name: "Apple Mac" };
+  }
+  if (["linux", "ubuntu", "debian", "fedora", "desktop-linux"].some((k) => lower === k || lower.startsWith(k + " "))) {
+    return { type: "os", os: "linux", deviceClass: "desktop", name: "Linux PC" };
+  }
+
+  // 2. Hệ điều hành di động chung (Mobile OS)
+  if (lower === "android") {
+    return { type: "os", os: "android", deviceClass: "mobile", name: "Android" };
+  }
+  if (lower === "ios") {
+    return { type: "os", os: "ios", deviceClass: "mobile", name: "Apple iOS" };
+  }
+
+  // 3. Khớp chính xác hoặc gần đúng trong IPHONES
+  const exactIphone = IPHONES.find((p) => p.name.toLowerCase() === lower);
+  if (exactIphone) {
+    return { type: "device", os: "ios", deviceClass: "mobile", device: exactIphone, name: exactIphone.name };
+  }
+  const subIphone = IPHONES.find((p) => {
+    const pLower = p.name.toLowerCase();
+    return pLower.includes(lower) || lower.includes(pLower);
+  });
+  if (subIphone) {
+    return { type: "device", os: "ios", deviceClass: "mobile", device: subIphone, name: subIphone.name };
+  }
+
+  // 4. Khớp chính xác hoặc gần đúng trong ANDROID_DEVICES
+  const exactAndroid = ANDROID_DEVICES.find(
+    (d) => d.name.toLowerCase() === lower || d.model.toLowerCase() === lower,
+  );
+  if (exactAndroid) {
+    return { type: "device", os: "android", deviceClass: "mobile", device: exactAndroid, name: exactAndroid.name };
+  }
+  const subAndroid = ANDROID_DEVICES.find((d) => {
+    const dLower = d.name.toLowerCase();
+    const mLower = d.model.toLowerCase();
+    return dLower.includes(lower) || lower.includes(dLower) || mLower.includes(lower);
+  });
+  if (subAndroid) {
+    return { type: "device", os: "android", deviceClass: "mobile", device: subAndroid, name: subAndroid.name };
+  }
+
+  // 5. Từ khoá nhận diện thiết bị Apple (iPhone, iPad, iPod)
+  if (lower.includes("iphone") || lower.includes("ipad") || lower.includes("ipod")) {
+    const isTablet = lower.includes("ipad");
+    const synthetic = {
+      name: raw,
+      w: isTablet ? 834 : 393,
+      h: isTablet ? 1194 : 852,
+      dpr: isTablet ? 2 : 3,
+    };
+    return { type: "custom-mobile", os: "ios", deviceClass: "mobile", device: synthetic, name: raw };
+  }
+
+  // 6. Từ khoá nhận diện thiết bị Android (Galaxy, Pixel, Xiaomi, Redmi, Samsung, OPPO, vivo...)
+  if (
+    lower.includes("galaxy") ||
+    lower.includes("pixel") ||
+    lower.includes("xiaomi") ||
+    lower.includes("redmi") ||
+    lower.includes("samsung") ||
+    lower.includes("oppo") ||
+    lower.includes("vivo") ||
+    lower.includes("sony") ||
+    lower.includes("huawei") ||
+    lower.includes("phone") ||
+    lower.includes("mobile")
+  ) {
+    const synthetic = {
+      model: raw.replace(/\s+/g, "-"),
+      name: raw,
+      w: 412,
+      h: 915,
+      dpr: 2.625,
+      gpuVendor: lower.includes("samsung") || lower.includes("galaxy") ? "Qualcomm" : "ARM",
+      gpu: lower.includes("samsung") || lower.includes("galaxy") ? "Adreno (TM) 750" : "Mali-G715",
+    };
+    return { type: "custom-mobile", os: "android", deviceClass: "mobile", device: synthetic, name: raw };
+  }
+
+  // 7. Dự phòng: Coi như thiết bị máy tính tuỳ chỉnh
+  return {
+    type: "custom-desktop",
+    name: raw,
+    deviceClass: "desktop",
+    os: "windows",
+  };
 }
 
 // ---- Bước 1: chọn hồ sơ --------------------------------------------------------------------
 
 /**
- * @param {{ device?: "random"|"desktop"|"mobile", browsers?: string[], mobileRatio?: number, rng?: () => number }} [options]
+ * @param {{ device?: string, browsers?: string[], mobileRatio?: number, rng?: () => number }} [options]
  */
 export function pickFingerprintProfile(options = {}) {
   const rng = options.rng ?? Math.random;
   const allowed = (options.browsers?.length ? options.browsers : BROWSER_IDS).filter((id) => BROWSERS[id]);
   const mobileRatio = Math.min(1, Math.max(0, options.mobileRatio ?? 0.5));
+
+  const customMatch =
+    options.device && options.device !== "random" && options.device !== "desktop" && options.device !== "mobile"
+      ? resolveCustomDevice(options.device)
+      : null;
 
   const supports = (id, cls) => {
     const def = BROWSERS[id];
@@ -181,7 +318,9 @@ export function pickFingerprintProfile(options = {}) {
 
   /** @type {DeviceClass} */
   let deviceClass =
-    options.device === "desktop" || options.device === "mobile"
+    customMatch
+      ? customMatch.deviceClass
+      : options.device === "desktop" || options.device === "mobile"
       ? options.device
       : rng() < mobileRatio
       ? "mobile"
@@ -209,12 +348,27 @@ export function pickFingerprintProfile(options = {}) {
     (id) => (deviceClass === "desktop" ? BROWSERS[id].desktopWeight : BROWSERS[id].mobileWeight),
     rng,
   );
-  const osPool = BROWSERS[browser].os.filter((os) => (deviceClass === "desktop" ? DESKTOP_OS : MOBILE_OS).includes(os));
-  /** @type {OsId} */
-  const os = weightedPick(osPool, (id) => OS_WEIGHTS[id], rng);
+
+  let os;
+  if (customMatch?.os && (deviceClass === "desktop" ? DESKTOP_OS : MOBILE_OS).includes(customMatch.os)) {
+    if (BROWSERS[browser].os.includes(customMatch.os)) {
+      os = customMatch.os;
+    } else {
+      const osPool = BROWSERS[browser].os.filter((o) => (deviceClass === "desktop" ? DESKTOP_OS : MOBILE_OS).includes(o));
+      os = weightedPick(osPool, (id) => OS_WEIGHTS[id], rng);
+      notes.push(`Trình duyệt ${browser} không hỗ trợ trên ${customMatch.os}; đổi sang ${os}.`);
+    }
+  } else {
+    const osPool = BROWSERS[browser].os.filter((o) => (deviceClass === "desktop" ? DESKTOP_OS : MOBILE_OS).includes(o));
+    os = weightedPick(osPool, (id) => OS_WEIGHTS[id], rng);
+  }
 
   /** @type {EngineFamily} */
   const family = os === "ios" ? "webkit" : browser === "firefox" ? "firefox" : browser === "safari" ? "webkit" : "chromium";
+
+  if (customMatch) {
+    notes.push(`Thiết bị theo yêu cầu: ${customMatch.name || options.device}`);
+  }
 
   const profile = {
     deviceClass,
@@ -222,6 +376,8 @@ export function pickFingerprintProfile(options = {}) {
     browser,
     family,
     notes,
+    /** @type {{ model?: string, name?: string } | null} */
+    device: null,
     // Số build ngẫu nhiên được chốt NGAY tại đây để cả danh tính dùng một bộ số duy nhất.
     build: randInt(7000, 7600, rng),
     patch: randInt(40, 220, rng),
@@ -241,7 +397,10 @@ export function pickFingerprintProfile(options = {}) {
     else if (os === "macos") profile.gpu = { vendor: "Apple", renderer: pickOne(MAC_CHIPS, rng) };
     else profile.gpu = pickOne(LINUX_GPUS, rng);
   } else if (os === "android") {
-    const device = weightedPick(ANDROID_DEVICES, (d) => d.weight, rng);
+    const device =
+      customMatch?.device && customMatch.os === "android"
+        ? customMatch.device
+        : weightedPick(ANDROID_DEVICES, (d) => d.weight, rng);
     const version = weightedPick(ANDROID_VERSIONS, (v) => v.weight, rng);
     profile.device = { model: device.model, name: device.name };
     profile.screen = { width: device.w, height: device.h, dpr: device.dpr };
@@ -249,10 +408,14 @@ export function pickFingerprintProfile(options = {}) {
     profile.androidMajor = version.major;
     profile.hardwareConcurrency = 8;
     profile.deviceMemory = pickOne([4, 8, 8], rng);
-    profile.gpu = { vendor: device.gpuVendor, renderer: device.gpu };
+    profile.gpu = { vendor: device.gpuVendor || "Qualcomm", renderer: device.gpu || "Adreno (TM) 750" };
   } else {
-    const device = weightedPick(IPHONES, (d) => d.weight, rng);
-    profile.device = { model: "iPhone", name: device.name };
+    // os === "ios"
+    const device =
+      customMatch?.device && customMatch.os === "ios"
+        ? customMatch.device
+        : weightedPick(IPHONES, (d) => d.weight, rng);
+    profile.device = { model: device.name?.includes("iPad") ? "iPad" : "iPhone", name: device.name };
     profile.screen = { width: device.w, height: device.h, dpr: device.dpr };
     profile.hardwareConcurrency = 6;
     profile.gpu = { vendor: "Apple", renderer: "Apple GPU" };
@@ -303,7 +466,9 @@ function platformToken(profile) {
       // Chrome Android đã "giảm UA": phiên bản và model thật chỉ nằm trong Client Hints.
       return "Linux; Android 10; K";
     default:
-      return "iPhone; CPU iPhone OS 18_6 like Mac OS X";
+      return profile.device?.model === "iPad"
+        ? "iPad; CPU OS 18_6 like Mac OS X"
+        : "iPhone; CPU iPhone OS 18_6 like Mac OS X";
   }
 }
 
@@ -426,7 +591,7 @@ export function materializeFingerprint(profile, options = {}) {
       : profile.os === "macos" ? "MacIntel"
       : profile.os === "linux" ? "Linux x86_64"
       : profile.os === "android" ? (profile.family === "firefox" ? "Linux aarch64" : "Linux armv81")
-      : "iPhone";
+      : profile.device?.model === "iPad" ? "iPad" : "iPhone";
 
   const webgl = buildWebgl(profile);
 

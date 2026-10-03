@@ -9,6 +9,18 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.155 — Bổ sung tuỳ chọn tự nhập thiết bị giả lập cụ thể theo ý muốn (03/10/2026)
+
+- Bổ sung tuỳ chọn cho phép người dùng tự nhập thiết bị hoặc hệ điều hành giả lập cụ thể:
+  - Cập nhật kịch bản Windows [run-ad-viewer.bat](run-ad-viewer.bat): Mở rộng mục lựa chọn `[9] Thiet bi gia lap`, thêm tuỳ chọn `4. Tu nhap thiet bi cu the [vi du: iPhone 15, Pixel 8, Galaxy S24, Windows, macOS...]`. Người dùng có thể chọn `4` rồi nhập tên thiết bị hoặc gõ trực tiếp tên thiết bị ngay tại dấu nhắc. Tự động bọc tham số `--device="%CUSTOM_DEVICE%"` vào chuỗi thực thi.
+  - Cập nhật [scripts/adViewerFingerprint.mjs](scripts/adViewerFingerprint.mjs):
+    - Mở rộng hàm `parseDeviceMode` để nhận diện chuỗi thiết bị tuỳ chỉnh của người dùng thay vì chỉ giới hạn ở `desktop` / `mobile` / `random`.
+    - Bổ sung hàm `resolveCustomDevice` có khả năng phân tích và khớp thiết bị thông minh: nhận diện hệ điều hành máy tính (`windows`, `macos`, `linux`), hệ điều hành di động (`android`, `ios`), các dòng iPhone/iPad (`iPhone 11` đến `iPhone 16 Pro Max`, `iPad Pro`, `iPad Air`), các dòng điện thoại Android phổ biến (`Galaxy S24 Ultra`, `Galaxy S24`, `Galaxy S23`, `Galaxy A55`, `Pixel 8/9`, `Xiaomi 14`, `Redmi`, `OPPO`, `vivo`).
+    - Nâng cấp `pickFingerprintProfile` để xây dựng vân tay phần cứng (màn hình, DPR, GPU WebGL, số nhân CPU, bộ nhớ RAM, Client Hints model) khớp chính xác với thiết bị người dùng chỉ định.
+    - Cập nhật `platformToken` và `navigatorPlatform` hỗ trợ đầy đủ nhận diện thiết bị iPad.
+  - Cập nhật [scripts/adViewer.mjs](scripts/adViewer.mjs): Tự động loại bỏ dấu nháy thừa trong `getCliArg` và hiển thị chi tiết tên thiết bị tuỳ chỉnh trên nhật ký khởi động.
+  - Cập nhật kiểm tra [scripts/verifyAdViewerHealth.mts](scripts/verifyAdViewerHealth.mts) kiểm chứng toàn diện cơ chế phân giải thiết bị tuỳ chỉnh và tuỳ chọn mới trong file batch.
+
 ## 1.3.154 — Tuỳ chỉnh thời gian tối đa chờ render Adsterra và cơ chế cưỡng chế click quảng cáo ngay lập tức (03/10/2026)
 
 - Cho phép người dùng thiết lập thời gian tối đa chờ render quảng cáo Adsterra:

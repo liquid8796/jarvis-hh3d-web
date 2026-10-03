@@ -188,8 +188,9 @@ echo [9] Thiet bi gia lap [doi moi sau moi lan xoa cache]:
 echo     1. Ngau nhien Desktop + Mobile [mac dinh, 50/50]
 echo     2. Chi Desktop [Windows / macOS / Linux]
 echo     3. Chi Mobile [Android / iPhone - chu ky mobile tu dung click cam ung CDP]
+echo     4. Tu nhap thiet bi cu the [vi du: iPhone 15, Pixel 8, Galaxy S24, Windows, macOS...]
 set "INPUT_DEVICE="
-set /p "INPUT_DEVICE=    Chon [1-3, Enter = 1]: "
+set /p "INPUT_DEVICE=    Chon [1-4, Enter = 1]: "
 set "ARG_DEVICE=--device=random"
 if "%INPUT_DEVICE%"=="2" (
     set "ARG_DEVICE=--device=desktop"
@@ -197,9 +198,24 @@ if "%INPUT_DEVICE%"=="2" (
 ) else if "%INPUT_DEVICE%"=="3" (
     set "ARG_DEVICE=--device=mobile"
     echo     -^> Thiet bi: Chi Mobile
+) else if "%INPUT_DEVICE%"=="4" (
+    set "CUSTOM_DEVICE="
+    set /p "CUSTOM_DEVICE=    Nhap ten thiet bi hoac he dieu hanh mong muon: "
+    goto :custom_device
+) else if not "%INPUT_DEVICE%"=="1" if not "%INPUT_DEVICE%"=="" (
+    set "CUSTOM_DEVICE=%INPUT_DEVICE%"
+    goto :custom_device
 ) else (
     echo     -^> Thiet bi: Ngau nhien Desktop + Mobile
 )
+goto :after_device
+
+:custom_device
+if not defined CUSTOM_DEVICE set "CUSTOM_DEVICE=random"
+set "ARG_DEVICE=--device="%CUSTOM_DEVICE%""
+echo     -^> Thiet bi: %CUSTOM_DEVICE%
+
+:after_device
 echo.
 
 REM 10. Trinh duyet gia lap

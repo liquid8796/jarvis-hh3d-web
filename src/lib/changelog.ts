@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.138",
+    date: "2026-10-03",
+    lines: [
+      "Tích hợp chế độ hỗ trợ chuột Logitech G-HUB cùng kịch bản driver phần cứng cho dòng chuột G304.",
+      "Khắc phục triệt để lỗi co nhỏ cửa sổ Chrome và chuẩn hoá toạ độ rê chuột phần cứng trên màn hình Windows.",
+    ],
+  },
+  {
     version: "1.3.137",
     date: "2026-10-03",
     lines: [
@@ -469,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Nuôi kho GitHub nay có thể chỉ tạo/nuôi repo phụ trước; khi bỏ chế độ hoãn, repo chính và khôi lỗi chính mới được mở mà không mất các repo phụ.",
       "Auto chuyển Hẹn giờ quest sang cột trái, có thể gấp/mở; các nút Mở/Gấp của quest cũng lớn và dễ bấm hơn.",
       "Profile GitHub mới được Ollama điền bio/name an toàn khi PAT có quyền user; avatar vẫn giữ nguyên vì PAT không hỗ trợ đổi ảnh tự động.",
-    ],
-  },
-  {
-    version: "1.3.88",
-    date: "2026-09-21",
-    lines: [
-      "Trong Phòng Chat, bấm khung tin được trả lời nay tự đưa bạn về đúng tin gốc và làm nó sáng nhẹ để dễ nhận ra.",
-      "Tin gốc nằm ở lịch sử cũ thì sảnh tự lật tới đúng chỗ; tin đã hết hạn sẽ báo rõ thay vì bấm mà không có phản hồi.",
     ],
   },
 ];

@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.138 — Tích hợp Logitech G-HUB Driver Assist & Sửa triệt để toạ độ OS Mouse (03/10/2026)
+
+- Loại bỏ lệnh `ShowWindow(SW_RESTORE)` trong `scripts/winMouse.ps1`, thay bằng `SwitchToThisWindow` và `SetForegroundWindow` an toàn, ngăn chặn việc cửa sổ Chrome bị co nhỏ làm sai lệch toàn bộ toạ độ click trên màn hình desktop.
+- Bổ sung chế độ `--click-mode=ghub` (Logitech G-HUB Assist) trong `scripts/adViewer.mjs` và menu `run-ad-viewer.bat`: auto tự động di chuyển con trỏ chuột đến đúng tâm quảng cáo trên Chrome, sau đó người dùng bấm nút hông G4/G5 trên chuột Logitech G304 để phát chuỗi click ở tầng driver kernel Logitech (`logi_joy_vir_hid.sys`).
+- Bổ sung tệp kịch bản mẫu Lua `scripts/ghub_macro.lua` để nạp vào mục Scripting trong phần mềm Logitech G-HUB.
+
 ## 1.3.137 — Rút ngắn thời gian lướt đọc bài viết trước khi click quảng cáo tối đa 3 giây (03/10/2026)
 
 - Giới hạn thời gian mô phỏng người dùng lướt và đọc bài viết trước khi bấm quảng cáo (`simulateHumanReading`) xuống tối đa 3 giây (`rand(1500, 3000)` thay vì 6–12 giây).

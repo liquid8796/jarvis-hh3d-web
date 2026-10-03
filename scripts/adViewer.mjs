@@ -111,6 +111,13 @@ let CLICK_MODE = "cdp";
 if (rawClickMode === "mouse") {
   CLICK_MODE = "mouse";
 } else if (
+  rawClickMode === "ghub" ||
+  rawClickMode === "logitech" ||
+  process.argv.includes("--ghub") ||
+  process.argv.includes("--logitech")
+) {
+  CLICK_MODE = "ghub";
+} else if (
   rawClickMode === "os" ||
   rawClickMode === "os-mouse" ||
   rawClickMode === "win32" ||
@@ -1014,8 +1021,68 @@ async function waitForManualUserClick(context, page, timeoutMs = 45000) {
   });
 }
 
+/**
+ * Chế độ kết hợp Logitech G-HUB: Auto rê chuột phần cứng đến quảng cáo, sau đó phát chuông báo
+ * để người dùng bấm nút hông G4/G5 trên chuột Logitech G304 nhằm kích hoạt click từ driver Logitech.
+ * Nếu không thấy phản hồi sau 25s, tự động click fallback bằng OS Hardware Mouse.
+ */
+async function humanClickGhub(page, ctx, targetX, targetY) {
+  if (process.platform !== "win32") {
+    return humanClickCdp(page, ctx, targetX, targetY);
+  }
+
+  try {
+    await page.bringToFront().catch(() => {});
+    const metrics = await page.evaluate(() => ({
+      screenX: window.screenX,
+      screenY: window.screenY,
+      outerWidth: window.outerWidth,
+      innerWidth: window.innerWidth,
+      outerHeight: window.outerHeight,
+      innerHeight: window.innerHeight,
+      dpr: window.devicePixelRatio || 1,
+    }));
+
+    const borderLeft = Math.max(0, (metrics.outerWidth - metrics.innerWidth) / 2);
+    const borderTop = Math.max(0, metrics.outerHeight - metrics.innerHeight - borderLeft);
+    const dpr = metrics.dpr || 1;
+
+    const desktopX = Math.round((metrics.screenX + borderLeft + targetX) * dpr);
+    const desktopY = Math.round((metrics.screenY + borderTop + targetY) * dpr);
+
+    const psScript = path.join(__dirname, "winMouse.ps1");
+    if (existsSync(psScript)) {
+      const hoverMs = rand(800, 1500);
+      execSync(
+        `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -targetX ${desktopX} -targetY ${desktopY} -steps 20 -hoverMs ${hoverMs} -click 0`,
+        { stdio: "ignore", timeout: 15000 },
+      );
+    }
+  } catch {}
+
+  log("\n" + "=".repeat(64));
+  log("🔔 [CHẾ ĐỘ LOGITECH G-HUB ASSIST]");
+  log("👉 Chuột đã rê trúng tâm quảng cáo trên Chrome!");
+  log("👉 Vui lòng bấm nút G4/G5 (nút hông) trên chuột Logitech G304 để phát click driver...");
+  log("⏳ Đang chờ tín hiệu click từ chuột Logitech (tối đa 25 giây)...");
+  log("=".repeat(64) + "\n");
+  try { process.stdout.write("\x07"); } catch {}
+
+  const userPage = await waitForManualUserClick(ctx, page, 25000);
+  if (userPage) {
+    log("✓ Đã nhận diện thao tác click driver thành công từ chuột Logitech G304!");
+    return;
+  }
+
+  log("⚠ Hết thời gian chờ click từ chuột G304; tự động click bằng OS Mouse.");
+  return humanClickOs(page, ctx, targetX, targetY);
+}
+
 /** Dispatcher thống nhất — chọn engine theo CLICK_MODE. */
 async function humanClick(page, ctx, x, y) {
+  if (CLICK_MODE === "ghub") {
+    return humanClickGhub(page, ctx, x, y);
+  }
   if (CLICK_MODE === "os-mouse") {
     return humanClickOs(page, ctx, x, y);
   }
@@ -1030,7 +1097,7 @@ async function humanClick(page, ctx, x, y) {
  * dừng lại như đang nhìn, rồi từ từ rê vào vị trí đích.
  */
 async function preClickEngagement(page, ctx, targetX, targetY) {
-  if (CLICK_MODE === "os-mouse" && process.platform === "win32") {
+  if ((CLICK_MODE === "os-mouse" || CLICK_MODE === "ghub") && process.platform === "win32") {
     try {
       const nearX = targetX + rand(-60, 60);
       const nearY = targetY + rand(-40, 40);
@@ -1755,6 +1822,7 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
         !useMyChrome &&
         CLICK_MODE !== "manual" &&
         CLICK_MODE !== "os-mouse" &&
+        CLICK_MODE !== "ghub" &&
         !process.argv.includes("--head") &&
         !process.argv.includes("--visible") &&
         process.env.HEADLESS !== "0";

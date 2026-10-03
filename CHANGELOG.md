@@ -9,6 +9,23 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.156 — Gỡ bỏ quảng cáo NativeBanner và nâng xác suất click Popunder lên 80% (03/10/2026)
+
+- Gỡ bỏ hoàn toàn loại quảng cáo NativeBanner (4:1) khỏi website:
+  - Cập nhật [src/components/adsterra/AdsterraClientAds.tsx](src/components/adsterra/AdsterraClientAds.tsx): Loại bỏ slot container NativeBanner (`ADSTERRA_NATIVE_CONTAINER_ID`), script nhúng `ADSTERRA_NATIVE_SCRIPT_SRC`, ref `nativeRef`, trạng thái `nativeStatus` và hiệu ứng gắn thẻ DOM tương ứng.
+  - Cập nhật [src/app/adsterra.css](src/app/adsterra.css): Xoá các định kiểu CSS cho class `.adsterra-native`.
+  - Cập nhật [scripts/verifyAdsterra.mts](scripts/verifyAdsterra.mts): Cập nhật phép kiểm xác nhận mã nguồn website không còn chứa script và container của NativeBanner.
+- Nâng cấp kịch bản tự động xem quảng cáo [scripts/adViewer.mjs](scripts/adViewer.mjs):
+  - Bổ sung cấu hình xác suất click Popunder `POPUNDER_RATIO` (mặc định 80% = 0.8), hỗ trợ tuỳ biến qua cờ CLI `--popunder-ratio`, `--popunder-prob`, `--popunder-probability`, `--popunder-rate` hoặc biến môi trường `AD_VIEWER_POPUNDER_RATIO`.
+  - Cập nhật `runOneCycle()`: Trong chế độ tự động, quay số xác suất (`Math.random() < POPUNDER_RATIO`). Khi đạt xác suất 80%, auto ưu tiên kích hoạt click tự nhiên trên trang để kích nổ Popunder trước; nếu Popunder gặp cooldown từ mạng quảng cáo thì tự động chuyển sang click banner dự phòng. Trong 20% còn lại, auto ưu tiên click banner trước với Popunder là phương án dự phòng.
+  - Xây dựng hàm `resolvePopunderTarget(page)`: Tính toán thông minh toạ độ click tự nhiên trong các thẻ nội dung (`main`, `article`, `section`, `.container`, `p`, tiêu đề) hoặc trong vùng trung tâm an toàn của khung nhìn (viewport), tương thích mượt mà cả desktop lẫn mobile.
+  - Cập nhật hàm `inspectAdsterraPlacements`: Điều chỉnh điều kiện kiểm tra `terminal` và cờ `allReady` để nhận biết khi trang không có slot native (`!nativeSlotFound`), đảm bảo chu kỳ render hoàn tất ngay khi banner sẵn sàng mà không bị chờ quá hạn vô ích.
+  - Hiển thị tỷ lệ ưu tiên click Popunder trong nhật ký khởi động `main()`.
+- Cập nhật kịch bản Windows [run-ad-viewer.bat](run-ad-viewer.bat):
+  - Bổ sung mục lựa chọn `[14] Xac suat uu tien click quang cao Popunder [Popunder Ratio]` với mặc định 80%, tự động tổng hợp tham số `--popunder-ratio` vào chuỗi thực thi.
+- Cập nhật kiểm tra sức khoẻ [scripts/verifyAdViewerHealth.mts](scripts/verifyAdViewerHealth.mts):
+  - Bổ sung bộ kiểm tra phân giải tỷ lệ Popunder `parsePopunderRatio`, kiểm chứng việc chuyển giao tham số trong batch file và điều kiện `allReady` linh hoạt.
+
 ## 1.3.155 — Bổ sung tuỳ chọn tự nhập thiết bị giả lập cụ thể theo ý muốn (03/10/2026)
 
 - Bổ sung tuỳ chọn cho phép người dùng tự nhập thiết bị hoặc hệ điều hành giả lập cụ thể:

@@ -167,6 +167,26 @@ const BROWSER_SELECTION = parseBrowserList(getCliArg("--browsers") || getCliArg(
 const rawMobileRatio = Number(getCliArg("--mobile-ratio") || process.env.AD_VIEWER_MOBILE_RATIO || 50);
 const MOBILE_RATIO = Math.min(1, Math.max(0, (Number.isNaN(rawMobileRatio) ? 50 : rawMobileRatio) / 100));
 
+function parsePopunderRatio(input) {
+  const cli =
+    input !== undefined
+      ? String(input)
+      : getCliArg("--popunder-ratio") ||
+        getCliArg("--popunder-prob") ||
+        getCliArg("--popunder-probability") ||
+        getCliArg("--popunder-rate");
+  const env = input === undefined ? process.env.AD_VIEWER_POPUNDER_RATIO || process.env.AD_VIEWER_POPUNDER_PROB : "";
+  const raw = (cli || env || "").trim().toLowerCase();
+  if (!raw) return 0.8;
+  const cleaned = raw.replace(/%/g, "").trim();
+  const num = Number(cleaned);
+  if (Number.isNaN(num) || num < 0) return 0.8;
+  if (num > 1) return Math.min(1, num / 100);
+  return Math.min(1, num);
+}
+
+const POPUNDER_RATIO = parsePopunderRatio();
+
 const rawPageTimeout = getCliArg("--page-timeout");
 const defaultPageTimeout = process.argv.some((a) => a.includes("proxy")) || process.env.AD_VIEWER_PROXY ? 35_000 : 25_000;
 const parsedPageTimeout = Number(rawPageTimeout || process.env.AD_VIEWER_PAGE_TIMEOUT_MS || defaultPageTimeout);
@@ -1651,6 +1671,47 @@ async function preClickEngagement(page, ctx, targetX, targetY, instanceId = 0, c
 }
 
 /**
+ * Xác định toạ độ click tự nhiên trên trang web để kích hoạt Popunder.
+ * Tìm kiếm các vùng nội dung chính (main, article, section, container, thẻ văn bản p/h)
+ * hoặc tính toán toạ độ an toàn trong khung nhìn của trang.
+ */
+async function resolvePopunderTarget(page) {
+  try {
+    const vp = page.viewportSize() || { width: 1280, height: 720 };
+    const contentSelectors = [
+      "main",
+      "article",
+      "section",
+      ".container",
+      "p",
+      "h1, h2, h3",
+      "body",
+    ];
+    for (const sel of contentSelectors) {
+      const loc = page.locator(sel).first();
+      if ((await loc.count().catch(() => 0)) > 0) {
+        const box = await loc.boundingBox().catch(() => null);
+        if (box && box.width >= 40 && box.height >= 40) {
+          const minX = Math.max(20, Math.floor(box.x + box.width * 0.2));
+          const maxX = Math.min(vp.width - 20, Math.floor(box.x + box.width * 0.8));
+          const minY = Math.max(20, Math.floor(box.y + box.height * 0.2));
+          const maxY = Math.min(vp.height - 20, Math.floor(box.y + box.height * 0.8));
+          if (maxX > minX && maxY > minY) {
+            return { x: rand(minX, maxX), y: rand(minY, maxY) };
+          }
+        }
+      }
+    }
+    return {
+      x: rand(Math.floor(vp.width * 0.25), Math.floor(vp.width * 0.75)),
+      y: rand(Math.floor(vp.height * 0.25), Math.floor(vp.height * 0.75)),
+    };
+  } catch {
+    return { x: rand(200, 600), y: rand(200, 500) };
+  }
+}
+
+/**
  * Chuỗi tương tác hoàn chỉnh (tiếp cận + click) kết hợp lượt chuột vật lý theo chu kỳ:
  * cú click vật lý đầu tiên của một chu kỳ nhận lượt chuột và GIỮ nó tới khi `runOneCycle` kết
  * thúc (nhả trong khối finally), nên các click đệ quy trên trang đích không phải xếp hàng lại và
@@ -1838,7 +1899,9 @@ async function inspectAdsterraPlacements(page, startedAt = Date.now()) {
       .waitForFunction(
         ({ bannerSelector, nativeSelector }) => {
           const terminal = (selector) => {
-            const status = document.querySelector(selector)?.getAttribute("data-status") ?? "";
+            const el = document.querySelector(selector);
+            if (!el) return true;
+            const status = el.getAttribute("data-status") ?? "";
             return status === "ready" || status === "blocked";
           };
           return terminal(bannerSelector) && terminal(nativeSelector);
@@ -1920,7 +1983,7 @@ async function inspectAdsterraPlacements(page, startedAt = Date.now()) {
     renderMs: Date.now() - startedAt,
     banner,
     native,
-    allReady: banner.status === "ready" && native.status === "ready",
+    allReady: banner.status === "ready" && (native.status === "ready" || !nativeSlotFound),
     bannerIframeFound,
     bannerIframe,
   };
@@ -3094,6 +3157,8 @@ async function runOneCycle(
       [adCandidates[i], adCandidates[j]] = [adCandidates[j], adCandidates[i]];
     }
 
+    const preferPopunder = Math.random() < POPUNDER_RATIO;
+
     if (CLICK_MODE === "manual") {
       const targetCandidate = adCandidates.length > 0 ? adCandidates[0] : null;
       const targetDesc = targetCandidate ? targetCandidate.name : "Vùng quảng cáo / Trang web";
@@ -3141,31 +3206,58 @@ async function runOneCycle(
       } else {
         log("⚠ Đã hết thời gian 45s chờ click thủ công; chuyển sang chu kỳ tiếp theo.");
       }
-    } else if (adCandidates.length > 0) {
-      log(
-        `${isForceClick ? "[ForceClick] " : ""}Tìm thấy tổng cộng ${adCandidates.length} vị trí quảng cáo khả dụng${isForceClick ? " (kể cả chưa ready)" : ""}. Đang chọn ngẫu nhiên để click (${cycleClickMode} mode)...`,
-      );
-      for (const candidate of adCandidates) {
-        const clickTarget = await resolveAdClickTarget(candidate.locator);
-        if (!clickTarget) {
-          log(`  Bỏ qua [${candidate.name}] — không xác định được toạ độ.`);
-          continue;
-        }
-        log(`-> ${isForceClick ? "[ForceClick] " : ""}Click ngẫu nhiên quảng cáo [${candidate.name}] tại (${Math.round(clickTarget.x)}, ${Math.round(clickTarget.y)})...`);
-        const newPage = await performEngageAndClick(page, context, clickTarget.x, clickTarget.y, instanceId, cycleClickMode);
-        if (newPage) {
-          openedPage = newPage;
+    } else {
+      // 3. Chế độ tự động: Ưu tiên click Popunder theo xác suất POPUNDER_RATIO (mặc định 80%)
+      if (preferPopunder) {
+        log(
+          `🎯 [Popunder Ưu Tiên ${Math.round(POPUNDER_RATIO * 100)}%] Kích hoạt click tự nhiên trên trang web để ưu tiên nổ Popunder (${cycleClickMode} mode)...`,
+        );
+        const popTarget = await resolvePopunderTarget(page);
+        log(`-> Click tự nhiên tại (${Math.round(popTarget.x)}, ${Math.round(popTarget.y)}) để kích hoạt Popunder...`);
+        const popup = await performEngageAndClick(page, context, popTarget.x, popTarget.y, instanceId, cycleClickMode);
+        if (popup) {
+          openedPage = popup;
           adClicked = true;
-          log(`✓ ${isForceClick ? "[ForceClick] " : ""}Đã mở tab quảng cáo thành công từ [${candidate.name}].`);
-          break;
+          log("✓ Popunder đã được kích hoạt thành công!");
         } else {
           await sleep(2500);
           const allPages = context.pages();
           if (allPages.length > 1) {
             openedPage = allPages[allPages.length - 1];
             adClicked = true;
-            log(`✓ ${isForceClick ? "[ForceClick] " : ""}Đã bắt được trang quảng cáo từ tab phụ [${candidate.name}].`);
+            log("✓ Đã bắt được trang Popunder từ tab phụ.");
+          } else {
+            log("Popunder chưa mở tab mới (có thể do cooldown mạng quảng cáo); chuyển sang click banner dự phòng...");
+          }
+        }
+      }
+
+      if (!adClicked && adCandidates.length > 0) {
+        log(
+          `${isForceClick ? "[ForceClick] " : ""}${preferPopunder ? "[Banner Dự Phòng] " : ""}Tìm thấy tổng cộng ${adCandidates.length} vị trí quảng cáo khả dụng${isForceClick ? " (kể cả chưa ready)" : ""}. Đang chọn ngẫu nhiên để click (${cycleClickMode} mode)...`,
+        );
+        for (const candidate of adCandidates) {
+          const clickTarget = await resolveAdClickTarget(candidate.locator);
+          if (!clickTarget) {
+            log(`  Bỏ qua [${candidate.name}] — không xác định được toạ độ.`);
+            continue;
+          }
+          log(`-> ${isForceClick ? "[ForceClick] " : ""}Click ngẫu nhiên quảng cáo [${candidate.name}] tại (${Math.round(clickTarget.x)}, ${Math.round(clickTarget.y)})...`);
+          const newPage = await performEngageAndClick(page, context, clickTarget.x, clickTarget.y, instanceId, cycleClickMode);
+          if (newPage) {
+            openedPage = newPage;
+            adClicked = true;
+            log(`✓ ${isForceClick ? "[ForceClick] " : ""}Đã mở tab quảng cáo thành công từ [${candidate.name}].`);
             break;
+          } else {
+            await sleep(2500);
+            const allPages = context.pages();
+            if (allPages.length > 1) {
+              openedPage = allPages[allPages.length - 1];
+              adClicked = true;
+              log(`✓ ${isForceClick ? "[ForceClick] " : ""}Đã bắt được trang quảng cáo từ tab phụ [${candidate.name}].`);
+              break;
+            }
           }
         }
       }
@@ -3233,8 +3325,8 @@ async function runOneCycle(
 
     // 4. Click tự nhiên để kích hoạt popunder nếu chưa click được
     if (!adClicked && cycleClickMode !== "manual") {
-      log("Không click được quảng cáo cụ thể bằng selector; kích hoạt click mô phỏng tự nhiên trên trang...");
-      const popTarget = { x: rand(200, 600), y: rand(200, 500) };
+      log("Không click được quảng cáo cụ thể bằng selector; kích hoạt click mô phỏng tự nhiên trên trang để thử Popunder...");
+      const popTarget = await resolvePopunderTarget(page);
       const popup = await performEngageAndClick(page, context, popTarget.x, popTarget.y, instanceId, cycleClickMode);
       if (popup) {
         openedPage = popup;
@@ -3422,6 +3514,7 @@ async function main() {
   }
 
   log(`Số lượng instance: ${INSTANCE_COUNT}${INSTANCE_COUNT > 1 ? " (Chế độ chạy song song đa instance)" : " (Chế độ đơn lẻ)"}`);
+  log(`Xác suất ưu tiên click Popunder: ${Math.round(POPUNDER_RATIO * 100)}% (tự nhiên hóa hành vi tương tác web)`);
 
   const proxyManager = new ProxyManager();
   proxyManager.init();
@@ -3567,4 +3660,4 @@ if (isDirectExecution) {
   });
 }
 
-export { ProxyManager, parseProxyItem };
+export { ProxyManager, parseProxyItem, parsePopunderRatio, resolvePopunderTarget };

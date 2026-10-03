@@ -17,7 +17,7 @@ assert.match(runtime, /creativeCount/);
 assert.match(runtime, /renderMs/);
 assert.match(runtime, /boundingBox/);
 assert.match(runtime, /return "no-fill"/);
-assert.match(runtime, /allReady: banner\.status === "ready" && native\.status === "ready"/);
+assert.match(runtime, /allReady: banner\.status === "ready" && \(native\.status === "ready" \|\| !nativeSlotFound\)/);
 const nativeCreativeIndex = runtime.indexOf("const nativeCreativeCount");
 const renderResultIndex = runtime.indexOf("renderMs: Date.now() - startedAt");
 assert.ok(nativeCreativeIndex >= 0 && renderResultIndex > nativeCreativeIndex, "renderMs must include creative verification time");
@@ -101,7 +101,7 @@ assert.deepEqual(fpMod.parseBrowserList("Edge, FF, xyz"), { browsers: ["edge", "
 assert.equal(fpMod.estimateSafariMajor(new Date("2026-10-03T00:00:00Z")), 27);
 assert.equal(fpMod.estimateSafariMajor(new Date("2026-06-01T00:00:00Z")), 26);
 // @ts-ignore
-const { parseProxyItem } = await import("./adViewer.mjs");
+const { parseProxyItem, parsePopunderRatio } = await import("./adViewer.mjs");
 const p1 = parseProxyItem("103.152.112.5:8080@liquid:secret123");
 assert.equal(p1?.server, "http://103.152.112.5:8080");
 assert.equal(p1?.username, "liquid");
@@ -129,6 +129,22 @@ assert.match(runtime, /parseRenderTimeoutConfig/, "ad-viewer must parse render t
 assert.match(runtime, /isForceClick\s*=/, "ad-viewer must determine isForceClick when render is not finished within timeout");
 assert.match(runtime, /\[ForceClick\]/, "ad-viewer must log and execute force click when render times out");
 assert.match(batContent, /--render-timeout=/, "run-ad-viewer.bat must support --render-timeout option [13]");
+
+// ---- Xác suất ưu tiên click quảng cáo Popunder (Popunder Ratio) ----
+assert.equal(parsePopunderRatio(), 0.8, "default popunder ratio must be 80% (0.8)");
+assert.equal(parsePopunderRatio("80"), 0.8);
+assert.equal(parsePopunderRatio("80%"), 0.8);
+assert.equal(parsePopunderRatio("50%"), 0.5);
+assert.equal(parsePopunderRatio("100"), 1.0);
+assert.equal(parsePopunderRatio("0"), 0.0);
+assert.equal(parsePopunderRatio("0.65"), 0.65);
+assert.equal(parsePopunderRatio("invalid"), 0.8);
+
+assert.match(runtime, /POPUNDER_RATIO/, "ad-viewer must configure POPUNDER_RATIO");
+assert.match(runtime, /preferPopunder\s*=\s*Math\.random\(\)\s*<\s*POPUNDER_RATIO/, "ad-viewer must roll popunder probability per cycle");
+assert.match(runtime, /resolvePopunderTarget/, "ad-viewer must resolve natural popunder click targets");
+assert.match(batContent, /\[14\] Xac suat uu tien click quang cao Popunder/, "run-ad-viewer.bat must offer option [14] for Popunder ratio");
+assert.match(batContent, /--popunder-ratio=/, "run-ad-viewer.bat must pass --popunder-ratio");
 
 // ---- Thiết bị giả lập tuỳ chọn theo mong muốn (Custom Device Emulation) ----
 assert.equal(fpMod.parseDeviceMode("iPhone 15"), "iPhone 15");

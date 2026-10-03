@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.156",
+    date: "2026-10-03",
+    lines: [
+      "Gỡ bỏ hoàn toàn quảng cáo dạng NativeBanner trên website để tối ưu tốc độ tải và bố cục trang.",
+      "Tăng xác suất ưu tiên click quảng cáo Popunder lên 80% trong các chu kỳ tự động xem trang.",
+    ],
+  },
+  {
     version: "1.3.155",
     date: "2026-10-03",
     lines: [
@@ -462,15 +470,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Góc phải nay có Trò chuyện, Phòng chat và Thành viên; mọi box mở ngay tại trang đang xem.",
       "Bạn có thể nhắn riêng, tìm đạo hữu, xem ai online hoặc đang bận và tự chọn trạng thái của mình.",
       "Trang Hồ Sơ nay cho đổi mật khẩu sau khi xác nhận mật khẩu hiện tại.",
-    ],
-  },
-  {
-    version: "1.3.106",
-    date: "2026-09-30",
-    lines: [
-      "Vấn Đáp nay nhận diện giao diện mới cho cả tài khoản VIP và thường.",
-      "Khôi lỗi đọc đúng nội dung đáp án, không còn nhầm chữ A, B, C, D vào tên lựa chọn.",
-      "Trạng thái trả lời và hoàn thành được chờ theo trang thật thay vì bộ chọn cũ.",
     ],
   },
 ];

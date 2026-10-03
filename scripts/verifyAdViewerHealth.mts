@@ -29,6 +29,8 @@ assert.match(runtime, /generateBezierPath\s*\(/, "ad-viewer must generate Bézie
 assert.match(runtime, /MAX_RECURSIVE_CLICKS/, "ad-viewer must support recursive ad clicks");
 assert.match(runtime, /handleRecursiveAdClicks/, "ad-viewer must handle recursive ad clicks");
 assert.match(runtime, /while \(Date\.now\(\) - startTime < MAX_LIFETIME_MS\)/, "ad-viewer must loop across lifetime cycles");
+assert.match(runtime, /CLEAR_CACHE_CYCLES/, "ad-viewer must configure clear cache cycles");
+assert.match(runtime, /cycleIndex % CLEAR_CACHE_CYCLES === 0/, "ad-viewer must clear browser data every n cycles");
 // @ts-ignore
 const { parseProxyItem } = await import("./adViewer.mjs");
 const p1 = parseProxyItem("103.152.112.5:8080@liquid:secret123");

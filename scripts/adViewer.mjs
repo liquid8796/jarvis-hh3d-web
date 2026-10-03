@@ -90,6 +90,19 @@ function getCliArg(flag) {
   return "";
 }
 
+const rawClearCacheCycles =
+  getCliArg("--clear-cache-cycles") ||
+  getCliArg("--clean-cycles") ||
+  process.argv.find((a) => a.startsWith("--clear-cache-cycles="))?.split("=")[1] ||
+  process.argv.find((a) => a.startsWith("--clean-cycles="))?.split("=")[1];
+const envClearCacheCycles =
+  process.env.AD_VIEWER_CLEAR_CACHE_CYCLES || process.env.AD_VIEWER_CLEAN_CYCLES;
+const parsedClearCacheCycles = Number(rawClearCacheCycles || envClearCacheCycles || 1);
+const CLEAR_CACHE_CYCLES = Math.max(
+  0,
+  Number.isNaN(parsedClearCacheCycles) ? 1 : Math.floor(parsedClearCacheCycles),
+);
+
 const rawPageTimeout = getCliArg("--page-timeout");
 const defaultPageTimeout = process.argv.some((a) => a.includes("proxy")) || process.env.AD_VIEWER_PROXY ? 35_000 : 25_000;
 const parsedPageTimeout = Number(rawPageTimeout || process.env.AD_VIEWER_PAGE_TIMEOUT_MS || defaultPageTimeout);
@@ -1806,7 +1819,13 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false, p
   throw new Error(`Không thể khởi động Chrome trên cổng CDP ${cdpPort} sau 15 giây.`);
 }
 
-async function runOneCycle(extensionPath, currentProxy = null, proxyManager = null) {
+async function runOneCycle(
+  extensionPath,
+  currentProxy = null,
+  proxyManager = null,
+  cycleIndex = 1,
+  sharedProfileDir = null
+) {
   const useMyChrome =
     process.argv.includes("--my-chrome") ||
     process.argv.includes("--my-profile") ||
@@ -1869,9 +1888,14 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
         process.exit(1);
       }
     } else {
-      profileDir = mkdtempSync(path.join(tmpdir(), "ad-viewer-profile-"));
-      isTempProfile = true;
-      prepareExtensionProfile(profileDir);
+      if (sharedProfileDir) {
+        profileDir = sharedProfileDir;
+        isTempProfile = false;
+      } else {
+        profileDir = mkdtempSync(path.join(tmpdir(), "ad-viewer-profile-"));
+        isTempProfile = true;
+        prepareExtensionProfile(profileDir);
+      }
     }
 
     if (!cdpUrl) {
@@ -1962,9 +1986,6 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
     }
 
     page = useMyChrome || cdpUrl ? await context.newPage() : context.pages()[0] || (await context.newPage());
-
-    // Dọn dẹp triệt để toàn bộ cache và cookies trước khi bắt đầu chu kỳ mới
-    await cleanupAllBrowserData(context, page).catch(() => {});
 
     // Cài đặt Anti-Detect overrides qua CDP
     try {
@@ -2410,8 +2431,14 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
       proxyManager?.flush();
     }
   } finally {
-    // 1. Dọn dẹp triệt để 100% cache, cookies và storage của toàn bộ trình duyệt sau mỗi chu kỳ
-    if (context) {
+    // 1. Dọn dẹp triệt để 100% cache, cookies và storage của toàn bộ trình duyệt sau mỗi n chu kỳ
+    const shouldCleanBrowserData =
+      CLEAR_CACHE_CYCLES > 0 && cycleIndex % CLEAR_CACHE_CYCLES === 0;
+
+    if (context && shouldCleanBrowserData) {
+      log(
+        `\n[Cache & Cookies] ✓ Đã hoàn thành mốc chu kỳ ${cycleIndex} (cứ mỗi ${CLEAR_CACHE_CYCLES} chu kỳ) — đang dọn dẹp triệt để 100% cache, cookies và storage toàn trình duyệt...`
+      );
       try {
         await withTimeout(
           cleanupAllBrowserData(context, page),
@@ -2420,6 +2447,13 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
       } catch {
         // bỏ qua lỗi dọn dẹp
       }
+    } else if (CLEAR_CACHE_CYCLES > 0) {
+      const step = ((cycleIndex - 1) % CLEAR_CACHE_CYCLES) + 1;
+      log(
+        `[Cache & Cookies] Bảo lưu cache và cookies phiên duyệt (tiến độ: ${step}/${CLEAR_CACHE_CYCLES} chu kỳ).`
+      );
+    } else {
+      log("[Cache & Cookies] Bảo lưu cache và cookies toàn thời gian (tắt tự động xoá định kỳ).");
     }
 
     if (cdpUrl) {
@@ -2481,38 +2515,76 @@ async function main() {
     log("Tiện ích CanvasBlocker: tắt (mặc định). Dùng --canvas-blocker để bật.");
   }
 
+  const cleanCyclesDesc =
+    CLEAR_CACHE_CYCLES === 0
+      ? "Tắt (không tự động xoá)"
+      : CLEAR_CACHE_CYCLES === 1
+      ? "Sau mỗi chu kỳ (1 chu kỳ)"
+      : `Sau mỗi ${CLEAR_CACHE_CYCLES} chu kỳ`;
+  log(`Chu kỳ xoá cache & cookies: ${cleanCyclesDesc}`);
+
   const proxyManager = new ProxyManager();
   proxyManager.init();
 
   const startTime = Date.now();
   let cycle = 0;
+  let sharedProfileDir = null;
 
-  while (Date.now() - startTime < MAX_LIFETIME_MS) {
-    cycle++;
-    log(`\n=================== BẮT ĐẦU CHU KỲ ${cycle} ===================`);
-    const currentProxy = await proxyManager.getNextWorkingProxy();
-    await runOneCycle(extPath, currentProxy, proxyManager);
+  try {
+    while (Date.now() - startTime < MAX_LIFETIME_MS) {
+      cycle++;
+      log(`\n=================== BẮT ĐẦU CHU KỲ ${cycle} ===================`);
+      const currentProxy = await proxyManager.getNextWorkingProxy();
 
-    const elapsedMs = Date.now() - startTime;
-    const remainingMs = MAX_LIFETIME_MS - elapsedMs;
-    log(`Hoàn thành chu kỳ ${cycle}. Thời gian đã chạy: ${Math.round(elapsedMs / 60000)}m (còn ${Math.round(remainingMs / 60000)}m)`);
-
-    // Kiểm tra nâng cấp runtime nếu bật
-    if (SELF_UPDATE && currentVersion && cycle % 5 === 0) {
-      const remoteVer = (await checkRemoteVersion(WEB_URL)) || (FALLBACK_URL ? await checkRemoteVersion(FALLBACK_URL) : null);
-      if (remoteVer && remoteVer !== currentVersion) {
-        log(`Phát hiện bản phát hành mới (${remoteVer} != ${currentVersion}). Kết thúc với mã 90 để nhận bản mới.`);
-        process.exit(90);
+      if (
+        !process.argv.some((a) => a.startsWith("--cdp")) &&
+        !process.env.CDP_URL &&
+        !process.argv.includes("--my-chrome") &&
+        !process.argv.includes("--my-profile") &&
+        process.env.USE_MY_CHROME !== "1"
+      ) {
+        if (!sharedProfileDir) {
+          sharedProfileDir = mkdtempSync(path.join(tmpdir(), "ad-viewer-profile-"));
+          prepareExtensionProfile(sharedProfileDir);
+        }
       }
-    }
 
-    if (remainingMs <= 30_000) {
-      log("Hết thời gian tuổi thọ ca trực. Đóng ca an toàn.");
-      break;
-    }
+      await runOneCycle(extPath, currentProxy, proxyManager, cycle, sharedProfileDir);
 
-    const restMs = rand(2000, 5000);
-    await sleep(restMs);
+      if (sharedProfileDir && CLEAR_CACHE_CYCLES > 0 && cycle % CLEAR_CACHE_CYCLES === 0) {
+        try {
+          rmSync(sharedProfileDir, { recursive: true, force: true });
+        } catch {}
+        sharedProfileDir = null;
+      }
+
+      const elapsedMs = Date.now() - startTime;
+      const remainingMs = MAX_LIFETIME_MS - elapsedMs;
+      log(`Hoàn thành chu kỳ ${cycle}. Thời gian đã chạy: ${Math.round(elapsedMs / 60000)}m (còn ${Math.round(remainingMs / 60000)}m)`);
+
+      // Kiểm tra nâng cấp runtime nếu bật
+      if (SELF_UPDATE && currentVersion && cycle % 5 === 0) {
+        const remoteVer = (await checkRemoteVersion(WEB_URL)) || (FALLBACK_URL ? await checkRemoteVersion(FALLBACK_URL) : null);
+        if (remoteVer && remoteVer !== currentVersion) {
+          log(`Phát hiện bản phát hành mới (${remoteVer} != ${currentVersion}). Kết thúc với mã 90 để nhận bản mới.`);
+          process.exit(90);
+        }
+      }
+
+      if (remainingMs <= 30_000) {
+        log("Hết thời gian tuổi thọ ca trực. Đóng ca an toàn.");
+        break;
+      }
+
+      const restMs = rand(2000, 5000);
+      await sleep(restMs);
+    }
+  } finally {
+    if (sharedProfileDir) {
+      try {
+        rmSync(sharedProfileDir, { recursive: true, force: true });
+      } catch {}
+    }
   }
 
   log("Ca trực hoàn tất bình thường. Thoát mã 0.");

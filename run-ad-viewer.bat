@@ -172,8 +172,19 @@ set "ARG_RECURSIVE=--max-recursive-clicks=%INPUT_RECURSIVE%"
 echo     -^> Toi da %INPUT_RECURSIVE% luot click chuyen tiep
 echo.
 
+REM 8. Chu ky xoa cache va cookies trinh duyet
+echo [8] Chu ky xoa sach cache va cookies trinh duyet:
+echo     Nhap so chu ky chay truoc khi xoa sach toan bo cache va cookies.
+echo     (Vi du: 1 = xoa sau moi chu ky; 5 = chay 5 chu ky moi xoa mot lan)
+set "INPUT_CLEAN_CYCLES="
+set /p "INPUT_CLEAN_CYCLES=    Xoa sach cache + cookies sau bao nhieu chu ky [Nhap so n, Enter = 1]: "
+if not defined INPUT_CLEAN_CYCLES set "INPUT_CLEAN_CYCLES=1"
+set "ARG_CLEAN_CYCLES=--clear-cache-cycles=%INPUT_CLEAN_CYCLES%"
+echo     -^> Xoa cache + cookies: Sau moi %INPUT_CLEAN_CYCLES% chu ky
+echo.
+
 REM Tong hop lenh thuc thi
-set FINAL_ARGS=--my-chrome %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE%
+set FINAL_ARGS=--my-chrome %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES%
 
 echo ============================================================================
 echo   TONG HOP CAU HINH CHAY:

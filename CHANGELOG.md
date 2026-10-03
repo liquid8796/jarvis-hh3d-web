@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.144 — Xoá cache + cookies trình duyệt theo chu kỳ n do người dùng nhập (03/10/2026)
+
+- Thêm cấu hình `CLEAR_CACHE_CYCLES` cho `scripts/adViewer.mjs` (cờ `--clear-cache-cycles=N`, bí danh `--clean-cycles`, biến môi trường `AD_VIEWER_CLEAR_CACHE_CYCLES`). Mặc định `1` giữ nguyên hành vi cũ (xoá sau mỗi chu kỳ); `0` tắt hẳn việc xoá định kỳ.
+- `cleanupAllBrowserData` chỉ chạy ở khối `finally` khi `cycleIndex % CLEAR_CACHE_CYCLES === 0`; bỏ lượt xoá ở đầu chu kỳ vì nó phá mất phiên đang được giữ giữa các mốc.
+- Chế độ profile tạm (không CDP/`--my-chrome`): `main()` giữ một `sharedProfileDir` dùng chung qua các chu kỳ và chỉ `rmSync` nó ở mốc xoá — trước đây mỗi chu kỳ tạo profile mới nên cookies không thể sống quá một vòng dù có tắt xoá.
+- `run-ad-viewer.bat` thêm bước [8] hỏi số chu kỳ n (Enter = 1) và truyền `--clear-cache-cycles=n`.
+- `verify:ad-viewer-health` khoá điều kiện chia hết theo chu kỳ.
+
 ## 1.3.143 — Khôi phục trọn bộ 10 định dạng quảng cáo Adsterra (03/10/2026)
 
 - Hoàn tác patch v1.3.142 theo yêu cầu, khôi phục lại trọn bộ 10 định dạng quảng cáo Adsterra (Leaderboard, 468x60, 320x50, 300x250, 160x600, 160x300, Native, Smartlink, Popunder, Social Bar).

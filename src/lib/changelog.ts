@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.144",
+    date: "2026-10-03",
+    lines: [
+      "Trình xem quảng cáo nay chỉ dọn sạch dữ liệu duyệt web sau mỗi n vòng chạy, với n do bạn tự nhập lúc khởi động.",
+      "Giữa các lần dọn, phiên duyệt được giữ nguyên để giống người dùng quay lại; nhập 0 để tắt hẳn việc dọn định kỳ.",
+    ],
+  },
+  {
     version: "1.3.143",
     date: "2026-10-03",
     lines: [
@@ -464,15 +472,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khôi lỗi GitHub nay được soát đủ cả đường chính lẫn đường dự phòng trước khi phát bản mới.",
       "Thiếu hoặc lặp một đường kết nối sẽ bị chặn từ đầu, không để ca mới khởi động với lối dự phòng hỏng.",
-    ],
-  },
-  {
-    version: "1.3.94",
-    date: "2026-09-26",
-    lines: [
-      "Khôi lỗi nay chỉ dùng Chromium; lựa chọn trình duyệt thứ hai và phần cài đặt liên quan đã được gỡ khỏi Tông Môn.",
-      "Promote repo phụ giờ giữ nguyên toàn bộ dự án, chỉ thêm phần vận hành khôi lỗi và không chép đè các tệp sẵn có.",
-      "Repo chính sau promote vẫn được nuôi tiếp phần dự án cũ; phần vận hành tự động được bảo vệ riêng và kho không thể bị xoá nhầm.",
     ],
   },
 ];

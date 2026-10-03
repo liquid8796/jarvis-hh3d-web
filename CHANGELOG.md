@@ -9,6 +9,18 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.150 — Ngăn chặn triệt để cửa sổ khởi động cướp focus và chuột khi chạy đa instance (03/10/2026)
+
+- Khắc phục triệt để hiện tượng instance khởi động (startup hoặc đầu chu kỳ mới) cướp tiêu điểm cửa sổ (OS window focus) và chuột vật lý từ instance đang trong lượt tương tác:
+  - Loại bỏ cờ `--start-maximized` khi khởi chạy Chromium ở chế độ đa instance (`INSTANCE_COUNT > 1`), ngăn Windows OS tự động đưa cửa sổ mới mở lên hàng đầu.
+  - Vô hiệu hoá việc gọi `maximizeAndFocusWindow()`, `ensureWindowMaximized()` và `page.bringToFront()` trong giai đoạn khởi động hoặc trước lượt tương tác khi chạy đa instance. Cửa sổ chỉ được phóng to và kích hoạt lên foreground khi instance đó đã chính thức nhận lượt độc quyền (`acquireCycleTurn`).
+  - Nâng cấp `organicScroll()`: Khi chạy đa instance và chưa nắm lượt tương tác, cuộn trang hoàn toàn qua DOM `window.scrollBy({ behavior: "smooth" })` thay vì `page.mouse.wheel()`, loại bỏ hoàn toàn xung đột hệ thống chuột.
+  - Nâng cấp `simulateHumanReading()`: Chỉ rê chuột vi mô (`page.mouse.move()`) khi đang nắm lượt tương tác (`canInteractForeground`). Khi chưa có lượt, chỉ dừng đọc tự nhiên và cuộn nhẹ qua DOM, tuyệt đối không chạm vào chuột.
+  - Bổ sung hàm `tagInstancePage()` tự động gắn thẻ `[AdViewer-Inst-$instanceId]` vào tiêu đề trang ngay khi mở trang, tải xong DOM và mở tab popup mới.
+  - Cập nhật `scripts/winMouse.ps1`: Tự động thử lại nhận diện cửa sổ theo thẻ `[AdViewer-Inst-$instanceId]` tối đa 10 lần (100ms/lần). Khi chỉ định `instanceId`, tuyệt đối không fallback sang cửa sổ Chrome của instance khác. Bổ sung chế độ kích hoạt/phóng to nhanh không rê chuột (`-targetX 0 -targetY 0 -click 0`).
+  - Mở rộng `guardLaunch`: Bảo vệ khởi chạy trình duyệt mới cho toàn bộ các chế độ khi chạy đa instance (`INSTANCE_COUNT > 1`), không để instance mới mở cửa sổ trong lúc instance khác đang tương tác.
+  - Tăng khoảng thời gian giãn cách khởi động so le ban đầu (`staggerDelayMs`) từ 6s lên 8s/instance.
+
 ## 1.3.149 — Khoá độc quyền tương tác quảng cáo theo trọn chu kỳ cho chế độ đa instance (03/10/2026)
 
 - Chuyển đổi cơ chế điều phối tương tác đa instance trong `scripts/adViewer.mjs`:

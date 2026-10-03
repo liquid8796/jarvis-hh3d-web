@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.150",
+    date: "2026-10-03",
+    lines: [
+      "Ngăn chặn triệt để hiện tượng cửa sổ mới mở cướp tiêu điểm và chuột khi chạy song song nhiều luồng.",
+      "Cửa sổ chỉ kích hoạt và phóng to toàn màn hình khi đến đúng lượt bấm quảng cáo của luồng đó.",
+      "Tự động gắn mã nhận diện và điều phối chuột Windows chính xác tuyệt đối vào đúng cửa sổ được chỉ định.",
+    ],
+  },
+  {
     version: "1.3.149",
     date: "2026-10-03",
     lines: [
@@ -466,14 +475,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Web đã sẵn sàng cho Google AdSense bằng mã nhà xuất bản ca-pub, ads.txt và trang quyền riêng tư công khai.",
       "Quảng cáo chỉ bật trên tên miền chính thức; phiên quản trị được miễn để giảm nguy cơ bấm nhầm quảng cáo của chính mình.",
       "Khoá Google do người dùng cung cấp không được đưa vào mã nguồn; quảng cáo chỉ dùng mã nhà xuất bản công khai.",
-    ],
-  },
-  {
-    version: "1.3.100",
-    date: "2026-09-27",
-    lines: [
-      "Trang Tên Miền nay gọn hơn, chỉ giữ tên miền, trạng thái, vai trò và nút mở cần thiết.",
-      "Các đoạn giải thích dài, Luồng chuyển tiếp và Khuyến nghị đã được bỏ khỏi trang.",
     ],
   },
 ];

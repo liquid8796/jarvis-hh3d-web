@@ -36,12 +36,18 @@ public static extern int GetSystemMetrics(int nIndex);
 $chromeProc = $null
 if ($instanceId -gt 0) {
     # Nếu chỉ định instanceId, tìm chính xác cửa sổ Chrome có MainWindowTitle chứa tag [AdViewer-Inst-$instanceId]
-    $chromeProc = Get-Process -Name chrome, chromium -ErrorAction SilentlyContinue | Where-Object { 
-        $_.MainWindowHandle -ne [IntPtr]::Zero -and $_.MainWindowTitle -like "*[AdViewer-Inst-$instanceId]*"
-    } | Select-Object -First 1
+    # Thử lại tối đa 10 lần (cách nhau 100ms) để đợi Windows OS cập nhật tiêu đề từ DOM
+    for ($attempt = 0; $attempt -lt 10; $attempt++) {
+        $chromeProc = Get-Process -Name chrome, chromium -ErrorAction SilentlyContinue | Where-Object { 
+            $_.MainWindowHandle -ne [IntPtr]::Zero -and $_.MainWindowTitle -like "*[AdViewer-Inst-$instanceId]*"
+        } | Select-Object -First 1
+        if ($chromeProc) { break }
+        Start-Sleep -Milliseconds 100
+    }
 }
 
-if (-not $chromeProc) {
+if (-not $chromeProc -and $instanceId -eq 0) {
+    # Chỉ khi chạy đơn instance ($instanceId -eq 0) mới được phép kích hoạt cửa sổ Chrome bất kỳ
     try {
         $wshell = New-Object -ComObject WScript.Shell
         $wshell.AppActivate("Chrome") | Out-Null
@@ -54,7 +60,15 @@ if ($chromeProc) {
     [void][WinMouse.NativeMethods]::ShowWindow($chromeProc.MainWindowHandle, 3)
     [void][WinMouse.NativeMethods]::SwitchToThisWindow($chromeProc.MainWindowHandle, $true)
     [void][WinMouse.NativeMethods]::SetForegroundWindow($chromeProc.MainWindowHandle)
-    Start-Sleep -Milliseconds 60
+    Start-Sleep -Milliseconds 100
+} elseif ($instanceId -gt 0) {
+    Write-Warning "Không tìm thấy cửa sổ Chrome cho instance #$instanceId (tag: [AdViewer-Inst-$instanceId])"
+}
+
+if ($targetX -eq 0 -and $targetY -eq 0 -and $click -eq 0) {
+    # Yêu cầu chỉ phóng to và kích hoạt cửa sổ, không di chuyển chuột
+    Write-Output "WIN_WINDOW_FOCUSED_$instanceId"
+    exit 0
 }
 
 # 2. Lấy kích thước màn hình vật lý

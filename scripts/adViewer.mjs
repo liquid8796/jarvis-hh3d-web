@@ -315,7 +315,48 @@ const cycleTurns = new Map();
 let turnHolder = null;
 
 function isPhysicalClickMode(mode) {
-  return (mode === "os-mouse" || mode === "ghub" || mode === "manual") && process.platform === "win32";
+  return (mode === "os-mouse" || mode === "ghub" || mode === "manual" || mode === "mouse") && process.platform === "win32";
+}
+
+/**
+ * Gắn nhãn [AdViewer-Inst-$instanceId] vào tiêu đề cửa sổ / document.title
+ * để winMouse.ps1 định vị chính xác cửa sổ tương ứng trên Windows Desktop.
+ */
+async function tagInstancePage(page, instanceId = logContext.getStore()?.instanceId) {
+  if (!page || !instanceId || instanceId <= 0) return;
+  const tag = `[AdViewer-Inst-${instanceId}]`;
+  try {
+    await page.evaluate((t) => {
+      if (!document.title.includes(t)) {
+        document.title = `${t} ${document.title || "AdViewer"}`;
+      }
+    }, tag).catch(() => {});
+  } catch {}
+}
+
+/**
+ * Kích hoạt và phóng to chính xác cửa sổ Chrome thuộc instanceId lên hàng đầu trên Windows Desktop.
+ */
+function focusInstanceWindow(instanceId = logContext.getStore()?.instanceId) {
+  if (process.platform !== "win32" || !instanceId || instanceId <= 0) return;
+  const psScript = path.join(__dirname, "winMouse.ps1");
+  if (!existsSync(psScript)) return;
+  try {
+    execSync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -instanceId ${instanceId} -targetX 0 -targetY 0 -click 0`,
+      { stdio: "ignore", timeout: 8000 }
+    );
+  } catch {}
+}
+
+/**
+ * Instance này có quyền tương tác màn hình / chuột / đưa cửa sổ lên foreground không?
+ * - Nếu chạy đơn instance: Luôn được phép.
+ * - Nếu chạy nhiều instance: Chỉ instance đang nắm lượt tương tác (turnHolder) mới được phép.
+ */
+function canInteractForeground(instanceId = logContext.getStore()?.instanceId) {
+  if (INSTANCE_COUNT <= 1) return true;
+  return turnHolder === instanceId;
 }
 
 async function acquireCycleTurn(instanceId, { quiet = false } = {}) {
@@ -1102,7 +1143,7 @@ function computeClickTarget(box) {
 
 /** Giải toạ độ viewport cho phần tử bất kỳ (kể cả trong iframe). Trả null nếu không xác định. */
 async function resolveAdClickTarget(locator) {
-  await locator.scrollIntoViewIfNeeded({ timeout: 4000 }).catch(() => {});
+  await locator.scrollIntoViewIfNeeded({ timeout: 2500 }).catch(() => {});
   await sleep(100);
   const box = await locator.boundingBox().catch(() => null);
   if (!box || box.width < 2 || box.height < 2) return null;
@@ -1117,14 +1158,28 @@ function logNormalDelay(medianMs, sigma) {
 
 /**
  * Cuộn trang tự nhiên — từng nhịp nhỏ có quán tính và khoảng dừng mắt đọc nội dung.
+ * Khi chạy nhiều instance và chưa đến lượt tương tác, cuộn thuần qua DOM window.scrollBy để không chiếm chuột.
  */
-async function organicScroll(page, totalDistance) {
-  if (Math.abs(totalDistance) < 30) return;
+async function organicScroll(page, totalDistance, instanceId = logContext.getStore()?.instanceId) {
+  if (!page || Math.abs(totalDistance) < 30) return;
   const dir = totalDistance > 0 ? 1 : -1;
   let remaining = Math.abs(totalDistance);
+  const useDomScroll = INSTANCE_COUNT > 1 && !canInteractForeground(instanceId);
   while (remaining > 0) {
     const chunk = Math.min(remaining, rand(60, 200));
-    await page.mouse.wheel(0, chunk * dir);
+    if (useDomScroll) {
+      await page.evaluate((d) => {
+        window.scrollBy({ top: d, behavior: "smooth" });
+      }, chunk * dir).catch(() => {});
+    } else {
+      try {
+        await page.mouse.wheel(0, chunk * dir);
+      } catch {
+        await page.evaluate((d) => {
+          window.scrollBy({ top: d, behavior: "smooth" });
+        }, chunk * dir).catch(() => {});
+      }
+    }
     remaining -= chunk;
     await sleep(rand(120, 450));
   }
@@ -1443,17 +1498,13 @@ async function performEngageAndClick(page, ctx, targetX, targetY, instanceId = 0
   if (isPhysicalClickMode(clickMode) || INSTANCE_COUNT > 1) {
     await acquireCycleTurn(instanceId);
     if (instanceId > 0) {
-      await page.evaluate((tag) => {
-        if (!document.title.includes(tag)) {
-          document.title = `${tag} ${document.title}`;
-        }
-      }, `[AdViewer-Inst-${instanceId}]`).catch(() => {});
+      await tagInstancePage(page, instanceId);
     }
     await page.bringToFront().catch(() => {});
   }
   await preClickEngagement(page, ctx, targetX, targetY, instanceId, clickMode);
   const [newPage] = await Promise.all([
-    ctx.waitForEvent("page", { timeout: 10000 }).catch(() => null),
+    ctx.waitForEvent("page", { timeout: 6000 }).catch(() => null),
     humanClick(page, ctx, targetX, targetY, instanceId, clickMode).catch(() => null),
   ]);
   return newPage;
@@ -1462,28 +1513,31 @@ async function performEngageAndClick(page, ctx, targetX, targetY, instanceId = 0
 /**
  * Mô phỏng người dùng dừng lại đọc nội dung trang web:
  * - Cuộn nhẹ lên xuống theo nhịp đọc.
- * - Rê chuột vi mô ngẫu nhiên theo dòng chữ hoặc khối bài viết.
+ * - Rê chuột vi mô ngẫu nhiên theo dòng chữ hoặc khối bài viết (chỉ rê khi đang giữ lượt chuột).
  * - Dừng lại ngẫu nhiên để mắt đọc thông tin trước khi chuyển sang xem quảng cáo.
  */
-async function simulateHumanReading(page, durationMs) {
+async function simulateHumanReading(page, durationMs, instanceId = logContext.getStore()?.instanceId) {
   if (!page || durationMs <= 0) return;
   const started = Date.now();
+  const canMoveMouse = canInteractForeground(instanceId);
   while (Date.now() - started < durationMs) {
     const elapsed = Date.now() - started;
     const remaining = durationMs - elapsed;
     if (remaining < 250) break;
 
-    // Rê chuột vi mô theo dòng đọc (drift)
-    const driftX = Math.max(100, Math.min(1200, lastMouseX + rand(-150, 150)));
-    const driftY = Math.max(80, Math.min(700, lastMouseY + rand(-80, 80)));
-    const path = generateBezierPath(lastMouseX, lastMouseY, driftX, driftY, rand(6, 10));
-    for (const pt of path) {
-      if (Date.now() - started >= durationMs) break;
-      await page.mouse.move(pt.x, pt.y).catch(() => {});
-      await sleep(rand(10, 20));
+    if (canMoveMouse) {
+      // Rê chuột vi mô theo dòng đọc (drift)
+      const driftX = Math.max(100, Math.min(1200, lastMouseX + rand(-150, 150)));
+      const driftY = Math.max(80, Math.min(700, lastMouseY + rand(-80, 80)));
+      const path = generateBezierPath(lastMouseX, lastMouseY, driftX, driftY, rand(6, 10));
+      for (const pt of path) {
+        if (Date.now() - started >= durationMs) break;
+        await page.mouse.move(pt.x, pt.y).catch(() => {});
+        await sleep(rand(10, 20));
+      }
+      lastMouseX = driftX;
+      lastMouseY = driftY;
     }
-    lastMouseX = driftX;
-    lastMouseY = driftY;
 
     // Dừng đọc đoạn văn bản (không vượt quá thời gian còn lại)
     const pauseRemaining = durationMs - (Date.now() - started);
@@ -1494,7 +1548,7 @@ async function simulateHumanReading(page, durationMs) {
     const scrollRemaining = durationMs - (Date.now() - started);
     if (scrollRemaining > 300 && Math.random() < 0.5) {
       const scrollDistance = rand(-50, 120);
-      await organicScroll(page, scrollDistance);
+      await organicScroll(page, scrollDistance, instanceId);
       const postScrollRemaining = durationMs - (Date.now() - started);
       if (postScrollRemaining > 100) {
         await sleep(Math.min(rand(200, 400), postScrollRemaining));
@@ -2171,9 +2225,8 @@ async function applyFingerprintToPage(context, page, fp, { emulateMobileMetrics 
  * và chuột phần cứng không bao giờ bị click tràn ra ngoài phạm vi cửa sổ.
  */
 async function ensureWindowMaximized(session, page, instanceId = logContext.getStore()?.instanceId) {
-  // Instance khác đang giữ lượt chuột: không giành foreground, bằng không cú click thật của nó
-  // rơi sang cửa sổ này. Instance này sẽ tự phóng to lại khi tới lượt.
-  if (foregroundOwnedByOther(instanceId)) return;
+  // Instance khác đang giữ lượt chuột hoặc chưa đến lượt tương tác: không giành foreground
+  if (foregroundOwnedByOther(instanceId) || !canInteractForeground(instanceId)) return;
   try {
     if (page) await page.bringToFront().catch(() => {});
     const { windowId } = await session.send("Browser.getWindowForTarget");
@@ -2187,7 +2240,7 @@ async function ensureWindowMaximized(session, page, instanceId = logContext.getS
 }
 
 async function maximizeAndFocusWindow(context, page, instanceId = logContext.getStore()?.instanceId) {
-  if (foregroundOwnedByOther(instanceId)) return;
+  if (foregroundOwnedByOther(instanceId) || !canInteractForeground(instanceId)) return;
   try {
     if (page) await page.bringToFront().catch(() => {});
     const session = await context.newCDPSession(page);
@@ -2304,7 +2357,6 @@ async function runOneCycle(
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
-        "--start-maximized",
         "--enable-experimental-extension-apis",
         "--extensions-on-chrome-urls",
         "--silent-debugger-extension-api",
@@ -2314,6 +2366,9 @@ async function runOneCycle(
         "--enforce-webrtc-ip-permission-check",
         "--webrtc-ip-handling-policy=disable_non_proxied_udp",
       ];
+      if (INSTANCE_COUNT <= 1) {
+        args.push("--start-maximized");
+      }
 
       if (extensionPath) {
         args.push(`--disable-extensions-except=${extensionPath}`);
@@ -2386,9 +2441,9 @@ async function runOneCycle(
 
       const channel = useMyChrome ? "chrome" : "chromium";
 
-      // Mở cửa sổ Chrome mới sẽ cướp foreground: khi nhiều instance dùng chuột thật, chỉ mở lúc
+      // Mở cửa sổ Chrome mới sẽ cướp foreground: khi nhiều instance, chỉ mở lúc
       // không instance nào đang trong lượt chuột.
-      const guardLaunch = INSTANCE_COUNT > 1 && isPhysicalClickMode(cycleClickMode);
+      const guardLaunch = INSTANCE_COUNT > 1;
       await withForegroundSlot(instanceId, guardLaunch, async () => {
         try {
           context = await chromium.launchPersistentContext(profileDir, {
@@ -2417,7 +2472,12 @@ async function runOneCycle(
     }
 
     page = useMyChrome || cdpUrl ? await context.newPage() : context.pages()[0] || (await context.newPage());
-    await maximizeAndFocusWindow(context, page);
+    await tagInstancePage(page, instanceId);
+    page.on("domcontentloaded", () => { tagInstancePage(page, instanceId).catch(() => {}); });
+    page.on("load", () => { tagInstancePage(page, instanceId).catch(() => {}); });
+    if (INSTANCE_COUNT <= 1) {
+      await maximizeAndFocusWindow(context, page, instanceId);
+    }
 
     if (fp) {
       const realMajor = await detectEngineMajorFromPage(context, page);
@@ -2431,14 +2491,19 @@ async function runOneCycle(
       const mainSession = await applyFingerprintToPage(context, page, fp, { emulateMobileMetrics }).catch(() => null);
       if (mainSession) {
         fpSessions.push(mainSession);
-        await ensureWindowMaximized(mainSession, page);
+        if (INSTANCE_COUNT <= 1) {
+          await ensureWindowMaximized(mainSession, page, instanceId);
+        }
       }
       // Tab popup / popunder do quảng cáo mở ra cũng phải mang cùng danh tính và được phóng to.
       onFingerprintPage = (newPage) => {
+        tagInstancePage(newPage, instanceId).catch(() => {});
         applyFingerprintToPage(context, newPage, fp, { emulateMobileMetrics })
           .then((s) => {
             fpSessions.push(s);
-            return ensureWindowMaximized(s, newPage, instanceId);
+            if (canInteractForeground(instanceId)) {
+              return ensureWindowMaximized(s, newPage, instanceId);
+            }
           })
           .catch(() => {});
       };
@@ -2597,8 +2662,10 @@ async function runOneCycle(
     // phải xoá nó đi.
     if (fp) await context.addInitScript(fingerprintInitScript, fp.inject).catch(() => {});
 
-    if (!foregroundOwnedByOther(instanceId)) await page.bringToFront().catch(() => {});
-    await maximizeAndFocusWindow(context, page, instanceId);
+    if (INSTANCE_COUNT <= 1) {
+      if (!foregroundOwnedByOther(instanceId)) await page.bringToFront().catch(() => {});
+      await maximizeAndFocusWindow(context, page, instanceId);
+    }
 
     const renderStartedAt = Date.now();
     log(`Mở trang chủ ${WEB_URL}...`);
@@ -2607,11 +2674,12 @@ async function runOneCycle(
       timeout: PAGE_GOTO_TIMEOUT_MS,
     });
     navigationSucceeded = true;
+    await tagInstancePage(page, instanceId);
 
     // Cuộn trang tự nhiên để kích hoạt lazy-load quảng cáo (từng nhịp, có quán tính)
-    await organicScroll(page, rand(250, 400));
+    await organicScroll(page, rand(250, 400), instanceId);
     await sleep(rand(300, 600));
-    await organicScroll(page, rand(350, 550));
+    await organicScroll(page, rand(350, 550), instanceId);
 
     await page.locator(".adsterra-stack").scrollIntoViewIfNeeded().catch(() => {});
     const diagnostic = await inspectAdsterraPlacements(page, renderStartedAt);
@@ -2633,15 +2701,19 @@ async function runOneCycle(
     const minReadingMs = Math.min(1500, MAX_READING_BEFORE_CLICK_MS);
     const readingBeforeClickMs = rand(minReadingMs, MAX_READING_BEFORE_CLICK_MS);
     log(`Đang đọc nội dung bài viết và lướt xem trang web trong ${(readingBeforeClickMs / 1000).toFixed(1)}s...`);
-    await simulateHumanReading(page, readingBeforeClickMs);
+    await simulateHumanReading(page, readingBeforeClickMs, instanceId);
 
     // Nhận lượt độc quyền tương tác quảng cáo TRƯỚC khi quét quảng cáo: nếu phải chờ instance khác
     // xong chu kỳ, toạ độ và iframe banner quét từ trước có thể đã đổi — quét sau khi nhận lượt thì luôn mới.
     // Lượt được giữ tới cuối chu kỳ và nhả trong khối finally bên dưới.
     if (isPhysicalClickMode(cycleClickMode) || INSTANCE_COUNT > 1) {
       await acquireCycleTurn(instanceId);
+      await tagInstancePage(page, instanceId);
       await page.bringToFront().catch(() => {});
       await maximizeAndFocusWindow(context, page, instanceId);
+      if (process.platform === "win32") {
+        focusInstanceWindow(instanceId);
+      }
     }
 
     let adClicked = false;
@@ -2863,6 +2935,10 @@ async function runOneCycle(
 
     // 5. Đọc trang quảng cáo chính và đệ quy click nếu có
     if (openedPage) {
+      await tagInstancePage(openedPage, instanceId);
+      if (process.platform === "win32") {
+        focusInstanceWindow(instanceId);
+      }
       await openedPage.waitForLoadState("domcontentloaded", { timeout: 25000 }).catch(() => {});
       try {
         const u = new URL(openedPage.url());
@@ -3051,7 +3127,7 @@ async function main() {
 async function runInstanceLoop(instanceId, proxyManager, extPath, startTime) {
   return logContext.run({ instanceId }, async () => {
     if (instanceId > 1) {
-      const staggerDelayMs = (instanceId - 1) * 6000;
+      const staggerDelayMs = (instanceId - 1) * 8000;
       log(`Khởi động so le (Staggered start): Chờ ${staggerDelayMs / 1000}s trước khi mở instance #${instanceId}...`);
       await sleep(staggerDelayMs);
     }

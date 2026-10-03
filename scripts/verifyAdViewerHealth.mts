@@ -37,6 +37,10 @@ assert.match(runtime, /mouseMutex/, "ad-viewer must coordinate physical mouse cl
 assert.match(runtime, /inUseProxyKeys/, "ad-viewer must isolate proxies across instances");
 assert.match(runtime, /performEngageAndClick/, "ad-viewer must synchronize physical engagement and clicks");
 assert.match(runtime, /runInstanceLoop/, "ad-viewer must support concurrent instance loops");
+assert.match(runtime, /acquireCycleTurn/, "ad-viewer must serialize full click-to-cycle-end turns across instances");
+assert.match(runtime, /releaseCycleTurn/, "ad-viewer must release turn when instance completes its cycle");
+assert.match(runtime, /withForegroundSlot/, "ad-viewer must guard new browser window launches from stealing foreground");
+assert.match(runtime, /foregroundOwnedByOther/, "ad-viewer must prevent background instances from stealing focus");
 assert.match(runtime, /resolveExtensionPath/, "ad-viewer must resolve CanvasBlocker extension path");
 assert.match(runtime, /prepareExtensionProfile/, "ad-viewer must prepare extension profile preferences");
 assert.match(runtime, /ensureDeveloperMode/, "ad-viewer must enforce developer mode via WebUI");

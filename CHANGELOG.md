@@ -9,6 +9,18 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.149 — Khoá độc quyền tương tác quảng cáo theo trọn chu kỳ cho chế độ đa instance (03/10/2026)
+
+- Chuyển đổi cơ chế điều phối tương tác đa instance trong `scripts/adViewer.mjs`:
+  - Trước đây, `mouseMutex` chỉ khoá theo từng cú click riêng lẻ rồi nhả ngay; khi chạy song song nhiều instance, instance A click xong chưa kịp kết thúc chu kỳ thì instance B đã chen ngang giành quyền click, dẫn tới tình trạng cướp cửa sổ foreground lẫn nhau, làm gián đoạn việc nhận diện tab quảng cáo và khiến 1 chu kỳ bị click lặp lại 2 lần gây lãng phí thời gian.
+  - Nay nâng cấp thành lượt tương tác độc quyền theo trọn chu kỳ (`acquireCycleTurn` / `releaseCycleTurn`): Instance nào bắt đầu bước click quảng cáo sẽ giữ độc quyền toàn bộ thao tác (tiếp cận, click quảng cáo, đọc trang đích, click đệ quy và dọn dẹp phiên duyệt).
+  - Chỉ khi instance hiện tại kết thúc hoàn toàn chu kỳ (`runOneCycle` finally), lượt tương tác mới được nhả cho instance tiếp theo trong hàng đợi.
+  - Các bước tải trang web ban đầu, kiểm tra render Adsterra và đọc lướt bài viết vẫn được thực hiện song song hoàn toàn giữa các instance để tối ưu thời gian.
+- Ngăn chặn triệt để hiện tượng cướp cửa sổ foreground (`foregroundOwnedByOther` & `withForegroundSlot`):
+  - Các instance đang chờ tới lượt sẽ không gọi `bringToFront()` hoặc phóng to cửa sổ làm che khuất instance đang click.
+  - Việc mở cửa sổ trình duyệt mới (`chromium.launchPersistentContext`) được bảo vệ bằng khe an toàn để không đè lên cửa sổ đang tương tác chuột thật.
+- Cập nhật kiểm thử `scripts/verifyAdViewerHealth.mts`: Bổ sung kiểm tra `acquireCycleTurn`, `releaseCycleTurn`, `withForegroundSlot` và `foregroundOwnedByOther`.
+
 ## 1.3.148 — Sửa nạp tiện ích CanvasBlocker và kích hoạt Developer Mode trên toàn bộ chế độ (03/10/2026)
 
 - Sửa lỗi nạp tiện ích CanvasBlocker trong `scripts/adViewer.mjs`:

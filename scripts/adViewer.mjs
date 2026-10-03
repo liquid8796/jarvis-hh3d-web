@@ -302,6 +302,73 @@ class AsyncMutex {
 
 const mouseMutex = new AsyncMutex();
 
+// ---- LƯỢT CHUỘT THEO CHU KỲ (03/10/2026) ----
+// Bản đầu khoá chuột theo TỪNG cú click: click xong là nhả. Khi chạy nhiều instance, instance A
+// vừa mở trang đích thì B chen vào click, rồi A quay lại click đệ quy trên trang đích, rồi C...
+// — các chu kỳ đan xen nhau, một chu kỳ bị click hai lần và ai cũng phải chờ lặp lại. Nay lượt
+// chuột thuộc về CẢ CHU KỲ: instance nào click đầu tiên thì giữ chuột cho tới khi chu kỳ của nó
+// kết thúc hẳn (đọc trang đích, click đệ quy, đóng tab, dọn trình duyệt). Các instance khác vẫn
+// tải trang và chờ quảng cáo song song, chỉ xếp hàng ở bước dùng chuột.
+/** instanceId → hàm nhả lượt đang giữ. */
+const cycleTurns = new Map();
+/** Instance đang giữ lượt chuột (null = rảnh). */
+let turnHolder = null;
+
+function isPhysicalClickMode(mode) {
+  return (mode === "os-mouse" || mode === "ghub" || mode === "manual") && process.platform === "win32";
+}
+
+async function acquireCycleTurn(instanceId, { quiet = false } = {}) {
+  if (cycleTurns.has(instanceId)) return false;
+  if (mouseMutex.isLocked && !quiet) {
+    const holderDesc = turnHolder !== null ? `#${turnHolder}` : "khác";
+    log(`[CycleTurn] Instance ${holderDesc} đang trong lượt click & kết thúc chu kỳ — chờ nó kết thúc chu kỳ (hàng đợi: ${mouseMutex.queueLength + 1})...`);
+  }
+  const unlock = await mouseMutex.acquire(`inst-${instanceId}`);
+  cycleTurns.set(instanceId, unlock);
+  turnHolder = instanceId;
+  if (!quiet && INSTANCE_COUNT > 1) {
+    log("[CycleTurn] ✓ Nhận lượt độc quyền tương tác quảng cáo — giữ tới khi kết thúc trọn chu kỳ này.");
+  }
+  return true;
+}
+
+function releaseCycleTurn(instanceId, { quiet = false } = {}) {
+  const unlock = cycleTurns.get(instanceId);
+  if (!unlock) return;
+  cycleTurns.delete(instanceId);
+  if (turnHolder === instanceId) turnHolder = null;
+  if (!quiet && INSTANCE_COUNT > 1) {
+    log("[CycleTurn] ✓ Kết thúc trọn chu kỳ — nhả lượt tương tác quảng cáo cho instance kế tiếp.");
+  }
+  unlock();
+}
+
+/**
+ * Chạy một thao tác làm đổi cửa sổ foreground (mở trình duyệt mới...) khi không ai đang giữ lượt
+ * chuột — mở một cửa sổ Chrome mới giữa lúc instance khác đang rê chuột thật sẽ cướp foreground và
+ * làm cú click rơi sang cửa sổ khác.
+ */
+async function withForegroundSlot(instanceId, enabled, fn) {
+  if (!enabled || cycleTurns.has(instanceId)) return fn();
+  await acquireCycleTurn(instanceId, { quiet: true });
+  try {
+    return await fn();
+  } finally {
+    releaseCycleTurn(instanceId, { quiet: true });
+  }
+}
+
+/**
+ * Instance này có bị cấm giành foreground không (vì instance khác đang giữ lượt chuột)?
+ * Truyền `instanceId` tường minh khi gọi từ callback sự kiện của Playwright — ở đó
+ * AsyncLocalStorage không chắc còn mang ngữ cảnh của instance.
+ */
+function foregroundOwnedByOther(instanceId = logContext.getStore()?.instanceId) {
+  if (INSTANCE_COUNT <= 1 || turnHolder === null) return false;
+  return turnHolder !== instanceId;
+}
+
 // ============================================================
 //  ANTI-DETECT PROXY ENGINE & AUTO-ROTATION MANAGER
 //  Quản lý danh sách proxy, xoay proxy mỗi chu kỳ, chống phát hiện
@@ -1366,45 +1433,30 @@ async function preClickEngagement(page, ctx, targetX, targetY, instanceId = 0, c
 }
 
 /**
- * Chuỗi tương tác hoàn chỉnh (tiếp cận + click) kết hợp Mutex chuột vật lý:
- * Điều phối độc quyền chuột vật lý khi nhiều instance chạy đồng thời,
- * gắn tag tiêu đề cửa sổ để winMouse.ps1 phóng to đúng cửa sổ trước khi click.
+ * Chuỗi tương tác hoàn chỉnh (tiếp cận + click) kết hợp lượt chuột vật lý theo chu kỳ:
+ * cú click vật lý đầu tiên của một chu kỳ nhận lượt chuột và GIỮ nó tới khi `runOneCycle` kết
+ * thúc (nhả trong khối finally), nên các click đệ quy trên trang đích không phải xếp hàng lại và
+ * không instance nào chen vào giữa chu kỳ. Gắn tag tiêu đề cửa sổ để winMouse.ps1 phóng to đúng
+ * cửa sổ trước khi click.
  */
 async function performEngageAndClick(page, ctx, targetX, targetY, instanceId = 0, clickMode = CLICK_MODE) {
-  const isPhysical = (clickMode === "os-mouse" || clickMode === "ghub" || clickMode === "manual") && process.platform === "win32";
-  if (isPhysical) {
-    const qLen = mouseMutex.queueLength;
-    if (mouseMutex.isLocked) {
-      log(`[MouseMutex] Đang chờ giải phóng chuột vật lý (hàng đợi: ${qLen + 1})...`);
+  if (isPhysicalClickMode(clickMode) || INSTANCE_COUNT > 1) {
+    await acquireCycleTurn(instanceId);
+    if (instanceId > 0) {
+      await page.evaluate((tag) => {
+        if (!document.title.includes(tag)) {
+          document.title = `${tag} ${document.title}`;
+        }
+      }, `[AdViewer-Inst-${instanceId}]`).catch(() => {});
     }
-    const unlock = await mouseMutex.acquire(`inst-${instanceId}`);
-    try {
-      if (instanceId > 0) {
-        await page.evaluate((tag) => {
-          if (!document.title.includes(tag)) {
-            document.title = `${tag} ${document.title}`;
-          }
-        }, `[AdViewer-Inst-${instanceId}]`).catch(() => {});
-      }
-      await page.bringToFront().catch(() => {});
-
-      await preClickEngagement(page, ctx, targetX, targetY, instanceId, clickMode);
-      const [newPage] = await Promise.all([
-        ctx.waitForEvent("page", { timeout: 10000 }).catch(() => null),
-        humanClick(page, ctx, targetX, targetY, instanceId, clickMode).catch(() => null),
-      ]);
-      return newPage;
-    } finally {
-      unlock();
-    }
-  } else {
-    await preClickEngagement(page, ctx, targetX, targetY, instanceId, clickMode);
-    const [newPage] = await Promise.all([
-      ctx.waitForEvent("page", { timeout: 10000 }).catch(() => null),
-      humanClick(page, ctx, targetX, targetY, instanceId, clickMode).catch(() => null),
-    ]);
-    return newPage;
+    await page.bringToFront().catch(() => {});
   }
+  await preClickEngagement(page, ctx, targetX, targetY, instanceId, clickMode);
+  const [newPage] = await Promise.all([
+    ctx.waitForEvent("page", { timeout: 10000 }).catch(() => null),
+    humanClick(page, ctx, targetX, targetY, instanceId, clickMode).catch(() => null),
+  ]);
+  return newPage;
 }
 
 /**
@@ -2118,7 +2170,10 @@ async function applyFingerprintToPage(context, page, fp, { emulateMobileMetrics 
  * Phóng to tối đa cửa sổ Chrome (Maximized) và đưa lên foreground để giao diện rộng nhất
  * và chuột phần cứng không bao giờ bị click tràn ra ngoài phạm vi cửa sổ.
  */
-async function ensureWindowMaximized(session, page) {
+async function ensureWindowMaximized(session, page, instanceId = logContext.getStore()?.instanceId) {
+  // Instance khác đang giữ lượt chuột: không giành foreground, bằng không cú click thật của nó
+  // rơi sang cửa sổ này. Instance này sẽ tự phóng to lại khi tới lượt.
+  if (foregroundOwnedByOther(instanceId)) return;
   try {
     if (page) await page.bringToFront().catch(() => {});
     const { windowId } = await session.send("Browser.getWindowForTarget");
@@ -2131,12 +2186,13 @@ async function ensureWindowMaximized(session, page) {
   } catch {}
 }
 
-async function maximizeAndFocusWindow(context, page) {
+async function maximizeAndFocusWindow(context, page, instanceId = logContext.getStore()?.instanceId) {
+  if (foregroundOwnedByOther(instanceId)) return;
   try {
     if (page) await page.bringToFront().catch(() => {});
     const session = await context.newCDPSession(page);
     try {
-      await ensureWindowMaximized(session, page);
+      await ensureWindowMaximized(session, page, instanceId);
     } finally {
       await session.detach().catch(() => {});
     }
@@ -2330,23 +2386,28 @@ async function runOneCycle(
 
       const channel = useMyChrome ? "chrome" : "chromium";
 
-      try {
-        context = await chromium.launchPersistentContext(profileDir, {
-          ...launchOptions,
-          channel,
-        });
-      } catch (err) {
-        if (useMyChrome) {
-          log("⚠ Không thể mở trực tiếp profile Chrome (có thể do Chrome đang mở sẵn trên máy).");
-          log(`  Gợi ý: Mở Chrome bằng: & "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222`);
-          log("  Sau đó chạy: npm run ad-viewer -- --cdp");
-          throw err;
+      // Mở cửa sổ Chrome mới sẽ cướp foreground: khi nhiều instance dùng chuột thật, chỉ mở lúc
+      // không instance nào đang trong lượt chuột.
+      const guardLaunch = INSTANCE_COUNT > 1 && isPhysicalClickMode(cycleClickMode);
+      await withForegroundSlot(instanceId, guardLaunch, async () => {
+        try {
+          context = await chromium.launchPersistentContext(profileDir, {
+            ...launchOptions,
+            channel,
+          });
+        } catch (err) {
+          if (useMyChrome) {
+            log("⚠ Không thể mở trực tiếp profile Chrome (có thể do Chrome đang mở sẵn trên máy).");
+            log(`  Gợi ý: Mở Chrome bằng: & "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222`);
+            log("  Sau đó chạy: npm run ad-viewer -- --cdp");
+            throw err;
+          }
+          context = await chromium.launchPersistentContext(profileDir, launchOptions);
         }
-        context = await chromium.launchPersistentContext(profileDir, launchOptions);
-      }
-      if (ENABLE_DEV_MODE && context) {
-        await ensureDeveloperMode(context);
-      }
+        if (ENABLE_DEV_MODE && context) {
+          await ensureDeveloperMode(context);
+        }
+      });
       if (context && currentProxy?.username && currentProxy?.password) {
         await context.setHTTPCredentials({
           username: currentProxy.username,
@@ -2377,7 +2438,7 @@ async function runOneCycle(
         applyFingerprintToPage(context, newPage, fp, { emulateMobileMetrics })
           .then((s) => {
             fpSessions.push(s);
-            return ensureWindowMaximized(s, newPage);
+            return ensureWindowMaximized(s, newPage, instanceId);
           })
           .catch(() => {});
       };
@@ -2536,8 +2597,8 @@ async function runOneCycle(
     // phải xoá nó đi.
     if (fp) await context.addInitScript(fingerprintInitScript, fp.inject).catch(() => {});
 
-    await page.bringToFront().catch(() => {});
-    await maximizeAndFocusWindow(context, page);
+    if (!foregroundOwnedByOther(instanceId)) await page.bringToFront().catch(() => {});
+    await maximizeAndFocusWindow(context, page, instanceId);
 
     const renderStartedAt = Date.now();
     log(`Mở trang chủ ${WEB_URL}...`);
@@ -2573,6 +2634,15 @@ async function runOneCycle(
     const readingBeforeClickMs = rand(minReadingMs, MAX_READING_BEFORE_CLICK_MS);
     log(`Đang đọc nội dung bài viết và lướt xem trang web trong ${(readingBeforeClickMs / 1000).toFixed(1)}s...`);
     await simulateHumanReading(page, readingBeforeClickMs);
+
+    // Nhận lượt độc quyền tương tác quảng cáo TRƯỚC khi quét quảng cáo: nếu phải chờ instance khác
+    // xong chu kỳ, toạ độ và iframe banner quét từ trước có thể đã đổi — quét sau khi nhận lượt thì luôn mới.
+    // Lượt được giữ tới cuối chu kỳ và nhả trong khối finally bên dưới.
+    if (isPhysicalClickMode(cycleClickMode) || INSTANCE_COUNT > 1) {
+      await acquireCycleTurn(instanceId);
+      await page.bringToFront().catch(() => {});
+      await maximizeAndFocusWindow(context, page, instanceId);
+    }
 
     let adClicked = false;
     let openedPage = null;
@@ -2904,6 +2974,7 @@ async function runOneCycle(
         }
       }
     }
+    releaseCycleTurn(instanceId);
   }
 }
 
@@ -3066,6 +3137,7 @@ async function runInstanceLoop(instanceId, proxyManager, extPath, startTime) {
         await sleep(restMs);
       }
     } finally {
+      releaseCycleTurn(instanceId, { quiet: true });
       if (sharedProfileDir) {
         try {
           rmSync(sharedProfileDir, { recursive: true, force: true });

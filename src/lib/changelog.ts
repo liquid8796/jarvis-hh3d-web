@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.149",
+    date: "2026-10-03",
+    lines: [
+      "Khoá độc quyền tương tác theo trọn chu kỳ khi chạy song song nhiều cửa sổ xem quảng cáo.",
+      "Mỗi cửa sổ hoàn thành trọn vẹn việc xem, bấm quảng cáo và đóng trang rồi mới chuyển lượt cho cửa sổ tiếp theo.",
+      "Chấm dứt hoàn toàn hiện tượng tranh chấp cửa sổ và bấm lặp lại hai lần trong cùng một chu kỳ.",
+    ],
+  },
+  {
     version: "1.3.148",
     date: "2026-10-03",
     lines: [
@@ -465,15 +474,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Trang Tên Miền nay gọn hơn, chỉ giữ tên miền, trạng thái, vai trò và nút mở cần thiết.",
       "Các đoạn giải thích dài, Luồng chuyển tiếp và Khuyến nghị đã được bỏ khỏi trang.",
-    ],
-  },
-  {
-    version: "1.3.99",
-    date: "2026-09-27",
-    lines: [
-      "Tên Miền nay nằm ngay trên thanh menu; khách, tài khoản chờ duyệt, thành viên và quản trị đều xem được.",
-      "Trang Tông Môn không còn chứa mục này; thông tin tên miền được mở ở một trang chung riêng.",
-      "Địa chỉ cũ vẫn giữ đúng đường dẫn đang mở khi chuyển sang tên miền chính thức.",
     ],
   },
 ];

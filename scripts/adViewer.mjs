@@ -1534,56 +1534,49 @@ function killChromeProcesses() {
   } catch {}
 }
 
-async function cleanupTargetedCookies(client, visitedDomains = []) {
-  if (!client) return;
+async function cleanupAllBrowserData(context, page) {
   try {
-    const { cookies } = await client.send("Network.getCookies").catch(() => ({ cookies: [] }));
-    if (!Array.isArray(cookies) || cookies.length === 0) return;
+    if (context) {
+      await context.clearCookies().catch(() => {});
+      await context.clearPermissions().catch(() => {});
+    }
 
-    let targetHost = "";
-    try {
-      targetHost = new URL(WEB_URL).hostname.toLowerCase();
-    } catch {}
+    const activePage = page && !page.isClosed() ? page : context?.pages?.().find((p) => !p.isClosed());
+    if (activePage && !activePage.isClosed()) {
+      await activePage
+        .evaluate(() => {
+          try {
+            localStorage.clear();
+          } catch {}
+          try {
+            sessionStorage.clear();
+          } catch {}
+        })
+        .catch(() => {});
+    }
 
-    const adKeywords = [
-      targetHost,
-      "auto-hh3d",
-      "deliberatewatchful",
-      "alwingulla",
-      "adsterra",
-      "profitablecpmrate",
-      "highcpmgate",
-      "ad-score",
-      "doubleclick",
-      "googleads",
-      "adnxs",
-      "popads",
-      "onclick",
-      "syndication",
-      ...visitedDomains.map((d) => String(d).toLowerCase()),
-    ].filter(Boolean);
-
-    let deletedCount = 0;
-    for (const c of cookies) {
-      const domain = (c.domain || "").toLowerCase().replace(/^\./, "");
-      const isTarget = adKeywords.some((kw) => domain.includes(kw));
-      if (isTarget) {
+    if (activePage && context) {
+      const client = await context.newCDPSession(activePage).catch(() => null);
+      if (client) {
+        // 1. Xoá triệt để dữ liệu lưu trữ (LocalStorage, IndexedDB, CacheStorage, ServiceWorkers, v.v.) của mọi domain
         await client
-          .send("Network.deleteCookies", {
-            name: c.name,
-            domain: c.domain,
-            path: c.path,
-          })
-          .catch(() => {});
-        deletedCount++;
+          .send("Storage.clearDataForOrigin", { origin: "*", storageTypes: "all" })
+          .catch(async () => {
+            await client.send("Storage.clearDataForStorageKey", { storageKey: "*", storageTypes: "all" }).catch(() => {});
+          });
+        // 2. Xoá sạch toàn bộ cookies của toàn bộ trình duyệt
+        await client.send("Network.clearBrowserCookies").catch(() => {});
+        // 3. Xoá sạch toàn bộ HTTP disk và memory cache của toàn bộ trình duyệt
+        await client.send("Network.clearBrowserCache").catch(() => {});
+        await client.detach().catch(() => {});
       }
     }
-    await client.send("Network.clearBrowserCache").catch(() => {});
-    log(`✓ Đã dọn dẹp có chọn lọc ${deletedCount} cookie quảng cáo và cache (bảo vệ an toàn tài khoản cá nhân).`);
+    log("✓ Đã dọn dẹp triệt để 100% cache, cookies và storage của toàn bộ trình duyệt.");
   } catch (err) {
-    log(`Lỗi khi dọn dẹp cookie có chọn lọc: ${err instanceof Error ? err.message : String(err)}`);
+    log(`Lỗi khi dọn dẹp toàn bộ dữ liệu trình duyệt: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
+
 
 function discoverMainChromeExtensions() {
   const extsDir = path.join(
@@ -1875,6 +1868,9 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
     }
 
     page = useMyChrome || cdpUrl ? await context.newPage() : context.pages()[0] || (await context.newPage());
+
+    // Dọn dẹp triệt để toàn bộ cache và cookies trước khi bắt đầu chu kỳ mới
+    await cleanupAllBrowserData(context, page).catch(() => {});
 
     // Cài đặt Anti-Detect overrides và xác thực Proxy qua CDP
     try {
@@ -2336,47 +2332,30 @@ async function runOneCycle(extensionPath, currentProxy = null, proxyManager = nu
       proxyManager?.flush();
     }
   } finally {
-    // 1. Dọn dẹp cache và cookies sau mỗi chu kỳ (chỉ chạy khi điều hướng thành công để tránh treo trên phiên lỗi)
-    if (context && navigationSucceeded) {
+    // 1. Dọn dẹp triệt để 100% cache, cookies và storage của toàn bộ trình duyệt sau mỗi chu kỳ
+    if (context) {
       try {
-        if (useMyChrome) {
-          // Xoá cookie có chọn lọc cho website và các domain quảng cáo — bảo vệ tài khoản cá nhân
-          if (page && !page.isClosed()) {
-            await withTimeout(
-              (async () => {
-                const client = await context.newCDPSession(page).catch(() => null);
-                if (client) {
-                  await cleanupTargetedCookies(client, visitedDomains).catch(() => {});
-                  await client.detach().catch(() => {});
-                }
-              })(),
-              3500,
-            );
-          }
-        } else {
-          await withTimeout(
-            (async () => {
-              await context.clearCookies().catch(() => {});
-              if (page && !page.isClosed()) {
-                const client = await context.newCDPSession(page).catch(() => null);
-                if (client) {
-                  await client.send("Network.clearBrowserCookies").catch(() => {});
-                  await client.send("Network.clearBrowserCache").catch(() => {});
-                  await client.detach().catch(() => {});
-                }
-              }
-            })(),
-            3500,
-          );
-          log("✓ Đã dọn dẹp sạch cache và cookies của trình duyệt.");
-        }
+        await withTimeout(
+          cleanupAllBrowserData(context, page),
+          5000,
+        ).catch(() => {});
       } catch {
-        // bỏ qua lỗi CDP session
+        // bỏ qua lỗi dọn dẹp
       }
     }
 
     if (cdpUrl) {
-      // Trong chế độ CDP, đóng tab chu kỳ với timeout bảo vệ
+      // Trong chế độ CDP, đóng tất cả tab quảng cáo phụ nếu còn mở, và đóng tab chu kỳ với timeout bảo vệ
+      try {
+        if (context) {
+          const allTabs = context.pages();
+          for (const tab of allTabs) {
+            if (tab !== page && !tab.isClosed()) {
+              await withTimeout(tab.close().catch(() => {}), 1500).catch(() => {});
+            }
+          }
+        }
+      } catch {}
       if (page && !page.isClosed()) {
         await withTimeout(page.close().catch(() => {}), 2000);
       }

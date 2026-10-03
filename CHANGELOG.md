@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.139 — Xoá triệt để Cache, Cookies và Web Storage toàn trình duyệt sau mỗi chu kỳ (03/10/2026)
+
+- Thay thế hàm xoá cookie có chọn lọc (`cleanupTargetedCookies`) bằng quy trình làm sạch toàn diện `cleanupAllBrowserData`: dọn dẹp triệt để 100% cookies, disk/memory cache, LocalStorage, SessionStorage, IndexedDB, Service Workers và Cache Storage cho toàn bộ trình duyệt thông qua giao thức CDP (`Storage.clearDataForOrigin`, `Network.clearBrowserCookies`, `Network.clearBrowserCache`).
+- Kích hoạt làm sạch trình duyệt ở cả hai đầu chu kỳ (trước khi truy cập trang web và ngay sau khi kết thúc chu kỳ xem quảng cáo), loại bỏ hoàn toàn các dấu vết định danh hay cache cũ tồn đọng.
+- Bổ sung cơ chế tự động quét và đóng sạch các tab popup/popunder phụ còn sót lại trong phiên duyệt web trước khi bước sang chu kỳ mới.
+
 ## 1.3.138 — Tích hợp Logitech G-HUB Driver Assist & Sửa triệt để toạ độ OS Mouse (03/10/2026)
 
 - Loại bỏ lệnh `ShowWindow(SW_RESTORE)` trong `scripts/winMouse.ps1`, thay bằng `SwitchToThisWindow` và `SetForegroundWindow` an toàn, ngăn chặn việc cửa sổ Chrome bị co nhỏ làm sai lệch toàn bộ toạ độ click trên màn hình desktop.

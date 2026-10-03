@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.139",
+    date: "2026-10-03",
+    lines: [
+      "Nâng cấp cơ chế làm sạch trình duyệt: dọn dẹp triệt để toàn bộ bộ nhớ tạm, dữ liệu lưu trữ và cookies toàn hệ thống sau mỗi chu kỳ.",
+      "Tự động đóng gọn các tab quảng cáo phụ phát sinh, đảm bảo phiên duyệt web luôn trong trạng thái tinh sạch và ổn định.",
+    ],
+  },
+  {
     version: "1.3.138",
     date: "2026-10-03",
     lines: [
@@ -468,15 +476,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Nuôi kho GitHub nay gỡ được kho trong sổ ngay cả khi tài khoản GitHub đã bị xoá bên ngoài.",
       "Nút Xoá gửi đúng thông tin xác nhận danh sách repo chính; repo phụ vẫn không nhận lệnh xoá.",
-    ],
-  },
-  {
-    version: "1.3.89",
-    date: "2026-09-21",
-    lines: [
-      "Nuôi kho GitHub nay có thể chỉ tạo/nuôi repo phụ trước; khi bỏ chế độ hoãn, repo chính và khôi lỗi chính mới được mở mà không mất các repo phụ.",
-      "Auto chuyển Hẹn giờ quest sang cột trái, có thể gấp/mở; các nút Mở/Gấp của quest cũng lớn và dễ bấm hơn.",
-      "Profile GitHub mới được Ollama điền bio/name an toàn khi PAT có quyền user; avatar vẫn giữ nguyên vì PAT không hỗ trợ đổi ảnh tự động.",
     ],
   },
 ];

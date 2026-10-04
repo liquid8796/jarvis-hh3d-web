@@ -340,20 +340,20 @@ echo.
 
 REM 16. Nha mang quang cao muc tieu (Ad Network)
 echo [16] Nha mang quang cao muc tieu [Ad Network]:
-echo      1. Clickadu [Mac dinh - uu tien phe duyet va chay ads Clickadu]
-echo      2. Adsterra [Mang quang cao Adsterra truyen thong]
-echo      3. Tat ca nha mang [All networks - Clickadu + Adsterra]
+echo      1. Tat ca nha mang [All networks - Adsterra + Clickadu - Mac dinh]
+echo      2. Adsterra [Chi quang cao Adsterra]
+echo      3. Clickadu [Chi quang cao Clickadu]
 set "INPUT_AD_NETWORK="
 set /p "INPUT_AD_NETWORK=    Chon [1-3, Enter = 1]: "
-set "ARG_AD_NETWORK=--ad-network=clickadu"
+set "ARG_AD_NETWORK=--ad-network=all"
 if "%INPUT_AD_NETWORK%"=="2" (
     set "ARG_AD_NETWORK=--ad-network=adsterra"
     echo     -^> Nha mang: Adsterra
 ) else if "%INPUT_AD_NETWORK%"=="3" (
-    set "ARG_AD_NETWORK=--ad-network=all"
-    echo     -^> Nha mang: Tat ca [Clickadu + Adsterra]
+    set "ARG_AD_NETWORK=--ad-network=clickadu"
+    echo     -^> Nha mang: Clickadu
 ) else (
-    echo     -^> Nha mang: Clickadu [Mac dinh]
+    echo     -^> Nha mang: Tat ca [Adsterra + Clickadu - Mac dinh]
 )
 echo.
 

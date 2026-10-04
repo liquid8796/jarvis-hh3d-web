@@ -2,15 +2,15 @@ export type AdNetworkProvider = "clickadu" | "adsterra" | "all" | "none";
 
 /**
  * Xác định nhà mạng quảng cáo hoạt động trên website.
- * Mặc định chuyển sang 'clickadu' và tạm thời vô hiệu hoá 'adsterra' theo yêu cầu.
- * Có thể điều khiển linh hoạt qua biến môi trường AD_PROVIDER ("clickadu" | "adsterra" | "all" | "none").
+ * Mặc định kích hoạt 'all' (bao gồm cả Adsterra và Clickadu).
+ * Có thể điều khiển linh hoạt qua biến môi trường AD_PROVIDER ("all" | "adsterra" | "clickadu" | "none").
  */
 export function getActiveAdProvider(env: Record<string, string | undefined> = process.env): AdNetworkProvider {
-  const raw = String(env.AD_PROVIDER ?? "clickadu").trim().toLowerCase();
+  const raw = String(env.AD_PROVIDER ?? "all").trim().toLowerCase();
   if (raw === "adsterra") return "adsterra";
-  if (raw === "all") return "all";
+  if (raw === "clickadu") return "clickadu";
   if (raw === "none") return "none";
-  return "clickadu";
+  return "all";
 }
 
 export function isAdsterraActive(env: Record<string, string | undefined> = process.env): boolean {

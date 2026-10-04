@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.174",
+    date: "2026-10-04",
+    lines: [
+      "Kích hoạt trở lại toàn diện mạng quảng cáo Adsterra trên website song hành cùng Clickadu.",
+      "Bộ công cụ xem quảng cáo tự động mặc định tương tác đồng thời mọi nhà mạng khả dụng.",
+    ],
+  },
+  {
     version: "1.3.173",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Hỗ trợ kết nối và điều khiển trực tiếp Chrome chính của máy, bảo toàn toàn bộ tiện ích mở rộng đang cài đặt.",
       "Cơ chế dọn dẹp dữ liệu có chọn lọc bảo vệ an toàn các phiên đăng nhập cá nhân sau mỗi chu kỳ xem quảng cáo.",
-    ],
-  },
-  {
-    version: "1.3.124",
-    date: "2026-10-02",
-    lines: [
-      "Kho Xem Quảng Cáo chuyển tiện ích chống nhận diện dấu vân tay thành tuỳ chọn linh hoạt qua cờ dòng lệnh.",
-      "Mặc định chạy trên trình duyệt tiêu chuẩn sạch, giúp giảm thiểu các dấu hiệu bất thường khi tương tác.",
     ],
   },
 ];

@@ -291,9 +291,9 @@ function parseAdNetwork(cliArgs = process.argv, env = process.env) {
   const envVal = env.AD_VIEWER_AD_NETWORK || env.AD_VIEWER_AD_PROVIDER || env.AD_PROVIDER || "";
   const raw = (cli || envVal || "").trim().toLowerCase();
   if (raw === "adsterra") return "adsterra";
-  if (raw === "all" || raw === "both") return "all";
   if (raw === "clickadu") return "clickadu";
-  return "clickadu";
+  if (raw === "all" || raw === "both") return "all";
+  return "all";
 }
 
 const AD_NETWORK = parseAdNetwork();

@@ -237,14 +237,16 @@ assert.match(batContent, /\[15\] Trong tam dinh dang quang cao/, "run-ad-viewer.
 assert.match(batContent, /ARG_AD_FOCUS=--focus-popunder-social/, "run-ad-viewer.bat must set ARG_AD_FOCUS to --focus-popunder-social");
 
 // ---- Lựa chọn Nhà Mạng Quảng Cáo (Ad Network: Clickadu, Adsterra, All) ----
-assert.equal(parseAdNetwork(["node", "adViewer.mjs"], dummyEnv), "clickadu", "ad-network must default to clickadu");
+assert.equal(parseAdNetwork(["node", "adViewer.mjs"], dummyEnv), "all", "ad-network must default to all");
 assert.equal(parseAdNetwork(["node", "adViewer.mjs", "--ad-network=adsterra"], dummyEnv), "adsterra");
+assert.equal(parseAdNetwork(["node", "adViewer.mjs", "--ad-network=clickadu"], dummyEnv), "clickadu");
 assert.equal(parseAdNetwork(["node", "adViewer.mjs", "--ad-network=all"], dummyEnv), "all");
-assert.equal(parseAdNetwork(["node", "adViewer.mjs", "--network=clickadu"], dummyEnv), "clickadu");
+assert.equal(parseAdNetwork(["node", "adViewer.mjs", "--network=adsterra"], dummyEnv), "adsterra");
 assert.equal(parseAdNetwork(["node", "adViewer.mjs"], { AD_PROVIDER: "adsterra" } as any), "adsterra");
+assert.equal(parseAdNetwork(["node", "adViewer.mjs"], { AD_PROVIDER: "clickadu" } as any), "clickadu");
 
 assert.match(batContent, /\[16\] Nha mang quang cao muc tieu/, "run-ad-viewer.bat must offer option [16] for ad network");
-assert.match(batContent, /ARG_AD_NETWORK=--ad-network=clickadu/, "run-ad-viewer.bat must default to Clickadu ad network");
+assert.match(batContent, /ARG_AD_NETWORK=--ad-network=all/, "run-ad-viewer.bat must default to all ad networks");
 assert.match(batContent, /FINAL_ARGS=.*ARG_AD_NETWORK/, "FINAL_ARGS must include ARG_AD_NETWORK");
 
 console.log(

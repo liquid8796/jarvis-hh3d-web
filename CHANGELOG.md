@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.174 — Kích hoạt trở lại mạng quảng cáo Adsterra và mặc định hỗ trợ toàn bộ nhà mạng (04/10/2026)
+
+- Kích hoạt trở lại toàn diện mạng quảng cáo Adsterra trên website:
+  - Cập nhật bộ điều phối nhà mạng quảng cáo trong [src/lib/ads/provider.ts](src/lib/ads/provider.ts): chuyển cấu hình mặc định sang `all`, cho phép toàn bộ 6 vị trí biểu ngữ (Banner), NativeBanner, SocialBar và Popunder của Adsterra hoạt động bình thường trên trang chủ song song cùng thẻ xác minh quyền sở hữu của Clickadu.
+- Nâng cấp bộ công cụ xem quảng cáo [run-ad-viewer.bat](run-ad-viewer.bat) và [scripts/adViewer.mjs](scripts/adViewer.mjs):
+  - Chuyển tuỳ chọn mặc định của mục [16] Nhà mạng quảng cáo mục tiêu sang Tất cả nhà mạng (`--ad-network=all`), tự động nhận diện và tương tác đồng thời cả Adsterra lẫn Clickadu.
+
 ## 1.3.173 — Thêm xác thực Clickadu, tạm dừng Adsterra và hỗ trợ chọn nhà mạng mục tiêu (04/10/2026)
 
 - Tích hợp mạng quảng cáo Clickadu và hoàn tất xác thực quyền sở hữu website:

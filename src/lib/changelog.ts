@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.176",
+    date: "2026-10-04",
+    lines: [
+      "Bộ công cụ xem quảng cáo tối ưu hoá nhận diện nhanh trạng thái nạp tự động của Adcash AutoTag.",
+      "Mô phỏng hành vi đọc bài viết tự nhiên và bổ sung danh sách bộ chọn dự phòng chuẩn xác.",
+    ],
+  },
+  {
     version: "1.3.175",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Hỗ trợ liên kết trực tiếp vào thư mục hồ sơ duyệt web mặc định của người dùng trên máy.",
       "Vượt qua kiểm tra bảo mật của trình duyệt để sử dụng đầy đủ cấu hình và tiện ích gốc.",
-    ],
-  },
-  {
-    version: "1.3.126",
-    date: "2026-10-02",
-    lines: [
-      "Tự động phát hiện và nạp toàn bộ tiện ích mở rộng đang cài trên Chrome chính của máy khi chạy xem quảng cáo.",
-      "Kết nối nhanh qua cổng gỡ lỗi mà không gây xung đột với phiên duyệt web cá nhân đang mở.",
     ],
   },
 ];

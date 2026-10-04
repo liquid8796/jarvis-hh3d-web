@@ -2170,6 +2170,53 @@ async function inspectAdsterraPlacements(page, startedAt = Date.now()) {
   };
 }
 
+async function inspectAdcashPlacements(page, startedAt = Date.now()) {
+  const waitMs = Math.min(3000, Math.max(0, AD_READY_TIMEOUT_MS - (Date.now() - startedAt)));
+  let ready = false;
+  let scriptCount = 0;
+  try {
+    if (waitMs > 0) {
+      await page
+        .waitForFunction(() => {
+          return typeof window.aclib !== "undefined";
+        }, { timeout: waitMs })
+        .catch(() => {});
+    }
+    const info = await page
+      .evaluate(() => {
+        const aclibReady = typeof window.aclib !== "undefined";
+        const scripts = Array.from(document.querySelectorAll("script"))
+          .map((s) => s.src)
+          .filter((src) => src.includes("acscdn"));
+        return { aclibReady, scriptCount: scripts.length };
+      })
+      .catch(() => ({ aclibReady: false, scriptCount: 0 }));
+    ready = info.aclibReady;
+    scriptCount = info.scriptCount;
+  } catch {}
+  return {
+    status: ready ? "ready" : "no-fill",
+    scriptCount,
+    renderMs: Date.now() - startedAt,
+  };
+}
+
+async function inspectClickaduPlacements(page, startedAt = Date.now()) {
+  const waitMs = Math.min(3000, Math.max(0, AD_READY_TIMEOUT_MS - (Date.now() - startedAt)));
+  let ready = false;
+  try {
+    const selector = "#clickadu-ad-container, meta[name='clckd'], iframe[src*='clickadu']";
+    if (waitMs > 0) {
+      await page.waitForSelector(selector, { timeout: waitMs }).catch(() => {});
+    }
+    ready = (await page.locator(selector).count().catch(() => 0)) > 0;
+  } catch {}
+  return {
+    status: ready ? "ready" : "no-fill",
+    renderMs: Date.now() - startedAt,
+  };
+}
+
 async function handleRecursiveAdClicks(targetPage, depth, maxDepth, ctx, instanceId = 0, clickMode = CLICK_MODE) {
   if (depth >= maxDepth) return;
 
@@ -3254,37 +3301,63 @@ async function runOneCycle(
     await sleep(rand(300, 600));
     await organicScroll(page, rand(350, 550), instanceId);
 
-    if (!FOCUS_POPUNDER_SOCIAL) {
-      await page.locator(".adsterra-stack").scrollIntoViewIfNeeded().catch(() => {});
-    }
-    const diagnostic = await inspectAdsterraPlacements(page, renderStartedAt);
+    let isRenderFinished = false;
+    let isForceClick = false;
+    let diagnostic = null;
 
-    log(
-      `Adsterra banner: ${diagnostic.banner.status} ` +
-        `(DOM=${diagnostic.banner.rawStatus}, iframe 728×90=${diagnostic.banner.iframe728x90 ? "có" : "không"}, ` +
-        `creative=${diagnostic.banner.creativeCount}, slot=${formatBox(diagnostic.banner.slotBox)}, ` +
-        `iframe=${formatBox(diagnostic.banner.iframeBox)})`,
-    );
-    log(
-      `Adsterra native: ${diagnostic.native.status} ` +
-        `(DOM=${diagnostic.native.rawStatus}, creative=${diagnostic.native.creativeCount}, ` +
-        `slot=${formatBox(diagnostic.native.slotBox)})`,
-    );
-    log(
-      `Adsterra social-bar: ${diagnostic.socialBar?.status || (diagnostic.socialBarFound ? "ready" : "waiting")} ` +
-        `(found=${diagnostic.socialBarFound ? "có" : "không"}, creative=${diagnostic.socialBar?.creativeCount || 0}, ` +
-        `frame=${formatBox(diagnostic.socialBar?.box)})`,
-    );
-    log(`Thời gian chờ render Adsterra: ${diagnostic.renderMs}ms.`);
+    if (AD_NETWORK === "adcash") {
+      const adcDiagnostic = await inspectAdcashPlacements(page, renderStartedAt);
+      log(`Adcash AutoTag: ${adcDiagnostic.status} (scripts acscdn=${adcDiagnostic.scriptCount}, render=${adcDiagnostic.renderMs}ms).`);
+      isRenderFinished = adcDiagnostic.status === "ready";
+      isForceClick = !isRenderFinished;
+      if (isForceClick) {
+        log(
+          `[ForceClick] ⚡ Quá thời gian chờ render Adcash AutoTag (${adcDiagnostic.renderMs}ms / tối đa ${AD_READY_TIMEOUT_MS}ms) — KÍCH HOẠT CƯỠNG CHẾ (Force Click) ngay!`,
+        );
+      }
+    } else if (AD_NETWORK === "clickadu") {
+      const clkDiagnostic = await inspectClickaduPlacements(page, renderStartedAt);
+      log(`Clickadu: ${clkDiagnostic.status} (render=${clkDiagnostic.renderMs}ms).`);
+      isRenderFinished = clkDiagnostic.status === "ready";
+      isForceClick = !isRenderFinished;
+      if (isForceClick) {
+        log(
+          `[ForceClick] ⚡ Quá thời gian chờ render Clickadu (${clkDiagnostic.renderMs}ms / tối đa ${AD_READY_TIMEOUT_MS}ms) — KÍCH HOẠT CƯỠNG CHẾ (Force Click) ngay!`,
+        );
+      }
+    } else {
+      if (!FOCUS_POPUNDER_SOCIAL) {
+        await page.locator(".adsterra-stack").scrollIntoViewIfNeeded().catch(() => {});
+      }
+      diagnostic = await inspectAdsterraPlacements(page, renderStartedAt);
 
-    const isRenderFinished = FOCUS_POPUNDER_SOCIAL
-      ? (diagnostic.socialBarFound || diagnostic.banner.status === "ready")
-      : (diagnostic.allReady || (diagnostic.banner.status === "ready" && diagnostic.native.status === "ready"));
-    const isForceClick = !isRenderFinished;
-    if (isForceClick) {
       log(
-        `[ForceClick] ⚡ Quá thời gian chờ render Adsterra (${diagnostic.renderMs}ms / tối đa ${AD_READY_TIMEOUT_MS}ms) mà quảng cáo chưa hoàn tất tải (banner=${diagnostic.banner.status}, native=${diagnostic.native.status}, socialBar=${diagnostic.socialBarFound ? "có" : "không"}) — KÍCH HOẠT CƯỠNG CHẾ (Force Click) 1 quảng cáo bất kỳ ngay lập tức!`,
+        `Adsterra banner: ${diagnostic.banner.status} ` +
+          `(DOM=${diagnostic.banner.rawStatus}, iframe 728×90=${diagnostic.banner.iframe728x90 ? "có" : "không"}, ` +
+          `creative=${diagnostic.banner.creativeCount}, slot=${formatBox(diagnostic.banner.slotBox)}, ` +
+          `iframe=${formatBox(diagnostic.banner.iframeBox)})`,
       );
+      log(
+        `Adsterra native: ${diagnostic.native.status} ` +
+          `(DOM=${diagnostic.native.rawStatus}, creative=${diagnostic.native.creativeCount}, ` +
+          `slot=${formatBox(diagnostic.native.slotBox)})`,
+      );
+      log(
+        `Adsterra social-bar: ${diagnostic.socialBar?.status || (diagnostic.socialBarFound ? "ready" : "waiting")} ` +
+          `(found=${diagnostic.socialBarFound ? "có" : "không"}, creative=${diagnostic.socialBar?.creativeCount || 0}, ` +
+          `frame=${formatBox(diagnostic.socialBar?.box)})`,
+      );
+      log(`Thời gian chờ render Adsterra: ${diagnostic.renderMs}ms.`);
+
+      isRenderFinished = FOCUS_POPUNDER_SOCIAL
+        ? (diagnostic.socialBarFound || diagnostic.banner.status === "ready")
+        : (diagnostic.allReady || (diagnostic.banner.status === "ready" && diagnostic.native.status === "ready"));
+      isForceClick = !isRenderFinished;
+      if (isForceClick) {
+        log(
+          `[ForceClick] ⚡ Quá thời gian chờ render Adsterra (${diagnostic.renderMs}ms / tối đa ${AD_READY_TIMEOUT_MS}ms) mà quảng cáo chưa hoàn tất tải (banner=${diagnostic.banner.status}, native=${diagnostic.native.status}, socialBar=${diagnostic.socialBarFound ? "có" : "không"}) — KÍCH HOẠT CƯỠNG CHẾ (Force Click) 1 quảng cáo bất kỳ ngay lập tức!`,
+        );
+      }
     }
 
     if (!isForceClick) {
@@ -3365,7 +3438,7 @@ async function runOneCycle(
       try {
         const nativeSelector = isForceClick
           ? `${NATIVE_READY_SELECTOR} #${NATIVE_CONTAINER_ID} a, ${NATIVE_READY_SELECTOR} a, #${NATIVE_CONTAINER_ID} a, .adsterra-native a, [id*="container-"] a`
-          : diagnostic.native.status === "ready"
+          : diagnostic?.native?.status === "ready"
           ? `${NATIVE_READY_SELECTOR} #${NATIVE_CONTAINER_ID} a[target="_blank"], ${NATIVE_READY_SELECTOR} a`
           : null;
         if (shouldScanAdsterra && nativeSelector) {
@@ -3677,22 +3750,44 @@ async function runOneCycle(
 
     // 5. Dự phòng selector cuối cùng (giới hạn tối đa 2 lần thử, TUYỆT ĐỐI không click Native khi bật FOCUS_POPUNDER_SOCIAL)
     if (!adClicked && cycleClickMode !== "manual") {
-      const candidateSelectors = FOCUS_POPUNDER_SOCIAL
-        ? [
-            SOCIAL_BAR_SELECTOR,
-            '.adsterra-smartlink',
-            '.adsterra-banner[data-status="ready"] iframe',
-            '.adsterra-leaderboard[data-status="ready"] iframe',
-            'iframe[src*="deliberatewatchful.com"]',
-            'iframe[src*="adsterra"]',
-          ]
-        : [
-            '.adsterra-smartlink',
-            'a[href*="deliberatewatchful.com"]',
-            '.adsterra-banner[data-status="ready"] iframe',
-            '#container-5e6634da84f8f263d7ab34ae152f1c8d a[target="_blank"]',
-            '.adsterra-native a[target="_blank"]',
-          ];
+      const candidateSelectors = [
+        ...(AD_NETWORK === "adcash" || AD_NETWORK === "all"
+          ? [
+              '#adcash-ad-container a[href]',
+              '.adcash-container a[href]',
+              'iframe[src*="acscdn"]',
+              'iframe[src*="adexchangerapid"]',
+              '[id*="aclib"] a[href]',
+              'div[id*="aclib"]',
+              'div[class*="aclib"]',
+            ]
+          : []),
+        ...(AD_NETWORK === "clickadu" || AD_NETWORK === "all"
+          ? [
+              '#clickadu-ad-container a[href]',
+              '.clickadu-container a[href]',
+              'iframe[src*="clickadu"]',
+            ]
+          : []),
+        ...(shouldScanAdsterra
+          ? (FOCUS_POPUNDER_SOCIAL
+              ? [
+                  SOCIAL_BAR_SELECTOR,
+                  '.adsterra-smartlink',
+                  '.adsterra-banner[data-status="ready"] iframe',
+                  '.adsterra-leaderboard[data-status="ready"] iframe',
+                  'iframe[src*="deliberatewatchful.com"]',
+                  'iframe[src*="adsterra"]',
+                ]
+              : [
+                  '.adsterra-smartlink',
+                  'a[href*="deliberatewatchful.com"]',
+                  '.adsterra-banner[data-status="ready"] iframe',
+                  '#container-5e6634da84f8f263d7ab34ae152f1c8d a[target="_blank"]',
+                  '.adsterra-native a[target="_blank"]',
+                ])
+          : []),
+      ];
 
       const maxFallbackAttempts = FOCUS_POPUNDER_SOCIAL ? 2 : 3;
       let fallbackAttempts = 0;

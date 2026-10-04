@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.176 — Tối ưu hoá nhận diện nạp Adcash AutoTag và hành vi tương tác tự nhiên (04/10/2026)
+
+- Tối ưu hoá quy trình rà soát và tương tác quảng cáo Adcash trong [scripts/adViewer.mjs](scripts/adViewer.mjs):
+  - Xây dựng hàm kiểm tra độc lập `inspectAdcashPlacements` và `inspectClickaduPlacements`: xác nhận trạng thái sẵn sàng ngay khi `window.aclib` và các kịch bản phụ trợ (`atagv2.js`, `inpagepush.js`, `videoSliderAlt.js`) được nạp, loại bỏ hoàn toàn việc chờ đợi lãng phí 8-10 giây tìm kiếm các thẻ Adsterra vốn đã tạm ngắt.
+  - Phục hồi cơ chế đọc bài viết và di chuột vi mô tự nhiên `simulateHumanReading` trước khi click: không còn bị kích hoạt cưỡng chế (`ForceClick`) sớm do nhầm lẫn trạng thái thiếu quảng cáo, tạo ấn tượng hành vi người thật tự nhiên nhất với hệ thống phòng chống gian lận của Adcash.
+  - Bổ sung toàn diện các bộ chọn phần tử quảng cáo Adcash và Clickadu vào danh sách dự phòng cuối chu kỳ (`candidateSelectors`), bảo đảm không bỏ sót tương tác kể cả khi Popunder gặp giới hạn tần suất (cooldown).
+
 ## 1.3.175 — Tích hợp mạng quảng cáo Adcash AutoTag, tạm dừng Adsterra và hỗ trợ chọn nhà mạng mục tiêu (04/10/2026)
 
 - Tích hợp mạng quảng cáo Adcash và triển khai mã nhúng AutoTag:

@@ -9,6 +9,17 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.173 — Thêm xác thực Clickadu, tạm dừng Adsterra và hỗ trợ chọn nhà mạng mục tiêu (04/10/2026)
+
+- Tích hợp mạng quảng cáo Clickadu và hoàn tất xác thực quyền sở hữu website:
+  - Thêm thẻ định danh xác minh `<meta name="clckd" content="e78045ddae492ded91a0b9f89210f895" />` đồng thời vào `metadata.other` và trực tiếp trong thẻ `<head>` tĩnh của [src/app/layout.tsx](src/app/layout.tsx), bảo đảm crawler phê duyệt của Clickadu nhận diện ngay từ lượt yêu cầu đầu tiên.
+  - Xây dựng bộ điều phối nhà mạng quảng cáo linh hoạt trong [src/lib/ads/provider.ts](src/lib/ads/provider.ts): mặc định chuyển sang `clickadu` và tạm dừng `adsterra`, cho phép hoán đổi hoặc chạy song song qua biến môi trường `AD_PROVIDER`.
+  - Bổ sung cấu hình [src/lib/clickadu/config.ts](src/lib/clickadu/config.ts), thành phần máy chủ [src/components/ClickaduAds.tsx](src/components/ClickaduAds.tsx) và máy khách [src/components/clickadu/ClickaduClientAds.tsx](src/components/clickadu/ClickaduClientAds.tsx) sẵn sàng nhận mã nhúng ngay sau khi duyệt.
+  - Cập nhật cổng kiểm soát Adsterra trong [src/components/AdsterraAds.tsx](src/components/AdsterraAds.tsx) để ngắt hiển thị khi chọn Clickadu mà không làm sai lệch các bài kiểm tra cấu hình tĩnh.
+- Nâng cấp bộ công cụ xem quảng cáo tự động [run-ad-viewer.bat](run-ad-viewer.bat) và [scripts/adViewer.mjs](scripts/adViewer.mjs):
+  - Thêm tuỳ chọn [16] trong tệp batch cho phép người dùng lựa chọn giữa: 1. Clickadu (mặc định), 2. Adsterra, 3. Tất cả nhà mạng (`--ad-network=clickadu|adsterra|all`).
+  - Tự động điều chỉnh thuật toán quét và ưu tiên click theo nhà mạng được chọn, hỗ trợ tương tác tự nhiên kích hoạt Popunder OnClick của Clickadu.
+
 ## 1.3.172 — Triệt tiêu vòng lặp click dự phòng kéo dài và cô lập chế độ Popunder + SocialBar (04/10/2026)
 
 - Khắc phục sự cố kịch bản bị đứng hình (stuck) nhiều phút trong danh sách bộ chọn dự phòng khi chạy chế độ Popunder + SocialBar trong [scripts/adViewer.mjs](scripts/adViewer.mjs):

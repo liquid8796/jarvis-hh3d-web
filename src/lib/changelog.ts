@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.173",
+    date: "2026-10-04",
+    lines: [
+      "Thêm thẻ xác thực quyền sở hữu website cho mạng quảng cáo Clickadu và tạm dừng hiển thị Adsterra.",
+      "Bộ công cụ xem quảng cáo bổ sung tuỳ chọn lựa chọn linh hoạt giữa Clickadu, Adsterra hoặc toàn bộ nhà mạng.",
+    ],
+  },
+  {
     version: "1.3.172",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Kho Xem Quảng Cáo chuyển tiện ích chống nhận diện dấu vân tay thành tuỳ chọn linh hoạt qua cờ dòng lệnh.",
       "Mặc định chạy trên trình duyệt tiêu chuẩn sạch, giúp giảm thiểu các dấu hiệu bất thường khi tương tác.",
-    ],
-  },
-  {
-    version: "1.3.123",
-    date: "2026-10-02",
-    lines: [
-      "Kho Xem Quảng Cáo nâng cấp cơ chế tương tác quảng cáo bằng mô phỏng hành vi người dùng tự nhiên, chống phát hiện tự động hoá.",
-      "Di chuyển chuột theo đường cong mượt mà và click tại vị trí lệch ngẫu nhiên, có thể chọn chế độ tương tác khác nhau.",
     ],
   },
 ];

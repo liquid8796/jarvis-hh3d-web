@@ -101,7 +101,7 @@ assert.deepEqual(fpMod.parseBrowserList("Edge, FF, xyz"), { browsers: ["edge", "
 assert.equal(fpMod.estimateSafariMajor(new Date("2026-10-03T00:00:00Z")), 27);
 assert.equal(fpMod.estimateSafariMajor(new Date("2026-06-01T00:00:00Z")), 26);
 // @ts-ignore
-const { parseProxyItem, parsePopunderRatio, parseFocusPopunderSocial, SOCIAL_BAR_KEY, SOCIAL_BAR_SELECTOR } = await import("./adViewer.mjs");
+const { parseProxyItem, parsePopunderRatio, parseFocusPopunderSocial, parseAdNetwork, SOCIAL_BAR_KEY, SOCIAL_BAR_SELECTOR } = await import("./adViewer.mjs");
 const p1 = parseProxyItem("103.152.112.5:8080@liquid:secret123");
 assert.equal(p1?.server, "http://103.152.112.5:8080");
 assert.equal(p1?.username, "liquid");
@@ -236,8 +236,19 @@ assert.match(runtime, /🔔 \[SocialBar Ưu Tiên\]/, "ad-viewer must prioritize
 assert.match(batContent, /\[15\] Trong tam dinh dang quang cao/, "run-ad-viewer.bat must offer option [15] for ad format focus");
 assert.match(batContent, /ARG_AD_FOCUS=--focus-popunder-social/, "run-ad-viewer.bat must set ARG_AD_FOCUS to --focus-popunder-social");
 
+// ---- Lựa chọn Nhà Mạng Quảng Cáo (Ad Network: Clickadu, Adsterra, All) ----
+assert.equal(parseAdNetwork(["node", "adViewer.mjs"], dummyEnv), "clickadu", "ad-network must default to clickadu");
+assert.equal(parseAdNetwork(["node", "adViewer.mjs", "--ad-network=adsterra"], dummyEnv), "adsterra");
+assert.equal(parseAdNetwork(["node", "adViewer.mjs", "--ad-network=all"], dummyEnv), "all");
+assert.equal(parseAdNetwork(["node", "adViewer.mjs", "--network=clickadu"], dummyEnv), "clickadu");
+assert.equal(parseAdNetwork(["node", "adViewer.mjs"], { AD_PROVIDER: "adsterra" } as any), "adsterra");
+
+assert.match(batContent, /\[16\] Nha mang quang cao muc tieu/, "run-ad-viewer.bat must offer option [16] for ad network");
+assert.match(batContent, /ARG_AD_NETWORK=--ad-network=clickadu/, "run-ad-viewer.bat must default to Clickadu ad network");
+assert.match(batContent, /FINAL_ARGS=.*ARG_AD_NETWORK/, "FINAL_ARGS must include ARG_AD_NETWORK");
+
 console.log(
-  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, fully supports headless mode without popping up windows or leaking headless signals, enables 100% lock-free parallel execution across multi-instance headless workers, and focuses on high-CPM Popunder + SocialBar while eliminating unwanted NativeBanner impressions and clicks.",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, fully supports headless mode without popping up windows or leaking headless signals, enables 100% lock-free parallel execution across multi-instance headless workers, focuses on high-CPM Popunder + SocialBar while eliminating unwanted NativeBanner impressions, and supports selecting target ad networks (Clickadu, Adsterra, All).",
 );
 
 

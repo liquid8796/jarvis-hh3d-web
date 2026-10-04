@@ -338,8 +338,27 @@ if "%INPUT_AD_FOCUS%"=="2" (
 )
 echo.
 
+REM 16. Nha mang quang cao muc tieu (Ad Network)
+echo [16] Nha mang quang cao muc tieu [Ad Network]:
+echo      1. Clickadu [Mac dinh - uu tien phe duyet va chay ads Clickadu]
+echo      2. Adsterra [Mang quang cao Adsterra truyen thong]
+echo      3. Tat ca nha mang [All networks - Clickadu + Adsterra]
+set "INPUT_AD_NETWORK="
+set /p "INPUT_AD_NETWORK=    Chon [1-3, Enter = 1]: "
+set "ARG_AD_NETWORK=--ad-network=clickadu"
+if "%INPUT_AD_NETWORK%"=="2" (
+    set "ARG_AD_NETWORK=--ad-network=adsterra"
+    echo     -^> Nha mang: Adsterra
+) else if "%INPUT_AD_NETWORK%"=="3" (
+    set "ARG_AD_NETWORK=--ad-network=all"
+    echo     -^> Nha mang: Tat ca [Clickadu + Adsterra]
+) else (
+    echo     -^> Nha mang: Clickadu [Mac dinh]
+)
+echo.
+
 REM Tong hop lenh thuc thi
-set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER% %ARG_AD_FOCUS%
+set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER% %ARG_AD_FOCUS% %ARG_AD_NETWORK%
 
 echo ============================================================================
 echo   TONG HOP CAU HINH CHAY:

@@ -7,6 +7,8 @@ import { BackdropPeek } from "@/components/BackdropPeek";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { GoogleAdSense } from "@/components/GoogleAdSense";
 import { AdsterraAds } from "@/components/AdsterraAds";
+import { ClickaduAds } from "@/components/ClickaduAds";
+import { CLICKADU_SITE_VERIFICATION_TOKEN } from "@/lib/clickadu/config";
 import { LanguageProvider } from "@/lib/i18n/context";
 import { SiteFooter } from "@/components/SiteFooter";
 import {
@@ -91,6 +93,9 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "./",
   },
+  other: {
+    clckd: CLICKADU_SITE_VERIFICATION_TOKEN,
+  },
   openGraph: {
     type: "website",
     locale: "vi_VN",
@@ -140,7 +145,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
-      <head><GoogleAdSense /></head>
+      <head>
+        <meta name="clckd" content={CLICKADU_SITE_VERIFICATION_TOKEN} />
+        <GoogleAdSense />
+      </head>
       <body>
         {/*
           Nền của từng trang, rót từ cấu hình.
@@ -178,6 +186,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               tranh ấy. Xem components/MaintenanceGate.tsx cho toàn bộ lý lẽ. */}
           <MaintenanceGate>{children}</MaintenanceGate>
           <AdsterraAds />
+          <ClickaduAds />
           <SiteFooter />
           {/* Dấu bản đứng NGOÀI cửa bế quan, cùng lẽ với tấm nền: lúc web đang bế quan là đúng
               lúc người ta cần biết trạm mình đang gõ cửa mang bản nào. Đứng cuối trong DOM để

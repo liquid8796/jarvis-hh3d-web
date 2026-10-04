@@ -239,6 +239,7 @@ const NATIVE_READY_SELECTOR = '.adsterra-native[data-status="ready"]';
 const NATIVE_CONTAINER_ID = "container-5e6634da84f8f263d7ab34ae152f1c8d";
 const SOCIAL_BAR_KEY = "977a66f06e979e2830ee60ed1fa88533";
 const SOCIAL_BAR_SELECTOR = `iframe[id*="${SOCIAL_BAR_KEY}"], iframe[class*="${SOCIAL_BAR_KEY}"], iframe[style*="2147483647"], iframe[id*="container-"][style*="fixed"]`;
+const CLICKADU_CONTAINER_SELECTOR = "#clickadu-ad-container, .clickadu-container, [id*='clickadu']";
 
 const rawClickMode = (
   process.argv.find((a) => a.startsWith("--click-mode="))?.split("=")[1] ||
@@ -277,6 +278,25 @@ function parseFocusPopunderSocial(cliArgs = process.argv, env = process.env) {
 }
 
 const FOCUS_POPUNDER_SOCIAL = parseFocusPopunderSocial();
+
+function parseAdNetwork(cliArgs = process.argv, env = process.env) {
+  const cli =
+    getCliArg("--ad-network") ||
+    getCliArg("--ad-provider") ||
+    getCliArg("--network") ||
+    cliArgs.find((a) => a.startsWith("--ad-network="))?.split("=")[1] ||
+    cliArgs.find((a) => a.startsWith("--ad-provider="))?.split("=")[1] ||
+    cliArgs.find((a) => a.startsWith("--network="))?.split("=")[1] ||
+    "";
+  const envVal = env.AD_VIEWER_AD_NETWORK || env.AD_VIEWER_AD_PROVIDER || env.AD_PROVIDER || "";
+  const raw = (cli || envVal || "").trim().toLowerCase();
+  if (raw === "adsterra") return "adsterra";
+  if (raw === "all" || raw === "both") return "all";
+  if (raw === "clickadu") return "clickadu";
+  return "clickadu";
+}
+
+const AD_NETWORK = parseAdNetwork();
 
 let CLICK_MODE = "cdp";
 if (rawClickMode === "mouse") {
@@ -2741,7 +2761,8 @@ async function runOneCycle(
         : "[AntiDetect] Chạy với Playwright Core mặc định."
     );
     log(`[AntiDetect] Cấu hình đệ quy click: ${MAX_RECURSIVE_CLICKS > 0 ? `Tối đa ${MAX_RECURSIVE_CLICKS} lần` : "Tắt (0 lần)"}`);
-    log(`[Adsterra Trọng Tâm] Chế độ quảng cáo: ${FOCUS_POPUNDER_SOCIAL ? "🎯 ƯU TIÊN POPUNDER + SOCIALBAR (Triệt tiêu impression & click NativeBanner)" : "Cân bằng mọi định dạng (Popunder + SocialBar + Banner + Native)"}`);
+    log(`[Nhà Mạng Quảng Cáo] Mục tiêu: ${AD_NETWORK.toUpperCase()} (${AD_NETWORK === "clickadu" ? "🚀 Clickadu (Đang phê duyệt / hoạt động)" : AD_NETWORK === "adsterra" ? "Adsterra" : "Tất cả nhà mạng"})`);
+    log(`[Trọng Tâm Định Dạng] Chế độ quảng cáo: ${FOCUS_POPUNDER_SOCIAL ? "🎯 ƯU TIÊN POPUNDER + SOCIALBAR (Triệt tiêu impression & click NativeBanner)" : "Cân bằng mọi định dạng (Popunder + SocialBar + Banner + Native)"}`);
     if (cdpUrl) {
       log(`Kết nối tới Chrome ${useMyChrome ? "chính " : ""}qua CDP: ${cdpUrl}...`);
       try {
@@ -3287,7 +3308,29 @@ async function runOneCycle(
     // Thu thập tất cả các quảng cáo khả dụng trên trang để chọn ngẫu nhiên
     const adCandidates = [];
 
-    // 1. Toàn bộ các thẻ Native Ads (chỉ quét nếu KHÔNG bật FOCUS_POPUNDER_SOCIAL)
+    // 0. Clickadu Ads (Banner / In-Page Push / Container / Links)
+    if (AD_NETWORK === "clickadu" || AD_NETWORK === "all") {
+      try {
+        const clickaduSelector = isForceClick
+          ? '#clickadu-ad-container a[href], .clickadu-container a[href], iframe[src*="clickadu"], a[href*="clickadu"], [data-clickadu] a[href], #clickadu-ad-container, .clickadu-container'
+          : '#clickadu-ad-container a[href], .clickadu-container a[href], iframe[src*="clickadu"], a[href*="clickadu"], [data-clickadu] a[href]';
+        const clickaduLocators = page.locator(clickaduSelector);
+        const clkCount = await clickaduLocators.count().catch(() => 0);
+        for (let i = 0; i < clkCount; i++) {
+          adCandidates.push({
+            name: `${isForceClick ? "[Force] " : ""}Clickadu Ad unit #${i + 1}/${clkCount}`,
+            locator: clickaduLocators.nth(i),
+            isClickadu: true,
+          });
+        }
+      } catch (err) {
+        log(`Lỗi khi quét Clickadu ads: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    const shouldScanAdsterra = AD_NETWORK === "adsterra" || AD_NETWORK === "all";
+
+    // 1. Toàn bộ các thẻ Native Ads (chỉ quét nếu KHÔNG bật FOCUS_POPUNDER_SOCIAL và cho phép Adsterra)
     if (!FOCUS_POPUNDER_SOCIAL) {
       try {
         const nativeSelector = isForceClick
@@ -3295,7 +3338,7 @@ async function runOneCycle(
           : diagnostic.native.status === "ready"
           ? `${NATIVE_READY_SELECTOR} #${NATIVE_CONTAINER_ID} a[target="_blank"], ${NATIVE_READY_SELECTOR} a`
           : null;
-        if (nativeSelector) {
+        if (shouldScanAdsterra && nativeSelector) {
           const nativeLinks = page.locator(nativeSelector);
           const count = await nativeLinks.count().catch(() => 0);
           for (let i = 0; i < count; i++) {
@@ -3311,97 +3354,110 @@ async function runOneCycle(
     }
 
     // 1b. SocialBar (Floating Notification iframe - CPM cao, ưu tiên đặc biệt)
-    try {
-      const socialBarIframe = page.locator(SOCIAL_BAR_SELECTOR).first();
-      const socialBarCount = await socialBarIframe.count().catch(() => 0);
-      if (socialBarCount > 0) {
-        const iframeHandle = await socialBarIframe.elementHandle().catch(() => null);
-        const frame = iframeHandle ? await iframeHandle.contentFrame().catch(() => null) : null;
-        let foundSocialLinks = false;
-        if (frame) {
-          const socialLinks = frame.locator('a[href], [class*="__link"]');
-          const scCount = await socialLinks.count().catch(() => 0);
-          for (let i = 0; i < scCount; i++) {
-            foundSocialLinks = true;
+    if (shouldScanAdsterra) {
+      try {
+        const socialBarIframe = page.locator(SOCIAL_BAR_SELECTOR).first();
+        const socialBarCount = await socialBarIframe.count().catch(() => 0);
+        if (socialBarCount > 0) {
+          const iframeHandle = await socialBarIframe.elementHandle().catch(() => null);
+          const frame = iframeHandle ? await iframeHandle.contentFrame().catch(() => null) : null;
+          let foundSocialLinks = false;
+          if (frame) {
+            const socialLinks = frame.locator('a[href], [class*="__link"]');
+            const scCount = await socialLinks.count().catch(() => 0);
+            for (let i = 0; i < scCount; i++) {
+              foundSocialLinks = true;
+              adCandidates.push({
+                name: `${isForceClick ? "[Force] " : ""}SocialBar Notification link ${i + 1}/${scCount}`,
+                locator: socialLinks.nth(i),
+                isSocialBar: true,
+              });
+            }
+          }
+          if (!foundSocialLinks) {
             adCandidates.push({
-              name: `${isForceClick ? "[Force] " : ""}SocialBar Notification link ${i + 1}/${scCount}`,
-              locator: socialLinks.nth(i),
+              name: `${isForceClick ? "[Force] " : ""}SocialBar Notification iframe`,
+              locator: socialBarIframe,
               isSocialBar: true,
             });
           }
         }
-        if (!foundSocialLinks) {
-          adCandidates.push({
-            name: `${isForceClick ? "[Force] " : ""}SocialBar Notification iframe`,
-            locator: socialBarIframe,
-            isSocialBar: true,
-          });
-        }
+      } catch (err) {
+        log(`Lỗi khi quét SocialBar: ${err instanceof Error ? err.message : String(err)}`);
       }
-    } catch (err) {
-      log(`Lỗi khi quét SocialBar: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     // 2. Banner ad creative trong các iframe quảng cáo (728x90, 468x60, 320x50, 300x250, 160x600, 160x300)
-    try {
-      const bannerSelector = isForceClick
-        ? '.adsterra-banner iframe, .adsterra-leaderboard iframe, .adsterra-unit iframe, .adsterra-stack iframe, iframe[width="728"], iframe[src*="adsterra"], iframe[src*="alwingulla"], iframe[src*="doubleclick"], iframe[src*="banner"]'
-        : '.adsterra-banner[data-status="ready"] iframe, .adsterra-leaderboard[data-status="ready"] iframe, .adsterra-unit iframe';
-      const bannerIframes = page.locator(bannerSelector);
-      const iframeCount = await bannerIframes.count().catch(() => 0);
-      for (let f = 0; f < iframeCount; f++) {
-        const iframeHandle = await bannerIframes.nth(f).elementHandle().catch(() => null);
-        const frame = iframeHandle ? await iframeHandle.contentFrame().catch(() => null) : null;
-        let foundFrameLinks = false;
-        if (frame) {
-          const bannerLinks = frame.locator("a[href]");
-          const bannerCount = await bannerLinks.count().catch(() => 0);
-          for (let i = 0; i < bannerCount; i++) {
-            foundFrameLinks = true;
+    if (shouldScanAdsterra) {
+      try {
+        const bannerSelector = isForceClick
+          ? '.adsterra-banner iframe, .adsterra-leaderboard iframe, .adsterra-unit iframe, .adsterra-stack iframe, iframe[width="728"], iframe[src*="adsterra"], iframe[src*="alwingulla"], iframe[src*="doubleclick"], iframe[src*="banner"]'
+          : '.adsterra-banner[data-status="ready"] iframe, .adsterra-leaderboard[data-status="ready"] iframe, .adsterra-unit iframe';
+        const bannerIframes = page.locator(bannerSelector);
+        const iframeCount = await bannerIframes.count().catch(() => 0);
+        for (let f = 0; f < iframeCount; f++) {
+          const iframeHandle = await bannerIframes.nth(f).elementHandle().catch(() => null);
+          const frame = iframeHandle ? await iframeHandle.contentFrame().catch(() => null) : null;
+          let foundFrameLinks = false;
+          if (frame) {
+            const bannerLinks = frame.locator("a[href]");
+            const bannerCount = await bannerLinks.count().catch(() => 0);
+            for (let i = 0; i < bannerCount; i++) {
+              foundFrameLinks = true;
+              adCandidates.push({
+                name: `${isForceClick ? "[Force] " : ""}Banner iframe #${f + 1} link ${i + 1}/${bannerCount}`,
+                locator: bannerLinks.nth(i),
+              });
+            }
+          }
+          if (isForceClick && !foundFrameLinks) {
             adCandidates.push({
-              name: `${isForceClick ? "[Force] " : ""}Banner iframe #${f + 1} link ${i + 1}/${bannerCount}`,
-              locator: bannerLinks.nth(i),
+              name: `[Force] Banner iframe #${f + 1} element`,
+              locator: bannerIframes.nth(f),
             });
           }
         }
-        if (isForceClick && !foundFrameLinks) {
-          adCandidates.push({
-            name: `[Force] Banner iframe #${f + 1} element`,
-            locator: bannerIframes.nth(f),
-          });
-        }
+      } catch (err) {
+        log(`Lỗi khi quét banner ads: ${err instanceof Error ? err.message : String(err)}`);
       }
-    } catch (err) {
-      log(`Lỗi khi quét banner ads: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     // 3. Adsterra Smartlink
-    try {
-      const smartlink = page.locator(
-        '.adsterra-smartlink, a[href*="deliberatewatchful.com"], a[href*="alwingulla"], a[href*="f06720140b3b11ad092d96fa65ca5110"]',
-      );
-      const smartCount = await smartlink.count().catch(() => 0);
-      for (let i = 0; i < smartCount; i++) {
-        adCandidates.push({
-          name: `${isForceClick ? "[Force] " : ""}Adsterra Smartlink ${i + 1}/${smartCount}`,
-          locator: smartlink.nth(i),
-        });
+    if (shouldScanAdsterra) {
+      try {
+        const smartlink = page.locator(
+          '.adsterra-smartlink, a[href*="deliberatewatchful.com"], a[href*="alwingulla"], a[href*="f06720140b3b11ad092d96fa65ca5110"]',
+        );
+        const smartCount = await smartlink.count().catch(() => 0);
+        for (let i = 0; i < smartCount; i++) {
+          adCandidates.push({
+            name: `${isForceClick ? "[Force] " : ""}Adsterra Smartlink ${i + 1}/${smartCount}`,
+            locator: smartlink.nth(i),
+          });
+        }
+      } catch {
+        // bỏ qua
       }
-    } catch {
-      // bỏ qua
     }
 
     // 4. Dự phòng cưỡng chế nếu trang tải quá chậm chưa có link nào
     if (isForceClick && adCandidates.length === 0) {
       const fallbackLocators = [
-        { name: "[Force] Adsterra Banner Slot", sel: ".adsterra-banner, .adsterra-leaderboard" },
-        ...(FOCUS_POPUNDER_SOCIAL
-          ? []
-          : [
-              { name: "[Force] Adsterra Native Slot", sel: ".adsterra-native, #container-5e6634da84f8f263d7ab34ae152f1c8d" },
-              { name: "[Force] Adsterra Stack Container", sel: ".adsterra-stack" },
-            ]),
-        { name: "[Force] Adsterra SocialBar", sel: SOCIAL_BAR_SELECTOR },
+        ...(AD_NETWORK === "clickadu" || AD_NETWORK === "all"
+          ? [{ name: "[Force] Clickadu Container", sel: CLICKADU_CONTAINER_SELECTOR }]
+          : []),
+        ...(shouldScanAdsterra
+          ? [
+              { name: "[Force] Adsterra Banner Slot", sel: ".adsterra-banner, .adsterra-leaderboard" },
+              ...(FOCUS_POPUNDER_SOCIAL
+                ? []
+                : [
+                    { name: "[Force] Adsterra Native Slot", sel: ".adsterra-native, #container-5e6634da84f8f263d7ab34ae152f1c8d" },
+                    { name: "[Force] Adsterra Stack Container", sel: ".adsterra-stack" },
+                  ]),
+              { name: "[Force] Adsterra SocialBar", sel: SOCIAL_BAR_SELECTOR },
+            ]
+          : []),
         { name: "[Force] External Link", sel: "a[target='_blank']" },
       ];
       for (const fb of fallbackLocators) {
@@ -4027,6 +4083,9 @@ export {
   resolvePopunderTarget,
   parseFocusPopunderSocial,
   FOCUS_POPUNDER_SOCIAL,
+  parseAdNetwork,
+  AD_NETWORK,
+  CLICKADU_CONTAINER_SELECTOR,
   SOCIAL_BAR_KEY,
   SOCIAL_BAR_SELECTOR,
 };

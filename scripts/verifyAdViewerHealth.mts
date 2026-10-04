@@ -101,7 +101,17 @@ assert.deepEqual(fpMod.parseBrowserList("Edge, FF, xyz"), { browsers: ["edge", "
 assert.equal(fpMod.estimateSafariMajor(new Date("2026-10-03T00:00:00Z")), 27);
 assert.equal(fpMod.estimateSafariMajor(new Date("2026-06-01T00:00:00Z")), 26);
 // @ts-ignore
-const { parseProxyItem, parsePopunderRatio, parseFocusPopunderSocial, parseAdNetwork, SOCIAL_BAR_KEY, SOCIAL_BAR_SELECTOR } = await import("./adViewer.mjs");
+const {
+  ProxyManager,
+  parseProxyItem,
+  parseAntiDetectProxy,
+  ANTI_DETECT_PROXY,
+  parsePopunderRatio,
+  parseFocusPopunderSocial,
+  parseAdNetwork,
+  SOCIAL_BAR_KEY,
+  SOCIAL_BAR_SELECTOR,
+} = await import("./adViewer.mjs");
 const p1 = parseProxyItem("103.152.112.5:8080@liquid:secret123");
 assert.equal(p1?.server, "http://103.152.112.5:8080");
 assert.equal(p1?.username, "liquid");
@@ -116,6 +126,30 @@ const p3 = parseProxyItem("liquid:secret123@103.152.112.5:8080");
 assert.equal(p3?.server, "http://103.152.112.5:8080");
 assert.equal(p3?.username, "liquid");
 assert.equal(p3?.password, "secret123");
+
+const dummyEnv = {} as NodeJS.ProcessEnv;
+
+// ---- Anti-Detect Proxy & Bảo vệ Proxy cố định (Direct Proxy Protection) ----
+assert.equal(parseAntiDetectProxy(["node", "adViewer.mjs"], dummyEnv), true);
+assert.equal(parseAntiDetectProxy(["node", "adViewer.mjs", "--no-anti-detect-proxy"], dummyEnv), false);
+assert.equal(parseAntiDetectProxy(["node", "adViewer.mjs", "--no-antidetect-proxy"], dummyEnv), false);
+assert.equal(parseAntiDetectProxy(["node", "adViewer.mjs", "--no-anti-detect"], dummyEnv), false);
+assert.equal(parseAntiDetectProxy(["node", "adViewer.mjs"], { ...dummyEnv, AD_VIEWER_ANTI_DETECT_PROXY: "0" }), false);
+assert.equal(parseAntiDetectProxy(["node", "adViewer.mjs", "--anti-detect-proxy"], dummyEnv), true);
+
+const fixedPm = new ProxyManager({ directProxy: "103.88.234.239:40019", antiDetectProxy: false });
+fixedPm.init();
+assert.equal(fixedPm.hasActiveProxy(), true, "directProxy must be recognized as active proxy");
+const fixedP = await fixedPm.getNextWorkingProxy(1);
+assert.ok(fixedP, "getNextWorkingProxy must return the directProxy");
+assert.equal(fixedP?.server, "http://103.88.234.239:40019");
+fixedPm.markDead(fixedP);
+assert.equal(fixedPm.proxyList.length, 1, "directProxy must never be removed by markDead");
+fixedPm.removeDeadProxies([fixedP]);
+assert.equal(fixedPm.proxyList.length, 1, "directProxy must never be removed by removeDeadProxies");
+const fixedP2 = await fixedPm.getNextWorkingProxy(1, fixedP);
+assert.ok(fixedP2, "getNextWorkingProxy must continue returning the directProxy in subsequent cycles");
+assert.equal(fixedP2?.server, "http://103.88.234.239:40019");
 
 // ---- Cấu hình hover tuỳ biến & ngăn chặn che khuất cửa sổ đa instance ----
 assert.match(runtime, /parseHoverConfig/, "ad-viewer must parse arbitrary hover configuration from CLI and env");
@@ -224,7 +258,6 @@ assert.match(runtime, /IS_EXPLICIT_HEADLESS \? 3000 : 8000/, "ad-viewer must sho
 assert.equal(SOCIAL_BAR_KEY, "977a66f06e979e2830ee60ed1fa88533");
 assert.match(SOCIAL_BAR_SELECTOR, /container-/);
 assert.match(runtime, /--disable-popup-blocking/, "ad-viewer must pass --disable-popup-blocking to prevent headless Chromium from suppressing popunders");
-const dummyEnv = {} as NodeJS.ProcessEnv;
 assert.equal(parseFocusPopunderSocial(["node", "adViewer.mjs", "--headless"], dummyEnv), true, "headless mode must enable focus popunder+social by default");
 assert.equal(parseFocusPopunderSocial(["node", "adViewer.mjs", "--focus-popunder-social"], dummyEnv), true);
 assert.equal(parseFocusPopunderSocial(["node", "adViewer.mjs", "--no-native-click"], dummyEnv), true);
@@ -254,9 +287,14 @@ assert.match(batContent, /\[14\] Nha mang quang cao muc tieu/, "run-ad-viewer.ba
 assert.match(batContent, /ARG_AD_NETWORK=--ad-network=adcash/, "run-ad-viewer.bat must default to adcash");
 assert.match(batContent, /FINAL_ARGS=.*ARG_AD_NETWORK/, "FINAL_ARGS must include ARG_AD_NETWORK");
 assert.match(runtime, /attachSafePageListeners/, "ad-viewer must attach safe page listeners for dialogs and downloads");
+assert.match(batContent, /--- Tuy chon Anti-Detect Proxy ---/, "run-ad-viewer.bat must offer Anti-Detect Proxy menu");
+assert.match(batContent, /ARG_ANTI_DETECT_PROXY=--anti-detect-proxy/, "run-ad-viewer.bat must support --anti-detect-proxy");
+assert.match(batContent, /ARG_ANTI_DETECT_PROXY=--no-anti-detect-proxy/, "run-ad-viewer.bat must support --no-anti-detect-proxy");
+assert.match(batContent, /FINAL_ARGS=.*ARG_ANTI_DETECT_PROXY/, "FINAL_ARGS must include ARG_ANTI_DETECT_PROXY");
+assert.match(batContent, /:skip_anti_detect_proxy/, "run-ad-viewer.bat must skip Anti-Detect Proxy when direct IP is selected");
 
 console.log(
-  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, fully supports headless mode without popping up windows or leaking headless signals, enables 100% lock-free parallel execution across multi-instance headless workers, focuses on high-CPM Popunder + SocialBar while eliminating unwanted NativeBanner impressions, and supports selecting target ad networks (Adcash, Clickadu, Adsterra, All).",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, fully supports headless mode without popping up windows or leaking headless signals, enables 100% lock-free parallel execution across multi-instance headless workers, focuses on high-CPM Popunder + SocialBar while eliminating unwanted NativeBanner impressions, supports selecting target ad networks (Adcash, Clickadu, Adsterra, All), toggles Anti-Detect Proxy (Zero-Mismatch Triad), and protects fixed proxy instances from falling back to Direct IP.",
 );
 
 

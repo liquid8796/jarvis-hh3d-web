@@ -371,6 +371,32 @@ function parseAdNetwork(cliArgs = process.argv, env = process.env) {
 
 const AD_NETWORK = parseAdNetwork();
 
+function parseAntiDetectProxy(cliArgs = process.argv, env = process.env) {
+  if (
+    cliArgs.includes("--no-anti-detect-proxy") ||
+    cliArgs.includes("--no-antidetect-proxy") ||
+    cliArgs.includes("--no-anti-detect")
+  ) {
+    return false;
+  }
+  if (env.AD_VIEWER_ANTI_DETECT_PROXY === "0" || env.AD_VIEWER_ANTI_DETECT === "0") {
+    return false;
+  }
+  if (
+    cliArgs.includes("--anti-detect-proxy") ||
+    cliArgs.includes("--antidetect-proxy") ||
+    cliArgs.includes("--anti-detect")
+  ) {
+    return true;
+  }
+  if (env.AD_VIEWER_ANTI_DETECT_PROXY === "1" || env.AD_VIEWER_ANTI_DETECT === "1") {
+    return true;
+  }
+  return true;
+}
+
+const ANTI_DETECT_PROXY = parseAntiDetectProxy();
+
 let CLICK_MODE = "cdp";
 if (rawClickMode === "mouse") {
   CLICK_MODE = "mouse";
@@ -940,6 +966,7 @@ class ProxyManager {
     this.noProxy = options.noProxy || NO_PROXY;
     this.shuffle = options.shuffle || PROXY_SHUFFLE;
     this.pruneDead = options.pruneDead !== undefined ? options.pruneDead : !process.argv.includes("--no-prune-proxy");
+    this.antiDetectProxy = options.antiDetectProxy !== undefined ? options.antiDetectProxy : ANTI_DETECT_PROXY;
     this.loadedFilePath = null;
     this.deadKeys = new Set();
     this.pendingDeadKeys = new Set();
@@ -981,7 +1008,7 @@ class ProxyManager {
       const p = parseProxyItem(this.directProxy);
       if (p) {
         this.proxyList.push(p);
-        log(`[ProxyManager] Chế độ: 1 Proxy cố định (${p.server}).`);
+        log(`[ProxyManager] Chế độ: 1 Proxy cố định (${p.server}) [Bảo vệ cố định, không chuyển về Direct IP].`);
       } else {
         log(`[ProxyManager] ⚠ Chuỗi proxy không hợp lệ: "${this.directProxy}"`);
       }
@@ -1020,7 +1047,7 @@ class ProxyManager {
   }
 
   hasActiveProxy() {
-    return !this.noProxy && (Boolean(this.rotateUrl) || this.proxyList.length > 0);
+    return !this.noProxy && (Boolean(this.directProxy) || Boolean(this.rotateUrl) || this.proxyList.length > 0);
   }
 
   hasMultipleProxies() {
@@ -1145,6 +1172,10 @@ class ProxyManager {
    * Đánh dấu proxy đã chết, loại bỏ khỏi bộ nhớ và lên lịch lưu lại tệp trên đĩa.
    */
   markDead(proxy) {
+    if (this.directProxy) {
+      // Proxy cố định do người dùng chỉ định tuyệt đối không tự ý huỷ bỏ hoặc đánh dấu chết
+      return;
+    }
     if (!this.pruneDead || !proxy || !proxy.host || !proxy.port) return;
     const key = `${proxy.host}:${proxy.port}`;
     if (this.deadKeys.has(key)) return;
@@ -1169,6 +1200,7 @@ class ProxyManager {
    * Ghi nhận và xoá các proxy chết khỏi danh sách bộ nhớ và tệp trên đĩa.
    */
   removeDeadProxies(deadProxies) {
+    if (this.directProxy) return;
     if (!this.pruneDead || !deadProxies || deadProxies.length === 0) return;
     for (const p of deadProxies) {
       this.markDead(p);
@@ -1254,7 +1286,7 @@ class ProxyManager {
    * Tra cứu thông tin Geolocation, Timezone, và Locale theo IP của proxy.
    */
   async resolveGeo(proxy) {
-    if (!proxy || !proxy.host) return null;
+    if (!this.antiDetectProxy || !proxy || !proxy.host) return null;
     try {
       const res = await fetch(
         `http://ip-api.com/json/${proxy.host}?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,query`,
@@ -1299,6 +1331,21 @@ class ProxyManager {
     }
     if (!this.hasActiveProxy()) return null;
 
+    if (this.directProxy) {
+      let single = this.proxyList[0];
+      if (!single) {
+        single = parseProxyItem(this.directProxy);
+        if (single) this.proxyList = [single];
+      }
+      if (single) {
+        if (this.antiDetectProxy && !single.geo) {
+          single.geo = await this.resolveGeo(single);
+        }
+        return single;
+      }
+      return null;
+    }
+
     if (this.rotateUrl) {
       try {
         log(`[ProxyManager] Đang lấy proxy mới từ rotate URL: ${this.rotateUrl}...`);
@@ -1312,11 +1359,15 @@ class ProxyManager {
           } catch {}
           const p = parseProxyItem(proxyStr);
           if (p) {
-            p.geo = await this.resolveGeo(p);
-            log(
-              `[ProxyManager] ✓ Đã nhận proxy mới từ API cho instance #${instanceId}: ${p.server} | ` +
-              `Vị trí: ${p.geo?.city}, ${p.geo?.country} | Timezone: ${p.geo?.timezoneId} | Locale: ${p.geo?.locale}`
-            );
+            if (this.antiDetectProxy) {
+              p.geo = await this.resolveGeo(p);
+              log(
+                `[ProxyManager] ✓ Đã nhận proxy mới từ API cho instance #${instanceId}: ${p.server} | ` +
+                `Vị trí: ${p.geo?.city}, ${p.geo?.country} | Timezone: ${p.geo?.timezoneId} | Locale: ${p.geo?.locale}`
+              );
+            } else {
+              log(`[ProxyManager] ✓ Đã nhận proxy mới từ API cho instance #${instanceId}: ${p.server} (Anti-Detect Proxy: TẮT)`);
+            }
             return p;
           }
         }
@@ -1336,7 +1387,7 @@ class ProxyManager {
         this.flush();
         return null;
       }
-      if (!single.geo) single.geo = await this.resolveGeo(single);
+      if (this.antiDetectProxy && !single.geo) single.geo = await this.resolveGeo(single);
       return single;
     }
 
@@ -1382,16 +1433,22 @@ class ProxyManager {
         const aliveKey = `${alive.host}:${alive.port}`;
         this.inUseProxyKeys.add(aliveKey);
         alive._inUseKey = aliveKey;
-        alive.geo = await this.resolveGeo(alive);
+        if (this.antiDetectProxy) {
+          alive.geo = await this.resolveGeo(alive);
+        }
         const aliveIdx = this.proxyList.findIndex((p) => p.host === alive.host && p.port === alive.port);
         if (aliveIdx !== -1) {
           this.currentIndex = (aliveIdx + 1) % Math.max(1, this.proxyList.length);
         }
-        log(
-          `[ProxyManager] ✓ Đã tìm thấy Proxy kết nối tốt cho instance #${instanceId}: ${alive.server} | ` +
-          `Vị trí: ${alive.geo?.city}, ${alive.geo?.country} (${alive.geo?.countryCode}) | ` +
-          `Timezone: ${alive.geo?.timezoneId} | Locale: ${alive.geo?.locale}`
-        );
+        if (this.antiDetectProxy && alive.geo) {
+          log(
+            `[ProxyManager] ✓ Đã tìm thấy Proxy kết nối tốt cho instance #${instanceId}: ${alive.server} | ` +
+            `Vị trí: ${alive.geo?.city}, ${alive.geo?.country} (${alive.geo?.countryCode}) | ` +
+            `Timezone: ${alive.geo?.timezoneId} | Locale: ${alive.geo?.locale}`
+          );
+        } else {
+          log(`[ProxyManager] ✓ Đã tìm thấy Proxy kết nối tốt cho instance #${instanceId}: ${alive.server} (Anti-Detect Proxy: TẮT)`);
+        }
         return alive;
       }
       log(`[ProxyManager] ⚠ Lô ${b + 1} (${currentBatch.length} proxy) không có proxy nào phản hồi; chuyển sang lô kế tiếp...`);
@@ -2635,11 +2692,13 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false, p
   ];
   const chromeBin = chromePaths.find((p) => existsSync(p)) || "chrome";
 
-  const webrtcAntiLeakFlags = [
-    "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
-    "--enforce-webrtc-ip-permission-check",
-    "--webrtc-ip-handling-policy=disable_non_proxied_udp",
-  ];
+  const webrtcAntiLeakFlags = ANTI_DETECT_PROXY
+    ? [
+        "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+        "--enforce-webrtc-ip-permission-check",
+        "--webrtc-ip-handling-policy=disable_non_proxied_udp",
+      ]
+    : [];
 
   const proxyFlags = proxy
     ? [`--proxy-server=${proxy.server}`, "--proxy-bypass-list=<-loopback>"]
@@ -2920,7 +2979,7 @@ async function runOneCycle(
   let navigationSucceeded = false;
   // Vân tay của chu kỳ này. Dựng sớm bằng số bản ước lượng (cần cho UA lúc launch), dựng lại
   // ngay khi đọc được engine thật nếu hai số lệch nhau.
-  const fpLocale = currentProxy?.geo?.locale || "vi-VN";
+  const fpLocale = (ANTI_DETECT_PROXY && currentProxy?.geo?.locale) ? currentProxy.geo.locale : "vi-VN";
   let fp = fingerprintProfile
     ? materializeFingerprint(fingerprintProfile, {
         engineMajor: cdpUrl ? cachedEngineMajor : cachedEngineMajor ?? detectEngineMajorFromExecutable(),
@@ -3024,9 +3083,13 @@ async function runOneCycle(
         "--silent-debugger-extension-api",
         "--no-default-browser-check",
         "--no-first-run",
-        "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
-        "--enforce-webrtc-ip-permission-check",
-        "--webrtc-ip-handling-policy=disable_non_proxied_udp",
+        ...(ANTI_DETECT_PROXY
+          ? [
+              "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+              "--enforce-webrtc-ip-permission-check",
+              "--webrtc-ip-handling-policy=disable_non_proxied_udp",
+            ]
+          : []),
       ];
       if (INSTANCE_COUNT <= 1 && !isHeadless) {
         args.push("--start-maximized");
@@ -3071,7 +3134,7 @@ async function runOneCycle(
         args: launchArgs,
         viewport: physicalMouse || !isHeadless ? null : { width: 1366, height: 768 },
         locale: fpLocale,
-        timezoneId: currentProxy?.geo?.timezoneId || "Asia/Ho_Chi_Minh",
+        timezoneId: (ANTI_DETECT_PROXY && currentProxy?.geo?.timezoneId) ? currentProxy.geo.timezoneId : "Asia/Ho_Chi_Minh",
         userAgent: fp ? fp.userAgent : defaultDesktopUA,
       };
       if (fp) {
@@ -3100,7 +3163,7 @@ async function runOneCycle(
           username: currentProxy.username || undefined,
           password: currentProxy.password || undefined,
         };
-        if (currentProxy.geo?.lat !== undefined && currentProxy.geo?.lon !== undefined) {
+        if (ANTI_DETECT_PROXY && currentProxy.geo?.lat !== undefined && currentProxy.geo?.lon !== undefined) {
           launchOptions.geolocation = {
             latitude: currentProxy.geo.lat,
             longitude: currentProxy.geo.lon,
@@ -3258,7 +3321,7 @@ async function runOneCycle(
       const cdpClient = await context.newCDPSession(page).catch(() => null);
       if (cdpClient) {
 
-        if (currentProxy?.geo) {
+        if (ANTI_DETECT_PROXY && currentProxy?.geo) {
           if (currentProxy.geo.timezoneId) {
             await cdpClient.send("Emulation.setTimezoneOverride", {
               timezoneId: currentProxy.geo.timezoneId,
@@ -3290,17 +3353,22 @@ async function runOneCycle(
     }
 
     // Tiêm các lớp bảo vệ chống phát hiện và rò rỉ (Stealth Anti-Tracker Injections)
-    await context.addInitScript(() => {
-      // 1. Chống rò rỉ IP qua WebRTC STUN request
-      if (window.RTCPeerConnection) {
-        const origSetConfiguration = RTCPeerConnection.prototype.setConfiguration;
-        if (origSetConfiguration) {
-          RTCPeerConnection.prototype.setConfiguration = function (config) {
-            if (config && config.iceCandidatePoolSize) config.iceCandidatePoolSize = 0;
-            return origSetConfiguration.call(this, config);
-          };
+    if (ANTI_DETECT_PROXY) {
+      await context.addInitScript(() => {
+        // 1. Chống rò rỉ IP qua WebRTC STUN request
+        if (window.RTCPeerConnection) {
+          const origSetConfiguration = RTCPeerConnection.prototype.setConfiguration;
+          if (origSetConfiguration) {
+            RTCPeerConnection.prototype.setConfiguration = function (config) {
+              if (config && config.iceCandidatePoolSize) config.iceCandidatePoolSize = 0;
+              return origSetConfiguration.call(this, config);
+            };
+          }
         }
-      }
+      });
+    }
+
+    await context.addInitScript(() => {
 
       // 2. Ẩn hoàn toàn cờ tự động hoá navigator.webdriver
       try {
@@ -4060,9 +4128,13 @@ async function runOneCycle(
       errMsg.toLowerCase().includes("timeout") ||
       errMsg.toLowerCase().includes("exceeded");
     if (currentProxy && isProxyNetworkError) {
-      log(`[ProxyManager] ⚠ Proxy ${currentProxy.server} phát sinh lỗi kết nối / timeout trong phiên duyệt web; tiến hành loại bỏ khỏi danh sách.`);
-      proxyManager?.markDead(currentProxy);
-      proxyManager?.flush();
+      if (proxyManager?.directProxy) {
+        log(`[ProxyManager] ⚠ Proxy cố định ${currentProxy.server} phát sinh lỗi/timeout (${errMsg}), bảo lưu proxy không loại bỏ để tiếp tục các chu kỳ sau.`);
+      } else {
+        log(`[ProxyManager] ⚠ Proxy ${currentProxy.server} phát sinh lỗi kết nối / timeout trong phiên duyệt web; tiến hành loại bỏ khỏi danh sách.`);
+        proxyManager?.markDead(currentProxy);
+        proxyManager?.flush();
+      }
     }
   } finally {
     // 0. Đóng tất cả tab popup phụ còn sót lại trước khi dọn dẹp cache hoặc kết thúc chu kỳ
@@ -4234,6 +4306,14 @@ async function main() {
   const proxyManager = new ProxyManager();
   proxyManager.init();
 
+  log(
+    `Anti-Detect Proxy: ${
+      ANTI_DETECT_PROXY
+        ? "BẬT [Zero-Mismatch Triad — Đồng bộ Timezone, Geolocation, Locale theo proxy & chống rò rỉ WebRTC]"
+        : "TẮT [Proxy tunnel thuần túy, không can thiệp Geo/Timezone/Locale/WebRTC]"
+    }`
+  );
+
   const startTime = Date.now();
 
   if (INSTANCE_COUNT === 1) {
@@ -4385,6 +4465,8 @@ if (isDirectExecution) {
 export {
   ProxyManager,
   parseProxyItem,
+  parseAntiDetectProxy,
+  ANTI_DETECT_PROXY,
   parsePopunderRatio,
   resolvePopunderTarget,
   parseFocusPopunderSocial,

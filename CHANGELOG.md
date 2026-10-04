@@ -9,6 +9,20 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.183 — Tuỳ chọn Anti-Detect Proxy & Khắc phục lỗi rơi về Direct IP của Proxy cố định (04/10/2026)
+
+- Bổ sung tuỳ chọn cấu hình Anti-Detect Proxy trong [run-ad-viewer.bat](run-ad-viewer.bat) và [scripts/adViewer.mjs](scripts/adViewer.mjs):
+  - **Menu tương tác**: Sau khi người dùng chỉ định proxy (nhập trực tiếp hoặc file), kịch bản cung cấp tuỳ chọn bật/tắt Anti-Detect Proxy (`--anti-detect-proxy` mặc định hoặc `--no-anti-detect-proxy`). Bỏ qua menu khi chọn Direct IP của máy.
+  - **Cơ chế hoạt động**: Khi bật (mặc định), hệ thống tự động đồng bộ Geolocation (kinh độ, vĩ độ), Timezone và Locale (Zero-Mismatch Triad) theo IP của proxy và chặn rò rỉ WebRTC qua cờ trình duyệt + can thiệp CDP/InitScript. Khi tắt, proxy chỉ hoạt động như một network tunnel thuần tuý mà không can thiệp môi trường hệ thống.
+- Khắc phục triệt để lỗi proxy cố định (`--proxy`) bị loại bỏ và rơi về Direct IP sau chu kỳ đầu tiên:
+  - **Nguyên nhân**: Khi duyệt trang quảng cáo gặp lỗi mạng hoặc quá thời gian tải (timeout), khối `catch` trong `runOneCycle` nhầm lẫn gọi `markDead(currentProxy)`, dẫn tới xoá proxy duy nhất khỏi danh sách. Ở các chu kỳ sau, `getNextWorkingProxy` trả về `null` khiến trình duyệt khởi chạy bằng Direct IP (IP thật của máy).
+  - **Bảo vệ tuyệt đối (Pinned Proxy)**: Cập nhật `ProxyManager`:
+    - `markDead(proxy)` và `removeDeadProxies(deadProxies)`: Ngay lập tức bỏ qua nếu là proxy cố định (`this.directProxy`).
+    - `hasActiveProxy()`: Luôn trả về `true` khi `this.directProxy` được cấu hình, bất kể trạng thái danh sách.
+    - `getNextWorkingProxy()`: Ưu tiên trả về proxy cố định, tự động phục hồi nếu danh sách rỗng, không bao giờ đánh dấu chết hoặc trả về `null` để rơi về Direct IP.
+    - Khối `catch` trong `runOneCycle`: Nhận diện `proxyManager?.directProxy` để chỉ in cảnh báo và bảo lưu proxy cho các chu kỳ tiếp theo thay vì gọi `markDead`.
+- Nâng cấp bộ kiểm thử [scripts/verifyAdViewerHealth.mts](scripts/verifyAdViewerHealth.mts): Xác thực cơ chế phân tích cờ Anti-Detect Proxy, kiểm tra khả năng miễn nhiễm `markDead`/`removeDeadProxies` và tính liên tục qua nhiều chu kỳ của proxy cố định.
+
 ## 1.3.182 — Tối ưu tự động hoá Adcash AutoTag & Khắc phục lỗi treo tương tác đệ quy (04/10/2026)
 
 - Tối ưu kịch bản chạy Ad-Viewer [run-ad-viewer.bat](run-ad-viewer.bat):

@@ -60,9 +60,10 @@ set /p "CUSTOM_PROXY=    Nhap proxy (vi du: 103.88.234.239:40019): "
 if not defined CUSTOM_PROXY (
     echo     [!] Khong nhap proxy, chuyen ve ket noi truc tiep.
     set "ARG_PROXY=--no-proxy"
+    set "INPUT_PROXY_SRC=4"
 ) else (
     set "ARG_PROXY=--proxy=%CUSTOM_PROXY%"
-    echo     -^> Proxy co dinh: %CUSTOM_PROXY%
+    echo     -^> Proxy co dinh: %CUSTOM_PROXY% [Bao ve co dinh, khong tu dong chuyen ve Direct IP]
 )
 goto :after_proxy
 
@@ -72,6 +73,7 @@ set /p "CUSTOM_URL=    Nhap URL API xoay proxy: "
 if not defined CUSTOM_URL (
     echo     [!] Khong nhap URL, chuyen ve ket noi truc tiep.
     set "ARG_PROXY=--no-proxy"
+    set "INPUT_PROXY_SRC=4"
 ) else (
     set "ARG_PROXY=--rotate-url=%CUSTOM_URL%"
     echo     -^> API rotate URL: %CUSTOM_URL%
@@ -108,6 +110,23 @@ echo     -^> Tu dong loai bo proxy chet khoi file: BAT [Tu dong lam sach danh sa
 goto :after_proxy
 
 :after_proxy
+set "ARG_ANTI_DETECT_PROXY="
+if "%INPUT_PROXY_SRC%"=="4" goto :skip_anti_detect_proxy
+echo.
+echo     --- Tuy chon Anti-Detect Proxy ---
+echo     1. Bat Anti-Detect Proxy [Mac dinh - Dong bo Timezone, Geolocation, Locale theo IP proxy va chong ro ri WebRTC]
+echo     2. Tat Anti-Detect Proxy [Chi dung proxy lam tunnel mang thuan tuy, khong can thiep Geo/Timezone]
+set "INPUT_ANTI_DETECT_PROXY="
+set /p "INPUT_ANTI_DETECT_PROXY=    Chon [1-2, Enter = 1]: "
+set "ARG_ANTI_DETECT_PROXY=--anti-detect-proxy"
+if "%INPUT_ANTI_DETECT_PROXY%"=="2" (
+    set "ARG_ANTI_DETECT_PROXY=--no-anti-detect-proxy"
+    echo     -^> Anti-Detect Proxy: TAT [Khong can thiep Timezone / Geo / Locale]
+) else (
+    set "ARG_ANTI_DETECT_PROXY=--anti-detect-proxy"
+    echo     -^> Anti-Detect Proxy: BAT [Zero-Mismatch Triad]
+)
+:skip_anti_detect_proxy
 echo.
 
 REM 3. Hien thi cua so Chrome
@@ -372,7 +391,7 @@ echo.
 :SKIP_POPUNDER_OPTIONS
 
 REM Tong hop lenh thuc thi
-set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER% %ARG_AD_FOCUS% %ARG_AD_NETWORK%
+set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_ANTI_DETECT_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER% %ARG_AD_FOCUS% %ARG_AD_NETWORK%
 
 echo ============================================================================
 echo   TONG HOP CAU HINH CHAY:

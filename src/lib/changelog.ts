@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.172",
+    date: "2026-10-04",
+    lines: [
+      "Kho Xem Quảng Cáo khắc phục triệt để sự cố lặp click kéo dài trong chế độ ưu tiên quảng cáo ngầm và thanh nổi.",
+      "Loại bỏ danh sách quảng cáo đề xuất khỏi dự phòng và giới hạn số lượt thử nhằm hoàn tất chu kỳ đúng hạn.",
+    ],
+  },
+  {
     version: "1.3.171",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Kho Xem Quảng Cáo nâng cấp cơ chế tương tác quảng cáo bằng mô phỏng hành vi người dùng tự nhiên, chống phát hiện tự động hoá.",
       "Di chuyển chuột theo đường cong mượt mà và click tại vị trí lệch ngẫu nhiên, có thể chọn chế độ tương tác khác nhau.",
-    ],
-  },
-  {
-    version: "1.3.122",
-    date: "2026-10-02",
-    lines: [
-      "Kho Xem Quảng Cáo tự động dọn dẹp sạch sẽ bộ nhớ đệm và dữ liệu duyệt web sau mỗi chu kỳ hoạt động.",
-      "Lựa chọn ngẫu nhiên vị trí và liên kết quảng cáo để tương tác, tăng cường tính tự nhiên cho phiên xem.",
     ],
   },
 ];

@@ -3531,16 +3531,21 @@ async function runOneCycle(
       if (!adClicked && adCandidates.length > 0) {
         const remainingCandidates = adCandidates.filter((c) => !c.isSocialBar);
         const candidatesToClick = remainingCandidates.length > 0 ? remainingCandidates : adCandidates;
+        const maxCandidates = FOCUS_POPUNDER_SOCIAL ? 2 : 3;
+        let candidateAttempts = 0;
         log(
-          `${isForceClick ? "[ForceClick] " : ""}${preferPopunder ? "[Banner Dự Phòng] " : ""}Tìm thấy tổng cộng ${candidatesToClick.length} vị trí quảng cáo khả dụng${isForceClick ? " (kể cả chưa ready)" : ""}. Đang chọn ngẫu nhiên để click (${cycleClickMode} mode)...`,
+          `${isForceClick ? "[ForceClick] " : ""}${preferPopunder ? "[Banner Dự Phòng] " : ""}Tìm thấy ${candidatesToClick.length} vị trí quảng cáo khả dụng${isForceClick ? " (kể cả chưa ready)" : ""}. Chọn ngẫu nhiên tối đa ${maxCandidates} vị trí (${cycleClickMode} mode)...`,
         );
-        for (const candidate of candidatesToClick) {
+        const shuffledCandidates = [...candidatesToClick].sort(() => Math.random() - 0.5);
+        for (const candidate of shuffledCandidates) {
+          if (candidateAttempts >= maxCandidates) break;
           const clickTarget = await resolveAdClickTarget(candidate.locator);
           if (!clickTarget) {
             log(`  Bỏ qua [${candidate.name}] — không xác định được toạ độ.`);
             continue;
           }
-          log(`-> ${isForceClick ? "[ForceClick] " : ""}Click ngẫu nhiên quảng cáo [${candidate.name}] tại (${Math.round(clickTarget.x)}, ${Math.round(clickTarget.y)})...`);
+          candidateAttempts++;
+          log(`-> ${isForceClick ? "[ForceClick] " : ""}Click ngẫu nhiên quảng cáo [${candidate.name}] (${candidateAttempts}/${maxCandidates}) tại (${Math.round(clickTarget.x)}, ${Math.round(clickTarget.y)})...`);
           const newPage = await performEngageAndClick(page, context, clickTarget.x, clickTarget.y, instanceId, cycleClickMode);
           if (newPage) {
             openedPage = newPage;
@@ -3548,7 +3553,7 @@ async function runOneCycle(
             log(`✓ ${isForceClick ? "[ForceClick] " : ""}Đã mở tab quảng cáo thành công từ [${candidate.name}].`);
             break;
           } else {
-            await sleep(2500);
+            await sleep(2000);
             const allPages = context.pages();
             if (allPages.length > 1) {
               openedPage = allPages[allPages.length - 1];
@@ -3561,42 +3566,74 @@ async function runOneCycle(
       }
     }
 
-    // 4. Danh sách bộ chọn quảng cáo dự phòng cần tương tác
-    const candidateSelectors = [
-      '.adsterra-smartlink',
-      'a[href*="deliberatewatchful.com"]',
-      '#container-5e6634da84f8f263d7ab34ae152f1c8d a[target="_blank"]',
-      '#container-5e6634da84f8f263d7ab34ae152f1c8d a',
-      '.adsterra-native a[target="_blank"]',
-      '.adsterra-native a',
-      'iframe[width="728"]',
-      'iframe[src*="alwingulla"]',
-      'iframe[src*="adsterra"]',
-      'iframe[src*="deliberatewatchful.com"]',
-      'a[href*="alwingulla"]',
-      'a[href*="smartlink"]',
-      'aside.adsterra-stack a',
-      '[class*="adsterra"] iframe',
-      '[id*="container-"] a',
-      'a[target="_blank"]',
-    ];
-
+    // 4. Nếu Popunder/SocialBar vẫn chưa mở được tab: Thử lại 1 lần click tự nhiên Popunder (tránh rơi vào Native)
     if (!adClicked && cycleClickMode !== "manual") {
-      // Xáo trộn ngẫu nhiên thứ tự selector dự phòng
+      log("🎯 [Popunder Thử Lại] Kích hoạt click mô phỏng tự nhiên trên trang để thử lại Popunder...");
+      const popTarget = await resolvePopunderTarget(page);
+      const popup = await performEngageAndClick(page, context, popTarget.x, popTarget.y, instanceId, cycleClickMode);
+      if (popup) {
+        openedPage = popup;
+        adClicked = true;
+        log("✓ Popunder đã được kích hoạt thành công!");
+      } else {
+        await sleep(2000);
+        const allPages = context.pages();
+        if (allPages.length > 1) {
+          openedPage = allPages[allPages.length - 1];
+          adClicked = true;
+          log("✓ Đã bắt được trang Popunder từ tab phụ.");
+        }
+      }
+    }
+
+    // 5. Dự phòng selector cuối cùng (giới hạn tối đa 2 lần thử, TUYỆT ĐỐI không click Native khi bật FOCUS_POPUNDER_SOCIAL)
+    if (!adClicked && cycleClickMode !== "manual") {
+      const candidateSelectors = FOCUS_POPUNDER_SOCIAL
+        ? [
+            SOCIAL_BAR_SELECTOR,
+            '.adsterra-smartlink',
+            '.adsterra-banner[data-status="ready"] iframe',
+            '.adsterra-leaderboard[data-status="ready"] iframe',
+            'iframe[src*="deliberatewatchful.com"]',
+            'iframe[src*="adsterra"]',
+          ]
+        : [
+            '.adsterra-smartlink',
+            'a[href*="deliberatewatchful.com"]',
+            '.adsterra-banner[data-status="ready"] iframe',
+            '#container-5e6634da84f8f263d7ab34ae152f1c8d a[target="_blank"]',
+            '.adsterra-native a[target="_blank"]',
+          ];
+
+      const maxFallbackAttempts = FOCUS_POPUNDER_SOCIAL ? 2 : 3;
+      let fallbackAttempts = 0;
+      const clickedTargets = [];
+
       const shuffledSelectors = [...candidateSelectors].sort(() => Math.random() - 0.5);
       for (const selector of shuffledSelectors) {
+        if (fallbackAttempts >= maxFallbackAttempts) break;
         const elements = await page.$$(selector);
+        if (!elements || elements.length === 0) continue;
         const shuffledElements = [...elements].sort(() => Math.random() - 0.5);
         for (const el of shuffledElements) {
+          if (fallbackAttempts >= maxFallbackAttempts) break;
           try {
             const visible = await el.isVisible().catch(() => false);
             if (!visible) continue;
-            await el.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {});
+            await el.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
             await sleep(100);
             const elBox = await el.boundingBox().catch(() => null);
-            if (!elBox || elBox.width < 2 || elBox.height < 2) continue;
+            if (!elBox || elBox.width < 5 || elBox.height < 5) continue;
             const target = computeClickTarget(elBox);
-            log(`Tìm thấy quảng cáo khớp [${selector}], click tại (${Math.round(target.x)}, ${Math.round(target.y)})...`);
+            // Kiểm tra xem đã click gần toạ độ này chưa (tránh click lặp đi lặp lại cùng 1 phần tử)
+            const alreadyClicked = clickedTargets.some(
+              (p) => Math.hypot(p.x - target.x, p.y - target.y) < 25,
+            );
+            if (alreadyClicked) continue;
+            clickedTargets.push(target);
+            fallbackAttempts++;
+
+            log(`[Dự phòng #${fallbackAttempts}/${maxFallbackAttempts}] Thử click quảng cáo khớp [${selector}] tại (${Math.round(target.x)}, ${Math.round(target.y)})...`);
             const newPage = await performEngageAndClick(page, context, target.x, target.y, instanceId, cycleClickMode);
             if (newPage) {
               openedPage = newPage;
@@ -3604,7 +3641,7 @@ async function runOneCycle(
               log("✓ Đã mở tab quảng cáo đích thành công.");
               break;
             } else {
-              await sleep(3000);
+              await sleep(2000);
               const allPages = context.pages();
               if (allPages.length > 1) {
                 openedPage = allPages[allPages.length - 1];
@@ -3614,22 +3651,10 @@ async function runOneCycle(
               }
             }
           } catch {
-            // thử tiếp phần tử sau
+            // thử tiếp
           }
         }
         if (adClicked) break;
-      }
-    }
-
-    // 4. Click tự nhiên để kích hoạt popunder nếu chưa click được
-    if (!adClicked && cycleClickMode !== "manual") {
-      log("Không click được quảng cáo cụ thể bằng selector; kích hoạt click mô phỏng tự nhiên trên trang để thử Popunder...");
-      const popTarget = await resolvePopunderTarget(page);
-      const popup = await performEngageAndClick(page, context, popTarget.x, popTarget.y, instanceId, cycleClickMode);
-      if (popup) {
-        openedPage = popup;
-        adClicked = true;
-        log("✓ Popunder đã được kích hoạt.");
       }
     }
 

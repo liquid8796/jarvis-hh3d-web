@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.172 — Triệt tiêu vòng lặp click dự phòng kéo dài và cô lập chế độ Popunder + SocialBar (04/10/2026)
+
+- Khắc phục sự cố kịch bản bị đứng hình (stuck) nhiều phút trong danh sách bộ chọn dự phòng khi chạy chế độ Popunder + SocialBar trong [scripts/adViewer.mjs](scripts/adViewer.mjs):
+  - Loại bỏ hoàn toàn các bộ chọn NativeBanner (`.adsterra-native`, `#container-5e6634da84f8f263d7ab34ae152f1c8d`, `aside.adsterra-stack a`) khỏi danh sách dự phòng khi kích hoạt `FOCUS_POPUNDER_SOCIAL`, chấm dứt tình trạng auto click lặp đi lặp lại hàng chục lần vào các thẻ quảng cáo đề xuất ngoài ý muốn.
+  - Tái cơ cấu thứ tự ưu tiên: thực hiện thử lại click tự nhiên Popunder ngay lập tức trước khi chuyển sang các bộ chọn khác; Popunder thường cần tương tác thứ hai để bung tab ngầm sau khi đã được kích hoạt.
+  - Giới hạn nghiêm ngặt số lượt thử dự phòng: khống chế tối đa 2 lượt thử cho chế độ Popunder + SocialBar (hoặc tối đa 3 lượt cho chế độ cân bằng), đồng thời theo dõi toạ độ đã click để triệt tiêu việc click lặp lại cùng một phần tử.
+
 ## 1.3.171 — Nâng cấp cơ chế nhận diện toàn bộ biểu ngữ và tối ưu toạ độ kích hoạt Popunder (04/10/2026)
 
 - Tối ưu hoá quy trình nhận diện và kích hoạt quảng cáo trong [scripts/adViewer.mjs](scripts/adViewer.mjs):

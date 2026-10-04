@@ -310,27 +310,15 @@ function AdsterraBannerSlot({
  */
 import { createPortal } from "react-dom";
 
-export function AdsterraClientAds() {
-  const pathname = usePathname();
+function AdsterraNativeSlot({
+  allowed,
+  pathname,
+}: {
+  allowed: boolean;
+  pathname: string;
+}) {
   const nativeRef = useRef<HTMLDivElement>(null);
   const [nativeStatus, setNativeStatus] = useState<AdSlotStatus>("loading");
-  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
-  const allowed = pathAllowsAds(pathname);
-
-  useEffect(() => {
-    if (!allowed) return;
-    appendGlobalScriptOnce(ADSTERRA_POPUNDER_SCRIPT_SRC, "popunder");
-    appendGlobalScriptOnce(ADSTERRA_SOCIAL_BAR_SCRIPT_SRC, "social-bar");
-  }, [allowed]);
-
-  useEffect(() => {
-    if (pathname === "/") {
-      const el = document.getElementById("landing-ad-placement");
-      setPortalTarget(el);
-    } else {
-      setPortalTarget(null);
-    }
-  }, [pathname]);
 
   useEffect(() => {
     const slot = nativeRef.current;
@@ -375,6 +363,38 @@ export function AdsterraClientAds() {
 
   if (!allowed) return null;
 
+  return (
+    <div
+      ref={nativeRef}
+      className="adsterra-unit adsterra-native"
+      data-status={nativeStatus}
+      aria-label="Quảng cáo đề xuất"
+    />
+  );
+}
+
+export function AdsterraClientAds() {
+  const pathname = usePathname();
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  const allowed = pathAllowsAds(pathname);
+
+  useEffect(() => {
+    if (!allowed) return;
+    appendGlobalScriptOnce(ADSTERRA_POPUNDER_SCRIPT_SRC, "popunder");
+    appendGlobalScriptOnce(ADSTERRA_SOCIAL_BAR_SCRIPT_SRC, "social-bar");
+  }, [allowed]);
+
+  useEffect(() => {
+    if (pathname === "/") {
+      const el = document.getElementById("landing-ad-placement");
+      setPortalTarget(el);
+    } else {
+      setPortalTarget(null);
+    }
+  }, [pathname]);
+
+  if (!allowed) return null;
+
   const mainStack = (
     <aside className="adsterra-stack" aria-label="Quảng cáo tài trợ">
       {/* 1. Biểu ngữ chính 728×90 */}
@@ -390,12 +410,7 @@ export function AdsterraClientAds() {
       <div className="adsterra-center-column mx-auto">
         <AdsterraBannerSlot spec={BANNER_300X250_SPEC} allowed={allowed} pathname={pathname} />
         {/* 4. Native Ads 4:1 */}
-        <div
-          ref={nativeRef}
-          className="adsterra-unit adsterra-native"
-          data-status={nativeStatus}
-          aria-label="Quảng cáo đề xuất"
-        />
+        <AdsterraNativeSlot allowed={allowed} pathname={pathname} />
       </div>
 
       {/* 5. Smartlink */}

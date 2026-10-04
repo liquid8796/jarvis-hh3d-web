@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.168",
+    date: "2026-10-04",
+    lines: [
+      "Tách Native Banner thành khối độc lập, đảm bảo nạp đầy đủ nội dung khi đặt trong Portal.",
+      "Ổn định toàn bộ chu trình hiển thị quảng cáo Adsterra trên cả máy tính lẫn di động.",
+    ],
+  },
+  {
     version: "1.3.167",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Bật chế độ Developer Mode cho tiện ích CanvasBlocker trong profile và cờ khởi chạy trình duyệt của kho Xem Quảng Cáo.",
       "Kho Xem Quảng Cáo tự động kích hoạt chế độ nhà phát triển và bổ sung lệnh chạy trực quan trên màn hình máy tính.",
-    ],
-  },
-  {
-    version: "1.3.118",
-    date: "2026-10-02",
-    lines: [
-      "Kho Xem Quảng Cáo bổ sung hỗ trợ click trực tiếp Adsterra Smartlink và bộ chọn dự phòng mở rộng.",
-      "Tự động chuyển đổi linh hoạt kênh trình duyệt khi khởi chạy, bảo đảm không bị gián đoạn giữa chừng.",
     ],
   },
 ];

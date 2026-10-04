@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.168 — Tách Native Banner thành khối độc lập AdsterraNativeSlot (04/10/2026)
+
+- Tách khối Native Banner thành component độc lập `AdsterraNativeSlot` trong [src/components/adsterra/AdsterraClientAds.tsx](src/components/adsterra/AdsterraClientAds.tsx):
+  - Khắc phục triệt để hiện tượng race condition vòng đời React Portal: khi khối quảng cáo `mainStack` chuyển trạng thái render qua Portal (`createPortal`), `nativeRef` trước đây nằm ở component cha `AdsterraClientAds` chỉ chạy `useEffect` một lần lúc ban đầu khi `ref.current` còn đang là `null`, dẫn đến việc không thể tạo thẻ `<script>` và `container-5e6634da84f8f263d7ab34ae152f1c8d`.
+  - Đóng gói trọn vẹn vòng đời khởi tạo của Native Banner vào `AdsterraNativeSlot`: bảo đảm khi DOM được gắn vào Portal trên trang chủ, component con tự động kích hoạt tạo thẻ `invoke.js` và thẻ container, kích hoạt tải quảng cáo Adsterra Native 100% chuẩn xác.
+
 ## 1.3.167 — Tối ưu cơ chế nhận diện nạp quảng cáo Adsterra và tránh ẩn nhầm khi tải chậm (04/10/2026)
 
 - Tinh chỉnh cơ chế theo dõi và trạng thái nạp quảng cáo Adsterra trong [src/components/adsterra/AdsterraClientAds.tsx](src/components/adsterra/AdsterraClientAds.tsx):

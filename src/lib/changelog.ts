@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.181",
+    date: "2026-10-04",
+    lines: [
+      "Gỡ bỏ toàn bộ biểu ngữ và kịch bản cũ, thiết lập duy nhất AutoTag Adcash mới.",
+      "Tối ưu hoá giao diện gọn nhẹ và nâng cấp công cụ tự động xem quảng cáo.",
+    ],
+  },
+  {
     version: "1.3.180",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Tự động loại bỏ proxy chết khỏi danh sách và cập nhật tệp trên đĩa ngay khi phát hiện lỗi kết nối.",
       "Thêm cơ chế kiểm tra kết nối mạng chủ để bảo vệ danh sách proxy không bị xoá nhầm khi mất mạng.",
-    ],
-  },
-  {
-    version: "1.3.131",
-    date: "2026-10-03",
-    lines: [
-      "Quét song song đồng thời nhiều proxy giúp tìm ra địa chỉ sống siêu tốc trong vài trăm mili-giây.",
-      "Sửa lỗi nhận diện số lượt click đệ quy trên trang đích khi người dùng nhập số 0.",
     ],
   },
 ];

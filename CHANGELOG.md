@@ -9,6 +9,15 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.181 — Tối giản hoá chỉ sử dụng duy nhất AutoTag Adcash (Zone ID g4flvknzlj) (04/10/2026)
+
+- Tối giản mã nguồn theo chỉ dẫn duyệt web từ Adcash:
+  - **AutoTag duy nhất (Zone ID `g4flvknzlj`)**: Nhúng Step 1 `<script id="aclib" src="//acscdn.com/script/aclib.js">` và Step 2 `aclib.runAutoTag({ zoneId: 'g4flvknzlj' })` trong thẻ `<head>` thông qua [src/components/AdcashAds.tsx](src/components/AdcashAds.tsx).
+  - Gỡ bỏ toàn bộ các thẻ nhúng biểu ngữ cứng (Flank 160×600 và Leaderboard 728×90) cùng Pop-Under độc lập trong body/head nhằm phục vụ kiểm duyệt web nhanh chóng và triệt tiêu mọi nguy cơ che khuất giao diện.
+  - Tinh gọn [src/app/adcash.css](src/app/adcash.css) và [src/components/adcash/AdcashClientAds.tsx](src/components/adcash/AdcashClientAds.tsx): chỉ giữ lại vùng chứa dự phòng `.adcash-container`.
+- Cập nhật bộ công cụ [scripts/adViewer.mjs](scripts/adViewer.mjs) và bài kiểm thử [scripts/verifyAdcash.mts](scripts/verifyAdcash.mts):
+  - Nhận diện trực tiếp trạng thái AutoTag Adcash qua `window.aclib` và các thẻ quảng cáo động thay vì phụ thuộc các phần tử banner tĩnh đã tháo gỡ.
+
 ## 1.3.180 — Cập nhật 5 vùng quảng cáo Adcash mới (Autotag, Pop-Under, Flank 160x600 x2, Leaderboard 728x90) (04/10/2026)
 
 - Cập nhật toàn bộ Zone ID theo tài khoản Adcash mới của website:

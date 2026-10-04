@@ -240,6 +240,8 @@ const NATIVE_CONTAINER_ID = "container-5e6634da84f8f263d7ab34ae152f1c8d";
 const SOCIAL_BAR_KEY = "977a66f06e979e2830ee60ed1fa88533";
 const SOCIAL_BAR_SELECTOR = `iframe[id*="${SOCIAL_BAR_KEY}"], iframe[class*="${SOCIAL_BAR_KEY}"], iframe[style*="2147483647"], iframe[id*="container-"][style*="fixed"]`;
 const CLICKADU_CONTAINER_SELECTOR = "#clickadu-ad-container, .clickadu-container, [id*='clickadu']";
+const ADCASH_CONTAINER_SELECTOR =
+  "#adcash-ad-container, .adcash-container, [id*='aclib'], [class*='aclib'], [id*='adcash'], iframe[src*='acscdn'], iframe[src*='adcash']";
 
 const rawClickMode = (
   process.argv.find((a) => a.startsWith("--click-mode="))?.split("=")[1] ||
@@ -290,10 +292,11 @@ function parseAdNetwork(cliArgs = process.argv, env = process.env) {
     "";
   const envVal = env.AD_VIEWER_AD_NETWORK || env.AD_VIEWER_AD_PROVIDER || env.AD_PROVIDER || "";
   const raw = (cli || envVal || "").trim().toLowerCase();
-  if (raw === "adsterra") return "adsterra";
+  if (raw === "adcash") return "adcash";
   if (raw === "clickadu") return "clickadu";
+  if (raw === "adsterra") return "adsterra";
   if (raw === "all" || raw === "both") return "all";
-  return "all";
+  return "adcash";
 }
 
 const AD_NETWORK = parseAdNetwork();
@@ -2760,8 +2763,15 @@ async function runOneCycle(
         ? "[AntiDetect] ✓ Kích hoạt Patched Chromium Engine (Patchright) — triệt tiêu rò rỉ CDP, Runtime.enable và cờ tự động hoá cấp trình duyệt."
         : "[AntiDetect] Chạy với Playwright Core mặc định."
     );
-    log(`[AntiDetect] Cấu hình đệ quy click: ${MAX_RECURSIVE_CLICKS > 0 ? `Tối đa ${MAX_RECURSIVE_CLICKS} lần` : "Tắt (0 lần)"}`);
-    log(`[Nhà Mạng Quảng Cáo] Mục tiêu: ${AD_NETWORK.toUpperCase()} (${AD_NETWORK === "clickadu" ? "🚀 Clickadu (Đang phê duyệt / hoạt động)" : AD_NETWORK === "adsterra" ? "Adsterra" : "Tất cả nhà mạng"})`);
+    const adNetworkDesc =
+      AD_NETWORK === "adcash"
+        ? "🚀 Adcash AutoTag (Đang phê duyệt / hoạt động)"
+        : AD_NETWORK === "clickadu"
+        ? "Clickadu"
+        : AD_NETWORK === "adsterra"
+        ? "Adsterra"
+        : "Tất cả nhà mạng";
+    log(`[Nhà Mạng Quảng Cáo] Mục tiêu: ${AD_NETWORK.toUpperCase()} (${adNetworkDesc})`);
     log(`[Trọng Tâm Định Dạng] Chế độ quảng cáo: ${FOCUS_POPUNDER_SOCIAL ? "🎯 ƯU TIÊN POPUNDER + SOCIALBAR (Triệt tiêu impression & click NativeBanner)" : "Cân bằng mọi định dạng (Popunder + SocialBar + Banner + Native)"}`);
     if (cdpUrl) {
       log(`Kết nối tới Chrome ${useMyChrome ? "chính " : ""}qua CDP: ${cdpUrl}...`);
@@ -3308,6 +3318,26 @@ async function runOneCycle(
     // Thu thập tất cả các quảng cáo khả dụng trên trang để chọn ngẫu nhiên
     const adCandidates = [];
 
+    // 0. Adcash Ads (AutoTag / Banner / Container / Links)
+    if (AD_NETWORK === "adcash" || AD_NETWORK === "all") {
+      try {
+        const adcashSelector = isForceClick
+          ? '#adcash-ad-container a[href], .adcash-container a[href], iframe[src*="acscdn"], iframe[src*="adcash"], a[href*="adcash"], a[href*="acscdn"], [id*="aclib"] a[href], #adcash-ad-container, .adcash-container'
+          : '#adcash-ad-container a[href], .adcash-container a[href], iframe[src*="acscdn"], iframe[src*="adcash"], a[href*="adcash"], a[href*="acscdn"], [id*="aclib"] a[href]';
+        const adcashLocators = page.locator(adcashSelector);
+        const adcCount = await adcashLocators.count().catch(() => 0);
+        for (let i = 0; i < adcCount; i++) {
+          adCandidates.push({
+            name: `${isForceClick ? "[Force] " : ""}Adcash Ad unit #${i + 1}/${adcCount}`,
+            locator: adcashLocators.nth(i),
+            isAdcash: true,
+          });
+        }
+      } catch (err) {
+        log(`Lỗi khi quét Adcash ads: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
     // 0. Clickadu Ads (Banner / In-Page Push / Container / Links)
     if (AD_NETWORK === "clickadu" || AD_NETWORK === "all") {
       try {
@@ -3443,6 +3473,9 @@ async function runOneCycle(
     // 4. Dự phòng cưỡng chế nếu trang tải quá chậm chưa có link nào
     if (isForceClick && adCandidates.length === 0) {
       const fallbackLocators = [
+        ...(AD_NETWORK === "adcash" || AD_NETWORK === "all"
+          ? [{ name: "[Force] Adcash Container", sel: ADCASH_CONTAINER_SELECTOR }]
+          : []),
         ...(AD_NETWORK === "clickadu" || AD_NETWORK === "all"
           ? [{ name: "[Force] Clickadu Container", sel: CLICKADU_CONTAINER_SELECTOR }]
           : []),
@@ -4085,6 +4118,7 @@ export {
   FOCUS_POPUNDER_SOCIAL,
   parseAdNetwork,
   AD_NETWORK,
+  ADCASH_CONTAINER_SELECTOR,
   CLICKADU_CONTAINER_SELECTOR,
   SOCIAL_BAR_KEY,
   SOCIAL_BAR_SELECTOR,

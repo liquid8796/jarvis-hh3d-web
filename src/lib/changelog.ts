@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.175",
+    date: "2026-10-04",
+    lines: [
+      "Tích hợp mã nhúng tự động AutoTag của mạng quảng cáo Adcash và tạm dừng hiển thị Adsterra.",
+      "Bộ công cụ xem quảng cáo bổ sung mục tiêu Adcash và tuỳ chọn linh hoạt giữa các nhà mạng.",
+    ],
+  },
+  {
     version: "1.3.174",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Tự động phát hiện và nạp toàn bộ tiện ích mở rộng đang cài trên Chrome chính của máy khi chạy xem quảng cáo.",
       "Kết nối nhanh qua cổng gỡ lỗi mà không gây xung đột với phiên duyệt web cá nhân đang mở.",
-    ],
-  },
-  {
-    version: "1.3.125",
-    date: "2026-10-02",
-    lines: [
-      "Hỗ trợ kết nối và điều khiển trực tiếp Chrome chính của máy, bảo toàn toàn bộ tiện ích mở rộng đang cài đặt.",
-      "Cơ chế dọn dẹp dữ liệu có chọn lọc bảo vệ an toàn các phiên đăng nhập cá nhân sau mỗi chu kỳ xem quảng cáo.",
     ],
   },
 ];

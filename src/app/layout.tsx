@@ -8,6 +8,7 @@ import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { GoogleAdSense } from "@/components/GoogleAdSense";
 import { AdsterraAds } from "@/components/AdsterraAds";
 import { ClickaduAds } from "@/components/ClickaduAds";
+import { AdcashAds, AdcashHead } from "@/components/AdcashAds";
 import { CLICKADU_SITE_VERIFICATION_TOKEN } from "@/lib/clickadu/config";
 import { LanguageProvider } from "@/lib/i18n/context";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -148,6 +149,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <meta name="clckd" content={CLICKADU_SITE_VERIFICATION_TOKEN} />
         <GoogleAdSense />
+        <AdcashHead />
       </head>
       <body>
         {/*
@@ -187,6 +189,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <MaintenanceGate>{children}</MaintenanceGate>
           <AdsterraAds />
           <ClickaduAds />
+          <AdcashAds />
           <SiteFooter />
           {/* Dấu bản đứng NGOÀI cửa bế quan, cùng lẽ với tấm nền: lúc web đang bế quan là đúng
               lúc người ta cần biết trạm mình đang gõ cửa mang bản nào. Đứng cuối trong DOM để

@@ -236,21 +236,23 @@ assert.match(runtime, /🔔 \[SocialBar Ưu Tiên\]/, "ad-viewer must prioritize
 assert.match(batContent, /\[15\] Trong tam dinh dang quang cao/, "run-ad-viewer.bat must offer option [15] for ad format focus");
 assert.match(batContent, /ARG_AD_FOCUS=--focus-popunder-social/, "run-ad-viewer.bat must set ARG_AD_FOCUS to --focus-popunder-social");
 
-// ---- Lựa chọn Nhà Mạng Quảng Cáo (Ad Network: Clickadu, Adsterra, All) ----
-assert.equal(parseAdNetwork(["node", "adViewer.mjs"], dummyEnv), "all", "ad-network must default to all");
+// ---- Lựa chọn Nhà Mạng Quảng Cáo (Ad Network: Adcash, Clickadu, Adsterra, All) ----
+assert.equal(parseAdNetwork(["node", "adViewer.mjs"], dummyEnv), "adcash", "ad-network must default to adcash");
+assert.equal(parseAdNetwork(["node", "adViewer.mjs", "--ad-network=adcash"], dummyEnv), "adcash");
 assert.equal(parseAdNetwork(["node", "adViewer.mjs", "--ad-network=adsterra"], dummyEnv), "adsterra");
 assert.equal(parseAdNetwork(["node", "adViewer.mjs", "--ad-network=clickadu"], dummyEnv), "clickadu");
 assert.equal(parseAdNetwork(["node", "adViewer.mjs", "--ad-network=all"], dummyEnv), "all");
-assert.equal(parseAdNetwork(["node", "adViewer.mjs", "--network=adsterra"], dummyEnv), "adsterra");
+assert.equal(parseAdNetwork(["node", "adViewer.mjs", "--network=adcash"], dummyEnv), "adcash");
+assert.equal(parseAdNetwork(["node", "adViewer.mjs"], { AD_PROVIDER: "adcash" } as any), "adcash");
 assert.equal(parseAdNetwork(["node", "adViewer.mjs"], { AD_PROVIDER: "adsterra" } as any), "adsterra");
 assert.equal(parseAdNetwork(["node", "adViewer.mjs"], { AD_PROVIDER: "clickadu" } as any), "clickadu");
 
 assert.match(batContent, /\[16\] Nha mang quang cao muc tieu/, "run-ad-viewer.bat must offer option [16] for ad network");
-assert.match(batContent, /ARG_AD_NETWORK=--ad-network=all/, "run-ad-viewer.bat must default to all ad networks");
+assert.match(batContent, /ARG_AD_NETWORK=--ad-network=adcash/, "run-ad-viewer.bat must default to adcash");
 assert.match(batContent, /FINAL_ARGS=.*ARG_AD_NETWORK/, "FINAL_ARGS must include ARG_AD_NETWORK");
 
 console.log(
-  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, fully supports headless mode without popping up windows or leaking headless signals, enables 100% lock-free parallel execution across multi-instance headless workers, focuses on high-CPM Popunder + SocialBar while eliminating unwanted NativeBanner impressions, and supports selecting target ad networks (Clickadu, Adsterra, All).",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, fully supports headless mode without popping up windows or leaking headless signals, enables 100% lock-free parallel execution across multi-instance headless workers, focuses on high-CPM Popunder + SocialBar while eliminating unwanted NativeBanner impressions, and supports selecting target ad networks (Adcash, Clickadu, Adsterra, All).",
 );
 
 

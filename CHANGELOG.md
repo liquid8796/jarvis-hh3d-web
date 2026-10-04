@@ -9,6 +9,17 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.175 — Tích hợp mạng quảng cáo Adcash AutoTag, tạm dừng Adsterra và hỗ trợ chọn nhà mạng mục tiêu (04/10/2026)
+
+- Tích hợp mạng quảng cáo Adcash và triển khai mã nhúng AutoTag:
+  - Thêm cấu hình mạng Adcash trong [src/lib/adcash/config.ts](src/lib/adcash/config.ts) với khoá khu vực Zone ID `s6snqbi4sg` và thư viện kịch bản `//acscdn.com/script/aclib.js`.
+  - Bổ sung thành phần [src/components/AdcashAds.tsx](src/components/AdcashAds.tsx) và máy khách [src/components/adcash/AdcashClientAds.tsx](src/components/adcash/AdcashClientAds.tsx): xuất trực tiếp các thẻ `<script id="aclib" type="text/javascript" src="//acscdn.com/script/aclib.js"></script>` và `<script type="text/javascript">aclib.runAutoTag({ zoneId: 's6snqbi4sg' });</script>` trong thẻ `<head>` tĩnh của [src/app/layout.tsx](src/app/layout.tsx) phục vụ quá trình phê duyệt và nạp định dạng AutoTag (Popunder, In-Page Push, Interstitial, Banner).
+  - Cập nhật bộ điều phối nhà mạng [src/lib/ads/provider.ts](src/lib/ads/provider.ts): bổ sung tuỳ chọn `adcash` và đặt làm mặc định (`DEFAULT_AD_PROVIDER`), tự động ngắt kích hoạt Adsterra trên website theo yêu cầu tạm dừng.
+- Nâng cấp bộ công cụ xem quảng cáo [run-ad-viewer.bat](run-ad-viewer.bat) và [scripts/adViewer.mjs](scripts/adViewer.mjs):
+  - Bổ sung tuỳ chọn Adcash trong menu cấu hình [16] Nhà mạng quảng cáo mục tiêu với 4 lựa chọn: 1. Adcash (mặc định - Enter = 1), 2. Clickadu, 3. Adsterra, 4. Tất cả nhà mạng (`--ad-network=adcash|clickadu|adsterra|all`).
+  - Tích hợp cơ chế quét phần tử quảng cáo Adcash AutoTag (`#adcash-ad-container`, `.adcash-container`, `iframe[src*="acscdn"]`, `iframe[src*="adcash"]`, `[id*="aclib"] a[href]`) vào danh sách đối tượng tương tác và danh sách cưỡng chế dự phòng.
+  - Đồng bộ và mở rộng bộ kiểm thử tự động trong [scripts/verifyAdViewerHealth.mts](scripts/verifyAdViewerHealth.mts).
+
 ## 1.3.174 — Kích hoạt trở lại mạng quảng cáo Adsterra và mặc định hỗ trợ toàn bộ nhà mạng (04/10/2026)
 
 - Kích hoạt trở lại toàn diện mạng quảng cáo Adsterra trên website:

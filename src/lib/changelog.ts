@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.179",
+    date: "2026-10-04",
+    lines: [
+      "Khắc phục sự cố biểu ngữ quảng cáo đè lên giao diện Hàng Đợi Công Việc và Phòng Chat.",
+      "Tối ưu hoá phạm vi hiển thị biểu ngữ sườn chỉ xuất hiện tại trang chủ công khai.",
+    ],
+  },
+  {
     version: "1.3.178",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Tích hợp Patched Chromium Engine triệt tiêu dấu hiệu tự động hoá và rò rỉ kênh gỡ lỗi của trình duyệt.",
       "Mô phỏng hành vi đọc trang và trải nghiệm sâu trên trang đích giúp tương tác quảng cáo tự nhiên hơn.",
-    ],
-  },
-  {
-    version: "1.3.129",
-    date: "2026-10-02",
-    lines: [
-      "Khắc phục sự cố tệp kịch bản batch bị đóng đột ngột khi nhập thông tin cấu hình trên Windows.",
-      "Tăng cường khả năng nhận diện proxy hợp lệ qua cơ chế thử nghiệm đường truyền HTTP CONNECT.",
     ],
   },
 ];

@@ -28,12 +28,35 @@
   border: 0;
 }
 
-/* Trên màn hình máy tính lớn (>= 1340px): đặt cố định tại sườn bên trái (Flank Left Skyscraper) */
-@media (min-width: 1340px) {
+/* Trên màn hình máy tính rộng (>= 1380px): đặt cố định tại sườn bên trái trang chủ (Flank Left Skyscraper) */
+@media (min-width: 1380px) {
   .adcash-banner-160x600 {
     position: fixed;
     top: 140px;
     left: max(8px, calc(50% - 512px - 170px));
     margin: 0;
   }
+}
+
+/* Triệt tiêu hoàn toàn hiện tượng đè lên nội dung tại các tab làm việc (Hàng đợi, Phòng chat, Bảng điều khiển, ...) */
+body:has([data-backdrop]) .adcash-banner-160x600,
+body:has([data-backdrop="hang-doi"]) .adcash-banner-160x600,
+body:has([data-backdrop="chat"]) .adcash-banner-160x600,
+body:has([data-backdrop="dashboard"]) .adcash-banner-160x600,
+body:has([data-backdrop="profile"]) .adcash-banner-160x600,
+body:has([data-backdrop="admin"]) .adcash-banner-160x600,
+body:has([data-backdrop="login"]) .adcash-banner-160x600,
+body:has([data-backdrop="register"]) .adcash-banner-160x600,
+body:has([data-backdrop="pending"]) .adcash-banner-160x600 {
+  display: none !important;
+}
+
+/* Áp dụng tương tự cho Adsterra flanks để tránh lỗi đè tương tự nếu kích hoạt lại */
+body:has([data-backdrop]) .adsterra-flank,
+body:has([data-backdrop="hang-doi"]) .adsterra-flank,
+body:has([data-backdrop="chat"]) .adsterra-flank,
+body:has([data-backdrop="dashboard"]) .adsterra-flank,
+body:has([data-backdrop="profile"]) .adsterra-flank,
+body:has([data-backdrop="admin"]) .adsterra-flank {
+  display: none !important;
 }

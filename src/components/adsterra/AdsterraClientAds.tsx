@@ -434,13 +434,17 @@ export function AdsterraClientAds() {
 
   return (
     <>
-      {/* 2 Banner sườn trái & phải trên desktop (Flank Sidebars) */}
-      <aside className="adsterra-flank adsterra-flank-left" aria-label="Quảng cáo sườn trái">
-        <AdsterraBannerSlot spec={BANNER_160X600_SPEC} allowed={allowed} pathname={pathname} />
-      </aside>
-      <aside className="adsterra-flank adsterra-flank-right" aria-label="Quảng cáo sườn phải">
-        <AdsterraBannerSlot spec={BANNER_160X300_SPEC} allowed={allowed} pathname={pathname} />
-      </aside>
+      {/* 2 Banner sườn trái & phải trên desktop (Flank Sidebars) - chỉ hiển thị trên trang chủ */}
+      {isLanding && (
+        <>
+          <aside className="adsterra-flank adsterra-flank-left" aria-label="Quảng cáo sườn trái">
+            <AdsterraBannerSlot spec={BANNER_160X600_SPEC} allowed={allowed} pathname={pathname} />
+          </aside>
+          <aside className="adsterra-flank adsterra-flank-right" aria-label="Quảng cáo sườn phải">
+            <AdsterraBannerSlot spec={BANNER_160X300_SPEC} allowed={allowed} pathname={pathname} />
+          </aside>
+        </>
+      )}
 
       {/* Cụm quảng cáo trung tâm: portal vào trước block tính năng nếu là trang chủ, hoặc hiển thị mặc định */}
       {renderedStack}

@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.179 — Khắc phục sự cố quảng cáo đè lên giao diện Hàng Đợi và Phòng Chat (04/10/2026)
+
+- Triệt tiêu hoàn toàn sự cố biểu ngữ 160×600 (Adcash và Adsterra) che khuất nội dung của các tab làm việc:
+  - **CSS Layer ([src/app/adcash.css](src/app/adcash.css))**: Thêm luật loại trừ `body:has([data-backdrop])` cho toàn bộ các tab nội bộ (`[data-backdrop="hang-doi"]`, `[data-backdrop="chat"]`, `[data-backdrop="dashboard"]`, `[data-backdrop="profile"]`, `[data-backdrop="admin"]`, ...), lập tức ẩn hoàn toàn `.adcash-banner-160x600` và `.adsterra-flank` trước cả khi React hydrate.
+  - **React/DOM Layer ([src/components/adcash/AdcashClientAds.tsx](src/components/adcash/AdcashClientAds.tsx) & [src/components/adsterra/AdsterraClientAds.tsx](src/components/adsterra/AdsterraClientAds.tsx))**: Khống chế hiển thị biểu ngữ sườn cố định duy nhất trên trang chủ công khai (`pathname === "/"`), ẩn triệt để khi chuyển sang các tab làm việc nội bộ.
+  - Tinh chỉnh điểm ngắt media query màn hình sườn rộng từ `1340px` lên `1380px` để bảo đảm khoảng cách an toàn, không bao giờ chạm mép nội dung chính.
+- Cập nhật bài kiểm tra tự động [scripts/verifyAdcash.mts](scripts/verifyAdcash.mts): bổ sung assertion xác minh luật CSS và hàm `pathAllowsBanner` ngăn ngừa tái diễn lỗi che khuất.
+
 ## 1.3.178 — Tích hợp quảng cáo Adcash Pop-Under (12265546) và Display 160x600 (12265554) (04/10/2026)
 
 - Bổ sung 2 định dạng quảng cáo chính thức từ Adcash theo tài khoản nhà xuất bản:

@@ -33,11 +33,12 @@ assert.equal(adcashEnabled("auto-hh3d.online", { NODE_ENV: "development" }), fal
 assert.equal(adcashEnabled("auto-hh3d.online", { NODE_ENV: "production", ADCASH_DISABLED: "1" }), false);
 
 // 3. Kiểm tra mã nguồn gắn thẻ trên giao diện web
-const [layout, headGate, adViewer, adcashCss] = await Promise.all([
+const [layout, headGate, adViewer, adcashCss, clientAds] = await Promise.all([
   read("src/app/layout.tsx"),
   read("src/components/AdcashAds.tsx"),
   read("scripts/adViewer.mjs"),
   read("src/app/adcash.css"),
+  read("src/components/adcash/AdcashClientAds.tsx"),
 ]);
 
 assert.match(layout, /<AdcashHead \/>/, "layout must include AdcashHead in <head>");
@@ -52,10 +53,13 @@ assert.match(headGate, /aclib\.runBanner/, "AdcashAds must call aclib.runBanner 
 assert.match(headGate, /12265554|ADCASH_BANNER_160X600_ZONE_ID/, "AdcashAds must reference Banner zoneId 12265554");
 assert.match(headGate, /id="adcash-banner-160x600"/, "AdcashAds must contain #adcash-banner-160x600");
 
-// 4. Kiểm tra CSS định vị banner 160x600
+// 4. Kiểm tra CSS định vị banner 160x600 và loại trừ che khuất các tab hàng đợi, phòng chat
 assert.match(adcashCss, /\.adcash-banner-160x600/, "adcash.css must define .adcash-banner-160x600");
 assert.match(adcashCss, /160px/, "adcash.css must specify 160px width");
 assert.match(adcashCss, /600px/, "adcash.css must specify 600px min-height");
+assert.match(adcashCss, /body:has\(\[data-backdrop="hang-doi"\]\)\s*\.adcash-banner-160x600/, "Must hide banner on hang-doi tab");
+assert.match(adcashCss, /body:has\(\[data-backdrop="chat"\]\)\s*\.adcash-banner-160x600/, "Must hide banner on chat tab");
+assert.match(clientAds, /pathAllowsBanner/, "clientAds must define pathAllowsBanner to protect inner tabs");
 
 // 5. Kiểm tra adViewer nhận diện cả AutoTag, Pop-Under và Banner 160x600
 assert.match(adViewer, /#adcash-banner-160x600/, "adViewer must recognize #adcash-banner-160x600");

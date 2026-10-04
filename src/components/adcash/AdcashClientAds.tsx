@@ -17,6 +17,10 @@ function pathAllowsAds(pathname: string): boolean {
   return !EXCLUDED_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
+function pathAllowsBanner(pathname: string): boolean {
+  return pathname === "/";
+}
+
 /**
  * Adcash Client Ads Component.
  * Cung cấp vùng chứa và hỗ trợ theo dõi quảng cáo Adcash AutoTag, Pop-Under và Banner 160x600 trên trang.
@@ -24,6 +28,7 @@ function pathAllowsAds(pathname: string): boolean {
 export function AdcashClientAds() {
   const pathname = usePathname();
   const allowed = pathAllowsAds(pathname);
+  const bannerAllowed = pathAllowsBanner(pathname);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -33,8 +38,8 @@ export function AdcashClientAds() {
   useEffect(() => {
     const bannerEl = document.getElementById("adcash-banner-160x600");
     if (bannerEl) {
-      bannerEl.style.display = allowed ? "" : "none";
-      if (allowed && typeof window !== "undefined") {
+      bannerEl.style.display = bannerAllowed ? "" : "none";
+      if (bannerAllowed && typeof window !== "undefined") {
         const aclib = (window as unknown as { aclib?: { runBanner?: (opts: { zoneId: string }) => void } }).aclib;
         if (aclib?.runBanner && !bannerEl.querySelector("iframe")) {
           try {
@@ -43,7 +48,7 @@ export function AdcashClientAds() {
         }
       }
     }
-  }, [allowed, pathname]);
+  }, [bannerAllowed, pathname]);
 
   if (!allowed || !mounted) return null;
 

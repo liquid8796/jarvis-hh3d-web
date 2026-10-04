@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.166",
+    date: "2026-10-04",
+    lines: [
+      "Khắc phục sự cố không hiển thị quảng cáo Native Banner và biểu ngữ trên trang chủ.",
+      "Cập nhật mã khoá chính xác theo tệp cấu hình gốc và ổn định luồng nạp quảng cáo.",
+    ],
+  },
+  {
     version: "1.3.165",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Kho Xem Quảng Cáo khôi phục đầy đủ tính năng tương tác: click vào creative banner và native để mở trang đích.",
       "Tự động đọc trang quảng cáo chính, click tiếp đệ quy tối đa 2 lần, dọn sạch dữ liệu duyệt web sau mỗi chu kỳ và chạy liên tục.",
-    ],
-  },
-  {
-    version: "1.3.116",
-    date: "2026-10-02",
-    lines: [
-      "Thời gian render quảng cáo nay được đo tới lúc banner và native thực sự có creative, không dừng sớm ở trạng thái DOM.",
-      "Lượt kiểm tra chỉ tự chạy lại khi cần tải runtime mới; hoàn tất bình thường sẽ chờ lịch bốn giờ.",
     ],
   },
 ];

@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.166 — Khắc phục sự cố hiển thị quảng cáo Adsterra và sửa lỗi khoá mã (04/10/2026)
+
+- Chẩn đoán toàn diện nguyên nhân khiến quảng cáo trên trang chủ không hiển thị và đối soát với tệp mã quảng cáo gốc từ bảng điều khiển Adsterra (`ads-code`):
+  - Khắc phục lỗi vòng đời Portal (Double-mount unmount/remount race): trong bản 1.3.165, cụm quảng cáo trung tâm `mainStack` được dựng ở `body` trước khi đối tượng `#landing-ad-placement` được xác định, sau đó React chuyển cây DOM sang Portal khiến toàn bộ thẻ script và container `<div id="container-5e6634da84f8f263d7ab34ae152f1c8d">` bị huỷ (`unmount`). Khi container mới được tạo lại, mã nguồn `invoke.js` của Adsterra đã nạp từ trước nên không thể kích hoạt lại, dẫn đến tình trạng Native Banner bị trống và rơi vào trạng thái `blocked` (ẩn hoàn toàn sau 8 giây).
+  - Khắc phục bằng cách chỉ khởi tạo `mainStack` duy nhất một lần trực tiếp vào `#landing-ad-placement` ngay khi container sẵn sàng trên trang chủ, triệt tiêu hoàn toàn sự cố huỷ DOM.
+  - Sửa lỗi chính tả khoá mã biểu ngữ 320×50 trong [src/lib/adsterra/config.ts](src/lib/adsterra/config.ts): sửa `bc0a7a3ea5179c58561c3533681bd724` thành `bc0a73ea5179c58561c3533681bd724` đúng khớp 100% với tệp `Banner 320x50.png` từ bảng điều khiển Adsterra.
+  - Tối ưu ngưỡng hiển thị hai banner sườn (Flank Banners) trong [src/app/adsterra.css](src/app/adsterra.css): hạ ngưỡng `@media (min-width: 1380px)` xuống `1340px` để hai banner 160×600 và 160×300 hiển thị đầy đủ trên màn hình laptop tiêu chuẩn 1366×768 px mà không bị ẩn.
+
 ## 1.3.165 — Chuyển cụm quảng cáo lên trước block tính năng, thêm banner sườn và hỗ trợ tiếng Anh mặc định (04/10/2026)
 
 - Tái cơ cấu vị trí hiển thị quảng cáo Adsterra trên trang chủ theo yêu cầu trải nghiệm và phân bổ không gian hiển thị:

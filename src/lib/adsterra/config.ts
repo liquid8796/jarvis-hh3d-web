@@ -22,7 +22,7 @@ export const ADSTERRA_BANNER_468X60_HEIGHT = 60 as const;
 export const ADSTERRA_BANNER_468X60_SCRIPT_SRC =
   `https://deliberatewatchful.com/${ADSTERRA_BANNER_468X60_KEY}/invoke.js` as const;
 
-export const ADSTERRA_BANNER_320X50_KEY = "bc0a7a3ea5179c58561c3533681bd724" as const;
+export const ADSTERRA_BANNER_320X50_KEY = "bc0a73ea5179c58561c3533681bd724" as const;
 export const ADSTERRA_BANNER_320X50_WIDTH = 320 as const;
 export const ADSTERRA_BANNER_320X50_HEIGHT = 50 as const;
 export const ADSTERRA_BANNER_320X50_SCRIPT_SRC =

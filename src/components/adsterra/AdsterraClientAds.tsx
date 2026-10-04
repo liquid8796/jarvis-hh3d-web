@@ -404,6 +404,11 @@ export function AdsterraClientAds() {
     </aside>
   );
 
+  const isLanding = pathname === "/";
+  const renderedStack = isLanding
+    ? (portalTarget ? createPortal(mainStack, portalTarget) : null)
+    : mainStack;
+
   return (
     <>
       {/* 2 Banner sườn trái & phải trên desktop (Flank Sidebars) */}
@@ -415,7 +420,7 @@ export function AdsterraClientAds() {
       </aside>
 
       {/* Cụm quảng cáo trung tâm: portal vào trước block tính năng nếu là trang chủ, hoặc hiển thị mặc định */}
-      {portalTarget ? createPortal(mainStack, portalTarget) : mainStack}
+      {renderedStack}
     </>
   );
 }

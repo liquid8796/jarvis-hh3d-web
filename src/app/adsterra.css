@@ -122,14 +122,14 @@
 }
 
 .adsterra-flank-left {
-  left: max(10px, calc(50% - 512px - 175px));
+  left: max(8px, calc(50% - 512px - 170px));
 }
 
 .adsterra-flank-right {
-  right: max(10px, calc(50% - 512px - 175px));
+  right: max(8px, calc(50% - 512px - 170px));
 }
 
-@media (min-width: 1380px) {
+@media (min-width: 1340px) {
   .adsterra-flank {
     display: block;
   }

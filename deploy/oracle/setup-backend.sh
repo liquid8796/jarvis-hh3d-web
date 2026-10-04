@@ -3,8 +3,7 @@
 #  Dựng nền BACKEND trên jarvis-oci-01 — chạy bằng root, idempotent.
 #
 #  Từ 16/08/2026 VM này là backend DUY NHẤT của tông môn: chạy trọn app Next.js
-#  (UI + API) sau Caddy, kèm PostgreSQL 17 + MongoDB 8.0 nội bộ. Các trạm Vercel
-#  chỉ còn là vỏ proxy trỏ về đây; khôi lỗi GitHub gọi thẳng vào đây.
+#  (UI + API) sau Caddy, kèm PostgreSQL 17 + MongoDB 8.0 nội bộ; khôi lỗi GitHub gọi thẳng vào đây.
 #
 #  Script này CHỈ dựng nền (runtime, DB, TLS, firewall, systemd). Mã app đi
 #  bằng scripts/deployBackend.mts ở repo — hai việc tách nhau để lượt phát hành

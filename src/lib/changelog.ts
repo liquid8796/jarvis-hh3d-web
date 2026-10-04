@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.164",
+    date: "2026-10-04",
+    lines: [
+      "Loại bỏ hoàn toàn các cấu hình chuyển tiếp trung gian không còn sử dụng.",
+      "Hệ thống tập trung vận hành trực tiếp trên hạ tầng máy chủ chính thức và các trạm phụ trợ.",
+    ],
+  },
+  {
     version: "1.3.163",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Kho Xem Quảng Cáo nay báo rõ banner và native là ready, blocked hay no-fill, kèm số creative, thời gian render và kích thước.",
       "Mỗi lượt chỉ kiểm tra một lần và không tự bấm quảng cáo production, giúp phân biệt lỗi tải tag với trường hợp thiếu fill.",
-    ],
-  },
-  {
-    version: "1.3.114",
-    date: "2026-10-02",
-    lines: [
-      "Kho Xem Quảng Cáo nay mặc định mở đúng tên miền chính thức, nơi các vị trí quảng cáo được bật.",
-      "Tạo mới, đưa kho phụ lên làm kho chính và phát hành lại đều giữ mặc định này, không tự quay về hostname máy chủ cũ.",
     ],
   },
 ];

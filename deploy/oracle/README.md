@@ -107,8 +107,7 @@ dán `~/.oci/jarvis_api_key_public.pem`.
 ## 2b. Backend trên VM — kiến trúc từ 16/08/2026
 
 Cùng ngày dựng lại máy, tông chủ quyết: **backend + database rời hẳn Vercel/Neon/Atlas về
-đây.** App Next.js (UI + API) chạy trọn trên VM sau Caddy; 5 trạm Vercel chỉ còn là vỏ proxy
-(xem `deploy/vercel-proxy/README.md`); khôi lỗi GitHub gọi thẳng VM.
+đây.** App Next.js (UI + API) chạy trọn trên VM sau Caddy; không còn sử dụng Vercel; khôi lỗi GitHub gọi thẳng VM.
 
 | Mảnh | Ở đâu |
 |---|---|
@@ -411,11 +410,11 @@ biến mất, vào được nghĩa là dòng vĩnh viễn thật sự đứng m�
 ### Cài đè engine mới (phát hành) — KHÔNG còn áp dụng cho VM
 
 > **Từ 16/08/2026 bước này ĐÃ BỎ khỏi lệ phát hành.** VM không còn chạy khôi lỗi, nên một bản vá
-> engine nay chỉ phải tới HAI nơi: các trạm Vercel (`npm run deploy:all`) và 6 kho GitHub đông
-> lạnh (`npm run github:deploy`). Đừng đi tìm một VM để cài đè — không có cái nào cả, và IP dưới
+> engine nay chỉ phải tới HAI nơi: máy chủ backend VM (`npm run deploy:backend`) và các kho GitHub
+> (`npm run github:deploy`). Đừng đi tìm một VM để cài đè — không có cái nào cả, và IP dưới
 > đây đã chết. Giữ lại công thức vì nó là đường dựng khôi lỗi VM nếu có ngày cần lại.
 
-Chạy **sau khi Vercel đã `READY`** — `setup.sh` tải gói từ `WEB_URL/linh-su/goi-linh-su.tgz`,
+Chạy **sau khi backend đã `READY`** — `setup.sh` tải gói từ `WEB_URL/linh-su/goi-linh-su.tgz`,
 mà gói ấy được đóng lại ở mỗi lần deploy. Deploy trước, cài sau; ngược lại là cài phải gói cũ.
 
 ```bash

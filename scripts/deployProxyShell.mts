@@ -1,23 +1,10 @@
 #!/usr/bin/env node
 /**
- * LẬT CÁC TRẠM VERCEL THÀNH VỎ PROXY — nửa còn lại của deploy:backend (16/08/2026).
+ * [ĐÃ NGỪNG SỬ DỤNG - DỰ ÁN KHÔNG CÒN DÙNG VERCEL NỮA]
+ * LẬT CÁC TRẠM VERCEL THÀNH VỎ PROXY — script cũ từng dùng cho Vercel proxy.
  *
- *   npm run deploy:all                      lật MỌI trạm mà chìa trong env mở được
- *   npm run deploy:all -- --site auto-hh3d-2   đúng một trạm
- *   npm run deploy:all -- --dry-run         kể kế hoạch, không đụng gì
- *
- * Từ ngày backend về VM OCI, một「lượt phát hành trạm」không còn build gì cả: nó đẩy đúng
- * HAI tệp (vercel.json rewrite + __proxy.txt đánh dấu) qua API v13/deployments với files
- * inline. Không CLI, không .vercel/project.json, không git metadata — nghĩa là hết luôn
- * bệnh BLOCKED git-author và hết cảnh mỗi trạm một .env.
- *
- * Đi bằng API thô thay vì `vercel deploy` còn vì một lẽ vận hành: máy nhà có lúc bị chặn
- * api.vercel.com (VPN — đo 16/08/2026), và script này phải chạy được từ chính VM. Nó chỉ
- * cần các biến VERCEL_TOKEN_* trong env — truyền qua SSH env là đủ, không chép tệp bí mật.
- *
- * Trạm được tìm bằng CHÌA, không bằng sổ: hệ sổ gương (mirrors book) đã nghỉ việc cùng
- * ngày với Neon. Mỗi token được hỏi「ngươi thấy những project auto-hh3d* nào」và mọi
- * project thấy được đều được lật — trạm nào thiếu chìa thì ✗ đích danh, như lệ cũ.
+ * Từ ngày backend về VM OCI, toàn bộ dịch vụ chạy trực tiếp trên VM OCI.
+ * Hệ thống trạm proxy trên Vercel đã ngừng hoạt động và không còn được deploy.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";

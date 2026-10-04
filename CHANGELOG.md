@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.164 — Loại bỏ quy trình và tài liệu deploy Vercel proxy (04/10/2026)
+
+- Ngừng hỗ trợ và loại bỏ toàn bộ ghi chú liên quan đến quy trình deploy Vercel proxy trong toàn bộ dự án:
+  - Cập nhật quy trình phát hành tự động trong [AGENTS.md](AGENTS.md): loại bỏ mục tiêu `Vercel proxies (npm run deploy:proxy)` khỏi danh sách deploy bắt buộc ở bước 4 và bỏ kiểm tra `proxy results` ở bước 5.
+  - Cập nhật tài liệu hạ tầng và hướng dẫn vận hành trong [deploy/oracle/README.md](deploy/oracle/README.md), kịch bản dựng nền [deploy/oracle/setup-backend.sh](deploy/oracle/setup-backend.sh) và công cụ phát hành nhanh [deploy-backend.bat](deploy-backend.bat): làm rõ việc dự án đã hoàn toàn chuyển dịch sang chạy trực tiếp trên VM OCI (`auto-hh3d.online`), không còn duy trì hệ thống trạm Vercel.
+  - Đánh dấu ngừng sử dụng đối với tài liệu [deploy/vercel-proxy/README.md](deploy/vercel-proxy/README.md) và kịch bản [scripts/deployProxyShell.mts](scripts/deployProxyShell.mts).
+
 ## 1.3.163 — Tập trung Popunder và SocialBar, triệt tiêu click và impression không mong muốn cho NativeBanner (04/10/2026)
 
 - Tối ưu hoá toàn diện cơ chế điều phối quảng cáo Adsterra: tập trung tối đa vào các định dạng quảng cáo có giá trị CPM cao (Popunder và SocialBar Floating Notification) và triệt tiêu hoàn toàn sự mất cân bằng do spam click/impression vào NativeBanner:

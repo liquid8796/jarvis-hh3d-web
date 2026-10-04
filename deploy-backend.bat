@@ -1,8 +1,7 @@
 @echo off
 REM ============================================================================
 REM  Phat hanh BACKEND len VM OCI (jarvis-oci-01) - thay cho deploy-all-stations
-REM  tu 16/08/2026: backend + database song tron tren VM, cac tram Vercel chi con
-REM  la vo proxy (hiem khi phai dong lai - dung deployercel-proxy khi can).
+REM  tu 16/08/2026: backend + database song tron tren VM. Du an khong con dung Vercel.
 REM
 REM  Cach dung: bam dup la phat hanh HEAD. Can xem truoc thi chay tay:
 REM     npm run deploy:backend -- --restart   (chi khoi dong lai service)

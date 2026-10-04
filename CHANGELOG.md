@@ -9,6 +9,15 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.169 — Bổ sung cơ chế chống treo tương tác click và tính toạ độ Popunder an toàn (04/10/2026)
+
+- Khắc phục sự cố đứng hình (hang/stuck) trong chuỗi tương tác click tự nhiên kích hoạt Popunder và quảng cáo trong [scripts/adViewer.mjs](scripts/adViewer.mjs):
+  - Bọc giới hạn thời gian nghiêm ngặt (`withTimeout`) cho toàn bộ chuỗi hành động: `performEngageAndClick` (tối đa 20s), `preClickEngagement` (tối đa 8s), `humanClick` (tối đa 8s), `client.send` (tối đa 2.5s) và `client.detach` (tối đa 1.5s). Triệt tiêu hoàn toàn nguy cơ tiến trình bị treo vĩnh viễn khi trình duyệt phân luồng hoặc Chromium hoãn phản hồi tín hiệu CDP lúc mở tab mới.
+  - Tối ưu hoá luồng di chuyển chuột trong `preClickEngagement`: sử dụng trực tiếp cơ chế dispatch tích hợp của Playwright `page.mouse.move`, xoá bỏ việc liên tục tạo và giải phóng nhiều phiên CDP session con trong thời gian ngắn gây desync giao thức.
+  - Tích hợp cơ chế dự phòng mềm (fallback): trong `humanClickCdp`, nếu phiên CDP gặp trục trặc, hệ thống tự động chuyển đổi êm ái sang `page.mouse` để hoàn tất cú click mà không làm gián đoạn chu kỳ.
+  - Nâng cấp thuật toán chọn toạ độ click Popunder trong `resolvePopunderTarget`: tự động quét và loại trừ toàn bộ toạ độ của các khối quảng cáo (`.adsterra-unit`, `.adsterra-stack`, `.adsterra-flank`, `iframe`), ưu tiên click vào tiêu đề, đoạn văn bản ở vùng trên trang để kích hoạt Popunder thuần tuý mà không vô tình click nhầm vào NativeBanner.
+  - Bổ sung thông tin tiến trình chi tiết trên màn hình console trong các bước kiểm tra mở tab Popunder.
+
 ## 1.3.168 — Tách Native Banner thành khối độc lập AdsterraNativeSlot (04/10/2026)
 
 - Tách khối Native Banner thành component độc lập `AdsterraNativeSlot` trong [src/components/adsterra/AdsterraClientAds.tsx](src/components/adsterra/AdsterraClientAds.tsx):

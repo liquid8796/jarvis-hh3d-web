@@ -1449,29 +1449,50 @@ async function organicScroll(page, totalDistance, instanceId = logContext.getSto
  * Sự kiện do CDP phát có isTrusted = true trong Chrome renderer.
  */
 async function humanClickCdp(page, ctx, targetX, targetY, instanceId = logContext.getStore()?.instanceId ?? 0) {
-  const client = await ctx.newCDPSession(page);
+  let client = null;
+  try {
+    client = await withTimeout(ctx.newCDPSession(page), 3500, null).catch(() => null);
+  } catch {}
+
+  if (!client) {
+    return humanClickMouse(page, targetX, targetY, instanceId);
+  }
+
   try {
     const mousePos = getMousePos(instanceId);
     const movePath = generateBezierPath(mousePos.x, mousePos.y, targetX, targetY);
     for (const pt of movePath) {
-      await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: pt.x, y: pt.y });
+      await withTimeout(
+        client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: pt.x, y: pt.y }),
+        1000,
+      ).catch(() => {});
       await sleep(rand(8, 22));
     }
     // Dwell / Hover — dừng lại như đang đọc nội dung quảng cáo trước khi nhấn
     await sleep(resolveHoverMs());
     // Press
-    await client.send("Input.dispatchMouseEvent", {
-      type: "mousePressed", button: "left", clickCount: 1, x: targetX, y: targetY,
-    });
+    await withTimeout(
+      client.send("Input.dispatchMouseEvent", {
+        type: "mousePressed", button: "left", clickCount: 1, x: targetX, y: targetY,
+      }),
+      2500,
+    ).catch(() => {});
     // Hold — giữ nút chuột 70-160ms như bàn tay người thật
     await sleep(rand(70, 160));
     // Release
-    await client.send("Input.dispatchMouseEvent", {
-      type: "mouseReleased", button: "left", clickCount: 1, x: targetX, y: targetY,
-    });
+    await withTimeout(
+      client.send("Input.dispatchMouseEvent", {
+        type: "mouseReleased", button: "left", clickCount: 1, x: targetX, y: targetY,
+      }),
+      2500,
+    ).catch(() => {});
     setMousePos(instanceId, targetX, targetY);
+  } catch {
+    await humanClickMouse(page, targetX, targetY, instanceId).catch(() => {});
   } finally {
-    await client.detach().catch(() => {});
+    if (client) {
+      await withTimeout(client.detach(), 1500, null).catch(() => {});
+    }
   }
 }
 
@@ -1714,18 +1735,9 @@ async function preClickEngagement(page, ctx, targetX, targetY, instanceId = 0, c
   const nearY = targetY + rand(-50, 50);
   const mousePos1 = getMousePos(instanceId);
   const approachPath = generateBezierPath(mousePos1.x, mousePos1.y, nearX, nearY, rand(12, 22));
-  if (clickMode === "cdp") {
-    const client = await ctx.newCDPSession(page);
-    for (const pt of approachPath) {
-      await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: pt.x, y: pt.y });
-      await sleep(rand(12, 28));
-    }
-    await client.detach().catch(() => {});
-  } else {
-    for (const pt of approachPath) {
-      await page.mouse.move(pt.x, pt.y);
-      await sleep(rand(12, 28));
-    }
+  for (const pt of approachPath) {
+    await page.mouse.move(pt.x, pt.y).catch(() => {});
+    await sleep(rand(12, 28));
   }
   setMousePos(instanceId, nearX, nearY);
 
@@ -1735,18 +1747,9 @@ async function preClickEngagement(page, ctx, targetX, targetY, instanceId = 0, c
   // 3. Rê chuột nhẹ nhàng từ vị trí lân cận vào đúng vị trí click đích
   const mousePos2 = getMousePos(instanceId);
   const finalGlide = generateBezierPath(mousePos2.x, mousePos2.y, targetX, targetY, rand(8, 14));
-  if (clickMode === "cdp") {
-    const client = await ctx.newCDPSession(page);
-    for (const pt of finalGlide) {
-      await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: pt.x, y: pt.y });
-      await sleep(rand(10, 22));
-    }
-    await client.detach().catch(() => {});
-  } else {
-    for (const pt of finalGlide) {
-      await page.mouse.move(pt.x, pt.y);
-      await sleep(rand(10, 22));
-    }
+  for (const pt of finalGlide) {
+    await page.mouse.move(pt.x, pt.y).catch(() => {});
+    await sleep(rand(10, 22));
   }
   setMousePos(instanceId, targetX, targetY);
   await sleep(rand(150, 450));
@@ -1754,42 +1757,64 @@ async function preClickEngagement(page, ctx, targetX, targetY, instanceId = 0, c
 
 /**
  * Xác định toạ độ click tự nhiên trên trang web để kích hoạt Popunder.
- * Tìm kiếm các vùng nội dung chính (main, article, section, container, thẻ văn bản p/h)
- * hoặc tính toán toạ độ an toàn trong khung nhìn của trang.
+ * Tìm kiếm các vùng nội dung chính (tiêu đề, đoạn văn, hero text) và loại trừ
+ * hoàn toàn các khung quảng cáo (adsterra-unit, adsterra-stack, adsterra-flank, iframe)
+ * để tránh việc click kích hoạt nhầm vào NativeBanner hoặc banner ngoài ý muốn.
  */
 async function resolvePopunderTarget(page) {
   try {
     const vp = page.viewportSize() || { width: 1280, height: 720 };
+    // Lấy toạ độ các khối quảng cáo để tránh click nhầm vào ads
+    const adBoxes = [];
+    try {
+      const adLocators = page.locator(".adsterra-unit, .adsterra-stack, .adsterra-flank, iframe");
+      const adCount = await adLocators.count().catch(() => 0);
+      for (let i = 0; i < Math.min(10, adCount); i++) {
+        const b = await adLocators.nth(i).boundingBox().catch(() => null);
+        if (b) adBoxes.push(b);
+      }
+    } catch {}
+
+    const isInsideAd = (x, y) =>
+      adBoxes.some((b) => x >= b.x - 5 && x <= b.x + b.width + 5 && y >= b.y - 5 && y <= b.y + b.height + 5);
+
     const contentSelectors = [
-      "main",
-      "article",
-      "section",
-      ".container",
-      "p",
       "h1, h2, h3",
-      "body",
+      "p",
+      ".hero",
+      "nav",
+      "header",
     ];
     for (const sel of contentSelectors) {
-      const loc = page.locator(sel).first();
-      if ((await loc.count().catch(() => 0)) > 0) {
+      const locators = page.locator(sel);
+      const count = await locators.count().catch(() => 0);
+      for (let i = 0; i < count; i++) {
+        const loc = locators.nth(i);
         const box = await loc.boundingBox().catch(() => null);
-        if (box && box.width >= 40 && box.height >= 40) {
-          const minX = Math.max(20, Math.floor(box.x + box.width * 0.2));
-          const maxX = Math.min(vp.width - 20, Math.floor(box.x + box.width * 0.8));
-          const minY = Math.max(20, Math.floor(box.y + box.height * 0.2));
-          const maxY = Math.min(vp.height - 20, Math.floor(box.y + box.height * 0.8));
-          if (maxX > minX && maxY > minY) {
-            return { x: rand(minX, maxX), y: rand(minY, maxY) };
+        if (box && box.width >= 40 && box.height >= 20) {
+          const cx = Math.floor(box.x + box.width * 0.5);
+          const cy = Math.floor(box.y + box.height * 0.5);
+          if (cx > 20 && cx < vp.width - 20 && cy > 50 && cy < vp.height - 20 && !isInsideAd(cx, cy)) {
+            return { x: cx + rand(-15, 15), y: cy + rand(-5, 5) };
           }
         }
       }
     }
+
+    // Fallback: chọn toạ độ an toàn trong vùng nội dung nửa trên màn hình (tránh mép và tránh ads)
+    for (let attempts = 0; attempts < 10; attempts++) {
+      const candidateX = rand(Math.floor(vp.width * 0.3), Math.floor(vp.width * 0.7));
+      const candidateY = rand(150, Math.min(480, vp.height - 50));
+      if (!isInsideAd(candidateX, candidateY)) {
+        return { x: candidateX, y: candidateY };
+      }
+    }
     return {
-      x: rand(Math.floor(vp.width * 0.25), Math.floor(vp.width * 0.75)),
-      y: rand(Math.floor(vp.height * 0.25), Math.floor(vp.height * 0.75)),
+      x: rand(Math.floor(vp.width * 0.35), Math.floor(vp.width * 0.65)),
+      y: rand(220, 420),
     };
   } catch {
-    return { x: rand(200, 600), y: rand(200, 500) };
+    return { x: rand(300, 600), y: rand(200, 400) };
   }
 }
 
@@ -1801,23 +1826,38 @@ async function resolvePopunderTarget(page) {
  * cửa sổ trước khi click.
  */
 async function performEngageAndClick(page, ctx, targetX, targetY, instanceId = 0, clickMode = CLICK_MODE) {
-  if (!IS_EXPLICIT_HEADLESS && (isPhysicalClickMode(clickMode) || INSTANCE_COUNT > 1)) {
-    await acquireCycleTurn(instanceId);
-    if (instanceId > 0) {
-      await tagInstancePage(page, instanceId);
+  return withTimeout((async () => {
+    if (!IS_EXPLICIT_HEADLESS && (isPhysicalClickMode(clickMode) || INSTANCE_COUNT > 1)) {
+      await withTimeout(acquireCycleTurn(instanceId), 8000).catch(() => {});
+      if (instanceId > 0) {
+        await tagInstancePage(page, instanceId).catch(() => {});
+      }
+      await page.bringToFront().catch(() => {});
+      await maximizeAndFocusWindow(ctx, page, instanceId).catch(() => {});
+      if (process.platform === "win32") {
+        focusInstanceWindow(instanceId);
+      }
     }
-    await page.bringToFront().catch(() => {});
-    await maximizeAndFocusWindow(ctx, page, instanceId);
-    if (process.platform === "win32") {
-      focusInstanceWindow(instanceId);
-    }
-  }
-  await preClickEngagement(page, ctx, targetX, targetY, instanceId, clickMode);
-  const [newPage] = await Promise.all([
-    ctx.waitForEvent("page", { timeout: 6000 }).catch(() => null),
-    humanClick(page, ctx, targetX, targetY, instanceId, clickMode).catch(() => null),
-  ]);
-  return newPage;
+    await withTimeout(
+      preClickEngagement(page, ctx, targetX, targetY, instanceId, clickMode),
+      8000,
+    ).catch(() => {});
+
+    let newPage = null;
+    const pageEventPromise = ctx.waitForEvent("page", { timeout: 6000 }).then((p) => {
+      newPage = p;
+      return p;
+    }).catch(() => null);
+
+    const clickPromise = withTimeout(
+      humanClick(page, ctx, targetX, targetY, instanceId, clickMode),
+      8000,
+      null,
+    ).catch(() => null);
+
+    await Promise.all([pageEventPromise, clickPromise]);
+    return newPage;
+  })(), 20000, null);
 }
 
 /**
@@ -3428,6 +3468,7 @@ async function runOneCycle(
         const popTarget = await resolvePopunderTarget(page);
         log(`-> Click tự nhiên tại (${Math.round(popTarget.x)}, ${Math.round(popTarget.y)}) để kích hoạt Popunder...`);
         const popup = await performEngageAndClick(page, context, popTarget.x, popTarget.y, instanceId, cycleClickMode);
+        log("  Đang kiểm tra kết quả mở tab Popunder...");
         if (popup) {
           openedPage = popup;
           adClicked = true;

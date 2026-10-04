@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.169",
+    date: "2026-10-04",
+    lines: [
+      "Kho Xem Quảng Cáo bổ sung cơ chế bọc thời gian chờ và chống treo cho chuỗi tương tác click.",
+      "Tự động phát hiện toạ độ click Popunder an toàn và dự phòng mượt mà khi trình duyệt phân luồng.",
+    ],
+  },
+  {
     version: "1.3.168",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Kho Xem Quảng Cáo chuyển sang trình duyệt Obscura độc lập, kết nối điều khiển trực tiếp qua giao thức mở.",
       "Tích hợp giải pháp chống nhận diện dấu vân tay CanvasBlocker trực tiếp vào phiên duyệt web của trình duyệt mới.",
-    ],
-  },
-  {
-    version: "1.3.119",
-    date: "2026-10-02",
-    lines: [
-      "Bật chế độ Developer Mode cho tiện ích CanvasBlocker trong profile và cờ khởi chạy trình duyệt của kho Xem Quảng Cáo.",
-      "Kho Xem Quảng Cáo tự động kích hoạt chế độ nhà phát triển và bổ sung lệnh chạy trực quan trên màn hình máy tính.",
     ],
   },
 ];

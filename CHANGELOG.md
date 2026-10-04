@@ -9,6 +9,21 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.180 — Cập nhật 5 vùng quảng cáo Adcash mới (Autotag, Pop-Under, Flank 160x600 x2, Leaderboard 728x90) (04/10/2026)
+
+- Cập nhật toàn bộ Zone ID theo tài khoản Adcash mới của website:
+  - **Autotag (Zone ID `vaup0kxkvs`)**: Nạp `aclib.runAutoTag({ zoneId: 'vaup0kxkvs' })` vào `<head>` thông qua [src/components/AdcashAds.tsx](src/components/AdcashAds.tsx).
+  - **Pop-Under (Zone ID `12265806`)**: Khởi tạo `aclib.runPop({ zoneId: '12265806' })` trong `<head>` phục vụ kích hoạt quảng cáo tự nhiên khi click.
+  - **Display Flank Left 160×600 (Zone ID `12265814`)**: Dựng `#adcash-banner-160x600-left` định vị cố định tại sườn trái màn hình desktop.
+  - **Display Flank Right 160×600 (Zone ID `12265822`)**: Dựng `#adcash-banner-160x600-right` định vị cố định tại sườn phải màn hình desktop.
+  - **Display Leaderboard 728×90 (Zone ID `12265830`)**: Dựng `#adcash-banner-728x90` căn giữa trước footer trên trang chủ công khai.
+- Hoàn thiện kiểu dáng và cơ chế cách ly giao diện trong [src/app/adcash.css](src/app/adcash.css) và [src/components/adcash/AdcashClientAds.tsx](src/components/adcash/AdcashClientAds.tsx):
+  - Định vị đối xứng 2 banner sườn trái (`.adcash-flank-left`) và sườn phải (`.adcash-flank-right`) trên desktop rộng (≥ 1380px), ẩn an toàn trên thiết bị màn hình nhỏ.
+  - Duy trì luật ẩn tuyệt đối `body:has([data-backdrop])` ngăn ngừa triệt để hiện tượng che đè các tab làm việc nội bộ (`/hang-doi`, `/chat`, `/dashboard`, ...).
+- Nâng cấp bộ công cụ xem quảng cáo [scripts/adViewer.mjs](scripts/adViewer.mjs) và bài kiểm thử [scripts/verifyAdcash.mts](scripts/verifyAdcash.mts):
+  - `adViewer.mjs`: quét toàn diện cả 3 vị trí banner (flank left, flank right, leaderboard) và tối ưu hóa logic chẩn đoán render.
+  - `verifyAdcash.mts`: xác thực chính xác 5 zone ID mới cùng toàn bộ kiểu dáng CSS và bộ chọn liên quan.
+
 ## 1.3.179 — Khắc phục sự cố quảng cáo đè lên giao diện Hàng Đợi và Phòng Chat (04/10/2026)
 
 - Triệt tiêu hoàn toàn sự cố biểu ngữ 160×600 (Adcash và Adsterra) che khuất nội dung của các tab làm việc:

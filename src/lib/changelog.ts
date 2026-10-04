@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.180",
+    date: "2026-10-04",
+    lines: [
+      "Cập nhật cấu hình 5 vùng quảng cáo mới từ Adcash (Autotag, Pop-Under, 2 sườn 160×600 và Leaderboard 728×90).",
+      "Tối ưu hoá vị trí hiển thị cân đối hai bên trang chủ và nâng cấp kịch bản kiểm tra tự động.",
+    ],
+  },
+  {
     version: "1.3.179",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Quét song song đồng thời nhiều proxy giúp tìm ra địa chỉ sống siêu tốc trong vài trăm mili-giây.",
       "Sửa lỗi nhận diện số lượt click đệ quy trên trang đích khi người dùng nhập số 0.",
-    ],
-  },
-  {
-    version: "1.3.130",
-    date: "2026-10-02",
-    lines: [
-      "Tích hợp Patched Chromium Engine triệt tiêu dấu hiệu tự động hoá và rò rỉ kênh gỡ lỗi của trình duyệt.",
-      "Mô phỏng hành vi đọc trang và trải nghiệm sâu trên trang đích giúp tương tác quảng cáo tự nhiên hơn.",
     ],
   },
 ];

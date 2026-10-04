@@ -311,7 +311,7 @@ const SOCIAL_BAR_KEY = "977a66f06e979e2830ee60ed1fa88533";
 const SOCIAL_BAR_SELECTOR = `iframe[id*="${SOCIAL_BAR_KEY}"], iframe[class*="${SOCIAL_BAR_KEY}"], iframe[style*="2147483647"], iframe[id*="container-"][style*="fixed"]`;
 const CLICKADU_CONTAINER_SELECTOR = "#clickadu-ad-container, .clickadu-container, [id*='clickadu']";
 const ADCASH_CONTAINER_SELECTOR =
-  "#adcash-ad-container, .adcash-container, #adcash-banner-160x600, .adcash-banner-160x600, [id*='aclib'], [class*='aclib'], [id*='adcash'], iframe[src*='acscdn'], iframe[src*='adcash']";
+  "#adcash-ad-container, .adcash-container, #adcash-banner-160x600-left, #adcash-banner-160x600-right, #adcash-banner-728x90, #adcash-banner-160x600, .adcash-banner-160x600, .adcash-flank, .adcash-leaderboard, [id*='aclib'], [class*='aclib'], [id*='adcash'], iframe[src*='acscdn'], iframe[src*='adcash']";
 
 const rawClickMode = (
   process.argv.find((a) => a.startsWith("--click-mode="))?.split("=")[1] ||
@@ -2251,6 +2251,9 @@ async function inspectAdcashPlacements(page, startedAt = Date.now()) {
         .waitForFunction(() => {
           return (
             typeof window.aclib !== "undefined" ||
+            document.getElementById("adcash-banner-160x600-left") !== null ||
+            document.getElementById("adcash-banner-160x600-right") !== null ||
+            document.getElementById("adcash-banner-728x90") !== null ||
             document.getElementById("adcash-banner-160x600") !== null
           );
         }, { timeout: waitMs })
@@ -2262,8 +2265,13 @@ async function inspectAdcashPlacements(page, startedAt = Date.now()) {
         const scripts = Array.from(document.querySelectorAll("script"))
           .map((s) => s.src)
           .filter((src) => src.includes("acscdn"));
-        const banner = document.getElementById("adcash-banner-160x600");
-        const bannerHasIframe = Boolean(banner && (banner.querySelector("iframe") || banner.children.length > 1));
+        const banners = [
+          document.getElementById("adcash-banner-160x600-left"),
+          document.getElementById("adcash-banner-160x600-right"),
+          document.getElementById("adcash-banner-728x90"),
+          document.getElementById("adcash-banner-160x600"),
+        ].filter(Boolean);
+        const bannerHasIframe = banners.some((b) => Boolean(b && (b.querySelector("iframe") || b.children.length > 1)));
         return { aclibReady, scriptCount: scripts.length, bannerReady: bannerHasIframe };
       })
       .catch(() => ({ aclibReady: false, scriptCount: 0, bannerReady: false }));
@@ -2904,7 +2912,7 @@ async function runOneCycle(
     );
     const adNetworkDesc =
       AD_NETWORK === "adcash"
-        ? "🚀 Adcash (Pop-Under 12265546, Banner 160x600 12265554, AutoTag)"
+        ? "🚀 Adcash (Autotag vaup0kxkvs, Pop-Under 12265806, Flank Left 12265814, Flank Right 12265822, Leaderboard 12265830)"
         : AD_NETWORK === "clickadu"
         ? "Clickadu"
         : AD_NETWORK === "adsterra"
@@ -3401,7 +3409,7 @@ async function runOneCycle(
 
     if (AD_NETWORK === "adcash") {
       const adcDiagnostic = await inspectAdcashPlacements(page, renderStartedAt);
-      log(`Adcash: ${adcDiagnostic.status} (scripts acscdn=${adcDiagnostic.scriptCount}, banner160x600=${adcDiagnostic.bannerReady ? "ready" : "chờ"}, render=${adcDiagnostic.renderMs}ms).`);
+      log(`Adcash: ${adcDiagnostic.status} (scripts acscdn=${adcDiagnostic.scriptCount}, banners=${adcDiagnostic.bannerReady ? "ready" : "chờ"}, render=${adcDiagnostic.renderMs}ms).`);
       isRenderFinished = adcDiagnostic.status === "ready";
       isForceClick = !isRenderFinished;
       if (isForceClick) {
@@ -3489,8 +3497,8 @@ async function runOneCycle(
     if (AD_NETWORK === "adcash" || AD_NETWORK === "all") {
       try {
         const adcashSelector = isForceClick
-          ? '#adcash-banner-160x600 a[href], .adcash-banner-160x600 a[href], #adcash-banner-160x600 iframe, .adcash-banner-160x600 iframe, #adcash-ad-container a[href], .adcash-container a[href], iframe[src*="acscdn"], iframe[src*="adcash"], a[href*="adcash"], a[href*="acscdn"], [id*="aclib"] a[href], #adcash-banner-160x600, #adcash-ad-container, .adcash-container'
-          : '#adcash-banner-160x600 a[href], .adcash-banner-160x600 a[href], #adcash-banner-160x600 iframe, .adcash-banner-160x600 iframe, #adcash-ad-container a[href], .adcash-container a[href], iframe[src*="acscdn"], iframe[src*="adcash"], a[href*="adcash"], a[href*="acscdn"], [id*="aclib"] a[href]';
+          ? '#adcash-banner-160x600-left a[href], #adcash-banner-160x600-right a[href], #adcash-banner-728x90 a[href], .adcash-banner-160x600 a[href], .adcash-flank a[href], .adcash-leaderboard a[href], #adcash-banner-160x600-left iframe, #adcash-banner-160x600-right iframe, #adcash-banner-728x90 iframe, .adcash-banner-160x600 iframe, .adcash-flank iframe, .adcash-leaderboard iframe, #adcash-ad-container a[href], .adcash-container a[href], iframe[src*="acscdn"], iframe[src*="adcash"], a[href*="adcash"], a[href*="acscdn"], [id*="aclib"] a[href], #adcash-banner-160x600-left, #adcash-banner-160x600-right, #adcash-banner-728x90, #adcash-banner-160x600, #adcash-ad-container, .adcash-container, .adcash-leaderboard'
+          : '#adcash-banner-160x600-left a[href], #adcash-banner-160x600-right a[href], #adcash-banner-728x90 a[href], .adcash-banner-160x600 a[href], .adcash-flank a[href], .adcash-leaderboard a[href], #adcash-banner-160x600-left iframe, #adcash-banner-160x600-right iframe, #adcash-banner-728x90 iframe, .adcash-banner-160x600 iframe, .adcash-flank iframe, .adcash-leaderboard iframe, #adcash-ad-container a[href], .adcash-container a[href], iframe[src*="acscdn"], iframe[src*="adcash"], a[href*="adcash"], a[href*="acscdn"], [id*="aclib"] a[href]';
         const adcashLocators = page.locator(adcashSelector);
         const adcCount = await adcashLocators.count().catch(() => 0);
         for (let i = 0; i < adcCount; i++) {
@@ -3847,9 +3855,17 @@ async function runOneCycle(
       const candidateSelectors = [
         ...(AD_NETWORK === "adcash" || AD_NETWORK === "all"
           ? [
-              '#adcash-banner-160x600 a[href]',
+              '#adcash-banner-160x600-left a[href]',
+              '#adcash-banner-160x600-right a[href]',
+              '#adcash-banner-728x90 a[href]',
               '.adcash-banner-160x600 a[href]',
+              '.adcash-flank a[href]',
+              '.adcash-leaderboard a[href]',
+              '#adcash-banner-160x600-left iframe',
+              '#adcash-banner-160x600-right iframe',
+              '#adcash-banner-728x90 iframe',
               '#adcash-banner-160x600 iframe',
+              '.adcash-leaderboard iframe',
               '#adcash-ad-container a[href]',
               '.adcash-container a[href]',
               'iframe[src*="acscdn"]',

@@ -9,6 +9,18 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.182 — Tối ưu tự động hoá Adcash AutoTag & Khắc phục lỗi treo tương tác đệ quy (04/10/2026)
+
+- Tối ưu kịch bản chạy Ad-Viewer [run-ad-viewer.bat](run-ad-viewer.bat):
+  - Đảo câu hỏi chọn mạng quảng cáo [14] lên trước. Khi người dùng chọn Adcash (1 - mặc định) hoặc Clickadu (2), kịch bản tự động nhảy qua các tuỳ chọn không cần thiết (Xác suất Popunder và Trọng tâm định dạng Popunder/SocialBar), tối giản trải nghiệm người dùng.
+  - Các tuỳ chọn Popunder Ratio [15] và Định dạng [16] chỉ được hỏi khi chọn Adsterra (3) hoặc Tất cả nhà mạng (4).
+- Khắc phục triệt để lỗi treo đọng vô tận trong `handleRecursiveAdClicks` và `simulateLandingPageEngagement` của [scripts/adViewer.mjs](scripts/adViewer.mjs):
+  - **Lỗi nhận diện trang**: `extraPage` trước đây tìm kiếm qua `allPages.find(p => p !== targetPage)`, dẫn tới việc nhặt trúng tab web chính (`auto-hh3d.online`) và thực hiện click/đóng tab chính. Đã chuyển sang ghi nhận `pagesBefore` và chỉ tương tác với các trang mới sinh ra sau click.
+  - **Bộ lắng nghe an toàn**: Đăng ký `attachSafePageListeners` trên context, trang chính và mọi trang con để tự động từ chối (`dismiss()`) tất cả các hộp thoại JavaScript (`alert`, `confirm`, `prompt`, `beforeunload`) và huỷ download ngầm, triệt tiêu tình trạng Playwright CDP bị pause đơ vĩnh viễn.
+  - **Bọc bảo vệ thời gian chờ (withTimeout)**: Toàn bộ các thao tác DOM bên trong đệ quy (`$$(sel)`, `isVisible()`, `evaluate()`, `scrollIntoViewIfNeeded()`, `boundingBox()`) cùng toàn bộ hàm `handleRecursiveAdClicks` và `simulateLandingPageEngagement` đều được bảo vệ bởi `withTimeout`.
+  - **Tối ưu theo mạng quảng cáo**: Khi chạy Adcash, chuyển sang log tương tác tự nhiên tối ưu AutoTag, loại bỏ bước thử lại Popunder đặc thù của Adsterra.
+- Nâng cấp bộ kiểm thử [scripts/verifyAdViewerHealth.mts](scripts/verifyAdViewerHealth.mts) kiểm chứng đầy đủ thứ tự menu prompt và các cơ chế an toàn.
+
 ## 1.3.181 — Tối giản hoá chỉ sử dụng duy nhất AutoTag Adcash (Zone ID g4flvknzlj) (04/10/2026)
 
 - Tối giản mã nguồn theo chỉ dẫn duyệt web từ Adcash:

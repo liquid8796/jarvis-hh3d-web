@@ -2004,47 +2004,76 @@ async function simulateHumanReading(page, durationMs, instanceId = logContext.ge
 }
 
 /**
+ * Gắn bộ xử lý an toàn ngăn chặn dialog (alert/confirm/prompt) và download tự động làm treo Playwright/CDP.
+ */
+function attachSafePageListeners(targetPage) {
+  if (!targetPage) return;
+  try {
+    targetPage.on?.("dialog", async (dialog) => {
+      try {
+        await dialog.dismiss().catch(() => {});
+      } catch {}
+    });
+    targetPage.on?.("download", async (dl) => {
+      try {
+        await dl.cancel().catch(() => {});
+      } catch {}
+    });
+  } catch {}
+}
+
+/**
  * Mô phỏng người dùng trải nghiệm trang đích (Landing Page):
  * - Cuộn qua các phân đoạn trang (150px - 350px).
  * - Rê chuột lên các phần tử nội dung, nút bấm, tiêu đề.
  * - Dừng đọc từ 20 đến 45 giây (ngăn chặn triệt để gắn cờ Bot Bounce / Accidental Click).
  */
 async function simulateLandingPageEngagement(page, durationMs, instanceId = logContext.getStore()?.instanceId) {
-  if (!page || durationMs <= 0) return;
-  const started = Date.now();
-  log(`  Đang trải nghiệm nội dung trang đích tự nhiên trong ${Math.round(durationMs / 1000)}s...`);
+  if (!page || durationMs <= 0 || page.isClosed?.()) return;
+  return withTimeout(
+    (async () => {
+      const started = Date.now();
+      log(`  Đang trải nghiệm nội dung trang đích tự nhiên trong ${Math.round(durationMs / 1000)}s...`);
 
-  let scrolledDown = 0;
-  while (Date.now() - started < durationMs) {
-    const remaining = durationMs - (Date.now() - started);
-    if (remaining < 1500) break;
+      let scrolledDown = 0;
+      while (Date.now() - started < durationMs) {
+        if (page.isClosed?.()) break;
+        const remaining = durationMs - (Date.now() - started);
+        if (remaining < 1500) break;
 
-    // Cuộn xuống nhịp 150 - 350px
-    const scrollStep = rand(150, 350);
-    await organicScroll(page, scrollStep, instanceId);
-    scrolledDown += scrollStep;
-    await sleep(rand(1000, 2500));
+        // Cuộn xuống nhịp 150 - 350px
+        const scrollStep = rand(150, 350);
+        await withTimeout(organicScroll(page, scrollStep, instanceId), 6000).catch(() => {});
+        if (page.isClosed?.()) break;
+        scrolledDown += scrollStep;
+        await sleep(rand(1000, 2500));
+        if (page.isClosed?.()) break;
 
-    // Rê chuột tự nhiên trên trang đích
-    const mousePos = getMousePos(instanceId);
-    const targetX = rand(200, 1000);
-    const targetY = rand(150, 650);
-    const movePath = generateBezierPath(mousePos.x, mousePos.y, targetX, targetY, rand(10, 18));
-    for (const pt of movePath) {
-      await page.mouse.move(pt.x, pt.y).catch(() => {});
-      await sleep(rand(12, 26));
-    }
-    setMousePos(instanceId, targetX, targetY);
+        // Rê chuột tự nhiên trên trang đích
+        const mousePos = getMousePos(instanceId);
+        const targetX = rand(200, 1000);
+        const targetY = rand(150, 650);
+        const movePath = generateBezierPath(mousePos.x, mousePos.y, targetX, targetY, rand(10, 18));
+        for (const pt of movePath) {
+          if (page.isClosed?.()) break;
+          await page.mouse.move(pt.x, pt.y).catch(() => {});
+          await sleep(rand(12, 26));
+        }
+        setMousePos(instanceId, targetX, targetY);
 
-    // Dừng đọc
-    await sleep(rand(1500, 3500));
+        // Dừng đọc
+        await sleep(rand(1500, 3500));
+        if (page.isClosed?.()) break;
 
-    // Nếu đã cuộn sâu (> 800px), thỉnh thoảng cuộn nhẹ lên 80-160px để xem lại
-    if (scrolledDown > 800 && Math.random() < 0.35) {
-      await organicScroll(page, -rand(80, 160), instanceId);
-      await sleep(rand(800, 1800));
-    }
-  }
+        // Nếu đã cuộn sâu (> 800px), thỉnh thoảng cuộn nhẹ lên 80-160px để xem lại
+        if (scrolledDown > 800 && Math.random() < 0.35) {
+          await withTimeout(organicScroll(page, -rand(80, 160), instanceId), 6000).catch(() => {});
+          await sleep(rand(800, 1800));
+        }
+      }
+    })(),
+    durationMs + 10000,
+  ).catch(() => {});
 }
 
 function resolveExtensionPath() {
@@ -2295,83 +2324,107 @@ async function inspectClickaduPlacements(page, startedAt = Date.now()) {
 }
 
 async function handleRecursiveAdClicks(targetPage, depth, maxDepth, ctx, instanceId = 0, clickMode = CLICK_MODE) {
-  if (depth >= maxDepth) return;
+  if (!targetPage || targetPage.isClosed?.() || depth >= maxDepth) return;
 
-  try {
-    const waitMs = rand(DELAY_MIN_MS, DELAY_MAX_MS);
-    log(`  [Đệ quy cấp ${depth + 1}/${maxDepth}] Trải nghiệm và đọc trang quảng cáo trong ${Math.round(waitMs / 1000)}s...`);
-    await simulateLandingPageEngagement(targetPage, waitMs);
+  return withTimeout(
+    (async () => {
+      try {
+        attachSafePageListeners(targetPage);
+        const waitMs = Math.min(rand(DELAY_MIN_MS, DELAY_MAX_MS), 15000);
+        log(`  [Đệ quy cấp ${depth + 1}/${maxDepth}] Trải nghiệm và đọc trang quảng cáo trong ${Math.round(waitMs / 1000)}s...`);
+        await simulateLandingPageEngagement(targetPage, waitMs, instanceId);
 
-    // Tìm quảng cáo hoặc liên kết ngoài trên trang quảng cáo
-    const adSelectors = [
-      'iframe[src*="ad"]',
-      'iframe[src*="banner"]',
-      'a[href*="googleads"]',
-      'a[href*="doubleclick"]',
-      'a[target="_blank"]',
-      'button[type="submit"]',
-      'a.btn',
-      'a.button',
-    ];
+        if (targetPage.isClosed?.() || depth + 1 >= maxDepth) return;
 
-    let clicked = false;
-    const shuffled = [...adSelectors].sort(() => Math.random() - 0.5);
-    for (const sel of shuffled) {
-      const handles = await targetPage.$$(sel);
-      const shuffledHandles = [...handles].sort(() => Math.random() - 0.5);
-      for (const handle of shuffledHandles) {
-        try {
-          const visible = await handle.isVisible().catch(() => false);
-          if (!visible) continue;
+        // Tìm quảng cáo hoặc liên kết ngoài trên trang quảng cáo
+        const adSelectors = [
+          'iframe[src*="ad"]',
+          'iframe[src*="banner"]',
+          'a[href*="googleads"]',
+          'a[href*="doubleclick"]',
+          'a[target="_blank"]',
+          'button[type="submit"]',
+          'a.btn',
+          'a.button',
+        ];
 
-          // Bỏ qua các nút tải file (download / apk / exe / zip / installer...) để tránh kích hoạt download làm tràn bộ nhớ pipe
-          const isDownload = await handle.evaluate((el) => {
-            const href = (el.getAttribute("href") || "").toLowerCase();
-            const downloadAttr = el.getAttribute("download");
-            const text = (el.innerText || el.textContent || "").toLowerCase();
-            const badExtensions = [".exe", ".apk", ".msi", ".zip", ".rar", ".dmg", ".iso", ".tar", ".gz", ".bin", ".7z", ".pkg"];
-            const hasBadExt = badExtensions.some((ext) => href.includes(ext));
-            const hasDownloadWord = text.includes("download") || text.includes("tải về") || text.includes("tải game") || text.includes("tải ngay") || text.includes("cài đặt") || text.includes("install");
-            return Boolean(downloadAttr) || hasBadExt || hasDownloadWord || href.startsWith("blob:") || href.startsWith("data:");
-          }).catch(() => false);
-          if (isDownload) continue;
+        let clicked = false;
+        const shuffled = [...adSelectors].sort(() => Math.random() - 0.5);
+        for (const sel of shuffled) {
+          if (targetPage.isClosed?.()) break;
+          const handles = await withTimeout(targetPage.$$(sel), 3000, []).catch(() => []);
+          if (!handles || handles.length === 0) continue;
+          const shuffledHandles = [...handles].sort(() => Math.random() - 0.5);
+          for (const handle of shuffledHandles) {
+            if (targetPage.isClosed?.()) break;
+            try {
+              const visible = await withTimeout(handle.isVisible(), 2000, false).catch(() => false);
+              if (!visible) continue;
 
-          await handle.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {});
-          await sleep(100);
-          const elBox = await handle.boundingBox().catch(() => null);
-          if (!elBox || elBox.width < 2 || elBox.height < 2) continue;
-          const target = computeClickTarget(elBox);
-          log(`  [Đệ quy cấp ${depth + 1}] Tìm thấy phần tử (${sel}), click tại (${Math.round(target.x)}, ${Math.round(target.y)})...`);
-          const resolvedCtx = ctx || targetPage.context();
-          const newPage = await performEngageAndClick(targetPage, resolvedCtx, target.x, target.y, instanceId, clickMode);
+              // Bỏ qua các nút tải file (download / apk / exe / zip / installer...) để tránh kích hoạt download làm tràn bộ nhớ pipe
+              const isDownload = await withTimeout(
+                handle.evaluate((el) => {
+                  const href = (el.getAttribute("href") || "").toLowerCase();
+                  const downloadAttr = el.getAttribute("download");
+                  const text = (el.innerText || el.textContent || "").toLowerCase();
+                  const badExtensions = [".exe", ".apk", ".msi", ".zip", ".rar", ".dmg", ".iso", ".tar", ".gz", ".bin", ".7z", ".pkg"];
+                  const hasBadExt = badExtensions.some((ext) => href.includes(ext));
+                  const hasDownloadWord = text.includes("download") || text.includes("tải về") || text.includes("tải game") || text.includes("tải ngay") || text.includes("cài đặt") || text.includes("install");
+                  return Boolean(downloadAttr) || hasBadExt || hasDownloadWord || href.startsWith("blob:") || href.startsWith("data:");
+                }),
+                2000,
+                false,
+              ).catch(() => false);
+              if (isDownload) continue;
 
-          clicked = true;
-          if (newPage) {
-            newPage.on?.("download", async (dl) => { await dl.cancel().catch(() => {}); });
-            await newPage.waitForLoadState("domcontentloaded", { timeout: 20000 }).catch(() => {});
-            await handleRecursiveAdClicks(newPage, depth + 1, maxDepth, resolvedCtx, instanceId, clickMode);
-            await withTimeout(newPage.close().catch(() => {}), 2500).catch(() => {});
-          } else {
-            const allPages = resolvedCtx?.pages?.() || [];
-            const extraPage = allPages.find((p) => p !== targetPage && !p.isClosed());
-            if (extraPage) {
-              await extraPage.waitForLoadState("domcontentloaded", { timeout: 20000 }).catch(() => {});
-              await handleRecursiveAdClicks(extraPage, depth + 1, maxDepth, resolvedCtx, instanceId, clickMode);
-              await withTimeout(extraPage.close().catch(() => {}), 2500).catch(() => {});
-            } else {
-              await simulateLandingPageEngagement(targetPage, rand(DELAY_MIN_MS, DELAY_MAX_MS));
+              await withTimeout(handle.scrollIntoViewIfNeeded({ timeout: 2000 }), 2500).catch(() => {});
+              await sleep(100);
+              const elBox = await withTimeout(handle.boundingBox(), 2000, null).catch(() => null);
+              if (!elBox || elBox.width < 2 || elBox.height < 2) continue;
+              const target = computeClickTarget(elBox);
+              log(`  [Đệ quy cấp ${depth + 1}] Tìm thấy phần tử (${sel}), click tại (${Math.round(target.x)}, ${Math.round(target.y)})...`);
+              const resolvedCtx = ctx || targetPage.context();
+
+              // Ghi nhận tập các trang trước khi click để chỉ nhận diện trang MỚI sinh ra
+              const pagesBefore = new Set(resolvedCtx?.pages?.() || []);
+              const urlBefore = targetPage.url();
+
+              const newPage = await performEngageAndClick(targetPage, resolvedCtx, target.x, target.y, instanceId, clickMode);
+
+              clicked = true;
+              if (newPage && !newPage.isClosed()) {
+                attachSafePageListeners(newPage);
+                await withTimeout(newPage.waitForLoadState("domcontentloaded", { timeout: 15000 }), 16000).catch(() => {});
+                await handleRecursiveAdClicks(newPage, depth + 1, maxDepth, resolvedCtx, instanceId, clickMode);
+                await withTimeout(newPage.close().catch(() => {}), 2500).catch(() => {});
+              } else {
+                const pagesAfter = resolvedCtx?.pages?.() || [];
+                const extraPage = pagesAfter.find((p) => !pagesBefore.has(p) && !p.isClosed());
+                if (extraPage) {
+                  attachSafePageListeners(extraPage);
+                  await withTimeout(extraPage.waitForLoadState("domcontentloaded", { timeout: 15000 }), 16000).catch(() => {});
+                  await handleRecursiveAdClicks(extraPage, depth + 1, maxDepth, resolvedCtx, instanceId, clickMode);
+                  await withTimeout(extraPage.close().catch(() => {}), 2500).catch(() => {});
+                } else if (!targetPage.isClosed?.() && targetPage.url() !== urlBefore) {
+                  await withTimeout(targetPage.waitForLoadState("domcontentloaded", { timeout: 15000 }), 16000).catch(() => {});
+                  await handleRecursiveAdClicks(targetPage, depth + 1, maxDepth, resolvedCtx, instanceId, clickMode);
+                } else if (!targetPage.isClosed?.()) {
+                  await simulateLandingPageEngagement(targetPage, rand(DELAY_MIN_MS, DELAY_MAX_MS), instanceId);
+                }
+              }
+              break;
+            } catch {
+              // Bỏ qua phần tử lỗi
             }
           }
-          break;
-        } catch {
-          // Bỏ qua phần tử lỗi
+          if (clicked) break;
         }
+      } catch (err) {
+        log(`  Lỗi trong bước đệ quy click: ${err instanceof Error ? err.message : String(err)}`);
       }
-      if (clicked) break;
-    }
-  } catch (err) {
-    log(`  Lỗi trong bước đệ quy click: ${err instanceof Error ? err.message : String(err)}`);
-  }
+    })(),
+    35000,
+  ).catch(() => {});
 }
 
 function prepareExtensionProfile(profileDir) {
@@ -2910,7 +2963,11 @@ async function runOneCycle(
         ? "Adsterra"
         : "Tất cả nhà mạng";
     log(`[Nhà Mạng Quảng Cáo] Mục tiêu: ${AD_NETWORK.toUpperCase()} (${adNetworkDesc})`);
-    log(`[Trọng Tâm Định Dạng] Chế độ quảng cáo: ${FOCUS_POPUNDER_SOCIAL ? "🎯 ƯU TIÊN POPUNDER + SOCIALBAR (Triệt tiêu impression & click NativeBanner)" : "Cân bằng mọi định dạng (Popunder + SocialBar + Banner + Native)"}`);
+    if (AD_NETWORK === "adcash") {
+      log(`[Trọng Tâm Định Dạng] Chế độ quảng cáo: 🚀 AutoTag tự động tối ưu hoá định dạng Adcash (Không phân biệt Popunder/Native)`);
+    } else {
+      log(`[Trọng Tâm Định Dạng] Chế độ quảng cáo: ${FOCUS_POPUNDER_SOCIAL ? "🎯 ƯU TIÊN POPUNDER + SOCIALBAR (Triệt tiêu impression & click NativeBanner)" : "Cân bằng mọi định dạng (Popunder + SocialBar + Banner + Native)"}`);
+    }
     if (cdpUrl) {
       log(`Kết nối tới Chrome ${useMyChrome ? "chính " : ""}qua CDP: ${cdpUrl}...`);
       try {
@@ -3110,7 +3167,7 @@ async function runOneCycle(
     }
 
     context.on("page", (newPage) => {
-      newPage.on?.("download", async (dl) => { await dl.cancel().catch(() => {}); });
+      attachSafePageListeners(newPage);
       closeExtensionPage(newPage).catch(() => {});
       newPage.on("domcontentloaded", () => { closeExtensionPage(newPage).catch(() => {}); });
       newPage.on("framenavigated", (frame) => {
@@ -3130,7 +3187,7 @@ async function runOneCycle(
       );
     });
     page = useMyChrome || cdpUrl ? await context.newPage() : nonExtPages[0] || (await context.newPage());
-    page.on?.("download", async (dl) => { await dl.cancel().catch(() => {}); });
+    attachSafePageListeners(page);
     if (!isHeadless) {
       await page.bringToFront().catch(() => {});
     }
@@ -3727,8 +3784,9 @@ async function runOneCycle(
         log("⚠ Đã hết thời gian 45s chờ click thủ công; chuyển sang chu kỳ tiếp theo.");
       }
     } else {
-      // 3. Chế độ tự động: Ưu tiên click Popunder theo xác suất POPUNDER_RATIO (mặc định 80%)
-      if (preferPopunder) {
+      // 3. Chế độ tự động: Ưu tiên click Popunder hoặc tương tác tự nhiên theo mạng quảng cáo
+      const isAdcash = AD_NETWORK === "adcash";
+      if (!isAdcash && preferPopunder) {
         log(
           `🎯 [Popunder Ưu Tiên ${Math.round(POPUNDER_RATIO * 100)}%] Kích hoạt click tự nhiên trên trang web để ưu tiên nổ Popunder (${cycleClickMode} mode)...`,
         );
@@ -3749,6 +3807,26 @@ async function runOneCycle(
             log("✓ Đã bắt được trang Popunder từ tab phụ.");
           } else {
             log("Popunder chưa mở tab mới (có thể do cooldown mạng quảng cáo); chuyển sang click banner dự phòng...");
+          }
+        }
+      } else if (isAdcash && preferPopunder) {
+        log(
+          `🚀 [Adcash AutoTag] Kích hoạt tương tác tự nhiên trên trang web để kích hoạt AutoTag (${cycleClickMode} mode)...`,
+        );
+        const popTarget = await resolvePopunderTarget(page);
+        log(`-> Click tương tác tự nhiên tại (${Math.round(popTarget.x)}, ${Math.round(popTarget.y)})...`);
+        const popup = await performEngageAndClick(page, context, popTarget.x, popTarget.y, instanceId, cycleClickMode);
+        if (popup) {
+          openedPage = popup;
+          adClicked = true;
+          log("✓ AutoTag Adcash đã mở trang quảng cáo thành công!");
+        } else {
+          await sleep(2500);
+          const allPages = context.pages();
+          if (allPages.length > 1) {
+            openedPage = allPages[allPages.length - 1];
+            adClicked = true;
+            log("✓ Đã bắt được trang quảng cáo từ tab phụ Adcash.");
           }
         }
       }
@@ -3821,8 +3899,8 @@ async function runOneCycle(
       }
     }
 
-    // 4. Nếu Popunder/SocialBar vẫn chưa mở được tab: Thử lại 1 lần click tự nhiên Popunder (tránh rơi vào Native)
-    if (!adClicked && cycleClickMode !== "manual") {
+    // 4. Nếu Popunder/SocialBar vẫn chưa mở được tab: Thử lại 1 lần click tự nhiên Popunder (chỉ áp dụng cho Adsterra)
+    if (!adClicked && cycleClickMode !== "manual" && shouldScanAdsterra) {
       log("🎯 [Popunder Thử Lại] Kích hoạt click mô phỏng tự nhiên trên trang để thử lại Popunder...");
       const popTarget = await resolvePopunderTarget(page);
       const popup = await performEngageAndClick(page, context, popTarget.x, popTarget.y, instanceId, cycleClickMode);
@@ -3952,7 +4030,10 @@ async function runOneCycle(
 
       // Đệ quy click thêm nếu còn quảng cáo trên trang đích (tối đa MAX_RECURSIVE_CLICKS)
       if (MAX_RECURSIVE_CLICKS > 0) {
-        await handleRecursiveAdClicks(openedPage, 0, MAX_RECURSIVE_CLICKS, context, instanceId, cycleClickMode);
+        await withTimeout(
+          handleRecursiveAdClicks(openedPage, 0, MAX_RECURSIVE_CLICKS, context, instanceId, cycleClickMode),
+          Math.max(45000, MAX_RECURSIVE_CLICKS * 35000),
+        ).catch(() => {});
       }
 
       await withTimeout(openedPage.close().catch(() => {}), 2500);
@@ -4144,7 +4225,11 @@ async function main() {
         : " (Chế độ đơn lẻ)"
     }`
   );
-  log(`Xác suất ưu tiên click Popunder: ${Math.round(POPUNDER_RATIO * 100)}% (tự nhiên hóa hành vi tương tác web)`);
+  if (AD_NETWORK !== "adcash") {
+    log(`Xác suất ưu tiên click Popunder: ${Math.round(POPUNDER_RATIO * 100)}% (tự nhiên hóa hành vi tương tác web)`);
+  } else {
+    log(`Định dạng quảng cáo: Tối ưu tự động bởi AutoTag Adcash (Không phân biệt Popunder/Native)`);
+  }
 
   const proxyManager = new ProxyManager();
   proxyManager.init();

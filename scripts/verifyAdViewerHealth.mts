@@ -143,8 +143,9 @@ assert.equal(parsePopunderRatio("invalid"), 0.8);
 assert.match(runtime, /POPUNDER_RATIO/, "ad-viewer must configure POPUNDER_RATIO");
 assert.match(runtime, /preferPopunder\s*=\s*Math\.random\(\)\s*<\s*POPUNDER_RATIO/, "ad-viewer must roll popunder probability per cycle");
 assert.match(runtime, /resolvePopunderTarget/, "ad-viewer must resolve natural popunder click targets");
-assert.match(batContent, /\[14\] Xac suat uu tien click quang cao Popunder/, "run-ad-viewer.bat must offer option [14] for Popunder ratio");
+assert.match(batContent, /\[15\] Xac suat uu tien click quang cao Popunder/, "run-ad-viewer.bat must offer option [15] for Popunder ratio");
 assert.match(batContent, /--popunder-ratio=/, "run-ad-viewer.bat must pass --popunder-ratio");
+assert.match(batContent, /goto SKIP_POPUNDER_OPTIONS/, "run-ad-viewer.bat must skip Popunder options when Adcash or Clickadu is selected");
 
 // ---- Khắc phục lỗi protocol bất đồng bộ Patchright/Playwright (Network.setCacheDisabled / session closed / ERR_STRING_TOO_LONG) ----
 assert.match(runtime, /isIgnorableProtocolError/, "ad-viewer must detect ignorable protocol errors");
@@ -235,7 +236,7 @@ assert.match(runtime, /if \(!FOCUS_POPUNDER_SOCIAL\) \{\s*try \{\s*const nativeS
 assert.match(runtime, /isSocialBar:\s*true/, "ad-viewer must tag SocialBar candidates");
 assert.match(runtime, /🔔 \[SocialBar Ưu Tiên\]/, "ad-viewer must prioritize clicking SocialBar if Popunder does not spawn a new page");
 
-assert.match(batContent, /\[15\] Trong tam dinh dang quang cao/, "run-ad-viewer.bat must offer option [15] for ad format focus");
+assert.match(batContent, /\[16\] Trong tam dinh dang quang cao/, "run-ad-viewer.bat must offer option [16] for ad format focus");
 assert.match(batContent, /ARG_AD_FOCUS=--focus-popunder-social/, "run-ad-viewer.bat must set ARG_AD_FOCUS to --focus-popunder-social");
 
 // ---- Lựa chọn Nhà Mạng Quảng Cáo (Ad Network: Adcash, Clickadu, Adsterra, All) ----
@@ -249,9 +250,10 @@ assert.equal(parseAdNetwork(["node", "adViewer.mjs"], { AD_PROVIDER: "adcash" } 
 assert.equal(parseAdNetwork(["node", "adViewer.mjs"], { AD_PROVIDER: "adsterra" } as any), "adsterra");
 assert.equal(parseAdNetwork(["node", "adViewer.mjs"], { AD_PROVIDER: "clickadu" } as any), "clickadu");
 
-assert.match(batContent, /\[16\] Nha mang quang cao muc tieu/, "run-ad-viewer.bat must offer option [16] for ad network");
+assert.match(batContent, /\[14\] Nha mang quang cao muc tieu/, "run-ad-viewer.bat must offer option [14] for ad network");
 assert.match(batContent, /ARG_AD_NETWORK=--ad-network=adcash/, "run-ad-viewer.bat must default to adcash");
 assert.match(batContent, /FINAL_ARGS=.*ARG_AD_NETWORK/, "FINAL_ARGS must include ARG_AD_NETWORK");
+assert.match(runtime, /attachSafePageListeners/, "ad-viewer must attach safe page listeners for dialogs and downloads");
 
 console.log(
   "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, fully supports headless mode without popping up windows or leaking headless signals, enables 100% lock-free parallel execution across multi-instance headless workers, focuses on high-CPM Popunder + SocialBar while eliminating unwanted NativeBanner impressions, and supports selecting target ad networks (Adcash, Clickadu, Adsterra, All).",

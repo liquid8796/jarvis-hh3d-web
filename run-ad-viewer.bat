@@ -307,40 +307,9 @@ if defined INPUT_RENDER_TIMEOUT (
 )
 echo.
 
-REM 14. Xac suat uu tien click quang cao Popunder
-echo [14] Xac suat uu tien click quang cao Popunder [Popunder Ratio]:
-echo      Nhap ti le phan tram (vi du: 80, 90, 100), hoac thap phan (0.8).
-echo      Auto se tu dong uu tien click tu nhien de kich hoat Popunder theo ti le nay.
-echo      De trong de su dung mac dinh (80%%).
-set "INPUT_POPUNDER="
-set /p "INPUT_POPUNDER=    Xac suat uu tien Popunder (%%) [Enter = mac dinh 80%%]: "
-set "ARG_POPUNDER="
-if defined INPUT_POPUNDER (
-    set "ARG_POPUNDER=--popunder-ratio=%INPUT_POPUNDER%"
-    echo     -^> Xac suat Popunder: %INPUT_POPUNDER%%%
-) else (
-    echo     -^> Xac suat Popunder: Mac dinh [80%%]
-)
-echo.
-
-REM 15. Trong tam dinh dang quang cao (Ad Format Focus)
-echo [15] Trong tam dinh dang quang cao [Popunder + SocialBar vs Balanced]:
-echo      1. Tap trung Popunder + SocialBar [Triet tieu click/impression Native - KHUYEN NGHI cho Headless]
-echo      2. Can bang tat ca cac dinh dang [Bao gom ca NativeBanner va Smartlink]
-set "INPUT_AD_FOCUS="
-set /p "INPUT_AD_FOCUS=    Chon [1-2, Enter = 1]: "
-set "ARG_AD_FOCUS=--focus-popunder-social"
-if "%INPUT_AD_FOCUS%"=="2" (
-    set "ARG_AD_FOCUS=--with-native"
-    echo     -^> Dinh dang: Can bang tat ca [Bao gom ca Native Ads]
-) else (
-    echo     -^> Dinh dang: Tap trung Popunder + SocialBar [Bo qua Native]
-)
-echo.
-
-REM 16. Nha mang quang cao muc tieu (Ad Network)
-echo [16] Nha mang quang cao muc tieu [Ad Network]:
-echo      1. Adcash [Mac dinh - dang phe duyet va chay AutoTag tren web]
+REM 14. Nha mang quang cao muc tieu (Ad Network)
+echo [14] Nha mang quang cao muc tieu [Ad Network]:
+echo      1. Adcash [Mac dinh - chay AutoTag tu dong]
 echo      2. Clickadu [Mang quang cao Clickadu]
 echo      3. Adsterra [Mang quang cao Adsterra]
 echo      4. Tat ca nha mang [All networks - Adcash + Clickadu + Adsterra]
@@ -360,6 +329,47 @@ if "%INPUT_AD_NETWORK%"=="2" (
     echo     -^> Nha mang: Adcash [Mac dinh]
 )
 echo.
+
+set "ARG_POPUNDER="
+set "ARG_AD_FOCUS="
+
+REM Doi voi Adcash va Clickadu thi khong can phan biet Popunder, chi hoi khi chon Adsterra hoac Tat ca
+if "%INPUT_AD_NETWORK%"=="3" goto PROMPT_ADSTERRA_FORMATS
+if "%INPUT_AD_NETWORK%"=="4" goto PROMPT_ADSTERRA_FORMATS
+goto SKIP_POPUNDER_OPTIONS
+
+:PROMPT_ADSTERRA_FORMATS
+REM 15. Xac suat uu tien click quang cao Popunder (Chi ap dung cho Adsterra)
+echo [15] Xac suat uu tien click quang cao Popunder [Popunder Ratio]:
+echo      Nhap ti le phan tram (vi du: 80, 90, 100), hoac thap phan (0.8).
+echo      Auto se tu dong uu tien click tu nhien de kich hoat Popunder theo ti le nay.
+echo      De trong de su dung mac dinh (80%%).
+set "INPUT_POPUNDER="
+set /p "INPUT_POPUNDER=    Xac suat uu tien Popunder (%%) [Enter = mac dinh 80%%]: "
+if defined INPUT_POPUNDER (
+    set "ARG_POPUNDER=--popunder-ratio=%INPUT_POPUNDER%"
+    echo     -^> Xac suat Popunder: %INPUT_POPUNDER%%%
+) else (
+    echo     -^> Xac suat Popunder: Mac dinh [80%%]
+)
+echo.
+
+REM 16. Trong tam dinh dang quang cao (Chi ap dung cho Adsterra)
+echo [16] Trong tam dinh dang quang cao [Popunder + SocialBar vs Balanced]:
+echo      1. Tap trung Popunder + SocialBar [Triet tieu click/impression Native - KHUYEN NGHI cho Headless]
+echo      2. Can bang tat ca cac dinh dang [Bao gom ca NativeBanner va Smartlink]
+set "INPUT_AD_FOCUS="
+set /p "INPUT_AD_FOCUS=    Chon [1-2, Enter = 1]: "
+set "ARG_AD_FOCUS=--focus-popunder-social"
+if "%INPUT_AD_FOCUS%"=="2" (
+    set "ARG_AD_FOCUS=--with-native"
+    echo     -^> Dinh dang: Can bang tat ca [Bao gom ca Native Ads]
+) else (
+    echo     -^> Dinh dang: Tap trung Popunder + SocialBar [Bo qua Native]
+)
+echo.
+
+:SKIP_POPUNDER_OPTIONS
 
 REM Tong hop lenh thuc thi
 set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER% %ARG_AD_FOCUS% %ARG_AD_NETWORK%

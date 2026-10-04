@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.182",
+    date: "2026-10-04",
+    lines: [
+      "Tối ưu bộ công cụ xem quảng cáo tự động hoá theo cơ chế AutoTag Adcash.",
+      "Khắc phục triệt để sự cố tiến trình bị treo khi tương tác đệ quy trang đích.",
+    ],
+  },
+  {
     version: "1.3.181",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Bổ sung chế độ di chuyển chuột vật lý thật cấp hệ điều hành qua cổng gửi tín hiệu Windows.",
       "Thêm chế độ bán tự động dừng lại chờ bạn click tay rồi tự động tiếp quản tương tác trang đích.",
-    ],
-  },
-  {
-    version: "1.3.132",
-    date: "2026-10-03",
-    lines: [
-      "Tự động loại bỏ proxy chết khỏi danh sách và cập nhật tệp trên đĩa ngay khi phát hiện lỗi kết nối.",
-      "Thêm cơ chế kiểm tra kết nối mạng chủ để bảo vệ danh sách proxy không bị xoá nhầm khi mất mạng.",
     ],
   },
 ];

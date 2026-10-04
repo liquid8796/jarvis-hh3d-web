@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.165",
+    date: "2026-10-04",
+    lines: [
+      "Chuyển khu vực quảng cáo lên trước block tính năng và bổ sung hai banner sườn hai bên trang.",
+      "Hỗ trợ song ngữ Anh - Việt cho toàn bộ trang chủ và thiết lập tiếng Anh làm ngôn ngữ mặc định.",
+    ],
+  },
+  {
     version: "1.3.164",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Thời gian render quảng cáo nay được đo tới lúc banner và native thực sự có creative, không dừng sớm ở trạng thái DOM.",
       "Lượt kiểm tra chỉ tự chạy lại khi cần tải runtime mới; hoàn tất bình thường sẽ chờ lịch bốn giờ.",
-    ],
-  },
-  {
-    version: "1.3.115",
-    date: "2026-10-02",
-    lines: [
-      "Kho Xem Quảng Cáo nay báo rõ banner và native là ready, blocked hay no-fill, kèm số creative, thời gian render và kích thước.",
-      "Mỗi lượt chỉ kiểm tra một lần và không tự bấm quảng cáo production, giúp phân biệt lỗi tải tag với trường hợp thiếu fill.",
     ],
   },
 ];

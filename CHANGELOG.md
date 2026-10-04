@@ -9,6 +9,18 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.165 — Chuyển cụm quảng cáo lên trước block tính năng, thêm banner sườn và hỗ trợ tiếng Anh mặc định (04/10/2026)
+
+- Tái cơ cấu vị trí hiển thị quảng cáo Adsterra trên trang chủ theo yêu cầu trải nghiệm và phân bổ không gian hiển thị:
+  - Di dời khối quảng cáo trung tâm (`.adsterra-stack` gồm Leaderboard 728×90, Banner phụ 468×60 / 320×50, Rectangle 300×250, Native Ads 4 cột và liên kết tài trợ Smartlink) từ vị trí đáy trang lên vị trí ngay trước section "Tính năng linh đài phục vụ tu sĩ" (`#features-heading`).
+  - Sử dụng cơ chế React Portal (`createPortal`) thông qua container `#landing-ad-placement` giúp đặt đúng vị trí trực quan trên trang chủ mà không phá vỡ cấu trúc layout tổng thể và giữ trọn tính tương thích với các phép kiểm tra Adsterra tự động.
+  - Bổ sung 2 banner sườn (`.adsterra-flank`): Skyscraper 160×600 bên trái (`.adsterra-flank-left`) và Skyscraper 160×300 bên phải (`.adsterra-flank-right`), định vị cố định (fixed) ở 2 bên mép layout khi màn hình máy tính rộng (desktop `min-width: 1380px`), và tự động ẩn khi thu nhỏ màn hình để tránh che lấp nội dung hoặc ảnh nền tu tiên.
+- Bổ sung đa ngôn ngữ (i18n) cho trang chủ với tiếng Anh là ngôn ngữ mặc định (`default language: en`):
+  - Xây dựng từ điển song ngữ [src/lib/i18n/translations.ts](src/lib/i18n/translations.ts) với văn phong tiếng Anh tự nhiên, mộc mạc, gần gũi, dịch sát nghĩa theo ngữ cảnh con người (không dùng các câu từ sáo rỗng AI slop).
+  - Tích hợp `LanguageProvider` ([src/lib/i18n/context.tsx](src/lib/i18n/context.tsx)) quản lý trạng thái ngôn ngữ toàn cục, tự động lưu lựa chọn người dùng vào `localStorage` và `cookie` `app_lang`.
+  - Bổ sung component chuyển đổi ngôn ngữ nhanh [src/components/LanguageToggle.tsx](src/components/LanguageToggle.tsx) (**🇬🇧 EN / 🇻🇳 VI**) trên thanh điều hướng đầu trang `SiteHeaderNav`.
+  - Cập nhật toàn bộ trang chủ (`LandingView`), menu điều hướng (`SiteHeaderNav`), và chân trang (`SiteFooter`) hỗ trợ chuyển đổi mượt mà giữa tiếng Anh và tiếng Việt.
+
 ## 1.3.164 — Loại bỏ quy trình và tài liệu deploy Vercel proxy (04/10/2026)
 
 - Ngừng hỗ trợ và loại bỏ toàn bộ ghi chú liên quan đến quy trình deploy Vercel proxy trong toàn bộ dự án:

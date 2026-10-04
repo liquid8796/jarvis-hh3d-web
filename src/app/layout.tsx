@@ -7,6 +7,8 @@ import { BackdropPeek } from "@/components/BackdropPeek";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { GoogleAdSense } from "@/components/GoogleAdSense";
 import { AdsterraAds } from "@/components/AdsterraAds";
+import { LanguageProvider } from "@/lib/i18n/context";
+import { SiteFooter } from "@/components/SiteFooter";
 import {
   SITE_URL,
   SITE_NAME,
@@ -137,7 +139,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const backdropRules = backdropCss(appearance.defaultBackdrop, appearance.pageBackdrops);
 
   return (
-    <html lang="vi" className={`${display.variable} ${body.variable}`}>
+    <html lang="en" className={`${display.variable} ${body.variable}`}>
       <head><GoogleAdSense /></head>
       <body>
         {/*
@@ -169,28 +171,26 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             nó là con trực tiếp duy nhất của body (cùng với nền) được miễn khỏi luật làm mờ,
             nên nó không bao giờ tự mờ mất đường quay lại. Xem components/BackdropPeek.tsx. */}
         <BackdropPeek />
-        {/* Cửa bế quan đứng Ở ĐÂY để không một trang nào lọt ra ngoài nó — kể cả trang thêm
-            vào sau này, thứ mà một danh sách đường dẫn ở proxy sẽ luôn quên. Nền và chân
-            trang nằm NGOÀI cửa: chúng là cái vỏ, và bảng bế quan cũng cần được đứng trên tấm
-            tranh ấy. Xem components/MaintenanceGate.tsx cho toàn bộ lý lẽ. */}
-        <MaintenanceGate>{children}</MaintenanceGate>
-        <AdsterraAds />
-        <footer className="site-footer">
-          <span>© 2026 Nam Cung Bình. All rights reserved.</span>
-          <span aria-hidden="true"> · </span>
-          <a href="/quyen-rieng-tu">Quyền riêng tư</a>
-        </footer>
-        {/* Dấu bản đứng NGOÀI cửa bế quan, cùng lẽ với tấm nền: lúc web đang bế quan là đúng
-            lúc người ta cần biết trạm mình đang gõ cửa mang bản nào. Đứng cuối trong DOM để
-            trình đọc màn hình đọc nó sau cùng — nó là chú thích, không phải nội dung. */}
-        <AppVersion />
-        {/* Popup thông báo tông môn — đứng ở đây, ngoài cửa bế quan và ngoài mọi trang, vì một
-            lời nhắn「phát lúc này」mà chỉ một trang thấy thì không phải là thông báo. Với khách
-            vãng lai nó tự nằm im (một cú 401 rồi thôi hẳn) — xem components/NoticePopup.tsx. */}
-        <NoticePopup />
-        {/* Cụm giao tiếp nổi ba tab — Trò chuyện riêng, Sảnh chung và Thành viên. Nó tự im
-            với khách/pending qua API 401 và lặn trên trang /chat đầy đủ. Xem ChatFab.tsx. */}
-        <ChatFab />
+        <LanguageProvider>
+          {/* Cửa bế quan đứng Ở ĐÂY để không một trang nào lọt ra ngoài nó — kể cả trang thêm
+              vào sau này, thứ mà một danh sách đường dẫn ở proxy sẽ luôn quên. Nền và chân
+              trang nằm NGOÀI cửa: chúng là cái vỏ, và bảng bế quan cũng cần được đứng trên tấm
+              tranh ấy. Xem components/MaintenanceGate.tsx cho toàn bộ lý lẽ. */}
+          <MaintenanceGate>{children}</MaintenanceGate>
+          <AdsterraAds />
+          <SiteFooter />
+          {/* Dấu bản đứng NGOÀI cửa bế quan, cùng lẽ với tấm nền: lúc web đang bế quan là đúng
+              lúc người ta cần biết trạm mình đang gõ cửa mang bản nào. Đứng cuối trong DOM để
+              trình đọc màn hình đọc nó sau cùng — nó là chú thích, không phải nội dung. */}
+          <AppVersion />
+          {/* Popup thông báo tông môn — đứng ở đây, ngoài cửa bế quan và ngoài mọi trang, vì một
+              lời nhắn「phát lúc này」mà chỉ một trang thấy thì không phải là thông báo. Với khách
+              vãng lai nó tự nằm im (một cú 401 rồi thôi hẳn) — xem components/NoticePopup.tsx. */}
+          <NoticePopup />
+          {/* Cụm giao tiếp nổi ba tab — Trò chuyện riêng, Sảnh chung và Thành viên. Nó tự im
+              với khách/pending qua API 401 và lặn trên trang /chat đầy đủ. Xem ChatFab.tsx. */}
+          <ChatFab />
+        </LanguageProvider>
       </body>
     </html>
   );

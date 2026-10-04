@@ -305,10 +305,13 @@ function AdsterraBannerSlot({
  * 9. Native Banner 4:1 (đề xuất nội dung tự nhiên)
  * 10. Smartlink (liên kết tài trợ trực tiếp)
  */
+import { createPortal } from "react-dom";
+
 export function AdsterraClientAds() {
   const pathname = usePathname();
   const nativeRef = useRef<HTMLDivElement>(null);
   const [nativeStatus, setNativeStatus] = useState<AdSlotStatus>("loading");
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const allowed = pathAllowsAds(pathname);
 
   useEffect(() => {
@@ -316,6 +319,15 @@ export function AdsterraClientAds() {
     appendGlobalScriptOnce(ADSTERRA_POPUNDER_SCRIPT_SRC, "popunder");
     appendGlobalScriptOnce(ADSTERRA_SOCIAL_BAR_SCRIPT_SRC, "social-bar");
   }, [allowed]);
+
+  useEffect(() => {
+    if (pathname === "/") {
+      const el = document.getElementById("landing-ad-placement");
+      setPortalTarget(el);
+    } else {
+      setPortalTarget(null);
+    }
+  }, [pathname]);
 
   useEffect(() => {
     const slot = nativeRef.current;
@@ -357,7 +369,7 @@ export function AdsterraClientAds() {
 
   if (!allowed) return null;
 
-  return (
+  const mainStack = (
     <aside className="adsterra-stack" aria-label="Quảng cáo tài trợ">
       {/* 1. Biểu ngữ chính 728×90 */}
       <AdsterraBannerSlot spec={BANNER_LEADERBOARD_SPEC} allowed={allowed} pathname={pathname} />
@@ -368,20 +380,16 @@ export function AdsterraClientAds() {
         <AdsterraBannerSlot spec={BANNER_320X50_SPEC} allowed={allowed} pathname={pathname} />
       </div>
 
-      {/* 3. Lưới hiển thị đa tầng: Skyscraper 160×600 + Cột trung tâm (300×250 & Native) + Skyscraper 160×300 */}
-      <div className="adsterra-grid-banners">
-        <AdsterraBannerSlot spec={BANNER_160X600_SPEC} allowed={allowed} pathname={pathname} />
-        <div className="adsterra-center-column">
-          <AdsterraBannerSlot spec={BANNER_300X250_SPEC} allowed={allowed} pathname={pathname} />
-          {/* 4. Native Ads 4:1 */}
-          <div
-            ref={nativeRef}
-            className="adsterra-unit adsterra-native"
-            data-status={nativeStatus}
-            aria-label="Quảng cáo đề xuất"
-          />
-        </div>
-        <AdsterraBannerSlot spec={BANNER_160X300_SPEC} allowed={allowed} pathname={pathname} />
+      {/* 3. Khối trung tâm: 300×250 & Native Ads */}
+      <div className="adsterra-center-column mx-auto">
+        <AdsterraBannerSlot spec={BANNER_300X250_SPEC} allowed={allowed} pathname={pathname} />
+        {/* 4. Native Ads 4:1 */}
+        <div
+          ref={nativeRef}
+          className="adsterra-unit adsterra-native"
+          data-status={nativeStatus}
+          aria-label="Quảng cáo đề xuất"
+        />
       </div>
 
       {/* 5. Smartlink */}
@@ -394,5 +402,20 @@ export function AdsterraClientAds() {
         Khám phá nội dung tài trợ
       </a>
     </aside>
+  );
+
+  return (
+    <>
+      {/* 2 Banner sườn trái & phải trên desktop (Flank Sidebars) */}
+      <aside className="adsterra-flank adsterra-flank-left" aria-label="Quảng cáo sườn trái">
+        <AdsterraBannerSlot spec={BANNER_160X600_SPEC} allowed={allowed} pathname={pathname} />
+      </aside>
+      <aside className="adsterra-flank adsterra-flank-right" aria-label="Quảng cáo sườn phải">
+        <AdsterraBannerSlot spec={BANNER_160X300_SPEC} allowed={allowed} pathname={pathname} />
+      </aside>
+
+      {/* Cụm quảng cáo trung tâm: portal vào trước block tính năng nếu là trang chủ, hoặc hiển thị mặc định */}
+      {portalTarget ? createPortal(mainStack, portalTarget) : mainStack}
+    </>
   );
 }

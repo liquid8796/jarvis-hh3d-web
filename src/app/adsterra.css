@@ -109,3 +109,28 @@
     margin-top: 1rem;
   }
 }
+
+/* Banner sườn hai bên trái & phải layout trang web (Flank Banners) */
+.adsterra-flank {
+  display: none;
+  position: fixed;
+  top: 140px;
+  z-index: 25;
+  width: 160px;
+  pointer-events: auto;
+  transition: opacity 0.25s ease;
+}
+
+.adsterra-flank-left {
+  left: max(10px, calc(50% - 512px - 175px));
+}
+
+.adsterra-flank-right {
+  right: max(10px, calc(50% - 512px - 175px));
+}
+
+@media (min-width: 1380px) {
+  .adsterra-flank {
+    display: block;
+  }
+}

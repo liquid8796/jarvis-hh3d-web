@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.167 — Tối ưu cơ chế nhận diện nạp quảng cáo Adsterra và tránh ẩn nhầm khi tải chậm (04/10/2026)
+
+- Tinh chỉnh cơ chế theo dõi và trạng thái nạp quảng cáo Adsterra trong [src/components/adsterra/AdsterraClientAds.tsx](src/components/adsterra/AdsterraClientAds.tsx):
+  - Bổ sung trình lắng nghe sự kiện nạp thành công (`load` event) trên thẻ `invoke.js` cho cả các ô biểu ngữ (`AdsterraBannerSlot`) và Native Banner, lập tức xác nhận trạng thái sẵn sàng (`ready`) khi script được tải từ máy chủ quảng cáo.
+  - Mở rộng điều kiện phát hiện quảng cáo render thành công: nhận diện thêm các phần tử DOM đặc thù của Adsterra (`[class*='atScript']`) bên cạnh thẻ `iframe`.
+  - Loại bỏ hoàn toàn tình trạng tự ý ẩn quảng cáo bằng `display: none !important`: quảng cáo không còn bị gán nhầm thành `blocked` khi Adsterra phản hồi chậm hoặc chưa có nội dung (no-fill), chỉ chuyển sang `blocked` khi trình duyệt bắn sự kiện lỗi nạp (`error` event do trình chặn quảng cáo chặn thực sự).
+
 ## 1.3.166 — Khắc phục sự cố hiển thị quảng cáo Adsterra và sửa lỗi khoá mã (04/10/2026)
 
 - Chẩn đoán toàn diện nguyên nhân khiến quảng cáo trên trang chủ không hiển thị và đối soát với tệp mã quảng cáo gốc từ bảng điều khiển Adsterra (`ads-code`):

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.167",
+    date: "2026-10-04",
+    lines: [
+      "Tối ưu hoá cơ chế nhận diện trạng thái nạp quảng cáo Adsterra cho biểu ngữ và Native.",
+      "Loại bỏ tình trạng ẩn nhầm quảng cáo khi mạng quảng cáo chưa kịp phân phối nội dung.",
+    ],
+  },
+  {
     version: "1.3.166",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Kho Xem Quảng Cáo bổ sung hỗ trợ click trực tiếp Adsterra Smartlink và bộ chọn dự phòng mở rộng.",
       "Tự động chuyển đổi linh hoạt kênh trình duyệt khi khởi chạy, bảo đảm không bị gián đoạn giữa chừng.",
-    ],
-  },
-  {
-    version: "1.3.117",
-    date: "2026-10-02",
-    lines: [
-      "Kho Xem Quảng Cáo khôi phục đầy đủ tính năng tương tác: click vào creative banner và native để mở trang đích.",
-      "Tự động đọc trang quảng cáo chính, click tiếp đệ quy tối đa 2 lần, dọn sạch dữ liệu duyệt web sau mỗi chu kỳ và chạy liên tục.",
     ],
   },
 ];

@@ -249,7 +249,10 @@ function AdsterraBannerSlot({
       invokeScript = invoke;
 
       const loadedPromise = new Promise<void>((resolve) => {
-        invoke.addEventListener("load", () => resolve(), { once: true });
+        invoke.addEventListener("load", () => {
+          if (active) setStatus("ready");
+          resolve();
+        }, { once: true });
         invoke.addEventListener("error", () => {
           markBlocked();
           resolve();
@@ -263,7 +266,7 @@ function AdsterraBannerSlot({
 
     const stopWatching = watchForRenderedAd(
       canvas,
-      () => Boolean(canvas.querySelector("iframe")),
+      () => Boolean(canvas.querySelector("iframe") || canvas.querySelector("[class*='atScript']")),
       () => {
         if (active) setStatus("ready");
       },
@@ -346,6 +349,9 @@ export function AdsterraClientAds() {
     invoke.dataset.cfasync = "false";
     invoke.dataset.adsterraPlacement = "native";
     invoke.addEventListener("error", markBlocked, { once: true });
+    invoke.addEventListener("load", () => {
+      if (active) setNativeStatus("ready");
+    }, { once: true });
     const container = document.createElement("div");
     container.id = ADSTERRA_NATIVE_CONTAINER_ID;
     slot.append(invoke, container);

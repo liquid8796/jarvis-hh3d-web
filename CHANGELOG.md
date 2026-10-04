@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.177 — Khắc phục lỗi tràn bộ đệm PipeTransport (ERR_STRING_TOO_LONG) và chặn tải file ngầm (04/10/2026)
+
+- Khắc phục sự cố sập tiến trình chí mạng `ERR_STRING_TOO_LONG` (Cannot create a string longer than 0x1fffffe8 characters) trong [scripts/adViewer.mjs](scripts/adViewer.mjs):
+  - Tự động kiểm tra và gia cố hàm `PipeTransport2._dispatch` trong thư viện lõi `patchright-core` và `playwright-core` qua cơ chế tự sửa lỗi `ensureResilientPipeTransport`: khống chế giới hạn tích luỹ bộ đệm tối đa 16MB và bọc `try...catch` quanh `Buffer.concat().toString()` cùng `JSON.parse`, triệt tiêu hoàn toàn nguy cơ tràn bộ nhớ chuỗi V8 của Node.js khi trang đích phát luồng dữ liệu lớn.
+  - Mở rộng hàm phát hiện lỗi bỏ qua được `isIgnorableProtocolError` và bộ xử lý ngoại lệ toàn cục `uncaughtException`: nhận diện `ERR_STRING_TOO_LONG` và lỗi PipeTransport như một cảnh báo mềm thay vì gọi `process.exit(1)`, giúp chuỗi ca trực của auto không bị đứt quãng giữa chừng.
+  - Tối ưu hoá luồng đệ quy click `handleRecursiveAdClicks` trên trang đích: chủ động nhận diện và loại trừ các nút tải tệp tin độc hại/nặng (`[download]`, `.exe`, `.apk`, `.zip`, `.msi`, các nút mang nhãn "download", "tải về", "cài đặt", "install"), ngăn ngừa việc vô tình kích hoạt tải bộ cài đặt game dung lượng lớn qua giao thức pipe.
+  - Bổ sung trình lắng nghe sự kiện `page.on("download")` và `context.on("page")` tự động huỷ bỏ lập tức mọi yêu cầu tải file ngầm từ trang đích quảng cáo.
+
 ## 1.3.176 — Tối ưu hoá nhận diện nạp Adcash AutoTag và hành vi tương tác tự nhiên (04/10/2026)
 
 - Tối ưu hoá quy trình rà soát và tương tác quảng cáo Adcash trong [scripts/adViewer.mjs](scripts/adViewer.mjs):

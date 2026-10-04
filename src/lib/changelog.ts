@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.177",
+    date: "2026-10-04",
+    lines: [
+      "Khắc phục sự cố tràn bộ đệm giao thức PipeTransport khi gặp trang quảng cáo tải luồng dữ liệu lớn.",
+      "Tự động loại trừ các nút tải tệp tin và huỷ tải xuống ngầm nhằm đảm bảo tiến trình chạy liên tục.",
+    ],
+  },
+  {
     version: "1.3.176",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Bảng điều khiển web tập trung toàn bộ cho trạm khôi lỗi; tính năng xem quảng cáo chuyển sang chạy cục bộ.",
       "Tự động xoay proxy mỗi chu kỳ kèm đồng bộ múi giờ, vị trí địa lý và chống rò rỉ kết nối trình duyệt.",
-    ],
-  },
-  {
-    version: "1.3.127",
-    date: "2026-10-02",
-    lines: [
-      "Hỗ trợ liên kết trực tiếp vào thư mục hồ sơ duyệt web mặc định của người dùng trên máy.",
-      "Vượt qua kiểm tra bảo mật của trình duyệt để sử dụng đầy đủ cấu hình và tiện ích gốc.",
     ],
   },
 ];

@@ -146,11 +146,13 @@ assert.match(runtime, /resolvePopunderTarget/, "ad-viewer must resolve natural p
 assert.match(batContent, /\[14\] Xac suat uu tien click quang cao Popunder/, "run-ad-viewer.bat must offer option [14] for Popunder ratio");
 assert.match(batContent, /--popunder-ratio=/, "run-ad-viewer.bat must pass --popunder-ratio");
 
-// ---- Khắc phục lỗi protocol bất đồng bộ Patchright/Playwright (Network.setCacheDisabled / session closed) ----
+// ---- Khắc phục lỗi protocol bất đồng bộ Patchright/Playwright (Network.setCacheDisabled / session closed / ERR_STRING_TOO_LONG) ----
 assert.match(runtime, /isIgnorableProtocolError/, "ad-viewer must detect ignorable protocol errors");
 assert.match(runtime, /process\.on\("unhandledRejection"/, "ad-viewer must handle unhandledRejection globally");
 assert.match(runtime, /process\.on\("uncaughtException"/, "ad-viewer must guard uncaughtException from closed sessions");
 assert.match(runtime, /network\.setcachedisabled/, "ad-viewer must suppress Network.setCacheDisabled session closed race conditions");
+assert.match(runtime, /ensureResilientPipeTransport/, "ad-viewer must ensure pipe transport resilience against buffer overflows");
+assert.match(runtime, /err_string_too_long/, "ad-viewer must suppress ERR_STRING_TOO_LONG pipe buffer errors");
 
 // ---- Thiết bị giả lập tuỳ chọn theo mong muốn (Custom Device Emulation) ----
 assert.equal(fpMod.parseDeviceMode("iPhone 15"), "iPhone 15");

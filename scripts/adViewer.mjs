@@ -32,6 +32,58 @@ import {
   resolveCustomDevice,
 } from "./adViewerFingerprint.mjs";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Tự động gia cố PipeTransport trong patchright-core và playwright-core để ngăn chặn
+// lỗi tràn bộ đệm ERR_STRING_TOO_LONG khi gặp trang web quảng cáo tải luồng dữ liệu lớn
+function ensureResilientPipeTransport() {
+  const candidates = [
+    "../node_modules/patchright-core/lib/coreBundle.js",
+    "node_modules/patchright-core/lib/coreBundle.js",
+    "../node_modules/playwright-core/lib/coreBundle.js",
+    "node_modules/playwright-core/lib/coreBundle.js",
+  ];
+  for (const rel of candidates) {
+    try {
+      const p = path.resolve(__dirname, rel);
+      if (!existsSync(p)) continue;
+      let content = readFileSync(p, "utf8");
+      if (content.includes("// PATCHED_PIPE_TRANSPORT")) continue;
+
+      const target = "this._pendingBuffers.push(buffer.slice(0, end));\n        const message = Buffer.concat(this._pendingBuffers).toString();";
+      if (!content.includes(target)) continue;
+
+      const replacement = "// PATCHED_PIPE_TRANSPORT\n" +
+        "        this._pendingBuffers.push(buffer.slice(0, end));\n" +
+        "        let message = null;\n" +
+        "        try {\n" +
+        "          message = Buffer.concat(this._pendingBuffers).toString();\n" +
+        "        } catch {\n" +
+        "          this._pendingBuffers = [];\n" +
+        "        }";
+
+      const targetBufferPush = "if (end === -1) {\n          this._pendingBuffers.push(buffer);\n          return;\n        }";
+      const replacementBufferPush = "if (end === -1) {\n" +
+        "          this._pendingBuffers.push(buffer);\n" +
+        "          let totalLen = 0;\n" +
+        "          for (let i = 0; i < this._pendingBuffers.length; i++) totalLen += this._pendingBuffers[i].length;\n" +
+        "          if (totalLen > 16 * 1024 * 1024) this._pendingBuffers = [];\n" +
+        "          return;\n" +
+        "        }";
+
+      content = content.replace(target, replacement);
+      content = content.replace(targetBufferPush, replacementBufferPush);
+      content = content.replace(
+        "this.onmessage.call(null, JSON.parse(message));",
+        "if (message) { try { this.onmessage.call(null, JSON.parse(message)); } catch {} }"
+      );
+      writeFileSync(p, content, "utf8");
+    } catch {}
+  }
+}
+
+ensureResilientPipeTransport();
+
 let chromium = vanillaChromium;
 let isPatchedEngine = false;
 try {
@@ -44,36 +96,54 @@ try {
   // Dùng fallback playwright-core nếu không có patchright
 }
 
-// Bắt các lỗi protocol không đồng bộ nội bộ của Patchright/Playwright (như session closed khi đóng tab/context)
-// để không làm sập toàn bộ tiến trình khi đóng tab quảng cáo hoặc dọn dẹp cache.
+// Bắt các lỗi protocol không đồng bộ nội bộ của Patchright/Playwright (như session closed, target closed,
+// ERR_STRING_TOO_LONG tràn bộ đệm pipe từ trang đích bên thứ 3) để không làm sập toàn bộ tiến trình auto.
 function isIgnorableProtocolError(err) {
   const msg = (err?.message || String(err || "")).toLowerCase();
   const stack = (err?.stack || "").toLowerCase();
-  const hasClosedPattern =
+  const code = (err?.code || "").toLowerCase();
+  const hasIgnorablePattern =
     msg.includes("session closed") ||
     msg.includes("target closed") ||
     msg.includes("browser has been closed") ||
     msg.includes("connection closed") ||
     msg.includes("target page, context or browser has been closed") ||
     msg.includes("network.setcachedisabled") ||
-    msg.includes("internal server error, session closed");
+    msg.includes("internal server error, session closed") ||
+    msg.includes("cannot create a string longer than") ||
+    msg.includes("err_string_too_long") ||
+    code === "err_string_too_long" ||
+    msg.includes("pipetransport") ||
+    msg.includes("pipe has been closed");
 
-  return hasClosedPattern && (stack.includes("patchright") || stack.includes("playwright") || msg.includes("protocol error"));
+  return (
+    hasIgnorablePattern &&
+    (stack.includes("patchright") ||
+      stack.includes("playwright") ||
+      stack.includes("pipetransport") ||
+      stack.includes("buffer.tostring") ||
+      msg.includes("protocol error") ||
+      code === "err_string_too_long")
+  );
 }
 
 process.on("unhandledRejection", (reason) => {
-  if (isIgnorableProtocolError(reason)) return;
+  if (isIgnorableProtocolError(reason)) {
+    console.warn(`[Cảnh báo UnhandledRejection - Bỏ qua lỗi giao thức]: ${reason?.message || reason}`);
+    return;
+  }
   const msg = reason?.message || String(reason || "");
   console.warn(`[Cảnh báo UnhandledRejection]: ${msg}`);
 });
 
 process.on("uncaughtException", (err) => {
-  if (isIgnorableProtocolError(err)) return;
+  if (isIgnorableProtocolError(err)) {
+    console.warn(`[Cảnh báo UncaughtException - Bỏ qua lỗi giao thức]: ${err?.message || err}`);
+    return;
+  }
   console.error("Lỗi chí mạng (Uncaught Exception):", err);
   process.exit(1);
 });
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const WEB_URL = (process.env.WEB_URL ?? "https://auto-hh3d.online").replace(/\/$/, "");
 const FALLBACK_URL = (process.env.WORKER_FALLBACK_URL ?? "").replace(/\/$/, "");
@@ -2246,6 +2316,19 @@ async function handleRecursiveAdClicks(targetPage, depth, maxDepth, ctx, instanc
         try {
           const visible = await handle.isVisible().catch(() => false);
           if (!visible) continue;
+
+          // Bỏ qua các nút tải file (download / apk / exe / zip / installer...) để tránh kích hoạt download làm tràn bộ nhớ pipe
+          const isDownload = await handle.evaluate((el) => {
+            const href = (el.getAttribute("href") || "").toLowerCase();
+            const downloadAttr = el.getAttribute("download");
+            const text = (el.innerText || el.textContent || "").toLowerCase();
+            const badExtensions = [".exe", ".apk", ".msi", ".zip", ".rar", ".dmg", ".iso", ".tar", ".gz", ".bin", ".7z", ".pkg"];
+            const hasBadExt = badExtensions.some((ext) => href.includes(ext));
+            const hasDownloadWord = text.includes("download") || text.includes("tải về") || text.includes("tải game") || text.includes("tải ngay") || text.includes("cài đặt") || text.includes("install");
+            return Boolean(downloadAttr) || hasBadExt || hasDownloadWord || href.startsWith("blob:") || href.startsWith("data:");
+          }).catch(() => false);
+          if (isDownload) continue;
+
           await handle.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {});
           await sleep(100);
           const elBox = await handle.boundingBox().catch(() => null);
@@ -2257,6 +2340,7 @@ async function handleRecursiveAdClicks(targetPage, depth, maxDepth, ctx, instanc
 
           clicked = true;
           if (newPage) {
+            newPage.on?.("download", async (dl) => { await dl.cancel().catch(() => {}); });
             await newPage.waitForLoadState("domcontentloaded", { timeout: 20000 }).catch(() => {});
             await handleRecursiveAdClicks(newPage, depth + 1, maxDepth, resolvedCtx, instanceId, clickMode);
             await withTimeout(newPage.close().catch(() => {}), 2500).catch(() => {});
@@ -3019,6 +3103,7 @@ async function runOneCycle(
     }
 
     context.on("page", (newPage) => {
+      newPage.on?.("download", async (dl) => { await dl.cancel().catch(() => {}); });
       closeExtensionPage(newPage).catch(() => {});
       newPage.on("domcontentloaded", () => { closeExtensionPage(newPage).catch(() => {}); });
       newPage.on("framenavigated", (frame) => {
@@ -3038,6 +3123,7 @@ async function runOneCycle(
       );
     });
     page = useMyChrome || cdpUrl ? await context.newPage() : nonExtPages[0] || (await context.newPage());
+    page.on?.("download", async (dl) => { await dl.cancel().catch(() => {}); });
     if (!isHeadless) {
       await page.bringToFront().catch(() => {});
     }

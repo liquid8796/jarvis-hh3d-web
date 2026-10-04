@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.170 — Cập nhật chính xác mã cấu hình và thẻ nhúng cho toàn bộ biểu ngữ Adsterra (04/10/2026)
+
+- Đối soát và đồng bộ toàn diện mã nhúng cho tất cả 6 định dạng Banner Adsterra theo đúng tệp kịch bản nhà cung cấp:
+  - Khắc phục lỗi khoá mã biểu ngữ 320×50 trong [src/lib/adsterra/config.ts](src/lib/adsterra/config.ts): cập nhật chính xác thành `bc0a7a3ea5179c58561c3533681bd724` (bổ sung ký tự `a` bị thiếu ở cụm `7a3e`), chấm dứt tình trạng máy chủ Adsterra trả về trang lỗi HTML thay vì tệp kịch bản thực thi.
+  - Chuẩn hoá cơ chế nạp biến cấu hình `atOptions` và script `invoke.js` trong [src/components/adsterra/AdsterraClientAds.tsx](src/components/adsterra/AdsterraClientAds.tsx): gán đầy đủ cả biến phạm vi toàn cục `atOptions` và `window.atOptions`, bổ sung thuộc tính `type="text/javascript"` đúng chuẩn thẻ nhúng của Adsterra.
+  - Bổ sung bộ kiểm thử khẳng định giá trị mã khoá và đường dẫn kịch bản cho cả 6 kích thước biểu ngữ (728×90, 468×60, 320×50, 300×250, 160×600, 160×300) trong [scripts/verifyAdsterra.mts](scripts/verifyAdsterra.mts) nhằm ngăn ngừa tuyệt đối lỗi sai lệch mã trong tương lai.
+
 ## 1.3.169 — Bổ sung cơ chế chống treo tương tác click và tính toạ độ Popunder an toàn (04/10/2026)
 
 - Khắc phục sự cố đứng hình (hang/stuck) trong chuỗi tương tác click tự nhiên kích hoạt Popunder và quảng cáo trong [scripts/adViewer.mjs](scripts/adViewer.mjs):

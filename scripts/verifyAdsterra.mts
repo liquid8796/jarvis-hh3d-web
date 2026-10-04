@@ -2,6 +2,16 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  ADSTERRA_BANNER_160X300_KEY,
+  ADSTERRA_BANNER_160X300_SCRIPT_SRC,
+  ADSTERRA_BANNER_160X600_KEY,
+  ADSTERRA_BANNER_160X600_SCRIPT_SRC,
+  ADSTERRA_BANNER_300X250_KEY,
+  ADSTERRA_BANNER_300X250_SCRIPT_SRC,
+  ADSTERRA_BANNER_320X50_KEY,
+  ADSTERRA_BANNER_320X50_SCRIPT_SRC,
+  ADSTERRA_BANNER_468X60_KEY,
+  ADSTERRA_BANNER_468X60_SCRIPT_SRC,
   ADSTERRA_LEADERBOARD_KEY,
   ADSTERRA_LEADERBOARD_SCRIPT_SRC,
   ADSTERRA_NATIVE_CONTAINER_ID,
@@ -19,6 +29,16 @@ const read = (relative: string) => readFile(path.join(root, relative), "utf8");
 assert.equal(ADSTERRA_SITE_ID, 6090351);
 assert.equal(ADSTERRA_LEADERBOARD_KEY, "5f0b1341593afd724f2bd2cd211c6b73");
 assert.equal(ADSTERRA_LEADERBOARD_SCRIPT_SRC, "https://deliberatewatchful.com/5f0b1341593afd724f2bd2cd211c6b73/invoke.js");
+assert.equal(ADSTERRA_BANNER_468X60_KEY, "58ea5fb15ce0c0db62dd342b49cc0c09");
+assert.equal(ADSTERRA_BANNER_468X60_SCRIPT_SRC, "https://deliberatewatchful.com/58ea5fb15ce0c0db62dd342b49cc0c09/invoke.js");
+assert.equal(ADSTERRA_BANNER_320X50_KEY, "bc0a7a3ea5179c58561c3533681bd724");
+assert.equal(ADSTERRA_BANNER_320X50_SCRIPT_SRC, "https://deliberatewatchful.com/bc0a7a3ea5179c58561c3533681bd724/invoke.js");
+assert.equal(ADSTERRA_BANNER_300X250_KEY, "aef3014b1366e74e02e2a6077acacbd5");
+assert.equal(ADSTERRA_BANNER_300X250_SCRIPT_SRC, "https://deliberatewatchful.com/aef3014b1366e74e02e2a6077acacbd5/invoke.js");
+assert.equal(ADSTERRA_BANNER_160X600_KEY, "1ac6ab6e1c65f90e0ba12414861b5fc1");
+assert.equal(ADSTERRA_BANNER_160X600_SCRIPT_SRC, "https://deliberatewatchful.com/1ac6ab6e1c65f90e0ba12414861b5fc1/invoke.js");
+assert.equal(ADSTERRA_BANNER_160X300_KEY, "5fa61640659a25e53bad269fbbed6304");
+assert.equal(ADSTERRA_BANNER_160X300_SCRIPT_SRC, "https://deliberatewatchful.com/5fa61640659a25e53bad269fbbed6304/invoke.js");
 assert.equal(ADSTERRA_NATIVE_CONTAINER_ID, "container-5e6634da84f8f263d7ab34ae152f1c8d");
 assert.equal(ADSTERRA_NATIVE_SCRIPT_SRC, "https://deliberatewatchful.com/5e6634da84f8f263d7ab34ae152f1c8d/invoke.js");
 assert.equal(ADSTERRA_POPUNDER_SCRIPT_SRC, "https://deliberatewatchful.com/43/0d/4f/430d4fbd8d66c3bb0f47cab838ef8a06.js");

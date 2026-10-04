@@ -234,15 +234,17 @@ function AdsterraBannerSlot({
       if (!active || !canvas.isConnected) return;
 
       const options = document.createElement("script");
-      options.text = `window.atOptions = ${JSON.stringify({
+      options.type = "text/javascript";
+      options.text = `var atOptions = ${JSON.stringify({
         key: spec.adKey,
         format: "iframe",
         height: spec.height,
         width: spec.width,
         params: {},
-      })};`;
+      })}; window.atOptions = atOptions;`;
 
       const invoke = document.createElement("script");
+      invoke.type = "text/javascript";
       invoke.src = spec.scriptSrc;
       invoke.async = false;
       invoke.dataset.adsterraPlacement = spec.id;

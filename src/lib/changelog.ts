@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.170",
+    date: "2026-10-04",
+    lines: [
+      "Cập nhật chính xác mã nhúng và khoá nhận diện cho toàn bộ sáu định dạng biểu ngữ quảng cáo.",
+      "Đảm bảo các thẻ kịch bản tuân thủ đúng định dạng nhà phát hành và hiển thị ổn định trên trang.",
+    ],
+  },
+  {
     version: "1.3.169",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Kho Xem Quảng Cáo chuyển về trình duyệt Chromium tiêu chuẩn cùng tiện ích mở rộng chống nhận diện dấu vân tay.",
       "Tự động chuẩn bị môi trường và kích hoạt chế độ mở rộng an toàn cho các phiên xem trên máy.",
-    ],
-  },
-  {
-    version: "1.3.120",
-    date: "2026-10-02",
-    lines: [
-      "Kho Xem Quảng Cáo chuyển sang trình duyệt Obscura độc lập, kết nối điều khiển trực tiếp qua giao thức mở.",
-      "Tích hợp giải pháp chống nhận diện dấu vân tay CanvasBlocker trực tiếp vào phiên duyệt web của trình duyệt mới.",
     ],
   },
 ];

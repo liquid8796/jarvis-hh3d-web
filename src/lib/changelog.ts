@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.178",
+    date: "2026-10-04",
+    lines: [
+      "Tích hợp thêm 2 định dạng quảng cáo Adcash gồm Pop-Under và biểu ngữ dọc 160×600.",
+      "Tối ưu hoá vị trí hiển thị sườn desktop và nâng cấp bộ công cụ nhận diện quảng cáo.",
+    ],
+  },
+  {
     version: "1.3.177",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khắc phục sự cố tệp kịch bản batch bị đóng đột ngột khi nhập thông tin cấu hình trên Windows.",
       "Tăng cường khả năng nhận diện proxy hợp lệ qua cơ chế thử nghiệm đường truyền HTTP CONNECT.",
-    ],
-  },
-  {
-    version: "1.3.128",
-    date: "2026-10-02",
-    lines: [
-      "Bảng điều khiển web tập trung toàn bộ cho trạm khôi lỗi; tính năng xem quảng cáo chuyển sang chạy cục bộ.",
-      "Tự động xoay proxy mỗi chu kỳ kèm đồng bộ múi giờ, vị trí địa lý và chống rò rỉ kết nối trình duyệt.",
     ],
   },
 ];

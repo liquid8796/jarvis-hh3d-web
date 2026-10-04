@@ -70,6 +70,17 @@ export default function PrivacyPage() {
               </p>
             </Section>
 
+            <Section title="Adcash và mạng quảng cáo đối tác">
+              <p>
+                Website có thể tải quảng cáo từ Adcash (AutoTag, Pop-Under, biểu ngữ 160×600) trên tên miền chính thức.
+                Adcash và các đối tác phân phối của họ có thể xử lý địa chỉ IP, thông tin trình duyệt/thiết bị, cookie và tín hiệu chống gian lận để phân phối và đo lường quảng cáo.
+              </p>
+              <p>
+                Mã thư viện và các thẻ vùng quảng cáo (Pop-Under, Banner) là tag tiêu chuẩn được cung cấp trực tiếp bởi Adcash.
+                Auto HH3D không tự kiểm tra tiện ích trình duyệt và không can thiệp vào hành vi của mạng quảng cáo.
+              </p>
+            </Section>
+
             <Section title="Chia sẻ và thời gian lưu">
               <p>
                 Auto HH3D không bán thông tin đăng nhập hoặc cấu hình nhiệm vụ của bạn. Dữ liệu chỉ được chia sẻ với nhà cung cấp

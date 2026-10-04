@@ -9,6 +9,17 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.178 — Tích hợp quảng cáo Adcash Pop-Under (12265546) và Display 160x600 (12265554) (04/10/2026)
+
+- Bổ sung 2 định dạng quảng cáo chính thức từ Adcash theo tài khoản nhà xuất bản:
+  - **Pop-Under (Zone ID `12265546`)**: Nhúng mã khởi tạo `aclib.runPop({ zoneId: '12265546' })` trong `<head>` thông qua [src/components/AdcashAds.tsx](src/components/AdcashAds.tsx) ngay sau thư viện `aclib.js`, kích hoạt mở tab tài trợ tự nhiên khi người dùng hoặc bot tương tác trang.
+  - **Display 160x600 (Zone ID `12265554`)**: Nhúng mã `aclib.runBanner({ zoneId: '12265554' })` trong khối `<div>` chuẩn của [src/components/AdcashAds.tsx](src/components/AdcashAds.tsx) theo đúng hướng dẫn của Adcash, hỗ trợ nạp SSR phục vụ phê duyệt tức thì và quản lý vòng đời DOM phía client qua [src/components/adcash/AdcashClientAds.tsx](src/components/adcash/AdcashClientAds.tsx).
+  - Bổ sung kiểu dáng [src/app/adcash.css](src/app/adcash.css): cố định biểu ngữ 160×600 tại sườn trái màn hình desktop (màn hình ≥ 1340px) và căn giữa tự nhiên trên màn hình nhỏ mà không che khuất nội dung trang.
+  - Đồng bộ trạng thái hiển thị theo đường dẫn: tự động ẩn biểu ngữ trên các trang nhạy cảm (`/admin`, `/login`, `/register`, `/quyen-rieng-tu`, `/chat-frame`).
+- Nâng cấp bộ công cụ [scripts/adViewer.mjs](scripts/adViewer.mjs) và kịch bản kiểm thử [scripts/verifyAdcash.mts](scripts/verifyAdcash.mts):
+  - `adViewer.mjs`: nhận diện container `#adcash-banner-160x600`, kiểm tra trạng thái nạp và click tương tác với các biểu ngữ Adcash.
+  - Thêm bài kiểm thử tự động `npm run verify:adcash` để bảo đảm tính nhất quán của các mã vùng, quy tắc bật/tắt và thẻ nhúng.
+
 ## 1.3.177 — Khắc phục lỗi tràn bộ đệm PipeTransport (ERR_STRING_TOO_LONG) và chặn tải file ngầm (04/10/2026)
 
 - Khắc phục sự cố sập tiến trình chí mạng `ERR_STRING_TOO_LONG` (Cannot create a string longer than 0x1fffffe8 characters) trong [scripts/adViewer.mjs](scripts/adViewer.mjs):

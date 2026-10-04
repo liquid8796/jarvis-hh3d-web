@@ -323,8 +323,23 @@ if defined INPUT_POPUNDER (
 )
 echo.
 
+REM 15. Trong tam dinh dang quang cao (Ad Format Focus)
+echo [15] Trong tam dinh dang quang cao [Popunder + SocialBar vs Balanced]:
+echo      1. Tap trung Popunder + SocialBar [Triet tieu click/impression Native - KHUYEN NGHI cho Headless]
+echo      2. Can bang tat ca cac dinh dang [Bao gom ca NativeBanner va Smartlink]
+set "INPUT_AD_FOCUS="
+set /p "INPUT_AD_FOCUS=    Chon [1-2, Enter = 1]: "
+set "ARG_AD_FOCUS=--focus-popunder-social"
+if "%INPUT_AD_FOCUS%"=="2" (
+    set "ARG_AD_FOCUS=--with-native"
+    echo     -^> Dinh dang: Can bang tat ca [Bao gom ca Native Ads]
+) else (
+    echo     -^> Dinh dang: Tap trung Popunder + SocialBar [Bo qua Native]
+)
+echo.
+
 REM Tong hop lenh thuc thi
-set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER%
+set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER% %ARG_AD_FOCUS%
 
 echo ============================================================================
 echo   TONG HOP CAU HINH CHAY:

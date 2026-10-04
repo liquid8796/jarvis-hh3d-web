@@ -101,7 +101,7 @@ assert.deepEqual(fpMod.parseBrowserList("Edge, FF, xyz"), { browsers: ["edge", "
 assert.equal(fpMod.estimateSafariMajor(new Date("2026-10-03T00:00:00Z")), 27);
 assert.equal(fpMod.estimateSafariMajor(new Date("2026-06-01T00:00:00Z")), 26);
 // @ts-ignore
-const { parseProxyItem, parsePopunderRatio } = await import("./adViewer.mjs");
+const { parseProxyItem, parsePopunderRatio, parseFocusPopunderSocial, SOCIAL_BAR_KEY, SOCIAL_BAR_SELECTOR } = await import("./adViewer.mjs");
 const p1 = parseProxyItem("103.152.112.5:8080@liquid:secret123");
 assert.equal(p1?.server, "http://103.152.112.5:8080");
 assert.equal(p1?.username, "liquid");
@@ -217,8 +217,28 @@ assert.match(runtime, /const guardLaunch = INSTANCE_COUNT > 1 && !isHeadless;/, 
 assert.match(runtime, /const needsCycleLock = !isHeadless && \(isPhysicalClickMode\(cycleClickMode\) \|\| INSTANCE_COUNT > 1\);/, "ad-viewer must not serialize cycle turns across headless instances");
 assert.match(runtime, /IS_EXPLICIT_HEADLESS \? 3000 : 8000/, "ad-viewer must shorten staggered start delay in headless mode");
 
+// ---- Trọng tâm định dạng Popunder + SocialBar & Triệt tiêu spam NativeBanner ----
+assert.equal(SOCIAL_BAR_KEY, "977a66f06e979e2830ee60ed1fa88533");
+assert.match(SOCIAL_BAR_SELECTOR, /container-/);
+assert.match(runtime, /--disable-popup-blocking/, "ad-viewer must pass --disable-popup-blocking to prevent headless Chromium from suppressing popunders");
+const dummyEnv = {} as NodeJS.ProcessEnv;
+assert.equal(parseFocusPopunderSocial(["node", "adViewer.mjs", "--headless"], dummyEnv), true, "headless mode must enable focus popunder+social by default");
+assert.equal(parseFocusPopunderSocial(["node", "adViewer.mjs", "--focus-popunder-social"], dummyEnv), true);
+assert.equal(parseFocusPopunderSocial(["node", "adViewer.mjs", "--no-native-click"], dummyEnv), true);
+assert.equal(parseFocusPopunderSocial(["node", "adViewer.mjs", "--headless", "--with-native"], dummyEnv), false);
+assert.equal(parseFocusPopunderSocial(["node", "adViewer.mjs", "--head"], dummyEnv), false);
+
+assert.match(runtime, /if \(!FOCUS_POPUNDER_SOCIAL\) \{\s*await page\.locator\("\.adsterra-stack"\)\.scrollIntoViewIfNeeded\(\)/, "ad-viewer must avoid scrolling to .adsterra-stack when FOCUS_POPUNDER_SOCIAL is active");
+assert.match(runtime, /if \(!FOCUS_POPUNDER_SOCIAL\) \{\s*try \{\s*const nativeSelector = isForceClick/, "ad-viewer must exclude native ads from candidates when FOCUS_POPUNDER_SOCIAL is active");
+assert.match(runtime, /isSocialBar:\s*true/, "ad-viewer must tag SocialBar candidates");
+assert.match(runtime, /🔔 \[SocialBar Ưu Tiên\]/, "ad-viewer must prioritize clicking SocialBar if Popunder does not spawn a new page");
+
+assert.match(batContent, /\[15\] Trong tam dinh dang quang cao/, "run-ad-viewer.bat must offer option [15] for ad format focus");
+assert.match(batContent, /ARG_AD_FOCUS=--focus-popunder-social/, "run-ad-viewer.bat must set ARG_AD_FOCUS to --focus-popunder-social");
+
 console.log(
-  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, fully supports headless mode without popping up windows or leaking headless signals, and enables 100% lock-free parallel execution across multi-instance headless workers.",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, fully supports headless mode without popping up windows or leaking headless signals, enables 100% lock-free parallel execution across multi-instance headless workers, and focuses on high-CPM Popunder + SocialBar while eliminating unwanted NativeBanner impressions and clicks.",
 );
+
 
 

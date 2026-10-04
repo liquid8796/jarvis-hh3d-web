@@ -9,6 +9,27 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.163 — Tập trung Popunder và SocialBar, triệt tiêu click và impression không mong muốn cho NativeBanner (04/10/2026)
+
+- Tối ưu hoá toàn diện cơ chế điều phối quảng cáo Adsterra: tập trung tối đa vào các định dạng quảng cáo có giá trị CPM cao (Popunder và SocialBar Floating Notification) và triệt tiêu hoàn toàn sự mất cân bằng do spam click/impression vào NativeBanner:
+  - Phân tích nguyên nhân:
+    1. Trong chế độ chạy ẩn (Headless), kịch bản [scripts/adViewer.mjs](scripts/adViewer.mjs) trước đây tự động cuộn trang bằng `page.locator(".adsterra-stack").scrollIntoViewIfNeeded()`, ép vùng container Native Ads (`.adsterra-native`, `.adsterra-stack`) ở chân trang lọt vào khung nhìn (viewport), kích hoạt 100% beacon Impression cho NativeBanner dù người dùng không mong muốn.
+    2. Khi quảng cáo Popunder gặp thời gian giãn cách (cooldown) hoặc không mở tab mới, kịch bản fallback sang danh sách `adCandidates`. Do khối NativeBanner chứa tới 4 liên kết con (`a[target="_blank"]`) trong khi Banner 728×90 chỉ có 1–2 liên kết, các thẻ NativeBanner chiếm tới 70–80% xác suất bốc thăm ngẫu nhiên, dẫn tới việc click dồn dập vào NativeBanner.
+    3. Định dạng SocialBar (`977a66f06e979e2830ee60ed1fa88533`) là thông báo nổi ở góc màn hình có CPM rất cao, nhưng trước đây kịch bản hoàn toàn không có bộ chọn (selector) và không quét SocialBar vào ứng viên click.
+    4. Trình duyệt Chromium chạy ẩn thiếu cờ `--disable-popup-blocking`, tiềm ẩn nguy cơ bị trình duyệt chặn sự kiện `window.open` của Popunder ngầm.
+  - Sửa đổi trong [scripts/adViewer.mjs](scripts/adViewer.mjs):
+    - Khai báo bộ nhận diện SocialBar: `SOCIAL_BAR_KEY = "977a66f06e979e2830ee60ed1fa88533"` và bộ chọn `SOCIAL_BAR_SELECTOR` tương thích cả id iframe, class và thuộc tính fixed position.
+    - Bổ sung cấu hình cờ `FOCUS_POPUNDER_SOCIAL` (tự động kích hoạt khi ở chế độ Headless, hoặc khi truyền các cờ `--focus-popunder-social`, `--no-native-click`, `--no-native`, `--focus-high-cpm`, biến môi trường `AD_VIEWER_FOCUS_POPUNDER_SOCIAL=1`). Có thể tắt bằng `--with-native` hoặc `--no-focus-popunder-social`.
+    - Thêm cờ `--disable-popup-blocking` vào danh sách Chromium launch arguments.
+    - Kiểm soát Impression: Khi bật `FOCUS_POPUNDER_SOCIAL`, kịch bản bỏ qua thao tác cuộn xuống `.adsterra-stack`, chỉ cuộn nhẹ nhàng tự nhiên ở vùng nội dung (200px – 550px) để kích hoạt Popunder và SocialBar. Khối NativeBanner ở chân trang không vào viewport nên triệt tiêu việc ghi nhận Impression ngoài ý muốn.
+    - Cập nhật hàm `inspectAdsterraPlacements()`: Quét và chẩn đoán sự hiện diện, kích thước và số lượng liên kết của SocialBar iframe (`Adsterra social-bar: ready`). Khi ở chế độ tập trung Popunder + SocialBar, trạng thái hoàn tất render (`isRenderFinished`) tính khi SocialBar xuất hiện hoặc Banner ready, không bắt buộc phải đợi NativeBanner.
+    - Tách biệt `adCandidates`: Khi bật `FOCUS_POPUNDER_SOCIAL`, kịch bản loại trừ 100% các thẻ NativeBanner khỏi danh sách ứng viên click và danh sách cưỡng chế (force click). Đồng thời bổ sung các liên kết và iframe SocialBar vào danh sách.
+    - Chiến lược click 3 tầng: Tầng 1 ưu tiên nổ Popunder theo `POPUNDER_RATIO` (80–90%). Tầng 2: nếu Popunder chưa nổ, ưu tiên click ngay vào SocialBar Floating Notification (`🔔 [SocialBar Ưu Tiên]`). Tầng 3: fallback sang Banner 728×90 hoặc Smartlink.
+  - Sửa đổi trong [run-ad-viewer.bat](run-ad-viewer.bat):
+    - Bổ sung mục lựa chọn cấu hình `[15] Trọng tâm định dạng quảng cáo [Popunder + SocialBar vs Balanced]`.
+    - Mặc định chọn `1. Tập trung Popunder + SocialBar [Triet tieu click/impression Native - KHUYEN NGHI cho Headless]`.
+  - Cập nhật [scripts/verifyAdViewerHealth.mts](scripts/verifyAdViewerHealth.mts): Thêm các phép kiểm tra toàn diện cho `SOCIAL_BAR_KEY`, `SOCIAL_BAR_SELECTOR`, `--disable-popup-blocking`, logic `parseFocusPopunderSocial`, loại trừ Native và tuỳ chọn [15] trong file batch.
+
 ## 1.3.162 — Mở khoá chạy song song 100% không khoá Mutex cho CDP Headless đa instance (03/10/2026)
 
 - Mở khoá và tối ưu hoá toàn diện khả năng chạy song song đa instance (`--instances=N`) trong chế độ chạy ẩn (Headless):

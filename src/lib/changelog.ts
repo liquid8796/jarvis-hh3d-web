@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.163",
+    date: "2026-10-04",
+    lines: [
+      "Tối ưu trọng tâm tương tác quảng cáo Adsterra: tập trung vào Popunder và SocialBar.",
+      "Triệt tiêu tình trạng click nhầm và ngăn chặn ghi nhận lượt hiển thị không mong muốn cho NativeBanner.",
+    ],
+  },
+  {
     version: "1.3.162",
     date: "2026-10-03",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Kho Xem Quảng Cáo nay mặc định mở đúng tên miền chính thức, nơi các vị trí quảng cáo được bật.",
       "Tạo mới, đưa kho phụ lên làm kho chính và phát hành lại đều giữ mặc định này, không tự quay về hostname máy chủ cũ.",
-    ],
-  },
-  {
-    version: "1.3.113",
-    date: "2026-10-02",
-    lines: [
-      "Sửa lỗi kho ở mục Xem Quảng Cáo và repo phụ được đưa lên làm kho chính bị chạy nhầm nhiệm vụ tông môn.",
-      "Cơ chế thiết lập nay nhận diện chính xác mục đích từng kho, đảm bảo tự động chạy đúng kịch bản xem trang.",
     ],
   },
 ];

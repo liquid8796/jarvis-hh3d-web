@@ -237,6 +237,8 @@ const BANNER_READY_SELECTOR = '.adsterra-leaderboard[data-status="ready"]';
 const NATIVE_SLOT_SELECTOR = ".adsterra-native";
 const NATIVE_READY_SELECTOR = '.adsterra-native[data-status="ready"]';
 const NATIVE_CONTAINER_ID = "container-5e6634da84f8f263d7ab34ae152f1c8d";
+const SOCIAL_BAR_KEY = "977a66f06e979e2830ee60ed1fa88533";
+const SOCIAL_BAR_SELECTOR = `iframe[id*="${SOCIAL_BAR_KEY}"], iframe[class*="${SOCIAL_BAR_KEY}"], iframe[style*="2147483647"], iframe[id*="container-"][style*="fixed"]`;
 
 const rawClickMode = (
   process.argv.find((a) => a.startsWith("--click-mode="))?.split("=")[1] ||
@@ -252,6 +254,29 @@ const IS_EXPLICIT_HEADED =
   process.argv.includes("--head") ||
   process.argv.includes("--visible") ||
   process.env.HEADLESS === "0";
+
+function parseFocusPopunderSocial(cliArgs = process.argv, env = process.env) {
+  if (cliArgs.includes("--no-focus-popunder-social") || cliArgs.includes("--with-native")) {
+    return false;
+  }
+  if (
+    cliArgs.includes("--focus-popunder-social") ||
+    cliArgs.includes("--no-native-click") ||
+    cliArgs.includes("--no-native") ||
+    cliArgs.includes("--focus-high-cpm") ||
+    env.AD_VIEWER_FOCUS_POPUNDER_SOCIAL === "1" ||
+    env.AD_VIEWER_NO_NATIVE === "1"
+  ) {
+    return true;
+  }
+  const isHeadless =
+    cliArgs.includes("--headless") ||
+    cliArgs.includes("--headless=new") ||
+    env.HEADLESS === "1";
+  return isHeadless;
+}
+
+const FOCUS_POPUNDER_SOCIAL = parseFocusPopunderSocial();
 
 let CLICK_MODE = "cdp";
 if (rawClickMode === "mouse") {
@@ -2036,13 +2061,37 @@ async function inspectAdsterraPlacements(page, startedAt = Date.now()) {
     slotBox: nativeSlotFound ? await nativeSlot.boundingBox().catch(() => null) : null,
   };
 
+  const socialBarIframe = page.locator(SOCIAL_BAR_SELECTOR).first();
+  const socialBarFound = (await socialBarIframe.count().catch(() => 0)) > 0;
+  let socialBarCreativeCount = 0;
+  let socialBarBox = null;
+  if (socialBarFound) {
+    socialBarBox = await socialBarIframe.boundingBox().catch(() => null);
+    const iframeHandle = await socialBarIframe.elementHandle().catch(() => null);
+    const frame = iframeHandle ? await iframeHandle.contentFrame().catch(() => null) : null;
+    if (frame) {
+      const socialLinks = await frame.locator('a[href], [class*="__link"]').count().catch(() => 0);
+      socialBarCreativeCount = socialLinks;
+    }
+  }
+
+  const socialBar = {
+    found: socialBarFound,
+    creativeCount: socialBarCreativeCount,
+    box: socialBarBox,
+    status: socialBarFound ? "ready" : "waiting",
+  };
+
   return {
     renderMs: Date.now() - startedAt,
     banner,
     native,
+    socialBar,
     allReady: banner.status === "ready" && (native.status === "ready" || !nativeSlotFound),
     bannerIframeFound,
     bannerIframe,
+    socialBarFound,
+    socialBarIframe,
   };
 }
 
@@ -2640,6 +2689,7 @@ async function runOneCycle(
         : "[AntiDetect] Chạy với Playwright Core mặc định."
     );
     log(`[AntiDetect] Cấu hình đệ quy click: ${MAX_RECURSIVE_CLICKS > 0 ? `Tối đa ${MAX_RECURSIVE_CLICKS} lần` : "Tắt (0 lần)"}`);
+    log(`[Adsterra Trọng Tâm] Chế độ quảng cáo: ${FOCUS_POPUNDER_SOCIAL ? "🎯 ƯU TIÊN POPUNDER + SOCIALBAR (Triệt tiêu impression & click NativeBanner)" : "Cân bằng mọi định dạng (Popunder + SocialBar + Banner + Native)"}`);
     if (cdpUrl) {
       log(`Kết nối tới Chrome ${useMyChrome ? "chính " : ""}qua CDP: ${cdpUrl}...`);
       try {
@@ -2690,6 +2740,7 @@ async function runOneCycle(
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
+        "--disable-popup-blocking",
         "--enable-experimental-extension-apis",
         "--extensions-on-chrome-urls",
         "--silent-debugger-extension-api",
@@ -3120,7 +3171,9 @@ async function runOneCycle(
     await sleep(rand(300, 600));
     await organicScroll(page, rand(350, 550), instanceId);
 
-    await page.locator(".adsterra-stack").scrollIntoViewIfNeeded().catch(() => {});
+    if (!FOCUS_POPUNDER_SOCIAL) {
+      await page.locator(".adsterra-stack").scrollIntoViewIfNeeded().catch(() => {});
+    }
     const diagnostic = await inspectAdsterraPlacements(page, renderStartedAt);
 
     log(
@@ -3134,14 +3187,20 @@ async function runOneCycle(
         `(DOM=${diagnostic.native.rawStatus}, creative=${diagnostic.native.creativeCount}, ` +
         `slot=${formatBox(diagnostic.native.slotBox)})`,
     );
+    log(
+      `Adsterra social-bar: ${diagnostic.socialBar?.status || (diagnostic.socialBarFound ? "ready" : "waiting")} ` +
+        `(found=${diagnostic.socialBarFound ? "có" : "không"}, creative=${diagnostic.socialBar?.creativeCount || 0}, ` +
+        `frame=${formatBox(diagnostic.socialBar?.box)})`,
+    );
     log(`Thời gian chờ render Adsterra: ${diagnostic.renderMs}ms.`);
 
-    const isRenderFinished =
-      diagnostic.allReady || (diagnostic.banner.status === "ready" && diagnostic.native.status === "ready");
+    const isRenderFinished = FOCUS_POPUNDER_SOCIAL
+      ? (diagnostic.socialBarFound || diagnostic.banner.status === "ready")
+      : (diagnostic.allReady || (diagnostic.banner.status === "ready" && diagnostic.native.status === "ready"));
     const isForceClick = !isRenderFinished;
     if (isForceClick) {
       log(
-        `[ForceClick] ⚡ Quá thời gian chờ render Adsterra (${diagnostic.renderMs}ms / tối đa ${AD_READY_TIMEOUT_MS}ms) mà quảng cáo chưa hoàn tất tải (banner=${diagnostic.banner.status}, native=${diagnostic.native.status}) — KÍCH HOẠT CƯỠNG CHẾ (Force Click) 1 quảng cáo bất kỳ ngay lập tức!`,
+        `[ForceClick] ⚡ Quá thời gian chờ render Adsterra (${diagnostic.renderMs}ms / tối đa ${AD_READY_TIMEOUT_MS}ms) mà quảng cáo chưa hoàn tất tải (banner=${diagnostic.banner.status}, native=${diagnostic.native.status}, socialBar=${diagnostic.socialBarFound ? "có" : "không"}) — KÍCH HOẠT CƯỠNG CHẾ (Force Click) 1 quảng cáo bất kỳ ngay lập tức!`,
       );
     }
 
@@ -3176,25 +3235,59 @@ async function runOneCycle(
     // Thu thập tất cả các quảng cáo khả dụng trên trang để chọn ngẫu nhiên
     const adCandidates = [];
 
-    // 1. Toàn bộ các thẻ Native Ads (nếu ready, hoặc toàn bộ thẻ link native nếu ở chế độ Force Click)
+    // 1. Toàn bộ các thẻ Native Ads (chỉ quét nếu KHÔNG bật FOCUS_POPUNDER_SOCIAL)
+    if (!FOCUS_POPUNDER_SOCIAL) {
+      try {
+        const nativeSelector = isForceClick
+          ? `${NATIVE_READY_SELECTOR} #${NATIVE_CONTAINER_ID} a, ${NATIVE_READY_SELECTOR} a, #${NATIVE_CONTAINER_ID} a, .adsterra-native a, [id*="container-"] a`
+          : diagnostic.native.status === "ready"
+          ? `${NATIVE_READY_SELECTOR} #${NATIVE_CONTAINER_ID} a[target="_blank"], ${NATIVE_READY_SELECTOR} a`
+          : null;
+        if (nativeSelector) {
+          const nativeLinks = page.locator(nativeSelector);
+          const count = await nativeLinks.count().catch(() => 0);
+          for (let i = 0; i < count; i++) {
+            adCandidates.push({
+              name: `${isForceClick ? "[Force] " : ""}Native ad card ${i + 1}/${count}`,
+              locator: nativeLinks.nth(i),
+            });
+          }
+        }
+      } catch (err) {
+        log(`Lỗi khi quét native ads: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    // 1b. SocialBar (Floating Notification iframe - CPM cao, ưu tiên đặc biệt)
     try {
-      const nativeSelector = isForceClick
-        ? `${NATIVE_READY_SELECTOR} #${NATIVE_CONTAINER_ID} a, ${NATIVE_READY_SELECTOR} a, #${NATIVE_CONTAINER_ID} a, .adsterra-native a, [id*="container-"] a`
-        : diagnostic.native.status === "ready"
-        ? `${NATIVE_READY_SELECTOR} #${NATIVE_CONTAINER_ID} a[target="_blank"], ${NATIVE_READY_SELECTOR} a`
-        : null;
-      if (nativeSelector) {
-        const nativeLinks = page.locator(nativeSelector);
-        const count = await nativeLinks.count().catch(() => 0);
-        for (let i = 0; i < count; i++) {
+      const socialBarIframe = page.locator(SOCIAL_BAR_SELECTOR).first();
+      const socialBarCount = await socialBarIframe.count().catch(() => 0);
+      if (socialBarCount > 0) {
+        const iframeHandle = await socialBarIframe.elementHandle().catch(() => null);
+        const frame = iframeHandle ? await iframeHandle.contentFrame().catch(() => null) : null;
+        let foundSocialLinks = false;
+        if (frame) {
+          const socialLinks = frame.locator('a[href], [class*="__link"]');
+          const scCount = await socialLinks.count().catch(() => 0);
+          for (let i = 0; i < scCount; i++) {
+            foundSocialLinks = true;
+            adCandidates.push({
+              name: `${isForceClick ? "[Force] " : ""}SocialBar Notification link ${i + 1}/${scCount}`,
+              locator: socialLinks.nth(i),
+              isSocialBar: true,
+            });
+          }
+        }
+        if (!foundSocialLinks) {
           adCandidates.push({
-            name: `${isForceClick ? "[Force] " : ""}Native ad card ${i + 1}/${count}`,
-            locator: nativeLinks.nth(i),
+            name: `${isForceClick ? "[Force] " : ""}SocialBar Notification iframe`,
+            locator: socialBarIframe,
+            isSocialBar: true,
           });
         }
       }
     } catch (err) {
-      log(`Lỗi khi quét native ads: ${err instanceof Error ? err.message : String(err)}`);
+      log(`Lỗi khi quét SocialBar: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     // 2. Banner ad creative trong các iframe quảng cáo (728x90, 468x60, 320x50, 300x250, 160x600, 160x300)
@@ -3250,14 +3343,23 @@ async function runOneCycle(
     if (isForceClick && adCandidates.length === 0) {
       const fallbackLocators = [
         { name: "[Force] Adsterra Banner Slot", sel: ".adsterra-banner, .adsterra-leaderboard" },
-        { name: "[Force] Adsterra Native Slot", sel: ".adsterra-native, #container-5e6634da84f8f263d7ab34ae152f1c8d" },
-        { name: "[Force] Adsterra Stack Container", sel: ".adsterra-stack" },
+        ...(FOCUS_POPUNDER_SOCIAL
+          ? []
+          : [
+              { name: "[Force] Adsterra Native Slot", sel: ".adsterra-native, #container-5e6634da84f8f263d7ab34ae152f1c8d" },
+              { name: "[Force] Adsterra Stack Container", sel: ".adsterra-stack" },
+            ]),
+        { name: "[Force] Adsterra SocialBar", sel: SOCIAL_BAR_SELECTOR },
         { name: "[Force] External Link", sel: "a[target='_blank']" },
       ];
       for (const fb of fallbackLocators) {
         const loc = page.locator(fb.sel).first();
         if ((await loc.count().catch(() => 0)) > 0) {
-          adCandidates.push({ name: fb.name, locator: loc });
+          adCandidates.push({
+            name: fb.name,
+            locator: loc,
+            isSocialBar: fb.sel === SOCIAL_BAR_SELECTOR,
+          });
         }
       }
     }
@@ -3343,11 +3445,43 @@ async function runOneCycle(
         }
       }
 
+      // 4. Ưu tiên click SocialBar nếu Popunder chưa mở tab
+      if (!adClicked) {
+        const socialCandidate = adCandidates.find((c) => c.isSocialBar);
+        if (socialCandidate) {
+          log(
+            `🔔 [SocialBar Ưu Tiên] Phát hiện quảng cáo SocialBar nổi; tiến hành click [${socialCandidate.name}] (${cycleClickMode} mode)...`,
+          );
+          const clickTarget = await resolveAdClickTarget(socialCandidate.locator);
+          if (clickTarget) {
+            log(`-> Click SocialBar tại (${Math.round(clickTarget.x)}, ${Math.round(clickTarget.y)})...`);
+            const sbPage = await performEngageAndClick(page, context, clickTarget.x, clickTarget.y, instanceId, cycleClickMode);
+            if (sbPage) {
+              openedPage = sbPage;
+              adClicked = true;
+              log(`✓ Đã mở tab quảng cáo thành công từ SocialBar [${socialCandidate.name}].`);
+            } else {
+              await sleep(2500);
+              const allPages = context.pages();
+              if (allPages.length > 1) {
+                openedPage = allPages[allPages.length - 1];
+                adClicked = true;
+                log(`✓ Đã bắt được trang quảng cáo từ tab phụ SocialBar [${socialCandidate.name}].`);
+              } else {
+                log("SocialBar chưa mở tab mới; chuyển sang danh sách banner dự phòng...");
+              }
+            }
+          }
+        }
+      }
+
       if (!adClicked && adCandidates.length > 0) {
+        const remainingCandidates = adCandidates.filter((c) => !c.isSocialBar);
+        const candidatesToClick = remainingCandidates.length > 0 ? remainingCandidates : adCandidates;
         log(
-          `${isForceClick ? "[ForceClick] " : ""}${preferPopunder ? "[Banner Dự Phòng] " : ""}Tìm thấy tổng cộng ${adCandidates.length} vị trí quảng cáo khả dụng${isForceClick ? " (kể cả chưa ready)" : ""}. Đang chọn ngẫu nhiên để click (${cycleClickMode} mode)...`,
+          `${isForceClick ? "[ForceClick] " : ""}${preferPopunder ? "[Banner Dự Phòng] " : ""}Tìm thấy tổng cộng ${candidatesToClick.length} vị trí quảng cáo khả dụng${isForceClick ? " (kể cả chưa ready)" : ""}. Đang chọn ngẫu nhiên để click (${cycleClickMode} mode)...`,
         );
-        for (const candidate of adCandidates) {
+        for (const candidate of candidatesToClick) {
           const clickTarget = await resolveAdClickTarget(candidate.locator);
           if (!clickTarget) {
             log(`  Bỏ qua [${candidate.name}] — không xác định được toạ độ.`);
@@ -3808,4 +3942,13 @@ if (isDirectExecution) {
   });
 }
 
-export { ProxyManager, parseProxyItem, parsePopunderRatio, resolvePopunderTarget };
+export {
+  ProxyManager,
+  parseProxyItem,
+  parsePopunderRatio,
+  resolvePopunderTarget,
+  parseFocusPopunderSocial,
+  FOCUS_POPUNDER_SOCIAL,
+  SOCIAL_BAR_KEY,
+  SOCIAL_BAR_SELECTOR,
+};

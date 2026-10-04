@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.171 — Nâng cấp cơ chế nhận diện toàn bộ biểu ngữ và tối ưu toạ độ kích hoạt Popunder (04/10/2026)
+
+- Tối ưu hoá quy trình nhận diện và kích hoạt quảng cáo trong [scripts/adViewer.mjs](scripts/adViewer.mjs):
+  - Nâng cấp bộ nhận diện biểu ngữ trong `inspectAdsterraPlacements`: quét toàn diện các khung `iframe` sẵn sàng trên mọi kích thước (728×90, 468×60, 320×50, 300×250, 160×600, 160×300), thay vì chỉ phụ thuộc vào biểu ngữ 728×90 đơn lẻ; ghi nhận trạng thái sẵn sàng ngay khi bất kỳ biểu ngữ nào tải xong nội dung sáng tạo, chấm dứt việc kích hoạt cưỡng chế (`ForceClick`) sớm khi quảng cáo vẫn đang hiển thị bình thường.
+  - Tối ưu thuật toán chọn toạ độ kích hoạt Popunder trong `resolvePopunderTarget`: mở rộng giới hạn quét khối quảng cáo từ 10 lên tối đa 50 phần tử để bao quát trọn vẹn toàn bộ 6 biểu ngữ, thanh SocialBar, NativeBanner và Smartlink; đồng thời loại trừ hoàn toàn các thẻ liên kết và nút bấm (`a`, `button`, `input`) nhằm ngăn ngừa việc click nhầm làm chuyển trang khỏi trang chủ.
+
 ## 1.3.170 — Cập nhật chính xác mã cấu hình và thẻ nhúng cho toàn bộ biểu ngữ Adsterra (04/10/2026)
 
 - Đối soát và đồng bộ toàn diện mã nhúng cho tất cả 6 định dạng Banner Adsterra theo đúng tệp kịch bản nhà cung cấp:

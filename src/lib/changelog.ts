@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.171",
+    date: "2026-10-04",
+    lines: [
+      "Kho Xem Quảng Cáo nâng cấp cơ chế quét toàn bộ các khung biểu ngữ và tính toạ độ an toàn cho quảng cáo ngầm.",
+      "Tối ưu hoá nhận diện nội dung sáng tạo trên các kích thước biểu ngữ mới, loại bỏ tình trạng kích hoạt cưỡng chế sớm.",
+    ],
+  },
+  {
     version: "1.3.170",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Kho Xem Quảng Cáo tự động dọn dẹp sạch sẽ bộ nhớ đệm và dữ liệu duyệt web sau mỗi chu kỳ hoạt động.",
       "Lựa chọn ngẫu nhiên vị trí và liên kết quảng cáo để tương tác, tăng cường tính tự nhiên cho phiên xem.",
-    ],
-  },
-  {
-    version: "1.3.121",
-    date: "2026-10-02",
-    lines: [
-      "Kho Xem Quảng Cáo chuyển về trình duyệt Chromium tiêu chuẩn cùng tiện ích mở rộng chống nhận diện dấu vân tay.",
-      "Tự động chuẩn bị môi trường và kích hoạt chế độ mở rộng an toàn cho các phiên xem trên máy.",
     ],
   },
 ];

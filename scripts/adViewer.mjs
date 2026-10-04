@@ -1769,7 +1769,7 @@ async function resolvePopunderTarget(page) {
     try {
       const adLocators = page.locator(".adsterra-unit, .adsterra-stack, .adsterra-flank, iframe");
       const adCount = await adLocators.count().catch(() => 0);
-      for (let i = 0; i < Math.min(10, adCount); i++) {
+      for (let i = 0; i < Math.min(50, adCount); i++) {
         const b = await adLocators.nth(i).boundingBox().catch(() => null);
         if (b) adBoxes.push(b);
       }
@@ -1779,17 +1779,20 @@ async function resolvePopunderTarget(page) {
       adBoxes.some((b) => x >= b.x - 5 && x <= b.x + b.width + 5 && y >= b.y - 5 && y <= b.y + b.height + 5);
 
     const contentSelectors = [
-      "h1, h2, h3",
+      "h1",
+      "h2",
+      "h3",
       "p",
-      ".hero",
-      "nav",
-      "header",
+      ".hero-description",
+      "section p",
     ];
     for (const sel of contentSelectors) {
       const locators = page.locator(sel);
       const count = await locators.count().catch(() => 0);
       for (let i = 0; i < count; i++) {
         const loc = locators.nth(i);
+        const isInteractive = await loc.evaluate((el) => Boolean(el.closest("a, button, input, textarea, select"))).catch(() => false);
+        if (isInteractive) continue;
         const box = await loc.boundingBox().catch(() => null);
         if (box && box.width >= 40 && box.height >= 20) {
           const cx = Math.floor(box.x + box.width * 0.5);
@@ -2048,25 +2051,34 @@ async function inspectAdsterraPlacements(page, startedAt = Date.now()) {
   const bannerReady = page.locator(BANNER_READY_SELECTOR).first();
   const bannerReadyFound = (await bannerReady.count()) > 0;
   const bannerIframe = page
-    .locator(`${BANNER_READY_SELECTOR} iframe[width="728"][height="90"]`)
+    .locator(`${BANNER_READY_SELECTOR} iframe[width="728"][height="90"], .adsterra-banner[data-status="ready"] iframe, .adsterra-unit iframe`)
     .first();
   const bannerIframeFound = (await bannerIframe.count()) > 0;
   let bannerCreativeCount = 0;
 
   if (bannerIframeFound) {
-    const iframeHandle = await bannerIframe.elementHandle().catch(() => null);
-    const frame = iframeHandle ? await iframeHandle.contentFrame().catch(() => null) : null;
-    if (frame) {
-      const creativeWaitMs = Math.max(0, AD_READY_TIMEOUT_MS - (Date.now() - startedAt));
-      if (creativeWaitMs > 0) {
-        await frame.locator("a[href] img, a[href]").first().waitFor({
-          state: "attached",
-          timeout: creativeWaitMs,
-        }).catch(() => {});
+    const candidateIframes = page.locator(
+      `${BANNER_READY_SELECTOR} iframe[width="728"][height="90"], .adsterra-banner[data-status="ready"] iframe, .adsterra-unit iframe`
+    );
+    const ifrCount = await candidateIframes.count().catch(() => 0);
+    for (let f = 0; f < ifrCount; f++) {
+      const iframeHandle = await candidateIframes.nth(f).elementHandle().catch(() => null);
+      const frame = iframeHandle ? await iframeHandle.contentFrame().catch(() => null) : null;
+      if (frame) {
+        const creativeWaitMs = Math.max(0, AD_READY_TIMEOUT_MS - (Date.now() - startedAt));
+        if (creativeWaitMs > 0 && bannerCreativeCount === 0) {
+          await frame.locator("a[href] img, a[href]").first().waitFor({
+            state: "attached",
+            timeout: Math.min(creativeWaitMs, 3000),
+          }).catch(() => {});
+        }
+        const linkedImages = await frame.locator("a[href] img").count().catch(() => 0);
+        const linkedCreatives = await frame.locator("a[href]").count().catch(() => 0);
+        const countCreatives = linkedImages > 0 ? linkedImages : linkedCreatives;
+        if (countCreatives > 0) {
+          bannerCreativeCount += countCreatives;
+        }
       }
-      const linkedImages = await frame.locator("a[href] img").count().catch(() => 0);
-      const linkedCreatives = await frame.locator("a[href]").count().catch(() => 0);
-      bannerCreativeCount = linkedImages > 0 ? linkedImages : linkedCreatives;
     }
   }
 

@@ -27,7 +27,11 @@ import {
   runCycle,
 } from "../src/lib/quest-engine/runCycle.mjs";
 // Nhập thẳng từ module LÁ: `detectWordPressUser` chỉ biết định dạng cookie, không đi qua engine.
-import { DEFAULT_GAME_BASE_URL, detectWordPressUser } from "../src/lib/quest-engine/cookies.mjs";
+import {
+  DEFAULT_GAME_BASE_URL,
+  detectWordPressUser,
+  gameBaseUrlFromCookieExport,
+} from "../src/lib/quest-engine/cookies.mjs";
 import {
   _observeGate,
   _resetGate,
@@ -1452,6 +1456,50 @@ async function main() {
   );
   check("wrapper .de vẫn loại cookie site khác", !fromDeExport.some((c) => c.name === "NID"));
 
+  // 05/10/2026: HH3D lại chuyển sang .you. File export mới của tài khoản thường mang đúng
+  // wrapper này; không chỉ parser phải nhận cookie, mà worker còn phải tự mở CHÍNH origin .you
+  // thay vì tiếp tục theo settings .de rồi chẩn đoán nhầm cookie hợp lệ thành hết hạn.
+  const youExport = JSON.stringify({
+    url: "https://hoathinh3d.you",
+    cookies: [
+      {
+        domain: "hoathinh3d.you",
+        hostOnly: true,
+        httpOnly: true,
+        name: "WPSESSID_x",
+        path: "/",
+        sameSite: "lax",
+        secure: true,
+        session: true,
+        storeId: "0",
+        value: "session",
+      },
+      {
+        domain: "hoathinh3d.you",
+        expirationDate: 1792437085.40906,
+        hostOnly: true,
+        httpOnly: true,
+        name: "wordpress_logged_in_x",
+        path: "/",
+        sameSite: "unspecified",
+        secure: true,
+        session: false,
+        storeId: "0",
+        value: "liquid8796%7C1792393885%7Ctoken%7Chmac",
+      },
+    ],
+  });
+  const fromYouExport = parseCookieString(youExport, "https://hoathinh3d.de");
+  check(
+    "wrapper .you của tài khoản thường đọc được dù cấu hình còn .de",
+    fromYouExport.length === 2 && fromYouExport.some((c) => c.name === "wordpress_logged_in_x"),
+    `nhận ${fromYouExport.length}`,
+  );
+  check(
+    "wrapper .you tự đưa worker sang origin .you",
+    gameBaseUrlFromCookieExport(youExport, "https://hoathinh3d.de") === "https://hoathinh3d.you",
+  );
+
   const foreignWrapper = JSON.stringify({
     url: "https://example.com",
     cookies: [{ domain: "example.com", name: "wordpress_logged_in_x", value: "x" }],
@@ -1459,6 +1507,10 @@ async function main() {
   check(
     "URL wrapper site khác không được nới hàng rào domain",
     parseCookieString(foreignWrapper, "https://hoathinh3d.so").length === 0,
+  );
+  check(
+    "wrapper site khác không được đổi origin worker",
+    gameBaseUrlFromCookieExport(foreignWrapper, "https://hoathinh3d.you") === "https://hoathinh3d.you",
   );
 
   const fromArray = parseCookieString('[{"name":"a","value":"1"}]', "https://e.test");

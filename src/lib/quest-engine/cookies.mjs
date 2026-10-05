@@ -19,7 +19,7 @@
  */
 
 /**
- * Tên miền game. Site đổi TLD định kỳ (…mx → …am → …one → …so → …de), nên đây phải là cấu hình chứ
+ * Tên miền game. Site đổi TLD định kỳ (…mx → …am → …one → …so → …de → …you), nên đây phải là cấu hình chứ
  * không phải hằng số — biến môi trường `GAME_BASE_URL` đè lên được, để một cú dời tên miền
  * chỉ tốn một lần sửa env thay vì một lần deploy.
  *
@@ -33,7 +33,7 @@
  * đã lưu chết theo, và đạo hữu BẮT BUỘC phải dán lại chuỗi cookie lấy từ tên miền mới. Cổng
  * sẵn sàng giờ tự nhận ra cú 301 và nói thẳng điều đó (xem `movedTo` trong runCycle).
  */
-export const DEFAULT_GAME_BASE_URL = "https://hoathinh3d.de";
+export const DEFAULT_GAME_BASE_URL = "https://hoathinh3d.you";
 
 /**
  * Chuẩn hoá thứ trưởng môn gõ vào ô tên miền thành một ORIGIN sạch, hoặc nói rõ vì sao không.
@@ -83,6 +83,53 @@ export function normalizeGameBaseUrl(raw) {
 }
 
 /**
+ * Lấy origin được ghi NGAY TRONG bản export cookie khi nó vẫn thuộc cùng site với origin cấu
+ * hình. Đây là lớp tự chữa cho lúc HH3D vừa đổi TLD: cookie mới đã nói rất rõ nó được lấy từ
+ * `hoathinh3d.<mới>`, nên khôi lỗi không được tiếp tục mở `hoathinh3d.<cũ>` chỉ vì cấu hình
+ * toàn cục chưa kịp đổi.
+ *
+ * Chỉ wrapper `{ url, cookies: [...] }` được quyền đổi origin. Mảng JSON trần không mang đủ
+ * bằng chứng; wrapper của site khác cũng tuyệt đối không được kéo browser sang chỗ khác.
+ *
+ * @param {string} rawCookie
+ * @param {string} configuredBaseUrl
+ * @returns {string}
+ */
+export function gameBaseUrlFromCookieExport(rawCookie, configuredBaseUrl) {
+  const fallback = normalizeGameBaseUrl(configuredBaseUrl);
+  const baseUrl = fallback.ok ? fallback.baseUrl : String(configuredBaseUrl ?? "").trim();
+  const text = String(rawCookie ?? "").trim();
+  if (!text.startsWith("{")) return baseUrl;
+
+  let target;
+  try {
+    target = new URL(baseUrl);
+  } catch {
+    return baseUrl;
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed?.cookies) || typeof parsed?.url !== "string" || !parsed.url.trim()) {
+      return baseUrl;
+    }
+
+    const exported = new URL(parsed.url.trim());
+    if (exported.protocol !== "https:" && exported.protocol !== "http:") return baseUrl;
+
+    const targetLabels = target.hostname.split(".").filter(Boolean);
+    const sourceLabels = exported.hostname.split(".").filter(Boolean);
+    const targetSld = targetLabels.length >= 2 ? targetLabels.at(-2)?.toLowerCase() : "";
+    const sourceSld = sourceLabels.length >= 2 ? sourceLabels.at(-2)?.toLowerCase() : "";
+    if (!targetSld || sourceSld !== targetSld) return baseUrl;
+
+    return exported.origin;
+  } catch {
+    return baseUrl;
+  }
+}
+
+/**
  * Chuỗi cookie người dùng dán → mảng cookie của Playwright. Hiểu MỌI định dạng hợp lý:
  *
  *   • `document.cookie` / header: "wordpress_logged_in_…=…; wordpress_sec_…=…"
@@ -100,9 +147,13 @@ export function parseCookieString(raw, url) {
   const text = String(raw ?? "").trim();
   if (!text) return [];
 
+  // Cùng nguồn sự thật với runCycle: wrapper cookie mới được phép tự chỉ sang TLD mới của
+  // đúng họ site. Nhờ vậy parser không vứt cookie .you chỉ vì settings vẫn còn .de.
+  const cookieBaseUrl = gameBaseUrlFromCookieExport(text, url) || url;
+
   let host = "";
   try {
-    host = new URL(url).hostname;
+    host = new URL(cookieBaseUrl).hostname;
   } catch {
     /* url hỏng thì bỏ lọc theo domain */
   }
@@ -117,28 +168,8 @@ export function parseCookieString(raw, url) {
           : null;
 
       if (list) {
-        // Wrapper mới của Cookie-Editor/J2TEAM mang URL nguồn ở gốc. Khi site vừa đổi TLD,
-        // cấu hình server có thể vẫn là hoathinh3d.<cũ>; nếu cứ lọc domain theo URL cũ thì một
-        // export hoàn toàn đúng từ hoathinh3d.<mới> bị vứt sạch. Chỉ tin URL nguồn khi nó vẫn
-        // thuộc CÙNG họ second-level-domain với target; export của site khác không được phép
-        // nới hàng rào này.
-        let cookieHost = host;
-        let cookieUrl = url;
-        const targetLabels = host.split(".").filter(Boolean);
-        const targetSld = targetLabels.length >= 2 ? targetLabels.at(-2)?.toLowerCase() : "";
-        if (!Array.isArray(parsed) && typeof parsed?.url === "string" && parsed.url.trim()) {
-          try {
-            const exported = new URL(parsed.url.trim());
-            const sourceLabels = exported.hostname.split(".").filter(Boolean);
-            const sourceSld = sourceLabels.length >= 2 ? sourceLabels.at(-2)?.toLowerCase() : "";
-            if (!targetSld || sourceSld === targetSld) {
-              cookieHost = exported.hostname;
-              cookieUrl = exported.origin;
-            }
-          } catch {
-            // URL nguồn hỏng thì giữ hàng rào theo target mà caller đưa vào.
-          }
-        }
+        const cookieHost = host;
+        const cookieUrl = cookieBaseUrl;
 
         const cookies = [];
         for (const c of list) {

@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.187 — Theo đúng tên miền `.you` trong file cookie mới của HH3D (05/10/2026)
+
+- Đổi tên miền mặc định sang `https://hoathinh3d.you` cho cài đặt mới và gói khôi lỗi mới.
+- Khi file cookie dạng wrapper có `url` thuộc cùng họ `hoathinh3d.*`, worker dùng chính origin đó để mở game thay vì tiếp tục bám cấu hình TLD cũ; nhờ vậy cookie tài khoản thường xuất từ `.you` không còn bị báo nhầm là hết phiên chỉ vì máy chủ vẫn lưu `.de`.
+- Bổ sung hồi quy cho đúng format Cookie-Editor/J2TEAM mới (`{ url, cookies: [...] }`) và giữ hàng rào không cho wrapper của site khác đổi origin.
+
 ## 1.3.186 — Khắc phục lỗi sập terminal khi chọn nguồn lưu lượng trong run-ad-viewer (05/10/2026)
 
 - Sửa lỗi cú pháp CMD trong [run-ad-viewer.bat](run-ad-viewer.bat) khiến cửa sổ dòng lệnh bị sập đột ngột khi người dùng chọn nguồn lưu lượng ngẫu nhiên hoặc các tuỳ chọn có chứa dấu ngoặc đơn:

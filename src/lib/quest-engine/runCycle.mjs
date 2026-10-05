@@ -10,7 +10,7 @@
 import { pillBagCapacityProbe, readinessProbe, vipProbe } from "./boardScripts.mjs";
 import { closeBrowserWithin } from "./browserShutdown.mjs";
 import { computeNextDelaySeconds } from "./cooldown.mjs";
-import { DEFAULT_GAME_BASE_URL, parseCookieString } from "./cookies.mjs";
+import { DEFAULT_GAME_BASE_URL, gameBaseUrlFromCookieExport, parseCookieString } from "./cookies.mjs";
 import { isDailyQuotaQuest, peersDoneForQuota, reachedDailyQuota } from "./dailyQuota.mjs";
 import { createQuestEngine, CycleBlocked, enabledQuestsInOrder, questsForAccount, QuestAborted } from "./engine.mjs";
 import { profileForConfig } from "./profile.mjs";
@@ -23,7 +23,7 @@ import { createSession } from "./session.mjs";
 // để server action của Next dùng được mà không kéo cả engine — và cả profile.json — vào
 // bundle. Re-export để mọi nơi đang import từ đây vẫn nguyên, và để gói khôi lỗi chỉ cần
 // biết một cửa.
-export { DEFAULT_GAME_BASE_URL, parseCookieString } from "./cookies.mjs";
+export { DEFAULT_GAME_BASE_URL, gameBaseUrlFromCookieExport, parseCookieString } from "./cookies.mjs";
 
 /**
  * UA của một Chrome desktop thật, chờ điền số hiệu bản. Chrome thật từ lâu chỉ khai major
@@ -618,11 +618,9 @@ export async function runCycle(deps) {
     reportPillBagCaps = async () => {},
     reportProgress = () => {},
     shouldStop = () => false,
-    // Thứ tự nguồn có chủ ý: người gọi truyền thẳng (smoke) > tên miền server gửi kèm job >
-    // env của máy chạy khôi lỗi > hằng số trong mã nguồn. Server đứng TRÊN env vì đó là chỗ
-    // duy nhất trưởng môn sửa được mà không phải đụng vào từng máy; env vẫn giữ nguyên quyền
-    // phủ quyết cục bộ cho ai muốn trỏ khôi lỗi nhà mình đi chỗ khác để thử.
-    baseUrl = deps.config?.gameBaseUrl?.trim() || process.env.GAME_BASE_URL || DEFAULT_GAME_BASE_URL,
+    // `baseUrl` truyền thẳng là nấc cao nhất (smoke/chẩn đoán). Khi không có nó, origin cấu
+    // hình còn được wrapper cookie tự sửa sang TLD mới của CÙNG site ở ngay dưới đây.
+    baseUrl: explicitBaseUrl,
     budgetMs = 0,
     headless = true,
     profileDir = process.env.BROWSER_PROFILE_DIR || "",
@@ -645,6 +643,19 @@ export async function runCycle(deps) {
       "Chưa có tài khoản hoathinh3d — hãy dán chuỗi cookie đăng nhập trước.",
     );
   }
+
+  // Tên miền HH3D đổi định kỳ. Bản export mới có `{url:"https://hoathinh3d.you",cookies:[…]}`
+  // chính là bằng chứng mạnh hơn một setting toàn cục còn kẹt ở TLD cũ. Bản PC đã làm việc
+  // này lúc import từ 19/09; bản web trước đây chỉ dùng URL wrapper để LỌC cookie nhưng vẫn mở
+  // browser ở origin cũ, nên một cookie hoàn toàn hợp lệ vẫn có thể bị kể thành "hết hạn".
+  //
+  // `deps.baseUrl` là cửa chẩn đoán/test nên được tôn trọng tuyệt đối. Chỉ đường chạy thật
+  // (server > env > default) mới tự theo wrapper, và helper chỉ chấp nhận cùng SLD.
+  const configuredBaseUrl =
+    explicitBaseUrl?.trim() || config?.gameBaseUrl?.trim() || process.env.GAME_BASE_URL || DEFAULT_GAME_BASE_URL;
+  const baseUrl = explicitBaseUrl?.trim()
+    ? configuredBaseUrl
+    : gameBaseUrlFromCookieExport(config.gameCookie, configuredBaseUrl);
 
   // Parse NGAY và coi số không là lỗi to — không bao giờ để browser đi tay trắng rồi chết
   // ở một selector vô tội mười bước sau (đúng kịch bản 02/08).

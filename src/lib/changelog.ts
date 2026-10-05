@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.187",
+    date: "2026-10-05",
+    lines: [
+      "Nhận đúng bản xuất đăng nhập HH3D mới từ hoathinh3d.you, kể cả khi cấu hình cũ vẫn còn trỏ .de.",
+      "Khôi lỗi tự theo tên miền của bản xuất cùng họ hoathinh3d và không để dữ liệu của trang khác đổi nơi chạy.",
+    ],
+  },
+  {
     version: "1.3.186",
     date: "2026-10-05",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Tích hợp chế độ hỗ trợ chuột Logitech G-HUB cùng kịch bản driver phần cứng cho dòng chuột G304.",
       "Khắc phục triệt để lỗi co nhỏ cửa sổ Chrome và chuẩn hoá toạ độ rê chuột phần cứng trên màn hình Windows.",
-    ],
-  },
-  {
-    version: "1.3.137",
-    date: "2026-10-03",
-    lines: [
-      "Rút ngắn thời gian đọc nội dung bài viết và lướt xem trang web trước khi click quảng cáo xuống tối đa 3 giây.",
-      "Bổ sung tham số cấu hình thời gian đọc bài giúp linh hoạt điều chỉnh nhịp tương tác tự nhiên theo nhu cầu.",
     ],
   },
 ];

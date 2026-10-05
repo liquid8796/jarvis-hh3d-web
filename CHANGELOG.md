@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.186 — Khắc phục lỗi sập terminal khi chọn nguồn lưu lượng trong run-ad-viewer (05/10/2026)
+
+- Sửa lỗi cú pháp CMD trong [run-ad-viewer.bat](run-ad-viewer.bat) khiến cửa sổ dòng lệnh bị sập đột ngột khi người dùng chọn nguồn lưu lượng ngẫu nhiên hoặc các tuỳ chọn có chứa dấu ngoặc đơn:
+  - **Nguyên nhân**: Chuỗi `echo -> Nguon truy cap: X (Twitter) [Social]` nằm bên trong khối lệnh cha `if (...) else (...)` làm bộ phân tích cú pháp của `cmd.exe` hiểu nhầm dấu `)` đóng ngoặc là kết thúc khối lệnh, dẫn tới lỗi cú pháp `[Social] was unexpected at this time.` và đóng cửa sổ ngay lập tức.
+  - **Khắc phục triệt để**: Tách các khối điều kiện `if` độc lập thay cho chuỗi `else if` gom nhóm lồng nhau, chuẩn hoá chuỗi hiển thị thành `X / Twitter [Social]`, đồng thời thêm cơ chế lọc bỏ ký tự `%` thừa (`%INPUT_TRAFFIC_RATIO:%=%`) trong ô nhập xác suất để ngăn chặn lỗi mở rộng biến batch.
+
 ## 1.3.185 — Tuỳ chọn nguồn lưu lượng đa dạng (Traffic Source) & Tỉ lệ điều phối tự nhiên (05/10/2026)
 
 - Bổ sung tuỳ chọn cấu hình nguồn lưu lượng truy cập (Traffic Source / Referrer) trong [run-ad-viewer.bat](run-ad-viewer.bat) và [scripts/adViewer.mjs](scripts/adViewer.mjs):

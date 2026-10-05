@@ -409,35 +409,41 @@ if "%INPUT_TRAFFIC_SOURCE%"=="2" (
     set "ARG_TRAFFIC_SOURCE=--traffic-source=all"
     echo     -^> Nguon truy cap: Ngau nhien tat ca [Google, Facebook, Instagram, TikTok, X, ChatGPT]
     goto PROMPT_TRAFFIC_RATIO
-) else if "%INPUT_TRAFFIC_SOURCE%"=="3" (
+)
+if "%INPUT_TRAFFIC_SOURCE%"=="3" (
     set "ARG_TRAFFIC_SOURCE=--traffic-source=google"
     echo     -^> Nguon truy cap: Google Search [Organic Search]
     goto PROMPT_TRAFFIC_RATIO
-) else if "%INPUT_TRAFFIC_SOURCE%"=="4" (
+)
+if "%INPUT_TRAFFIC_SOURCE%"=="4" (
     set "ARG_TRAFFIC_SOURCE=--traffic-source=facebook"
     echo     -^> Nguon truy cap: Facebook [Social]
     goto PROMPT_TRAFFIC_RATIO
-) else if "%INPUT_TRAFFIC_SOURCE%"=="5" (
+)
+if "%INPUT_TRAFFIC_SOURCE%"=="5" (
     set "ARG_TRAFFIC_SOURCE=--traffic-source=instagram"
     echo     -^> Nguon truy cap: Instagram [Social]
     goto PROMPT_TRAFFIC_RATIO
-) else if "%INPUT_TRAFFIC_SOURCE%"=="6" (
+)
+if "%INPUT_TRAFFIC_SOURCE%"=="6" (
     set "ARG_TRAFFIC_SOURCE=--traffic-source=tiktok"
     echo     -^> Nguon truy cap: TikTok [Social]
     goto PROMPT_TRAFFIC_RATIO
-) else if "%INPUT_TRAFFIC_SOURCE%"=="7" (
+)
+if "%INPUT_TRAFFIC_SOURCE%"=="7" (
     set "ARG_TRAFFIC_SOURCE=--traffic-source=x"
-    echo     -^> Nguon truy cap: X (Twitter) [Social]
+    echo     -^> Nguon truy cap: X / Twitter [Social]
     goto PROMPT_TRAFFIC_RATIO
-) else if "%INPUT_TRAFFIC_SOURCE%"=="8" (
+)
+if "%INPUT_TRAFFIC_SOURCE%"=="8" (
     set "ARG_TRAFFIC_SOURCE=--traffic-source=chatgpt"
     echo     -^> Nguon truy cap: ChatGPT [AI Referral]
     goto PROMPT_TRAFFIC_RATIO
-) else (
-    set "ARG_TRAFFIC_SOURCE=--traffic-source=none"
-    echo     -^> Nguon truy cap: Khong dung [Truy cap truc tiep - Direct Traffic]
-    goto SKIP_TRAFFIC_RATIO
 )
+
+set "ARG_TRAFFIC_SOURCE=--traffic-source=none"
+echo     -^> Nguon truy cap: Khong dung [Truy cap truc tiep - Direct Traffic]
+goto SKIP_TRAFFIC_RATIO
 
 :PROMPT_TRAFFIC_RATIO
 echo.
@@ -447,8 +453,9 @@ echo      Nhap ti le phan tram (vi du: 70, 80, 100), hoac thap phan (0.8).
 echo      Vi du: 80%% = 80%% luot truy cap mang referrer cua nguon, 20%% con lai la truc tiep (Direct).
 echo      De trong de su dung mac dinh (80%%).
 set "INPUT_TRAFFIC_RATIO="
-set /p "INPUT_TRAFFIC_RATIO=    Xac suat co referrer (%%) [Enter = mac dinh 80%%]: "
+set /p "INPUT_TRAFFIC_RATIO=    Xac suat co referrer [Enter = mac dinh 80%%]: "
 if defined INPUT_TRAFFIC_RATIO (
+    set "INPUT_TRAFFIC_RATIO=%INPUT_TRAFFIC_RATIO:%%=%"
     set "ARG_TRAFFIC_RATIO=--traffic-ratio=%INPUT_TRAFFIC_RATIO%"
     echo     -^> Xac suat: %INPUT_TRAFFIC_RATIO%%%
 ) else (

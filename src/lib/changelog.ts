@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.186",
+    date: "2026-10-05",
+    lines: [
+      "Khắc phục sự cố sập cửa sổ dòng lệnh khi chọn nguồn lưu lượng trong công cụ xem quảng cáo.",
+      "Tối ưu hoá cú pháp xử lý khối lệnh batch và chuẩn hoá tỉ lệ phần trăm nhập vào.",
+    ],
+  },
+  {
     version: "1.3.185",
     date: "2026-10-05",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Rút ngắn thời gian đọc nội dung bài viết và lướt xem trang web trước khi click quảng cáo xuống tối đa 3 giây.",
       "Bổ sung tham số cấu hình thời gian đọc bài giúp linh hoạt điều chỉnh nhịp tương tác tự nhiên theo nhu cầu.",
-    ],
-  },
-  {
-    version: "1.3.136",
-    date: "2026-10-03",
-    lines: [
-      "Sửa lỗi cú pháp toán tử gom nhóm trong bộ cấu hình thời gian tải trang của trình xem quảng cáo.",
-      "Khắc phục sự cố xung đột ký tự lệnh trong menu khởi chạy tệp batch trên môi trường Windows.",
     ],
   },
 ];

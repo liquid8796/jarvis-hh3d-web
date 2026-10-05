@@ -286,6 +286,151 @@ function parsePopunderRatio(input) {
 
 const POPUNDER_RATIO = parsePopunderRatio();
 
+const TRAFFIC_SOURCES = {
+  google: {
+    id: "google",
+    name: "Google Search (Organic)",
+    referrers: [
+      "https://www.google.com/",
+      "https://www.google.com/search?q=auto+hh3d",
+      "https://www.google.com/search?q=auto+hh3d+online",
+      "https://www.google.com.vn/",
+      "https://www.google.com.vn/search?q=auto+hoathinh3d",
+      "https://www.google.com.vn/search?q=auto+hh3d",
+    ],
+  },
+  facebook: {
+    id: "facebook",
+    name: "Facebook (Social)",
+    referrers: [
+      "https://l.facebook.com/",
+      "https://www.facebook.com/",
+      "https://m.facebook.com/",
+      "https://lm.facebook.com/",
+    ],
+  },
+  instagram: {
+    id: "instagram",
+    name: "Instagram (Social)",
+    referrers: [
+      "https://l.instagram.com/",
+      "https://www.instagram.com/",
+    ],
+  },
+  tiktok: {
+    id: "tiktok",
+    name: "TikTok (Social)",
+    referrers: [
+      "https://www.tiktok.com/",
+      "https://link.tiktok.com/",
+    ],
+  },
+  x: {
+    id: "x",
+    name: "X / Twitter (Social)",
+    referrers: [
+      "https://t.co/",
+      "https://x.com/",
+      "https://twitter.com/",
+    ],
+  },
+  chatgpt: {
+    id: "chatgpt",
+    name: "ChatGPT (AI Referral)",
+    referrers: [
+      "https://chatgpt.com/",
+      "https://chat.openai.com/",
+    ],
+  },
+};
+
+function parseTrafficSource(argv = process.argv, env = process.env) {
+  const cli =
+    argv.find((a) => a.startsWith("--traffic-source="))?.split("=")[1] ||
+    argv.find((a) => a.startsWith("--traffic-src="))?.split("=")[1] ||
+    argv.find((a) => a.startsWith("--referrer="))?.split("=")[1] ||
+    argv.find((a) => a.startsWith("--referer="))?.split("=")[1] ||
+    argv.find((a) => a.startsWith("--source="))?.split("=")[1];
+
+  const envVal = env.AD_VIEWER_TRAFFIC_SOURCE || env.AD_VIEWER_REFERRER || "";
+  const raw = (cli || envVal || "none").trim().toLowerCase();
+
+  if (raw === "all" || raw === "random" || raw === "any") return "all";
+  if (raw === "google" || raw === "googlesearch" || raw === "search") return "google";
+  if (raw === "facebook" || raw === "fb") return "facebook";
+  if (raw === "instagram" || raw === "ig" || raw === "insta") return "instagram";
+  if (raw === "tiktok" || raw === "tt") return "tiktok";
+  if (raw === "x" || raw === "twitter") return "x";
+  if (raw === "chatgpt" || raw === "openai") return "chatgpt";
+  return "none";
+}
+
+function parseTrafficRatio(argv = process.argv, env = process.env) {
+  const cli =
+    argv.find((a) => a.startsWith("--traffic-ratio="))?.split("=")[1] ||
+    argv.find((a) => a.startsWith("--traffic-rate="))?.split("=")[1] ||
+    argv.find((a) => a.startsWith("--traffic-prob="))?.split("=")[1] ||
+    argv.find((a) => a.startsWith("--traffic-probability="))?.split("=")[1] ||
+    argv.find((a) => a.startsWith("--referrer-ratio="))?.split("=")[1] ||
+    argv.find((a) => a.startsWith("--source-ratio="))?.split("=")[1];
+
+  const envVal = env.AD_VIEWER_TRAFFIC_RATIO || env.AD_VIEWER_REFERRER_RATIO || "";
+  const raw = (cli || envVal || "").trim().toLowerCase();
+  if (!raw) return 0.8;
+  const cleaned = raw.replace(/%/g, "").trim();
+  const num = Number(cleaned);
+  if (Number.isNaN(num) || num < 0) return 0.8;
+  if (num > 1) return Math.min(1, num / 100);
+  return Math.min(1, num);
+}
+
+function resolveTrafficReferrer(trafficSource = TRAFFIC_SOURCE, trafficRatio = TRAFFIC_RATIO, rng = Math.random) {
+  if (!trafficSource || trafficSource === "none") {
+    return {
+      active: false,
+      sourceKey: "direct",
+      sourceName: "Truy cập trực tiếp (Direct Traffic)",
+      referrer: null,
+    };
+  }
+
+  const roll = rng();
+  if (roll >= trafficRatio) {
+    return {
+      active: false,
+      sourceKey: "direct",
+      sourceName: "Truy cập trực tiếp (Direct Traffic)",
+      referrer: null,
+    };
+  }
+
+  const sourceKey =
+    trafficSource === "all"
+      ? ["google", "facebook", "instagram", "tiktok", "x", "chatgpt"][Math.floor(rng() * 6)]
+      : trafficSource;
+
+  const cfg = TRAFFIC_SOURCES[sourceKey];
+  if (!cfg) {
+    return {
+      active: false,
+      sourceKey: "direct",
+      sourceName: "Truy cập trực tiếp (Direct Traffic)",
+      referrer: null,
+    };
+  }
+
+  const referrer = cfg.referrers[Math.floor(rng() * cfg.referrers.length)];
+  return {
+    active: true,
+    sourceKey,
+    sourceName: cfg.name,
+    referrer,
+  };
+}
+
+const TRAFFIC_SOURCE = parseTrafficSource();
+const TRAFFIC_RATIO = parseTrafficRatio();
+
 const rawPageTimeout = getCliArg("--page-timeout");
 const defaultPageTimeout = process.argv.some((a) => a.includes("proxy")) || process.env.AD_VIEWER_PROXY ? 35_000 : 25_000;
 const parsedPageTimeout = Number(rawPageTimeout || process.env.AD_VIEWER_PAGE_TIMEOUT_MS || defaultPageTimeout);
@@ -3505,11 +3650,29 @@ async function runOneCycle(
       await maximizeAndFocusWindow(context, page, instanceId);
     }
 
+    const trafficInfo = resolveTrafficReferrer(TRAFFIC_SOURCE, TRAFFIC_RATIO);
+    if (trafficInfo.active && trafficInfo.referrer) {
+      await page
+        .addInitScript((ref) => {
+          try {
+            Object.defineProperty(document, "referrer", {
+              get: () => ref,
+              configurable: true,
+            });
+          } catch {}
+        }, trafficInfo.referrer)
+        .catch(() => {});
+      log(`[Traffic Source] 🌐 Đến từ ${trafficInfo.sourceName} — Referrer: ${trafficInfo.referrer}`);
+    } else {
+      log(`[Traffic Source] 🌐 Truy cập trực tiếp (Direct Traffic)`);
+    }
+
     const renderStartedAt = Date.now();
     log(`Mở trang chủ ${WEB_URL}...`);
     await page.goto(WEB_URL, {
       waitUntil: "domcontentloaded",
       timeout: PAGE_GOTO_TIMEOUT_MS,
+      ...(trafficInfo.referrer ? { referer: trafficInfo.referrer } : {}),
     });
     navigationSucceeded = true;
     await tagInstancePage(page, instanceId);
@@ -4314,6 +4477,14 @@ async function main() {
     }`
   );
 
+  const trafficSourceDesc =
+    TRAFFIC_SOURCE === "none"
+      ? "TẮT [Truy cập trực tiếp - Direct Traffic]"
+      : TRAFFIC_SOURCE === "all"
+      ? `BẬT [Ngẫu nhiên tất cả nguồn: Google, Facebook, Instagram, TikTok, X, ChatGPT — Tỉ lệ có Referrer: ${Math.round(TRAFFIC_RATIO * 100)}%]`
+      : `BẬT [${TRAFFIC_SOURCES[TRAFFIC_SOURCE]?.name || TRAFFIC_SOURCE} — Tỉ lệ có Referrer: ${Math.round(TRAFFIC_RATIO * 100)}%]`;
+  log(`Nguồn lưu lượng (Traffic Source): ${trafficSourceDesc}`);
+
   const startTime = Date.now();
 
   if (INSTANCE_COUNT === 1) {
@@ -4477,4 +4648,10 @@ export {
   CLICKADU_CONTAINER_SELECTOR,
   SOCIAL_BAR_KEY,
   SOCIAL_BAR_SELECTOR,
+  parseTrafficSource,
+  parseTrafficRatio,
+  resolveTrafficReferrer,
+  TRAFFIC_SOURCES,
+  TRAFFIC_SOURCE,
+  TRAFFIC_RATIO,
 };

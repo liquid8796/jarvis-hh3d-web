@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.185",
+    date: "2026-10-05",
+    lines: [
+      "Bổ sung tuỳ chọn nguồn lưu lượng đa dạng cho công cụ xem trang và tương tác.",
+      "Hỗ trợ cấu hình tỉ lệ điều phối tự nhiên giữa các nguồn và truy cập trực tiếp.",
+    ],
+  },
+  {
     version: "1.3.184",
     date: "2026-10-05",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Sửa lỗi cú pháp toán tử gom nhóm trong bộ cấu hình thời gian tải trang của trình xem quảng cáo.",
       "Khắc phục sự cố xung đột ký tự lệnh trong menu khởi chạy tệp batch trên môi trường Windows.",
-    ],
-  },
-  {
-    version: "1.3.135",
-    date: "2026-10-03",
-    lines: [
-      "Nâng cấp bộ giả lập chuột phần cứng Windows phát chuỗi sự kiện di chuyển và rê lượn tương tác.",
-      "Tối ưu kích hoạt cửa sổ trình duyệt và bổ sung pha rê chuột tự nhiên trước khi click quảng cáo.",
     ],
   },
 ];

@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.185 — Tuỳ chọn nguồn lưu lượng đa dạng (Traffic Source) & Tỉ lệ điều phối tự nhiên (05/10/2026)
+
+- Bổ sung tuỳ chọn cấu hình nguồn lưu lượng truy cập (Traffic Source / Referrer) trong [run-ad-viewer.bat](run-ad-viewer.bat) và [scripts/adViewer.mjs](scripts/adViewer.mjs):
+  - **Menu tương tác nguồn lưu lượng [17]**: Cung cấp 8 lựa chọn bao gồm: Truy cập trực tiếp (Direct Traffic - mặc định), Ngẫu nhiên tất cả các nguồn (All), Google Search (Organic), Facebook, Instagram, TikTok, X (Twitter), ChatGPT (AI Referral).
+  - **Menu xác suất điều phối [18]**: Khi bật nguồn lưu lượng, người dùng có thể chỉ định tỉ lệ phần trăm truy cập mang Referrer (mặc định 80%, 20% còn lại là Direct Traffic), giúp tạo profile lưu lượng tự nhiên cho Google Analytics và các mạng quảng cáo (AdSense, Adcash, Adsterra, Clickadu).
+  - **Cơ chế mô phỏng 2 lớp**: Tự động gửi header `Referer` chuẩn qua Playwright `page.goto(url, { referer })` đồng thời can thiệp `document.referrer` trong DOM qua `addInitScript`, đảm bảo tương thích 100% trên cả trình duyệt headless lẫn headed/CDP.
+- Cập nhật bộ kiểm thử [scripts/verifyAdViewerHealth.mts](scripts/verifyAdViewerHealth.mts) kiểm chứng toàn diện logic phân tích cú pháp cờ CLI, phân phối xác suất và hiển thị menu prompt.
+
 ## 1.3.184 — Tích hợp thẻ đo lường Google Tag (gtag.js) trên toàn trang (05/10/2026)
 
 - Tích hợp chính thức Google Tag (`gtag.js`, mã đo lường `G-CPEZWQKMNB`) phục vụ kiểm tra và phân tích lưu lượng cho website `auto-hh3d.online`:

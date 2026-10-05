@@ -111,6 +111,10 @@ const {
   parseAdNetwork,
   SOCIAL_BAR_KEY,
   SOCIAL_BAR_SELECTOR,
+  parseTrafficSource,
+  parseTrafficRatio,
+  resolveTrafficReferrer,
+  TRAFFIC_SOURCES,
 } = await import("./adViewer.mjs");
 const p1 = parseProxyItem("103.152.112.5:8080@liquid:secret123");
 assert.equal(p1?.server, "http://103.152.112.5:8080");
@@ -293,8 +297,46 @@ assert.match(batContent, /ARG_ANTI_DETECT_PROXY=--no-anti-detect-proxy/, "run-ad
 assert.match(batContent, /FINAL_ARGS=.*ARG_ANTI_DETECT_PROXY/, "FINAL_ARGS must include ARG_ANTI_DETECT_PROXY");
 assert.match(batContent, /:skip_anti_detect_proxy/, "run-ad-viewer.bat must skip Anti-Detect Proxy when direct IP is selected");
 
+// ---- Nguon luu luong truy cap (Traffic Source: Google, Facebook, Instagram, TikTok, X, ChatGPT, All, None) ----
+assert.equal(parseTrafficSource(["node", "adViewer.mjs"], dummyEnv), "none", "traffic source must default to none");
+assert.equal(parseTrafficSource(["node", "adViewer.mjs", "--traffic-source=all"], dummyEnv), "all");
+assert.equal(parseTrafficSource(["node", "adViewer.mjs", "--traffic-source=google"], dummyEnv), "google");
+assert.equal(parseTrafficSource(["node", "adViewer.mjs", "--traffic-source=facebook"], dummyEnv), "facebook");
+assert.equal(parseTrafficSource(["node", "adViewer.mjs", "--traffic-source=instagram"], dummyEnv), "instagram");
+assert.equal(parseTrafficSource(["node", "adViewer.mjs", "--traffic-source=tiktok"], dummyEnv), "tiktok");
+assert.equal(parseTrafficSource(["node", "adViewer.mjs", "--traffic-source=x"], dummyEnv), "x");
+assert.equal(parseTrafficSource(["node", "adViewer.mjs", "--traffic-source=chatgpt"], dummyEnv), "chatgpt");
+assert.equal(parseTrafficSource(["node", "adViewer.mjs", "--traffic-source=none"], dummyEnv), "none");
+
+assert.equal(parseTrafficRatio(["node", "adViewer.mjs"], dummyEnv), 0.8, "traffic ratio must default to 0.8");
+assert.equal(parseTrafficRatio(["node", "adViewer.mjs", "--traffic-ratio=80"], dummyEnv), 0.8);
+assert.equal(parseTrafficRatio(["node", "adViewer.mjs", "--traffic-ratio=100%"], dummyEnv), 1.0);
+assert.equal(parseTrafficRatio(["node", "adViewer.mjs", "--traffic-ratio=0.5"], dummyEnv), 0.5);
+
+const directRef = resolveTrafficReferrer("none", 1.0);
+assert.equal(directRef.active, false);
+assert.equal(directRef.referrer, null);
+
+const googleRef = resolveTrafficReferrer("google", 1.0, () => 0.1);
+assert.equal(googleRef.active, true);
+assert.equal(googleRef.sourceKey, "google");
+assert.ok(googleRef.referrer?.includes("google"));
+
+const allRef = resolveTrafficReferrer("all", 1.0, () => 0.1);
+assert.equal(allRef.active, true);
+assert.ok(allRef.referrer && allRef.referrer.length > 0);
+
+const missedRef = resolveTrafficReferrer("google", 0.5, () => 0.9);
+assert.equal(missedRef.active, false);
+assert.equal(missedRef.referrer, null);
+
+assert.match(batContent, /\[17\] Nguon truy cap website/, "run-ad-viewer.bat must offer option [17] for traffic source");
+assert.match(batContent, /\[18\] Xac suat truy cap tu nguon duoc chon/, "run-ad-viewer.bat must offer option [18] for traffic ratio");
+assert.match(batContent, /ARG_TRAFFIC_SOURCE=--traffic-source=all/, "run-ad-viewer.bat must support --traffic-source=all");
+assert.match(batContent, /FINAL_ARGS=.*ARG_TRAFFIC_SOURCE.*ARG_TRAFFIC_RATIO/, "FINAL_ARGS must include traffic source and ratio");
+
 console.log(
-  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, fully supports headless mode without popping up windows or leaking headless signals, enables 100% lock-free parallel execution across multi-instance headless workers, focuses on high-CPM Popunder + SocialBar while eliminating unwanted NativeBanner impressions, supports selecting target ad networks (Adcash, Clickadu, Adsterra, All), toggles Anti-Detect Proxy (Zero-Mismatch Triad), and protects fixed proxy instances from falling back to Direct IP.",
+  "PASS: ad-viewer waits for ready selectors, verifies banner/native creatives, logs render evidence, clicks ads, recursively reads landing pages, parses IP:PORT@USER:PASS proxies, supports user-defined hover durations, prevents window occlusion across instances, supports user-defined render timeout with force click fallback, supports custom user-defined device emulation, fully supports headless mode without popping up windows or leaking headless signals, enables 100% lock-free parallel execution across multi-instance headless workers, focuses on high-CPM Popunder + SocialBar while eliminating unwanted NativeBanner impressions, supports selecting target ad networks (Adcash, Clickadu, Adsterra, All), toggles Anti-Detect Proxy (Zero-Mismatch Triad), protects fixed proxy instances from falling back to Direct IP, and supports customizable traffic sources (Google, Facebook, Instagram, TikTok, X, ChatGPT, All) with user-defined referrer ratios.",
 );
 
 

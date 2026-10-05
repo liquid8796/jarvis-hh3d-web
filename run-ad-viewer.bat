@@ -390,8 +390,77 @@ echo.
 
 :SKIP_POPUNDER_OPTIONS
 
+REM 17. Nguon truy cap website (Traffic Source / Referrer)
+echo [17] Nguon truy cap website [Traffic Source / Referrer]:
+echo      1. Khong dung [Truy cap truc tiep - Direct Traffic - mac dinh]
+echo      2. Ngau nhien tat ca nguon [Google, Facebook, Instagram, TikTok, X, ChatGPT - KHUYEN NGHI]
+echo      3. Google Search [Tim kiem tu nhien - Google Organic Search]
+echo      4. Facebook [Mang xa hoi Facebook]
+echo      5. Instagram [Mang xa hoi Instagram]
+echo      6. TikTok [Mang xa hoi TikTok]
+echo      7. X / Twitter [Mang xa hoi X]
+echo      8. ChatGPT [AI Referral]
+set "INPUT_TRAFFIC_SOURCE="
+set /p "INPUT_TRAFFIC_SOURCE=    Chon [1-8, Enter = 1]: "
+set "ARG_TRAFFIC_SOURCE="
+set "ARG_TRAFFIC_RATIO="
+
+if "%INPUT_TRAFFIC_SOURCE%"=="2" (
+    set "ARG_TRAFFIC_SOURCE=--traffic-source=all"
+    echo     -^> Nguon truy cap: Ngau nhien tat ca [Google, Facebook, Instagram, TikTok, X, ChatGPT]
+    goto PROMPT_TRAFFIC_RATIO
+) else if "%INPUT_TRAFFIC_SOURCE%"=="3" (
+    set "ARG_TRAFFIC_SOURCE=--traffic-source=google"
+    echo     -^> Nguon truy cap: Google Search [Organic Search]
+    goto PROMPT_TRAFFIC_RATIO
+) else if "%INPUT_TRAFFIC_SOURCE%"=="4" (
+    set "ARG_TRAFFIC_SOURCE=--traffic-source=facebook"
+    echo     -^> Nguon truy cap: Facebook [Social]
+    goto PROMPT_TRAFFIC_RATIO
+) else if "%INPUT_TRAFFIC_SOURCE%"=="5" (
+    set "ARG_TRAFFIC_SOURCE=--traffic-source=instagram"
+    echo     -^> Nguon truy cap: Instagram [Social]
+    goto PROMPT_TRAFFIC_RATIO
+) else if "%INPUT_TRAFFIC_SOURCE%"=="6" (
+    set "ARG_TRAFFIC_SOURCE=--traffic-source=tiktok"
+    echo     -^> Nguon truy cap: TikTok [Social]
+    goto PROMPT_TRAFFIC_RATIO
+) else if "%INPUT_TRAFFIC_SOURCE%"=="7" (
+    set "ARG_TRAFFIC_SOURCE=--traffic-source=x"
+    echo     -^> Nguon truy cap: X (Twitter) [Social]
+    goto PROMPT_TRAFFIC_RATIO
+) else if "%INPUT_TRAFFIC_SOURCE%"=="8" (
+    set "ARG_TRAFFIC_SOURCE=--traffic-source=chatgpt"
+    echo     -^> Nguon truy cap: ChatGPT [AI Referral]
+    goto PROMPT_TRAFFIC_RATIO
+) else (
+    set "ARG_TRAFFIC_SOURCE=--traffic-source=none"
+    echo     -^> Nguon truy cap: Khong dung [Truy cap truc tiep - Direct Traffic]
+    goto SKIP_TRAFFIC_RATIO
+)
+
+:PROMPT_TRAFFIC_RATIO
+echo.
+REM 18. Xac suat truy cap tu nguon duoc chon [Traffic Source Ratio]
+echo [18] Xac suat truy cap tu nguon duoc chon [Traffic Source Ratio]:
+echo      Nhap ti le phan tram (vi du: 70, 80, 100), hoac thap phan (0.8).
+echo      Vi du: 80%% = 80%% luot truy cap mang referrer cua nguon, 20%% con lai la truc tiep (Direct).
+echo      De trong de su dung mac dinh (80%%).
+set "INPUT_TRAFFIC_RATIO="
+set /p "INPUT_TRAFFIC_RATIO=    Xac suat co referrer (%%) [Enter = mac dinh 80%%]: "
+if defined INPUT_TRAFFIC_RATIO (
+    set "ARG_TRAFFIC_RATIO=--traffic-ratio=%INPUT_TRAFFIC_RATIO%"
+    echo     -^> Xac suat: %INPUT_TRAFFIC_RATIO%%%
+) else (
+    set "ARG_TRAFFIC_RATIO=--traffic-ratio=80"
+    echo     -^> Xac suat: Mac dinh [80%%]
+)
+
+:SKIP_TRAFFIC_RATIO
+echo.
+
 REM Tong hop lenh thuc thi
-set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_ANTI_DETECT_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER% %ARG_AD_FOCUS% %ARG_AD_NETWORK%
+set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_ANTI_DETECT_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER% %ARG_AD_FOCUS% %ARG_AD_NETWORK% %ARG_TRAFFIC_SOURCE% %ARG_TRAFFIC_RATIO%
 
 echo ============================================================================
 echo   TONG HOP CAU HINH CHAY:

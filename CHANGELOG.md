@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.184 — Tích hợp thẻ đo lường Google Tag (gtag.js) trên toàn trang (05/10/2026)
+
+- Tích hợp chính thức Google Tag (`gtag.js`, mã đo lường `G-CPEZWQKMNB`) phục vụ kiểm tra và phân tích lưu lượng cho website `auto-hh3d.online`:
+  - **Cấu hình độc lập**: Khởi tạo [src/lib/google-tag/config.ts](src/lib/google-tag/config.ts) quản lý mã `GOOGLE_TAG_ID = "G-CPEZWQKMNB"` và script URL chính thức `https://www.googletagmanager.com/gtag/js?id=G-CPEZWQKMNB`.
+  - **Kiểm soát môi trường (Host Gating)**: Thẻ chỉ được nạp trên các hostname chính thức (`auto-hh3d.online`, `www.auto-hh3d.online`) ở môi trường `production`. Các trạm gương, tên miền đã đóng và trạm nội bộ không tải script. Hỗ trợ biến môi trường `GOOGLE_TAG_DISABLED=1` để ngắt khẩn cấp và `GOOGLE_TAG_DEV=1` cho mục đích kiểm thử cục bộ.
+  - **Vị trí nhúng chuẩn Google**: Component [src/components/GoogleTag.tsx](src/components/GoogleTag.tsx) được đặt ngay sau thẻ mở `<head>` trong [src/app/layout.tsx](src/app/layout.tsx) chuẩn theo hướng dẫn của Google, xuất hiện trực tiếp trong phản hồi SSR giúp công cụ kiểm tra tự động nhận diện thành công ngay lập tức.
+- Bổ sung bộ kiểm thử [scripts/verifyGoogleTag.mts](scripts/verifyGoogleTag.mts) xác thực tính nhất quán của ID, đường dẫn script, logic lọc tên miền và vị trí nhúng trong layout. Đồng thời cập nhật [scripts/verifyAdSense.mts](scripts/verifyAdSense.mts) đồng bộ cấu trúc footer.
+
 ## 1.3.183 — Tuỳ chọn Anti-Detect Proxy & Khắc phục lỗi rơi về Direct IP của Proxy cố định (04/10/2026)
 
 - Bổ sung tuỳ chọn cấu hình Anti-Detect Proxy trong [run-ad-viewer.bat](run-ad-viewer.bat) và [scripts/adViewer.mjs](scripts/adViewer.mjs):

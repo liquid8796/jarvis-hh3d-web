@@ -25,7 +25,7 @@ assert.equal(googleAdSenseEnabled("158.180.59.36.sslip.io", { NODE_ENV: "product
 assert.equal(googleAdSenseEnabled("auto-hh3d.online", { NODE_ENV: "development" }), false);
 assert.equal(googleAdSenseEnabled("auto-hh3d.online", { NODE_ENV: "production", GOOGLE_ADSENSE_DISABLED: "1" }), false);
 
-const [layout, component, adsTxt, privacy, css, proxy, envExample, nextConfig, packageJson] = await Promise.all([
+const [layout, component, adsTxt, privacy, css, proxy, envExample, nextConfig, packageJson, footer] = await Promise.all([
   read("src/app/layout.tsx"),
   read("src/components/GoogleAdSense.tsx"),
   read("public/ads.txt"),
@@ -35,11 +35,13 @@ const [layout, component, adsTxt, privacy, css, proxy, envExample, nextConfig, p
   read(".env.example"),
   read("next.config.ts"),
   read("package.json"),
+  read("src/components/SiteFooter.tsx"),
 ]);
 
 assert.equal(adsTxt.trim(), GOOGLE_ADSENSE_ADS_TXT_LINE);
 assert.ok(layout.includes("<GoogleAdSense />"));
-assert.ok(layout.includes('href="/quyen-rieng-tu"'));
+assert.ok(layout.includes("<SiteFooter />"));
+assert.ok(footer.includes('href="/quyen-rieng-tu"'));
 assert.ok(component.includes("google-adsense-account"));
 assert.ok(component.includes("isOfficialAdSenseHost(host)"));
 assert.ok(component.includes("googleAdSenseEnabled(host)"));

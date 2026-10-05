@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.184",
+    date: "2026-10-05",
+    lines: [
+      "Tích hợp thẻ đo lường Google Tag chính thức trên tên miền website.",
+      "Tối ưu vị trí tải thẻ ngay đầu trang phục vụ kiểm tra và phân tích lưu lượng.",
+    ],
+  },
+  {
     version: "1.3.183",
     date: "2026-10-04",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Nâng cấp bộ giả lập chuột phần cứng Windows phát chuỗi sự kiện di chuyển và rê lượn tương tác.",
       "Tối ưu kích hoạt cửa sổ trình duyệt và bổ sung pha rê chuột tự nhiên trước khi click quảng cáo.",
-    ],
-  },
-  {
-    version: "1.3.134",
-    date: "2026-10-03",
-    lines: [
-      "Khắc phục sự cố tiến trình bị treo khi gặp proxy bị nghẽn mạng hoặc quá thời gian tải trang.",
-      "Tối ưu cơ chế đóng tab an toàn và tự động loại bỏ proxy quá hạn để tiếp tục chu kỳ mới mượt mà.",
     ],
   },
 ];

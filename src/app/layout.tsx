@@ -5,6 +5,7 @@ import { NoticePopup } from "@/components/NoticePopup";
 import { ChatFab } from "@/components/ChatFab";
 import { BackdropPeek } from "@/components/BackdropPeek";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
+import { GoogleTag } from "@/components/GoogleTag";
 import { GoogleAdSense } from "@/components/GoogleAdSense";
 import { AdsterraAds } from "@/components/AdsterraAds";
 import { ClickaduAds } from "@/components/ClickaduAds";
@@ -148,6 +149,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
       <head>
+        <GoogleTag />
         <meta name="clckd" content={CLICKADU_SITE_VERIFICATION_TOKEN} />
         <GoogleAdSense />
         <AdcashHead />

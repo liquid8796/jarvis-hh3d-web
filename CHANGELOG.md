@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.188 — Vô hiệu hoá và tháo gỡ toàn bộ hệ thống quảng cáo trên website (05/10/2026)
+
+- Tháo gỡ và vô hiệu hoá toàn bộ các mạng quảng cáo (Google AdSense, Adcash, Clickadu, Adsterra) trên giao diện website chính thức theo yêu cầu:
+  - **Mặc định tắt hoàn toàn (AD_PROVIDER="none")**: Điều chỉnh bộ định tuyến quảng cáo [src/lib/ads/provider.ts](src/lib/ads/provider.ts) mặc định về `none`, đảm bảo `isAdcashActive()`, `isClickaduActive()` và `isAdsterraActive()` đều trả về `false`.
+  - **Ngắt mã nhúng Google AdSense**: Bổ sung hàm kiểm tra `isAdSenseActive()` vào cổng kiểm soát [src/components/GoogleAdSense.tsx](src/components/GoogleAdSense.tsx), ngăn chặn toàn bộ thẻ định danh và script Auto Ads tải vào `<head>` trang web khi hệ thống ở trạng thái tắt quảng cáo.
+  - **Đồng bộ môi trường máy chủ**: Cập nhật tệp môi trường chung `/opt/jarvis/shared/.env` với `AD_PROVIDER=none` và `GOOGLE_ADSENSE_DISABLED=1` để khoá hoàn toàn các luồng nạp quảng cáo phía máy chủ production.
+
 ## 1.3.187 — Theo đúng tên miền `.you` trong file cookie mới của HH3D (05/10/2026)
 
 - Đổi tên miền mặc định sang `https://hoathinh3d.you` cho cài đặt mới và gói khôi lỗi mới.

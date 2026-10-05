@@ -6,6 +6,7 @@ import {
   googleAdSenseEnabled,
   isOfficialAdSenseHost,
 } from "@/lib/adsense/config";
+import { isAdSenseActive } from "@/lib/ads/provider";
 
 /**
  * Loads the public AdSense account marker on the official host and the Auto ads script for
@@ -16,7 +17,7 @@ export async function GoogleAdSense() {
   const [requestHeaders, session] = await Promise.all([headers(), readSession()]);
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
 
-  if (!isOfficialAdSenseHost(host)) return null;
+  if (!isOfficialAdSenseHost(host) || !isAdSenseActive()) return null;
 
   return (
     <>

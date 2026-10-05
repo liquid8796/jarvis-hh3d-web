@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.188",
+    date: "2026-10-05",
+    lines: [
+      "Vô hiệu hoá toàn bộ hệ thống quảng cáo trên website nhằm mang lại trải nghiệm tinh sạch cho người dùng.",
+      "Chuyển chế độ nhà mạng mặc định về trạng thái tắt và ngừng phân phối các mã kịch bản quảng cáo đối tác.",
+    ],
+  },
+  {
     version: "1.3.187",
     date: "2026-10-05",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Nâng cấp cơ chế làm sạch trình duyệt: dọn dẹp triệt để toàn bộ bộ nhớ tạm, dữ liệu lưu trữ và cookies toàn hệ thống sau mỗi chu kỳ.",
       "Tự động đóng gọn các tab quảng cáo phụ phát sinh, đảm bảo phiên duyệt web luôn trong trạng thái tinh sạch và ổn định.",
-    ],
-  },
-  {
-    version: "1.3.138",
-    date: "2026-10-03",
-    lines: [
-      "Tích hợp chế độ hỗ trợ chuột Logitech G-HUB cùng kịch bản driver phần cứng cho dòng chuột G304.",
-      "Khắc phục triệt để lỗi co nhỏ cửa sổ Chrome và chuẩn hoá toạ độ rê chuột phần cứng trên màn hình Windows.",
     ],
   },
 ];

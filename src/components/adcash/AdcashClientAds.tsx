@@ -18,7 +18,7 @@ function pathAllowsAds(pathname: string): boolean {
 
 /**
  * Adcash Client Ads Component.
- * Cung cấp vùng chứa hỗ trợ cho Adcash AutoTag (g4flvknzlj).
+ * Cung cấp vùng chứa hỗ trợ cho Adcash AutoTag (qmnntqoxdc).
  */
 export function AdcashClientAds() {
   const pathname = usePathname();

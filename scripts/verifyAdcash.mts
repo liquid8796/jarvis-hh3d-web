@@ -13,8 +13,8 @@ const read = (relative: string) => readFile(path.join(root, relative), "utf8");
 
 // 1. Kiểm tra cấu hình và hằng số Adcash AutoTag duy nhất
 assert.equal(ADCASH_LIB_SRC, "//acscdn.com/script/aclib.js", "Adcash library script source must match");
-assert.equal(ADCASH_AUTOTAG_ZONE_ID, "g4flvknzlj", "AutoTag zoneId must be g4flvknzlj");
-assert.equal(ADCASH_ZONE_ID, "g4flvknzlj", "Default zoneId alias must match AutoTag");
+assert.equal(ADCASH_AUTOTAG_ZONE_ID, "qmnntqoxdc", "AutoTag zoneId must be qmnntqoxdc");
+assert.equal(ADCASH_ZONE_ID, "qmnntqoxdc", "Default zoneId alias must match AutoTag");
 
 // 2. Kiểm tra điều kiện kích hoạt an toàn của Adcash
 assert.equal(adcashEnabled("auto-hh3d.online", { NODE_ENV: "production" }), true);
@@ -39,7 +39,7 @@ assert.match(layout, /<AdcashAds \/>/, "layout must include AdcashAds in <body>"
 assert.match(layout, /import "\.\/adcash\.css"/, "layout must import adcash.css");
 
 assert.match(headGate, /aclib\.runAutoTag/, "AdcashHead must call aclib.runAutoTag");
-assert.match(headGate, /g4flvknzlj|ADCASH_AUTOTAG_ZONE_ID/, "AdcashHead must reference AutoTag zoneId g4flvknzlj");
+assert.match(headGate, /qmnntqoxdc|ADCASH_AUTOTAG_ZONE_ID/, "AdcashHead must reference AutoTag zoneId qmnntqoxdc");
 
 // Phải loại bỏ toàn bộ các popunder và banner thủ công
 assert.doesNotMatch(headGate, /aclib\.runPop/, "AdcashHead must NOT call aclib.runPop");
@@ -52,8 +52,8 @@ assert.match(adcashCss, /\.adcash-container/, "adcash.css must define .adcash-co
 assert.match(clientAds, /id="adcash-ad-container"/, "clientAds must define #adcash-ad-container for AutoTag");
 
 // 5. Kiểm tra adViewer nhận diện AutoTag duy nhất
-assert.match(adViewer, /g4flvknzlj/, "adViewer must recognize AutoTag g4flvknzlj");
+assert.match(adViewer, /qmnntqoxdc/, "adViewer must recognize AutoTag qmnntqoxdc");
 assert.match(adViewer, /ADCASH_CONTAINER_SELECTOR/, "adViewer must define ADCASH_CONTAINER_SELECTOR");
 assert.doesNotMatch(adViewer, /adcash-banner-160x600-left/, "adViewer must not depend on removed manual banner IDs");
 
-console.log("PASS: Cấu hình Adcash duy nhất AutoTag (g4flvknzlj) đã được kiểm chứng chuẩn xác.");
+console.log("PASS: Cấu hình Adcash duy nhất AutoTag (qmnntqoxdc) đã được kiểm chứng chuẩn xác.");

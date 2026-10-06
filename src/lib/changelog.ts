@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.189",
+    date: "2026-10-06",
+    lines: [
+      "Mở lại hệ thống quảng cáo tự động hoá trên website với vùng hiển thị mới từ đối tác Adcash.",
+      "Kích hoạt cơ chế phân phối tự nhiên và đồng bộ trạng thái nhà mạng mặc định trên toàn hệ thống.",
+    ],
+  },
+  {
     version: "1.3.188",
     date: "2026-10-05",
     lines: [
@@ -461,14 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Hỗ trợ linh hoạt định dạng danh sách proxy IP:PORT@USER:PASS cùng các biến thể giao thức mạng phổ biến.",
       "Chuẩn hoá bộ phân tích máy chủ mạng trung gian, đảm bảo tương thích mọi nhà cung cấp proxy trên thị trường.",
-    ],
-  },
-  {
-    version: "1.3.139",
-    date: "2026-10-03",
-    lines: [
-      "Nâng cấp cơ chế làm sạch trình duyệt: dọn dẹp triệt để toàn bộ bộ nhớ tạm, dữ liệu lưu trữ và cookies toàn hệ thống sau mỗi chu kỳ.",
-      "Tự động đóng gọn các tab quảng cáo phụ phát sinh, đảm bảo phiên duyệt web luôn trong trạng thái tinh sạch và ổn định.",
     ],
   },
 ];

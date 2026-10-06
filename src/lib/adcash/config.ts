@@ -2,12 +2,12 @@ import { normalizeDomainHost } from "@/lib/domains/catalog";
 
 /**
  * Cấu hình mạng quảng cáo Adcash:
- * Duy nhất AutoTag (zoneId: 'g4flvknzlj') theo yêu cầu phê duyệt trang web.
+ * Duy nhất AutoTag (zoneId: 'qmnntqoxdc') theo yêu cầu phê duyệt trang web.
  *
  * Bước 1: <script id="aclib" type="text/javascript" src="//acscdn.com/script/aclib.js"></script>
- * Bước 2: <script type="text/javascript">aclib.runAutoTag({ zoneId: 'g4flvknzlj' });</script>
+ * Bước 2: <script type="text/javascript">aclib.runAutoTag({ zoneId: 'qmnntqoxdc' });</script>
  */
-export const ADCASH_AUTOTAG_ZONE_ID = "g4flvknzlj" as const;
+export const ADCASH_AUTOTAG_ZONE_ID = "qmnntqoxdc" as const;
 export const ADCASH_ZONE_ID = ADCASH_AUTOTAG_ZONE_ID;
 
 export const ADCASH_LIB_SRC = "//acscdn.com/script/aclib.js" as const;

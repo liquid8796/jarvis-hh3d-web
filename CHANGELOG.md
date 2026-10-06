@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.189 — Mở lại quảng cáo Adcash AutoTag với mã vùng mới (06/10/2026)
+
+- Kích hoạt lại quảng cáo đối tác Adcash trên website chính thức theo yêu cầu:
+  - **Mặc định kích hoạt Adcash (AD_PROVIDER="adcash")**: Khôi phục bộ định tuyến quảng cáo [src/lib/ads/provider.ts](src/lib/ads/provider.ts) mặc định về `adcash`, cho phép `isAdcashActive()` kích hoạt các vùng chứa và script AutoTag.
+  - **Cập nhật mã vùng AutoTag mới (qmnntqoxdc)**: Cập nhật `ADCASH_AUTOTAG_ZONE_ID` trong [src/lib/adcash/config.ts](src/lib/adcash/config.ts) sang `qmnntqoxdc` theo cấu hình tài khoản mới từ Adcash.
+  - **Đồng bộ kiểm thử và công cụ xem quảng cáo**: Cập nhật bộ kiểm tra [scripts/verifyAdcash.mts](scripts/verifyAdcash.mts) và công cụ [scripts/adViewer.mjs](scripts/adViewer.mjs) nhận diện chuẩn xác mã vùng `qmnntqoxdc`.
+
 ## 1.3.188 — Vô hiệu hoá và tháo gỡ toàn bộ hệ thống quảng cáo trên website (05/10/2026)
 
 - Tháo gỡ và vô hiệu hoá toàn bộ các mạng quảng cáo (Google AdSense, Adcash, Clickadu, Adsterra) trên giao diện website chính thức theo yêu cầu:

@@ -349,65 +349,62 @@ if "%INPUT_AD_NETWORK%"=="2" (
 )
 echo.
 
-set "ARG_POPUNDER="
-set "ARG_AD_FOCUS="
-
-REM Doi voi Adcash va Clickadu thi khong can phan biet Popunder, chi hoi khi chon Adsterra hoac Tat ca
-if "%INPUT_AD_NETWORK%"=="3" goto PROMPT_ADSTERRA_FORMATS
-if "%INPUT_AD_NETWORK%"=="4" goto PROMPT_ADSTERRA_FORMATS
-goto SKIP_POPUNDER_OPTIONS
-
-:PROMPT_ADSTERRA_FORMATS
-REM 15. Xac suat uu tien click quang cao Popunder (Chi ap dung cho Adsterra)
-echo [15] Xac suat uu tien click quang cao Popunder [Popunder Ratio]:
-echo      Nhap ti le phan tram (vi du: 80, 90, 100), hoac thap phan (0.8).
-echo      Auto se tu dong uu tien click tu nhien de kich hoat Popunder theo ti le nay.
-echo      De trong de su dung mac dinh (80%%).
-set "INPUT_POPUNDER="
-set /p "INPUT_POPUNDER=    Xac suat uu tien Popunder (%%) [Enter = mac dinh 80%%]: "
-if defined INPUT_POPUNDER (
-    set "ARG_POPUNDER=--popunder-ratio=%INPUT_POPUNDER%"
-    echo     -^> Xac suat Popunder: %INPUT_POPUNDER%%%
-) else (
-    echo     -^> Xac suat Popunder: Mac dinh [80%%]
-)
-echo.
-
-REM 16. Trong tam dinh dang quang cao (Chi ap dung cho Adsterra)
-echo [16] Trong tam dinh dang quang cao [Popunder + SocialBar vs Balanced]:
-echo      1. Tap trung Popunder + SocialBar [Triet tieu click/impression Native - KHUYEN NGHI cho Headless]
-echo      2. Can bang tat ca cac dinh dang [Bao gom ca NativeBanner va Smartlink]
-set "INPUT_AD_FOCUS="
-set /p "INPUT_AD_FOCUS=    Chon [1-2, Enter = 1]: "
+REM 15. Tap trung click vao Popunder (Popunder Focus)
+echo [15] Tap trung click vao Popunder [Popunder Focus]:
+echo      1. Co [Uu tien click tu nhien de kich hoat Popunder - KHUYEN NGHI]
+echo      2. Khong [Can bang tat ca cac dinh dang, khong uu tien Popunder]
+set "INPUT_FOCUS_POPUNDER="
+set /p "INPUT_FOCUS_POPUNDER=    Chon [1-2, Enter = 1]: "
 set "ARG_AD_FOCUS=--focus-popunder-social"
-if "%INPUT_AD_FOCUS%"=="2" (
+set "ARG_POPUNDER="
+
+if "%INPUT_FOCUS_POPUNDER%"=="2" (
     set "ARG_AD_FOCUS=--with-native"
-    echo     -^> Dinh dang: Can bang tat ca [Bao gom ca Native Ads]
+    set "ARG_POPUNDER=--popunder-ratio=0"
+    echo     -^> Tap trung Popunder: KHONG [Can bang cac dinh dang, khong uu tien Popunder]
 ) else (
-    echo     -^> Dinh dang: Tap trung Popunder + SocialBar [Bo qua Native]
+    echo     -^> Tap trung Popunder: CO [Uu tien Popunder]
+    echo.
+    REM 16. Xac suat uu tien click quang cao Popunder [Popunder Ratio]
+    echo [16] Xac suat click quang cao Popunder [Popunder Ratio]:
+    echo      Nhap ti le phan tram (vi du: 70, 80, 90, 100), hoac thap phan (0.8).
+    echo      Auto se tu dong uu tien click tu nhien de kich hoat Popunder theo ti le nay.
+    echo      De trong de su dung mac dinh (80%%).
+    set "INPUT_POPUNDER="
+    set /p "INPUT_POPUNDER=    Xac suat Popunder (%%) [Enter = mac dinh 80%%]: "
+    if defined INPUT_POPUNDER (
+        set "INPUT_POPUNDER=%INPUT_POPUNDER:%%=%"
+        set "ARG_POPUNDER=--popunder-ratio=%INPUT_POPUNDER%"
+        echo     -^> Xac suat Popunder: %INPUT_POPUNDER%%%
+    ) else (
+        set "ARG_POPUNDER=--popunder-ratio=80"
+        echo     -^> Xac suat Popunder: Mac dinh [80%%]
+    )
 )
 echo.
 
-:SKIP_POPUNDER_OPTIONS
 
 REM 17. Nguon truy cap website (Traffic Source / Referrer)
 echo [17] Nguon truy cap website [Traffic Source / Referrer]:
 echo      1. Khong dung [Truy cap truc tiep - Direct Traffic - mac dinh]
-echo      2. Ngau nhien tat ca nguon [Google, Facebook, Instagram, TikTok, X, ChatGPT - KHUYEN NGHI]
+echo      2. Ngau nhien tat ca nguon [Google, Facebook, Instagram, TikTok, X, ChatGPT, Claude, Grok, Gemini - KHUYEN NGHI]
 echo      3. Google Search [Tim kiem tu nhien - Google Organic Search]
 echo      4. Facebook [Mang xa hoi Facebook]
 echo      5. Instagram [Mang xa hoi Instagram]
 echo      6. TikTok [Mang xa hoi TikTok]
 echo      7. X / Twitter [Mang xa hoi X]
 echo      8. ChatGPT [AI Referral]
+echo      9. Claude [Anthropic AI Referral]
+echo      10. Grok [xAI Referral]
+echo      11. Google Gemini [AI Referral]
 set "INPUT_TRAFFIC_SOURCE="
-set /p "INPUT_TRAFFIC_SOURCE=    Chon [1-8, Enter = 1]: "
+set /p "INPUT_TRAFFIC_SOURCE=    Chon [1-11, Enter = 1]: "
 set "ARG_TRAFFIC_SOURCE="
 set "ARG_TRAFFIC_RATIO="
 
 if "%INPUT_TRAFFIC_SOURCE%"=="2" (
     set "ARG_TRAFFIC_SOURCE=--traffic-source=all"
-    echo     -^> Nguon truy cap: Ngau nhien tat ca [Google, Facebook, Instagram, TikTok, X, ChatGPT]
+    echo     -^> Nguon truy cap: Ngau nhien tat ca [Google, Facebook, Instagram, TikTok, X, ChatGPT, Claude, Grok, Gemini]
     goto PROMPT_TRAFFIC_RATIO
 )
 if "%INPUT_TRAFFIC_SOURCE%"=="3" (
@@ -438,6 +435,21 @@ if "%INPUT_TRAFFIC_SOURCE%"=="7" (
 if "%INPUT_TRAFFIC_SOURCE%"=="8" (
     set "ARG_TRAFFIC_SOURCE=--traffic-source=chatgpt"
     echo     -^> Nguon truy cap: ChatGPT [AI Referral]
+    goto PROMPT_TRAFFIC_RATIO
+)
+if "%INPUT_TRAFFIC_SOURCE%"=="9" (
+    set "ARG_TRAFFIC_SOURCE=--traffic-source=claude"
+    echo     -^> Nguon truy cap: Claude [Anthropic AI Referral]
+    goto PROMPT_TRAFFIC_RATIO
+)
+if "%INPUT_TRAFFIC_SOURCE%"=="10" (
+    set "ARG_TRAFFIC_SOURCE=--traffic-source=grok"
+    echo     -^> Nguon truy cap: Grok [xAI Referral]
+    goto PROMPT_TRAFFIC_RATIO
+)
+if "%INPUT_TRAFFIC_SOURCE%"=="11" (
+    set "ARG_TRAFFIC_SOURCE=--traffic-source=gemini"
+    echo     -^> Nguon truy cap: Google Gemini [AI Referral]
     goto PROMPT_TRAFFIC_RATIO
 )
 

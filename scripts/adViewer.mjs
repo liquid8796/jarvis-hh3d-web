@@ -342,6 +342,30 @@ const TRAFFIC_SOURCES = {
       "https://chat.openai.com/",
     ],
   },
+  claude: {
+    id: "claude",
+    name: "Claude (Anthropic AI Referral)",
+    referrers: [
+      "https://claude.ai/",
+      "https://www.claude.ai/",
+    ],
+  },
+  grok: {
+    id: "grok",
+    name: "Grok (xAI Referral)",
+    referrers: [
+      "https://grok.com/",
+      "https://x.com/i/grok",
+    ],
+  },
+  gemini: {
+    id: "gemini",
+    name: "Google Gemini (AI Referral)",
+    referrers: [
+      "https://gemini.google.com/",
+      "https://gemini.google.com/app",
+    ],
+  },
 };
 
 function parseTrafficSource(argv = process.argv, env = process.env) {
@@ -362,6 +386,9 @@ function parseTrafficSource(argv = process.argv, env = process.env) {
   if (raw === "tiktok" || raw === "tt") return "tiktok";
   if (raw === "x" || raw === "twitter") return "x";
   if (raw === "chatgpt" || raw === "openai") return "chatgpt";
+  if (raw === "claude" || raw === "anthropic") return "claude";
+  if (raw === "grok" || raw === "xai") return "grok";
+  if (raw === "gemini" || raw === "google-gemini") return "gemini";
   return "none";
 }
 
@@ -406,7 +433,7 @@ function resolveTrafficReferrer(trafficSource = TRAFFIC_SOURCE, trafficRatio = T
 
   const sourceKey =
     trafficSource === "all"
-      ? ["google", "facebook", "instagram", "tiktok", "x", "chatgpt"][Math.floor(rng() * 6)]
+      ? Object.keys(TRAFFIC_SOURCES)[Math.floor(rng() * Object.keys(TRAFFIC_SOURCES).length)]
       : trafficSource;
 
   const cfg = TRAFFIC_SOURCES[sourceKey];
@@ -474,11 +501,12 @@ const IS_EXPLICIT_HEADED =
   process.env.HEADLESS === "0";
 
 function parseFocusPopunderSocial(cliArgs = process.argv, env = process.env) {
-  if (cliArgs.includes("--no-focus-popunder-social") || cliArgs.includes("--with-native")) {
+  if (cliArgs.includes("--no-focus-popunder-social") || cliArgs.includes("--no-focus-popunder") || cliArgs.includes("--with-native")) {
     return false;
   }
   if (
     cliArgs.includes("--focus-popunder-social") ||
+    cliArgs.includes("--focus-popunder") ||
     cliArgs.includes("--no-native-click") ||
     cliArgs.includes("--no-native") ||
     cliArgs.includes("--focus-high-cpm") ||
@@ -4016,8 +4044,8 @@ async function runOneCycle(
       }
     } else {
       // 3. Chế độ tự động: Ưu tiên click Popunder hoặc tương tác tự nhiên theo mạng quảng cáo
-      const isAdcash = AD_NETWORK === "adcash";
-      if (!isAdcash && preferPopunder) {
+      const allowPopunderAttempt = FOCUS_POPUNDER_SOCIAL || POPUNDER_RATIO > 0;
+      if (allowPopunderAttempt && preferPopunder) {
         log(
           `🎯 [Popunder Ưu Tiên ${Math.round(POPUNDER_RATIO * 100)}%] Kích hoạt click tự nhiên trên trang web để ưu tiên nổ Popunder (${cycleClickMode} mode)...`,
         );
@@ -4460,10 +4488,10 @@ async function main() {
         : " (Chế độ đơn lẻ)"
     }`
   );
-  if (AD_NETWORK !== "adcash") {
+  if (FOCUS_POPUNDER_SOCIAL || POPUNDER_RATIO > 0) {
     log(`Xác suất ưu tiên click Popunder: ${Math.round(POPUNDER_RATIO * 100)}% (tự nhiên hóa hành vi tương tác web)`);
   } else {
-    log(`Định dạng quảng cáo: Tối ưu tự động bởi AutoTag Adcash (Không phân biệt Popunder/Native)`);
+    log(`Định dạng quảng cáo: Cân bằng tất cả định dạng (không ưu tiên riêng Popunder)`);
   }
 
   const proxyManager = new ProxyManager();
@@ -4481,7 +4509,7 @@ async function main() {
     TRAFFIC_SOURCE === "none"
       ? "TẮT [Truy cập trực tiếp - Direct Traffic]"
       : TRAFFIC_SOURCE === "all"
-      ? `BẬT [Ngẫu nhiên tất cả nguồn: Google, Facebook, Instagram, TikTok, X, ChatGPT — Tỉ lệ có Referrer: ${Math.round(TRAFFIC_RATIO * 100)}%]`
+      ? `BẬT [Ngẫu nhiên tất cả nguồn: Google, Facebook, Instagram, TikTok, X, ChatGPT, Claude, Grok, Gemini — Tỉ lệ có Referrer: ${Math.round(TRAFFIC_RATIO * 100)}%]`
       : `BẬT [${TRAFFIC_SOURCES[TRAFFIC_SOURCE]?.name || TRAFFIC_SOURCE} — Tỉ lệ có Referrer: ${Math.round(TRAFFIC_RATIO * 100)}%]`;
   log(`Nguồn lưu lượng (Traffic Source): ${trafficSourceDesc}`);
 

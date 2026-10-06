@@ -662,6 +662,30 @@ function parseAntiDetectProxy(cliArgs = process.argv, env = process.env) {
 
 const ANTI_DETECT_PROXY = parseAntiDetectProxy();
 
+function parseAntiDetectVpn(cliArgs = process.argv, env = process.env) {
+  if (
+    cliArgs.includes("--no-anti-detect-vpn") ||
+    cliArgs.includes("--no-antidetect-vpn")
+  ) {
+    return false;
+  }
+  if (env.AD_VIEWER_ANTI_DETECT_VPN === "0") {
+    return false;
+  }
+  if (
+    cliArgs.includes("--anti-detect-vpn") ||
+    cliArgs.includes("--antidetect-vpn")
+  ) {
+    return true;
+  }
+  if (env.AD_VIEWER_ANTI_DETECT_VPN === "1") {
+    return true;
+  }
+  return true;
+}
+
+const ANTI_DETECT_VPN = parseAntiDetectVpn();
+
 let CLICK_MODE = "cdp";
 if (rawClickMode === "mouse") {
   CLICK_MODE = "mouse";
@@ -1119,6 +1143,78 @@ const COUNTRY_TO_LOCALE = {
   PL: "pl-PL",
   TR: "tr-TR",
 };
+
+let cachedVpnGeo = null;
+let lastVpnGeoFetch = 0;
+const VPN_GEO_CACHE_TTL = 3 * 60 * 1000; // 3 phút cache
+
+/**
+ * Tra cứu thông tin Geolocation, Timezone và Locale theo IP máy hiện tại (dành cho Proton VPN / Mạng gốc).
+ */
+async function resolveVpnGeo(forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && cachedVpnGeo && now - lastVpnGeoFetch < VPN_GEO_CACHE_TTL) {
+    return cachedVpnGeo;
+  }
+
+  // 1. Tra cứu qua ip-api.com
+  try {
+    const res = await fetch(
+      "http://ip-api.com/json/?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,query",
+      { signal: AbortSignal.timeout(3500) }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === "success" && data.countryCode) {
+        const locale = COUNTRY_TO_LOCALE[data.countryCode] || "en-US";
+        cachedVpnGeo = {
+          country: data.country || "United States",
+          countryCode: data.countryCode || "US",
+          region: data.regionName || "",
+          city: data.city || "",
+          lat: Number(data.lat) || 40.7128,
+          lon: Number(data.lon) || -74.006,
+          timezoneId: data.timezone || "America/New_York",
+          locale,
+          query: data.query || "",
+          ip: data.query || "",
+        };
+        lastVpnGeoFetch = now;
+        return cachedVpnGeo;
+      }
+    }
+  } catch {}
+
+  // 2. Dự phòng qua ipwho.is
+  try {
+    const res = await fetch("https://ipwho.is/", {
+      signal: AbortSignal.timeout(3500),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success !== false && data.country_code) {
+        const locale = COUNTRY_TO_LOCALE[data.country_code] || "en-US";
+        cachedVpnGeo = {
+          country: data.country || "United States",
+          countryCode: data.country_code || "US",
+          region: data.region || "",
+          city: data.city || "",
+          lat: Number(data.latitude) || 40.7128,
+          lon: Number(data.longitude) || -74.006,
+          timezoneId: data.timezone?.id || "America/New_York",
+          locale,
+          query: data.ip || "",
+          ip: data.ip || "",
+        };
+        lastVpnGeoFetch = now;
+        return cachedVpnGeo;
+      }
+    }
+  } catch {}
+
+  if (cachedVpnGeo) return cachedVpnGeo;
+  return null;
+}
 
 /**
  * Trợ thủ phân tích host và port. Trả về { host, port, isIp } nếu hợp lệ.
@@ -3263,13 +3359,14 @@ async function ensureCdpServer(cdpPort, extensionPath, useRealProfile = false, p
   ];
   const chromeBin = chromePaths.find((p) => existsSync(p)) || "chrome";
 
-  const webrtcAntiLeakFlags = ANTI_DETECT_PROXY
-    ? [
-        "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
-        "--enforce-webrtc-ip-permission-check",
-        "--webrtc-ip-handling-policy=disable_non_proxied_udp",
-      ]
-    : [];
+  const webrtcAntiLeakFlags =
+    (ANTI_DETECT_PROXY && proxy) || (ANTI_DETECT_VPN && !proxy)
+      ? [
+          "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+          "--enforce-webrtc-ip-permission-check",
+          "--webrtc-ip-handling-policy=disable_non_proxied_udp",
+        ]
+      : [];
 
   const proxyFlags = proxy
     ? [`--proxy-server=${proxy.server}`, "--proxy-bypass-list=<-loopback>"]
@@ -3548,9 +3645,27 @@ async function runOneCycle(
   let isTempProfile = false;
   let page = null;
   let navigationSucceeded = false;
+  let activeGeo = null;
+  if (currentProxy) {
+    if (ANTI_DETECT_PROXY && currentProxy.geo) {
+      activeGeo = currentProxy.geo;
+    }
+  } else if (ANTI_DETECT_VPN) {
+    activeGeo = await resolveVpnGeo();
+    if (activeGeo) {
+      log(
+        `[AntiDetect VPN] ✓ Nhận diện vị trí VPN: ${
+          activeGeo.city ? `${activeGeo.city}, ` : ""
+        }${activeGeo.country} (${activeGeo.countryCode}) | IP: ${activeGeo.ip || activeGeo.query} | Timezone: ${
+          activeGeo.timezoneId
+        } | Locale: ${activeGeo.locale}`
+      );
+    }
+  }
+
   // Vân tay của chu kỳ này. Dựng sớm bằng số bản ước lượng (cần cho UA lúc launch), dựng lại
   // ngay khi đọc được engine thật nếu hai số lệch nhau.
-  const fpLocale = (ANTI_DETECT_PROXY && currentProxy?.geo?.locale) ? currentProxy.geo.locale : "vi-VN";
+  const fpLocale = activeGeo?.locale || (ANTI_DETECT_PROXY && currentProxy?.geo?.locale ? currentProxy.geo.locale : "vi-VN");
   let fp = fingerprintProfile
     ? materializeFingerprint(fingerprintProfile, {
         engineMajor: cdpUrl ? cachedEngineMajor : cachedEngineMajor ?? detectEngineMajorFromExecutable(),
@@ -3654,7 +3769,7 @@ async function runOneCycle(
         "--silent-debugger-extension-api",
         "--no-default-browser-check",
         "--no-first-run",
-        ...(ANTI_DETECT_PROXY
+        ...((ANTI_DETECT_PROXY && currentProxy) || (ANTI_DETECT_VPN && !currentProxy)
           ? [
               "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
               "--enforce-webrtc-ip-permission-check",
@@ -3705,7 +3820,7 @@ async function runOneCycle(
         args: launchArgs,
         viewport: physicalMouse || !isHeadless ? null : { width: 1366, height: 768 },
         locale: fpLocale,
-        timezoneId: (ANTI_DETECT_PROXY && currentProxy?.geo?.timezoneId) ? currentProxy.geo.timezoneId : "Asia/Ho_Chi_Minh",
+        timezoneId: activeGeo?.timezoneId || "Asia/Ho_Chi_Minh",
         userAgent: fp ? fp.userAgent : defaultDesktopUA,
       };
       if (fp) {
@@ -3734,14 +3849,14 @@ async function runOneCycle(
           username: currentProxy.username || undefined,
           password: currentProxy.password || undefined,
         };
-        if (ANTI_DETECT_PROXY && currentProxy.geo?.lat !== undefined && currentProxy.geo?.lon !== undefined) {
-          launchOptions.geolocation = {
-            latitude: currentProxy.geo.lat,
-            longitude: currentProxy.geo.lon,
-            accuracy: 10,
-          };
-          launchOptions.permissions = ["geolocation"];
-        }
+      }
+      if (activeGeo && activeGeo.lat !== undefined && activeGeo.lon !== undefined) {
+        launchOptions.geolocation = {
+          latitude: activeGeo.lat,
+          longitude: activeGeo.lon,
+          accuracy: 10,
+        };
+        launchOptions.permissions = ["geolocation"];
       }
 
       const channel = useMyChrome ? "chrome" : "chromium";
@@ -3892,23 +4007,23 @@ async function runOneCycle(
       const cdpClient = await context.newCDPSession(page).catch(() => null);
       if (cdpClient) {
 
-        if (ANTI_DETECT_PROXY && currentProxy?.geo) {
-          if (currentProxy.geo.timezoneId) {
+        if (activeGeo) {
+          if (activeGeo.timezoneId) {
             await cdpClient.send("Emulation.setTimezoneOverride", {
-              timezoneId: currentProxy.geo.timezoneId,
+              timezoneId: activeGeo.timezoneId,
             }).catch(() => {});
           }
-          if (currentProxy.geo.lat !== undefined && currentProxy.geo.lon !== undefined) {
+          if (activeGeo.lat !== undefined && activeGeo.lon !== undefined) {
             await cdpClient.send("Emulation.setGeolocationOverride", {
-              latitude: currentProxy.geo.lat,
-              longitude: currentProxy.geo.lon,
+              latitude: activeGeo.lat,
+              longitude: activeGeo.lon,
               accuracy: 10,
             }).catch(() => {});
             await context.grantPermissions(["geolocation"], { origin: WEB_URL }).catch(() => {});
           }
-          // Khi bật vân tay, UA + ngôn ngữ đã được applyFingerprintToPage đặt theo locale của proxy.
-          if (currentProxy.geo.locale && !fp) {
-            const lang = currentProxy.geo.locale;
+          // Khi bật vân tay, UA + ngôn ngữ đã được applyFingerprintToPage đặt theo locale của proxy/VPN.
+          if (activeGeo.locale && !fp) {
+            const lang = activeGeo.locale;
             const baseLang = lang.split("-")[0];
             const liveVer = (context.browser()?.version() || "134.0.0.0").split(".")[0] || "134";
             await cdpClient.send("Network.setUserAgentOverride", {
@@ -3924,7 +4039,7 @@ async function runOneCycle(
     }
 
     // Tiêm các lớp bảo vệ chống phát hiện và rò rỉ (Stealth Anti-Tracker Injections)
-    if (ANTI_DETECT_PROXY) {
+    if (ANTI_DETECT_PROXY || ANTI_DETECT_VPN) {
       await context.addInitScript(() => {
         // 1. Chống rò rỉ IP qua WebRTC STUN request
         if (window.RTCPeerConnection) {
@@ -4943,13 +5058,23 @@ async function main() {
   const proxyManager = new ProxyManager();
   proxyManager.init();
 
-  log(
-    `Anti-Detect Proxy: ${
-      ANTI_DETECT_PROXY
-        ? "BẬT [Zero-Mismatch Triad — Đồng bộ Timezone, Geolocation, Locale theo proxy & chống rò rỉ WebRTC]"
-        : "TẮT [Proxy tunnel thuần túy, không can thiệp Geo/Timezone/Locale/WebRTC]"
-    }`
-  );
+  if (!proxyManager.hasActiveProxy()) {
+    log(
+      `Anti-Detect VPN (Proton VPN / IP máy): ${
+        ANTI_DETECT_VPN
+          ? "BẬT [Tự động nhận diện vị trí VPN, đồng bộ Timezone, Geolocation, Locale & chống rò rỉ WebRTC]"
+          : "TẮT [Dùng IP máy / VPN thuần túy, giữ nguyên thông số hệ thống]"
+      }`
+    );
+  } else {
+    log(
+      `Anti-Detect Proxy: ${
+        ANTI_DETECT_PROXY
+          ? "BẬT [Zero-Mismatch Triad — Đồng bộ Timezone, Geolocation, Locale theo proxy & chống rò rỉ WebRTC]"
+          : "TẮT [Proxy tunnel thuần túy, không can thiệp Geo/Timezone/Locale/WebRTC]"
+      }`
+    );
+  }
 
   const trafficSourceDesc =
     TRAFFIC_SOURCE === "none"
@@ -5155,6 +5280,9 @@ export {
   parseProxyItem,
   parseAntiDetectProxy,
   ANTI_DETECT_PROXY,
+  parseAntiDetectVpn,
+  ANTI_DETECT_VPN,
+  resolveVpnGeo,
   parsePopunderRatio,
   resolvePopunderTarget,
   parseFocusPopunderSocial,

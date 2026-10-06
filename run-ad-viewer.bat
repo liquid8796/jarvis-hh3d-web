@@ -111,14 +111,16 @@ goto :after_proxy
 
 :after_proxy
 set "ARG_ANTI_DETECT_PROXY="
-if "%INPUT_PROXY_SRC%"=="4" goto :skip_anti_detect_proxy
+set "ARG_ANTI_DETECT_VPN="
+if "%INPUT_PROXY_SRC%"=="4" goto :prompt_anti_detect_vpn
+if "%INPUT_PROXY_SRC%"=="" goto :prompt_anti_detect_vpn
+
 echo.
 echo     --- Tuy chon Anti-Detect Proxy ---
 echo     1. Bat Anti-Detect Proxy [Mac dinh - Dong bo Timezone, Geolocation, Locale theo IP proxy va chong ro ri WebRTC]
 echo     2. Tat Anti-Detect Proxy [Chi dung proxy lam tunnel mang thuan tuy, khong can thiep Geo/Timezone]
 set "INPUT_ANTI_DETECT_PROXY="
 set /p "INPUT_ANTI_DETECT_PROXY=    Chon [1-2, Enter = 1]: "
-set "ARG_ANTI_DETECT_PROXY=--anti-detect-proxy"
 if "%INPUT_ANTI_DETECT_PROXY%"=="2" (
     set "ARG_ANTI_DETECT_PROXY=--no-anti-detect-proxy"
     echo     -^> Anti-Detect Proxy: TAT [Khong can thiep Timezone / Geo / Locale]
@@ -126,7 +128,24 @@ if "%INPUT_ANTI_DETECT_PROXY%"=="2" (
     set "ARG_ANTI_DETECT_PROXY=--anti-detect-proxy"
     echo     -^> Anti-Detect Proxy: BAT [Zero-Mismatch Triad]
 )
-:skip_anti_detect_proxy
+goto :after_anti_detect
+
+:prompt_anti_detect_vpn
+echo.
+echo     --- Tuy chon Anti-Detect VPN (Proton VPN / VPN he thong) ---
+echo     1. Bat Anti-Detect VPN [Mac dinh - Nhan dien IP VPN, dong bo Timezone, Geolocation, Locale theo vi tri VPN va chan ro ri WebRTC]
+echo     2. Tat Anti-Detect VPN [Giu nguyen thong so goc cua may tinh]
+set "INPUT_ANTI_DETECT_VPN="
+set /p "INPUT_ANTI_DETECT_VPN=    Chon [1-2, Enter = 1]: "
+if "%INPUT_ANTI_DETECT_VPN%"=="2" (
+    set "ARG_ANTI_DETECT_VPN=--no-anti-detect-vpn"
+    echo     -^> Anti-Detect VPN: TAT [Giu nguyen thong so may tinh]
+) else (
+    set "ARG_ANTI_DETECT_VPN=--anti-detect-vpn"
+    echo     -^> Anti-Detect VPN: BAT [Dong bo theo vi tri VPN & chan ro ri WebRTC - Mac dinh]
+)
+
+:after_anti_detect
 echo.
 
 REM 3. Hien thi cua so Chrome
@@ -555,7 +574,7 @@ if "%INPUT_POST_ENGAGE%"=="2" (
 echo.
 
 REM Tong hop lenh thuc thi
-set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_ANTI_DETECT_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER% %ARG_AD_FOCUS% %ARG_AD_NETWORK% %ARG_TRAFFIC_SOURCE% %ARG_TRAFFIC_RATIO% %ARG_DEEP_ENGAGE% %ARG_DEEP_RATIO% %ARG_SCROLL_BEFORE% %ARG_POST_ENGAGE%
+set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_ANTI_DETECT_PROXY% %ARG_ANTI_DETECT_VPN% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER% %ARG_AD_FOCUS% %ARG_AD_NETWORK% %ARG_TRAFFIC_SOURCE% %ARG_TRAFFIC_RATIO% %ARG_DEEP_ENGAGE% %ARG_DEEP_RATIO% %ARG_SCROLL_BEFORE% %ARG_POST_ENGAGE%
 
 echo ============================================================================
 echo   TONG HOP CAU HINH CHAY:

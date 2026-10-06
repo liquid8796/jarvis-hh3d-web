@@ -538,8 +538,24 @@ if "%INPUT_SCROLL_BEFORE%"=="2" (
 )
 echo.
 
+REM 22. Hau tuong tac sau khi xem quang cao (Post-ad engagement)
+echo [22] Hau tuong tac sau khi xem quang cao [Post-ad engagement]:
+echo      Quay lai trang web chinh de cuon toi day trang va trai nghiem them 1 lan nua truoc khi ket thuc chu ky.
+echo      1. Co [Khuyen nghi - tang time-on-page tu nhien cho web chinh - Mac dinh]
+echo      2. Khong [Dong tab quang cao va ket thuc chu ky ngay]
+set "INPUT_POST_ENGAGE="
+set /p "INPUT_POST_ENGAGE=    Chon [1-2, Enter = 1]: "
+if "%INPUT_POST_ENGAGE%"=="2" (
+    set "ARG_POST_ENGAGE=--no-post-ad-engagement"
+    echo     -^> Hau tuong tac: KHONG [Ket thuc chu ky ngay sau khi xem quang cao]
+) else (
+    set "ARG_POST_ENGAGE=--post-ad-engagement"
+    echo     -^> Hau tuong tac: CO [Quay lai web chinh cuon toi day trang - Mac dinh]
+)
+echo.
+
 REM Tong hop lenh thuc thi
-set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_ANTI_DETECT_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER% %ARG_AD_FOCUS% %ARG_AD_NETWORK% %ARG_TRAFFIC_SOURCE% %ARG_TRAFFIC_RATIO% %ARG_DEEP_ENGAGE% %ARG_DEEP_RATIO% %ARG_SCROLL_BEFORE%
+set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_ANTI_DETECT_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER% %ARG_AD_FOCUS% %ARG_AD_NETWORK% %ARG_TRAFFIC_SOURCE% %ARG_TRAFFIC_RATIO% %ARG_DEEP_ENGAGE% %ARG_DEEP_RATIO% %ARG_SCROLL_BEFORE% %ARG_POST_ENGAGE%
 
 echo ============================================================================
 echo   TONG HOP CAU HINH CHAY:

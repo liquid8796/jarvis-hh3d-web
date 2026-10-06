@@ -519,10 +519,36 @@ function parseScrollBeforeClick(argv = process.argv, env = process.env) {
   return true;
 }
 
+function parsePostAdEngagement(argv = process.argv, env = process.env) {
+  if (
+    argv.includes("--no-post-ad-engagement") ||
+    argv.includes("--no-post-engagement") ||
+    argv.includes("--no-post-engage") ||
+    argv.includes("--skip-post-engagement") ||
+    argv.includes("--skip-post-ad-engagement")
+  ) {
+    return false;
+  }
+  if (
+    argv.includes("--post-ad-engagement") ||
+    argv.includes("--post-engagement") ||
+    argv.includes("--post-engage")
+  ) {
+    return true;
+  }
+  const envVal = env.AD_VIEWER_POST_AD_ENGAGEMENT ?? env.AD_VIEWER_POST_ENGAGEMENT;
+  if (envVal !== undefined && envVal !== "") {
+    const val = envVal.toLowerCase().trim();
+    return val === "1" || val === "true" || val === "yes" || val === "on";
+  }
+  return true;
+}
+
 const DEEP_ENGAGEMENT_MODE = parseDeepEngagement();
 const DEEP_ENGAGEMENT_ENABLED = DEEP_ENGAGEMENT_MODE !== "none";
 const DEEP_ENGAGEMENT_RATIO = parseDeepEngagementRatio();
 const SCROLL_BEFORE_CLICK = parseScrollBeforeClick();
+const POST_AD_ENGAGEMENT = parsePostAdEngagement();
 
 const rawPageTimeout = getCliArg("--page-timeout");
 const defaultPageTimeout = process.argv.some((a) => a.includes("proxy")) || process.env.AD_VIEWER_PROXY ? 35_000 : 25_000;
@@ -4682,7 +4708,7 @@ async function runOneCycle(
     }
 
     // 6. Quay lại web chính để scroll tới cuối trang và trải nghiệm 1 lần nữa trước khi kết thúc chu kỳ
-    if (page && !page.isClosed?.()) {
+    if (POST_AD_ENGAGEMENT && page && !page.isClosed?.()) {
       try {
         log(`[Hậu tương tác] 🔄 Quay lại trang chính ${WEB_URL} để cuộn tới cuối trang và trải nghiệm thêm 1 lần nữa trước khi kết thúc chu kỳ...`);
         if (!isHeadless) {
@@ -4712,6 +4738,8 @@ async function runOneCycle(
       } catch (postErr) {
         log(`[Hậu tương tác] ⚠ Bỏ qua lỗi hậu tương tác: ${postErr?.message || postErr}`);
       }
+    } else if (!POST_AD_ENGAGEMENT) {
+      log(`[Hậu tương tác] ⏩ Bỏ qua bước hậu tương tác (đã tắt theo tùy chọn cấu hình).`);
     }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
@@ -4938,6 +4966,7 @@ async function main() {
     : `BẬT [Duyệt tất cả các tab & scroll tới đáy từng tab — Tỉ lệ: ${Math.round(DEEP_ENGAGEMENT_RATIO * 100)}%]`;
   log(`Tương tác lâu với website (Deep Engagement): ${deepEngageDesc}`);
   log(`Cuộn trang trước khi click ads (Scroll before click): ${SCROLL_BEFORE_CLICK ? "BẬT [Cuộn lướt trước để kích hoạt lazy-load rồi mới click]" : "TẮT [Click ads ngay sau khi mở trang]"}`);
+  log(`Hậu tương tác sau khi xem ads (Post-ad engagement): ${POST_AD_ENGAGEMENT ? "BẬT [Quay lại web chính cuộn tới đáy trang & dừng đọc 3-6s]" : "TẮT [Kết thúc chu kỳ ngay sau khi xem ads]"}`);
 
   const startTime = Date.now();
 
@@ -5149,6 +5178,8 @@ export {
   DEEP_ENGAGEMENT_MODE,
   SCROLL_BEFORE_CLICK,
   parseScrollBeforeClick,
+  POST_AD_ENGAGEMENT,
+  parsePostAdEngagement,
   scrollPageToBottom,
   performDeepEngagement,
 };

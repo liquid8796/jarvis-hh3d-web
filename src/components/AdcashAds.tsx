@@ -10,7 +10,7 @@ import { AdcashClientAds } from "@/components/adcash/AdcashClientAds";
 
 /**
  * Adcash Head Scripts.
- * Nhúng duy nhất Step 1 thư viện aclib và Step 2 AutoTag (7gpx1rimky) trong <head>.
+ * Nhúng duy nhất Step 1 thư viện aclib và Step 2 AutoTag (qmnntqoxdc) trong <head>.
  * Crawler Adcash sẽ thấy ngay lập tức mã xác thực này trong phản hồi SSR của trang.
  */
 export async function AdcashHead() {

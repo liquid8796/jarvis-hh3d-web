@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.190 — Cập nhật mã vùng AutoTag Adcash mới (7gpx1rimky) (06/10/2026)
+
+- Cập nhật cấu hình mã vùng hiển thị AutoTag Adcash theo thiết lập tài khoản mới:
+  - **Mã vùng AutoTag mới (7gpx1rimky)**: Chuyển `ADCASH_AUTOTAG_ZONE_ID` trong [src/lib/adcash/config.ts](src/lib/adcash/config.ts) sang `7gpx1rimky` để phục vụ quảng cáo theo thiết lập mới từ trang quản trị Adcash.
+  - **Đồng bộ kiểm thử và công cụ xem quảng cáo**: Cập nhật bộ kiểm tra [scripts/verifyAdcash.mts](scripts/verifyAdcash.mts) và công cụ [scripts/adViewer.mjs](scripts/adViewer.mjs) nhận diện mã vùng `7gpx1rimky`.
+
 ## 1.3.189 — Mở lại quảng cáo Adcash AutoTag với mã vùng mới (06/10/2026)
 
 - Kích hoạt lại quảng cáo đối tác Adcash trên website chính thức theo yêu cầu:

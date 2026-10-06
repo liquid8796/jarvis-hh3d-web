@@ -777,20 +777,39 @@ class AsyncMutex {
   constructor() {
     this._queue = [];
     this._locked = false;
+    this._currentTag = "";
+    this._acquiredAt = 0;
   }
 
-  async acquire(tag = "") {
-    return new Promise((resolve) => {
+  async acquire(tag = "", timeoutMs = 60000) {
+    if (!this._locked) {
+      this._locked = true;
+      this._currentTag = tag;
+      this._acquiredAt = Date.now();
+      return () => this.release();
+    }
+
+    return new Promise((resolve, reject) => {
+      let timer = null;
       const ticket = () => {
+        if (timer) clearTimeout(timer);
         this._locked = true;
+        this._currentTag = tag;
+        this._acquiredAt = Date.now();
         resolve(() => this.release());
       };
-      if (!this._locked) {
-        this._locked = true;
-        resolve(() => this.release());
-      } else {
-        this._queue.push(ticket);
+
+      if (timeoutMs > 0) {
+        timer = setTimeout(() => {
+          const idx = this._queue.indexOf(ticket);
+          if (idx !== -1) {
+            this._queue.splice(idx, 1);
+          }
+          reject(new Error(`Timeout acquiring mutex [${tag}] sau ${timeoutMs}ms (dang giu boi ${this._currentTag})`));
+        }, timeoutMs);
       }
+
+      this._queue.push(ticket);
     });
   }
 
@@ -800,10 +819,26 @@ class AsyncMutex {
       next();
     } else {
       this._locked = false;
+      this._currentTag = "";
+      this._acquiredAt = 0;
+    }
+  }
+
+  forceRelease() {
+    this._locked = false;
+    this._currentTag = "";
+    this._acquiredAt = 0;
+    if (this._queue.length > 0) {
+      const next = this._queue.shift();
+      next();
     }
   }
 
   get isLocked() {
+    if (this._locked && this._acquiredAt > 0 && Date.now() - this._acquiredAt > 180000) {
+      console.warn(`[AsyncMutex] ⚠ Phat hien lock bi chiem giu qua 180s (${this._currentTag}). Tu dong giai phong phong ngua deadlock!`);
+      this.forceRelease();
+    }
     return this._locked;
   }
 
@@ -894,32 +929,42 @@ function canInteractForeground(instanceId = logContext.getStore()?.instanceId) {
   return turnHolder === instanceId;
 }
 
-async function acquireCycleTurn(instanceId, { quiet = false } = {}) {
+async function acquireCycleTurn(instanceId, { quiet = false, timeoutMs = 90000 } = {}) {
   if (IS_EXPLICIT_HEADLESS) return true;
   if (cycleTurns.has(instanceId)) return false;
   if (mouseMutex.isLocked && !quiet) {
     const holderDesc = turnHolder !== null ? `#${turnHolder}` : "khác";
     log(`[CycleTurn] Instance ${holderDesc} đang trong lượt click & kết thúc chu kỳ — chờ nó kết thúc chu kỳ (hàng đợi: ${mouseMutex.queueLength + 1})...`);
   }
-  const unlock = await mouseMutex.acquire(`inst-${instanceId}`);
-  cycleTurns.set(instanceId, unlock);
-  turnHolder = instanceId;
-  if (!quiet && INSTANCE_COUNT > 1) {
-    log("[CycleTurn] ✓ Nhận lượt độc quyền tương tác quảng cáo — giữ tới khi kết thúc trọn chu kỳ này.");
+  try {
+    const unlock = await mouseMutex.acquire(`inst-${instanceId}`, timeoutMs);
+    cycleTurns.set(instanceId, unlock);
+    turnHolder = instanceId;
+    if (!quiet && INSTANCE_COUNT > 1) {
+      log("[CycleTurn] ✓ Nhận lượt độc quyền tương tác quảng cáo — giữ tới khi kết thúc trọn chu kỳ này.");
+    }
+    return true;
+  } catch (err) {
+    if (!quiet) {
+      log(`[CycleTurn] ⚠ Hết thời gian chờ lượt chuột cho instance #${instanceId}: ${err.message}. Tiếp tục thao tác an toàn.`);
+    }
+    return false;
   }
-  return true;
 }
 
 function releaseCycleTurn(instanceId, { quiet = false } = {}) {
   if (IS_EXPLICIT_HEADLESS) return;
   const unlock = cycleTurns.get(instanceId);
-  if (!unlock) return;
   cycleTurns.delete(instanceId);
   if (turnHolder === instanceId) turnHolder = null;
-  if (!quiet && INSTANCE_COUNT > 1) {
-    log("[CycleTurn] ✓ Kết thúc trọn chu kỳ — nhả lượt tương tác quảng cáo cho instance kế tiếp.");
+  if (unlock) {
+    if (!quiet && INSTANCE_COUNT > 1) {
+      log("[CycleTurn] ✓ Kết thúc trọn chu kỳ — nhả lượt tương tác quảng cáo cho instance kế tiếp.");
+    }
+    try { unlock(); } catch {}
+  } else if (mouseMutex.isLocked && turnHolder === null && cycleTurns.size === 0) {
+    mouseMutex.forceRelease();
   }
-  unlock();
 }
 
 /**
@@ -2154,7 +2199,9 @@ async function resolvePopunderTarget(page) {
 async function performEngageAndClick(page, ctx, targetX, targetY, instanceId = 0, clickMode = CLICK_MODE) {
   return withTimeout((async () => {
     if (!IS_EXPLICIT_HEADLESS && (isPhysicalClickMode(clickMode) || INSTANCE_COUNT > 1)) {
-      await withTimeout(acquireCycleTurn(instanceId), 8000).catch(() => {});
+      if (!cycleTurns.has(instanceId)) {
+        await acquireCycleTurn(instanceId, { quiet: true, timeoutMs: 15000 });
+      }
       if (instanceId > 0) {
         await tagInstancePage(page, instanceId).catch(() => {});
       }
@@ -4364,8 +4411,12 @@ async function runOneCycle(
     }
 
     // Gỡ vân tay của chu kỳ: listener popup và các phiên CDP giữ override.
-    if (onFingerprintPage && context) context.off("page", onFingerprintPage);
-    for (const session of fpSessions) await session.detach().catch(() => {});
+    try {
+      if (onFingerprintPage && context) context.off("page", onFingerprintPage);
+    } catch {}
+    for (const session of fpSessions) {
+      try { await session.detach().catch(() => {}); } catch {}
+    }
 
     if (cdpUrl) {
       // Trong chế độ CDP, đóng tất cả tab quảng cáo phụ nếu còn mở, và đóng tab chu kỳ với timeout bảo vệ
@@ -4414,7 +4465,7 @@ async function runOneCycle(
         }
       }
     }
-    releaseCycleTurn(instanceId);
+    try { releaseCycleTurn(instanceId); } catch {}
   }
 }
 
@@ -4516,7 +4567,7 @@ async function main() {
   const startTime = Date.now();
 
   if (INSTANCE_COUNT === 1) {
-    await runInstanceLoop(1, proxyManager, extPath, startTime);
+    await runInstanceSupervisor(1, proxyManager, extPath, startTime);
   } else {
     log(
       `Khởi chạy đồng thời ${INSTANCE_COUNT} instance (${
@@ -4527,19 +4578,33 @@ async function main() {
     );
     const instancePromises = [];
     for (let id = 1; id <= INSTANCE_COUNT; id++) {
-      instancePromises.push(runInstanceLoop(id, proxyManager, extPath, startTime));
+      instancePromises.push(runInstanceSupervisor(id, proxyManager, extPath, startTime));
     }
-    const results = await Promise.allSettled(instancePromises);
-    for (let i = 0; i < results.length; i++) {
-      const res = results[i];
-      if (res.status === "rejected") {
-        log(`⚠ Instance #${i + 1} kết thúc với lỗi: ${res.reason?.message || res.reason}`);
-      }
-    }
+    await Promise.allSettled(instancePromises);
   }
 
   log("Ca trực hoàn tất bình thường. Thoát mã 0.");
   process.exit(0);
+}
+
+async function runInstanceSupervisor(instanceId, proxyManager, extPath, startTime) {
+  let restarts = 0;
+  while (Date.now() - startTime < MAX_LIFETIME_MS - 30_000) {
+    try {
+      await runInstanceLoop(instanceId, proxyManager, extPath, startTime);
+      break;
+    } catch (fatalErr) {
+      restarts++;
+      const remainingMs = MAX_LIFETIME_MS - (Date.now() - startTime);
+      if (remainingMs <= 30_000) {
+        log(`[Supervisor] Instance #${instanceId} hoàn thành theo hạn mức ca trực.`);
+        break;
+      }
+      log(`🔥 [Supervisor] Instance #${instanceId} gặp sự cố ngoài dự kiến (Lần #${restarts}): ${fatalErr?.message || fatalErr}. Tự động phục hồi và tiếp tục ca trực sau 6 giây...`);
+      try { releaseCycleTurn(instanceId, { quiet: true }); } catch {}
+      await sleep(6000);
+    }
+  }
 }
 
 async function runInstanceLoop(instanceId, proxyManager, extPath, startTime) {
@@ -4560,79 +4625,99 @@ async function runInstanceLoop(instanceId, proxyManager, extPath, startTime) {
       while (Date.now() - startTime < MAX_LIFETIME_MS) {
         cycle++;
         log(`\n=================== BẮT ĐẦU CHU KỲ ${cycle} ===================`);
-        currentProxy = await proxyManager.getNextWorkingProxy(instanceId, currentProxy);
-
-        // Danh tính mới chỉ ra đời ở đầu một cửa sổ cookie (ngay sau lượt xoá cache) — n = 0 thì
-        // giữ một danh tính cho cả ca trực.
-        const identityWindowStart = CLEAR_CACHE_CYCLES > 0 && (cycle - 1) % CLEAR_CACHE_CYCLES === 0;
-        if (FINGERPRINT_ENABLED && (!fingerprintProfile || identityWindowStart)) {
-          fingerprintProfile = pickFingerprintProfile({
-            device: DEVICE_MODE,
-            browsers: BROWSER_SELECTION.browsers,
-            mobileRatio: MOBILE_RATIO,
-          });
-          for (const note of fingerprintProfile.notes) log(`[Fingerprint] ⚠ ${note}`);
-          log(`[Fingerprint] Danh tính mới cho ${CLEAR_CACHE_CYCLES > 0 ? `${CLEAR_CACHE_CYCLES} chu kỳ tới` : "cả ca trực"}.`);
-        }
-
-        const requiresIsolatedProfile = Boolean(extPath) || IS_EXPLICIT_HEADLESS;
-        const bypassSharedProfile =
-          !requiresIsolatedProfile &&
-          (process.argv.some((a) => a.startsWith("--cdp")) ||
-           Boolean(process.env.CDP_URL) ||
-           process.argv.includes("--my-chrome") ||
-           process.argv.includes("--my-profile") ||
-           process.env.USE_MY_CHROME === "1");
-
-        if (!bypassSharedProfile) {
-          if (!sharedProfileDir) {
-            sharedProfileDir = mkdtempSync(path.join(tmpdir(), `ad-viewer-profile-inst${instanceId}-`));
-            prepareExtensionProfile(sharedProfileDir);
-          }
-        }
 
         try {
-          await runOneCycle(
-            extPath,
-            currentProxy,
-            proxyManager,
-            cycle,
-            sharedProfileDir,
-            fingerprintProfile,
-            instanceId
-          );
-        } finally {
-          proxyManager.releaseProxy(currentProxy);
-          currentProxy = null;
-        }
+          currentProxy = await proxyManager.getNextWorkingProxy(instanceId, currentProxy);
 
-        if (sharedProfileDir && CLEAR_CACHE_CYCLES > 0 && cycle % CLEAR_CACHE_CYCLES === 0) {
-          try {
-            rmSync(sharedProfileDir, { recursive: true, force: true });
-          } catch {}
-          sharedProfileDir = null;
-        }
-
-        const elapsedMs = Date.now() - startTime;
-        const remainingMs = MAX_LIFETIME_MS - elapsedMs;
-        log(`Hoàn thành chu kỳ ${cycle}. Thời gian đã chạy: ${Math.round(elapsedMs / 60000)}m (còn ${Math.round(remainingMs / 60000)}m)`);
-
-        // Kiểm tra nâng cấp runtime nếu bật
-        if (SELF_UPDATE && currentVersion && cycle % 5 === 0) {
-          const remoteVer = (await checkRemoteVersion(WEB_URL)) || (FALLBACK_URL ? await checkRemoteVersion(FALLBACK_URL) : null);
-          if (remoteVer && remoteVer !== currentVersion) {
-            log(`Phát hiện bản phát hành mới (${remoteVer} != ${currentVersion}). Kết thúc với mã 90 để nhận bản mới.`);
-            process.exit(90);
+          // Danh tính mới chỉ ra đời ở đầu một cửa sổ cookie (ngay sau lượt xoá cache) — n = 0 thì
+          // giữ một danh tính cho cả ca trực.
+          const identityWindowStart = CLEAR_CACHE_CYCLES > 0 && (cycle - 1) % CLEAR_CACHE_CYCLES === 0;
+          if (FINGERPRINT_ENABLED && (!fingerprintProfile || identityWindowStart)) {
+            fingerprintProfile = pickFingerprintProfile({
+              device: DEVICE_MODE,
+              browsers: BROWSER_SELECTION.browsers,
+              mobileRatio: MOBILE_RATIO,
+            });
+            for (const note of fingerprintProfile.notes) log(`[Fingerprint] ⚠ ${note}`);
+            log(`[Fingerprint] Danh tính mới cho ${CLEAR_CACHE_CYCLES > 0 ? `${CLEAR_CACHE_CYCLES} chu kỳ tới` : "cả ca trực"}.`);
           }
-        }
 
-        if (remainingMs <= 30_000) {
-          log("Hết thời gian tuổi thọ ca trực. Đóng instance an toàn.");
-          break;
-        }
+          const requiresIsolatedProfile = Boolean(extPath) || IS_EXPLICIT_HEADLESS;
+          const bypassSharedProfile =
+            !requiresIsolatedProfile &&
+            (process.argv.some((a) => a.startsWith("--cdp")) ||
+             Boolean(process.env.CDP_URL) ||
+             process.argv.includes("--my-chrome") ||
+             process.argv.includes("--my-profile") ||
+             process.env.USE_MY_CHROME === "1");
 
-        const restMs = rand(2000, 5000);
-        await sleep(restMs);
+          if (!bypassSharedProfile) {
+            if (!sharedProfileDir) {
+              sharedProfileDir = mkdtempSync(path.join(tmpdir(), `ad-viewer-profile-inst${instanceId}-`));
+              prepareExtensionProfile(sharedProfileDir);
+            }
+          }
+
+          try {
+            await runOneCycle(
+              extPath,
+              currentProxy,
+              proxyManager,
+              cycle,
+              sharedProfileDir,
+              fingerprintProfile,
+              instanceId
+            );
+          } finally {
+            proxyManager.releaseProxy(currentProxy);
+            currentProxy = null;
+          }
+
+          if (sharedProfileDir && CLEAR_CACHE_CYCLES > 0 && cycle % CLEAR_CACHE_CYCLES === 0) {
+            try {
+              rmSync(sharedProfileDir, { recursive: true, force: true });
+            } catch {}
+            sharedProfileDir = null;
+          }
+
+          const elapsedMs = Date.now() - startTime;
+          const remainingMs = MAX_LIFETIME_MS - elapsedMs;
+          log(`Hoàn thành chu kỳ ${cycle}. Thời gian đã chạy: ${Math.round(elapsedMs / 60000)}m (còn ${Math.round(remainingMs / 60000)}m)`);
+
+          // Kiểm tra nâng cấp runtime nếu bật
+          if (SELF_UPDATE && currentVersion && cycle % 5 === 0) {
+            const remoteVer = (await checkRemoteVersion(WEB_URL)) || (FALLBACK_URL ? await checkRemoteVersion(FALLBACK_URL) : null);
+            if (remoteVer && remoteVer !== currentVersion) {
+              log(`Phát hiện bản phát hành mới (${remoteVer} != ${currentVersion}). Kết thúc với mã 90 để nhận bản mới.`);
+              process.exit(90);
+            }
+          }
+
+          if (remainingMs <= 30_000) {
+            log("Hết thời gian tuổi thọ ca trực. Đóng instance an toàn.");
+            break;
+          }
+
+          const restMs = rand(2000, 5000);
+          await sleep(restMs);
+        } catch (cycleErr) {
+          log(`⚠ [Instance #${instanceId}] Sự cố chu kỳ ${cycle}: ${cycleErr?.message || cycleErr}. Đang tự động dọn dẹp và tiếp tục chu kỳ mới sau 5s...`);
+          try { releaseCycleTurn(instanceId, { quiet: true }); } catch {}
+          if (currentProxy) {
+            try { proxyManager.releaseProxy(currentProxy); } catch {}
+            currentProxy = null;
+          }
+          if (sharedProfileDir && CLEAR_CACHE_CYCLES > 0) {
+            try { rmSync(sharedProfileDir, { recursive: true, force: true }); } catch {}
+            sharedProfileDir = null;
+          }
+          const remainingMs = MAX_LIFETIME_MS - (Date.now() - startTime);
+          if (remainingMs <= 30_000) {
+            log(`[Instance #${instanceId}] Hết thời gian tuổi thọ ca trực. Đóng instance an toàn.`);
+            break;
+          }
+          await sleep(5000);
+        }
       }
     } finally {
       releaseCycleTurn(instanceId, { quiet: true });

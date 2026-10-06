@@ -2460,7 +2460,7 @@ async function resolvePopunderTarget(page) {
     // Lấy toạ độ các khối quảng cáo để tránh click nhầm vào ads
     const adBoxes = [];
     try {
-      const adLocators = page.locator(".adsterra-unit, .adsterra-stack, .adsterra-flank, iframe");
+      const adLocators = page.locator(".adsterra-unit, .adsterra-stack, .adsterra-flank, iframe, #adcash-ad-container, .adcash-container");
       const adCount = await adLocators.count().catch(() => 0);
       for (let i = 0; i < Math.min(50, adCount); i++) {
         const b = await adLocators.nth(i).boundingBox().catch(() => null);
@@ -4424,6 +4424,7 @@ async function runOneCycle(
       }
     } else {
       // 3. Chế độ tự động: Ưu tiên click Popunder hoặc tương tác tự nhiên theo mạng quảng cáo
+      const isAdcash = AD_NETWORK === "adcash" || AD_NETWORK === "all";
       const allowPopunderAttempt = FOCUS_POPUNDER_SOCIAL || POPUNDER_RATIO > 0;
       if (allowPopunderAttempt && preferPopunder) {
         log(
@@ -4448,7 +4449,7 @@ async function runOneCycle(
             log("Popunder chưa mở tab mới (có thể do cooldown mạng quảng cáo); chuyển sang click banner dự phòng...");
           }
         }
-      } else if (isAdcash && preferPopunder) {
+      } else if (isAdcash) {
         log(
           `🚀 [Adcash AutoTag] Kích hoạt tương tác tự nhiên trên trang web để kích hoạt AutoTag (${cycleClickMode} mode)...`,
         );
@@ -4538,22 +4539,22 @@ async function runOneCycle(
       }
     }
 
-    // 4. Nếu Popunder/SocialBar vẫn chưa mở được tab: Thử lại 1 lần click tự nhiên Popunder (chỉ áp dụng cho Adsterra)
-    if (!adClicked && cycleClickMode !== "manual" && shouldScanAdsterra) {
-      log("🎯 [Popunder Thử Lại] Kích hoạt click mô phỏng tự nhiên trên trang để thử lại Popunder...");
+    // 4. Nếu Popunder/SocialBar/AutoTag vẫn chưa mở được tab: Thử lại 1 lần click tự nhiên
+    if (!adClicked && cycleClickMode !== "manual" && (shouldScanAdsterra || isAdcash)) {
+      log(`🎯 [${isAdcash ? "Adcash AutoTag" : "Popunder"} Thử Lại] Kích hoạt click mô phỏng tự nhiên trên trang để thử lại...`);
       const popTarget = await resolvePopunderTarget(page);
       const popup = await performEngageAndClick(page, context, popTarget.x, popTarget.y, instanceId, cycleClickMode);
       if (popup) {
         openedPage = popup;
         adClicked = true;
-        log("✓ Popunder đã được kích hoạt thành công!");
+        log(`✓ ${isAdcash ? "AutoTag Adcash" : "Popunder"} đã được kích hoạt thành công!`);
       } else {
         await sleep(2000);
         const allPages = context.pages();
         if (allPages.length > 1) {
           openedPage = allPages[allPages.length - 1];
           adClicked = true;
-          log("✓ Đã bắt được trang Popunder từ tab phụ.");
+          log(`✓ Đã bắt được trang ${isAdcash ? "Adcash" : "Popunder"} từ tab phụ.`);
         }
       }
     }

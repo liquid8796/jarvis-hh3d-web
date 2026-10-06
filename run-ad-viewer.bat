@@ -355,32 +355,33 @@ echo      1. Co [Uu tien click tu nhien de kich hoat Popunder - KHUYEN NGHI]
 echo      2. Khong [Can bang tat ca cac dinh dang, khong uu tien Popunder]
 set "INPUT_FOCUS_POPUNDER="
 set /p "INPUT_FOCUS_POPUNDER=    Chon [1-2, Enter = 1]: "
-set "ARG_AD_FOCUS=--focus-popunder-social"
-set "ARG_POPUNDER="
+if "%INPUT_FOCUS_POPUNDER%"=="2" goto :popunder_skip
 
-if "%INPUT_FOCUS_POPUNDER%"=="2" (
-    set "ARG_AD_FOCUS=--with-native"
-    set "ARG_POPUNDER=--popunder-ratio=0"
-    echo     -^> Tap trung Popunder: KHONG [Can bang cac dinh dang, khong uu tien Popunder]
+:popunder_focus
+set "ARG_AD_FOCUS=--focus-popunder-social"
+echo     -^> Tap trung Popunder: CO [Uu tien Popunder]
+echo.
+echo [16] Xac suat click quang cao Popunder [Popunder Ratio]:
+echo      Nhap ti le phan tram (vi du: 70, 80, 90, 100), hoac thap phan (0.8).
+echo      Auto se tu dong uu tien click tu nhien de kich hoat Popunder theo ti le nay.
+echo      De trong de su dung mac dinh (80%%).
+set "INPUT_POPUNDER="
+set /p "INPUT_POPUNDER=    Xac suat Popunder (%%) [Enter = mac dinh 80%%]: "
+if defined INPUT_POPUNDER (
+    set "ARG_POPUNDER=--popunder-ratio=%INPUT_POPUNDER%"
+    echo     -^> Xac suat Popunder: %INPUT_POPUNDER%%%
 ) else (
-    echo     -^> Tap trung Popunder: CO [Uu tien Popunder]
-    echo.
-    REM 16. Xac suat uu tien click quang cao Popunder [Popunder Ratio]
-    echo [16] Xac suat click quang cao Popunder [Popunder Ratio]:
-    echo      Nhap ti le phan tram (vi du: 70, 80, 90, 100), hoac thap phan (0.8).
-    echo      Auto se tu dong uu tien click tu nhien de kich hoat Popunder theo ti le nay.
-    echo      De trong de su dung mac dinh (80%%).
-    set "INPUT_POPUNDER="
-    set /p "INPUT_POPUNDER=    Xac suat Popunder (%%) [Enter = mac dinh 80%%]: "
-    if defined INPUT_POPUNDER (
-        set "INPUT_POPUNDER=%INPUT_POPUNDER:%%=%"
-        set "ARG_POPUNDER=--popunder-ratio=%INPUT_POPUNDER%"
-        echo     -^> Xac suat Popunder: %INPUT_POPUNDER%%%
-    ) else (
-        set "ARG_POPUNDER=--popunder-ratio=80"
-        echo     -^> Xac suat Popunder: Mac dinh [80%%]
-    )
+    set "ARG_POPUNDER=--popunder-ratio=80"
+    echo     -^> Xac suat Popunder: Mac dinh [80%%]
 )
+goto :after_popunder
+
+:popunder_skip
+set "ARG_AD_FOCUS=--with-native"
+set "ARG_POPUNDER=--popunder-ratio=0"
+echo     -^> Tap trung Popunder: KHONG [Can bang cac dinh dang, khong uu tien Popunder]
+
+:after_popunder
 echo.
 
 
@@ -467,7 +468,6 @@ echo      De trong de su dung mac dinh (80%%).
 set "INPUT_TRAFFIC_RATIO="
 set /p "INPUT_TRAFFIC_RATIO=    Xac suat co referrer [Enter = mac dinh 80%%]: "
 if defined INPUT_TRAFFIC_RATIO (
-    set "INPUT_TRAFFIC_RATIO=%INPUT_TRAFFIC_RATIO:%%=%"
     set "ARG_TRAFFIC_RATIO=--traffic-ratio=%INPUT_TRAFFIC_RATIO%"
     echo     -^> Xac suat: %INPUT_TRAFFIC_RATIO%%%
 ) else (

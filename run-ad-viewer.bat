@@ -478,8 +478,43 @@ if defined INPUT_TRAFFIC_RATIO (
 :SKIP_TRAFFIC_RATIO
 echo.
 
+REM 19. Tuong tac sau toan trang (Deep Engagement / Extended Interaction)
+echo [19] Tuong tac sau toan trang [Deep Engagement]:
+echo      1. Co [Bat tuong tac sau: scroll het trang, click vao cac tab/menu, cuon toi cuoi moi trang - KHUYEN NGHI]
+echo      2. Khong [Mac dinh - Tuong tac nhanh theo khu vuc quang cao]
+set "INPUT_DEEP_ENGAGE="
+set /p "INPUT_DEEP_ENGAGE=    Chon [1-2, Enter = 1]: "
+if "%INPUT_DEEP_ENGAGE%"=="2" goto DEEP_ENGAGE_SKIP
+
+:DEEP_ENGAGE_YES
+set "ARG_DEEP_ENGAGE=--deep-engagement"
+echo     -^> Tuong tac sau: CO [Scroll het trang va duyet tat ca tab]
+echo.
+echo [20] Xac suat tuong tac sau [Deep Engagement Ratio]:
+echo      Nhap ti le phan tram (vi du: 70, 80, 90, 100), hoac thap phan (0.7).
+echo      Auto se tu dong thuc hien cuon het trang va click qua cac tab theo ti le nay.
+echo      De trong de su dung mac dinh (70%%).
+set "INPUT_DEEP_RATIO="
+set /p "INPUT_DEEP_RATIO=    Xac suat tuong tac sau (%%) [Enter = mac dinh 70%%]: "
+if defined INPUT_DEEP_RATIO (
+    set "ARG_DEEP_RATIO=--deep-engagement-ratio=%INPUT_DEEP_RATIO%"
+    echo     -^> Xac suat tuong tac sau: %INPUT_DEEP_RATIO%%%
+) else (
+    set "ARG_DEEP_RATIO=--deep-engagement-ratio=70"
+    echo     -^> Xac suat tuong tac sau: Mac dinh [70%%]
+)
+goto AFTER_DEEP_ENGAGE
+
+:DEEP_ENGAGE_SKIP
+set "ARG_DEEP_ENGAGE=--no-deep-engagement"
+set "ARG_DEEP_RATIO=--deep-engagement-ratio=0"
+echo     -^> Tuong tac sau: KHONG [Tuong tac nhanh theo quang cao]
+
+:AFTER_DEEP_ENGAGE
+echo.
+
 REM Tong hop lenh thuc thi
-set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_ANTI_DETECT_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER% %ARG_AD_FOCUS% %ARG_AD_NETWORK% %ARG_TRAFFIC_SOURCE% %ARG_TRAFFIC_RATIO%
+set FINAL_ARGS=%ARG_MY_CHROME% %ARG_HEAD% %ARG_CLICK_MODE% %ARG_PROXY% %ARG_ANTI_DETECT_PROXY% %ARG_CB% %ARG_LIFETIME% %ARG_DELAY% %ARG_RECURSIVE% %ARG_CLEAN_CYCLES% %ARG_DEVICE% %ARG_BROWSERS% %ARG_INSTANCES% %ARG_HOVER% %ARG_RENDER_TIMEOUT% %ARG_POPUNDER% %ARG_AD_FOCUS% %ARG_AD_NETWORK% %ARG_TRAFFIC_SOURCE% %ARG_TRAFFIC_RATIO% %ARG_DEEP_ENGAGE% %ARG_DEEP_RATIO%
 
 echo ============================================================================
 echo   TONG HOP CAU HINH CHAY:

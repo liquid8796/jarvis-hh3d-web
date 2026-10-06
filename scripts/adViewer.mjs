@@ -458,6 +458,45 @@ function resolveTrafficReferrer(trafficSource = TRAFFIC_SOURCE, trafficRatio = T
 const TRAFFIC_SOURCE = parseTrafficSource();
 const TRAFFIC_RATIO = parseTrafficRatio();
 
+function parseDeepEngagement(argv = process.argv, env = process.env) {
+  if (
+    argv.includes("--deep-engagement") ||
+    argv.includes("--deep-engage") ||
+    argv.includes("--extended-interaction")
+  ) {
+    return true;
+  }
+  if (argv.includes("--no-deep-engagement") || argv.includes("--no-deep-engage")) {
+    return false;
+  }
+  const envVal = env.AD_VIEWER_DEEP_ENGAGEMENT || env.AD_VIEWER_EXTENDED_INTERACTION;
+  if (envVal !== undefined && envVal !== "") {
+    return envVal === "1" || envVal.toLowerCase() === "true";
+  }
+  return false;
+}
+
+function parseDeepEngagementRatio(argv = process.argv, env = process.env) {
+  const cli =
+    getCliArg("--deep-engagement-ratio") ||
+    getCliArg("--deep-engage-ratio") ||
+    getCliArg("--deep-ratio") ||
+    argv.find((a) => a.startsWith("--deep-engagement-ratio="))?.split("=")[1] ||
+    argv.find((a) => a.startsWith("--deep-engage-ratio="))?.split("=")[1] ||
+    argv.find((a) => a.startsWith("--deep-ratio="))?.split("=")[1];
+  const envVal = env.AD_VIEWER_DEEP_ENGAGEMENT_RATIO || env.AD_VIEWER_DEEP_RATIO || "";
+  const raw = (cli || envVal || "").trim().toLowerCase();
+  if (!raw) return 0.7;
+  const cleaned = raw.replace(/%/g, "").trim();
+  const num = Number(cleaned);
+  if (Number.isNaN(num) || num < 0) return 0.7;
+  if (num > 1) return Math.min(1, num / 100);
+  return Math.min(1, num);
+}
+
+const DEEP_ENGAGEMENT_ENABLED = parseDeepEngagement();
+const DEEP_ENGAGEMENT_RATIO = parseDeepEngagementRatio();
+
 const rawPageTimeout = getCliArg("--page-timeout");
 const defaultPageTimeout = process.argv.some((a) => a.includes("proxy")) || process.env.AD_VIEWER_PROXY ? 35_000 : 25_000;
 const parsedPageTimeout = Number(rawPageTimeout || process.env.AD_VIEWER_PAGE_TIMEOUT_MS || defaultPageTimeout);
@@ -1808,6 +1847,256 @@ async function organicScroll(page, totalDistance, instanceId = logContext.getSto
     }
     remaining -= chunk;
     await sleep(rand(120, 450));
+  }
+}
+
+/**
+ * Cuộn tự nhiên từ vị trí hiện tại xuống hết đáy trang web.
+ * Có ngắt quãng đọc lướt, thỉnh thoảng cuộn ngược lại một chút mô phỏng hành vi người thật.
+ */
+async function scrollPageToBottom(page, instanceId = logContext.getStore()?.instanceId, options = {}) {
+  if (!page || page.isClosed?.()) return;
+  const maxSteps = options.maxSteps || 35;
+  let steps = 0;
+  let lastScrollY = -1;
+  let unchangedCount = 0;
+
+  try {
+    while (steps < maxSteps) {
+      if (page.isClosed?.()) break;
+      const metrics = await page.evaluate(() => {
+        const doc = document.documentElement;
+        const body = document.body;
+        const scrollY = window.scrollY || window.pageYOffset || (doc ? doc.scrollTop : 0) || 0;
+        const scrollHeight = Math.max(
+          doc ? doc.scrollHeight : 0,
+          body ? body.scrollHeight : 0,
+          doc ? doc.offsetHeight : 0,
+          body ? body.offsetHeight : 0
+        );
+        const innerHeight = window.innerHeight || 800;
+        return { scrollY, scrollHeight, innerHeight };
+      }).catch(() => null);
+
+      if (!metrics) break;
+      const { scrollY, scrollHeight, innerHeight } = metrics;
+
+      // Đã chạm hoặc rất sát đáy trang (còn cách đáy dưới 90px)
+      if (scrollY + innerHeight >= scrollHeight - 90) {
+        break;
+      }
+
+      if (Math.abs(scrollY - lastScrollY) < 20) {
+        unchangedCount++;
+        if (unchangedCount >= 3) {
+          // Trang đã kịch trần cuộn
+          break;
+        }
+      } else {
+        unchangedCount = 0;
+      }
+      lastScrollY = scrollY;
+
+      // Cuộn xuống nhịp 320 - 580px
+      const chunk = rand(320, 580);
+      await organicScroll(page, chunk, instanceId);
+      steps++;
+
+      // Tạm dừng đọc lướt giữa các lần cuộn (500 - 1100ms)
+      await sleep(rand(500, 1100));
+
+      // 15% xác suất lướt ngược lại một chút để xem lại nội dung vừa qua
+      if (Math.random() < 0.15 && scrollY > 250) {
+        await organicScroll(page, -rand(70, 160), instanceId);
+        await sleep(rand(400, 800));
+      }
+    }
+
+    // Dừng lại ở đáy trang 1.5 - 2.5s như đang xem nội dung cuối trang / footer
+    await sleep(rand(1500, 2500));
+  } catch (err) {
+    // Không ném lỗi nếu trang đóng hoặc điều hướng
+  }
+}
+
+/**
+ * Thực hiện tương tác sâu toàn trang:
+ * 1. Cuộn hết trang chính từ đầu tới cuối đáy trang.
+ * 2. Tìm tất cả các tab (in-page tabs) và menu điều hướng trang con (internal nav links).
+ * 3. Lần lượt click vào từng tab, mỗi tab được cuộn tiếp xuống tận đáy trang để xem trọn vẹn nội dung.
+ * 4. Duyệt qua các trang con nội bộ, mỗi trang con cuộn xuống tới đáy.
+ * 5. Quay trở về trang đích ban đầu để tiếp tục quy trình duyệt và tương tác quảng cáo.
+ */
+async function performDeepEngagement(page, context, instanceId = logContext.getStore()?.instanceId, options = {}) {
+  if (!DEEP_ENGAGEMENT_ENABLED) return false;
+  if (!page || page.isClosed?.()) return false;
+
+  const roll = Math.random();
+  if (roll > DEEP_ENGAGEMENT_RATIO) {
+    log(`[DeepEngagement] 🎲 Bỏ qua tương tác sâu chu kỳ này (roll=${roll.toFixed(2)} > tỉ lệ ${DEEP_ENGAGEMENT_RATIO.toFixed(2)}).`);
+    return false;
+  }
+
+  const targetUrl = options.targetUrl || WEB_URL;
+  log(`[DeepEngagement] 🚀 Bắt đầu tương tác sâu toàn trang (xác suất đạt: ${(roll * 100).toFixed(0)}% <= ${(DEEP_ENGAGEMENT_RATIO * 100).toFixed(0)}%)...`);
+
+  try {
+    // 1. Cuộn hết trang chính tới đáy
+    log(`[DeepEngagement] 📜 [1/3] Cuộn toàn bộ trang chính từ đầu đến cuối đáy trang...`);
+    await scrollPageToBottom(page, instanceId);
+
+    // 2. Quét tất cả các tab và menu nội bộ trên trang
+    let pageOrigin = "";
+    try {
+      pageOrigin = new URL(page.url() || targetUrl).origin;
+    } catch {
+      pageOrigin = new URL(targetUrl).origin;
+    }
+
+    const elementsInfo = await page.evaluate((origin) => {
+      const items = [];
+      const seenTexts = new Set();
+
+      function isVisible(el) {
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return false;
+        const style = window.getComputedStyle(el);
+        return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
+      }
+
+      // Quét các nút tab trên trang
+      const tabSelectors = [
+        '[role="tab"]',
+        '[role="tablist"] button',
+        '[role="tablist"] a',
+        'button[data-state]',
+        'button[data-tab]',
+        '.tab',
+        '.tabs button',
+        'button.nav-link',
+        '[data-tab-target]',
+      ];
+      const tabNodes = document.querySelectorAll(tabSelectors.join(", "));
+      for (const node of tabNodes) {
+        if (!isVisible(node)) continue;
+        const text = (node.innerText || node.textContent || "").trim();
+        if (!text || seenTexts.has(text.toLowerCase())) continue;
+        seenTexts.add(text.toLowerCase());
+        const id = node.id ? `#${node.id}` : null;
+        items.push({
+          kind: "tab",
+          text: text.slice(0, 50),
+          id,
+        });
+      }
+
+      // Quét các link menu / điều hướng nội bộ
+      const navLinks = document.querySelectorAll('header nav a[href], nav a[href], .site-header a[href], [role="navigation"] a[href]');
+      for (const a of navLinks) {
+        if (!isVisible(a)) continue;
+        const href = a.getAttribute("href") || "";
+        if (!href || href.startsWith("#") || href.startsWith("javascript:") || href.startsWith("mailto:")) continue;
+        const lowerHref = href.toLowerCase();
+        if (lowerHref.includes("login") || lowerHref.includes("signup") || lowerHref.includes("logout") || lowerHref.includes("auth")) continue;
+
+        try {
+          const resolved = new URL(href, window.location.href);
+          if (resolved.origin !== origin) continue;
+          if (resolved.pathname === "/" || resolved.pathname === window.location.pathname) continue;
+          const text = (a.innerText || a.textContent || "").trim();
+          const key = `nav:${resolved.pathname}`;
+          if (!seenTexts.has(key)) {
+            seenTexts.add(key);
+            items.push({
+              kind: "nav-link",
+              text: text || resolved.pathname,
+              href: resolved.href,
+              pathname: resolved.pathname,
+            });
+          }
+        } catch {}
+      }
+
+      return items;
+    }, pageOrigin).catch(() => []);
+
+    const tabs = elementsInfo.filter((item) => item.kind === "tab");
+    const navLinks = elementsInfo.filter((item) => item.kind === "nav-link");
+
+    // 3. Lần lượt tương tác và click vào tất cả các tab
+    if (tabs.length > 0) {
+      log(`[DeepEngagement] 📑 [2/3] Phát hiện ${tabs.length} tab trên trang. Bắt đầu duyệt và click qua tất cả các tab...`);
+      for (let i = 0; i < tabs.length; i++) {
+        if (page.isClosed?.()) break;
+        const tabInfo = tabs[i];
+        log(`[DeepEngagement] 👆 [Tab ${i + 1}/${tabs.length}] Click chuyển sang tab: "${tabInfo.text}"...`);
+
+        try {
+          let tabLocator = tabInfo.id ? page.locator(tabInfo.id) : null;
+          if (!tabLocator || ((await tabLocator.count().catch(() => 0)) === 0)) {
+            tabLocator = page.locator(`button:has-text("${tabInfo.text}"), [role="tab"]:has-text("${tabInfo.text}"), a:has-text("${tabInfo.text}")`).first();
+          }
+
+          if ((await tabLocator.count().catch(() => 0)) > 0) {
+            await tabLocator.scrollIntoViewIfNeeded().catch(() => {});
+            await sleep(rand(300, 600));
+            await tabLocator.click({ timeout: 5000 }).catch(async () => {
+              await page.evaluate((txt) => {
+                const els = Array.from(document.querySelectorAll('[role="tab"], button, a'));
+                const found = els.find((el) => (el.innerText || el.textContent || "").trim() === txt);
+                if (found) found.click();
+              }, tabInfo.text).catch(() => {});
+            });
+
+            await sleep(rand(800, 1600));
+
+            // Cuộn tab mới này xuống tận đáy trang
+            log(`[DeepEngagement] 📜 [Tab ${i + 1}/${tabs.length}] Cuộn nội dung tab "${tabInfo.text}" xuống tận đáy...`);
+            await scrollPageToBottom(page, instanceId, { maxSteps: 20 });
+            await sleep(rand(1000, 2000));
+          }
+        } catch (tabErr) {
+          log(`[DeepEngagement] ⚠ Bỏ qua lỗi click tab "${tabInfo.text}": ${tabErr?.message || tabErr}`);
+        }
+      }
+    } else {
+      log(`[DeepEngagement] ℹ [2/3] Không phát hiện thêm tab chuyển đổi dạng in-page.`);
+    }
+
+    // 4. Nếu có menu điều hướng nội bộ, duyệt qua các trang con (tối đa 3 trang con) và cuộn xuống tận đáy
+    if (navLinks.length > 0) {
+      const maxSubPages = Math.min(3, navLinks.length);
+      log(`[DeepEngagement] 🌐 [3/3] Duyệt qua ${maxSubPages}/${navLinks.length} trang con nội bộ...`);
+      for (let j = 0; j < maxSubPages; j++) {
+        if (page.isClosed?.()) break;
+        const navItem = navLinks[j];
+        log(`[DeepEngagement] 🔗 [Trang ${j + 1}/${maxSubPages}] Truy cập: ${navItem.pathname} ("${navItem.text}")...`);
+
+        try {
+          await page.goto(navItem.href, { waitUntil: "domcontentloaded", timeout: PAGE_GOTO_TIMEOUT_MS }).catch(() => {});
+          await sleep(rand(600, 1200));
+
+          log(`[DeepEngagement] 📜 [Trang ${j + 1}/${maxSubPages}] Cuộn toàn bộ trang ${navItem.pathname} xuống tận đáy...`);
+          await scrollPageToBottom(page, instanceId, { maxSteps: 25 });
+          await sleep(rand(1200, 2500));
+        } catch (navErr) {
+          log(`[DeepEngagement] ⚠ Bỏ qua lỗi truy cập trang con ${navItem.pathname}: ${navErr?.message || navErr}`);
+        }
+      }
+
+      // Quay lại trang chủ ban đầu để hoàn tất chu kỳ tương tác quảng cáo
+      log(`[DeepEngagement] 🔄 Trở lại trang đích chính ${targetUrl} để chuẩn bị tương tác quảng cáo...`);
+      await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: PAGE_GOTO_TIMEOUT_MS }).catch(() => {});
+      await organicScroll(page, rand(200, 400), instanceId);
+      await sleep(rand(500, 1000));
+    }
+
+    log(`[DeepEngagement] ✅ Hoàn tất tương tác sâu toàn trang! Chuyển sang quét & tương tác quảng cáo.`);
+    return true;
+  } catch (err) {
+    log(`[DeepEngagement] ⚠ Gặp ngoại lệ khi tương tác sâu (tiếp tục phiên làm việc bình thường): ${err?.message || err}`);
+    return false;
   }
 }
 
@@ -3757,6 +4046,10 @@ async function runOneCycle(
     await sleep(rand(300, 600));
     await organicScroll(page, rand(350, 550), instanceId);
 
+    if (DEEP_ENGAGEMENT_ENABLED) {
+      await performDeepEngagement(page, context, instanceId);
+    }
+
     let isRenderFinished = false;
     let isForceClick = false;
     let diagnostic = null;
@@ -4564,6 +4857,11 @@ async function main() {
       : `BẬT [${TRAFFIC_SOURCES[TRAFFIC_SOURCE]?.name || TRAFFIC_SOURCE} — Tỉ lệ có Referrer: ${Math.round(TRAFFIC_RATIO * 100)}%]`;
   log(`Nguồn lưu lượng (Traffic Source): ${trafficSourceDesc}`);
 
+  const deepEngageDesc = DEEP_ENGAGEMENT_ENABLED
+    ? `BẬT [Tỉ lệ thực hiện: ${Math.round(DEEP_ENGAGEMENT_RATIO * 100)}% — cuộn hết trang chính, click qua các tab & cuộn tới đáy từng tab]`
+    : "TẮT [Mặc định — tương tác nhanh tập trung khu vực quảng cáo]";
+  log(`Tương tác sâu toàn trang (Deep Engagement): ${deepEngageDesc}`);
+
   const startTime = Date.now();
 
   if (INSTANCE_COUNT === 1) {
@@ -4767,4 +5065,10 @@ export {
   TRAFFIC_SOURCES,
   TRAFFIC_SOURCE,
   TRAFFIC_RATIO,
+  parseDeepEngagement,
+  parseDeepEngagementRatio,
+  DEEP_ENGAGEMENT_ENABLED,
+  DEEP_ENGAGEMENT_RATIO,
+  scrollPageToBottom,
+  performDeepEngagement,
 };

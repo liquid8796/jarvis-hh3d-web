@@ -1142,7 +1142,70 @@ const COUNTRY_TO_LOCALE = {
   NL: "nl-NL",
   PL: "pl-PL",
   TR: "tr-TR",
+  SE: "sv-SE",
+  NO: "nb-NO",
+  FI: "fi-FI",
+  DK: "da-DK",
+  CH: "de-CH",
+  AT: "de-AT",
+  BE: "nl-BE",
+  CZ: "cs-CZ",
+  RO: "ro-RO",
+  UA: "uk-UA",
+  MY: "ms-MY",
+  NZ: "en-NZ",
+  IE: "en-IE",
+  ZA: "en-ZA",
+  IL: "he-IL",
+  AE: "ar-AE",
+  SA: "ar-SA",
 };
+
+/**
+ * Tính toán timezone offset chính xác (phút) cho một IANA Timezone ID tại thời điểm hiện tại.
+ * Giá trị trả về khớp với quy ước Date.prototype.getTimezoneOffset() (âm cho múi giờ phía đông UTC).
+ */
+function getTimezoneOffsetFor(timezoneId, date = new Date()) {
+  try {
+    const utcDate = new Date(date.toLocaleString("en-US", { timeZone: "UTC" }));
+    const tzDate = new Date(date.toLocaleString("en-US", { timeZone: timezoneId }));
+    return Math.round((utcDate.getTime() - tzDate.getTime()) / 60000);
+  } catch {
+    return -420;
+  }
+}
+
+/**
+ * Xây dựng hồ sơ vị trí địa lý chuẩn (Zero-Mismatch Triad: Geo + Timezone + Locale + Languages).
+ */
+function buildGeoProfile(countryCode, country, city, region, lat, lon, timezone, ip) {
+  const code = (countryCode || "US").toUpperCase();
+  const locale = COUNTRY_TO_LOCALE[code] || "en-US";
+  const baseLang = locale.split("-")[0];
+  const languages = baseLang === "en" ? [locale, "en"] : [locale, baseLang, "en-US", "en"];
+  const acceptLanguage =
+    baseLang === "en"
+      ? `${locale},en;q=0.9`
+      : `${locale},${baseLang};q=0.9,en-US;q=0.8,en;q=0.7`;
+  const timezoneId = timezone || "America/New_York";
+  const timezoneOffset = getTimezoneOffsetFor(timezoneId);
+
+  return {
+    country: country || "United States",
+    countryCode: code,
+    region: region || "",
+    city: city || "",
+    lat: Number(lat) || 40.7128,
+    lon: Number(lon) || -74.006,
+    timezoneId,
+    timezoneOffset,
+    locale,
+    languages,
+    acceptLanguage,
+    query: ip || "",
+    ip: ip || "",
+  };
+}
 
 let cachedVpnGeo = null;
 let lastVpnGeoFetch = 0;
@@ -1166,19 +1229,16 @@ async function resolveVpnGeo(forceRefresh = false) {
     if (res.ok) {
       const data = await res.json();
       if (data.status === "success" && data.countryCode) {
-        const locale = COUNTRY_TO_LOCALE[data.countryCode] || "en-US";
-        cachedVpnGeo = {
-          country: data.country || "United States",
-          countryCode: data.countryCode || "US",
-          region: data.regionName || "",
-          city: data.city || "",
-          lat: Number(data.lat) || 40.7128,
-          lon: Number(data.lon) || -74.006,
-          timezoneId: data.timezone || "America/New_York",
-          locale,
-          query: data.query || "",
-          ip: data.query || "",
-        };
+        cachedVpnGeo = buildGeoProfile(
+          data.countryCode,
+          data.country,
+          data.city,
+          data.regionName,
+          data.lat,
+          data.lon,
+          data.timezone,
+          data.query
+        );
         lastVpnGeoFetch = now;
         return cachedVpnGeo;
       }
@@ -1193,19 +1253,40 @@ async function resolveVpnGeo(forceRefresh = false) {
     if (res.ok) {
       const data = await res.json();
       if (data.success !== false && data.country_code) {
-        const locale = COUNTRY_TO_LOCALE[data.country_code] || "en-US";
-        cachedVpnGeo = {
-          country: data.country || "United States",
-          countryCode: data.country_code || "US",
-          region: data.region || "",
-          city: data.city || "",
-          lat: Number(data.latitude) || 40.7128,
-          lon: Number(data.longitude) || -74.006,
-          timezoneId: data.timezone?.id || "America/New_York",
-          locale,
-          query: data.ip || "",
-          ip: data.ip || "",
-        };
+        cachedVpnGeo = buildGeoProfile(
+          data.country_code,
+          data.country,
+          data.city,
+          data.region,
+          data.latitude,
+          data.longitude,
+          data.timezone?.id,
+          data.ip
+        );
+        lastVpnGeoFetch = now;
+        return cachedVpnGeo;
+      }
+    }
+  } catch {}
+
+  // 3. Dự phòng qua ipapi.co
+  try {
+    const res = await fetch("https://ipapi.co/json/", {
+      signal: AbortSignal.timeout(3500),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.country_code) {
+        cachedVpnGeo = buildGeoProfile(
+          data.country_code,
+          data.country_name,
+          data.city,
+          data.region,
+          data.latitude,
+          data.longitude,
+          data.timezone,
+          data.ip
+        );
         lastVpnGeoFetch = now;
         return cachedVpnGeo;
       }
@@ -1701,33 +1782,21 @@ class ProxyManager {
       if (res.ok) {
         const data = await res.json();
         if (data.status === "success") {
-          const locale = COUNTRY_TO_LOCALE[data.countryCode] || "en-US";
-          return {
-            country: data.country || "United States",
-            countryCode: data.countryCode || "US",
-            region: data.regionName || "",
-            city: data.city || "",
-            lat: Number(data.lat) || 40.7128,
-            lon: Number(data.lon) || -74.006,
-            timezoneId: data.timezone || "America/New_York",
-            locale,
-            query: data.query || proxy.host,
-          };
+          return buildGeoProfile(
+            data.countryCode,
+            data.country,
+            data.city,
+            data.regionName,
+            data.lat,
+            data.lon,
+            data.timezone,
+            data.query || proxy.host
+          );
         }
       }
     } catch {}
 
-    return {
-      country: "United States",
-      countryCode: "US",
-      region: "New York",
-      city: "New York",
-      lat: 40.7128,
-      lon: -74.006,
-      timezoneId: "America/New_York",
-      locale: "en-US",
-      query: proxy.host,
-    };
+    return buildGeoProfile("US", "United States", "New York", "New York", 40.7128, -74.006, "America/New_York", proxy.host);
   }
 
   async getNextWorkingProxy(instanceId = 1, previousProxy = null) {
@@ -3725,11 +3794,11 @@ async function runOneCycle(
     activeGeo = await resolveVpnGeo();
     if (activeGeo) {
       log(
-        `[AntiDetect VPN] ✓ Nhận diện vị trí VPN: ${
+        `[AntiDetect VPN] ✓ Tự động căn chỉnh theo IP: ${
           activeGeo.city ? `${activeGeo.city}, ` : ""
         }${activeGeo.country} (${activeGeo.countryCode}) | IP: ${activeGeo.ip || activeGeo.query} | Timezone: ${
           activeGeo.timezoneId
-        } | Locale: ${activeGeo.locale}`
+        } (Offset: ${activeGeo.timezoneOffset}m) | Locale: ${activeGeo.locale} | Languages: ${activeGeo.languages.join(", ")}`
       );
     }
   }
@@ -3807,8 +3876,16 @@ async function runOneCycle(
               username: currentProxy.username,
               password: currentProxy.password,
             }).catch(() => {});
+            if (activeGeo?.acceptLanguage) {
+              await newCtx.setExtraHTTPHeaders({ "Accept-Language": activeGeo.acceptLanguage }).catch(() => {});
+            }
           });
           log(`[Proxy] ✓ Đã cấu hình xác thực Proxy cho CDP Context (${currentProxy.username}).`);
+        }
+        if (activeGeo?.acceptLanguage) {
+          for (const ctx of browser.contexts()) {
+            await ctx.setExtraHTTPHeaders({ "Accept-Language": activeGeo.acceptLanguage }).catch(() => {});
+          }
         }
         log(`✓ Đã kết nối thành công tới Chrome ${useMyChrome ? "chính (đầy đủ extension) " : ""}qua CDP.`);
       } catch (err) {
@@ -3893,6 +3970,7 @@ async function runOneCycle(
         locale: fpLocale,
         timezoneId: activeGeo?.timezoneId || "Asia/Ho_Chi_Minh",
         userAgent: fp ? fp.userAgent : defaultDesktopUA,
+        ...(activeGeo?.acceptLanguage ? { extraHTTPHeaders: { "Accept-Language": activeGeo.acceptLanguage } } : {}),
       };
       if (fp) {
         if (fp.isMobile) {
@@ -3986,7 +4064,40 @@ async function runOneCycle(
       await closeExtensionPage(p);
     }
 
+    const applyGeoOverridesToPage = async (targetPage) => {
+      if (!activeGeo || !targetPage) return;
+      try {
+        const cdpClient = await context.newCDPSession(targetPage).catch(() => null);
+        if (cdpClient) {
+          if (activeGeo.timezoneId) {
+            await cdpClient.send("Emulation.setTimezoneOverride", {
+              timezoneId: activeGeo.timezoneId,
+            }).catch(() => {});
+          }
+          if (activeGeo.lat !== undefined && activeGeo.lon !== undefined) {
+            await cdpClient.send("Emulation.setGeolocationOverride", {
+              latitude: activeGeo.lat,
+              longitude: activeGeo.lon,
+              accuracy: 10,
+            }).catch(() => {});
+            await context.grantPermissions(["geolocation"], { origin: WEB_URL }).catch(() => {});
+          }
+          if (activeGeo.acceptLanguage && !fp) {
+            const liveVer = (context.browser()?.version() || "134.0.0.0").split(".")[0] || "134";
+            await cdpClient.send("Network.setUserAgentOverride", {
+              userAgent:
+                `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${liveVer}.0.0.0 Safari/537.36`,
+              acceptLanguage: activeGeo.acceptLanguage,
+            }).catch(() => {});
+          }
+        }
+      } catch (err) {
+        log(`[AntiDetect] ⚠ Không thể cấu hình CDP overrides: ${err.message}`);
+      }
+    };
+
     context.on("page", (newPage) => {
+      applyGeoOverridesToPage(newPage).catch(() => {});
       attachSafePageListeners(newPage);
       closeExtensionPage(newPage).catch(() => {});
       newPage.on("domcontentloaded", () => { closeExtensionPage(newPage).catch(() => {}); });
@@ -4007,6 +4118,7 @@ async function runOneCycle(
       );
     });
     page = useMyChrome || cdpUrl ? await context.newPage() : nonExtPages[0] || (await context.newPage());
+    await applyGeoOverridesToPage(page);
     attachSafePageListeners(page);
     if (!isHeadless) {
       await page.bringToFront().catch(() => {});
@@ -4073,40 +4185,51 @@ async function runOneCycle(
       log(`[Fingerprint] UA: ${fp.userAgent}`);
     }
 
-    // Cài đặt Anti-Detect overrides qua CDP
-    try {
-      const cdpClient = await context.newCDPSession(page).catch(() => null);
-      if (cdpClient) {
-
-        if (activeGeo) {
-          if (activeGeo.timezoneId) {
-            await cdpClient.send("Emulation.setTimezoneOverride", {
-              timezoneId: activeGeo.timezoneId,
-            }).catch(() => {});
+    // Đồng bộ Múi giờ, Timezone Offset và Ngôn ngữ cấp JS (Zero-Mismatch Triad: Geo + Timezone + Locale)
+    if (activeGeo) {
+      await context.addInitScript(({ timezoneId, timezoneOffset, locale, languages }) => {
+        try {
+          if (typeof timezoneOffset === "number") {
+            Date.prototype.getTimezoneOffset = function () {
+              return timezoneOffset;
+            };
           }
-          if (activeGeo.lat !== undefined && activeGeo.lon !== undefined) {
-            await cdpClient.send("Emulation.setGeolocationOverride", {
-              latitude: activeGeo.lat,
-              longitude: activeGeo.lon,
-              accuracy: 10,
-            }).catch(() => {});
-            await context.grantPermissions(["geolocation"], { origin: WEB_URL }).catch(() => {});
+        } catch {}
+        try {
+          if (timezoneId) {
+            const origResolved = Intl.DateTimeFormat.prototype.resolvedOptions;
+            Intl.DateTimeFormat.prototype.resolvedOptions = function () {
+              const res = origResolved.call(this);
+              res.timeZone = timezoneId;
+              if (locale) res.locale = locale;
+              return res;
+            };
           }
-          // Khi bật vân tay, UA + ngôn ngữ đã được applyFingerprintToPage đặt theo locale của proxy/VPN.
-          if (activeGeo.locale && !fp) {
-            const lang = activeGeo.locale;
-            const baseLang = lang.split("-")[0];
-            const liveVer = (context.browser()?.version() || "134.0.0.0").split(".")[0] || "134";
-            await cdpClient.send("Network.setUserAgentOverride", {
-              userAgent:
-                `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${liveVer}.0.0.0 Safari/537.36`,
-              acceptLanguage: `${lang},${baseLang};q=0.9,en;q=0.8`,
-            }).catch(() => {});
+        } catch {}
+        try {
+          if (locale) {
+            Object.defineProperty(Navigator.prototype, "language", {
+              get: () => locale,
+              configurable: true,
+              enumerable: true,
+            });
           }
-        }
-      }
-    } catch (err) {
-      log(`[AntiDetect] ⚠ Không thể cấu hình CDP overrides: ${err.message}`);
+        } catch {}
+        try {
+          if (languages && languages.length > 0) {
+            Object.defineProperty(Navigator.prototype, "languages", {
+              get: () => languages,
+              configurable: true,
+              enumerable: true,
+            });
+          }
+        } catch {}
+      }, {
+        timezoneId: activeGeo.timezoneId,
+        timezoneOffset: activeGeo.timezoneOffset,
+        locale: activeGeo.locale,
+        languages: activeGeo.languages,
+      }).catch(() => {});
     }
 
     // Tiêm các lớp bảo vệ chống phát hiện và rò rỉ (Stealth Anti-Tracker Injections)
@@ -5386,6 +5509,9 @@ if (isDirectExecution) {
 }
 
 export {
+  COUNTRY_TO_LOCALE,
+  getTimezoneOffsetFor,
+  buildGeoProfile,
   ProxyManager,
   parseProxyItem,
   parseAntiDetectProxy,

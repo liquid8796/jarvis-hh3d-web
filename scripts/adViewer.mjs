@@ -1975,22 +1975,28 @@ function logNormalDelay(medianMs, sigma) {
  * Khi chạy nhiều instance và chưa đến lượt tương tác, cuộn thuần qua DOM window.scrollBy để không chiếm chuột.
  */
 async function organicScroll(page, totalDistance, instanceId = logContext.getStore()?.instanceId) {
-  if (!page || Math.abs(totalDistance) < 30) return;
+  if (!page || page.isClosed?.() || Math.abs(totalDistance) < 20) return;
   const dir = totalDistance > 0 ? 1 : -1;
   let remaining = Math.abs(totalDistance);
   const useDomScroll = INSTANCE_COUNT > 1 && !canInteractForeground(instanceId);
   while (remaining > 0) {
+    if (page.isClosed?.()) break;
     const chunk = Math.min(remaining, rand(60, 200));
     if (useDomScroll) {
       await page.evaluate((d) => {
         window.scrollBy({ top: d, behavior: "smooth" });
+        window.dispatchEvent(new Event("scroll", { bubbles: true }));
       }, chunk * dir).catch(() => {});
     } else {
       try {
         await page.mouse.wheel(0, chunk * dir);
+        await page.evaluate(() => {
+          window.dispatchEvent(new Event("scroll", { bubbles: true }));
+        }).catch(() => {});
       } catch {
         await page.evaluate((d) => {
           window.scrollBy({ top: d, behavior: "smooth" });
+          window.dispatchEvent(new Event("scroll", { bubbles: true }));
         }, chunk * dir).catch(() => {});
       }
     }
@@ -2000,12 +2006,13 @@ async function organicScroll(page, totalDistance, instanceId = logContext.getSto
 }
 
 /**
- * Cuộn tự nhiên từ vị trí hiện tại xuống hết đáy trang web.
+ * Cuộn tự nhiên từ vị trí hiện tại xuống hết đáy trang web (đáp ứng tiêu chuẩn đo lường Google Analytics 4: percent_scrolled >= 90%).
  * Có ngắt quãng đọc lướt, thỉnh thoảng cuộn ngược lại một chút mô phỏng hành vi người thật.
+ * Đảm bảo kích hoạt sự kiện scroll & scrollend và duy trì đủ thời gian để GA4 kịp gửi beacon collect (4.5 - 5.5s debounce).
  */
 async function scrollPageToBottom(page, instanceId = logContext.getStore()?.instanceId, options = {}) {
   if (!page || page.isClosed?.()) return;
-  const maxSteps = options.maxSteps || 35;
+  const maxSteps = options.maxSteps || 45;
   let steps = 0;
   let lastScrollY = -1;
   let unchangedCount = 0;
@@ -2029,16 +2036,25 @@ async function scrollPageToBottom(page, instanceId = logContext.getStore()?.inst
 
       if (!metrics) break;
       const { scrollY, scrollHeight, innerHeight } = metrics;
+      const currentDepth = scrollHeight > 0 ? (scrollY + innerHeight) / scrollHeight : 1;
 
-      // Đã chạm hoặc rất sát đáy trang (còn cách đáy dưới 90px)
-      if (scrollY + innerHeight >= scrollHeight - 90) {
+      // Đã chạm hoặc sát đáy trang (>= 95% hoặc cách đáy dưới 60px)
+      if (currentDepth >= 0.95 || scrollY + innerHeight >= scrollHeight - 60) {
         break;
       }
 
-      if (Math.abs(scrollY - lastScrollY) < 20) {
+      if (Math.abs(scrollY - lastScrollY) < 15) {
         unchangedCount++;
         if (unchangedCount >= 3) {
-          // Trang đã kịch trần cuộn
+          // Nếu bị kẹt vị trí nhưng chưa đạt 90%, chủ động cuộn tới ngưỡng 95% để kích hoạt GA4
+          if (currentDepth < 0.90) {
+            const forcedTarget = Math.max(0, Math.ceil(scrollHeight * 0.95 - innerHeight));
+            await page.evaluate((target) => {
+              window.scrollTo({ top: target, behavior: "smooth" });
+              window.dispatchEvent(new Event("scroll", { bubbles: true }));
+            }, forcedTarget).catch(() => {});
+            await sleep(rand(400, 700));
+          }
           break;
         }
       } else {
@@ -2046,23 +2062,33 @@ async function scrollPageToBottom(page, instanceId = logContext.getStore()?.inst
       }
       lastScrollY = scrollY;
 
-      // Cuộn xuống nhịp 320 - 580px
-      const chunk = rand(320, 580);
+      // Cuộn xuống nhịp 280 - 480px
+      const chunk = rand(280, 480);
       await organicScroll(page, chunk, instanceId);
       steps++;
 
-      // Tạm dừng đọc lướt giữa các lần cuộn (500 - 1100ms)
-      await sleep(rand(500, 1100));
+      // Tạm dừng đọc lướt giữa các lần cuộn (400 - 800ms)
+      await sleep(rand(400, 800));
 
-      // 15% xác suất lướt ngược lại một chút để xem lại nội dung vừa qua
-      if (Math.random() < 0.15 && scrollY > 250) {
-        await organicScroll(page, -rand(70, 160), instanceId);
-        await sleep(rand(400, 800));
+      // 12% xác suất lướt ngược lại một chút để xem lại nội dung vừa qua
+      if (Math.random() < 0.12 && scrollY > 300) {
+        await organicScroll(page, -rand(60, 140), instanceId);
+        await sleep(rand(300, 600));
       }
     }
 
-    // Dừng lại ở đáy trang 1.5 - 2.5s như đang xem nội dung cuối trang / footer
-    await sleep(rand(1500, 2500));
+    // Đảm bảo chạm đáy hoàn toàn (>= 95%) và kích hoạt dứt điểm sự kiện scroll + scrollend cho Google Analytics 4
+    await page.evaluate(() => {
+      const doc = document.documentElement;
+      const body = document.body;
+      const target = Math.max(doc ? doc.scrollHeight : 0, body ? body.scrollHeight : 0);
+      window.scrollTo({ top: target, behavior: "smooth" });
+      window.dispatchEvent(new Event("scroll", { bubbles: true }));
+      window.dispatchEvent(new Event("scrollend", { bubbles: true }));
+    }).catch(() => {});
+
+    // Dừng lại ở đáy trang 4.5 - 5.5s để mô phỏng người thật xem footer VÀ đảm bảo GA4 kịp flush beacon mạng percent_scrolled: 90
+    await sleep(rand(4500, 5500));
   } catch (err) {
     // Không ném lỗi nếu trang đóng hoặc điều hướng
   }
@@ -2099,7 +2125,12 @@ async function performDeepEngagement(page, context, instanceId = logContext.getS
 
     // Nếu người dùng chọn chế độ chỉ scroll trang hiện tại: kết thúc ngay không click tab khác
     if (mode === "single-page") {
-      log(`[DeepEngagement] ✓ Chế độ chỉ scroll trang đầu tiên: Đã cuộn xong đáy trang, không click chuyển sang tab khác.`);
+      log(`[DeepEngagement] ✓ Chế độ chỉ scroll trang đầu tiên: Đã cuộn xong đáy trang, cuộn mượt trở lại phía trên...`);
+      await page.evaluate(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.dispatchEvent(new Event("scroll", { bubbles: true }));
+      }).catch(() => {});
+      await sleep(rand(1000, 1800));
       return true;
     }
 
@@ -4219,16 +4250,23 @@ async function runOneCycle(
     await tagInstancePage(page, instanceId);
 
     if (SCROLL_BEFORE_CLICK) {
-      // Cuộn trang tự nhiên để kích hoạt lazy-load quảng cáo (từng nhịp, có quán tính)
-      await organicScroll(page, rand(250, 400), instanceId);
-      await sleep(rand(300, 600));
-      await organicScroll(page, rand(350, 550), instanceId);
+      log(`[Scroll Trước Click] 📜 Bắt đầu cuộn trang tự nhiên trước khi click quảng cáo (kích hoạt lazy-load ads & đạt chuẩn GA4 scroll >= 90%)...`);
+      // Cuộn tự nhiên xuống tận đáy trang đạt >= 90% theo đúng chuẩn Google Analytics 4
+      await scrollPageToBottom(page, instanceId, { maxSteps: 35 });
 
-      if (DEEP_ENGAGEMENT_ENABLED) {
-        await performDeepEngagement(page, context, instanceId);
-      }
+      // Cuộn mượt trở lại phía trên để chuẩn bị định vị và click quảng cáo
+      log(`[Scroll Trước Click] 🔄 Cuộn mượt trở lại khu vực phía trên để sẵn sàng nhận diện và tương tác quảng cáo...`);
+      await page.evaluate(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.dispatchEvent(new Event("scroll", { bubbles: true }));
+      }).catch(() => {});
+      await sleep(rand(1200, 2000));
     } else {
       log(`[Scroll Trước Click] ⏩ Bỏ qua bước cuộn trang trước khi click ads theo tùy chọn cấu hình.`);
+    }
+
+    if (DEEP_ENGAGEMENT_ENABLED) {
+      await performDeepEngagement(page, context, instanceId);
     }
 
     let isRenderFinished = false;

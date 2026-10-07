@@ -575,7 +575,7 @@ const SOCIAL_BAR_KEY = "977a66f06e979e2830ee60ed1fa88533";
 const SOCIAL_BAR_SELECTOR = `iframe[id*="${SOCIAL_BAR_KEY}"], iframe[class*="${SOCIAL_BAR_KEY}"], iframe[style*="2147483647"], iframe[id*="container-"][style*="fixed"]`;
 const CLICKADU_CONTAINER_SELECTOR = "#clickadu-ad-container, .clickadu-container, [id*='clickadu']";
 const ADCASH_CONTAINER_SELECTOR =
-  "#adcash-ad-container, .adcash-container, [id*='aclib'], [class*='aclib'], [id*='adcash'], iframe[src*='acscdn'], iframe[src*='adcash']";
+  "#adcash-ad-container, .adcash-container, in-page-message, div[znid], div[donto], [id*='aclib'], [class*='aclib'], [id*='adcash'], iframe[src*='acscdn'], iframe[src*='adcash']";
 
 const rawClickMode = (
   process.argv.find((a) => a.startsWith("--click-mode="))?.split("=")[1] ||
@@ -1956,11 +1956,23 @@ function computeClickTarget(box) {
 }
 
 /** Giải toạ độ viewport cho phần tử bất kỳ (kể cả trong iframe). Trả null nếu không xác định. */
-async function resolveAdClickTarget(locator) {
+async function resolveAdClickTarget(locator, options = {}) {
   await locator.scrollIntoViewIfNeeded({ timeout: 2500 }).catch(() => {});
   await sleep(100);
   const box = await locator.boundingBox().catch(() => null);
   if (!box || box.width < 2 || box.height < 2) return null;
+  const isPush =
+    options.isInPagePush ||
+    (await locator
+      .evaluate((el) => el.tagName.toLowerCase() === "in-page-message" || Boolean(el.closest("in-page-message")))
+      .catch(() => false));
+  if (isPush) {
+    // Với In-Page Push (thường có nút đóng [x] ở góc trên bên phải):
+    // Click vào vùng giữa-trái (25% - 45% chiều rộng, 35% - 65% chiều cao) để an toàn vào nội dung quảng cáo và tránh nút close.
+    const tx = box.x + box.width * (0.25 + Math.random() * 0.2);
+    const ty = box.y + box.height * (0.35 + Math.random() * 0.3);
+    return { x: Math.round(tx * 10) / 10, y: Math.round(ty * 10) / 10 };
+  }
   return computeClickTarget(box);
 }
 
@@ -2610,10 +2622,33 @@ async function preClickEngagement(page, ctx, targetX, targetY, instanceId = 0, c
 async function resolvePopunderTarget(page) {
   try {
     const vp = page.viewportSize() || { width: 1280, height: 720 };
+
+    // 1. Kiểm tra lớp phủ Adcash Popunder Interceptor (div[znid], div[donto])
+    if (AD_NETWORK === "adcash" || AD_NETWORK === "all") {
+      try {
+        const adcashOverlays = page.locator("div[znid], div[donto]");
+        const overlayCount = await adcashOverlays.count().catch(() => 0);
+        if (overlayCount > 0) {
+          const indices = Array.from({ length: overlayCount }, (_, i) => i).sort(() => Math.random() - 0.5);
+          for (const idx of indices.slice(0, 15)) {
+            const loc = adcashOverlays.nth(idx);
+            const box = await loc.boundingBox().catch(() => null);
+            if (box && box.width >= 10 && box.height >= 10) {
+              const cx = Math.floor(box.x + box.width * 0.5);
+              const cy = Math.floor(box.y + box.height * 0.5);
+              if (cx > 20 && cx < vp.width - 20 && cy > 50 && cy < vp.height - 20) {
+                return { x: cx + rand(-5, 5), y: cy + rand(-3, 3) };
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
     // Lấy toạ độ các khối quảng cáo để tránh click nhầm vào ads
     const adBoxes = [];
     try {
-      const adLocators = page.locator(".adsterra-unit, .adsterra-stack, .adsterra-flank, iframe, #adcash-ad-container, .adcash-container");
+      const adLocators = page.locator(".adsterra-unit, .adsterra-stack, .adsterra-flank, iframe, in-page-message, #adcash-ad-container, .adcash-container");
       const adCount = await adLocators.count().catch(() => 0);
       for (let i = 0; i < Math.min(50, adCount); i++) {
         const b = await adLocators.nth(i).boundingBox().catch(() => null);
@@ -3035,7 +3070,10 @@ async function inspectAdcashPlacements(page, startedAt = Date.now()) {
           return (
             typeof window.aclib !== "undefined" ||
             document.getElementById("aclib") !== null ||
-            document.getElementById("adcash-ad-container") !== null
+            document.getElementById("adcash-ad-container") !== null ||
+            document.querySelector(
+              "in-page-message, div[znid], div[donto], [id*='aclib'], [class*='aclib'], iframe[src*='acscdn']"
+            ) !== null
           );
         }, { timeout: waitMs })
         .catch(() => {});
@@ -3047,7 +3085,9 @@ async function inspectAdcashPlacements(page, startedAt = Date.now()) {
           .map((s) => s.src)
           .filter((src) => src.includes("acscdn"));
         const hasAdcashElements = Boolean(
-          document.querySelector("#adcash-ad-container, [id*='aclib'], [class*='aclib'], iframe[src*='acscdn']")
+          document.querySelector(
+            "#adcash-ad-container, .adcash-container, in-page-message, div[znid], div[donto], [id*='aclib'], [class*='aclib'], iframe[src*='acscdn'], iframe[src*='adcash']"
+          )
         );
         return { aclibReady, scriptCount: scripts.length, hasAdcashElements };
       })
@@ -4359,9 +4399,33 @@ async function runOneCycle(
     // Thu thập tất cả các quảng cáo khả dụng trên trang để chọn ngẫu nhiên
     const adCandidates = [];
 
-    // 0. Adcash Ads (AutoTag / Banner / Container / Links)
+    // 0. Adcash Ads (AutoTag / In-Page Push / Overlays / Banner / Container / Links)
     if (AD_NETWORK === "adcash" || AD_NETWORK === "all") {
       try {
+        // In-page Push notifications (Custom web components)
+        const inPagePushLocators = page.locator("in-page-message");
+        const inPageCount = await inPagePushLocators.count().catch(() => 0);
+        for (let i = 0; i < inPageCount; i++) {
+          adCandidates.push({
+            name: `${isForceClick ? "[Force] " : ""}Adcash In-Page Push #${i + 1}/${inPageCount}`,
+            locator: inPagePushLocators.nth(i),
+            isAdcash: true,
+            isInPagePush: true,
+          });
+        }
+
+        // Popunder Interceptor overlays (div[znid], div[donto])
+        const overlayLocators = page.locator("div[znid], div[donto]");
+        const overlayCount = await overlayLocators.count().catch(() => 0);
+        for (let i = 0; i < Math.min(5, overlayCount); i++) {
+          adCandidates.push({
+            name: `${isForceClick ? "[Force] " : ""}Adcash Popunder Overlay #${i + 1}/${overlayCount}`,
+            locator: overlayLocators.nth(i),
+            isAdcash: true,
+            isOverlay: true,
+          });
+        }
+
         const adcashSelector = isForceClick
           ? '#adcash-ad-container a[href], .adcash-container a[href], iframe[src*="acscdn"], iframe[src*="adcash"], a[href*="adcash"], a[href*="acscdn"], [id*="aclib"] a[href], #adcash-ad-container, .adcash-container'
           : '#adcash-ad-container a[href], .adcash-container a[href], iframe[src*="acscdn"], iframe[src*="adcash"], a[href*="adcash"], a[href*="acscdn"], [id*="aclib"] a[href]';
@@ -4650,30 +4714,33 @@ async function runOneCycle(
         }
       }
 
-      // 4. Ưu tiên click SocialBar nếu Popunder chưa mở tab
+      // 4. Ưu tiên click In-Page Push (Adcash) hoặc SocialBar (Adsterra) nếu Popunder chưa mở tab
       if (!adClicked) {
-        const socialCandidate = adCandidates.find((c) => c.isSocialBar);
-        if (socialCandidate) {
+        const pushCandidate = adCandidates.find((c) => c.isInPagePush || c.isSocialBar);
+        if (pushCandidate) {
+          const typeLabel = pushCandidate.isInPagePush ? "In-Page Push" : "SocialBar";
           log(
-            `🔔 [SocialBar Ưu Tiên] Phát hiện quảng cáo SocialBar nổi; tiến hành click [${socialCandidate.name}] (${cycleClickMode} mode)...`,
+            `🔔 [${typeLabel} Ưu Tiên] Phát hiện quảng cáo thông báo nổi; tiến hành click [${pushCandidate.name}] (${cycleClickMode} mode)...`,
           );
-          const clickTarget = await resolveAdClickTarget(socialCandidate.locator);
+          const clickTarget = await resolveAdClickTarget(pushCandidate.locator, {
+            isInPagePush: Boolean(pushCandidate.isInPagePush),
+          });
           if (clickTarget) {
-            log(`-> Click SocialBar tại (${Math.round(clickTarget.x)}, ${Math.round(clickTarget.y)})...`);
+            log(`-> Click ${typeLabel} tại (${Math.round(clickTarget.x)}, ${Math.round(clickTarget.y)})...`);
             const sbPage = await performEngageAndClick(page, context, clickTarget.x, clickTarget.y, instanceId, cycleClickMode);
             if (sbPage) {
               openedPage = sbPage;
               adClicked = true;
-              log(`✓ Đã mở tab quảng cáo thành công từ SocialBar [${socialCandidate.name}].`);
+              log(`✓ Đã mở tab quảng cáo thành công từ ${typeLabel} [${pushCandidate.name}].`);
             } else {
               await sleep(2500);
               const allPages = context.pages();
               if (allPages.length > 1) {
                 openedPage = allPages[allPages.length - 1];
                 adClicked = true;
-                log(`✓ Đã bắt được trang quảng cáo từ tab phụ SocialBar [${socialCandidate.name}].`);
+                log(`✓ Đã bắt được trang quảng cáo từ tab phụ ${typeLabel} [${pushCandidate.name}].`);
               } else {
-                log("SocialBar chưa mở tab mới; chuyển sang danh sách banner dự phòng...");
+                log(`${typeLabel} chưa mở tab mới; chuyển sang danh sách banner dự phòng...`);
               }
             }
           }
@@ -4681,7 +4748,7 @@ async function runOneCycle(
       }
 
       if (!adClicked && adCandidates.length > 0) {
-        const remainingCandidates = adCandidates.filter((c) => !c.isSocialBar);
+        const remainingCandidates = adCandidates.filter((c) => !c.isSocialBar && !c.isInPagePush);
         const candidatesToClick = remainingCandidates.length > 0 ? remainingCandidates : adCandidates;
         const maxCandidates = FOCUS_POPUNDER_SOCIAL ? 2 : 3;
         let candidateAttempts = 0;
@@ -4691,7 +4758,9 @@ async function runOneCycle(
         const shuffledCandidates = [...candidatesToClick].sort(() => Math.random() - 0.5);
         for (const candidate of shuffledCandidates) {
           if (candidateAttempts >= maxCandidates) break;
-          const clickTarget = await resolveAdClickTarget(candidate.locator);
+          const clickTarget = await resolveAdClickTarget(candidate.locator, {
+            isInPagePush: Boolean(candidate.isInPagePush),
+          });
           if (!clickTarget) {
             log(`  Bỏ qua [${candidate.name}] — không xác định được toạ độ.`);
             continue;
@@ -4743,6 +4812,9 @@ async function runOneCycle(
       const candidateSelectors = [
         ...(AD_NETWORK === "adcash" || AD_NETWORK === "all"
           ? [
+              'in-page-message',
+              'div[znid]',
+              'div[donto]',
               '#adcash-ad-container a[href]',
               '.adcash-container a[href]',
               'iframe[src*="acscdn"]',

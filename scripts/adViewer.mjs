@@ -635,7 +635,7 @@ const SOCIAL_BAR_KEY = "977a66f06e979e2830ee60ed1fa88533";
 const SOCIAL_BAR_SELECTOR = `iframe[id*="${SOCIAL_BAR_KEY}"], iframe[class*="${SOCIAL_BAR_KEY}"], iframe[style*="2147483647"], iframe[id*="container-"][style*="fixed"]`;
 const CLICKADU_CONTAINER_SELECTOR = "#clickadu-ad-container, .clickadu-container, [id*='clickadu']";
 const ADCASH_CONTAINER_SELECTOR =
-  "#adcash-ad-container, .adcash-container, in-page-message, div[znid], div[donto], [id*='aclib'], [class*='aclib'], [id*='adcash'], iframe[src*='acscdn'], iframe[src*='adcash']";
+  "#adcash-ad-container, .adcash-container, in-page-message, in-page-message >>> [id^='note-'], div >>> #goToButton, div >>> #modal, div[znid], div[donto], div[donto][znid], [id*='aclib'], [class*='aclib'], [id*='adcash'], iframe[src*='acscdn'], iframe[src*='adcash']";
 
 const rawClickMode = (
   process.argv.find((a) => a.startsWith("--click-mode="))?.split("=")[1] ||
@@ -2819,21 +2819,37 @@ async function resolvePopunderTarget(page) {
   try {
     const vp = page.viewportSize() || { width: 1280, height: 720 };
 
-    // 1. Kiểm tra lớp phủ Adcash Popunder Interceptor (div[znid], div[donto])
+    // 1. Kiểm tra Adcash Interstitial Modal hoặc lớp phủ Popunder Interceptor (div[donto], div[znid])
     if (AD_NETWORK === "adcash" || AD_NETWORK === "all") {
       try {
-        const adcashOverlays = page.locator("div[znid], div[donto]");
+        // 1a. Nếu Interstitial Modal đang hiển thị (Shadow DOM), ưu tiên click nút CTA #goToButton
+        const interstitialCta = page.locator("div >>> #goToButton, #goToButton");
+        const ctaCount = await interstitialCta.count().catch(() => 0);
+        for (let idx = 0; idx < ctaCount; idx++) {
+          const loc = interstitialCta.nth(idx);
+          const box = await loc.boundingBox().catch(() => null);
+          if (box && box.width >= 10 && box.height >= 10) {
+            const cx = Math.floor(box.x + box.width * 0.5);
+            const cy = Math.floor(box.y + box.height * 0.5);
+            if (cx > 10 && cx < vp.width - 10 && cy > 10 && cy < vp.height - 10) {
+              return { x: cx, y: cy };
+            }
+          }
+        }
+
+        // 1b. Lớp phủ Popunder / Tabover Interceptor (div[donto], div[znid]) - thường phủ trên navbar và liên kết
+        const adcashOverlays = page.locator("div[donto], div[znid]");
         const overlayCount = await adcashOverlays.count().catch(() => 0);
         if (overlayCount > 0) {
           const indices = Array.from({ length: overlayCount }, (_, i) => i).sort(() => Math.random() - 0.5);
-          for (const idx of indices.slice(0, 15)) {
+          for (const idx of indices.slice(0, 20)) {
             const loc = adcashOverlays.nth(idx);
             const box = await loc.boundingBox().catch(() => null);
             if (box && box.width >= 10 && box.height >= 10) {
               const cx = Math.floor(box.x + box.width * 0.5);
               const cy = Math.floor(box.y + box.height * 0.5);
-              if (cx > 20 && cx < vp.width - 20 && cy > 50 && cy < vp.height - 20) {
-                return { x: cx + rand(-5, 5), y: cy + rand(-3, 3) };
+              if (cx > 10 && cx < vp.width - 10 && cy > 10 && cy < vp.height - 10) {
+                return { x: cx + rand(-4, 4), y: cy + rand(-3, 3) };
               }
             }
           }
@@ -3263,14 +3279,19 @@ async function inspectAdcashPlacements(page, startedAt = Date.now()) {
     if (waitMs > 0) {
       await page
         .waitForFunction(() => {
-          return (
-            typeof window.aclib !== "undefined" ||
-            document.getElementById("aclib") !== null ||
-            document.getElementById("adcash-ad-container") !== null ||
-            document.querySelector(
-              "in-page-message, div[znid], div[donto], [id*='aclib'], [class*='aclib'], iframe[src*='acscdn']"
-            ) !== null
-          );
+          const aclibReady = typeof window.aclib !== "undefined" || document.getElementById("aclib") !== null;
+          const containerReady = document.getElementById("adcash-ad-container") !== null;
+          const selectorMatch = document.querySelector(
+            "in-page-message, div[znid], div[donto], [id*='aclib'], [class*='aclib'], iframe[src*='acscdn'], iframe[src*='adcash']"
+          ) !== null;
+          const shadowReady = Array.from(document.querySelectorAll("div, in-page-message")).some((el) => {
+            try {
+              return Boolean(el.shadowRoot?.querySelector("#goToButton, #modal, #creative_iframe, [id^='note-'], [id^='missclick-']"));
+            } catch {
+              return false;
+            }
+          });
+          return aclibReady || containerReady || selectorMatch || shadowReady;
         }, { timeout: waitMs })
         .catch(() => {});
     }
@@ -3279,11 +3300,18 @@ async function inspectAdcashPlacements(page, startedAt = Date.now()) {
         const aclibReady = typeof window.aclib !== "undefined";
         const scripts = Array.from(document.querySelectorAll("script"))
           .map((s) => s.src)
-          .filter((src) => src.includes("acscdn"));
+          .filter((src) => src.includes("acscdn") || src.includes("adcash"));
         const hasAdcashElements = Boolean(
           document.querySelector(
             "#adcash-ad-container, .adcash-container, in-page-message, div[znid], div[donto], [id*='aclib'], [class*='aclib'], iframe[src*='acscdn'], iframe[src*='adcash']"
-          )
+          ) ||
+          Array.from(document.querySelectorAll("div, in-page-message")).some((el) => {
+            try {
+              return Boolean(el.shadowRoot?.querySelector("#goToButton, #modal, #creative_iframe, [id^='note-'], [id^='missclick-']"));
+            } catch {
+              return false;
+            }
+          })
         );
         return { aclibReady, scriptCount: scripts.length, hasAdcashElements };
       })
@@ -4681,11 +4709,25 @@ async function runOneCycle(
     // Thu thập tất cả các quảng cáo khả dụng trên trang để chọn ngẫu nhiên
     const adCandidates = [];
 
-    // 0. Adcash Ads (AutoTag / In-Page Push / Overlays / Banner / Container / Links)
+    // 0. Adcash Ads (AutoTag / Interstitial / In-Page Push / Overlays / Banner / Container / Links)
     if (AD_NETWORK === "adcash" || AD_NETWORK === "all") {
       try {
-        // In-page Push notifications (Custom web components)
-        const inPagePushLocators = page.locator("in-page-message");
+        // Interstitial Modal (Shadow DOM piercing)
+        const interstitialLocators = page.locator("div >>> #goToButton, #goToButton");
+        const interstitialCount = await interstitialLocators.count().catch(() => 0);
+        for (let i = 0; i < interstitialCount; i++) {
+          adCandidates.push({
+            name: `${isForceClick ? "[Force] " : ""}Adcash Interstitial CTA #${i + 1}/${interstitialCount}`,
+            locator: interstitialLocators.nth(i),
+            isAdcash: true,
+            isInterstitial: true,
+          });
+        }
+
+        // In-page Push notifications (Custom web components & Shadow DOM piercing)
+        const inPagePushLocators = page.locator(
+          "in-page-message >>> [id^='note-'], in-page-message >>> [id^='missclick-'], in-page-message >>> #creative_iframe, in-page-message",
+        );
         const inPageCount = await inPagePushLocators.count().catch(() => 0);
         for (let i = 0; i < inPageCount; i++) {
           adCandidates.push({
@@ -4696,10 +4738,10 @@ async function runOneCycle(
           });
         }
 
-        // Popunder Interceptor overlays (div[znid], div[donto])
-        const overlayLocators = page.locator("div[znid], div[donto]");
+        // Popunder Interceptor overlays (div[donto], div[znid])
+        const overlayLocators = page.locator("div[donto], div[znid]");
         const overlayCount = await overlayLocators.count().catch(() => 0);
-        for (let i = 0; i < Math.min(5, overlayCount); i++) {
+        for (let i = 0; i < Math.min(10, overlayCount); i++) {
           adCandidates.push({
             name: `${isForceClick ? "[Force] " : ""}Adcash Popunder Overlay #${i + 1}/${overlayCount}`,
             locator: overlayLocators.nth(i),
@@ -4996,16 +5038,21 @@ async function runOneCycle(
         }
       }
 
-      // 4. Ưu tiên click In-Page Push (Adcash) hoặc SocialBar (Adsterra) nếu Popunder chưa mở tab
+      // 4. Ưu tiên click Interstitial Modal, In-Page Push (Adcash) hoặc SocialBar (Adsterra) nếu Popunder chưa mở tab
       if (!adClicked) {
-        const pushCandidate = adCandidates.find((c) => c.isInPagePush || c.isSocialBar);
-        if (pushCandidate) {
-          const typeLabel = pushCandidate.isInPagePush ? "In-Page Push" : "SocialBar";
+        const highPriorityCandidate = adCandidates.find((c) => c.isInterstitial || c.isInPagePush || c.isSocialBar);
+        if (highPriorityCandidate) {
+          const typeLabel = highPriorityCandidate.isInterstitial
+            ? "Interstitial Modal"
+            : highPriorityCandidate.isInPagePush
+            ? "In-Page Push"
+            : "SocialBar";
           log(
-            `🔔 [${typeLabel} Ưu Tiên] Phát hiện quảng cáo thông báo nổi; tiến hành click [${pushCandidate.name}] (${cycleClickMode} mode)...`,
+            `🔔 [${typeLabel} Ưu Tiên] Phát hiện quảng cáo nổi/modal; tiến hành click [${highPriorityCandidate.name}] (${cycleClickMode} mode)...`,
           );
-          const clickTarget = await resolveAdClickTarget(pushCandidate.locator, {
-            isInPagePush: Boolean(pushCandidate.isInPagePush),
+          const clickTarget = await resolveAdClickTarget(highPriorityCandidate.locator, {
+            isInPagePush: Boolean(highPriorityCandidate.isInPagePush),
+            isInterstitial: Boolean(highPriorityCandidate.isInterstitial),
           });
           if (clickTarget) {
             log(`-> Click ${typeLabel} tại (${Math.round(clickTarget.x)}, ${Math.round(clickTarget.y)})...`);
@@ -5013,14 +5060,14 @@ async function runOneCycle(
             if (sbPage) {
               openedPage = sbPage;
               adClicked = true;
-              log(`✓ Đã mở tab quảng cáo thành công từ ${typeLabel} [${pushCandidate.name}].`);
+              log(`✓ Đã mở tab quảng cáo thành công từ ${typeLabel} [${highPriorityCandidate.name}].`);
             } else {
               await sleep(2500);
               const allPages = context.pages();
               if (allPages.length > 1) {
                 openedPage = allPages[allPages.length - 1];
                 adClicked = true;
-                log(`✓ Đã bắt được trang quảng cáo từ tab phụ ${typeLabel} [${pushCandidate.name}].`);
+                log(`✓ Đã bắt được trang quảng cáo từ tab phụ ${typeLabel} [${highPriorityCandidate.name}].`);
               } else {
                 log(`${typeLabel} chưa mở tab mới; chuyển sang danh sách banner dự phòng...`);
               }
@@ -5030,7 +5077,7 @@ async function runOneCycle(
       }
 
       if (!adClicked && adCandidates.length > 0) {
-        const remainingCandidates = adCandidates.filter((c) => !c.isSocialBar && !c.isInPagePush);
+        const remainingCandidates = adCandidates.filter((c) => !c.isSocialBar && !c.isInPagePush && !c.isInterstitial);
         const candidatesToClick = remainingCandidates.length > 0 ? remainingCandidates : adCandidates;
         const maxCandidates = FOCUS_POPUNDER_SOCIAL ? 2 : 3;
         let candidateAttempts = 0;
@@ -5094,9 +5141,14 @@ async function runOneCycle(
       const candidateSelectors = [
         ...(AD_NETWORK === "adcash" || AD_NETWORK === "all"
           ? [
+              'div >>> #goToButton',
+              '#goToButton',
+              'in-page-message >>> [id^="note-"]',
+              'in-page-message >>> [id^="missclick-"]',
               'in-page-message',
-              'div[znid]',
               'div[donto]',
+              'div[znid]',
+              'div[donto][znid]',
               '#adcash-ad-container a[href]',
               '.adcash-container a[href]',
               'iframe[src*="acscdn"]',
@@ -5152,7 +5204,14 @@ async function runOneCycle(
             await sleep(100);
             const elBox = await el.boundingBox().catch(() => null);
             if (!elBox || elBox.width < 5 || elBox.height < 5) continue;
-            const target = computeClickTarget(elBox);
+            let target;
+            if (selector.includes("in-page-message")) {
+              const tx = elBox.x + elBox.width * (0.25 + Math.random() * 0.2);
+              const ty = elBox.y + elBox.height * (0.35 + Math.random() * 0.3);
+              target = { x: Math.round(tx * 10) / 10, y: Math.round(ty * 10) / 10 };
+            } else {
+              target = computeClickTarget(elBox);
+            }
             // Kiểm tra xem đã click gần toạ độ này chưa (tránh click lặp đi lặp lại cùng 1 phần tử)
             const alreadyClicked = clickedTargets.some(
               (p) => Math.hypot(p.x - target.x, p.y - target.y) < 25,
@@ -5186,9 +5245,23 @@ async function runOneCycle(
       }
     }
 
+    if (!openedPage) {
+      try {
+        const curUrl = page.url();
+        const isNotHome = curUrl && !curUrl.startsWith(WEB_URL) && !curUrl.startsWith(FALLBACK_URL) && curUrl !== "about:blank";
+        if (isNotHome) {
+          openedPage = page;
+          adClicked = true;
+          log(`✓ Phát hiện trang hiện tại đã được chuyển hướng sang trang quảng cáo đích: ${curUrl}`);
+        }
+      } catch {}
+    }
+
     // 5. Đọc trang quảng cáo chính và đệ quy click nếu có
     if (openedPage) {
-      await tagInstancePage(openedPage, instanceId);
+      if (openedPage !== page) {
+        await tagInstancePage(openedPage, instanceId);
+      }
       if (process.platform === "win32" && !isHeadless) {
         focusInstanceWindow(instanceId);
       }
@@ -5202,14 +5275,16 @@ async function runOneCycle(
       await simulateLandingPageEngagement(openedPage, readingMs);
 
       // Đệ quy click thêm nếu còn quảng cáo trên trang đích (tối đa MAX_RECURSIVE_CLICKS)
-      if (MAX_RECURSIVE_CLICKS > 0) {
+      if (MAX_RECURSIVE_CLICKS > 0 && openedPage !== page) {
         await withTimeout(
           handleRecursiveAdClicks(openedPage, 0, MAX_RECURSIVE_CLICKS, context, instanceId, cycleClickMode),
           Math.max(45000, MAX_RECURSIVE_CLICKS * 35000),
         ).catch(() => {});
       }
 
-      await withTimeout(openedPage.close().catch(() => {}), 2500);
+      if (openedPage !== page) {
+        await withTimeout(openedPage.close().catch(() => {}), 2500);
+      }
     } else {
       log("Chu kỳ này chỉ xem quảng cáo trên trang, không có tab chuyển hướng mới.");
     }

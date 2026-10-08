@@ -280,15 +280,28 @@ const CLEAR_CACHE_CYCLES = Math.max(
   Number.isNaN(parsedClearCacheCycles) ? 1 : Math.floor(parsedClearCacheCycles),
 );
 
-const rawInstances =
-  getCliArg("--instances") ||
-  getCliArg("--instance-count") ||
-  getCliArg("--threads") ||
-  process.argv.find((a) => a.startsWith("--instances="))?.split("=")[1] ||
-  process.argv.find((a) => a.startsWith("--instance-count="))?.split("=")[1];
-const envInstances = process.env.AD_VIEWER_INSTANCES || process.env.AD_VIEWER_INSTANCE_COUNT;
-const parsedInstances = Number(rawInstances || envInstances || 1);
-const INSTANCE_COUNT = Math.max(1, Math.min(10, Number.isNaN(parsedInstances) ? 1 : Math.floor(parsedInstances)));
+function parseInstanceCount(argv = process.argv, env = process.env) {
+  const getArg = (name) => {
+    const prefix = `${name}=`;
+    const found = argv.find((a) => a.startsWith(prefix));
+    if (found) return found.slice(prefix.length).replace(/^["']|["']$/g, "").trim();
+    const idx = argv.indexOf(name);
+    if (idx !== -1 && idx + 1 < argv.length && !argv[idx + 1].startsWith("--")) {
+      return argv[idx + 1].replace(/^["']|["']$/g, "").trim();
+    }
+    return undefined;
+  };
+  const raw =
+    getArg("--instances") ||
+    getArg("--instance-count") ||
+    getArg("--threads") ||
+    env.AD_VIEWER_INSTANCES ||
+    env.AD_VIEWER_INSTANCE_COUNT;
+  const parsed = Number(raw || 1);
+  return Math.max(1, Number.isNaN(parsed) ? 1 : Math.floor(parsed));
+}
+
+const INSTANCE_COUNT = parseInstanceCount();
 
 // Vân tay thiết bị + trình duyệt ngẫu nhiên. Một danh tính sống đúng bằng một cửa sổ cookie
 // (CLEAR_CACHE_CYCLES chu kỳ): khách quay lại với cùng cookie mà đổi máy/trình duyệt mỗi vòng
@@ -5812,6 +5825,8 @@ export {
   parseScrollBottomDelay,
   CYCLE_TIMEOUT_MS,
   parseCycleTimeoutConfig,
+  INSTANCE_COUNT,
+  parseInstanceCount,
   killInstanceProcesses,
   scrollPageToBottom,
   performDeepEngagement,

@@ -290,10 +290,10 @@ echo.
 
 REM 11. So luong instance chay dong thoi
 echo [11] So luong instance chay dong thoi [Multi-Instance]:
-echo      Nhap so luong instance muon chay dong thoi (1-10, Enter = 1).
+echo      Nhap so luong instance muon chay dong thoi (Enter = 1, khong gioi han).
 echo      Moi instance co lap hoan toan profile, proxy va fingerprint, tu dong dieu phoi mutex chuot.
 set "INPUT_INSTANCES="
-set /p "INPUT_INSTANCES=    So luong instance [1-10, Enter = 1]: "
+set /p "INPUT_INSTANCES=    So luong instance [Enter = 1, khong gioi han]: "
 if not defined INPUT_INSTANCES set "INPUT_INSTANCES=1"
 set "ARG_INSTANCES=--instances=%INPUT_INSTANCES%"
 echo     -^> So luong instance: %INPUT_INSTANCES%

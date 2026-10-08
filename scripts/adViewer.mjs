@@ -544,11 +544,37 @@ function parsePostAdEngagement(argv = process.argv, env = process.env) {
   return true;
 }
 
+function parseScrollSpeed(argv = process.argv, env = process.env) {
+  const explicit =
+    argv.find((a) => a.startsWith("--scroll-speed="))?.split("=")[1] ||
+    getCliArg("--scroll-speed");
+  const envVal = env.AD_VIEWER_SCROLL_SPEED || "";
+  const raw = (explicit || envVal || "").trim().toLowerCase();
+  if (raw === "normal" || raw === "slow") return "normal";
+  if (raw === "turbo" || raw === "instant") return "turbo";
+  return "max"; // Mặc định: nhanh tối đa
+}
+
+function parseScrollBottomDelay(argv = process.argv, env = process.env) {
+  const explicit =
+    argv.find((a) => a.startsWith("--scroll-bottom-delay="))?.split("=")[1] ||
+    argv.find((a) => a.startsWith("--scroll-delay="))?.split("=")[1] ||
+    getCliArg("--scroll-bottom-delay") ||
+    getCliArg("--scroll-delay");
+  const envVal = env.AD_VIEWER_SCROLL_BOTTOM_DELAY || env.AD_VIEWER_SCROLL_DELAY || "";
+  const raw = (explicit || envVal || "").trim().toLowerCase();
+  if (!raw) return 400; // 400ms thay vì 5000ms
+  const num = Number(raw.replace("ms", ""));
+  return Number.isNaN(num) || num < 0 ? 400 : Math.round(num);
+}
+
 const DEEP_ENGAGEMENT_MODE = parseDeepEngagement();
 const DEEP_ENGAGEMENT_ENABLED = DEEP_ENGAGEMENT_MODE !== "none";
 const DEEP_ENGAGEMENT_RATIO = parseDeepEngagementRatio();
 const SCROLL_BEFORE_CLICK = parseScrollBeforeClick();
 const POST_AD_ENGAGEMENT = parsePostAdEngagement();
+const SCROLL_SPEED = parseScrollSpeed();
+const SCROLL_BOTTOM_DELAY = parseScrollBottomDelay();
 
 const rawPageTimeout = getCliArg("--page-timeout");
 const defaultPageTimeout = process.argv.some((a) => a.includes("proxy")) || process.env.AD_VIEWER_PROXY ? 35_000 : 25_000;
@@ -2093,7 +2119,10 @@ async function organicScroll(page, totalDistance, instanceId = logContext.getSto
  */
 async function scrollPageToBottom(page, instanceId = logContext.getStore()?.instanceId, options = {}) {
   if (!page || page.isClosed?.()) return;
-  const maxSteps = options.maxSteps || 45;
+  const speed = options.speed || SCROLL_SPEED;
+  const isMaxSpeed = speed === "max" || speed === "turbo" || speed === "fast";
+  const bottomDelay = options.bottomDelay !== undefined ? options.bottomDelay : SCROLL_BOTTOM_DELAY;
+  const maxSteps = options.maxSteps || (isMaxSpeed ? 15 : 45);
   let steps = 0;
   let lastScrollY = -1;
   let unchangedCount = 0;
@@ -2126,7 +2155,7 @@ async function scrollPageToBottom(page, instanceId = logContext.getStore()?.inst
 
       if (Math.abs(scrollY - lastScrollY) < 15) {
         unchangedCount++;
-        if (unchangedCount >= 3) {
+        if (unchangedCount >= (isMaxSpeed ? 2 : 3)) {
           // Nếu bị kẹt vị trí nhưng chưa đạt 90%, chủ động cuộn tới ngưỡng 95% để kích hoạt GA4
           if (currentDepth < 0.90) {
             const forcedTarget = Math.max(0, Math.ceil(scrollHeight * 0.95 - innerHeight));
@@ -2134,7 +2163,7 @@ async function scrollPageToBottom(page, instanceId = logContext.getStore()?.inst
               window.scrollTo({ top: target, behavior: "smooth" });
               window.dispatchEvent(new Event("scroll", { bubbles: true }));
             }, forcedTarget).catch(() => {});
-            await sleep(rand(400, 700));
+            await sleep(isMaxSpeed ? rand(60, 120) : rand(400, 700));
           }
           break;
         }
@@ -2143,18 +2172,43 @@ async function scrollPageToBottom(page, instanceId = logContext.getStore()?.inst
       }
       lastScrollY = scrollY;
 
-      // Cuộn xuống nhịp 280 - 480px
-      const chunk = rand(280, 480);
-      await organicScroll(page, chunk, instanceId);
-      steps++;
+      if (isMaxSpeed) {
+        // Tốc độ nhanh tối đa: cuộn nhịp lớn 900 - 1500px với micro-delay cực ngắn (30 - 60ms)
+        const remainingDist = Math.max(100, Math.ceil(scrollHeight - (scrollY + innerHeight)));
+        const chunk = Math.min(remainingDist, rand(900, 1500));
+        const useDomScroll = INSTANCE_COUNT > 1 && !canInteractForeground(instanceId);
 
-      // Tạm dừng đọc lướt giữa các lần cuộn (400 - 800ms)
-      await sleep(rand(400, 800));
-
-      // 12% xác suất lướt ngược lại một chút để xem lại nội dung vừa qua
-      if (Math.random() < 0.12 && scrollY > 300) {
-        await organicScroll(page, -rand(60, 140), instanceId);
-        await sleep(rand(300, 600));
+        if (useDomScroll) {
+          await page.evaluate((c) => {
+            window.scrollBy({ top: c, behavior: "smooth" });
+            window.dispatchEvent(new Event("scroll", { bubbles: true }));
+          }, chunk).catch(() => {});
+        } else {
+          try {
+            await page.mouse.wheel(0, chunk);
+            await page.evaluate(() => {
+              window.dispatchEvent(new Event("scroll", { bubbles: true }));
+            }).catch(() => {});
+          } catch {
+            await page.evaluate((c) => {
+              window.scrollBy({ top: c, behavior: "smooth" });
+              window.dispatchEvent(new Event("scroll", { bubbles: true }));
+            }, chunk).catch(() => {});
+          }
+        }
+        steps++;
+        // Độ trễ siêu ngắn giữa các nhịp cuộn (30 - 60ms) để giao diện lướt xuống mượt và nhanh tối đa
+        await sleep(rand(30, 60));
+      } else {
+        // Chế độ cuộn chậm thông thường
+        const chunk = rand(280, 480);
+        await organicScroll(page, chunk, instanceId);
+        steps++;
+        await sleep(rand(400, 800));
+        if (Math.random() < 0.12 && scrollY > 300) {
+          await organicScroll(page, -rand(60, 140), instanceId);
+          await sleep(rand(300, 600));
+        }
       }
     }
 
@@ -2168,8 +2222,9 @@ async function scrollPageToBottom(page, instanceId = logContext.getStore()?.inst
       window.dispatchEvent(new Event("scrollend", { bubbles: true }));
     }).catch(() => {});
 
-    // Dừng lại ở đáy trang 4.5 - 5.5s để mô phỏng người thật xem footer VÀ đảm bảo GA4 kịp flush beacon mạng percent_scrolled: 90
-    await sleep(rand(4500, 5500));
+    // Dừng lại ở đáy trang đủ để GA4 kịp flush beacon mạng percent_scrolled: 90
+    // Ở chế độ nhanh tối đa: chỉ dừng 300 - 500ms (hoặc theo cấu hình bottomDelay) thay vì 5 giây
+    await sleep(isMaxSpeed ? Math.max(150, bottomDelay) : rand(4500, 5500));
   } catch (err) {
     // Không ném lỗi nếu trang đóng hoặc điều hướng
   }
@@ -2211,7 +2266,7 @@ async function performDeepEngagement(page, context, instanceId = logContext.getS
         window.scrollTo({ top: 0, behavior: "smooth" });
         window.dispatchEvent(new Event("scroll", { bubbles: true }));
       }).catch(() => {});
-      await sleep(rand(1000, 1800));
+      await sleep(SCROLL_SPEED === "normal" ? rand(1000, 1800) : rand(250, 450));
       return true;
     }
 
@@ -2319,12 +2374,12 @@ async function performDeepEngagement(page, context, instanceId = logContext.getS
               }, tabInfo.text).catch(() => {});
             });
 
-            await sleep(rand(800, 1600));
+            await sleep(SCROLL_SPEED === "normal" ? rand(800, 1600) : rand(150, 300));
 
             // Cuộn tab mới này xuống tận đáy trang
             log(`[DeepEngagement] 📜 [Tab ${i + 1}/${tabs.length}] Cuộn nội dung tab "${tabInfo.text}" xuống tận đáy...`);
             await scrollPageToBottom(page, instanceId, { maxSteps: 20 });
-            await sleep(rand(1000, 2000));
+            await sleep(SCROLL_SPEED === "normal" ? rand(1000, 2000) : rand(150, 300));
           }
         } catch (tabErr) {
           log(`[DeepEngagement] ⚠ Bỏ qua lỗi click tab "${tabInfo.text}": ${tabErr?.message || tabErr}`);
@@ -2345,11 +2400,11 @@ async function performDeepEngagement(page, context, instanceId = logContext.getS
 
         try {
           await page.goto(navItem.href, { waitUntil: "domcontentloaded", timeout: PAGE_GOTO_TIMEOUT_MS }).catch(() => {});
-          await sleep(rand(600, 1200));
+          await sleep(SCROLL_SPEED === "normal" ? rand(600, 1200) : rand(200, 400));
 
           log(`[DeepEngagement] 📜 [Trang ${j + 1}/${maxSubPages}] Cuộn toàn bộ trang ${navItem.pathname} xuống tận đáy...`);
           await scrollPageToBottom(page, instanceId, { maxSteps: 25 });
-          await sleep(rand(1200, 2500));
+          await sleep(SCROLL_SPEED === "normal" ? rand(1200, 2500) : rand(200, 400));
         } catch (navErr) {
           log(`[DeepEngagement] ⚠ Bỏ qua lỗi truy cập trang con ${navItem.pathname}: ${navErr?.message || navErr}`);
         }
@@ -2359,7 +2414,7 @@ async function performDeepEngagement(page, context, instanceId = logContext.getS
       log(`[DeepEngagement] 🔄 Trở lại trang đích chính ${targetUrl} để chuẩn bị tương tác quảng cáo...`);
       await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: PAGE_GOTO_TIMEOUT_MS }).catch(() => {});
       await organicScroll(page, rand(200, 400), instanceId);
-      await sleep(rand(500, 1000));
+      await sleep(SCROLL_SPEED === "normal" ? rand(500, 1000) : rand(150, 300));
     }
 
     log(`[DeepEngagement] ✅ Hoàn tất tương tác sâu toàn trang! Chuyển sang quét & tương tác quảng cáo.`);
@@ -4423,7 +4478,7 @@ async function runOneCycle(
         window.scrollTo({ top: 0, behavior: "smooth" });
         window.dispatchEvent(new Event("scroll", { bubbles: true }));
       }).catch(() => {});
-      await sleep(rand(1200, 2000));
+      await sleep(SCROLL_SPEED === "normal" ? rand(1200, 2000) : rand(250, 450));
     } else {
       log(`[Scroll Trước Click] ⏩ Bỏ qua bước cuộn trang trước khi click ads theo tùy chọn cấu hình.`);
     }
@@ -5544,6 +5599,10 @@ export {
   parseScrollBeforeClick,
   POST_AD_ENGAGEMENT,
   parsePostAdEngagement,
+  SCROLL_SPEED,
+  parseScrollSpeed,
+  SCROLL_BOTTOM_DELAY,
+  parseScrollBottomDelay,
   scrollPageToBottom,
   performDeepEngagement,
 };

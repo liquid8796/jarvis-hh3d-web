@@ -2399,7 +2399,20 @@ async function performDeepEngagement(page, context, instanceId = logContext.getS
         log(`[DeepEngagement] 🔗 [Trang ${j + 1}/${maxSubPages}] Truy cập: ${navItem.pathname} ("${navItem.text}")...`);
 
         try {
-          await page.goto(navItem.href, { waitUntil: "domcontentloaded", timeout: PAGE_GOTO_TIMEOUT_MS }).catch(() => {});
+          const previousUrl = page.url() || targetUrl;
+          await page.goto(navItem.href, {
+            waitUntil: "domcontentloaded",
+            timeout: PAGE_GOTO_TIMEOUT_MS,
+            referer: previousUrl,
+          }).catch(() => {});
+          await page.evaluate((ref) => {
+            try {
+              Object.defineProperty(document, "referrer", {
+                get: () => ref,
+                configurable: true,
+              });
+            } catch {}
+          }, previousUrl).catch(() => {});
           await sleep(SCROLL_SPEED === "normal" ? rand(600, 1200) : rand(200, 400));
 
           log(`[DeepEngagement] 📜 [Trang ${j + 1}/${maxSubPages}] Cuộn toàn bộ trang ${navItem.pathname} xuống tận đáy...`);
@@ -2411,8 +2424,23 @@ async function performDeepEngagement(page, context, instanceId = logContext.getS
       }
 
       // Quay lại trang chủ ban đầu để hoàn tất chu kỳ tương tác quảng cáo
+      const lastSubpageUrl = page.url() || "";
       log(`[DeepEngagement] 🔄 Trở lại trang đích chính ${targetUrl} để chuẩn bị tương tác quảng cáo...`);
-      await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: PAGE_GOTO_TIMEOUT_MS }).catch(() => {});
+      await page.goto(targetUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: PAGE_GOTO_TIMEOUT_MS,
+        ...(lastSubpageUrl ? { referer: lastSubpageUrl } : {}),
+      }).catch(() => {});
+      if (lastSubpageUrl) {
+        await page.evaluate((ref) => {
+          try {
+            Object.defineProperty(document, "referrer", {
+              get: () => ref,
+              configurable: true,
+            });
+          } catch {}
+        }, lastSubpageUrl).catch(() => {});
+      }
       await organicScroll(page, rand(200, 400), instanceId);
       await sleep(SCROLL_SPEED === "normal" ? rand(500, 1000) : rand(150, 300));
     }

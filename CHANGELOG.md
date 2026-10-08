@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.190 — Phúc Lợi Đường: nhận rương tích luỹ tháng cho VIP và thường (09/10/2026)
+
+- Đối chiếu video /watch, DOM và AJAX trong recording 08/10: trang hiện modal "Còn rương mốc chưa nhận", thao tác thật là CTA `.pl-mile__cta` (không phải biểu tượng quà `.pl-mile__btn`).
+- Cả VIP/thường ghé `/phuc-loi-duong`, đóng modal và nhận từng mốc `data-state=ready` trước khi kiểm tra bốn rương ngày. VIP quay về hub mở rương ngày, thường tiếp tục trên trang riêng.
+- Ngoại lệ chọn lọc ở `skipQuestForToday`: vẫn giữ hai quest trong sổ trần ngày (để không làm sai điều kiện mở lượt cuối Vòng Quay), nhưng sau khi đủ 4 rương vẫn ghé nhận mốc tích điểm tháng ở lượt sau. `stopIf` trên trang vẫn chặn mở quá trần.
+- Đồng bộ quest schema 87 với PC 1.59.25, thêm `scripts/verifyWelfareProgress20261008.mts` làm kiểm thử hồi quy.
+
 ## 1.3.189 — Mở lại quảng cáo Adcash AutoTag với mã vùng mới (06/10/2026)
 
 - Kích hoạt lại quảng cáo đối tác Adcash trên website chính thức theo yêu cầu:

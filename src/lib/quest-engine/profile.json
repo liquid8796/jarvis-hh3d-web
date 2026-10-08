@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 86,
+  "schemaVersion": 87,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -343,8 +343,71 @@
         "ph\u00FAc l\u1EE3i \u0111\u01B0\u1EDDng",
         "phuc loi duong"
       ],
-      "pagePath": "/nhiem-vu-hang-ngay",
+      "pagePath": "/phuc-loi-duong",
       "steps": [
+        {
+          "action": "navigate",
+          "text": "/phuc-loi-duong",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#plPage",
+          "timeoutMs": 25000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#plMiles",
+          "timeoutMs": 25000
+        },
+        {
+          "action": "waitMilliseconds",
+          "timeoutMs": 900,
+          "note": "đợi AJAX cập nhật mốc tháng và popup"
+        },
+        {
+          "action": "click",
+          "selector": "#pl-claim-overlay.is-open .pl-claim-btn",
+          "optional": true,
+          "timeoutMs": 4000,
+          "when": {
+            "kind": "visible",
+            "selector": "#pl-claim-overlay.is-open .pl-claim-btn"
+          },
+          "note": "đóng popup Đến nhận thưởng trước khi nhận mốc"
+        },
+        {
+          "action": "waitForCondition",
+          "optional": true,
+          "timeoutMs": 4000,
+          "condition": {
+            "kind": "hidden",
+            "selector": "#pl-claim-overlay.is-open"
+          }
+        },
+        {
+          "action": "repeat",
+          "timeoutMs": 15000,
+          "note": "nhận từng mốc tháng trước khi về hub mở rương ngày",
+          "steps": [
+            {
+              "action": "click",
+              "selector": "#plMiles .pl-mile[data-state='ready'] .pl-mile__cta",
+              "timeoutMs": 8000,
+              "forceClick": true
+            },
+            {
+              "action": "waitMilliseconds",
+              "timeoutMs": 1600
+            }
+          ],
+          "until": {
+            "kind": "hidden",
+            "selector": "#plMiles .pl-mile[data-state='ready'] .pl-mile__cta"
+          },
+          "maxIterations": 6,
+          "maxSeconds": 70
+        },
         {
           "action": "navigate",
           "text": "/nhiem-vu-hang-ngay",
@@ -2008,26 +2071,6 @@
       "steps": [
         {
           "action": "navigate",
-          "text": "/nhiem-vu-hang-ngay",
-          "timeoutMs": 15000
-        },
-        {
-          "action": "waitForSelector",
-          "selector": ".nv-quest",
-          "timeoutMs": 25000
-        },
-        {
-          "action": "stopIf",
-          "text": "h\u1EBFt 4 r\u01B0\u01A1ng h\u00F4m nay",
-          "timeoutMs": 15000,
-          "note": "h\u00E0ng ho\u00E0n t\u1EA5t m\u1EA5t link L\u00E0m Ngay; board m\u1EDBi d\u00F9ng href",
-          "condition": {
-            "kind": "hidden",
-            "selector": "a.btn-go[href*=\u0027phuc-loi-duong\u0027]"
-          }
-        },
-        {
-          "action": "navigate",
           "text": "/phuc-loi-duong",
           "timeoutMs": 15000
         },
@@ -2047,13 +2090,42 @@
           "timeoutMs": 25000
         },
         {
+          "action": "waitForSelector",
+          "selector": "#plMiles",
+          "timeoutMs": 25000
+        },
+        {
+          "action": "waitMilliseconds",
+          "timeoutMs": 900,
+          "note": "doi AJAX cap nhat cac moc va popup"
+        },
+        {
+          "action": "click",
+          "selector": "#pl-claim-overlay.is-open .pl-claim-btn",
+          "timeoutMs": 4000,
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#pl-claim-overlay.is-open .pl-claim-btn"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 4000,
+          "optional": true,
+          "condition": {
+            "kind": "hidden",
+            "selector": "#pl-claim-overlay.is-open"
+          }
+        },
+        {
           "action": "repeat",
           "timeoutMs": 15000,
           "note": "nh\u1EADn t\u1EEBng m\u1ED1c th\u00E1ng data-state=ready tr\u01B0\u1EDBc cooldown ng\u00E0y",
           "steps": [
             {
               "action": "click",
-              "selector": "#plMiles .pl-mile[data-state=\u0027ready\u0027] .pl-mile__btn",
+              "selector": "#plMiles .pl-mile[data-state=\u0027ready\u0027] .pl-mile__cta",
               "timeoutMs": 8000,
               "forceClick": true
             },
@@ -2064,7 +2136,7 @@
           ],
           "until": {
             "kind": "hidden",
-            "selector": "#plMiles .pl-mile[data-state=\u0027ready\u0027] .pl-mile__btn"
+            "selector": "#plMiles .pl-mile[data-state=\u0027ready\u0027] .pl-mile__cta"
           },
           "maxIterations": 6,
           "maxSeconds": 60

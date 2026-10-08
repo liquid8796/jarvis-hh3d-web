@@ -11,7 +11,7 @@ import { pillBagCapacityProbe, readinessProbe, vipProbe } from "./boardScripts.m
 import { closeBrowserWithin } from "./browserShutdown.mjs";
 import { computeNextDelaySeconds } from "./cooldown.mjs";
 import { DEFAULT_GAME_BASE_URL, gameBaseUrlFromCookieExport, parseCookieString } from "./cookies.mjs";
-import { isDailyQuotaQuest, peersDoneForQuota, reachedDailyQuota } from "./dailyQuota.mjs";
+import { isDailyQuotaQuest, peersDoneForQuota, reachedDailyQuota, skipQuestForToday } from "./dailyQuota.mjs";
 import { createQuestEngine, CycleBlocked, enabledQuestsInOrder, questsForAccount, QuestAborted } from "./engine.mjs";
 import { profileForConfig } from "./profile.mjs";
 import { acquireQuestSlot, isDedicatedPageQuest } from "./questGate.mjs";
@@ -719,7 +719,7 @@ export async function runCycle(deps) {
     const keep = [];
     const skipped = [];
     for (const quest of plan) {
-      (doneToday.has(quest.id) && isDailyQuotaQuest(quest) ? skipped : keep).push(quest);
+      (skipQuestForToday(quest, doneToday) ? skipped : keep).push(quest);
     }
     return { keep, skipped };
   };

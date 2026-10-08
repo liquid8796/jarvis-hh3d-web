@@ -18,6 +18,8 @@
 export const DAILY_QUOTA_QUEST_IDS = new Set([
   "diem-danh",
   "diem-danh-thuong",
+  // Phúc Lợi Đường VẪN có trần 4 rương/ngày và phải được tính vào điều kiện mở lượt cuối
+  // Vòng Quay VIP. Ngoại lệ ở skipQuestForToday chỉ giữ phần nhận mốc THÁNG chạy tiếp.
   "phuc-loi-duong",
   "phuc-loi-duong-thuong",
   "hoang-vuc",
@@ -83,6 +85,20 @@ export const DAILY_QUOTA_QUEST_IDS = new Set([
 /** Nhiệm vụ này có trần lượt theo ngày không. */
 export function isDailyQuotaQuest(quest) {
   return quest != null && DAILY_QUOTA_QUEST_IDS.has(quest.id);
+}
+
+// 08/10/2026: Không skip toàn bộ Phúc Lợi Đường chỉ vì đã mở đủ 4 rương NGÀY.
+// Mốc tích luỹ THÁNG có thể đủ điểm SAU khi nhiệm vụ đã được ghi vào daily_done;
+// cần vào /phuc-loi-duong để nhận, nhưng stopIf #plDayCount tiếp tục chặn rương ngày.
+const QUESTS_WITH_MONTHLY_REWARDS = new Set(["phuc-loi-duong", "phuc-loi-duong-thuong"]);
+
+export function skipQuestForToday(quest, doneToday) {
+  return (
+    quest != null &&
+    doneToday.has(quest.id) &&
+    isDailyQuotaQuest(quest) &&
+    !QUESTS_WITH_MONTHLY_REWARDS.has(quest.id)
+  );
 }
 
 /**

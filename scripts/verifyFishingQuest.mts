@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { enforceFishingAdminPolicy } from "../src/lib/quest-engine/fishingAccess.mjs";
 
 const p = JSON.parse(readFileSync(new URL("../src/lib/quest-engine/profile.json", import.meta.url), "utf8"));
-assert.equal(p.schemaVersion, 91);
+assert.equal(p.schemaVersion, 92);
 const v = p.quests.find((q: { id: string }) => q.id === "cau-ca");
 const f = p.quests.find((q: { id: string }) => q.id === "cau-ca-thuong");
 assert.ok(v && f, "both tiers have a fishing quest");
@@ -19,9 +19,18 @@ for (const [quest, isFree] of [[v, false], [f, true]] as const) {
   assert.ok(quest.options.some((o: { key: string }) => o.key === "castLimit"));
   const repeating = quest.steps.find((s: { action: string }) => s.action === "repeat");
   assert.ok(repeating);
-  assert.ok(repeating.steps.some((s: { action: string; selector?: string; pressMs?: number }) =>
-    s.action === "click" && s.selector?.includes("jvz-fish-press") && s.pressMs === 280),
-    "game requires trusted Playwright input with hold time");
+  const trustedClicks = repeating.steps.filter(
+    (s: { action: string }) => s.action === "click");
+  assert.equal(trustedClicks.length, 2, "cast and hook need distinct timing");
+  assert.ok(trustedClicks.some((s: {selector: string; pressMs: number}) =>
+    s.selector.includes(".st-idle.jvz-fish-press") && s.pressMs === 280),
+    "retain reliable 280ms casting input");
+  assert.ok(trustedClicks.some((s: {selector: string; pressMs: number}) =>
+    s.selector.includes(".st-bite.jvz-fish-press") && s.pressMs === 90),
+    "recorded successful hook released after 88–115ms");
+  assert.ok(repeating.steps.some((s: {action: string; timeoutMs?: number}) =>
+    s.action === "waitMilliseconds" && (s.timeoutMs ?? 1000) <= 260),
+    "poll bite promptly before the Giật! window closes");
 }
 assert.deepEqual(v.steps, f.steps, "same game protocol for both account tiers");
 for (const quest of [v, f]) {

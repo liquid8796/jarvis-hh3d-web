@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.195 — Giật cá nhanh theo record 141700 (10/10/2026)
+
+- Phân tích /watch trên video 02:17 và so khớp 3 hook với g:snap/g:input/catch trong recording cau-ca-20261010-141700: 3 lượt bắt thật, thời gian reel 8.43 / 6.78 / 4.10 giây, tiến độ p=1.
+- Game tăng tiến độ khoảng +0.21/s khi cá nằm trong vùng lực và giảm khoảng -0.13/s khi trượt; phải tiếp tục bám bằng adaptive servo hiện có, không coi Giật! là catch.
+- Tách click ném câu (280ms) và Giật! (90ms, theo hold đầu 88–115ms trong 3 lượt thành công); đọc trạng thái cá cắn mỗi 250ms thay vì 700ms, giảm độ trễ bỏ lỡ bite.
+- Giữ nguyên điều khiển giữ/thả theo g:snap, câu không giới hạn tới Thu Đàn và Web admin-only. Schema 92, PC 1.59.30, migrate bảo toàn cấu hình.
+- Không đưa video/cookie/tài khoản người ghi vào Git. Chưa xác minh bắt cá trên phiên worker mới của live game.
+
 ## 1.3.194 — Tiên Giới: bám thanh lực theo cá, không nhấp cố định (10/10/2026)
 
 - Reverse-engineer live fish-AKRSGEO2.js qua browser MCP và 577 gói g:snap ghi trong recording: cá f, tâm lực z, vùng zone, tiến độ p; lực giữ +2.6, lực thả -2.2, ma sát exp(-2.5*dt), mẫu 66ms.

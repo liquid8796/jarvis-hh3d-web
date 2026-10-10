@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 91,
+  "schemaVersion": 92,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -7814,13 +7814,17 @@
           "until": { "kind": "visible", "selector": "body.jvz-fish-finished, body.jvz-fish-error" },
           "steps": [
             { "action": "evaluateJavaScript", "script": "@@FISH_TICK@@", "timeoutMs": 5000 },
-            { "action": "click", "selector": ".fish-room .fish-main.jvz-fish-press",
+            { "action": "click", "selector": ".fish-room .fish-main.st-idle.jvz-fish-press",
               "pressMs": 280, "timeoutMs": 2500, "optional": true,
-              "when": { "kind": "visible", "selector": ".fish-room .fish-main.jvz-fish-press" },
-              "note": "Playwright native pointerdown/up; Câu Cá filters untrusted DOM events" },
+              "when": { "kind": "visible", "selector": ".fish-room .fish-main.st-idle.jvz-fish-press" },
+              "note": "Ném câu: thao tác chuột thật giữ 280ms, không dùng synthetic DOM click" },
+            { "action": "click", "selector": ".fish-room .fish-main.st-bite.jvz-fish-press",
+              "pressMs": 90, "timeoutMs": 2500, "optional": true,
+              "when": { "kind": "visible", "selector": ".fish-room .fish-main.st-bite.jvz-fish-press" },
+              "note": "Giật! thành công trong record: nhấn/thả 88–115ms, chuyển ngay sang reel" },
             { "action": "fishingReel", "timeoutMs": 120000, "optional": true,
               "note": "Bám vị trí cá f trong z±zone/2 tới p=1; WebSocket chỉ nghe" },
-            { "action": "waitMilliseconds", "timeoutMs": 700 }
+            { "action": "waitMilliseconds", "timeoutMs": 250 }
           ]
         }
       ],
@@ -7843,13 +7847,17 @@
           "until": { "kind": "visible", "selector": "body.jvz-fish-finished, body.jvz-fish-error" },
           "steps": [
             { "action": "evaluateJavaScript", "script": "@@FISH_TICK@@", "timeoutMs": 5000 },
-            { "action": "click", "selector": ".fish-room .fish-main.jvz-fish-press",
+            { "action": "click", "selector": ".fish-room .fish-main.st-idle.jvz-fish-press",
               "pressMs": 280, "timeoutMs": 2500, "optional": true,
-              "when": { "kind": "visible", "selector": ".fish-room .fish-main.jvz-fish-press" },
-              "note": "Playwright native pointerdown/up; Câu Cá filters untrusted DOM events" },
+              "when": { "kind": "visible", "selector": ".fish-room .fish-main.st-idle.jvz-fish-press" },
+              "note": "Ném câu: thao tác chuột thật giữ 280ms, không dùng synthetic DOM click" },
+            { "action": "click", "selector": ".fish-room .fish-main.st-bite.jvz-fish-press",
+              "pressMs": 90, "timeoutMs": 2500, "optional": true,
+              "when": { "kind": "visible", "selector": ".fish-room .fish-main.st-bite.jvz-fish-press" },
+              "note": "Giật! thành công trong record: nhấn/thả 88–115ms, chuyển ngay sang reel" },
             { "action": "fishingReel", "timeoutMs": 120000, "optional": true,
               "note": "Bám vị trí cá f trong z±zone/2 tới p=1; WebSocket chỉ nghe" },
-            { "action": "waitMilliseconds", "timeoutMs": 700 }
+            { "action": "waitMilliseconds", "timeoutMs": 250 }
           ]
         }
       ],

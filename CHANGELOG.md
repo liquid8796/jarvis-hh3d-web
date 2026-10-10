@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.191 — Tiên Giới: Câu Cá cho hai hạng, admin-only (10/10/2026)
+
+- Phân tích recording cau-ca-20261010-103257 bằng /watch, DOM và Socket.IO: g:act cast/hook, g:input giữ/thả; câu cá cần trạng thái game, không phải click nhận thưởng.
+- Thêm block Tiên Giới với Câu Cá cho tài khoản thường và VIP, mặc định tắt. Tuỳ chọn ngư lực tự bán tối đa +N (0 không bán), số lần ném câu (0 không giới hạn).
+- Cổng quyền admin ở hai nơi: server lưu cấu hình và API cấp job cho mọi loại worker; PC do chính người vận hành kiểm soát.
+- Controller tick ngắn, hạn chế bán nhầm cá mạnh, xác nhận game thực sự nhận cú ném trước khi đếm, xử lý giỏ đầy, hết sức câu và thoát phòng khi đạt trần. Schema 88 / PC 1.59.26.
+- Có kiểm thử browser-fixture; thao tác trong tài khoản live vẫn cần được kiểm chứng riêng trước khi bật rộng rãi.
+
 ## 1.3.190 — Phúc Lợi Đường: nhận rương tích luỹ tháng cho VIP và thường (09/10/2026)
 
 - Đối chiếu video /watch, DOM và AJAX trong recording 08/10: trang hiện modal "Còn rương mốc chưa nhận", thao tác thật là CTA `.pl-mile__cta` (không phải biểu tượng quà `.pl-mile__btn`).

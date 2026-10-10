@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { isAdminUser } from "@/lib/auth/permissions";
+import { enforceFishingAdminPolicy } from "@/lib/quest-engine/fishingAccess.mjs";
 import { requireActiveUser } from "@/lib/auth/guards";
 import {
   addAccount,
@@ -194,6 +195,11 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
       vanDap: simple("vanDap"),
       hySuDuong: simple("hySuDuong"),
       phanThuongHoatDong: simple("phanThuongHoatDong"),
+      cauCa: {
+        enabled: formData.get("cauCaEnabled") === "on",
+        sellBelow: Math.min(30, Math.max(0, Math.trunc(Number(formData.get("cauCaSellBelow") ?? 4)) || 0)),
+        castLimit: Math.min(10000, Math.max(0, Math.trunc(Number(formData.get("cauCaCastLimit") ?? 0)) || 0)),
+      },
       // Hai bản Khoáng Mạch — cùng phép tách tab VIP/Thường như Luyện Đan Đường ngay trên.
       khoangMach: {
         enabled: formData.get("khoangMachEnabled") === "on",
@@ -227,12 +233,12 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
   // khoá như `sect`. Đọc preference đang lưu ở thời điểm POST thay vì tin configSchema mặc định
   // (`any`) hoặc một hidden field có thể bị dựng tay.
   const current = await getStoredConfigForSnapshot(user.id);
-  const guarded = enforceUnavailableQuestPolicy(
+  const guarded = enforceFishingAdminPolicy(enforceUnavailableQuestPolicy(
     enforceMazeCapPolicy(parsed.data, {
       isAdmin: isAdminUser(user),
       workerPref: current.workerPref,
     }),
-  );
+  ), isAdminUser(user));
   await saveConfig(user.id, guarded);
   revalidatePath("/dashboard");
 

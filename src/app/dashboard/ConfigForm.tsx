@@ -110,7 +110,7 @@ const FREE_QUESTS = SIMPLE_QUESTS.filter((quest) => FREE_QUEST_KEYS.has(quest.ke
  * người dùng không phải gấp hai lần cho một thứ. Ngược lại hai lưới nhiệm-vụ-ngày là hai
  * danh sách KHÁC nhau nên mỗi bên một khoá.
  */
-type BlockKey = "simpleFree" | "meCung" | "luyenDan" | "khoangMach" | "simpleVip";
+type BlockKey = "simpleFree" | "meCung" | "luyenDan" | "khoangMach" | "simpleVip" | "tienGioi";
 
 const COLLAPSE_STORAGE_KEY = "jvz.config.collapsed";
 
@@ -1017,6 +1017,41 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
           </div>
         </fieldset>
       </div>
+
+      {/* Tiên Giới is a separate quest block with one shared config for VIP and free.
+          The disabled state is presentation only; server save and worker claim recheck admin. */}
+      <fieldset className={`mb-5 rounded-xl border border-[var(--color-ink-600)]/60 ${collapsed.tienGioi ? "px-4 py-0" : "p-4"}`}>
+        <legend className="px-2">
+          <span className="flex items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
+            Tiên Giới
+            <CollapseToggle bodyId="tienGioi-body" collapsed={collapsed.tienGioi === true}
+              onToggle={() => toggleCollapsed("tienGioi")} label="Tiên Giới" />
+          </span>
+        </legend>
+        <div id="tienGioi-body" hidden={collapsed.tienGioi === true} className="space-y-3">
+          <label className="flex items-center gap-3 text-sm text-[var(--color-parchment)]">
+            <input type="checkbox" name="cauCaEnabled" defaultChecked={isAdmin && config.quests.cauCa.enabled}
+              disabled={!isAdmin} />
+            <span className="font-semibold">Câu Cá</span>
+            <span className="text-xs text-[var(--color-mist)]">VIP + thường</span>
+          </label>
+          {!isAdmin && <p className="text-xs text-[var(--color-mist)]">Thử nghiệm — hiện chỉ tài khoản admin được bật và chạy quest này.</p>}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="space-y-1 text-xs text-[var(--color-mist)]">
+              <span>Tự bán cá có ngư lực không quá +N (0 = không bán)</span>
+              <input type="number" name="cauCaSellBelow" min={0} max={30} step={1}
+                defaultValue={config.quests.cauCa.sellBelow} disabled={!isAdmin}
+                className="w-full rounded-lg border border-[var(--color-ink-500)] bg-[var(--color-ink-700)] p-2 text-[var(--color-parchment)]" />
+            </label>
+            <label className="space-y-1 text-xs text-[var(--color-mist)]">
+              <span>Giới hạn số lần ném câu (0 = không giới hạn)</span>
+              <input type="number" name="cauCaCastLimit" min={0} max={10000} step={1}
+                defaultValue={config.quests.cauCa.castLimit} disabled={!isAdmin}
+                className="w-full rounded-lg border border-[var(--color-ink-500)] bg-[var(--color-ink-700)] p-2 text-[var(--color-parchment)]" />
+            </label>
+          </div>
+        </div>
+      </fieldset>
 
       {/* -------- Mê Cung: hiện ở MỌI tab, không nằm trong div ẩn nào --------
           Từ schema 45 nó có twin thường (me-cung-thuong) dùng chung script và chung

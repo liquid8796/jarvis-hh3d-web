@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { z } from "zod";
+export { enforceFishingAdminPolicy } from "@/lib/quest-engine/fishingAccess.mjs";
 import { QUEST_TIMER_KEYS, type QuestTimer } from "@/lib/questTimers";
 
 /**
@@ -296,6 +297,12 @@ export const configSchema = z.object({
        * twin dùng chung một script và chung một tên trong hồ sơ, y như Điểm Danh hay Hoang Vực.
        */
       phanThuongHoatDong: simpleQuest,
+      /** Câu Cá — Tiên Giới, admin only (server policy lives in fishingAccess.mjs). */
+      cauCa: z.object({
+        enabled: z.boolean().default(false),
+        sellBelow: z.number().int().min(0).max(30).default(4),
+        castLimit: z.number().int().min(0).max(10000).default(0),
+      }).prefault({}),
       /** Bản cho hạng VIP — twin `luyen-dan-duong` của hồ sơ. */
       luyenDan: luyenDanQuest,
       /** Bản cho hạng thường — twin `luyen-dan-duong-thuong`. Xem chú thích ở luyenDanQuest. */

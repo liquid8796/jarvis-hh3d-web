@@ -22,10 +22,20 @@ import { applyQuestTimerGates } from "./questTimers.mjs";
 const profileData = JSON.parse(
   readFileSync(fileURLToPath(new URL("./profile.json", import.meta.url)), "utf8"),
 );
+// The in-page controller is a resource, not a 6 KB escaped JSON string. Substitute
+// before option interpolation, in a fresh clone per run; the profile remains immutable.
+const fishingTick = readFileSync(fileURLToPath(new URL("./fishingTick.js", import.meta.url)), "utf8");
 
 /** Bản sao sâu — người gọi được phép sửa thoải mái mà không đụng vào hồ sơ gốc. */
 export function loadProfile() {
-  return structuredClone(profileData);
+  const profile = structuredClone(profileData);
+  for (const quest of profile.quests.filter((q) => q.id === "cau-ca" || q.id === "cau-ca-thuong")) {
+    const tick = quest.steps.find((step) => step.action === "repeat")?.steps?.find(
+      (step) => step.action === "evaluateJavaScript" && step.script === "@@FISH_TICK@@",
+    );
+    if (tick) tick.script = fishingTick;
+  }
+  return profile;
 }
 
 const findQuests = (profile, name) => profile.quests.filter((q) => q.name === name);
@@ -149,6 +159,7 @@ const SIMPLE_QUESTS = [
   ["vanDap", "Vấn Đáp"],
   ["hySuDuong", "Hỷ Sự Đường"],
   ["phanThuongHoatDong", "Phần Thưởng Hoạt Động"],
+  ["cauCa", "Câu Cá"],
 ];
 
 /**
@@ -400,6 +411,14 @@ export function profileForConfig(config, say, marksToday, at = new Date()) {
   }
 
   // ---- Mười nhiệm vụ một-công-tắc ------------------------------------------------------
+  for (const quest of findQuests(profile, "Câu Cá")) {
+    const fishing = config.quests?.cauCa;
+    quest.enabled = fishing?.enabled === true;
+    if (quest.enabled) {
+      setOption(quest, "sellBelow", String(fishing.sellBelow ?? 4), { allowFreeform: true, log });
+      setOption(quest, "castLimit", String(fishing.castLimit ?? 0), { allowFreeform: true, log });
+    }
+  }
   for (const [key, name] of SIMPLE_QUESTS) {
     const quests = findQuests(profile, name);
     if (quests.length === 0) {
@@ -433,6 +452,7 @@ export function profileForConfig(config, say, marksToday, at = new Date()) {
     "luyenDanThuong",
     "khoangMach",
     "khoangMachThuong",
+    "cauCa",
   ]);
   for (const [key, value] of Object.entries(config.quests ?? {})) {
     if (value?.enabled === true && !knownKeys.has(key)) {

@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 87,
+  "schemaVersion": 88,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -7800,6 +7800,53 @@
       "requiresVip": false,
       "order": 105,
       "notes": "T\u1EF1 luy\u1EC7n \u0111an \u1EDF Luy\u1EC7n \u0110an \u0110\u01B0\u1EDDng \u2014 m\u1ED7i m\u1EBB T\u1ED0N d\u01B0\u1EE3c li\u1EC7u \u002B Ti\u00EAn Ng\u1ECDc theo ph\u1EA9m/c\u00F4ng th\u1EE9c."
+    }
+    ,
+    {
+      "id": "cau-ca", "name": "Câu Cá", "group": "Tiên Giới",
+      "enabled": false, "kind": "customSteps", "matchTexts": ["câu cá", "cau ca"],
+      "pagePath": "/game/",
+      "steps": [
+        { "action": "navigate", "text": "/game/", "timeoutMs": 20000 },
+        { "action": "waitForSelector", "selector": "#app", "timeoutMs": 25000 },
+        {
+          "action": "repeat", "maxIterations": 200, "maxSeconds": 480, "optional": true,
+          "until": { "kind": "visible", "selector": "body.jvz-fish-finished, body.jvz-fish-error" },
+          "steps": [
+            { "action": "evaluateJavaScript", "script": "@@FISH_TICK@@", "timeoutMs": 5000 },
+            { "action": "waitMilliseconds", "timeoutMs": 700 }
+          ]
+        }
+      ],
+      "options": [
+        { "key": "sellBelow", "label": "Tự bán cá ngư lực ≤ +N (0: không bán)", "allowCustom": true, "customMinimum": 0, "customMaximum": 30, "selectedValue": "4", "choices": [{ "value": "0", "label": "Không bán" }, { "value": "4", "label": "≤ +4" }, { "value": "8", "label": "≤ +8" }] },
+        { "key": "castLimit", "label": "Giới hạn số lần ném câu (0: không giới hạn)", "allowCustom": true, "customMinimum": 0, "customMaximum": 10000, "selectedValue": "0", "choices": [{ "value": "0", "label": "Không giới hạn" }, { "value": "10", "label": "10 lần" }, { "value": "50", "label": "50 lần" }] }
+      ],
+      "fallbackCooldownSeconds": 0, "requiresVip": true, "order": 300,
+      "notes": "Tiên Giới · vào phòng còn chỗ, câu, bán cá theo ngư lực; chỉ admin Web / PC."
+    },
+    {
+      "id": "cau-ca-thuong", "name": "Câu Cá", "group": "Tiên Giới",
+      "enabled": false, "kind": "customSteps", "matchTexts": ["câu cá", "cau ca"],
+      "pagePath": "/game/",
+      "steps": [
+        { "action": "navigate", "text": "/game/", "timeoutMs": 20000 },
+        { "action": "waitForSelector", "selector": "#app", "timeoutMs": 25000 },
+        {
+          "action": "repeat", "maxIterations": 200, "maxSeconds": 480, "optional": true,
+          "until": { "kind": "visible", "selector": "body.jvz-fish-finished, body.jvz-fish-error" },
+          "steps": [
+            { "action": "evaluateJavaScript", "script": "@@FISH_TICK@@", "timeoutMs": 5000 },
+            { "action": "waitMilliseconds", "timeoutMs": 700 }
+          ]
+        }
+      ],
+      "options": [
+        { "key": "sellBelow", "label": "Tự bán cá ngư lực ≤ +N (0: không bán)", "allowCustom": true, "customMinimum": 0, "customMaximum": 30, "selectedValue": "4", "choices": [{ "value": "0", "label": "Không bán" }, { "value": "4", "label": "≤ +4" }, { "value": "8", "label": "≤ +8" }] },
+        { "key": "castLimit", "label": "Giới hạn số lần ném câu (0: không giới hạn)", "allowCustom": true, "customMinimum": 0, "customMaximum": 10000, "selectedValue": "0", "choices": [{ "value": "0", "label": "Không giới hạn" }, { "value": "10", "label": "10 lần" }, { "value": "50", "label": "50 lần" }] }
+      ],
+      "fallbackCooldownSeconds": 0, "requiresVip": false, "order": 300,
+      "notes": "Tiên Giới · câu cá chung flow VIP/thường; chỉ admin Web / PC."
     }
   ]
 }

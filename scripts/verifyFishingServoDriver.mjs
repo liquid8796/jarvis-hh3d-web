@@ -37,3 +37,33 @@ assert.ok(presses.includes("down"),"trusted mouse must hold while chasing fish a
 assert.ok(presses.includes("up"),"trusted mouse must release to chase fish below");
 assert.equal(presses[presses.length-1],"up","button must be released on reel end");
 console.log("PASS passive Socket.IO g:snap telemetry drives trusted mouse down/up and releases at exit");
+
+const stalledPage = new EventEmitter(), stalledSocket = new EventEmitter();
+stalledSocket.url = () => "wss://example.invalid/socket.io/";
+const timeline = [];
+let loops = 0;
+stalledPage.locator = () => ({ boundingBox: async () => ({ x: 10, y: 10, width: 60, height: 40 }) });
+stalledPage.evaluate = async () => {
+  const active = ++loops <= 20;
+  if (!active) timeline.push("reel-finished");
+  return active;
+};
+stalledPage.mouse = {
+  move: async () => {},
+  down: async () => timeline.push("down"),
+  up: async () => timeline.push("up")
+};
+const stalledSession = createSession(stalledPage, {
+  baseUrl: "https://example.invalid",
+  log: { debug: () => {}, info: () => {}, warning: () => {} }
+});
+stalledSession.beginFishingTelemetry();
+stalledPage.emit("websocket", stalledSocket);
+stalledSocket.emit("framereceived",
+  '42["g:snap",'+JSON.stringify({ t: .066, z: .15, f: .85, zone: .27, p: .21, fv: 0 })+']');
+await stalledSession.fishingReel();
+assert.ok(timeline.includes("down"), "start holding with a fresh valid position");
+assert.ok(timeline.includes("up"), "release when g:snap stops arriving");
+assert.ok(timeline.indexOf("up") < timeline.indexOf("reel-finished"),
+  "stale telemetry must release during reel, not only at its end");
+console.log("PASS stale 400ms g:snap gap releases trusted mouse before reel exits");

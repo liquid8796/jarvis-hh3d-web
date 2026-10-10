@@ -7,7 +7,7 @@
  */
 
 import { parseCooldownSeconds } from "./cooldown.mjs";
-import { chooseFishingHold, parseFishingSnapshotFrame } from "./fishingServo.mjs";
+import { chooseFishingHold, createFishingTelemetry } from "./fishingServo.mjs";
 
 /**
  * Bỏ dấu, hạ chữ thường, chỉ giữ chữ và số, cách nhau đúng một khoảng trắng.
@@ -72,16 +72,8 @@ export function createSession(page, options) {
   const maxDelay = Math.max(minDelay + 1, options.maxActionDelayMs ?? 1800);
   const pageTimeoutMs = options.pageTimeoutMs ?? 45_000;
   let fishTelemetryActive = false;
-  let fishSnapshot = null;
-  let fishVelocity = 0;
-  const onFishFrame = (raw) => {
-    const snap = parseFishingSnapshotFrame(raw);
-    if (!snap) return;
-    if (fishSnapshot && snap.t > fishSnapshot.t && snap.t - fishSnapshot.t < .4)
-      fishVelocity = Math.max(-1.6, Math.min(1.6, (snap.z - fishSnapshot.z) / (snap.t - fishSnapshot.t)));
-    else fishVelocity = 0;
-    fishSnapshot = { ...snap, receivedAt: Date.now() };
-  };
+  const fishingTelemetry = createFishingTelemetry();
+  const onFishFrame = (raw) => fishingTelemetry.ingest(raw);
 
   return {
     beginFishingTelemetry() {
@@ -110,9 +102,11 @@ export function createSession(page, options) {
             document.querySelector(".fish-room .fish-main.st-reel") !== null);
           if (!reelActive) break;
           const now = Date.now();
-          const fresh = fishSnapshot && now - fishSnapshot.receivedAt < 900;
-          const desired = fresh ? chooseFishingHold(fishSnapshot, {
-            velocity: fishVelocity, last: holding, now, lastSwitchedAt: lastSwitchAt
+          const gauge = fishingTelemetry.current(now);
+          const desired = gauge ? chooseFishingHold(gauge, {
+            velocity: gauge.velocity, last: holding, now,
+            lastSwitchedAt: lastSwitchAt,
+            lookaheadSeconds: gauge.lookaheadSeconds
           }) : false;
           if (desired !== holding) {
             if (desired) await page.mouse.down();

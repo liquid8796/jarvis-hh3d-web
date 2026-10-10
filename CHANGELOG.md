@@ -9,7 +9,15 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
-## 1.3.195 — Giật cá nhanh theo record 141700 (10/10/2026)
+## 1.3.196 — Câu Cá: chống lag g:snap, nhả giữ an toàn (10/10/2026)
+
+- Đo trực tiếp record cau-ca-20261010-141700: 291 g:snap trong 3 lượt câu thành công; các mẫu thường cách nhau ~65ms nhưng có đợt gián đoạn 287–403ms và độ trễ tương đối tăng tới ~353ms. Không nhầm các con số này với RTT hay độ trễ tuyệt đối.
+- Bộ đo thụ động lấy độ lệch nhỏ nhất giữa đồng hồ g:snap và thời điểm nhận làm mốc từng lượt; phát hiện gói đến muộn, loại gói đảo thứ tự, nhận biết reset đồng hồ khi giật cá mới.
+- Servo điều chỉnh khoảng dự đoán quán tính có giới hạn theo độ trễ tương đối; khi dữ liệu quá cũ hoặc mất gói, nhả chuột thực ngay trong lượt kéo để tránh kéo quá đà. Không gửi Socket.IO giả hoặc làm thay đổi logic game.
+- Test mới cho backlog, out-of-order, gói đến quá trễ, reset lượt câu, và kiểm chứng mouse-up trước khi reel kết thúc khi mạng ngừng gửi g:snap.
+- PC tương ứng 1.59.31; quest schema tiếp tục là 92 để giữ nguyên trạng thái và tùy chọn. Phân quyền admin Web và chế độ câu liên tục tới Thu Đàn không đổi. Chưa xác nhận một catch do worker mới trên game live.
+
+## 1.3.195 —## 1.3.195 — Giật cá nhanh theo record 141700 (10/10/2026)
 
 - Phân tích /watch trên video 02:17 và so khớp 3 hook với g:snap/g:input/catch trong recording cau-ca-20261010-141700: 3 lượt bắt thật, thời gian reel 8.43 / 6.78 / 4.10 giây, tiến độ p=1.
 - Game tăng tiến độ khoảng +0.21/s khi cá nằm trong vùng lực và giảm khoảng -0.13/s khi trượt; phải tiếp tục bám bằng adaptive servo hiện có, không coi Giật! là catch.

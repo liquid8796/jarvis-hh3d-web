@@ -135,6 +135,25 @@ try {
   assert.deepEqual(await page.evaluate(() => window.testRoom), { launch: 0, join: 1 },
     "join the actual fishing room despite nested launcher overlay");
 
+  // An unlimited user must NEVER enter the finished/error state for temporary
+  // connectivity/basket failures. Otherwise the worker closes and sleeps 5 min.
+  await page.setContent('<div class="view fish-room"><button class="fish-main st-wait">Chờ cá</button></div>');
+  await page.evaluate(() => {
+    window.__jvzFish = {
+      casts: 7, ticks: 0, bagChecked: true, lastBagCast: 7,
+      entering: 0, lastPress: 0, pendingSale: false,
+      pendingCast: false, lastCast: Date.now() - 151000,
+    };
+  });
+  const unlimitedSource = readFileSync(new URL("../src/lib/quest-engine/fishingTick.js", import.meta.url), "utf8")
+    .replace("{{sellBelow}}", "4").replace("{{castLimit}}", "0");
+  const interrupted = await page.evaluate("(" + unlimitedSource + ")()");
+  assert.match(interrupted, /vẫn treo/);
+  assert.equal(await page.locator("body.jvz-fish-finished, body.jvz-fish-error").count(), 0,
+    "unlimited castLimit may not close the job on a temporary error");
+  const retryAt = await page.evaluate(() => window.__jvzFish.retryAfter);
+  assert.ok(retryAt > Date.now(), "unlimited mode backs off instead of busy-looping");
+
   console.log("PASS fishing browser fixture: trusted pointer input, protected sale, nested room, exit cap");
 } finally {
   await browser.close();

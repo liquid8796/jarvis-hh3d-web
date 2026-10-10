@@ -11,10 +11,22 @@
   const body = document.body;
   const state = window.__jvzFish ??= { casts: 0, ticks: 0, bagChecked: false, lastBagCast: -1, entering: 0, pressed: false, lastPress: 0, pendingSale: false };
   state.ticks++;
+  // Lượt câu không giới hạn: NEVER finish the job on room/basket/network
+  // issues. Retry in the same worker/browser so no five-minute cycle break.
+  if (castLimit === 0 && state.retryAfter > Date.now()) return "fish: chờ hồi phục";
   const get = (sel) => document.querySelector(sel);
   const label = (element) => (element?.textContent || "").replace(/\s+/g, " ").trim();
   const visible = (el) => !!el && el.getClientRects().length > 0 && !el.disabled;
   const finish = (message, error = false) => {
+    if (castLimit === 0) {
+      // Temporary blockers should not become a finished quest. The operator's
+      // Thu Đàn is the only normal exit; the engine still checks cancellation.
+      state.retryAfter = Date.now() + (error ? 30_000 : 60_000);
+      state.pendingCast = false;
+      state.lastCast = 0;
+      state.entering = 0;
+      return "!" + message + " — Câu Cá không giới hạn: vẫn treo, sẽ thử lại.";
+    }
     body.classList.add(error ? "jvz-fish-error" : "jvz-fish-finished");
     return "!" + message;
   };
@@ -112,8 +124,8 @@
   const stamina = /([0-9]+)\s*\/\s*([0-9]+)/.exec(label(get(".fish-day .short")));
   if (stamina && +stamina[1] >= +stamina[2] && +stamina[2] > 0) {
     const leave = get(".fish-room .room-top button[aria-label='Rời phòng']");
-    if (visible(leave)) leave.click();
-    return finish("Đã dùng hết sức câu hôm nay; dừng và rời phòng.");
+    if (castLimit > 0 && visible(leave)) leave.click();
+    return finish("Đã dùng hết sức câu hôm nay; tạm chờ sức câu hồi phục.");
   }
   if (state.pendingCast && !idle) {
     // The browser sent a cast only after the game changed its own state.

@@ -830,9 +830,16 @@ export function createQuestEngine(deps) {
         const body = step.steps;
         if (!(body?.length > 0)) return "repeat không có bước nào.";
 
-        const maxIterations = clamp(step.maxIterations ?? 10, 1, 200);
-        const maxSeconds = clamp(step.maxSeconds ?? 600, 5, 6 * 3600);
-        const deadline = Date.now() + maxSeconds * 1000;
+        // Câu Cá owns its termination: castLimit>0 finishes in fishingTick after
+        // the last cast and leaves the room; castLimit=0 MUST hold this job until
+        // Thu Đàn (shouldStop). The generic 200 ticks / 480s previously closed
+        // the browser and put the worker to sleep for five minutes.
+        // Keep strict caps for EVERY other quest.
+        const fishing = (quest.id === "cau-ca" || quest.id === "cau-ca-thuong") &&
+          body.some((s) => s.action === "evaluateJavaScript" && s.script?.includes("__jvzFish"));
+        const maxIterations = fishing ? Infinity : clamp(step.maxIterations ?? 10, 1, 200);
+        const maxSeconds = fishing ? Infinity : clamp(step.maxSeconds ?? 600, 5, 6 * 3600);
+        const deadline = fishing ? Infinity : Date.now() + maxSeconds * 1000;
         let done = 0;
         let reason;
 

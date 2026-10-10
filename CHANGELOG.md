@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.193 — Câu Cá không giới hạn: không nghỉ đàn (10/10/2026)
+
+- CastLimit=0 giữ cùng job/Chromium để câu liên tục tới Thu Đàn, không tự kết thúc khi repeat chạm 200 nhịp hoặc 480 giây. Tài khoản VIP và thường đều dùng quy tắc này.
+- Giới hạn lượt câu lớn hơn 0 vẫn để controller tự đếm và rời phòng khi đủ, không bị lẫn với trần repeat của engine. Các nhiệm vụ KHÁC giữ giới hạn repeat cũ.
+- Giỏ đầy, hết sức câu, không còn phòng và sự cố kết nối tạm thời khi castLimit=0 không đánh dấu quest hoàn tất: tự chờ và kiểm tra lại ở chính phiên đang chạy.
+- PC tương ứng 1.59.28, profile schema 90; migration PC chỉ thay thế hai Câu Cá, giữ nguyên công tắc và mọi tuỳ chọn.
+- Test hồi quy: >200 nhịp không dừng, Thu Đàn dừng đúng nhịp, quest thường giữ trần 200, sự cố không kết thúc Câu Cá vô hạn.
+
 ## 1.3.192 — Câu Cá: native input được Cốc Cốc chấp nhận (10/10/2026)
 
 - Debug MCP trên Cốc Cốc 152: DOM click không làm game ném câu; frontend chỉ xử lý pointerdown/pointerup và lọc sự kiện isTrusted=false. Click chuột thật đã chuyển st-idle sang st-wait.

@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { enforceFishingAdminPolicy } from "../src/lib/quest-engine/fishingAccess.mjs";
 
 const p = JSON.parse(readFileSync(new URL("../src/lib/quest-engine/profile.json", import.meta.url), "utf8"));
-assert.equal(p.schemaVersion, 89);
+assert.equal(p.schemaVersion, 90);
 const v = p.quests.find((q: { id: string }) => q.id === "cau-ca");
 const f = p.quests.find((q: { id: string }) => q.id === "cau-ca-thuong");
 assert.ok(v && f, "both tiers have a fishing quest");
@@ -24,6 +24,11 @@ for (const [quest, isFree] of [[v, false], [f, true]] as const) {
     "game requires trusted Playwright input with hold time");
 }
 assert.deepEqual(v.steps, f.steps, "same game protocol for both account tiers");
+for (const quest of [v, f]) {
+  const repeating = quest.steps.find((s: { action: string }) => s.action === "repeat");
+  assert.equal(repeating.maxIterations, 200, "profile retains caps for other quests");
+  assert.equal(repeating.maxSeconds, 480, "engine bypass is restricted to fishing runtime");
+}
 const cfg = { quests: { cauCa: { enabled: true, sellBelow: 8, castLimit: 0 } } };
 assert.equal(enforceFishingAdminPolicy(cfg, true), cfg, "admin may enable");
 const denied = enforceFishingAdminPolicy(cfg, false);

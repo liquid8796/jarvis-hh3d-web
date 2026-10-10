@@ -1,7 +1,8 @@
 /**
  * In-page fishing controller, run as one short evaluateJavaScript step per tick.
  * Grounded in the 10/10 recording (DOM + Socket.IO g:act/g:input). It acts via
- * site controls rather than calling private socket events or inventing rewards.
+ * site controls for bag/rooms. Fishing input itself MUST run as a trusted
+ * Playwright click: the game rejects synthetic PointerEvent (isTrusted=false).
  * The quest engine owns the bounded repeat loop and its cancellation.
  */
 () => {
@@ -13,14 +14,6 @@
   const get = (sel) => document.querySelector(sel);
   const label = (element) => (element?.textContent || "").replace(/\s+/g, " ").trim();
   const visible = (el) => !!el && el.getClientRects().length > 0 && !el.disabled;
-  const press = (button) => {
-    const common = { bubbles: true, cancelable: true, pointerId: 1, pointerType: "mouse", isPrimary: true };
-    button.dispatchEvent(new PointerEvent("pointerdown", { ...common, buttons: 1 }));
-    window.setTimeout(() => {
-      if (!button.isConnected) return;
-      button.dispatchEvent(new PointerEvent("pointerup", { ...common, buttons: 0 }));
-    }, 300);
-  };
   const finish = (message, error = false) => {
     body.classList.add(error ? "jvz-fish-error" : "jvz-fish-finished");
     return "!" + message;
@@ -29,7 +22,10 @@
   const room = get(".view.fish-room");
   if (!room) {
     // The fish game is in the Tiên Giới hub's Trò chơi launcher, NOT /nhiem-vu-hang-ngay.
-    const sheet = get(".sheet");
+    // The launcher sheet stays mounted behind the fishing-room sheet.
+    // Use the foremost sheet carrying actual room listings, not querySelector first.
+    const sheets = [...document.querySelectorAll(".sheet")].filter(visible);
+    const sheet = sheets.find((s) => s.querySelector(".room-item")) ?? sheets.at(-1);
     if (sheet) {
       const rooms = [...sheet.querySelectorAll(".room-item")];
       if (rooms.length) {
@@ -56,6 +52,7 @@
 
   const main = get(".fish-room .fish-main");
   if (!main) return finish("Phòng đã vào nhưng không thấy nút câu.", true);
+  main.classList.remove("jvz-fish-press");
   const badge = label(get(".fish-quick-bag .fish-badge"));
   const bagCount = +(badge.match(/^(\d+)\s*\//)?.[1] || 0);
   const bagCap = +(badge.match(/\/\s*(\d+)/)?.[1] || 30);
@@ -127,7 +124,7 @@
   }
   if (state.pendingCast && idle) {
     if (Date.now() - state.lastCast > 12000)
-      return finish("Đã bấm Ném câu nhưng game vẫn idle hơn 12s (chưa chọn điểm câu hoặc mạng lỗi).", true);
+      return finish("Đã gửi thao tác ném câu nhưng game không chuyển khỏi idle sau 12s; kiểm tra kết nối Tiên Giới và thông báo trong phòng.", true);
     return "fish: đợi game xác nhận ném câu";
   }
   if (castLimit > 0 && state.casts >= castLimit && idle) {
@@ -138,15 +135,17 @@
   if (idle && visible(main)) {
     if (state.casts > 0 && Date.now() - (state.lastCast || 0) < 2200) return "fish: đợi lượt trước";
     // Initial target: the site uses the currently selected Điểm câu; don't guess world coordinates.
-    main.click();
+    // Playwright Click step below will deliver trusted pointerdown/up.
+    main.classList.add("jvz-fish-press");
     state.pendingCast = true;
     state.lastCast = Date.now();
     return "fish: gửi thao tác Ném câu; đợi trạng thái của game";
   }
   if (/GIỮ|GIẬT|Nhấc cần/i.test(mainText) && visible(main)) {
     if (Date.now() - state.lastPress > 470) {
-      if (main.classList.contains("st-bite") || /GIẬT|Nhấc cần/i.test(mainText)) main.click();
-      else press(main); // recording: g:input h=1 then h=0, never a long permanent hold
+      // A real Playwright click with pressMs=280 sends g:act hook or
+      // g:input h=1 -> h=0. Direct dispatchEvent is rejected by the game.
+      main.classList.add("jvz-fish-press");
       state.lastPress = Date.now();
     }
   }

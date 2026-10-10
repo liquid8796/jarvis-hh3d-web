@@ -163,10 +163,10 @@ export function createSession(page, options) {
      * trên đúng cái nút mà chính quest vừa dò thấy sẵn sàng. Chỉ dùng cho bước nào có guard
      * kiểm lại được những gì bị bỏ qua.
      */
-    async click(selector, timeoutMs, force = false) {
+    async click(selector, timeoutMs, force = false, pressMs = 0) {
       if (!selector || !selector.trim()) return false;
       try {
-        await page.click(selector, { timeout: timeoutMs, force });
+        await page.click(selector, { timeout: timeoutMs, force, delay: Math.max(0, Math.min(1000, pressMs)) });
         return true;
       } catch (err) {
         log.debug(`Click '${selector}' hỏng — ${squashCallLog(err instanceof Error ? err.message : String(err))}`);

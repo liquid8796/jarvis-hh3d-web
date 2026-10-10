@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.192 — Câu Cá: native input được Cốc Cốc chấp nhận (10/10/2026)
+
+- Debug MCP trên Cốc Cốc 152: DOM click không làm game ném câu; frontend chỉ xử lý pointerdown/pointerup và lọc sự kiện isTrusted=false. Click chuột thật đã chuyển st-idle sang st-wait.
+- Chuyển thao tác câu từ evaluateJavaScript sang Playwright click thật với thời lượng nhấn 280ms; DOM controller chỉ đọc trạng thái và đánh dấu nút.
+- Chọn đúng sheet danh sách phòng thay vì lặp mở launcher khi hai popup cùng hiện.
+- Schema 89 / PC 1.59.27; browser-fixture kiểm trusted input, nhấn giữ, phòng câu và bán cá. Quyền admin Web không thay đổi.
+- Live game từng báo Mạng chập chờn: socket là vấn đề riêng, chưa xác nhận bắt cá thành công.
+
 ## 1.3.191 — Tiên Giới: Câu Cá cho hai hạng, admin-only (10/10/2026)
 
 - Phân tích recording cau-ca-20261010-103257 bằng /watch, DOM và Socket.IO: g:act cast/hook, g:input giữ/thả; câu cá cần trạng thái game, không phải click nhận thưởng.

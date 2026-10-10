@@ -33,8 +33,19 @@ try {
     document.querySelector(".sheet-head button").addEventListener("click", () => {
       document.querySelector(".sheet").remove();
     });
-    document.querySelector(".fish-main").addEventListener("click", () => {
+    // Game filters isTrusted=false and listens to pointerdown / pointerup,
+    // not DOM click. Mimic that contract in the fixture.
+    const main = document.querySelector(".fish-main");
+    let pressedAt = null;
+    main.addEventListener("pointerdown", (event) => {
+      if (event.isTrusted) pressedAt = performance.now();
+    });
+    main.addEventListener("pointerup", (event) => {
+      if (!event.isTrusted || pressedAt === null) return;
       window.clicks.cast++;
+      pressedAt = null;
+      main.classList.replace("st-idle", "st-wait");
+      main.textContent = "Chờ cá";
     });
     byId("leave").addEventListener("click", () => (window.clicks.left++));
   });
@@ -47,14 +58,17 @@ try {
   await tick();
   assert.equal(await page.evaluate(() => window.clicks.sold), 1, "sell only selected weak fish");
   await tick(); // close bag
-  await tick(); // attempt a cast but UI stays idle: no server confirmation
+  await tick(); // controller flags request, does not itself click
   assert.equal(await page.evaluate(() => window.__jvzFish.casts), 0,
     "do not count a click as a successful cast before state changes");
-  await page.evaluate(() => {
-    const main = document.querySelector(".fish-main");
-    main.classList.replace("st-idle", "st-wait");
-    main.textContent = "Chờ cá";
-  });
+  assert.equal(await page.locator(".fish-main.jvz-fish-press").count(), 1,
+    "tick requests a trusted Playwright press");
+  await page.evaluate(() => document.querySelector(".fish-main").click());
+  assert.equal(await page.evaluate(() => window.clicks.cast), 0,
+    "synthetic DOM click must be rejected, as on Cốc Cốc");
+  await page.locator(".fish-main.jvz-fish-press").click({ delay: 280 });
+  assert.equal(await page.evaluate(() => window.clicks.cast), 1,
+    "trusted Playwright press casts successfully");
   await tick();
   assert.equal(await page.evaluate(() => window.__jvzFish.casts), 1,
     "count a real cast after game enters wait state");
@@ -63,13 +77,20 @@ try {
     main.classList.replace("st-wait", "st-reel");
     main.textContent = "GIỮ";
     window.holds = { down: 0, up: 0 };
-    main.addEventListener("pointerdown", () => window.holds.down++);
-    main.addEventListener("pointerup", () => window.holds.up++);
+    main.addEventListener("pointerdown", (e) => {
+      if (e.isTrusted) { window.holds.down++; window.holds.at = performance.now(); }
+    });
+    main.addEventListener("pointerup", (e) => {
+      if (e.isTrusted) { window.holds.up++; window.holds.duration = performance.now() - window.holds.at; }
+    });
   });
   await tick();
-  await page.waitForTimeout(350);
-  assert.deepEqual(await page.evaluate(() => window.holds), { down: 1, up: 1 },
-    "reeling pulses must release the button (g:input h=1 → h=0)");
+  assert.equal(await page.locator(".fish-main.jvz-fish-press").count(), 1);
+  await page.locator(".fish-main.jvz-fish-press").click({ delay: 280 });
+  const holds = await page.evaluate(() => window.holds);
+  assert.equal(holds.down, 1);
+  assert.equal(holds.up, 1);
+  assert.ok(holds.duration >= 250, "hold must last long enough to influence reel tension");
   await page.evaluate(() => {
     const main = document.querySelector(".fish-main");
     main.classList.replace("st-reel", "st-idle");
@@ -99,7 +120,22 @@ try {
   await page.evaluate("(" + disabledSource + ")()");
   assert.equal(await page.locator(".notif-toggle[aria-checked=false]").count(), 1,
     "sellBelow=0 must disable built-in automatic fish sales");
-  console.log("PASS fishing browser fixture: selective sale, cast confirmation, exit cap");
+  // The launcher sheet remains mounted behind the list of fishing rooms.
+  // A querySelector(".sheet") would wrongly re-open the launcher forever.
+  await page.setContent('<div class="view hub"></div>' +
+    '<div class="sheet"><button id="launcher">Câu Cá Tiên Giới</button></div>' +
+    '<div class="sheet"><div class="room-item">1/12 người · đang chơi<button id="join">Vào</button></div></div>');
+  await page.evaluate(() => {
+    window.testRoom = { launch: 0, join: 0 };
+    document.querySelector("#launcher").addEventListener("click", () => window.testRoom.launch++);
+    document.querySelector("#join").addEventListener("click", () => window.testRoom.join++);
+    window.__jvzFish = undefined;
+  });
+  await page.evaluate("(" + source + ")()");
+  assert.deepEqual(await page.evaluate(() => window.testRoom), { launch: 0, join: 1 },
+    "join the actual fishing room despite nested launcher overlay");
+
+  console.log("PASS fishing browser fixture: trusted pointer input, protected sale, nested room, exit cap");
 } finally {
   await browser.close();
 }

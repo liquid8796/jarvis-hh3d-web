@@ -687,7 +687,7 @@ export function createQuestEngine(deps) {
 
       case "click":
         await session.humanDelay();
-        return (await session.click(step.selector ?? "", step.timeoutMs, step.forceClick === true))
+        return (await session.click(step.selector ?? "", step.timeoutMs, step.forceClick === true, step.pressMs ?? 0))
           ? null
           : `Click hỏng: ${step.selector}`;
 

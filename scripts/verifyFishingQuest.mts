@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { enforceFishingAdminPolicy } from "../src/lib/quest-engine/fishingAccess.mjs";
 
 const p = JSON.parse(readFileSync(new URL("../src/lib/quest-engine/profile.json", import.meta.url), "utf8"));
-assert.equal(p.schemaVersion, 88);
+assert.equal(p.schemaVersion, 89);
 const v = p.quests.find((q: { id: string }) => q.id === "cau-ca");
 const f = p.quests.find((q: { id: string }) => q.id === "cau-ca-thuong");
 assert.ok(v && f, "both tiers have a fishing quest");
@@ -17,7 +17,11 @@ for (const [quest, isFree] of [[v, false], [f, true]] as const) {
   assert.equal(quest.kind, "customSteps");
   assert.ok(quest.options.some((o: { key: string }) => o.key === "sellBelow"));
   assert.ok(quest.options.some((o: { key: string }) => o.key === "castLimit"));
-  assert.ok(quest.steps.some((s: { action: string }) => s.action === "repeat"));
+  const repeating = quest.steps.find((s: { action: string }) => s.action === "repeat");
+  assert.ok(repeating);
+  assert.ok(repeating.steps.some((s: { action: string; selector?: string; pressMs?: number }) =>
+    s.action === "click" && s.selector?.includes("jvz-fish-press") && s.pressMs === 280),
+    "game requires trusted Playwright input with hold time");
 }
 assert.deepEqual(v.steps, f.steps, "same game protocol for both account tiers");
 const cfg = { quests: { cauCa: { enabled: true, sellBelow: 8, castLimit: 0 } } };

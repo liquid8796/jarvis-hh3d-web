@@ -490,6 +490,8 @@ export function createQuestEngine(deps) {
     }
 
     const scope = `Quest:${quest.name}`;
+    if (quest.id === "cau-ca" || quest.id === "cau-ca-thuong")
+      session.beginFishingTelemetry?.();
     let state;
     let error;
 
@@ -748,6 +750,12 @@ export function createQuestEngine(deps) {
           }
         }
 
+        return null;
+      }
+
+      case "fishingReel": {
+        await session.fishingReel?.(shouldStop);
+        throwIfStopped();
         return null;
       }
 

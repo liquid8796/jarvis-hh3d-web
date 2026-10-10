@@ -153,10 +153,11 @@
     state.lastCast = Date.now();
     return "fish: gửi thao tác Ném câu; đợi trạng thái của game";
   }
-  if (/GIỮ|GIẬT|Nhấc cần/i.test(mainText) && visible(main)) {
+  if (main.classList.contains("st-reel"))
+    return "fish: servo đang bám thanh lực theo g:snap (f, z, zone, p)";
+  if (/GIẬT|Nhấc cần/i.test(mainText) && visible(main)) {
     if (Date.now() - state.lastPress > 470) {
-      // A real Playwright click with pressMs=280 sends g:act hook or
-      // g:input h=1 -> h=0. Direct dispatchEvent is rejected by the game.
+      // Trusted hook click, then the native servo takes over in st-reel.
       main.classList.add("jvz-fish-press");
       state.lastPress = Date.now();
     }

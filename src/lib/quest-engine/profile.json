@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 90,
+  "schemaVersion": 91,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -7818,6 +7818,8 @@
               "pressMs": 280, "timeoutMs": 2500, "optional": true,
               "when": { "kind": "visible", "selector": ".fish-room .fish-main.jvz-fish-press" },
               "note": "Playwright native pointerdown/up; Câu Cá filters untrusted DOM events" },
+            { "action": "fishingReel", "timeoutMs": 120000, "optional": true,
+              "note": "Bám vị trí cá f trong z±zone/2 tới p=1; WebSocket chỉ nghe" },
             { "action": "waitMilliseconds", "timeoutMs": 700 }
           ]
         }
@@ -7845,6 +7847,8 @@
               "pressMs": 280, "timeoutMs": 2500, "optional": true,
               "when": { "kind": "visible", "selector": ".fish-room .fish-main.jvz-fish-press" },
               "note": "Playwright native pointerdown/up; Câu Cá filters untrusted DOM events" },
+            { "action": "fishingReel", "timeoutMs": 120000, "optional": true,
+              "note": "Bám vị trí cá f trong z±zone/2 tới p=1; WebSocket chỉ nghe" },
             { "action": "waitMilliseconds", "timeoutMs": 700 }
           ]
         }

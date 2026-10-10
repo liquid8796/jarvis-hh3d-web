@@ -76,21 +76,11 @@ try {
     const main = document.querySelector(".fish-main");
     main.classList.replace("st-wait", "st-reel");
     main.textContent = "GIỮ";
-    window.holds = { down: 0, up: 0 };
-    main.addEventListener("pointerdown", (e) => {
-      if (e.isTrusted) { window.holds.down++; window.holds.at = performance.now(); }
-    });
-    main.addEventListener("pointerup", (e) => {
-      if (e.isTrusted) { window.holds.up++; window.holds.duration = performance.now() - window.holds.at; }
-    });
   });
-  await tick();
-  assert.equal(await page.locator(".fish-main.jvz-fish-press").count(), 1);
-  await page.locator(".fish-main.jvz-fish-press").click({ delay: 280 });
-  const holds = await page.evaluate(() => window.holds);
-  assert.equal(holds.down, 1);
-  assert.equal(holds.up, 1);
-  assert.ok(holds.duration >= 250, "hold must last long enough to influence reel tension");
+  const reelRead = await tick();
+  assert.match(reelRead, /servo/, "state reader delegates reeling to adaptive driver");
+  assert.equal(await page.locator(".fish-main.jvz-fish-press").count(), 0,
+    "do NOT emit blind 280ms click pulses while reeling");
   await page.evaluate(() => {
     const main = document.querySelector(".fish-main");
     main.classList.replace("st-reel", "st-idle");

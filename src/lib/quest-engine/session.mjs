@@ -7,6 +7,7 @@
  */
 
 import { parseCooldownSeconds } from "./cooldown.mjs";
+import { chooseFishingHold, parseFishingSnapshotFrame } from "./fishingServo.mjs";
 
 /**
  * Bỏ dấu, hạ chữ thường, chỉ giữ chữ và số, cách nhau đúng một khoảng trắng.
@@ -70,8 +71,67 @@ export function createSession(page, options) {
   const minDelay = Math.max(0, options.minActionDelayMs ?? 700);
   const maxDelay = Math.max(minDelay + 1, options.maxActionDelayMs ?? 1800);
   const pageTimeoutMs = options.pageTimeoutMs ?? 45_000;
+  let fishTelemetryActive = false;
+  let fishSnapshot = null;
+  let fishVelocity = 0;
+  const onFishFrame = (raw) => {
+    const snap = parseFishingSnapshotFrame(raw);
+    if (!snap) return;
+    if (fishSnapshot && snap.t > fishSnapshot.t && snap.t - fishSnapshot.t < .4)
+      fishVelocity = Math.max(-1.6, Math.min(1.6, (snap.z - fishSnapshot.z) / (snap.t - fishSnapshot.t)));
+    else fishVelocity = 0;
+    fishSnapshot = { ...snap, receivedAt: Date.now() };
+  };
 
   return {
+    beginFishingTelemetry() {
+      if (fishTelemetryActive) return;
+      fishTelemetryActive = true;
+      page.on("websocket", (socket) => {
+        if (!socket.url().includes("/socket.io/")) return;
+        socket.on("framereceived", onFishFrame); // passive, no forged packets
+      });
+    },
+
+    /** Continuous trusted mouse holding using 66ms authoritative g:snap frames. */
+    async fishingReel(shouldStop = () => false) {
+      const button = page.locator(".fish-room .fish-main.st-reel");
+      let rect;
+      try { rect = await button.boundingBox(); }
+      catch { return; }
+      if (!rect) return;
+      let holding = false;
+      let lastSwitchAt = 0;
+      const started = Date.now();
+      try {
+        await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+        while (Date.now() - started < 120_000 && !shouldStop()) {
+          const reelActive = await page.evaluate(() =>
+            document.querySelector(".fish-room .fish-main.st-reel") !== null);
+          if (!reelActive) break;
+          const now = Date.now();
+          const fresh = fishSnapshot && now - fishSnapshot.receivedAt < 900;
+          const desired = fresh ? chooseFishingHold(fishSnapshot, {
+            velocity: fishVelocity, last: holding, now, lastSwitchedAt: lastSwitchAt
+          }) : false;
+          if (desired !== holding) {
+            if (desired) await page.mouse.down();
+            else await page.mouse.up();
+            holding = desired;
+            lastSwitchAt = now;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 65));
+        }
+      } catch (err) {
+        log.debug("fish reel: " + squashCallLog(err instanceof Error ? err.message : String(err)));
+      } finally {
+        if (holding) {
+          try { await page.mouse.up(); } catch { /* page closed during Thu Đàn */ }
+        }
+      }
+    },
+
+    page,
     page,
 
     /**

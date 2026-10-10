@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { enforceFishingAdminPolicy } from "../src/lib/quest-engine/fishingAccess.mjs";
 
 const p = JSON.parse(readFileSync(new URL("../src/lib/quest-engine/profile.json", import.meta.url), "utf8"));
-assert.equal(p.schemaVersion, 90);
+assert.equal(p.schemaVersion, 91);
 const v = p.quests.find((q: { id: string }) => q.id === "cau-ca");
 const f = p.quests.find((q: { id: string }) => q.id === "cau-ca-thuong");
 assert.ok(v && f, "both tiers have a fishing quest");

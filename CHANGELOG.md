@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.194 — Tiên Giới: bám thanh lực theo cá, không nhấp cố định (10/10/2026)
+
+- Reverse-engineer live fish-AKRSGEO2.js qua browser MCP và 577 gói g:snap ghi trong recording: cá f, tâm lực z, vùng zone, tiến độ p; lực giữ +2.6, lực thả -2.2, ma sát exp(-2.5*dt), mẫu 66ms.
+- Khi reel, worker nghe WebSocket Playwright ở chế độ thụ động rồi điều khiển mouse.down/up thật theo servo dự đoán 260ms; không giả mạo request hoặc phụ thuộc chiều vẽ canvas.
+- Phân biệt input cast/hook bằng trusted click và reel bằng giữ/thả liên tục; luôn thả nút khi người dùng Thu Đàn hoặc rời minigame; tất cả quest khác giữ nguyên.
+- Test mô phỏng chuyển động, replay recording (offline), parser g:snap, driver websocket/mouse và các test Câu Cá trước đây. PC 1.59.29, schema quest 91.
+- Chưa xác minh bắt cá thành công ở phòng live đang có kết nối ổn định.
+
 ## 1.3.193 — Câu Cá không giới hạn: không nghỉ đàn (10/10/2026)
 
 - CastLimit=0 giữ cùng job/Chromium để câu liên tục tới Thu Đàn, không tự kết thúc khi repeat chạm 200 nhịp hoặc 480 giây. Tài khoản VIP và thường đều dùng quy tắc này.

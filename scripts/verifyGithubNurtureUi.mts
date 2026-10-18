@@ -63,6 +63,11 @@ const mockActions = `
   export const importGithubNurtureKeysAction = complete("importGithubNurtureKeysAction");
   export const deleteGithubNurtureKeyAction = complete("deleteGithubNurtureKeyAction");
   export const setGithubNurtureKeyDisabledAction = complete("setGithubNurtureKeyDisabledAction");
+  export const revealGithubNurtureKeyAction = async (id) => {
+    globalThis.__fixtureRevealId = id;
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return id === "fixture-4" ? {ok:false,message:"Không đọc được API key."} : {ok:true,key:"offline-test-key-"+id};
+  };
   export const saveGithubCompanionSettingsAction = complete("saveGithubCompanionSettingsAction");
   export const promoteGithubCompanionAction = complete("promoteGithubCompanionAction");
   export const deleteGithubCompanionAction = complete("deleteGithubCompanionAction");
@@ -209,6 +214,7 @@ if (!process.argv.includes("--check")) {
     // Fresh headless profile for this local fixture only; no access to a user browser.
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], {origin});
     await context.route("**/*", (route) => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
     for (const width of [390, 1366]) {
       const page = await context.newPage();
@@ -227,6 +233,37 @@ if (!process.argv.includes("--check")) {
           assert.equal(await page.getByRole("tab").count(), 3);
           assert.equal(await page.locator(`#github-workspace-tab-${tabId}`).getAttribute("aria-selected"), "true");
           await page.locator(`#github-workspace-panel-${tabId}`).waitFor({ state: "visible" });
+        }
+        if (view === "keys") {
+          const row = page.locator('[data-ollama-key-id="fixture-0"]');
+          assert.equal(await row.count(), 1);
+          assert.equal(await row.locator("input[readonly]").count(), 0, "key must never be present before explicit reveal");
+          assert.equal((await row.innerText()).includes("offline-test-key"), false);
+          await row.getByRole("button", {name:"Hiện khóa"}).click();
+          const plain = row.locator("input[readonly]");
+          await plain.waitFor();
+          assert.equal(await plain.inputValue(), "offline-test-key-fixture-0");
+          assert.equal(await page.evaluate(() => (window as typeof window & {__fixtureRevealId?: string}).__fixtureRevealId), "fixture-0");
+          await page.evaluate('`Object.defineProperty(navigator, "clipboard", {configurable:true, value: {writeText: async function(value) {window.__fixtureCopiedKey = value;}}})`');
+          await row.getByRole("button", {name:"Sao chép"}).click();
+          await page.waitForFunction(async () => (await navigator.clipboard.readText()) === "offline-test-key-fixture-0");
+          await row.getByRole("status").waitFor();
+
+          assert.equal(await page.evaluate("navigator.clipboard.readText()"), "offline-test-key-fixture-0");
+          await row.getByRole("button", {name:"Ẩn khóa"}).click();
+          assert.equal(await row.locator("input[readonly]").count(), 0, "hide must remove plain key from DOM");
+          const unreadable = page.locator('[data-ollama-key-id="fixture-4"]');
+          await unreadable.getByRole("button", {name:"Hiện khóa"}).click();
+          await unreadable.getByRole("status").waitFor();
+          assert.equal(await unreadable.locator("input[readonly]").count(), 0, "error must not show a secret");
+          await page.reload();
+          assert.equal(await page.locator('input[readonly]').count(), 0, "revealed key must not persist after reload");
+          const reopenedRow = page.locator('[data-ollama-key-id="fixture-0"]');
+          await reopenedRow.getByRole("button", {name:"Hiện khóa"}).click();
+          await reopenedRow.locator("input[readonly]").waitFor();
+          await page.locator("#github-workspace-tab-ollama").click();
+          await page.locator("#github-workspace-tab-keys").click();
+          assert.equal(await reopenedRow.locator("input[readonly]").count(), 0, "switching panels must discard decrypted key");
         }
         if (view === "stations") {
           assert.equal(await page.getByRole("dialog").count(), 0, "Create/edit modal must be closed in the initial station view");
@@ -284,7 +321,7 @@ if (!process.argv.includes("--check")) {
         await page.getByRole("dialog").waitFor();
         const createForm = page.locator("form").filter({ has: page.locator("#station-pat") });
         assert.equal(await createForm.locator("input[name=owner],input[name=workerId],textarea[name=companionRepos],input[name=enabled]").count(), 0);
-        assert.equal(await createForm.locator("input").count(), 6);
+        assert.equal(await createForm.locator("input").count(), 7);
         assert.equal(await page.locator("#station-pat").getAttribute("type"), "password");
         assert.equal(await page.locator("#station-defer-primary").isChecked(), false);
         assert.equal(await createForm.locator('input[name="deferPrimaryPresent"]').inputValue(), "1");
@@ -319,7 +356,7 @@ if (!process.argv.includes("--check")) {
         await page.getByRole("button", { name: "Tạo repo + workflow", exact: true }).waitFor();
         const submitted = await page.evaluate(() => (window as typeof window & { __fixtureSubmitted: { label: string; values: Record<string, string> } }).__fixtureSubmitted);
         assert.equal(submitted.label, "provisionGithubStationAction");
-        assert.deepEqual(submitted.values, { pat: "offline-fixture-pat", repo: "", visibility: "public", deferPrimaryPresent: "1", workflowFile: "", dailyPushes: "" });
+        assert.deepEqual(submitted.values, { purpose: "worker", pat: "offline-fixture-pat", repo: "", visibility: "public", deferPrimaryPresent: "1", workflowFile: "", dailyPushes: "" });
         const status = page.locator("section[aria-labelledby=station-form-title]").getByRole("status");
         assert.match(await status.innerText(), outcome === "error" ? /Classic PAT còn thiếu scope: delete_repo/ : /Đã tạo và đăng ký/);
         if (outcome === "error") assert.ok(!(await status.innerText()).includes("sample-owner/"));

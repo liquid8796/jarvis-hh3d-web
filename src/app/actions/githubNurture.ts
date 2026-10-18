@@ -183,6 +183,30 @@ export async function importGithubNurtureKeysAction(
   return { ok: true, message: `Đã mã hoá và thêm ${added} API key; bỏ qua ${imported.length - added} key trùng. Key được kiểm tra khi vòng Ollama sử dụng.` };
 }
 
+/**
+ * Fetch a single Ollama key only after an explicit click by a permitted admin.
+ * Never include decrypted values in initial page props, settings views or logs.
+ * Next.js server actions use POST and are authorized on every invocation.
+ */
+export async function revealGithubNurtureKeyAction(
+  id: string,
+): Promise<{ ok: true; key: string } | { ok: false; message: string }> {
+  await requireManage();
+  if (typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return { ok: false, message: "Mã API key không hợp lệ." };
+  }
+  const entry = (await getAppSettings()).githubNurture.apiKeys.find((key) => key.id === id);
+  if (!entry) return { ok: false, message: "API key không còn trong danh sách." };
+  try {
+    const plain = decryptSecret(entry.secret);
+    if (!plain) throw new Error("empty-key");
+    return { ok: true, key: plain };
+  } catch {
+    // Do not disclose encrypted content, crypto errors or secrets in responses.
+    return { ok: false, message: "Không thể giải mã API key. Kiểm tra ENCRYPTION_KEY của máy chủ." };
+  }
+}
+
 export async function deleteGithubNurtureKeyAction(
   _prev: StationResult | null, formData: FormData,
 ): Promise<StationResult> {

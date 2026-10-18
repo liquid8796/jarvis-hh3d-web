@@ -128,7 +128,7 @@ export function GithubAdminWorkspace({
         tabIndex={0}
         hidden={section !== "keys"}
       >
-        <GithubNurtureSettings config={config} section="keys" />
+        {section === "keys" && <GithubNurtureSettings config={config} section="keys" />}
       </div>
     </div>
   );

@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   deleteGithubNurtureKeyAction,
   importGithubNurtureKeysAction,
+  revealGithubNurtureKeyAction,
   saveGithubNurtureSettingsAction,
   setGithubNurtureKeyDisabledAction,
   type GithubNurtureView,
@@ -29,6 +30,62 @@ const HEALTH: Record<GithubNurtureView["apiKeys"][number]["health"], string> = {
 
 function Result({ result }: { result: StationResult | null }) {
   return result ? <p role="status" className={`text-sm ${result.ok ? "text-[var(--color-jade-300)]" : "text-[#f2a0a0]"}`}>{result.message}</p> : null;
+}
+
+function OllamaKeyReveal({ id, label }: { id: string; label: string }) {
+  // Plain key stays in local component state ONLY while explicitly revealed.
+  const [plainKey, setPlainKey] = useState<string | null>(null);
+  const [revealing, setRevealing] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  async function toggle() {
+    if (plainKey !== null) {
+      setPlainKey(null);
+      setNotice("");
+      return;
+    }
+    setRevealing(true);
+    setNotice("");
+    try {
+      const result = await revealGithubNurtureKeyAction(id);
+      if (!result.ok) setNotice(result.message);
+      else setPlainKey(result.key);
+    } catch {
+      setNotice("Không thể lấy API key lúc này. Vui lòng thử lại.");
+    } finally {
+      setRevealing(false);
+    }
+  }
+
+  async function copy() {
+    if (plainKey === null) return;
+    try {
+      await navigator.clipboard.writeText(plainKey);
+      setNotice("Đã sao chép API key.");
+    } catch {
+      setNotice("Trình duyệt không cho sao chép tự động. Chọn khóa bên trên rồi nhấn Ctrl+C.");
+    }
+  }
+
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn btn-ghost px-3 py-1.5 text-xs"
+          aria-pressed={plainKey !== null} disabled={revealing} onClick={toggle}>
+          {revealing ? "Đang mở…" : plainKey === null ? "Hiện khóa" : "Ẩn khóa"}
+        </button>
+        {plainKey !== null && (
+          <button type="button" className="btn btn-ghost px-3 py-1.5 text-xs" onClick={copy}>Sao chép</button>
+        )}
+      </div>
+      {plainKey !== null && (
+        <input aria-label={`Giá trị API key ${label}`} className="input w-full min-w-0 font-mono text-xs"
+          type="text" readOnly autoComplete="off" spellCheck={false} value={plainKey}
+          onFocus={(event) => event.currentTarget.select()} />
+      )}
+      {notice && <p role="status" className="break-words text-xs text-[var(--color-mist)]">{notice}</p>}
+    </div>
+  );
 }
 
 export type GithubNurtureSection = "ollama" | "keys";
@@ -114,13 +171,14 @@ export function GithubNurtureSettings({
           ) : (
             <div className="grid max-h-[28rem] gap-2 overflow-y-auto pr-1 md:grid-cols-2">
               {config.apiKeys.map((key) => (
-                <div key={key.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--color-ink-600)]/60 p-3">
+                <div key={key.id} data-ollama-key-id={key.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--color-ink-600)]/60 p-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium" title={`${key.label} ${key.maskedKey}`}>{key.label} <span className="font-mono text-[var(--color-mist)]">{key.maskedKey}</span></p>
                     <p className={`text-xs ${key.health === "error" ? "text-[#f2a0a0]" : "text-[var(--color-mist)]"}`}>{HEALTH[key.health]}{key.lastUsedAt ? ` · ${when(key.lastUsedAt)}` : ""}</p>
                     {key.cooldownUntil && <p className="text-[11px] text-[var(--color-mist)]">Chờ đến {when(key.cooldownUntil)}</p>}
                   </div>
-                  <div className="flex shrink-0 gap-2">
+                  <div className="flex min-w-0 shrink-0 flex-wrap items-start gap-2">
+                    <OllamaKeyReveal id={key.id} label={key.label} />
                     <form action={toggleAction}>
                       <input type="hidden" name="id" value={key.id} />
                       <input type="hidden" name="disabled" value={String(!key.disabled)} />

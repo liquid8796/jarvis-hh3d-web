@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.197 — Admin GitHub: hiện và sao chép API key Ollama (18/10/2026)
+
+- Trang Admin → Kho GitHub → API key Ollama bổ sung nút Hiện khóa / Ẩn khóa và Sao chép từng key. Danh sách vẫn che khóa mặc định, chỉ hiện giá trị khi admin yêu cầu.
+- Server action giải mã một key theo ID sau khi xác minh requireAdmin và github_station.manage. Không gửi plaintext khi tải trang hay trong danh sách key; lỗi giải mã không tiết lộ ciphertext.
+- Khi ẩn, đổi tab hoặc tải lại trang, khóa plaintext được gỡ khỏi DOM; thông báo khi clipboard không khả dụng để người dùng tự chọn và sao chép.
+- Test giao diện offline trong Chromium 390px và 1366px xác minh mặc định che, mở riêng, sao chép, ẩn, không lưu qua reload/đổi tab và xử lý lỗi giải mã. Giữ nguyên encryption-at-rest; không cần migration dữ liệu.
+
 ## 1.3.196 — Câu Cá: chống lag g:snap, nhả giữ an toàn (10/10/2026)
 
 - Đo trực tiếp record cau-ca-20261010-141700: 291 g:snap trong 3 lượt câu thành công; các mẫu thường cách nhau ~65ms nhưng có đợt gián đoạn 287–403ms và độ trễ tương đối tăng tới ~353ms. Không nhầm các con số này với RTT hay độ trễ tuyệt đối.

@@ -179,8 +179,14 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
     await github.disableActions(current.owner, decision.repo);
     await patchStation(slug, (row) => { row.companionRepos.find((c) => same(c.repo, decision.repo))!.actionsDisabled = true; });
     if (decision.action === "fork") return resultOf(station, decision.repo, `Đã fork ${decision.forkFrom}; lượt tiếp theo đọc source để phát triển.`);
-    const snapshot: RepoSnapshot = { branch: info.default_branch || "main", head: null, tree: null, files: new Map(), context: "", githubId: info.id };
-    const commit = await github.commit(current.owner, decision.repo, snapshot, decision.files, decision.commitMessage, decision.readPaths, current.dailyPushes, decision.sourcePaths);
+    // GitHub auto_init seeds a branch/README first: an empty repository cannot accept Git refs.
+    // Read the branch and perform ONE atomic model-authored commit for every generated file,
+    // even when dailyPushes is 1. Only the host-generated README is exempted from readPaths.
+    const snapshot = await github.snapshot(current.owner, decision.repo, fresh.githubNurture.contextWindow, decision.sourcePaths);
+    if (!snapshot?.head || !snapshot.tree || !snapshot.complete) throw new Error("Kho GitHub mới chưa sẵn sàng để ghi trọn bộ source; sẽ tiếp tục lượt sau.");
+    const bootstrapReadme = snapshot.files.get("README.md")?.content !== undefined ? ["README.md"] : [];
+    const commit = await github.commit(current.owner, decision.repo, snapshot, decision.files, decision.commitMessage,
+      [...(decision.readPaths ?? []), ...bootstrapReadme], current.dailyPushes, decision.sourcePaths);
     const createdTarget: NurtureTarget = {
       kind: "companion",
       repo: decision.repo,

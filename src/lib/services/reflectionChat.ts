@@ -49,7 +49,7 @@ export function createReflectionChatClient(options: {
   const now = options.now ?? Date.now;
   const fetcher = options.fetch ?? globalThis.fetch;
   const config = options.config;
-  const outputTokens = options.outputTokens ?? Math.min(16384, Math.floor(config.contextWindow / 4));
+  const outputTokens = options.outputTokens ?? Math.min(32768, Math.floor(config.contextWindow / (config.contextWindow >= 32768 ? 2 : 4)));
   const model = (config.reflectionModel ?? "Beam-1.0-501B-A23B").trim();
   if (!model || model.length > 200) throw new Error("Invalid Reflection model.");
   if (options.deadlineAt <= now()) throw new Error("Reflection deadline expired.");
@@ -101,6 +101,7 @@ export function createReflectionChatClient(options: {
           headers: {"Content-Type": "application/json", Authorization: "Bearer " + secretsByKey.get(key)},
           body: JSON.stringify({
             model, messages: conversation, stream: false, max_completion_tokens: outputTokens,
+            reasoning_effort: "max",
             ...(opts.temperature === undefined ? {} : {temperature: opts.temperature}),
             ...(opts.tools ? {tools: opts.tools, tool_choice: "auto"} : {}),
             ...(opts.format === "json" ? {response_format: {type: "json_object"}} : {})

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.201",
+    date: "2026-10-19",
+    lines: [
+      "Reflection được tăng sức suy luận lên mức cao nhất để phát triển mã nguồn có chiều sâu hơn.",
+      "Kho GitHub phụ mới phải có hướng dẫn sử dụng và mã nguồn đầy đủ, không còn chỉ tạo một tệp rồi bỏ dở.",
+      "Hệ thống chuyển trọn bộ tệp vào cùng một lượt cập nhật; các kho hiện có vẫn được giữ nguyên.",
+    ],
+  },
+  {
     version: "1.3.200",
     date: "2026-10-19",
     lines: [
@@ -462,14 +471,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khôi phục đầy đủ hệ thống quảng cáo Adsterra đa định dạng và các vùng hiển thị chuyên biệt trên toàn bộ trang web.",
       "Hoàn tác thay đổi tinh gọn để bảo đảm số lượng vị trí hiển thị và tương tác ổn định.",
-    ],
-  },
-  {
-    version: "1.3.142",
-    date: "2026-10-03",
-    lines: [
-      "Tinh gọn hệ thống quảng cáo Adsterra chỉ giữ lại Popunder và Social Bar, loại bỏ toàn bộ biểu ngữ không còn sử dụng.",
-      "Chuyển đổi cơ chế hiển thị quảng cáo từ phía trình duyệt sang kết xuất trực tiếp từ máy chủ, giảm dung lượng tải trang.",
     ],
   },
 ];

@@ -107,7 +107,7 @@ function harness(options: {
       events.push({ method: "snapshot", slug, sourcePaths });
       const info = remote.get(slug);
       if (!info) return null;
-      return { branch: "main", head: "fixture-head", tree: "fixture-tree", githubId: info.id, context: "Existing local catalog source.",
+      return { branch: "main", head: "fixture-head", tree: "fixture-tree", githubId: info.id, complete: true, context: "Existing local catalog source.",
         files: new Map((storedFiles.get(slug) ?? []).map((file) => [file.path, { sha: "fixture-blob", mode: "100644", content: file.content ?? "" }])) };
     },
     async commit(owner: string, repo: string, _snapshot: RepoSnapshot, files: SourceFile[], message: string, _readPaths?: string[], _maxCommits?: number, sourcePaths?: readonly string[]) {
@@ -195,7 +195,7 @@ try {
       assert.equal(companion.lastPushOk, true);
       assert.deepEqual(h.storedFiles.get(`fixture/${companion.repo}`), modelSource);
     }
-    assert.deepEqual(h.events.slice(0, 4).map((event) => event.method), ["info", "create", "disableActions", "commit"]);
+    assert.deepEqual(h.events.slice(0, 4).map((event) => event.method), ["info", "create", "disableActions", "snapshot"]);
     assert.equal(h.events.find((event) => event.method === "create")?.description, "Search a local catalog");
     assert.equal(state.githubStations[0].companionRepos[0].language, "Python");
     assert.deepEqual(state.githubStations[0].companionRepos[0].sourcePaths, ["src/catalog.py"]);

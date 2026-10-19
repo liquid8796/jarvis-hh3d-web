@@ -9,6 +9,15 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.201 — Reflection max reasoning and complete companion repositories (19/10/2026)
+
+- Reflection Beam-1.0-501B-A23B now explicitly receives reasoning_effort=max on every native completion (tool research and final source decisions). At context window >=32768, increase its completion budget from one quarter to one half of configured context (capped at 32768 tokens) to accommodate reasoning plus complete JSON source output; Ollama requests remain unchanged.
+- Reflection new-project decisions must include a root README.md with meaningful purpose, usage/example and >=160 characters, as well as >=240 bytes of actual primary-language implementation; otherwise request one repair or choose wait rather than publishing an incomplete repository.
+- GitHub creates new companion repositories with auto_init=true, then snapshots the initialized branch and writes ALL generated project files in one atomic model-authored commit even when the station permits only one push per day. This avoids the prior path that seeded only one source file and silently skipped README and others. GitHub's automatic bootstrap commit is separate from the model's daily source commit.
+- Preserve GitHub parent SHA, non-force branch updates, source read guards, GitHub ID checks, Actions-disabled policy, and all existing project/source safety rules.
+- Regression includes Reflection native max reasoning/output and incomplete create repair, GitHub atomic initial multi-file commit, and offline lifecycle coverage. Existing unrelated local files untouched.
+- This release changes new creation behavior only; repositories created by previous versions are not silently overwritten.
+
 ## 1.3.200 — Reflection: hiển thị mã lỗi an toàn trong Admin (19/10/2026)
 
 - Khắc phục trạng thái “Lỗi gần nhất” quá chung chung tại Kho GitHub → API key Reflection: admin có quyền quản lý sẽ thấy mã HTTP và error.code / error.param của lượt lỗi. Với những lỗi cũ chỉ có HTTP status, vẫn hiển thị lại status đã lưu.

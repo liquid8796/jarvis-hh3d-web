@@ -35,6 +35,8 @@ let tested=0;
  assert.equal(result.content,'{"ok":true}');
  assert.equal(captured.url,"https://api.reflection.ai/openai/v1/chat/completions");
  assert.equal(captured.body.model,"Beam-1.0-501B-A23B");
+ assert.equal(captured.body.reasoning_effort,"max");
+ assert.equal(captured.body.max_completion_tokens,16384);
  assert.deepEqual(captured.body.response_format,{type:"json_object"});
  assert.equal(captured.body.stream,false);
  assert.equal(captured.body.think,undefined);
@@ -136,5 +138,40 @@ let tested=0;
  await assert.rejects(()=>client.request([{role:"user",content:"model"}]),/Reflection HTTP 404/);
  assert.equal(c.reflectionApiKeys[0].lastError,"Reflection HTTP 404 (model_not_found; model)");
  tested++;
+}
+{
+ const readme="# Complete demo\\n\\nThis TypeScript library checks UI color contrast ratios for accessible applications.\\n\\n## Usage\\nImport contrastRatio and test values by passing six-digit hex strings.\\n\\n## Example\\nRun the exported function from your own TypeScript project and validate the results.";
+ const source=[
+   "export function toLinear(channel: number): number {",
+   "  const value = Math.max(0, Math.min(255, channel)) / 255;",
+   "  return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;",
+   "}",
+   "export function luminance(red: number, green: number, blue: number): number {",
+   "  return 0.2126 * toLinear(red) + 0.7152 * toLinear(green) + 0.0722 * toLinear(blue);",
+   "}",
+   "export function contrastRatio(first: number, second: number): number {",
+   "  const highest = Math.max(first, second); const lowest = Math.min(first, second);",
+   "  return (highest + 0.05) / (lowest + 0.05);",
+   "}"
+ ].join("\\n");
+ const created={action:"create",repo:"contrast-tool",description:"Color contrast helper",
+   reason:"Useful calculation library",commitMessage:"feat: implement contrast ratio utility",
+   files:[{path:"src/contrast.ts",content:source},{path:"README.md",content:readme}],
+   language:"TypeScript",sourcePaths:["src/contrast.ts"],nextCheckMinutes:60};
+ const original=globalThis.fetch;
+ let attempts=0;
+ globalThis.fetch=async () => body(JSON.stringify(++attempts===1 ?
+   {...created,files:[created.files[0]]} : created));
+ try {
+   const cfg=config();
+   cfg.webSearchEnabled=false;
+   const result=await planCompanion({config:cfg,station:{owner:"example-owner",repo:"protected"},
+     existingRepos:[],mode:"create",context:"A runnable color contrast calculator",
+     deadlineAt:Date.now()+15000});
+   assert.equal(attempts,2,"missing README must cause repair before GitHub mutations");
+   assert.equal(result.files.length,2);
+   assert(result.files.some(f=>f.path==="README.md"));
+   tested++;
+ } finally {globalThis.fetch=original;}
 }
 console.log("PASS: "+tested+" Reflection adapter integration cases (mock network).");

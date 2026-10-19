@@ -66,6 +66,23 @@ assert.deepEqual(await emptyGithub.commit("Owner", "side", empty, initialFiles, 
 assert.equal(emptyCalls.length, 1);
 assert(emptyCalls[0].path.endsWith("/contents/src/main.ts"), "one-commit initialization must prioritize substantive source");
 
+// A GitHub-initialized repository has a branch and host-owned README. All new project
+// files must land in ONE model-authored commit despite a daily limit of one push.
+const initialBranch = {
+  branch: "main", head: "github-bootstrap", tree: "github-bootstrap-tree", githubId: 8,
+  complete: true, context: "", files: new Map([["README.md", {
+    sha: "github-readme", mode: "100644", content: "# GitHub starter"
+  }]])
+};
+conflict = false; calls.length = 0;
+const complete = await github.commit("Owner", "side", initialBranch, initialFiles,
+  "Initial complete repository", ["README.md"], 1, ["src/main.ts"]);
+assert.deepEqual(complete, {sha:"commit-new",pushed:1});
+const staged = calls.find((call) => call.path.endsWith("/git/trees"));
+assert.deepEqual(staged?.body.tree.map((file: {path: string}) => file.path), ["README.md","src/main.ts"]);
+assert.equal(staged?.body.base_tree, "github-bootstrap-tree");
+assert.deepEqual(calls.find((call) => call.path.endsWith("/git/commits"))?.body.parents, ["github-bootstrap"]);
+
 const snapshotCalls: URL[] = [];
 const legacyMarker = "[companion:1789000000000-01234567-89ab-4cde-8fab-0123456789ab]";
 const janetSource = "(defn square [number]\n  (* number number))\n";
@@ -154,7 +171,7 @@ const createGithub = new CompanionGithub("test-secret", Date.now() + 60000, asyn
 });
 assert.equal((await createGithub.create("Owner", "fresh", `Useful calculator ${legacyMarker}`)).description, "Useful calculator");
 assert.equal(createCalls.at(-1)?.body.description, "Useful calculator");
-assert.equal(createCalls.at(-1)?.body.auto_init, false);
+assert.equal(createCalls.at(-1)?.body.auto_init, true);
 assert.equal(createCalls.at(-1)?.body.private, false);
 assert(!JSON.stringify(createCalls).includes("[companion:"));
 console.log("PASS companion GitHub target/read guards, declared unfamiliar source, clean descriptions, atomic commit, no-op, and non-force conflicts");

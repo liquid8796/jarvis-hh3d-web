@@ -126,7 +126,7 @@ export class CompanionGithub {
   async create(owner: string, repo: string, description: string): Promise<RepoInfo> {
     const user = await this.call<{ login: string }>("GET", "/user");
     const path = user.login.toLowerCase() === owner.toLowerCase() ? "/user/repos" : `/orgs/${encodeURIComponent(owner)}/repos`;
-    return this.call("POST", path, { name: repo, description: stripCompanionMarker(description).slice(0, 350), private: false, auto_init: false, has_issues: true });
+    return this.call("POST", path, { name: repo, description: stripCompanionMarker(description).slice(0, 350), private: false, auto_init: true, has_issues: true });
   }
 
   async fork(owner: string, repo: string, source: string): Promise<RepoInfo> {

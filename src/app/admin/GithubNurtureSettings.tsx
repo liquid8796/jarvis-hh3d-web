@@ -12,6 +12,7 @@ import {
 import type { StationResult } from "@/app/actions/githubStations";
 import {
   DEFAULT_OLLAMA_MODEL,
+  DEFAULT_REFLECTION_MODEL,
   MAX_COMPANION_COUNT,
   MIN_OLLAMA_CONTEXT_WINDOW,
   MAX_OLLAMA_CONTEXT_WINDOW,
@@ -32,7 +33,7 @@ function Result({ result }: { result: StationResult | null }) {
   return result ? <p role="status" className={`text-sm ${result.ok ? "text-[var(--color-jade-300)]" : "text-[#f2a0a0]"}`}>{result.message}</p> : null;
 }
 
-function OllamaKeyReveal({ id, label }: { id: string; label: string }) {
+function ProviderKeyReveal({ id, label, provider }: { id: string; label: string; provider: "ollama" | "reflection" }) {
   // Plain key stays in local component state ONLY while explicitly revealed.
   const [plainKey, setPlainKey] = useState<string | null>(null);
   const [revealing, setRevealing] = useState(false);
@@ -47,7 +48,7 @@ function OllamaKeyReveal({ id, label }: { id: string; label: string }) {
     setRevealing(true);
     setNotice("");
     try {
-      const result = await revealGithubNurtureKeyAction(id);
+      const result = await revealGithubNurtureKeyAction(id, provider);
       if (!result.ok) setNotice(result.message);
       else setPlainKey(result.key);
     } catch {
@@ -101,16 +102,27 @@ export function GithubNurtureSettings({
   const [imported, importAction, importing] = useActionState<StationResult | null, FormData>(importGithubNurtureKeysAction, null);
   const [deleted, deleteAction, deleting] = useActionState<StationResult | null, FormData>(deleteGithubNurtureKeyAction, null);
   const [toggled, toggleAction, toggling] = useActionState<StationResult | null, FormData>(setGithubNurtureKeyDisabledAction, null);
+  const [providerChoice, setProviderChoice] = useState<"ollama" | "reflection">(config.provider ?? "ollama");
+  const [keyProvider, setKeyProvider] = useState<"ollama" | "reflection">(config.provider ?? "ollama");
+  const activeKeys = keyProvider === "reflection" ? (config.reflectionApiKeys ?? []) : config.apiKeys;
 
   if (section === "ollama") {
     return (
       <section className="card card-hairline p-4 sm:p-5" aria-labelledby="github-ollama-title">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="github-ollama-title" className="h-display text-lg font-semibold text-gilded">Cấu hình Ollama</h2>
+          <h2 id="github-ollama-title" className="h-display text-lg font-semibold text-gilded">Cấu hình AI provider</h2>
           <span className="text-xs text-[var(--color-mist)]">Áp dụng chung cho mọi kho phụ</span>
         </div>
         <form action={saveAction} className="mt-4 flex flex-col gap-4">
           <div className="grid gap-3 md:grid-cols-12">
+            <div className="md:col-span-3">
+              <label className="label" htmlFor="nurture-provider">AI provider</label>
+              <select id="nurture-provider" name="provider" className="input w-full" value={providerChoice}
+                onChange={event => setProviderChoice(event.target.value as "ollama" | "reflection")}>
+                <option value="ollama">Ollama</option>
+                <option value="reflection">Reflection</option>
+              </select>
+            </div>
             <div className="md:col-span-3">
               <label className="label" htmlFor="nurture-default-count">Số kho phụ mặc định</label>
               <input id="nurture-default-count" name="defaultCompanionCount" type="number" min={0} max={MAX_COMPANION_COUNT} step={1} required defaultValue={config.defaultCompanionCount} className="input w-full font-mono" />
@@ -118,6 +130,12 @@ export function GithubNurtureSettings({
             <div className="md:col-span-6">
               <label className="label" htmlFor="nurture-model">Model Ollama</label>
               <input id="nurture-model" name="model" required maxLength={200} defaultValue={config.model} placeholder={DEFAULT_OLLAMA_MODEL} className="input w-full font-mono" />
+            </div>
+            <div className="md:col-span-6">
+              <label className="label" htmlFor="nurture-reflection-model">Model Reflection</label>
+              <input id="nurture-reflection-model" name="reflectionModel" required maxLength={200}
+                defaultValue={config.reflectionModel ?? DEFAULT_REFLECTION_MODEL}
+                placeholder={DEFAULT_REFLECTION_MODEL} className="input w-full font-mono" />
             </div>
             <div className="md:col-span-3">
               <label className="label" htmlFor="nurture-context">Context (token)</label>
@@ -138,7 +156,7 @@ export function GithubNurtureSettings({
             </div>
           </div>
           <Result result={saved} />
-          <button type="submit" className="btn btn-gold self-start" disabled={saving}>{saving ? "Đang lưu…" : "Lưu cấu hình Ollama"}</button>
+          <button type="submit" className="btn btn-gold self-start" disabled={saving}>{saving ? "Đang lưu…" : "Lưu cấu hình AI"}</button>
         </form>
       </section>
     );
@@ -147,11 +165,19 @@ export function GithubNurtureSettings({
   return (
     <section className="card card-hairline p-4 sm:p-5" aria-labelledby="github-keys-title">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="github-keys-title" className="h-display text-lg font-semibold text-gilded">API key Ollama</h2>
-        <span className="text-xs text-[var(--color-mist)]">{config.apiKeys.length}/100 key · tự luân phiên khi lỗi hoặc hết quota</span>
+        <h2 id="github-keys-title" className="h-display text-lg font-semibold text-gilded">API key {keyProvider === "reflection" ? "Reflection" : "Ollama"}</h2>
+        <div className="flex items-center gap-2">
+          <label htmlFor="nurture-key-provider" className="text-xs">Provider</label>
+          <select id="nurture-key-provider" className="input" value={keyProvider}
+            onChange={event => setKeyProvider(event.target.value as "ollama" | "reflection")}>
+            <option value="ollama">Ollama</option><option value="reflection">Reflection</option>
+          </select>
+          <span className="text-xs text-[var(--color-mist)]">{activeKeys.length}/100 key</span>
+        </div>
       </div>
       <form action={importAction} className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(16rem,1fr)]">
         <div>
+          <input type="hidden" name="provider" value={keyProvider} />
           <label className="label" htmlFor="nurture-api-keys">Dán danh sách key</label>
           <textarea id="nurture-api-keys" name="apiKeys" rows={2} maxLength={262144} autoComplete="off" spellCheck={false} placeholder={'Mỗi dòng một key, hoặc JSON ["key-1", "key-2"]'} className="input w-full font-mono text-sm" />
         </div>
@@ -166,11 +192,11 @@ export function GithubNurtureSettings({
       <div className="mt-4 flex flex-col gap-2">
           <Result result={deleted} />
           <Result result={toggled} />
-          {config.apiKeys.length === 0 ? (
+          {activeKeys.length === 0 ? (
             <p className="py-8 text-center text-sm text-[var(--color-mist)]">Chưa có API key.</p>
           ) : (
             <div className="grid max-h-[28rem] gap-2 overflow-y-auto pr-1 md:grid-cols-2">
-              {config.apiKeys.map((key) => (
+              {activeKeys.map((key) => (
                 <div key={key.id} data-ollama-key-id={key.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--color-ink-600)]/60 p-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium" title={`${key.label} ${key.maskedKey}`}>{key.label} <span className="font-mono text-[var(--color-mist)]">{key.maskedKey}</span></p>
@@ -178,14 +204,16 @@ export function GithubNurtureSettings({
                     {key.cooldownUntil && <p className="text-[11px] text-[var(--color-mist)]">Chờ đến {when(key.cooldownUntil)}</p>}
                   </div>
                   <div className="flex min-w-0 shrink-0 flex-wrap items-start gap-2">
-                    <OllamaKeyReveal id={key.id} label={key.label} />
+                    <ProviderKeyReveal id={key.id} label={key.label} provider={keyProvider} />
                     <form action={toggleAction}>
                       <input type="hidden" name="id" value={key.id} />
+                      <input type="hidden" name="provider" value={keyProvider} />
                       <input type="hidden" name="disabled" value={String(!key.disabled)} />
                       <button type="submit" className="btn btn-ghost px-3 py-1.5 text-xs" disabled={toggling}>{key.disabled ? "Bật" : "Tạm tắt"}</button>
                     </form>
-                    <form action={deleteAction} onSubmit={(event) => { if (!confirm(`Xoá ${key.label} khỏi sổ Ollama? Muốn dùng lại cần nhập lại key.`)) event.preventDefault(); }}>
+                    <form action={deleteAction} onSubmit={(event) => { if (!confirm(`Xoá ${key.label} khỏi sổ provider? Muốn dùng lại cần nhập lại key.`)) event.preventDefault(); }}>
                       <input type="hidden" name="id" value={key.id} />
+                      <input type="hidden" name="provider" value={keyProvider} />
                       <button type="submit" className="btn btn-danger px-3 py-1.5 text-xs" disabled={deleting}>Xoá key</button>
                     </form>
                   </div>

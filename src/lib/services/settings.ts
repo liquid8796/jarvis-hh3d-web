@@ -26,6 +26,7 @@ import {
   DEFAULT_COMPANION_COUNT,
   MAX_COMPANION_COUNT,
   DEFAULT_OLLAMA_MODEL,
+  DEFAULT_REFLECTION_MODEL,
   DEFAULT_OLLAMA_CONTEXT_WINDOW,
   MIN_OLLAMA_CONTEXT_WINDOW,
   MAX_OLLAMA_CONTEXT_WINDOW,
@@ -65,7 +66,7 @@ const githubNurtureTraceSchema = z.object({
   lastPushAt: z.string().nullable().catch(null).default(null),
   lastPushOk: z.boolean().nullable().catch(null).default(null),
   lastPushNote: z.string().max(500).catch("").default(""),
-  managedBy: z.literal("ollama").optional(),
+  managedBy: z.enum(["ollama", "reflection"]).optional(),
   createdAt: z.string().optional(),
   nextDecisionAt: z.string().nullable().optional(),
   lastCommitSha: z.string().max(100).optional(),
@@ -402,7 +403,9 @@ export const appSettingsSchema = z.object({
    */
   githubNurture: z.object({
     defaultCompanionCount: z.number().int().min(0).max(MAX_COMPANION_COUNT).catch(DEFAULT_COMPANION_COUNT).default(DEFAULT_COMPANION_COUNT),
+    provider: z.enum(["ollama", "reflection"]).catch("ollama").optional(),
     model: z.string().trim().min(1).max(200).catch(DEFAULT_OLLAMA_MODEL).default(DEFAULT_OLLAMA_MODEL),
+    reflectionModel: z.string().trim().min(1).max(200).catch(DEFAULT_REFLECTION_MODEL).optional(),
     contextWindow: z.number().int().min(MIN_OLLAMA_CONTEXT_WINDOW).max(MAX_OLLAMA_CONTEXT_WINDOW).catch(DEFAULT_OLLAMA_CONTEXT_WINDOW).default(DEFAULT_OLLAMA_CONTEXT_WINDOW),
     webSearchEnabled: z.boolean().catch(DEFAULT_WEB_SEARCH_ENABLED).optional(),
     searxngBaseUrl: z.string().max(2048).refine((value) => {
@@ -417,6 +420,15 @@ export const appSettingsSchema = z.object({
       lastUsedAt: z.string().nullable().catch(null).default(null),
       lastError: z.string().max(500).catch("").default(""),
     })).max(MAX_OLLAMA_API_KEYS).catch([]).default([]),
+    reflectionApiKeys: z.array(z.object({
+      id: z.string().min(1).max(100),
+      label: z.string().max(100).default("Reflection API key"),
+      secret: z.string().min(1),
+      disabled: z.boolean().catch(false).default(false),
+      cooldownUntil: z.string().nullable().catch(null).default(null),
+      lastUsedAt: z.string().nullable().catch(null).default(null),
+      lastError: z.string().max(500).catch("").default(""),
+    })).max(MAX_OLLAMA_API_KEYS).catch([]).optional(),
   }).prefault({}),
 
   githubStations: z

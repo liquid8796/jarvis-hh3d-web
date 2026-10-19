@@ -27,7 +27,9 @@ import {
 
 export type GithubNurtureView = {
   defaultCompanionCount: number;
+  provider: "ollama" | "reflection";
   model: string;
+  reflectionModel: string;
   contextWindow: number;
   webSearchEnabled?: boolean;
   searxngBaseUrl?: string;
@@ -40,6 +42,7 @@ export type GithubNurtureView = {
     lastUsedAt: string | null;
     health: "disabled" | "cooldown" | "error" | "ready" | "unused";
   }>;
+  reflectionApiKeys: GithubNurtureView["apiKeys"];
 };
 
 export type GithubStationDetailView = {
@@ -51,29 +54,28 @@ export type GithubStationDetailView = {
 async function requireManage() {
   const viewer = await requireAdmin();
   if (!hasPermission(viewer, "github_station.manage")) {
-    throw new Error("Chỉ Gia chủ mới quản lý được kho GitHub và API key Ollama.");
+    throw new Error("Chỉ Gia chủ mới quản lý được kho GitHub và API key AI.");
   }
 }
 
 function safeView(config: AppSettings["githubNurture"]): GithubNurtureView {
+  const mapKeys = (keys: AppSettings["githubNurture"]["apiKeys"], name: string) =>
+    keys.map((key) => ({
+      id: key.id, label: name + " " + key.id.slice(0, 8), maskedKey: "••••••••",
+      disabled: key.disabled, cooldownUntil: key.cooldownUntil, lastUsedAt: key.lastUsedAt,
+      health: (key.disabled ? "disabled" : key.cooldownUntil && Date.parse(key.cooldownUntil) > Date.now() ? "cooldown"
+          : key.lastError ? "error" : key.lastUsedAt ? "ready" : "unused") as GithubNurtureView["apiKeys"][number]["health"],
+    }));
   return {
     defaultCompanionCount: config.defaultCompanionCount,
+    provider: config.provider ?? "ollama",
     model: config.model,
+    reflectionModel: config.reflectionModel ?? "Beam-1.0-501B-A23B",
     contextWindow: config.contextWindow,
     webSearchEnabled: config.webSearchEnabled ?? DEFAULT_WEB_SEARCH_ENABLED,
     searxngBaseUrl: config.searxngBaseUrl ?? DEFAULT_SEARXNG_BASE_URL,
-    apiKeys: config.apiKeys.map((key) => ({
-      id: key.id,
-      // Generated labels prevent a legacy label or an upstream error from exposing a key.
-      label: `Ollama ${key.id.slice(0, 8)}`,
-      maskedKey: "••••••••",
-      disabled: key.disabled,
-      cooldownUntil: key.cooldownUntil,
-      lastUsedAt: key.lastUsedAt,
-      health: key.disabled ? "disabled"
-        : key.cooldownUntil && Date.parse(key.cooldownUntil) > Date.now() ? "cooldown"
-          : key.lastError ? "error" : key.lastUsedAt ? "ready" : "unused",
-    })),
+    apiKeys: mapKeys(config.apiKeys, "Ollama"),
+    reflectionApiKeys: mapKeys(config.reflectionApiKeys ?? [], "Reflection"),
   };
 }
 
@@ -114,7 +116,11 @@ export async function saveGithubNurtureSettingsAction(
   } catch {
     return { ok: false, message: "Số kho phụ mặc định phải là số nguyên từ 0 đến 20." };
   }
+  const provider = formData.get("provider") === "reflection" ? "reflection" : "ollama";
   const model = String(formData.get("model") ?? "").trim();
+  const reflectionModel = String(formData.get("reflectionModel") ?? "Beam-1.0-501B-A23B").trim();
+  if (!reflectionModel || reflectionModel.length > 200 || /[\r\n\x00-\x1f]/.test(reflectionModel))
+    return { ok:false, message:"Model Reflection không hợp lệ." };
   const rawContext = String(formData.get("contextWindow") ?? "").trim();
   const contextWindow = Number(rawContext);
   if (!model || model.length > 200 || /[\r\n\x00-\x1f]/.test(model)) {
@@ -130,16 +136,17 @@ export async function saveGithubNurtureSettingsAction(
   try { webSearchSettings = parseWebSearchSettings(formData); }
   catch { return { ok: false, message: "SearXNG cần URL HTTPS công khai, không chứa tài khoản, query, fragment, cổng riêng hay địa chỉ nội bộ. Instance phải bật kết quả JSON." }; }
   await mutateGithubState((settings) => {
-    Object.assign(settings.githubNurture, { defaultCompanionCount, model, contextWindow }, webSearchSettings);
+    Object.assign(settings.githubNurture, { defaultCompanionCount, provider, model, reflectionModel, contextWindow }, webSearchSettings);
   });
   refresh();
-  return { ok: true, message: "Đã lưu cấu hình Ollama và số kho phụ mặc định." };
+  return { ok: true, message: "Đã lưu provider, model và số kho phụ mặc định." };
 }
 
 export async function importGithubNurtureKeysAction(
   _prev: StationResult | null, formData: FormData,
 ): Promise<StationResult> {
   await requireManage();
+  const provider = formData.get("provider") === "reflection" ? "reflection" : "ollama";
   const pasted = String(formData.get("apiKeys") ?? "");
   const file = formData.get("apiKeyFile");
   let imported: string[];
@@ -148,30 +155,32 @@ export async function importGithubNurtureKeysAction(
       return { ok: false, message: "Tệp API key vượt quá 256 KiB." };
     }
     const uploaded = file && typeof file !== "string" && file.size > 0 ? await file.text() : "";
-    imported = [...new Set([...parseOllamaKeyImport(pasted), ...parseOllamaKeyImport(uploaded)])];
+    imported = [...new Set([...parseOllamaKeyImport(pasted, provider === "reflection" ? 4096 : 512),
+      ...parseOllamaKeyImport(uploaded, provider === "reflection" ? 4096 : 512)])];
   } catch {
-    return { ok: false, message: "Không đọc được danh sách API key. Dùng mỗi dòng một key, JSON dạng [\"key\"], hoặc {\"keys\":[{\"key\":\"…\"}]}; tối đa 100 key, 256 KiB, mỗi key 8–512 ký tự không có khoảng trắng." };
+    return { ok: false, message: "Không đọc được danh sách API key. Dùng mỗi dòng một key, JSON dạng [\"key\"], hoặc {\"keys\":[{\"key\":\"…\"}]}; tối đa 100 key, 256 KiB, mỗi key Ollama tối đa 512 ký tự, Reflection tối đa 4096 ký tự." };
   }
   if (imported.length === 0) return { ok: false, message: "Dán danh sách API key hoặc chọn tệp TXT/JSON trước khi nhập." };
   let added = 0;
   try {
     await mutateGithubState((settings) => {
       const known = new Set<string>();
-      for (const entry of settings.githubNurture.apiKeys) {
+      const collection = provider === "reflection" ? (settings.githubNurture.reflectionApiKeys ??= []) : settings.githubNurture.apiKeys;
+      for (const entry of collection) {
         try { known.add(decryptSecret(entry.secret)); } catch { /* Keep unreadable envelopes for explicit admin deletion. */ }
       }
       const fresh = imported.filter((key) => !known.has(key));
-      if (settings.githubNurture.apiKeys.length + fresh.length > MAX_OLLAMA_API_KEYS) {
+      if (collection.length + fresh.length > MAX_OLLAMA_API_KEYS) {
         throw new Error("key-limit");
       }
       const entries = fresh.map((secret) => {
         const id = randomUUID();
         return {
-          id, label: `Ollama ${id.slice(0, 8)}`, secret: encryptSecret(secret),
+          id, label: (provider === "reflection" ? "Reflection " : "Ollama ") + id.slice(0, 8), secret: encryptSecret(secret),
           disabled: false, cooldownUntil: null, lastUsedAt: null, lastError: "",
         };
       });
-      settings.githubNurture.apiKeys.push(...entries);
+      collection.push(...entries);
       added = entries.length;
     });
   } catch (error) {
@@ -180,7 +189,7 @@ export async function importGithubNurtureKeysAction(
       : "Không mã hoá hoặc lưu được API key. Kiểm tra cấu hình ENCRYPTION_KEY của máy chủ rồi thử lại." };
   }
   refresh();
-  return { ok: true, message: `Đã mã hoá và thêm ${added} API key; bỏ qua ${imported.length - added} key trùng. Key được kiểm tra khi vòng Ollama sử dụng.` };
+  return { ok: true, message: `Đã mã hoá và thêm ${added} API key; bỏ qua ${imported.length - added} key trùng. Key được kiểm tra khi provider được chọn sử dụng.` };
 }
 
 /**
@@ -190,12 +199,14 @@ export async function importGithubNurtureKeysAction(
  */
 export async function revealGithubNurtureKeyAction(
   id: string,
+  provider: "ollama" | "reflection" = "ollama",
 ): Promise<{ ok: true; key: string } | { ok: false; message: string }> {
   await requireManage();
   if (typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
     return { ok: false, message: "Mã API key không hợp lệ." };
   }
-  const entry = (await getAppSettings()).githubNurture.apiKeys.find((key) => key.id === id);
+  const config = (await getAppSettings()).githubNurture;
+  const entry = (provider === "reflection" ? config.reflectionApiKeys ?? [] : config.apiKeys).find((key) => key.id === id);
   if (!entry) return { ok: false, message: "API key không còn trong danh sách." };
   try {
     const plain = decryptSecret(entry.secret);
@@ -212,13 +223,16 @@ export async function deleteGithubNurtureKeyAction(
 ): Promise<StationResult> {
   await requireManage();
   const id = String(formData.get("id") ?? "");
+  const provider = formData.get("provider") === "reflection" ? "reflection" : "ollama";
   let found = false;
   await mutateGithubState((settings) => {
-    found = settings.githubNurture.apiKeys.some((key) => key.id === id);
-    settings.githubNurture.apiKeys = settings.githubNurture.apiKeys.filter((key) => key.id !== id);
+    const field = provider === "reflection" ? "reflectionApiKeys" : "apiKeys";
+    const collection = settings.githubNurture[field] ?? [];
+    found = collection.some((key) => key.id === id);
+    settings.githubNurture[field] = collection.filter((key) => key.id !== id);
   });
   refresh();
-  return { ok: found, message: found ? "Đã xoá API key khỏi sổ Ollama." : "API key này không còn trong sổ." };
+  return { ok: found, message: found ? "Đã xoá API key khỏi sổ provider." : "API key này không còn trong sổ." };
 }
 
 export async function setGithubNurtureKeyDisabledAction(
@@ -226,10 +240,12 @@ export async function setGithubNurtureKeyDisabledAction(
 ): Promise<StationResult> {
   await requireManage();
   const id = String(formData.get("id") ?? "");
+  const provider = formData.get("provider") === "reflection" ? "reflection" : "ollama";
   const disabled = formData.get("disabled") === "true";
   let found = false;
   await mutateGithubState((settings) => {
-    const key = settings.githubNurture.apiKeys.find((entry) => entry.id === id);
+    const collection = provider === "reflection" ? settings.githubNurture.reflectionApiKeys ?? [] : settings.githubNurture.apiKeys;
+    const key = collection.find((entry) => entry.id === id);
     if (!key) return;
     key.disabled = disabled;
     found = true;

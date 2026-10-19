@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.199",
+    date: "2026-10-19",
+    lines: [
+      "Có thêm Reflection bên cạnh Ollama cho kho GitHub; chọn nhà cung cấp ngay trong phần cấu hình.",
+      "Khóa Reflection có sổ riêng; có thể nhập bằng tệp hoặc dán nhiều dòng, xem, sao chép và tạm tắt.",
+      "Khi chuyển nhà cung cấp, các khóa Ollama đã lưu không bị mất hay trộn sang Reflection.",
+    ],
+  },
+  {
     version: "1.3.189",
     date: "2026-10-06",
     lines: [
@@ -461,14 +470,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Bổ sung tuỳ chọn không dùng ảnh nền tại tab Giao diện của trang Tông môn, tối ưu tốc độ và tiết kiệm dữ liệu cho người dùng.",
       "Tích hợp trọn bộ 10/10 định dạng quảng cáo Adsterra vào trang web với cơ chế nạp tuần tự triệt tiêu xung đột cấu hình.",
-    ],
-  },
-  {
-    version: "1.3.140",
-    date: "2026-10-03",
-    lines: [
-      "Hỗ trợ linh hoạt định dạng danh sách proxy IP:PORT@USER:PASS cùng các biến thể giao thức mạng phổ biến.",
-      "Chuẩn hoá bộ phân tích máy chủ mạng trung gian, đảm bảo tương thích mọi nhà cung cấp proxy trên thị trường.",
     ],
   },
 ];

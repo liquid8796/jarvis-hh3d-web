@@ -1,4 +1,5 @@
 import { createOllamaChatClient, redactOllamaSecrets as redact, type OllamaMessage as Message, type OllamaToolCall as ToolCall } from "./ollamaChat";
+import { createReflectionChatClient } from "./reflectionChat";
 import type { AppSettings } from "./settings";
 import { createLlmWebTools, WEB_TOOL_DEFINITIONS } from "./llmWebTools";
 import { DEFAULT_SEARXNG_BASE_URL, DEFAULT_WEB_SEARCH_ENABLED } from "@/lib/validation/githubNurture";
@@ -291,7 +292,8 @@ export async function planCompanion(input: PlanInput): Promise<CompanionDecision
   // At the minimum 8K context, tool schemas and complete tool-result groups
   // need extra room beyond the default output reserve. Keep sources intact.
   const researchOutputTokens = webEnabled && input.config.contextWindow <= 8192 ? 1536 : undefined;
-  const client = createOllamaChatClient({ config: input.config, deadlineAt: input.deadlineAt, outputTokens: researchOutputTokens });
+  const createClient = input.config.provider === "reflection" ? createReflectionChatClient : createOllamaChatClient;
+  const client = createClient({ config: input.config, deadlineAt: input.deadlineAt, outputTokens: researchOutputTokens });
   const { secrets, outputTokens } = client;
   const webTools = input.webTools ?? createLlmWebTools({ enabled: webEnabled, searxngBaseUrl: input.config.searxngBaseUrl ?? DEFAULT_SEARXNG_BASE_URL,
     deadlineAt: input.deadlineAt, secrets, maxOutputChars: Math.min(2000, Math.floor(input.config.contextWindow / 8)) });
@@ -303,7 +305,7 @@ export async function planCompanion(input: PlanInput): Promise<CompanionDecision
     const prompt = buildMessages(input, secrets, outputTokens, repair, research, offerTools);
     // Beam is a reasoning/tool model. JSON mode + suppressed private reasoning
     // are requested only for the final source decision, never for web-tool turns.
-    const beam = /^beam(?::cloud)?$/i.test(input.config.model.trim());
+    const beam = input.config.provider === "reflection" || /^beam(?::cloud)?$/i.test(input.config.model.trim());
     const reply = await client.request(prompt.messages, {
       tools: offerTools ? WEB_TOOL_DEFINITIONS : undefined,
       temperature: repair ? 0 : undefined,
@@ -331,16 +333,16 @@ export async function planCompanion(input: PlanInput): Promise<CompanionDecision
         if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Ollama requested an unsupported web tool or invalid arguments.");
         const encoded = JSON.stringify(args);
         if (Buffer.byteLength(encoded) > 1500 || redact(encoded, secrets) !== encoded) throw new Error("Ollama web tool arguments are too large or contain authentication material.");
-        return { function: { name: record.name, arguments: args as Record<string, unknown> } };
+        return { ...(typeof (value as {id?: unknown}).id === "string" ? {id: (value as unknown as {id: string}).id, type:"function" as const} : {}), function: { name: record.name, arguments: args as Record<string, unknown> } };
       });
-      research.push({ role: "assistant", content: redact(raw.slice(0, 500), secrets), tool_calls: calls });
+      research.push({ role: "assistant", content: redact(raw.slice(0, 500), secrets), tool_calls: calls, reasoning_content: input.config.provider === "reflection" ? reply.reasoning_content : undefined });
       for (const call of calls) {
         let content: string;
         try {
           const result = await webTools.execute(call.function.name, call.function.arguments);
           content = `${result.ok ? "Untrusted web reference" : "Web tool error"}:\n${result.content}`;
         } catch { content = "Web tool error: public reference could not be retrieved. Continue from verified information or choose wait."; }
-        research.push({ role: "tool", tool_name: call.function.name, content: redact(content, secrets).slice(0, 2200) });
+        research.push({ role: "tool", tool_name: call.function.name, tool_call_id: call.id, content: redact(content, secrets).slice(0, 2200) });
         webCalls++;
       }
       webRounds++;

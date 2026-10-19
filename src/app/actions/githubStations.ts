@@ -58,7 +58,7 @@ export type StationView = {
     lastPushAt: string | null;
     lastPushOk: boolean | null;
     lastPushNote: string;
-    managedBy?: "ollama";
+    managedBy?: "ollama" | "reflection";
     topic?: string;
     forkedFrom?: string;
     createdAt?: string;
@@ -72,7 +72,7 @@ export type StationView = {
     lastPushAt: string | null;
     lastPushOk: boolean | null;
     lastPushNote: string;
-    managedBy?: "ollama";
+    managedBy?: "ollama" | "reflection";
     topic?: string;
     language?: string;
     forkedFrom?: string;

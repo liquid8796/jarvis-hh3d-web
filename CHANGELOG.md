@@ -9,6 +9,15 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.199 — Reflection AI: provider và API key riêng (19/10/2026)
+
+- Admin → Kho GitHub → AI provider: chọn Ollama hoặc Reflection; giữ nguyên model, danh sách key và trạng thái hiện có của Ollama khi chuyển qua lại. Mặc định bản nâng cấp vẫn là Ollama.
+- Reflection sử dụng OpenAI-compatible Chat Completions tại api.reflection.ai/openai/v1, model mặc định Beam-1.0-501B-A23B. Coding Agent, đặt tên repo, scheduler, fallback key/cooldown đều tuân theo provider đang chọn.
+- Reflection API key quản lý riêng, nhập nhiều key từ TXT/JSON/dán, mã hóa khi lưu, mặc định che, chỉ admin có quyền mới hiện/copy/xóa hoặc bật/tắt. Hỗ trợ JWT đến 4096 ký tự; không lưu plaintext vào mã nguồn hoặc log.
+- Giữ tool_call_id và reasoning_content cần thiết cho Reflection tool-calling; dùng response_format json_object ở lượt ra quyết định, kiểm tra source path và các quyền GitHub như cũ.
+- Regression: 6 bài test Reflection offline (transport, JSON, tool results, cách ly key, quota, 2 luồng planner), 63 bài Ollama PASS; production build PASS trước khi phát hành. Chưa xác minh Reflection thật với key của người dùng tại thời điểm build.
+- Không đổi schema SQL hoặc PC worker; không chạy khôi lỗi trên OCI.
+
 ## 1.3.198 — Beam Cloud: tương thích Coding Agent và JSON/Ollama (19/10/2026)
 
 - Tầng Ollama Cloud nhận biết response chỉ có message.thinking khi hết giới hạn token (done_reason: length, max_tokens, max_output_tokens), rồi yêu cầu một JSON decision mới gọn hơn; không coi private reasoning là mã nguồn hay nội dung quyết định.

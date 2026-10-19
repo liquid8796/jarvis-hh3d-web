@@ -34,8 +34,8 @@ const patOf = (station: Station) => {
   if (!isEncrypted(station.pat)) throw new Error("PAT GitHub chưa được mã hóa hợp lệ.");
   try { return decryptSecret(station.pat); } catch { throw new Error("Không mở được PAT GitHub; kiểm tra cấu hình mã hóa."); }
 };
-function entryOf(info: RepoInfo, decision?: CompanionDecision): Companion {
-  return { repo: info.full_name.split("/")[1], githubId: info.id, managedBy: "ollama", createdAt: new Date().toISOString(), nextDecisionAt: decision?.action === "fork" ? later(decision.nextCheckMinutes) : null, topic: stripCompanionMarker(decision?.description ?? info.description ?? ""), forkedFrom: info.parent?.full_name,
+function entryOf(info: RepoInfo, decision?: CompanionDecision, provider: "ollama" | "reflection" = "ollama"): Companion {
+  return { repo: info.full_name.split("/")[1], githubId: info.id, managedBy: provider, createdAt: new Date().toISOString(), nextDecisionAt: decision?.action === "fork" ? later(decision.nextCheckMinutes) : null, topic: stripCompanionMarker(decision?.description ?? info.description ?? ""), forkedFrom: info.parent?.full_name,
     language: decision?.action === "fork" ? info.language || undefined : decision?.language || info.language || inferCompanionLanguages(decision?.files ?? [])[0], sourcePaths: decision?.action === "fork" ? undefined : decision?.sourcePaths,
     lastNurtureDay: null, pushesToday: 0, lastPushAt: null, lastPushOk: null, lastPushNote: "Đã tạo kho; đang chuẩn bị source." };
 }
@@ -57,11 +57,14 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
   });
 
   async function persistKeyHealth(config: AppSettings["githubNurture"], before: AppSettings["githubNurture"]["apiKeys"]) {
+    const field = config.provider === "reflection" ? "reflectionApiKeys" : "apiKeys";
     await deps.mutate((all) => {
-      for (const observed of config.apiKeys) {
+      const current = config[field] ?? [];
+      const stored = all.githubNurture[field] ?? [];
+      for (const observed of current) {
         const previous = before.find((key) => key.id === observed.id);
         if (previous && previous.lastUsedAt === observed.lastUsedAt && previous.lastError === observed.lastError && previous.cooldownUntil === observed.cooldownUntil && previous.disabled === observed.disabled) continue;
-        const fresh = all.githubNurture.apiKeys.find((k) => k.id === observed.id && k.secret === observed.secret);
+        const fresh = stored.find((k) => k.id === observed.id && k.secret === observed.secret);
         if (!fresh || (fresh.lastUsedAt && (!observed.lastUsedAt || fresh.lastUsedAt > observed.lastUsedAt))) continue;
         fresh.lastUsedAt = observed.lastUsedAt;
         fresh.lastError = observed.lastError;
@@ -79,7 +82,8 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
     snapshot?: RepoSnapshot,
     target?: NurtureTarget,
   ) {
-    const healthBefore = structuredClone(all.githubNurture.apiKeys);
+    const healthBefore = structuredClone(all.githubNurture.provider === "reflection"
+      ? all.githubNurture.reflectionApiKeys ?? [] : all.githubNurture.apiKeys);
     try {
       const trace = target?.trace;
       return await deps.plan({ config: all.githubNurture, station: { owner: station.owner, repo: station.repo, allowCompanionFork: station.allowCompanionFork, allowCompanionDelete: target?.kind === "primary" ? false : station.allowCompanionDelete },
@@ -170,7 +174,7 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
       : await github.create(current.owner, decision.repo, stripCompanionMarker(decision.description));
     if (!same(info.full_name, `${current.owner}/${decision.repo}`)) throw new Error("GitHub trả tên kho khác tên đã yêu cầu.");
     await patchStation(slug, (row) => { if (row.nurturePending) row.nurturePending.githubId = info.id; });
-    await patchStation(slug, (row) => { row.companionRepos.push(entryOf(info, decision)); delete row.nurturePending; row.nurtureNextAt = null; row.nurtureLastNote = decision.reason.slice(0, 1000); });
+    await patchStation(slug, (row) => { row.companionRepos.push(entryOf(info, decision, all.githubNurture.provider ?? "ollama")); delete row.nurturePending; row.nurtureNextAt = null; row.nurtureLastNote = decision.reason.slice(0, 1000); });
     // Forked Actions remain disabled; generated code never gets workflow permissions.
     await github.disableActions(current.owner, decision.repo);
     await patchStation(slug, (row) => { row.companionRepos.find((c) => same(c.repo, decision.repo))!.actionsDisabled = true; });
@@ -180,7 +184,7 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
     const createdTarget: NurtureTarget = {
       kind: "companion",
       repo: decision.repo,
-      trace: entryOf(info, decision),
+      trace: entryOf(info, decision, all.githubNurture.provider ?? "ollama"),
     };
     await recordCommit(slug, createdTarget, decision, commit);
     return resultOf(station, decision.repo, `Đã tạo repo và ghi ${commit.pushed} commit source${current.dailyPushes === 1 && decision.files.length > 1 ? "; phần còn lại chờ lượt phát triển tiếp theo do giới hạn 1 commit/ngày" : ""}: ${decision.reason}`, true, commit.pushed);
@@ -271,7 +275,7 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
 
     // A primary repository must keep Actions enabled for its worker workflow. Companion projects
     // remain non-executable and have Actions disabled as before.
-    if (target.kind === "companion" && (target.trace.managedBy === "ollama" || target.trace.forkedFrom) && !(target.trace as Companion).actionsDisabled) {
+    if (target.kind === "companion" && (target.trace.managedBy === "ollama" || target.trace.managedBy === "reflection" || target.trace.forkedFrom) && !(target.trace as Companion).actionsDisabled) {
       await github.disableActions(station.owner, target.repo);
       await patchStation(slug, (fresh) => {
         const current = fresh.companionRepos.find((item) => same(item.repo, target.repo));
@@ -336,7 +340,10 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
               summary.results.push(resultOf(station, deleting.repo, "Hoàn tất lượt xóa đã được yêu cầu trước đó."));
               return;
             }
-            if (!all.githubNurture.apiKeys.some((k) => !k.disabled && due(k.cooldownUntil))) throw new Error("Chưa có API key Ollama sẵn sàng; nhập key hoặc chờ hết thời gian nghỉ.");
+            const activeKeys = all.githubNurture.provider === "reflection"
+              ? all.githubNurture.reflectionApiKeys ?? [] : all.githubNurture.apiKeys;
+            if (!activeKeys.some((k) => !k.disabled && due(k.cooldownUntil)))
+              throw new Error("Chưa có API key " + (all.githubNurture.provider === "reflection" ? "Reflection" : "Ollama") + " sẵn sàng; nhập key hoặc chờ hết thời gian nghỉ.");
             let result: CompanionNurtureResult | undefined;
             const day = nurtureDayKey(new Date());
             const primaryDue = station.primarySource
@@ -359,7 +366,7 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
           } catch (error) {
             // Provider adapters expose fixed, secret-free errors. Unknown errors stay generic.
             const message = error instanceof Error ? error.message : "";
-            const note = /^(?:Ollama |No eligible Ollama|All eligible Ollama|Invalid Ollama|Kho |Không |Chưa |Đã |Hết |Model |GitHub |Tên |Quyền |ID |Lượt |Repo |Danh |JSON |PAT |Giữ )/.test(message)
+            const note = /^(?:Ollama |Reflection |No eligible (?:Ollama|Reflection)|All eligible (?:Ollama|Reflection)|Invalid (?:Ollama|Reflection)|Kho |Không |Chưa |Đã |Hết |Model |GitHub |Tên |Quyền |ID |Lượt |Repo |Danh |JSON |PAT |Giữ )/.test(message)
               ? message.slice(0, 500) : "Lượt nuôi kho chưa hoàn tất; kiểm tra kết nối và cấu hình máy chủ.";
             // A removed station or a failed checkpoint must not hide results from other stations.
             try {

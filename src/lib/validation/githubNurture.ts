@@ -2,6 +2,8 @@
 export const DEFAULT_COMPANION_COUNT = 3;
 export const MAX_COMPANION_COUNT = 20;
 export const DEFAULT_OLLAMA_MODEL = "gemma4:31b-cloud";
+export const DEFAULT_REFLECTION_MODEL = "Beam-1.0-501B-A23B";
+export type GithubAiProvider = "ollama" | "reflection";
 export const DEFAULT_OLLAMA_CONTEXT_WINDOW = 32768;
 export const MIN_OLLAMA_CONTEXT_WINDOW = 8192;
 export const MAX_OLLAMA_CONTEXT_WINDOW = 1048576;
@@ -69,7 +71,7 @@ export function parseCompanionCount(value: string, allowDefault = false): number
 }
 
 /** Accept newline-separated keys, a JSON array, or {keys: [...]}/{apiKeys: [...]}. */
-export function parseOllamaKeyImport(text: string): string[] {
+export function parseOllamaKeyImport(text: string, maxKeyLength = 512): string[] {
   if (new TextEncoder().encode(text).byteLength > MAX_KEY_IMPORT_BYTES) {
     throw new Error("Danh sách API key vượt quá 256 KiB.");
   }
@@ -110,8 +112,8 @@ export function parseOllamaKeyImport(text: string): string[] {
     }
     if (typeof candidate !== "string") throw new Error(`Mục ${index + 1} không có API key dạng chuỗi.`);
     const key = candidate.trim();
-    if (key.length < 8 || key.length > 512 || /[^\x21-\x7e]/.test(key)) {
-      throw new Error(`API key ở mục ${index + 1} không hợp lệ: dùng 8–512 ký tự, không có khoảng trắng.`);
+    if (key.length < 8 || key.length > maxKeyLength || /[^\x21-\x7e]/.test(key)) {
+      throw new Error(`API key ở mục ${index + 1} không hợp lệ: dùng 8–${maxKeyLength} ký tự, không có khoảng trắng.`);
     }
     return key;
   });

@@ -8,7 +8,7 @@ import { GithubStationPanel } from "./GithubStationPanel";
 
 const SECTIONS = [
   { id: "stations", label: "Kho chính" },
-  { id: "ollama", label: "Ollama" },
+  { id: "ollama", label: "AI provider" },
   { id: "keys", label: "API key" },
 ] as const;
 
@@ -32,7 +32,8 @@ export function GithubAdminWorkspace({
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const totalCompanions = stations.reduce((total, station) => total + station.companionRepos.length, 0);
-  const enabledKeys = config.apiKeys.filter((key) => !key.disabled).length;
+  const allKeys = [...config.apiKeys, ...(config.reflectionApiKeys ?? [])];
+  const enabledKeys = allKeys.filter((key) => !key.disabled).length;
 
   function openSection(next: GithubSection) {
     setSection(next);
@@ -57,7 +58,7 @@ export function GithubAdminWorkspace({
   }
 
   const countFor = (id: GithubSection) =>
-    id === "stations" ? stations.length : id === "keys" ? config.apiKeys.length : null;
+    id === "stations" ? stations.length : id === "keys" ? allKeys.length : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -68,8 +69,8 @@ export function GithubAdminWorkspace({
             <p className="mt-1 flex flex-wrap gap-x-2 text-xs text-[var(--color-mist)]">
               <span>{stations.length} khôi lỗi</span>
               <span>· {totalCompanions} kho phụ</span>
-              <span>· {enabledKeys}/{config.apiKeys.length} API key bật</span>
-              <span className="max-w-full truncate font-mono" title={config.model}>· {config.model}</span>
+              <span>· {enabledKeys}/{allKeys.length} API key bật</span>
+              <span className="max-w-full truncate font-mono" title={config.provider === "reflection" ? (config.reflectionModel ?? "Beam-1.0-501B-A23B") : config.model}>· {config.provider === "reflection" ? "Reflection" : "Ollama"}: {config.provider === "reflection" ? config.reflectionModel ?? "Beam-1.0-501B-A23B" : config.model}</span>
             </p>
           </div>
           <div

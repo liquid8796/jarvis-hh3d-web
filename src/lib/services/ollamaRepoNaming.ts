@@ -1,6 +1,7 @@
 import type { AppSettings } from "./settings";
 import { DEFAULT_WORKFLOW_FILE, reviewStationIdentity } from "@/lib/validation/githubStations";
 import { createOllamaChatClient, redactOllamaSecrets, type OllamaMessage } from "./ollamaChat";
+import { createReflectionChatClient } from "./reflectionChat";
 
 type Config = AppSettings["githubNurture"];
 type Budget = { deadlineAt: number; now: () => number };
@@ -32,7 +33,8 @@ export async function planPrimaryRepoName(input: PrimaryRepoNameInput): Promise<
   if (reviewStationIdentity(input.owner, "repository", DEFAULT_WORKFLOW_FILE)) throw new Error("Invalid GitHub account for repository naming.");
   const now = input.now ?? Date.now;
   const deadlineAt = Math.min(input.deadlineAt, now() + MAX_NAMING_MS);
-  const client = createOllamaChatClient({ config: input.config, deadlineAt, now, fetch: input.fetch, outputTokens: 2048, maxResponseBytes: 32 * 1024, requestTimeoutMs: MAX_NAMING_MS });
+  const createClient = input.config.provider === "reflection" ? createReflectionChatClient : createOllamaChatClient;
+  const client = createClient({ config: input.config, deadlineAt, now, fetch: input.fetch, outputTokens: 2048, maxResponseBytes: 32 * 1024, requestTimeoutMs: MAX_NAMING_MS });
   const recentNames = input.recentNames.filter(name => validName(input.owner, name) && redactOllamaSecrets(name, client.secrets) === name).slice(-HISTORY_LIMIT);
   const forbiddenNames = (input.forbiddenNames ?? []).filter(name => validName(input.owner, name) && redactOllamaSecrets(name, client.secrets) === name).slice(-HISTORY_LIMIT);
   const blocked = new Set([...recentNames, ...forbiddenNames].map(name => name.toLowerCase()));
@@ -42,7 +44,7 @@ export async function planPrimaryRepoName(input: PrimaryRepoNameInput): Promise<
   ];
   let invalid = "Invalid repository name.";
   for (let attempt = 0; attempt < 2; attempt++) {
-    const beam = /^beam(?::cloud)?$/i.test(input.config.model.trim());
+    const beam = input.config.provider === "reflection" || /^beam(?::cloud)?$/i.test(input.config.model.trim());
     const reply = await client.request(messages, { temperature: 1, format: beam ? "json" : undefined, think: beam ? false : undefined });
     try {
       if (reply.tool_calls?.length) throw new Error("Repository naming does not allow tools.");
@@ -68,11 +70,13 @@ export async function planPrimaryRepoName(input: PrimaryRepoNameInput): Promise<
 }
 
 /** Key health merges into the latest settings, preserving concurrent user edits and newer usage. */
-function mergeKeyHealth(all: AppSettings, before: Config["apiKeys"], observed: Config["apiKeys"]) {
+function mergeKeyHealth(all: AppSettings, before: Config["apiKeys"], observed: Config["apiKeys"], provider: "ollama" | "reflection") {
+  const field = provider === "reflection" ? "reflectionApiKeys" : "apiKeys";
+  const stored = all.githubNurture[field] ?? [];
   const fields = ["disabled", "cooldownUntil", "lastUsedAt", "lastError"] as const;
   for (const after of observed) {
     const baseline = before.find(key => key.id === after.id && key.secret === after.secret);
-    const fresh = all.githubNurture.apiKeys.find(key => key.id === after.id && key.secret === after.secret);
+    const fresh = stored.find(key => key.id === after.id && key.secret === after.secret);
     if (!baseline || !fresh || fields.every(field => baseline[field] === after[field])) continue;
     if (fresh.lastUsedAt && (!after.lastUsedAt || fresh.lastUsedAt > after.lastUsedAt)) continue;
     if (fields.some(field => fresh[field] !== baseline[field])) continue;
@@ -86,7 +90,9 @@ export function createPrimaryRepoNameGenerator(deps: NamingDependencies) {
     if (!Number.isFinite(deadlineAt) || deadlineAt - budget.now() <= PERSIST_RESERVE_MS) throw new Error("Ollama repository naming deadline has expired.");
     const all = await deps.read(deadlineAt - PERSIST_RESERVE_MS);
     const config = structuredClone(all.githubNurture);
-    const before = structuredClone(config.apiKeys);
+    const provider = config.provider === "reflection" ? "reflection" : "ollama";
+    const field = provider === "reflection" ? "reflectionApiKeys" : "apiKeys";
+    const before = structuredClone(config[field] ?? []);
     try {
       const stationNames = all.githubStations.flatMap(station => [
         station.repo,
@@ -106,7 +112,8 @@ export function createPrimaryRepoNameGenerator(deps: NamingDependencies) {
         now: budget.now,
       });
     } finally {
-      if (JSON.stringify(before) !== JSON.stringify(config.apiKeys)) await deps.mutate(fresh => mergeKeyHealth(fresh, before, config.apiKeys), { deadlineAt });
+      if (JSON.stringify(before) !== JSON.stringify(config[field] ?? []))
+        await deps.mutate(fresh => mergeKeyHealth(fresh, before, config[field] ?? [], provider), { deadlineAt });
     }
   };
 }

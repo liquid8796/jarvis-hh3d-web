@@ -1,9 +1,9 @@
 import { decryptSecret } from "@/lib/crypto/secretBox";
 import type { AppSettings } from "./settings";
 
-export type OllamaToolCall = { function: { name: string; arguments: Record<string, unknown> } };
-export type OllamaMessage = { role: "system" | "user" | "assistant" | "tool"; content: string; tool_calls?: OllamaToolCall[]; tool_name?: string };
-export type OllamaReply = { content: string; tool_calls?: unknown[]; doneReason?: string };
+export type OllamaToolCall = { id?: string; type?: "function"; function: { name: string; arguments: Record<string, unknown> } };
+export type OllamaMessage = { role: "system" | "user" | "assistant" | "tool"; content: string; tool_calls?: OllamaToolCall[]; tool_name?: string; tool_call_id?: string; reasoning_content?: string };
+export type OllamaReply = { content: string; tool_calls?: unknown[]; doneReason?: string; reasoning_content?: string };
 type Config = AppSettings["githubNurture"];
 type Key = Config["apiKeys"][number];
 const API_URL = "https://ollama.com/api/chat";

@@ -53,6 +53,14 @@ await check("configured cloud model and keys use a bounded native request withou
   await planPrimaryRepoName(request);
   assert.equal(calls[1].body.model, request.config.model);
 });
+await check("Beam cloud naming uses JSON mode and never includes private reasoning", async () => {
+  const request = input(); request.config.model = "beam:cloud";
+  respond = () => reply({ repo: "BeamLibrary" });
+  assert.equal(await planPrimaryRepoName(request), "BeamLibrary");
+  assert.equal(calls[0].body.model, "beam");
+  assert.equal(calls[0].body.format, "json");
+  assert.equal((calls[0].body as typeof calls[0]["body"] & {think?:boolean}).think, false);
+});
 await check("names retain arbitrary model-selected lengths, case and separators without template or suffix", async () => {
   for (const repo of ["A", "MixedCase", "with_underscores", "a.b.c", "multiple-long-word-combinations", "123", ".hidden", "Z".repeat(100)]) {
     respond = () => reply({ repo });

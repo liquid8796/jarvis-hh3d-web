@@ -78,7 +78,7 @@ export function createOllamaChatClient(options: {
   const failed = new Set<Key>();
   let preferred: Key | undefined;
 
-  async function request(messages: OllamaMessage[], requestOptions: { tools?: readonly unknown[]; temperature?: number } = {}): Promise<OllamaReply> {
+  async function request(messages: OllamaMessage[], requestOptions: { tools?: readonly unknown[]; temperature?: number; format?: "json"; think?: boolean } = {}): Promise<OllamaReply> {
     const eligible = config.apiKeys.filter((key) => !key.disabled && !failed.has(key) && keySecrets.has(key) && (!key.cooldownUntil || Date.parse(key.cooldownUntil) <= now()))
       .sort((a, b) => (a === preferred ? -1 : b === preferred ? 1 : (Date.parse(a.lastUsedAt ?? "") || 0) - (Date.parse(b.lastUsedAt ?? "") || 0)));
     if (!eligible.length) throw new Error("No eligible Ollama API key; add a key or wait for its cooldown.");
@@ -89,7 +89,7 @@ export function createOllamaChatClient(options: {
       const timer = setTimeout(() => controller.abort(), Math.min(requestTimeoutMs, remaining));
       key.lastUsedAt = new Date(now()).toISOString();
       try {
-        const response = await fetcher(API_URL, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${keySecrets.get(key)}` }, body: JSON.stringify({ model, messages, stream: false, options: { num_predict: outputTokens, ...(requestOptions.temperature === undefined ? {} : { temperature: requestOptions.temperature }) }, ...(requestOptions.tools ? { tools: requestOptions.tools } : {}) }), signal: controller.signal, redirect: "error" });
+        const response = await fetcher(API_URL, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${keySecrets.get(key)}` }, body: JSON.stringify({ model, messages, stream: false, options: { num_predict: outputTokens, ...(requestOptions.temperature === undefined ? {} : { temperature: requestOptions.temperature }) }, ...(requestOptions.tools ? { tools: requestOptions.tools } : {}), ...(requestOptions.format ? { format: requestOptions.format } : {}), ...(requestOptions.think === undefined ? {} : { think: requestOptions.think }) }), signal: controller.signal, redirect: "error" });
         if (!response.ok) {
           await response.body?.cancel();
           if ([401, 402, 403, 429].includes(response.status)) {
@@ -107,17 +107,24 @@ export function createOllamaChatClient(options: {
           throw new Error(key.lastError);
         }
         const raw = await readBounded(response, maxResponseBytes);
-        let payload: { message?: { content?: unknown; tool_calls?: unknown }; error?: unknown; done_reason?: unknown };
+        let payload: { message?: { content?: unknown; thinking?: unknown; tool_calls?: unknown }; error?: unknown; done_reason?: unknown; done?: unknown };
         try { payload = JSON.parse(raw); } catch { throw new Error("Ollama returned an invalid response envelope."); }
         if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("Ollama returned an invalid response envelope.");
-        if (payload.error || !payload.message || (typeof payload.message.content !== "string" && !Array.isArray(payload.message.tool_calls))) throw new Error("Ollama returned no usable decision; check model/service availability.");
+        const reason = typeof payload.done_reason === "string" ? payload.done_reason : undefined;
+        const truncated = reason === "length" || reason === "max_tokens" || reason === "max_output_tokens";
+        // Thinking-only replies sometimes consume the entire output budget. Let the
+        // decision planner retry with a smaller answer; never treat thinking as source.
+        if (payload.error || payload.done === false || !payload.message ||
+            (typeof payload.message.content !== "string" && !Array.isArray(payload.message.tool_calls) && !truncated) ||
+            (!payload.message.content && !Array.isArray(payload.message.tool_calls) && !truncated))
+          throw new Error("Ollama returned no usable decision; check model/service availability.");
         preferred = key;
         key.cooldownUntil = null;
         key.lastError = "";
         return {
           content: typeof payload.message.content === "string" ? payload.message.content : "",
           tool_calls: Array.isArray(payload.message.tool_calls) ? payload.message.tool_calls : undefined,
-          doneReason: typeof payload.done_reason === "string" ? payload.done_reason : undefined,
+          doneReason: truncated ? "length" : reason,
         };
       } catch (error) {
         // Raw provider bodies, request URLs, headers and transport exceptions are

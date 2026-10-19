@@ -51,6 +51,29 @@ try {
     await planCompanion(request);
     assert.equal(calls[1].body.model, "future-model:custom");
   });
+  await check("Beam cloud coding requests JSON-mode final answer without thinking", async () => {
+    const request = input();
+    request.config.model = "beam:cloud";
+    request.config.webSearchEnabled = false;
+    respond = () => reply(decision());
+    assert.equal((await planCompanion(request)).action, "create");
+    assert.equal(calls[0].body.model, "beam");
+    assert.equal(calls[0].body.format, "json");
+    assert.equal(calls[0].body.think, false);
+    assert.equal(calls[0].body.tools, undefined);
+  });
+  await check("Beam thinking-only token-limit response repairs rather than crashing the provider adapter", async () => {
+    const request = input();
+    request.config.model = "beam:cloud";
+    request.config.webSearchEnabled = false;
+    respond = () => calls.length === 1
+      ? Response.json({ message: { role: "assistant", thinking: "private reasoning only", content: null }, done_reason: "max_tokens", done: true })
+      : reply(decision());
+    assert.equal((await planCompanion(request)).repo, decision().repo);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].body.format, "json");
+    assert(!JSON.stringify(calls[1].body.messages).includes("private reasoning only"));
+  });
   await check("new projects declare language and matching primary source while legacy maintenance remains valid", async () => {
     for (const change of [{ language: undefined }, { language: "" }, { sourcePaths: undefined }, { sourcePaths: [] }]) {
       calls = []; respond = () => reply({ ...decision(), ...change });

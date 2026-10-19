@@ -8,7 +8,7 @@ process.env.ENCRYPTION_KEY = "7".repeat(64);
 type Input = Parameters<typeof planCompanion>[0];
 type NativeCall = { function: { name: string; arguments: unknown } };
 type Message = { role: string; content: string; tool_name?: string; tool_calls?: NativeCall[] };
-type Request = { model: string; messages: Message[]; tools?: Array<{function:{name:string}}>; options: {num_predict:number} };
+type Request = { model: string; messages: Message[]; tools?: Array<{function:{name:string}}>; options: {num_predict:number}; format?:string; think?:boolean };
 const fixtureSecret = "test-ollama-secret-12345";
 const smallSource = "export function weekday(date: Date): number { return date.getUTCDay(); }\n";
 const decision = (): CompanionDecision => ({
@@ -91,6 +91,20 @@ try {
     for (const request of requests) assertCompleteNativeHistory(request);
   });
 
+  await check("Beam cloud accepts safe JSON-string tool arguments but preserves object-only execution", async () => {
+    const request = input(); request.config.model = "beam:cloud";
+    respond = () => requests.length === 1
+      ? toolReply([native("WebSearch", JSON.stringify({query:"Official TypeScript documentation"}))])
+      : reply(decision());
+    assert.equal((await planCompanion(request)).action, "create");
+    assert.equal(executed.length, 1);
+    assert.deepEqual(executed[0], {name:"WebSearch", args:{query:"Official TypeScript documentation"}});
+    assert.equal(requests[0].model, "beam");
+    assert.equal(requests[0].tools?.length, 2);
+    assert.equal((requests[1].messages.find(m => m.role === "assistant" && m.tool_calls?.length)?.tool_calls?.[0].function.arguments as {query?:string} | undefined)?.query, "Official TypeScript documentation");
+    assert.equal(requests[1].format, undefined, "do not force JSON mode while native web tools remain offered");
+    assert.equal(requests[1].think, undefined);
+  });
   await check("disabled web research offers no tools but accepts a valid decision", async () => {
     const request = input(); request.config.webSearchEnabled = false;
     assert.equal((await planCompanion(request)).action, "create");

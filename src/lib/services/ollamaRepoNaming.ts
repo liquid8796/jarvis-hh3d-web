@@ -42,7 +42,8 @@ export async function planPrimaryRepoName(input: PrimaryRepoNameInput): Promise<
   ];
   let invalid = "Invalid repository name.";
   for (let attempt = 0; attempt < 2; attempt++) {
-    const reply = await client.request(messages, { temperature: 1 });
+    const beam = /^beam(?::cloud)?$/i.test(input.config.model.trim());
+    const reply = await client.request(messages, { temperature: 1, format: beam ? "json" : undefined, think: beam ? false : undefined });
     try {
       if (reply.tool_calls?.length) throw new Error("Repository naming does not allow tools.");
       if (redactOllamaSecrets(reply.content, client.secrets) !== reply.content) throw new Error("Repository naming returned authentication material.");

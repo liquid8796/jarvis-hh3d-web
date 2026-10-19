@@ -287,9 +287,12 @@ function buildMessages(input: PlanInput, secrets: readonly string[], outputToken
 
 /** Plans only. The caller owns repository reads/writes and persists key health. */
 export async function planCompanion(input: PlanInput): Promise<CompanionDecision> {
-  const client = createOllamaChatClient({ config: input.config, deadlineAt: input.deadlineAt });
-  const { secrets, outputTokens } = client;
   const webEnabled = input.config.webSearchEnabled ?? DEFAULT_WEB_SEARCH_ENABLED;
+  // At the minimum 8K context, tool schemas and complete tool-result groups
+  // need extra room beyond the default output reserve. Keep sources intact.
+  const researchOutputTokens = webEnabled && input.config.contextWindow <= 8192 ? 1536 : undefined;
+  const client = createOllamaChatClient({ config: input.config, deadlineAt: input.deadlineAt, outputTokens: researchOutputTokens });
+  const { secrets, outputTokens } = client;
   const webTools = input.webTools ?? createLlmWebTools({ enabled: webEnabled, searxngBaseUrl: input.config.searxngBaseUrl ?? DEFAULT_SEARXNG_BASE_URL,
     deadlineAt: input.deadlineAt, secrets, maxOutputChars: Math.min(2000, Math.floor(input.config.contextWindow / 8)) });
   let repair: { raw: string; error: string; truncated?: boolean } | undefined;
@@ -298,9 +301,14 @@ export async function planCompanion(input: PlanInput): Promise<CompanionDecision
   for (let round = 0; round < MAX_WEB_ROUNDS + 2; round++) {
     const offerTools = webEnabled && webCalls < MAX_WEB_CALLS && webRounds < MAX_WEB_ROUNDS && repairs === 0;
     const prompt = buildMessages(input, secrets, outputTokens, repair, research, offerTools);
+    // Beam is a reasoning/tool model. JSON mode + suppressed private reasoning
+    // are requested only for the final source decision, never for web-tool turns.
+    const beam = /^beam(?::cloud)?$/i.test(input.config.model.trim());
     const reply = await client.request(prompt.messages, {
       tools: offerTools ? WEB_TOOL_DEFINITIONS : undefined,
       temperature: repair ? 0 : undefined,
+      format: beam && !offerTools ? "json" : undefined,
+      think: beam && !offerTools ? false : undefined,
     });
     const raw = reply.content;
     if (reply.tool_calls?.length) {
@@ -311,10 +319,19 @@ export async function planCompanion(input: PlanInput): Promise<CompanionDecision
         const fn = (value as { function?: unknown }).function;
         if (!fn || typeof fn !== "object") throw new Error("Ollama returned an invalid web tool call.");
         const record = fn as Record<string, unknown>;
-        if (typeof record.name !== "string" || !["WebSearch", "WebFetch"].includes(record.name) || !record.arguments || typeof record.arguments !== "object" || Array.isArray(record.arguments)) throw new Error("Ollama requested an unsupported web tool or invalid arguments.");
-        const encoded = JSON.stringify(record.arguments);
+        if (typeof record.name !== "string" || !["WebSearch", "WebFetch"].includes(record.name)) throw new Error("Ollama requested an unsupported web tool or invalid arguments.");
+        // Native Ollama usually returns an object. Some cloud tool models emit
+        // OpenAI-style JSON-encoded arguments; decode exactly one JSON object.
+        let args: unknown = record.arguments;
+        if (typeof args === "string") {
+          if (Buffer.byteLength(args, "utf8") > 1500) throw new Error("Ollama web tool arguments are too large or contain authentication material.");
+          try { args = JSON.parse(args); }
+          catch { throw new Error("Ollama requested an unsupported web tool or invalid arguments."); }
+        }
+        if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Ollama requested an unsupported web tool or invalid arguments.");
+        const encoded = JSON.stringify(args);
         if (Buffer.byteLength(encoded) > 1500 || redact(encoded, secrets) !== encoded) throw new Error("Ollama web tool arguments are too large or contain authentication material.");
-        return { function: { name: record.name, arguments: record.arguments as Record<string, unknown> } };
+        return { function: { name: record.name, arguments: args as Record<string, unknown> } };
       });
       research.push({ role: "assistant", content: redact(raw.slice(0, 500), secrets), tool_calls: calls });
       for (const call of calls) {

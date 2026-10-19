@@ -9,6 +9,15 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.198 — Beam Cloud: tương thích Coding Agent và JSON/Ollama (19/10/2026)
+
+- Tầng Ollama Cloud nhận biết response chỉ có message.thinking khi hết giới hạn token (done_reason: length, max_tokens, max_output_tokens), rồi yêu cầu một JSON decision mới gọn hơn; không coi private reasoning là mã nguồn hay nội dung quyết định.
+- Với beam:cloud, chỉ lượt coding/đặt tên cuối mới bật native format: json và think: false. Vòng WebSearch/WebFetch giữ native tool-calling, không ép JSON format trong lúc còn tools.
+- Tool-call arguments nhận object và chuỗi JSON-object theo cloud models; decode đúng một object, giới hạn 1500 UTF-8 bytes, kiểm tra tên tool, chống lộ secret và cấm tool ngoài WebSearch/WebFetch.
+- Khi context chỉ 8192 token và WebSearch bật, dự trữ output 1536 thay vì 2048 token để giữ lịch sử tool-call/result đúng cặp. Không cắt file nguồn đã đọc hoặc nới lỏng quyền ghi GitHub.
+- Regression: 32 test Coding Agent, 17 test Web Research, 14 test đặt tên kho PASS trên HTTP mock; bao gồm sửa lỗi cũ khi lịch sử nghiên cứu làm context 8K quá giới hạn. Chưa xác minh Beam Cloud end-to-end bằng API key thật.
+- Không thay đổi cấu hình người dùng, mã hóa API key, worker PC hay dữ liệu kho; không cần migration.
+
 ## 1.3.197 — Admin GitHub: hiện và sao chép API key Ollama (18/10/2026)
 
 - Trang Admin → Kho GitHub → API key Ollama bổ sung nút Hiện khóa / Ẩn khóa và Sao chép từng key. Danh sách vẫn che khóa mặc định, chỉ hiện giá trị khi admin yêu cầu.

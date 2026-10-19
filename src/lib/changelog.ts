@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.200",
+    date: "2026-10-19",
+    lines: [
+      "Trong sổ khóa Reflection, thông báo lỗi giờ cho biết mã và nguyên nhân thay vì chỉ ghi Lỗi gần nhất.",
+      "Thông tin bí mật vẫn được che; khi có lỗi bạn có thể xem chi tiết ngay tại dòng khóa tương ứng.",
+    ],
+  },
+  {
     version: "1.3.199",
     date: "2026-10-19",
     lines: [
@@ -462,14 +470,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Tinh gọn hệ thống quảng cáo Adsterra chỉ giữ lại Popunder và Social Bar, loại bỏ toàn bộ biểu ngữ không còn sử dụng.",
       "Chuyển đổi cơ chế hiển thị quảng cáo từ phía trình duyệt sang kết xuất trực tiếp từ máy chủ, giảm dung lượng tải trang.",
-    ],
-  },
-  {
-    version: "1.3.141",
-    date: "2026-10-03",
-    lines: [
-      "Bổ sung tuỳ chọn không dùng ảnh nền tại tab Giao diện của trang Tông môn, tối ưu tốc độ và tiết kiệm dữ liệu cho người dùng.",
-      "Tích hợp trọn bộ 10/10 định dạng quảng cáo Adsterra vào trang web với cơ chế nạp tuần tự triệt tiêu xung đột cấu hình.",
     ],
   },
 ];

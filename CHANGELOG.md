@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.200 — Reflection: hiển thị mã lỗi an toàn trong Admin (19/10/2026)
+
+- Khắc phục trạng thái “Lỗi gần nhất” quá chung chung tại Kho GitHub → API key Reflection: admin có quyền quản lý sẽ thấy mã HTTP và error.code / error.param của lượt lỗi. Với những lỗi cũ chỉ có HTTP status, vẫn hiển thị lại status đã lưu.
+- Đọc error body Reflection có giới hạn 4096 bytes, chỉ lưu machine-readable code/param sau khi kiểm tra định dạng; tuyệt đối không ghi nguyên văn error.message, HTTP headers, credential hoặc request content.
+- Giữ cách ly key Ollama/Reflection và logic cooldown/tắt key, không thay đổi lịch chạy hoặc cấp quyền. Thêm 2 test lỗi API 400/404 và kiểm tra không làm lộ dữ liệu nhạy cảm.
+- Chưa tự động chạy thử key hoặc thay đổi provider đang hoạt động; phát hành bản chẩn đoán để phân biệt chính xác nguyên nhân của key hiện tại.
+
 ## 1.3.199 — Reflection AI: provider và API key riêng (19/10/2026)
 
 - Admin → Kho GitHub → AI provider: chọn Ollama hoặc Reflection; giữ nguyên model, danh sách key và trạng thái hiện có của Ollama khi chuyển qua lại. Mặc định bản nâng cấp vẫn là Ollama.

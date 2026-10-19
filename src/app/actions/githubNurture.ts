@@ -41,6 +41,7 @@ export type GithubNurtureView = {
     cooldownUntil: string | null;
     lastUsedAt: string | null;
     health: "disabled" | "cooldown" | "error" | "ready" | "unused";
+    errorDetail: string | null;
   }>;
   reflectionApiKeys: GithubNurtureView["apiKeys"];
 };
@@ -58,11 +59,39 @@ async function requireManage() {
   }
 }
 
+/**
+ * Expose only adapter-owned diagnostic categories to authorized administrators.
+ * Never forward arbitrary provider response text, secret values or stored payloads.
+ */
+function safeKeyError(error: string): string | null {
+  if (!error) return null;
+  const status = /^Reflection HTTP error (400|404|409|413|415|422|500|502|503|504)$/.exec(error);
+  if (status) return "Reflection HTTP " + status[1];
+  const detailed = /^Reflection HTTP ([0-9]{3}) \(([a-z][a-z0-9_]{1,60})(?:; ([^)]+))?\)$/.exec(error);
+  if (detailed && (!detailed[3] || (detailed[3].length <= 100 && /^[A-Za-z_]/.test(detailed[3]) &&
+      [...detailed[3]].every(char => char === "[" || char === "]" || /^[A-Za-z0-9_.-]$/.test(char)))))
+    return "Reflection HTTP " + detailed[1] + " — " + detailed[2] + (detailed[3] ? " · " + detailed[3] : "");
+  const messages: Record<string, string> = {
+    "Reflection request timed out.": "Reflection: request timeout.",
+    "Reflection request could not reach provider.": "Reflection: lỗi kết nối tới provider.",
+    "Reflection invalid response JSON.": "Reflection: response JSON không hợp lệ.",
+    "Reflection returned no usable response.": "Reflection: response trống hoặc chưa hoàn tất.",
+    "Reflection response too large.": "Reflection: response vượt giới hạn.",
+    "Reflection quota exhausted.": "Reflection: hết credit/quota.",
+    "Reflection rate limit reached.": "Reflection: bị giới hạn tốc độ (429).",
+    "Reflection authentication rejected key.": "Reflection: xác thực/tài khoản bị từ chối (401/403).",
+    "Unable to decrypt Reflection key.": "Reflection: không giải mã được khóa.",
+    "Empty Reflection key.": "Reflection: khóa trống.",
+  };
+  return messages[error] ?? "Không thể xác định chi tiết từ lỗi cũ.";
+}
+
 function safeView(config: AppSettings["githubNurture"]): GithubNurtureView {
   const mapKeys = (keys: AppSettings["githubNurture"]["apiKeys"], name: string) =>
     keys.map((key) => ({
       id: key.id, label: name + " " + key.id.slice(0, 8), maskedKey: "••••••••",
       disabled: key.disabled, cooldownUntil: key.cooldownUntil, lastUsedAt: key.lastUsedAt,
+      errorDetail: name === "Reflection" ? safeKeyError(key.lastError) : null,
       health: (key.disabled ? "disabled" : key.cooldownUntil && Date.parse(key.cooldownUntil) > Date.now() ? "cooldown"
           : key.lastError ? "error" : key.lastUsedAt ? "ready" : "unused") as GithubNurtureView["apiKeys"][number]["health"],
     }));

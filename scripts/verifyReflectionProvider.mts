@@ -113,4 +113,28 @@ let tested=0;
    tested++;
  } finally {globalThis.fetch=fetchOriginal;}
 }
+{
+ const c=config();c.reflectionApiKeys=[key("bad-request")];
+ const client=createReflectionChatClient({config:c,deadlineAt:Date.now()+10000,
+   fetch:async ()=>new Response(JSON.stringify({error:{
+     code:"unsupported_parameter",param:"messages[0].content",
+     message:"Untrusted text and secret value local-fixture-bad-request"
+   }}),{status:400,headers:{"Content-Type":"application/json"}})});
+ await assert.rejects(()=>client.request([{role:"user",content:"bad request"}]),
+   /Reflection HTTP 400/);
+ assert.equal(c.reflectionApiKeys[0].lastError,
+   "Reflection HTTP 400 (unsupported_parameter; messages[0].content)");
+ assert(!c.reflectionApiKeys[0].lastError.includes("local-fixture"));
+ assert.equal(c.reflectionApiKeys[0].disabled,false);
+ tested++;
+}
+{
+ const c=config();c.reflectionApiKeys=[key("error-code")];
+ const client=createReflectionChatClient({config:c,deadlineAt:Date.now()+10000,
+   fetch:async ()=>new Response(JSON.stringify({error:{code:"model_not_found",param:"model"}}),
+     {status:404})});
+ await assert.rejects(()=>client.request([{role:"user",content:"model"}]),/Reflection HTTP 404/);
+ assert.equal(c.reflectionApiKeys[0].lastError,"Reflection HTTP 404 (model_not_found; model)");
+ tested++;
+}
 console.log("PASS: "+tested+" Reflection adapter integration cases (mock network).");

@@ -20,6 +20,23 @@ async function readLimited(response: Response, maxBytes: number): Promise<string
   } finally { reader.releaseLock(); }
   return Buffer.concat(chunks).toString("utf8");
 }
+/** Keep only official machine-readable error codes and parameter paths, not provider messages. */
+function sanitizedApiError(status: number, raw: string): string {
+  const generic = "Reflection HTTP error " + status;
+  try {
+    const data: unknown = JSON.parse(raw);
+    if (!data || typeof data !== "object" || Array.isArray(data)) return generic;
+    const error = (data as {error?: unknown}).error;
+    if (!error || typeof error !== "object" || Array.isArray(error)) return generic;
+    const {code, param} = error as {code?: unknown; param?: unknown};
+    if (typeof code !== "string" || !/^[a-z][a-z0-9_]{1,60}$/.test(code)) return generic;
+    const validParam = typeof param === "string" && param.length <= 100 &&
+      /^[A-Za-z_]/.test(param) &&
+      [...param].every(char => char === "[" || char === "]" || /^[A-Za-z0-9_.-]$/.test(char));
+    const location = validParam ? "; " + param : "";
+    return "Reflection HTTP " + status + " (" + code + location + ")";
+  } catch { return generic; }
+}
 function retryAt(header: string | null, now: number, fallback: number) {
   const secs = Number(header);
   const date = header && Number.isFinite(secs) ? now + secs * 1000 : Date.parse(header ?? "");
@@ -92,19 +109,22 @@ export function createReflectionChatClient(options: {
         });
 
         if (!response.ok) {
-          await response.body?.cancel();
+          // Error bodies are bounded and reduced to validated error.code / error.param only.
+          // Never persist or display error.message, headers, request content or credentials.
+          const details = await readLimited(response, 4096).catch(() => "");
+          const diagnostic = sanitizedApiError(response.status, details);
           if ([401, 402, 403, 429].includes(response.status)) {
             attempted.add(key);
             if (response.status === 402 || response.status === 429) {
               key.cooldownUntil = retryAt(response.headers.get("Retry-After"), now(), response.status === 402 ? 3600000 : 60000);
-              key.lastError = response.status === 402 ? "Reflection quota exhausted." : "Reflection rate limit reached.";
+              key.lastError = diagnostic;
             } else {
               key.disabled = true;
-              key.lastError = "Reflection authentication rejected key.";
+              key.lastError = diagnostic;
             }
             continue;
           }
-          key.lastError = "Reflection HTTP error " + response.status;
+          key.lastError = diagnostic;
           throw new Error(key.lastError);
         }
         const raw = await readLimited(response, options.maxResponseBytes ?? 2097152);
@@ -126,7 +146,10 @@ export function createReflectionChatClient(options: {
         };
       } catch(error) {
         // Never place response bodies, headers, credential text, or transport details in logs.
-        const safe = error instanceof Error && /^(Reflection (HTTP error [0-9]+|response too large|invalid response JSON|returned no usable response))$/.test(error.message);
+        const sameHttpError = error instanceof Error && error.message === key.lastError &&
+          /^Reflection HTTP (?:error )?[0-9]{3}(?: \([a-z][a-z0-9_]{1,60}(?:; [A-Za-z0-9_.\[\]-]{1,100})?\))?$/.test(error.message);
+        const safe = sameHttpError || (error instanceof Error &&
+          /^(?:Reflection (?:response too large|invalid response JSON|returned no usable response))$/.test(error.message));
         const message = safe ? (error as Error).message :
           controller.signal.aborted ? "Reflection request timed out." : "Reflection request could not reach provider.";
         key.lastError = message; throw new Error(message);

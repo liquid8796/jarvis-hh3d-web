@@ -201,6 +201,7 @@ export function GithubNurtureSettings({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium" title={`${key.label} ${key.maskedKey}`}>{key.label} <span className="font-mono text-[var(--color-mist)]">{key.maskedKey}</span></p>
                     <p className={`text-xs ${key.health === "error" ? "text-[#f2a0a0]" : "text-[var(--color-mist)]"}`}>{HEALTH[key.health]}{key.lastUsedAt ? ` · ${when(key.lastUsedAt)}` : ""}</p>
+                    {key.errorDetail && <p className="mt-1 max-w-sm break-words text-xs text-[#f2a0a0]" role="status">Chi tiết: {key.errorDetail}</p>}
                     {key.cooldownUntil && <p className="text-[11px] text-[var(--color-mist)]">Chờ đến {when(key.cooldownUntil)}</p>}
                   </div>
                   <div className="flex min-w-0 shrink-0 flex-wrap items-start gap-2">

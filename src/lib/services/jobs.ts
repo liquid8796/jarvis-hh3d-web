@@ -1,6 +1,7 @@
 import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { listAccountsWithEnvelope } from "./accounts";
+import { effectiveWorkerPref } from "@/lib/validation/accountWorkerPref";
 import {
   getEditableConfig,
   getStoredConfigForSnapshot,
@@ -217,7 +218,6 @@ export async function startJob(userId: string): Promise<StartOutcome> {
   const config = await getStoredConfigForSnapshot(userId);
   // Hỏi đúng LOẠI khôi lỗi đã chọn, không hỏi chung chung: với đàn giao riêng cho máy nhà thì
   // một khôi lỗi tông môn đang trực không giúp được gì, và ngược lại.
-  const workerOnline = await workerOnlineFor(userId, config.workerPref);
   const startedLabels: string[] = [];
 
   for (const account of idle) {
@@ -258,7 +258,8 @@ export async function startJob(userId: string): Promise<StartOutcome> {
     // Nói thật NGAY LÚC NÀY nếu chẳng có khôi lỗi nào nhận nổi job — trước đây người dùng chỉ
     // biết điều đó sau sáu phút im lặng, khi reaper kết liễu job. Vẫn cho xếp hàng (một linh
     // sứ có thể lên ca ngay sau đây), nhưng cảnh báo nằm sẵn trong nhật ký.
-    const wait = describeWorkerWait(config.workerPref, workerOnline);
+    const effectivePref = effectiveWorkerPref(account.workerPrefOverride, config.workerPref);
+    const wait = describeWorkerWait(effectivePref, await workerOnlineFor(userId, effectivePref));
     await addEvent(jobId, wait.level, wait.message);
 
     startedLabels.push(account.label);
@@ -503,8 +504,9 @@ export async function forceStartJob(stoppedJobId: string, actorName: string): Pr
   );
   // Lựa chọn loại khôi lỗi là của CHỦ ĐÀN, không phải của bậc trị sự đang bấm nút: đàn khai hộ
   // vẫn đi đúng con đường mà chủ nhân đã chọn cho mình.
-  const ownerWorkerOnline = await workerOnlineFor(ownerId, config.workerPref);
-  const wait = describeWorkerWait(config.workerPref, ownerWorkerOnline);
+  const effectivePref = effectiveWorkerPref(account.workerPrefOverride, config.workerPref);
+  const ownerWorkerOnline = await workerOnlineFor(ownerId, effectivePref);
+  const wait = describeWorkerWait(effectivePref, ownerWorkerOnline);
   await addEvent(newJobId, wait.level, wait.message);
 
   await notifyDashboard({ userId: ownerId, topic: "job" });
@@ -678,6 +680,9 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
     select
       job.id, job.user_id, job.next_run_at, job.last_worker_id,
       coalesce(
+        (select acc.worker_pref_override from game_accounts as acc
+         where acc.id = job.account_id and acc.user_id = job.user_id
+           and acc.worker_pref_override in ('sect', 'mine')),
         (select uc.config->>'workerPref' from user_configs as uc where uc.user_id = job.user_id),
         'any'
       ) as owner_pref

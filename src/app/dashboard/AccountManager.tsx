@@ -5,6 +5,7 @@ import {
   addAccountAction,
   deleteAccountAction,
   renameAccountAction,
+  setAccountWorkerPrefAction,
   toggleAccountAction,
   updateAccountCookieAction,
   type ActionResult,
@@ -92,6 +93,13 @@ export function AccountManager() {
     formData.set("accountId", account.id);
     formData.set("enabled", enabled ? "on" : "off");
     run(() => toggleAccountAction(formData));
+  };
+
+  const changeWorkerPref = (accountId: string, value: "default" | "sect" | "mine") => {
+    const formData = new FormData();
+    formData.set("accountId", accountId);
+    formData.set("workerPrefOverride", value);
+    run(() => setAccountWorkerPrefAction(formData));
   };
 
   const deleteAccount = (account: DashboardAccount) => {
@@ -223,6 +231,11 @@ export function AccountManager() {
                     <span className={account.enabled ? "" : "opacity-50"}>{account.label}</span>
                   </label>
                   <TierBadge tier={account.accountTier} />
+                  {account.workerPrefOverride !== "default" && (
+                    <span className="rounded-lg border border-[var(--color-jade-400)]/40 bg-[var(--color-jade-400)]/10 px-2 py-0.5 text-[11px] text-[var(--color-jade-300)]">
+                      {account.workerPrefOverride === "sect" ? "Khôi lỗi tông môn" : "Máy nhà"}
+                    </span>
+                  )}
                   {!account.enabled && (
                     <span className="text-xs text-[var(--color-mist)]">đang tắt</span>
                   )}
@@ -244,6 +257,23 @@ export function AccountManager() {
 
                 {editing && (
                   <div className="mt-3 border-t border-[var(--color-ink-600)]/40 pt-3">
+                    <label className="label" htmlFor={`account-worker-${account.id}`}>
+                      Giao tài khoản này cho
+                    </label>
+                    <select
+                      id={`account-worker-${account.id}`}
+                      className="input mb-2 w-full"
+                      value={account.workerPrefOverride ?? "default"}
+                      disabled={pending}
+                      onChange={(event) => changeWorkerPref(account.id, event.target.value as "default" | "sect" | "mine")}
+                    >
+                      <option value="default">Mặc định — theo Giao đàn cho ở Tế đàn auto</option>
+                      <option value="sect">Khôi lỗi tông môn</option>
+                      <option value="mine">Máy nhà của tôi</option>
+                    </select>
+                    <p className="mb-4 text-xs text-[var(--color-mist)]">
+                      Tự lưu khi chọn. Nếu đang chạy, khôi lỗi hiện tại hoàn tất vòng rồi tài khoản mới chuyển nơi chạy.
+                    </p>
                     <label className="label" htmlFor={`rename-${account.id}`}>
                       Tên tài khoản
                     </label>

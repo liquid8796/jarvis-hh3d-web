@@ -49,6 +49,8 @@ export type DashboardAccount = {
   pillBagCaps: PillBagCaps | null;
   pillBagCapsObservedAt: string | null;
   enabled: boolean;
+  /** default inherits the global worker routing. */
+  workerPrefOverride: "default" | "sect" | "mine";
 };
 
 export type DashboardWorker = {

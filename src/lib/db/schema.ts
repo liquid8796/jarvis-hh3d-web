@@ -243,6 +243,8 @@ export const gameAccounts = pgTable(
     pillBagCapsObservedAt: timestamp("pill_bag_caps_observed_at", { withTimezone: true }),
     /** Tắt là đứng ngoài Khai Đàn — cấu hình và lịch sử giữ nguyên, chỉ không chạy. */
     enabled: boolean("enabled").notNull().default(true),
+    /** null = follow global preference; sect or mine = account-specific worker location. */
+    workerPrefOverride: text("worker_pref_override").$type<"sect" | "mine">(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

@@ -13,6 +13,7 @@ const account = (overrides: Partial<DashboardAccount>): DashboardAccount => ({
   label: "VIP A",
   accountTier: "vip",
   enabled: true,
+  workerPrefOverride: "default",
   pillBagCaps: { ha: 13, trung: 7, thuong: 5, cuc: 3 },
   pillBagCapsObservedAt: observedAt,
   ...overrides,

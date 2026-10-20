@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db/client";
 import { decryptSecret, encryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import type { GameAccountRow } from "@/lib/db/schema";
 import type { AccountTier } from "./configs";
+import { resolveAccountWorkerPref, type AccountWorkerPref } from "@/lib/validation/accountWorkerPref";
 import { pillBagCapsSchema, type PillBagCaps } from "@/lib/validation/pillBagCaps";
 
 /**
@@ -23,6 +24,7 @@ export type GameAccountView = {
   pillBagCaps: PillBagCaps | null;
   pillBagCapsObservedAt: string | null;
   enabled: boolean;
+  workerPrefOverride: AccountWorkerPref;
 };
 
 /** Chặn phình vô hạn — 9 người đăng ký, không ai nuôi nổi hơn chừng này tài khoản thật. */
@@ -43,6 +45,7 @@ function toView(row: GameAccountRow): GameAccountView {
         ? observedAt.toISOString()
         : null,
     enabled: row.enabled,
+    workerPrefOverride: row.workerPrefOverride === "sect" || row.workerPrefOverride === "mine" ? row.workerPrefOverride : "default",
   };
 }
 
@@ -228,6 +231,20 @@ export async function setAccountEnabled(
  * còn job đang sống (actions kiểm và từ chối), vì một khôi lỗi đang cầm job bị xoá dưới chân
  * sẽ chỉ còn biết kể lỗi vào console của chính nó.
  */
+/** Account-scoped override, atomically updated without changing cookies or global config. */
+export async function setAccountWorkerPref(
+  userId: string, accountId: string, choice: AccountWorkerPref,
+): Promise<AccountMutation> {
+  const parsed = resolveAccountWorkerPref(choice);
+  if (parsed === null) return { ok: false, error: "Lựa chọn khôi lỗi không hợp lệ." };
+  const rows = await db().update(schema.gameAccounts).set({
+    workerPrefOverride: parsed === "default" ? null : parsed,
+    updatedAt: new Date(),
+  }).where(and(eq(schema.gameAccounts.id, accountId), eq(schema.gameAccounts.userId, userId))).returning();
+  if (!rows.length) return { ok: false, error: "Không tìm thấy tài khoản này." };
+  return { ok: true, account: toView(rows[0]) };
+}
+
 export async function deleteAccount(
   userId: string,
   accountId: string,

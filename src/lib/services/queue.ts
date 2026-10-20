@@ -439,6 +439,9 @@ export async function getQueueSnapshot(viewer: QueueViewer): Promise<QueueSnapsh
       -- không bảng sẽ vẽ một hàng chờ khác với hàng mà cửa phát việc thực sự dùng.
       -- (Không dùng dấu huyền trong bình chú SQL: cả câu này nằm trong một template literal.)
       coalesce(
+        (select acc.worker_pref_override from game_accounts as acc
+         where acc.id = job.account_id and acc.user_id = job.user_id
+           and acc.worker_pref_override in ('sect', 'mine')),
         (select uc.config->>'workerPref' from user_configs as uc where uc.user_id = job.user_id),
         'any'
       ) as owner_pref,

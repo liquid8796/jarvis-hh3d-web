@@ -9,6 +9,7 @@ import {
   deleteAccount,
   renameAccount,
   setAccountEnabled,
+  setAccountWorkerPref,
   updateAccountCookie,
 } from "@/lib/services/accounts";
 import {
@@ -23,6 +24,7 @@ import {
   workerPrefSchema,
 } from "@/lib/services/configs";
 import { getAppSettings } from "@/lib/services/settings";
+import { resolveAccountWorkerPref } from "@/lib/validation/accountWorkerPref";
 import {
   clearVisibleJobEvents,
   getActiveJobs,
@@ -357,6 +359,25 @@ export async function toggleAccountAction(formData: FormData): Promise<ActionRes
       ? `Đã tắt「${result.account.label}」và gửi lệnh thu đàn cho tài khoản này.`
       : `Đã tắt「${result.account.label}」.`,
   };
+}
+
+/**
+ * An override is account-specific and applies at the next worker-claim boundary;
+ * a running cycle is never interrupted. Global pref remains untouched.
+ */
+export async function setAccountWorkerPrefAction(formData: FormData): Promise<ActionResult> {
+  const user = await requireActiveUser();
+  const accountId = readAccountId(formData);
+  if (!accountId) return { ok: false, message: "Thiếu tài khoản cần giao khôi lỗi." };
+  const choice = resolveAccountWorkerPref(formData.get("workerPrefOverride"));
+  if (!choice) return { ok: false, message: "Lựa chọn nơi chạy không hợp lệ — chưa lưu." };
+
+  const result = await setAccountWorkerPref(user.id, accountId, choice);
+  if (!result.ok) return { ok: false, message: result.error };
+  revalidatePath("/dashboard");
+  return { ok: true, message: choice === "default"
+    ? "Đã cho tài khoản kế thừa cài đặt chung. Đàn đang chạy sẽ dùng nơi mới từ vòng tiếp theo."
+    : "Đã đổi nơi chạy riêng của tài khoản. Vòng đang chạy hoàn tất trước khi chuyển khôi lỗi." };
 }
 
 /** Xoá tài khoản — kéo theo toàn bộ lịch sử chạy của nó. Từ chối khi đàn còn sống. */

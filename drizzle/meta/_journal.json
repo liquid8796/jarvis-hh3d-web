@@ -239,6 +239,13 @@
       "when": 1790768344153,
       "tag": "0033_user_presence",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792440000000,
+      "tag": "0034_account_worker_preference",
+      "breakpoints": true
     }
   ]
 }

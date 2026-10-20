@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.203 — Per-account worker assignment (20/10/2026)
+
+- Ngọc Giản → Tài khoản → Sửa now provides three worker routing choices per game account: Mặc định (inherit the live global "Giao đàn cho"), Khôi lỗi tông môn (sect only), and Máy nhà (owner worker only). Each account's choice persists independently; creating accounts preserves the default behavior.
+- New nullable game_accounts.worker_pref_override column, migration 0034. NULL means inherit; only sect/mine overrides are accepted by the guarded server action. No changes to cookie encryption, credentials, enabled flags, or existing account rows.
+- Both claimNextJob's live queued-job routing and the public queue board now resolve the exact same account preference, falling back to global workerPref. Changing an assignment takes effect at the next claim/worker-cycle boundary without interrupting an in-progress browser session.
+- Khai Đàn and admin resume provide availability messages based on each account's effective preference rather than a misleading shared warning.
+- Realtime account feed reflects per-account assignment; existing user config save remains untouched. Offline tests cover inheritance, separate sect/mine jobs under one owner, queue isolation, invalid values, and SQL override precedence. Existing unrelated local files preserved.
+
 ## 1.3.202 — Fix Reflection missing reasoning_content in multi-round web research (20/10/2026)
 
 - Fix HTTP 400 missing_required_parameter at messages[2/4].reasoning_content when Beam tool-calling responses omit the nonempty reasoning_content required on every replayed assistant turn.

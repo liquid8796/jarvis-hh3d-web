@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.203",
+    date: "2026-10-20",
+    lines: [
+      "Mỗi tài khoản game có thể chọn riêng Khôi lỗi tông môn, Máy nhà hoặc theo cài đặt chung.",
+      "Đổi nơi chạy trong phần Sửa tài khoản; đàn đang chạy sẽ hoàn tất vòng trước khi chuyển.",
+      "Bảng hàng đợi tự cập nhật theo lựa chọn riêng của từng tài khoản để không giao sai khôi lỗi.",
+    ],
+  },
+  {
     version: "1.3.202",
     date: "2026-10-20",
     lines: [
@@ -464,14 +473,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Trình xem quảng cáo nay đổi ngẫu nhiên thiết bị (máy tính, điện thoại) và trình duyệt cho mỗi lượt khách.",
       "Có thể chọn chỉ máy tính, chỉ điện thoại, hoặc tự chọn danh sách trình duyệt như Chrome, Edge, Opera, Firefox.",
       "Mỗi danh tính được giữ nguyên cho tới lần dọn dữ liệu duyệt web kế tiếp để trông như một người khách thật.",
-    ],
-  },
-  {
-    version: "1.3.144",
-    date: "2026-10-03",
-    lines: [
-      "Trình xem quảng cáo nay chỉ dọn sạch dữ liệu duyệt web sau mỗi n vòng chạy, với n do bạn tự nhập lúc khởi động.",
-      "Giữa các lần dọn, phiên duyệt được giữ nguyên để giống người dùng quay lại; nhập 0 để tắt hẳn việc dọn định kỳ.",
     ],
   },
 ];

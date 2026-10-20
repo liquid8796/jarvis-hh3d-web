@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.202",
+    date: "2026-10-20",
+    lines: [
+      "Đã sửa lỗi Reflection dừng giữa chừng khi tìm tài liệu trên web rồi quay lại viết mã.",
+      "Kho phụ có thể đọc tài liệu rồi tiếp tục viết mã mà không phải bắt đầu lại lượt làm việc.",
+      "Các kho GitHub có thể tiếp tục phát triển mà không bị lỗi thiếu dữ liệu suy luận trước đó.",
+    ],
+  },
+  {
     version: "1.3.201",
     date: "2026-10-19",
     lines: [
@@ -463,14 +472,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Trình xem quảng cáo nay chỉ dọn sạch dữ liệu duyệt web sau mỗi n vòng chạy, với n do bạn tự nhập lúc khởi động.",
       "Giữa các lần dọn, phiên duyệt được giữ nguyên để giống người dùng quay lại; nhập 0 để tắt hẳn việc dọn định kỳ.",
-    ],
-  },
-  {
-    version: "1.3.143",
-    date: "2026-10-03",
-    lines: [
-      "Khôi phục đầy đủ hệ thống quảng cáo Adsterra đa định dạng và các vùng hiển thị chuyên biệt trên toàn bộ trang web.",
-      "Hoàn tác thay đổi tinh gọn để bảo đảm số lượng vị trí hiển thị và tương tác ổn định.",
     ],
   },
 ];

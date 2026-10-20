@@ -9,6 +9,15 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.202 — Fix Reflection missing reasoning_content in multi-round web research (20/10/2026)
+
+- Fix HTTP 400 missing_required_parameter at messages[2/4].reasoning_content when Beam tool-calling responses omit the nonempty reasoning_content required on every replayed assistant turn.
+- The Reflection client refuses invalid assistant replay locally instead of sending null reasoning to the API; original nonempty model reasoning is sent back unchanged with the matching tool_call_id where available.
+- When Beam omits reasoning from a read-only tool-call response, web search/fetch results are delivered as untrusted reference data in a new user turn without inventing reasoning or replaying orphaned assistant/tool messages. Tool-call and result safety boundaries, secret redaction, quota checks and tool limits remain enforced.
+- On JSON validation repair, Reflection receives a user repair instruction quoting sanitized prior output rather than a synthetic assistant message lacking reasoning; Ollama retains its original behavior.
+- Reflection history packing now drops whole tool rounds when above context budget instead of truncating linked tool-call/result history. No private reasoning, API keys or raw provider error payloads are written to DB or logs.
+- Regression: reproducible two missing-reasoning WebSearch rounds, original reasoning replay, invalid-history fail-fast, JSON repair, and Ollama behavior checks.
+
 ## 1.3.201 — Reflection max reasoning and complete companion repositories (19/10/2026)
 
 - Reflection Beam-1.0-501B-A23B now explicitly receives reasoning_effort=max on every native completion (tool research and final source decisions). At context window >=32768, increase its completion budget from one quarter to one half of configured context (capped at 32768 tokens) to accommodate reasoning plus complete JSON source output; Ollama requests remain unchanged.

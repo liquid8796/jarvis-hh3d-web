@@ -174,4 +174,98 @@ let tested=0;
    tested++;
  } finally {globalThis.fetch=original;}
 }
+{
+ const c=config();
+ let requests=0;
+ const client=createReflectionChatClient({config:c,deadlineAt:Date.now()+10000,
+   fetch:async ()=>{requests++;return body('{"ok":true}');}});
+ await assert.rejects(()=>client.request([{role:"assistant",content:"orphan assistant"}]),
+   /missing reasoning_content/);
+ assert.equal(requests,0,"bad replay fails before the network and does not poison key health");
+ assert.equal(c.reflectionApiKeys?.[0].disabled,false);
+ await client.request([{role:"assistant",content:"previous response",reasoning_content:"Original reasoning"}]);
+ assert.equal(requests,1);
+ tested++;
+}
+{
+ // Regression: Beam sometimes calls WebSearch without reasoning. Replaying this
+ // message used to cause HTTP 400 at messages[2/4].reasoning_content.
+ const c=config();c.webSearchEnabled=true;
+ const sent:Array<Record<string,any>>=[];
+ const original=globalThis.fetch;
+ globalThis.fetch=async (_url,init)=>{
+   const req=JSON.parse(String(init?.body));
+   sent.push(req);
+   const n=sent.length;
+   if(n<=2) return new Response(JSON.stringify({choices:[{message:{
+     role:"assistant",content:null,reasoning_content:null,
+     tool_calls:[{id:"call_"+n,type:"function",function:{name:"WebSearch",arguments:JSON.stringify({query:"documentation "+n})}}]
+   },finish_reason:"tool_calls"}]}),{status:200});
+   return body(JSON.stringify({action:"wait",repo:"research-retry",description:"",
+     reason:"Enough technical references were reviewed.",commitMessage:"",
+     files:[],nextCheckMinutes:60}));
+ };
+ try {
+   const decision=await planCompanion({config:c,station:{owner:"example-owner",repo:"protected"},
+     existingRepos:[],mode:"create",context:"Review public docs then wait.",
+     deadlineAt:Date.now()+15000,
+     webTools:{execute:async ()=>({ok:true,content:"Documentation data only"})}});
+   assert.equal(decision.action,"wait");
+   assert.equal(sent.length,3);
+   for(const request of sent.slice(1)) {
+     assert(request.messages.some((message:any)=>message.role==="user" && message.content.includes("Documentation data only")));
+     assert(!request.messages.some((message:any)=>message.role==="tool"),"no orphan tool responses");
+     assert(!request.messages.some((message:any)=>message.role==="assistant" && !message.reasoning_content),"no null assistant reasoning");
+     assert.equal(request.reasoning_effort,"max");
+   }
+   tested++;
+ } finally {globalThis.fetch=original;}
+}
+{
+ // When the model DOES supply reasoning, preserve it byte-for-byte on replay
+ // alongside tool_call_id rather than replacing the reasoning with a placeholder.
+ const c=config();c.webSearchEnabled=true;
+ const history:Array<Record<string,any>>=[];
+ const original=globalThis.fetch;
+ globalThis.fetch=async (_url,init)=>{
+   const req=JSON.parse(String(init?.body));
+   history.push(req);
+   if(history.length===1) return new Response(JSON.stringify({choices:[{message:{
+     role:"assistant",content:null,reasoning_content:"Original Beam thought to inspect the official API.",
+     tool_calls:[{id:"call_real",type:"function",function:{name:"WebSearch",arguments:'{"query":"official docs"}'}}]
+   },finish_reason:"tool_calls"}]}),{status:200});
+   return body(JSON.stringify({action:"wait",repo:"research-retry",description:"",
+     reason:"The reference was reviewed.",commitMessage:"",files:[],nextCheckMinutes:60}));
+ };
+ try {
+   await planCompanion({config:c,station:{owner:"example-owner",repo:"protected"},
+     existingRepos:[],mode:"create",context:"Inspect official docs.",deadlineAt:Date.now()+15000,
+     webTools:{execute:async ()=>({ok:true,content:"Official documentation reference"})}});
+   const replay=history[1].messages;
+   assert.equal(replay.find((m:any)=>m.role==="assistant")?.reasoning_content,
+     "Original Beam thought to inspect the official API.");
+   assert.equal(replay.find((m:any)=>m.role==="tool")?.tool_call_id,"call_real");
+   tested++;
+ } finally {globalThis.fetch=original;}
+}
+{
+ // JSON validation repair must not append an assistant with missing reasoning.
+ const c=config();c.webSearchEnabled=false;
+ const sent:Array<Record<string,any>>=[];
+ const original=globalThis.fetch;
+ globalThis.fetch=async (_url,init)=>{
+   const req=JSON.parse(String(init?.body));
+   sent.push(req);
+   return body(sent.length===1?"invalid json":JSON.stringify({
+     action:"wait",repo:"repair",description:"",reason:"Wait for next iteration.",
+     commitMessage:"",files:[],nextCheckMinutes:60}));
+ };
+ try {
+   assert.equal((await planCompanion({config:c,station:{owner:"example-owner",repo:"protected"},
+     existingRepos:[],mode:"create",context:"Research later.",deadlineAt:Date.now()+15000})).action,"wait");
+   assert.equal(sent.length,2);
+   assert(!sent[1].messages.some((m:any)=>m.role==="assistant" && !m.reasoning_content));
+   tested++;
+ } finally {globalThis.fetch=original;}
+}
 console.log("PASS: "+tested+" Reflection adapter integration cases (mock network).");

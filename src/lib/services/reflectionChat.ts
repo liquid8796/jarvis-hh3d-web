@@ -79,14 +79,23 @@ export function createReflectionChatClient(options: {
     if (!eligible.length) throw new Error("No eligible Reflection API key.");
     const conversation = messages.map(m => {
       if (m.role === "tool") return {role: "tool", content: m.content, tool_call_id: m.tool_call_id};
-      if (m.role === "assistant" && m.tool_calls?.length) return {
-        role: "assistant", content: m.content || null,
-        reasoning_content: m.reasoning_content ?? null,
-        tool_calls: m.tool_calls.map((call, index) => ({
-          type: "function", id: call.id ?? ("call_" + index),
-          function: {name: call.function.name, arguments: JSON.stringify(call.function.arguments)}
-        }))
-      };
+      if (m.role === "assistant") {
+        // Reflection requires nonempty original reasoning on EVERY replayed
+        // assistant turn. Never substitute null or fabricate private reasoning.
+        if (typeof m.reasoning_content !== "string" || !m.reasoning_content.trim())
+          throw new Error("Reflection assistant history is missing reasoning_content; discard this turn instead of replaying.");
+        return {
+          role: "assistant",
+          content: m.content || null,
+          reasoning_content: m.reasoning_content,
+          ...(m.tool_calls?.length ? {
+            tool_calls: m.tool_calls.map((call) => ({
+              type: "function" as const, id: call.id,
+              function: {name: call.function.name, arguments: JSON.stringify(call.function.arguments)}
+            }))
+          } : {})
+        };
+      }
       return {role: m.role, content: m.content};
     });
     for (const key of eligible) {

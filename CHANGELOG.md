@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.205 — Single-row account worker choices (21/10/2026)
+
+- Account list now places the three worker-assignment checkboxes on the SAME horizontal row as account enabled/username, tier and edit button; no second line or "Khôi lỗi phụ trách" caption.
+- The account toolbar is nonwrapping. On narrow viewports, only the choices region can scroll sideways, leaving username, tier and edit action in the same visible row without clipping the action.
+- Preserves mutually exclusive checkbox selection, immediate per-account persistence and save-failure rollback. No changes to worker dispatch or database.
+- Added regression assertions for inline order, nowrap toolbar, responsive overflow, and existing accessible checkbox behavior.
+
 ## 1.3.204 — Inline checkbox worker assignment inside each account (21/10/2026)
 
 - Ngọc Giản Cấu Hình now shows the account's worker assignment inside the visible account card, alongside its enabled state, tier and edit button, without requiring Sửa.

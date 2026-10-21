@@ -257,10 +257,12 @@ export function AccountManager() {
                 key={account.id}
                 className="rounded-xl border border-[var(--color-ink-600)]/60 p-3"
               >
-                <div className="flex flex-wrap items-center gap-3">
+                {/* A single account toolbar. On narrow screens the worker choices scroll
+                    horizontally inside this row rather than wrapping below the username. */}
+                <div className="flex min-w-0 items-center gap-2">
                   {/* Công tắc "tài khoản này có ra trận không". Tắt giữa chừng thì đàn của
                       riêng nó được thu — các tài khoản khác không bị vạ lây. */}
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--color-parchment)]">
+                  <label className="flex min-w-0 max-w-[35%] shrink items-center gap-1.5 text-sm text-[var(--color-parchment)] sm:max-w-[28%]">
                     <input
                       type="checkbox"
                       checked={account.enabled}
@@ -268,13 +270,14 @@ export function AccountManager() {
                       onChange={(event) => toggleAccount(account, event.target.checked)}
                       className="h-4 w-4 accent-[var(--color-jade-400)]"
                     />
-                    <span className={account.enabled ? "" : "opacity-50"}>{account.label}</span>
+                    <span title={account.label} className={"min-w-0 truncate " + (account.enabled ? "" : "opacity-50")}>{account.label}</span>
                   </label>
-                  <TierBadge tier={account.accountTier} />
+                  <span className="shrink-0"><TierBadge tier={account.accountTier} /></span>
+                  <AccountWorkerAssignment account={account} disabled={pending} onResult={setNotice} />
                   {!account.enabled && (
                     <span className="text-xs text-[var(--color-mist)]">đang tắt</span>
                   )}
-                  <div className="ml-auto flex items-center gap-2">
+                  <div className="ml-auto flex shrink-0 items-center gap-2">
                     <button
                       type="button"
                       className="rounded-md border border-[var(--color-ink-600)] px-2 py-0.5 text-xs text-[var(--color-mist)] transition-colors hover:text-[var(--color-gold-300)]"
@@ -289,8 +292,6 @@ export function AccountManager() {
                     </button>
                   </div>
                 </div>
-
-                <AccountWorkerAssignment account={account} disabled={pending} onResult={setNotice} />
 
                 {editing && (
                   <div className="mt-3 border-t border-[var(--color-ink-600)]/40 pt-3">

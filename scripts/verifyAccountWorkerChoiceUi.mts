@@ -33,6 +33,15 @@ const source = readFileSync(new URL("../src/app/dashboard/AccountManager.tsx", i
 const inline = source.indexOf("<AccountWorkerAssignment account={account}");
 const editor = source.indexOf("{editing && (");
 assert(inline > 0 && editor > inline, "inline checkboxes must render OUTSIDE collapsed editor");
+const toolbarStart = source.lastIndexOf('className="flex min-w-0 items-center gap-2"', inline);
+const toolbarEnd = source.indexOf('{editing && (', toolbarStart);
+assert(toolbarStart > 0 && toolbarEnd > inline, "worker checkboxes belong in the same account toolbar");
+assert(source.slice(toolbarStart, inline).includes('<TierBadge tier={account.accountTier} />'), "checkboxes must follow the account tier on same row");
+assert(source.slice(inline, toolbarEnd).includes('onClick={() => {'), "Sửa remains on the same row");
+assert(!source.slice(toolbarStart, toolbarEnd).includes('flex-wrap'), "account toolbar must not wrap into two lines");
+const choices = readFileSync(new URL("../src/app/dashboard/AccountWorkerChoices.tsx", import.meta.url), "utf8");
+assert(choices.includes("overflow-x-auto whitespace-nowrap"), "checkbox options stay on one row with horizontal scroll on narrow viewports");
+assert(!choices.includes('className="mt-3 border-t'), "no separate second-row fieldset");
 assert(!source.includes('id={' + String.fromCharCode(96) + 'account-worker-'), "old edit-only dropdown must be gone");
 assert(source.includes("if (!result.ok) setSelected(before)"), "failed writes roll back optimistic selection");
 console.log("PASS: 3 exclusive checkboxes in the account card, all choices, pending, accessibility and error rollback.");

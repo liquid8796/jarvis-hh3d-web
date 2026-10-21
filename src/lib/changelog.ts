@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.205",
+    date: "2026-10-21",
+    lines: [
+      "Ba ô chọn khôi lỗi nằm cùng một hàng với tên tài khoản và nút Sửa, gọn hơn trước.",
+      "Trên màn hình hẹp, vuốt ngang nhóm ô chọn để đổi nơi chạy mà không làm xuống dòng.",
+    ],
+  },
+  {
     version: "1.3.204",
     date: "2026-10-21",
     lines: [
@@ -464,14 +472,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Hỗ trợ chạy đồng thời nhiều cửa sổ xem quảng cáo độc lập giúp tăng tốc độ và tối ưu hiệu suất.",
       "Mỗi cửa sổ được cách ly hoàn toàn về hồ sơ trình duyệt, mạng trung gian và dấu vân tay thiết bị.",
       "Tự động điều phối thứ tự dùng chuột phần cứng giữa các cửa sổ, đảm bảo thao tác tự nhiên không tranh chấp.",
-    ],
-  },
-  {
-    version: "1.3.146",
-    date: "2026-10-03",
-    lines: [
-      "Cửa sổ trình duyệt nay luôn được phóng to tối đa và tự động đưa lên hàng đầu khi tương tác.",
-      "Toạ độ bấm chuột được giới hạn chặt chẽ bên trong khung trang web, chấm dứt hoàn toàn tình trạng bấm trượt ra ngoài màn hình.",
     ],
   },
 ];

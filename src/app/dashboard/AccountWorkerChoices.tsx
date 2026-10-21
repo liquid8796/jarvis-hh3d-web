@@ -22,20 +22,17 @@ export function AccountWorkerChoices({
   onSelect: (value: AccountWorkerChoice) => void;
 }) {
   return (
-    <fieldset disabled={disabled} aria-busy={saving ? true : undefined} className="mt-3 border-t border-[var(--color-ink-600)]/40 pt-2.5">
+    <fieldset disabled={disabled} aria-busy={saving ? true : undefined} className="min-w-0 flex-1 overflow-hidden">
       <legend className="sr-only">Giao khôi lỗi phụ trách tài khoản</legend>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="shrink-0 text-[11px] font-medium text-[var(--color-mist)]">
-          Khôi lỗi phụ trách
-        </span>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Chọn một nơi chạy cho tài khoản">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto whitespace-nowrap" role="group" aria-label="Chọn một nơi chạy cho tài khoản">
           {OPTIONS.map((option) => {
             const checked = selected === option.value;
             return (
               <label
                 key={option.value}
                 className={
-                  "inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs leading-none transition-colors " +
+                  "inline-flex min-h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[11px] leading-none transition-colors " +
                   "focus-within:ring-2 focus-within:ring-[var(--color-jade-400)]/60 " +
                   (checked
                     ? "border-[var(--color-jade-400)]/55 bg-[var(--color-jade-400)]/10 text-[var(--color-jade-300)]"
@@ -61,7 +58,7 @@ export function AccountWorkerChoices({
             );
           })}
         </div>
-        {saving && <span className="text-[11px] text-[var(--color-mist)]" role="status">Đang lưu…</span>}
+        {saving && <span className="shrink-0 text-[11px] text-[var(--color-mist)]" role="status">Đang lưu…</span>}
       </div>
     </fieldset>
   );

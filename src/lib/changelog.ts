@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.204",
+    date: "2026-10-21",
+    lines: [
+      "Mỗi tài khoản nay có ba ô chọn khôi lỗi ngay trên thẻ, không cần mở mục Sửa.",
+      "Chạm một ô để chuyển nơi chạy và tự lưu; nếu gặp lỗi, lựa chọn trước vẫn được giữ.",
+    ],
+  },
+  {
     version: "1.3.203",
     date: "2026-10-20",
     lines: [
@@ -464,15 +472,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Cửa sổ trình duyệt nay luôn được phóng to tối đa và tự động đưa lên hàng đầu khi tương tác.",
       "Toạ độ bấm chuột được giới hạn chặt chẽ bên trong khung trang web, chấm dứt hoàn toàn tình trạng bấm trượt ra ngoài màn hình.",
-    ],
-  },
-  {
-    version: "1.3.145",
-    date: "2026-10-03",
-    lines: [
-      "Trình xem quảng cáo nay đổi ngẫu nhiên thiết bị (máy tính, điện thoại) và trình duyệt cho mỗi lượt khách.",
-      "Có thể chọn chỉ máy tính, chỉ điện thoại, hoặc tự chọn danh sách trình duyệt như Chrome, Edge, Opera, Firefox.",
-      "Mỗi danh tính được giữ nguyên cho tới lần dọn dữ liệu duyệt web kế tiếp để trông như một người khách thật.",
     ],
   },
 ];

@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.204 — Inline checkbox worker assignment inside each account (21/10/2026)
+
+- Ngọc Giản Cấu Hình now shows the account's worker assignment inside the visible account card, alongside its enabled state, tier and edit button, without requiring Sửa.
+- Three compact native checkbox controls replace the edit-only dropdown: Mặc định, Khôi lỗi tông môn, Máy nhà. They are mutually exclusive (exactly one checked at a time), accessible via an explicit fieldset/group label, and wrap on narrow screens.
+- Selection saves immediately per account using the existing authenticated setAccountWorkerPrefAction. Each card owns its own pending state; it updates optimistically and restores the previous choice if the request fails, without changing other accounts, cookies or global preference.
+- The Sửa section continues to handle renaming, cookie replacement and account deletion. No database or worker-routing changes required.
+- Added render regression for all three choices, one-selection invariant, disabled/saving state, inline placement and error rollback. Preserved existing dark ink/jade visual tokens and untracked local files.
+
 ## 1.3.203 — Per-account worker assignment (20/10/2026)
 
 - Ngọc Giản → Tài khoản → Sửa now provides three worker routing choices per game account: Mặc định (inherit the live global "Giao đàn cho"), Khôi lỗi tông môn (sect only), and Máy nhà (owner worker only). Each account's choice persists independently; creating accounts preserves the default behavior.

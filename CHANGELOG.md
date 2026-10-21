@@ -15,6 +15,7 @@ Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 - The account toolbar is nonwrapping. On narrow viewports, only the choices region can scroll sideways, leaving username, tier and edit action in the same visible row without clipping the action.
 - Preserves mutually exclusive checkbox selection, immediate per-account persistence and save-failure rollback. No changes to worker dispatch or database.
 - Added regression assertions for inline order, nowrap toolbar, responsive overflow, and existing accessible checkbox behavior.
+- Deployment hardening: SCP retries SSH transport failures (exit 255) up to four times, matching existing remote shell retries; no retry for source/application failures.
 
 ## 1.3.204 — Inline checkbox worker assignment inside each account (21/10/2026)
 

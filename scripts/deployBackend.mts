@@ -224,10 +224,22 @@ try {
   execFileSync("git", ["-c", "core.autocrlf=false", "archive", "--format=tar.gz", "-o", tarball, "HEAD"], { stdio: "inherit" });
 
   console.log("• Chở gói lên VM…");
-  const scp = spawnSync("scp", ["-q", "-i", SSH_KEY, tarball, `${VM_USER}@${VM_HOST}:/tmp/jarvis-app.tar.gz`], {
-    stdio: ["ignore", "inherit", "inherit"],
-  });
-  if (scp.status !== 0) die(`scp thoát ${scp.status}`);
+  // Treat SCP transport errors like remote SSH transport errors: retry only 255.
+  // An interrupted transfer cannot affect the active blue/green release slot.
+  let scpStatus: number | null = null;
+  for (let attempt = 1; attempt <= SSH_ATTEMPTS; attempt++) {
+    const scp = spawnSync("scp", [
+      "-q", "-i", SSH_KEY, "-o", "BatchMode=yes", "-o", "ConnectTimeout=25",
+      "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=8",
+      tarball, VM_USER + "@" + VM_HOST + ":/tmp/jarvis-app.tar.gz",
+    ], {stdio: ["ignore", "inherit", "inherit"]});
+    scpStatus = scp.status;
+    if (scpStatus === 0) break;
+    if (scpStatus !== SSH_TRANSPORT_FAILURE || attempt === SSH_ATTEMPTS) break;
+    console.error("  SCP mất kết nối (255) — thử lại lượt " + (attempt + 1) + "/" + SSH_ATTEMPTS + "…");
+    sleep(SSH_RETRY_MS);
+  }
+  if (scpStatus !== 0) die("scp thoát " + scpStatus);
 
   console.log(`• Dựng release + khởi động cổng ${state.idle} (npm ci + next build — vài phút)…`);
   remoteOrDie(

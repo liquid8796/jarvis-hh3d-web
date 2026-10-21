@@ -31,7 +31,9 @@ assert(quests.includes("grid-cols-3 items-end gap-2"),"quest time fields must sh
 assert(quests.includes("col-span-3 min-w-0 sm:col-span-1"),"quest field adapts to full phone width");
 assert(account.includes("<AccountWorkerAssignment account={account}"),"per-account worker choice retained");
 assert(account.includes('min-[360px]:inline-flex'),"compact tiers must free space for checkboxes at 320px");
+assert(account.includes('<span className="sm:hidden">{compactLabel}</span>') && account.includes('<span className="hidden sm:inline">{fullLabel}</span>'),"badge visibility must be applied to inner text, not unlayered .badge component");
 const workerChoices = read("src/app/dashboard/AccountWorkerChoices.tsx");
 assert(workerChoices.includes('ref={scrollRef}') && workerChoices.includes('rail.scrollLeft'),"selected checkbox must be scrolled into view on narrow phones");
+assert(workerChoices.includes("b.width > a.width") && workerChoices.includes("rail.scrollLeft += b.left - a.left"),"wide chips must align at the start so the native checkbox remains visible");
 assert(workerChoices.includes('overflow-x-auto whitespace-nowrap'),"choice chips remain on one line");
 console.log("PASS responsive contract: header/menu, route parity, mobile inputs, admin tabs, timers, account choices, panorama.");

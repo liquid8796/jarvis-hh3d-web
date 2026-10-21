@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.208 — Mobile badge visibility and choice alignment (21/10/2026)
+
+- Rendered production QA at 320/360/390 px exposed an unlayered .badge display:inline-flex rule defeating Tailwind hidden on the two tier-badge variants, showing both at once and starving the checkbox rail of space.
+- Fix by keeping exactly one badge surface while applying responsive visibility to its nested plain-text spans; preserves VIP/free/pending statuses and desktop appearance.
+- For narrower-than-a-chip rails, selected worker choice scrolls to its START rather than its end, ensuring the actual checkbox remains visible and tappable.
+- Extend mobile regression to protect badge visibility structure and selected-checkbox start alignment. No changes to routing, backend or user account state.
+
 ## 1.3.207 — Fix extra-narrow account choice rail (21/10/2026)
 
 - Verified live 320/360/390/768/1024/1280/1440 viewport behavior and found that the existing normal-tier badge starved mobile inline worker checkbox rail to 0px at 320–360 widths.

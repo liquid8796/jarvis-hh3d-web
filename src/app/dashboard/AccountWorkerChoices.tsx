@@ -36,7 +36,10 @@ export function AccountWorkerChoices({
     if (!rail || !chip) return;
     const a = rail.getBoundingClientRect();
     const b = chip.getBoundingClientRect();
-    if (b.left < a.left) rail.scrollLeft -= a.left - b.left;
+    // If a chip itself is wider than the rail, align its START so the
+    // checkbox remains visible (right-aligning would clip the input).
+    if (b.width > a.width) rail.scrollLeft += b.left - a.left;
+    else if (b.left < a.left) rail.scrollLeft -= a.left - b.left;
     else if (b.right > a.right) rail.scrollLeft += b.right - a.right;
   }, [selected]);
 

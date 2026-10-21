@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.208",
+    date: "2026-10-21",
+    lines: [
+      "Huy hiệu hạng tài khoản nay gọn đúng cỡ trên điện thoại, không còn che lựa chọn khôi lỗi.",
+      "Vùng vuốt ngang tự canh để ô tích đang chọn luôn nằm trong tầm nhìn và dễ chạm.",
+    ],
+  },
+  {
     version: "1.3.207",
     date: "2026-10-21",
     lines: [
@@ -462,15 +470,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Ngăn chặn triệt để hiện tượng cửa sổ mới mở cướp tiêu điểm và chuột khi chạy song song nhiều luồng.",
       "Cửa sổ chỉ kích hoạt và phóng to toàn màn hình khi đến đúng lượt bấm quảng cáo của luồng đó.",
       "Tự động gắn mã nhận diện và điều phối chuột Windows chính xác tuyệt đối vào đúng cửa sổ được chỉ định.",
-    ],
-  },
-  {
-    version: "1.3.149",
-    date: "2026-10-03",
-    lines: [
-      "Khoá độc quyền tương tác theo trọn chu kỳ khi chạy song song nhiều cửa sổ xem quảng cáo.",
-      "Mỗi cửa sổ hoàn thành trọn vẹn việc xem, bấm quảng cáo và đóng trang rồi mới chuyển lượt cho cửa sổ tiếp theo.",
-      "Chấm dứt hoàn toàn hiện tượng tranh chấp cửa sổ và bấm lặp lại hai lần trong cùng một chu kỳ.",
     ],
   },
 ];

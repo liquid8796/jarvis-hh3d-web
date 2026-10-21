@@ -34,11 +34,12 @@ function TierBadge({ tier }: { tier: DashboardAccount["accountTier"] }) {
   // must not consume the last pixels needed for worker-assignment checkboxes.
   return (
     <span className="hidden shrink-0 min-[360px]:inline-flex" title={fullLabel} aria-label={fullLabel}>
-      <span className={"badge " + badgeStyle + " px-1.5 text-[10px] sm:hidden"} aria-hidden="true">
-        {compactLabel}
-      </span>
-      <span className={"badge " + badgeStyle + " hidden sm:inline-flex"} aria-hidden="true">
-        {fullLabel}
+      {/* .badge is unlayered CSS with display:inline-flex. A Tailwind hidden
+          class on .badge itself cannot hide it, so visibility belongs ONLY
+          to inner text spans without .badge. */}
+      <span className={"badge " + badgeStyle + " max-sm:px-1.5 max-sm:text-[10px]"} aria-hidden="true">
+        <span className="sm:hidden">{compactLabel}</span>
+        <span className="hidden sm:inline">{fullLabel}</span>
       </span>
     </span>
   );

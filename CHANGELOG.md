@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.209 — Final compact mobile tier sizing (21/10/2026)
+
+- Live Chrome viewport audit confirmed account choice rail was usable at 320px, but too narrow at 360px because the normal-tier badge retained global unlayered padding.
+- Use compact familiar tier labels (VIP, Free, ?) on phones and an explicit CSS mobile override for badge padding/size. Full Vietnamese tier labels remain intact on desktop and accessible title/name.
+- Preserve one-row username/checkboxes/edit and the existing selected-chip swipe behavior, without any changes to account or worker data.
+- Extend static responsive regression for CSS layer-override contract.
+
 ## 1.3.208 — Mobile badge visibility and choice alignment (21/10/2026)
 
 - Rendered production QA at 320/360/390 px exposed an unlayered .badge display:inline-flex rule defeating Tailwind hidden on the two tier-badge variants, showing both at once and starving the checkbox rail of space.

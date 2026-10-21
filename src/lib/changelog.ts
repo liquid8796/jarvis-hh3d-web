@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.209",
+    date: "2026-10-21",
+    lines: [
+      "Nhãn hạng trên điện thoại gọn hơn để có thêm chỗ thao tác với ba ô chọn khôi lỗi.",
+      "Tên hạng đầy đủ vẫn được giữ trên màn hình lớn, mọi phân công cũ không đổi.",
+    ],
+  },
+  {
     version: "1.3.208",
     date: "2026-10-21",
     lines: [
@@ -461,15 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Cho phép cấu hình tuỳ ý thời gian rê chuột lượn trên quảng cáo trước khi nhấn qua tham số dòng lệnh.",
       "Cửa sổ đang làm việc luôn được đưa lên hàng đầu và phóng to toàn màn hình mà không bao giờ bị che khuất.",
       "Tự động thu nhỏ các cửa sổ khác và đóng sạch tab cài đặt của tiện ích ngay khi khởi chạy.",
-    ],
-  },
-  {
-    version: "1.3.150",
-    date: "2026-10-03",
-    lines: [
-      "Ngăn chặn triệt để hiện tượng cửa sổ mới mở cướp tiêu điểm và chuột khi chạy song song nhiều luồng.",
-      "Cửa sổ chỉ kích hoạt và phóng to toàn màn hình khi đến đúng lượt bấm quảng cáo của luồng đó.",
-      "Tự động gắn mã nhận diện và điều phối chuột Windows chính xác tuyệt đối vào đúng cửa sổ được chỉ định.",
     ],
   },
 ];

@@ -49,6 +49,13 @@
   }
 }
 @media (max-width: 639px) {
+  /* .badge is an unlayered rule: override its padding here rather than
+     relying on Tailwind utilities from a lower cascade layer. */
+  .account-tier-badge {
+    padding: 0.2rem 0.3rem;
+    font-size: 0.625rem;
+    letter-spacing: 0;
+  }
   main .card.p-6 {
     padding: 1rem;
   }

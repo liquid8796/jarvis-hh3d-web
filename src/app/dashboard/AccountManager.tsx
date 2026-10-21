@@ -28,7 +28,7 @@ import { AccountWorkerChoices, type AccountWorkerChoice } from "./AccountWorkerC
 function TierBadge({ tier }: { tier: DashboardAccount["accountTier"] }) {
   const badgeStyle = tier === "vip" || tier === "free" ? "badge-active" : "badge-pending";
   const fullLabel = tier === "vip" ? "Hạng VIP" : tier === "free" ? "Hạng thường" : "Chưa dò hạng";
-  const compactLabel = tier === "vip" ? "VIP" : tier === "free" ? "Thường" : "Chưa rõ";
+  const compactLabel = tier === "vip" ? "VIP" : tier === "free" ? "Free" : "?";
 
   // On tiny phones the badge may be read via the account name's title, but
   // must not consume the last pixels needed for worker-assignment checkboxes.
@@ -37,7 +37,7 @@ function TierBadge({ tier }: { tier: DashboardAccount["accountTier"] }) {
       {/* .badge is unlayered CSS with display:inline-flex. A Tailwind hidden
           class on .badge itself cannot hide it, so visibility belongs ONLY
           to inner text spans without .badge. */}
-      <span className={"badge " + badgeStyle + " max-sm:px-1.5 max-sm:text-[10px]"} aria-hidden="true">
+      <span className={"badge account-tier-badge " + badgeStyle} aria-hidden="true">
         <span className="sm:hidden">{compactLabel}</span>
         <span className="hidden sm:inline">{fullLabel}</span>
       </span>

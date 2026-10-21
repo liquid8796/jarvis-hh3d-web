@@ -32,7 +32,7 @@ export function AccountWorkerChoices({
               <label
                 key={option.value}
                 className={
-                  "inline-flex min-h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[11px] leading-none transition-colors " +
+                  "inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs leading-none transition-colors sm:min-h-8 sm:px-2 sm:py-1.5 sm:text-[11px] " +
                   "focus-within:ring-2 focus-within:ring-[var(--color-jade-400)]/60 " +
                   (checked
                     ? "border-[var(--color-jade-400)]/55 bg-[var(--color-jade-400)]/10 text-[var(--color-jade-300)]"

@@ -28,12 +28,12 @@ export async function SiteHeader() {
 
   return (
     <header
-      className={`mx-auto flex w-full ${SHELL_WIDTH} flex-wrap items-center justify-between gap-y-3 px-4 py-4 sm:px-6 sm:py-5`}
+      className={`site-header relative z-30 mx-auto flex w-full ${SHELL_WIDTH} items-center justify-between gap-2 px-4 py-3 sm:px-6 xl:flex-wrap xl:gap-y-3 xl:py-5`}
       style={{ paddingRight: "max(var(--peek-gutter, 4rem), 1rem)" }}
     >
-      <Link href="/" className="flex items-center gap-3">
+      <Link href="/" className="flex min-w-0 items-center gap-2 sm:gap-3">
         <SectSeal size="2.6rem" />
-        <span className="h-display text-lg font-semibold text-gilded">Auto HH3D</span>
+        <span className="h-display whitespace-nowrap text-base font-semibold text-gilded sm:text-lg">Auto HH3D</span>
       </Link>
 
       <SiteHeaderNav

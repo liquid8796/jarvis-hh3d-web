@@ -78,7 +78,7 @@ export function QuestTimerPanel({
         </span>
       </button>
 
-      <div id="quest-timer-body" hidden={collapsed} className="border-t border-[var(--color-ink-600)]/50 px-6 pb-6 pt-5">
+      <div id="quest-timer-body" hidden={collapsed} className="border-t border-[var(--color-ink-600)]/50 px-3 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
         <div className="mb-4 flex justify-start">
           <button
             type="button"
@@ -109,10 +109,10 @@ export function QuestTimerPanel({
             return (
               <div
                 key={row.rowId}
-                className="rounded-xl border border-[var(--color-ink-600)]/60 bg-[var(--color-ink-900)]/20 p-4"
+                className="rounded-xl border border-[var(--color-ink-600)]/60 bg-[var(--color-ink-900)]/20 p-3 sm:p-4"
               >
-                <div className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]">
-                  <div>
+                <div className="grid grid-cols-3 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] sm:gap-3">
+                  <div className="col-span-3 min-w-0 sm:col-span-1">
                     <label className="label" htmlFor={row.rowId + "-quest"}>Quest</label>
                     <select
                       id={row.rowId + "-quest"}
@@ -141,7 +141,7 @@ export function QuestTimerPanel({
                       ["Giây", "second", row.second, 59],
                     ] as const
                   ).map(([label, field, value, max]) => (
-                    <div key={field} className="w-[5.2rem]">
+                    <div key={field} className="min-w-0 sm:w-[5.2rem]">
                       <label className="label" htmlFor={row.rowId + "-" + field}>{label}</label>
                       <input
                         id={row.rowId + "-" + field}
@@ -161,7 +161,7 @@ export function QuestTimerPanel({
 
                   <button
                     type="button"
-                    className="btn btn-ghost"
+                    className="btn btn-ghost col-span-3 sm:col-span-1"
                     onClick={() => setRows((current) => current.filter((item) => item.rowId !== row.rowId))}
                     disabled={pending}
                   >

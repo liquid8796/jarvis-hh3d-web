@@ -262,7 +262,7 @@ export function AccountManager() {
                 <div className="flex min-w-0 items-center gap-2">
                   {/* Công tắc "tài khoản này có ra trận không". Tắt giữa chừng thì đàn của
                       riêng nó được thu — các tài khoản khác không bị vạ lây. */}
-                  <label className="flex min-w-0 max-w-[35%] shrink items-center gap-1.5 text-sm text-[var(--color-parchment)] sm:max-w-[28%]">
+                  <label className="flex min-h-11 min-w-0 max-w-[35%] shrink items-center gap-1.5 text-sm text-[var(--color-parchment)] sm:max-w-[28%]">
                     <input
                       type="checkbox"
                       checked={account.enabled}
@@ -280,7 +280,7 @@ export function AccountManager() {
                   <div className="ml-auto flex shrink-0 items-center gap-2">
                     <button
                       type="button"
-                      className="rounded-md border border-[var(--color-ink-600)] px-2 py-0.5 text-xs text-[var(--color-mist)] transition-colors hover:text-[var(--color-gold-300)]"
+                      className="inline-flex min-h-11 shrink-0 items-center rounded-lg border border-[var(--color-ink-600)] px-3 py-1.5 text-xs text-[var(--color-mist)] transition-colors hover:text-[var(--color-gold-300)] sm:min-h-8"
                       disabled={pending}
                       onClick={() => {
                         setEditingId(editing ? null : account.id);

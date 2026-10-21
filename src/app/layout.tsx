@@ -28,6 +28,7 @@ import "./communication.css";
 import "./peek.css";
 import "./adsterra.css";
 import "./adcash.css";
+import "./mobile.css";
 
 /**
  * `minimumScale: 1` là một nửa của tính năng pan tranh trên mobile (nửa kia là `.backdrop`

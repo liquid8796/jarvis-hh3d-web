@@ -43,7 +43,11 @@ export function AdminTabs({
           Mượn luôn `.card` thay vì tự pha một màu nền mới: độ đục 0.93/0.96 của nó là con số
           đã ĐO (xem ghi chú tại `.card`), và tab thì được hưởng ké mỗi lần thẻ chỉnh lại.
           Trên nền ấy: chữ sương 4.96:1, chữ vàng của tab đang mở 7.93:1. */}
-      <div className="card mb-6 flex gap-1 p-1">
+      <div
+        role="group"
+        aria-label="Các mục quản trị"
+        className="card mb-6 flex max-w-full snap-x snap-mandatory gap-1 overflow-x-auto overscroll-x-contain p-1 [scrollbar-width:thin]"
+      >
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -55,7 +59,7 @@ export function AdminTabs({
                bấm. Và viền vàng là thứ mang HÌNH của tab đang mở: nền thanh nay đã tối, nên
                mảng nền tím một mình chỉ hơn thanh 1.25:1 — nhìn ra chữ vàng chứ không nhìn ra
                cái nút. Vàng 0.6 đưa đường viền ấy lên 3.90:1, qua chuẩn 3:1 cho nét giao diện. */
-            className={`flex-1 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
+            className={`min-h-11 shrink-0 snap-start whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-semibold transition-colors md:flex-1 md:px-4 ${
               activeKey === t.key
                 ? "border-[var(--color-gold-400)]/60 bg-[var(--color-spirit-500)]/25 text-[var(--color-gold-300)]"
                 : "border-transparent text-[var(--color-mist)] hover:bg-[var(--color-ink-600)]/50 hover:text-[var(--color-parchment)]"

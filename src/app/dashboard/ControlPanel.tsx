@@ -220,7 +220,7 @@ export function ControlPanel({
                 onChange={() => chooseWorkerPref(option.value)}
                 className="peer sr-only"
               />
-              <span className="inline-block cursor-pointer rounded-lg border border-[var(--color-ink-600)] px-3 py-1.5 text-xs text-[var(--color-mist)] transition-colors peer-checked:border-[var(--color-jade-400)]/50 peer-checked:bg-[var(--color-jade-400)]/15 peer-checked:text-[var(--color-jade-400)] peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--color-gold-300)]/60 peer-disabled:cursor-not-allowed peer-disabled:opacity-50">
+              <span className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-[var(--color-ink-600)] px-3 py-2 text-xs text-[var(--color-mist)] transition-colors peer-checked:border-[var(--color-jade-400)]/50 peer-checked:bg-[var(--color-jade-400)]/15 peer-checked:text-[var(--color-jade-400)] peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--color-gold-300)]/60 peer-disabled:cursor-not-allowed peer-disabled:opacity-50">
                 {option.label}
               </span>
             </label>

@@ -9,6 +9,15 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.206 — Mobile-first responsive navigation and core workspaces (21/10/2026)
+
+- Refactor site-wide header into a compact mobile/tablet one-row brand + accessible menu disclosure; desktop navigation stays visible at xl and above. Menu has all signed-in/out/authorized destinations, language control, sign out, current-page indicators, Escape/outside dismissal and large touch targets.
+- Preserve site's distinctive ink/jade/gold identity and intentional panorama-panning backdrop, while containing interactive content to the mobile foreground viewport.
+- Admin tab bar becomes an independently horizontally scrollable snap rail, with 44px targets rather than compressed tab labels.
+- Auto workspace keeps account-level exclusive checkboxes, enlarges mobile tap areas and improves worker routing choices. Quest scheduler uses a readable full-width quest picker, three equal-width time fields, and a full-width delete button on phones instead of five vertical rows.
+- Introduce shared mobile.css behavior for responsive card spacing, viewport-contained main content, iOS 16px inputs (avoid focus zoom), 44px primary actions, safe-area footer and code wrapping; unchanged desktop styles.
+- Add verify:mobile-responsive static route/interaction contract and maintain all existing project rules. No worker dispatch, secrets or database changes.
+
 ## 1.3.205 — Single-row account worker choices (21/10/2026)
 
 - Account list now places the three worker-assignment checkboxes on the SAME horizontal row as account enabled/username, tier and edit button; no second line or "Khôi lỗi phụ trách" caption.

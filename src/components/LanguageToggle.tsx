@@ -14,7 +14,7 @@ export function LanguageToggle() {
       <button
         type="button"
         onClick={() => setLanguage("en")}
-        className={`px-2 py-1 font-semibold rounded-md transition-all ${
+        className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-2 py-1 font-semibold transition-all xl:min-h-0 xl:min-w-0 ${
           language === "en"
             ? "bg-[rgba(232,194,92,.22)] text-[var(--color-gold-300)] shadow-sm"
             : "text-[var(--color-mist)] hover:text-[var(--color-parchment)]"
@@ -30,7 +30,7 @@ export function LanguageToggle() {
       <button
         type="button"
         onClick={() => setLanguage("vi")}
-        className={`px-2 py-1 font-semibold rounded-md transition-all ${
+        className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-2 py-1 font-semibold transition-all xl:min-h-0 xl:min-w-0 ${
           language === "vi"
             ? "bg-[rgba(232,194,92,.22)] text-[var(--color-gold-300)] shadow-sm"
             : "text-[var(--color-mist)] hover:text-[var(--color-parchment)]"

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.206",
+    date: "2026-10-21",
+    lines: [
+      "Giao diện điện thoại được sắp xếp lại: menu gọn, thao tác chạm dễ hơn và nội dung không chen chúc.",
+      "Các tab trong Tông Môn có thể vuốt ngang; lịch hẹn quest và thẻ tài khoản hiển thị gọn hơn.",
+      "Giữ nguyên phong cách, hình nền và mọi cấu hình auto đang có.",
+    ],
+  },
+  {
     version: "1.3.205",
     date: "2026-10-21",
     lines: [
@@ -463,15 +472,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Khắc phục sự cố tiện ích CanvasBlocker không xuất hiện khi khởi chạy trình xem quảng cáo.",
       "Tự động kích hoạt chế độ nhà phát triển (Developer Mode) cho toàn bộ phiên duyệt web đơn và đa luồng.",
       "Hỗ trợ cấu hình đường dẫn tiện ích tuỳ chỉnh linh hoạt và tương thích tuyệt đối với Chromium.",
-    ],
-  },
-  {
-    version: "1.3.147",
-    date: "2026-10-03",
-    lines: [
-      "Hỗ trợ chạy đồng thời nhiều cửa sổ xem quảng cáo độc lập giúp tăng tốc độ và tối ưu hiệu suất.",
-      "Mỗi cửa sổ được cách ly hoàn toàn về hồ sơ trình duyệt, mạng trung gian và dấu vân tay thiết bị.",
-      "Tự động điều phối thứ tự dùng chuột phần cứng giữa các cửa sổ, đảm bảo thao tác tự nhiên không tranh chấp.",
     ],
   },
 ];

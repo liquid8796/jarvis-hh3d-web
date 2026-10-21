@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.207",
+    date: "2026-10-21",
+    lines: [
+      "Màn hình rất hẹp (320–360px) vẫn nhìn thấy lựa chọn khôi lỗi ngay cạnh tên tài khoản.",
+      "Ô đã chọn tự hiện trong vùng vuốt ngang của tài khoản, không còn bị che mất.",
+    ],
+  },
+  {
     version: "1.3.206",
     date: "2026-10-21",
     lines: [
@@ -463,15 +471,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Khoá độc quyền tương tác theo trọn chu kỳ khi chạy song song nhiều cửa sổ xem quảng cáo.",
       "Mỗi cửa sổ hoàn thành trọn vẹn việc xem, bấm quảng cáo và đóng trang rồi mới chuyển lượt cho cửa sổ tiếp theo.",
       "Chấm dứt hoàn toàn hiện tượng tranh chấp cửa sổ và bấm lặp lại hai lần trong cùng một chu kỳ.",
-    ],
-  },
-  {
-    version: "1.3.148",
-    date: "2026-10-03",
-    lines: [
-      "Khắc phục sự cố tiện ích CanvasBlocker không xuất hiện khi khởi chạy trình xem quảng cáo.",
-      "Tự động kích hoạt chế độ nhà phát triển (Developer Mode) cho toàn bộ phiên duyệt web đơn và đa luồng.",
-      "Hỗ trợ cấu hình đường dẫn tiện ích tuỳ chỉnh linh hoạt và tương thích tuyệt đối với Chromium.",
     ],
   },
 ];

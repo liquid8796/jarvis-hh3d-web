@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import type { DashboardAccount } from "@/lib/realtime/dashboardTypes";
 
 export type AccountWorkerChoice = DashboardAccount["workerPrefOverride"];
@@ -21,11 +24,27 @@ export function AccountWorkerChoices({
   saving?: boolean;
   onSelect: (value: AccountWorkerChoice) => void;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // On narrow screens the three checkboxes cannot all fit beside the account
+  // name and Sửa button. Keep the row intact but show the currently selected
+  // option when the account loads or its worker changes.
+  useEffect(() => {
+    const rail = scrollRef.current;
+    const checked = rail?.querySelector<HTMLInputElement>("input:checked");
+    const chip = checked?.closest("label");
+    if (!rail || !chip) return;
+    const a = rail.getBoundingClientRect();
+    const b = chip.getBoundingClientRect();
+    if (b.left < a.left) rail.scrollLeft -= a.left - b.left;
+    else if (b.right > a.right) rail.scrollLeft += b.right - a.right;
+  }, [selected]);
+
   return (
     <fieldset disabled={disabled} aria-busy={saving ? true : undefined} className="min-w-0 flex-1 overflow-hidden">
       <legend className="sr-only">Giao khôi lỗi phụ trách tài khoản</legend>
       <div className="flex min-w-0 items-center gap-1.5">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto whitespace-nowrap" role="group" aria-label="Chọn một nơi chạy cho tài khoản">
+        <div ref={scrollRef} className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto whitespace-nowrap" role="group" aria-label="Chọn một nơi chạy cho tài khoản" title="Vuốt ngang để xem các lựa chọn">
           {OPTIONS.map((option) => {
             const checked = selected === option.value;
             return (

@@ -26,13 +26,22 @@ import { AccountWorkerChoices, type AccountWorkerChoice } from "./AccountWorkerC
  */
 
 function TierBadge({ tier }: { tier: DashboardAccount["accountTier"] }) {
-  if (tier === "vip") {
-    return <span className="badge badge-active">Hạng VIP</span>;
-  }
-  if (tier === "free") {
-    return <span className="badge badge-active">Hạng thường</span>;
-  }
-  return <span className="badge badge-pending">Chưa dò hạng</span>;
+  const badgeStyle = tier === "vip" || tier === "free" ? "badge-active" : "badge-pending";
+  const fullLabel = tier === "vip" ? "Hạng VIP" : tier === "free" ? "Hạng thường" : "Chưa dò hạng";
+  const compactLabel = tier === "vip" ? "VIP" : tier === "free" ? "Thường" : "Chưa rõ";
+
+  // On tiny phones the badge may be read via the account name's title, but
+  // must not consume the last pixels needed for worker-assignment checkboxes.
+  return (
+    <span className="hidden shrink-0 min-[360px]:inline-flex" title={fullLabel} aria-label={fullLabel}>
+      <span className={"badge " + badgeStyle + " px-1.5 text-[10px] sm:hidden"} aria-hidden="true">
+        {compactLabel}
+      </span>
+      <span className={"badge " + badgeStyle + " hidden sm:inline-flex"} aria-hidden="true">
+        {fullLabel}
+      </span>
+    </span>
+  );
 }
 
 /**

@@ -30,4 +30,8 @@ assert(admin.includes("min-h-11 shrink-0 snap-start"),"admin tabs remain reachab
 assert(quests.includes("grid-cols-3 items-end gap-2"),"quest time fields must share a row on phones");
 assert(quests.includes("col-span-3 min-w-0 sm:col-span-1"),"quest field adapts to full phone width");
 assert(account.includes("<AccountWorkerAssignment account={account}"),"per-account worker choice retained");
+assert(account.includes('min-[360px]:inline-flex'),"compact tiers must free space for checkboxes at 320px");
+const workerChoices = read("src/app/dashboard/AccountWorkerChoices.tsx");
+assert(workerChoices.includes('ref={scrollRef}') && workerChoices.includes('rail.scrollLeft'),"selected checkbox must be scrolled into view on narrow phones");
+assert(workerChoices.includes('overflow-x-auto whitespace-nowrap'),"choice chips remain on one line");
 console.log("PASS responsive contract: header/menu, route parity, mobile inputs, admin tabs, timers, account choices, panorama.");

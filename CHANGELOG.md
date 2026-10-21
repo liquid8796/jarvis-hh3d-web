@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.207 — Fix extra-narrow account choice rail (21/10/2026)
+
+- Verified live 320/360/390/768/1024/1280/1440 viewport behavior and found that the existing normal-tier badge starved mobile inline worker checkbox rail to 0px at 320–360 widths.
+- Tier badge now uses compact mobile text at >=360px, and yields space entirely below 360px; normal tablet/desktop tier text is unchanged.
+- Retains the single-row account name → tier → 3 mutually exclusive checkbox choices → Sửa composition. Worker choice rail remains horizontally swipeable, now automatically reveals the selected location when loading or changing a worker selection.
+- Extended responsive contract to guard minimum-width behavior and selected-chip visibility. No worker runtime, account data, or business logic changes.
+
 ## 1.3.206 — Mobile-first responsive navigation and core workspaces (21/10/2026)
 
 - Refactor site-wide header into a compact mobile/tablet one-row brand + accessible menu disclosure; desktop navigation stays visible at xl and above. Menu has all signed-in/out/authorized destinations, language control, sign out, current-page indicators, Escape/outside dismissal and large touch targets.

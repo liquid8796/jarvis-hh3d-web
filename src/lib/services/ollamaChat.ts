@@ -1,5 +1,6 @@
 import { decryptSecret } from "@/lib/crypto/secretBox";
 import type { AppSettings } from "./settings";
+import { boundedLlmTimeoutMs, LLM_REQUEST_TIMEOUT_MS } from "./llmTimeouts";
 
 export type OllamaToolCall = { id?: string; type?: "function"; function: { name: string; arguments: Record<string, unknown> } };
 export type OllamaMessage = { role: "system" | "user" | "assistant" | "tool"; content: string; tool_calls?: OllamaToolCall[]; tool_name?: string; tool_call_id?: string; reasoning_content?: string };
@@ -58,7 +59,7 @@ export function createOllamaChatClient(options: {
   const fetcher = options.fetch ?? globalThis.fetch;
   const outputTokens = options.outputTokens ?? Math.min(16384, Math.floor(config.contextWindow / 4));
   const maxResponseBytes = options.maxResponseBytes ?? 2 * 1024 * 1024;
-  const requestTimeoutMs = options.requestTimeoutMs ?? 60000;
+  const requestTimeoutMs = options.requestTimeoutMs ?? LLM_REQUEST_TIMEOUT_MS;
   if (!Number.isFinite(deadlineAt) || deadlineAt <= now()) throw new Error("Ollama decision deadline has expired.");
   if (!Number.isInteger(config.contextWindow) || config.contextWindow < 8192 || config.contextWindow > 2000000) throw new Error("Invalid Ollama context window; use at least 8192 tokens.");
   const model = config.model.trim().replace(/-cloud$/i, "").replace(/:cloud$/i, "");
@@ -86,7 +87,7 @@ export function createOllamaChatClient(options: {
       const remaining = deadlineAt - now();
       if (remaining <= 0) throw new Error("Ollama decision deadline has expired.");
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), Math.min(requestTimeoutMs, remaining));
+      const timer = setTimeout(() => controller.abort(), boundedLlmTimeoutMs(requestTimeoutMs, remaining));
       key.lastUsedAt = new Date(now()).toISOString();
       try {
         const response = await fetcher(API_URL, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${keySecrets.get(key)}` }, body: JSON.stringify({ model, messages, stream: false, options: { num_predict: outputTokens, ...(requestOptions.temperature === undefined ? {} : { temperature: requestOptions.temperature }) }, ...(requestOptions.tools ? { tools: requestOptions.tools } : {}), ...(requestOptions.format ? { format: requestOptions.format } : {}), ...(requestOptions.think === undefined ? {} : { think: requestOptions.think }) }), signal: controller.signal, redirect: "error" });

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.210",
+    date: "2026-10-24",
+    lines: [
+      "Ollama và Reflection được chờ tối đa 5 phút cho mỗi yêu cầu AI thay vì 1 phút.",
+      "Lượt nuôi kho GitHub và lịch chạy OCI được nới giới hạn tương ứng để không ngắt model quá sớm.",
+      "Các khóa đã nhập và cấu hình đang dùng được giữ nguyên; những lượt chạy ngắn vẫn được bảo vệ.",
+    ],
+  },
+  {
     version: "1.3.209",
     date: "2026-10-21",
     lines: [
@@ -460,15 +469,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Bổ sung mục cấu hình thời gian hover lượn chuột trực tiếp trong kịch bản chạy nhanh của Windows.",
       "Người dùng có thể nhập trực tiếp số giây hoặc khoảng thời gian tuỳ ý khi mở bảng chọn.",
-    ],
-  },
-  {
-    version: "1.3.151",
-    date: "2026-10-03",
-    lines: [
-      "Cho phép cấu hình tuỳ ý thời gian rê chuột lượn trên quảng cáo trước khi nhấn qua tham số dòng lệnh.",
-      "Cửa sổ đang làm việc luôn được đưa lên hàng đầu và phóng to toàn màn hình mà không bao giờ bị che khuất.",
-      "Tự động thu nhỏ các cửa sổ khác và đóng sạch tab cài đặt của tiện ích ngay khi khởi chạy.",
     ],
   },
 ];

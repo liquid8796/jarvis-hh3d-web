@@ -1,3 +1,4 @@
+import { COMPANION_RUN_BUDGET_MS } from "./llmTimeouts";
 import { randomUUID } from "node:crypto";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { effectiveCompanionCount } from "@/lib/validation/githubNurture";
@@ -322,7 +323,7 @@ export function createCompanionEngine(deps: Dependencies = defaults) {
   }
 
   async function run(options: Options = {}): Promise<CompanionNurtureSummary> {
-    const deadline = Math.min(options.deadlineAt ?? Date.now() + 120_000, Date.now() + 240_000);
+    const deadline = Math.min(options.deadlineAt ?? Date.now() + COMPANION_RUN_BUDGET_MS, Date.now() + COMPANION_RUN_BUDGET_MS);
     const summary: CompanionNurtureSummary = { checked: 0, pushed: 0, completed: 0, failed: 0, skipped: 0, results: [] };
     const locked = await deps.lease("all-runners", async () => {
       const initial = await deps.read();

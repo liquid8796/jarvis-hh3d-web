@@ -141,8 +141,8 @@ Model chọn lần xem tiếp theo từ **5 phút đến 7 ngày**. Timer thăm 
 phát hiện ở lần thăm dò kế. Khóa đang bận, API lỗi hoặc hết ngân sách có thể đẩy việc thực thi
 sang lượt sau. `dailyPushes` là trần commit/ngày, `0` tạm dừng; timer không ép tạo commit mỗi lượt.
 
-Service cho `curl` tối đa **300 giây**, `TimeoutStartSec=330`, đủ bao quanh ngân sách runtime
-tối đa 240 giây. Cú pháp lịch và độ trễ theo [systemd.time](https://github.com/systemd/systemd/blob/main/man/systemd.time.xml)
+Service cho `curl` tối đa **480 giây**, `TimeoutStartSec=510`, đủ bao quanh ngân sách runtime
+tối đa 420 giây và mỗi request AI tối đa 300 giây. Cú pháp lịch và độ trễ theo [systemd.time](https://github.com/systemd/systemd/blob/main/man/systemd.time.xml)
 và [systemd.timer](https://github.com/systemd/systemd/blob/main/man/systemd.timer.xml).
 
 **`deploy:backend` và `setup-backend.sh` chưa cài lại hai unit companion.** Sau khi phát hành app

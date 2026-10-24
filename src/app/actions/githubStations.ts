@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
 import { decryptSecret, encryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { pingStationBySlug, runCompanionNurture, runKeepalive } from "@/lib/services/githubStations";
+import { COMPANION_RUN_BUDGET_MS } from "@/lib/services/llmTimeouts";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
 import { mutateGithubState } from "@/lib/services/companionState";
 import { provisionGithubStation, productionGithubProvisionDependencies } from "@/lib/services/githubProvisioning";
@@ -313,7 +314,7 @@ export async function runKeepaliveAction(
   await requireStationManage();
   const startedAt = Date.now();
   const summary = await runKeepalive({ deadlineAt: startedAt + 10_000 });
-  const companionSummary = await runCompanionNurture({ deadlineAt: startedAt + 240_000 });
+  const companionSummary = await runCompanionNurture({ deadlineAt: startedAt + COMPANION_RUN_BUDGET_MS });
   revalidatePath("/admin");
   revalidatePath("/admin/github/[owner]/[repo]", "page");
 

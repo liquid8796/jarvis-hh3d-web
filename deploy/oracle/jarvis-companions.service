@@ -4,10 +4,10 @@ After=jarvis-web.service
 
 [Service]
 Type=oneshot
-TimeoutStartSec=330
+TimeoutStartSec=510
 # Chi phan kho phu: ?only=companions. Quet don va ngo kho chinh giu nguyen nhip NGAY o
 # jarvis-cron.service - polling kho phu khong dung toi chung (xem reviewCronScope).
-# HTTP allows 300 seconds around the runtime's maximum 240-second work budget.
+# HTTP allows 480 seconds around the runtime's maximum 420-second work budget.
 #
 # CONG doc tu /etc/caddy/upstream.conf vi blue/green doi qua lai 3000<->3001.
-ExecStart=/bin/bash -c 'set -eu; PORT=$(grep -oE "127[.]0[.]0[.]1:[0-9]+" /etc/caddy/upstream.conf | cut -d: -f2); TOK=$(grep -m1 "^CRON_SECRET=" /opt/jarvis/shared/.env | cut -d= -f2-); curl -fsS -m 300 -H "Authorization: Bearer $TOK" "http://127.0.0.1:$PORT/api/cron?only=companions"'
+ExecStart=/bin/bash -c 'set -eu; PORT=$(grep -oE "127[.]0[.]0[.]1:[0-9]+" /etc/caddy/upstream.conf | cut -d: -f2); TOK=$(grep -m1 "^CRON_SECRET=" /opt/jarvis/shared/.env | cut -d= -f2-); curl -fsS -m 480 -H "Authorization: Bearer $TOK" "http://127.0.0.1:$PORT/api/cron?only=companions"'

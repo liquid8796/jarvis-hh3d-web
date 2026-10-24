@@ -1,6 +1,7 @@
 import { decryptSecret } from "@/lib/crypto/secretBox";
 import type { AppSettings } from "./settings";
 import type { OllamaMessage, OllamaReply } from "./ollamaChat";
+import { boundedLlmTimeoutMs, LLM_REQUEST_TIMEOUT_MS } from "./llmTimeouts";
 type Config = AppSettings["githubNurture"];
 type Key = NonNullable<Config["reflectionApiKeys"]>[number];
 const ENDPOINT = "https://api.reflection.ai/openai/v1/chat/completions";
@@ -102,7 +103,7 @@ export function createReflectionChatClient(options: {
       const remaining = options.deadlineAt - now();
       if (remaining <= 0) throw new Error("Reflection deadline expired.");
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), Math.min(remaining, options.requestTimeoutMs ?? 60000));
+      const timer = setTimeout(() => controller.abort(), boundedLlmTimeoutMs(options.requestTimeoutMs ?? LLM_REQUEST_TIMEOUT_MS, remaining));
       key.lastUsedAt = new Date(now()).toISOString();
       try {
         const response = await fetcher(ENDPOINT, {

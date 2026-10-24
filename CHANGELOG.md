@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.210 — Five-minute Ollama and Reflection request timeouts (24/10/2026)
+
+- Increased DEFAULT Ollama and Reflection chat request timeout from 60,000 to 300,000 ms (5 minutes) for both web-research tool rounds and final source decisions. The request still respects the remaining task deadline and explicit shorter callsite overrides; no hanging/unbounded calls.
+- The companion Github nurture runner now allows up to 420 seconds per run, including setup, model request, checkpoints and GitHub commits, instead of a 240-second upper bound. Manual admin trigger and automatic cron pass the matching total budget.
+- Raised /api/cron maxDuration to 480 seconds and the OCI hourly companion polling service limits to curl 480 seconds and systemd TimeoutStartSec=510, avoiding an outer termination before the five-minute AI request. The dedicated naming flow keeps its intentional shorter bound and other unrelated provisioning deadlines remain unchanged.
+- Added offline regression validating BOTH providers' actual AbortController timers (300 seconds), deadline clipping, explicit shorter timeouts and consistency across cron, manual triggers and OCI systemd service. No API key, model choice, quota, GitHub content or database changes.
+- OCI unit must be installed from the new active release (deploy:backend does not install it automatically).
+
 ## 1.3.209 — Final compact mobile tier sizing (21/10/2026)
 
 - Live Chrome viewport audit confirmed account choice rail was usable at 320px, but too narrow at 360px because the normal-tier badge retained global unlayered padding.

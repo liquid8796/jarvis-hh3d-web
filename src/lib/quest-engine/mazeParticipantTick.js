@@ -31,6 +31,26 @@
       !Number.isFinite(state.startedAt) || now - state.startedAt > 45 * 60_000) {
     state = {mode, requestedCode: code, startedAt: now, avoided: {}, room: '', waitingAt: 0, lastJoinAt: 0, lastRefreshAt: 0};
   }
+  // Only '!' lines are promoted to Info in quest-engine. Log observable stage
+  // transitions and real decisions, NOT every 2-second probe. Keep phase / last
+  // notice in the same per-account session state as the controller.
+  const journal = [];
+  if (!state.journalSeen || typeof state.journalSeen !== 'object') state.journalSeen = {};
+  const say = (message) => journal.push('!Mê Cung • ' + message);
+  const stage = (next, message) => {
+    if (state.journalStage !== next) {
+      state.journalStage = next;
+      say(message);
+    }
+  };
+  const once = (id, message, repeatMs = 0) => {
+    const previous = Number(state.journalSeen[id]) || 0;
+    if (!previous || (repeatMs > 0 && now - previous >= repeatMs)) {
+      state.journalSeen[id] = now;
+      say(message);
+    }
+  };
+  const report = () => journal.join('\n');
   const save = () => { try { sessionStorage.setItem(key, JSON.stringify(state)); } catch (_) {} };
   const avoid = (value) => {
     // A kick/disband/AFK exit always requires another room, including when
@@ -84,12 +104,28 @@
     vietnamDay(chestAt) === vietnamDay(now);
   const dailyFull = (sameDayChest && chest.cap > 0 && chest.total >= chest.cap) ||
     (cap > 0 && total >= cap);
+  const currentRoom = roomCode();
+  if (lobby && !room && !battle && !(checkCap && dailyFull)) {
+    stage('lobby', state.room
+      ? 'Đã trở về sảnh; kiểm tra phòng khác sau khi rời phòng trước.'
+      : 'Đang ở sảnh; tìm phòng phù hợp với độ khó đã chọn.');
+  } else if (battle) {
+    stage('battle:' + currentRoom, 'Đang chiến đấu trong Mê Cung; theo dõi tự đánh và chuyển ải.');
+  } else if (room) {
+    stage('room:' + currentRoom, 'Đã vào phòng Mê Cung' +
+      (currentRoom ? ' #' + currentRoom : '') + '; kiểm tra sẵn sàng và các chế độ tự động.');
+  }
+  if (sameDayChest && chest.at !== state.journalChestAt) {
+    state.journalChestAt = chest.at;
+    say('Đã nhận kết quả rương Boss 5: Huyền Tinh ' + chest.total + '/' + chest.cap + '.');
+  }
 
   // Never finish an in-progress boss fight or declare success while a room's
   // leave-confirm dialog remains open. Completing the quest in that state
   // closes the browser before the official leave request has been sent.
   // Keep battle auto-actions running; finish only once back in the lobby.
   if (checkCap && dailyFull && !battle) {
+    once('cap:' + vietnamDay(now), 'Đã đạt giới hạn Huyền Tinh trong ngày; sẽ rời phòng an toàn.');
     if (room) {
       state.leaving = true;
       const confirm = get('#confirm-overlay .confirm-btn-ok');
@@ -99,12 +135,13 @@
         if (visible(leave)) leave.classList.add('jvz-mc-join-leave');
       }
       save();
-      return '';
+      return report();
     }
     if (lobby) {
+      stage('daily-done:' + vietnamDay(now), 'Đã ở sảnh và đủ Huyền Tinh; kết thúc lượt Mê Cung.');
       body.classList.add('jvz-mc-join-done');
       save();
-      return '';
+      return report();
     }
   }
   body.classList.remove('jvz-mc-join-done');
@@ -113,12 +150,12 @@
   if (state.leaving && visible(get('#confirm-overlay .confirm-btn-ok'))) {
     get('#confirm-overlay .confirm-btn-ok').classList.add('jvz-mc-join-confirm');
     save();
-    return '';
+    return report();
   }
 
   if (lobby && !room && !battle) {
     if (state.room) { avoid(state.room); state.room = ''; state.waitingAt = 0; state.leaving = false; }
-    if (now - (state.lastJoinAt || 0) < 7_000) { save(); return ''; }
+    if (now - (state.lastJoinAt || 0) < 7_000) { save(); return report(); }
     const list = get('#room-list');
     // Prefer the entered code initially. If that room kicked us (or failed to
     // start), temporarily fall back to another suitable public room.
@@ -144,9 +181,11 @@
       target.querySelector('button.btn-join-room').classList.add('jvz-mc-join-target');
       state.lastJoinAt = now;
       save();
-      return '';
+      return report();
     }
     if (preferredCode && /^\d{6}$/.test(preferredCode)) {
+      once('search-code:' + preferredCode,
+        'Chưa thấy phòng #' + preferredCode + ' trong danh sách; thử tham gia bằng mã phòng.');
       const input = get('#room-id-input');
       const quick = get('.room-search-tools button.btn-join-room');
       if (input && visible(quick) && !quick.disabled) {
@@ -157,15 +196,16 @@
         state.pendingCode = code;
         state.lastJoinAt = now;
         save();
-        return '';
+        return report();
       }
     }
     if (now - (state.lastRefreshAt || 0) > 15000) {
       state.lastRefreshAt = now;
+      once('lobby-heartbeat', 'Vẫn đang tìm phòng trống phù hợp; sẽ tiếp tục làm mới danh sách.', 90_000);
       if (typeof window.manualRefreshLobby === 'function') window.manualRefreshLobby();
     }
     save();
-    return '';
+    return report();
   }
   // Site saves toggles per account but they may be OFF on a newly added account.
   // Mark only actionable, visible, currently-off switches. Playwright clicks them.
@@ -194,12 +234,14 @@
       readyButton.classList.add('jvz-mc-join-ready');
     }
     if (!battle && now - state.waitingAt > waitSec * 1000) {
+      once('wait-expired:' + current + ':' + state.waitingAt,
+        'Đã chờ chủ phòng quá ' + waitSec + ' giây mà chưa bắt đầu; rời phòng để tìm đội khác.');
       avoid(current);
       state.leaving = true;
       const leave = get('#btn-leave-room');
       if (visible(leave)) leave.classList.add('jvz-mc-join-leave');
       save();
-      return '';
+      return report();
     }
     if (state.leaving && visible(get('#confirm-overlay .confirm-btn-ok'))) {
       get('#confirm-overlay .confirm-btn-ok').classList.add('jvz-mc-join-confirm');
@@ -214,5 +256,5 @@
     if (visible(next) && !next.disabled) next.classList.add('jvz-mc-join-next');
   }
   save();
-  return '';
+  return report();
 }

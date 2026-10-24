@@ -3,7 +3,8 @@
     "action": "navigate",
     "text": "/me-cung",
     "timeoutMs": 15000,
-    "note": "Người tham gia: mở sảnh mê cung"
+    "note": "Người tham gia: mở sảnh mê cung",
+    "journalOnSuccess": "Thành viên: đã mở trang Mê Cung."
   },
   {
     "action": "waitForCondition",
@@ -39,7 +40,8 @@
         },
         "optional": true,
         "timeoutMs": 5000,
-        "note": "Vào phòng phù hợp qua nút chính thức của game"
+        "note": "Vào phòng phù hợp qua nút chính thức của game",
+        "journalOnSuccess": "Đã bấm tham gia phòng; chờ game xác nhận vào đội."
       },
       {
         "action": "click",
@@ -50,7 +52,8 @@
         },
         "optional": true,
         "timeoutMs": 3000,
-        "note": "Bật tự động sẵn sàng nếu đang tắt"
+        "note": "Bật tự động sẵn sàng nếu đang tắt",
+        "journalOnSuccess": "Đã bấm bật tự động sẵn sàng."
       },
       {
         "action": "click",
@@ -61,7 +64,8 @@
         },
         "optional": true,
         "timeoutMs": 3000,
-        "note": "Bật tự động chuyển ải"
+        "note": "Bật tự động chuyển ải",
+        "journalOnSuccess": "Đã bấm bật tự động chuyển ải."
       },
       {
         "action": "click",
@@ -72,7 +76,8 @@
         },
         "optional": true,
         "timeoutMs": 3000,
-        "note": "Bật tự động mở rương"
+        "note": "Bật tự động mở rương",
+        "journalOnSuccess": "Đã bấm bật tự động mở rương."
       },
       {
         "action": "click",
@@ -83,7 +88,8 @@
         },
         "optional": true,
         "timeoutMs": 4000,
-        "note": "Đánh dấu sẵn sàng (không bấm HỦY sẵn sàng)"
+        "note": "Đánh dấu sẵn sàng (không bấm HỦY sẵn sàng)",
+        "journalOnSuccess": "Đã bấm Sẵn Sàng; chờ chủ phòng."
       },
       {
         "action": "click",
@@ -94,7 +100,8 @@
         },
         "optional": true,
         "timeoutMs": 4000,
-        "note": "Bật auto đánh khi đã vào ải"
+        "note": "Bật auto đánh khi đã vào ải",
+        "journalOnSuccess": "Đã bấm bật tự động tấn công."
       },
       {
         "action": "click",
@@ -105,7 +112,8 @@
         },
         "optional": true,
         "timeoutMs": 4000,
-        "note": "Chuyển ải nếu trang chưa tự chuyển"
+        "note": "Chuyển ải nếu trang chưa tự chuyển",
+        "journalOnSuccess": "Đã bấm chuyển ải tiếp theo."
       },
       {
         "action": "click",
@@ -116,7 +124,8 @@
         },
         "optional": true,
         "timeoutMs": 5000,
-        "note": "Chủ phòng AFK quá ngưỡng hoặc đã đủ huyền tinh: rời phòng"
+        "note": "Chủ phòng AFK quá ngưỡng hoặc đã đủ huyền tinh: rời phòng",
+        "journalOnSuccess": "Đã bấm rời phòng."
       },
       {
         "action": "click",
@@ -127,7 +136,8 @@
         },
         "optional": true,
         "timeoutMs": 5000,
-        "note": "Xác nhận rời phòng của thành viên"
+        "note": "Xác nhận rời phòng của thành viên",
+        "journalOnSuccess": "Đã bấm xác nhận rời phòng."
       },
       {
         "action": "waitMilliseconds",

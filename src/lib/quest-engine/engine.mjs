@@ -676,6 +676,7 @@ export function createQuestEngine(deps) {
     switch (step.action) {
       case "navigate": {
         const nav = await session.navigate(session.resolveUrl(step.text ?? step.selector ?? "/"));
+        if (nav.ok && step.journalOnSuccess) log.info(scope, step.journalOnSuccess);
         return nav.ok ? null : `Điều hướng hỏng: ${nav.error}`;
       }
 
@@ -687,11 +688,21 @@ export function createQuestEngine(deps) {
           // một tính năng chưa mở — hai chuyện cần cách chữa hoàn toàn khác nhau.
           : `Trang chưa dựng xong sau ${Math.round((step.timeoutMs ?? 15000) / 1000)}s — không thấy ${step.selector}`;
 
-      case "click":
+      case "click": {
         await session.humanDelay();
-        return (await session.click(step.selector ?? "", step.timeoutMs, step.forceClick === true, step.pressMs ?? 0))
-          ? null
-          : `Click hỏng: ${step.selector}`;
+        const clicked = await session.click(step.selector ?? "", step.timeoutMs, step.forceClick === true, step.pressMs ?? 0);
+        // Log a successful click, not an intent or an absent optional control.
+        if (clicked && step.journalOnSuccess) {
+          const last = state.journalClickAt?.[step.selector] ?? 0;
+          // Unresponsive toggles must not flood Info every two seconds.
+          if (!last || Date.now() - last >= 30_000) {
+            state.journalClickAt ??= {};
+            state.journalClickAt[step.selector] = Date.now();
+            log.info(scope, step.journalOnSuccess);
+          }
+        }
+        return clicked ? null : `Click hỏng: ${step.selector}`;
+      }
 
       case "clickByText":
         await session.humanDelay();

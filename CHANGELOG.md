@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.213 — Nhật Ký từng bước Mê Cung Thành viên (24/10/2026)
+
+- Fixed missing per-step user-facing Info logs for Maze participant (VIP/free, web and PC worker); controller was returning an empty string from every poll, while the engine only promotes leading !-prefixed status lines to Info.
+- Participant now reports real, observable transitions (lobby, room entered/returned, battle, Boss 5 chest reward, cap reached and safe completion), room-code search fallback, timeout waiting for host, and a throttled 90-second heartbeat while waiting for rooms. Stage and once-only stamps persist in the account's sessionStorage, avoiding a flood across roughly 950 repeat iterations.
+- Each explicitly tagged navigate/click step now adds an Info entry only after the browser successfully navigates/clicks: join, enable auto-ready/next/chest, ready, auto attack, next stage, leave, and confirm. Repeated unsuccessful toggles are log-throttled at 30 seconds; guard-skipped or failed optional actions never claim success.
+- The existing quest engine ! Info channel is reused, so entries go through the normal Web/PC worker journal pipeline, not browser console or sensitive HTTP logs. All other quests and the host Maze flow retain their prior behavior.
+- Added offline regression covering VIP/free profile projection, stage dedup, heartbeats, chest rewards, host AFK, real newline splitting, successful vs. skipped clicks, and log throttling. No account data, API keys, endpoints, worker routing or database changes.
+
 ## 1.3.212 — Mê Cung: role-specific configuration panels (24/10/2026)
 
 - Selecting Chủ phòng now shows only host-specific controls (HP kick, minimum ready players, idle kick, opening/battle messages). Selecting Thành viên shows only its room code and maximum host wait; difficulty and Huyền Tinh daily-cap toggle remain shared.

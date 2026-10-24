@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.213",
+    date: "2026-10-24",
+    lines: [
+      "Nhật Ký Mê Cung ở chế độ Thành viên nay kể rõ từng bước tìm phòng, tham gia, sẵn sàng, chiến đấu, mở rương và rời phòng.",
+      "Khi phải chờ, bị rời phòng hoặc đã đủ Huyền Tinh, Nhật Ký sẽ giải thích trạng thái thay vì im lặng.",
+      "Các vòng kiểm tra liên tục được gộp hợp lý để Nhật Ký không bị tràn dòng giống nhau.",
+    ],
+  },
+  {
     version: "1.3.212",
     date: "2026-10-24",
     lines: [
@@ -463,14 +472,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Bổ sung tuỳ chọn cho phép người dùng tự nhập thiết bị giả lập mong muốn trong kịch bản chạy nhanh.",
       "Hỗ trợ nhận diện các dòng iPhone, iPad, điện thoại Android, chip máy Mac và hệ điều hành chỉ định.",
-    ],
-  },
-  {
-    version: "1.3.154",
-    date: "2026-10-03",
-    lines: [
-      "Cho phép người dùng thiết lập thời gian tối đa chờ render quảng cáo Adsterra qua giao diện và dòng lệnh.",
-      "Tự động cưỡng chế click quảng cáo ngay lập tức nếu quá thời gian chờ mà quảng cáo chưa render xong.",
     ],
   },
 ];

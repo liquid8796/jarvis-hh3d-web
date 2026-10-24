@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.211",
+    date: "2026-10-24",
+    lines: [
+      "Mê Cung nay cho chọn làm chủ phòng hoặc thành viên; áp dụng cho cả VIP và tài khoản thường.",
+      "Có thể lọc độ khó, nhập mã phòng, chọn thời gian chờ và tự tìm phòng khác nếu bị trục xuất.",
+      "Khôi lỗi tự bật các chế độ hỗ trợ khi vào phòng và kiểm tra Huyền Tinh đúng ngày.",
+    ],
+  },
+  {
     version: "1.3.210",
     date: "2026-10-24",
     lines: [
@@ -461,14 +470,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khắc phục sự cố tiện ích CanvasBlocker không hiển thị trên trình duyệt khi chạy 1 instance.",
       "Tự động chuyển sang hồ sơ độc lập để nạp tiện ích trọn vẹn và kích hoạt sẵn Developer Mode.",
-    ],
-  },
-  {
-    version: "1.3.152",
-    date: "2026-10-03",
-    lines: [
-      "Bổ sung mục cấu hình thời gian hover lượn chuột trực tiếp trong kịch bản chạy nhanh của Windows.",
-      "Người dùng có thể nhập trực tiếp số giây hoặc khoảng thời gian tuỳ ý khi mở bảng chọn.",
     ],
   },
 ];

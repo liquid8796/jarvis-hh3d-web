@@ -235,6 +235,12 @@ export const configSchema = z.object({
       meCung: z
         .object({
           enabled: z.boolean().default(false),
+          /** Keep old users hosting. Participant selects a waiting public room instead. */
+          role: z.enum(["host", "join"]).default("host"),
+          /** A particular six-digit room code, or empty = find a suitable public room. */
+          roomCode: z.string().regex(/^(?:\d{6})?$/).default(""),
+          /** Stop waiting for an inactive host and seek another room. */
+          hostWaitSec: z.number().int().min(30).max(3600).default(180),
           /** is-normal | is-hard | is-nightmare — the site's own mode classes. */
           mode: z.enum(["is-normal", "is-hard", "is-nightmare"]).default("is-normal"),
           /** 0 = never kick; anything else is an HP floor (the desktop's kickHp). */

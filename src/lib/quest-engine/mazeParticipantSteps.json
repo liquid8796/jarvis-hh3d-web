@@ -1,0 +1,144 @@
+[
+  {
+    "action": "navigate",
+    "text": "/me-cung",
+    "timeoutMs": 15000,
+    "note": "Người tham gia: mở sảnh mê cung"
+  },
+  {
+    "action": "waitForCondition",
+    "condition": {
+      "kind": "visible",
+      "selector": "#lobby-overview, #room-panel, #screen-battle"
+    },
+    "timeoutMs": 25000,
+    "note": "Chờ game xác nhận đang ở sảnh, trong phòng hoặc đang đánh"
+  },
+  {
+    "action": "repeat",
+    "note": "Tự tìm phòng, sẵn sàng, đánh và tái gia nhập sau kick/giải tán; tối đa 35 phút mỗi lượt",
+    "maxIterations": 950,
+    "maxSeconds": 2100,
+    "until": {
+      "kind": "visible",
+      "selector": "body.jvz-mc-join-done"
+    },
+    "steps": [
+      {
+        "action": "evaluateJavaScript",
+        "script": "@@MAZE_JOIN_TICK@@",
+        "timeoutMs": 5000,
+        "note": "Dò phòng và trạng thái; đọc huyền tinh và đánh dấu thao tác an toàn"
+      },
+      {
+        "action": "click",
+        "selector": ".jvz-mc-join-target",
+        "when": {
+          "kind": "visible",
+          "selector": ".jvz-mc-join-target"
+        },
+        "optional": true,
+        "timeoutMs": 5000,
+        "note": "Vào phòng phù hợp qua nút chính thức của game"
+      },
+      {
+        "action": "click",
+        "selector": ".jvz-mc-join-auto-ready",
+        "when": {
+          "kind": "visible",
+          "selector": ".jvz-mc-join-auto-ready"
+        },
+        "optional": true,
+        "timeoutMs": 3000,
+        "note": "Bật tự động sẵn sàng nếu đang tắt"
+      },
+      {
+        "action": "click",
+        "selector": ".jvz-mc-join-auto-next",
+        "when": {
+          "kind": "visible",
+          "selector": ".jvz-mc-join-auto-next"
+        },
+        "optional": true,
+        "timeoutMs": 3000,
+        "note": "Bật tự động chuyển ải"
+      },
+      {
+        "action": "click",
+        "selector": ".jvz-mc-join-auto-chest",
+        "when": {
+          "kind": "visible",
+          "selector": ".jvz-mc-join-auto-chest"
+        },
+        "optional": true,
+        "timeoutMs": 3000,
+        "note": "Bật tự động mở rương"
+      },
+      {
+        "action": "click",
+        "selector": "#btn-start.jvz-mc-join-ready",
+        "when": {
+          "kind": "visible",
+          "selector": "#btn-start.jvz-mc-join-ready"
+        },
+        "optional": true,
+        "timeoutMs": 4000,
+        "note": "Đánh dấu sẵn sàng (không bấm HỦY sẵn sàng)"
+      },
+      {
+        "action": "click",
+        "selector": ".jvz-mc-join-attack",
+        "when": {
+          "kind": "visible",
+          "selector": ".jvz-mc-join-attack"
+        },
+        "optional": true,
+        "timeoutMs": 4000,
+        "note": "Bật auto đánh khi đã vào ải"
+      },
+      {
+        "action": "click",
+        "selector": "#btn-next-stage.jvz-mc-join-next",
+        "when": {
+          "kind": "visible",
+          "selector": "#btn-next-stage.jvz-mc-join-next"
+        },
+        "optional": true,
+        "timeoutMs": 4000,
+        "note": "Chuyển ải nếu trang chưa tự chuyển"
+      },
+      {
+        "action": "click",
+        "selector": "#btn-leave-room.jvz-mc-join-leave",
+        "when": {
+          "kind": "visible",
+          "selector": "#btn-leave-room.jvz-mc-join-leave"
+        },
+        "optional": true,
+        "timeoutMs": 5000,
+        "note": "Chủ phòng AFK quá ngưỡng hoặc đã đủ huyền tinh: rời phòng"
+      },
+      {
+        "action": "click",
+        "selector": "#confirm-overlay .confirm-btn-ok.jvz-mc-join-confirm",
+        "when": {
+          "kind": "visible",
+          "selector": "#confirm-overlay .confirm-btn-ok.jvz-mc-join-confirm"
+        },
+        "optional": true,
+        "timeoutMs": 5000,
+        "note": "Xác nhận rời phòng của thành viên"
+      },
+      {
+        "action": "waitMilliseconds",
+        "timeoutMs": 2000,
+        "note": "Chờ server cập nhật phòng và chiến đấu"
+      }
+    ]
+  },
+  {
+    "action": "readCooldownSeconds",
+    "timeoutMs": 4000,
+    "note": "Kết thúc một lượt mê cung thành viên; quay lại kiểm tra sau theo lịch"
+  }
+]

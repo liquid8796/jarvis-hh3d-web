@@ -156,6 +156,9 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
     quests: {
       meCung: {
         enabled: formData.get("meCungEnabled") === "on",
+        role: String(formData.get("meCungRole") ?? "host"),
+        roomCode: String(formData.get("meCungRoomCode") ?? "").trim(),
+        hostWaitSec: Number(formData.get("meCungHostWaitSec") ?? 180) || 180,
         mode: String(formData.get("meCungMode") ?? "is-normal"),
         kickHp: Number(formData.get("meCungKickHp") ?? 0) || 0,
         kickIdleSec: Number(formData.get("meCungKickIdle") ?? 0) || 0,

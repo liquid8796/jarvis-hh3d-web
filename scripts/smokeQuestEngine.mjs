@@ -3460,7 +3460,13 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
-  const browser = await chromium.launch({ headless: true });
+  // Reuse a locally installed Chrome when Playwright's optional headless-shell
+  // download is unavailable. The default CI browser remains unchanged.
+  const smokeBrowserPath = process.env.JARVIS_SMOKE_BROWSER_PATH;
+  const browser = await chromium.launch({
+    headless: true,
+    ...(smokeBrowserPath ? { executablePath: smokeBrowserPath } : {}),
+  });
   const infos = [];
   const debugs = [];
   const log = {

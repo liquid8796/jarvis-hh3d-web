@@ -845,7 +845,16 @@ export function createQuestEngine(deps) {
         // Keep strict caps for EVERY other quest.
         const fishing = (quest.id === "cau-ca" || quest.id === "cau-ca-thuong") &&
           body.some((s) => s.action === "evaluateJavaScript" && s.script?.includes("__jvzFish"));
-        const maxIterations = fishing ? Infinity : clamp(step.maxIterations ?? 10, 1, 200);
+        // Mê Cung participant polls roughly every two seconds for up to 35
+        // minutes. The general 200-iteration safety cap ended it after ~6m.
+        // Extend ONLY the explicitly identified participant flow; every other
+        // quest retains the existing 200-iteration limit.
+        const mazeParticipant = (quest.id === "me-cung" || quest.id === "me-cung-thuong") &&
+          body.some((s) => s.action === "evaluateJavaScript" &&
+            s.script?.includes("__jvz_maze_participant_state"));
+        const maxIterations = fishing ? Infinity :
+          mazeParticipant ? clamp(step.maxIterations ?? 950, 1, 1200) :
+            clamp(step.maxIterations ?? 10, 1, 200);
         const maxSeconds = fishing ? Infinity : clamp(step.maxSeconds ?? 600, 5, 6 * 3600);
         const deadline = fishing ? Infinity : Date.now() + maxSeconds * 1000;
         let done = 0;

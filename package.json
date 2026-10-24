@@ -1,6 +1,6 @@
 {
   "name": "jarvis-hh3d-web",
-  "version": "1.3.210",
+  "version": "1.3.211",
   "private": true,
   "description": "Auto HH3D — control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn tự động chạy trên server.",
   "scripts": {
@@ -43,6 +43,7 @@
     "verify:pill-bag-capacity:store": "tsx scripts/verifyPillBagCapacityStore.mts",
     "verify:te-le-confirm": "tsx scripts/verifyTeLeConfirm.mts",
     "verify:hy-su-quick": "tsx scripts/verifyHySuQuickLiXi.mts",
+    "verify:maze-participant": "tsx scripts/verifyMazeParticipant.mts",
     "verify:maze-kick": "tsx scripts/verifyMazeKickTimer.mts",
     "verify:config-collapse": "tsx scripts/verifyConfigCollapse.mts",
     "verify:welfare-bonus": "tsx scripts/verifyWelfareProgress20261008.mts",

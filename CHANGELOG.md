@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.211 — Mê Cung: vai trò thành viên cho VIP và thường (24/10/2026)
+
+- Recording me-cung-20261024-134035: analyzed 8+ minutes of actual WebM using local /watch (frame timestamps), 34 screenshots, DOM, probes and HTTP/WebSocket traces; cookies and session data were never copied to the repository. Installed and verified FFmpeg/FFprobe/yt-dlp on the Windows host for future /watch runs.
+- Both VIP and free Maze twins can host (old flow preserved) or join (new opt-in): six-digit room code (optional), difficulty, maximum host wait.
+- Participant searches public rooms, joins through available site button, enables all three auto toggles, marks ready (never cancel ready), advances and claims the final chest. On kick/disband/AFK it leaves and seeks another room, temporarily avoiding the previous room even when initially pinned by code.
+- Huyen Tinh cap comes from daily widget and chest claim response; prior-day session cache is ignored using Vietnam-day boundaries. Below cap, continue within quest visit limit.
+- Quest engine now respects up to 950 participant poll iterations within the 35-minute budget instead of silently clamping them to 200. Daily cap must wait until the fight finishes and the room has actually been left/confirmed before completing; added regression for those transitions, both account tiers and kick recovery. No real game write request or recorded credential shipped.
+
 ## 1.3.210 — Five-minute Ollama and Reflection request timeouts (24/10/2026)
 
 - Increased DEFAULT Ollama and Reflection chat request timeout from 60,000 to 300,000 ms (5 minutes) for both web-research tool rounds and final source decisions. The request still respects the remaining task deadline and explicit shorter callsite overrides; no hanging/unbounded calls.

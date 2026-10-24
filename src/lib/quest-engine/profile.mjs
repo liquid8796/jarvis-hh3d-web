@@ -25,6 +25,15 @@ const profileData = JSON.parse(
 // The in-page controller is a resource, not a 6 KB escaped JSON string. Substitute
 // before option interpolation, in a fresh clone per run; the profile remains immutable.
 const fishingTick = readFileSync(fileURLToPath(new URL("./fishingTick.js", import.meta.url)), "utf8");
+const mazeJoinTick = readFileSync(fileURLToPath(new URL("./mazeParticipantTick.js", import.meta.url)), "utf8");
+const mazeJoinSteps = JSON.parse(readFileSync(fileURLToPath(new URL("./mazeParticipantSteps.json", import.meta.url)), "utf8"));
+const participantSteps = () => {
+  const steps = structuredClone(mazeJoinSteps);
+  const tick = steps.find(s => s.action === "repeat")?.steps?.find(s => s.script === "@@MAZE_JOIN_TICK@@");
+  if (!tick) throw new Error("Maze participant tick missing.");
+  tick.script = mazeJoinTick;
+  return steps;
+};
 
 /** Bản sao sâu — người gọi được phép sửa thoải mái mà không đụng vào hồ sơ gốc. */
 export function loadProfile() {
@@ -247,6 +256,12 @@ export function profileForConfig(config, say, marksToday, at = new Date()) {
     meCung.enabled = config.quests?.meCung?.enabled === true;
     if (meCung.enabled) {
       const mc = config.quests.meCung;
+      // Preserve the original host flow verbatim. Select the participant
+      // flow only for explicitly opted-in accounts, on BOTH tier twins.
+      if (mc.role === "join") meCung.steps = participantSteps();
+      setOption(meCung, "role", mc.role ?? "host", { log });
+      setOption(meCung, "roomCode", mc.roomCode ?? "", { allowFreeform: true, log });
+      setOption(meCung, "hostWaitSec", String(mc.hostWaitSec ?? 180), { allowFreeform: true, log });
       setOption(meCung, "mode", mc.mode, { log });
 
       // Ngưỡng HP là một con số tự do trên web, trong khi hồ sơ chỉ liệt kê vài nấc quen

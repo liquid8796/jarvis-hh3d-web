@@ -1,6 +1,6 @@
 {
   "name": "Ho\u1EA1t \u0111\u1ED9ng h\u00E0ng ng\u00E0y (m\u1EB7c \u0111\u1ECBnh)",
-  "schemaVersion": 92,
+  "schemaVersion": 93,
   "dailyQuestPath": "/nhiem-vu-hang-ngay",
   "quests": [
     {
@@ -4738,6 +4738,45 @@
           ],
           "allowCustom": true,
           "selectedValue": ""
+        },
+        {
+          "key": "role",
+          "label": "Vai trò mê cung",
+          "selectedValue": "host",
+          "choices": [
+            {
+              "value": "host",
+              "label": "Chủ phòng (mặc định)"
+            },
+            {
+              "value": "join",
+              "label": "Tham gia phòng khác"
+            }
+          ]
+        },
+        {
+          "key": "roomCode",
+          "label": "Mã phòng muốn tham gia (rỗng = tìm bất kỳ)",
+          "selectedValue": "",
+          "allowCustom": true,
+          "choices": [
+            {
+              "value": "",
+              "label": "Bất kỳ phòng phù hợp"
+            }
+          ]
+        },
+        {
+          "key": "hostWaitSec",
+          "label": "Chờ chủ phòng tối đa (giây)",
+          "selectedValue": "180",
+          "allowCustom": true,
+          "choices": [
+            {
+              "value": "180",
+              "label": "180 giây"
+            }
+          ]
         }
       ],
       "fallbackCooldownSeconds": 3600,
@@ -6930,6 +6969,45 @@
           ],
           "allowCustom": true,
           "selectedValue": ""
+        },
+        {
+          "key": "role",
+          "label": "Vai trò mê cung",
+          "selectedValue": "host",
+          "choices": [
+            {
+              "value": "host",
+              "label": "Chủ phòng (mặc định)"
+            },
+            {
+              "value": "join",
+              "label": "Tham gia phòng khác"
+            }
+          ]
+        },
+        {
+          "key": "roomCode",
+          "label": "Mã phòng muốn tham gia (rỗng = tìm bất kỳ)",
+          "selectedValue": "",
+          "allowCustom": true,
+          "choices": [
+            {
+              "value": "",
+              "label": "Bất kỳ phòng phù hợp"
+            }
+          ]
+        },
+        {
+          "key": "hostWaitSec",
+          "label": "Chờ chủ phòng tối đa (giây)",
+          "selectedValue": "180",
+          "allowCustom": true,
+          "choices": [
+            {
+              "value": "180",
+              "label": "180 giây"
+            }
+          ]
         }
       ],
       "fallbackCooldownSeconds": 3600,

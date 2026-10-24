@@ -1097,6 +1097,27 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
           }`}
         >
           <div>
+            <label className="label" htmlFor="meCungRole">Vai trò Mê Cung</label>
+            <select id="meCungRole" name="meCungRole" className="input" defaultValue={config.quests.meCung.role}>
+              <option value="host">Chủ phòng — lập đội (như trước)</option>
+              <option value="join">Thành viên — tự tìm và vào đội</option>
+            </select>
+            <p className="mt-1 text-xs text-[var(--color-mist)]">Áp dụng cho cả tài khoản VIP và thường.</p>
+          </div>
+          <div>
+            <label className="label" htmlFor="meCungRoomCode">Mã phòng muốn vào (tùy chọn)</label>
+            <input id="meCungRoomCode" name="meCungRoomCode" type="text" inputMode="numeric"
+              maxLength={6} pattern="[0-9]{6}" className="input font-mono"
+              defaultValue={config.quests.meCung.roomCode} placeholder="Trống = tìm phòng công khai phù hợp" />
+          </div>
+          <div>
+            <label className="label" htmlFor="meCungHostWaitSec">Chờ chủ phòng bắt đầu tối đa (giây)</label>
+            <input id="meCungHostWaitSec" name="meCungHostWaitSec" type="number"
+              min={30} max={3600} step={30} className="input font-mono"
+              defaultValue={config.quests.meCung.hostWaitSec} />
+            <p className="mt-1 text-xs text-[var(--color-mist)]">Chỉ áp dụng khi là thành viên. Quá hạn sẽ rời phòng và tìm phòng khác.</p>
+          </div>
+          <div>
             <label className="label" htmlFor="meCungMode">
               Độ khó phòng
             </label>

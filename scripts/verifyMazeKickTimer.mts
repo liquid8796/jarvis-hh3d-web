@@ -106,7 +106,12 @@ const server = createServer((_req, res) => {
 await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
 const port = (server.address() as { port: number }).port;
 
-const browser = await chromium.launch({ headless: true, channel: "chromium" });
+const browser = await chromium.launch({
+  headless: true,
+  ...(process.env.JARVIS_SMOKE_BROWSER_PATH
+    ? { executablePath: process.env.JARVIS_SMOKE_BROWSER_PATH }
+    : { channel: "chromium" }),
+});
 try {
   const page = await browser.newPage();
   await page.goto(`http://127.0.0.1:${port}/`);

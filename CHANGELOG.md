@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.212 — Mê Cung: role-specific configuration panels (24/10/2026)
+
+- Selecting Chủ phòng now shows only host-specific controls (HP kick, minimum ready players, idle kick, opening/battle messages). Selecting Thành viên shows only its room code and maximum host wait; difficulty and Huyền Tinh daily-cap toggle remain shared.
+- The role selector updates client-side immediately without page refresh or saving. Both sections remain mounted but hidden to preserve uncontrolled input values and ensure switching roles never silently overwrites stored settings upon submission. This honors existing noValidate semantics and applies to VIP and free accounts.
+- Added AST-based regression asserting which named inputs belong to host/member/shared groups, visibility switching expressions, maintained FormData fields, and no accidental disabled inputs. No quest execution, schema, secret or account permission changes.
+
 ## 1.3.211 — Mê Cung: vai trò thành viên cho VIP và thường (24/10/2026)
 
 - Recording me-cung-20261024-134035: analyzed 8+ minutes of actual WebM using local /watch (frame timestamps), 34 screenshots, DOM, probes and HTTP/WebSocket traces; cookies and session data were never copied to the repository. Installed and verified FFmpeg/FFprobe/yt-dlp on the Windows host for future /watch runs.

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.212",
+    date: "2026-10-24",
+    lines: [
+      "Mê Cung chỉ hiện các tùy chọn phù hợp khi chọn Chủ phòng hoặc Thành viên.",
+      "Độ khó và giới hạn Huyền Tinh dùng chung; chuyển vai trò không làm mất dữ liệu đang nhập.",
+      "Cách hiển thị mới áp dụng cho cả VIP lẫn tài khoản thường.",
+    ],
+  },
+  {
     version: "1.3.211",
     date: "2026-10-24",
     lines: [
@@ -462,14 +471,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Cho phép người dùng thiết lập thời gian tối đa chờ render quảng cáo Adsterra qua giao diện và dòng lệnh.",
       "Tự động cưỡng chế click quảng cáo ngay lập tức nếu quá thời gian chờ mà quảng cáo chưa render xong.",
-    ],
-  },
-  {
-    version: "1.3.153",
-    date: "2026-10-03",
-    lines: [
-      "Khắc phục sự cố tiện ích CanvasBlocker không hiển thị trên trình duyệt khi chạy 1 instance.",
-      "Tự động chuyển sang hồ sơ độc lập để nạp tiện ích trọn vẹn và kích hoạt sẵn Developer Mode.",
     ],
   },
 ];

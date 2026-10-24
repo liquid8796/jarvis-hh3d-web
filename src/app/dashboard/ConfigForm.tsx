@@ -870,6 +870,10 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
     null,
   );
   const [meCung, setMeCung] = useState(config.quests.meCung.enabled);
+  // Visibility only: retaining mounted inputs is essential for this uncontrolled
+  // form. Both role configurations continue to submit, so editing one role
+  // never silently resets the values saved for the other role.
+  const [meCungRole, setMeCungRole] = useState<"host" | "join">(config.quests.meCung.role);
   /**
    * Ô「Dừng khi đã đủ huyền tinh」là ô DUY NHẤT có kiểm soát trong khối này, vì nó là ô duy
    * nhất có luật. Với đạo hữu thường, `false` chỉ được vẽ thật khi họ chọn `mine`; ở `sect`
@@ -1098,12 +1102,22 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
         >
           <div>
             <label className="label" htmlFor="meCungRole">Vai trò Mê Cung</label>
-            <select id="meCungRole" name="meCungRole" className="input" defaultValue={config.quests.meCung.role}>
+            <select
+              id="meCungRole"
+              name="meCungRole"
+              className="input"
+              value={meCungRole}
+              onChange={(event) => setMeCungRole(event.target.value as "host" | "join")}
+            >
               <option value="host">Chủ phòng — lập đội (như trước)</option>
               <option value="join">Thành viên — tự tìm và vào đội</option>
             </select>
             <p className="mt-1 text-xs text-[var(--color-mist)]">Áp dụng cho cả tài khoản VIP và thường.</p>
           </div>
+          {/* Keep both sets mounted: hidden sections retain their unsaved DOM values,
+              and their names remain in FormData when the user saves the other role. */}
+          <div hidden={meCungRole !== "join"} className="sm:col-span-2" data-maze-role-fields="join">
+            <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="meCungRoomCode">Mã phòng muốn vào (tùy chọn)</label>
             <input id="meCungRoomCode" name="meCungRoomCode" type="text" inputMode="numeric"
@@ -1116,6 +1130,8 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
               min={30} max={3600} step={30} className="input font-mono"
               defaultValue={config.quests.meCung.hostWaitSec} />
             <p className="mt-1 text-xs text-[var(--color-mist)]">Chỉ áp dụng khi là thành viên. Quá hạn sẽ rời phòng và tìm phòng khác.</p>
+          </div>
+            </div>
           </div>
           <div>
             <label className="label" htmlFor="meCungMode">
@@ -1133,6 +1149,8 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
             </select>
           </div>
 
+          <div hidden={meCungRole !== "host"} className="sm:col-span-2" data-maze-role-fields="host">
+            <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="meCungKickHp">
               Trục xuất theo HP
@@ -1220,6 +1238,9 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
               defaultValue={config.quests.meCung.chatFight}
               placeholder="để trống = không nhắn"
             />
+          </div>
+
+            </div>
           </div>
 
           <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--color-parchment)] sm:col-span-2">

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { autoscaleDesiredWorkers, autoscaleScheduleTarget, workerAutoscaleSchema, chooseWorkflowTransitions } from "../src/lib/validation/workerAutoscale";
+import { autoscaleDesiredWorkers, autoscaleScheduleTarget, workerAutoscaleSchema, chooseWorkflowTransitions, shouldDispatchIdleWorkflow } from "../src/lib/validation/workerAutoscale";
 const defaults = workerAutoscaleSchema.parse({});
 assert.equal(defaults.minWorkers, 2);
 assert.equal(defaults.enabled, false);
@@ -16,3 +16,15 @@ assert.deepEqual(chooseWorkflowTransitions(["a"], ["b", "c"], 3), { enable: ["b"
 assert.equal(workerAutoscaleSchema.safeParse({ minWorkers: 0 }).success, false);
 assert.equal(workerAutoscaleSchema.safeParse({ schedule: [{ time: "25:00", workers: 2 }] }).success, false);
 console.log("PASS: autoscale modes, Vietnam schedule, minimum, and workflow transitions");
+
+const now = Date.parse("2026-10-27T00:40:00Z");
+assert.equal(shouldDispatchIdleWorkflow([{status:"in_progress",created_at:"2026-10-26T00:00:00Z"}], now), false);
+assert.equal(shouldDispatchIdleWorkflow([{status:"queued",created_at:"2026-10-26T00:00:00Z"}], now), false);
+assert.equal(shouldDispatchIdleWorkflow([{status:"completed",created_at:"2026-10-27T00:35:00Z"}], now), false);
+assert.equal(shouldDispatchIdleWorkflow([{status:"completed",created_at:"2026-10-26T15:23:00Z"}], now), true);
+assert.equal(shouldDispatchIdleWorkflow([], now), true);
+assert.equal(shouldDispatchIdleWorkflow([{status:"unexpected",created_at:"2026-10-26T00:00:00Z"}], now), false);
+const { readFileSync } = await import("node:fs");
+const template = readFileSync("deploy/github/linh-su.yml","utf8");
+assert.match(template, /GITHUB_WORKFLOW_REF/, "self-chain should dispatch its actual workflow file");
+assert.doesNotMatch(template, /actions\/workflows\/linh-su\.yml\/dispatches/, "self-chain must not hardcode linh-su.yml");

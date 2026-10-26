@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.217",
+    date: "2026-10-27",
+    lines: [
+      "Auto Scaling Dynamic dự báo cả các job sẽ đến hạn trong 10 phút tới để chuẩn bị năng lực xử lý.",
+      "Bật kho GitHub sẽ phát lượt chạy ngay; kho ngừng ca sẽ được kiểm tra và phục hồi an toàn khi cần.",
+      "Giao diện báo khi đã dùng hết kho GitHub, giúp phân biệt kho bật và máy thực sự đang trực.",
+    ],
+  },
+  {
     version: "1.3.216",
     date: "2026-10-27",
     lines: [
@@ -465,14 +474,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khôi phục quảng cáo dạng đề xuất nội dung NativeBanner trên website để đa dạng hoá hiển thị.",
       "Khu vực tài trợ trung tâm kết hợp hài hoà giữa biểu ngữ chữ nhật và khối đề xuất tự nhiên.",
-    ],
-  },
-  {
-    version: "1.3.158",
-    date: "2026-10-03",
-    lines: [
-      "Tối ưu hoá SEO toàn diện website: bổ sung sơ đồ trang sitemap.xml, chỉ dẫn bot robots.txt và thẻ mạng xã hội chuẩn mực.",
-      "Làm giàu nội dung trang chủ với mục hỏi đáp thực tế, câu hỏi thường gặp và giới thiệu chi tiết pháp bảo tự động.",
     ],
   },
 ];

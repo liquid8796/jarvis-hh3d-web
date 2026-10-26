@@ -8,7 +8,7 @@ import type { StationView } from "@/app/actions/githubStations";
 const modes = [
   { id: "manual", label: "Manual", description: "Chốt số workflow muốn duy trì" },
   { id: "scheduler", label: "Scheduler", description: "Đổi quy mô theo khung giờ mỗi ngày" },
-  { id: "dynamic", label: "Dynamic", description: "Tự điều chỉnh theo công việc đến hạn" },
+  { id: "dynamic", label: "Dynamic", description: "Tự điều chỉnh theo hàng đợi sắp đến hạn" },
 ] as const;
 const fieldClass = "mt-2 w-full min-h-11 rounded-xl border border-[var(--color-gold-400)]/25 bg-[var(--color-ink-900)]/70 px-3 text-[var(--color-parchment)] outline-none focus:border-[var(--color-gold-300)] focus:ring-2 focus:ring-[var(--color-gold-300)]/20";
 const panelClass = "rounded-2xl border border-[var(--color-gold-400)]/20 bg-[var(--color-ink-900)]/55 p-5 sm:p-6";
@@ -82,6 +82,7 @@ export function WorkerAutoscalePanel({ initial, stations }: { initial: WorkerAut
             <div className="mt-1 text-xs text-[var(--color-mist)]">{item.label}</div>
           </div>)}
         </div>
+        {active === eligible.length && eligible.length > 0 && config.mode === "dynamic" && <p className="mt-3 text-sm text-amber-200" role="status">Đã bật toàn bộ {eligible.length} workflow hiện có. Nếu job vẫn ùn ứ, phải bổ sung kho Khôi Lỗi mới hoặc tăng năng lực runner; nâng Max vượt số kho không tạo thêm runner.</p>}
         <p className="mt-3 text-xs leading-5 text-[var(--color-mist)]">* Dựa trên lần kiểm tra workflow gần nhất; kết quả thực tế được đối chiếu lại trực tiếp với GitHub mỗi lần scale. {countUnknown > 0 ? `${countUnknown} kho chưa có trạng thái xác thực.` : ""}</p>
       </div>
 
@@ -134,7 +135,7 @@ export function WorkerAutoscalePanel({ initial, stations }: { initial: WorkerAut
 
         {config.mode === "dynamic" && <div className="mt-6 border-t border-white/10 pt-5">
           <h4 className="font-bold text-[var(--color-parchment)]">Điều tiết theo hàng đợi</h4>
-          <p className="mt-1 text-sm text-[var(--color-mist)]">Ước lượng số workflow bằng số job đã đến hạn và job đang chạy. Scale-in có thời gian chống dao động.</p>
+          <p className="mt-1 text-sm text-[var(--color-mist)]">Ước lượng số workflow từ job đang chạy và job chờ tới hạn trong 10 phút tới. Scale-in có thời gian chống dao động.</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <label className="text-xs font-semibold text-[var(--color-mist)]">Tối đa workflow
               <input type="number" className={fieldClass} min={config.minWorkers} max={100} value={config.dynamicMaxWorkers} onChange={e => change("dynamicMaxWorkers", limited(Number(e.target.value)))} disabled={busy} />

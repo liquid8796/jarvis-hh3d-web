@@ -38,3 +38,20 @@ export function chooseWorkflowTransitions(active: readonly string[], inactive: r
   const selected = [...active.slice(0, count), ...inactive.slice(0, Math.max(0, count - active.length))];
   return { enable: selected.filter(slug => inactive.includes(slug)), disable: active.slice(count), selected };
 }
+
+/**
+ * GitHub workflow "active" only means schedule is enabled; no runner may exist.
+ * Only awaken a workflow with no requested/queued/running runs. A recently
+ * completed failure gets 15 minutes of backoff to prevent dispatch storms.
+ * Unknown response state is fail-closed.
+ */
+export function shouldDispatchIdleWorkflow(
+  runs: readonly { status: string; created_at: string }[],
+  nowMs: number,
+): boolean {
+  if (runs.some(run => ["in_progress", "queued", "requested", "waiting", "pending"].includes(run.status))) return false;
+  if (runs.some(run => run.status !== "completed")) return false;
+  if (runs.length === 0) return true;
+  const latest = Math.max(...runs.map(run => Date.parse(run.created_at)));
+  return Number.isFinite(latest) && nowMs - latest >= 15 * 60_000;
+}

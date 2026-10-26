@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.217 — Scale Out: actual GitHub runs and 10-minute demand (27/10/2026)
+
+- Dynamic includes jobs due in the next ten minutes, not merely overdue jobs.
+- A workflow enabled on GitHub is not proof that a worker exists. Reconciler inspects actual Actions runs and dispatches selected idle workflows with an explicit 15-minute retry backoff, without cancelling live jobs.
+- GitHub worker's self-dispatch uses its actual workflow filename from GITHUB_WORKFLOW_REF (registries have different .yml file names, not always linh-su.yml).
+- Admin shows the real scaling ceiling from the available repository count. OCI is only an API orchestrator and must never run a worker.
 ## 1.3.216 — Điểm Danh thường: giao diện 26/10 (27/10/2026)
 
 - Sửa flow Điểm Danh tài khoản thường dựa trên video /watch và bản ghi DOM/request-response ngày 26/10: ô ngày dùng `.ddg-day.is-today`; nút `#ddStamp` sau khi nhận chuyển sang `is-done[disabled]`.

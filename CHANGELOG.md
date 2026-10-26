@@ -9,6 +9,11 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.215 — Auto Scaling Khôi Lỗi GitHub (26/10/2026)
+
+- Tab Auto Scaling cho Gia chủ: Manual (số workflow), Scheduler (giờ Việt Nam hằng ngày), Dynamic (nhu cầu job) với minimum chung mặc định 2.
+- Chỉ thao tác GitHub workflow của kho Khôi Lỗi đã đăng ký. Có khoá đồng bộ và kiểm tra trạng thái thật trước khi thay đổi; không tạo Khôi Lỗi trên OCI.
+- Cron GitHub Actions mỗi 10 phút, bảo vệ bằng CRON_SECRET; mặc định chưa bật, không thay đổi workflow cũ trước khi admin kích hoạt.
 ## 1.3.214 — Tên miền: chỉ còn auto-hh3d.online (26/10/2026)
 
 - Trang công khai Tên miền chỉ liệt kê một địa chỉ chính thức auto-hh3d.online. Đã xoá thẻ auto-hh3d.vercel.app mang trạng thái đã chết và nút xem thông báo đóng cửa khỏi danh bạ.

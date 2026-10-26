@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { workerAutoscaleSchema } from "@/lib/validation/workerAutoscale";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -431,6 +432,8 @@ export const appSettingsSchema = z.object({
     })).max(MAX_OLLAMA_API_KEYS).catch([]).optional(),
   }).prefault({}),
 
+  workerAutoscale: workerAutoscaleSchema.prefault({}).catch(workerAutoscaleSchema.parse({})),
+
   githubStations: z
     .array(
       z.object({
@@ -623,7 +626,7 @@ export function parseGithubSettingsForMutation(value: unknown): AppSettings {
 }
 
 const GLOBAL_ID = "global";
-const githubReadBaselines = new WeakMap<AppSettings, Pick<AppSettings, "githubStations" | "githubNurture">>();
+const githubReadBaselines = new WeakMap<AppSettings, Pick<AppSettings, "githubStations" | "githubNurture" | "workerAutoscale">>();
 
 export async function getAppSettings(options: { deadlineAt?: number } = {}): Promise<AppSettings> {
   const read = (database: NodePgDatabase<typeof schema>) => database
@@ -635,7 +638,7 @@ export async function getAppSettings(options: { deadlineAt?: number } = {}): Pro
 
   const parsed = appSettingsSchema.safeParse(rows[0]?.value ?? {});
   const settings = parsed.success ? parsed.data : appSettingsSchema.parse({});
-  githubReadBaselines.set(settings, structuredClone({ githubStations: settings.githubStations, githubNurture: settings.githubNurture }));
+  githubReadBaselines.set(settings, structuredClone({ githubStations: settings.githubStations, githubNurture: settings.githubNurture, workerAutoscale: settings.workerAutoscale }));
   return settings;
 }
 
@@ -666,9 +669,10 @@ export async function saveAppSettings(value: AppSettings): Promise<void> {
       const current = appSettingsSchema.parse(row.value);
       clean.githubStations = mergeGithubBranch(baseline.githubStations, clean.githubStations, current.githubStations) as AppSettings["githubStations"];
       clean.githubNurture = mergeGithubBranch(baseline.githubNurture, clean.githubNurture, current.githubNurture) as AppSettings["githubNurture"];
+      clean.workerAutoscale = mergeGithubBranch(baseline.workerAutoscale, clean.workerAutoscale, current.workerAutoscale) as AppSettings["workerAutoscale"];
     }
     await tx.update(schema.appSettings).set({ value: appSettingsSchema.parse(clean), updatedAt: sql`now()` }).where(eq(schema.appSettings.id, GLOBAL_ID));
   });
   // Keep the baseline paired with the caller's object, which may be saved again later.
-  githubReadBaselines.set(value, structuredClone({ githubStations: value.githubStations, githubNurture: value.githubNurture }));
+  githubReadBaselines.set(value, structuredClone({ githubStations: value.githubStations, githubNurture: value.githubNurture, workerAutoscale: value.workerAutoscale }));
 }

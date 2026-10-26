@@ -112,3 +112,7 @@ export async function withCompanionLease<T>(slug: string, work: () => Promise<T>
   });
   return options.deadlineAt !== undefined ? withDatabaseDeadline(options.deadlineAt, leased) : leased(db());
 }
+
+export async function acquireGithubAutoscaleLease(deadlineAt = Date.now() + 105000) {
+  return acquireGithubSessionLease(['github-worker-autoscale'], deadlineAt, 'Auto scaling lease unavailable');
+}

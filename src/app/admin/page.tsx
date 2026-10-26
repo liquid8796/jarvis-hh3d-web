@@ -21,6 +21,7 @@ import { TagFrameManager } from "./TagFrameManager";
 import { DailyResetForm } from "./DailyResetForm";
 import { GameDomainForm } from "./GameDomainForm";
 import { GithubAdminWorkspace } from "./GithubAdminWorkspace";
+import { WorkerAutoscalePanel } from "./WorkerAutoscalePanel";
 import { JobEventRetentionForm } from "./JobEventRetentionForm";
 import { MaintenanceForm } from "./MaintenanceForm";
 import { MirrorPanel } from "./MirrorPanel";
@@ -216,6 +217,13 @@ export default async function AdminPage({
                   key: "guongTram",
                   label: "Gương Trạm",
                   pane: <MirrorPanel mirrors={await mirrorsForAdmin()} switchState={await switchStateForAdmin()} />,
+                }]
+              : []),
+            ...(hasPermission(viewer, "github_station.manage")
+              ? [{
+                  key: "autoscale",
+                  label: "Auto Scaling",
+                  pane: <WorkerAutoscalePanel initial={settings.workerAutoscale} stations={await githubStationsForAdmin()} />,
                 }]
               : []),
             // Kho GitHub đứng SAU Gương Trạm và mọc theo một quyền RIÊNG (`github_station.manage`,

@@ -1,0 +1,26 @@
+name: Tự động cân bằng Khôi Lỗi
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+concurrency:
+  group: auto-hh3d-workflow-autoscale
+  cancel-in-progress: false
+permissions: {}
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Reconcile registered GitHub worker workflows
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Missing CRON_SECRET"
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --max-time 150 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://auto-hh3d.online/api/cron/autoscale"

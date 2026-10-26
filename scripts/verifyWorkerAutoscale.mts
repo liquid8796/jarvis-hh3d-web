@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import { autoscaleDesiredWorkers, autoscaleScheduleTarget, workerAutoscaleSchema, chooseWorkflowTransitions } from "../src/lib/validation/workerAutoscale";
+const defaults = workerAutoscaleSchema.parse({});
+assert.equal(defaults.minWorkers, 2);
+assert.equal(defaults.enabled, false);
+assert.equal(defaults.mode, "manual");
+assert.equal(autoscaleDesiredWorkers(defaults, 0, 0, Date.parse("2026-10-26T12:00:00Z")), 2);
+assert.equal(autoscaleDesiredWorkers({ ...defaults, mode: "manual", manualWorkers: 1, minWorkers: 3 }, 0, 0, Date.now()), 3);
+const schedule = [{ time: "08:00", workers: 5 }, { time: "22:30", workers: 2 }];
+assert.equal(autoscaleScheduleTarget(schedule, Date.parse("2026-10-26T00:00:00Z")), 2);
+assert.equal(autoscaleScheduleTarget(schedule, Date.parse("2026-10-26T01:00:00Z")), 5);
+assert.equal(autoscaleScheduleTarget(schedule, Date.parse("2026-10-26T16:00:00Z")), 2);
+assert.equal(autoscaleDesiredWorkers({ ...defaults, mode: "dynamic", minWorkers: 2, dynamicMaxWorkers: 8 }, 9, 1, Date.now()), 5);
+assert.deepEqual(chooseWorkflowTransitions(["a", "b", "c"], ["d"], 2), { enable: [], disable: ["c"], selected: ["a", "b"] });
+assert.deepEqual(chooseWorkflowTransitions(["a"], ["b", "c"], 3), { enable: ["b", "c"], disable: [], selected: ["a", "b", "c"] });
+assert.equal(workerAutoscaleSchema.safeParse({ minWorkers: 0 }).success, false);
+assert.equal(workerAutoscaleSchema.safeParse({ schedule: [{ time: "25:00", workers: 2 }] }).success, false);
+console.log("PASS: autoscale modes, Vietnam schedule, minimum, and workflow transitions");

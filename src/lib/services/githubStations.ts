@@ -906,6 +906,14 @@ export async function runKeepalive(options: { force?: boolean; deadlineAt?: numb
         workflowState: "unknown",
       };
     }
+    // The autoscaler deliberately disables idle workflows. Keepalive must not report
+    // that intentional state as a broken GitHub repository, nor re-enable it.
+    if (result.workflowState === "disabled_manually"
+      && station.purpose === "worker"
+      && settings.workerAutoscale.enabled
+      && settings.workerAutoscale.managedSlugs.includes(result.slug)) {
+      result = { ...result, ok: true, note: "Khôi Lỗi đang tạm nghỉ theo Auto Scaling; không tự bật lại trong vòng nuôi kho." };
+    }
     results.push(result);
     await recordPing(result, now);
   }

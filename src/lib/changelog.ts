@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.215",
+    date: "2026-10-26",
+    lines: [
+      "Thêm Auto Scaling Khôi Lỗi trong trang Tông Môn: Manual, Scheduler và Dynamic, với số tối thiểu dùng chung mặc định là 2.",
+      "Điều phối bằng cách bật hoặc tắt GitHub Actions, không cắt ca đang chạy và không vận hành Khôi Lỗi trên OCI.",
+      "Lịch kiểm tra 10 phút, múi giờ Việt Nam, và mặc định tắt để không tự thay đổi những kho đang chạy.",
+    ],
+  },
+  {
     version: "1.3.214",
     date: "2026-10-26",
     lines: [
@@ -464,14 +473,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khắc phục sự cố ngắt kết nối trình duyệt khi dọn dẹp bộ nhớ tạm và đóng tab xem quảng cáo.",
       "Tự động đóng các tab phụ và bảo vệ tiến trình tự động chạy liên tục không bị gián đoạn.",
-    ],
-  },
-  {
-    version: "1.3.156",
-    date: "2026-10-03",
-    lines: [
-      "Gỡ bỏ hoàn toàn quảng cáo dạng NativeBanner trên website để tối ưu tốc độ tải và bố cục trang.",
-      "Tăng xác suất ưu tiên click quảng cáo Popunder lên 80% trong các chu kỳ tự động xem trang.",
     ],
   },
 ];

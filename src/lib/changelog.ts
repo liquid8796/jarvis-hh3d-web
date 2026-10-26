@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.214",
+    date: "2026-10-26",
+    lines: [
+      "Tab Tên miền nay chỉ hiển thị auto-hh3d.online là địa chỉ truy cập chính thức.",
+      "Đã bỏ thẻ tên miền cũ khỏi danh bạ và nút xem thông báo đóng cửa.",
+    ],
+  },
+  {
     version: "1.3.213",
     date: "2026-10-24",
     lines: [
@@ -464,14 +472,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Gỡ bỏ hoàn toàn quảng cáo dạng NativeBanner trên website để tối ưu tốc độ tải và bố cục trang.",
       "Tăng xác suất ưu tiên click quảng cáo Popunder lên 80% trong các chu kỳ tự động xem trang.",
-    ],
-  },
-  {
-    version: "1.3.155",
-    date: "2026-10-03",
-    lines: [
-      "Bổ sung tuỳ chọn cho phép người dùng tự nhập thiết bị giả lập mong muốn trong kịch bản chạy nhanh.",
-      "Hỗ trợ nhận diện các dòng iPhone, iPad, điện thoại Android, chip máy Mac và hệ điều hành chỉ định.",
     ],
   },
 ];

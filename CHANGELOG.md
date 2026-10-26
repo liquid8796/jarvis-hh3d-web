@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.214 — Tên miền: chỉ còn auto-hh3d.online (26/10/2026)
+
+- Trang công khai Tên miền chỉ liệt kê một địa chỉ chính thức auto-hh3d.online. Đã xoá thẻ auto-hh3d.vercel.app mang trạng thái đã chết và nút xem thông báo đóng cửa khỏi danh bạ.
+- Cập nhật trạng thái tổng thành "1 tên miền đang hoạt động"; hiển thị một thẻ rộng duy nhất, thích ứng mobile.
+- Giữ nguyên nhận diện hostname cũ ở proxy (HTTP 410 và trang hướng dẫn chuyển sang domain chính) để ngăn endpoint cũ phục vụ lại ngoài ý muốn; không thay đổi DNS, Vercel, routing worker hoặc tài khoản.
+- Cập nhật verify:domains bảo đảm catalog chỉ có địa chỉ chính thức, không còn card dead, và test responsive SiteHeaderNav đang dùng thực tế.
+
 ## 1.3.213 — Nhật Ký từng bước Mê Cung Thành viên (24/10/2026)
 
 - Fixed missing per-step user-facing Info logs for Maze participant (VIP/free, web and PC worker); controller was returning an empty string from every poll, while the engine only promotes leading !-prefixed status lines to Info.

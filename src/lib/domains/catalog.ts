@@ -15,8 +15,9 @@ export type ManagedDomain = Readonly<{
 }>;
 
 /**
- * Sổ tên miền dùng chung cho trang Tên Miền công khai và Proxy đóng gương trạm. Một nguồn duy nhất
- * tránh tình trạng UI bảo một tên miền đã chết trong khi routing vẫn gửi worker tới đó.
+ * Danh bạ công khai chỉ liệt kê tên miền đang phục vụ.
+ * RETIRED_DOMAIN vẫn được giữ riêng cho proxy xử lý hostname cũ,
+ * không hiện trên giao diện nhưng vẫn chặn các endpoint không còn phục vụ.
  */
 export const DOMAIN_CATALOG: readonly ManagedDomain[] = Object.freeze([
   Object.freeze({
@@ -26,14 +27,6 @@ export const DOMAIN_CATALOG: readonly ManagedDomain[] = Object.freeze([
     statusLabel: "hoạt động",
     title: "Tên miền chính thức",
     role: "Cổng truy cập chính",
-  }),
-  Object.freeze({
-    hostname: RETIRED_DOMAIN,
-    origin: RETIRED_ORIGIN,
-    status: "dead",
-    statusLabel: "đã chết",
-    title: "Gương trạm đã đóng",
-    role: "Chỉ còn trang thông báo",
   }),
 ]);
 

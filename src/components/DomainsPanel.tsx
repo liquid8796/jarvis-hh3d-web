@@ -27,37 +27,30 @@ export function DomainsPanel() {
             </div>
             <div className="rounded-xl border border-[rgba(126,224,184,.24)] bg-[rgba(33,109,81,.16)] px-4 py-3 text-right">
               <p className="text-[11px] font-bold uppercase tracking-[.12em] text-[#9ff2cf]">Trạng thái hệ thống</p>
-              <p className="mt-1 text-sm font-semibold text-[var(--color-parchment)]">1 hoạt động · 1 đã chết</p>
+              <p className="mt-1 text-sm font-semibold text-[var(--color-parchment)]">1 tên miền đang hoạt động</p>
             </div>
           </div>
         </div>
 
-        <div className="grid gap-4 p-5 sm:p-7 lg:grid-cols-2">
-          {DOMAIN_CATALOG.map((domain) => {
-            const active = domain.status === "active";
-            return (
-              <article key={domain.hostname} className={`relative overflow-hidden rounded-2xl border p-5 ${active ? "border-[rgba(126,224,184,.28)] bg-[linear-gradient(145deg,rgba(30,83,70,.25),rgba(7,6,15,.48))]" : "border-[rgba(242,160,160,.22)] bg-[rgba(7,6,15,.45)]"}`}>
+        <div className="grid gap-4 p-5 sm:p-7">
+          {DOMAIN_CATALOG.map((domain) => (
+              <article key={domain.hostname} className="relative overflow-hidden rounded-2xl border border-[rgba(126,224,184,.28)] bg-[linear-gradient(145deg,rgba(30,83,70,.25),rgba(7,6,15,.48))] p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[.12em] text-[var(--color-mist)]">{domain.title}</p>
                     <p className="mt-1 text-xs text-[var(--color-mist)]/75">{domain.role}</p>
                   </div>
-                  <span className={`inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ${active ? "bg-[rgba(33,109,81,.32)] text-[#9ff2cf]" : "bg-[rgba(122,43,64,.35)] text-[#ffc0c0]"}`}>
+                  <span className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[rgba(33,109,81,.32)] px-3 py-1.5 text-xs font-bold text-[#9ff2cf]">
                     <i className="h-2 w-2 rounded-full bg-current" />
                     {domain.statusLabel}
                   </span>
                 </div>
-                <p className={`mt-5 break-all font-mono text-base font-bold sm:text-lg ${active ? "text-[#dff8ec]" : "text-[#b7afc8] line-through decoration-[#f2a0a0]"}`}>{domain.hostname}</p>
+                <p className="mt-5 break-all font-mono text-base font-bold text-[#dff8ec] sm:text-lg">{domain.hostname}</p>
                 <div className="mt-5 border-t border-[rgba(155,150,190,.12)] pt-4">
-                  {active ? (
-                    <a className="btn btn-gold w-full justify-center" href={domain.origin} target="_blank" rel="noreferrer">Mở tên miền chính thức ↗</a>
-                  ) : (
-                    <a className="btn w-full justify-center border border-[rgba(185,165,255,.2)] bg-[rgba(42,36,80,.45)] text-[var(--color-parchment)] hover:bg-[rgba(55,48,99,.62)]" href={domain.origin} target="_blank" rel="noreferrer">Xem trang thông báo đóng cửa ↗</a>
-                  )}
+                  <a className="btn btn-gold w-full justify-center" href={domain.origin} target="_blank" rel="noreferrer">Mở tên miền chính thức ↗</a>
                 </div>
               </article>
-            );
-          })}
+          ))}
         </div>
       </div>
 

@@ -23,7 +23,6 @@ assert.deepEqual(
   DOMAIN_CATALOG.map(({ hostname, status, statusLabel }) => ({ hostname, status, statusLabel })),
   [
     { hostname: "auto-hh3d.online", status: "active", statusLabel: "hoạt động" },
-    { hostname: "auto-hh3d.vercel.app", status: "dead", statusLabel: "đã chết" },
   ],
 );
 assert.equal(OFFICIAL_ORIGIN, "https://auto-hh3d.online");
@@ -60,11 +59,12 @@ assert.equal(
   "the committed HTML prototype must remain byte-for-byte equivalent to the runtime page",
 );
 
-const [proxy, adminPage, domainsPage, siteHeader, panel, workflow, setup, installerSh, installerPs1, vercel] = await Promise.all([
+const [proxy, adminPage, domainsPage, siteHeader, siteHeaderNav, panel, workflow, setup, installerSh, installerPs1, vercel] = await Promise.all([
   read("src/proxy.ts"),
   read("src/app/admin/page.tsx"),
   read("src/app/ten-mien/page.tsx"),
   read("src/components/SiteHeader.tsx"),
+  read("src/components/SiteHeaderNav.tsx"),
   read("src/components/DomainsPanel.tsx"),
   read("deploy/github/linh-su.yml"),
   read("deploy/oracle/setup.sh"),
@@ -82,10 +82,14 @@ assert.doesNotMatch(adminPage, /key: "tenMien"/, "the domain catalog must not be
 assert.doesNotMatch(adminPage, /DomainsPanel/, "the admin page must not own the public domain panel");
 assert.match(domainsPage, /<SiteHeader \/>/);
 assert.match(domainsPage, /<DomainsPanel \/>/);
-assert.match(siteHeader, /href="\/ten-mien"/);
-assert.equal((siteHeader.match(/<DomainsLink \/>/g) ?? []).length, 2, "signed-in users and guests must both see the domain menu item");
+assert.match(siteHeader, /<SiteHeaderNav/);
+assert.match(siteHeaderNav, /href: "\/ten-mien"/);
+assert.equal((siteHeaderNav.match(/links\.map\(/g) ?? []).length, 2, "desktop and mobile navigation must both show the public domain menu");
 assert.doesNotMatch(proxy, /PROTECTED_PREFIXES[^;]*ten-mien/s, "the public domain page must not require a session");
-assert.match(panel, /1 hoạt động · 1 đã chết/);
+assert.match(panel, /1 tên miền đang hoạt động/);
+assert.doesNotMatch(panel, /Gương trạm đã đóng|Xem trang thông báo đóng cửa|line-through/);
+assert.equal(DOMAIN_CATALOG.length, 1, "Only the official domain appears in public list");
+assert(!DOMAIN_CATALOG.some(({ hostname }) => hostname === RETIRED_DOMAIN));
 assert.doesNotMatch(panel, /Một địa chỉ chính thức đang phục vụ Auto HH3D/);
 assert.doesNotMatch(panel, /Địa chỉ ổn định dành cho người dùng/);
 assert.doesNotMatch(panel, /Không còn phục vụ ứng dụng/);

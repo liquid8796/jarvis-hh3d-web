@@ -9,6 +9,11 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.216 — Điểm Danh thường: giao diện 26/10 (27/10/2026)
+
+- Sửa flow Điểm Danh tài khoản thường dựa trên video /watch và bản ghi DOM/request-response ngày 26/10: ô ngày dùng `.ddg-day.is-today`; nút `#ddStamp` sau khi nhận chuyển sang `is-done[disabled]`.
+- Bỏ selector `.dd-tile` và kiểm chứng `.is-claimed` cũ. Giữ bước bỏ qua nếu đã nhận và chờ xác nhận server trước khi kết thúc; không thay đổi quest VIP.
+- Thêm regression test với Web/PC và kiểm chứng không lộ cookie hay token từ recording.
 ## 1.3.215 — Auto Scaling Khôi Lỗi GitHub (26/10/2026)
 
 - Tab Auto Scaling cho Gia chủ: Manual (số workflow), Scheduler (giờ Việt Nam hằng ngày), Dynamic (nhu cầu job) với minimum chung mặc định 2.

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.216",
+    date: "2026-10-27",
+    lines: [
+      "Điểm Danh tài khoản thường đã tương thích với lịch mới ngày 26/10 và nút đóng dấu hoàn thành.",
+      "Nhận diện ngày hôm nay theo ô lịch mới, không bấm lại khi đã nhận thưởng và chờ server xác nhận.",
+    ],
+  },
+  {
     version: "1.3.215",
     date: "2026-10-26",
     lines: [
@@ -465,14 +473,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Tối ưu hoá SEO toàn diện website: bổ sung sơ đồ trang sitemap.xml, chỉ dẫn bot robots.txt và thẻ mạng xã hội chuẩn mực.",
       "Làm giàu nội dung trang chủ với mục hỏi đáp thực tế, câu hỏi thường gặp và giới thiệu chi tiết pháp bảo tự động.",
-    ],
-  },
-  {
-    version: "1.3.157",
-    date: "2026-10-03",
-    lines: [
-      "Khắc phục sự cố ngắt kết nối trình duyệt khi dọn dẹp bộ nhớ tạm và đóng tab xem quảng cáo.",
-      "Tự động đóng các tab phụ và bảo vệ tiến trình tự động chạy liên tục không bị gián đoạn.",
     ],
   },
 ];

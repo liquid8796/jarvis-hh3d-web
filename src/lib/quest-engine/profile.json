@@ -1688,36 +1688,36 @@
         },
         {
           "action": "waitForSelector",
-          "selector": "#ddGrid .dd-tile.is-today",
+          "selector": "#ddGrid .ddg-day.is-today",
           "timeoutMs": 25000
         },
         {
           "action": "stopIf",
           "text": "\u0111\u00E3 \u0111i\u1EC3m danh h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "\u00F4 h\u00F4m nay c\u00F3 .is-claimed = server \u0111\u00E3 ghi nh\u1EADn",
+          "note": "Nút đóng dấu đã hoàn tất và bị vô hiệu hóa: server đã nhận điểm danh; không bấm lại.",
           "condition": {
             "kind": "visible",
-            "selector": "#ddGrid .dd-tile.is-today.is-claimed"
+            "selector": "#ddStamp.is-done[disabled]"
           }
         },
         {
           "action": "click",
           "selector": "#ddStamp",
           "timeoutMs": 8000,
-          "note": "n\u00FAt con d\u1EA5u m\u1EDBi, ch\u1EC9 b\u1EA5m khi h\u00F4m nay ch\u01B0a nh\u1EADn",
+          "note": "Chỉ ấn con dấu đang sẵn sàng; không bấm khi đã điểm danh.",
           "when": {
             "kind": "visible",
-            "selector": "#ddGrid .dd-tile.is-today:not(.is-claimed)"
+            "selector": "#ddStamp:not(.is-done):not([disabled])"
           }
         },
         {
           "action": "waitForCondition",
           "timeoutMs": 15000,
-          "note": "nh\u00E2n ch\u1EE9ng b\u1EAFt bu\u1ED9c: response th\u00E0nh c\u00F4ng th\u00EAm .is-claimed v\u00E0o \u00F4 h\u00F4m nay",
+          "note": "Đợi nút chuyển thành is-done và disabled sau phản hồi thành công.",
           "condition": {
             "kind": "visible",
-            "selector": "#ddGrid .dd-tile.is-today.is-claimed"
+            "selector": "#ddStamp.is-done[disabled]"
           }
         }
       ],

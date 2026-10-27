@@ -168,7 +168,7 @@ sudo journalctl -u jarvis-companions.service -n 20 --no-pager
 
 Bản v1.3.215 có tab `Auto Scaling` cho quyền `github_station.manage`. Mặc định chưa bật; Min = 2. Khi bật, bộ điều phối chỉ sử dụng GitHub API để bật/tắt workflow `linh-su.yml` đã đăng ký. Tắt workflow không hủy Actions runner đang chạy: khôi lỗi chỉ biến mất khỏi roster khi ca đang chạy kết thúc và hết hiệu lực heartbeat.
 
-Lịch GitHub `.github/workflows/autoscale-khoi-loi.yml` không bảo đảm chạy đúng nhịp (lần đầu phát hành quan sát không có lịch sử lượt nào). Vì vậy OCI sử dụng `jarvis-autoscale.timer` mỗi 10 phút để gọi duy nhất `/api/cron/autoscale`. **Đây là lời gọi HTTP điều khiển, không chạy Khôi Lỗi trên VM.** API yêu cầu `CRON_SECRET`; service đọc bí mật từ `/opt/jarvis/shared/.env` và chọn cổng hiện hành qua `/etc/caddy/upstream.conf` để chịu được blue/green. Advisory lease ở database bảo vệ khi hai lịch tới cùng lúc.
+Lịch GitHub `.github/workflows/autoscale-khoi-loi.yml` không bảo đảm chạy đúng nhịp (lần đầu phát hành quan sát không có lịch sử lượt nào). Vì vậy OCI sử dụng `jarvis-autoscale.timer` mỗi 1 phút để gọi duy nhất `/api/cron/autoscale`. **Đây là lời gọi HTTP điều khiển, không chạy Khôi Lỗi trên VM.** API yêu cầu `CRON_SECRET`; service đọc bí mật từ `/opt/jarvis/shared/.env` và chọn cổng hiện hành qua `/etc/caddy/upstream.conf` để chịu được blue/green. Advisory lease ở database bảo vệ khi hai lịch tới cùng lúc.
 
 Để cài lại timer sau khi dựng VM mới, từ bản release chứa script:
 

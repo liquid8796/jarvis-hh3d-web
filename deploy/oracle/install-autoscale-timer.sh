@@ -36,11 +36,11 @@ SERVICE
 
 cat > /etc/systemd/system/jarvis-autoscale.timer <<'TIMER'
 [Unit]
-Description=Reconcile GitHub worker scaling every 10 minutes
+Description=Reconcile GitHub worker scaling every minute
 
 [Timer]
-OnCalendar=*-*-* *:00/10:00
-AccuracySec=10s
+OnCalendar=*-*-* *:*:00
+AccuracySec=5s
 Persistent=true
 Unit=jarvis-autoscale.service
 
@@ -52,4 +52,7 @@ bash -n /usr/local/libexec/jarvis-autoscale-reconcile.sh
 systemd-analyze verify /etc/systemd/system/jarvis-autoscale.service /etc/systemd/system/jarvis-autoscale.timer
 systemctl daemon-reload
 systemctl enable --now jarvis-autoscale.timer
+# A timer already active from a prior installation retains its previous schedule
+# until restarted. Reload and rearm it immediately.
+systemctl restart jarvis-autoscale.timer
 systemctl list-timers --all jarvis-autoscale.timer --no-pager

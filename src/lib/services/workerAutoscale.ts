@@ -10,7 +10,7 @@ type Station = AppSettings["githubStations"][number];
 type Workflow = { station: Station; slug: string; state: string; pat: string };
 export type AutoscaleResult = {
   ok: boolean; message: string; mode: string; desired: number; active: number;
-  enabled: string[]; disabled: string[]; dispatched: string[]; recoveryRequested?: string[]; recoveryFailures?: string[]; queued: number; running: number; checkedAt: string;
+  enabled: string[]; disabled: string[]; dispatched: string[]; recoveryRequested?: string[]; recoveryFailures?: string[]; stalledQueue?: string[]; queued: number; running: number; checkedAt: string;
 };
 const root = "https://api.github.com";
 function pathOf(station: Station) {
@@ -71,12 +71,12 @@ export async function runWorkerAutoscale(): Promise<AutoscaleResult> {
   const lease = await acquireGithubAutoscaleLease(deadline);
   if (!lease) return { ok: false, message: "Một lượt autoscale khác đang chạy.", mode: "-", desired: 0, active: 0, enabled: [], disabled: [], dispatched: [], queued: 0, running: 0, checkedAt };
   let mode = "manual", desired = 0, active = 0, queued = 0, running = 0;
-  const enabled: string[] = [], disabled: string[] = [], dispatched: string[] = [], recoveryRequested: string[] = [], recoveryFailures: string[] = [];
+  const enabled: string[] = [], disabled: string[] = [], dispatched: string[] = [], recoveryRequested: string[] = [], recoveryFailures: string[] = [], stalledQueue: string[] = [];
   try {
     const settings = await getAppSettings();
     const config = settings.workerAutoscale;
     mode = config.mode;
-    if (!config.enabled) return { ok: true, message: "Auto scaling đang tắt; không thay đổi GitHub.", mode, desired: 0, active: 0, enabled, disabled, dispatched, recoveryRequested, recoveryFailures, queued, running, checkedAt };
+    if (!config.enabled) return { ok: true, message: "Auto scaling đang tắt; không thay đổi GitHub.", mode, desired: 0, active: 0, enabled, disabled, dispatched, recoveryRequested, recoveryFailures, stalledQueue, queued, running, checkedAt };
     const demand = await readAutoscaleDemand();
     queued = demand.queued; running = demand.running;
     desired = autoscaleDesiredWorkers(config, queued, running, Date.now());
@@ -152,7 +152,14 @@ export async function runWorkerAutoscale(): Promise<AutoscaleResult> {
               and last_seen > now() - interval '90 seconds'
           ) as online
         `);
-        const candidate = stuckQueuedRunForRecovery(
+        const latest = runs.workflow_runs[0];
+        if (online.rows[0]?.online !== true
+            && latest?.status === "queued"
+            && Number.isFinite(Date.parse(latest.created_at))
+            && Date.now() - Date.parse(latest.created_at) >= 30 * 60_000
+            && !runs.workflow_runs.some(run => run.status === "in_progress")) {
+          stalledQueue.push(slug);
+        }        const candidate = stuckQueuedRunForRecovery(
           runs.workflow_runs,
           online.rows[0]?.online === true,
           config.queueRecoveryAt[slug],
@@ -205,13 +212,14 @@ export async function runWorkerAutoscale(): Promise<AutoscaleResult> {
         const station = current.githubStations.find(s => stationSlug(s) === wf.slug);
         if (station && !enabled.includes(wf.slug) && !disabled.includes(wf.slug)) station.workflowState = wf.state;
       }
-      current.workerAutoscale.lastError = recoveryFailures.join("; ").slice(0, 470);
+      current.workerAutoscale.lastError = (recoveryFailures.length ? recoveryFailures.join("; ")
+        : stalledQueue.length ? `GitHub Actions không cấp runner cho ${stalledQueue.length} kho: ${stalledQueue.join(", ")}. Run queued >30 phút, chưa có job. Xem Actions hoặc liên hệ GitHub Support.` : "").slice(0, 470);
     }, { deadlineAt: deadline });
-    return { ok: recoveryFailures.length === 0, message: `Mục tiêu ${target}/${workflows.length} workflow. Đã bật ${enabled.length}, tắt ${disabled.length}, phát lượt chạy ${dispatched.length}, làm mới hàng chờ GitHub ${recoveryRequested.length}, yêu cầu rút lui ${drainingWorkerIds.length} Khôi Lỗi. Chờ nhận ngay: ${queued} job; đang chạy: ${running} job. Job cooldown không được tính.${recoveryFailures.length ? " Lỗi phục hồi: " + recoveryFailures.join("; ").slice(0, 250) : ""}`, mode, desired: target, active: active + enabled.length - disabled.length, enabled, disabled, dispatched, recoveryRequested, recoveryFailures, queued, running, checkedAt };
+    return { ok: recoveryFailures.length === 0, message: `Mục tiêu ${target}/${workflows.length} workflow. Đã bật ${enabled.length}, tắt ${disabled.length}, phát lượt chạy ${dispatched.length}, làm mới hàng chờ GitHub ${recoveryRequested.length}, kho GitHub còn kẹt ${stalledQueue.length}, yêu cầu rút lui ${drainingWorkerIds.length} Khôi Lỗi. Chờ nhận ngay: ${queued} job; đang chạy: ${running} job. Job cooldown không được tính.${recoveryFailures.length ? " Lỗi phục hồi: " + recoveryFailures.join("; ").slice(0, 250) : ""}`, mode, desired: target, active: active + enabled.length - disabled.length, enabled, disabled, dispatched, recoveryRequested, recoveryFailures, stalledQueue, queued, running, checkedAt };
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 470) : "Autoscale không thể hoàn tất.";
     try { await mutateGithubState(s => { s.workerAutoscale.lastError = message; }); } catch { /* preserve original error */ }
-    return { ok: false, message, mode, desired, active, enabled, disabled, dispatched, recoveryRequested, recoveryFailures, queued, running, checkedAt };
+    return { ok: false, message, mode, desired, active, enabled, disabled, dispatched, recoveryRequested, recoveryFailures, stalledQueue, queued, running, checkedAt };
   } finally {
     await lease.release();
   }

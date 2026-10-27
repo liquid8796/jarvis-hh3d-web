@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.224",
+    date: "2026-10-28",
+    lines: [
+      "Trang Admin báo rõ kho GitHub bị kẹt hàng chờ dù kho vẫn đang bật.",
+      "Thông báo lỗi được giữ trong thời gian chờ thử lại, giúp phân biệt máy thực sự trực và kho đã kích hoạt.",
+      "Không hủy các ca đang chạy và không thay đổi giới hạn Khôi Lỗi đã cấu hình.",
+    ],
+  },
+  {
     version: "1.3.223",
     date: "2026-10-28",
     lines: [
@@ -472,14 +481,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khắc phục sự cố không hiển thị quảng cáo Native Banner và biểu ngữ trên trang chủ.",
       "Cập nhật mã khoá chính xác theo tệp cấu hình gốc và ổn định luồng nạp quảng cáo.",
-    ],
-  },
-  {
-    version: "1.3.165",
-    date: "2026-10-04",
-    lines: [
-      "Chuyển khu vực quảng cáo lên trước block tính năng và bổ sung hai banner sườn hai bên trang.",
-      "Hỗ trợ song ngữ Anh - Việt cho toàn bộ trang chủ và thiết lập tiếng Anh làm ngôn ngữ mặc định.",
     ],
   },
 ];

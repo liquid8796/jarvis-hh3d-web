@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.224 — Surface externally stuck GitHub queues in Admin (28/10/2026)
+
+- Real production test confirmed that five GitHub workflow runs were queued for hours with no jobs, and GitHub returned HTTP 409 to both normal cancellation and force cancellation.
+- Record a persistent, actionable autoscaler error while a selected GitHub repository remains queued for over thirty minutes without a live runner. Previously, the next successful no-op reconciliation cleared the error and misleadingly appeared healthy.
+- Continue checking every minute and maintain previous no-job/no-live-run guardrails. Do not rewrite workflow concurrency groups, because old runs could later resume and duplicate worker IDs.
+- GitHub Support is required to clear externally stuck/out-of-sync Actions runs if neither cancellation endpoint works.
 ## 1.3.223 — GitHub Actions force-cancel fallback on HTTP 409 (28/10/2026)
 
 - Production revealed all five zero-job, multi-hour queued Actions runs return HTTP 409 when the standard cancel API is used.

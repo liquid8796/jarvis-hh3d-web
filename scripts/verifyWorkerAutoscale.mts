@@ -57,3 +57,5 @@ assert.match(demandSource, /"POST", deadline, undefined, 202/, "GitHub run cance
 assert.match(demandSource, /queueRecoveryAt\[slug\]/, "persist once-per-hour queue recovery checkpoint");
 assert.ok(demandSource.includes('/force-cancel'), "fallback must use force-cancel after HTTP 409");
 assert.ok(!demandSource.includes('/delete'), "never delete GitHub Actions runs");
+
+assert.ok(demandSource.includes("stalledQueue.push(slug)"), "Admin error must report GitHub queued runs even during retry cooldown");

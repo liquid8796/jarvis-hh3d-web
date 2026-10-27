@@ -9,7 +9,7 @@ const root = process.cwd();
 const release = await mkdtemp(path.join(await realpath(tmpdir()), "gitless-provision-test-"));
 let prepared: Awaited<ReturnType<typeof production.localPreflight>> | undefined;
 try {
-  for (const relative of ["scripts/githubProvisioningPayload.mjs", "scripts/githubPublicIdentity.mjs", "scripts/khoiloiPayload.mjs", "scripts/khoiloiNaming.mjs", "scripts/worker.mjs", "src/lib/quest-engine", "src/lib/worker/controlFollow.mjs", "src/lib/worker/selfUpdate.mjs", "deploy/github/linh-su.yml", "package.json", "public/linh-su/github-provisioning-lock.json"]) {
+  for (const relative of ["scripts/githubProvisioningPayload.mjs", "scripts/githubPublicIdentity.mjs", "scripts/khoiloiPayload.mjs", "scripts/khoiloiNaming.mjs", "scripts/worker.mjs", "src/lib/quest-engine", "src/lib/worker/controlFollow.mjs", "src/lib/worker/selfUpdate.mjs", "deploy/github/linh-su.yml", "package.json"]) {
     await mkdir(path.dirname(path.join(release, relative)), { recursive: true });
     await cp(path.join(root, relative), path.join(release, relative), { recursive: true });
   }
@@ -29,7 +29,7 @@ try {
   assert.match(proof.initialCommitSha, /^[a-f0-9]{40}$/);
   const workflow = await readFile(path.join(prepared.directory, ".github/workflows/custom.yaml"), "utf8");
   assert.ok(workflow.includes("WORKER_ID: fixture-worker"));
-  assert.ok(workflow.includes("/actions/workflows/custom.yaml/dispatches"));
+  assert.ok(workflow.includes("/actions/workflows/$wf_file/dispatches"));
   assert.ok(!workflow.includes("/actions/workflows/linh-su.yml/dispatches"));
   assert.ok(!workflow.includes("__PUBLIC_WORKFLOW_NAME__") && !workflow.includes("__PUBLIC_JOB_NAME__"));
   assert.match(workflow, /^jobs:\r?\n  linh-su:\r?\n    name: "[A-Za-z0-9 '&-]+"$/m);
@@ -38,9 +38,9 @@ try {
   assert.equal(packageJson.version, lock.packages[""].version);
   assert.ok(!workflow.includes(ctx.pat));
   assert.ok(!workflow.includes(process.env.WORKER_TOKEN));
-  await writeFile(path.join(release, "public/linh-su/github-provisioning-lock.json"), JSON.stringify({ schemaVersion: 1, packageVersion: "0.0.0" }));
+  await writeFile(path.join(release, "deploy/github/linh-su.yml"), "name: invalid template\\n");
   await assert.rejects(production.localPreflight(ctx));
-  console.log("PASS: gitless production staging, custom self-dispatch, lock version, secret boundary and guarded cleanup; no GitHub/DB calls.");
+  console.log("PASS: gitless production staging, custom self-dispatch, invalid template rejection, secret boundary and guarded cleanup; no GitHub/DB calls.");
 } finally {
   process.chdir(root);
   if (prepared) await production.dispose(prepared);

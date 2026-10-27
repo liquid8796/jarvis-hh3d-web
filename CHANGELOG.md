@@ -9,6 +9,11 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.221 — Fix GitHub new-repository provisioning payload (27/10/2026)
+
+- Root cause: after GitHub Actions self-dispatch was changed to use `$wf_file` inferred from `GITHUB_WORKFLOW_REF`, `renderWorkflow()` still required the old literal `linh-su.yml/dispatches` text. Local preflight classified the template mismatch as `payload_unavailable` before any GitHub repo creation.
+- Support both legacy literal self-dispatch and current dynamic self-dispatch, while rejecting ambiguous/missing target markers and retaining exact public identity and endpoint checks.
+- Add production-style helper regression tests, including custom workflow filename and gitless release source; no token or repository creation needed.
 ## 1.3.220 — Cooperative graceful scale-in for active GitHub workers (27/10/2026)
 
 - Persist a worker drain allow-list tied to each registered GitHub worker ID, including already-disabled workflows whose existing runners are still online.

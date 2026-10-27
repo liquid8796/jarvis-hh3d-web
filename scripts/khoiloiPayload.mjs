@@ -295,10 +295,13 @@ export function uncommittedPayloadPaths(repoRoot) {
 export function renderWorkflow({ template, workerId, webUrl, workflowFile = "linh-su.yml", purpose: _purpose = "worker" }) {
   const renderedWebUrl = webUrl;
   const templateDispatchTarget = "/actions/workflows/linh-su.yml/dispatches";
+  const dynamicDispatchTarget = "/actions/workflows/$wf_file/dispatches";
   const renderedDispatchTarget = `/actions/workflows/${workflowFile}/dispatches`;
   const publicIdentity = publicIdentityForWorker(workerId);
-  if (!template.includes(templateDispatchTarget)) {
-    throw new Error("Workflow template is missing its self-dispatch target.");
+  const legacyDispatch = template.includes(templateDispatchTarget);
+  const dynamicDispatch = template.includes(dynamicDispatchTarget);
+  if (legacyDispatch === dynamicDispatch) {
+    throw new Error("Workflow template must contain exactly one supported self-dispatch target.");
   }
   for (const placeholder of [PUBLIC_WORKFLOW_NAME_PLACEHOLDER, PUBLIC_JOB_NAME_PLACEHOLDER]) {
     if (template.split(placeholder).length !== 2) {
@@ -328,7 +331,9 @@ export function renderWorkflow({ template, workerId, webUrl, workflowFile = "lin
         "và một cho tiến trình khôi lỗi.",
     );
   }
-  if (!workflow.includes(renderedDispatchTarget) || (workflowFile !== "linh-su.yml" && workflow.includes(templateDispatchTarget))) {
+  if (legacyDispatch
+    ? (!workflow.includes(renderedDispatchTarget) || (workflowFile !== "linh-su.yml" && workflow.includes(templateDispatchTarget)))
+    : (!workflow.includes(dynamicDispatchTarget) || workflow.includes(templateDispatchTarget))) {
     throw new Error("Workflow self-dispatch target does not match the configured workflow filename.");
   }
   if (

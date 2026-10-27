@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.221",
+    date: "2026-10-27",
+    lines: [
+      "Khắc phục lỗi không tạo được kho GitHub mới do bộ dựng gói chưa theo kịp bản phát hành.",
+      "Bộ chuẩn bị kho mới tương thích cả mẫu GitHub cũ và mới, kể cả tên tệp tùy chỉnh.",
+      "Thêm kiểm thử dựng thử gói kho GitHub trước khi phát hành, không chạm tới kho người dùng.",
+    ],
+  },
+  {
     version: "1.3.220",
     date: "2026-10-27",
     lines: [
@@ -469,14 +478,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Tối ưu trọng tâm tương tác quảng cáo Adsterra: tập trung vào Popunder và SocialBar.",
       "Triệt tiêu tình trạng click nhầm và ngăn chặn ghi nhận lượt hiển thị không mong muốn cho NativeBanner.",
-    ],
-  },
-  {
-    version: "1.3.162",
-    date: "2026-10-03",
-    lines: [
-      "Mở khoá khả năng chạy song song 100% không khoá Mutex chuột cho chế độ chạy ẩn (CDP Headless) đa tiến trình.",
-      "Phân lập hoàn toàn toạ độ chuột ảo và tối ưu hoá thời gian khởi động, giúp các phiên duyệt tự do tải trang và tương tác quảng cáo đồng thời.",
     ],
   },
 ];

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { autoscaleDesiredWorkers, autoscaleScheduleTarget, workerAutoscaleSchema, chooseWorkflowTransitions, shouldDispatchIdleWorkflow } from "../src/lib/validation/workerAutoscale";
+import { autoscaleDesiredWorkers, autoscaleScheduleTarget, workerAutoscaleSchema, chooseWorkflowTransitions, shouldDispatchIdleWorkflow, stuckQueuedRunForRecovery } from "../src/lib/validation/workerAutoscale";
 const defaults = workerAutoscaleSchema.parse({});
 assert.equal(defaults.minWorkers, 2);
 assert.equal(defaults.enabled, false);
@@ -14,6 +14,8 @@ assert.equal(autoscaleDesiredWorkers({ ...defaults, mode: "dynamic", minWorkers:
 assert.deepEqual(chooseWorkflowTransitions(["a", "b", "c"], ["d"], 2), { enable: [], disable: ["c"], selected: ["a", "b"] });
 assert.deepEqual(chooseWorkflowTransitions(["a"], ["b", "c"], 3), { enable: ["b", "c"], disable: [], selected: ["a", "b", "c"] });
 assert.equal(workerAutoscaleSchema.safeParse({ minWorkers: 0 }).success, false);
+assert.equal(workerAutoscaleSchema.parse({downscaleCooldownMinutes: 0}).downscaleCooldownMinutes, 0);
+assert.equal(workerAutoscaleSchema.safeParse({downscaleCooldownMinutes: -1}).success, false);
 assert.equal(workerAutoscaleSchema.safeParse({ schedule: [{ time: "25:00", workers: 2 }] }).success, false);
 console.log("PASS: autoscale modes, Vietnam schedule, minimum, and workflow transitions");
 
@@ -40,3 +42,16 @@ const config = { ...defaults, mode: "dynamic" as const, minWorkers: 2, dynamicMa
 assert.equal(autoscaleDesiredWorkers(config, 0, 1, Date.now()), 2, "100 cooldown jobs plus 1 active -> minimum");
 assert.equal(autoscaleDesiredWorkers(config, 3, 1, Date.now()), 2);
 assert.equal(autoscaleDesiredWorkers(config, 9, 1, Date.now()), 5);
+const stuckStartedAt = "2026-10-27T12:00:00.000Z";
+const retryNow = Date.parse("2026-10-27T15:00:00.000Z");
+const staleQueued = [{ id: 12345, status: "queued", created_at: stuckStartedAt }];
+assert.equal(stuckQueuedRunForRecovery(staleQueued, false, undefined, retryNow), 12345, "stale 0-job queued run is recoverable");
+assert.equal(stuckQueuedRunForRecovery(staleQueued, true, undefined, retryNow), null, "never cancel a run when its worker is online");
+assert.equal(stuckQueuedRunForRecovery(staleQueued, false, "2026-10-27T14:40:00.000Z", retryNow), null, "one-hour recovery throttle");
+assert.equal(stuckQueuedRunForRecovery(staleQueued, false, undefined, Date.parse("2026-10-27T12:05:00Z")), null, "do not disrupt a young queued run");
+assert.equal(stuckQueuedRunForRecovery([{ id: 12345, status: "queued", created_at: stuckStartedAt }, { id: 12340, status: "in_progress", created_at: stuckStartedAt }], false, undefined, retryNow), null, "never recover while another run is executing");
+assert.equal(stuckQueuedRunForRecovery([{ id: 12345, status: "queued", created_at: stuckStartedAt }, { id: 12340, status: "unexpected", created_at: stuckStartedAt }], false, undefined, retryNow), null, "fail closed on unknown GitHub state");
+assert.match(demandSource, /liveRuns\?\.total_count === 0 && runJobs\?\.total_count === 0/, "never cancel a GitHub job that has started");
+assert.match(demandSource, /mode === "dynamic" && queued > 0/, "do not force GitHub queue recovery without demand");
+assert.match(demandSource, /"POST", deadline, undefined, 202/, "GitHub run cancel accepts HTTP 202");
+assert.match(demandSource, /queueRecoveryAt\[slug\]/, "persist once-per-hour queue recovery checkpoint");

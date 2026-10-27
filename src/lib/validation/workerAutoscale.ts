@@ -9,11 +9,12 @@ export const workerAutoscaleSchema = z.object({
   schedule: z.array(z.object({ time: clock, workers: z.number().int().min(1).max(100) })).min(1).max(24).default([{ time: "00:00", workers: 2 }]),
   dynamicMaxWorkers: z.number().int().min(1).max(100).default(8),
   jobsPerWorker: z.number().int().min(1).max(20).default(2),
-  downscaleCooldownMinutes: z.number().int().min(10).max(1440).default(30),
+  downscaleCooldownMinutes: z.number().int().min(0).max(1440).default(30),
   lastAppliedAt: z.string().nullable().default(null),
   lastError: z.string().max(500).default(""),
   managedSlugs: z.array(z.string().min(3).max(141)).max(100).default([]),
   drainingWorkerIds: z.array(z.string().min(1).max(64)).max(100).default([]),
+  queueRecoveryAt: z.record(z.string(), z.string().datetime()).default({}),
 }).superRefine((data, ctx) => {
   if (new Set(data.schedule.map(p => p.time)).size !== data.schedule.length) ctx.addIssue({ code: "custom", path: ["schedule"], message: "Duplicate schedule time" });
   if (data.dynamicMaxWorkers < data.minWorkers) ctx.addIssue({ code: "custom", path: ["dynamicMaxWorkers"], message: "Maximum must be >= minimum" });
@@ -76,4 +77,28 @@ export function workerDrainIdsForSelection(
   }
   const selected = new Set(retainedSlugs);
   return stations.filter(s => !selected.has(s.slug)).map(s => s.workerId);
+}
+
+
+/** GitHub Actions can leave a dispatch queued with zero jobs for hours.
+ * Safe recovery candidate only if no runner is online and no execution is underway.
+ * This is merely a candidate: caller MUST check run jobs and repository activity
+ * before cancelling anything.
+ */
+export function stuckQueuedRunForRecovery(
+  runs: readonly { id: number; status: string; created_at: string }[],
+  workerOnline: boolean,
+  lastRecoveryAt: string | undefined,
+  nowMs: number,
+): number | null {
+  if (workerOnline || runs.length === 0) return null;
+  if (runs.some(run => ["in_progress", "requested", "waiting", "pending"].includes(run.status))) return null;
+  if (runs.some(run => !["completed", "queued"].includes(run.status))) return null;
+  const latest = runs[0];
+  if (!latest || latest.status !== "queued" || !Number.isSafeInteger(latest.id) || latest.id <= 0) return null;
+  const at = Date.parse(latest.created_at);
+  if (!Number.isFinite(at) || nowMs - at < 30 * 60_000) return null;
+  const recovered = lastRecoveryAt ? Date.parse(lastRecoveryAt) : NaN;
+  if (Number.isFinite(recovered) && nowMs - recovered < 60 * 60_000) return null;
+  return latest.id;
 }

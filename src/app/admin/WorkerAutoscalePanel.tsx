@@ -136,7 +136,7 @@ export function WorkerAutoscalePanel({ initial, stations }: { initial: WorkerAut
 
         {config.mode === "dynamic" && <div className="mt-6 border-t border-white/10 pt-5">
           <h4 className="font-bold text-[var(--color-parchment)]">Điều tiết theo hàng đợi</h4>
-          <p className="mt-1 text-sm text-[var(--color-mist)]">Chỉ tính job đã hết cooldown, đang chờ Khôi Lỗi nhận ngay và job đang chạy còn nhịp tim. Không tính job còn cooldown hoặc dành cho máy nhà. Cooldown giảm tải riêng vẫn có hiệu lực.</p>
+          <p className="mt-1 text-sm text-[var(--color-mist)]">Chỉ tính job đã hết cooldown, đang chờ Khôi Lỗi nhận ngay và job đang chạy còn nhịp tim. Không tính job còn cooldown hoặc dành cho máy nhà. Cooldown giảm tải có thể đặt 0 phút để cho phép giảm ngay ở lần kiểm tra tiếp theo.</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <label className="text-xs font-semibold text-[var(--color-mist)]">Tối đa workflow
               <input type="number" className={fieldClass} min={config.minWorkers} max={100} value={config.dynamicMaxWorkers} onChange={e => change("dynamicMaxWorkers", limited(Number(e.target.value)))} disabled={busy} />
@@ -145,7 +145,7 @@ export function WorkerAutoscalePanel({ initial, stations }: { initial: WorkerAut
               <input type="number" className={fieldClass} min={1} max={20} value={config.jobsPerWorker} onChange={e => change("jobsPerWorker", limited(Number(e.target.value)))} disabled={busy} />
             </label>
             <label className="text-xs font-semibold text-[var(--color-mist)]">Cooldown giảm tải (phút)
-              <input type="number" className={fieldClass} min={10} max={1440} value={config.downscaleCooldownMinutes} onChange={e => change("downscaleCooldownMinutes", limited(Number(e.target.value), 10))} disabled={busy} />
+              <input type="number" className={fieldClass} min={0} max={1440} value={config.downscaleCooldownMinutes} onChange={e => change("downscaleCooldownMinutes", limited(Number(e.target.value), 0))} disabled={busy} />
             </label>
           </div>
         </div>}

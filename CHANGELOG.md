@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.222 — Gracefully recover GitHub Actions queues and allow zero Scale-In cooldown (28/10/2026)
+
+- Dynamic scaling still counts only immediately eligible queued jobs and fresh running jobs; jobs on cooldown remain excluded.
+- Set `downscaleCooldownMinutes` minimum to 0 in Zod validation and Admin input, retaining the existing default of 30 minutes and each user's saved value until edited.
+- The scaler no longer equates an enabled workflow with a provisioned runner: detect a GitHub dispatch stuck queued for over 30 minutes while no worker is online, no GitHub job has started, and there is no other active run. Ask GitHub to cancel this not-started run and re-dispatch only after cancellation is observed.
+- Bound recovery to once per hour per repo in persisted control-plane settings, never cancel running jobs, and report GitHub cancellation errors instead of blocking recovery in other repositories.
+- This cannot bypass external GitHub Actions account limits or platform outages.
 ## 1.3.221 — Fix GitHub new-repository provisioning payload (27/10/2026)
 
 - Root cause: after GitHub Actions self-dispatch was changed to use `$wf_file` inferred from `GITHUB_WORKFLOW_REF`, `renderWorkflow()` still required the old literal `linh-su.yml/dispatches` text. Local preflight classified the template mismatch as `payload_unavailable` before any GitHub repo creation.

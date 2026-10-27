@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.222",
+    date: "2026-10-28",
+    lines: [
+      "Giảm tải cho phép đặt 0 phút và giữ nguyên mức tối thiểu, tối đa đã lưu.",
+      "Phát hiện kho GitHub chờ quá lâu chưa được cấp máy để yêu cầu làm mới lượt chạy an toàn.",
+      "Bảo vệ công việc đang thực hiện và hạn chế làm mới mỗi kho một lần trong một giờ.",
+    ],
+  },
+  {
     version: "1.3.221",
     date: "2026-10-27",
     lines: [
@@ -470,14 +479,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Loại bỏ hoàn toàn các cấu hình chuyển tiếp trung gian không còn sử dụng.",
       "Hệ thống tập trung vận hành trực tiếp trên hạ tầng máy chủ chính thức và các trạm phụ trợ.",
-    ],
-  },
-  {
-    version: "1.3.163",
-    date: "2026-10-04",
-    lines: [
-      "Tối ưu trọng tâm tương tác quảng cáo Adsterra: tập trung vào Popunder và SocialBar.",
-      "Triệt tiêu tình trạng click nhầm và ngăn chặn ghi nhận lượt hiển thị không mong muốn cho NativeBanner.",
     ],
   },
 ];

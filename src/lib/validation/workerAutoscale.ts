@@ -55,21 +55,3 @@ export function shouldDispatchIdleWorkflow(
   const latest = Math.max(...runs.map(run => Date.parse(run.created_at)));
   return Number.isFinite(latest) && nowMs - latest >= 15 * 60_000;
 }
-/**
- * Number of jobs that may overlap in the busiest short slice, instead of
- * treating every job within a long lookahead as simultaneously runnable.
- */
-export function peakDueWithinRollingWindow(
-  dueAt: readonly number[], nowMs: number, horizonMs: number, windowMs: number,
-): number {
-  if (horizonMs <= 0 || windowMs <= 0) return 0;
-  let peak = 0;
-  for (let offset = 0; offset < horizonMs; offset += 60_000) {
-    const start = nowMs + offset;
-    const end = nowMs + Math.min(horizonMs, offset + windowMs);
-    let count = 0;
-    for (const due of dueAt) if (due > start && due <= end) count++;
-    peak = Math.max(peak, count);
-  }
-  return peak;
-}

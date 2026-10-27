@@ -8,7 +8,7 @@ import type { StationView } from "@/app/actions/githubStations";
 const modes = [
   { id: "manual", label: "Manual", description: "Chốt số workflow muốn duy trì" },
   { id: "scheduler", label: "Scheduler", description: "Đổi quy mô theo khung giờ mỗi ngày" },
-  { id: "dynamic", label: "Dynamic", description: "Tự điều chỉnh theo hàng đợi sắp đến hạn" },
+  { id: "dynamic", label: "Dynamic", description: "Tính từ job chờ lượt và đang chạy" },
 ] as const;
 const fieldClass = "mt-2 w-full min-h-11 rounded-xl border border-[var(--color-gold-400)]/25 bg-[var(--color-ink-900)]/70 px-3 text-[var(--color-parchment)] outline-none focus:border-[var(--color-gold-300)] focus:ring-2 focus:ring-[var(--color-gold-300)]/20";
 const panelClass = "rounded-2xl border border-[var(--color-gold-400)]/20 bg-[var(--color-ink-900)]/55 p-5 sm:p-6";
@@ -135,7 +135,7 @@ export function WorkerAutoscalePanel({ initial, stations }: { initial: WorkerAut
 
         {config.mode === "dynamic" && <div className="mt-6 border-t border-white/10 pt-5">
           <h4 className="font-bold text-[var(--color-parchment)]">Điều tiết theo hàng đợi</h4>
-          <p className="mt-1 text-sm text-[var(--color-mist)]">Đếm job mà Khôi Lỗi GitHub có thể nhận, cộng với đỉnh tải trong từng cửa sổ 3 phút của 10 phút sắp tới. Job dành riêng cho máy nhà không làm tăng số kho GitHub. Scale-in vẫn có cooldown.</p>
+          <p className="mt-1 text-sm text-[var(--color-mist)]">Chỉ tính job đã hết cooldown, đang chờ Khôi Lỗi nhận ngay và job đang chạy còn nhịp tim. Không tính job còn cooldown hoặc dành cho máy nhà. Cooldown giảm tải riêng vẫn có hiệu lực.</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <label className="text-xs font-semibold text-[var(--color-mist)]">Tối đa workflow
               <input type="number" className={fieldClass} min={config.minWorkers} max={100} value={config.dynamicMaxWorkers} onChange={e => change("dynamicMaxWorkers", limited(Number(e.target.value)))} disabled={busy} />

@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.219 — Dynamic: exclude job cooldown completely (27/10/2026)
+
+- Scale solely on queued jobs ready for an immediate claim (`status=queued AND next_run_at<=now()`) and fresh running jobs eligible for sect GitHub workers.
+- Do not include future-scheduled jobs in demand, even those due within the next ten minutes; remove rolling peak forecasting.
+- Keep Min/Max, jobs-per-workflow, scale-in cooldown, and serialized GitHub Actions reconciliation unchanged. Job cooldown and scale-in cooldown are different concepts.
+- Update Admin explanation and add regression tests asserting job cooldown is never included.
 ## 1.3.218 — Dynamic: scale on predicted overlap, not entire queue (27/10/2026)
 
 - Forecast GitHub worker capacity using jobs eligible for sect workers only. Jobs pinned to personal PC workers no longer inflate GitHub demand.

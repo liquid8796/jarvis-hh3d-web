@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.219",
+    date: "2026-10-27",
+    lines: [
+      "Điều phối tự động chỉ tính các đàn đã hết chờ nghỉ, sẵn sàng nhận lượt hoặc đang chạy.",
+      "Đàn còn trong thời gian nghỉ không còn làm tăng số kho GitHub cần bật, kể cả khi sắp tới lượt.",
+      "Giữ nguyên giới hạn tối thiểu, tối đa và thời gian chống bật tắt liên tục.",
+    ],
+  },
+  {
     version: "1.3.218",
     date: "2026-10-27",
     lines: [
@@ -467,14 +476,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khắc phục sự cố không ghi nhận lượt hiển thị quảng cáo trong chế độ chạy ẩn.",
       "Tối ưu hoá khả năng tương thích đồ hoạ WebGL và xoá bỏ dấu vết tự động hoá để các đối tác quảng cáo ghi nhận đầy đủ.",
-    ],
-  },
-  {
-    version: "1.3.160",
-    date: "2026-10-03",
-    lines: [
-      "Khắc phục sự cố chế độ chạy ẩn (Headless) trong kịch bản tự động xem quảng cáo.",
-      "Tự động dùng hồ sơ độc lập và chuyển thao tác sang chuột ảo CDP để trình duyệt chạy ngầm hoàn toàn.",
     ],
   },
 ];

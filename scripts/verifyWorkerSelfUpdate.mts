@@ -122,7 +122,7 @@ check("WEB_VERSION lấy từ package.json, không phải hằng gõ tay", /cons
 
 console.log("\nMối nối phía khôi lỗi");
 const worker = read("scripts/worker.mjs");
-check("đọc webVersion từ hồi đáp claim", /const \{ job, webVersion \} = await call\("claim"/.test(worker));
+check("đọc webVersion từ hồi đáp claim", /const \{ job, webVersion(?:, drain)? \} = await call\("claim"/.test(worker));
 check("hỏi luật rồi mới thu đàn", /shouldSelfUpdate\(\{/.test(worker) && /beginDrain\(xet\.reason\)/.test(worker));
 check("thoát bằng đúng mã ấy khi thu xong", /process\.exitCode = UPDATE_EXIT_CODE/.test(worker));
 check(
@@ -170,8 +170,8 @@ check(
     /if \[ "\$troi" -lt "\$nguong" \]/.test(workflow),
 );
 check(
-  "lượt kế vẫn dispatch đúng workflow linh-su.yml",
-  /actions\/workflows\/linh-su\.yml\/dispatches/.test(workflow),
+  "lượt kế dispatch theo tên workflow thực từ GITHUB_WORKFLOW_REF",
+  /GITHUB_WORKFLOW_REF/.test(workflow) && /actions\/workflows\/\$wf_file\/dispatches/.test(workflow),
 );
 
 console.log(`\n${passed} thuận, ${failures.length} nghịch.`);

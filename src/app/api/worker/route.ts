@@ -38,6 +38,7 @@ import {
   storedConfigSchema,
 } from "@/lib/services/configs";
 import { getAppSettings } from "@/lib/services/settings";
+import { isDrainingWorkerId } from "@/lib/validation/workerAutoscale";
 import { findById } from "@/lib/services/users";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 
@@ -211,6 +212,15 @@ export async function POST(request: Request) {
       // Điểm danh ở claim — op dày nhịp nhất, và là op duy nhất một khôi lỗi NHÀN RỖI vẫn
       // gọi đều — nên "đang trực" nghĩa là tiến trình còn sống, không phải nó đang bận.
       await recordWorkerSeen(body.workerId, scope, body.version ?? null, body.maxJobs ?? null);
+      // Scale In is cooperative: stop assigning new work before asking this
+      // process to finish its in-flight cycles and exit. Personal workers are
+      // never affected. Keep recording heartbeat until the process leaves.
+      if (scope.kind === "operator") {
+        const state = (await getAppSettings()).workerAutoscale;
+        if (state.enabled && isDrainingWorkerId(state.drainingWorkerIds, body.workerId)) {
+          return NextResponse.json({ job: null, drain: true, webVersion: WEB_VERSION });
+        }
+      }
 
       // Bế quan trùng tu: đóng ĐÚNG MỘT cánh cửa, và cánh cửa ấy nằm TRONG `claimNextJob`
       // (từ 18/08/2026 — trước đó nó là một cú chặn thẳng thừng ngay tại đây). Bốn op còn lại

@@ -64,7 +64,7 @@ export function WorkerAutoscalePanel({ initial, stations }: { initial: WorkerAut
           <div>
             <p className="text-xs font-bold uppercase tracking-[.18em] text-[var(--color-gold-300)]">GitHub Actions / Điều phối tải</p>
             <h2 id="worker-autoscale-title" className="h-display mt-2 text-2xl font-bold text-gilded">Auto Scaling Khôi Lỗi</h2>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--color-mist)]">Điều chỉnh số workflow đang bật. Workflow tắt sẽ không nhận ca mới; ca đang chạy vẫn hoàn tất. Không tạo Khôi Lỗi trên OCI.</p>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--color-mist)]">Điều chỉnh số workflow GitHub đang bật. Khi giảm tải, Khôi Lỗi được chọn ngừng nhận job mới, hoàn tất job đang chạy rồi tự thoát. Không chạy Khôi Lỗi trên OCI.</p>
           </div>
           <label className="flex min-h-11 items-center gap-3 rounded-xl border border-[var(--color-gold-400)]/25 bg-[var(--color-ink-900)]/70 px-4 text-sm font-semibold text-[var(--color-parchment)]">
             <input type="checkbox" checked={config.enabled} onChange={e => change("enabled", e.target.checked)} className="size-5 accent-amber-400" disabled={busy} />
@@ -83,6 +83,7 @@ export function WorkerAutoscalePanel({ initial, stations }: { initial: WorkerAut
           </div>)}
         </div>
         {active === eligible.length && eligible.length > 0 && config.mode === "dynamic" && <p className="mt-3 text-sm text-amber-200" role="status">Đã bật toàn bộ {eligible.length} workflow hiện có. Nếu job vẫn ùn ứ, phải bổ sung kho Khôi Lỗi mới hoặc tăng năng lực runner; nâng Max vượt số kho không tạo thêm runner.</p>}
+        {initial.drainingWorkerIds.length > 0 && <p className="mt-3 text-sm text-amber-200" role="status">{initial.drainingWorkerIds.length} Khôi Lỗi đang rút lui hoặc đã được ngừng nhận job mới. Số máy online sẽ giảm khi ca cũ kết thúc.</p>}
         <p className="mt-3 text-xs leading-5 text-[var(--color-mist)]">* Dựa trên lần kiểm tra workflow gần nhất; kết quả thực tế được đối chiếu lại trực tiếp với GitHub mỗi lần scale. {countUnknown > 0 ? `${countUnknown} kho chưa có trạng thái xác thực.` : ""}</p>
       </div>
 

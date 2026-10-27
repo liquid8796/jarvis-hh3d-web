@@ -19,7 +19,9 @@ export async function saveWorkerAutoscaleAction(input: AutoscaleInput): Promise<
   if (!validation.success) return { ok: false, message: validation.error.issues[0]?.message ?? "Cấu hình không hợp lệ." };
   await mutateGithubState(settings => {
     // Never replace another request's checkpoint/ownership fields with stale client values.
-    settings.workerAutoscale = { ...settings.workerAutoscale, ...input, lastError: "" };
+    settings.workerAutoscale = { ...settings.workerAutoscale, ...input, lastError: "",
+      ...(!input.enabled ? { drainingWorkerIds: [] } : {}),
+    };
   });
   const result = input.enabled ? await runWorkerAutoscale() : null;
   revalidatePath("/admin");

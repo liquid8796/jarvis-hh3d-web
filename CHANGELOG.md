@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.220 — Cooperative graceful scale-in for active GitHub workers (27/10/2026)
+
+- Persist a worker drain allow-list tied to each registered GitHub worker ID, including already-disabled workflows whose existing runners are still online.
+- Stop assigning new jobs to these GitHub operators; respond to their next claim with `drain=true`, while leaving job heartbeat/event/complete fully functional.
+- Worker runtime drains its in-flight jobs and exits itself (does not cancel the GitHub Actions run); an active scale-out clears drain markers before reenabling workflows.
+- Preserve Min/Max, job cooldown exclusions, and the 10-minute scale-in hysteresis. Private PC workers are never placed on the drain list.
+- Admin displays the number of marked workers; unit and source regression tests cover drain identities and the worker protocol.
 ## 1.3.219 — Dynamic: exclude job cooldown completely (27/10/2026)
 
 - Scale solely on queued jobs ready for an immediate claim (`status=queued AND next_run_at<=now()`) and fresh running jobs eligible for sect GitHub workers.

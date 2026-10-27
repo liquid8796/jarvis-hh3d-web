@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.220",
+    date: "2026-10-27",
+    lines: [
+      "Khôi Lỗi được chọn giảm tải sẽ thôi nhận việc mới, chờ hết ca dang dở rồi tự rút lui.",
+      "Lệnh rút lui áp dụng cả cho những kho GitHub đã tắt nhưng tiến trình cũ vẫn còn trực.",
+      "Tăng tải trở lại sẽ hủy lệnh rút lui cho những Khôi Lỗi được giữ lại.",
+    ],
+  },
+  {
     version: "1.3.219",
     date: "2026-10-27",
     lines: [
@@ -468,14 +477,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Mở khoá khả năng chạy song song 100% không khoá Mutex chuột cho chế độ chạy ẩn (CDP Headless) đa tiến trình.",
       "Phân lập hoàn toàn toạ độ chuột ảo và tối ưu hoá thời gian khởi động, giúp các phiên duyệt tự do tải trang và tương tác quảng cáo đồng thời.",
-    ],
-  },
-  {
-    version: "1.3.161",
-    date: "2026-10-03",
-    lines: [
-      "Khắc phục sự cố không ghi nhận lượt hiển thị quảng cáo trong chế độ chạy ẩn.",
-      "Tối ưu hoá khả năng tương thích đồ hoạ WebGL và xoá bỏ dấu vết tự động hoá để các đối tác quảng cáo ghi nhận đầy đủ.",
     ],
   },
 ];

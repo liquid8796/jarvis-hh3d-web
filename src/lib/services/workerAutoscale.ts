@@ -3,7 +3,7 @@ import { db } from "@/lib/db/client";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { acquireGithubAutoscaleLease, mutateGithubState } from "@/lib/services/companionState";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
-import { autoscaleDesiredWorkers, chooseWorkflowTransitions, shouldDispatchIdleWorkflow } from "@/lib/validation/workerAutoscale";
+import { autoscaleDesiredWorkers, chooseWorkflowTransitions, shouldDispatchIdleWorkflow, workerDrainIdsForSelection } from "@/lib/validation/workerAutoscale";
 import { stationSlug } from "@/lib/validation/githubStations";
 
 type Station = AppSettings["githubStations"][number];
@@ -103,6 +103,17 @@ export async function runWorkerAutoscale(): Promise<AutoscaleResult> {
     // Cooldown prevents scale-IN, but must never block idle-workflow recovery.
     const target = retainDuringCooldown ? active : requested;
     const plan = chooseWorkflowTransitions(currentlyActive.map(w => w.slug), available.map(w => w.slug), target);
+    // Persist draining identities BEFORE disabling GitHub. This also targets
+    // previously-disabled repos whose old runners are still online. During
+    // scale-out the kept identities are removed BEFORE enabling dispatch.
+    // Reconcile every time (even if there are zero workflow transitions).
+    const drainingWorkerIds = workerDrainIdsForSelection(
+      workflows.map(w => ({ slug: w.slug, workerId: w.station.workerId })),
+      plan.selected,
+    );
+    await mutateGithubState(current => {
+      current.workerAutoscale.drainingWorkerIds = drainingWorkerIds;
+    }, { deadlineAt: deadline });
     // Prefer additions before reductions; keep the minimum intact even if a GitHub request fails.
     for (const [action, slugs, state] of [
       ["enable", plan.enable, "active"],
@@ -146,7 +157,7 @@ export async function runWorkerAutoscale(): Promise<AutoscaleResult> {
       }
       current.workerAutoscale.lastError = "";
     }, { deadlineAt: deadline });
-    return { ok: true, message: `Mục tiêu ${target}/${workflows.length} workflow. Đã bật ${enabled.length}, tắt ${disabled.length}, phát lượt chạy ${dispatched.length}. Chờ nhận ngay: ${queued} job; đang chạy: ${running} job. Job cooldown không được tính.`, mode, desired: target, active: active + enabled.length - disabled.length, enabled, disabled, dispatched, queued, running, checkedAt };
+    return { ok: true, message: `Mục tiêu ${target}/${workflows.length} workflow. Đã bật ${enabled.length}, tắt ${disabled.length}, phát lượt chạy ${dispatched.length}, yêu cầu rút lui ${drainingWorkerIds.length} Khôi Lỗi. Chờ nhận ngay: ${queued} job; đang chạy: ${running} job. Job cooldown không được tính.`, mode, desired: target, active: active + enabled.length - disabled.length, enabled, disabled, dispatched, queued, running, checkedAt };
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 470) : "Autoscale không thể hoàn tất.";
     try { await mutateGithubState(s => { s.workerAutoscale.lastError = message; }); } catch { /* preserve original error */ }

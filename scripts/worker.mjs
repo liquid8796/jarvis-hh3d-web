@@ -320,6 +320,7 @@ let nextSweepAt = Date.now();
  * huỷ trên Actions mà lại kích một cú thay gói là hành vi không ai ngờ tới.
  */
 let drainingForUpdate = false;
+let drainingByAutoscale = false;
 let draining = false;
 let drainStartedAt = 0;
 const startedAt = Date.now();
@@ -355,7 +356,7 @@ for (;;) {
       }
       break;
     }
-    if (DRAIN_TIMEOUT_MS > 0 && Date.now() - drainStartedAt >= DRAIN_TIMEOUT_MS) {
+    if (!drainingByAutoscale && DRAIN_TIMEOUT_MS > 0 && Date.now() - drainStartedAt >= DRAIN_TIMEOUT_MS) {
       // Thoát với mã khác 0: còn đàn dở nghĩa là nhịp tim sắp tắt và reaper sẽ kết liễu chúng
       // sau 3 phút. Có người sắp mất một vòng — chuyện ấy phải hiện ĐỎ.
       console.error(
@@ -373,12 +374,15 @@ for (;;) {
 
   if (running.size < MAX_JOBS) {
     try {
-      const { job, webVersion } = await call("claim", {
+      const { job, webVersion, drain } = await call("claim", {
         workerId: WORKER_ID,
         maxJobs: MAX_JOBS,
         ...(VERSION ? { version: VERSION } : {}),
       });
-      if (job) {
+      if (drain === true) {
+        drainingByAutoscale = true;
+        beginDrain("backend requested graceful scale-in");
+      } else if (job) {
         claimed = true;
         // handle() tự nuốt mọi lỗi của chính nó (kể cả lỗi báo cáo complete), nên promise
         // này không bao giờ reject — Set chỉ để đếm ghế.

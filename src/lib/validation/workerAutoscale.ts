@@ -13,6 +13,7 @@ export const workerAutoscaleSchema = z.object({
   lastAppliedAt: z.string().nullable().default(null),
   lastError: z.string().max(500).default(""),
   managedSlugs: z.array(z.string().min(3).max(141)).max(100).default([]),
+  drainingWorkerIds: z.array(z.string().min(1).max(64)).max(100).default([]),
 }).superRefine((data, ctx) => {
   if (new Set(data.schedule.map(p => p.time)).size !== data.schedule.length) ctx.addIssue({ code: "custom", path: ["schedule"], message: "Duplicate schedule time" });
   if (data.dynamicMaxWorkers < data.minWorkers) ctx.addIssue({ code: "custom", path: ["dynamicMaxWorkers"], message: "Maximum must be >= minimum" });
@@ -54,4 +55,25 @@ export function shouldDispatchIdleWorkflow(
   if (runs.length === 0) return true;
   const latest = Math.max(...runs.map(run => Date.parse(run.created_at)));
   return Number.isFinite(latest) && nowMs - latest >= 15 * 60_000;
+}
+
+
+/** Persisted backend stop-list. Operator-scoped worker IDs only. */
+export function isDrainingWorkerId(workerIds: readonly string[], workerId: string): boolean {
+  return workerId.length > 0 && workerIds.includes(workerId);
+}
+
+/** Compute desired drains for ALL excluded stations, including already disabled workflows. */
+export function workerDrainIdsForSelection(
+  stations: readonly { slug: string; workerId: string }[],
+  retainedSlugs: readonly string[],
+): string[] {
+  const known = new Set<string>();
+  for (const station of stations) {
+    if (!station.workerId || station.workerId.length > 64) throw Error("Thiếu workerId hợp lệ trong kho GitHub: " + station.slug);
+    if (known.has(station.workerId)) throw Error("Trùng workerId giữa các kho GitHub: " + station.workerId);
+    known.add(station.workerId);
+  }
+  const selected = new Set(retainedSlugs);
+  return stations.filter(s => !selected.has(s.slug)).map(s => s.workerId);
 }

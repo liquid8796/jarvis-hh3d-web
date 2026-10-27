@@ -1,3 +1,4 @@
+import { isDrainingWorkerId } from "@/lib/validation/workerAutoscale";
 import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { listAccountsWithEnvelope } from "./accounts";
@@ -664,7 +665,12 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
    * bảng quyền. `user_roles` có khoá chính `(user_id, role_code)` nên phép `exists` này đi bằng
    * tiền tố khoá chính, không thêm chỉ mục nào.
    */
-  const { maintenance } = await getAppSettings();
+  const settings = await getAppSettings();
+  // Second line of defense, in case another service calls claimNextJob
+  // directly rather than through /api/worker.
+  if (scope.kind === "operator" && settings.workerAutoscale.enabled
+      && isDrainingWorkerId(settings.workerAutoscale.drainingWorkerIds, workerId)) return null;
+  const { maintenance } = settings;
   const maintenanceFilter = maintenance.active
     ? sql` and exists (
         select 1 from ${schema.userRoles} as ur

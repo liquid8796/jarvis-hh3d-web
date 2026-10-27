@@ -8,6 +8,7 @@ import {
   pingGithubStationAction,
   revealGithubStationPatAction,
   runKeepaliveAction,
+  runGithubStationWorkflowAction,
   provisionGithubStationAction,
   updateGithubStationAction,
   type StationResult,
@@ -191,6 +192,8 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
   const [pingState, pingAction, pinging] = useActionState<StationResult | null, FormData>(pingGithubStationAction, null);
   const [deleteState, deleteAction, deleting] = useActionState<StationResult | null, FormData>(deleteGithubStationAction, null);
   const [loopState, loopAction, looping] = useActionState<StationResult | null, FormData>(runKeepaliveAction, null);
+  const [runState, runAction, running] = useActionState<Awaited<ReturnType<typeof runGithubStationWorkflowAction>> | null, FormData>(runGithubStationWorkflowAction, null);
+  const [runningSlug, setRunningSlug] = useState<string | null>(null);
   const [editing, setEditing] = useState<StationView | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const editorTrigger = useRef<HTMLButtonElement | null>(null);
@@ -225,7 +228,7 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
     .filter((part): part is string => part !== null)
     .join(" · ");
 
-  const notice = [pingState, deleteState, loopState].find((s) => s !== null);
+  const notice = [runState, pingState, deleteState, loopState].find((s) => s !== null);
 
   function openEditor(station: StationView | null, trigger: HTMLButtonElement) {
     editorTrigger.current = trigger;
@@ -281,6 +284,9 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
           className={`rounded-lg border px-4 py-2 text-sm ${notice.ok ? "border-[rgba(76,201,154,0.4)] text-[var(--color-jade-300)]" : "border-[rgba(255,120,120,0.4)] text-[#f2a0a0]"}`}
         >
           {notice.message}
+          {runState && notice === runState && runState.runUrl && (
+            <a className="ml-2 font-medium underline" href={runState.runUrl} target="_blank" rel="noopener noreferrer">Xem trên GitHub Actions</a>
+          )}
         </p>
       )}
 
@@ -373,7 +379,22 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                     </div>
                     <div className="flex flex-wrap gap-2 lg:justify-end">
                       <Link href={`/admin/github/${encodeURIComponent(station.owner)}/${encodeURIComponent(station.repo)}`} className="btn btn-ghost px-3 py-1.5 text-xs">Chi tiết</Link>
-                      <form action={pingAction}>
+                      <form
+                        action={runAction}
+                        onSubmit={() => setRunningSlug(station.slug)}
+                      >
+                        <input type="hidden" name="slug" value={station.slug} />
+                        <button
+                          type="submit"
+                          className="btn btn-gold px-3 py-1.5 text-xs"
+                          disabled={running || deleting || !station.enabled || station.primaryDeferred || station.purpose !== "worker" || station.workflowState.startsWith("disabled_")}
+                          title={station.primaryDeferred ? "Kho chính đang hoãn."
+                            : station.workflowState.startsWith("disabled_") ? "Workflow đang tắt trên GitHub."
+                            : "Gửi lượt workflow_dispatch mới; bỏ qua queued cũ quá 60 giây, không hủy job đang chạy."}
+                        >
+                          {running && runningSlug === station.slug ? "Đang gửi…" : "Run workflow"}
+                        </button>
+                      </form>                      <form action={pingAction}>
                         <input type="hidden" name="slug" value={station.slug} />
                         <button
                           type="submit"

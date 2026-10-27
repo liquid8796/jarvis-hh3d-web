@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.225",
+    date: "2026-10-28",
+    lines: [
+      "Thêm nút Chạy GitHub trên từng kho để chủ động gọi lượt chạy mới.",
+      "Cho phép bỏ qua lượt chờ cũ bị kẹt nhưng không chạy trùng khi đã có ca đang thực hiện.",
+      "Hiện kết quả GitHub và đường dẫn lượt chạy mà không đưa PAT về trình duyệt.",
+    ],
+  },
+  {
     version: "1.3.224",
     date: "2026-10-28",
     lines: [
@@ -473,14 +482,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Tối ưu hoá cơ chế nhận diện trạng thái nạp quảng cáo Adsterra cho biểu ngữ và Native.",
       "Loại bỏ tình trạng ẩn nhầm quảng cáo khi mạng quảng cáo chưa kịp phân phối nội dung.",
-    ],
-  },
-  {
-    version: "1.3.166",
-    date: "2026-10-04",
-    lines: [
-      "Khắc phục sự cố không hiển thị quảng cáo Native Banner và biểu ngữ trên trang chủ.",
-      "Cập nhật mã khoá chính xác theo tệp cấu hình gốc và ổn định luồng nạp quảng cáo.",
     ],
   },
 ];

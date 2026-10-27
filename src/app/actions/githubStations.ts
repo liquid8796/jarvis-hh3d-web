@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
 import { decryptSecret, encryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { pingStationBySlug, runCompanionNurture, runKeepalive } from "@/lib/services/githubStations";
+import { dispatchGithubWorkflowManually, type ManualWorkflowResult } from "@/lib/services/githubManualDispatch";
 import { COMPANION_RUN_BUDGET_MS } from "@/lib/services/llmTimeouts";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
 import { mutateGithubState } from "@/lib/services/companionState";
@@ -262,6 +263,32 @@ export async function updateGithubStationAction(
   return stationForms.update(formData);
 }
 
+/** One authorized Admin click -> one Actions dispatch, even if an older run is stuck queued.
+ * PAT is decrypted only in this server action; it is never returned to the client.
+ */
+export async function runGithubStationWorkflowAction(
+  _previous: ManualWorkflowResult | null,
+  formData: FormData,
+): Promise<ManualWorkflowResult> {
+  await requireStationManage();
+  const slug = String(formData.get("slug") ?? "").trim();
+  if (!/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9_.-]{1,100}$/.test(slug)) {
+    return { ok: false, message: "Kho GitHub không hợp lệ." };
+  }
+  const settings = await getAppSettings();
+  const station = settings.githubStations.find(s => stationSlug(s) === slug);
+  if (!station) return { ok: false, message: "Kho này không còn trong sổ GitHub." };
+  if (!isEncrypted(station.pat)) return { ok: false, message: "PAT của kho chưa được mã hóa hợp lệ. Hãy cập nhật PAT." };
+  let pat: string;
+  try {
+    pat = decryptSecret(station.pat);
+  } catch {
+    return { ok: false, message: "Không giải mã được PAT. Kiểm tra ENCRYPTION_KEY hoặc cập nhật PAT." };
+  }
+  const result = await dispatchGithubWorkflowManually(station, pat);
+  if (result.ok) revalidatePath("/admin");
+  return result;
+}
 /** Compatibility with already loaded admin clients; this path can never append a registration. */
 export async function saveGithubStationAction(
   _prev: StationResult | null,

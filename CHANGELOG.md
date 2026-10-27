@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.225 — Manual Run workflow button on each GitHub station (28/10/2026)
+
+- Add a per-station Run workflow button to Admin / Kho GitHub, gated by the existing github_station.manage permission and never disclosing stored encrypted PAT.
+- The server action decrypts only the matching station PAT and calls GitHub Actions workflow_dispatch using the repository default branch.
+- Manual run bypasses old GitHub queued runs, unlike dynamic autoscale; it refuses disabled/deferred stations, active/waiting runs and queued runs created in the last 60 seconds to avoid accidental duplicate dispatch.
+- Show GitHub HTTP confirmation and a link to a newly observed run ID (or the workflow Actions page while GitHub is still indexing).
+- Test with a fake GitHub API: queued bypass, active-run guard, cooldown and secret boundary. No worker runs on OCI.
 ## 1.3.224 — Surface externally stuck GitHub queues in Admin (28/10/2026)
 
 - Real production test confirmed that five GitHub workflow runs were queued for hours with no jobs, and GitHub returned HTTP 409 to both normal cancellation and force cancellation.

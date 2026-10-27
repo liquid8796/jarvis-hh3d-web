@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.218",
+    date: "2026-10-27",
+    lines: [
+      "Điều phối Khôi Lỗi nay nhìn theo đỉnh công việc trong ba phút, không cộng cả hàng chờ của mười phút.",
+      "Các đàn dành riêng cho máy nhà không còn làm tăng nhu cầu kho GitHub.",
+      "Nhật ký điều phối ghi rõ tải được dự báo và số đàn sắp tới lượt.",
+    ],
+  },
+  {
     version: "1.3.217",
     date: "2026-10-27",
     lines: [
@@ -466,14 +475,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khắc phục sự cố chế độ chạy ẩn (Headless) trong kịch bản tự động xem quảng cáo.",
       "Tự động dùng hồ sơ độc lập và chuyển thao tác sang chuột ảo CDP để trình duyệt chạy ngầm hoàn toàn.",
-    ],
-  },
-  {
-    version: "1.3.159",
-    date: "2026-10-03",
-    lines: [
-      "Khôi phục quảng cáo dạng đề xuất nội dung NativeBanner trên website để đa dạng hoá hiển thị.",
-      "Khu vực tài trợ trung tâm kết hợp hài hoà giữa biểu ngữ chữ nhật và khối đề xuất tự nhiên.",
     ],
   },
 ];

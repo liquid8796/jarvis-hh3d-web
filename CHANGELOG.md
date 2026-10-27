@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.218 — Dynamic: scale on predicted overlap, not entire queue (27/10/2026)
+
+- Forecast GitHub worker capacity using jobs eligible for sect workers only. Jobs pinned to personal PC workers no longer inflate GitHub demand.
+- Look ahead 10 minutes but count the peak demand in rolling 3-minute windows, plus overdue and fresh running work. Confirmed recent job cycles had median 40 seconds and p90 around 182 seconds.
+- Keep shared Min, Max and scale-in cooldown unchanged. Scheduled jobs far in the future never contribute; a substantial imminent burst still prevents premature scale-in.
+- Report both the scheduled 10-minute total and the predicted peak in cron responses, so operators can explain why scale-in did or did not occur. Existing GitHub Actions runs are never cancelled.
 ## 1.3.217 — Scale Out: actual GitHub runs and 10-minute demand (27/10/2026)
 
 - Dynamic includes jobs due in the next ten minutes, not merely overdue jobs.

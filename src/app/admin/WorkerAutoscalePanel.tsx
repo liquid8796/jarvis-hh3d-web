@@ -135,7 +135,7 @@ export function WorkerAutoscalePanel({ initial, stations }: { initial: WorkerAut
 
         {config.mode === "dynamic" && <div className="mt-6 border-t border-white/10 pt-5">
           <h4 className="font-bold text-[var(--color-parchment)]">Điều tiết theo hàng đợi</h4>
-          <p className="mt-1 text-sm text-[var(--color-mist)]">Ước lượng số workflow từ job đang chạy và job chờ tới hạn trong 10 phút tới. Scale-in có thời gian chống dao động.</p>
+          <p className="mt-1 text-sm text-[var(--color-mist)]">Đếm job mà Khôi Lỗi GitHub có thể nhận, cộng với đỉnh tải trong từng cửa sổ 3 phút của 10 phút sắp tới. Job dành riêng cho máy nhà không làm tăng số kho GitHub. Scale-in vẫn có cooldown.</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <label className="text-xs font-semibold text-[var(--color-mist)]">Tối đa workflow
               <input type="number" className={fieldClass} min={config.minWorkers} max={100} value={config.dynamicMaxWorkers} onChange={e => change("dynamicMaxWorkers", limited(Number(e.target.value)))} disabled={busy} />

@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.223 — GitHub Actions force-cancel fallback on HTTP 409 (28/10/2026)
+
+- Production revealed all five zero-job, multi-hour queued Actions runs return HTTP 409 when the standard cancel API is used.
+- Per official GitHub API documentation, retry only those verified non-started runs with `POST /actions/runs/{run_id}/force-cancel` after ordinary cancel returns HTTP 409.
+- Never force-cancel an executing run or any run that has created GitHub jobs; preserve per-repository one-hour recovery throttle.
+- If force-cancel also fails with 409, the out-of-sync queue is an external GitHub Actions issue and requires GitHub Support; surface the error instead of fabricating online capacity.
 ## 1.3.222 — Gracefully recover GitHub Actions queues and allow zero Scale-In cooldown (28/10/2026)
 
 - Dynamic scaling still counts only immediately eligible queued jobs and fresh running jobs; jobs on cooldown remain excluded.

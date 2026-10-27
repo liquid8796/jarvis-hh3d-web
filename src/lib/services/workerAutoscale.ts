@@ -169,9 +169,16 @@ export async function runWorkerAutoscale(): Promise<AutoscaleResult> {
               current.workerAutoscale.queueRecoveryAt[slug] = new Date().toISOString();
             }, { deadlineAt: deadline });
             try {
-              await github(workflow.pat,
-                `/repos/${encodeURIComponent(workflow.station.owner)}/${encodeURIComponent(workflow.station.repo)}/actions/runs/${candidate}/cancel`,
-                "POST", deadline, undefined, 202);
+              const runPath = `/repos/${encodeURIComponent(workflow.station.owner)}/${encodeURIComponent(workflow.station.repo)}/actions/runs/${candidate}`;
+              try {
+                await github(workflow.pat, runPath + "/cancel", "POST", deadline, undefined, 202);
+              } catch (error) {
+                // Per GitHub's documented API: force-cancel is for runs that
+                // resist ordinary cancellation. Both can still return 409
+                // for an abnormal, out-of-sync queue: report that externally.
+                if (!(error instanceof Error) || !error.message.includes("HTTP 409")) throw error;
+                await github(workflow.pat, runPath + "/force-cancel", "POST", deadline, undefined, 202);
+              }
               recoveryRequested.push(slug);
             } catch (error) {
               // One GitHub account may reject cancel while other repositories are

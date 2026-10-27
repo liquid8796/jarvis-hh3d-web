@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.223",
+    date: "2026-10-28",
+    lines: [
+      "Bổ sung phương án làm mới lượt GitHub bị kẹt khi thao tác hủy thông thường thất bại.",
+      "Chỉ áp dụng cho lượt chưa có job, khi không có Khôi Lỗi đang trực và không có ca GitHub đang chạy.",
+      "Giữ nguyên giới hạn thử lại mỗi giờ và báo lỗi nếu GitHub chưa thể giải phóng hàng chờ.",
+    ],
+  },
+  {
     version: "1.3.222",
     date: "2026-10-28",
     lines: [
@@ -471,14 +480,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Chuyển khu vực quảng cáo lên trước block tính năng và bổ sung hai banner sườn hai bên trang.",
       "Hỗ trợ song ngữ Anh - Việt cho toàn bộ trang chủ và thiết lập tiếng Anh làm ngôn ngữ mặc định.",
-    ],
-  },
-  {
-    version: "1.3.164",
-    date: "2026-10-04",
-    lines: [
-      "Loại bỏ hoàn toàn các cấu hình chuyển tiếp trung gian không còn sử dụng.",
-      "Hệ thống tập trung vận hành trực tiếp trên hạ tầng máy chủ chính thức và các trạm phụ trợ.",
     ],
   },
 ];

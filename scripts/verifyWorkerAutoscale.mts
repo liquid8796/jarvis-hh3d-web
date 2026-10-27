@@ -55,3 +55,5 @@ assert.match(demandSource, /liveRuns\?\.total_count === 0 && runJobs\?\.total_co
 assert.match(demandSource, /mode === "dynamic" && queued > 0/, "do not force GitHub queue recovery without demand");
 assert.match(demandSource, /"POST", deadline, undefined, 202/, "GitHub run cancel accepts HTTP 202");
 assert.match(demandSource, /queueRecoveryAt\[slug\]/, "persist once-per-hour queue recovery checkpoint");
+assert.ok(demandSource.includes('/force-cancel'), "fallback must use force-cancel after HTTP 409");
+assert.ok(!demandSource.includes('/delete'), "never delete GitHub Actions runs");

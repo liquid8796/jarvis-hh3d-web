@@ -3,7 +3,7 @@ import { db } from "@/lib/db/client";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { acquireGithubAutoscaleLease, mutateGithubState } from "@/lib/services/companionState";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
-import { autoscaleDesiredWorkers, chooseWorkflowTransitions, shouldDispatchIdleWorkflow, workerDrainIdsForSelection, stuckQueuedRunForRecovery, autoscaleEligibleStations } from "@/lib/validation/workerAutoscale";
+import { autoscaleDesiredWorkers, chooseWorkflowTransitions, shouldDispatchIdleWorkflow, workerDrainIdsForSelection, stuckQueuedRunForRecovery, autoscaleEligibleStations, activeManualWorkflowHolds, chooseWorkflowTransitionsWithPriority } from "@/lib/validation/workerAutoscale";
 import { stationSlug } from "@/lib/validation/githubStations";
 
 type Station = AppSettings["githubStations"][number];
@@ -103,8 +103,19 @@ export async function runWorkerAutoscale(): Promise<AutoscaleResult> {
     const retainDuringCooldown = mode === "dynamic" && requested < active && Boolean(config.lastAppliedAt)
       && Date.now() - Date.parse(config.lastAppliedAt!) < config.downscaleCooldownMinutes * 60_000;
     // Cooldown prevents scale-IN, but must never block idle-workflow recovery.
-    const target = retainDuringCooldown ? active : requested;
-    const plan = chooseWorkflowTransitions(currentlyActive.map(w => w.slug), available.map(w => w.slug), target);
+    const baseTarget = retainDuringCooldown ? active : requested;
+    const priority = activeManualWorkflowHolds(config.manualRunHoldUntil, Date.now())
+      .filter(slug => workflows.some(w => w.slug === slug));
+    // Only add capacity when a manual hold is OUTSIDE the default selection.
+    // Holding an already-selected worker must not create unnecessary runners.
+    const baseline = chooseWorkflowTransitions(
+      currentlyActive.map(w => w.slug), available.map(w => w.slug), baseTarget,
+    ).selected;
+    const extra = priority.filter(slug => !baseline.includes(slug)).length;
+    const target = Math.min(workflows.length, baseTarget + extra);
+    const plan = chooseWorkflowTransitionsWithPriority(
+      currentlyActive.map(w => w.slug), available.map(w => w.slug), target, priority,
+    );
     // Persist draining identities BEFORE disabling GitHub. This also targets
     // previously-disabled repos whose old runners are still online. During
     // scale-out the kept identities are removed BEFORE enabling dispatch.

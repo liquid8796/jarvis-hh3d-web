@@ -277,20 +277,49 @@ export async function runGithubStationWorkflowAction(
   if (!/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9_.-]{1,100}$/.test(slug)) {
     return { ok: false, message: "Kho GitHub không hợp lệ." };
   }
-  const settings = await getAppSettings();
-  const station = settings.githubStations.find(s => stationSlug(s) === slug);
-  if (!station) return { ok: false, message: "Kho này không còn trong sổ GitHub." };
-  if (settings.workerAutoscale.manualDisabledSlugs.includes(slug)) return { ok: false, message: "Kho đang tạm dừng thủ công; bật workflow trước khi chạy." };
-  if (!isEncrypted(station.pat)) return { ok: false, message: "PAT của kho chưa được mã hóa hợp lệ. Hãy cập nhật PAT." };
-  let pat: string;
+  // Prevent the minute scheduler from disabling an auto-scaled workflow
+  // between enable and dispatch, or before the new runner comes online.
+  const lease = await acquireGithubAutoscaleLease(Date.now() + 40_000);
+  if (!lease) return { ok: false, message: "Auto Scaling đang điều phối; hãy thử lại sau ít giây." };
   try {
-    pat = decryptSecret(station.pat);
+    const settings = await getAppSettings();
+    const station = settings.githubStations.find(s => stationSlug(s) === slug);
+    if (!station || !station.enabled || station.primaryDeferred || station.purpose !== "worker") {
+      return { ok: false, message: "Kho GitHub chưa sẵn sàng để chạy." };
+    }
+    if (settings.workerAutoscale.manualDisabledSlugs.includes(slug)) {
+      return { ok: false, message: "Kho đã được tắt thủ công; hãy bật workflow trước." };
+    }
+    if (!isEncrypted(station.pat)) return { ok: false, message: "PAT chưa được mã hóa hợp lệ." };
+    let pat: string;
+    try { pat = decryptSecret(station.pat); }
+    catch { return { ok: false, message: "Không giải mã được PAT; hãy kiểm tra khóa hoặc cập nhật PAT." }; }
+
+    // GitHub itself is the source of truth. A stale disabled_manually state
+    // in the registry must never prevent a deliberate manual run.
+    const enabled = await setGithubWorkflowEnabledManually(station, pat, true);
+    if (!enabled.ok) return enabled;
+    const result = await dispatchGithubWorkflowManually(station, pat);
+    if (!result.ok) return result;
+
+    await mutateGithubState(current => {
+      const liveStation = current.githubStations.find(s => stationSlug(s) === slug);
+      if (!liveStation) throw Error("Kho đã thay đổi trong lúc chạy.");
+      if (current.workerAutoscale.manualDisabledSlugs.includes(slug)) throw Error("Kho đã bị tạm dừng.");
+      liveStation.workflowState = "active";
+      // Hold the manually started worker while GitHub provisions a runner
+      // and while its workflow may be processing jobs (max GitHub runtime 6h).
+      current.workerAutoscale.manualRunHoldUntil[slug] = new Date(Date.now() + 6 * 60 * 60_000).toISOString();
+      current.workerAutoscale.drainingWorkerIds =
+        current.workerAutoscale.drainingWorkerIds.filter(id => id !== liveStation.workerId);
+    });
+    revalidatePath("/admin");
+    return result;
   } catch {
-    return { ok: false, message: "Không giải mã được PAT. Kiểm tra ENCRYPTION_KEY hoặc cập nhật PAT." };
+    return { ok: false, message: "GitHub có thể đã nhận lệnh nhưng không xác nhận được trạng thái. Hãy xem GitHub Actions trước khi bấm lại." };
+  } finally {
+    await lease.release();
   }
-  const result = await dispatchGithubWorkflowManually(station, pat);
-  if (result.ok) revalidatePath("/admin");
-  return result;
 }
 /** One Admin click -> GitHub enable/disable + persistent override against autoscale.
  * Shares the autoscale session lock so a minute tick cannot instantly undo a manual switch.
@@ -327,6 +356,8 @@ export async function toggleGithubStationWorkflowAction(
       const paused = new Set(current.workerAutoscale.manualDisabledSlugs);
       if (enable) paused.delete(slug); else paused.add(slug);
       current.workerAutoscale.manualDisabledSlugs = [...paused];
+      if (enable) current.workerAutoscale.manualRunHoldUntil[slug] = new Date(Date.now() + 6 * 60 * 60_000).toISOString();
+      else delete current.workerAutoscale.manualRunHoldUntil[slug];
       const draining = new Set(current.workerAutoscale.drainingWorkerIds);
       if (enable) draining.delete(currentStation.workerId); else draining.add(currentStation.workerId);
       current.workerAutoscale.drainingWorkerIds = [...draining];

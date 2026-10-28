@@ -14,6 +14,7 @@ export const workerAutoscaleSchema = z.object({
   lastError: z.string().max(500).default(""),
   managedSlugs: z.array(z.string().min(3).max(141)).max(100).default([]),
   manualDisabledSlugs: z.array(z.string().min(3).max(141)).max(100).default([]),
+  manualRunHoldUntil: z.record(z.string(), z.string().datetime()).default({}),
   drainingWorkerIds: z.array(z.string().min(1).max(64)).max(100).default([]),
   queueRecoveryAt: z.record(z.string(), z.string().datetime()).default({}),
 }).superRefine((data, ctx) => {
@@ -110,4 +111,26 @@ export function autoscaleEligibleStations<T extends { owner: string; repo: strin
 ): T[] {
   const paused = new Set(manuallyDisabled);
   return stations.filter(s => !paused.has(s.owner + "/" + s.repo));
+}
+
+/** Manually requested workflows retain capacity while the scheduler scales the rest. */
+export function chooseWorkflowTransitionsWithPriority(
+  active: readonly string[], inactive: readonly string[], requested: number,
+  priority: readonly string[],
+) {
+  const valid = new Set([...active, ...inactive]);
+  const selected = [...new Set(priority.filter(slug => valid.has(slug)))];
+  const target = clamp(Math.floor(requested), 0, valid.size);
+  for (const slug of [...active, ...inactive]) {
+    if (selected.length >= target) break;
+    if (!selected.includes(slug)) selected.push(slug);
+  }
+  return {
+    selected,
+    enable: selected.filter(slug => inactive.includes(slug)),
+    disable: active.filter(slug => !selected.includes(slug)),
+  };
+}
+export function activeManualWorkflowHolds(holds: Record<string,string>, nowMs: number): string[] {
+  return Object.entries(holds).filter(([, end]) => Number.isFinite(Date.parse(end)) && Date.parse(end) > nowMs).map(([slug]) => slug);
 }

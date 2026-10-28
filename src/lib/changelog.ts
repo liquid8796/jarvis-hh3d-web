@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.227",
+    date: "2026-10-28",
+    lines: [
+      "Sửa nút Chạy GitHub bị khóa khi kho đang tạm tắt theo lịch điều phối.",
+      "Nút Bật và chạy tự khởi động kho, gửi lệnh và giữ công suất tạm thời.",
+      "Phân biệt trạng thái kho tắt trên GitHub với lệnh tạm dừng của Admin.",
+    ],
+  },
+  {
     version: "1.3.226",
     date: "2026-10-28",
     lines: [
@@ -475,14 +484,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Kho Xem Quảng Cáo bổ sung cơ chế bọc thời gian chờ và chống treo cho chuỗi tương tác click.",
       "Tự động phát hiện toạ độ click Popunder an toàn và dự phòng mượt mà khi trình duyệt phân luồng.",
-    ],
-  },
-  {
-    version: "1.3.168",
-    date: "2026-10-04",
-    lines: [
-      "Tách Native Banner thành khối độc lập, đảm bảo nạp đầy đủ nội dung khi đặt trong Portal.",
-      "Ổn định toàn bộ chu trình hiển thị quảng cáo Adsterra trên cả máy tính lẫn di động.",
     ],
   },
 ];

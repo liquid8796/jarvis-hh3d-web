@@ -76,7 +76,7 @@ function countdownTone(days: number | null): { text: string; className: string }
 function workflowStateLabel(state: string): string {
   if (state === "active") return "lịch đang chạy";
   if (state === "disabled_inactivity") return "lịch bị tắt vì im lặng";
-  if (state === "disabled_manually") return "lịch bị tắt tay";
+  if (state === "disabled_manually") return "lịch đang tắt trên GitHub";
   if (state === "") return "chưa ngó lần nào";
   return state;
 }
@@ -369,7 +369,7 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                         )}
                       </p>
                       <p className={`mt-0.5 text-xs ${companionIssues > 0 ? "text-[var(--color-gold-300)]" : "text-[var(--color-mist)]"}`}>
-                        {station.primaryDeferred ? "chưa tạo workflow chính" : workflowStateLabel(station.workflowState)} · {station.companionRepos.length} kho phụ
+                        {station.primaryDeferred ? "chưa tạo workflow chính" : station.manuallyPaused ? "tạm dừng theo lệnh Admin" : workflowStateLabel(station.workflowState)} · {station.companionRepos.length} kho phụ
                         {companionIssues > 0 && <> · {companionIssues} cần xem</>}
                         {station.dailyPushes === 0 ? " · đã dừng nuôi" : ` · ${station.dailyPushes} lượt/kho/ngày`}
                       </p>
@@ -391,18 +391,19 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                         <button
                           type="submit"
                           className="btn btn-gold px-3 py-1.5 text-xs"
-                          disabled={running || deleting || !station.enabled || station.primaryDeferred || station.purpose !== "worker" || station.manuallyPaused || station.workflowState.startsWith("disabled_")}
+                          disabled={running || deleting || !station.enabled || station.primaryDeferred || station.purpose !== "worker" || station.manuallyPaused}
                           title={station.primaryDeferred ? "Kho chính đang hoãn."
-                            : station.workflowState.startsWith("disabled_") ? "Workflow đang tắt trên GitHub."
+                            : station.manuallyPaused ? "Kho đã được bạn tạm dừng, hãy bật lại trước."
+                            : station.workflowState.startsWith("disabled_") ? "Workflow đang tắt do điều phối; bấm để bật và chạy, ưu tiên trong tối đa 6 giờ."
                             : "Gửi lượt workflow_dispatch mới; bỏ qua queued cũ quá 60 giây, không hủy job đang chạy."}
                         >
-                          {running && runningSlug === station.slug ? "Đang gửi…" : "Run workflow"}
+                          {running && runningSlug === station.slug ? "Đang gửi…" : station.workflowState.startsWith("disabled_") && !station.manuallyPaused ? "Bật & chạy" : "Run workflow"}
                         </button>
                       </form>
                       <form
                         action={toggleAction}
                         onSubmit={(event) => {
-                          if (!station.manuallyPaused && !confirm(
+                          if (!station.manuallyPaused && !station.workflowState.startsWith("disabled_") && !confirm(
                             "Tắt workflow của " + station.slug + " trên GitHub?\n\nKho sẽ tạm dừng Auto Scaling; Khôi Lỗi đang xử lý job sẽ hoàn tất ca rồi rút lui."
                           )) {
                             event.preventDefault();
@@ -412,20 +413,21 @@ export function GithubStationPanel({ stations }: { stations: StationView[] }) {
                         }}
                       >
                         <input type="hidden" name="slug" value={station.slug} />
-                        <input type="hidden" name="operation" value={station.manuallyPaused ? "enable" : "disable"} />
+                        <input type="hidden" name="operation" value={station.manuallyPaused || station.workflowState.startsWith("disabled_") ? "enable" : "disable"} />
                         <button
                           type="submit"
-                          className={station.manuallyPaused ? "btn btn-gold px-3 py-1.5 text-xs" : "btn btn-ghost px-3 py-1.5 text-xs"}
+                          className={station.manuallyPaused || station.workflowState.startsWith("disabled_") ? "btn btn-gold px-3 py-1.5 text-xs" : "btn btn-ghost px-3 py-1.5 text-xs"}
                           disabled={toggling || running || deleting || !station.enabled || station.primaryDeferred || station.purpose !== "worker"}
-                          title={station.manuallyPaused
-                            ? "Bật lại workflow và trả kho về quyền điều phối của Auto Scaling."
+                          title={station.manuallyPaused || station.workflowState.startsWith("disabled_")
+                            ? "Bật lại workflow, ưu tiên cho thao tác thủ công trong tối đa 6 giờ, sau đó trả về Auto Scaling."
                             : "Tắt workflow trên GitHub, chặn Auto Scaling bật lại. Không hủy job đang chạy."}
                         >
                           {toggling && togglingSlug === station.slug
                             ? "Đang cập nhật…"
-                            : station.manuallyPaused ? "Bật workflow" : "Tắt workflow"}
+                            : station.manuallyPaused || station.workflowState.startsWith("disabled_") ? "Bật workflow" : "Tắt workflow"}
                         </button>
-                      </form>                      <form action={pingAction}>
+                      </form>
+                      <form action={pingAction}>
                         <input type="hidden" name="slug" value={station.slug} />
                         <button
                           type="submit"

@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.227 — Allow Run workflow when Scheduler has disabled the repository (28/10/2026)
+
+- Reproduced on OCI: scheduler mode has 2 active and 5 disabled_manually GitHub worker workflows, but manualDisabledSlugs is empty. GitHub reports disabled_manually for the scheduler API's own disables, so it does not mean the operator explicitly paused a repo.
+- Run workflow now stays enabled for all eligible, unpaused registered workers. For scheduler-disabled workflows it displays Bật & chạy, checks GitHub state, enables with the encrypted PAT, dispatches through the existing guarded manual runner, and persists the state.
+- Hold explicitly enabled/manual-run workflows in autoscale priority for up to six hours so the next scheduler tick cannot disable their runner before it starts. The priority is additive only when outside the baseline selection; unrelated active runners are retained. Explicit Admin pauses remain protected.
+- The separate toggle shows Bật workflow for any disabled workflow, rather than misleadingly showing Tắt workflow. Status labels no longer misattribute a scheduler-issued disable to an Admin click.
+- Mock API + pure regression tests verify enable/dispatch order, paused-worker rejection, capacity preservation, and expiration. No GitHub run is automatically dispatched as part of deployment.
 ## 1.3.226 — Per-repository disable/enable GitHub workflow controls (28/10/2026)
 
 - Provide Tắt workflow / Bật workflow controls beside Run workflow for each registered GitHub worker repo.

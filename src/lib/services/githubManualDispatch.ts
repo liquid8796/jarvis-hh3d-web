@@ -107,3 +107,55 @@ export async function dispatchGithubWorkflowManually(
       (/^GitHub HTTP \d{3}/.test(detail) ? detail : "lỗi kết nối GitHub; thử lại sau."));
   }
 }
+
+/**
+ * Enable/disable only the workflow definition. Never cancel an existing run:
+ * workers already alive finish their current tasks via cooperative drain.
+ */
+export async function setGithubWorkflowEnabledManually(
+  station: ManualWorkflowStation,
+  pat: string,
+  enabled: boolean,
+  request: typeof fetch = fetch,
+): Promise<ManualWorkflowResult> {
+  const slug = station.owner + "/" + station.repo;
+  if (!station.enabled || station.primaryDeferred || station.purpose !== "worker") {
+    return { ok: false, message: "Kho chính chưa được kích hoạt để điều khiển workflow." };
+  }
+  if (!/^[A-Za-z0-9._-]+\.ya?ml$/.test(station.workflowFile)) {
+    return { ok: false, message: "Tên workflow chưa hợp lệ." };
+  }
+  const endpoint = "https://api.github.com/repos/" + encodeURIComponent(station.owner) +
+    "/" + encodeURIComponent(station.repo) + "/actions/workflows/" +
+    encodeURIComponent(station.workflowFile);
+  const headers = {
+    authorization: "Bearer " + pat,
+    accept: "application/vnd.github+json",
+    "x-github-api-version": "2022-11-28",
+    "user-agent": "auto-hh3d-admin-workflow-switch",
+  };
+  try {
+    const status = await request(endpoint, {
+      headers, cache: "no-store", signal: AbortSignal.timeout(10000),
+    });
+    if (!status.ok) return { ok: false, message: "Không đọc được workflow GitHub (HTTP " + status.status + ")." };
+    const value = await status.json() as { state?: string };
+    if (!["active", "disabled_manually", "disabled_inactivity"].includes(value.state ?? "")) {
+      return { ok: false, message: "Workflow có trạng thái không hỗ trợ: " + (value.state ?? "không rõ") };
+    }
+    const already = enabled ? value.state === "active" : value.state !== "active";
+    if (!already) {
+      const update = await request(endpoint + (enabled ? "/enable" : "/disable"), {
+        method: "PUT", headers, cache: "no-store", signal: AbortSignal.timeout(12000),
+      });
+      if (update.status !== 204) {
+        return { ok: false, message: "GitHub từ chối " + (enabled ? "bật" : "tắt") + " workflow (HTTP " + update.status + ")." };
+      }
+    }
+    return { ok: true, message: enabled
+      ? "Đã bật lại workflow " + slug + " trên GitHub; Auto Scaling có thể điều chỉnh theo nhu cầu."
+      : "Đã tắt workflow " + slug + " trên GitHub và tạm dừng Auto Scaling cho kho này. Runner đang chạy không bị hủy." };
+  } catch {
+    return { ok: false, message: "Không kết nối được GitHub; chưa xác nhận thay đổi workflow." };
+  }
+}

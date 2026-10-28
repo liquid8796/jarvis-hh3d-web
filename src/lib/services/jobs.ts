@@ -668,7 +668,7 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
   const settings = await getAppSettings();
   // Second line of defense, in case another service calls claimNextJob
   // directly rather than through /api/worker.
-  if (scope.kind === "operator" && settings.workerAutoscale.enabled
+  if (scope.kind === "operator"
       && isDrainingWorkerId(settings.workerAutoscale.drainingWorkerIds, workerId)) return null;
   const { maintenance } = settings;
   const maintenanceFilter = maintenance.active

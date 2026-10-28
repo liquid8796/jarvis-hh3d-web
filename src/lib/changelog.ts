@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.226",
+    date: "2026-10-28",
+    lines: [
+      "Bổ sung nút Tắt và Bật lại ca GitHub cho từng kho trên trang Admin.",
+      "Lệnh tắt thủ công được giữ nguyên qua các lượt Auto Scaling để tránh tự bật lại.",
+      "Khôi Lỗi đang xử lý hoàn tất công việc trước khi rút lui; không hủy lượt GitHub đang chạy.",
+    ],
+  },
+  {
     version: "1.3.225",
     date: "2026-10-28",
     lines: [
@@ -474,14 +483,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Tách Native Banner thành khối độc lập, đảm bảo nạp đầy đủ nội dung khi đặt trong Portal.",
       "Ổn định toàn bộ chu trình hiển thị quảng cáo Adsterra trên cả máy tính lẫn di động.",
-    ],
-  },
-  {
-    version: "1.3.167",
-    date: "2026-10-04",
-    lines: [
-      "Tối ưu hoá cơ chế nhận diện trạng thái nạp quảng cáo Adsterra cho biểu ngữ và Native.",
-      "Loại bỏ tình trạng ẩn nhầm quảng cáo khi mạng quảng cáo chưa kịp phân phối nội dung.",
     ],
   },
 ];

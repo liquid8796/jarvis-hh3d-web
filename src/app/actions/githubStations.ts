@@ -5,10 +5,10 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
 import { decryptSecret, encryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { pingStationBySlug, runCompanionNurture, runKeepalive } from "@/lib/services/githubStations";
-import { dispatchGithubWorkflowManually, type ManualWorkflowResult } from "@/lib/services/githubManualDispatch";
+import { dispatchGithubWorkflowManually, setGithubWorkflowEnabledManually, type ManualWorkflowResult } from "@/lib/services/githubManualDispatch";
 import { COMPANION_RUN_BUDGET_MS } from "@/lib/services/llmTimeouts";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
-import { mutateGithubState } from "@/lib/services/companionState";
+import { acquireGithubAutoscaleLease, mutateGithubState } from "@/lib/services/companionState";
 import { provisionGithubStation, productionGithubProvisionDependencies } from "@/lib/services/githubProvisioning";
 import { createGithubStationFormHandlers, type GithubStationFormResult } from "@/lib/services/githubStationForms";
 import { deletePrimaryGithubAccountGroup } from "@/lib/services/githubPrimaryDeletion";
@@ -52,6 +52,7 @@ export type StationView = {
   lastPingOk: boolean | null;
   lastPingNote: string;
   workflowState: string;
+  manuallyPaused: boolean;
   /** Kho phần mềm cùng owner/PAT; chỉ mang dấu vết vận hành, không mang thêm bí mật. */
   companionRepos: Array<{
     repo: string;
@@ -109,7 +110,7 @@ async function requireStationManage() {
   return user;
 }
 
-function viewOf(station: AppSettings["githubStations"][number], now: number): StationView {
+function viewOf(station: AppSettings["githubStations"][number], now: number, paused: boolean): StationView {
   const lastCommit = station.lastCommitAt ? Date.parse(station.lastCommitAt) : Number.NaN;
   return {
     slug: stationSlug(station),
@@ -128,6 +129,7 @@ function viewOf(station: AppSettings["githubStations"][number], now: number): St
     lastPingOk: station.lastPingOk,
     lastPingNote: station.lastPingNote,
     workflowState: station.workflowState,
+    manuallyPaused: paused,
     companionRepos: station.companionRepos.map((companion) => ({
       repo: companion.repo,
       lastNurtureDay: companion.lastNurtureDay,
@@ -175,7 +177,7 @@ export async function githubStationsForAdmin(): Promise<StationView[]> {
   await requireStationManage();
   const settings = await getAppSettings();
   const now = Date.now();
-  return settings.githubStations.map((station) => viewOf(station, now));
+  return settings.githubStations.map((station) => viewOf(station, now, settings.workerAutoscale.manualDisabledSlugs.includes(stationSlug(station))));
 }
 
 export type StationPatResult = { ok: true; pat: string } | { ok: false; message: string };
@@ -278,6 +280,7 @@ export async function runGithubStationWorkflowAction(
   const settings = await getAppSettings();
   const station = settings.githubStations.find(s => stationSlug(s) === slug);
   if (!station) return { ok: false, message: "Kho này không còn trong sổ GitHub." };
+  if (settings.workerAutoscale.manualDisabledSlugs.includes(slug)) return { ok: false, message: "Kho đang tạm dừng thủ công; bật workflow trước khi chạy." };
   if (!isEncrypted(station.pat)) return { ok: false, message: "PAT của kho chưa được mã hóa hợp lệ. Hãy cập nhật PAT." };
   let pat: string;
   try {
@@ -288,6 +291,54 @@ export async function runGithubStationWorkflowAction(
   const result = await dispatchGithubWorkflowManually(station, pat);
   if (result.ok) revalidatePath("/admin");
   return result;
+}
+/** One Admin click -> GitHub enable/disable + persistent override against autoscale.
+ * Shares the autoscale session lock so a minute tick cannot instantly undo a manual switch.
+ */
+export async function toggleGithubStationWorkflowAction(
+  _previous: ManualWorkflowResult | null,
+  formData: FormData,
+): Promise<ManualWorkflowResult> {
+  await requireStationManage();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const operation = String(formData.get("operation") ?? "");
+  if (!/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9_.-]{1,100}$/.test(slug)
+      || (operation !== "disable" && operation !== "enable")) {
+    return { ok: false, message: "Kho GitHub hoặc thao tác không hợp lệ." };
+  }
+  const lease = await acquireGithubAutoscaleLease(Date.now() + 35_000);
+  if (!lease) return { ok: false, message: "Auto Scaling đang cập nhật; thử lại sau ít giây." };
+  try {
+    const settings = await getAppSettings();
+    const station = settings.githubStations.find(s => stationSlug(s) === slug);
+    if (!station || !station.enabled || station.primaryDeferred || station.purpose !== "worker") {
+      return { ok: false, message: "Kho này chưa sẵn sàng điều khiển workflow." };
+    }
+    if (!isEncrypted(station.pat)) return { ok: false, message: "PAT chưa được mã hóa hợp lệ." };
+    let pat: string;
+    try { pat = decryptSecret(station.pat); }
+    catch { return { ok: false, message: "Không giải mã được PAT; hãy kiểm tra khóa hoặc cập nhật PAT." }; }
+    const enable = operation === "enable";
+    const result = await setGithubWorkflowEnabledManually(station, pat, enable);
+    if (!result.ok) return result;
+    await mutateGithubState(current => {
+      const currentStation = current.githubStations.find(s => stationSlug(s) === slug);
+      if (!currentStation) throw Error("Kho đã thay đổi trong lúc điều khiển.");
+      const paused = new Set(current.workerAutoscale.manualDisabledSlugs);
+      if (enable) paused.delete(slug); else paused.add(slug);
+      current.workerAutoscale.manualDisabledSlugs = [...paused];
+      const draining = new Set(current.workerAutoscale.drainingWorkerIds);
+      if (enable) draining.delete(currentStation.workerId); else draining.add(currentStation.workerId);
+      current.workerAutoscale.drainingWorkerIds = [...draining];
+      currentStation.workflowState = enable ? "active" : "disabled_manually";
+    });
+    revalidatePath("/admin");
+    return result;
+  } catch {
+    return { ok: false, message: "GitHub có thể đã nhận lệnh nhưng chưa lưu được trạng thái. Hãy tải lại và kiểm tra trước khi thử lại." };
+  } finally {
+    await lease.release();
+  }
 }
 /** Compatibility with already loaded admin clients; this path can never append a registration. */
 export async function saveGithubStationAction(

@@ -13,6 +13,7 @@ export const workerAutoscaleSchema = z.object({
   lastAppliedAt: z.string().nullable().default(null),
   lastError: z.string().max(500).default(""),
   managedSlugs: z.array(z.string().min(3).max(141)).max(100).default([]),
+  manualDisabledSlugs: z.array(z.string().min(3).max(141)).max(100).default([]),
   drainingWorkerIds: z.array(z.string().min(1).max(64)).max(100).default([]),
   queueRecoveryAt: z.record(z.string(), z.string().datetime()).default({}),
 }).superRefine((data, ctx) => {
@@ -101,4 +102,12 @@ export function stuckQueuedRunForRecovery(
   const recovered = lastRecoveryAt ? Date.parse(lastRecoveryAt) : NaN;
   if (Number.isFinite(recovered) && nowMs - recovered < 60 * 60_000) return null;
   return latest.id;
+}
+
+/** Persistent operator pause has priority over scale-out. */
+export function autoscaleEligibleStations<T extends { owner: string; repo: string }>(
+  stations: readonly T[], manuallyDisabled: readonly string[],
+): T[] {
+  const paused = new Set(manuallyDisabled);
+  return stations.filter(s => !paused.has(s.owner + "/" + s.repo));
 }

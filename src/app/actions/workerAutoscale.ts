@@ -20,7 +20,9 @@ export async function saveWorkerAutoscaleAction(input: AutoscaleInput): Promise<
   await mutateGithubState(settings => {
     // Never replace another request's checkpoint/ownership fields with stale client values.
     settings.workerAutoscale = { ...settings.workerAutoscale, ...input, lastError: "",
-      ...(!input.enabled ? { drainingWorkerIds: [] } : {}),
+      ...(!input.enabled ? { drainingWorkerIds: settings.githubStations
+        .filter(station => settings.workerAutoscale.manualDisabledSlugs.includes(station.owner + "/" + station.repo))
+        .map(station => station.workerId) } : {}),
     };
   });
   const result = input.enabled ? await runWorkerAutoscale() : null;

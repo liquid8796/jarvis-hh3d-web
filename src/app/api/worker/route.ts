@@ -217,7 +217,7 @@ export async function POST(request: Request) {
       // never affected. Keep recording heartbeat until the process leaves.
       if (scope.kind === "operator") {
         const state = (await getAppSettings()).workerAutoscale;
-        if (state.enabled && isDrainingWorkerId(state.drainingWorkerIds, body.workerId)) {
+        if (isDrainingWorkerId(state.drainingWorkerIds, body.workerId)) {
           return NextResponse.json({ job: null, drain: true, webVersion: WEB_VERSION });
         }
       }

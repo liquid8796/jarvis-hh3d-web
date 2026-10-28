@@ -3,7 +3,7 @@ import { db } from "@/lib/db/client";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { acquireGithubAutoscaleLease, mutateGithubState } from "@/lib/services/companionState";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
-import { autoscaleDesiredWorkers, chooseWorkflowTransitions, shouldDispatchIdleWorkflow, workerDrainIdsForSelection, stuckQueuedRunForRecovery } from "@/lib/validation/workerAutoscale";
+import { autoscaleDesiredWorkers, chooseWorkflowTransitions, shouldDispatchIdleWorkflow, workerDrainIdsForSelection, stuckQueuedRunForRecovery, autoscaleEligibleStations } from "@/lib/validation/workerAutoscale";
 import { stationSlug } from "@/lib/validation/githubStations";
 
 type Station = AppSettings["githubStations"][number];
@@ -80,8 +80,10 @@ export async function runWorkerAutoscale(): Promise<AutoscaleResult> {
     const demand = await readAutoscaleDemand();
     queued = demand.queued; running = demand.running;
     desired = autoscaleDesiredWorkers(config, queued, running, Date.now());
-    const stations = settings.githubStations.filter(s => s.enabled && s.purpose === "worker" && !s.primaryDeferred);
-    if (stations.length < config.minWorkers) throw Error(`Chỉ có ${stations.length} kho Khôi Lỗi hợp lệ, thấp hơn mức tối thiểu ${config.minWorkers}. Không thay đổi workflow.`);
+    const registered = settings.githubStations.filter(s => s.enabled && s.purpose === "worker" && !s.primaryDeferred);
+    // Operator pause wins over every mode, even when eligible capacity
+    // falls below minWorkers. Never silently re-enable paused workflows.
+    const stations = autoscaleEligibleStations(registered, config.manualDisabledSlugs);
     const workflows: Workflow[] = [];
     // Observe ALL states before changing one. Failed reads must never cause mass scale-in.
     for (const station of stations) {
@@ -108,7 +110,7 @@ export async function runWorkerAutoscale(): Promise<AutoscaleResult> {
     // scale-out the kept identities are removed BEFORE enabling dispatch.
     // Reconcile every time (even if there are zero workflow transitions).
     const drainingWorkerIds = workerDrainIdsForSelection(
-      workflows.map(w => ({ slug: w.slug, workerId: w.station.workerId })),
+      registered.map(s => ({ slug: stationSlug(s), workerId: s.workerId })),
       plan.selected,
     );
     await mutateGithubState(current => {
@@ -159,7 +161,8 @@ export async function runWorkerAutoscale(): Promise<AutoscaleResult> {
             && Date.now() - Date.parse(latest.created_at) >= 30 * 60_000
             && !runs.workflow_runs.some(run => run.status === "in_progress")) {
           stalledQueue.push(slug);
-        }        const candidate = stuckQueuedRunForRecovery(
+        }
+        const candidate = stuckQueuedRunForRecovery(
           runs.workflow_runs,
           online.rows[0]?.online === true,
           config.queueRecoveryAt[slug],

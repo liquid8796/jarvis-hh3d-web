@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.226 — Per-repository disable/enable GitHub workflow controls (28/10/2026)
+
+- Provide Tắt workflow / Bật workflow controls beside Run workflow for each registered GitHub worker repo.
+- Gate changes with github_station.manage, reuse the encrypted PAT only inside the server, confirm GitHub state, then use its official PUT enable/disable API; no cancel or force-cancel is issued.
+- Persist explicit manualDisabledSlugs and exclude paused repos from every autoscaling mode, including when their count leaves fewer than minWorkers eligible. Lock against the minute autoscale scheduler so the user action is not immediately reversed.
+- On manual disable, mark the worker ID as draining. The worker finishes in-flight work but accepts no new jobs, even if autoscaling itself is disabled. Bật workflow removes the persistent pause and permits future scaling.
+- Add isolated GitHub API and state/guard regression tests; never expose PAT in a response and never run any worker on OCI.
 ## 1.3.225 — Manual Run workflow button on each GitHub station (28/10/2026)
 
 - Add a per-station Run workflow button to Admin / Kho GitHub, gated by the existing github_station.manage permission and never disclosing stored encrypted PAT.

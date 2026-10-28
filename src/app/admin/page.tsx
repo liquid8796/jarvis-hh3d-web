@@ -165,7 +165,7 @@ export default async function AdminPage({
               // Tên miền game là cấu hình vận hành do trưởng môn quản lý.
               pane: (
                 <div className="flex max-w-2xl flex-col gap-6">
-                  <GameDomainForm baseUrl={settings.game.baseUrl} />
+                  <GameDomainForm baseUrl={settings.game.baseUrl} canStopJobs={hasPermission(viewer, "job.force_stop")} />
                   <DailyResetForm
                     enabled={settings.dailyReset.enabled}
                     lastRunDay={settings.dailyReset.lastRunDay}

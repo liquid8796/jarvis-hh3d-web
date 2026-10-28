@@ -23,6 +23,7 @@ import {
   type MediaSweepResult,
 } from "@/lib/services/media";
 import { purgeExpiredJobEvents } from "@/lib/services/jobs";
+import { parseBulkStopRounds, stopJobsByRoundThreshold } from "@/lib/services/bulkStopJobs";
 import { DEFAULT_RELEASE_NOTES, hiddenVersionsFor, parseNotesText } from "@/lib/changelog";
 import { getAppSettings, saveAppSettings } from "@/lib/services/settings";
 import {
@@ -325,6 +326,40 @@ export async function saveGameDomainAction(
   };
 }
 
+/** Administrative cross-user bulk stop by the same round count shown in Hàng Đợi.
+ * Requires the SAME job.force_stop permission as the individual queue stop.
+ */
+export async function stopJobsByRoundsAction(
+  _previous: AdminResult | null,
+  formData: FormData,
+): Promise<AdminResult> {
+  const user = await requireAdmin();
+  if (!hasPermission(user, "job.force_stop")) {
+    return { ok: false, message: "Bạn không có quyền dừng đàn của người khác." };
+  }
+  const rounds = parseBulkStopRounds(formData.get("rounds"));
+  if (rounds === null) {
+    return { ok: false, message: "Số vòng tối thiểu phải là số nguyên từ 1 đến 1.000.000." };
+  }
+  let result: Awaited<ReturnType<typeof stopJobsByRoundThreshold>>;
+  try {
+    result = await stopJobsByRoundThreshold(rounds, user.displayName);
+  } catch (error) {
+    console.error("stopJobsByRoundsAction: không dừng được các đàn đạt ngưỡng", error);
+    return { ok: false, message: "Không thể dừng đàn theo số vòng lúc này. Chưa xác nhận thao tác thành công, hãy tải lại Hàng Đợi để kiểm tra." };
+  }
+  revalidatePath("/admin");
+  revalidatePath("/hang-doi");
+  revalidatePath("/dashboard");
+  return {
+    ok: true,
+    message: result.total === 0
+      ? "Không có đàn đang chạy hoặc đang chờ nào đạt từ " + rounds + " vòng."
+      : "Đã xử lý " + result.total + " đàn đạt từ " + rounds + " vòng: " +
+        result.stoppedImmediately + " đàn đã dừng ngay, " + result.stoppingSafely +
+        " đàn đang chạy đã nhận lệnh dừng an toàn.",
+  };
+}
 /**
  * Bật/tắt luật「sang ngày mới thì chạy lại từ đầu」.
  *

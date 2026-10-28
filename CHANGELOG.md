@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.228 — Bulk stop active jobs after N claimed cycles (29/10/2026)
+
+- In Admin / Bảo trì / Tên Miền Game add an independent bulk-stop form with an integer threshold N between 1 and 1,000,000. The counter is the same attempts number labeled vòng on the Hàng Đợi board.
+- Authorized Admin roles with job.force_stop can request one atomic cross-user stop of all queued/running jobs whose attempts >= N. Queued jobs stop immediately; running jobs enter stopping and finish at the worker's next safe point. Already stopping and terminal jobs are untouched.
+- Clear restart_after_stop so a daily-reset marker never resurrects a manually stopped job. Keep historical jobs, account data, and per-job audit records; notify affected owners without running any worker on OCI.
+- Guard the action on the server and in the UI, require explicit confirmation, provide success counts, and add non-destructive regression tests. Deployment does not trigger a bulk stop.
 ## 1.3.227 — Allow Run workflow when Scheduler has disabled the repository (28/10/2026)
 
 - Reproduced on OCI: scheduler mode has 2 active and 5 disabled_manually GitHub worker workflows, but manualDisabledSlugs is empty. GitHub reports disabled_manually for the scheduler API's own disables, so it does not mean the operator explicitly paused a repo.

@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { saveGameDomainAction, type AdminResult } from "@/app/actions/admin";
+import { BulkStopRoundsForm } from "./BulkStopRoundsForm";
 
 /**
  * Tên miền hoathinh3d đang sống — ô cấu hình mà cả tông môn phụ thuộc vào.
@@ -14,14 +15,15 @@ import { saveGameDomainAction, type AdminResult } from "@/app/actions/admin";
  * thông báo trả về sau khi lưu (`saveGameDomainAction`), và dòng lỗi mà chính vòng chạy nói
  * ra khi phiên đăng nhập không còn dùng được.
  */
-export function GameDomainForm({ baseUrl }: { baseUrl: string }) {
+export function GameDomainForm({ baseUrl, canStopJobs }: { baseUrl: string; canStopJobs: boolean }) {
   const [state, action, pending] = useActionState<AdminResult | null, FormData>(
     saveGameDomainAction,
     null,
   );
 
   return (
-    <form action={action} className="card card-hairline p-6">
+    <section className="card card-hairline p-6">
+      <form action={action}>
       {/* `mb-5` chứ không `mb-2`: dòng dẫn nhập bên dưới tiêu đề đã bỏ, nên chính tiêu đề
           phải gánh khoảng thở trước ô nhập. */}
       <h2 className="h-display mb-5 text-lg font-semibold text-gilded">Tên Miền Game</h2>
@@ -57,6 +59,8 @@ export function GameDomainForm({ baseUrl }: { baseUrl: string }) {
           </p>
         )}
       </div>
-    </form>
+      </form>
+      {canStopJobs && <BulkStopRoundsForm />}
+    </section>
   );
 }

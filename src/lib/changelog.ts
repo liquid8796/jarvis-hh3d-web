@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.228",
+    date: "2026-10-29",
+    lines: [
+      "Thêm công cụ thu đàn hàng loạt theo số vòng tối thiểu trong mục Tên Miền Game.",
+      "Đàn đang nghỉ dừng ngay; đàn đang thực hiện sẽ thu tại điểm an toàn kế tiếp.",
+      "Giữ nhật ký và quyền dừng đàn của bậc quản trị, không tác động đàn chưa đủ số vòng.",
+    ],
+  },
+  {
     version: "1.3.227",
     date: "2026-10-28",
     lines: [
@@ -476,14 +485,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Cập nhật chính xác mã nhúng và khoá nhận diện cho toàn bộ sáu định dạng biểu ngữ quảng cáo.",
       "Đảm bảo các thẻ kịch bản tuân thủ đúng định dạng nhà phát hành và hiển thị ổn định trên trang.",
-    ],
-  },
-  {
-    version: "1.3.169",
-    date: "2026-10-04",
-    lines: [
-      "Kho Xem Quảng Cáo bổ sung cơ chế bọc thời gian chờ và chống treo cho chuỗi tương tác click.",
-      "Tự động phát hiện toạ độ click Popunder an toàn và dự phòng mượt mà khi trình duyệt phân luồng.",
     ],
   },
 ];

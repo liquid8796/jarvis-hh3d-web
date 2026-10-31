@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { saveConfigAction, type ActionResult } from "@/app/actions/automation";
 import type { DashboardAccount } from "@/lib/realtime/dashboardTypes";
 import type { EditableConfig } from "@/lib/services/configs";
@@ -946,7 +946,19 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       {/* noValidate: hai tab dùng `hidden`, một input số invalid nằm trong tab đang ẩn sẽ
           bị native validation chặn submit mà không hiện được bong bóng lỗi nào — nút bấm
           câm lặng. Zod ở server mới là trọng tài, và nó biết nói lỗi ra lời. */}
-      <form action={action} noValidate>
+      <form
+        action={action}
+        noValidate
+        onSubmit={(event) => {
+          // React 19 automatically resets uncontrolled inputs after a native form action.
+          // Dispatch outside the native submit to preserve freshly saved DOM values.
+          event.preventDefault();
+          const values = new FormData(event.currentTarget);
+          startTransition(() => {
+            action(values);
+          });
+        }}
+      >
       {/* ------------------------------------------------------- Hai tab nhiệm vụ */}
       <div className="mb-4 flex gap-1 rounded-xl border border-[var(--color-ink-600)]/60 p-1">
         {(

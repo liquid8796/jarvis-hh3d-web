@@ -9,6 +9,11 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.229 — Preserve quest form changes after saving (31/10/2026)
+
+- Fix React 19 form-action automatic reset on Admin/Auto Quest Config: after a successful save, uncontrolled inputs previously reverted to their initial defaults until the page was refreshed.
+- Prevent the default native submit, capture all FormData (including hidden VIP/free tabs), and dispatch the existing useActionState server action in startTransition. Preserve dirty values, validation feedback, the pending state, and single-submit behavior.
+- Add a Chromium/Chrome React 19 regression for controlled and uncontrolled checkboxes, visible and hidden fields, and duplicate submissions. The backend validation/policy and DB storage remain unchanged.
 ## 1.3.228 — Bulk stop active jobs after N claimed cycles (29/10/2026)
 
 - In Admin / Bảo trì / Tên Miền Game add an independent bulk-stop form with an integer threshold N between 1 and 1,000,000. The counter is the same attempts number labeled vòng on the Hàng Đợi board.

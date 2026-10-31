@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.229",
+    date: "2026-10-31",
+    lines: [
+      "Giữ nguyên các giá trị nhiệm vụ trên tab Auto ngay sau khi khắc ngọc giản thành công.",
+      "Sửa lỗi biểu mẫu tự trở về lựa chọn cũ dù dữ liệu mới đã được lưu vào hệ thống.",
+      "Đảm bảo dữ liệu của cả hai nhóm VIP và Thường không bị mất khi lưu thay đổi.",
+    ],
+  },
+  {
     version: "1.3.228",
     date: "2026-10-29",
     lines: [
@@ -471,14 +480,7 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Loại bỏ danh sách quảng cáo đề xuất khỏi dự phòng và giới hạn số lượt thử nhằm hoàn tất chu kỳ đúng hạn.",
     ],
   },
-  {
-    version: "1.3.171",
-    date: "2026-10-04",
-    lines: [
-      "Kho Xem Quảng Cáo nâng cấp cơ chế quét toàn bộ các khung biểu ngữ và tính toạ độ an toàn cho quảng cáo ngầm.",
-      "Tối ưu hoá nhận diện nội dung sáng tạo trên các kích thước biểu ngữ mới, loại bỏ tình trạng kích hoạt cưỡng chế sớm.",
-    ],
-  },
+
   {
     version: "1.3.170",
     date: "2026-10-04",

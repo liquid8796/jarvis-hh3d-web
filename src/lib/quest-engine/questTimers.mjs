@@ -7,7 +7,7 @@ export const QUEST_TIMER_KEYS = [
   "hoangVuc",
   "phucLoiDuong",
   "thiLuyen",
-  "biCanh",
+  "biCanh", // legacy persisted key only; does not gate Bí Cảnh
   "teLe",
   "phucLoiVip",
   "vongQuay",
@@ -56,7 +56,7 @@ function timerQuestEnabled(config, key) {
 function validTimers(config) {
   const timers = Array.isArray(config?.questTimers) ? config.questTimers : [];
   return timers.filter((timer) =>
-    QUEST_TIMER_KEYS.includes(timer?.questKey) && timerQuestEnabled(config, timer.questKey));
+    QUEST_TIMER_KEYS.includes(timer?.questKey) && timer?.questKey !== "biCanh" && timerQuestEnabled(config, timer.questKey));
 }
 
 /** Trước HH:MM:SS thì quest có lịch bị gác; từ mốc đó tới hết ngày thì chạy như flow cũ. */

@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.230 — Run sect hidden realm on every worker cycle (02/11/2026)
+
+- Both VIP and free Bí Cảnh Tông Môn use the dedicated boss page each worker cycle. Stop using the VIP hub quick-attack button and remove hub navigation from the raid scripts.
+- Remove both tiers from the worker's persisted daily_done quota filter. Legacy daily marks do not prevent later boss reward claims, 50 TT contribution, or a newly summoned boss.
+- Preserve the game's true five-attack daily limit and cooldown, but keep checking rewards and summoning states on subsequent cycles. Ignore legacy quest timer gates for Bí Cảnh and hide their inactive schedule option.
+- Cover the 02/11 recording's claim/donation acknowledgements and both tier flows with npm run verify:bi-canh. No worker is run on OCI.
+
 ## 1.3.229 — Preserve quest form changes after saving (31/10/2026)
 
 - Fix React 19 form-action automatic reset on Admin/Auto Quest Config: after a successful save, uncontrolled inputs previously reverted to their initial defaults until the page was refreshed.

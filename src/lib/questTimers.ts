@@ -8,7 +8,7 @@ export const QUEST_TIMER_KEYS = [
   "hoangVuc",
   "phucLoiDuong",
   "thiLuyen",
-  "biCanh",
+  "biCanh", // legacy persisted value; accepted but never scheduled
   "teLe",
   "phucLoiVip",
   "vongQuay",
@@ -34,7 +34,6 @@ export const QUEST_TIMER_OPTIONS: ReadonlyArray<{ key: QuestTimerKey; name: stri
   { key: "hoangVuc", name: "Hoang Vực" },
   { key: "phucLoiDuong", name: "Phúc Lợi Đường" },
   { key: "thiLuyen", name: "Thí Luyện Tông Môn" },
-  { key: "biCanh", name: "Bí Cảnh Tông Môn" },
   { key: "teLe", name: "Tế Lễ Tông Môn" },
   { key: "phucLoiVip", name: "Phúc Lợi VIP" },
   { key: "vongQuay", name: "Vòng Quay Phúc Vận" },
@@ -79,7 +78,8 @@ export function isTimerQuestEnabled(
 export function enabledQuestTimers(
   config: { quests?: Record<string, { enabled?: boolean }>; questTimers?: QuestTimer[] },
 ): QuestTimer[] {
-  return (config.questTimers ?? []).filter((timer) => isTimerQuestEnabled(config, timer.questKey));
+  return (config.questTimers ?? []).filter((timer) =>
+    timer.questKey !== "biCanh" && isTimerQuestEnabled(config, timer.questKey));
 }
 
 /** Mốc kích hoạt kế tiếp; timer đã qua hôm nay trả mốc của ngày mai. */

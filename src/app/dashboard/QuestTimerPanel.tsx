@@ -26,7 +26,8 @@ export function QuestTimerPanel({
   );
   const nextId = useRef(initialTimers.length);
   const [rows, setRows] = useState<TimerRow[]>(() =>
-    initialTimers.map((timer, index) => ({ ...timer, rowId: "saved-" + index })),
+    initialTimers.filter((timer) => QUEST_TIMER_OPTIONS.some((option) => option.key === timer.questKey))
+      .map((timer, index) => ({ ...timer, rowId: "saved-" + index })),
   );
   const [collapsed, setCollapsed] = useState(false);
   const enabled = new Set(enabledQuestKeys);

@@ -787,7 +787,12 @@ export function createQuestEngine(deps) {
           // có cờ này thì nơi trên chỉ còn cách dò chữ trong `stopReason` để đoán xem lượt
           // dừng là「hết lượt hôm nay」hay「ta chưa biết đáp án」— một phép đoán chết lặng vào
           // ngày ai đó sửa lời văn của một quest trong hồ sơ.
-          state.dailyCapReached = true;
+          if (Number.isFinite(step.deferSeconds) && step.deferSeconds > 0) {
+            // A summoning guild needs another visit, NOT a permanent daily quota mark.
+            state.cooldown = Math.max(60, Math.floor(step.deferSeconds));
+          } else {
+            state.dailyCapReached = true;
+          }
           // KHÔNG kể ở đây, và đó là chủ ý — xem `stopReason` đi tiếp vào `result.message`.
           //
           // Lý do dừng vẫn phải tới tay người đọc bằng lời TRẦN ("đã đủ huyền tinh hôm nay",

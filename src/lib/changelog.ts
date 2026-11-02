@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.230",
+    date: "2026-11-02",
+    lines: [
+      "Bí Cảnh Tông Môn được kiểm tra ở mọi vòng đàn, không còn bỏ qua khi nhiệm vụ ngày đã đủ lượt.",
+      "Tài khoản VIP và thường cùng nhận thưởng boss, hiến tế một lần và đánh boss mới khi được phép.",
+      "Giữ giới hạn lượt đánh của game; đang chờ triệu hồi thì trở lại kiểm tra trong vòng tiếp theo.",
+    ],
+  },
+  {
     version: "1.3.229",
     date: "2026-10-31",
     lines: [
@@ -481,14 +490,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     ],
   },
 
-  {
-    version: "1.3.170",
-    date: "2026-10-04",
-    lines: [
-      "Cập nhật chính xác mã nhúng và khoá nhận diện cho toàn bộ sáu định dạng biểu ngữ quảng cáo.",
-      "Đảm bảo các thẻ kịch bản tuân thủ đúng định dạng nhà phát hành và hiển thị ổn định trên trang.",
-    ],
-  },
 ];
 
 

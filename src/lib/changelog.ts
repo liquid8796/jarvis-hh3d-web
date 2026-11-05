@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.231",
+    date: "2026-11-05",
+    lines: [
+      "Auto Scaling chọn ngẫu nhiên kho Khôi Lỗi sẽ bật hoặc tắt khi cần thay đổi công suất.",
+      "Khi đã đủ số lượng đang chạy, giữ nguyên đội hình thay vì thay đổi liên tục.",
+      "Vẫn tôn trọng kho đã tắt thủ công và các lượt chạy được quản trị ưu tiên.",
+    ],
+  },
+  {
     version: "1.3.230",
     date: "2026-11-02",
     lines: [
@@ -479,14 +488,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Thêm thẻ xác thực quyền sở hữu website cho mạng quảng cáo Clickadu và tạm dừng hiển thị Adsterra.",
       "Bộ công cụ xem quảng cáo bổ sung tuỳ chọn lựa chọn linh hoạt giữa Clickadu, Adsterra hoặc toàn bộ nhà mạng.",
-    ],
-  },
-  {
-    version: "1.3.172",
-    date: "2026-10-04",
-    lines: [
-      "Kho Xem Quảng Cáo khắc phục triệt để sự cố lặp click kéo dài trong chế độ ưu tiên quảng cáo ngầm và thanh nổi.",
-      "Loại bỏ danh sách quảng cáo đề xuất khỏi dự phòng và giới hạn số lượt thử nhằm hoàn tất chu kỳ đúng hạn.",
     ],
   },
 

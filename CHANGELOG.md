@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.231 — Randomize GitHub worker auto-scaling transitions (05/11/2026)
+
+- Select random *eligible* active workflows for scale-in and random eligible inactive workflows for scale-out using unbiased Fisher-Yates sampling, instead of always choosing the earliest registered stations.
+- Keep existing active workers when the target is unchanged or scaling out: a minute-by-minute reconcile must not swap runners solely to get a different random sample.
+- Respect explicit manual pauses and manual-run priority holds. Account for already-active held workflows when calculating extra capacity, so a randomized sample cannot over-provision capacity due to omitted priority.
+- Retain graceful draining before GitHub disable, original cooldowns, safety checks and no cancellation of in-progress jobs. Add deterministic injected-RNG regression tests for both directions, retained capacity, paused workers and holds.
+
 ## 1.3.230 — Run sect hidden realm on every worker cycle (02/11/2026)
 
 - Both VIP and free Bí Cảnh Tông Môn use the dedicated boss page each worker cycle. Stop using the VIP hub quick-attack button and remove hub navigation from the raid scripts.

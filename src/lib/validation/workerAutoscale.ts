@@ -37,10 +37,28 @@ export function autoscaleDesiredWorkers(c: WorkerAutoscaleSettings, queued: numb
   if (c.mode === "scheduler") return Math.max(c.minWorkers, autoscaleScheduleTarget(c.schedule, now));
   return clamp(Math.ceil((Math.max(0, queued) + Math.max(0, running)) / c.jobsPerWorker), c.minWorkers, Math.max(c.minWorkers, c.dynamicMaxWorkers));
 }
-export function chooseWorkflowTransitions(active: readonly string[], inactive: readonly string[], requested: number) {
-  const count = clamp(Math.floor(requested), 0, active.length + inactive.length);
-  const selected = [...active.slice(0, count), ...inactive.slice(0, Math.max(0, count - active.length))];
-  return { enable: selected.filter(slug => inactive.includes(slug)), disable: active.slice(count), selected };
+/**
+ * Fisher-Yates sampling: only shuffle the pool when some candidates must lose
+ * their slot. Never reshuffle an already-correct active set every minute.
+ * Inject the RNG for deterministic regression tests; production uses Math.random.
+ */
+function sampleOrder(values: readonly string[], random: () => number): string[] {
+  const result = [...values];
+  for (let i = result.length - 1; i > 0; i--) {
+    const unit = random();
+    if (!Number.isFinite(unit) || unit < 0 || unit >= 1) throw Error("Invalid autoscale random sample");
+    const j = Math.floor(unit * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+/** Randomize which active stations scale in and which inactive stations scale out. */
+export function chooseWorkflowTransitions(
+  active: readonly string[], inactive: readonly string[], requested: number,
+  random: () => number = Math.random,
+) {
+  return chooseWorkflowTransitionsWithPriority(active, inactive, requested, [], random);
 }
 
 /**
@@ -116,19 +134,37 @@ export function autoscaleEligibleStations<T extends { owner: string; repo: strin
 /** Manually requested workflows retain capacity while the scheduler scales the rest. */
 export function chooseWorkflowTransitionsWithPriority(
   active: readonly string[], inactive: readonly string[], requested: number,
-  priority: readonly string[],
+  priority: readonly string[], random: () => number = Math.random,
 ) {
   const valid = new Set([...active, ...inactive]);
   const selected = [...new Set(priority.filter(slug => valid.has(slug)))];
   const target = clamp(Math.floor(requested), 0, valid.size);
-  for (const slug of [...active, ...inactive]) {
+  const included = new Set(selected);
+  // Existing active runners keep their slots on scale-out. On scale-in,
+  // choose randomly among non-held active runners instead of insertion order.
+  const remainingActive = active.filter(slug => !included.has(slug));
+  const openActiveSlots = Math.max(0, target - selected.length);
+  const activeOrder = remainingActive.length > openActiveSlots
+    ? sampleOrder(remainingActive, random) : remainingActive;
+  for (const slug of activeOrder) {
     if (selected.length >= target) break;
-    if (!selected.includes(slug)) selected.push(slug);
+    selected.push(slug);
+    included.add(slug);
+  }
+  // Only sample inactive runners when we need fewer than are available.
+  const remainingInactive = inactive.filter(slug => !included.has(slug));
+  const openInactiveSlots = Math.max(0, target - selected.length);
+  const inactiveOrder = remainingInactive.length > openInactiveSlots
+    ? sampleOrder(remainingInactive, random) : remainingInactive;
+  for (const slug of inactiveOrder) {
+    if (selected.length >= target) break;
+    selected.push(slug);
+    included.add(slug);
   }
   return {
     selected,
     enable: selected.filter(slug => inactive.includes(slug)),
-    disable: active.filter(slug => !selected.includes(slug)),
+    disable: active.filter(slug => !included.has(slug)),
   };
 }
 export function activeManualWorkflowHolds(holds: Record<string,string>, nowMs: number): string[] {

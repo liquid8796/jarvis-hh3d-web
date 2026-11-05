@@ -11,8 +11,8 @@ assert.equal(autoscaleScheduleTarget(schedule, Date.parse("2026-10-26T00:00:00Z"
 assert.equal(autoscaleScheduleTarget(schedule, Date.parse("2026-10-26T01:00:00Z")), 5);
 assert.equal(autoscaleScheduleTarget(schedule, Date.parse("2026-10-26T16:00:00Z")), 2);
 assert.equal(autoscaleDesiredWorkers({ ...defaults, mode: "dynamic", minWorkers: 2, dynamicMaxWorkers: 8 }, 9, 1, Date.now()), 5);
-assert.deepEqual(chooseWorkflowTransitions(["a", "b", "c"], ["d"], 2), { enable: [], disable: ["c"], selected: ["a", "b"] });
-assert.deepEqual(chooseWorkflowTransitions(["a"], ["b", "c"], 3), { enable: ["b", "c"], disable: [], selected: ["a", "b", "c"] });
+assert.deepEqual(chooseWorkflowTransitions(["a", "b", "c"], ["d"], 2, () => 0.999999), { enable: [], disable: ["c"], selected: ["a", "b"] });
+assert.deepEqual(chooseWorkflowTransitions(["a"], ["b", "c"], 3, () => 0.999999), { enable: ["b", "c"], disable: [], selected: ["a", "b", "c"] });
 assert.equal(workerAutoscaleSchema.safeParse({ minWorkers: 0 }).success, false);
 assert.equal(workerAutoscaleSchema.parse({downscaleCooldownMinutes: 0}).downscaleCooldownMinutes, 0);
 assert.equal(workerAutoscaleSchema.safeParse({downscaleCooldownMinutes: -1}).success, false);

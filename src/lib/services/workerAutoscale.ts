@@ -3,7 +3,7 @@ import { db } from "@/lib/db/client";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
 import { acquireGithubAutoscaleLease, mutateGithubState } from "@/lib/services/companionState";
 import { getAppSettings, type AppSettings } from "@/lib/services/settings";
-import { autoscaleDesiredWorkers, chooseWorkflowTransitions, shouldDispatchIdleWorkflow, workerDrainIdsForSelection, stuckQueuedRunForRecovery, autoscaleEligibleStations, activeManualWorkflowHolds, chooseWorkflowTransitionsWithPriority } from "@/lib/validation/workerAutoscale";
+import { autoscaleDesiredWorkers, shouldDispatchIdleWorkflow, workerDrainIdsForSelection, stuckQueuedRunForRecovery, autoscaleEligibleStations, activeManualWorkflowHolds, chooseWorkflowTransitionsWithPriority } from "@/lib/validation/workerAutoscale";
 import { stationSlug } from "@/lib/validation/githubStations";
 
 type Station = AppSettings["githubStations"][number];
@@ -108,8 +108,13 @@ export async function runWorkerAutoscale(): Promise<AutoscaleResult> {
       .filter(slug => workflows.some(w => w.slug === slug));
     // Only add capacity when a manual hold is OUTSIDE the default selection.
     // Holding an already-selected worker must not create unnecessary runners.
-    const baseline = chooseWorkflowTransitions(
+    // Include holds that are ALREADY active in the baseline: a randomized
+    // downscale must never count their temporary omission as extra capacity.
+    // Inactive manual holds are added when outside normal capacity; this
+    // preserves current active workers rather than sacrificing a live runner.
+    const baseline = chooseWorkflowTransitionsWithPriority(
       currentlyActive.map(w => w.slug), available.map(w => w.slug), baseTarget,
+      priority.filter(slug => currentlyActive.some(w => w.slug === slug)),
     ).selected;
     const extra = priority.filter(slug => !baseline.includes(slug)).length;
     const target = Math.min(workflows.length, baseTarget + extra);

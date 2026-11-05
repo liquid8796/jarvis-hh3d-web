@@ -19,16 +19,16 @@ assert.deepEqual(activeManualWorkflowHolds({"alpha/worker":"invalid"},now),[]);
 
 const active=["a/runner","b/runner"];
 const inactive=["c/runner","d/runner"];
-assert.deepEqual(chooseWorkflowTransitionsWithPriority(active,inactive,3,["c/runner"]),{
+assert.deepEqual(chooseWorkflowTransitionsWithPriority(active,inactive,3,["c/runner"],()=>0.999999),{
  selected:["c/runner","a/runner","b/runner"],enable:["c/runner"],disable:[],
 },"manual run must not sacrifice existing scheduled workers");
-assert.deepEqual(chooseWorkflowTransitionsWithPriority(active,inactive,2,["a/runner"]),{
+assert.deepEqual(chooseWorkflowTransitionsWithPriority(active,inactive,2,["a/runner"],()=>0.999999),{
  selected:["a/runner","b/runner"],enable:[],disable:[],
 },"already-selected priority must not generate an extra worker");
-assert.deepEqual(chooseWorkflowTransitionsWithPriority(active,inactive,2,["c/runner"]),{
+assert.deepEqual(chooseWorkflowTransitionsWithPriority(active,inactive,2,["c/runner"],()=>0.999999),{
  selected:["c/runner","a/runner"],enable:["c/runner"],disable:["b/runner"],
 },"priority honored at fixed target");
-assert.deepEqual(chooseWorkflowTransitionsWithPriority(active,inactive,3,["absent/repo"]),{
+assert.deepEqual(chooseWorkflowTransitionsWithPriority(active,inactive,3,["absent/repo"],()=>0.999999),{
  selected:["a/runner","b/runner","c/runner"],enable:["c/runner"],disable:[],
 },"unknown priority never dispatched");
 

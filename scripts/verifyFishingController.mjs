@@ -5,7 +5,14 @@ import { chromium } from "playwright-core";
 
 const source = readFileSync(new URL("../src/lib/quest-engine/fishingTick.js", import.meta.url), "utf8")
   .replace("{{sellBelow}}", "4").replace("{{castLimit}}", "1");
-const browser = await chromium.launch({ headless: true, channel: "chromium" });
+let browser;
+try {
+  browser = await chromium.launch({ headless: true, channel: "chromium" });
+} catch (error) {
+  if (!/Executable doesn't exist/i.test(String(error))) throw error;
+  // Developer PCs can have Chrome while Playwright's Chromium cache is empty.
+  browser = await chromium.launch({ headless: true, channel: "chrome" });
+}
 try {
   const page = await browser.newPage();
   await page.setContent(`<div class="view fish-room">

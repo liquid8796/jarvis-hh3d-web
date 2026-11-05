@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.232",
+    date: "2026-11-05",
+    lines: [
+      "Câu Cá Tiên Giới: sửa bộ đọc tín hiệu mới để Khôi Lỗi bám được cá khi giật và kéo.",
+      "Giữ thao tác chuột thật, chống mất tín hiệu và hỗ trợ cả phiên bản gói cũ.",
+      "Bổ sung kiểm thử dựa trên capture thao tác câu cá thực tế bằng Chrome MCP.",
+    ],
+  },
+  {
     version: "1.3.231",
     date: "2026-11-05",
     lines: [
@@ -480,14 +489,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Kích hoạt trở lại toàn diện mạng quảng cáo Adsterra trên website song hành cùng Clickadu.",
       "Bộ công cụ xem quảng cáo tự động mặc định tương tác đồng thời mọi nhà mạng khả dụng.",
-    ],
-  },
-  {
-    version: "1.3.173",
-    date: "2026-10-04",
-    lines: [
-      "Thêm thẻ xác thực quyền sở hữu website cho mạng quảng cáo Clickadu và tạm dừng hiển thị Adsterra.",
-      "Bộ công cụ xem quảng cáo bổ sung tuỳ chọn lựa chọn linh hoạt giữa Clickadu, Adsterra hoặc toàn bộ nhà mạng.",
     ],
   },
 

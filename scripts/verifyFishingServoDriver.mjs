@@ -9,6 +9,26 @@ assert.deepEqual(parseFishingSnapshotFrame('42["g:snap",{"t":0.07,"z":0.51,"f":0
  t:.07,z:.51,f:.5,fv:-.002,p:.313,zone:.336,inside:false
 });
 
+const packet = (v) => '42["g:snap",'+JSON.stringify(v)+']';
+const recorded = [-3,66,510,4975,-380,313,1,0.25661090000000003,3460,7598];
+assert.deepEqual(parseFishingSnapshotFrame(packet(recorded)),{
+  t:.066,z:.51,f:.4975,fv:-.038,p:.313,zone:.25661090000000003,inside:true
+}, "decode the 2026-11-05 compact live fishing snapshot");
+assert.deepEqual(parseFishingSnapshotFrame(packet(
+  [-3,1386,128,4658,2141,338,0,.2566109,7247,7598,0,0]
+)),{
+  t:1.386,z:.128,f:.4658,fv:.2141,p:.338,zone:.2566109,inside:false
+});
+for(const invalid of [
+  [-2,66,510,4975,-380,313,1,.2566],
+  [-3,66,510],
+  [-3,66,510,4975,-380,313,1,2.5],
+  [-3,66,510,4975,-380,1313,1,.3],
+  [-3,66,510,4975,-380,313,2,.3],
+  [-3,66,510,"bad",-380,313,1,.3],
+]) assert.equal(parseFishingSnapshotFrame(packet(invalid)),null,
+  "fail closed on unknown/corrupt compact packets");
+
 const page=new EventEmitter(),socket=new EventEmitter();
 socket.url=()=> "wss://example.invalid/socket.io/?EIO=4";
 const presses=[];
@@ -27,7 +47,10 @@ let i=0;
 const timer=setInterval(()=>{
  i++;
  const low=i<14, z=low?.2:.82, f=low?.8:.15;
- socket.emit("framereceived",'42["g:snap",'+JSON.stringify({t:i*.066,z,f,zone:.34,p:.3+i*.01,fv:0})+']');
+ socket.emit("framereceived",packet(
+  [-3,Math.round(i*66),Math.round(z*1000),Math.round(f*10000),0,
+    Math.round((.3+i*.01)*1000),1,.34,0,5000]
+));
 },55);
 try {
  await session.fishingReel();

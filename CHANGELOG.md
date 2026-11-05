@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.232 — Câu Cá: đọc g:snap nén trong Tiên Giới (05/11/2026)
+
+- Capture thao tác tay qua Chrome MCP: 530 g:snap, 66 g:input và 12 g:act. Game đã đổi g:snap từ object sang mảng v3 có mã -3.
+- Giải mã đúng đồng hồ, tâm thanh lực, vị trí/vận tốc cá, tiến độ, và vùng hợp lệ; giữ hỗ trợ gói cũ, từ chối phiên bản lạ hoặc số không hợp lệ.
+- Khắc phục bộ điều khiển giữ/thả chuột thật không nhận dữ liệu từ game; có bản vá tương ứng cho PC. Giữ nguyên quyền admin, VIP/thường, logic thoát và chống lag.
+- Test Playwright servo bằng frame thật từ capture; chưa xác minh khôi lỗi đã bắt cá trên server live sau phát hành.
+
 ## 1.3.231 — Randomize GitHub worker auto-scaling transitions (05/11/2026)
 
 - Select random *eligible* active workflows for scale-in and random eligible inactive workflows for scale-out using unbiased Fisher-Yates sampling, instead of always choosing the earliest registered stations.

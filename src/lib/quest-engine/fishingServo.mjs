@@ -36,8 +36,23 @@ export function parseFishingSnapshotFrame(raw) {
   const frame = typeof raw === "string" ? raw : raw?.toString?.();
   if (!frame?.startsWith('42["g:snap",')) return null;
   try {
-    const [name, snap] = JSON.parse(frame.slice(2));
-    if (name !== "g:snap" || !snap || typeof snap !== "object") return null;
+    const [name, payload] = JSON.parse(frame.slice(2));
+    if (name !== "g:snap" || !payload || typeof payload !== "object") return null;
+    let snap = payload;
+    if (Array.isArray(payload)) {
+      // Recorded 2026-11-05, compact v3:
+      // [-3,66,510,4975,-380,313,1,0.2566109,3460,7598]
+      // [v,t*1000,z*1000,f*10000,fv*10000,p*1000,inside,zone,...].
+      if (payload.length < 8 || payload[0] !== -3
+          || !payload.slice(1,8).every(n => typeof n === "number" && Number.isFinite(n)))
+        return null;
+      const [, ms, z1000, f10000, fv10000, p1000, inside, zone] = payload;
+      if (ms < 0 || z1000 < 0 || z1000 > 1000 || f10000 < 0 || f10000 > 10000
+          || Math.abs(fv10000) > 15000 || p1000 < 0 || p1000 > 1000
+          || (inside !== 0 && inside !== 1) || zone <= 0 || zone > 1) return null;
+      snap = { t: ms/1000, z: z1000/1000, f: f10000/10000,
+        fv: fv10000/10000, p: p1000/1000, in: inside, zone };
+    }
     if (![snap.t, snap.z, snap.f, snap.zone, snap.p].every((n) =>
       typeof n === "number" && Number.isFinite(n))) return null;
     return { t: snap.t, z: snap.z, f: snap.f, fv: Number.isFinite(snap.fv) ? snap.fv : 0,

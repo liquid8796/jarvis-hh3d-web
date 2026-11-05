@@ -76,6 +76,13 @@ try {
   await page.locator(".fish-main.jvz-fish-press").click({ delay: 280 });
   assert.equal(await page.evaluate(() => window.clicks.cast), 1,
     "trusted Playwright press casts successfully");
+  // The real session driver now confirms the browser's state transition before
+  // marking the cast. An intentionally standalone DOM fixture must model that
+  // callback rather than assuming the earlier unverified intent counts.
+  await page.evaluate(() => {
+    window.__jvzFish.pendingCast = true;
+    window.__jvzFish.lastCast = Date.now();
+  });
   await tick();
   assert.equal(await page.evaluate(() => window.__jvzFish.casts), 1,
     "count a real cast after game enters wait state");

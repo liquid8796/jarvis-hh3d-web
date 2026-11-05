@@ -689,7 +689,10 @@ export function createQuestEngine(deps) {
           : `Trang chưa dựng xong sau ${Math.round((step.timeoutMs ?? 15000) / 1000)}s — không thấy ${step.selector}`;
 
       case "click": {
-        await session.humanDelay();
+        // REA: bite is a short real-time window; the normal 700–1800ms
+        // humanDelay silently misses it. Fishing already uses timed true inputs.
+        if (quest.id !== "cau-ca" && quest.id !== "cau-ca-thuong")
+          await session.humanDelay();
         const clicked = await session.click(step.selector ?? "", step.timeoutMs, step.forceClick === true, step.pressMs ?? 0);
         // Log a successful click, not an intent or an absent optional control.
         if (clicked && step.journalOnSuccess) {

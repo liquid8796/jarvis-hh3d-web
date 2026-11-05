@@ -13,7 +13,12 @@
   state.ticks++;
   // Lượt câu không giới hạn: NEVER finish the job on room/basket/network
   // issues. Retry in the same worker/browser so no five-minute cycle break.
-  if (castLimit === 0 && state.retryAfter > Date.now()) return "fish: chờ hồi phục";
+  if (state.castFailure) {
+    const reason = state.castFailure;
+    state.castFailure = "";
+    return "!Ném câu chưa thành công: " + reason + " — thử lại sau khi kiểm tra điều kiện câu.";
+  }
+  if (state.retryAfter > Date.now()) return "fish: chờ hồi phục";
   const get = (sel) => document.querySelector(sel);
   const label = (element) => (element?.textContent || "").replace(/\s+/g, " ").trim();
   const visible = (el) => !!el && el.getClientRects().length > 0 && !el.disabled;
@@ -149,9 +154,10 @@
     // Initial target: the site uses the currently selected Điểm câu; don't guess world coordinates.
     // Playwright Click step below will deliver trusted pointerdown/up.
     main.classList.add("jvz-fish-press");
-    state.pendingCast = true;
-    state.lastCast = Date.now();
-    return "fish: gửi thao tác Ném câu; đợi trạng thái của game";
+    // Only the trusted input driver may set pendingCast AFTER the game
+    // actually leaves idle. A skipped optional click is not a cast.
+    state.pendingCast = false;
+    return "fish: chuẩn bị nhấn/thả chuột thật để Ném câu (chưa xác nhận game nhận)";
   }
   if (main.classList.contains("st-reel"))
     return "fish: servo đang bám thanh lực theo g:snap (f, z, zone, p)";

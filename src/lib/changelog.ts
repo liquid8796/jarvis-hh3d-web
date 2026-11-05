@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.233",
+    date: "2026-11-05",
+    lines: [
+      "Câu Cá Tiên Giới: sửa tình trạng nhấn Ném câu nhưng game vẫn đứng yên, báo lỗi và thử lại rõ ràng hơn.",
+      "Nút câu hỗ trợ nhấn chuột thật và phím Space dự phòng khi giao diện không nhận thao tác chuột.",
+      "Khắc phục thao tác Giật cá bị chậm, đồng thời không đếm nhầm lượt câu chưa được game xác nhận.",
+    ],
+  },
+  {
     version: "1.3.232",
     date: "2026-11-05",
     lines: [
@@ -481,14 +490,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Tích hợp mã nhúng tự động AutoTag của mạng quảng cáo Adcash và tạm dừng hiển thị Adsterra.",
       "Bộ công cụ xem quảng cáo bổ sung mục tiêu Adcash và tuỳ chọn linh hoạt giữa các nhà mạng.",
-    ],
-  },
-  {
-    version: "1.3.174",
-    date: "2026-10-04",
-    lines: [
-      "Kích hoạt trở lại toàn diện mạng quảng cáo Adsterra trên website song hành cùng Clickadu.",
-      "Bộ công cụ xem quảng cáo tự động mặc định tương tác đồng thời mọi nhà mạng khả dụng.",
     ],
   },
 

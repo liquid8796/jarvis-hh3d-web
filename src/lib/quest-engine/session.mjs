@@ -74,6 +74,95 @@ export function createSession(page, options) {
   let fishTelemetryActive = false;
   const fishingTelemetry = createFishingTelemetry();
   const onFishFrame = (raw) => fishingTelemetry.ingest(raw);
+  let sentFishCasts = 0;
+  const onFishSentFrame = (frame) => {
+    const raw = typeof frame === "string" ? frame : frame?.toString?.() ?? "";
+    // Socket.IO's 42<ack-id>["g:act",{"a":"cast",...}] outgoing action.
+    // Merely attempting Playwright click is NOT evidence the game sent cast.
+    if (raw.startsWith("42") && raw.includes('"g:act"') && raw.includes('"a":"cast"'))
+      sentFishCasts++;
+  };
+  const delayFish = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const readFishCastState = async () => page.evaluate(() => {
+    const main = document.querySelector(".fish-room .fish-main");
+    if (!main) return "missing";
+    if (main.classList.contains("st-wait") || main.classList.contains("st-bite") ||
+        main.classList.contains("st-reel")) return "accepted";
+    if (main.classList.contains("st-load")) return "loading";
+    return main.classList.contains("st-idle") ? "idle" : "unknown";
+  });
+  const watchFishCast = async (previousSent) => {
+    for (let i = 0; i < 6; i++) {
+      await delayFish(125);
+      const state = await readFishCastState();
+      if (state === "accepted") return "accepted";
+      if (state === "missing" || state === "loading") return state;
+    }
+    return sentFishCasts > previousSent ? "sent-but-idle" : "no-packet";
+  };
+  const castConfirmed = async () => {
+    await page.evaluate(() => {
+      const state = window.__jvzFish;
+      if (!state) return;
+      state.pendingCast = true;
+      state.lastCast = Date.now();
+      state.castFailure = "";
+    }).catch(() => {});
+    return true;
+  };
+  const castFailed = async (reason) => {
+    log.debug("fish cast: " + reason);
+    await page.evaluate((diagnostic) => {
+      const state = window.__jvzFish;
+      if (!state) return;
+      state.pendingCast = false;
+      state.castFailure = diagnostic;
+      state.retryAfter = Date.now() + 5_000;
+    }, reason).catch(() => {});
+    return false;
+  };
+  /** REA: the game accepts casts on trusted pointerup and also Space keyup.
+   * The old page.click could time out on an animated/covered button and the
+   * controller still claimed it had cast; use direct trusted input plus proof.
+   */
+  const trustedFishCast = async (pressMs) => {
+    const main = page.locator(".fish-room .fish-main.st-idle");
+    const before = sentFishCasts;
+    const bounds = await main.boundingBox().catch(() => null);
+    if (!bounds) return castFailed("Không tìm được nút Ném câu có hộp hiển thị.");
+    const x = bounds.x + bounds.width / 2;
+    const y = bounds.y + bounds.height / 2;
+    let held = false;
+    try {
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      held = true;
+      await delayFish(Math.max(90, Math.min(350, pressMs || 150)));
+    } finally {
+      if (held) await page.mouse.up().catch(() => {});
+    }
+    let observed = await watchFishCast(before);
+    if (observed === "accepted") return castConfirmed();
+    if (observed !== "no-packet")
+      return castFailed("Đã có g:act/cast nhưng game chưa nhận lượt câu (" + observed + ").");
+    // The client's source registers keydown/keyup Space as the SAME trusted
+    // fa/_i handlers. It bypasses pointer interception without forging packets.
+    const beforeSpace = sentFishCasts;
+    await page.locator(".fish-room .fish-main").focus({ timeout: 1500 });
+    let down = false;
+    try {
+      await page.keyboard.down("Space");
+      down = true;
+      await delayFish(110);
+    } finally {
+      if (down) await page.keyboard.up("Space").catch(() => {});
+    }
+    observed = await watchFishCast(beforeSpace);
+    if (observed === "accepted") return castConfirmed();
+    return castFailed(observed === "no-packet"
+      ? "Cả pointerup và Space đều không tạo g:act/cast; kiểm tra tải cảnh, trạng thái quan sát và lớp phủ."
+      : "Game không rời idle sau cast (" + observed + "); kiểm tra phản hồi server.");
+  };
 
   return {
     beginFishingTelemetry() {
@@ -82,6 +171,7 @@ export function createSession(page, options) {
       page.on("websocket", (socket) => {
         if (!socket.url().includes("/socket.io/")) return;
         socket.on("framereceived", onFishFrame); // passive, no forged packets
+        socket.on("framesent", onFishSentFrame); // confirm actual game cast request
       });
     },
 
@@ -220,6 +310,13 @@ export function createSession(page, options) {
     async click(selector, timeoutMs, force = false, pressMs = 0) {
       if (!selector || !selector.trim()) return false;
       try {
+        if (selector.includes(".fish-main.st-idle.jvz-fish-press")) {
+          try { return await trustedFishCast(pressMs); }
+          catch (err) {
+            return castFailed("Lỗi gửi thao tác thật: " +
+              squashCallLog(err instanceof Error ? err.message : String(err)));
+          }
+        }
         await page.click(selector, { timeout: timeoutMs, force, delay: Math.max(0, Math.min(1000, pressMs)) });
         return true;
       } catch (err) {

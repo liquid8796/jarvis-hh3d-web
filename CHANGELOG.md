@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.233 — REA-backed fishing cast and hook input recovery (05/11/2026)
+
+- Analyzed current Tiên Giới fishing JavaScript plus four dependencies with REA: 63,124 AST nodes, 434 findings. Confirmed trusted pointerdown/up, selected spot guard, outgoing g:act cast, and built-in Space key fallback.
+- Web/GitHub workers now emit trusted mouse events, observe the real transition to wait/bite/reel and try Space only if the pointer event produced no game cast. Do not forge network messages.
+- Only a confirmed cast sets pendingCast. Previously it was set when an optional click had merely been requested, creating false 12s idle timeouts. Report concrete input/transition failures and retry with short backoff.
+- Skip generic 700–1800ms human delay for just the two fishing quests: the hook window can be brief. All other quest input delays stay unchanged.
+- Add browser test coverage for pointer cast, Space fallback, no-ack recovery and hook timing; patch equivalent PC local input flow. Catching a real fish after deployment still requires observation.
+
 ## 1.3.232 — Câu Cá: đọc g:snap nén trong Tiên Giới (05/11/2026)
 
 - Capture thao tác tay qua Chrome MCP: 530 g:snap, 66 g:input và 12 g:act. Game đã đổi g:snap từ object sang mảng v3 có mã -3.

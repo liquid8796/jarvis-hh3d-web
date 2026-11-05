@@ -8020,6 +8020,11 @@
           "until": { "kind": "visible", "selector": "body.jvz-fish-finished, body.jvz-fish-error" },
           "steps": [
             { "action": "evaluateJavaScript", "script": "@@FISH_TICK@@", "timeoutMs": 5000 },
+            { "action": "click", "selector": ".pl-go.jvz-fish-enter",
+              "pressMs": 80, "timeoutMs": 4500, "optional": true,
+              "when": { "kind": "visible", "selector": ".pl-go.jvz-fish-enter" },
+              "journalOnSuccess": "Đã bấm Vào Ngay để vào Tiên Giới trước khi câu cá.",
+              "note": "Bắt buộc đi qua cổng tải; #app/hub có thể đã dựng nhưng vẫn bị splash chặn chuột thật" },
             { "action": "click", "selector": ".fish-room .fish-main.st-idle.jvz-fish-press",
               "pressMs": 280, "timeoutMs": 2500, "optional": true,
               "when": { "kind": "visible", "selector": ".fish-room .fish-main.st-idle.jvz-fish-press" },
@@ -8053,6 +8058,11 @@
           "until": { "kind": "visible", "selector": "body.jvz-fish-finished, body.jvz-fish-error" },
           "steps": [
             { "action": "evaluateJavaScript", "script": "@@FISH_TICK@@", "timeoutMs": 5000 },
+            { "action": "click", "selector": ".pl-go.jvz-fish-enter",
+              "pressMs": 80, "timeoutMs": 4500, "optional": true,
+              "when": { "kind": "visible", "selector": ".pl-go.jvz-fish-enter" },
+              "journalOnSuccess": "Đã bấm Vào Ngay để vào Tiên Giới trước khi câu cá.",
+              "note": "Bắt buộc đi qua cổng tải; #app/hub có thể đã dựng nhưng vẫn bị splash chặn chuột thật" },
             { "action": "click", "selector": ".fish-room .fish-main.st-idle.jvz-fish-press",
               "pressMs": 280, "timeoutMs": 2500, "optional": true,
               "when": { "kind": "visible", "selector": ".fish-room .fish-main.st-idle.jvz-fish-press" },

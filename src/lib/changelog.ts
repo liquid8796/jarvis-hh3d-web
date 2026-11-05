@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.234",
+    date: "2026-11-05",
+    lines: [
+      "Câu Cá: Khôi Lỗi nay bấm Vào Ngay trước khi mở trò chơi, không còn thao tác phía sau màn chào.",
+      "Khi màn tải còn hiện, Khôi Lỗi sẽ chờ thay vì ném câu hay kéo cá vào lớp phủ.",
+      "Bổ sung kiểm thử tình huống bị kẹt; giữ nguyên ngư lực, bán cá và giới hạn lượt câu.",
+    ],
+  },
+  {
     version: "1.3.233",
     date: "2026-11-05",
     lines: [
@@ -482,14 +491,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Bộ công cụ xem quảng cáo tối ưu hoá nhận diện nhanh trạng thái nạp tự động của Adcash AutoTag.",
       "Mô phỏng hành vi đọc bài viết tự nhiên và bổ sung danh sách bộ chọn dự phòng chuẩn xác.",
-    ],
-  },
-  {
-    version: "1.3.175",
-    date: "2026-10-04",
-    lines: [
-      "Tích hợp mã nhúng tự động AutoTag của mạng quảng cáo Adcash và tạm dừng hiển thị Adsterra.",
-      "Bộ công cụ xem quảng cáo bổ sung mục tiêu Adcash và tuỳ chọn linh hoạt giữa các nhà mạng.",
     ],
   },
 

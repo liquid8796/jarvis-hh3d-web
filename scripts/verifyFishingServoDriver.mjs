@@ -34,7 +34,7 @@ socket.url=()=> "wss://example.invalid/socket.io/?EIO=4";
 const presses=[];
 let checks=0;
 page.locator=()=>({boundingBox:async()=>({x:50,y:80,width:80,height:48})});
-page.evaluate=async()=>++checks<=32;
+page.evaluate=async(fn)=>String(fn).includes(".pl-gate")?false:++checks<=32;
 page.mouse={
  move:async (x,y)=>presses.push("move:"+x+":"+y),
  down:async()=>presses.push("down"),
@@ -66,7 +66,8 @@ stalledSocket.url = () => "wss://example.invalid/socket.io/";
 const timeline = [];
 let loops = 0;
 stalledPage.locator = () => ({ boundingBox: async () => ({ x: 10, y: 10, width: 60, height: 40 }) });
-stalledPage.evaluate = async () => {
+stalledPage.evaluate = async (fn) => {
+  if (String(fn).includes(".pl-gate")) return false;
   const active = ++loops <= 20;
   if (!active) timeline.push("reel-finished");
   return active;

@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.234 — Enter Tiên Giới before fishing, reject background input (05/11/2026)
+
+- Reproduced the screenshot issue on the live game: the full-screen preload gate displays Vào Ngay while the hub and Trò chơi menu have already been mounted behind it. The fishing controller was calling synthetic DOM click on background controls without ever entering through the official gate.
+- REA-analyzed preload-gate-O4IU7EXX.js: its pl-go button binds onclick to enter(); the game's displayed gate disappears only after entry. Verified on the actual page by activating the button and checking the overlay's removal.
+- VIP and normal fishing now detect the visible preload gate, mark its Vào Ngay control, perform a trusted Playwright click and wait for the actual overlay to disappear before interacting with the fishing game or inventory. Loading gates without an actionable button stay in a diagnostic wait state.
+- Add safety checks in native cast and reel drivers: never bypass the loader using Space while real mouse reel input remains obstructed. Clear stale retry backoff after successful cast to avoid missing the bite window.
+- Reproduce with Playwright fixtures for gateway blocking, game entry, click order and protected fishing input. Mirror logic into the local PC client without incorporating unrelated work. Production fish-catching remains to be proven by a real worker session.
+
 ## 1.3.233 — REA-backed fishing cast and hook input recovery (05/11/2026)
 
 - Analyzed current Tiên Giới fishing JavaScript plus four dependencies with REA: 63,124 AST nodes, 434 findings. Confirmed trusted pointerdown/up, selected spot guard, outgoing g:act cast, and built-in Space key fallback.

@@ -106,6 +106,7 @@ export function createSession(page, options) {
       if (!state) return;
       state.pendingCast = true;
       state.lastCast = Date.now();
+      state.retryAfter = 0; // never postpone the brief hook window after recovery
       state.castFailure = "";
     }).catch(() => {});
     return true;
@@ -126,6 +127,16 @@ export function createSession(page, options) {
    * controller still claimed it had cast; use direct trusted input plus proof.
    */
   const trustedFishCast = async (pressMs) => {
+    // A Space fallback can cast through the preloader although real reel
+    // mouse events remain blocked. Prevent this dangerous false success.
+    const gatePresent = await page.evaluate(() => {
+      const el = document.querySelector(".pl-go, .pl-gate, .bt-wrap");
+      if (!el || !el.getClientRects().length) return false;
+      const style = getComputedStyle(el);
+      return style.display !== "none" && style.visibility !== "hidden" &&
+        Number(style.opacity || "1") > 0.01;
+    });
+    if (gatePresent) return castFailed("Màn Vào Ngay chưa đóng; không ném câu vào game nằm sau lớp phủ.");
     const main = page.locator(".fish-room .fish-main.st-idle");
     const before = sentFishCasts;
     const bounds = await main.boundingBox().catch(() => null);
@@ -177,6 +188,17 @@ export function createSession(page, options) {
 
     /** Continuous trusted mouse holding using 66ms authoritative g:snap frames. */
     async fishingReel(shouldStop = () => false) {
+      const blockedByGate = await page.evaluate(() => {
+        const el = document.querySelector(".pl-gate, .bt-wrap");
+        if (!el || !el.getClientRects().length) return false;
+        const css = getComputedStyle(el);
+        return css.display !== "none" && css.visibility !== "hidden" &&
+          Number(css.opacity || "1") > 0.01;
+      }).catch(() => false);
+      if (blockedByGate) {
+        log.debug("fish reel: màn Vào Ngay vẫn phủ trên nút giữ/thả; cần đóng splash trước khi kéo.");
+        return;
+      }
       const button = page.locator(".fish-room .fish-main.st-reel");
       let rect;
       try { rect = await button.boundingBox(); }

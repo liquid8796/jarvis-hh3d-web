@@ -36,6 +36,33 @@
     return "!" + message;
   };
   if (body.classList.contains("jvz-fish-finished") || body.classList.contains("jvz-fish-error")) return "";
+
+  // REA: the hub can be mounted BEHIND the Tiên Giới preloader.
+  // DOM clicks on its hidden menu work, but real mouse down/up are blocked
+  // until the official .pl-go entry invokes the game's enter() callback.
+  const gateGo = get(".pl-go");
+  const loader = get(".bt-wrap");
+  const gate = get(".pl-gate");
+  const splashVisible = [gateGo, gate, loader].some((el) => {
+    if (!el || !el.getClientRects().length) return false;
+    const style = getComputedStyle(el);
+    return style.display !== "none" && style.visibility !== "hidden"
+      && Number(style.opacity || "1") > 0.01;
+  });
+  if (splashVisible) {
+    if (!state.gateStartedAt) state.gateStartedAt = Date.now();
+    if (visible(gateGo)) {
+      gateGo.classList.add("jvz-fish-enter");
+      return "fish: cần bấm Vào Ngay để đóng màn chào Tiên Giới";
+    }
+    if (Date.now() - state.gateStartedAt > 30_000 &&
+        Date.now() - (state.gateWarnedAt || 0) > 30_000) {
+      state.gateWarnedAt = Date.now();
+      return "!Tiên Giới vẫn đang hiển thị màn tải; chưa được phép câu cá phía sau màn chào.";
+    }
+    return "fish: đợi màn tải Tiên Giới hiển thị Vào Ngay";
+  }
+  state.gateStartedAt = 0;
   const room = get(".view.fish-room");
   if (!room) {
     // The fish game is in the Tiên Giới hub's Trò chơi launcher, NOT /nhiem-vu-hang-ngay.

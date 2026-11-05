@@ -57,6 +57,27 @@ try {
     byId("leave").addEventListener("click", () => (window.clicks.left++));
   });
   const tick = () => page.evaluate("(" + source + ")()");
+  // The real game builds the hub behind a Tiên Giới preload gate. This used
+  // to let JS open the room without Vào Ngay, leaving trusted reel input
+  // intercepted for 150 seconds. Explicitly exercise the obstructed state.
+  await page.evaluate(() => {
+    const blocker = document.createElement("div");
+    blocker.className = "bt-wrap";
+    blocker.style.cssText = "position:fixed;inset:0;background:#fff;z-index:9999";
+    blocker.innerHTML = '<div class="pl-gate"><button class="pl-go">Vào Ngay</button></div>';
+    blocker.querySelector(".pl-go").addEventListener("click", () => blocker.remove());
+    document.body.append(blocker);
+  });
+  const gated = await tick();
+  assert.match(gated, /Vào Ngay/, "must require the official game entry");
+  assert.equal(await page.locator(".pl-go.jvz-fish-enter").count(), 1);
+  assert.equal(await page.locator(".fish-main.jvz-fish-press").count(), 0,
+    "no hidden cast behind the splash");
+  assert.equal(await page.locator("#rare.on").count(), 1,
+    "do not manipulate fish inventory while gate covers the game");
+  await page.locator(".pl-go.jvz-fish-enter").click();
+  assert.equal(await page.locator(".bt-wrap").count(), 0,
+    "trusted click on Vào Ngay dismisses the game gate");
   await tick();
   assert.equal(await page.locator("#rare.on").count(), 0, "rare fish selection is cleared before selling");
   await tick();

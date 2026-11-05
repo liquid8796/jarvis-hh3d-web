@@ -21,7 +21,11 @@ for (const [quest, isFree] of [[v, false], [f, true]] as const) {
   assert.ok(repeating);
   const trustedClicks = repeating.steps.filter(
     (s: { action: string }) => s.action === "click");
-  assert.equal(trustedClicks.length, 2, "cast and hook need distinct timing");
+  assert.equal(trustedClicks.length, 3,
+    "enter Tiên Giới first; cast and hook have distinct timing");
+  assert.ok(trustedClicks.some((s: {selector: string; pressMs: number}) =>
+    s.selector === ".pl-go.jvz-fish-enter" && s.pressMs === 80),
+    "official Vào Ngay is required before background game clicks");
   assert.ok(trustedClicks.some((s: {selector: string; pressMs: number}) =>
     s.selector.includes(".st-idle.jvz-fish-press") && s.pressMs === 280),
     "retain reliable 280ms casting input");

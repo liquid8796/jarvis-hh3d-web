@@ -76,6 +76,35 @@ try {
   assert.ok(failure.retry > Date.now());
   assert.match(failure.reason,/g:act|Space|pointerup/);
   assert.deepEqual([failure.down,failure.up,failure.space],[1,1,1]);
+  // Real screenshot regression: an active splash can cover the game room.
+  // Without a gate check, pointer hits the splash, Space casts behind it, and
+  // the mouse cannot reel the fish. Fail closed before either input path.
+  await setup("pointer");
+  await page.evaluate(() => {
+    const blocker = document.createElement("div");
+    blocker.className = "bt-wrap";
+    blocker.style.cssText = "position:fixed;inset:0;background:#fff;z-index:9999";
+    blocker.innerHTML = '<div class="pl-gate"><button class="pl-go">Vào Ngay</button></div>';
+    blocker.querySelector(".pl-go").addEventListener("click", () => blocker.remove());
+    document.body.append(blocker);
+  });
+  assert.equal(await session.click(select, 2500, false, 120), false);
+  assert.deepEqual(await page.evaluate(() => [window.__test.down, window.__test.up, window.__test.space]),[0,0,0]);
+  assert.match(await page.evaluate(() => window.__jvzFish.castFailure), /Vào Ngay/);
+  await page.locator(".pl-go").click();
+  assert.equal(await page.locator(".bt-wrap").count(), 0);
+  assert.equal(await session.click(select, 2500, false, 120), true);
+  assert.equal(await page.evaluate(() => window.__jvzFish.retryAfter), 0,
+    "accepted cast clears old retry timer before bite/hook");
+
+  const profile = JSON.parse(readFileSync(new URL("../src/lib/quest-engine/profile.json", import.meta.url),"utf8"));
+  for (const id of ["cau-ca","cau-ca-thuong"]) {
+    const quest = profile.quests.find(q => q.id === id);
+    assert.ok(quest, id + " must exist");
+    const repeat = quest.steps.find(s => s.action === "repeat");
+    assert.ok(repeat.steps.some(s => s.action === "click" &&
+      s.selector === ".pl-go.jvz-fish-enter"), id + " must dismiss the preload gate");
+  }
   const engine = readFileSync(new URL("../src/lib/quest-engine/engine.mjs", import.meta.url),"utf8");
   assert.match(engine,/quest.id !== "cau-ca" && quest.id !== "cau-ca-thuong"/,
     "the short bite/hook window must not wait through normal humanDelay");

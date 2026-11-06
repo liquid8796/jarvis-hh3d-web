@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.237 — Reset fishing telemetry at authoritative fight boundaries (06/11/2026)
+
+- A short previous fight or a late first snapshot could poison the next fight's clock baseline: every new gauge was rejected as out of order or stale, leaving the controller releasing continuously. Reset telemetry on the game's private reel/escaped events, including ordered g:evts batches, rather than relying only on a t < 0.4 heuristic.
+- Reset on the current Socket.IO connection's creation/close and ignore obsolete socket frames or close events. Ignore other players' broadcast status/catch events; special hunts do not reuse the normal bar servo. Keep controller math, trusted input and quest options unchanged.
+- Preserve sanitized failed and successful live captures as regression fixtures. Tests cover consecutive fights, terminal events, delayed packets, batches and reconnection ownership.
+- Verified a real Cua Vang catch in the user's existing logged-in Chrome using the actual telemetry/servo modules and trusted native Space holds. Server progress reached 1.000 at 3.564 seconds, the catch matched authenticated self identity, and the bag increased from 11/30 to 12/30. This confirms one normal catch, not every fish or special hunt.
+- Seven focused fishing checks and both TypeScript checks passed. The local production build passed with webpack; default Turbopack reported an unrelated generated Google-font import failure. The broad smoke suite is not claimed green.
+
 ## 1.3.236 — Keep fishing ticks responsive before reel phase (06/11/2026)
 
 - The fishing profile invokes fishingReel on every tick. Its reel-only locator previously waited for Playwright's default 30-second timeout during idle, loading, wait and bite phases, blocking the controller from checking the brief hook window.

@@ -21,7 +21,8 @@ export function chooseFishingHold(s, {velocity = 0, last = null, lastSwitchedAt 
  }
  const upDist=Math.abs(predict(true)-fish),downDist=Math.abs(predict(false)-fish);
  const preferred=upDist<downDist;
- // The site's anti-tap rule flags 4 sub-150ms holds in 2s.
+ // The client advises against 4 sub-150ms holds in 2s; this smooths inputs.
+ // Its UI warning is not evidence of a server-side anti-tap penalty.
  if(last!==null&&preferred!==last&&lastSwitchedAt>0&&now-lastSwitchedAt<175
     &&Math.abs(s.f-s.z)<zone*.8) return last;
  return preferred;
@@ -74,15 +75,52 @@ export function createFishingTelemetry() {
   let latest = null;
   let velocity = 0;
   let minOffsetMs = Infinity;
+  let lifecycle = "unknown";
+  const reset = () => {
+    latest = null;
+    velocity = 0;
+    minOffsetMs = Infinity;
+    lifecycle = "unknown";
+  };
 
   return {
+    reset,
     ingest(raw, receivedAt = Date.now()) {
+      if (!Number.isFinite(receivedAt)) return false;
+      const text = typeof raw === "string" ? raw : raw?.toString?.();
+      // The game routes both single and batched events to onEvt, in order.
+      // `reel` is private to this fight; `st`/`catch` may describe other players.
+      // Reset from the authoritative start rather than guessing from t<.4.
+      if (text?.startsWith('42["g:evt",') || text?.startsWith('42["g:evts",')) {
+        try {
+          const [name, payload] = JSON.parse(text.slice(2));
+          const events = name === "g:evts" ? payload : [payload];
+          if (!Array.isArray(events)) return false;
+          let accepted = false;
+          for (const event of events) {
+            if (!event || typeof event !== "object") continue;
+            if (event.type === "reel") {
+              reset();
+              // Special hunts have different controls and cannot use this bar servo.
+              lifecycle = event.line || event.pull || event.duel ? "ended" : "active";
+              if (lifecycle === "active") {
+                accepted = this.ingest('42["g:snap",' + JSON.stringify(event) + ']', receivedAt) || accepted;
+              }
+            } else if (event.type === "escaped") {
+              reset();
+              lifecycle = "ended";
+            }
+          }
+          return accepted;
+        } catch { return false; }
+      }
+      if (lifecycle === "ended") return false;
       const snap = parseFishingSnapshotFrame(raw);
       if (!snap || !Number.isFinite(receivedAt)) return false;
       if (latest && snap.t <= latest.t) {
         // Server's per-fight clock restarts when a NEW fish is hooked.
         // Small backwards steps are out-of-order frames, not a reset.
-        if (latest.t > 1.5 && snap.t < .4 && latest.t - snap.t > 1) {
+        if (lifecycle === "unknown" && latest.t > 1.5 && snap.t < .4 && latest.t - snap.t > 1) {
           latest = null;
           velocity = 0;
           minOffsetMs = Infinity;

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.237",
+    date: "2026-11-06",
+    lines: [
+      "Câu Cá: sửa lỗi lần câu trước làm Khôi Lỗi ngừng kéo ở lần tiếp theo hoặc sau khi nối lại trò chơi.",
+      "Đã thử trên Chrome đang đăng nhập: câu được Cua Vàng, túi tăng từ 11 lên 12 món.",
+      "Giữ nguyên ngư lực, ngưỡng bán và giới hạn lượt câu của đạo hữu.",
+    ],
+  },
+  {
     version: "1.3.236",
     date: "2026-11-06",
     lines: [
@@ -484,14 +493,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khắc phục sự cố biểu ngữ quảng cáo đè lên giao diện Hàng Đợi Công Việc và Phòng Chat.",
       "Tối ưu hoá phạm vi hiển thị biểu ngữ sườn chỉ xuất hiện tại trang chủ công khai.",
-    ],
-  },
-  {
-    version: "1.3.178",
-    date: "2026-10-04",
-    lines: [
-      "Tích hợp thêm 2 định dạng quảng cáo Adcash gồm Pop-Under và biểu ngữ dọc 160×600.",
-      "Tối ưu hoá vị trí hiển thị sườn desktop và nâng cấp bộ công cụ nhận diện quảng cáo.",
     ],
   },
 ];

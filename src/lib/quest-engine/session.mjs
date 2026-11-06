@@ -72,6 +72,7 @@ export function createSession(page, options) {
   const maxDelay = Math.max(minDelay + 1, options.maxActionDelayMs ?? 1800);
   const pageTimeoutMs = options.pageTimeoutMs ?? 45_000;
   let fishTelemetryActive = false;
+  let fishSocket = null;
   const fishingTelemetry = createFishingTelemetry();
   const onFishFrame = (raw) => fishingTelemetry.ingest(raw);
   let sentFishCasts = 0;
@@ -181,8 +182,19 @@ export function createSession(page, options) {
       fishTelemetryActive = true;
       page.on("websocket", (socket) => {
         if (!socket.url().includes("/socket.io/")) return;
-        socket.on("framereceived", onFishFrame); // passive, no forged packets
-        socket.on("framesent", onFishSentFrame); // confirm actual game cast request
+        fishSocket = socket;
+        fishingTelemetry.reset();
+        socket.on("framereceived", (frame) => {
+          if (fishSocket === socket) onFishFrame(frame); // passive, no forged packets
+        });
+        socket.on("framesent", (frame) => {
+          if (fishSocket === socket) onFishSentFrame(frame);
+        });
+        socket.on("close", () => {
+          if (fishSocket !== socket) return;
+          fishSocket = null;
+          fishingTelemetry.reset();
+        });
       });
     },
 

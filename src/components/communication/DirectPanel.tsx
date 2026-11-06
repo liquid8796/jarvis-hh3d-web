@@ -53,6 +53,7 @@ export function DirectPanel({
   if (peer) {
     return (
       <DirectThread
+        key={peer.id}
         meId={snapshot.me.id}
         peer={peer}
         onBack={() => onPeer(null)}
@@ -64,7 +65,7 @@ export function DirectPanel({
 
   const row = (member: (typeof snapshot.members)[number], thread?: Thread) => {
     const mine = thread?.latest.senderId === snapshot.me.id;
-    const preview = thread ? `${mine ? "Bạn: " : ""}${thread.latest.text}` : PRESENCE_LABEL[member.presence];
+    const preview = thread ? `${mine ? "Bạn: " : ""}${thread.latest.text || (thread.latest.attachments?.length ? `📎 ${thread.latest.attachments[0].name}` : "")}` : PRESENCE_LABEL[member.presence];
     return (
       <button
         key={member.id}

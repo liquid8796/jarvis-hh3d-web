@@ -3,6 +3,7 @@ import { z } from "zod";
 import { currentUser } from "@/lib/auth/guards";
 import {
   STORE_CLOSED_MESSAGE,
+  directMessageBodySchema,
   getDirectMessages,
   markDirectMessagesRead,
   sendDirectMessage,
@@ -12,10 +13,9 @@ import { findById } from "@/lib/services/users";
 const peerSchema = z.string().uuid();
 const operationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("read"), peer: peerSchema }),
-  z.object({
+  directMessageBodySchema.extend({
     op: z.literal("send"),
     peer: peerSchema,
-    text: z.string().trim().min(1, "Tin nhắn không được để trống.").max(4000),
   }),
 ]);
 
@@ -69,6 +69,7 @@ export async function POST(request: Request) {
     { id: user.id, name: user.displayName },
     peer.id,
     parsed.data.text,
+    parsed.data.attachments,
   );
   return NextResponse.json(sent, { status: sent.ok ? 200 : 400 });
 }

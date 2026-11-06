@@ -464,3 +464,24 @@
   .communication-panel { animation: none; }
   .communication-dock > button { transition: none; }
 }
+/* Shared picker/drop draft stays inside the compact chat window. */
+.communication-conversation { display: flex; flex: 1; min-height: 0; flex-direction: column; position: relative; }
+.communication-draft { flex: none; min-width: 0; max-height: 45%; overflow-y: auto; background: rgba(9,10,23,.88); }
+.communication-composer input[type="file"] { display: none; }
+.communication-composer .communication-attach { background: rgba(232,194,92,.08); color: #e9c45a; }
+.communication-draft-files { display: grid; gap: 6px; max-height: 140px; overflow-y: auto; margin: 0; padding: 8px 10px; list-style: none; }
+.communication-draft-files li { display: flex; align-items: center; gap: 6px; padding: 6px; background: rgba(31,29,58,.78); border: 1px solid rgba(155,150,190,.2); border-radius: 8px; }
+.communication-draft-files img, .communication-file-icon { width: 32px; height: 32px; flex: none; object-fit: cover; border-radius: 5px; display: grid; place-items: center; }
+.communication-draft-name { min-width: 0; flex: 1; }
+.communication-draft-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .7rem; }
+.communication-draft-name small { display: block; color: #b6accd; font-size: .62rem; overflow-wrap: anywhere; }
+.communication-draft-files button { border: 0; padding: 6px; min-height: 30px; border-radius: 5px; background: transparent; color: #e9c45a; cursor: pointer; flex: none; font-size: .7rem; }
+.communication-draft-files button:disabled { opacity: .45; cursor: not-allowed; }
+.communication-drop-overlay { position: absolute; z-index: 2; inset: 5px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; border: 2px dashed #e9c45a; border-radius: 10px; background: rgba(15,14,30,.94); color: #e9c45a; pointer-events: none; font-size: .85rem; }
+.communication-drop-overlay small { font-size: .7rem; margin-top: 8px; color: #ccc; }
+.communication-attachments { display: grid; gap: 6px; min-width: 0; text-align: left; }
+.communication-attachments:empty { display: none; }
+.communication-attachments a { display: grid; gap: 3px; max-width: 100%; margin-top: 5px; padding: 7px; border: 1px solid rgba(232,194,92,.2); border-radius: 8px; color: #e9c45a; text-decoration: none; overflow-wrap: anywhere; font-size: .72rem; background: rgba(31,29,58,.6); }
+.communication-attachments a:focus-visible { outline: 2px solid #e9c45a; }
+.communication-attachments small { color: #aaa2ba; font-size: .6rem; }
+.communication-attachments img { display: block; width: auto; max-width: 100%; max-height: 160px; object-fit: contain; border-radius: 5px; }

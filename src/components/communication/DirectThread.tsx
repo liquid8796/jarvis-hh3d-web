@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { PRESENCE_LABEL } from "@/lib/validation/presence";
-import { BackIcon, SendIcon } from "./Icons";
+import { BackIcon } from "./Icons";
 import { StatusDot } from "./Common";
+import { AttachmentComposer } from "./AttachmentComposer";
+import { MessageAttachments } from "./MessageAttachments";
+import type { RoomAttachment } from "./types";
 import type { DirectMessage, Member } from "./types";
 
 const POLL_MS = 2_500;
@@ -27,9 +30,7 @@ export function DirectThread({
   onChanged: () => void;
 }) {
   const [messages, setMessages] = useState<DirectMessage[]>([]);
-  const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -68,35 +69,20 @@ export function DirectThread({
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages]);
 
-  async function send(event: FormEvent) {
-    event.preventDefault();
-    const body = text.trim();
-    if (!body || sending) return;
-    setSending(true);
-    setError("");
-    try {
-      const response = await fetch("/api/direct-messages", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ op: "send", peer: peer.id, text: body }),
-      });
-      const payload = (await response.json()) as { ok?: boolean; error?: string };
-      if (!response.ok || !payload.ok) {
-        setError(payload.error ?? "Không gửi được tin nhắn.");
-        return;
-      }
-      setText("");
-      await load();
-      onChanged();
-    } catch {
-      setError("Mất kết nối khi gửi tin.");
-    } finally {
-      setSending(false);
-    }
+  async function send(text: string, attachments: RoomAttachment[]) {
+    const response = await fetch("/api/direct-messages", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ op: "send", peer: peer.id, text, attachments }),
+    });
+    const payload = (await response.json()) as { ok?: boolean; error?: string };
+    if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Không gửi được tin nhắn.");
+    await load();
+    onChanged();
   }
 
   return (
-    <>
+    <AttachmentComposer key={peer.id} peerId={peer.id} placeholder={`Nhắn cho ${peer.displayName}…`} sendLabel="Gửi tin nhắn" onSend={send}>
       <header className="communication-panel-head">
         <button type="button" className="communication-back" onClick={onBack}>
           <BackIcon /> Quay lại
@@ -119,7 +105,8 @@ export function DirectThread({
           const mine = message.senderId === meId;
           return (
             <div key={message.id} className={`communication-direct-message${mine ? " is-mine" : ""}`}>
-              <p>{message.text}</p>
+              {message.text && <p>{message.text}</p>}
+              <MessageAttachments attachments={message.attachments} />
               <time dateTime={message.createdAt}>{clock(message.createdAt)}</time>
             </div>
           );
@@ -128,17 +115,7 @@ export function DirectThread({
       </div>
 
       {error && <p className="communication-error" role="status">{error}</p>}
-      <form className="communication-composer" onSubmit={send}>
-        <input
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          placeholder={`Nhắn cho ${peer.displayName}…`}
-          maxLength={4000}
-          aria-label={`Nhắn cho ${peer.displayName}`}
-        />
-        <button type="submit" disabled={sending || !text.trim()} aria-label="Gửi tin nhắn"><SendIcon /></button>
-      </form>
-    </>
+    </AttachmentComposer>
   );
 }
 

@@ -3,6 +3,8 @@ import { z } from "zod";
 import { resolveMongoDbName } from "@/lib/mongo/dbName";
 import { isSafeAttachmentUrl } from "@/lib/validation/chat";
 import { getAppSettings } from "./settings";
+import { directAttachmentSchema } from "@/lib/validation/directAttachments";
+import { canonicalizeDirectAttachments, purgeExpiredDirectAttachments, closeDirectAttachmentStore } from "./directAttachments";
 
 /**
  * Đàm đạo toàn tông môn — sống trong MongoDB, KHÔNG trong Postgres.
@@ -52,6 +54,11 @@ export const messageBodySchema = z.object({
   sticker: z.string().max(16).nullish(),
 });
 
+export const directMessageBodySchema = z.object({
+  text: z.string().trim().max(4000).default(""),
+  attachments: z.array(directAttachmentSchema).max(6).default([]),
+});
+
 const reactionSchema = z.object({ emoji: z.string(), userId: z.string() });
 
 const directMessageSchema = z.object({
@@ -60,7 +67,8 @@ const directMessageSchema = z.object({
   senderId: z.string(),
   recipientId: z.string(),
   senderName: z.string().default("?"),
-  text: z.string().min(1).max(4000),
+  text: z.string().max(4000),
+  attachments: z.array(directAttachmentSchema).max(6).default([]),
   createdAt: z.number(),
   readAt: z.number().nullable().default(null),
 });
@@ -73,6 +81,7 @@ export type DirectMessageView = {
   recipientId: string;
   senderName: string;
   text: string;
+  attachments: Attachment[];
   createdAt: string;
   readAt: string | null;
 };
@@ -216,6 +225,7 @@ async function connect(uri: string): Promise<ChatStore> {
  * đã trả giá bằng hai lần chạy 600 giây.
  */
 export async function closeChatStore(): Promise<void> {
+  await closeDirectAttachmentStore();
   const opened = globalForMongo.__jarvisChatStore;
   globalForMongo.__jarvisChatStore = undefined;
   if (!opened) return;
@@ -531,6 +541,7 @@ function directView(message: DirectMessageDoc): DirectMessageView {
     recipientId: message.recipientId,
     senderName: message.senderName,
     text: message.text,
+    attachments: message.attachments,
     createdAt: new Date(message.createdAt).toISOString(),
     readAt: message.readAt === null ? null : new Date(message.readAt).toISOString(),
   };
@@ -541,15 +552,24 @@ export async function sendDirectMessage(
   sender: { id: string; name: string },
   recipientId: string,
   rawText: string,
+  rawAttachments: unknown = [],
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const opened = store();
   if (!opened) return { ok: false, error: STORE_CLOSED_MESSAGE };
   const text = String(rawText ?? "").trim();
-  if (!text) return { ok: false, error: "Tin nhắn không được để trống." };
+  const parsed = directMessageBodySchema.safeParse({ text, attachments: rawAttachments });
+  if (!parsed.success) return { ok: false, error: "Tin nhắn hoặc tệp đính kèm không hợp lệ." };
+  if (!text && parsed.data.attachments.length === 0) {
+    return { ok: false, error: "Tin nhắn không được để trống." };
+  }
   if (text.length > 4000) return { ok: false, error: "Tin nhắn tối đa 4.000 ký tự." };
   if (!recipientId || recipientId === sender.id) {
     return { ok: false, error: "Hãy chọn một thành viên khác để trò chuyện." };
   }
+
+  const createdAt = Date.now();
+  const attachments = await canonicalizeDirectAttachments(sender.id, recipientId, parsed.data.attachments);
+  if (!attachments) return { ok: false, error: "Tệp đính kèm không thuộc cuộc trò chuyện này." };
 
   const document: DirectMessageDoc = {
     _id: crypto.randomUUID(),
@@ -558,7 +578,8 @@ export async function sendDirectMessage(
     recipientId,
     senderName: sender.name,
     text,
-    createdAt: Date.now(),
+    attachments,
+    createdAt,
     readAt: null,
   };
   await (await opened).directMessages.insertOne(document);
@@ -680,6 +701,7 @@ export async function purgeExpiredChat(): Promise<{ purged: number }> {
     messages.deleteMany({ createdAt: { $lt: cutoff } }),
     directMessages.deleteMany({ createdAt: { $lt: cutoff } }),
   ]);
+  await purgeExpiredDirectAttachments(cutoff);
   return { purged: (room.deletedCount ?? 0) + (direct.deletedCount ?? 0) };
 }
 

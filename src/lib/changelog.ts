@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.240",
+    date: "2026-11-06",
+    lines: [
+      "Trò chuyện: thêm nút đính kèm và kéo thả file từ máy vào cửa sổ nhắn tin riêng hoặc phòng chat.",
+      "Xem trước, bỏ file hoặc thử tải lại trước khi gửi; tối đa 6 file mỗi tin, 8 MB mỗi file.",
+      "File gửi riêng chỉ người gửi và người nhận đã đăng nhập mới mở được.",
+    ],
+  },
+  {
     version: "1.3.239",
     date: "2026-11-06",
     lines: [
@@ -486,14 +495,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Tối ưu bộ công cụ xem quảng cáo tự động hoá theo cơ chế AutoTag Adcash.",
       "Khắc phục triệt để sự cố tiến trình bị treo khi tương tác đệ quy trang đích.",
-    ],
-  },
-  {
-    version: "1.3.181",
-    date: "2026-10-04",
-    lines: [
-      "Gỡ bỏ toàn bộ biểu ngữ và kịch bản cũ, thiết lập duy nhất AutoTag Adcash mới.",
-      "Tối ưu hoá giao diện gọn nhẹ và nâng cấp công cụ tự động xem quảng cáo.",
     ],
   },
 ];

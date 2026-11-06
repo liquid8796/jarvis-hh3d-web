@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.240 — Attach files in the floating conversation dock (06/11/2026)
+
+- Add a shared file picker and external drag/drop flow for private and public-room composers. Stage up to six files, 8 MB each, with upload state, image/file previews, removal, retry, and attachment-only messages. Preserve failed-send drafts and cancel unfinished uploads when switching conversations.
+- Store private attachment bytes separately on the OCI backend and serve them through authenticated participant-only routes. Validate upload ownership and recipient at send time; recipient access starts only after the message is sent. Public-room media storage and purge remain unchanged.
+- Preserve legacy text-only direct messages and show attachment names in recent-conversation previews. Reject unsafe file links at upload/send/render boundaries.
+- Add isolated Mongo authorization tests and real React/Chromium interaction regressions for picker/drop, file limits, failure/retry, repeat selection, draft reset and compact mobile layout.
+
 ## 1.3.239 — Match fishing ruler edges and measure every fight (06/11/2026)
 
 - Manual capture confirms the right force interval must contain the fish; the left circle is accumulated catch progress. Keep aiming for the fish center with predictive hold/release control, not a copied fixed tapping rhythm.

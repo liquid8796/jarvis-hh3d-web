@@ -17,6 +17,7 @@ export type DirectMessage = {
   senderId: string;
   recipientId: string;
   senderName: string;
+  attachments?: RoomAttachment[];
   text: string;
   createdAt: string;
   readAt: string | null;

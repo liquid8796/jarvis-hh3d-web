@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { isNearChatBottom } from "@/lib/validation/chatRead";
-import { SendIcon } from "./Icons";
+import { AttachmentComposer } from "./AttachmentComposer";
+import { MessageAttachments } from "./MessageAttachments";
 import { EmptyState } from "./Common";
-import type { RoomMessage } from "./types";
+import type { RoomMessage, RoomAttachment } from "./types";
 
 const POLL_MS = 2_500;
 
@@ -25,9 +26,7 @@ export function RoomPanel({
   const [messages, setMessages] = useState<RoomMessage[]>([]);
   const [avatars, setAvatars] = useState<Record<string, string>>({});
   const [typing, setTyping] = useState<string[]>([]);
-  const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
@@ -140,39 +139,21 @@ export function RoomPanel({
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [markLatestRead, messages]);
 
-  async function send(event: FormEvent) {
-    event.preventDefault();
-    const body = text.trim();
-    if (!body || sending) return;
-    setSending(true);
-    setError("");
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          op: "send",
-          body: { text: body, attachments: [], replyTo: null, sticker: null },
-        }),
-      });
-      const payload = (await response.json()) as { ok?: boolean; error?: string };
-      if (!response.ok || !payload.ok) {
-        setError(payload.error ?? "Không gửi được tin vào sảnh.");
-        return;
-      }
-      setText("");
-      pinnedToBottomRef.current = true;
-      await load();
-      onChanged();
-    } catch {
-      setError("Mất kết nối khi gửi tin.");
-    } finally {
-      setSending(false);
-    }
+  async function send(text: string, attachments: RoomAttachment[]) {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ op: "send", body: { text, attachments, replyTo: null, sticker: null } }),
+    });
+    const payload = (await response.json()) as { ok?: boolean; error?: string };
+    if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Không gửi được tin vào sảnh.");
+    pinnedToBottomRef.current = true;
+    await load();
+    onChanged();
   }
 
   return (
-    <>
+    <AttachmentComposer placeholder="Nhắn lên Sảnh đàm đạo chung…" sendLabel="Gửi lên sảnh" onSend={send}>
       <header className="communication-panel-head">
         <span><small>Phòng chat</small><strong>Sảnh đàm đạo chung</strong></span>
         {unread > 0 && <b className="communication-count">{unread}</b>}
@@ -200,18 +181,7 @@ export function RoomPanel({
                     {message.replyTo && <blockquote>{message.replyTo.author} · {message.replyTo.excerpt}</blockquote>}
                     {message.sticker && <span className="communication-sticker">{message.sticker}</span>}
                     {message.text && <p>{message.text}</p>}
-                    {message.attachments.map((attachment) =>
-                      attachment.type.startsWith("image/") ? (
-                        <a key={attachment.url} href={attachment.url} target="_blank" rel="noreferrer">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={attachment.url} alt={attachment.name} loading="lazy" />
-                        </a>
-                      ) : (
-                        <a key={attachment.url} href={attachment.url} target="_blank" rel="noreferrer">
-                          📎 {attachment.name}
-                        </a>
-                      ),
-                    )}
+                    <MessageAttachments attachments={message.attachments} />
                   </>
                 )}
               </div>
@@ -225,16 +195,6 @@ export function RoomPanel({
       </p>
       {error && <p className="communication-error" role="status">{error}</p>}
 
-      <form className="communication-composer" onSubmit={send}>
-        <input
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          placeholder="Nhắn lên Sảnh đàm đạo chung…"
-          maxLength={4000}
-          aria-label="Nhắn lên Sảnh đàm đạo chung"
-        />
-        <button type="submit" disabled={sending || !text.trim()} aria-label="Gửi lên sảnh"><SendIcon /></button>
-      </form>
-    </>
+    </AttachmentComposer>
   );
 }

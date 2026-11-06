@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.238 — Use real Playwright frame envelopes and select launcher Games tab (06/11/2026)
+
+- The worker fed Playwright's `{payload: string | Buffer}` frame event wrapper into the wire parser. Every real gauge was rejected as `[object Object]`, so the reel loop never held the mouse. Unwrap both received and sent frames. Prior raw-string mocks and the native Space harness bypassed this boundary and did not establish worker end-to-end success.
+- A real Chromium plus local WebSocket regression reproduced valid incoming text/binary frames with zero trusted holds before the fix. It also covers outgoing cast acknowledgment, duplicate fallback prevention, and authenticated-self catch evidence. Update older mocks to the real envelope contract.
+- The Tiên Giới launcher defaults to recruitment when adverts exist. Its fishing entry remains hidden behind the Games tab; select `.rc-tab[data-t="games"]` before looking for Câu Cá. A real DOM fixture reproduced the missed-tab failure before the fix.
+- Log bounded reel summaries and only server catch events matching the authenticated player's ID within an active fight. Do not log full packets, credentials or IDs; ignore other players and duplicate/late catch events. Keep controller math, sales thresholds and cast limits unchanged.
+
 ## 1.3.237 — Reset fishing telemetry at authoritative fight boundaries (06/11/2026)
 
 - A short previous fight or a late first snapshot could poison the next fight's clock baseline: every new gauge was rejected as out of order or stale, leaving the controller releasing continuously. Reset telemetry on the game's private reel/escaped events, including ordered g:evts batches, rather than relying only on a t < 0.4 heuristic.

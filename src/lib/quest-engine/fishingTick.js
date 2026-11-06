@@ -85,6 +85,14 @@
         }
         return finish("Không có phòng câu cá còn chỗ; sẽ thử lại lượt sau.", true);
       }
+      // The launcher opens on recruitment when there are active adverts.
+      // Its games panel stays mounted but hidden until this tab is selected.
+      const games = sheet.querySelector('.rc-tab[data-t="games"]');
+      if (visible(games) && games.getAttribute("aria-selected") === "false") {
+        games.click();
+        state.entering = 0;
+        return "fish: chuyển sang danh sách Trò chơi";
+      }
       const fish = [...sheet.querySelectorAll("button")].find((b) => /Câu Cá/i.test(label(b)) && visible(b));
       if (fish) { fish.click(); return "fish: mở danh sách phòng"; }
     }

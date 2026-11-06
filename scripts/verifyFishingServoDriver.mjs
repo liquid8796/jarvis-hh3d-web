@@ -47,10 +47,10 @@ let i=0;
 const timer=setInterval(()=>{
  i++;
  const low=i<14, z=low?.2:.82, f=low?.8:.15;
- socket.emit("framereceived",packet(
+ socket.emit("framereceived",{payload:packet(
   [-3,Math.round(i*66),Math.round(z*1000),Math.round(f*10000),0,
     Math.round((.3+i*.01)*1000),1,.34,0,5000]
-));
+)});
 },55);
 try {
  await session.fishingReel();
@@ -83,8 +83,8 @@ const stalledSession = createSession(stalledPage, {
 });
 stalledSession.beginFishingTelemetry();
 stalledPage.emit("websocket", stalledSocket);
-stalledSocket.emit("framereceived",
-  '42["g:snap",'+JSON.stringify({ t: .066, z: .15, f: .85, zone: .27, p: .21, fv: 0 })+']');
+stalledSocket.emit("framereceived", {payload:
+  '42["g:snap",'+JSON.stringify({ t: .066, z: .15, f: .85, zone: .27, p: .21, fv: 0 })+']'});
 await stalledSession.fishingReel();
 assert.ok(timeline.includes("down"), "start holding with a fresh valid position");
 assert.ok(timeline.includes("up"), "release when g:snap stops arriving");
@@ -102,13 +102,13 @@ reconnectPage.mouse={move:async()=>{},down:async()=>reconnectPresses.push('down'
 const reconnect=createSession(reconnectPage,{baseUrl:'https://example.invalid',log:{debug:()=>{},info:()=>{},warning:()=>{}}});
 reconnect.beginFishingTelemetry();
 reconnectPage.emit('websocket',oldSocket);
-oldSocket.emit('framereceived',packet({t:1,z:.15,f:.85,zone:.27,p:.3,fv:0}));
+oldSocket.emit('framereceived',{payload:packet({t:1,z:.15,f:.85,zone:.27,p:.3,fv:0})});
 reconnectPage.emit('websocket',newSocket);
-oldSocket.emit('framereceived',packet({t:1.066,z:.15,f:.85,zone:.27,p:.3,fv:0}));
+oldSocket.emit('framereceived',{payload:packet({t:1.066,z:.15,f:.85,zone:.27,p:.3,fv:0})});
 await reconnect.fishingReel();
 assert.deepEqual(reconnectPresses,[],'new socket clears gauge and obsolete socket cannot restore it');
 reconnectChecks=0;
-newSocket.emit('framereceived',packet({t:.066,z:.15,f:.85,zone:.27,p:.3,fv:0}));
+newSocket.emit('framereceived',{payload:packet({t:.066,z:.15,f:.85,zone:.27,p:.3,fv:0})});
 oldSocket.emit('close');
 await reconnect.fishingReel();
 assert.ok(reconnectPresses.includes('down'),'obsolete socket close cannot clear new socket gauge');

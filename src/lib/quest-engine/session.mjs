@@ -74,7 +74,34 @@ export function createSession(page, options) {
   let fishTelemetryActive = false;
   let fishSocket = null;
   const fishingTelemetry = createFishingTelemetry();
-  const onFishFrame = (raw) => fishingTelemetry.ingest(raw);
+  let fishSelfId = null;
+  let fishAwaitingCatch = false;
+  const onFishFrame = (raw) => {
+    fishingTelemetry.ingest(raw);
+    const text = typeof raw === "string" ? raw : raw?.toString?.() ?? "";
+    // Only record server-confirmed catches for this authenticated player.
+    // Never log hello payloads, credentials, player IDs or other players' catches.
+    if (!text.startsWith('42["hello",') && !text.startsWith('42["g:evt",') &&
+        !text.startsWith('42["g:evts",')) return;
+    try {
+      const [name, payload] = JSON.parse(text.slice(2));
+      if (name === "hello") {
+        fishSelfId = Number.isSafeInteger(payload?.me?.id) && payload.me.id > 0 ? payload.me.id : null;
+        return;
+      }
+      const events = name === "g:evts" ? payload : [payload];
+      if (!Array.isArray(events)) return;
+      for (const event of events) {
+        if (event?.type === "reel") fishAwaitingCatch = true;
+        else if (event?.type === "escaped") fishAwaitingCatch = false;
+        else if (event?.type === "catch" && fishAwaitingCatch &&
+                 fishSelfId !== null && event.uid === fishSelfId) {
+          fishAwaitingCatch = false;
+          log.info("Câu Cá: server xác nhận bắt thành công cho tài khoản đang chạy.");
+        }
+      }
+    } catch { /* Ignore unrelated/malformed frames; never infer success. */ }
+  };
   let sentFishCasts = 0;
   const onFishSentFrame = (frame) => {
     const raw = typeof frame === "string" ? frame : frame?.toString?.() ?? "";
@@ -183,16 +210,21 @@ export function createSession(page, options) {
       page.on("websocket", (socket) => {
         if (!socket.url().includes("/socket.io/")) return;
         fishSocket = socket;
+        fishSelfId = null;
+        fishAwaitingCatch = false;
         fishingTelemetry.reset();
         socket.on("framereceived", (frame) => {
-          if (fishSocket === socket) onFishFrame(frame); // passive, no forged packets
+          // Playwright events wrap the wire text/binary bytes in { payload }.
+          if (fishSocket === socket) onFishFrame(frame.payload); // passive, no forged packets
         });
         socket.on("framesent", (frame) => {
-          if (fishSocket === socket) onFishSentFrame(frame);
+          if (fishSocket === socket) onFishSentFrame(frame.payload);
         });
         socket.on("close", () => {
           if (fishSocket !== socket) return;
           fishSocket = null;
+          fishSelfId = null;
+          fishAwaitingCatch = false;
           fishingTelemetry.reset();
         });
       });
@@ -226,6 +258,7 @@ export function createSession(page, options) {
       let holding = false;
       let lastSwitchAt = 0;
       const started = Date.now();
+      let gaugeSamples = 0, holds = 0, maxProgress = 0;
       try {
         await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
         while (Date.now() - started < 120_000 && !shouldStop()) {
@@ -234,13 +267,14 @@ export function createSession(page, options) {
           if (!reelActive) break;
           const now = Date.now();
           const gauge = fishingTelemetry.current(now);
+          if (gauge) { gaugeSamples++; maxProgress = Math.max(maxProgress, gauge.p); }
           const desired = gauge ? chooseFishingHold(gauge, {
             velocity: gauge.velocity, last: holding, now,
             lastSwitchedAt: lastSwitchAt,
             lookaheadSeconds: gauge.lookaheadSeconds
           }) : false;
           if (desired !== holding) {
-            if (desired) await page.mouse.down();
+            if (desired) { await page.mouse.down(); holds++; }
             else await page.mouse.up();
             holding = desired;
             lastSwitchAt = now;
@@ -253,6 +287,9 @@ export function createSession(page, options) {
         if (holding) {
           try { await page.mouse.up(); } catch { /* page closed during Thu Đàn */ }
         }
+        const finalGauge = fishingTelemetry.current(Date.now());
+        if (finalGauge) maxProgress = Math.max(maxProgress, finalGauge.p);
+        log.info(`Câu Cá: kết thúc kéo; ${gaugeSamples} mẫu hợp lệ, ${holds} lần giữ, tiến độ tối đa ${Math.round(maxProgress * 100)}%.`);
       }
     },
 

@@ -160,6 +160,26 @@ try {
   assert.deepEqual(await page.evaluate(() => window.testRoom), { launch: 0, join: 1 },
     "join the actual fishing room despite nested launcher overlay");
 
+  // Live launcher defaults to recruitment when advertisements exist. The games
+  // panel remains mounted but hidden until its explicit tab is selected.
+  await page.setContent('<style>.hidden{display:none}</style><div class="view hub"><button class="launcher-btn">Trò chơi</button></div>' +
+    '<div class="sheet"><button class="rc-tab" data-t="recruit" aria-selected="true">Chiêu mộ</button>' +
+    '<button class="rc-tab" data-t="games" aria-selected="false">Trò chơi</button>' +
+    '<div class="games hidden"><button class="launcher-item" data-game="fish">Câu Cá</button></div></div>');
+  await page.evaluate(() => {
+    window.__jvzFish = undefined;
+    window.launchTest = {games:0,fish:0};
+    document.querySelector('[data-t="games"]').addEventListener('click', event => {
+      window.launchTest.games++;
+      event.currentTarget.setAttribute('aria-selected','true');
+      document.querySelector('.games').classList.remove('hidden');
+    });
+    document.querySelector('[data-game="fish"]').addEventListener('click',()=>window.launchTest.fish++);
+  });
+  await tick(); await tick();
+  assert.deepEqual(await page.evaluate(()=>window.launchTest),{games:1,fish:1},
+    'select the Games tab before the hidden fishing entry');
+
   // An unlimited user must NEVER enter the finished/error state for temporary
   // connectivity/basket failures. Otherwise the worker closes and sleeps 5 min.
   await page.setContent('<div class="view fish-room"><button class="fish-main st-wait">Chờ cá</button></div>');

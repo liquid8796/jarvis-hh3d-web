@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.238",
+    date: "2026-11-06",
+    lines: [
+      "Câu Cá: sửa lỗi Khôi Lỗi nhận tín hiệu nhưng không giữ cần khi kéo cá.",
+      "Tự chuyển sang tab Trò chơi khi bảng mở ở Chiêu mộ, tránh kẹt không tìm thấy Câu Cá.",
+      "Nhật ký ghi nhận riêng lần bắt thành công của đúng tài khoản đang chạy.",
+    ],
+  },
+  {
     version: "1.3.237",
     date: "2026-11-06",
     lines: [
@@ -485,14 +494,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Cập nhật cấu hình 5 vùng quảng cáo mới từ Adcash (Autotag, Pop-Under, 2 sườn 160×600 và Leaderboard 728×90).",
       "Tối ưu hoá vị trí hiển thị cân đối hai bên trang chủ và nâng cấp kịch bản kiểm tra tự động.",
-    ],
-  },
-  {
-    version: "1.3.179",
-    date: "2026-10-04",
-    lines: [
-      "Khắc phục sự cố biểu ngữ quảng cáo đè lên giao diện Hàng Đợi Công Việc và Phòng Chat.",
-      "Tối ưu hoá phạm vi hiển thị biểu ngữ sườn chỉ xuất hiện tại trang chủ công khai.",
     ],
   },
 ];

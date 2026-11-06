@@ -359,15 +359,41 @@ function formatDuration(seconds) {
  * câu「sau vòng này còn nhiệm vụ ngày nào phải ghé lại không」mà không cần đoán từ lời log.
  */
 export const PENDING_DAILY_MIN_DELAY_SECONDS = 10 * 60;
-/** A finished traversal sleeps for one hour before starting another full board.
- * Per-quest cooldowns can lengthen that wait, but must not shorten it.
- * Explicit quest clock schedules remain separate and may wake a job earlier.
- */
+/** Hourly rechecks apply to exhausted/repeating work, not remaining daily turns. */
 export const COMPLETED_CYCLE_MIN_DELAY_SECONDS = 60 * 60;
 
-export function completedCycleMinimumSeconds(quests, cappedToday = []) {
-  return Math.max(COMPLETED_CYCLE_MIN_DELAY_SECONDS,
-    pendingDailyMinimumSeconds(quests, cappedToday));
+export function completedCycleMinimumSeconds(quests, cappedToday = [], results = []) {
+  const capped = new Set(cappedToday);
+  const latest = new Map(results.map((result) => [result.questId, result]));
+  const hasOwnTimer = (quests ?? []).some((quest) => {
+    if (["hy-su-duong", "hy-su-duong-thuong"].includes(quest.id)) return true;
+    if (["bi-canh-tong-mon", "bi-canh-tong-mon-thuong"].includes(quest.id)) {
+      const result = latest.get(quest.id);
+      return !(result?.outcome === "alreadyDone" && result.dailyCapReached === true);
+    }
+    return isDailyQuotaQuest(quest) && !capped.has(quest.id);
+  });
+  return hasOwnTimer ? 0 : COMPLETED_CYCLE_MIN_DELAY_SECONDS;
+}
+
+/** Compare each quest's timer separately; capped daily fallback timers cannot win. */
+export function completedCycleDelaySeconds(quests, results, cappedToday = [], { random = Math.random } = {}) {
+  const plan = new Map((quests ?? []).map((quest) => [quest.id, quest]));
+  const capped = new Set(cappedToday);
+  const candidates = [];
+  for (const result of results ?? []) {
+    const quest = plan.get(result.questId);
+    if (quest && skipQuestForToday(quest, capped)) continue;
+    const minimumSeconds = completedCycleMinimumSeconds(quest ? [quest] : [], cappedToday, [result]);
+    candidates.push({
+      outcome: result.outcome,
+      cooldownSeconds: computeNextDelaySeconds([result], { minimumSeconds, random: () => 0 }),
+    });
+  }
+  return computeNextDelaySeconds(candidates, {
+    minimumSeconds: candidates.length ? 0 : COMPLETED_CYCLE_MIN_DELAY_SECONDS,
+    random,
+  });
 }
 
 export function pendingDailyMinimumSeconds(quests, cappedToday = []) {
@@ -1136,24 +1162,12 @@ export async function runCycle(deps) {
       );
     }
 
-    // Reaching the end of the full quest list means the next full board
-    // must wait >= 1h; formerly the shortest per-quest timer (often 7m)
-    // overrode this, immediately recycling every guild.
-    const minimumSeconds = completedCycleMinimumSeconds(quests, cappedToday);
     return {
-      ...(failed > 0
-        ? scheduledCycleResult(
-            "done",
-            `Đi hết một vòng — ${done} thuận, ${failed} trắc trở.`,
-            results,
-            { minimumSeconds },
-          )
-        : scheduledCycleResult(
-            "done",
-            `Đi hết một vòng — ${done} nhiệm vụ thuận lợi.`,
-            results,
-            { minimumSeconds },
-          )),
+      outcome: "done",
+      message: failed > 0
+        ? `Đi hết một vòng — ${done} thuận, ${failed} trắc trở.`
+        : `Đi hết một vòng — ${done} nhiệm vụ thuận lợi.`,
+      nextDelaySeconds: completedCycleDelaySeconds(quests, results, [...doneToday, ...cappedToday]),
       dailyCapQuestIds: cappedToday,
     };
   } finally {

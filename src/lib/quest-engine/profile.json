@@ -689,7 +689,7 @@
           "action": "stopIf",
           "text": "đã hết 5 lượt hôm nay",
           "timeoutMs": 15000,
-          "note": "hết lượt là hết NGÀY, không phải chờ — nói đúng tên nó để runner khỏi quay lại sau bảy phút cho một cánh cửa chỉ mở lại vào ngày mai",
+          "note": "Hết lượt boss hiện tại: kiểm lại mỗi giờ vì boss mới có thể được triệu hồi trong cùng ngày.",
           "condition": {
             "kind": "textMatches",
             "selector": "#challenge-boss-btn",
@@ -748,6 +748,16 @@
           "timeoutMs": 6000,
           "note": "đóng màn đánh để lần ghé sau không phải mở lại từ trong modal; tuỳ chọn vì trận đã tính rồi, không đáng làm hỏng một lượt đã thành",
           "optional": true
+        },
+        {
+          "action": "stopIf",
+          "text": "đã hết lượt đánh boss hiện tại",
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#challenge-boss-btn",
+            "text": "hết lượt"
+          },
+          "note": "Đọc lại sau đòn cuối: chuyển sang kiểm boss mới mỗi giờ, không ghi sổ hết ngày."
         },
         {
           "action": "readCooldownSeconds",
@@ -2568,7 +2578,7 @@
           "action": "stopIf",
           "text": "đã hết 5 lượt hôm nay",
           "timeoutMs": 15000,
-          "note": "hết lượt là hết NGÀY, không phải chờ — nói đúng tên nó để runner khỏi quay lại sau bảy phút cho một cánh cửa chỉ mở lại vào ngày mai",
+          "note": "Hết lượt boss hiện tại: kiểm lại mỗi giờ vì boss mới có thể được triệu hồi trong cùng ngày.",
           "condition": {
             "kind": "textMatches",
             "selector": "#challenge-boss-btn",
@@ -2627,6 +2637,16 @@
           "timeoutMs": 6000,
           "note": "đóng màn đánh để lần ghé sau không phải mở lại từ trong modal; tuỳ chọn vì trận đã tính rồi, không đáng làm hỏng một lượt đã thành",
           "optional": true
+        },
+        {
+          "action": "stopIf",
+          "text": "đã hết lượt đánh boss hiện tại",
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#challenge-boss-btn",
+            "text": "hết lượt"
+          },
+          "note": "Đọc lại sau đòn cuối: chuyển sang kiểm boss mới mỗi giờ, không ghi sổ hết ngày."
         },
         {
           "action": "readCooldownSeconds",

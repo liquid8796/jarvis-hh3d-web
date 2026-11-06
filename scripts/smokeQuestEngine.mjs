@@ -3645,8 +3645,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     await resetBiCanh({ lastTurn: true });
     const btmLast = await run(biCanhFree);
     check(
-      "lượt thứ năm: nút nhảy thẳng sang \"Hết lượt hôm nay\" mà lượt vẫn tính là XONG",
-      btmLast.outcome === "completed" && btmAttacks.length === 1,
+      "lượt thứ năm: ghi nhận hết lượt boss ngay sau đòn đánh",
+      btmLast.outcome === "alreadyDone" && btmLast.dailyCapReached === true && btmAttacks.length === 1,
       `${btmLast.outcome} · POST=${btmAttacks.length}`,
     );
 

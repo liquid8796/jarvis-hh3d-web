@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.241 — Respect unfinished quest cooldowns (07/11/2026)
+
+- Replace the unconditional completed-cycle one-hour floor with per-quest eligibility: unfinished daily quests use their own cooldown; capped daily fallback timers cannot win; monthly welfare checks remain runnable.
+- Recheck exhausted Bí Cảnh hourly without adding a daily ledger entry. Inspect exhaustion immediately after the last attack so a fresh boss on a later visit restores the actual attack timer. Keep the existing five-minute summon-state retry.
+- Hỷ Sự contributes its existing timer outside hub/hourly floors. Preserve the shared earliest-wake job architecture and explicit clock schedules.
+- Add pure scheduler cases plus real Chromium regressions for both boss tiers through last hit, exhausted boss, summon wait, and a new boss.
+
 ## 1.3.240 — Attach files in the floating conversation dock (06/11/2026)
 
 - Add a shared file picker and external drag/drop flow for private and public-room composers. Stage up to six files, 8 MB each, with upload state, image/file previews, removal, retry, and attachment-only messages. Preserve failed-send drafts and cancel unfinished uploads when switching conversations.

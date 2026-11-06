@@ -1,19 +1,46 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { completedCycleMinimumSeconds } from "../src/lib/quest-engine/runCycle.mjs";
+import { completedCycleDelaySeconds, completedCycleMinimumSeconds } from "../src/lib/quest-engine/runCycle.mjs";
 import { computeNextDelaySeconds } from "../src/lib/quest-engine/cooldown.mjs";
 
-const floor=completedCycleMinimumSeconds([{id:"me-cung"}, {id:"phuc-loi-duong"}],["phuc-loi-duong"]);
-assert.equal(floor,3600);
-const wait=(results: Array<{ outcome: string; cooldownSeconds?: number }>,options: { random?: () => number } = {})=>computeNextDelaySeconds(results,{minimumSeconds:floor,random:()=>0,...options});
-assert.equal(wait([{outcome:"completed",cooldownSeconds:420}]),3600,"7-minute quest must not accelerate entire completed board");
-assert.equal(wait([{outcome:"alreadyDone",cooldownSeconds:60}]),3600);
-assert.equal(wait([{outcome:"failed"}]),3600,"full board with nonfatal quest failures has the same rest interval");
-assert.equal(wait([{outcome:"onCooldown",cooldownSeconds:7200}]),7200,"real 2-hour cooldown must remain 2h");
-assert.equal(wait([], {random:()=>0.9999}),3625,"jitter stays within 25 seconds");
-assert.equal(computeNextDelaySeconds([{outcome:"failed"}],{random:()=>0}),1800,"early failures keep their 30m fallback");
-assert.equal(computeNextDelaySeconds([],{random:()=>0}),300,"empty check keeps its 5m fallback");
-const source=readFileSync(new URL("../src/lib/quest-engine/runCycle.mjs",import.meta.url),"utf8");
-assert.ok(source.includes("const minimumSeconds = completedCycleMinimumSeconds(quests, cappedToday);"),
-  "one-hour minimum must be used by the actual all-quests-completed return path");
-console.log("PASS: full-cycle 60m, old 7m regression, >60m timer, jitter, aborted/empty exceptions");
+const wait = (ids: string[], results: object[], capped: string[] = [], random = () => 0) =>
+  completedCycleDelaySeconds(ids.map((id) => ({ id })), results, capped, { random });
+const result = (questId: string, cooldownSeconds: number, outcome = "onCooldown") =>
+  ({ questId, cooldownSeconds, outcome });
+
+for (const id of ["phan-thuong-hoat-dong", "phan-thuong-hoat-dong-thuong", "hoang-vuc", "phuc-loi-duong"]) {
+  assert.equal(wait([id], [result(id, 420)]), 420, id + ": unfinished turns keep their timer");
+  assert.equal(wait([id], [result(id, 7200)]), 7200, id + ": longer timers remain intact");
+  assert.equal(wait([id], [{ questId: id, outcome: "failed" }]), 1800, id + ": failure is not exhausted quota");
+}
+const hub = "phan-thuong-hoat-dong";
+const maze = "me-cung";
+assert.equal(wait([hub, maze], [result(hub, 1800), result(maze, 60)]), 1800,
+  "short repeating timer must not override the unfinished hub's 30-minute timer");
+assert.equal(wait([hub, maze], [result(hub, 60, "alreadyDone"), result(maze, 420)], [hub]), 3600,
+  "completed daily timer is ignored and ordinary board rests hourly");
+assert.equal(wait([hub, maze], [result(hub, 60, "alreadyDone"), result(maze, 7200)], [hub]), 7200,
+  "completed daily timer cannot shorten a remaining 2-hour quest");
+assert.equal(wait(["phuc-loi-duong"], [result("phuc-loi-duong", 60)], ["phuc-loi-duong"]), 3600,
+  "monthly welfare revisit survives daily cap");
+
+for (const id of ["bi-canh-tong-mon", "bi-canh-tong-mon-thuong"]) {
+  const spent = { questId: id, outcome: "alreadyDone", dailyCapReached: true, cooldownSeconds: 420 };
+  assert.equal(wait([id], [spent]), 3600, id + ": exhausted boss is rechecked hourly");
+  assert.equal(wait([id], [result(id, 412)], [id]), 412, id + ": new boss clears hourly wait and stale daily mark");
+  assert.equal(wait([id], [result(id, 420, "completed")]), 420, id + ": successful attack uses game timer");
+  assert.equal(wait([id], [{ questId: id, outcome: "failed" }]), 1800, id + ": unknown boss state is retryable");
+  assert.equal(wait([hub, id], [result(hub, 60, "alreadyDone"), result(id, 412)], [hub]), 412);
+}
+for (const id of ["hy-su-duong", "hy-su-duong-thuong"]) {
+  assert.equal(completedCycleMinimumSeconds([{ id }], [id]), 0, id + ": no hub/hour floor");
+  assert.equal(wait([id], [result(id, 120)]), 120, id + ": own timer remains independent");
+  assert.equal(wait([hub, id], [result(hub, 7200), result(id, 3600)]), 3600,
+    id + ": long hub timer cannot postpone wedding revisit");
+  assert.equal(wait([hub, id], [result(hub, 7200), result(id, 120)]), 120);
+  assert.equal(wait([hub, id], [result(hub, 1800), result(id, 3600)]), 1800,
+    id + ": wedding fallback cannot postpone an unfinished hub");
+}
+assert.equal(wait([], [], [], () => 0.9999), 3625, "jitter applied only once");
+assert.equal(computeNextDelaySeconds([{ outcome: "failed" }], { random: () => 0 }), 1800);
+assert.equal(computeNextDelaySeconds([], { random: () => 0 }), 300);
+console.log("PASS: unfinished hubs, capped groups, boss transitions, Hỷ Sự independence, failure fallback and jitter");

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.241",
+    date: "2026-11-07",
+    lines: [
+      "Quest chưa đủ lượt ngày tiếp tục theo hồi chiêu riêng, không còn bị ép chờ 1 giờ sau mỗi vòng.",
+      "Bí Cảnh hết lượt được kiểm lại mỗi giờ; gặp boss mới sẽ trở về hồi chiêu của Bí Cảnh.",
+      "Hỷ Sự Đường giữ nhịp kiểm tra riêng, không bị thời gian chờ của hub kéo dài.",
+    ],
+  },
+  {
     version: "1.3.240",
     date: "2026-11-06",
     lines: [
@@ -489,14 +498,7 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Khắc phục sự cố proxy cố định bị rơi về IP trực tiếp của máy sau chu kỳ duyệt web đầu tiên.",
     ],
   },
-  {
-    version: "1.3.182",
-    date: "2026-10-04",
-    lines: [
-      "Tối ưu bộ công cụ xem quảng cáo tự động hoá theo cơ chế AutoTag Adcash.",
-      "Khắc phục triệt để sự cố tiến trình bị treo khi tương tác đệ quy trang đích.",
-    ],
-  },
+
 ];
 
 

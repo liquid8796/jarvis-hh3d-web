@@ -76,9 +76,27 @@ export function createSession(page, options) {
   const fishingTelemetry = createFishingTelemetry();
   let fishSelfId = null;
   let fishAwaitingCatch = false;
+  let fishFight = null;
+  const finishFishEvidence = (outcome) => {
+    if (!fishFight) return;
+    const f = fishFight;
+    fishFight = null;
+    const entry = f.enteredAt === null ? "chưa vào điều khiển (" + f.skipped + ")" :
+      "đã vào điều khiển sau " + (f.enteredAt - f.startedAt) + "ms";
+    const overlap = f.samples ? Math.round(f.inside / f.samples * 100) + "%" : "chưa có dữ liệu";
+    log.info(`Câu Cá bám lực: ${outcome}; ${entry}; ${f.samples} mẫu, cá trong thanh ${overlap}, tiến độ tối đa ${Math.round(f.peak * 100)}%.`);
+  };
   const onFishFrame = (raw) => {
-    fishingTelemetry.ingest(raw);
+    const accepted = fishingTelemetry.ingest(raw);
     const text = typeof raw === "string" ? raw : raw?.toString?.() ?? "";
+    if (accepted && fishFight && text.startsWith('42["g:snap",')) {
+      const gauge = fishingTelemetry.current();
+      if (gauge) {
+        fishFight.samples++;
+        if (Math.abs(gauge.f - gauge.z) <= gauge.zone / 2) fishFight.inside++;
+        fishFight.peak = Math.max(fishFight.peak, gauge.p);
+      }
+    }
     // Only record server-confirmed catches for this authenticated player.
     // Never log hello payloads, credentials, player IDs or other players' catches.
     if (!text.startsWith('42["hello",') && !text.startsWith('42["g:evt",') &&
@@ -92,12 +110,20 @@ export function createSession(page, options) {
       const events = name === "g:evts" ? payload : [payload];
       if (!Array.isArray(events)) return;
       for (const event of events) {
-        if (event?.type === "reel") fishAwaitingCatch = true;
-        else if (event?.type === "escaped") fishAwaitingCatch = false;
+        if (event?.type === "reel") {
+          fishAwaitingCatch = true;
+          fishFight = { startedAt: Date.now(), enteredAt: null, samples: 0, inside: 0,
+            peak: Number.isFinite(event.p) && event.p >= 0 && event.p <= 1 ? event.p : 0,
+            skipped: event.line || event.pull || event.duel ? "chế độ câu đặc biệt" : "chưa tới bước kéo" };
+        } else if (event?.type === "escaped") {
+          fishAwaitingCatch = false;
+          finishFishEvidence("cá thoát");
+        }
         else if (event?.type === "catch" && fishAwaitingCatch &&
                  fishSelfId !== null && event.uid === fishSelfId) {
           fishAwaitingCatch = false;
           log.info("Câu Cá: server xác nhận bắt thành công cho tài khoản đang chạy.");
+          finishFishEvidence("bắt được");
         }
       }
     } catch { /* Ignore unrelated/malformed frames; never infer success. */ }
@@ -212,6 +238,7 @@ export function createSession(page, options) {
         fishSocket = socket;
         fishSelfId = null;
         fishAwaitingCatch = false;
+        fishFight = null;
         fishingTelemetry.reset();
         socket.on("framereceived", (frame) => {
           // Playwright events wrap the wire text/binary bytes in { payload }.
@@ -225,6 +252,7 @@ export function createSession(page, options) {
           fishSocket = null;
           fishSelfId = null;
           fishAwaitingCatch = false;
+          fishFight = null;
           fishingTelemetry.reset();
         });
       });
@@ -240,6 +268,7 @@ export function createSession(page, options) {
           Number(css.opacity || "1") > 0.01;
       }).catch(() => false);
       if (blockedByGate) {
+        if (fishFight) fishFight.skipped = "màn chào còn phủ";
         log.debug("fish reel: màn Vào Ngay vẫn phủ trên nút giữ/thả; cần đóng splash trước khi kéo.");
         return;
       }
@@ -248,13 +277,16 @@ export function createSession(page, options) {
       const reelReady = await page.evaluate(() =>
         document.querySelector(".fish-room .fish-main.st-reel") !== null
       ).catch(() => false);
-      if (!reelReady || shouldStop()) return;
+      if (!reelReady || shouldStop()) {
+        if (fishFight) fishFight.skipped = reelReady ? "đã nhận lệnh dừng" : "nút chưa ở trạng thái kéo";
+        return;
+      }
       const button = page.locator(".fish-room .fish-main.st-reel");
       let rect;
       // The phase may end between the immediate DOM check and this lookup.
       try { rect = await button.boundingBox({ timeout: 150 }); }
-      catch { return; }
-      if (!rect) return;
+      catch { if (fishFight) fishFight.skipped = "không đọc được vị trí nút"; return; }
+      if (!rect) { if (fishFight) fishFight.skipped = "nút không có hộp hiển thị"; return; }
       let holding = false;
       let lastSwitchAt = 0;
       const started = Date.now();
@@ -265,6 +297,7 @@ export function createSession(page, options) {
           const reelActive = await page.evaluate(() =>
             document.querySelector(".fish-room .fish-main.st-reel") !== null);
           if (!reelActive) break;
+          if (fishFight && fishFight.enteredAt === null) fishFight.enteredAt = Date.now();
           const now = Date.now();
           const gauge = fishingTelemetry.current(now);
           if (gauge) { gaugeSamples++; maxProgress = Math.max(maxProgress, gauge.p); }
@@ -282,6 +315,7 @@ export function createSession(page, options) {
           await new Promise((resolve) => setTimeout(resolve, 65));
         }
       } catch (err) {
+        if (fishFight && fishFight.enteredAt === null) fishFight.skipped = "lỗi chuẩn bị thao tác kéo";
         log.debug("fish reel: " + squashCallLog(err instanceof Error ? err.message : String(err)));
       } finally {
         if (holding) {

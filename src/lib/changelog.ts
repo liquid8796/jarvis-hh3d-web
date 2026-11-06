@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.239",
+    date: "2026-11-06",
+    lines: [
+      "Câu Cá: chỉnh cách dự đoán thanh lực khi chạm hai đầu, tiếp tục canh icon cá vào giữa thanh.",
+      "Nhật ký mỗi lượt cho biết đã kéo hay chưa, thời gian cá nằm trong thanh và tiến độ cao nhất để tìm lỗi còn lại.",
+    ],
+  },
+  {
     version: "1.3.238",
     date: "2026-11-06",
     lines: [
@@ -486,14 +494,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Gỡ bỏ toàn bộ biểu ngữ và kịch bản cũ, thiết lập duy nhất AutoTag Adcash mới.",
       "Tối ưu hoá giao diện gọn nhẹ và nâng cấp công cụ tự động xem quảng cáo.",
-    ],
-  },
-  {
-    version: "1.3.180",
-    date: "2026-10-04",
-    lines: [
-      "Cập nhật cấu hình 5 vùng quảng cáo mới từ Adcash (Autotag, Pop-Under, 2 sườn 160×600 và Leaderboard 728×90).",
-      "Tối ưu hoá vị trí hiển thị cân đối hai bên trang chủ và nâng cấp kịch bản kiểm tra tự động.",
     ],
   },
 ];

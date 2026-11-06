@@ -60,11 +60,27 @@ try {
   await page.waitForTimeout(100);
   assert.equal(messages.filter(m=>m.includes("server xác nhận bắt thành công")).length,1,
     "report exactly one authenticated self catch, not another player or duplicate");
-  wireSocket.send('42["g:evts",[{"type":"reel"},{"type":"escaped"},{"type":"catch","uid":7}]]');
+  assert.ok(messages.some(m=>/bám lực:.*bắt được.*đã vào điều khiển/.test(m)),
+    "terminal diagnostics must prove controller entry, not infer it from a catch");
+  wireSocket.send('42["g:evts",[{"type":"reel","t":0,"z":0.5,"f":0.5,"zone":0.3,"p":0.3},{"type":"escaped"},{"type":"catch","uid":7}]]');
   await page.waitForTimeout(100);
   assert.equal(messages.filter(m=>m.includes("server xác nhận bắt thành công")).length,1,
     "late catch after terminal escape cannot manufacture success");
+  assert.ok(messages.some(m=>/bám lực:.*cá thoát.*chưa vào điều khiển/.test(m)),
+    "terminal diagnostics distinguish a fight that never entered the servo");
+  assert.match(messages.filter(m=>m.includes("bám lực:")).at(-1), /tiến độ tối đa 30%/,
+    "batched immediate escape preserves initial authoritative reel progress");
   console.log("PASS server-confirmed catch evidence is scoped to authenticated self and active fight");
+  wireSocket.send('42["g:evt",{"type":"reel"}]');
+  await page.waitForTimeout(50);
+  const move = page.mouse.move;
+  page.mouse.move = async () => { throw new Error("fixture: input move unavailable"); };
+  try { await session.fishingReel(); } finally { page.mouse.move = move; }
+  wireSocket.send('42["g:evt",{"type":"escaped"}]');
+  await page.waitForTimeout(50);
+  assert.match(messages.filter(m=>m.includes("bám lực:")).at(-1), /chưa vào điều khiển/,
+    "failed input setup must not claim controller loop entry");
+  console.log("PASS fight diagnostics do not confuse failed input setup with active control");
   sending = false;
   await page.evaluate(() => {
     const button = document.querySelector("button");

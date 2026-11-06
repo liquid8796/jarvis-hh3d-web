@@ -15,7 +15,11 @@ export function chooseFishingHold(s, {velocity = 0, last = null, lastSwitchedAt 
      const dt=h/4;
      v += (hold?2.6:-2.2)*dt;
      v *= Math.exp(-2.5*dt);
-     z = Math.max(zone/2,Math.min(1-zone/2,z+v*dt));
+     z += v*dt;
+     // Match the game's ruler physics: an edge stops outward momentum.
+     // Clamping position alone incorrectly delays the predicted rebound.
+     if(z<zone/2) { z=zone/2; v=Math.max(0,v)*.3; }
+     if(z>1-zone/2) { z=1-zone/2; v=Math.min(0,v)*.3; }
    }
    return z;
  }

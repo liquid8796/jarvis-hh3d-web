@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.239 — Match fishing ruler edges and measure every fight (06/11/2026)
+
+- Manual capture confirms the right force interval must contain the fish; the left circle is accumulated catch progress. Keep aiming for the fish center with predictive hold/release control, not a copied fixed tapping rhythm.
+- Match the public client's boundary velocity correction. Position clamping alone retained outward momentum and mispredicted the rebound near either end of the ruler. Both edge regressions failed before the correction and pass after it.
+- Record a bounded, credential-free summary at each private escape or authenticated-self catch: controller entry/delay, valid snapshot count, overlap fraction, and peak progress. This distinguishes missing controller entry from poor tracking without recording packets or player IDs.
+- Add a real Playwright/local WebSocket regression through the loaded fishing profile, quest engine, and session for three consecutive cast/hook/reel cycles. It proves routing and trusted input, not live catch physics or a production success-rate improvement.
+
 ## 1.3.238 — Use real Playwright frame envelopes and select launcher Games tab (06/11/2026)
 
 - The worker fed Playwright's `{payload: string | Buffer}` frame event wrapper into the wire parser. Every real gauge was rejected as `[object Object]`, so the reel loop never held the mouse. Unwrap both received and sent frames. Prior raw-string mocks and the native Space harness bypassed this boundary and did not establish worker end-to-end success.

@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.235",
+    date: "2026-11-06",
+    lines: [
+      "Đã sửa thời gian nghỉ của đàn: sau khi đi hết một vòng nhiệm vụ, đàn nghỉ ít nhất 1 giờ thay vì chỉ vài phút.",
+      "Giữ thời gian hồi chiêu dài hơn 1 giờ và các lịch hẹn quest riêng mà đạo hữu đã đặt.",
+      "Thu Đàn và các vòng bị gián đoạn vẫn hoạt động như trước; không tự dừng khôi lỗi đang làm nhiệm vụ.",
+    ],
+  },
+  {
     version: "1.3.234",
     date: "2026-11-05",
     lines: [
@@ -483,14 +492,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khắc phục sự cố tràn bộ đệm giao thức PipeTransport khi gặp trang quảng cáo tải luồng dữ liệu lớn.",
       "Tự động loại trừ các nút tải tệp tin và huỷ tải xuống ngầm nhằm đảm bảo tiến trình chạy liên tục.",
-    ],
-  },
-  {
-    version: "1.3.176",
-    date: "2026-10-04",
-    lines: [
-      "Bộ công cụ xem quảng cáo tối ưu hoá nhận diện nhanh trạng thái nạp tự động của Adcash AutoTag.",
-      "Mô phỏng hành vi đọc bài viết tự nhiên và bổ sung danh sách bộ chọn dự phòng chuẩn xác.",
     ],
   },
 

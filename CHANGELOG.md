@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.235 — Restore 1-hour cooldown after finishing a full quest round (06/11/2026)
+
+- Fixed the live 06/11 report: after "Đi hết một vòng — 6 nhiệm vụ thuận lợi", worker cooldown could be about 7 minutes because completed-cycle scheduling reused the shortest per-quest cooldown and removed the earlier 10-minute daily floor once daily quests were capped.
+- A fully traversed Web/GitHub worker round now has a minimum 3,600-second rest (plus 0–25 seconds of existing jitter). Longer genuine per-quest cooldowns still win; individual quest timer metadata is not rewritten.
+- Keep special paths separate: an unfinished or blocked round uses its original recovery; daily reset and explicitly configured quest-clock activation times retain their dedicated scheduling behavior; Thu Đàn / restart_after_stop remain unchanged.
+- Applied the same completed-board minimum to the local PC CooldownPlanner (not included in the Web commit). Tests guard 7-minute, 1-hour, 2-hour, failed, empty and jitter conditions, plus the call-site at the end of runCycle.
+- The existing local integration DB lacks game_accounts.worker_pref_override and cannot run all integration verifiers; do not auto-migrate production as part of this fix.
+
 ## 1.3.234 — Enter Tiên Giới before fishing, reject background input (05/11/2026)
 
 - Reproduced the screenshot issue on the live game: the full-screen preload gate displays Vào Ngay while the hub and Trò chơi menu have already been mounted behind it. The fishing controller was calling synthetic DOM click on background controls without ever entering through the official gate.

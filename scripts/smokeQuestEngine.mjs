@@ -22,7 +22,7 @@ import { createQuestEngine, enabledQuestsInOrder, questsForAccount } from "../sr
 import { createSession } from "../src/lib/quest-engine/session.mjs";
 import {
   parseCookieString,
-  pendingDailyMinimumSeconds,
+  completedCycleMinimumSeconds, pendingDailyMinimumSeconds,
   PENDING_DAILY_MIN_DELAY_SECONDS,
   runCycle,
 } from "../src/lib/quest-engine/runCycle.mjs";
@@ -1276,12 +1276,31 @@ async function main() {
     String(finishedDailyFloor),
   );
   check(
-    "sau khi việc ngày đã đủ, Mê Cung 60s lại được giữ nguyên",
+    "mỗi quest vẫn giữ đồng hồ riêng 60s, không sửa metadata của game",
     computeNextDelaySeconds(
       [{ outcome: "completed", cooldownSeconds: 60 }],
       { random: () => 0, minimumSeconds: finishedDailyFloor },
     ) === 60,
   );
+  check("đi hết một vòng phải có sàn 1 giờ, kể cả hết quest ngày",
+    completedCycleMinimumSeconds(pendingDailyPlan,
+      ["phan-thuong-hoat-dong"]) === 3600);
+  check("quest 7 phút không thể rút lịch cả đàn xuống dưới 1 giờ",
+    computeNextDelaySeconds(
+      [{ outcome: "onCooldown", cooldownSeconds: 420 }],
+      { random: () => 0, minimumSeconds: completedCycleMinimumSeconds(pendingDailyPlan,
+        ["phan-thuong-hoat-dong"]) },
+    ) === 3600);
+  check("quest có cooldown thật 2 giờ thì vẫn được chờ 2 giờ",
+    computeNextDelaySeconds(
+      [{ outcome: "onCooldown", cooldownSeconds: 7200 }],
+      { random: () => 0, minimumSeconds: completedCycleMinimumSeconds(pendingDailyPlan, []) },
+    ) === 7200);
+  check("jitter chỉ cộng thêm tối đa 25 giây lên sàn 1 giờ",
+    computeNextDelaySeconds([], {
+      random: () => 0.999,
+      minimumSeconds: completedCycleMinimumSeconds([], []),
+    }) === 3625);
 
   console.log("\nDanh sách tham khảo Vấn Đáp");
   const referencePage = `

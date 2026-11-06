@@ -359,6 +359,16 @@ function formatDuration(seconds) {
  * câu「sau vòng này còn nhiệm vụ ngày nào phải ghé lại không」mà không cần đoán từ lời log.
  */
 export const PENDING_DAILY_MIN_DELAY_SECONDS = 10 * 60;
+/** A finished traversal sleeps for one hour before starting another full board.
+ * Per-quest cooldowns can lengthen that wait, but must not shorten it.
+ * Explicit quest clock schedules remain separate and may wake a job earlier.
+ */
+export const COMPLETED_CYCLE_MIN_DELAY_SECONDS = 60 * 60;
+
+export function completedCycleMinimumSeconds(quests, cappedToday = []) {
+  return Math.max(COMPLETED_CYCLE_MIN_DELAY_SECONDS,
+    pendingDailyMinimumSeconds(quests, cappedToday));
+}
 
 export function pendingDailyMinimumSeconds(quests, cappedToday = []) {
   const capped = new Set(cappedToday);
@@ -1126,7 +1136,10 @@ export async function runCycle(deps) {
       );
     }
 
-    const minimumSeconds = pendingDailyMinimumSeconds(quests, cappedToday);
+    // Reaching the end of the full quest list means the next full board
+    // must wait >= 1h; formerly the shortest per-quest timer (often 7m)
+    // overrode this, immediately recycling every guild.
+    const minimumSeconds = completedCycleMinimumSeconds(quests, cappedToday);
     return {
       ...(failed > 0
         ? scheduledCycleResult(

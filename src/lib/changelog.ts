@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.236",
+    date: "2026-11-06",
+    lines: [
+      "Câu Cá: bỏ khoảng chờ 30 giây giữa các lần kiểm tra khi chưa kéo cá, giúp Khôi Lỗi kịp giật lúc cá cắn câu.",
+      "Giữ nguyên cách kéo cá, ngưỡng bán và giới hạn lượt câu; bổ sung kiểm thử trên trình duyệt thật.",
+    ],
+  },
+  {
     version: "1.3.235",
     date: "2026-11-06",
     lines: [
@@ -486,15 +494,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Tối ưu hoá vị trí hiển thị sườn desktop và nâng cấp bộ công cụ nhận diện quảng cáo.",
     ],
   },
-  {
-    version: "1.3.177",
-    date: "2026-10-04",
-    lines: [
-      "Khắc phục sự cố tràn bộ đệm giao thức PipeTransport khi gặp trang quảng cáo tải luồng dữ liệu lớn.",
-      "Tự động loại trừ các nút tải tệp tin và huỷ tải xuống ngầm nhằm đảm bảo tiến trình chạy liên tục.",
-    ],
-  },
-
 ];
 
 

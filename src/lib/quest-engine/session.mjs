@@ -199,9 +199,16 @@ export function createSession(page, options) {
         log.debug("fish reel: màn Vào Ngay vẫn phủ trên nút giữ/thả; cần đóng splash trước khi kéo.");
         return;
       }
+      // This driver runs on every quest tick. Do not let a reel-only locator
+      // auto-wait for 30s during idle/wait/bite and prevent the next hook tick.
+      const reelReady = await page.evaluate(() =>
+        document.querySelector(".fish-room .fish-main.st-reel") !== null
+      ).catch(() => false);
+      if (!reelReady || shouldStop()) return;
       const button = page.locator(".fish-room .fish-main.st-reel");
       let rect;
-      try { rect = await button.boundingBox(); }
+      // The phase may end between the immediate DOM check and this lookup.
+      try { rect = await button.boundingBox({ timeout: 150 }); }
       catch { return; }
       if (!rect) return;
       let holding = false;

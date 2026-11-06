@@ -18,6 +18,20 @@ try {
     minActionDelayMs: 0, maxActionDelayMs: 1,
     log: { debug:()=>{}, info:()=>{}, warning:()=>{} }
   });
+  // The profile invokes fishingReel on every tick, not only while reeling.
+  // A locator auto-wait here blocks casting and misses the short bite window.
+  page.setDefaultTimeout(900);
+  for (const phase of ["missing", "idle", "load", "wait", "bite"]) {
+    await page.setContent(phase === "missing" ? "<main>Hub</main>" :
+      `<div class="fish-room"><button class="fish-main st-${phase}">test</button></div>`);
+    const started = performance.now();
+    await session.fishingReel();
+    const elapsed = performance.now() - started;
+    assert.ok(elapsed < 300,
+      `non-reel ${phase} must return immediately, took ${Math.round(elapsed)}ms`);
+  }
+  page.setDefaultTimeout(30_000);
+  console.log("PASS real Playwright reel probe does not block missing/idle/load/wait/bite ticks");
   const setup = async (mode) => {
     await page.setContent('<div class="fish-room"><button class="fish-main st-idle jvz-fish-press" type="button">Ném câu</button></div>');
     await page.evaluate(mode => {

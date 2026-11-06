@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.236 — Keep fishing ticks responsive before reel phase (06/11/2026)
+
+- The fishing profile invokes fishingReel on every tick. Its reel-only locator previously waited for Playwright's default 30-second timeout during idle, loading, wait and bite phases, blocking the controller from checking the brief hook window.
+- Check the current reel phase without locator auto-wait; return immediately when not reeling. Bound the subsequent bounding-box lookup to 150ms in case the phase ends between checks. Preserve native input, telemetry, servo behavior and quest options.
+- Add a real-Playwright regression covering missing, idle, loading, wait and bite states. It failed at 910ms with the test timeout reduced to 900ms, then passed after the fix; measured idle/wait/bite probes took 7/2/4ms.
+- All seven fishing checks, both TypeScript checks and production build passed. The broad smoke suite was stopped after 327 seconds and was not green: existing ordering/schema expectations and check-in/boss-hub cases failed. Live Chrome accepted cast, bite and hook into reel; a successful catch was not verified.
+
 ## 1.3.235 — Restore 1-hour cooldown after finishing a full quest round (06/11/2026)
 
 - Fixed the live 06/11 report: after "Đi hết một vòng — 6 nhiệm vụ thuận lợi", worker cooldown could be about 7 minutes because completed-cycle scheduling reused the shortest per-quest cooldown and removed the earlier 10-minute daily floor once daily quests were capped.

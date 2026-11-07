@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-/** October 10 fishing recording: require an admin gate and two tier-identical quests. */
+/** October 10 fishing recording: require an access gate and two tier-identical quests. */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { profileForConfig } from "../src/lib/quest-engine/profile.mjs";
 import { configSchema } from "../src/lib/services/configs";
-import { enforceFishingAdminPolicy } from "../src/lib/quest-engine/fishingAccess.mjs";
+import { enforceFishingAccessPolicy } from "../src/lib/quest-engine/fishingAccess.mjs";
 
 const p = JSON.parse(readFileSync(new URL("../src/lib/quest-engine/profile.json", import.meta.url), "utf8"));
 assert.ok(p.schemaVersion >= 92, "fishing quest is present in later profile schema migrations");
@@ -45,11 +45,11 @@ for (const quest of [v, f]) {
   assert.equal(repeating.maxSeconds, 480, "engine bypass is restricted to fishing runtime");
 }
 const cfg = { quests: { cauCa: { enabled: true, sellBelow: 8, castLimit: 0 } } };
-assert.equal(enforceFishingAdminPolicy(cfg, true), cfg, "admin may enable");
-const denied = enforceFishingAdminPolicy(cfg, false);
-assert.equal(denied.quests.cauCa.enabled, false, "non-admin cannot activate via forged config");
+assert.equal(enforceFishingAccessPolicy(cfg, true), cfg, "authorized user may enable");
+const denied = enforceFishingAccessPolicy(cfg, false);
+assert.equal(denied.quests.cauCa.enabled, false, "unauthorized user cannot activate via forged config");
 assert.equal(cfg.quests.cauCa.enabled, true, "policy must not mutate input");
-console.log("PASS: Câu Cá twin quests, options and admin-only gate");
+console.log("PASS: Câu Cá twin quests, options and access gate");
 
 assert.equal(configSchema.parse({}).quests.cauCa.spot, "giua", "old config retains Giữa hồ");
 assert.equal(configSchema.safeParse({quests:{cauCa:{spot:"invalid"}}}).success, false);

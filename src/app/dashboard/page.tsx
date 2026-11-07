@@ -1,5 +1,5 @@
 import { SHELL_WIDTH, SiteHeader } from "@/components/SiteHeader";
-import { isAdminUser } from "@/lib/auth/permissions";
+import { canUseFishingQuest, isAdminUser } from "@/lib/auth/permissions";
 import { requireActiveUser } from "@/lib/auth/guards";
 import { listAccounts } from "@/lib/services/accounts";
 import { getEditableConfig } from "@/lib/services/configs";
@@ -58,7 +58,7 @@ export default async function DashboardPage() {
         <DashboardLiveProvider initialAccounts={accounts} initialWorkerPref={config.workerPref}>
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] xl:gap-8">
             <div className="flex min-w-0 flex-col gap-6 xl:gap-8">
-              <ConfigForm config={config} isAdmin={isAdminUser(user)} />
+              <ConfigForm config={config} isAdmin={isAdminUser(user)} canFish={canUseFishingQuest(user)} />
               <QuestTimerPanel
                 initialTimers={config.questTimers}
                 enabledQuestKeys={enabledQuestKeys}

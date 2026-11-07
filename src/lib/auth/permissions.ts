@@ -309,6 +309,11 @@ export function isAdminUser(user: RoleBearer): boolean {
   return hasPermission(user, ADMIN_PANEL);
 }
 
+/** Câu Cá uses the current web user's admin role or VIP tag, never the game account tier. */
+export function canUseFishingQuest(user: (RoleBearer & { tags: readonly string[] }) | null): boolean {
+  return user !== null && (isAdminUser(user) || user.tags.some((tag) => tag.trim().toLowerCase() === "vip"));
+}
+
 /**
  * A có được quản B không (sửa hồ sơ, đổi trạng thái, trục xuất)?
  *

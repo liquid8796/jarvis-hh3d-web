@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { isAdminUser } from "@/lib/auth/permissions";
-import { enforceFishingAdminPolicy } from "@/lib/quest-engine/fishingAccess.mjs";
+import { canUseFishingQuest, isAdminUser } from "@/lib/auth/permissions";
+import { enforceFishingAccessPolicy } from "@/lib/quest-engine/fishingAccess.mjs";
 import { requireActiveUser } from "@/lib/auth/guards";
 import {
   addAccount,
@@ -242,25 +242,29 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
   // khoá như `sect`. Đọc preference đang lưu ở thời điểm POST thay vì tin configSchema mặc định
   // (`any`) hoặc một hidden field có thể bị dựng tay.
   const current = await getStoredConfigForSnapshot(user.id);
-  const guarded = enforceFishingAdminPolicy(enforceUnavailableQuestPolicy(
+  const guarded = enforceFishingAccessPolicy(enforceUnavailableQuestPolicy(
     enforceMazeCapPolicy(parsed.data, {
       isAdmin: isAdminUser(user),
       workerPref: current.workerPref,
     }),
-  ), isAdminUser(user));
+  ), canUseFishingQuest(user));
   await saveConfig(user.id, guarded);
   revalidatePath("/dashboard");
 
-  // So THAM CHIẾU: hàm luật trả về chính vật cũ khi không phải sửa gì. Nói ra khi nó đã ra
-  // tay — im lặng ghi đè một lựa chọn người ta vừa bấm là cách nhanh nhất để họ tin rằng
-  // ngọc giản này không nghe lời mình.
-  const overridden = guarded !== parsed.data;
+  // Explain each overridden setting separately so a denied fishing toggle is not
+  // reported as a Maze-cap change. Other accepted settings still save normally.
+  const mazeOverridden = guarded.quests.meCung.capCheck !== parsed.data.quests.meCung.capCheck;
+  const fishingOverridden = guarded.quests.cauCa.enabled !== parsed.data.quests.cauCa.enabled;
+  const notes: string[] = [];
+  if (mazeOverridden) notes.push(
+    "Riêng「Dừng khi đã đủ huyền tinh」của Mê Cung được bật lại: lựa chọn hiện tại vẫn có thể dùng ghế khôi lỗi tông môn. " +
+    "Chọn Máy nhà của tôi nếu muốn bỏ tick bằng tài nguyên riêng.",
+  );
+  if (fishingOverridden) notes.push("Câu Cá đã tắt: chỉ admin hoặc user có tag VIP được bật nhiệm vụ này.");
   return {
     ok: true,
-    message: overridden
-      ? "Đã khắc cấu hình vào ngọc giản. Riêng「Dừng khi đã đủ huyền tinh」của Mê Cung được " +
-        "bật lại: lựa chọn hiện tại vẫn có thể dùng ghế khôi lỗi tông môn. Chọn Máy nhà của tôi " +
-        "nếu muốn bỏ tick bằng tài nguyên riêng."
+    message: notes.length > 0
+      ? "Đã khắc cấu hình vào ngọc giản. " + notes.join(" ")
       : "Đã khắc cấu hình vào ngọc giản. Nếu đàn đang chạy, vòng kế tiếp sẽ dùng bản này.",
   };
 }

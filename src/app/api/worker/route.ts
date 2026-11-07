@@ -13,8 +13,8 @@ import pkg from "../../../../package.json";
  * chỉ-đôi-khi-có là thứ không ai kiểm được.
  */
 const WEB_VERSION = pkg.version.trim() || null;
-import { isAdminUser } from "@/lib/auth/permissions";
-import { enforceFishingAdminPolicy } from "@/lib/quest-engine/fishingAccess.mjs";
+import { canUseFishingQuest, isAdminUser } from "@/lib/auth/permissions";
+import { enforceFishingAccessPolicy } from "@/lib/quest-engine/fishingAccess.mjs";
 import { z } from "zod";
 import { authorizeWorker } from "@/lib/auth/worker";
 import {
@@ -312,10 +312,10 @@ export async function POST(request: Request) {
       // cũng sai y như vậy. Áp ở đây thì một cấu hình đã bật từ trước, nằm im trong database,
       // cũng không lọt được ra vòng chạy nào.
       guarded = enforceUnavailableQuestPolicy(guarded);
-      // Both personal and sect workers must enforce the owner's *current* role.
+      // Both personal and sect workers enforce the owner's *current* role and VIP tag.
       // Never trust a saved config or a job snapshot claiming Câu Cá is enabled.
       const fishingOwner = await findById(job.userId);
-      guarded = enforceFishingAdminPolicy(guarded, fishingOwner !== null && isAdminUser(fishingOwner));
+      guarded = enforceFishingAccessPolicy(guarded, canUseFishingQuest(fishingOwner));
 
       // Tên miền game ghép vào ĐÂY, cùng chỗ và cùng lý do với cookie: nó là sự thật của
       // TOÀN HỆ THỐNG tại thời điểm phát việc, không phải thứ đông lạnh trong snapshot của

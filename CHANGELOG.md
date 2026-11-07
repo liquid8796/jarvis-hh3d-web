@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.250 — Allow fishing for admins and VIP-tagged users (07/11/2026)
+
+- Replace the fishing row hint with the exact requested text, “Chỉ dành cho các user VIP”. Enable its checkbox and options only for web users with an existing administrator role or a whole VIP tag (case/outer whitespace insensitive), not merely a VIP game account.
+- Derive UI access from the authenticated user. Recheck the current database user during config saves and the current job owner for both personal and sect worker claims, so forged requests or old snapshots cannot bypass access after a tag is removed. Existing in-flight jobs are not interrupted.
+- Explain a denied fishing toggle separately from the Maze-cap policy. Add isolated tests of the real config action, worker POST, dashboard and rendered controls for administrators, VIP membership, missing users, tag changes and forged access fields.
+- Keep this release local plus OCI; do not push GitHub or redeploy/cancel running workers.
+
 ## 1.3.249 — Remove fishing option helper notes (07/11/2026)
 
 - Remove only the three explanatory notes below the sale interval, release threshold and release interval inputs shown in the user's screenshots.

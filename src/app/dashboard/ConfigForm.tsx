@@ -862,7 +862,7 @@ function QuestLockedDialog({ quest, onClose }: { quest: SimpleQuest; onClose: ()
   );
 }
 
-export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmin: boolean }) {
+export function ConfigForm({ config, isAdmin, canFish }: { config: EditableConfig; isAdmin: boolean; canFish: boolean }) {
   const { accounts } = useDashboardAccountLive();
   const { workerPref } = useDashboardWorkerPref();
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
@@ -1035,7 +1035,7 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
       </div>
 
       {/* Tiên Giới is a separate quest block with one shared config for VIP and free.
-          The disabled state is presentation only; server save and worker claim recheck admin. */}
+          The disabled state is presentation only; server save and worker claim recheck access. */}
       <fieldset className={`mb-5 rounded-xl border border-[var(--color-ink-600)]/60 ${collapsed.tienGioi ? "px-4 py-0" : "p-4"}`}>
         <legend className="px-2">
           <span className="flex items-center gap-2 text-sm font-semibold text-[var(--color-parchment)]">
@@ -1046,15 +1046,15 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
         </legend>
         <div id="tienGioi-body" hidden={collapsed.tienGioi === true} className="space-y-3">
           <label className="flex items-center gap-3 text-sm text-[var(--color-parchment)]">
-            <input type="checkbox" name="cauCaEnabled" defaultChecked={isAdmin && config.quests.cauCa.enabled}
-              disabled={!isAdmin} />
+            <input key={String(canFish)} type="checkbox" name="cauCaEnabled" defaultChecked={canFish && config.quests.cauCa.enabled}
+              disabled={!canFish} />
             <span className="font-semibold">Câu Cá</span>
-            <span className="text-xs text-[var(--color-mist)]">VIP + thường</span>
+            <span className="text-xs text-[var(--color-mist)]">Chỉ dành cho các user VIP</span>
           </label>
-          {!isAdmin && <p className="text-xs text-[var(--color-mist)]">Thử nghiệm — hiện chỉ tài khoản admin được bật và chạy quest này.</p>}
+          {!canFish && <p className="text-xs text-[var(--color-mist)]">Chỉ admin hoặc user có tag VIP được bật và chạy quest này.</p>}
           <label className="block space-y-1 text-xs text-[var(--color-mist)]">
             <span>Điểm câu</span>
-            <select name="cauCaSpot" defaultValue={config.quests.cauCa.spot} disabled={!isAdmin}
+            <select name="cauCaSpot" defaultValue={config.quests.cauCa.spot} disabled={!canFish}
               className="w-full rounded-lg border border-[var(--color-ink-500)] bg-[var(--color-ink-700)] p-2 text-[var(--color-parchment)]">
               <option value="nong">Bờ nông</option>
               <option value="sen">Bãi sen</option>
@@ -1068,31 +1068,31 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
             <label className="space-y-1 text-xs text-[var(--color-mist)]">
               <span>Tự bán cá có ngư lực không quá +N (0 = không bán)</span>
               <input type="number" name="cauCaSellBelow" min={0} max={30} step={1}
-                defaultValue={config.quests.cauCa.sellBelow} disabled={!isAdmin}
+                defaultValue={config.quests.cauCa.sellBelow} disabled={!canFish}
                 className="w-full rounded-lg border border-[var(--color-ink-500)] bg-[var(--color-ink-700)] p-2 text-[var(--color-parchment)]" />
             </label>
             <label className="space-y-1 text-xs text-[var(--color-mist)]">
               <span>Kiểm tra và bán cá sau tối đa N lần ném</span>
               <input type="number" name="cauCaSellEveryCasts" min={1} max={10000} step={1}
-                defaultValue={config.quests.cauCa.sellEveryCasts} disabled={!isAdmin}
+                defaultValue={config.quests.cauCa.sellEveryCasts} disabled={!canFish}
                 className="w-full rounded-lg border border-[var(--color-ink-500)] bg-[var(--color-ink-700)] p-2 text-[var(--color-parchment)]" />
             </label>
             <label className="space-y-1 text-xs text-[var(--color-mist)]">
               <span>Tự thả cá có ngư lực không quá +N (0 = không thả)</span>
               <input type="number" name="cauCaReleaseBelow" min={0} max={30} step={1}
-                defaultValue={config.quests.cauCa.releaseBelow} disabled={!isAdmin}
+                defaultValue={config.quests.cauCa.releaseBelow} disabled={!canFish}
                 className="w-full rounded-lg border border-[var(--color-ink-500)] bg-[var(--color-ink-700)] p-2 text-[var(--color-parchment)]" />
             </label>
             <label className="space-y-1 text-xs text-[var(--color-mist)]">
               <span>Kiểm tra và thả cá sau tối đa N lần ném</span>
               <input type="number" name="cauCaReleaseEveryCasts" min={1} max={10000} step={1}
-                defaultValue={config.quests.cauCa.releaseEveryCasts} disabled={!isAdmin}
+                defaultValue={config.quests.cauCa.releaseEveryCasts} disabled={!canFish}
                 className="w-full rounded-lg border border-[var(--color-ink-500)] bg-[var(--color-ink-700)] p-2 text-[var(--color-parchment)]" />
             </label>
             <label className="space-y-1 text-xs text-[var(--color-mist)]">
               <span>Giới hạn số lần ném câu (0 = không giới hạn)</span>
               <input type="number" name="cauCaCastLimit" min={0} max={10000} step={1}
-                defaultValue={config.quests.cauCa.castLimit} disabled={!isAdmin}
+                defaultValue={config.quests.cauCa.castLimit} disabled={!canFish}
                 className="w-full rounded-lg border border-[var(--color-ink-500)] bg-[var(--color-ink-700)] p-2 text-[var(--color-parchment)]" />
             </label>
           </div>

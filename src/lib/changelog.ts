@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.250",
+    date: "2026-11-07",
+    lines: [
+      "Câu Cá nay mở cho admin và user được gắn tag VIP; các user khác không thể bật nhiệm vụ này.",
+      "Dòng chú thích Câu Cá đổi thành: Chỉ dành cho các user VIP.",
+    ],
+  },
+  {
     version: "1.3.249",
     date: "2026-11-07",
     lines: [
@@ -494,14 +502,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Reflection được tăng sức suy luận lên mức cao nhất để phát triển mã nguồn có chiều sâu hơn.",
       "Kho GitHub phụ mới phải có hướng dẫn sử dụng và mã nguồn đầy đủ, không còn chỉ tạo một tệp rồi bỏ dở.",
       "Hệ thống chuyển trọn bộ tệp vào cùng một lượt cập nhật; các kho hiện có vẫn được giữ nguyên.",
-    ],
-  },
-  {
-    version: "1.3.200",
-    date: "2026-10-19",
-    lines: [
-      "Trong sổ khóa Reflection, thông báo lỗi giờ cho biết mã và nguyên nhân thay vì chỉ ghi Lỗi gần nhất.",
-      "Thông tin bí mật vẫn được che; khi có lỗi bạn có thể xem chi tiết ngay tại dòng khóa tương ứng.",
     ],
   },
 ];

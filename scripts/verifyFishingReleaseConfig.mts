@@ -54,7 +54,7 @@ for (const [key, name, min, max, fallback] of [
   assert.ok(input.includes("max={" + max + "}"));
   assert.ok(input.includes("step={1}"));
   assert.ok(input.includes("defaultValue={config.quests.cauCa." + key + "}"));
-  assert.ok(input.includes("disabled={!isAdmin}"));
+  assert.ok(input.includes("disabled={!canFish}"));
   const expression = action.match(new RegExp(key + ": ([^\\n]+),"))?.[1];
   assert.ok(expression, name + " is persisted by the form action");
   const parse = new Function("formData", "return (" + expression + ");") as (data: FormData) => number;

@@ -41,6 +41,12 @@ try {
     document.querySelector(".sheet-head button").addEventListener("click", () => {
       document.querySelector(".sheet").remove();
     });
+    // The real game toggle updates its local state synchronously.
+    const auto = document.querySelector(".notif-toggle");
+    auto.addEventListener("click", () => {
+      auto.classList.toggle("on");
+      auto.setAttribute("aria-checked", String(auto.classList.contains("on")));
+    });
     // Game filters isTrusted=false and listens to pointerdown / pointerup,
     // not DOM click. Mimic that contract in the fixture.
     const main = document.querySelector(".fish-main");
@@ -79,6 +85,8 @@ try {
   await page.locator(".pl-go.jvz-fish-enter").click();
   assert.equal(await page.locator(".bt-wrap").count(), 0,
     "trusted click on Vào Ngay dismisses the game gate");
+  await tick(); // native immediate auto-sale must not bypass the batch interval
+  assert.equal(await page.locator(".notif-toggle[aria-checked=false]").count(), 1);
   await tick();
   assert.equal(await page.locator("#rare.on").count(), 0, "rare fish selection is cleared before selling");
   await tick();

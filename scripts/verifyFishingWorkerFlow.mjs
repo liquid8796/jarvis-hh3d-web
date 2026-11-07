@@ -8,7 +8,12 @@ import { loadProfile } from "../src/lib/quest-engine/profile.mjs";
 import { createQuestEngine } from "../src/lib/quest-engine/engine.mjs";
 import { createSession } from "../src/lib/quest-engine/session.mjs";
 const cycles=3,logs=[],entries=[],wire=[],timers=new Set();
-const html=`<!doctype html><meta charset="utf-8"><style>button{width:180px;height:90px;margin:100px}</style><div id="app"><div class="view fish-room"><button class="fish-main st-idle">Ném câu</button><span class="fish-day"><span class="short">0 / 100</span></span></div></div><script>
+const html=`<!doctype html><meta charset="utf-8"><style>button{width:180px;height:90px;margin:100px}</style><div id="app"><div class="view fish-room"><button class="fish-quick-bag"><span class="fish-badge">0/30</span></button><button class="fish-main st-idle">Ném câu</button><span class="fish-day"><span class="short">0 / 100</span></span></div></div><script>
+document.querySelector(".fish-quick-bag").onclick=()=>{
+ const sheet=document.createElement("div");sheet.className="sheet";
+ sheet.innerHTML='<div class="sheet-head"><button aria-label="Đóng">Đóng</button></div><div class="fish-bag"><div class="fish-bag-head">Giỏ</div><p class="fish-bag-empty">Trống</p></div>';
+ sheet.querySelector("button").onclick=()=>sheet.remove();document.body.append(sheet);
+};
 const b=document.querySelector(".fish-main"),trace=window.testTrace=[];
 const mark=(type,data={})=>trace.push({type,at:Date.now(),...data});
 let phase="idle",castDown=false,finished=0;

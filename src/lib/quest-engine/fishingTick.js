@@ -8,6 +8,7 @@
 () => {
   const sellBelow = Math.max(0, Math.min(30, Number("{{sellBelow}}") || 0));
   const castLimit = Math.max(0, Math.min(10000, Number("{{castLimit}}") || 0));
+  const sellEveryCasts = Math.max(1, Math.min(10000, Math.trunc(Number("{{sellEveryCasts}}")) || 5));
   const body = document.body;
   const state = window.__jvzFish ??= { casts: 0, ticks: 0, bagChecked: false, lastBagCast: -1, entering: 0, pressed: false, lastPress: 0, pendingSale: false };
   state.spot = "{{spot}}";
@@ -107,6 +108,8 @@
 
   const main = get(".fish-room .fish-main");
   if (!main) return finish("Đã vào phòng nhưng chưa thấy nút Ném câu.", true);
+  const mainText = label(main);
+  const idle = main.classList.contains("st-idle") || /Ném câu/i.test(mainText);
   main.classList.remove("jvz-fish-press");
   const badge = label(get(".fish-quick-bag .fish-badge"));
   const bagCount = +(badge.match(/^(\d+)\s*\//)?.[1] || 0);
@@ -119,6 +122,7 @@
   }
   const bag = [...document.querySelectorAll(".sheet .fish-bag")].find(visible);
   if (bag) {
+    state.bagOpeningAt = 0; state.bagOpenStartedAt = 0;
     if (!bag.querySelector(".fish-bag-head, .fish-bag-item, .fish-bag-empty")) {
       state.bagLoadingAt ||= Date.now();
       if (Date.now() - state.bagLoadingAt > 12_000) {
@@ -129,15 +133,13 @@
       return "fish: đợi dữ liệu giỏ cá";
     }
     state.bagLoadingAt = 0;
-    const auto = get(".fish-bag-auto button.notif-toggle");
-    if (sellBelow === 0 && visible(auto) &&
-        (auto.getAttribute("aria-checked") === "true" || auto.classList.contains("on"))) {
+    // Native star-based auto-sale runs after every catch and ignores both the
+    // configured interval and our ngư lực threshold. Batch sales own this flow.
+    const auto = bag.querySelector(".fish-bag-auto button.notif-toggle");
+    if (visible(auto) && (auto.getAttribute("aria-checked") === "true" || auto.classList.contains("on"))) {
       auto.click();
-      return "!Đã tắt tự bán cá. Giữ lại toàn bộ cá.";
-    }
-    if (sellBelow > 0 && visible(auto) && auto.getAttribute("aria-checked") !== "true" && !auto.classList.contains("on")) {
-      auto.click();
-      return "!Đã bật tự bán cá cấp thấp.";
+      return sellBelow === 0 ? "!Đã tắt tự bán cá. Giữ lại toàn bộ cá."
+        : "!Đã tắt tự bán tức thời của game; sẽ bán cá theo ngưỡng và số lượt đã chọn.";
     }
     const cards = [...bag.querySelectorAll(".fish-bag-item.fish-card")];
     const eligible = cards.filter((card) => {
@@ -206,13 +208,28 @@
     return "fish: xong kiểm giỏ";
   }
 
-  if (!state.bagChecked || bagCount >= bagCap || (state.casts > state.lastBagCast && (state.casts % 5 === 0 || bagCount >= bagCap - 1))) {
+  const castsSinceBag = state.casts - Math.max(0, state.lastBagCast ?? 0);
+  const bagDue = !state.bagChecked || bagCount >= bagCap ||
+    (castsSinceBag > 0 && (castsSinceBag >= sellEveryCasts || bagCount >= bagCap - 1));
+  // Count only accepted casts, then wait for their result before opening a
+  // basket. A safety sale starts a fresh interval rather than a global modulo.
+  if (idle && bagDue) {
     const opener = get(".fish-room .fish-quick-bag");
-    if (visible(opener)) { opener.click(); state.bagChecked = true; return "fish: kiểm giỏ"; }
+    if (!visible(opener)) return finish("Chưa mở được giỏ cá để kiểm tra trước khi câu.", true);
+    state.bagOpenStartedAt ||= Date.now();
+    if (Date.now() - state.bagOpenStartedAt > 12_000) {
+      state.bagOpenStartedAt = 0; state.bagOpeningAt = 0;
+      return finish("Trò chơi chưa mở được giỏ cá.", true);
+    }
+    if (!state.bagOpeningAt || Date.now() - state.bagOpeningAt >= 1500) {
+      opener.click(); state.bagOpeningAt = Date.now();
+      return "fish: kiểm giỏ";
+    }
+    // Only closing a loaded, processed basket sets bagChecked. In particular,
+    // a delayed first open may never allow the first cast to slip through.
+    return "fish: chờ mở giỏ cá trước khi tiếp tục câu";
   }
 
-  const mainText = label(main);
-  const idle = main.classList.contains("st-idle") || /Ném câu/i.test(mainText);
   const stamina = /([0-9]+)\s*\/\s*([0-9]+)/.exec(label(get(".fish-day .short")));
   if (stamina && +stamina[1] >= +stamina[2] && +stamina[2] > 0) {
     const leave = get(".fish-room .room-top button[aria-label='Rời phòng']");

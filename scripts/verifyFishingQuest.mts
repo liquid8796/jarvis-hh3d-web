@@ -61,3 +61,54 @@ for (const spot of ["nong", "sen", "giua", "cau", "random"]) {
   }
 }
 console.log("PASS fishing spot config defaults, validation and twin translation");
+
+assert.equal(configSchema.parse({}).quests.cauCa.sellEveryCasts, 5,
+  "old config defaults to checking and selling every five accepted casts");
+const legacyFishing = configSchema.parse({ quests: { cauCa: { enabled: true, sellBelow: 8, castLimit: 10 } } });
+assert.equal(legacyFishing.quests.cauCa.sellEveryCasts, 5, "existing fishing configs receive the interval default");
+for (const quest of [v, f]) {
+  const interval = quest.options.find((o: { key: string }) => o.key === "sellEveryCasts");
+  assert.ok(interval, "both raw profile twins expose the sell interval");
+  assert.equal(interval.selectedValue, "5");
+  assert.equal(interval.allowCustom, true);
+  assert.equal(interval.customMinimum, 1);
+  assert.equal(interval.customMaximum, 10000);
+}
+for (const sellEveryCasts of [1, 5, 7, 10000]) {
+  const config = configSchema.parse({ quests: { cauCa: { enabled: true, sellEveryCasts } } });
+  assert.equal(config.quests.cauCa.sellEveryCasts, sellEveryCasts);
+  const twins = profileForConfig(config).quests.filter((q: { id: string }) => ["cau-ca", "cau-ca-thuong"].includes(q.id));
+  assert.equal(twins.length, 2);
+  for (const quest of twins) {
+    assert.equal(quest.options.find((o: { key: string; selectedValue: string }) => o.key === "sellEveryCasts")?.selectedValue,
+      String(sellEveryCasts), "custom interval survives validation and both profile twins");
+  }
+}
+for (const sellEveryCasts of [0, -1, 1.5, 10001, Number.NaN, Infinity, "5", null]) {
+  assert.equal(configSchema.safeParse({ quests: { cauCa: { sellEveryCasts } } }).success, false,
+    `reject invalid interval ${String(sellEveryCasts)}`);
+}
+for (const oldConfig of [legacyFishing, cfg]) {
+  for (const quest of profileForConfig(oldConfig).quests.filter((q: { id: string }) => ["cau-ca", "cau-ca-thuong"].includes(q.id))) {
+    assert.equal(quest.options.find((o: { key: string; selectedValue: string }) => o.key === "sellEveryCasts")?.selectedValue, "5",
+      "legacy profile callers also receive the interval default");
+  }
+}
+
+// Exercise the real form conversion without importing Next's authenticated server-action dependencies.
+const actionSource = readFileSync(new URL("../src/app/actions/automation.ts", import.meta.url), "utf8");
+const intervalExpression = actionSource.match(/^\s*sellEveryCasts: (.+),\s*$/m)?.[1];
+assert.ok(intervalExpression, "server action reads the interval field");
+const readInterval = new Function("formData", `return (${intervalExpression});`) as (form: FormData) => number;
+for (const [raw, expected] of [[undefined, 5], ["", 5], ["abc", 5], ["1", 1], ["7", 7], ["7.9", 7], ["-2", 1], ["10001", 10000]] as const) {
+  const form = new FormData();
+  if (raw !== undefined) form.set("cauCaSellEveryCasts", raw);
+  const interval = readInterval(form);
+  assert.equal(interval, expected, `server normalizes interval ${String(raw)}`);
+  assert.equal(configSchema.safeParse({ quests: { cauCa: { sellEveryCasts: interval } } }).success, true);
+}
+const formSource = readFileSync(new URL("../src/app/dashboard/ConfigForm.tsx", import.meta.url), "utf8");
+assert.equal((formSource.match(/name="cauCaSellEveryCasts"/g) ?? []).length, 1, "one shared input serves both account tiers");
+assert.match(formSource, /name="cauCaSellEveryCasts" min=\{1\} max=\{10000\} step=\{1\}/);
+assert.match(formSource, /defaultValue=\{config\.quests\.cauCa\.sellEveryCasts\}/);
+console.log("PASS fishing sale interval defaults, bounds, form conversion and twin translation");

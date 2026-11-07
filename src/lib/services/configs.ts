@@ -308,6 +308,7 @@ export const configSchema = z.object({
         enabled: z.boolean().default(false),
         spot: z.enum(["nong", "sen", "giua", "cau", "random"]).default("giua"),
         sellBelow: z.number().int().min(0).max(30).default(4),
+        sellEveryCasts: z.number().int().min(1).max(10000).default(5),
         castLimit: z.number().int().min(0).max(10000).default(0),
       }).prefault({}),
       /** Bản cho hạng VIP — twin `luyen-dan-duong` của hồ sơ. */

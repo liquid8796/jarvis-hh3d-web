@@ -8088,6 +8088,7 @@
           ]
         },
         { "key": "sellBelow", "label": "Tự bán cá ngư lực ≤ +N (0: không bán)", "allowCustom": true, "customMinimum": 0, "customMaximum": 30, "selectedValue": "4", "choices": [{ "value": "0", "label": "Không bán" }, { "value": "4", "label": "≤ +4" }, { "value": "8", "label": "≤ +8" }] },
+        { "key": "sellEveryCasts", "label": "Kiểm tra và bán cá sau tối đa N lần ném", "allowCustom": true, "customMinimum": 1, "customMaximum": 10000, "selectedValue": "5", "choices": [{ "value": "1", "label": "1 lần" }, { "value": "5", "label": "5 lần" }, { "value": "10", "label": "10 lần" }] },
         { "key": "castLimit", "label": "Giới hạn số lần ném câu (0: không giới hạn)", "allowCustom": true, "customMinimum": 0, "customMaximum": 10000, "selectedValue": "0", "choices": [{ "value": "0", "label": "Không giới hạn" }, { "value": "10", "label": "10 lần" }, { "value": "50", "label": "50 lần" }] }
       ],
       "fallbackCooldownSeconds": 0, "requiresVip": true, "order": 300,
@@ -8153,6 +8154,7 @@
           ]
         },
         { "key": "sellBelow", "label": "Tự bán cá ngư lực ≤ +N (0: không bán)", "allowCustom": true, "customMinimum": 0, "customMaximum": 30, "selectedValue": "4", "choices": [{ "value": "0", "label": "Không bán" }, { "value": "4", "label": "≤ +4" }, { "value": "8", "label": "≤ +8" }] },
+        { "key": "sellEveryCasts", "label": "Kiểm tra và bán cá sau tối đa N lần ném", "allowCustom": true, "customMinimum": 1, "customMaximum": 10000, "selectedValue": "5", "choices": [{ "value": "1", "label": "1 lần" }, { "value": "5", "label": "5 lần" }, { "value": "10", "label": "10 lần" }] },
         { "key": "castLimit", "label": "Giới hạn số lần ném câu (0: không giới hạn)", "allowCustom": true, "customMinimum": 0, "customMaximum": 10000, "selectedValue": "0", "choices": [{ "value": "0", "label": "Không giới hạn" }, { "value": "10", "label": "10 lần" }, { "value": "50", "label": "50 lần" }] }
       ],
       "fallbackCooldownSeconds": 0, "requiresVip": false, "order": 300,

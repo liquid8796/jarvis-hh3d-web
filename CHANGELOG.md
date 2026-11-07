@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.247 — Configure casts between basket sales (07/11/2026)
+
+- Complete the requested sale interval setting omitted from 1.3.246: sellEveryCasts accepts 1–10000 with a legacy-compatible default of 5 through the shared form, server validation, both quest profiles and worker runtime.
+- Process the basket before the first automated cast. A missing or delayed opener cannot mark the first basket check complete. Later checks count accepted casts since the last processed basket and wait for idle after the current result, rather than interrupting a fight or using a global modulo.
+- Disable the game's immediate star-based auto-sale so it cannot bypass the selected interval or ngư lực threshold. Near/full baskets may sell early to free space, then start a fresh interval; protected fish and daily-cap safety remain unchanged.
+- Add isolated real-browser integration from config through profile, engine and session for n=1, n=2, legacy n=5, full-basket overrides, interval reset after an early sale, and delayed/missing initial basket opening. Update the existing worker fixture to model its required initial basket check.
+
 ## 1.3.246 — Reliable basket sales and selectable fishing habitats (07/11/2026)
 
 - Passive capture of the user's manual sale proved that rare fish need a second confirmation click. Revalidate threshold-safe selections, handle immediate or delayed confirmation, and wait for an inventory change instead of resubmitting while the sale is pending. Selection changes alone are not a receipt.

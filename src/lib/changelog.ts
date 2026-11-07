@@ -66,6 +66,16 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.247",
+    date: "2026-11-07",
+    lines: [
+      "Thêm số lượt ném giữa các lần kiểm tra và bán cá; mặc định là 5, có thể nhập từ 1 đến 10.000.",
+      "Lần đầu vào phòng sẽ xử lý giỏ trước khi ném câu. Sau đó bán theo số lượt đã chọn, khi lượt câu đã kết thúc.",
+      "Giỏ gần đầy hoặc đầy được dọn sớm theo ngưỡng; chu kỳ mới tính lại từ lần kiểm tra đó.",
+      "Tắt tự bán tức thời của game để giữ đúng lịch và ngưỡng bán đã chọn; không tự thả cá.",
+    ],
+  },
+  {
     version: "1.3.246",
     date: "2026-11-07",
     lines: [
@@ -493,14 +503,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Mở lại hệ thống quảng cáo tự động hoá trên website với vùng hiển thị mới từ đối tác Adcash.",
       "Kích hoạt cơ chế phân phối tự nhiên và đồng bộ trạng thái nhà mạng mặc định trên toàn hệ thống.",
-    ],
-  },
-  {
-    version: "1.3.188",
-    date: "2026-10-05",
-    lines: [
-      "Vô hiệu hoá toàn bộ hệ thống quảng cáo trên website nhằm mang lại trải nghiệm tinh sạch cho người dùng.",
-      "Chuyển chế độ nhà mạng mặc định về trạng thái tắt và ngừng phân phối các mã kịch bản quảng cáo đối tác.",
     ],
   },
 ];

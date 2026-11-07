@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.244",
+    date: "2026-11-07",
+    lines: [
+      "Nhật ký Câu Cá ghi tên cá, biến thể và giá bán bằng Linh Thạch khi có dữ liệu.",
+      "Mỗi lần bán ghi số cá theo từng mức giá và tổng Linh Thạch thực nhận, kể cả tự bán.",
+      "Chỉ báo bán thành công khi trò chơi xác nhận; không tính cá còn lại vào tiền đã thu.",
+    ],
+  },
+  {
     version: "1.3.243",
     date: "2026-11-07",
     lines: [
@@ -488,14 +497,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Khắc phục sự cố sập cửa sổ dòng lệnh khi chọn nguồn lưu lượng trong công cụ xem quảng cáo.",
       "Tối ưu hoá cú pháp xử lý khối lệnh batch và chuẩn hoá tỉ lệ phần trăm nhập vào.",
-    ],
-  },
-  {
-    version: "1.3.185",
-    date: "2026-10-05",
-    lines: [
-      "Bổ sung tuỳ chọn nguồn lưu lượng đa dạng cho công cụ xem trang và tương tác.",
-      "Hỗ trợ cấu hình tỉ lệ điều phối tự nhiên giữa các nguồn và truy cập trực tiếp.",
     ],
   },
 ];

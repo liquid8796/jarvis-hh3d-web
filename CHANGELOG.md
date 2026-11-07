@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.244 — Detailed, server-confirmed fishing receipts (07/11/2026)
+
+- Resolve exact caught species and variant names from the 398-entry live game catalog. Record the catch price only when supplied by the server; unknown future names and missing values stay explicit rather than invented.
+- Passively correlate Socket.IO bag/sell/settle requests and acknowledgements. Group only sold IDs by their observed price and use the server's transaction total, including partial sales, automatic sales and full-basket settlement. Clear receipt state on reconnect and suppress repeated acknowledgements.
+- Remove the premature sale-success message at button click. Preserve all fishing controls, sale selection rules and thresholds.
+- Verified in the user's current Chrome: the card's +N is item.price in Linh Thạch, not a separate ngư lực field. Use the accurate price label in these new logs. Sources: /game/assets/chunks/fish-TLBXRWCJ.js and chunk-QZZBBVNM.js at hoathinh3d.pw.
+- Add a real Chromium/WebSocket regression covering fish variants, missing metadata, foreign catches, binary frames, pending/failed/partial sale receipts, actual totals, duplicates, auto-sale and reconnects.
+
 ## 1.3.243 — Select the middle-lake fishing habitat (07/11/2026)
 
 - Before a normal cast, use trusted clicks on the official Điểm câu → Giữa hồ controls and require the visible selection and sheet dismissal before casting. The game calculates a legal target for the current seat; no guessed screen/world coordinate or unproven within-habitat hotspot.

@@ -9,6 +9,7 @@
 import { parseCooldownSeconds } from "./cooldown.mjs";
 import { chooseFishingHold, createFishingTelemetry } from "./fishingServo.mjs";
 import { prepareFishingSpot } from "./fishingSpot.mjs";
+import { createFishingSaleJournal, formatFishingCatch } from "./fishingJournal.mjs";
 
 /**
  * Bỏ dấu, hạ chữ thường, chỉ giữ chữ và số, cách nhau đúng một khoảng trắng.
@@ -75,6 +76,7 @@ export function createSession(page, options) {
   let fishTelemetryActive = false;
   let fishSocket = null;
   const fishingTelemetry = createFishingTelemetry();
+  const fishingSales = createFishingSaleJournal(log);
   let fishSelfId = null;
   let fishAwaitingCatch = false;
   let fishFight = null;
@@ -90,6 +92,7 @@ export function createSession(page, options) {
   const onFishFrame = (raw) => {
     const accepted = fishingTelemetry.ingest(raw);
     const text = typeof raw === "string" ? raw : raw?.toString?.() ?? "";
+    fishingSales.received(text);
     if (accepted && fishFight && text.startsWith('42["g:snap",')) {
       const gauge = fishingTelemetry.current();
       if (gauge) {
@@ -124,7 +127,7 @@ export function createSession(page, options) {
         else if (event?.type === "catch" && fishAwaitingCatch &&
                  fishSelfId !== null && event.uid === fishSelfId) {
           fishAwaitingCatch = false;
-          log.info("Câu Cá: Bắt được cá.");
+          log.info(formatFishingCatch(event));
           finishFishEvidence("bắt được");
         }
       }
@@ -133,6 +136,7 @@ export function createSession(page, options) {
   let sentFishCasts = 0;
   const onFishSentFrame = (frame) => {
     const raw = typeof frame === "string" ? frame : frame?.toString?.() ?? "";
+    fishingSales.sent(raw);
     // Socket.IO's 42<ack-id>["g:act",{"a":"cast",...}] outgoing action.
     // Merely attempting Playwright click is NOT evidence the game sent cast.
     if (raw.startsWith("42") && raw.includes('"g:act"') && raw.includes('"a":"cast"'))
@@ -250,6 +254,7 @@ export function createSession(page, options) {
       page.on("websocket", (socket) => {
         if (!socket.url().includes("/socket.io/")) return;
         fishSocket = socket;
+        fishingSales.reset();
         fishSelfId = null;
         fishAwaitingCatch = false;
         fishFight = null;
@@ -264,6 +269,7 @@ export function createSession(page, options) {
         socket.on("close", () => {
           if (fishSocket !== socket) return;
           fishSocket = null;
+          fishingSales.reset();
           fishSelfId = null;
           fishAwaitingCatch = false;
           fishFight = null;

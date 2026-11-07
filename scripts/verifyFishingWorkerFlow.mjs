@@ -50,7 +50,7 @@ wss.on("connection",socket=>{
     tick++;send("g:snap",[-3,tick*66,200,8000,0,Math.min(1000,300+tick*24),0,.3]);
     if(tick===30){
      clearInterval(timer);timers.delete(timer);
-     send("g:evt",{type:"catch",uid:99,f:"fixture",w:1,price:1});
+     send("g:evt",{type:"catch",uid:99,f:"ca_chep",w:1,price:1});
      send("g:evt",{type:"st",uid:99,s:"idle"});
     }
    },66);timers.add(timer);
@@ -90,7 +90,7 @@ try {
  assert.deepEqual(pageErrors,[]);
  assert.equal(hooks.length,cycles,"full engine must hook every fixture cycle");
  assert.equal(summary.length,cycles,"every completed fight must retain its debug summary");
- assert.equal(logs.filter(l=>l.level==="info"&&l.message==="Câu Cá: Bắt được cá.").length,cycles,
+ assert.equal(logs.filter(l=>l.level==="info"&&l.message==="Câu Cá: Bắt được Cá Chép Đỏ · giá bán +1 Linh Thạch.").length,cycles,
   "one clear result per completed fight in the journal");
  assert.ok(!logs.some(l=>l.level==="info"&&/bám lực|mẫu hợp lệ|tiến độ tối đa/.test(l.message)),
   "journal excludes controller telemetry");

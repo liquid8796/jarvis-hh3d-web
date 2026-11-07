@@ -143,7 +143,9 @@
       if (sell && state.pendingSale) {
         state.pendingSale = false;
         sell.click();
-        return "!Bán cá có ngư lực từ +" + sellBelow + " trở xuống.";
+        // A click can fail or sell only part of the selection. The passive
+        // Socket.IO receipt writes the actual count and proceeds to the journal.
+        return "fish: đã gửi yêu cầu bán cá, chờ trò chơi xác nhận";
       }
     }
     if (bagCount >= bagCap && (sellBelow === 0 || eligible.length === 0))

@@ -185,7 +185,7 @@
   }
   if (idle && visible(main)) {
     if (state.casts > 0 && Date.now() - (state.lastCast || 0) < 2200) return "fish: đợi lượt trước";
-    // Initial target: the site uses the currently selected Điểm câu; don't guess world coordinates.
+    // The trusted session driver selects Giữa hồ through the official Điểm câu UI before casting.
     // Playwright Click step below will deliver trusted pointerdown/up.
     main.classList.add("jvz-fish-press");
     // Only the trusted input driver may set pendingCast AFTER the game

@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.243",
+    date: "2026-11-07",
+    lines: [
+      "Câu Cá ưu tiên điểm Giữa hồ trước khi ném, để tiếp cận nhóm cá hiếm của vùng này.",
+      "Chờ game xác nhận điểm câu rồi mới thả phao; giữ điểm đang chọn trong đợt Cá Săn.",
+    ],
+  },
+  {
     version: "1.3.242",
     date: "2026-11-07",
     lines: [
@@ -488,14 +496,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Bổ sung tuỳ chọn nguồn lưu lượng đa dạng cho công cụ xem trang và tương tác.",
       "Hỗ trợ cấu hình tỉ lệ điều phối tự nhiên giữa các nguồn và truy cập trực tiếp.",
-    ],
-  },
-  {
-    version: "1.3.184",
-    date: "2026-10-05",
-    lines: [
-      "Tích hợp thẻ đo lường Google Tag chính thức trên tên miền website.",
-      "Tối ưu vị trí tải thẻ ngay đầu trang phục vụ kiểm tra và phân tích lưu lượng.",
     ],
   },
 ];

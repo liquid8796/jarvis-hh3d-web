@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.243 — Select the middle-lake fishing habitat (07/11/2026)
+
+- Before a normal cast, use trusted clicks on the official Điểm câu → Giữa hồ controls and require the visible selection and sheet dismissal before casting. The game calculates a legal target for the current seat; no guessed screen/world coordinate or unproven within-habitat hotspot.
+- Reuse the selected habitat on later casts. Preserve the current aim during an active Cá Săn announcement; an upcoming-hunt countdown does not suppress normal optimization. Do not add special-hunt control.
+- Keep legacy aim when the spot UI is unavailable. Refuse casts behind unrelated sheets, while spectating/non-idle, or after rejected/unconfirmed selections; close only the spot sheet opened by the driver before retry. Preserve cast/hook/reel timing, sale thresholds and limits.
+- Real Chromium regression was red on the old worker (cast at Ven bờ), then green for trusted selection, delayed confirmation, repeat casts, hunt handling, unavailable controls, rejection and overlay safety.
+
 ## 1.3.242 — Simplify the fishing quest journal (07/11/2026)
 
 - Replace technical journal entries with short Vietnamese cast, catch, escape, bag and retry messages. Keep catch confirmation scoped to the authenticated player and emit an escape message once per active fight.

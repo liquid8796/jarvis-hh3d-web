@@ -8,6 +8,7 @@
 
 import { parseCooldownSeconds } from "./cooldown.mjs";
 import { chooseFishingHold, createFishingTelemetry } from "./fishingServo.mjs";
+import { prepareFishingSpot } from "./fishingSpot.mjs";
 
 /**
  * Bỏ dấu, hạ chữ thường, chỉ giữ chữ và số, cách nhau đúng một khoảng trắng.
@@ -192,10 +193,22 @@ export function createSession(page, options) {
         Number(style.opacity || "1") > 0.01;
     });
     if (gatePresent) return castFailed("Màn Vào Ngay chưa đóng; không ném câu vào game nằm sau lớp phủ.");
+    const spot = await prepareFishingSpot(page);
+    if (!spot.ready) {
+      // A late bite/reel transition is not a failed cast. Keep the next tick
+      // free to hook/reel instead of installing a five-second cast backoff.
+      if (await readFishCastState() === "accepted") return false;
+      return castFailed(spot.reason);
+    }
+    if (spot.changed) log.info("Câu Cá: Đã chọn điểm Giữa hồ.");
+    else if (spot.reason) log.debug("fish spot: " + spot.reason);
     const main = page.locator(".fish-room .fish-main.st-idle");
     const before = sentFishCasts;
-    const bounds = await main.boundingBox().catch(() => null);
-    if (!bounds) return castFailed("Không tìm được nút Ném câu có hộp hiển thị.");
+    const bounds = await main.boundingBox({ timeout: 150 }).catch(() => null);
+    if (!bounds) {
+      if (await readFishCastState() === "accepted") return false;
+      return castFailed("Không tìm được nút Ném câu có hộp hiển thị.");
+    }
     const x = bounds.x + bounds.width / 2;
     const y = bounds.y + bounds.height / 2;
     let held = false;

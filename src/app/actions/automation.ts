@@ -205,6 +205,8 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
         spot: formData.get("cauCaSpot") ?? "giua",
         sellBelow: Math.min(30, Math.max(0, Math.trunc(Number(formData.get("cauCaSellBelow") ?? 4)) || 0)),
         sellEveryCasts: Math.min(10000, Math.max(1, Math.trunc(Number(formData.get("cauCaSellEveryCasts") ?? 5)) || 5)),
+        releaseBelow: Math.min(30, Math.max(0, Math.trunc(Number(formData.get("cauCaReleaseBelow") ?? 0)) || 0)),
+        releaseEveryCasts: Math.min(10000, Math.max(1, Math.trunc(Number(formData.get("cauCaReleaseEveryCasts") ?? 5)) || 5)),
         castLimit: Math.min(10000, Math.max(0, Math.trunc(Number(formData.get("cauCaCastLimit") ?? 0)) || 0)),
       },
       // Hai bản Khoáng Mạch — cùng phép tách tab VIP/Thường như Luyện Đan Đường ngay trên.

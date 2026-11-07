@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.248",
+    date: "2026-11-07",
+    lines: [
+      "Nhận đúng hạn mức bán cá, kể cả khi phần còn lại không đủ cho một con; không báo nhầm lỗi chờ bán.",
+      "Thêm ngưỡng ngư lực và số lượt ném giữa các lần thả cá. Mặc định tắt; ưu tiên bán trước khi cá phù hợp cả hai.",
+      "Chờ xác nhận thả cá, giữ cá ngoài ngưỡng và đọc lại giỏ khi kết nối hoặc hạn mức thay đổi.",
+    ],
+  },
+  {
     version: "1.3.247",
     date: "2026-11-07",
     lines: [
@@ -495,14 +504,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Có thêm Reflection bên cạnh Ollama cho kho GitHub; chọn nhà cung cấp ngay trong phần cấu hình.",
       "Khóa Reflection có sổ riêng; có thể nhập bằng tệp hoặc dán nhiều dòng, xem, sao chép và tạm tắt.",
       "Khi chuyển nhà cung cấp, các khóa Ollama đã lưu không bị mất hay trộn sang Reflection.",
-    ],
-  },
-  {
-    version: "1.3.189",
-    date: "2026-10-06",
-    lines: [
-      "Mở lại hệ thống quảng cáo tự động hoá trên website với vùng hiển thị mới từ đối tác Adcash.",
-      "Kích hoạt cơ chế phân phối tự nhiên và đồng bộ trạng thái nhà mạng mặc định trên toàn hệ thống.",
     ],
   },
 ];

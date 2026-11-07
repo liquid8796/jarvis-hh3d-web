@@ -60,8 +60,11 @@ export function createFishingSaleJournal(log, now = Date.now) {
     pendingFish = payload.pend ? {f:payload.pend.f,w:payload.pend.w,len:payload.pend.len,price:amount(payload.pend.price)} : null;
     fromPending(pendingFish);
   };
-  const report = (count, fish, total, automatic = false, stopped = "") => {
-    if (!Number.isSafeInteger(count) || count <= 0) return;
+  const report = (count, fish, total, automatic = false, stopped = "", released = false) => {
+    if (!Number.isSafeInteger(count) || count <= 0) {
+      if (stopped === "cap") log.info("Câu Cá: Đã chạm hạn mức bán hôm nay hoặc phần hạn mức còn lại không đủ bán cá đã chọn.");
+      return;
+    }
     const groups = new Map();
     let unknown = count;
     for (const item of fish.slice(0,count)) {
@@ -71,9 +74,9 @@ export function createFishingSaleJournal(log, now = Date.now) {
     const parts = [...groups].sort((a,b)=>a[0]-b[0]).map(([price,n])=>"+"+number(price)+": "+number(n)+" cá");
     if (unknown) parts.push("chưa rõ: "+number(unknown)+" cá");
     const earned = amount(total);
-    log.info("Câu Cá: " + (automatic ? "Tự bán " : "Đã bán ") + number(count) +
-      " cá (ngư lực: " + parts.join("; ") + ") · " +
-      (earned === null ? "chưa rõ số Linh Thạch thu được." : "thu "+number(earned)+" Linh Thạch.") +
+    log.info("Câu Cá: " + (released ? "Đã thả " : automatic ? "Tự bán " : "Đã bán ") + number(count) +
+      " cá (ngư lực: " + parts.join("; ") + ")" + (released ? "." : " · " +
+      (earned === null ? "chưa rõ số Linh Thạch thu được." : "thu "+number(earned)+" Linh Thạch.")) +
       (stopped === "cap" ? " Đã chạm hạn mức bán hôm nay." : ""));
   };
   return {
@@ -102,7 +105,7 @@ export function createFishingSaleJournal(log, now = Date.now) {
       const packet = decode(raw,"42");
       if (!packet?.ack || self === null) return;
       const [name, action] = packet.data;
-      if (name !== "g:act" || !["bag","sell","settle"].includes(action?.a)) return;
+      if (name !== "g:act" || !["bag","sell","release","settle"].includes(action?.a)) return;
       const at = now();
       for (const [key, request] of pending) if (at-request.at>60_000) pending.delete(key);
       while (pending.size >= 128) pending.delete(pending.keys().next().value);
@@ -117,19 +120,36 @@ export function createFishingSaleJournal(log, now = Date.now) {
         pending.delete(response.ack);
         if (!request || self === null || now()-request.at>60_000) return;
         const result = response.data[0];
-        if (!result || typeof result !== "object") return;
+        if (!result || typeof result !== "object" || Array.isArray(result)) return;
         if (request.action === "sell") {
           const sold = Array.isArray(result.sold) ? [...new Set(result.sold.filter(id))] : [];
           // sold is authoritative, not the requested count or the remaining bag size.
-          report(sold.length, sold.map(key=>request.items.get(key)), result.total, false, result.stop);
           if (!Array.isArray(result.sold) && result.ok === true && amount(result.total) > 0)
-            log.info("Câu Cá: Đã bán cá (chưa rõ số cá và ngư lực từng con) · thu " + number(result.total) + " Linh Thạch.");
+            log.info("Câu Cá: Đã bán cá (chưa rõ số cá và ngư lực từng con) · thu " + number(result.total) + " Linh Thạch." +
+              (result.stop === "cap" ? " Đã chạm hạn mức bán hôm nay." : ""));
+          else report(sold.length, sold.map(key=>request.items.get(key)), result.total, false, result.stop);
           for (const key of sold) bag.delete(key);
+        } else if (request.action === "release" && result.ok === true) {
+          const released = amount(result.released);
+          // A count-only partial receipt does not identify which requested fish left.
+          const fish = released === request.items.size ? [...request.items.values()] : [];
+          report(released, fish, null, false, "", true);
+          if (released === request.items.size) for (const key of request.items.keys()) bag.delete(key);
         } else if (request.action === "settle" && request.how === "sell" && result.ok === true) {
           report(1,[request.fish],result.total);
           pendingFish = null;
         }
         if (result.ok || Array.isArray(result.sold)) rememberBag(result);
+        if (["bag","sell","release"].includes(request.action)) return {
+          action: request.action,
+          ok: result.ok === true,
+          stop: request.action === "sell" && result.stop === "cap" ? "cap" : null,
+          soldCount: request.action === "sell" && Array.isArray(result.sold) ?
+            new Set(result.sold.filter(id)).size : null,
+          released: request.action === "release" ? amount(result.released) : null,
+          remainingAllowance: amount(result.wallet?.fish?.room),
+          at: now(),
+        };
         return;
       }
       const packet = decode(raw,"42");

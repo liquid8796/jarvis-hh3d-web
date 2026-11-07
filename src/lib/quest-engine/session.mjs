@@ -78,6 +78,8 @@ export function createSession(page, options) {
   let fishSocket = null;
   const fishingTelemetry = createFishingTelemetry();
   const fishingSales = createFishingSaleJournal(log);
+  let fishBagReceipts = [];
+  let fishReceiptGeneration = 0;
   let fishSelfId = null;
   let fishAwaitingCatch = false;
   let fishFight = null;
@@ -93,7 +95,11 @@ export function createSession(page, options) {
   const onFishFrame = (raw) => {
     const accepted = fishingTelemetry.ingest(raw);
     const text = typeof raw === "string" ? raw : raw?.toString?.() ?? "";
-    fishingSales.received(text);
+    const receipt = fishingSales.received(text);
+    if (receipt) {
+      fishBagReceipts.push(receipt);
+      if (fishBagReceipts.length > 32) fishBagReceipts.shift();
+    }
     if (accepted && fishFight && text.startsWith('42["g:snap",')) {
       const gauge = fishingTelemetry.current();
       if (gauge) {
@@ -109,6 +115,8 @@ export function createSession(page, options) {
     try {
       const [name, payload] = JSON.parse(text.slice(2));
       if (name === "hello") {
+        fishBagReceipts = [];
+        fishReceiptGeneration++;
         fishSelfId = Number.isSafeInteger(payload?.me?.id) && payload.me.id > 0 ? payload.me.id : null;
         return;
       }
@@ -278,6 +286,8 @@ export function createSession(page, options) {
         if (!socket.url().includes("/socket.io/")) return;
         fishSocket = socket;
         fishingSales.reset();
+        fishBagReceipts = [];
+        fishReceiptGeneration++;
         fishSelfId = null;
         fishAwaitingCatch = false;
         fishFight = null;
@@ -293,6 +303,8 @@ export function createSession(page, options) {
           if (fishSocket !== socket) return;
           fishSocket = null;
           fishingSales.reset();
+          fishBagReceipts = [];
+          fishReceiptGeneration++;
           fishSelfId = null;
           fishAwaitingCatch = false;
           fishFight = null;
@@ -431,8 +443,26 @@ export function createSession(page, options) {
     async evaluate(fnOrSource, arg) {
       try {
         if (typeof fnOrSource === "string") {
-          const source = `(() => { const v = (${fnOrSource}); return typeof v === "function" ? v() : v; })()`;
-          return await page.evaluate(source);
+          const queue = fishBagReceipts;
+          const receipts = queue.slice();
+          const delivery = fishTelemetryActive
+            ? `if (window.__jvzFishReceiptGeneration !== ${fishReceiptGeneration}) {
+                window.__jvzFishReceiptGeneration = ${fishReceiptGeneration};
+                window.__jvzFishReceipts = [];
+                if (window.__jvzFish) {
+                  delete window.__jvzFish.saleAllowance;
+                  window.__jvzFish.bagRequest = null;
+                  window.__jvzFish.bagWork = null;
+                  window.__jvzFish.bagChecked = false;
+                  window.__jvzFish.bagRefreshRequired = true;
+                }
+              }
+              window.__jvzFishReceipts = (window.__jvzFishReceipts || []).concat(${JSON.stringify(receipts)}).slice(-32);`
+            : "";
+          const source = `(() => { ${delivery} const v = (${fnOrSource}); return typeof v === "function" ? v() : v; })()`;
+          const result = await page.evaluate(source);
+          queue.splice(0, receipts.length);
+          return result;
         }
 
         return arg === undefined

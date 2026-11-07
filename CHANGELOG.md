@@ -9,6 +9,15 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.248 — Daily sale allowance and opt-in fish release (07/11/2026)
+
+- Manual Chrome capture shows a successful response can reject every requested sale with sold:[], stop:cap and total:0. A +4 fish cannot fit the remaining allowance 1 even while the displayed total is 999/1000. Correlate passive bag/sell/release acknowledgements and deliver only sanitized summaries to the controller.
+- Apply the remaining sale allowance before selecting fish, prefer sales for overlapping thresholds, and handle cap receipts without the misleading unconfirmed-sale timeout. Reopen blocked full baskets after backoff so renewed allowance can be learned; discard stale receipts and refresh inventory after reconnect.
+- Add releaseBelow (0–30, default 0/off) and releaseEveryCasts (1–10000, default 5) to schema, form parsing, shared dashboard and both quest profiles. Count accepted casts independently, inspect before first cast and handle near/full baskets early. Never release unknown or above-threshold fish, and never release the pending catch directly.
+- Use the captured Thả về hồ control; revalidate rare-fish confirmation and wait for inventory acknowledgement without duplicate submission. Journal only server-confirmed release counts and known ngư lực, without invented sale proceeds.
+- Add focused regressions for unchanged cap rejection, known allowance/reset, opt-in release, overlap priority, rare confirmation, cadence, unknown fish, unresolved responses, reconnect queue invalidation and full-basket recovery. Preserve the no-GitHub-push deployment restriction.
+- All 18 fishing checks, application/scripts typechecks and production build pass. The aggregate smoke was stopped after 412 seconds after reproducing the already documented check-in and boss-hub fixture failures; it is not claimed green.
+
 ## 1.3.247 — Configure casts between basket sales (07/11/2026)
 
 - Complete the requested sale interval setting omitted from 1.3.246: sellEveryCasts accepts 1–10000 with a legacy-compatible default of 5 through the shared form, server validation, both quest profiles and worker runtime.

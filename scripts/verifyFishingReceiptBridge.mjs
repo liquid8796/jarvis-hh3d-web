@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+import assert from "node:assert/strict";
+import {EventEmitter} from "node:events";
+import vm from "node:vm";
+import {createSession} from "../src/lib/quest-engine/session.mjs";
+const page=new EventEmitter(),context=vm.createContext({window:{}});
+page.evaluate=async source=>vm.runInContext(source,context);
+const log={info(){},debug(){},warning(){},error(){}};
+const session=createSession(page,{log});session.beginFishingTelemetry();
+const socket=new EventEmitter();socket.url=()=>"wss://example.test/socket.io/";
+page.emit("websocket",socket);
+socket.emit("framereceived",{payload:'42["hello",{"me":{"id":1}}]'});
+socket.emit("framesent",{payload:'421["g:act",{"a":"sell","ids":[7]}]'});
+socket.emit("framereceived",{payload:'431[{"ok":true,"sold":[],"stop":"cap","total":0,"wallet":{"fish":{"cap":1000,"room":1}}}]'});
+const take=()=>session.evaluate("() => window.__jvzFishReceipts?.splice(0) || []");
+const receipt=JSON.parse(JSON.stringify(await take()));
+assert.equal(receipt.length,1,"session must deliver correlated sale cap before the controller tick");
+assert.equal(receipt[0].stop,"cap");assert.equal(receipt[0].remainingAllowance,1);
+assert.equal((await take()).length,0,"do not deliver twice");
+socket.emit("framesent",{payload:'422["g:act",{"a":"release","ids":[7]}]'});
+socket.emit("framereceived",{payload:'432[{"ok":true,"released":1}]'});
+await session.evaluate("() => {window.__jvzFish={saleAllowance:0,bagRequest:{kind:\"release\"},bagChecked:true};return 0}");
+socket.emit("close");
+assert.equal((await take()).length,0,"closed socket cannot leak stale receipts");
+assert.equal(context.window.__jvzFish.saleAllowance,undefined,"forget allowance on socket reset");
+assert.equal(context.window.__jvzFish.bagRefreshRequired,true,"refresh the basket before any new action");
+console.log("PASS passive fishing receipt session bridge");

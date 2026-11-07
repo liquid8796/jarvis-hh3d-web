@@ -1079,6 +1079,20 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
               <span className="block">Lần đầu vào sẽ kiểm tra giỏ và bán cá theo ngưỡng trước khi ném câu; sau đó lặp lại sau tối đa N lần ném được game chấp nhận. Giỏ gần đầy hoặc đầy có thể được kiểm tra sớm để tránh tràn.</span>
             </label>
             <label className="space-y-1 text-xs text-[var(--color-mist)]">
+              <span>Tự thả cá có ngư lực không quá +N (0 = không thả)</span>
+              <input type="number" name="cauCaReleaseBelow" min={0} max={30} step={1}
+                defaultValue={config.quests.cauCa.releaseBelow} disabled={!isAdmin}
+                className="w-full rounded-lg border border-[var(--color-ink-500)] bg-[var(--color-ink-700)] p-2 text-[var(--color-parchment)]" />
+              <span className="block">Mặc định tắt. Cá được thả sẽ rời giỏ và không nhận phần thưởng bán cá. Ưu tiên bán khi cá cùng đạt cả hai ngưỡng và vẫn có thể bán, rồi mới xét thả theo cấu hình.</span>
+            </label>
+            <label className="space-y-1 text-xs text-[var(--color-mist)]">
+              <span>Kiểm tra và thả cá sau tối đa N lần ném</span>
+              <input type="number" name="cauCaReleaseEveryCasts" min={1} max={10000} step={1}
+                defaultValue={config.quests.cauCa.releaseEveryCasts} disabled={!isAdmin}
+                className="w-full rounded-lg border border-[var(--color-ink-500)] bg-[var(--color-ink-700)] p-2 text-[var(--color-parchment)]" />
+              <span className="block">Khi bật thả cá, kiểm tra giỏ lần đầu trước khi ném; sau đó kiểm tra độc lập với bán cá sau tối đa N lần ném được game chấp nhận. Giỏ gần đầy hoặc đầy có thể được kiểm tra sớm để tránh tràn.</span>
+            </label>
+            <label className="space-y-1 text-xs text-[var(--color-mist)]">
               <span>Giới hạn số lần ném câu (0 = không giới hạn)</span>
               <input type="number" name="cauCaCastLimit" min={0} max={10000} step={1}
                 defaultValue={config.quests.cauCa.castLimit} disabled={!isAdmin}

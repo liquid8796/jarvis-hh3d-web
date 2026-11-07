@@ -433,6 +433,8 @@ export function profileForConfig(config, say, marksToday, at = new Date()) {
       setOption(quest, "spot", fishing.spot ?? "giua", { log });
       setOption(quest, "sellBelow", String(fishing.sellBelow ?? 4), { allowFreeform: true, log });
       setOption(quest, "sellEveryCasts", String(fishing.sellEveryCasts ?? 5), { allowFreeform: true, log });
+      setOption(quest, "releaseBelow", String(fishing.releaseBelow ?? 0), { allowFreeform: true, log });
+      setOption(quest, "releaseEveryCasts", String(fishing.releaseEveryCasts ?? 5), { allowFreeform: true, log });
       setOption(quest, "castLimit", String(fishing.castLimit ?? 0), { allowFreeform: true, log });
     }
   }

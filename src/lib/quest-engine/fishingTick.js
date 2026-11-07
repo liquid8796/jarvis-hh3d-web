@@ -9,10 +9,27 @@
   const sellBelow = Math.max(0, Math.min(30, Number("{{sellBelow}}") || 0));
   const castLimit = Math.max(0, Math.min(10000, Number("{{castLimit}}") || 0));
   const sellEveryCasts = Math.max(1, Math.min(10000, Math.trunc(Number("{{sellEveryCasts}}")) || 5));
+  const releaseBelow = Math.max(0, Math.min(30, Number("{{releaseBelow}}") || 0));
+  const releaseEveryCasts = Math.max(1, Math.min(10000, Math.trunc(Number("{{releaseEveryCasts}}")) || 5));
   const body = document.body;
+
   const state = window.__jvzFish ??= { casts: 0, ticks: 0, bagChecked: false, lastBagCast: -1, entering: 0, pressed: false, lastPress: 0, pendingSale: false };
   state.spot = "{{spot}}";
   state.ticks++;
+  // Correlated, passive Socket.IO receipts are supplied by the session driver.
+  // The daily cap is a value allowance: 999/1000 can reject a +4 fish.
+  for (const receipt of (window.__jvzFishReceipts?.splice(0) || [])) {
+    if (!Number.isFinite(receipt.at) || Date.now() - receipt.at > 60_000) continue;
+    if (receipt.ok && Number.isSafeInteger(receipt.remainingAllowance) && receipt.remainingAllowance >= 0)
+      state.saleAllowance = receipt.remainingAllowance;
+    if (receipt.action === "sell" && receipt.stop === "cap") {
+      if (!Number.isSafeInteger(receipt.remainingAllowance)) state.saleAllowance = 0;
+      state.saleCapNotice = true;
+    }
+    if (state.bagRequest && receipt.action === state.bagRequest.kind && receipt.at >= state.bagRequest.at)
+      state.bagRequest.receipt = receipt;
+  }
+
   // Detail-only basket reads must not trigger the normal sale/cast branch.
   if (state.journalReading)
     return "fish: đang đọc chi tiết cá vừa bắt";
@@ -22,7 +39,12 @@
     state.castFailure = "";
     return "!Chưa ném được câu. Sẽ thử lại sau 5 giây.";
   }
+  if (state.saleCapNotice) {
+    state.saleCapNotice = false;
+    return "!Đã chạm hạn mức bán cá hôm nay. Bỏ qua cá vượt phần hạn mức còn lại; chỉ thả khi đã bật tùy chọn thả cá.";
+  }
   if (state.retryAfter > Date.now()) return "fish: chờ hồi phục";
+
   const get = (sel) => document.querySelector(sel);
   const label = (element) => (element?.textContent || "").replace(/\s+/g, " ").trim();
   const visible = (el) => !!el && el.getClientRects().length > 0 && !el.disabled;
@@ -114,6 +136,12 @@
   const badge = label(get(".fish-quick-bag .fish-badge"));
   const bagCount = +(badge.match(/^(\d+)\s*\//)?.[1] || 0);
   const bagCap = +(badge.match(/\/\s*(\d+)/)?.[1] || 30);
+  const castsSinceSale = state.casts - Math.max(0, state.lastSaleCast ?? state.lastBagCast ?? 0);
+  const castsSinceRelease = state.casts - Math.max(0, state.lastReleaseCast ?? 0);
+  const castsSinceBag = state.casts - Math.max(0, state.lastBagCast ?? 0);
+  const safetyDue = bagCount >= bagCap || (castsSinceBag > 0 && bagCount >= bagCap - 1);
+  const saleDue = !state.bagChecked || safetyDue || castsSinceSale >= sellEveryCasts;
+  const releaseDue = releaseBelow > 0 && (!state.bagChecked || safetyDue || castsSinceRelease >= releaseEveryCasts);
   const pendingBag = [...document.querySelectorAll(".sheet .fish-bag-pend")].find(visible);
   if (pendingBag) {
     const open = [...pendingBag.querySelectorAll("button")].find(b => visible(b) && /^Mở giỏ dọn chỗ$/i.test(label(b)));
@@ -122,6 +150,11 @@
   }
   const bag = [...document.querySelectorAll(".sheet .fish-bag")].find(visible);
   if (bag) {
+    if (state.bagRefreshRequired) {
+      bag.closest(".sheet")?.querySelector('.sheet-head button[aria-label="Đóng"]')?.click();
+      state.bagRefreshRequired = false;
+      return "fish: đọc lại giỏ sau khi kết nối thay đổi";
+    }
     state.bagOpeningAt = 0; state.bagOpenStartedAt = 0;
     if (!bag.querySelector(".fish-bag-head, .fish-bag-item, .fish-bag-empty")) {
       state.bagLoadingAt ||= Date.now();
@@ -138,79 +171,104 @@
     const auto = bag.querySelector(".fish-bag-auto button.notif-toggle");
     if (visible(auto) && (auto.getAttribute("aria-checked") === "true" || auto.classList.contains("on"))) {
       auto.click();
-      return sellBelow === 0 ? "!Đã tắt tự bán cá. Giữ lại toàn bộ cá."
-        : "!Đã tắt tự bán tức thời của game; sẽ bán cá theo ngưỡng và số lượt đã chọn.";
+      return sellBelow === 0 && releaseBelow === 0 ? "!Đã tắt tự bán cá. Giữ lại toàn bộ cá."
+        : "!Đã tắt tự bán tức thời của game; sẽ bán/thả cá theo ngưỡng và số lượt đã chọn.";
     }
-    const cards = [...bag.querySelectorAll(".fish-bag-item.fish-card")];
-    const eligible = cards.filter((card) => {
-      const strengths = [...label(card).matchAll(/\+(\d+)\b/g)].map((m) => +m[1]);
-      return strengths.length > 0 && strengths[strengths.length - 1] <= sellBelow;
-    });
-    // A user might have selected a rare fish before automation resumed. Clear
-    // those selections BEFORE submitting the game's single bulk-sale button.
-    const eligibleSet = new Set(eligible);
-    const unsafeSelected = cards.filter((card) => card.classList.contains("on") && !eligibleSet.has(card));
-    if (unsafeSelected.length) {
-      unsafeSelected.forEach((card) => card.click());
-      return "fish: bỏ chọn cá vượt ngưỡng hoặc không xác định được ngư lực";
-    }
+    state.bagWork ??= { sale: saleDue, release: releaseDue };
+    if (bag.querySelector(".fish-bag-capnote")) state.saleAllowance = 0;
     const inventorySignature = () => JSON.stringify(
       [...bag.querySelectorAll(".fish-bag-item.fish-card")].map(label).sort(),
     );
-    // The sale button stays mounted until the request completes. Do not
-    // resubmit or close the bag before the game renders its new selection.
-    if (state.saleRequestedAt) {
-      if (!state.saleConfirmationSent && bag.querySelector(".fish-bag-ask")) {
-        state.saleRequestedAt = 0; // delayed confirmation is not a submitted sale
-      } else if (inventorySignature() === state.saleInventory) {
-        if (Date.now() - state.saleRequestedAt < 12_000)
-          return "fish: chờ trò chơi cập nhật giỏ sau yêu cầu bán";
-        bag.closest(".sheet")?.querySelector('.sheet-head button[aria-label="Đóng"]')?.click();
-        state.saleRequestedAt = 0;
-        state.pendingSale = false;
-        state.bagChecked = false;
-        state.retryAfter = Date.now() + 30_000;
-        return "!Chưa xác nhận được kết quả bán cá. Sẽ đọc lại giỏ sau 30 giây.";
-      }
-      state.saleRequestedAt = 0;
-      state.pendingSale = false;
-    }
-    if (sellBelow > 0 && eligible.length) {
-      const notSelected = eligible.filter((c) => !c.classList.contains("on"));
-      if (notSelected.length) {
-        notSelected.forEach((card) => card.click());
-        state.pendingSale = true;
-        return `fish: chọn ${notSelected.length} cá có ngư lực ≤ +${sellBelow}`;
-      }
-      const sell = [...bag.querySelectorAll(".fish-bag-bar button")].find((b) => visible(b) && /^Bán \d+ con/i.test(label(b)));
-      if (sell) {
-        const confirming = !!bag.querySelector(".fish-bag-ask");
-        state.saleInventory = inventorySignature();
-        state.saleConfirmationSent = confirming;
-        sell.click();
-        // Manual Chrome capture 2026-11-07: the first click for rare fish
-        // only opens .fish-bag-ask. Revalidate the selection before confirming.
-        if (!confirming && bag.querySelector(".fish-bag-ask")) {
-          state.pendingSale = true;
-          return "fish: kiểm tra lại cá đã chọn trước khi xác nhận bán cá hiếm";
+    // Never change selection, close the basket or retry an unresolved action.
+    const request = state.bagRequest;
+    if (request) {
+      const receipt = request.receipt;
+      if (!request.confirmationSent && bag.querySelector(".fish-bag-ask")) {
+        state.bagRequest = null; // a delayed rare-fish prompt is not submission
+      } else if (receipt && (!receipt.ok || (receipt.stop === "cap" && receipt.soldCount === 0))) {
+        state.bagRequest = null;
+        if (!receipt.ok) {
+          state.bagWork = null;
+          state.bagChecked = false;
+          return finish("Trò chơi chưa chấp nhận yêu cầu " + (request.kind === "sell" ? "bán" : "thả") + " cá.", true);
         }
-        state.pendingSale = false;
-        state.saleRequestedAt = Date.now();
-        return "fish: đã gửi yêu cầu bán cá, chờ trò chơi xác nhận";
+      } else if (inventorySignature() === request.inventory) {
+        if (Date.now() - request.at < 12_000)
+          return "fish: chờ trò chơi cập nhật giỏ sau yêu cầu " + (request.kind === "sell" ? "bán" : "thả");
+        bag.closest(".sheet")?.querySelector('.sheet-head button[aria-label="Đóng"]')?.click();
+        state.bagRequest = null; state.bagWork = null; state.bagChecked = false;
+        state.retryAfter = Date.now() + 30_000;
+        return "!Chưa xác nhận được kết quả " + (request.kind === "sell" ? "bán" : "thả") + " cá. Sẽ đọc lại giỏ sau 30 giây.";
+      } else {
+        state.bagRequest = null;
       }
     }
-    if (bagCount >= bagCap && bag.querySelector(".fish-bag-capnote"))
-      return finish("Ngư Ông đã mua đủ hôm nay. Giữ nguyên cá trong giỏ; không tự thả cá.", true);
-    if (bagCount >= bagCap && (sellBelow === 0 || eligible.length === 0))
-      return finish("Giỏ cá đã đầy. Không có cá phù hợp với ngưỡng bán đã chọn.", true);
+    const cards = [...bag.querySelectorAll(".fish-bag-item.fish-card")];
+    const strength = card => {
+      const values = [...label(card).matchAll(/\+(\d+)\b/g)].map(m => +m[1]);
+      return values.length ? values.at(-1) : null;
+    };
+    const releaseEligible = state.bagWork.release && releaseBelow > 0
+      ? cards.filter(card => strength(card) !== null && strength(card) <= releaseBelow) : [];
+    const releaseSet = new Set(releaseEligible);
+    const saleCandidates = sellBelow > 0 ? cards.filter(card =>
+      strength(card) !== null && strength(card) <= sellBelow &&
+      (state.bagWork.sale || releaseSet.has(card))) : [];
+    let allowance = Number.isSafeInteger(state.saleAllowance) ? state.saleAllowance : Infinity;
+    const saleEligible = saleCandidates.slice().sort((a,b) => strength(a)-strength(b)).filter(card => {
+      const value = strength(card);
+      if (value > allowance) return false;
+      allowance -= value;
+      return true;
+    });
+    // Sale wins overlap, including a release check before the next sale check.
+    const kind = saleEligible.length ? "sell" : releaseEligible.length ? "release" : "";
+    const eligible = kind === "sell" ? saleEligible : releaseEligible;
+    const eligibleSet = new Set(eligible);
+    if (!kind && bagCount >= bagCap) {
+      bag.closest(".sheet")?.querySelector('.sheet-head button[aria-label="Đóng"]')?.click();
+      state.bagChecked = false;
+      state.bagWork = null;
+      if (Number.isSafeInteger(state.saleAllowance) && saleCandidates.length)
+        return finish("Hạn mức bán hôm nay không đủ cho cá trong giỏ. Không có cá phù hợp với tùy chọn thả đã bật.", true);
+      if (bag.querySelector(".fish-bag-capnote"))
+        return finish("Ngư Ông đã mua đủ hôm nay. Giữ nguyên cá không phù hợp với tùy chọn thả.", true);
+      return finish("Giỏ cá đã đầy. Không có cá phù hợp với ngưỡng bán hoặc thả đã chọn.", true);
+    }
+    const unsafeSelected = cards.filter(card => card.classList.contains("on") && !eligibleSet.has(card));
+    if (unsafeSelected.length) {
+      unsafeSelected.forEach(card => card.click());
+      return "fish: bỏ chọn cá vượt ngưỡng hoặc không xác định được ngư lực";
+    }
+    if (kind) {
+      const notSelected = eligible.filter(card => !card.classList.contains("on"));
+      if (notSelected.length) {
+        notSelected.forEach(card => card.click());
+        return `fish: chọn ${notSelected.length} cá để ${kind === "sell" ? "bán" : "thả"} theo ngưỡng ngư lực`;
+      }
+      const action = [...bag.querySelectorAll(".fish-bag-bar button")].find(button =>
+        visible(button) && (kind === "sell" ? /^Bán \d+ con/i : /^Thả về hồ$/i).test(label(button)));
+      if (!action) return finish("Chưa tìm thấy nút " + (kind === "sell" ? "bán" : "thả") + " cá phù hợp.", true);
+      const confirming = !!bag.querySelector(".fish-bag-ask");
+      const inventory = inventorySignature();
+      action.click();
+      if (!confirming && bag.querySelector(".fish-bag-ask"))
+        return "fish: kiểm tra lại cá đã chọn trước khi xác nhận " + (kind === "sell" ? "bán" : "thả") + " cá hiếm";
+      state.bagRequest = { kind, at: Date.now(), inventory, confirmationSent: confirming };
+      return "fish: đã gửi yêu cầu " + (kind === "sell" ? "bán" : "thả") + " cá, chờ trò chơi xác nhận";
+    }
     const close = bag.closest(".sheet")?.querySelector('.sheet-head button[aria-label="Đóng"]');
-    if (close) { close.click(); state.bagChecked = true; state.lastBagCast = state.casts; }
+    if (close) {
+      close.click();
+      if (state.bagWork.sale) state.lastSaleCast = state.casts;
+      if (state.bagWork.release) state.lastReleaseCast = state.casts;
+      state.bagWork = null; state.bagChecked = true; state.lastBagCast = state.casts;
+    }
     return "fish: xong kiểm giỏ";
   }
 
-  const castsSinceBag = state.casts - Math.max(0, state.lastBagCast ?? 0);
-  const bagDue = !state.bagChecked || bagCount >= bagCap ||
-    (castsSinceBag > 0 && (castsSinceBag >= sellEveryCasts || bagCount >= bagCap - 1));
+  state.bagRefreshRequired = false;
+  const bagDue = saleDue || releaseDue;
   // Count only accepted casts, then wait for their result before opening a
   // basket. A safety sale starts a fresh interval rather than a global modulo.
   if (idle && bagDue) {

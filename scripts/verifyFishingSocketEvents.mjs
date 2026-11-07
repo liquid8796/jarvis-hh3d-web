@@ -58,19 +58,19 @@ try {
   console.log("PASS real Playwright text/binary WebSocket envelopes drive trusted reel input");
   wireSocket.send('42["g:evts",[{"type":"catch","uid":999},{"type":"catch","uid":7},{"type":"catch","uid":7}]]');
   await page.waitForTimeout(100);
-  assert.equal(messages.filter(m=>m === "Câu Cá: Bắt được cá.").length,1,
+  assert.equal(messages.filter(m=>m === "Câu Cá: Bắt được cá · ngư lực chưa rõ.").length,1,
     "report exactly one authenticated self catch, not another player or duplicate");
   assert.ok(diagnostics.some(m=>/bám lực:.*bắt được.*đã vào điều khiển/.test(m)),
     "terminal diagnostics must prove controller entry, not infer it from a catch");
   wireSocket.send('42["g:evts",[{"type":"reel","t":0,"z":0.5,"f":0.5,"zone":0.3,"p":0.3},{"type":"escaped"},{"type":"catch","uid":7}]]');
   await page.waitForTimeout(100);
-  assert.equal(messages.filter(m=>m === "Câu Cá: Bắt được cá.").length,1,
+  assert.equal(messages.filter(m=>m === "Câu Cá: Bắt được cá · ngư lực chưa rõ.").length,1,
     "late catch after terminal escape cannot manufacture success");
   assert.ok(diagnostics.some(m=>/bám lực:.*cá thoát.*chưa vào điều khiển/.test(m)),
     "terminal diagnostics distinguish a fight that never entered the servo");
   assert.match(diagnostics.filter(m=>m.includes("bám lực:")).at(-1), /tiến độ tối đa 30%/,
     "batched immediate escape preserves initial authoritative reel progress");
-  assert.deepEqual(messages, ["Câu Cá: Bắt được cá.", "Câu Cá: Cá thoát mất."],
+  assert.deepEqual(messages, ["Câu Cá: Bắt được cá · ngư lực chưa rõ.", "Câu Cá: Cá thoát mất."],
     "journal has one readable result per fight, without controller telemetry");
   wireSocket.send('42["g:evt",{"type":"escaped"}]');
   await page.waitForTimeout(50);

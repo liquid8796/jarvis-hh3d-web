@@ -66,6 +66,16 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.245",
+    date: "2026-11-07",
+    lines: [
+      "Nhật ký Câu Cá hiển thị tên cá và ngư lực; tự đọc giỏ để lấy số của đúng con cá vừa bắt.",
+      "Khi bán, số cá được nhóm theo ngư lực; Linh Thạch chỉ dùng cho tổng tiền thực nhận.",
+      "Câu trúng vật phẩm thì ghi đúng tên vật phẩm, không ghép với cá trong giỏ.",
+      "Giữ nguyên ngưỡng bán. Khi chưa xác định được ngư lực, nhật ký báo rõ thay vì đoán số.",
+    ],
+  },
+  {
     version: "1.3.244",
     date: "2026-11-07",
     lines: [
@@ -489,14 +499,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Nhận đúng bản xuất đăng nhập HH3D mới từ hoathinh3d.you, kể cả khi cấu hình cũ vẫn còn trỏ .de.",
       "Khôi lỗi tự theo tên miền của bản xuất cùng họ hoathinh3d và không để dữ liệu của trang khác đổi nơi chạy.",
-    ],
-  },
-  {
-    version: "1.3.186",
-    date: "2026-10-05",
-    lines: [
-      "Khắc phục sự cố sập cửa sổ dòng lệnh khi chọn nguồn lưu lượng trong công cụ xem quảng cáo.",
-      "Tối ưu hoá cú pháp xử lý khối lệnh batch và chuẩn hoá tỉ lệ phần trăm nhập vào.",
     ],
   },
 ];

@@ -43,8 +43,8 @@ try {
   await event({type:"catch",uid:7,f:"ca_chep:bachngoc",price:4});
   assert.equal(messages.length, 1);
   assert.match(messages[0], /Cá Chép Đỏ · Bạch Ngọc/, "resolve the exact caught species and variant");
-  assert.match(messages[0], /giá bán \+4 Linh Thạch/, "the observed price is not fish power");
-  assert.ok(!messages[0].includes("ngư lực"));
+  assert.match(messages[0], /ngư lực \+4/, "use the requested catch classification label");
+  assert.ok(!messages[0].includes("Linh Thạch"), "currency belongs only to sale proceeds");
   await event({type:"catch",uid:7,f:"ca_chep:bachngoc",price:4});
   assert.equal(messages.length,1,"one result per authenticated fight");
   await event({type:"reel"});
@@ -61,6 +61,8 @@ try {
   await receive('432[{"ok":true,"sold":[11,13],"n":2,"total":10,"stop":"cap","items":[{"id":12,"f":"ca_ro","price":4}]}]',true);
   assert.equal(messages.length,beforeSale+1);
   assert.match(messages.at(-1),/Đã bán 2 cá/);
+  assert.match(messages.at(-1),/ngư lực:/);
+  assert.equal(messages.at(-1).match(/Linh Thạch/g)?.length,1,"only total proceeds use currency");
   assert.match(messages.at(-1),/\+4: 1 cá/);
   assert.match(messages.at(-1),/\+8: 1 cá/);
   assert.match(messages.at(-1),/thu 10 Linh Thạch/,"use server proceeds, not summed sticker prices");
@@ -73,7 +75,7 @@ try {
   await send('424["g:act",{"a":"sell","ids":[12,999]}]');
   await receive('434[{"ok":true,"sold":[12,999],"n":2}]');
   assert.match(messages.at(-1),/\+4: 1 cá/);
-  assert.match(messages.at(-1),/chưa rõ giá: 1 cá/);
+  assert.match(messages.at(-1),/chưa rõ: 1 cá/);
   assert.match(messages.at(-1),/chưa rõ số Linh Thạch/);
   const beforeMissingSold=messages.length;
   await send('4224["g:act",{"a":"sell","ids":[12]}]');
@@ -122,6 +124,26 @@ try {
   await receive('43bad[{}]');
   await page.waitForTimeout(40);
   assert.equal(messages.length,beforeReconnect,"old live socket and malformed frames cannot add receipts");
+  // Live catch packets omit price. Exercise session -> normal UI read -> real ACK -> enriched log.
+  await page.setContent('<div class="sheet" style="display:none">Hidden launcher</div><div class="fish-room"><button class="fish-main st-idle">Ném câu</button><button class="fish-quick-bag">Giỏ cá</button></div>');
+  await page.evaluate(()=>{
+    window.__jvzFish={casts:1,bagChecked:true,lastBagCast:1};
+    document.querySelector('.fish-quick-bag').onclick=()=>{
+      const sheet=document.createElement('div');sheet.className='sheet';
+      sheet.innerHTML='<div class="sheet-head"><button aria-label="Đóng">Đóng</button></div><div class="fish-bag">Đang tải</div>';
+      sheet.querySelector('button').onclick=()=>sheet.remove();document.body.append(sheet);
+      window.ws.addEventListener('message',e=>{if(e.data.startsWith('4361['))sheet.querySelector('.fish-bag').innerHTML='<div class="fish-bag-head">Giỏ 2/30</div>'},{once:true});
+      window.ws.send('4261["g:act",{"a":"bag"}]');
+    };
+  });
+  sockets.at(-1).on('message',raw=>{if(raw.toString()==='4261["g:act",{"a":"bag"}]')
+    sockets.at(-1).send('4361[{"ok":true,"items":[{"id":2062372,"f":"ngan_ly","w":2.34,"len":57,"price":9},{"id":2062373,"f":"ngan_ly","w":2.34,"len":57,"price":4}]}]');});
+  await event({type:"reel"});
+  await receive('42'+JSON.stringify(['g:evts',[{type:"bag",n:29,cap:30,got:2062373},{type:"catch",uid:7,f:"ngan_ly",kind:"FISH",w:2.34,len:57,big:false,h:"giua",isNew:true,caught:5,best:"den_hoa_dang",pct:4.2}]]));
+  for(let i=0;i<40&&!messages.at(-1)?.includes('Ngân Lý · ngư lực +4');i++) await page.waitForTimeout(50);
+  assert.match(messages.at(-1),/Bắt được Ngân Lý · ngư lực \+4/,'captured price-missing catch gets the exact ID value via bag ACK without a baseline');
+  await page.waitForFunction(()=>!window.__jvzFish.journalReading,{},{timeout:2000});
+  assert.equal(await page.locator('.sheet .fish-bag').count(),0,'detail panel closed after ACK');
   const expired=[], journal=createFishingSaleJournal({info:m=>expired.push(m)},()=>clock);
   let clock=0;
   journal.received('42["hello",{"me":{"id":7}}]');
@@ -129,7 +151,7 @@ try {
   clock=60001;
   journal.received('431[{"ok":true,"sold":[1],"total":4}]');
   assert.deepEqual(expired,[],"expired requests cannot create late receipts");
-  console.log("PASS fishing journal: exact names, price semantics, partial/failed sales, server totals, duplicate suppression, auto-sale, settle and reconnect");
+  console.log("PASS fishing journal: exact names, ngư lực labels, partial/failed sales, server totals, duplicate suppression, auto-sale, settle and reconnect");
 } finally {
   await browser?.close();
   for(const socket of server.clients) socket.terminate();

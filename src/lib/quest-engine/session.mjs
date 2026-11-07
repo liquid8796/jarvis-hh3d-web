@@ -9,7 +9,8 @@
 import { parseCooldownSeconds } from "./cooldown.mjs";
 import { chooseFishingHold, createFishingTelemetry } from "./fishingServo.mjs";
 import { prepareFishingSpot } from "./fishingSpot.mjs";
-import { createFishingSaleJournal, formatFishingCatch } from "./fishingJournal.mjs";
+import { createFishingSaleJournal } from "./fishingJournal.mjs";
+import { readFishingCatchBag } from "./fishingCatchDetails.mjs";
 
 /**
  * Bỏ dấu, hạ chữ thường, chỉ giữ chữ và số, cách nhau đúng một khoảng trắng.
@@ -127,7 +128,8 @@ export function createSession(page, options) {
         else if (event?.type === "catch" && fishAwaitingCatch &&
                  fishSelfId !== null && event.uid === fishSelfId) {
           fishAwaitingCatch = false;
-          log.info(formatFishingCatch(event));
+          const detailToken = fishingSales.caught(event);
+          if (detailToken !== null) void readFishingCatchBag(page).finally(()=>fishingSales.finishCatch(detailToken));
           finishFishEvidence("bắt được");
         }
       }

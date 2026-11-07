@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.245 — Catch details and requested ngư lực labels (07/11/2026)
+
+- Follow the user's explicit journal terminology: label each fish's observed +N as ngư lực, and reserve Linh Thạch for confirmed sale proceeds. The underlying game field remains price; no separate power value is invented.
+- Trace the user's manual Chrome catches: catch omits price, while bag.got identifies the newly stored fish. Read the regular basket once and match that exact ID plus species/measurements, including the captured Ngân Lý +4 without a previous basket snapshot. When the ID is absent, require an unambiguous new ID against the previous snapshot. Also use same-fight immediate auto-sale and pending-fish details. Unknown or ambiguous values stay explicit.
+- Log non-fish catches by name as vật phẩm, including the captured Đèn hoa đăng and Trúc thư. Do not read the fish basket or assign a fish classification to them.
+- Keep detail-only basket inspection separate from sale controls: hold the controller while reading, do not select/sell fish or toggle settings, preserve existing panels, and close only the panel opened for this read. Preserve existing sale thresholds and server-confirmed receipt totals.
+- Add regressions for stale/ambiguous fish, same-batch pending data, delayed/failed basket loads, hidden launcher panels and a complete session/UI/WebSocket acknowledgement path.
+
 ## 1.3.244 — Detailed, server-confirmed fishing receipts (07/11/2026)
 
 - Resolve exact caught species and variant names from the 398-entry live game catalog. Record the catch price only when supplied by the server; unknown future names and missing values stay explicit rather than invented.

@@ -1,6 +1,6 @@
 {
   "name": "jarvis-hh3d-web",
-  "version": "1.3.244",
+  "version": "1.3.245",
   "private": true,
   "description": "Auto HH3D — control plane tu tiên cho automation hoathinh3d: đăng ký môn đồ, tông môn duyệt, khai đàn tự động chạy trên server.",
   "scripts": {
@@ -183,7 +183,7 @@
     "verify:direct-attachments": "tsx scripts/verifyDirectAttachments.mts",
     "verify:chat-attachments-ui": "tsx scripts/verifyCommunicationAttachmentsUi.mts",
     "verify:bi-canh-cooldown": "node scripts/verifyBiCanhCooldown.mjs",
-    "verify:fishing-journal": "node scripts/verifyFishingJournal.mjs"
+    "verify:fishing-journal": "node scripts/verifyFishingJournal.mjs && node scripts/verifyFishingCatchDetails.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1106.0",

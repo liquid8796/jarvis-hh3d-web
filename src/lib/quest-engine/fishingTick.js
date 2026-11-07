@@ -11,6 +11,9 @@
   const body = document.body;
   const state = window.__jvzFish ??= { casts: 0, ticks: 0, bagChecked: false, lastBagCast: -1, entering: 0, pressed: false, lastPress: 0, pendingSale: false };
   state.ticks++;
+  // Detail-only basket reads must not trigger the normal sale/cast branch.
+  if (state.journalReading)
+    return "fish: đang đọc chi tiết cá vừa bắt";
   // Lượt câu không giới hạn: NEVER finish the job on room/basket/network
   // issues. Retry in the same worker/browser so no five-minute cycle break.
   if (state.castFailure) {

@@ -90,7 +90,7 @@ try {
  assert.deepEqual(pageErrors,[]);
  assert.equal(hooks.length,cycles,"full engine must hook every fixture cycle");
  assert.equal(summary.length,cycles,"every completed fight must retain its debug summary");
- assert.equal(logs.filter(l=>l.level==="info"&&l.message==="Câu Cá: Bắt được Cá Chép Đỏ · giá bán +1 Linh Thạch.").length,cycles,
+ assert.equal(logs.filter(l=>l.level==="info"&&l.message==="Câu Cá: Bắt được Cá Chép Đỏ · ngư lực +1.").length,cycles,
   "one clear result per completed fight in the journal");
  assert.ok(!logs.some(l=>l.level==="info"&&/bám lực|mẫu hợp lệ|tiến độ tối đa/.test(l.message)),
   "journal excludes controller telemetry");

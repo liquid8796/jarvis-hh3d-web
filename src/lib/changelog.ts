@@ -66,6 +66,13 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.249",
+    date: "2026-11-07",
+    lines: [
+      "Gỡ ba dòng ghi chú dưới các tùy chọn bán và thả cá để phần cấu hình gọn hơn.",
+    ],
+  },
+  {
     version: "1.3.248",
     date: "2026-11-07",
     lines: [
@@ -495,15 +502,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Trong sổ khóa Reflection, thông báo lỗi giờ cho biết mã và nguyên nhân thay vì chỉ ghi Lỗi gần nhất.",
       "Thông tin bí mật vẫn được che; khi có lỗi bạn có thể xem chi tiết ngay tại dòng khóa tương ứng.",
-    ],
-  },
-  {
-    version: "1.3.199",
-    date: "2026-10-19",
-    lines: [
-      "Có thêm Reflection bên cạnh Ollama cho kho GitHub; chọn nhà cung cấp ngay trong phần cấu hình.",
-      "Khóa Reflection có sổ riêng; có thể nhập bằng tệp hoặc dán nhiều dòng, xem, sao chép và tạm tắt.",
-      "Khi chuyển nhà cung cấp, các khóa Ollama đã lưu không bị mất hay trộn sang Reflection.",
     ],
   },
 ];

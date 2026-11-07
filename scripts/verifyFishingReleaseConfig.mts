@@ -64,7 +64,4 @@ for (const [key, name, min, max, fallback] of [
     assert.equal(parse(data), expected, name + ": " + value);
   }
 }
-assert.match(form, /Mặc định tắt/);
-assert.match(form, /độc lập/);
-assert.match(form, /Ưu tiên bán/);
 console.log("PASS fishing release config: schema bounds/defaults, both twins, legacy off, form wiring and action parsing");

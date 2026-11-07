@@ -9,6 +9,11 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.249 — Remove fishing option helper notes (07/11/2026)
+
+- Remove only the three explanatory notes below the sale interval, release threshold and release interval inputs shown in the user's screenshots.
+- Preserve option labels, input attributes, stored values and fishing behavior. Keep the release local plus OCI, without GitHub pushes or worker deployment.
+
 ## 1.3.248 — Daily sale allowance and opt-in fish release (07/11/2026)
 
 - Manual Chrome capture shows a successful response can reject every requested sale with sold:[], stop:cap and total:0. A +4 fish cannot fit the remaining allowance 1 even while the displayed total is 999/1000. Correlate passive bag/sell/release acknowledgements and deliver only sanitized summaries to the controller.

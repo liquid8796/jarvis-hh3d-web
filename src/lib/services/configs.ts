@@ -306,6 +306,7 @@ export const configSchema = z.object({
       /** Câu Cá — Tiên Giới, admin only (server policy lives in fishingAccess.mjs). */
       cauCa: z.object({
         enabled: z.boolean().default(false),
+        spot: z.enum(["nong", "sen", "giua", "cau", "random"]).default("giua"),
         sellBelow: z.number().int().min(0).max(30).default(4),
         castLimit: z.number().int().min(0).max(10000).default(0),
       }).prefault({}),

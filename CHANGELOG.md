@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.246 — Reliable basket sales and selectable fishing habitats (07/11/2026)
+
+- Passive capture of the user's manual sale proved that rare fish need a second confirmation click. Revalidate threshold-safe selections, handle immediate or delayed confirmation, and wait for an inventory change instead of resubmitting while the sale is pending. Selection changes alone are not a receipt.
+- Wait for basket data before judging it empty. Reopen a full basket even without another successful cast, open the basket from the pending-fish dialog, and retain fish with a clear retry when daily buying capacity or the configured threshold prevents freeing space. Close only the inspected basket sheet.
+- Add a fishing habitat config across dashboard, server schema/actions and both quest profiles: Bờ nông, Bãi sen, Giữa hồ, Dưới cầu đá, or a uniformly random habitat for each cast. Existing configs default to Giữa hồ; active Cá Săn keeps the current aim.
+- Recheck readiness immediately before trusted pointer input and Space fallback, without resampling a random habitat. Late dialogs, spectators, loading and accepted casts cannot trigger an unsafe duplicate input.
+- Add real-browser sale regressions and extend habitat/config/cast tests. All 13 fishing checks plus application and script typechecks pass. The old aggregate smoke's Điểm Danh and hub-only Bí Cảnh expectations predate existing game/profile changes; their identical failures are recorded in 06/11 baseline logs.
+
 ## 1.3.245 — Catch details and requested ngư lực labels (07/11/2026)
 
 - Follow the user's explicit journal terminology: label each fish's observed +N as ngư lực, and reserve Linh Thạch for confirmed sale proceeds. The underlying game field remains price; no separate power value is invented.

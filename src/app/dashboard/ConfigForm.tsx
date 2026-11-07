@@ -1052,6 +1052,18 @@ export function ConfigForm({ config, isAdmin }: { config: EditableConfig; isAdmi
             <span className="text-xs text-[var(--color-mist)]">VIP + thường</span>
           </label>
           {!isAdmin && <p className="text-xs text-[var(--color-mist)]">Thử nghiệm — hiện chỉ tài khoản admin được bật và chạy quest này.</p>}
+          <label className="block space-y-1 text-xs text-[var(--color-mist)]">
+            <span>Điểm câu</span>
+            <select name="cauCaSpot" defaultValue={config.quests.cauCa.spot} disabled={!isAdmin}
+              className="w-full rounded-lg border border-[var(--color-ink-500)] bg-[var(--color-ink-700)] p-2 text-[var(--color-parchment)]">
+              <option value="nong">Bờ nông</option>
+              <option value="sen">Bãi sen</option>
+              <option value="giua">Giữa hồ</option>
+              <option value="cau">Dưới cầu đá</option>
+              <option value="random">Ngẫu nhiên mỗi lần ném</option>
+            </select>
+            <span className="block">Chọn vùng ném câu, không đổi chỗ ngồi. Trong đợt Cá Săn, giữ điểm hiện tại.</span>
+          </label>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="space-y-1 text-xs text-[var(--color-mist)]">
               <span>Tự bán cá có ngư lực không quá +N (0 = không bán)</span>

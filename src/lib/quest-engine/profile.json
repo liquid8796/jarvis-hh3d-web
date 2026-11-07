@@ -8060,6 +8060,33 @@
         }
       ],
       "options": [
+        {
+          "key": "spot",
+          "label": "Điểm câu",
+          "selectedValue": "giua",
+          "choices": [
+            {
+              "value": "nong",
+              "label": "Bờ nông"
+            },
+            {
+              "value": "sen",
+              "label": "Bãi sen"
+            },
+            {
+              "value": "giua",
+              "label": "Giữa hồ"
+            },
+            {
+              "value": "cau",
+              "label": "Dưới cầu đá"
+            },
+            {
+              "value": "random",
+              "label": "Ngẫu nhiên mỗi lần ném"
+            }
+          ]
+        },
         { "key": "sellBelow", "label": "Tự bán cá ngư lực ≤ +N (0: không bán)", "allowCustom": true, "customMinimum": 0, "customMaximum": 30, "selectedValue": "4", "choices": [{ "value": "0", "label": "Không bán" }, { "value": "4", "label": "≤ +4" }, { "value": "8", "label": "≤ +8" }] },
         { "key": "castLimit", "label": "Giới hạn số lần ném câu (0: không giới hạn)", "allowCustom": true, "customMinimum": 0, "customMaximum": 10000, "selectedValue": "0", "choices": [{ "value": "0", "label": "Không giới hạn" }, { "value": "10", "label": "10 lần" }, { "value": "50", "label": "50 lần" }] }
       ],
@@ -8098,6 +8125,33 @@
         }
       ],
       "options": [
+        {
+          "key": "spot",
+          "label": "Điểm câu",
+          "selectedValue": "giua",
+          "choices": [
+            {
+              "value": "nong",
+              "label": "Bờ nông"
+            },
+            {
+              "value": "sen",
+              "label": "Bãi sen"
+            },
+            {
+              "value": "giua",
+              "label": "Giữa hồ"
+            },
+            {
+              "value": "cau",
+              "label": "Dưới cầu đá"
+            },
+            {
+              "value": "random",
+              "label": "Ngẫu nhiên mỗi lần ném"
+            }
+          ]
+        },
         { "key": "sellBelow", "label": "Tự bán cá ngư lực ≤ +N (0: không bán)", "allowCustom": true, "customMinimum": 0, "customMaximum": 30, "selectedValue": "4", "choices": [{ "value": "0", "label": "Không bán" }, { "value": "4", "label": "≤ +4" }, { "value": "8", "label": "≤ +8" }] },
         { "key": "castLimit", "label": "Giới hạn số lần ném câu (0: không giới hạn)", "allowCustom": true, "customMinimum": 0, "customMaximum": 10000, "selectedValue": "0", "choices": [{ "value": "0", "label": "Không giới hạn" }, { "value": "10", "label": "10 lần" }, { "value": "50", "label": "50 lần" }] }
       ],

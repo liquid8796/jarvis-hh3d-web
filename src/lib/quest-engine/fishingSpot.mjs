@@ -1,5 +1,5 @@
 /**
- * Pick the normal rare-fish habitat through the game's UI. The client chooses a
+ * Pick the configured habitat through the game's UI. The client chooses a
  * legal in-habitat point for the current seat; screen/world coordinates are not
  * interchangeable and no within-habitat hotspot has been established.
  */
@@ -31,7 +31,16 @@ export async function prepareFishingSpot(page) {
   if (state.blocked) return { ready: false, reason: "Còn cửa sổ che hồ; chưa ném câu." };
   if (state.hunt) return { ready: true, reason: "Giữ điểm hiện tại trong đợt Cá Săn." };
   if (!state.hasSpot) return { ready: true, reason: "Không thấy Điểm câu; giữ chỗ ném do game chọn." };
-  if (state.current === "Giữa hồ") return { ready: true };
+  const label = await page.evaluate(() => {
+    // IDs and labels from the game's habitat catalog; random means one of
+    // these four destinations on each cast, never a guessed world point.
+    const habitats = { nong: "Bờ nông", sen: "Bãi sen", giua: "Giữa hồ", cau: "Dưới cầu đá" };
+    const selected = window.__jvzFish?.spot;
+    const labels = Object.values(habitats);
+    return selected === "random" ? labels[Math.floor(Math.random() * labels.length)]
+      : Object.hasOwn(habitats, selected) ? habitats[selected] : habitats.giua;
+  });
+  if (state.current === label) return { ready: true, label };
 
   let sheet;
   try {
@@ -39,26 +48,26 @@ export async function prepareFishingSpot(page) {
     sheet = page.locator(".sheet").filter({ has: page.locator(".fish-spots") }).last();
     await sheet.waitFor({ state: "visible", timeout: 1500 });
     const target = sheet.locator("button.fish-hab").filter({
-      has: page.locator(".fish-hab-text b", { hasText: /^Giữa hồ$/u }),
+      has: page.locator(".fish-hab-text b", { hasText: new RegExp("^" + label + "$", "u") }),
     });
     // Recheck the idle state after opening a sheet. Never change habitat in a
     // bite/fight, or replace a hunt destination that appeared during selection.
     state = await inspect(true);
     if (!state.idle || state.spectator || state.blocked || state.hunt || await target.count() !== 1)
-      return { ready: false, reason: "Chưa xác định được điểm Giữa hồ an toàn." };
+      return { ready: false, reason: `Chưa xác định được điểm ${label} an toàn.` };
     await target.click({ timeout: 1500 }); // Ge(event) requires a trusted click.
-    await page.waitForFunction(() => {
+    await page.waitForFunction((label) => {
       const spot = document.querySelector(".fish-room .fish-spot b");
       const open = [...document.querySelectorAll(".fish-spots")].some(el => el.getClientRects().length);
       return !document.querySelector(".fish-room .fish-main.st-idle") ||
-        (spot?.textContent?.trim() === "Giữa hồ" && !open);
-    }, null, { timeout: 2500 });
+        (spot?.textContent?.trim() === label && !open);
+    }, label, { timeout: 2500 });
     state = await inspect();
     return state.idle && !state.spectator && !state.blocked
-      ? { ready: true, changed: true }
+      ? { ready: true, changed: true, label }
       : { ready: false, reason: "Điểm câu đã đổi nhưng trò chơi chưa sẵn sàng ném." };
   } catch {
-    return { ready: false, reason: "Game chưa xác nhận điểm Giữa hồ; sẽ thử lại." };
+    return { ready: false, reason: `Game chưa xác nhận điểm ${label}; sẽ thử lại.` };
   } finally {
     // Close only the spot sheet opened by this call. Never dismiss another
     // dialog or let Space cast through a failed spot selection.

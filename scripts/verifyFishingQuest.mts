@@ -2,6 +2,8 @@
 /** October 10 fishing recording: require an admin gate and two tier-identical quests. */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { profileForConfig } from "../src/lib/quest-engine/profile.mjs";
+import { configSchema } from "../src/lib/services/configs";
 import { enforceFishingAdminPolicy } from "../src/lib/quest-engine/fishingAccess.mjs";
 
 const p = JSON.parse(readFileSync(new URL("../src/lib/quest-engine/profile.json", import.meta.url), "utf8"));
@@ -48,3 +50,14 @@ const denied = enforceFishingAdminPolicy(cfg, false);
 assert.equal(denied.quests.cauCa.enabled, false, "non-admin cannot activate via forged config");
 assert.equal(cfg.quests.cauCa.enabled, true, "policy must not mutate input");
 console.log("PASS: Câu Cá twin quests, options and admin-only gate");
+
+assert.equal(configSchema.parse({}).quests.cauCa.spot, "giua", "old config retains Giữa hồ");
+assert.equal(configSchema.safeParse({quests:{cauCa:{spot:"invalid"}}}).success, false);
+for (const spot of ["nong", "sen", "giua", "cau", "random"]) {
+  const config = configSchema.parse({ quests: { cauCa: { enabled: true, spot } } });
+  const profile = profileForConfig(config);
+  for (const q of profile.quests.filter((q: { id: string }) => ["cau-ca", "cau-ca-thuong"].includes(q.id))) {
+    assert.equal(q.options.find((o: { key: string; selectedValue: string }) => o.key === "spot")?.selectedValue, spot, "spot survives validation and both profile twins");
+  }
+}
+console.log("PASS fishing spot config defaults, validation and twin translation");

@@ -10,6 +10,7 @@
   const castLimit = Math.max(0, Math.min(10000, Number("{{castLimit}}") || 0));
   const body = document.body;
   const state = window.__jvzFish ??= { casts: 0, ticks: 0, bagChecked: false, lastBagCast: -1, entering: 0, pressed: false, lastPress: 0, pendingSale: false };
+  state.spot = "{{spot}}";
   state.ticks++;
   // Detail-only basket reads must not trigger the normal sale/cast branch.
   if (state.journalReading)
@@ -110,8 +111,24 @@
   const badge = label(get(".fish-quick-bag .fish-badge"));
   const bagCount = +(badge.match(/^(\d+)\s*\//)?.[1] || 0);
   const bagCap = +(badge.match(/\/\s*(\d+)/)?.[1] || 30);
-  const bag = get(".sheet .fish-bag");
+  const pendingBag = [...document.querySelectorAll(".sheet .fish-bag-pend")].find(visible);
+  if (pendingBag) {
+    const open = [...pendingBag.querySelectorAll("button")].find(b => visible(b) && /^Mở giỏ dọn chỗ$/i.test(label(b)));
+    if (open) { open.click(); state.bagChecked = false; return "fish: mở giỏ để dọn chỗ cho cá đang chờ"; }
+    return finish("Giỏ cá đầy, chưa mở được giỏ để kiểm tra. Giữ nguyên cá đang chờ.", true);
+  }
+  const bag = [...document.querySelectorAll(".sheet .fish-bag")].find(visible);
   if (bag) {
+    if (!bag.querySelector(".fish-bag-head, .fish-bag-item, .fish-bag-empty")) {
+      state.bagLoadingAt ||= Date.now();
+      if (Date.now() - state.bagLoadingAt > 12_000) {
+        bag.closest(".sheet")?.querySelector('.sheet-head button[aria-label="Đóng"]')?.click();
+        state.bagChecked = false; state.bagLoadingAt = 0;
+        return finish("Chưa đọc được giỏ cá.", true);
+      }
+      return "fish: đợi dữ liệu giỏ cá";
+    }
+    state.bagLoadingAt = 0;
     const auto = get(".fish-bag-auto button.notif-toggle");
     if (sellBelow === 0 && visible(auto) &&
         (auto.getAttribute("aria-checked") === "true" || auto.classList.contains("on"))) {
@@ -135,6 +152,27 @@
       unsafeSelected.forEach((card) => card.click());
       return "fish: bỏ chọn cá vượt ngưỡng hoặc không xác định được ngư lực";
     }
+    const inventorySignature = () => JSON.stringify(
+      [...bag.querySelectorAll(".fish-bag-item.fish-card")].map(label).sort(),
+    );
+    // The sale button stays mounted until the request completes. Do not
+    // resubmit or close the bag before the game renders its new selection.
+    if (state.saleRequestedAt) {
+      if (!state.saleConfirmationSent && bag.querySelector(".fish-bag-ask")) {
+        state.saleRequestedAt = 0; // delayed confirmation is not a submitted sale
+      } else if (inventorySignature() === state.saleInventory) {
+        if (Date.now() - state.saleRequestedAt < 12_000)
+          return "fish: chờ trò chơi cập nhật giỏ sau yêu cầu bán";
+        bag.closest(".sheet")?.querySelector('.sheet-head button[aria-label="Đóng"]')?.click();
+        state.saleRequestedAt = 0;
+        state.pendingSale = false;
+        state.bagChecked = false;
+        state.retryAfter = Date.now() + 30_000;
+        return "!Chưa xác nhận được kết quả bán cá. Sẽ đọc lại giỏ sau 30 giây.";
+      }
+      state.saleRequestedAt = 0;
+      state.pendingSale = false;
+    }
     if (sellBelow > 0 && eligible.length) {
       const notSelected = eligible.filter((c) => !c.classList.contains("on"));
       if (notSelected.length) {
@@ -143,22 +181,32 @@
         return `fish: chọn ${notSelected.length} cá có ngư lực ≤ +${sellBelow}`;
       }
       const sell = [...bag.querySelectorAll(".fish-bag-bar button")].find((b) => visible(b) && /^Bán \d+ con/i.test(label(b)));
-      if (sell && state.pendingSale) {
-        state.pendingSale = false;
+      if (sell) {
+        const confirming = !!bag.querySelector(".fish-bag-ask");
+        state.saleInventory = inventorySignature();
+        state.saleConfirmationSent = confirming;
         sell.click();
-        // A click can fail or sell only part of the selection. The passive
-        // Socket.IO receipt writes the actual count and proceeds to the journal.
+        // Manual Chrome capture 2026-11-07: the first click for rare fish
+        // only opens .fish-bag-ask. Revalidate the selection before confirming.
+        if (!confirming && bag.querySelector(".fish-bag-ask")) {
+          state.pendingSale = true;
+          return "fish: kiểm tra lại cá đã chọn trước khi xác nhận bán cá hiếm";
+        }
+        state.pendingSale = false;
+        state.saleRequestedAt = Date.now();
         return "fish: đã gửi yêu cầu bán cá, chờ trò chơi xác nhận";
       }
     }
+    if (bagCount >= bagCap && bag.querySelector(".fish-bag-capnote"))
+      return finish("Ngư Ông đã mua đủ hôm nay. Giữ nguyên cá trong giỏ; không tự thả cá.", true);
     if (bagCount >= bagCap && (sellBelow === 0 || eligible.length === 0))
       return finish("Giỏ cá đã đầy. Không có cá phù hợp với ngưỡng bán đã chọn.", true);
-    const close = [...document.querySelectorAll(".sheet-head button")].find((b) => b.getAttribute("aria-label") === "Đóng");
+    const close = bag.closest(".sheet")?.querySelector('.sheet-head button[aria-label="Đóng"]');
     if (close) { close.click(); state.bagChecked = true; state.lastBagCast = state.casts; }
     return "fish: xong kiểm giỏ";
   }
 
-  if (!state.bagChecked || (state.casts > state.lastBagCast && (state.casts % 5 === 0 || bagCount >= bagCap - 1))) {
+  if (!state.bagChecked || bagCount >= bagCap || (state.casts > state.lastBagCast && (state.casts % 5 === 0 || bagCount >= bagCap - 1))) {
     const opener = get(".fish-room .fish-quick-bag");
     if (visible(opener)) { opener.click(); state.bagChecked = true; return "fish: kiểm giỏ"; }
   }
@@ -190,7 +238,7 @@
   }
   if (idle && visible(main)) {
     if (state.casts > 0 && Date.now() - (state.lastCast || 0) < 2200) return "fish: đợi lượt trước";
-    // The trusted session driver selects Giữa hồ through the official Điểm câu UI before casting.
+    // The trusted session driver selects the configured habitat before casting.
     // Playwright Click step below will deliver trusted pointerdown/up.
     main.classList.add("jvz-fish-press");
     // Only the trusted input driver may set pendingCast AFTER the game

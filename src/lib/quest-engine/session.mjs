@@ -184,6 +184,19 @@ export function createSession(page, options) {
     }, reason).catch(() => {});
     return false;
   };
+  // Readiness only: never select another habitat or resample random here.
+  const readFishInputReadiness = () => page.evaluate(() => {
+    const visible = el => {
+      if (!el || !el.getClientRects().length) return false;
+      const css = getComputedStyle(el);
+      return css.display !== "none" && css.visibility !== "hidden" &&
+        Number(css.opacity || "1") > .01;
+    };
+    const main = document.querySelector(".fish-room .fish-main");
+    return !!main?.classList.contains("st-idle") && !main.disabled && visible(main) &&
+      !visible(document.querySelector(".fish-room .fish-spec")) &&
+      ![...document.querySelectorAll(".sheet, .pl-go, .pl-gate, .bt-wrap")].some(visible);
+  });
   /** REA: the game accepts casts on trusted pointerup and also Space keyup.
    * The old page.click could time out on an animated/covered button and the
    * controller still claimed it had cast; use direct trusted input plus proof.
@@ -206,7 +219,7 @@ export function createSession(page, options) {
       if (await readFishCastState() === "accepted") return false;
       return castFailed(spot.reason);
     }
-    if (spot.changed) log.info("Câu Cá: Đã chọn điểm Giữa hồ.");
+    if (spot.changed) log.info(`Câu Cá: Đã chọn điểm ${spot.label}.`);
     else if (spot.reason) log.debug("fish spot: " + spot.reason);
     const main = page.locator(".fish-room .fish-main.st-idle");
     const before = sentFishCasts;
@@ -220,6 +233,10 @@ export function createSession(page, options) {
     let held = false;
     try {
       await page.mouse.move(x, y);
+      if (!await readFishInputReadiness()) {
+        if (await readFishCastState() === "accepted") return false;
+        return castFailed("Trò chơi không còn sẵn sàng ném; không bấm qua lớp phủ.");
+      }
       await page.mouse.down();
       held = true;
       await delayFish(Math.max(90, Math.min(350, pressMs || 150)));
@@ -234,6 +251,10 @@ export function createSession(page, options) {
     // fa/_i handlers. It bypasses pointer interception without forging packets.
     const beforeSpace = sentFishCasts;
     await page.locator(".fish-room .fish-main").focus({ timeout: 1500 });
+    if (!await readFishInputReadiness()) {
+      if (await readFishCastState() === "accepted") return castConfirmed();
+      return castFailed("Trò chơi không còn sẵn sàng ném; bỏ qua Space.");
+    }
     let down = false;
     try {
       await page.keyboard.down("Space");

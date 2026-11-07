@@ -430,6 +430,7 @@ export function profileForConfig(config, say, marksToday, at = new Date()) {
     const fishing = config.quests?.cauCa;
     quest.enabled = fishing?.enabled === true;
     if (quest.enabled) {
+      setOption(quest, "spot", fishing.spot ?? "giua", { log });
       setOption(quest, "sellBelow", String(fishing.sellBelow ?? 4), { allowFreeform: true, log });
       setOption(quest, "castLimit", String(fishing.castLimit ?? 0), { allowFreeform: true, log });
     }

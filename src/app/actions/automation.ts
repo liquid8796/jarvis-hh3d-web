@@ -202,6 +202,7 @@ export async function saveConfigAction(_prev: ActionResult | null, formData: For
       phanThuongHoatDong: simple("phanThuongHoatDong"),
       cauCa: {
         enabled: formData.get("cauCaEnabled") === "on",
+        spot: formData.get("cauCaSpot") ?? "giua",
         sellBelow: Math.min(30, Math.max(0, Math.trunc(Number(formData.get("cauCaSellBelow") ?? 4)) || 0)),
         castLimit: Math.min(10000, Math.max(0, Math.trunc(Number(formData.get("cauCaCastLimit") ?? 0)) || 0)),
       },

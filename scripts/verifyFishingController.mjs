@@ -36,6 +36,7 @@ try {
       byId(id).addEventListener("click", () => byId(id).classList.toggle("on"));
     document.querySelector(".fish-bag-bar button").addEventListener("click", () => {
       window.clicks.sold++;
+      document.getElementById("weak").remove();
     });
     document.querySelector(".sheet-head button").addEventListener("click", () => {
       document.querySelector(".sheet").remove();

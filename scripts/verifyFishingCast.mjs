@@ -76,6 +76,56 @@ try {
   assert.equal(await session.click(select, 2500, false, 120), true);
   assert.equal(await page.evaluate(() => window.__test.space), 1,
     "game source supports keydown/keyup Space as the fallback cast path");
+  // Pointer movement itself can expose a dialog after spot preparation.
+  await setup("keyboard");
+  await page.mouse.move(800, 600);
+  await page.evaluate(() => {
+    document.querySelector(".fish-main").addEventListener("pointermove", () => {
+      const blocker = document.createElement("div");
+      blocker.className = "sheet";
+      blocker.textContent = "Late dialog before press";
+      document.body.append(blocker);
+    }, { once: true });
+  });
+  assert.equal(await session.click(select, 2500, false, 120), false);
+  assert.deepEqual(await page.evaluate(() => [window.__test.down, window.__test.space]), [0, 0],
+    "recheck readiness after moving the mouse and before pressing");
+
+  // A late accepted cast must not gain a recovery timer or another input.
+  await setup("keyboard");
+  await page.evaluate(() => {
+    document.querySelector(".fish-main").addEventListener("pointerup", () => {
+      document.activeElement?.blur();
+      document.querySelector(".fish-main").addEventListener("focus", () => {
+        document.querySelector(".fish-main").classList.replace("st-idle", "st-wait");
+      }, { once: true });
+    }, { once: true });
+  });
+  assert.equal(await session.click(select, 2500, false, 120), true);
+  assert.equal(await page.evaluate(() => window.__test.space), 0);
+  assert.equal(await page.evaluate(() => window.__jvzFish.retryAfter), 0);
+  // A late dialog/spectator transition must not be bypassed by Space.
+  for (const late of ["sheet", "spectator", "disabled", "load"]) {
+    await setup("keyboard");
+    await page.evaluate(late => {
+      document.querySelector(".fish-main").addEventListener("pointerup", () => {
+        setTimeout(() => {
+          const main = document.querySelector(".fish-main");
+          if (late === "disabled") main.disabled = true;
+          else if (late === "load") main.classList.replace("st-idle", "st-load");
+          else {
+            const blocker = document.createElement("div");
+            blocker.className = late === "sheet" ? "sheet" : "fish-spec";
+            blocker.textContent = "Late blocker";
+            document.querySelector(".fish-room").append(blocker);
+          }
+        }, 10);
+      }, { once: true });
+    }, late);
+    assert.equal(await session.click(select, 2500, false, 120), false, late + " must block fallback");
+    assert.equal(await page.evaluate(() => window.__test.space), 0, late + " must not receive Space");
+    assert.equal(await page.evaluate(() => window.__jvzFish.pendingCast), false);
+  }
   await setup("none");
   assert.equal(await session.click(select, 2500, false, 120), false);
   const failure = await page.evaluate(() => ({

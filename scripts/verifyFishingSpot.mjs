@@ -1,6 +1,7 @@
 /** Regression of the worker's trusted spot-menu path, using the observed live DOM. */
 import assert from "node:assert/strict";
 import { chromium } from "playwright-core";
+import { prepareFishingSpot } from "../src/lib/quest-engine/fishingSpot.mjs";
 import { createSession } from "../src/lib/quest-engine/session.mjs";
 let browser;
 try { browser = await chromium.launch({ headless: true, channel: "chromium" }); }
@@ -16,7 +17,8 @@ try {
   const setup = async (options = {}) => {
     await page.setContent('<style>.hidden{display:none}.sheet{position:fixed;inset:0;background:white;z-index:5}button{min-width:130px;min-height:50px}</style><div class="view fish-room"><button class="fish-spot"><small>Điểm câu</small><b></b></button><button class="fish-tide hunt hidden"></button><button class="fish-main st-idle jvz-fish-press">Ném câu</button></div>');
     await page.evaluate(options => {
-      window.__jvzFish = { casts: 0, pendingCast: false };
+      window.__jvzFish = { casts: 0, pendingCast: false, spot: options.spot };
+      if (options.random !== undefined) Math.random = () => options.random;
       window.trace = [];
       const spot = document.querySelector('.fish-spot'), main = document.querySelector('.fish-main');
       spot.querySelector('b').textContent = options.current || 'Ven bờ';
@@ -33,7 +35,7 @@ try {
         const sheet = document.createElement('div'); sheet.className = 'sheet';
         sheet.innerHTML = '<div class="sheet-head"><button aria-label="Đóng">Đóng</button></div><div class="fish-spots"></div>';
         sheet.querySelector('[aria-label="Đóng"]').onclick = () => { window.trace.push('close'); sheet.remove(); };
-        for (const name of options.missingTarget ? ['Ven bờ'] : ['Ven bờ', 'Giữa hồ']) {
+        for (const name of options.missingTarget ? ['Ven bờ'] : ['Bờ nông', 'Bãi sen', 'Giữa hồ', 'Dưới cầu đá']) {
           const card = document.createElement('button'); card.className = 'fish-hab kit-card';
           card.innerHTML = '<div class="fish-hab-text"><b>' + name + '</b><small>Cá vùng này</small></div>';
           card.onclick = event => {
@@ -57,6 +59,25 @@ try {
   };
   const cast = () => session.click('.fish-room .fish-main.st-idle.jvz-fish-press', 1000, false, 100);
   const trace = () => page.evaluate(() => window.trace);
+
+  for (const [spot, label] of [['nong', 'Bờ nông'], ['sen', 'Bãi sen'], ['giua', 'Giữa hồ'], ['cau', 'Dưới cầu đá']]) {
+    await setup({ spot });
+    assert.equal(await cast(), true);
+    assert.deepEqual(await trace(), ['open', 'select:' + label, 'cast:' + label], 'configured habitat must reach trusted cast');
+  }
+  for (const [random, label] of [[0, 'Bờ nông'], [.25, 'Bãi sen'], [.5, 'Giữa hồ'], [.999999, 'Dưới cầu đá']]) {
+    await setup({ spot: 'random', random });
+    assert.equal((await prepareFishingSpot(page)).ready, true);
+    assert.deepEqual(await trace(), ['open', 'select:' + label], 'random spans four habitats');
+  }
+  await setup({ spot: 'random', random: 0 });
+  await prepareFishingSpot(page);
+  await page.evaluate(() => { Math.random = () => .75; });
+  await prepareFishingSpot(page);
+  assert.deepEqual(await trace(), ['open', 'select:Bờ nông', 'open', 'select:Dưới cầu đá'], 'sample anew each cast');
+  await setup({ spot: 'invalid' });
+  assert.equal(await cast(), true);
+  assert.deepEqual(await trace(), ['open', 'select:Giữa hồ', 'cast:Giữa hồ'], 'invalid runtime option uses legacy default');
   await setup({ delay: 150 });
   assert.equal(await cast(), true);
   assert.deepEqual(await trace(), ['open', 'select:Giữa hồ', 'cast:Giữa hồ']);

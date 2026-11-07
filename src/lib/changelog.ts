@@ -66,6 +66,16 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.246",
+    date: "2026-11-07",
+    lines: [
+      "Sửa bán cá khi giỏ đầy hoặc tải chậm; xác nhận đủ bước với cá hiếm nằm trong ngưỡng bán.",
+      "Chờ trò chơi cập nhật giỏ trước khi bán tiếp, tránh gửi lặp; không tự thả cá khi hết hạn mức mua.",
+      "Thêm chọn Bờ nông, Bãi sen, Giữa hồ, Dưới cầu đá hoặc ngẫu nhiên mỗi lần ném.",
+      "Mặc định vẫn là Giữa hồ; giữ điểm hiện tại trong đợt Cá Săn và không ném qua cửa sổ đang mở.",
+    ],
+  },
+  {
     version: "1.3.245",
     date: "2026-11-07",
     lines: [
@@ -491,14 +501,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Vô hiệu hoá toàn bộ hệ thống quảng cáo trên website nhằm mang lại trải nghiệm tinh sạch cho người dùng.",
       "Chuyển chế độ nhà mạng mặc định về trạng thái tắt và ngừng phân phối các mã kịch bản quảng cáo đối tác.",
-    ],
-  },
-  {
-    version: "1.3.187",
-    date: "2026-10-05",
-    lines: [
-      "Nhận đúng bản xuất đăng nhập HH3D mới từ hoathinh3d.you, kể cả khi cấu hình cũ vẫn còn trỏ .de.",
-      "Khôi lỗi tự theo tên miền của bản xuất cùng họ hoathinh3d và không để dữ liệu của trang khác đổi nơi chạy.",
     ],
   },
 ];

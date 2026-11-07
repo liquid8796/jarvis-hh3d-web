@@ -79,7 +79,7 @@ try {
  const start=Date.now(),engine=createQuestEngine({log,shouldStop:()=>Date.now()-start>30000});
  const outcome=await engine.run(session,profile,quest);
  const trace=await page.evaluate(()=>window.testTrace),hooks=trace.filter(t=>t.type==="hook");
- const summary=logs.filter(l=>l.message.includes("kết thúc kéo"));
+ const summary=logs.filter(l=>l.level==="debug"&&l.message.includes("kết thúc kéo"));
  const perFight=hooks.map((hook,i)=>{
   const end=hooks[i+1]?.at??Infinity;
   const entry=entries.find(e=>e.at>=hook.at&&e.at<end&&e.phase.includes("st-reel"));
@@ -89,7 +89,11 @@ try {
  console.log(JSON.stringify({outcome,pageErrors,hooks:hooks.length,entries:entries.length,reelEntries:entries.filter(e=>e.phase.includes("st-reel")).length,summaries:summary.length,perFight,wireCounts:wire.reduce((a,v)=>(a[v.a??v.name]=(a[v.a??v.name]??0)+1,a),{}),logs},null,2));
  assert.deepEqual(pageErrors,[]);
  assert.equal(hooks.length,cycles,"full engine must hook every fixture cycle");
- assert.equal(summary.length,cycles,"every completed fight must enter servo and log its summary");
+ assert.equal(summary.length,cycles,"every completed fight must retain its debug summary");
+ assert.equal(logs.filter(l=>l.level==="info"&&l.message==="Câu Cá: Bắt được cá.").length,cycles,
+  "one clear result per completed fight in the journal");
+ assert.ok(!logs.some(l=>l.level==="info"&&/bám lực|mẫu hợp lệ|tiến độ tối đa/.test(l.message)),
+  "journal excludes controller telemetry");
  for(const fight of perFight){
   assert.notEqual(fight.entryDelayMs,null,"controller entry missing in fight "+fight.fight);
   assert.notEqual(fight.firstHoldDelayMs,null,"trusted reel hold missing in fight "+fight.fight);

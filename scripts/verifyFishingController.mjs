@@ -104,7 +104,7 @@ try {
     window.__jvzFish.pendingCast = true;
     window.__jvzFish.lastCast = Date.now();
   });
-  await tick();
+  assert.equal(await tick(), "!Đã ném câu lần 1/1.");
   assert.equal(await page.evaluate(() => window.__jvzFish.casts), 1,
     "count a real cast after game enters wait state");
   await page.evaluate(() => {
@@ -193,11 +193,20 @@ try {
   const unlimitedSource = readFileSync(new URL("../src/lib/quest-engine/fishingTick.js", import.meta.url), "utf8")
     .replace("{{sellBelow}}", "4").replace("{{castLimit}}", "0");
   const interrupted = await page.evaluate("(" + unlimitedSource + ")()");
-  assert.match(interrupted, /vẫn treo/);
+  assert.match(interrupted, /Sẽ thử lại sau 30 giây/);
   assert.equal(await page.locator("body.jvz-fish-finished, body.jvz-fish-error").count(), 0,
     "unlimited castLimit may not close the job on a temporary error");
   const retryAt = await page.evaluate(() => window.__jvzFish.retryAfter);
   assert.ok(retryAt > Date.now(), "unlimited mode backs off instead of busy-looping");
+
+  await page.evaluate(() => {
+    window.__jvzFish.castFailure = "g:act/cast sent-but-idle";
+    window.__jvzFish.retryAfter = 0;
+  });
+  const failedCast = await page.evaluate("(" + unlimitedSource + ")()");
+  assert.match(failedCast, /Chưa ném được câu.*5 giây/);
+  assert.doesNotMatch(failedCast, /g:act|pointerup|idle/,
+    "failed casts explain the retry without exposing transport diagnostics");
 
   console.log("PASS fishing browser fixture: trusted pointer input, protected sale, nested room, exit cap");
 } finally {

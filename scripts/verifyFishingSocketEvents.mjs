@@ -31,9 +31,9 @@ try {
     socket.on("framereceived", event => received.push(event));
     socket.on("framesent", event => sent.push(event));
   });
-  const messages = [];
+  const messages = [], diagnostics = [];
   const session = createSession(page, {baseUrl: "https://example.invalid",
-    minActionDelayMs: 0, maxActionDelayMs: 1, log: {debug:()=>{},info:m=>messages.push(m),warning:()=>{}}});
+    minActionDelayMs: 0, maxActionDelayMs: 1, log: {debug:m=>diagnostics.push(m),info:m=>messages.push(m),warning:()=>{}}});
   session.beginFishingTelemetry();
   await page.setContent('<div class="fish-room"><button class="fish-main st-reel" style="width:200px;height:100px">Reel</button></div>');
   await page.evaluate(port => {
@@ -58,18 +58,23 @@ try {
   console.log("PASS real Playwright text/binary WebSocket envelopes drive trusted reel input");
   wireSocket.send('42["g:evts",[{"type":"catch","uid":999},{"type":"catch","uid":7},{"type":"catch","uid":7}]]');
   await page.waitForTimeout(100);
-  assert.equal(messages.filter(m=>m.includes("server xác nhận bắt thành công")).length,1,
+  assert.equal(messages.filter(m=>m === "Câu Cá: Bắt được cá.").length,1,
     "report exactly one authenticated self catch, not another player or duplicate");
-  assert.ok(messages.some(m=>/bám lực:.*bắt được.*đã vào điều khiển/.test(m)),
+  assert.ok(diagnostics.some(m=>/bám lực:.*bắt được.*đã vào điều khiển/.test(m)),
     "terminal diagnostics must prove controller entry, not infer it from a catch");
   wireSocket.send('42["g:evts",[{"type":"reel","t":0,"z":0.5,"f":0.5,"zone":0.3,"p":0.3},{"type":"escaped"},{"type":"catch","uid":7}]]');
   await page.waitForTimeout(100);
-  assert.equal(messages.filter(m=>m.includes("server xác nhận bắt thành công")).length,1,
+  assert.equal(messages.filter(m=>m === "Câu Cá: Bắt được cá.").length,1,
     "late catch after terminal escape cannot manufacture success");
-  assert.ok(messages.some(m=>/bám lực:.*cá thoát.*chưa vào điều khiển/.test(m)),
+  assert.ok(diagnostics.some(m=>/bám lực:.*cá thoát.*chưa vào điều khiển/.test(m)),
     "terminal diagnostics distinguish a fight that never entered the servo");
-  assert.match(messages.filter(m=>m.includes("bám lực:")).at(-1), /tiến độ tối đa 30%/,
+  assert.match(diagnostics.filter(m=>m.includes("bám lực:")).at(-1), /tiến độ tối đa 30%/,
     "batched immediate escape preserves initial authoritative reel progress");
+  assert.deepEqual(messages, ["Câu Cá: Bắt được cá.", "Câu Cá: Cá thoát mất."],
+    "journal has one readable result per fight, without controller telemetry");
+  wireSocket.send('42["g:evt",{"type":"escaped"}]');
+  await page.waitForTimeout(50);
+  assert.equal(messages.length, 2, "duplicate terminal events must not repeat journal results");
   console.log("PASS server-confirmed catch evidence is scoped to authenticated self and active fight");
   wireSocket.send('42["g:evt",{"type":"reel"}]');
   await page.waitForTimeout(50);
@@ -78,8 +83,11 @@ try {
   try { await session.fishingReel(); } finally { page.mouse.move = move; }
   wireSocket.send('42["g:evt",{"type":"escaped"}]');
   await page.waitForTimeout(50);
-  assert.match(messages.filter(m=>m.includes("bám lực:")).at(-1), /chưa vào điều khiển/,
+  assert.match(diagnostics.filter(m=>m.includes("bám lực:")).at(-1), /chưa vào điều khiển/,
     "failed input setup must not claim controller loop entry");
+  assert.equal(messages.at(-1), "Câu Cá: Cá thoát mất.");
+  assert.ok(!messages.some(m => /mẫu|\d+ms|bám lực|tiến độ tối đa|kết thúc kéo/.test(m)),
+    "technical diagnostics stay out of the player journal");
   console.log("PASS fight diagnostics do not confuse failed input setup with active control");
   sending = false;
   await page.evaluate(() => {

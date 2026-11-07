@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.242 — Simplify the fishing quest journal (07/11/2026)
+
+- Replace technical journal entries with short Vietnamese cast, catch, escape, bag and retry messages. Keep catch confirmation scoped to the authenticated player and emit an escape message once per active fight.
+- Keep controller timing, samples, overlap and progress summaries in debug output instead of the player journal. Do not change fishing input, controller math, limits, sale thresholds or retry timing.
+- Extend real Chromium/WebSocket and full-profile regressions to check concise results, duplicate suppression and retained diagnostic evidence.
+
 ## 1.3.241 — Respect unfinished quest cooldowns (07/11/2026)
 
 - Replace the unconditional completed-cycle one-hour floor with per-quest eligibility: unfinished daily quests use their own cooldown; capped daily fallback timers cannot win; monthly welfare checks remain runnable.

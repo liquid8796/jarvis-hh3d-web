@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.242",
+    date: "2026-11-07",
+    lines: [
+      "Nhật ký Câu Cá viết ngắn gọn, dễ đọc: ném câu, bắt được cá hoặc cá thoát.",
+      "Bỏ các dòng thông số kỹ thuật khỏi nhật ký. Thông báo chờ và thử lại rõ ràng hơn.",
+    ],
+  },
+  {
     version: "1.3.241",
     date: "2026-11-07",
     lines: [
@@ -490,15 +498,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Tối ưu vị trí tải thẻ ngay đầu trang phục vụ kiểm tra và phân tích lưu lượng.",
     ],
   },
-  {
-    version: "1.3.183",
-    date: "2026-10-04",
-    lines: [
-      "Bổ sung tuỳ chọn bật/tắt cơ chế Anti-Detect Proxy (đồng bộ Timezone, Geolocation, Locale và chống rò rỉ WebRTC).",
-      "Khắc phục sự cố proxy cố định bị rơi về IP trực tiếp của máy sau chu kỳ duyệt web đầu tiên.",
-    ],
-  },
-
 ];
 
 

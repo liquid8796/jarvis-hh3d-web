@@ -14,9 +14,8 @@
   // Lượt câu không giới hạn: NEVER finish the job on room/basket/network
   // issues. Retry in the same worker/browser so no five-minute cycle break.
   if (state.castFailure) {
-    const reason = state.castFailure;
     state.castFailure = "";
-    return "!Ném câu chưa thành công: " + reason + " — thử lại sau khi kiểm tra điều kiện câu.";
+    return "!Chưa ném được câu. Sẽ thử lại sau 5 giây.";
   }
   if (state.retryAfter > Date.now()) return "fish: chờ hồi phục";
   const get = (sel) => document.querySelector(sel);
@@ -30,7 +29,7 @@
       state.pendingCast = false;
       state.lastCast = 0;
       state.entering = 0;
-      return "!" + message + " — Câu Cá không giới hạn: vẫn treo, sẽ thử lại.";
+      return "!" + message + ` Sẽ thử lại sau ${error ? 30 : 60} giây.`;
     }
     body.classList.add(error ? "jvz-fish-error" : "jvz-fish-finished");
     return "!" + message;
@@ -58,7 +57,7 @@
     if (Date.now() - state.gateStartedAt > 30_000 &&
         Date.now() - (state.gateWarnedAt || 0) > 30_000) {
       state.gateWarnedAt = Date.now();
-      return "!Tiên Giới vẫn đang hiển thị màn tải; chưa được phép câu cá phía sau màn chào.";
+      return "!Tiên Giới vẫn đang tải. Chờ tải xong để câu cá.";
     }
     return "fish: đợi màn tải Tiên Giới hiển thị Vào Ngay";
   }
@@ -81,9 +80,9 @@
         if (available) {
           [...available.querySelectorAll("button")].find((b) => /^Vào$/i.test(label(b)))?.click();
           state.entering = 0;
-          return "!Tiên Giới: vào phòng câu cá còn chỗ.";
+          return "!Đang vào phòng câu cá.";
         }
-        return finish("Không có phòng câu cá còn chỗ; sẽ thử lại lượt sau.", true);
+        return finish("Chưa có phòng câu cá nào vào được.", true);
       }
       // The launcher opens on recruitment when there are active adverts.
       // Its games panel stays mounted but hidden until this tab is selected.
@@ -98,12 +97,12 @@
     }
     const launcher = get(".view.hub .launcher-btn");
     if (visible(launcher) && state.entering++ === 0) { launcher.click(); return "fish: mở Trò chơi"; }
-    if (state.entering > 8) return finish("Không tìm thấy Câu Cá trong Tiên Giới; không thử click toạ độ đoán.", true);
+    if (state.entering > 8) return finish("Chưa tìm thấy Câu Cá trong Tiên Giới.", true);
     return "fish: chờ danh sách Câu Cá";
   }
 
   const main = get(".fish-room .fish-main");
-  if (!main) return finish("Phòng đã vào nhưng không thấy nút câu.", true);
+  if (!main) return finish("Đã vào phòng nhưng chưa thấy nút Ném câu.", true);
   main.classList.remove("jvz-fish-press");
   const badge = label(get(".fish-quick-bag .fish-badge"));
   const bagCount = +(badge.match(/^(\d+)\s*\//)?.[1] || 0);
@@ -114,11 +113,11 @@
     if (sellBelow === 0 && visible(auto) &&
         (auto.getAttribute("aria-checked") === "true" || auto.classList.contains("on"))) {
       auto.click();
-      return "!Đã tắt tự bán cá mặc định vì ngưỡng bán đang là 0 (giữ toàn bộ cá).";
+      return "!Đã tắt tự bán cá. Giữ lại toàn bộ cá.";
     }
     if (sellBelow > 0 && visible(auto) && auto.getAttribute("aria-checked") !== "true" && !auto.classList.contains("on")) {
       auto.click();
-      return "!Bật tự bán cá cấp thấp của trò chơi.";
+      return "!Đã bật tự bán cá cấp thấp.";
     }
     const cards = [...bag.querySelectorAll(".fish-bag-item.fish-card")];
     const eligible = cards.filter((card) => {
@@ -144,11 +143,11 @@
       if (sell && state.pendingSale) {
         state.pendingSale = false;
         sell.click();
-        return "!Bán cá có ngư lực không quá +" + sellBelow;
+        return "!Bán cá có ngư lực từ +" + sellBelow + " trở xuống.";
       }
     }
     if (bagCount >= bagCap && (sellBelow === 0 || eligible.length === 0))
-      return finish("Giỏ cá đầy, không có cá trong ngưỡng bán; dừng để giữ cá quý.", true);
+      return finish("Giỏ cá đã đầy. Không có cá phù hợp với ngưỡng bán đã chọn.", true);
     const close = [...document.querySelectorAll(".sheet-head button")].find((b) => b.getAttribute("aria-label") === "Đóng");
     if (close) { close.click(); state.bagChecked = true; state.lastBagCast = state.casts; }
     return "fish: xong kiểm giỏ";
@@ -165,24 +164,24 @@
   if (stamina && +stamina[1] >= +stamina[2] && +stamina[2] > 0) {
     const leave = get(".fish-room .room-top button[aria-label='Rời phòng']");
     if (castLimit > 0 && visible(leave)) leave.click();
-    return finish("Đã dùng hết sức câu hôm nay; tạm chờ sức câu hồi phục.");
+    return finish("Đã dùng hết sức câu hôm nay.");
   }
   if (state.pendingCast && !idle) {
     // The browser sent a cast only after the game changed its own state.
     // Never report a cast merely because a click was dispatched (no spot / net lag).
     state.pendingCast = false;
     state.casts++;
-    return `!Game nhận lượt ném câu ${state.casts}${castLimit ? "/" + castLimit : ""}`;
+    return `!Đã ném câu lần ${state.casts}${castLimit ? "/" + castLimit : ""}.`;
   }
   if (state.pendingCast && idle) {
     if (Date.now() - state.lastCast > 12000)
-      return finish("Đã gửi thao tác ném câu nhưng game không chuyển khỏi idle sau 12s; kiểm tra kết nối Tiên Giới và thông báo trong phòng.", true);
+      return finish("Trò chơi chưa phản hồi sau 12 giây. Hãy kiểm tra kết nối Tiên Giới.", true);
     return "fish: đợi game xác nhận ném câu";
   }
   if (castLimit > 0 && state.casts >= castLimit && idle) {
     const leave = get(".fish-room .room-top button[aria-label='Rời phòng']");
-    if (visible(leave)) { leave.click(); return finish(`Đã thực hiện ${state.casts} lần ném câu; rời phòng.`); }
-    return finish("Đã đến giới hạn lượt câu, nhưng không thấy nút rời phòng.", true);
+    if (visible(leave)) { leave.click(); return finish(`Đã câu đủ ${state.casts} lượt. Rời phòng câu.`); }
+    return finish("Đã câu đủ lượt nhưng chưa rời được phòng.", true);
   }
   if (idle && visible(main)) {
     if (state.casts > 0 && Date.now() - (state.lastCast || 0) < 2200) return "fish: đợi lượt trước";
@@ -205,6 +204,6 @@
   }
   // Safety valve if the game stays stuck in an unknown state for several minutes.
   if (state.lastCast && Date.now() - state.lastCast > 150000 && state.casts > 0)
-    return finish("Lượt câu bị kẹt hơn 150 giây; dừng thay vì gửi input vô hạn.", true);
+    return finish("Lượt câu chưa có kết quả sau 2 phút 30 giây.", true);
   return "fish: " + mainText.slice(0, 60);
 }

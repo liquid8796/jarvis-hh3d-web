@@ -84,7 +84,7 @@ export function createSession(page, options) {
     const entry = f.enteredAt === null ? "chưa vào điều khiển (" + f.skipped + ")" :
       "đã vào điều khiển sau " + (f.enteredAt - f.startedAt) + "ms";
     const overlap = f.samples ? Math.round(f.inside / f.samples * 100) + "%" : "chưa có dữ liệu";
-    log.info(`Câu Cá bám lực: ${outcome}; ${entry}; ${f.samples} mẫu, cá trong thanh ${overlap}, tiến độ tối đa ${Math.round(f.peak * 100)}%.`);
+    log.debug(`Câu Cá bám lực: ${outcome}; ${entry}; ${f.samples} mẫu, cá trong thanh ${overlap}, tiến độ tối đa ${Math.round(f.peak * 100)}%.`);
   };
   const onFishFrame = (raw) => {
     const accepted = fishingTelemetry.ingest(raw);
@@ -116,13 +116,14 @@ export function createSession(page, options) {
             peak: Number.isFinite(event.p) && event.p >= 0 && event.p <= 1 ? event.p : 0,
             skipped: event.line || event.pull || event.duel ? "chế độ câu đặc biệt" : "chưa tới bước kéo" };
         } else if (event?.type === "escaped") {
+          if (fishAwaitingCatch) log.info("Câu Cá: Cá thoát mất.");
           fishAwaitingCatch = false;
           finishFishEvidence("cá thoát");
         }
         else if (event?.type === "catch" && fishAwaitingCatch &&
                  fishSelfId !== null && event.uid === fishSelfId) {
           fishAwaitingCatch = false;
-          log.info("Câu Cá: server xác nhận bắt thành công cho tài khoản đang chạy.");
+          log.info("Câu Cá: Bắt được cá.");
           finishFishEvidence("bắt được");
         }
       }
@@ -323,7 +324,7 @@ export function createSession(page, options) {
         }
         const finalGauge = fishingTelemetry.current(Date.now());
         if (finalGauge) maxProgress = Math.max(maxProgress, finalGauge.p);
-        log.info(`Câu Cá: kết thúc kéo; ${gaugeSamples} mẫu hợp lệ, ${holds} lần giữ, tiến độ tối đa ${Math.round(maxProgress * 100)}%.`);
+        log.debug(`Câu Cá: kết thúc kéo; ${gaugeSamples} mẫu hợp lệ, ${holds} lần giữ, tiến độ tối đa ${Math.round(maxProgress * 100)}%.`);
       }
     },
 

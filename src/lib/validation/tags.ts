@@ -39,7 +39,13 @@ export const TAG_PRESETS = ["Trưởng lão", "Thánh nữ", "Thái thượng tr
  * tag thì `parseTags` trả lỗi, mà chip vẫn phải biết cái nào đang bật để người ta bấm bớt đi.
  */
 export function splitTags(raw: string): string[] {
-  return [...new Set(raw.split(",").map((t) => t.trim()).filter((t) => t.length > 0))];
+  const seen = new Set<string>();
+  return raw.split(",").map(tag => tag.trim()).filter(tag => {
+    const key = normalizeTagLabel(tag);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /** Soát danh sách tag theo luật trần. Đây là thứ action gọi ở ranh giới tin cậy. */
@@ -53,6 +59,64 @@ export function parseTags(raw: string): { ok: true; tags: string[] } | { ok: fal
     return { ok: false, error: `Tag「${tooLong.slice(0, 30)}…」dài quá ${MAX_TAG_LENGTH} ký tự.` };
   }
   return { ok: true, tags };
+}
+
+/** Expiries are UTC instants keyed by the normalized label; absent/null means unlimited. */
+export type TagExpirations = Record<string, string | null>;
+export type TagAssignment = { label: string; expiresAt: string | null };
+
+function validTagExpiry(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!match || !Number.isFinite(Date.parse(value))) return false;
+  const [, year, month, day, hour, minute, second] = match.map(Number);
+  return month >= 1 && month <= 12 && day >= 1 &&
+    day <= new Date(Date.UTC(year, month, 0)).getUTCDate() &&
+    hour <= 23 && minute <= 59 && second <= 59;
+}
+
+/** Validate the whole form before writing anything; explicit null clears a deadline. */
+export function parseTagExpirations(
+  raw: string,
+  labels: readonly string[],
+): { ok: true; tagExpirations: TagExpirations } | { ok: false; error: string } {
+  const invalid = { ok: false, error: "Thời hạn tag không hợp lệ. Hãy chọn ngày giờ đầy đủ hoặc Vô hạn." } as const;
+  if (raw.length > 4096) return invalid;
+  let value: unknown;
+  try { value = JSON.parse(raw); } catch { return invalid; }
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return invalid;
+  const selected = new Set(labels.map(normalizeTagLabel));
+  const seen = new Set<string>();
+  const entries: [string, string][] = [];
+  for (const [label, expiresAt] of Object.entries(value)) {
+    const key = normalizeTagLabel(label);
+    if (!selected.has(key) || seen.has(key)) return invalid;
+    seen.add(key);
+    if (expiresAt === null) continue;
+    if (typeof expiresAt !== "string" || !validTagExpiry(expiresAt)) return invalid;
+    entries.push([key, new Date(expiresAt).toISOString()]);
+  }
+  return { ok: true, tagExpirations: Object.fromEntries(entries) };
+}
+
+/** Never use inherited object properties as tag metadata. Invalid stored values fail closed. */
+export function tagExpiresAt(label: string, expirations?: TagExpirations | null): string | null {
+  const key = normalizeTagLabel(label);
+  if (expirations === null || expirations === undefined) return null;
+  if (typeof expirations !== "object" || Array.isArray(expirations)) return "invalid";
+  if (!Object.hasOwn(expirations, key)) return null;
+  const value = expirations[key];
+  return value === null ? null : typeof value === "string" ? value : "invalid";
+}
+
+export function getTagAssignments(labels: readonly string[], expirations?: TagExpirations | null): TagAssignment[] {
+  return labels.map(label => ({ label, expiresAt: tagExpiresAt(label, expirations) }));
+}
+
+export function getActiveTags(labels: readonly string[], expirations?: TagExpirations | null, now = Date.now()): string[] {
+  return labels.filter(label => {
+    const expiry = tagExpiresAt(label, expirations);
+    return expiry === null || (validTagExpiry(expiry) && Date.parse(expiry) > now);
+  });
 }
 
 // ---------------------------------------------------------------------------------------

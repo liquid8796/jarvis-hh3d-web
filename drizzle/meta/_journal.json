@@ -246,6 +246,13 @@
       "when": 1792440000000,
       "tag": "0034_account_worker_preference",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794056400000,
+      "tag": "0035_user_tag_expirations",
+      "breakpoints": true
     }
   ]
 }

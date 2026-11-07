@@ -1,3 +1,5 @@
+import { getActiveTags, normalizeTagLabel, tagExpiresAt, type TagExpirations } from "@/lib/validation/tags";
+
 /**
  * Ma trận ai-được-làm-gì của tông môn — MỘT chỗ duy nhất, thuần, không đụng database.
  *
@@ -310,8 +312,20 @@ export function isAdminUser(user: RoleBearer): boolean {
 }
 
 /** Câu Cá uses the current web user's admin role or VIP tag, never the game account tier. */
-export function canUseFishingQuest(user: (RoleBearer & { tags: readonly string[] }) | null): boolean {
-  return user !== null && (isAdminUser(user) || user.tags.some((tag) => tag.trim().toLowerCase() === "vip"));
+type TaggedUser = RoleBearer & { tags: readonly string[]; tagExpirations?: TagExpirations | null };
+
+export function canUseFishingQuest(user: TaggedUser | null, now = Date.now()): boolean {
+  return user !== null && (isAdminUser(user) ||
+    getActiveTags(user.tags, user.tagExpirations, now).some(tag => normalizeTagLabel(tag) === "vip"));
+}
+
+/** Server-issued capability for workers, including a deadline that survives network outages. */
+export function fishingAccessForUser(user: TaggedUser | null, now = Date.now()): { allowed: boolean; expiresAt: string | null } {
+  const allowed = canUseFishingQuest(user, now);
+  return {
+    allowed,
+    expiresAt: allowed && user && !isAdminUser(user) ? tagExpiresAt("vip", user.tagExpirations) : null,
+  };
 }
 
 /**

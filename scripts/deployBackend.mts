@@ -255,6 +255,8 @@ try {
       // (public/linh-su/goi-linh-su.tgz) — gọi thẳng next là gói ấy vắng mặt và mọi lượt cài
       // khôi lỗi tải về 404. Đã trả giá 16/08/2026.
       "cd $REL && sudo -u jarvis npm ci --no-audit --no-fund 2>&1 | tail -2",
+      // Apply additive schema changes against the VM shared env, never the developer's legacy DB.
+      "cd $REL && sudo -u jarvis npm run db:migrate",
       "cd $REL && sudo -u jarvis npm run build 2>&1 | tail -12",
       // Chỗ rảnh trỏ vào release mới. `[ -L ]` gác vì `ln -sfn` vào một THƯ MỤC thật sẽ tạo
       // symlink BÊN TRONG nó thay vì thay thế — app khởi động trong thư mục rỗng.

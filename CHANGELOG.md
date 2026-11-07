@@ -9,6 +9,15 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.251 — Independent user-tag expiry and viewport edit dialog (07/11/2026)
+
+- Add optional per-tag deadlines, defaulting existing and newly selected tags to unlimited. Store UTC instants and display the admin date/time controls explicitly in Vietnam time (UTC+7), independent of browser timezone. Keep expired assignments available for renewal and remove stale deadlines when tags are removed.
+- Filter expired labels on user reads and enforce VIP fishing expiry at server and worker boundaries, with safe checks inside long-running fishing. Keep administrator role privileges independent of decorative tag expiry.
+- Replace the table-contained fixed overlay with a native top-layer dialog. The card backdrop-filter no longer anchors the dialog to a long table. Bound dialog height, scroll contents internally, trap focus, restore focus/scroll, and support Escape/Cancel. Preserve edits after failed saves instead of native action-form reset.
+- Add isolated service/action/worker regressions and real React browser checks covering 100 rows, scrolled tables, 1440/390/320px viewports, independent deadlines, timezone conversion, unlimited reset, expiry renewal, failed saves and dismissal. Release locally plus OCI, without GitHub pushes or interrupting active jobs.
+- Apply additive migration 0035 against the VM shared database before building the new release; old labels remain unlimited. Include the live expiry gate in the downloadable worker bundle. Already-running old workers acquire in-flight expiry enforcement only after their normal update/restart; do not stop them for this release.
+- Verification: targeted expiry, fishing-access, worker and browser tests, both typechecks and production build pass. The broad engine smoke run still reproduces the pre-existing check-in and Bi Canh failures recorded in 1.3.248; it was stopped after 245 seconds and is not claimed as passing. Worker self-update checks pass 51/51; worker-env retains its unrelated Oracle proxy-fallback assertion failure in unchanged setup/test files.
+
 ## 1.3.250 — Allow fishing for admins and VIP-tagged users (07/11/2026)
 
 - Replace the fishing row hint with the exact requested text, “Chỉ dành cho các user VIP”. Enable its checkbox and options only for web users with an existing administrator role or a whole VIP tag (case/outer whitespace insensitive), not merely a VIP game account.

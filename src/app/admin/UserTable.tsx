@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   deleteUserAction,
   setStatusAction,
@@ -16,7 +16,7 @@ import {
   ROLE_LABEL,
   type Role,
 } from "@/lib/auth/permissions";
-import { MAX_TAGS, MAX_TAG_LENGTH, TAG_PRESETS, parseTags, splitTags } from "@/lib/validation/tags";
+import { MAX_TAGS, MAX_TAG_LENGTH, TAG_PRESETS, normalizeTagLabel, parseTags, splitTags } from "@/lib/validation/tags";
 import type { PublicUser } from "@/lib/services/users";
 import { PageSizeSelect, Pager, usePageSize, usePaged } from "@/components/Pager";
 
@@ -300,28 +300,51 @@ function EditDialog({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const mayEditRoles = canEditRoles(viewer);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    dialog?.showModal();
+    document.body.style.overflow = "hidden";
+    return () => {
+      dialog?.close();
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus({ preventScroll: true });
+    };
+  }, []);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
+    <dialog
+      ref={dialogRef}
+      className="card user-edit-dialog"
+      aria-labelledby="edit-user-title"
+      onCancel={(event) => { event.preventDefault(); if (!pending) onClose(); }}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget || pending) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onClose();
+      }}
     >
-      <div className="card card-hairline w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-        <h3 className="h-display mb-4 text-lg font-semibold text-gilded">
+      <div className="p-5 sm:p-6">
+        <h3 id="edit-user-title" className="h-display mb-4 text-lg font-semibold text-gilded">
           Sửa đạo hữu @{user.username}
         </h3>
 
         <form
-          action={(formData) =>
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (pending) return;
+            const formData = new FormData(event.currentTarget);
             startTransition(async () => {
               const result = await updateUserAction(null, formData);
               if (result.ok) onDone(result);
               else setError(result.message);
-            })
-          }
+            });
+          }}
         >
+          <fieldset disabled={pending} className="min-w-0">
           <input type="hidden" name="userId" value={user.id} />
 
           <label className="label" htmlFor="edit-displayName">
@@ -398,7 +421,7 @@ function EditDialog({
             </select>
           </div>
 
-          <TagField initial={user.tags} presets={presets} />
+          <TagField initial={user.tagAssignments?.map((tag) => tag.label) ?? user.tags} expirations={user.tagExpirations ?? {}} presets={presets} />
 
           <label className="label" htmlFor="edit-password">
             Mật khẩu mới
@@ -415,19 +438,20 @@ function EditDialog({
             Bỏ trống thì mật khẩu cũ được giữ nguyên.
           </p>
 
-          {error && <p className="mb-3 text-sm text-[#f2a0a0]">{error}</p>}
+          {error && <p role="alert" className="mb-3 text-sm text-[#f2a0a0]">{error}</p>}
 
           <div className="flex justify-end gap-3">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>
+            <button type="button" className="btn btn-ghost" disabled={pending} onClick={onClose}>
               Thôi
             </button>
             <button type="submit" className="btn btn-gold" disabled={pending}>
               {pending ? "Đang lưu…" : "Lưu"}
             </button>
           </div>
+          </fieldset>
         </form>
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -443,12 +467,21 @@ function EditDialog({
  * thì gõ tay「chưởng môn」rồi bấm chip「Chưởng môn」sẽ ra hai tag trông y hệt nhau nằm cạnh
  * nhau, và người nhìn bảng không hiểu vì sao.
  */
-function TagField({ initial, presets }: { initial: string[]; presets: readonly string[] }) {
+function TagField({ initial, expirations, presets }: { initial: string[]; expirations: Record<string, string | null>; presets: readonly string[] }) {
   const [raw, setRaw] = useState(initial.join(", "));
+  const [deadlines, setDeadlines] = useState<Record<string, string | null>>(expirations);
 
   const current = splitTags(raw);
   const check = parseTags(raw);
   const full = current.length >= MAX_TAGS;
+  const deadlineFor = (key: string) => Object.hasOwn(deadlines, key) ? deadlines[key] : null;
+  const submitted = Object.fromEntries(current.map((tag) => [normalizeTagLabel(tag), deadlineFor(normalizeTagLabel(tag)) ?? null]));
+  // A removed/re-added tag is a new unlimited assignment; never resurrect a hidden deadline.
+  const changeRaw = (value: string) => {
+    const keys = new Set(splitTags(value).map(normalizeTagLabel));
+    setDeadlines((previous) => Object.fromEntries(Object.entries(previous).filter(([key]) => keys.has(key))));
+    setRaw(value);
+  };
 
   const indexOfPreset = (preset: string) =>
     current.findIndex((t) => t.toLowerCase() === preset.toLowerCase());
@@ -467,6 +500,11 @@ function TagField({ initial, presets }: { initial: string[]; presets: readonly s
       if (at < 0 && list.length >= MAX_TAGS) return prev;
       const next = at >= 0 ? list.filter((_, i) => i !== at) : [...list, preset];
       return next.join(", ");
+    });
+    setDeadlines((previous) => {
+      const next = { ...previous };
+      delete next[normalizeTagLabel(preset)];
+      return next;
     });
   };
 
@@ -505,13 +543,56 @@ function TagField({ initial, presets }: { initial: string[]; presets: readonly s
         name="tags"
         className="input"
         value={raw}
-        onChange={(e) => setRaw(e.target.value)}
+        onChange={(e) => changeRaw(e.target.value)}
         placeholder="Ví dụ: Trận pháp sư, Luyện đan"
         // Trần ký tự của cả ô, tính từ luật chứ không gõ tay một con số: đủ chỗ cho tối đa
         // ngần ấy tag dài hết cỡ, cộng phần ", " ngăn giữa chúng.
         maxLength={MAX_TAGS * MAX_TAG_LENGTH + (MAX_TAGS - 1) * 2}
       />
-      {!check.ok && <p className="mt-1 text-xs text-[#f2a0a0]">{check.error}</p>}
+      {!check.ok && <p role="alert" className="mt-1 text-xs text-[#f2a0a0]">{check.error}</p>}
+      <input type="hidden" name="tagExpirations" value={JSON.stringify(submitted)} />
+      {current.length > 0 && (
+        <div className="mt-3 space-y-3">
+          <p id="tag-expiry-help" className="text-xs text-[var(--color-mist)]">
+            Mặc định vô hạn. Có thể đặt hạn riêng cho từng tag, theo giờ Việt Nam (UTC+7).
+          </p>
+          {current.map((tag, index) => {
+            const key = normalizeTagLabel(tag);
+            const deadline = deadlineFor(key);
+            const limited = deadline !== null && deadline !== undefined;
+            const expired = !!deadline && Date.parse(deadline) <= Date.now();
+            const local = deadline && Number.isFinite(Date.parse(deadline))
+              ? new Date(Date.parse(deadline) + 7 * 60 * 60 * 1000).toISOString().slice(0, 16) : "";
+            return (
+              <fieldset key={key} className="tag-expiry-row">
+                <legend className="px-1 text-sm font-semibold text-[var(--color-parchment)]">{tag}</legend>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+                    <input type="checkbox" checked={limited} aria-label={`Đặt thời hạn ${tag}`}
+                      onChange={(event) => setDeadlines((previous) => ({ ...previous, [key]: event.target.checked ? "" : null }))} />
+                    Đặt thời hạn
+                  </label>
+                  <span className={`text-xs ${expired ? "text-[#f2a0a0]" : "text-[var(--color-mist)]"}`}>
+                    {expired ? "Đã hết hạn" : limited ? "Có thời hạn" : "Vô hạn"}
+                  </span>
+                </div>
+                {limited && (
+                  <div>
+                    <label className="label" htmlFor={`tag-expiry-${index}`}>Hết hạn {tag}</label>
+                    <input id={`tag-expiry-${index}`} className="input" type="datetime-local" step="60"
+                      required value={local} aria-describedby="tag-expiry-help"
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        const date = value ? new Date(`${value}+07:00`) : null;
+                        setDeadlines((previous) => ({ ...previous, [key]: date && Number.isFinite(date.getTime()) ? date.toISOString() : "" }));
+                      }} />
+                  </div>
+                )}
+              </fieldset>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

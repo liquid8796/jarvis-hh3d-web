@@ -271,6 +271,7 @@ const result = (quest, outcome, extra = {}) => ({
  * @param {object} deps
  * @param {{info:Function, debug:Function, warning:Function}} deps.log  nhận (scope, message)
  * @param {() => boolean} [deps.shouldStop]   true khi người dùng đã bấm dừng
+ * @param {() => boolean} [deps.canFish]   current server-issued access, checked at every safe step
  * @param {{resolve:Function, learn:Function}} [deps.quiz]  kho đáp án, nếu có
  * @param {(session: object) => Promise<{cleared: boolean, clicked: boolean}>} [deps.clickTurnstile]  cách GỠ một màn kiểm tra
  *   gặp giữa vòng — `cleared: true` CHỈ KHI trang đã hết màn kiểm tra; `clicked` để lời báo kể
@@ -364,6 +365,28 @@ export function createQuestEngine(deps) {
   // -------------------------------------------------------------------------------------
 
   async function run(session, profile, quest) {
+    if (deps.canFish && (quest.id === "cau-ca" || quest.id === "cau-ca-thuong")) {
+      // Reuse all existing safe stop points, including the live reel. A scoped
+      // interpreter avoids shared mutable quest state and stops only fishing.
+      let revoked = false;
+      const guarded = createQuestEngine({
+        ...deps,
+        canFish: undefined,
+        shouldStop: () => {
+          if (shouldStop()) return true;
+          revoked ||= !deps.canFish();
+          return revoked;
+        },
+      });
+      try {
+        return await guarded.run(session, profile, quest);
+      } catch (err) {
+        if (err instanceof QuestAborted && revoked && !shouldStop()) {
+          return result(quest, "skipped", { message: "Quyền Câu Cá đã hết hạn hoặc bị thu hồi." });
+        }
+        throw err;
+      }
+    }
     try {
       if (quest.kind === "labelMatch") return await runLabelMatch(session, profile, quest);
       if (quest.kind === "customSteps") return await runCustomSteps(session, quest);

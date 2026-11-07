@@ -631,6 +631,7 @@ export async function observePillBagCapacity(session, questId, report) {
  * @param {(tier: "vip"|"free") => Promise<void>|void} [deps.reportAccountTier]
  * @param {(caps: {ha: number, trung: number, thuong: number, cuc: number}) => Promise<void>|void} [deps.reportPillBagCaps]
  * @param {() => boolean} deps.shouldStop  ĐỒNG BỘ — được gọi trong vòng lặp chặt
+ * @param {() => boolean} [deps.canFish]  live fishing access, independent of other quests
  * @param {(progress: {running: string[], done: number, total: number}) => void} [deps.reportProgress]
  *   Vòng này đang chạy nhiệm vụ nào — Hàng Đợi Công Việc hiển thị nó. ĐỒNG BỘ, cùng lý do
  *   với `shouldStop`: nó được gọi ở mỗi lần một nhiệm vụ vào/ra tay, tức trong đường chạy
@@ -654,6 +655,7 @@ export async function runCycle(deps) {
     reportPillBagCaps = async () => {},
     reportProgress = () => {},
     shouldStop = () => false,
+    canFish = () => true,
     // `baseUrl` truyền thẳng là nấc cao nhất (smoke/chẩn đoán). Khi không có nó, origin cấu
     // hình còn được wrapper cookie tự sửa sang TLD mới của CÙNG site ở ngay dưới đây.
     baseUrl: explicitBaseUrl,
@@ -1051,7 +1053,7 @@ export async function runCycle(deps) {
             return { cleared: false, clicked: true };
           };
 
-      const engine = createQuestEngine({ log, shouldStop, quiz, clickTurnstile: clearChallenge });
+      const engine = createQuestEngine({ log, shouldStop, canFish, quiz, clickTurnstile: clearChallenge });
 
       for (const quest of quests) {
         if (shouldStop()) {

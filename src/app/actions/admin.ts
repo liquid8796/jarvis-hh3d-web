@@ -35,7 +35,7 @@ import {
 } from "@/lib/validation/retention";
 import { adminCreate, adminDelete, adminUpdate, findById, setStatus } from "@/lib/services/users";
 import { CHAT_PURGE_PHRASE, matchesChatPurgePhrase } from "@/lib/validation/chat";
-import { parseTags } from "@/lib/validation/tags";
+import { parseTagExpirations, parseTags } from "@/lib/validation/tags";
 import {
   displayNameSchema,
   emailSchema,
@@ -170,6 +170,13 @@ export async function updateUserAction(_prev: AdminResult | null, formData: Form
     return { ok: false, message: tagsParsed.error };
   }
 
+  const expirationsParsed = formData.has("tagExpirations")
+    ? parseTagExpirations(String(formData.get("tagExpirations") ?? ""), tagsParsed.tags)
+    : null;
+  if (expirationsParsed && !expirationsParsed.ok) {
+    return { ok: false, message: expirationsParsed.error };
+  }
+
   // Vai: form của Gia chủ gửi kèm cờ `rolesSubmitted` — "phần vai CÓ mặt trong form này".
   // Thiếu cờ = form không bày phần vai (admin thường) = giữ nguyên. Khác hẳn "bỏ hết tick"
   // của Gia chủ, thứ PHẢI hiểu là thu mọi vai — không có cờ thì hai ý ấy trùng hình dạng
@@ -192,6 +199,7 @@ export async function updateUserAction(_prev: AdminResult | null, formData: Form
     email: parsed.data.email,
     roles: nextRoles,
     tags: tagsParsed.tags,
+    tagExpirations: expirationsParsed?.tagExpirations,
     status: parsed.data.status,
     password: parsed.data.password || undefined,
   });

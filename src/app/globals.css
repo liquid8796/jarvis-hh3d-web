@@ -234,6 +234,33 @@ body {
   position: relative;
 }
 
+/* Native top-layer dialog escapes the table card's backdrop-filter containing block. */
+.user-edit-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(40rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--color-parchment);
+  color-scheme: dark;
+}
+
+.user-edit-dialog::backdrop { background: rgb(0 0 0 / 70%); }
+.tag-expiry-row {
+  min-width: 0;
+  border: 1px solid rgba(143, 137, 179, 0.28);
+  border-radius: 10px;
+  padding: 0.25rem 0.75rem 0.75rem;
+}
+.tag-expiry-row input[type="datetime-local"] {
+  min-width: 0;
+  padding-inline: 0.5rem;
+  font-size: 0.875rem;
+}
+
 .card-hairline::before {
   content: "";
   position: absolute;

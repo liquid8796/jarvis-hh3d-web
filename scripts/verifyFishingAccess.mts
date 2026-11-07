@@ -14,7 +14,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 const read = (path: string) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
 const require = createRequire(import.meta.url);
-type User = { id: string; roles: string[]; tags: string[]; status: string };
+type User = { id: string; roles: string[]; tags: string[]; tagExpirations?: Record<string, string | null>; status: string };
 const makeUser = (roles: string[], tags: string[]): User => ({ id: "fixture-owner", roles, tags, status: "active" });
 let currentUser: User | null = makeUser([], []);
 let scope: { kind: "user"; userId: string } | { kind: "operator" } | null = { kind: "user", userId: "fixture-owner" };
@@ -47,6 +47,8 @@ const dependencies: Record<string, unknown> = {
       return { id: "fixture-job", userId: "fixture-owner", configSnapshot: snapshot, dailyDone: {} };
     },
     dailyQuotaPlan: () => ({}),
+    jobBelongsTo: async (_id: string, suppliedScope: typeof scope) => suppliedScope !== null,
+    heartbeat: async () => ({ status: "running", workerId: "fixture-worker", userId: "fixture-owner" }),
   },
   "@/lib/services/workers": { recordWorkerSeen: async () => {} },
   "@/lib/services/users": { findById: async (id: string) => {
@@ -108,7 +110,9 @@ const mutable = makeUser(["de-tu"], []);
 await saveAs(mutable, false);
 mutable.tags = ["VIP"]; await saveAs(mutable, true);
 mutable.tags = []; await saveAs(mutable, false);
-console.log("PASS server action: admins, VIP tags, tag changes and forged form fields");
+await saveAs({ ...makeUser([], ["VIP"]), tagExpirations: { vip: "2000-01-01T00:00:00.000Z" } }, false);
+await saveAs({ ...makeUser([], ["VIP"]), tagExpirations: { vip: "2099-01-01T00:00:00.000Z" } }, true);
+console.log("PASS server action: admins, VIP tags, expiry, tag changes and forged form fields");
 async function claimAs(user: User | null, kind: "user" | "operator", expected: boolean) {
   currentUser = user; scope = kind === "operator" ? { kind } : { kind, userId: "fixture-owner" };
   snapshot = { ...enabled, accountTier: "vip", isAdmin: true, tags: ["VIP"], canFish: true };
@@ -120,6 +124,7 @@ async function claimAs(user: User | null, kind: "user" | "operator", expected: b
   const body = await response.json();
   assert.equal(body.job.config.quests.cauCa.enabled, expected, kind + " access for " + JSON.stringify(user));
   assert.equal(body.job.config.quests.cauCa.sellBelow, 8);
+  assert.equal(body.job.fishingAccess.allowed, expected, "claim supplies authoritative live capability");
   assert.equal(enabled.quests.cauCa.enabled, true, "source snapshots stay unchanged");
 }
 for (const kind of ["user", "operator"] as const) {
@@ -130,10 +135,27 @@ for (const kind of ["user", "operator"] as const) {
   owner.tags = ["vip"]; await claimAs(owner, kind, true);
   await claimAs(makeUser(["de-tu"], ["VIPER"]), kind, false);
   await claimAs(null, kind, false);
+  await claimAs({ ...makeUser([], ["VIP"]), tagExpirations: { vip: "2000-01-01T00:00:00.000Z" } }, kind, false);
+  await claimAs({ ...makeUser([], ["VIP"]), tagExpirations: { vip: "2099-01-01T00:00:00.000Z" } }, kind, true);
 }
 scope = null;
 assert.equal((await route.POST(new Request("http://localhost/api/worker", { method: "POST" }))).status, 401);
 console.log("PASS worker POST: both scopes, current tags, stale/forged snapshots, missing owner and unauthenticated request");
+for (const kind of ["user", "operator"] as const) {
+  scope = kind === "operator" ? { kind } : { kind, userId: "fixture-owner" };
+  for (const [expiry, expected] of [["2000-01-01T00:00:00.000Z", false], ["2099-01-01T00:00:00.000Z", true]] as const) {
+    currentUser = { ...makeUser([], ["VIP"]), tagExpirations: { vip: expiry } };
+    const response = await route.POST(new Request("http://localhost/api/worker", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ op: "heartbeat", jobId: "00000000-0000-4000-8000-000000000001" }),
+    }));
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.status, "running", "expiry does not stop unrelated automation");
+    assert.deepEqual(body.fishingAccess, { allowed: expected, expiresAt: expected ? expiry : null });
+  }
+}
+console.log("PASS worker heartbeat: both scopes refresh current owner expiry during active jobs");
 const { ConfigForm } = load<{ ConfigForm: (props: { config: configs.UserConfig; isAdmin: boolean; canFish: boolean }) => ReturnType<typeof createElement> }>(
   "src/app/dashboard/ConfigForm.tsx", {
     "@/app/actions/automation": { saveConfigAction: async () => ({ ok: true, message: "" }) },

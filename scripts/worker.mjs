@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 import { mkdir } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { runCycle } from "../src/lib/quest-engine/runCycle.mjs";
+import { createFishingAccessGate } from "../src/lib/quest-engine/fishingAccess.mjs";
 import { profileDirForJob, sweepStaleProfiles } from "../src/lib/quest-engine/browserProfile.mjs";
 import { createWorkerCall } from "../src/lib/worker/controlFollow.mjs";
 import { createOfficialDnsCachedFetch } from "../src/lib/worker/dnsCache.mjs";
@@ -166,6 +167,7 @@ async function runQuest({
   reportPillBagCaps,
   reportProgress,
   shouldStop,
+  canFish,
 }) {
   await say("Khôi lỗi đã nhận ngọc giản, đang khởi động tế đàn...");
 
@@ -198,6 +200,7 @@ async function runQuest({
     reportPillBagCaps,
     reportProgress,
     shouldStop,
+    canFish,
     profileDir,
   });
 }
@@ -207,6 +210,7 @@ async function handle(job) {
   console.log(`→ nhận job ${job.id}`);
 
   let stopping = false;
+  const fishingGate = createFishingAccessGate(job.fishingAccess);
 
   // Tiến độ vòng này, cưỡi nhịp tim sẵn có — không thêm một request nào. Engine cập nhật
   // biến này (đồng bộ, trong đường chạy nóng), nhịp tim kế tiếp mang nó đi; trễ tối đa đúng
@@ -219,11 +223,12 @@ async function handle(job) {
 
   const beat = setInterval(async () => {
     try {
-      const { status } = await call("heartbeat", {
+      const { status, fishingAccess } = await call("heartbeat", {
         jobId: job.id,
         ...(progress ? { progress } : {}),
         ...(VERSION ? { version: VERSION } : {}),
       });
+      fishingGate.update(fishingAccess);
       // Bất kỳ trạng thái nào KHÔNG phải 'running' đều nghĩa là không còn ai chờ lượt này:
       // 'stopping/stopped' là Thu Đàn, còn 'failed/done' là reaper đã kết liễu job (mất
       // liên lạc dài rồi nối lại) — ôm browser chạy nốt một vòng không ai nhận chỉ tổ
@@ -261,6 +266,7 @@ async function handle(job) {
         progress = next;
       },
       shouldStop: () => stopping,
+      canFish: fishingGate.canFish,
     });
     // TRẢ LẠI cái ngày server đã phát ở `claim`, không tự lấy ngày trên máy này. Một vòng bắt
     // đầu 23h50 và kết thúc 00h30 đã quan sát trạng thái của NGÀY HÔM QUA; khai theo đồng hồ

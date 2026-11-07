@@ -13,7 +13,7 @@ import pkg from "../../../../package.json";
  * chỉ-đôi-khi-có là thứ không ai kiểm được.
  */
 const WEB_VERSION = pkg.version.trim() || null;
-import { canUseFishingQuest, isAdminUser } from "@/lib/auth/permissions";
+import { fishingAccessForUser, isAdminUser } from "@/lib/auth/permissions";
 import { enforceFishingAccessPolicy } from "@/lib/quest-engine/fishingAccess.mjs";
 import { z } from "zod";
 import { authorizeWorker } from "@/lib/auth/worker";
@@ -315,7 +315,8 @@ export async function POST(request: Request) {
       // Both personal and sect workers enforce the owner's *current* role and VIP tag.
       // Never trust a saved config or a job snapshot claiming Câu Cá is enabled.
       const fishingOwner = await findById(job.userId);
-      guarded = enforceFishingAccessPolicy(guarded, canUseFishingQuest(fishingOwner));
+      const fishingAccess = fishingAccessForUser(fishingOwner);
+      guarded = enforceFishingAccessPolicy(guarded, fishingAccess.allowed);
 
       // Tên miền game ghép vào ĐÂY, cùng chỗ và cùng lý do với cookie: nó là sự thật của
       // TOÀN HỆ THỐNG tại thời điểm phát việc, không phải thứ đông lạnh trong snapshot của
@@ -327,6 +328,7 @@ export async function POST(request: Request) {
         job: {
           id: job.id,
           userId: job.userId,
+          fishingAccess,
           config: { ...guarded, gameCookie: cookie, gameBaseUrl: settings.game.baseUrl },
           // Sổ đủ lượt hôm nay của chính đàn này. Sổ mang ngày cũ ra khỏi đây thành sổ trắng,
           // nên khôi lỗi không cần biết gì về múi giờ — nó chỉ đọc danh sách và trả lại `day`
@@ -357,7 +359,8 @@ export async function POST(request: Request) {
       }
 
       // `stopping` là tín hiệu người dùng đã bấm Thu Đàn; worker tự kết thúc ở điểm an toàn.
-      return NextResponse.json({ status: beat.status });
+      const owner = await findById(beat.userId);
+      return NextResponse.json({ status: beat.status, fishingAccess: fishingAccessForUser(owner) });
     }
 
     case "accountTier": {

@@ -902,7 +902,7 @@ export async function jobBelongsTo(jobId: string, scope: WorkerScope): Promise<b
 export async function heartbeat(
   jobId: string,
   progress?: CycleProgress,
-): Promise<{ status: JobRow["status"]; workerId: string | null } | null> {
+): Promise<{ status: JobRow["status"]; workerId: string | null; userId: string } | null> {
   if (progress === undefined) {
     const rows = await db()
       .update(schema.automationJobs)
@@ -911,6 +911,7 @@ export async function heartbeat(
       .returning({
         status: schema.automationJobs.status,
         workerId: schema.automationJobs.workerId,
+        userId: schema.automationJobs.userId,
       });
     return rows[0] ?? null;
   }
@@ -934,14 +935,15 @@ export async function heartbeat(
       end,
       cycle_progress = ${serialised}::jsonb
     where id = ${jobId}
-    returning status, worker_id
+    returning status, worker_id, user_id
   `);
 
-  const row = result.rows[0] as { status: string; worker_id: unknown } | undefined;
+  const row = result.rows[0] as { status: string; worker_id: unknown; user_id: string } | undefined;
   if (!row) return null;
   return {
     status: row.status as JobRow["status"],
     workerId: row.worker_id == null ? null : String(row.worker_id),
+    userId: row.user_id,
   };
 }
 

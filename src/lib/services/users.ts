@@ -12,6 +12,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { getAppSettings } from "@/lib/services/settings";
 import type { UserRow } from "@/lib/db/schema";
 import { effectivePresence, type PresenceStatus } from "@/lib/validation/presence";
+import { getActiveTags, getTagAssignments, normalizeTagLabel, parseTagExpirations, parseTags, type TagAssignment, type TagExpirations } from "@/lib/validation/tags";
 
 /**
  * Every rule about WHO may exist and WHAT state they are in lives here, behind plain
@@ -28,6 +29,16 @@ import { effectivePresence, type PresenceStatus } from "@/lib/validation/presenc
  * mang vai nào.
  */
 type WithRoles = { roles: string[] };
+type WithTagAssignments = { tagAssignments: TagAssignment[] };
+
+/** Keep expired assignments editable while all ordinary consumers see active labels only. */
+function withCurrentTags<T extends { tags: string[]; tagExpirations: TagExpirations }>(user: T): T & WithTagAssignments {
+  return {
+    ...user,
+    tagAssignments: getTagAssignments(user.tags, user.tagExpirations),
+    tags: getActiveTags(user.tags, user.tagExpirations),
+  };
+}
 
 export type PublicUser = Pick<
   UserRow,
@@ -36,6 +47,7 @@ export type PublicUser = Pick<
   | "displayName"
   | "email"
   | "tags"
+  | "tagExpirations"
   | "avatarUrl"
   | "status"
   | "presenceStatus"
@@ -43,10 +55,10 @@ export type PublicUser = Pick<
   | "createdAt"
   | "updatedAt"
 > &
-  WithRoles;
+  WithRoles & WithTagAssignments;
 
 /** Trọn hàng users (kèm `passwordHash`) cộng vai — thứ mà đường đăng nhập cần. */
-export type FullUser = UserRow & WithRoles;
+export type FullUser = UserRow & WithRoles & WithTagAssignments;
 
 /**
  * Vai của một đạo hữu, đọc từ bảng `user_roles` — nguồn DUY NHẤT kể từ 09/08/2026.
@@ -78,6 +90,7 @@ const publicColumns = {
   email: schema.users.email,
   roles: rolesOfUser,
   tags: schema.users.tags,
+  tagExpirations: schema.users.tagExpirations,
   avatarUrl: schema.users.avatarUrl,
   status: schema.users.status,
   presenceStatus: schema.users.presenceStatus,
@@ -102,7 +115,7 @@ export async function findByUsername(username: string): Promise<FullUser | null>
     .from(schema.users)
     .where(eq(schema.users.username, username.toLowerCase()))
     .limit(1);
-  return rows[0] ?? null;
+  return rows[0] ? withCurrentTags(rows[0]) : null;
 }
 
 export async function findByEmail(email: string): Promise<FullUser | null> {
@@ -111,12 +124,12 @@ export async function findByEmail(email: string): Promise<FullUser | null> {
     .from(schema.users)
     .where(eq(schema.users.email, email.trim().toLowerCase()))
     .limit(1);
-  return rows[0] ?? null;
+  return rows[0] ? withCurrentTags(rows[0]) : null;
 }
 
 export async function findById(id: string): Promise<PublicUser | null> {
   const rows = await db().select(publicColumns).from(schema.users).where(eq(schema.users.id, id)).limit(1);
-  return rows[0] ?? null;
+  return rows[0] ? withCurrentTags(rows[0]) : null;
 }
 
 /**
@@ -329,7 +342,7 @@ export async function listUsers(options: {
     conditions.push(eq(schema.users.status, options.status));
   }
 
-  return db()
+  const rows = await db()
     .select(publicColumns)
     .from(schema.users)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -338,6 +351,7 @@ export async function listUsers(options: {
       sql`case ${schema.users.status} when 'pending' then 0 when 'active' then 1 else 2 end`,
       schema.users.createdAt,
     );
+  return rows.map(withCurrentTags);
 }
 
 export async function countPending(): Promise<number> {
@@ -504,6 +518,7 @@ export async function adminUpdate(
     password?: string;
     roles?: string[];
     tags?: string[];
+    tagExpirations?: TagExpirations;
     status?: "pending" | "active" | "disabled";
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -518,7 +533,29 @@ export async function adminUpdate(
   if (input.displayName !== undefined) patch.displayName = input.displayName.trim();
   if (input.email !== undefined) patch.email = input.email.trim().toLowerCase();
   if (input.password) patch.passwordHash = hashPassword(input.password);
-  if (input.tags) patch.tags = input.tags;
+  if (input.tagExpirations !== undefined && input.tags === undefined) {
+    return { ok: false, error: "Thiếu danh sách tag cần đặt thời hạn." };
+  }
+  if (input.tags !== undefined) {
+    if (!Array.isArray(input.tags) || input.tags.some(tag => typeof tag !== "string")) {
+      return { ok: false, error: "Danh sách tag không hợp lệ." };
+    }
+    const labels = parseTags(input.tags.join(","));
+    if (!labels.ok) return labels;
+    let expirations = input.tagExpirations;
+    if (expirations === undefined) {
+      // An old open form must not silently turn an expiring tag into a permanent grant.
+      const previous = await db().select({ tagExpirations: schema.users.tagExpirations })
+        .from(schema.users).where(eq(schema.users.id, id)).limit(1);
+      const selected = new Set(labels.tags.map(normalizeTagLabel));
+      expirations = Object.fromEntries(Object.entries(previous[0]?.tagExpirations ?? {})
+        .filter(([label]) => selected.has(normalizeTagLabel(label))));
+    }
+    const parsedExpirations = parseTagExpirations(JSON.stringify(expirations), labels.tags);
+    if (!parsedExpirations.ok) return parsedExpirations;
+    patch.tags = labels.tags;
+    patch.tagExpirations = parsedExpirations.tagExpirations;
+  }
   if (input.status) patch.status = input.status;
 
   try {

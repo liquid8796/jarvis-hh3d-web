@@ -44,6 +44,10 @@ try {
       'import { runCycle } from "./quest-engine/runCycle.mjs";',
     ],
     [
+      'import { createFishingAccessGate } from "../src/lib/quest-engine/fishingAccess.mjs";',
+      'import { createFishingAccessGate } from "./quest-engine/fishingAccess.mjs";',
+    ],
+    [
       'import { profileDirForJob, sweepStaleProfiles } from "../src/lib/quest-engine/browserProfile.mjs";',
       'import { profileDirForJob, sweepStaleProfiles } from "./quest-engine/browserProfile.mjs";',
     ],

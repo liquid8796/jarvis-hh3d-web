@@ -66,6 +66,15 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.251",
+    date: "2026-11-07",
+    lines: [
+      "Admin có thể đặt thời hạn riêng cho từng tag theo giờ Việt Nam; không chọn thời hạn thì tag giữ vô hạn.",
+      "Tag hết hạn không còn mở quyền tương ứng. Có thể sửa hạn hoặc chuyển lại vô hạn trong hộp Sửa đạo hữu.",
+      "Hộp Sửa đạo hữu luôn nằm giữa màn hình, kể cả khi bảng dài; nội dung dài cuộn ngay trong hộp.",
+    ],
+  },
+  {
     version: "1.3.250",
     date: "2026-11-07",
     lines: [
@@ -493,15 +502,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Đã sửa lỗi Reflection dừng giữa chừng khi tìm tài liệu trên web rồi quay lại viết mã.",
       "Kho phụ có thể đọc tài liệu rồi tiếp tục viết mã mà không phải bắt đầu lại lượt làm việc.",
       "Các kho GitHub có thể tiếp tục phát triển mà không bị lỗi thiếu dữ liệu suy luận trước đó.",
-    ],
-  },
-  {
-    version: "1.3.201",
-    date: "2026-10-19",
-    lines: [
-      "Reflection được tăng sức suy luận lên mức cao nhất để phát triển mã nguồn có chiều sâu hơn.",
-      "Kho GitHub phụ mới phải có hướng dẫn sử dụng và mã nguồn đầy đủ, không còn chỉ tạo một tệp rồi bỏ dở.",
-      "Hệ thống chuyển trọn bộ tệp vào cùng một lượt cập nhật; các kho hiện có vẫn được giữ nguyên.",
     ],
   },
 ];

@@ -17,6 +17,7 @@ import {
 import type { CycleProgress } from "@/lib/realtime/dashboardTypes";
 import type { NoticeAudienceKind } from "@/lib/validation/notices";
 import type { PillBagCaps } from "@/lib/validation/pillBagCaps";
+import type { TagExpirations } from "@/lib/validation/tags";
 
 /**
  * One database for everything, on purpose.
@@ -90,6 +91,8 @@ export const users = pgTable(
      * gác ở tầng action; cột chỉ là mảng chữ.
      */
     tags: text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
+    // Missing entries are unlimited, including every tag created before this column existed.
+    tagExpirations: jsonb("tag_expirations").$type<TagExpirations>().notNull().default({}),
     /**
      * Ảnh đại diện — URL công khai trong tàng khố media (OCI), null = chưa đặt và giao diện
      * vẽ vòng tròn chữ đầu như trước.

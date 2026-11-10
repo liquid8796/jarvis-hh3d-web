@@ -730,6 +730,21 @@ Vài lằn ranh an toàn đã cài sẵn: không thể xoá trưởng môn cuố
 hay tự khoá chính mình, và một lượt chạy mà khôi lỗi im lặng quá 3 phút sẽ tự kết thúc với
 một dòng giải thích trung thực trong nhật ký.
 
+### Chẩn đoán cú Giật câu bị lỗi
+
+Chỉ cú click hook thất bại mới ghi `diagnostics/fishing/hook-0..3.json` và PNG cùng tên
+trong thư mục chạy worker (repo hoặc gói máy nhà). Không tự tải các tệp này lên mạng.
+JSON giữ tối đa 100 dòng actionability đã lọc: bỏ URL, HTML, chữ riêng tư và chi tiết lạ;
+trạng thái nút, hộp bao và hit-test là bằng chứng chính. Ảnh chỉ cắt quanh nút, che chữ,
+form, media và phần tử khác nên có thể gần như trống; đọc `screenshotNote` trước khi dùng.
+Ảnh được bỏ qua khi có chữ CSS sinh thêm, ảnh nền URL, shadow DOM, hoặc trang đổi trong lúc chụp.
+Chỉ mở PNG được trường `screenshot` trong JSON trỏ tới; slot bỏ qua ảnh có PNG rỗng.
+Giới hạn dùng chung toàn tiến trình: 1 lần/phút, tối đa 800ms chờ bổ sung, 4 cặp tệp,
+mỗi PNG không quá 96KB. Không xóa tệp khác; khởi động lại vẫn dùng 4 tên slot đó.
+Một thao tác chẩn đoán bị treo sẽ chặn chẩn đoán mới cho tới khi nó kết thúc, không chặn
+quest; lỗi đọc/chụp/ghi không đổi kết quả click và không thử click lại.
+Kiểm thử offline: `npm run verify:fishing-click-diagnostics`.
+
 ## 5. Migration về sau
 
 ```bash

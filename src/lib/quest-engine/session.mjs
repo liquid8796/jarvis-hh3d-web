@@ -11,6 +11,7 @@ import { chooseFishingHold, createFishingTelemetry } from "./fishingServo.mjs";
 import { prepareFishingSpot } from "./fishingSpot.mjs";
 import { createFishingSaleJournal } from "./fishingJournal.mjs";
 import { readFishingCatchBag } from "./fishingCatchDetails.mjs";
+import { FISHING_HOOK_SELECTOR, diagnoseFishingHookFailure } from "./fishingClickDiagnostics.mjs";
 
 /**
  * Bỏ dấu, hạ chữ thường, chỉ giữ chữ và số, cách nhau đúng một khoảng trắng.
@@ -505,6 +506,10 @@ export function createSession(page, options) {
         await page.click(selector, { timeout: timeoutMs, force, delay: Math.max(0, Math.min(1000, pressMs)) });
         return true;
       } catch (err) {
+        if (selector.trim() === FISHING_HOOK_SELECTOR) {
+          await diagnoseFishingHookFailure(page, err, log);
+          return false;
+        }
         log.debug(`Click '${selector}' hỏng — ${squashCallLog(err instanceof Error ? err.message : String(err))}`);
         return false;
       }

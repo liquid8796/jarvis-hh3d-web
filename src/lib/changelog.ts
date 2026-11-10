@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.252",
+    date: "2026-11-10",
+    lines: [
+      "Khi bấm Giật bị lỗi, khôi lỗi mới lưu thêm trạng thái nút và phần tử che để tìm đúng nguyên nhân.",
+      "Ảnh chẩn đoán được cắt, che thông tin riêng tư và giữ có giới hạn trên máy chạy; không thay đổi cách câu cá.",
+    ],
+  },
+  {
     version: "1.3.251",
     date: "2026-11-07",
     lines: [
@@ -493,15 +501,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Mỗi tài khoản game có thể chọn riêng Khôi lỗi tông môn, Máy nhà hoặc theo cài đặt chung.",
       "Đổi nơi chạy trong phần Sửa tài khoản; đàn đang chạy sẽ hoàn tất vòng trước khi chuyển.",
       "Bảng hàng đợi tự cập nhật theo lựa chọn riêng của từng tài khoản để không giao sai khôi lỗi.",
-    ],
-  },
-  {
-    version: "1.3.202",
-    date: "2026-10-20",
-    lines: [
-      "Đã sửa lỗi Reflection dừng giữa chừng khi tìm tài liệu trên web rồi quay lại viết mã.",
-      "Kho phụ có thể đọc tài liệu rồi tiếp tục viết mã mà không phải bắt đầu lại lượt làm việc.",
-      "Các kho GitHub có thể tiếp tục phát triển mà không bị lỗi thiếu dữ liệu suy luận trước đó.",
     ],
   },
 ];

@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.252 — Bounded fishing hook-click diagnostics (10/11/2026)
+
+- Record sanitized chronological Playwright actionability reasons and fixed-schema button bounds, styles and hit-test evidence when a trusted hook click fails. Preserve the original failed result without retrying or changing fishing behavior; the intermittent failure cause remains unconfirmed.
+- Keep at most four local JSON/PNG pairs in diagnostics/fishing, one capture per minute across sessions, with 96 KB image and 800 ms caller budgets. Crop and mask screenshots, discard images on navigation or unsafe generated/shadow/media content, and isolate stalled capture work without interrupting the quest.
+- Add offline regressions for real blocked clicks, sensitive-pixel masking, generated/shadow visuals, navigation races, hostile observation data, grouped call logs, fixed retention, closed pages, disk errors and hung reads/screenshots. Types, build, packaging and existing fishing checks pass.
+- Release the application and downloadable worker bundle to OCI only. Do not start a worker on OCI, push GitHub, or interrupt currently running home workers. Existing workers gain the diagnostics after their normal update/restart.
+
 ## 1.3.251 — Independent user-tag expiry and viewport edit dialog (07/11/2026)
 
 - Add optional per-tag deadlines, defaulting existing and newly selected tags to unlimited. Store UTC instants and display the admin date/time controls explicitly in Vietnam time (UTC+7), independent of browser timezone. Keep expired assignments available for renewal and remove stale deadlines when tags are removed.

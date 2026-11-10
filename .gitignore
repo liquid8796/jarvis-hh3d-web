@@ -3,6 +3,7 @@ node_modules/
 .next/
 out/
 .tmp-watch/
+diagnostics/fishing/
 next-env.d.ts
 *.tsbuildinfo
 

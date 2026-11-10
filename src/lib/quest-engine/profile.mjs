@@ -430,7 +430,10 @@ export function profileForConfig(config, say, marksToday, at = new Date()) {
     const fishing = config.quests?.cauCa;
     quest.enabled = fishing?.enabled === true;
     if (quest.enabled) {
-      setOption(quest, "spot", fishing.spot ?? "giua", { log });
+      const spots = fishing.spot === "random" ? ["nong", "sen", "giua", "cau"]
+        : Array.isArray(fishing.spot) ? fishing.spot : [fishing.spot ?? "giua"];
+      const selectedSpots = [...new Set(spots.filter(spot => ["nong", "sen", "giua", "cau"].includes(spot)))];
+      setOption(quest, "spot", (selectedSpots.length ? selectedSpots : ["giua"]).join(","), { allowFreeform: true });
       setOption(quest, "sellBelow", String(fishing.sellBelow ?? 4), { allowFreeform: true, log });
       setOption(quest, "sellEveryCasts", String(fishing.sellEveryCasts ?? 5), { allowFreeform: true, log });
       setOption(quest, "releaseBelow", String(fishing.releaseBelow ?? 0), { allowFreeform: true, log });

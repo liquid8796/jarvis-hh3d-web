@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.253 — Multiple selected fishing spots (10/11/2026)
+
+- Replace the single Điểm câu dropdown with four checkboxes, retaining at least one selection. A single selected habitat stays fixed; multiple selections are sampled uniformly before each cast, only within that set.
+- Persist all selected values through the form, configuration schema and both fishing quest profiles. Read old single-spot configurations as one selection and old random configurations as all four, without a separate random option.
+- Preserve active Cá Săn targeting, trusted habitat selection and failed-selection safety. Add configuration round-trip, real action, worker subset-randomization and browser UI regressions.
+- OCI release scope: application and downloadable worker bundle only. Do not start a worker on OCI, push GitHub, or interrupt running home workers; they receive the update at their normal restart/update.
+
 ## 1.3.252 — Bounded fishing hook-click diagnostics (10/11/2026)
 
 - Record sanitized chronological Playwright actionability reasons and fixed-schema button bounds, styles and hit-test evidence when a trusted hook click fails. Preserve the original failed result without retrying or changing fishing behavior; the intermittent failure cause remains unconfirmed.

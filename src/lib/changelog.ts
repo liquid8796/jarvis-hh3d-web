@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.253",
+    date: "2026-11-10",
+    lines: [
+      "Điểm câu cho phép chọn nhiều vùng; chọn một vùng thì giữ cố định, chọn từ hai vùng sẽ ngẫu nhiên trong nhóm mỗi lần ném.",
+      "Bỏ lựa chọn Ngẫu nhiên riêng. Cấu hình cũ được giữ tương đương; trong đợt Cá Săn vẫn giữ điểm hiện tại.",
+    ],
+  },
+  {
     version: "1.3.252",
     date: "2026-11-10",
     lines: [
@@ -492,15 +500,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Mỗi tài khoản nay có ba ô chọn khôi lỗi ngay trên thẻ, không cần mở mục Sửa.",
       "Chạm một ô để chuyển nơi chạy và tự lưu; nếu gặp lỗi, lựa chọn trước vẫn được giữ.",
-    ],
-  },
-  {
-    version: "1.3.203",
-    date: "2026-10-20",
-    lines: [
-      "Mỗi tài khoản game có thể chọn riêng Khôi lỗi tông môn, Máy nhà hoặc theo cài đặt chung.",
-      "Đổi nơi chạy trong phần Sửa tài khoản; đàn đang chạy sẽ hoàn tất vòng trước khi chuyển.",
-      "Bảng hàng đợi tự cập nhật theo lựa chọn riêng của từng tài khoản để không giao sai khôi lỗi.",
     ],
   },
 ];

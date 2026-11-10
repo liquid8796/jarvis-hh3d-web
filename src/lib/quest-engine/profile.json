@@ -8080,10 +8080,6 @@
             {
               "value": "cau",
               "label": "Dưới cầu đá"
-            },
-            {
-              "value": "random",
-              "label": "Ngẫu nhiên mỗi lần ném"
             }
           ]
         },
@@ -8148,10 +8144,6 @@
             {
               "value": "cau",
               "label": "Dưới cầu đá"
-            },
-            {
-              "value": "random",
-              "label": "Ngẫu nhiên mỗi lần ném"
             }
           ]
         },

@@ -32,13 +32,15 @@ export async function prepareFishingSpot(page) {
   if (state.hunt) return { ready: true, reason: "Giữ điểm hiện tại trong đợt Cá Săn." };
   if (!state.hasSpot) return { ready: true, reason: "Không thấy Điểm câu; giữ chỗ ném do game chọn." };
   const label = await page.evaluate(() => {
-    // IDs and labels from the game's habitat catalog; random means one of
-    // these four destinations on each cast, never a guessed world point.
+    // The profile sends comma-separated IDs. Keep scalar/random compatibility
+    // for old job snapshots, but sample only the selected habitats each cast.
     const habitats = { nong: "Bờ nông", sen: "Bãi sen", giua: "Giữa hồ", cau: "Dưới cầu đá" };
     const selected = window.__jvzFish?.spot;
-    const labels = Object.values(habitats);
-    return selected === "random" ? labels[Math.floor(Math.random() * labels.length)]
-      : Object.hasOwn(habitats, selected) ? habitats[selected] : habitats.giua;
+    const raw = selected === "random" ? Object.keys(habitats)
+      : Array.isArray(selected) ? selected : typeof selected === "string" ? selected.split(",") : [];
+    const spots = [...new Set(raw.filter(spot => typeof spot === "string" && Object.hasOwn(habitats, spot)))];
+    if (!spots.length) return habitats.giua;
+    return habitats[spots.length === 1 ? spots[0] : spots[Math.floor(Math.random() * spots.length)]];
   });
   if (state.current === label) return { ready: true, label };
 

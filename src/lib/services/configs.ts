@@ -306,7 +306,13 @@ export const configSchema = z.object({
       /** Câu Cá — Tiên Giới, admin or VIP-tagged web users (server policy in fishingAccess.mjs). */
       cauCa: z.object({
         enabled: z.boolean().default(false),
-        spot: z.enum(["nong", "sen", "giua", "cau", "random"]).default("giua"),
+        // Old scalar configs remain readable; legacy random means all four selected.
+        spot: z.preprocess(
+          value => value === "random" ? ["nong", "sen", "giua", "cau"]
+            : typeof value === "string" ? [value] : value,
+          z.array(z.enum(["nong", "sen", "giua", "cau"])).min(1, "Chọn ít nhất một điểm câu.")
+            .transform(values => [...new Set(values)]),
+        ).default(["giua"]),
         sellBelow: z.number().int().min(0).max(30).default(4),
         sellEveryCasts: z.number().int().min(1).max(10000).default(5),
         releaseBelow: z.number().int().min(0).max(30).default(0),

@@ -7,6 +7,7 @@ import type { EditableConfig } from "@/lib/services/configs";
 import { AccountManager } from "./AccountManager";
 import { useDashboardAccountLive, useDashboardWorkerPref } from "./DashboardLiveProvider";
 import { PillBagCapacitySummary } from "./PillBagCapacitySummary";
+import { FishingSpotOptions } from "./FishingSpotOptions";
 
 /**
  * Ngọc giản cấu hình. Uncontrolled inputs với defaultValue từ server — form chỉ là tấm
@@ -14,9 +15,8 @@ import { PillBagCapacitySummary } from "./PillBagCapacitySummary";
  * nhiệm vụ (Mê Cung + hai bản Luyện Đan) chỉ để LÀM MỜ phần tuỳ chọn bên dưới: giá trị
  * vẫn được gửi đi đầy đủ, nên tắt rồi bật lại không mất những gì đã chọn.
  *
- * Đúng MỘT ô đi ngược luật ấy và có kiểm soát:「Dừng khi đã đủ huyền tinh」của Mê Cung. Nó
- * là ô duy nhất server có quyền phủ quyết, nên nó phải vẽ được cái phủ quyết đó ra — xem
- * CapLockDialog. Mọi ô còn lại vẫn thuần uncontrolled.
+ * 「Dừng khi đã đủ huyền tinh」của Mê Cung có kiểm soát để phản ánh quyền phủ quyết của
+ * server (CapLockDialog). Nhóm Điểm câu cũng có state để luôn giữ ít nhất một lựa chọn.
  *
  * Cấu hình nhiệm vụ là MỘT bộ chung cho mọi tài khoản (y như bản desktop dùng một
  * quests.json toàn cục): tab VIP áp cho các tài khoản hạng VIP, tab Thường cho các tài
@@ -1052,18 +1052,8 @@ export function ConfigForm({ config, isAdmin, canFish }: { config: EditableConfi
             <span className="text-xs text-[var(--color-mist)]">Chỉ dành cho các user VIP</span>
           </label>
           {!canFish && <p className="text-xs text-[var(--color-mist)]">Chỉ admin hoặc user có tag VIP được bật và chạy quest này.</p>}
-          <label className="block space-y-1 text-xs text-[var(--color-mist)]">
-            <span>Điểm câu</span>
-            <select name="cauCaSpot" defaultValue={config.quests.cauCa.spot} disabled={!canFish}
-              className="w-full rounded-lg border border-[var(--color-ink-500)] bg-[var(--color-ink-700)] p-2 text-[var(--color-parchment)]">
-              <option value="nong">Bờ nông</option>
-              <option value="sen">Bãi sen</option>
-              <option value="giua">Giữa hồ</option>
-              <option value="cau">Dưới cầu đá</option>
-              <option value="random">Ngẫu nhiên mỗi lần ném</option>
-            </select>
-            <span className="block">Chọn vùng ném câu, không đổi chỗ ngồi. Trong đợt Cá Săn, giữ điểm hiện tại.</span>
-          </label>
+          <FishingSpotOptions key={config.quests.cauCa.spot.join(",")}
+            defaultValue={config.quests.cauCa.spot} disabled={!canFish} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="space-y-1 text-xs text-[var(--color-mist)]">
               <span>Tự bán cá có ngư lực không quá +N (0 = không bán)</span>

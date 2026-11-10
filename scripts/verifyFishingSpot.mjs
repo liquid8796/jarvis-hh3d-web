@@ -71,6 +71,19 @@ try {
     assert.deepEqual(await trace(), ['open', 'select:' + label], 'random spans four habitats');
   }
   await setup({ spot: 'random', random: 0 });
+  for (const spot of ['sen,cau', ['sen', 'cau']]) {
+    for (const [random, label] of [[0, 'Bãi sen'], [.49999, 'Bãi sen'], [.5, 'Dưới cầu đá'], [.999999, 'Dưới cầu đá']]) {
+      await setup({ spot, random });
+      assert.equal(await cast(), true);
+      assert.deepEqual(await trace(), ['open', 'select:' + label, 'cast:' + label], 'random stays inside selected subset');
+    }
+  }
+  await setup({ spot: 'sen,cau', random: 0 });
+  await prepareFishingSpot(page);
+  await page.evaluate(() => { Math.random = () => .75; });
+  await prepareFishingSpot(page);
+  assert.deepEqual(await trace(), ['open', 'select:Bãi sen', 'open', 'select:Dưới cầu đá'], 'multi-selection samples anew each cast');
+  await setup({ spot: 'random', random: 0 });
   await prepareFishingSpot(page);
   await page.evaluate(() => { Math.random = () => .75; });
   await prepareFishingSpot(page);

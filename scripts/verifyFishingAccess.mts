@@ -84,6 +84,8 @@ function forgedForm() {
     cauCaEnabled: "on", cauCaSellBelow: "8", meCungCapCheck: "on", q_diemDanh: "on",
     userId: "other-user", isAdmin: "true", canFish: "true", tags: "VIP", accountTier: "vip",
   })) data.set(key, value);
+  data.append("cauCaSpot", "sen");
+  data.append("cauCaSpot", "cau");
   return data;
 }
 async function saveAs(user: User, expected: boolean) {
@@ -94,6 +96,7 @@ async function saveAs(user: User, expected: boolean) {
   const config = saved as configs.UserConfig;
   assert.equal(config.quests.cauCa.enabled, expected, "save access for " + JSON.stringify(user));
   assert.equal(config.quests.cauCa.sellBelow, 8, "other fishing settings survive");
+  assert.deepEqual(config.quests.cauCa.spot, ["sen", "cau"], "real server action persists every selected spot");
   assert.equal(config.quests.diemDanh.enabled, true, "other quests survive");
   return result;
 }
@@ -161,6 +164,7 @@ const { ConfigForm } = load<{ ConfigForm: (props: { config: configs.UserConfig; 
     "@/app/actions/automation": { saveConfigAction: async () => ({ ok: true, message: "" }) },
     "./AccountManager": { AccountManager: () => null },
     "./PillBagCapacitySummary": { PillBagCapacitySummary: () => null },
+    "./FishingSpotOptions": load("src/app/dashboard/FishingSpotOptions.tsx"),
     "./DashboardLiveProvider": {
       useDashboardAccountLive: () => ({ accounts: [] }), useDashboardWorkerPref: () => ({ workerPref: "any" }),
     },
@@ -172,7 +176,7 @@ for (const access of [{ isAdmin: true, canFish: true }, { isAdmin: false, canFis
   assert.equal(/disabled=""/.test(checkbox), !access.canFish);
   assert.equal(/checked=""/.test(checkbox), access.canFish);
   const fields = [...html.matchAll(/<(?:input|select)[^>]*name="cauCa[^"]*"[^>]*>/g)];
-  assert.equal(fields.length, 7);
+  assert.equal(fields.length, 10, "four spot checkboxes replace one select");
   for (const [field] of fields) assert.equal(/disabled=""/.test(field), !access.canFish, field);
   assert.ok(html.includes("Chỉ dành cho các user VIP"));
   assert.ok(!html.includes("VIP + thường"));

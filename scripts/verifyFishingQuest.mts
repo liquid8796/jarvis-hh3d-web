@@ -51,13 +51,28 @@ assert.equal(denied.quests.cauCa.enabled, false, "unauthorized user cannot activ
 assert.equal(cfg.quests.cauCa.enabled, true, "policy must not mutate input");
 console.log("PASS: Câu Cá twin quests, options and access gate");
 
-assert.equal(configSchema.parse({}).quests.cauCa.spot, "giua", "old config retains Giữa hồ");
+assert.deepEqual(configSchema.parse({}).quests.cauCa.spot, ["giua"], "old config retains Giữa hồ");
 assert.equal(configSchema.safeParse({quests:{cauCa:{spot:"invalid"}}}).success, false);
-for (const spot of ["nong", "sen", "giua", "cau", "random"]) {
+for (const spot of ["nong", "sen", "giua", "cau", "random", ["sen", "cau"], ["nong", "giua", "cau"], ["sen", "sen"]]) {
   const config = configSchema.parse({ quests: { cauCa: { enabled: true, spot } } });
+  const expected = spot === "random" ? ["nong", "sen", "giua", "cau"] : [...new Set(Array.isArray(spot) ? spot : [spot])];
+  assert.deepEqual(config.quests.cauCa.spot, expected, "normalize old scalars, random and repeated selections");
+  assert.deepEqual(configSchema.parse(JSON.parse(JSON.stringify(config))).quests.cauCa.spot, expected, "saved config round-trips");
   const profile = profileForConfig(config);
   for (const q of profile.quests.filter((q: { id: string }) => ["cau-ca", "cau-ca-thuong"].includes(q.id))) {
-    assert.equal(q.options.find((o: { key: string; selectedValue: string }) => o.key === "spot")?.selectedValue, spot, "spot survives validation and both profile twins");
+    const option = q.options.find((o: { key: string }) => o.key === "spot");
+    assert.equal(option?.selectedValue, expected.join(","), "all spots survive validation and both profile twins");
+    assert.ok(!option.choices.some((c: { value: string }) => c.value === "random"), "no separate random choice remains");
+    if (expected.length > 1) assert.equal(option.allowCustom, true, "engine must retain multi-selection tokens");
+  }
+}
+for (const spot of [[], ["random"], ["sen", "invalid"], null, 1, [1]]) {
+  assert.equal(configSchema.safeParse({ quests: { cauCa: { spot } } }).success, false, "reject invalid selections");
+}
+for (const spot of ["sen", "random", ["sen", "cau"]]) {
+  const expected = spot === "random" ? "nong,sen,giua,cau" : Array.isArray(spot) ? spot.join(",") : spot;
+  for (const q of profileForConfig({ quests: { cauCa: { enabled: true, spot } } }).quests.filter((q: { id: string }) => ["cau-ca", "cau-ca-thuong"].includes(q.id))) {
+    assert.equal(q.options.find((o: { key: string }) => o.key === "spot").selectedValue, expected, "legacy snapshots bypassing schema stay compatible");
   }
 }
 console.log("PASS fishing spot config defaults, validation and twin translation");
@@ -97,6 +112,14 @@ for (const oldConfig of [legacyFishing, cfg]) {
 
 // Exercise the real form conversion without importing Next's authenticated server-action dependencies.
 const actionSource = readFileSync(new URL("../src/app/actions/automation.ts", import.meta.url), "utf8");
+const spotExpression = actionSource.match(/^\s*spot: (.+),\s*$/m)?.[1];
+assert.ok(spotExpression);
+const readSpots = new Function("formData", `return (${spotExpression});`) as (form: FormData) => unknown;
+for (const values of [[], ["sen"], ["sen", "cau"], ["nong", "sen", "giua", "cau"]]) {
+  const data = new FormData();
+  for (const value of values) data.append("cauCaSpot", value);
+  assert.deepEqual(readSpots(data), values.length ? values : ["giua"], "form preserves all selected spots");
+}
 const intervalExpression = actionSource.match(/^\s*sellEveryCasts: (.+),\s*$/m)?.[1];
 assert.ok(intervalExpression, "server action reads the interval field");
 const readInterval = new Function("formData", `return (${intervalExpression});`) as (form: FormData) => number;

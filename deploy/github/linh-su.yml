@@ -111,9 +111,40 @@ jobs:
 
       - name: Install Chromium for worker runtime
         run: |
-          set -eu
+          set -euo pipefail
           cd "$LINH_SU_RUNTIME"
-          node node_modules/playwright-core/cli.js install --with-deps chromium
+          # 11/11/2026: Ubuntu apt mirrors stopped resolving on GitHub runners.
+          # Installing OS dependencies invokes apt even though this Ubuntu image
+          # already has the required Chromium shared libraries. Missing optional
+          # fonts caused the whole workflow to fail at startup.
+          # Only download the revision pinned by the bundled playwright-core.
+          for attempt in 1 2 3; do
+            if node node_modules/playwright-core/cli.js install chromium; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Chromium download failed after 3 attempts."
+              exit 1
+            fi
+            sleep "$((attempt * 5))"
+          done
+
+          # Launch full Chromium in the SAME channel as the worker runtime,
+          # and verify renderer readiness before claiming real jobs.
+          node --input-type=module <<'NODE'
+          import { chromium } from "playwright-core";
+          const browser = await chromium.launch({ channel: "chromium", headless: true });
+          try {
+            const page = await browser.newPage();
+            await page.goto("data:text/html,<title>HH3D-CHROMIUM-READY</title>");
+            if (await page.title() !== "HH3D-CHROMIUM-READY") {
+              throw new Error("Chromium smoke page was not rendered.");
+            }
+            console.log("Chromium launch OK:", browser.version());
+          } finally {
+            await browser.close();
+          }
+          NODE
 
       - name: Trực ca
         env:

@@ -73,7 +73,10 @@ async function main() {
     );
     check(
       "workflow chỉ cài Chromium",
-      workflow.includes("playwright-core/cli.js install --with-deps chromium") && !/obscura/i.test(workflow),
+      workflow.includes("playwright-core/cli.js install chromium") &&
+        !workflow.includes("install --with-deps chromium") &&
+        workflow.includes('chromium.launch({ channel: "chromium", headless: true })') &&
+        !/obscura/i.test(workflow),
     );
     check(
       "module Obscura và UI selector đã bị xóa",

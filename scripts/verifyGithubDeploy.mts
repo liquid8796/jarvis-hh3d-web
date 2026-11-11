@@ -203,7 +203,9 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
     check("helper bỏ workflow placeholder mặc định", !stationFiles.has(WORKFLOW_TARGET_PATH));
     check("helper giữ workflow không liên quan", stationFiles.has(unrelatedWorkflow));
     const renderedCustomWorkflow = stationFiles.get(customWorkflow)?.toString("utf8") ?? "";
-    check("workflow phát hành tự phát lại đúng tên riêng", renderedCustomWorkflow.includes("/actions/workflows/nightly.yaml/dispatches"));
+    check("workflow tự xác định tên từ GITHUB_WORKFLOW_REF thay vì chốt tên cố định",
+      renderedCustomWorkflow.includes("GITHUB_WORKFLOW_REF") &&
+      renderedCustomWorkflow.includes("/actions/workflows/$wf_file/dispatches"));
     check("workflow phát hành không còn tự phát vào tên mặc định", !renderedCustomWorkflow.includes("/actions/workflows/linh-su.yml/dispatches"));
 
     const customPayload = new Map(
@@ -262,7 +264,9 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
   });
   check("vẽ xong thì WORKER_ID là id mới", workerIdFromWorkflow(rendered) === "khoiloi-tro-kiem-chung");
   check("vẽ xong thì WEB_URL là địa chỉ mới", webUrlFromWorkflow(rendered) === "https://vi-du.invalid");
-  check("workflow riêng tự phát lại đúng tệp", rendered.includes("/actions/workflows/nightly.yaml/dispatches"));
+  check("workflow riêng phát lượt kế theo đúng GITHUB_WORKFLOW_REF",
+    rendered.includes("GITHUB_WORKFLOW_REF") &&
+    rendered.includes("/actions/workflows/$wf_file/dispatches"));
   check("workflow riêng không còn tự phát vào linh-su.yml", !rendered.includes("/actions/workflows/linh-su.yml/dispatches"));
   check(
     "đổi WEB_URL không làm trôi cổng dự phòng",
@@ -281,7 +285,9 @@ console.log("Phát hành khôi lỗi GitHub — ba phần thuần dễ sai nhấ
   );
   check(
     "workflow chỉ cài Chromium từ playwright-core đi kèm gói",
-    workingTemplate.includes("node node_modules/playwright-core/cli.js install --with-deps chromium") &&
+    workingTemplate.includes("node node_modules/playwright-core/cli.js install chromium") &&
+      !workingTemplate.includes("install --with-deps chromium") &&
+      workingTemplate.includes('chromium.launch({ channel: "chromium", headless: true })') &&
       !/obscura/i.test(workingTemplate),
   );
   check(

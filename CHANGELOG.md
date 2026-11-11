@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.254 — Release-version correction for Chromium CI DNS recovery (12/11/2026)
+
+- Correct the release bookkeeping after the same-version OCI deployment of 1.3.253: every new production release must have a distinct version, matching package.json, package-lock.json, the user-facing release notes and this technical changelog.
+- Include Chromium installer hotfix b2c7e57: the canonical Tông Môn GitHub Actions workflow downloads the browser revision pinned by the bundled playwright-core without invoking apt-get/Ubuntu mirrors, retries bounded download failures and smoke-tests actual headless Chromium before claiming any jobs.
+- Preserve the v1.3.252 hook diagnostics and v1.3.253 multi-fishing-spot functionality already running on OCI. Retain native systemd/Caddy blue/green slots, without Docker or cancellation of ongoing worker actions.
+- GitHub worker workflows were already synchronized 8/8 separately; do not redeploy or restart those jobs as part of this Web release.
+
 ## 1.3.253 — Multiple selected fishing spots (10/11/2026)
 
 - Replace the single Điểm câu dropdown with four checkboxes, retaining at least one selection. A single selected habitat stays fixed; multiple selections are sampled uniformly before each cast, only within that set.

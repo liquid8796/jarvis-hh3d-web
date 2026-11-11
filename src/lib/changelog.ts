@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.254",
+    date: "2026-11-12",
+    lines: [
+      "Đã sửa lỗi khôi lỗi Tông Môn dừng khi tải và cài trình duyệt do máy chủ gói phụ trợ không phản hồi.",
+      "Trình duyệt sẽ được kiểm tra trước khi khôi lỗi nhận việc; không thay đổi cách chạy nhiệm vụ hiện tại.",
+    ],
+  },
+  {
     version: "1.3.253",
     date: "2026-11-10",
     lines: [
@@ -492,14 +500,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Ba ô chọn khôi lỗi nằm cùng một hàng với tên tài khoản và nút Sửa, gọn hơn trước.",
       "Trên màn hình hẹp, vuốt ngang nhóm ô chọn để đổi nơi chạy mà không làm xuống dòng.",
-    ],
-  },
-  {
-    version: "1.3.204",
-    date: "2026-10-21",
-    lines: [
-      "Mỗi tài khoản nay có ba ô chọn khôi lỗi ngay trên thẻ, không cần mở mục Sửa.",
-      "Chạm một ô để chuyển nơi chạy và tự lưu; nếu gặp lỗi, lựa chọn trước vẫn được giữ.",
     ],
   },
 ];

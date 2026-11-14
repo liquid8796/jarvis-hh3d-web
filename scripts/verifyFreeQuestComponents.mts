@@ -4,7 +4,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const profile = JSON.parse(await readFile(path.join(root, "src", "lib", "quest-engine", "profile.json"), "utf8"));
-assert.equal(profile.schemaVersion, 85, "refreshed free quest components require schema 85");
+assert.ok(profile.schemaVersion >= 85, "free quest components require schema 85 or later");
 
 const find = (id: string) => {
   const quest = profile.quests.find((entry: { id?: string }) => entry.id === id);
@@ -32,11 +32,11 @@ const assertExcludesFragments = (haystack: string[], fragments: string[], label:
   const quest = find("diem-danh-thuong");
   const all = selectors(quest);
   assertIncludes(all, "#ddPage", "Điểm Danh");
-  assertIncludes(all, "#ddGrid .dd-tile.is-today", "Điểm Danh");
-  assertIncludes(all, "#ddGrid .dd-tile.is-today.is-claimed", "Điểm Danh");
+  assertIncludes(all, "#ddGrid .ddg-day.is-today", "Điểm Danh");
+  assertIncludes(all, "#ddStamp.is-done[disabled]", "Điểm Danh");
   assertIncludes(all, "#ddStamp", "Điểm Danh");
   assertExcludesFragments(all, ["#checkInButton", "#nv-checkin-btn"], "Điểm Danh");
-  assert.ok(flatten(quest.steps).some((step) => step.action === "waitForCondition" && step.optional !== true && step.condition?.selector === "#ddGrid .dd-tile.is-today.is-claimed"), "Điểm Danh must require claimed-state proof");
+  assert.ok(flatten(quest.steps).some((step) => step.action === "waitForCondition" && step.optional !== true && step.condition?.selector === "#ddStamp.is-done[disabled]"), "Điểm Danh must require claimed-state proof");
 }
 
 {
@@ -49,7 +49,7 @@ const assertExcludesFragments = (haystack: string[], fragments: string[], label:
     "#plChests .pl-chest[data-state='ready']",
     "#plChests .pl-chest[data-state='cooldown']",
     "#plChests .pl-chest[data-state='cooldown'] .pl-chest__timer",
-    "#plMiles .pl-mile[data-state='ready'] .pl-mile__btn",
+    "#plMiles .pl-mile[data-state='ready'] .pl-mile__cta",
   ]) assertIncludes(all, selector, "Phúc Lợi Đường");
   assertExcludesFragments(all, ["#countdown-timer", "#chest-", ".reward-progress-container", ".gift-box"], "Phúc Lợi Đường");
   assert.ok(flatten(quest.steps).some((step) => step.action === "waitForCondition" && step.optional !== true && step.condition?.kind === "hidden" && step.condition?.selector === "#plChests .pl-chest[data-state='ready']"), "Phúc Lợi Đường must require ready chest to leave ready state");
@@ -63,4 +63,4 @@ const assertExcludesFragments = (haystack: string[], fragments: string[], label:
   assert.ok(flatten(quest.steps).some((step) => step.action === "waitForCondition" && step.optional !== true && step.condition?.kind === "hidden" && step.condition?.selector === "#tlPage[data-state='ready']"), "Thí Luyện Tông Môn must require leaving ready state");
 }
 
-console.log("PASS: free Check-in, Welfare Hall and Sect Trial follow the 29/09 server components and reject stale selectors.");
+console.log("PASS: free Check-in, Welfare Hall and Sect Trial follow the current server components and reject stale selectors.");

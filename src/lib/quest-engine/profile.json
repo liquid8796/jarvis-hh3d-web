@@ -357,29 +357,38 @@
         },
         {
           "action": "waitForSelector",
+          "selector": "#plChests",
+          "timeoutMs": 25000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#plDayCount",
+          "timeoutMs": 25000
+        },
+        {
+          "action": "waitForSelector",
           "selector": "#plMiles",
           "timeoutMs": 25000
         },
         {
           "action": "waitMilliseconds",
           "timeoutMs": 900,
-          "note": "đợi AJAX cập nhật mốc tháng và popup"
+          "note": "doi AJAX cap nhat cac moc va popup"
         },
         {
           "action": "click",
           "selector": "#pl-claim-overlay.is-open .pl-claim-btn",
-          "optional": true,
           "timeoutMs": 4000,
+          "optional": true,
           "when": {
             "kind": "visible",
             "selector": "#pl-claim-overlay.is-open .pl-claim-btn"
-          },
-          "note": "đóng popup Đến nhận thưởng trước khi nhận mốc"
+          }
         },
         {
           "action": "waitForCondition",
-          "optional": true,
           "timeoutMs": 4000,
+          "optional": true,
           "condition": {
             "kind": "hidden",
             "selector": "#pl-claim-overlay.is-open"
@@ -388,11 +397,11 @@
         {
           "action": "repeat",
           "timeoutMs": 15000,
-          "note": "nhận từng mốc tháng trước khi về hub mở rương ngày",
+          "note": "nh\u1EADn t\u1EEBng m\u1ED1c th\u00E1ng data-state=ready tr\u01B0\u1EDBc cooldown ng\u00E0y",
           "steps": [
             {
               "action": "click",
-              "selector": "#plMiles .pl-mile[data-state='ready'] .pl-mile__cta",
+              "selector": "#plMiles .pl-mile[data-state=\u0027ready\u0027] .pl-mile__cta",
               "timeoutMs": 8000,
               "forceClick": true
             },
@@ -403,73 +412,82 @@
           ],
           "until": {
             "kind": "hidden",
-            "selector": "#plMiles .pl-mile[data-state='ready'] .pl-mile__cta"
+            "selector": "#plMiles .pl-mile[data-state=\u0027ready\u0027] .pl-mile__cta"
           },
           "maxIterations": 6,
-          "maxSeconds": 70
-        },
-        {
-          "action": "navigate",
-          "text": "/nhiem-vu-hang-ngay",
-          "timeoutMs": 15000
-        },
-        {
-          "action": "waitForSelector",
-          "selector": ".nv-quest",
-          "timeoutMs": 25000,
-          "note": "ch\u1EDD hub render; .nv-quest t\u1ED3n t\u1EA1i c\u1EA3 khi quest \u0111\u00E3 xong"
+          "maxSeconds": 60
         },
         {
           "action": "stopIf",
-          "text": "h\u1EBFt 4 l\u01B0\u1EE3t h\u00F4m nay",
+          "text": "h\u1EBFt 4 r\u01B0\u01A1ng h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay \u2192 n\u00FAt b\u1ECB xo\u00E1 kh\u1ECFi DOM; d\u1EEBng h\u1EB3n thay v\u00EC ch\u1EDD timeout",
           "condition": {
-            "kind": "hidden",
-            "selector": "#nv-phucloi-open-btn"
+            "kind": "textMatches",
+            "selector": "#plDayCount",
+            "text": "4"
           }
         },
         {
           "action": "readCooldownSeconds",
-          "selector": "#nv-phucloi-open-btn",
+          "selector": "#plChests .pl-chest[data-state=\u0027cooldown\u0027] .pl-chest__timer",
           "timeoutMs": 15000,
-          "note": "\u0111\u1ECDc tr\u01B0\u1EDBc: n\u1EBFu \u0111ang \u0111\u1EBFm ng\u01B0\u1EE3c th\u00EC \u0111\u00E2y ch\u00EDnh l\u00E0 th\u1EDDi gian c\u00F2n l\u1EA1i"
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#plChests .pl-chest[data-state=\u0027cooldown\u0027]"
+          }
         },
         {
           "action": "stopIf",
-          "text": "\u0111ang cooldown",
+          "text": "\u0111ang ch\u1EDD r\u01B0\u01A1ng k\u1EBF (30 ph\u00FAt gi\u1EEFa hai l\u1EA7n m\u1EDF)",
           "timeoutMs": 15000,
-          "note": "n\u00FAt c\u00F2n \u0111\u00F3 nh\u01B0ng b\u1ECB kho\u00E1 \u2192 d\u1EEBng, kh\u00F4ng t\u1ED1n timeout cho m\u1ED9t c\u00FA click v\u00F4 \u00EDch",
           "condition": {
-            "kind": "disabled",
-            "selector": "#nv-phucloi-open-btn"
+            "kind": "visible",
+            "selector": "#plChests .pl-chest[data-state=\u0027cooldown\u0027]"
           }
         },
         {
           "action": "click",
-          "selector": "#nv-phucloi-open-btn",
-          "timeoutMs": 15000
+          "selector": "#plChests .pl-chest[data-state=\u0027ready\u0027]",
+          "timeoutMs": 8000,
+          "note": "m\u1EDF r\u01B0\u01A1ng m\u00E0 server \u0111\u00E1nh data-state=ready",
+          "forceClick": true
         },
         {
           "action": "waitForCondition",
-          "timeoutMs": 10000,
-          "note": "d\u1EA5u \u0027:\u0027 ch\u1EC9 xu\u1EA5t hi\u1EC7n khi n\u00FAt \u0111\u00E3 chuy\u1EC3n sang \u0111\u1ED3ng h\u1ED3 \u0111\u1EBFm ng\u01B0\u1EE3c \u2014 \u0111\u00FAng cho m\u1ECDi quest b\u1EA5t k\u1EC3 ch\u1EEF trung gian (\u0022\u0110ang m\u1EDF...\u0022, \u0022\u0110ang qu\u00E9t...\u0022) kh\u00E1c nhau",
-          "optional": true,
+          "timeoutMs": 15000,
+          "note": "response open_chest_new_v2 ph\u1EA3i l\u00E0m r\u01B0\u01A1ng ready \u0111\u1ED5i tr\u1EA1ng th\u00E1i",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#plChests .pl-chest[data-state=\u0027ready\u0027]"
+          }
+        },
+        {
+          "action": "stopIf",
+          "text": "h\u1EBFt 4 r\u01B0\u01A1ng h\u00F4m nay",
+          "timeoutMs": 15000,
           "condition": {
             "kind": "textMatches",
-            "selector": "#nv-phucloi-open-btn",
-            "text": ":"
+            "selector": "#plDayCount",
+            "text": "4"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 12000,
+          "condition": {
+            "kind": "visible",
+            "selector": "#plChests .pl-chest[data-state=\u0027cooldown\u0027]"
           }
         },
         {
           "action": "readCooldownSeconds",
-          "selector": "#nv-phucloi-open-btn",
-          "timeoutMs": 15000,
-          "note": "\u0111\u1ECDc l\u1EA1i sau khi b\u1EA5m"
+          "selector": "#plChests .pl-chest[data-state=\u0027cooldown\u0027] .pl-chest__timer",
+          "timeoutMs": 15000
         }
       ],
       "options": [],
-      "fallbackCooldownSeconds": 3600,
+      "fallbackCooldownSeconds": 1800,
       "requiresVip": true,
       "order": 30,
       "notes": "M\u1EDF r\u01B0\u01A1ng Ph\u00FAc L\u1EE3i \u0110\u01B0\u1EDDng nh\u1EADn th\u01B0\u1EDFng, 4 l\u01B0\u1EE3t/ng\u00E0y."
@@ -483,7 +501,7 @@
         "th\u00ED luy\u1EC7n",
         "thi luyen"
       ],
-      "pagePath": "/nhiem-vu-hang-ngay",
+      "pagePath": "/thi-luyen-tong-mon-hh3d/?nv_embed=1",
       "steps": [
         {
           "action": "navigate",
@@ -493,60 +511,110 @@
         {
           "action": "waitForSelector",
           "selector": ".nv-quest",
-          "timeoutMs": 25000,
-          "note": "ch\u1EDD hub render; .nv-quest t\u1ED3n t\u1EA1i c\u1EA3 khi quest \u0111\u00E3 xong"
+          "timeoutMs": 25000
         },
         {
           "action": "stopIf",
           "text": "h\u1EBFt 3 l\u01B0\u1EE3t h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "h\u1EBFt l\u01B0\u1EE3t h\u00F4m nay \u2192 n\u00FAt b\u1ECB xo\u00E1 kh\u1ECFi DOM; d\u1EEBng h\u1EB3n thay v\u00EC ch\u1EDD timeout",
           "condition": {
             "kind": "hidden",
-            "selector": "#nv-tltm-open-btn"
+            "selector": "a.btn-go[href*=\u0027thi-luyen-tong-mon\u0027]"
+          }
+        },
+        {
+          "action": "navigate",
+          "text": "/thi-luyen-tong-mon-hh3d/?nv_embed=1",
+          "timeoutMs": 15000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#tlPage",
+          "timeoutMs": 25000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#tlScroll",
+          "timeoutMs": 25000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#tlLeft",
+          "timeoutMs": 25000
+        },
+        {
+          "action": "stopIf",
+          "text": "h\u1EBFt 3 l\u01B0\u1EE3t h\u00F4m nay",
+          "timeoutMs": 15000,
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#tlLeft",
+            "text": "0"
           }
         },
         {
           "action": "readCooldownSeconds",
-          "selector": "#nv-tltm-open-btn",
+          "selector": "#tlClock",
           "timeoutMs": 15000,
-          "note": "\u0111\u1ECDc tr\u01B0\u1EDBc: n\u1EBFu \u0111ang \u0111\u1EBFm ng\u01B0\u1EE3c th\u00EC \u0111\u00E2y ch\u00EDnh l\u00E0 th\u1EDDi gian c\u00F2n l\u1EA1i"
+          "optional": true,
+          "when": {
+            "kind": "visible",
+            "selector": "#tlPage[data-state=\u0027cooldown\u0027]"
+          }
         },
         {
           "action": "stopIf",
-          "text": "\u0111ang cooldown",
+          "text": "\u0111ang ch\u1EDD l\u01B0\u1EE3t k\u1EBF (30 ph\u00FAt gi\u1EEFa hai l\u01B0\u1EE3t th\u00ED luy\u1EC7n)",
           "timeoutMs": 15000,
-          "note": "n\u00FAt c\u00F2n \u0111\u00F3 nh\u01B0ng b\u1ECB kho\u00E1 \u2192 d\u1EEBng, kh\u00F4ng t\u1ED1n timeout cho m\u1ED9t c\u00FA click v\u00F4 \u00EDch",
           "condition": {
-            "kind": "disabled",
-            "selector": "#nv-tltm-open-btn"
+            "kind": "visible",
+            "selector": "#tlPage[data-state=\u0027cooldown\u0027]"
           }
         },
         {
           "action": "click",
-          "selector": "#nv-tltm-open-btn",
-          "timeoutMs": 15000
+          "selector": "#tlScroll",
+          "timeoutMs": 8000,
+          "when": {
+            "kind": "enabled",
+            "selector": "#tlScroll"
+          }
         },
         {
           "action": "waitForCondition",
-          "timeoutMs": 10000,
-          "note": "d\u1EA5u \u0027:\u0027 ch\u1EC9 xu\u1EA5t hi\u1EC7n khi n\u00FAt \u0111\u00E3 chuy\u1EC3n sang \u0111\u1ED3ng h\u1ED3 \u0111\u1EBFm ng\u01B0\u1EE3c \u2014 \u0111\u00FAng cho m\u1ECDi quest b\u1EA5t k\u1EC3 ch\u1EEF trung gian (\u0022\u0110ang m\u1EDF...\u0022, \u0022\u0110ang qu\u00E9t...\u0022) kh\u00E1c nhau",
-          "optional": true,
+          "timeoutMs": 20000,
+          "note": "response tl_open ph\u1EA3i \u0111\u01B0a trang r\u1EDDi state ready",
+          "condition": {
+            "kind": "hidden",
+            "selector": "#tlPage[data-state=\u0027ready\u0027]"
+          }
+        },
+        {
+          "action": "stopIf",
+          "text": "h\u1EBFt 3 l\u01B0\u1EE3t h\u00F4m nay",
+          "timeoutMs": 15000,
           "condition": {
             "kind": "textMatches",
-            "selector": "#nv-tltm-open-btn",
-            "text": ":"
+            "selector": "#tlLeft",
+            "text": "0"
+          }
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 12000,
+          "condition": {
+            "kind": "visible",
+            "selector": "#tlPage[data-state=\u0027cooldown\u0027]"
           }
         },
         {
           "action": "readCooldownSeconds",
-          "selector": "#nv-tltm-open-btn",
-          "timeoutMs": 15000,
-          "note": "\u0111\u1ECDc l\u1EA1i sau khi b\u1EA5m"
+          "selector": "#tlClock",
+          "timeoutMs": 15000
         }
       ],
       "options": [],
-      "fallbackCooldownSeconds": 3600,
+      "fallbackCooldownSeconds": 1800,
       "requiresVip": true,
       "order": 40,
       "notes": "Th\u00ED luy\u1EC7n t\u00F4ng m\u00F4n nh\u1EADn th\u01B0\u1EDFng, 3 l\u01B0\u1EE3t/ng\u00E0y."
@@ -781,41 +849,65 @@
         "t\u1EBF l\u1EC5",
         "te le"
       ],
-      "pagePath": "/nhiem-vu-hang-ngay",
+      "pagePath": "/danh-sach-thanh-vien-tong-mon?nv_embed=1",
       "steps": [
         {
           "action": "navigate",
-          "text": "/nhiem-vu-hang-ngay",
+          "text": "/danh-sach-thanh-vien-tong-mon?nv_embed=1",
           "timeoutMs": 15000
         },
         {
           "action": "waitForSelector",
-          "selector": ".nv-quest",
+          "selector": "#te-le-button",
           "timeoutMs": 25000,
-          "note": "ch\u1EDD hub render; .nv-quest t\u1ED3n t\u1EA1i c\u1EA3 khi quest \u0111\u00E3 xong"
+          "note": "n\u00FAt t\u1ED3n t\u1EA1i \u1EDF c\u1EA3 hai tr\u1EA1ng th\u00E1i \u2014 ch\u1EC9 ch\u1EEF tr\u00EAn n\u00FAt kh\u00E1c nhau"
+        },
+        {
+          "action": "waitMilliseconds",
+          "timeoutMs": 1500,
+          "note": "ch\u1EDD tr\u1EA1ng th\u00E1i th\u1EADt t\u1EEB server \u00E1p v\u00E0o n\u00FAt \u2014 trang v\u1EBD khung tr\u01B0\u1EDBc, ch\u1EEF \u0111\u1EBFn sau"
         },
         {
           "action": "stopIf",
           "text": "\u0111\u00E3 t\u1EBF l\u1EC5 h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "\u0111\u00E3 l\u00E0m h\u00F4m nay \u2192 n\u00FAt b\u1ECB xo\u00E1 kh\u1ECFi DOM; d\u1EEBng h\u1EB3n thay v\u00EC ch\u1EDD timeout",
+          "note": "match NGUY\u00CAN C\u1EE4M \u0022\u0111\u00E3 t\u1EBF l\u1EC5\u0022 \u2014 b\u00E0i h\u1ECDc so-b\u1ECF-d\u1EA5u c\u1EE7a \u0110i\u1EC3m Danh",
           "condition": {
-            "kind": "hidden",
-            "selector": "#nv-tele-open-btn"
+            "kind": "textMatches",
+            "selector": "#te-le-button",
+            "text": "\u0111\u00E3 t\u1EBF l\u1EC5"
           }
         },
         {
           "action": "click",
-          "selector": "#nv-tele-open-btn",
-          "timeoutMs": 15000
+          "selector": "#te-le-button",
+          "timeoutMs": 15000,
+          "note": "m\u1EDF h\u1ED9p x\u00E1c nh\u1EADn \u0022d\u00F9ng 10 Tinh Th\u1EA1ch t\u1EBF l\u1EC5 cho T\u00F4ng M\u00F4n?\u0022"
+        },
+        {
+          "action": "waitForCondition",
+          "timeoutMs": 10000,
+          "note": "h\u1ED9p x\u00E1c nh\u1EADn c\u1EE7a CH\u00CDNH SITE (\u0110\u1EA1o h\u1EEFu ch\u1EAFc ch\u1EAFn d\u00F9ng 10 Tinh Th\u1EA1ch t\u1EBF l\u1EC5 cho T\u00F4ng M\u00F4n?) \u2014 b\u1EAFt bu\u1ED9c, v\u00EC b\u1EA3n ghi cho th\u1EA5y h\u1ED9p lu\u00F4n hi\u1EC7n; h\u1ECFi CH\u1EEE ch\u1EE9 kh\u00F4ng ch\u1EC9 h\u1ECFi h\u1ED9p, v\u00EC c\u00F9ng l\u1EDBp \u1EA5y h\u1ECFi h\u1ED9 c\u1EA3 \u0022Tho\u00E1t Kh\u1ECFi T\u00F4ng\u0022",
+          "condition": {
+            "kind": "textMatches",
+            "selector": "#hh3d-confirm-layer",
+            "text": "t\u1EBF l\u1EC5"
+          }
+        },
+        {
+          "action": "click",
+          "selector": "#hh3d-confirm-layer .hh3d-confirm__btn--confirm",
+          "timeoutMs": 15000,
+          "note": "n\u00FAt positive b\u00EAn TRONG l\u1EDBp x\u00E1c nh\u1EADn \u2014 kh\u00F4ng bao gi\u1EDD \u0111\u1EE5ng .hh3d-confirm__btn--cancel"
         },
         {
           "action": "waitForCondition",
           "timeoutMs": 15000,
-          "note": "ch\u1EDD n\u00FAt th\u1EADt s\u1EF1 bi\u1EBFn m\u1EA5t = site \u0111\u00E3 ghi nh\u1EADn. Kh\u00F4ng \u0111\u1EA1t th\u00EC b\u00E1o l\u1ED7i r\u00F5 r\u00E0ng ch\u1EE9 kh\u00F4ng nh\u1EADn v\u01A1 l\u00E0 xong",
+          "note": "ch\u1EDD n\u00FAt \u0111\u1ED5i th\u00E0nh \u0022\u0110\u00E3 T\u1EBF L\u1EC5\u0022 = site \u0111\u00E3 nh\u1EADn l\u1EC5; t\u1EBF l\u1EC5 T\u1ED0N 10 Tinh Th\u1EA1ch n\u00EAn tr\u01B0\u1EE3t ph\u1EA3i k\u00EAu to, kh\u00F4ng nh\u1EADn v\u01A1 l\u00E0 xong",
           "condition": {
-            "kind": "hidden",
-            "selector": "#nv-tele-open-btn"
+            "kind": "textMatches",
+            "selector": "#te-le-button",
+            "text": "\u0111\u00E3 t\u1EBF l\u1EC5"
           }
         }
       ],
@@ -916,65 +1008,88 @@
         "v\u00F2ng quay",
         "vong quay"
       ],
-      "pagePath": "/nhiem-vu-hang-ngay",
+      "pagePath": "/vong-quay-phuc-van",
       "steps": [
         {
           "action": "navigate",
-          "text": "/nhiem-vu-hang-ngay",
+          "text": "/vong-quay-phuc-van",
           "timeoutMs": 15000
         },
         {
           "action": "waitForSelector",
-          "selector": ".nv-quest",
-          "timeoutMs": 25000,
-          "note": "ch\u1EDD hub render; .nv-quest t\u1ED3n t\u1EA1i c\u1EA3 khi quest \u0111\u00E3 xong"
+          "selector": "#spinButton",
+          "timeoutMs": 25000
+        },
+        {
+          "action": "waitMilliseconds",
+          "timeoutMs": 1500,
+          "note": "ch\u1EEF tr\u00EAn n\u00FAt v\u00E0 s\u1ED1 l\u01B0\u1EE3t do JS \u00E1p sau khi trang v\u1EBD \u2014 \u0111\u1ECDc qu\u00E1 s\u1EDBm l\u00E0 \u0111\u1ECDc tr\u1EA1ng th\u00E1i gi\u1EA3"
         },
         {
           "action": "stopIf",
-          "text": "h\u1EBFt l\u01B0\u1EE3t quay h\u00F4m nay",
+          "text": "h\u1EBFt l\u01B0\u1EE3t quay (l\u01B0\u1EE3t th\u1EE9 4 ch\u1EC9 m\u1EDF khi xong h\u1EBFt nhi\u1EC7m v\u1EE5 ng\u00E0y)",
           "timeoutMs": 15000,
-          "note": "n\u00FAt b\u1ECB xo\u00E1 kh\u1ECFi DOM",
-          "condition": {
-            "kind": "hidden",
-            "selector": "#nv-lottery-spin-btn"
-          }
-        },
-        {
-          "action": "stopIf",
-          "text": "\u0111\u00E3 quay \u0111\u1EE7 4 l\u01B0\u1EE3t h\u00F4m nay",
-          "timeoutMs": 15000,
-          "note": "ti\u1EBFn \u0111\u1ED9 \u0111\u00E3 \u0111\u1EA7y th\u00EC kh\u00F4ng b\u1EA5m g\u00EC n\u1EEFa",
+          "note": "n\u00FAt t\u1EF1 vi\u1EBFt l\u1EA1i th\u00E0nh \u0022H\u1EBFt l\u01B0\u1EE3t\u0022 khi l\u01B0\u1EE3t v\u1EC1 0 \u2014 l\u01B0\u1EE3t 4 l\u00E0 chuy\u1EC7n c\u1EE7a l\u1EA7n gh\u00E9 sau, kh\u00F4ng \u0111\u00E1ng gi\u1EEF browser ch\u1EDD",
           "condition": {
             "kind": "textMatches",
-            "selector": ".nv-quest:has(#nv-lottery-spin-btn) .nv-prog-txt",
-            "text": "4/4"
+            "selector": "#spinButton",
+            "text": "h\u1EBFt l\u01B0\u1EE3t"
           }
         },
         {
           "action": "repeat",
           "timeoutMs": 15000,
-          "note": "b\u1EA5m quay cho t\u1EDBi khi UI \u0111\u1EA1t 4/4. Tr\u1EA7n 4 l\u1EA7n v\u00EC m\u1ED9t ng\u00E0y nhi\u1EC1u nh\u1EA5t 4 l\u01B0\u1EE3t \u2014 l\u01B0\u1EE3t th\u1EE9 4 b\u1ECB kho\u00E1 cho t\u1EDBi khi c\u00E1c quest kh\u00E1c xong, n\u00EAn c\u1EE9 b\u1EA5m th\u1EED; server t\u1EEB ch\u1ED1i th\u00EC ti\u1EBFn \u0111\u1ED9 \u0111\u1EE9ng y\u00EAn, v\u00F2ng l\u1EB7p h\u1EBFt tr\u1EA7n v\u00E0 l\u1EA7n gh\u00E9 sau th\u1EED l\u1EA1i.",
+          "note": "#userTurns l\u00E0 s\u1ED1 l\u01B0\u1EE3t c\u00F2n l\u1EA1i, t\u1ED1i \u0111a 4/ng\u00E0y n\u00EAn \u00220\u0022 kh\u00F4ng th\u1EC3 l\u1EABn v\u00E0o \u002210\u0022. Tr\u1EA7n 5 v\u00F2ng: 4 l\u01B0\u1EE3t \u002B 1 v\u00F2ng \u0111\u1EC7m cho m\u1ED9t c\u00FA b\u1EA5m b\u1ECB nu\u1ED1t.",
           "steps": [
             {
               "action": "click",
-              "selector": "#nv-lottery-spin-btn",
-              "timeoutMs": 5000,
-              "note": "optional \u002B timeout ng\u1EAFn: m\u1ED9t c\u00FA b\u1EA5m b\u1ECB t\u1EEB ch\u1ED1i l\u00E0 chuy\u1EC7n b\u00ECnh th\u01B0\u1EDDng \u1EDF \u0111\u00E2y, kh\u00F4ng ph\u1EA3i l\u1ED7i c\u1EE7a quest",
-              "optional": true
+              "selector": "#prizeSubtitle",
+              "timeoutMs": 2500,
+              "note": "\u0111\u00F3ng m\u00E0n ch\u00FAc m\u1EEBng c\u1EE7a l\u01B0\u1EE3t tr\u01B0\u1EDBc \u2014 n\u00F3 ph\u1EE7 l\u00EAn n\u00FAt v\u00E0 nu\u1ED1t c\u00FA b\u1EA5m (\u0111o \u0111\u01B0\u1EE3c trong recording 02/08)",
+              "optional": true,
+              "when": {
+                "kind": "visible",
+                "selector": "#prizeSubtitle"
+              }
             },
             {
-              "action": "waitMilliseconds",
-              "timeoutMs": 4000,
-              "note": "ch\u1EDD animation quay xong (API tr\u1EA3 final_rotation v\u00E0i ngh\u00ECn \u0111\u1ED9) r\u1ED3i m\u1EDBi quay ti\u1EBFp"
+              "action": "waitForCondition",
+              "timeoutMs": 2000,
+              "optional": true,
+              "condition": {
+                "kind": "hidden",
+                "selector": "#prizeSubtitle"
+              }
+            },
+            {
+              "action": "click",
+              "selector": "#spinButton",
+              "timeoutMs": 5000,
+              "note": "guard Enabled: n\u00FAt t\u1EF1 kho\u00E1 trong l\u00FAc b\u00E1nh xe quay",
+              "optional": true,
+              "when": {
+                "kind": "enabled",
+                "selector": "#spinButton"
+              }
+            },
+            {
+              "action": "waitForCondition",
+              "timeoutMs": 12000,
+              "note": "b\u00E1nh xe quay ~8s r\u1ED3i n\u00FAt m\u1EDF l\u1EA1i; \u1EDF l\u01B0\u1EE3t cu\u1ED1i n\u00FAt th\u00E0nh \u0022H\u1EBFt l\u01B0\u1EE3t\u0022 v\u0129nh vi\u1EC5n \u2014 timeout \u0111\u01B0\u1EE3c tha v\u00E0 until b\u1EAFt s\u1ED1 0",
+              "optional": true,
+              "condition": {
+                "kind": "enabled",
+                "selector": "#spinButton"
+              }
             }
           ],
           "until": {
             "kind": "textMatches",
-            "selector": ".nv-quest:has(#nv-lottery-spin-btn) .nv-prog-txt",
-            "text": "4/4"
+            "selector": "#userTurns",
+            "text": "0"
           },
-          "maxIterations": 4,
-          "maxSeconds": 75
+          "maxIterations": 5,
+          "maxSeconds": 120
         }
       ],
       "options": [],
@@ -1123,41 +1238,50 @@
         "\u0111i\u1EC3m danh",
         "diem danh"
       ],
-      "pagePath": "/nhiem-vu-hang-ngay",
+      "pagePath": "/diem-danh",
       "steps": [
         {
           "action": "navigate",
-          "text": "/nhiem-vu-hang-ngay",
+          "text": "/diem-danh",
           "timeoutMs": 15000
         },
         {
           "action": "waitForSelector",
-          "selector": ".nv-quest",
-          "timeoutMs": 25000,
-          "note": "ch\u1EDD hub render; .nv-quest t\u1ED3n t\u1EA1i c\u1EA3 khi quest \u0111\u00E3 xong"
+          "selector": "#ddPage",
+          "timeoutMs": 25000
+        },
+        {
+          "action": "waitForSelector",
+          "selector": "#ddGrid .ddg-day.is-today",
+          "timeoutMs": 25000
         },
         {
           "action": "stopIf",
           "text": "\u0111\u00E3 \u0111i\u1EC3m danh h\u00F4m nay",
           "timeoutMs": 15000,
-          "note": "\u0111\u00E3 l\u00E0m h\u00F4m nay \u2192 n\u00FAt b\u1ECB xo\u00E1 kh\u1ECFi DOM; d\u1EEBng h\u1EB3n thay v\u00EC ch\u1EDD timeout",
+          "note": "Nút đóng dấu đã hoàn tất và bị vô hiệu hóa: server đã nhận điểm danh; không bấm lại.",
           "condition": {
-            "kind": "hidden",
-            "selector": "#nv-checkin-btn"
+            "kind": "visible",
+            "selector": "#ddStamp.is-done[disabled]"
           }
         },
         {
           "action": "click",
-          "selector": "#nv-checkin-btn",
-          "timeoutMs": 15000
+          "selector": "#ddStamp",
+          "timeoutMs": 8000,
+          "note": "Chỉ ấn con dấu đang sẵn sàng; không bấm khi đã điểm danh.",
+          "when": {
+            "kind": "visible",
+            "selector": "#ddStamp:not(.is-done):not([disabled])"
+          }
         },
         {
           "action": "waitForCondition",
           "timeoutMs": 15000,
-          "note": "ch\u1EDD n\u00FAt th\u1EADt s\u1EF1 bi\u1EBFn m\u1EA5t = site \u0111\u00E3 ghi nh\u1EADn. Kh\u00F4ng \u0111\u1EA1t th\u00EC b\u00E1o l\u1ED7i r\u00F5 r\u00E0ng ch\u1EE9 kh\u00F4ng nh\u1EADn v\u01A1 l\u00E0 xong",
+          "note": "Đợi nút chuyển thành is-done và disabled sau phản hồi thành công.",
           "condition": {
-            "kind": "hidden",
-            "selector": "#nv-checkin-btn"
+            "kind": "visible",
+            "selector": "#ddStamp.is-done[disabled]"
           }
         }
       ],

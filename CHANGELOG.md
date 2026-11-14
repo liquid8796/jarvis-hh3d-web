@@ -9,6 +9,14 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.255 — Reuse ordinary quest flows for six VIP daily activities (14/11/2026)
+
+- Replace the VIP step trees with copies of the existing ordinary-tier flow for Điểm Danh, Phúc Lợi Đường, Thí Luyện Tông Môn, Vòng Quay Phúc Vận and Tế Lễ Tông Môn. Phần Thưởng Hoạt Động already uses identical steps in both tiers; retain this exact behavior.
+- Copy each ordinary quest's own-page route and fallback cooldown as well, so quest selection and worker concurrency lanes match the actions actually performed. Retain the original VIP quest IDs, tier restrictions, user-enabled states, options, notes and order, and do not alter any ordinary or unrelated quest definition.
+- Web default profile remains on schema 93, retains exact JSON formatting and all 29 quest definitions. Add deterministic deep flow parity verification with critical dedicated-page selectors.
+- PC locally mirrors the same ordinary steps for these six VIP quests in both new defaults and persisted profiles, including a narrow load-time migration that saves corrections without resetting custom user toggles or unrelated in-progress PC work.
+- Release using systemd/Caddy blue/green and distribute the updated Web runtime to registered GitHub worker repositories without canceling active runs.
+
 ## 1.3.254 — Release-version correction for Chromium CI DNS recovery (12/11/2026)
 
 - Correct the release bookkeeping after the same-version OCI deployment of 1.3.253: every new production release must have a distinct version, matching package.json, package-lock.json, the user-facing release notes and this technical changelog.

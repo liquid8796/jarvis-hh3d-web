@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.255",
+    date: "2026-11-14",
+    lines: [
+      "Sáu nhiệm vụ ngày của tài khoản VIP nay đi đúng các trang và thao tác như tài khoản thường, thay cho lối bấm tắt ở bảng nhiệm vụ.",
+      "Giữ nguyên quyền VIP, lựa chọn bật/tắt và các nhiệm vụ khác; thời gian hẹn lại của sáu nhiệm vụ cũng theo bản thường.",
+    ],
+  },
+  {
     version: "1.3.254",
     date: "2026-11-12",
     lines: [
@@ -492,14 +500,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Giao diện điện thoại được sắp xếp lại: menu gọn, thao tác chạm dễ hơn và nội dung không chen chúc.",
       "Các tab trong Tông Môn có thể vuốt ngang; lịch hẹn quest và thẻ tài khoản hiển thị gọn hơn.",
       "Giữ nguyên phong cách, hình nền và mọi cấu hình auto đang có.",
-    ],
-  },
-  {
-    version: "1.3.205",
-    date: "2026-10-21",
-    lines: [
-      "Ba ô chọn khôi lỗi nằm cùng một hàng với tên tài khoản và nút Sửa, gọn hơn trước.",
-      "Trên màn hình hẹp, vuốt ngang nhóm ô chọn để đổi nơi chạy mà không làm xuống dòng.",
     ],
   },
 ];

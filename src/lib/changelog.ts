@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.256",
+    date: "2026-11-15",
+    lines: [
+      "Thí Luyện Tông Môn của tài khoản VIP nay mở cuộn trục trên trang nhiệm vụ riêng, không còn phụ thuộc nút cũ ở bảng ngày.",
+      "Sau khi nhận thưởng, khôi lỗi đợi trang xác nhận rồi đọc giờ hồi lượt mới; không bấm lại khi đang chờ hoặc đã đủ ba lượt.",
+    ],
+  },
+  {
     version: "1.3.255",
     date: "2026-11-14",
     lines: [
@@ -491,15 +499,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Màn hình rất hẹp (320–360px) vẫn nhìn thấy lựa chọn khôi lỗi ngay cạnh tên tài khoản.",
       "Ô đã chọn tự hiện trong vùng vuốt ngang của tài khoản, không còn bị che mất.",
-    ],
-  },
-  {
-    version: "1.3.206",
-    date: "2026-10-21",
-    lines: [
-      "Giao diện điện thoại được sắp xếp lại: menu gọn, thao tác chạm dễ hơn và nội dung không chen chúc.",
-      "Các tab trong Tông Môn có thể vuốt ngang; lịch hẹn quest và thẻ tài khoản hiển thị gọn hơn.",
-      "Giữ nguyên phong cách, hình nền và mọi cấu hình auto đang có.",
     ],
   },
 ];

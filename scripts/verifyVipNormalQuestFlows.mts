@@ -34,19 +34,44 @@ for (const id of ids) {
   const ordinary = find(id+"-thuong");
   assert.equal(vip.requiresVip, true, id+": preserve VIP entitlement");
   assert.equal(ordinary.requiresVip, false, id+": preserve ordinary entitlement");
-  assert.deepEqual(vip.steps, ordinary.steps, id+": copy the complete ordinary action tree");
-  assert.equal(vip.pagePath, ordinary.pagePath, id+": same quest page");
-  assert.equal(vip.fallbackCooldownSeconds, ordinary.fallbackCooldownSeconds,
-    id+": same fallback cooldown");
+  if (id === "thi-luyen-tong-mon") {
+    // Recorded VIP flow (15/11): the hub .nv-quest + quick-link gate is stale.
+    // Keep the ordinary variant untouched; the VIP-only direct-page update
+    // must not be reverted by the earlier parity invariant.
+    assert.notDeepEqual(vip.steps, ordinary.steps, "VIP trial uses the new recorded flow");
+    assert.equal(vip.pagePath, "/thi-luyen-tong-mon-hh3d/?nv_embed=1");
+    assert.equal(vip.fallbackCooldownSeconds, 450, "recorded VIP interval ~07:26");
+    assert.equal(vip.steps[0].action, "navigate");
+    assert.equal((vip.steps[0] as any).text, vip.pagePath, "navigate to own page first");
+    assert.equal(vip.steps.some((step: any) =>
+      step.action === "navigate" && step.text === "/nhiem-vu-hang-ngay" ||
+      step.selector === ".nv-quest" ||
+      step.condition?.selector?.includes("a.btn-go[")), false, "no stale hub selectors");
+    assert.ok(vip.steps.some((step: any) => step.action === "click" &&
+      step.selector === "#tlPage[data-state='ready'] #tlScroll"),
+      "only click the scroll in ready state");
+    assert.ok(vip.steps.some((step: any) => step.action === "waitForCondition" &&
+      step.condition?.selector === "#tlPage[data-state='cooldown'], #tlPage[data-state='done']"),
+      "require a server-backed state transition after the reveal");
+    assert.ok(vip.steps.some((step: any) => step.action === "stopIf" &&
+      step.condition?.selector === "#tlPage[data-state='cooldown']" && step.deferSeconds > 0),
+      "cooldown must not be mistaken for the day's quota");
+  } else {
+    assert.deepEqual(vip.steps, ordinary.steps, id+": copy the ordinary action tree");
+    assert.equal(vip.pagePath, ordinary.pagePath, id+": same quest page");
+    assert.equal(vip.fallbackCooldownSeconds, ordinary.fallbackCooldownSeconds,
+      id+": same fallback cooldown");
+  }
   assert.equal(vip.order, ordinary.order, id+": preserve original ordering");
   assert.equal(vip.enabled, false, id+": respect disabled-by-default setting");
   const controls = flatten(vip.steps).map(s => s.selector);
   assert.ok(controls.includes(normalFlowSelectors[id]),
     id+": expected ordinary control "+normalFlowSelectors[id]);
-  console.log("PASS "+id+": "+vip.steps.length+" matching top-level steps");
+  console.log("PASS "+id+": "+vip.steps.length+" top-level steps" +
+    (id === "thi-luyen-tong-mon" ? " (recorded VIP exception)" : " (ordinary parity)"));
 }
 assert.equal(new Set(profile.quests.map(q => q.id)).size, profile.quests.length,
   "no duplicate quest definitions");
 assert.equal(profile.quests.length, 29,
   "all unrelated quest definitions remain present");
-console.log("PASS six VIP quests mirror ordinary flows, paths and cooldowns with separate tier metadata");
+console.log("PASS five shared VIP flows plus the recorded VIP Trial exception; no ordinary quest modified");

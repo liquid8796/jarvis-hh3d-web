@@ -9,6 +9,15 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.256 — VIP Sect Trial flow follows 15/11/2026 recording (15/11/2026)
+
+- Based on the 20.32-second local VIP Thí Luyện Tông Môn video, recorded DOM states and HTTP request/response evidence in thi-luyen-tong-mon-20261115-004159; recording network.json contains private session headers, so none are committed.
+- Remove the stale Nhiệm Vụ Hằng Ngày hub preflight from VIP only: navigate straight to /thi-luyen-tong-mon-hh3d/?nv_embed=1 and check #tlPage[data-state], #tlLeft, #tlScroll and #tlClock. The ordinary-tier flow remains unchanged.
+- Only click a visible scroll when the page is ready. Require cooldown or done confirmation after the click (the game displays rewards during a short animation); treat cooldown as a revisit, done as daily exhaustion and locked as deferred, not daily-capped.
+- The captured VIP POST successfully granted 68 Tinh Thạch, reduced the daily count from 3 to 2 and a separate cooldown request returned 07:26. Use the visible real clock, with a 450-second fallback, rather than the old 30-minute ordinary-tier assumption.
+- Add local real-browser tests using isolated HTTP fixtures for successful opening, final daily turn, cooldown, done, locked and rejected server responses. No live HH3D account was used in tests.
+- PC source has a separate VIP definition and a targeted migration of existing saved VIP profiles, preserving all switches, user options and other quest definitions.
+
 ## 1.3.255 — Reuse ordinary quest flows for six VIP daily activities (14/11/2026)
 
 - Replace the VIP step trees with copies of the existing ordinary-tier flow for Điểm Danh, Phúc Lợi Đường, Thí Luyện Tông Môn, Vòng Quay Phúc Vận and Tế Lễ Tông Môn. Phần Thưởng Hoạt Động already uses identical steps in both tiers; retain this exact behavior.

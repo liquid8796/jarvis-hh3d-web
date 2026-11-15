@@ -505,32 +505,14 @@
       "steps": [
         {
           "action": "navigate",
-          "text": "/nhiem-vu-hang-ngay",
-          "timeoutMs": 15000
-        },
-        {
-          "action": "waitForSelector",
-          "selector": ".nv-quest",
-          "timeoutMs": 25000
-        },
-        {
-          "action": "stopIf",
-          "text": "h\u1EBFt 3 l\u01B0\u1EE3t h\u00F4m nay",
-          "timeoutMs": 15000,
-          "condition": {
-            "kind": "hidden",
-            "selector": "a.btn-go[href*=\u0027thi-luyen-tong-mon\u0027]"
-          }
-        },
-        {
-          "action": "navigate",
           "text": "/thi-luyen-tong-mon-hh3d/?nv_embed=1",
           "timeoutMs": 15000
         },
         {
           "action": "waitForSelector",
           "selector": "#tlPage",
-          "timeoutMs": 25000
+          "timeoutMs": 25000,
+          "note": "\u0111\u1EE3i \u0111\u00FAng trang Th\u00ED Luy\u1EC7n \u2014 kh\u00F4ng \u0111\u1ECDc th\u1EBB hub \u0111\u00E3 \u0111\u1ED5i UI"
         },
         {
           "action": "waitForSelector",
@@ -544,28 +526,42 @@
         },
         {
           "action": "stopIf",
-          "text": "h\u1EBFt 3 l\u01B0\u1EE3t h\u00F4m nay",
+          "text": "\u0111\u00E3 m\u1EDF \u0111\u1EE7 3 l\u01B0\u1EE3t Th\u00ED Luy\u1EC7n h\u00F4m nay",
           "timeoutMs": 15000,
+          "note": "done l\u00E0 tr\u1EA1ng th\u00E1i c\u1EE7a trang, kh\u00F4ng suy t\u1EEB n\u00FAt hub b\u1ECB \u1EA9n",
           "condition": {
-            "kind": "textMatches",
-            "selector": "#tlLeft",
-            "text": "0"
+            "kind": "visible",
+            "selector": "#tlPage[data-state=\u0027done\u0027]"
           }
         },
         {
           "action": "readCooldownSeconds",
           "selector": "#tlClock",
           "timeoutMs": 15000,
+          "note": "\u0111\u1ECDc \u0111\u1ED3ng h\u1ED3 th\u1EADt c\u1EE7a trang khi \u0111ang ch\u1EDD; VIP h\u1ED3i kho\u1EA3ng 7 ph\u00FAt r\u01B0\u1EE1i",
           "optional": true,
           "when": {
             "kind": "visible",
-            "selector": "#tlPage[data-state=\u0027cooldown\u0027]"
+            "selector": "#tlClock"
           }
         },
         {
           "action": "stopIf",
-          "text": "\u0111ang ch\u1EDD l\u01B0\u1EE3t k\u1EBF (30 ph\u00FAt gi\u1EEFa hai l\u01B0\u1EE3t th\u00ED luy\u1EC7n)",
+          "text": "ch\u01B0a \u0111\u1EE7 24 gi\u1EDD gia nh\u1EADp T\u00F4ng M\u00F4n",
           "timeoutMs": 15000,
+          "deferSeconds": 1800,
+          "note": "locked l\u00E0 h\u1EB9n quay l\u1EA1i, tuy\u1EC7t \u0111\u1ED1i kh\u00F4ng t\u00EDnh h\u1EBFt l\u01B0\u1EE3t ng\u00E0y",
+          "condition": {
+            "kind": "visible",
+            "selector": "#tlPage[data-state=\u0027locked\u0027]"
+          }
+        },
+        {
+          "action": "stopIf",
+          "text": "\u0111ang ch\u1EDD l\u01B0\u1EE3t Th\u00ED Luy\u1EC7n k\u1EBF ti\u1EBFp",
+          "timeoutMs": 15000,
+          "deferSeconds": 450,
+          "note": "cooldown kh\u00F4ng \u0111\u01B0\u1EE3c ghi nh\u1EA7m th\u00E0nh \u0111\u1EE7 l\u01B0\u1EE3t h\u00F4m nay",
           "condition": {
             "kind": "visible",
             "selector": "#tlPage[data-state=\u0027cooldown\u0027]"
@@ -573,48 +569,46 @@
         },
         {
           "action": "click",
-          "selector": "#tlScroll",
-          "timeoutMs": 8000,
+          "selector": "#tlPage[data-state=\u0027ready\u0027] #tlScroll",
+          "timeoutMs": 10000,
+          "note": "ch\u1EC9 b\u1EA5m cu\u1ED9n tr\u1EE5c khi trang th\u1EADt s\u1EF1 ready \u2014 n\u00FAt v\u1EABn enabled trong cooldown",
           "when": {
-            "kind": "enabled",
-            "selector": "#tlScroll"
+            "kind": "visible",
+            "selector": "#tlPage[data-state=\u0027ready\u0027] #tlScroll"
           }
         },
         {
           "action": "waitForCondition",
           "timeoutMs": 20000,
-          "note": "response tl_open ph\u1EA3i \u0111\u01B0a trang r\u1EDDi state ready",
+          "note": "b\u1EAFt bu\u1ED9c: server \u0111\u00E3 nh\u1EADn l\u01B0\u1EE3t; game hi\u1EC3n th\u1ECB th\u01B0\u1EDFng ~3.8s r\u1ED3i v\u00E0o cooldown/done",
           "condition": {
-            "kind": "hidden",
-            "selector": "#tlPage[data-state=\u0027ready\u0027]"
+            "kind": "visible",
+            "selector": "#tlPage[data-state=\u0027cooldown\u0027], #tlPage[data-state=\u0027done\u0027]"
           }
         },
         {
           "action": "stopIf",
-          "text": "h\u1EBFt 3 l\u01B0\u1EE3t h\u00F4m nay",
+          "text": "\u0111\u00E3 m\u1EDF \u0111\u1EE7 3 l\u01B0\u1EE3t Th\u00ED Luy\u1EC7n h\u00F4m nay",
           "timeoutMs": 15000,
-          "condition": {
-            "kind": "textMatches",
-            "selector": "#tlLeft",
-            "text": "0"
-          }
-        },
-        {
-          "action": "waitForCondition",
-          "timeoutMs": 12000,
+          "note": "ch\u1EC9 ghi \u0111\u1EE7 l\u01B0\u1EE3t khi trang x\u00E1c nh\u1EADn done, k\u1EC3 c\u1EA3 \u1EDF l\u01B0\u1EE3t cu\u1ED1i",
           "condition": {
             "kind": "visible",
-            "selector": "#tlPage[data-state=\u0027cooldown\u0027]"
+            "selector": "#tlPage[data-state=\u0027done\u0027]"
           }
         },
         {
           "action": "readCooldownSeconds",
           "selector": "#tlClock",
-          "timeoutMs": 15000
+          "timeoutMs": 15000,
+          "note": "\u0111\u1ECDc th\u1EDDi gian h\u1ED3i sau khi nh\u1EADn th\u01B0\u1EDFng; request GET timer tr\u1EA3 07:26",
+          "when": {
+            "kind": "visible",
+            "selector": "#tlPage[data-state=\u0027cooldown\u0027] #tlClock"
+          }
         }
       ],
       "options": [],
-      "fallbackCooldownSeconds": 1800,
+      "fallbackCooldownSeconds": 450,
       "requiresVip": true,
       "order": 40,
       "notes": "Th\u00ED luy\u1EC7n t\u00F4ng m\u00F4n nh\u1EADn th\u01B0\u1EDFng, 3 l\u01B0\u1EE3t/ng\u00E0y."

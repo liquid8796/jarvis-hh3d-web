@@ -52,11 +52,10 @@ assert.equal(adsterraEnabled("158.180.59.36.sslip.io", { NODE_ENV: "production" 
 assert.equal(adsterraEnabled("auto-hh3d.online", { NODE_ENV: "development" }), false);
 assert.equal(adsterraEnabled("auto-hh3d.online", { NODE_ENV: "production", ADSTERRA_DISABLED: "1" }), false);
 
-const [layout, gate, client, privacy, css, envExample, packageJson] = await Promise.all([
+const [layout, gate, client, css, envExample, packageJson] = await Promise.all([
   read("src/app/layout.tsx"),
   read("src/components/AdsterraAds.tsx"),
   read("src/components/adsterra/AdsterraClientAds.tsx"),
-  read("src/app/quyen-rieng-tu/page.tsx"),
   read("src/app/adsterra.css"),
   read(".env.example"),
   read("package.json"),
@@ -74,7 +73,7 @@ assert.match(client, /ADSTERRA_SMARTLINK_URL/);
 assert.match(client, /data-adsterra-global/);
 assert.match(client, /dataset\.cfasync = "false"/);
 assert.match(client, /rel="sponsored noopener noreferrer"/);
-for (const excludedPath of ["/admin", "/chat-frame", "/login", "/pending", "/quyen-rieng-tu", "/register"]) {
+for (const excludedPath of ["/admin", "/chat-frame", "/login", "/pending", "/register"]) {
   assert.match(client, new RegExp(JSON.stringify(excludedPath).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 }
 assert.doesNotMatch(client, /matchMedia\("\(min-width: 760px\)"\)/);
@@ -89,10 +88,6 @@ assert.match(client, /data-status=\{status\}/);
 assert.match(client, /data-status=\{nativeStatus\}/);
 assert.match(client, /adsterra-native/);
 assert.doesNotMatch(client, /adsterra-label/);
-assert.match(privacy, /Adsterra và định dạng quảng cáo/);
-assert.match(privacy, /Popunder và liên kết tài trợ dùng miền tuỳ chỉnh\/chống chặn/);
-assert.match(privacy, /Social Bar là tag tiêu chuẩn/);
-assert.doesNotMatch(privacy, /Social Bar và Popunder dùng phiên bản chống chặn/);
 assert.match(css, /\.adsterra-stack/);
 assert.match(css, /\.adsterra-native/);
 assert.match(css, /\.adsterra-unit\[data-status="blocked"\]/);
@@ -104,4 +99,4 @@ assert.match(css, /@media \(max-width: 759px\)/);
 assert.match(envExample, /ADSTERRA_DISABLED="0"/);
 assert.equal(JSON.parse(packageJson).scripts["verify:adsterra"], "tsx scripts/verifyAdsterra.mts");
 
-console.log("PASS: Adsterra desktop/mobile placements, responsive banner scaling, blocked-slot collapse, vendor tags, gates and privacy disclosure are consistent.");
+console.log("PASS: Adsterra desktop/mobile placements, responsive banner scaling, blocked-slot collapse, vendor tags and gates are consistent.");

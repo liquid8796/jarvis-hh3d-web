@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.257 — Remove privacy page and public links (15/11/2026)
+
+- Delete /quyen-rieng-tu; remove footer and landing CTA links, unused translations and ad exclusion entries. Preserve the standalone copyright.
+- Remove the sitemap entry and inaccurate policy references from landing/FAQ text and schema; keep old changelog history.
+- Update AdSense, Adsterra and SEO verifications for the removed page without changing other ad integration.
+- Removing a public privacy disclosure may affect advertising-provider cookie/privacy obligations; review compliance separately.
+
 ## 1.3.256 — VIP Sect Trial flow follows 15/11/2026 recording (15/11/2026)
 
 - Based on the 20.32-second local VIP Thí Luyện Tông Môn video, recorded DOM states and HTTP request/response evidence in thi-luyen-tong-mon-20261115-004159; recording network.json contains private session headers, so none are committed.

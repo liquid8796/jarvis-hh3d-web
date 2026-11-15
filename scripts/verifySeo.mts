@@ -60,7 +60,7 @@ for (const item of sitemapOutput) {
   assert.ok(item.changeFrequency, "changeFrequency must be set");
 }
 assert.ok(sitemapOutput.some((r) => r.url === absoluteUrl("/")));
-assert.ok(sitemapOutput.some((r) => r.url === absoluteUrl("/quyen-rieng-tu")));
+assert.ok(!sitemapOutput.some((r) => r.url === absoluteUrl("/quyen-rieng-tu")));
 assert.ok(sitemapOutput.some((r) => r.url === absoluteUrl("/ten-mien")));
 assert.ok(sitemapOutput.some((r) => r.url === absoluteUrl("/login")));
 assert.ok(sitemapOutput.some((r) => r.url === absoluteUrl("/register")));

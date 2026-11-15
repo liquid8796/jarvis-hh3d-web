@@ -56,11 +56,9 @@ export interface LandingTranslations {
     heading: string;
     description: string;
     buttonRegister: string;
-    buttonPrivacy: string;
   };
   footer: {
     rights: string;
-    privacy: string;
   };
 }
 
@@ -129,7 +127,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, LandingTranslations> = {
         },
         {
           title: "Privacy & Account Safety",
-          body: "Passwords are one-way hashed, login sessions expire cleanly, and data is only used to run your tasks. Review our transparent privacy policy anytime.",
+          body: "Passwords are one-way hashed, login sessions expire, and account access is limited by permissions.",
         },
       ],
     },
@@ -185,7 +183,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, LandingTranslations> = {
         {
           question: "Is my account information secure?",
           answer:
-            "Yes. Passwords are securely hashed and never stored in readable text. Data is used strictly for operating your automation runs, as detailed in our Privacy Policy.",
+            "Passwords are securely hashed and are never stored in readable text. Sessions expire and account access is permission-controlled.",
         },
         {
           question: "What does 'Sect Seclusion' (Bế Quan) mean?",
@@ -199,11 +197,9 @@ export const TRANSLATIONS: Record<SupportedLanguage, LandingTranslations> = {
       description:
         "Create an account today to join the sect and put your daily hoathinh3d quests on autopilot.",
       buttonRegister: "Join the Sect",
-      buttonPrivacy: "Privacy Policy",
     },
     footer: {
       rights: "© 2026 Nam Cung Binh. All rights reserved.",
-      privacy: "Privacy Policy",
     },
   },
   vi: {
@@ -270,7 +266,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, LandingTranslations> = {
         },
         {
           title: "Bảo mật và riêng tư",
-          body: "Mật khẩu được băm một chiều, phiên đăng nhập có hạn dùng, dữ liệu chỉ phục vụ vận hành. Chính sách quyền riêng tư công khai cách hệ thống và đối tác quảng cáo xử lý dữ liệu.",
+          body: "Mật khẩu được băm một chiều, phiên đăng nhập có hạn dùng và quyền truy cập được kiểm soát theo tài khoản.",
         },
       ],
     },
@@ -326,7 +322,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, LandingTranslations> = {
         {
           question: "Dữ liệu tài khoản của tôi có an toàn không?",
           answer:
-            "Mật khẩu được băm một chiều và không bao giờ lưu dạng đọc được. Dữ liệu chỉ dùng để vận hành dịch vụ. Chi tiết cách xử lý dữ liệu và cookie quảng cáo được công khai tại trang Quyền riêng tư.",
+            "Mật khẩu được băm một chiều và không lưu dạng đọc được. Phiên đăng nhập có hạn dùng và quyền truy cập được phân theo vai trò.",
         },
         {
           question: "Bế quan trùng tu nghĩa là gì?",
@@ -340,11 +336,9 @@ export const TRANSLATIONS: Record<SupportedLanguage, LandingTranslations> = {
       description:
         "Tạo tài khoản ngay hôm nay để gia nhập tông môn và trải nghiệm cỗ máy tự động hoá nhiệm vụ ngày chạy trên đám mây.",
       buttonRegister: "Bái Sư Nhập Môn",
-      buttonPrivacy: "Chính sách bảo mật",
     },
     footer: {
       rights: "© 2026 Nam Cung Bình. All rights reserved.",
-      privacy: "Quyền riêng tư",
     },
   },
 };

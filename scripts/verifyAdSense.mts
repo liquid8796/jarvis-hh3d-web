@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, access } from "node:fs/promises";
 import path from "node:path";
 import {
   GOOGLE_ADSENSE_ADS_TXT_LINE,
@@ -25,11 +25,10 @@ assert.equal(googleAdSenseEnabled("158.180.59.36.sslip.io", { NODE_ENV: "product
 assert.equal(googleAdSenseEnabled("auto-hh3d.online", { NODE_ENV: "development" }), false);
 assert.equal(googleAdSenseEnabled("auto-hh3d.online", { NODE_ENV: "production", GOOGLE_ADSENSE_DISABLED: "1" }), false);
 
-const [layout, component, adsTxt, privacy, css, proxy, envExample, nextConfig, packageJson, footer] = await Promise.all([
+const [layout, component, adsTxt, css, proxy, envExample, nextConfig, packageJson, footer] = await Promise.all([
   read("src/app/layout.tsx"),
   read("src/components/GoogleAdSense.tsx"),
   read("public/ads.txt"),
-  read("src/app/quyen-rieng-tu/page.tsx"),
   read("src/app/globals.css"),
   read("src/proxy.ts"),
   read(".env.example"),
@@ -41,17 +40,16 @@ const [layout, component, adsTxt, privacy, css, proxy, envExample, nextConfig, p
 assert.equal(adsTxt.trim(), GOOGLE_ADSENSE_ADS_TXT_LINE);
 assert.ok(layout.includes("<GoogleAdSense />"));
 assert.ok(layout.includes("<SiteFooter />"));
-assert.ok(footer.includes('href="/quyen-rieng-tu"'));
+assert.ok(footer.includes("t.footer.rights"));
+assert.ok(!footer.includes("/quyen-rieng-tu"));
+await assert.rejects(access(path.join(root, "src/app/quyen-rieng-tu/page.tsx")), { code: "ENOENT" });
 assert.ok(component.includes("google-adsense-account"));
 assert.ok(component.includes("isOfficialAdSenseHost(host)"));
 assert.ok(component.includes("googleAdSenseEnabled(host)"));
 assert.ok(component.includes('session?.role !== "admin"'));
 assert.ok(component.includes("data-ad-client={GOOGLE_ADSENSE_CLIENT_ID}"));
 assert.ok(component.includes('crossOrigin="anonymous"'));
-assert.ok(privacy.includes("Google AdSense và cookie quảng cáo"));
-assert.ok(privacy.includes("policies.google.com/technologies/partner-sites"));
-assert.ok(privacy.includes("myadcenter.google.com"));
-assert.ok(css.includes(".site-footer a"));
+assert.ok(css.includes(".site-footer {"));
 assert.ok(!/PROTECTED_PREFIXES[^;]*quyen-rieng-tu/s.test(proxy));
 assert.ok(envExample.includes('GOOGLE_ADSENSE_DISABLED="0"'));
 assert.ok(!envExample.includes("GOOGLE_ADSENSE_API_KEY"));
@@ -63,4 +61,4 @@ const apiKeyPrefix = "AIza" + "Sy";
 const grep = spawnSync("git", ["grep", "-n", "-I", apiKeyPrefix, "--", "."], { cwd: root, encoding: "utf8" });
 assert.equal(grep.status, 1, "tracked Google API key found: " + (grep.stdout || grep.stderr));
 
-console.log("PASS: AdSense code, host gating, ads.txt, privacy disclosure and API-key guard are consistent.");
+console.log("PASS: AdSense code, host gating, ads.txt, removed privacy page and API-key guard are consistent.");

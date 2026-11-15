@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.257",
+    date: "2026-11-15",
+    lines: [
+      "Đã bỏ trang Quyền riêng tư cùng các đường dẫn đến trang này ở cuối website và trang giới thiệu.",
+      "Phần cuối trang giờ chỉ còn dòng bản quyền như trước.",
+    ],
+  },
+  {
     version: "1.3.256",
     date: "2026-11-15",
     lines: [
@@ -491,14 +499,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Huy hiệu hạng tài khoản nay gọn đúng cỡ trên điện thoại, không còn che lựa chọn khôi lỗi.",
       "Vùng vuốt ngang tự canh để ô tích đang chọn luôn nằm trong tầm nhìn và dễ chạm.",
-    ],
-  },
-  {
-    version: "1.3.207",
-    date: "2026-10-21",
-    lines: [
-      "Màn hình rất hẹp (320–360px) vẫn nhìn thấy lựa chọn khôi lỗi ngay cạnh tên tài khoản.",
-      "Ô đã chọn tự hiện trong vùng vuốt ngang của tài khoản, không còn bị che mất.",
     ],
   },
 ];

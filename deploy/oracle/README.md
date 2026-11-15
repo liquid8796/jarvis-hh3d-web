@@ -121,8 +121,9 @@ Cùng ngày dựng lại máy, tông chủ quyết: **backend + database rời h
 AdSense dùng publisher/client ID công khai cố định trong `src/lib/adsense/config.ts` và seller
 record tĩnh `public/ads.txt`; không lưu Google API key trong VM hay source. Quảng cáo mặc định chỉ tải
 trên `auto-hh3d.online`/`www`, không tải cho phiên quản trị. Khi cần dừng khẩn cấp, đặt
-`GOOGLE_ADSENSE_DISABLED=1` trong `/opt/jarvis/shared/.env` rồi phát hành lại. Trang quyền riêng tư
-công khai ở `/quyen-rieng-tu`; consent/CMP và trạng thái xét duyệt vẫn được quản lý trong AdSense.
+`GOOGLE_ADSENSE_DISABLED=1` trong `/opt/jarvis/shared/.env` rồi phát hành lại. Trang `/quyen-rieng-tu`
+không còn tồn tại; cần kiểm tra lại yêu cầu công bố dữ liệu/cookie trước khi phân phối quảng cáo.
+Consent/CMP và trạng thái xét duyệt vẫn được quản lý trong AdSense.
 | cron | systemd `jarvis-cron.timer` 03:00 UTC → `/api/cron` (quét dọn + ngó kho chính) — thay Vercel Cron |
 | cron kho phụ | systemd `jarvis-companions.timer` mỗi 5 phút + độ trễ ngẫu nhiên 0–30 giây → `/api/cron?only=companions`; runtime Ollama chỉ xử lý kho đã tới `nextDecisionAt` |
 | media | vẫn Object Storage `jarvis-media` (mục 3) — không đổi |

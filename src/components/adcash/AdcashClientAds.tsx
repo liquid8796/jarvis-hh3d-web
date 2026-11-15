@@ -8,7 +8,6 @@ const EXCLUDED_PATH_PREFIXES = [
   "/chat-frame",
   "/login",
   "/pending",
-  "/quyen-rieng-tu",
   "/register",
 ] as const;
 

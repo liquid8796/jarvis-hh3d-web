@@ -58,7 +58,6 @@ export const PUBLIC_SITEMAP_ROUTES: readonly SitemapRoute[] = [
   { path: "/register", changeFrequency: "monthly", priority: 0.7 },
   { path: "/login", changeFrequency: "monthly", priority: 0.6 },
   { path: "/ten-mien", changeFrequency: "weekly", priority: 0.5 },
-  { path: "/quyen-rieng-tu", changeFrequency: "monthly", priority: 0.4 },
 ];
 
 /**
@@ -105,7 +104,7 @@ export const LANDING_FEATURES: readonly LandingFeature[] = [
   },
   {
     title: "Bảo mật và riêng tư",
-    body: "Mật khẩu được băm một chiều, phiên đăng nhập có hạn dùng, dữ liệu chỉ phục vụ vận hành. Chính sách quyền riêng tư công khai cách hệ thống và đối tác quảng cáo xử lý dữ liệu.",
+    body: "Mật khẩu được băm một chiều, phiên đăng nhập có hạn dùng và quyền truy cập được kiểm soát theo tài khoản.",
   },
 ];
 
@@ -144,7 +143,7 @@ export const LANDING_FAQ: readonly FaqItem[] = [
   {
     question: "Dữ liệu tài khoản của tôi có an toàn không?",
     answer:
-      "Mật khẩu được băm một chiều và không bao giờ lưu dạng đọc được. Dữ liệu chỉ dùng để vận hành dịch vụ. Chi tiết cách xử lý dữ liệu và cookie quảng cáo được công khai tại trang Quyền riêng tư.",
+      "Mật khẩu được băm một chiều và không lưu dạng đọc được. Phiên đăng nhập có hạn dùng và quyền truy cập được phân theo vai trò.",
   },
   {
     question: "Bế quan trùng tu nghĩa là gì?",

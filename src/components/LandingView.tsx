@@ -168,9 +168,6 @@ export function LandingView() {
               <Link href="/register" className="btn btn-gold text-base">
                 {t.cta.buttonRegister}
               </Link>
-              <Link href="/quyen-rieng-tu" className="btn btn-ghost text-base">
-                {t.cta.buttonPrivacy}
-              </Link>
             </div>
           </div>
         </section>

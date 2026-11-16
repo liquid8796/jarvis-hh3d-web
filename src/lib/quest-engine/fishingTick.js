@@ -12,6 +12,10 @@
   const releaseBelow = Math.max(0, Math.min(30, Number("{{releaseBelow}}") || 0));
   const releaseEveryCasts = Math.max(1, Math.min(10000, Math.trunc(Number("{{releaseEveryCasts}}")) || 5));
   const body = document.body;
+  // These classes authorize later trusted-input steps for ONE tick only.
+  // Revoke them before any early return (especially castFailure/backoff).
+  for (const el of document.querySelectorAll('.jvz-fish-press, .jvz-fish-enter'))
+    el.classList.remove('jvz-fish-press', 'jvz-fish-enter');
 
   const state = window.__jvzFish ??= { casts: 0, ticks: 0, bagChecked: false, lastBagCast: -1, entering: 0, pressed: false, lastPress: 0, pendingSale: false };
   state.spot = "{{spot}}";
@@ -129,6 +133,15 @@
   }
 
   const main = get(".fish-room .fish-main");
+  // The game shows this informational result only on the first weekly entry.
+  // Close its own dismiss control, never arbitrary sheets or reward buttons.
+  const weeklyResult = [...document.querySelectorAll('.sheet[aria-label="Kết quả giải câu tuần"]')]
+    .find(el => visible(el) && el.querySelector('.fr-result'));
+  if (weeklyResult) {
+    const close = weeklyResult.querySelector('.sheet-head button[aria-label="Đóng"]');
+    if (visible(close)) close.click();
+    return "fish: đóng thông báo kết quả giải câu tuần trước khi câu";
+  }
   if (!main) return finish("Đã vào phòng nhưng chưa thấy nút Ném câu.", true);
   const mainText = label(main);
   const idle = main.classList.contains("st-idle") || /Ném câu/i.test(mainText);

@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.258 — Fishing first-start dialog and retry (16/11/2026)
+
+- Revoke stale cast/entry markers before every early return so failed casts honor the five-second retry instead of clicking every tick.
+- Dismiss only the observed weekly fishing-result information sheet before casting; preserve other dialogs. Shared controller covers VIP and ordinary fishing quests.
+- Add browser regression cases for backoff, retry recovery, weekly results and unknown dialogs on web and PC controllers. Live dialog closure verified; full live catch remains blocked by game server loading.
+
 ## 1.3.257 — Remove privacy page and public links (15/11/2026)
 
 - Delete /quyen-rieng-tu; remove footer and landing CTA links, unused translations and ad exclusion entries. Preserve the standalone copyright.

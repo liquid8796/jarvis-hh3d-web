@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.258",
+    date: "2026-11-16",
+    lines: [
+      "Sửa lỗi Câu Cá bị vướng thông báo kết quả tuần ở lần khởi động đầu, áp dụng cho cả VIP và tài khoản thường.",
+      "Khi ném câu chưa được, chờ đúng nhịp thử lại thay vì liên tục báo lỗi.",
+    ],
+  },
+  {
     version: "1.3.257",
     date: "2026-11-15",
     lines: [
@@ -491,14 +499,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
     lines: [
       "Nhãn hạng trên điện thoại gọn hơn để có thêm chỗ thao tác với ba ô chọn khôi lỗi.",
       "Tên hạng đầy đủ vẫn được giữ trên màn hình lớn, mọi phân công cũ không đổi.",
-    ],
-  },
-  {
-    version: "1.3.208",
-    date: "2026-10-21",
-    lines: [
-      "Huy hiệu hạng tài khoản nay gọn đúng cỡ trên điện thoại, không còn che lựa chọn khôi lỗi.",
-      "Vùng vuốt ngang tự canh để ô tích đang chọn luôn nằm trong tầm nhìn và dễ chạm.",
     ],
   },
 ];

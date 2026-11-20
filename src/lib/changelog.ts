@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.259",
+    date: "2026-11-20",
+    lines: [
+      "Tạo tài khoản GitHub nay dùng đúng AI đã chọn để viết bio: chọn Reflection thì không còn gọi Ollama.",
+      "Nếu cập nhật profile thất bại, thông báo sẽ phân biệt lỗi từ AI và GitHub; kho vừa đăng ký vẫn được giữ nguyên.",
+    ],
+  },
+  {
     version: "1.3.258",
     date: "2026-11-16",
     lines: [
@@ -491,14 +499,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Ollama và Reflection được chờ tối đa 5 phút cho mỗi yêu cầu AI thay vì 1 phút.",
       "Lượt nuôi kho GitHub và lịch chạy OCI được nới giới hạn tương ứng để không ngắt model quá sớm.",
       "Các khóa đã nhập và cấu hình đang dùng được giữ nguyên; những lượt chạy ngắn vẫn được bảo vệ.",
-    ],
-  },
-  {
-    version: "1.3.209",
-    date: "2026-10-21",
-    lines: [
-      "Nhãn hạng trên điện thoại gọn hơn để có thêm chỗ thao tác với ba ô chọn khôi lỗi.",
-      "Tên hạng đầy đủ vẫn được giữ trên màn hình lớn, mọi phân công cũ không đổi.",
     ],
   },
 ];

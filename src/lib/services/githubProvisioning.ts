@@ -286,9 +286,9 @@ export async function provisionGithubStation(input: GithubProvisionInput, deps: 
         ) throw Error("invalid model name");
         normalized.repo = repo;
       } catch {
-        safeMessage = "Không thể nhờ Ollama đặt tên kho. Kiểm tra model, API key và kết nối, hoặc nhập tên kho để tạo; chưa tạo repo nào.";
+        safeMessage = "Không thể nhờ AI đã cấu hình đặt tên kho. Kiểm tra model, API key và kết nối, hoặc nhập tên kho để tạo; chưa tạo repo nào.";
         safeFailureCode = "repository_name_unavailable";
-        throw Error("Ollama naming failed");
+        throw Error("Provider repository naming failed");
       }
     }
     const khoiloiCollision = reviewPrimaryRepoAgainstKhoiloiNames(normalized.repo, khoiloiNames);
@@ -340,7 +340,7 @@ export async function provisionGithubStation(input: GithubProvisionInput, deps: 
       await work(() => deps.registerDeferred!(ctx, local));
       registered = true;
       try { await work(() => deps.nurture(ctx)); }
-      catch { warnings.push("Đã đăng ký chế độ chỉ nuôi repo phụ; vòng tạo repo phụ Ollama sẽ tiếp tục ở cron kế."); }
+      catch { warnings.push("Đã đăng ký chế độ chỉ nuôi repo phụ; vòng tạo repo phụ bằng AI đã cấu hình sẽ tiếp tục ở cron kế."); }
       if (deps.enrichProfile) {
         try { warnings.push(...await work(() => deps.enrichProfile!(ctx))); }
         catch { warnings.push("Đã đăng ký tài khoản nhưng chưa hoàn tất cập nhật profile GitHub."); }
@@ -385,7 +385,7 @@ export async function provisionGithubStation(input: GithubProvisionInput, deps: 
       for (const [operation, warning] of [
         [deps.dispatch, "Kho đã đăng ký; chưa khởi chạy được workflow."],
         [deps.ping, "Kho đã đăng ký; chưa xác minh được trạng thái workflow."],
-        [deps.nurture, "Kho đã đăng ký; vòng tạo kho phụ Ollama cần chạy lại sau."],
+        [deps.nurture, "Kho đã đăng ký; vòng tạo kho phụ bằng AI đã cấu hình cần chạy lại sau."],
       ] as const) {
         try { await work(() => operation(ctx)); } catch { warnings.push(warning); }
       }

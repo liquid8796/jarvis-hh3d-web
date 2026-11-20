@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createOllamaChatClient } from "./ollamaChat";
-import { getAppSettings } from "./settings";
+import { createReflectionChatClient } from "./reflectionChat";
+import { getAppSettings, type AppSettings } from "./settings";
 
 const profileSchema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -23,10 +24,11 @@ async function githubPatchProfile(
   pat: string,
   profile: z.infer<typeof profileSchema>,
   deadlineAt: number,
+  fetcher: typeof globalThis.fetch,
 ): Promise<void> {
   const remaining = deadlineAt - Date.now();
   if (remaining < 1000) throw new Error("profile deadline expired");
-  const response = await fetch("https://api.github.com/user", {
+  const response = await fetcher("https://api.github.com/user", {
     method: "PATCH",
     redirect: "error",
     cache: "no-store",
@@ -52,14 +54,22 @@ async function githubPatchProfile(
  *
  * GitHub REST/PAT không có API upload avatar. Vì vậy avatar là warning cố định, không giả thành công.
  */
+export type GithubProfileEnrichmentDependencies = {
+  readSettings?: (deadlineAt: number) => Promise<Pick<AppSettings, "githubNurture" | "githubStations">>;
+  fetch?: typeof globalThis.fetch;
+};
+
 export async function enrichNewGithubProfile(options: {
   pat: string;
   login: string;
   deadlineAt: number;
-}): Promise<string[]> {
+}, deps: GithubProfileEnrichmentDependencies = {}): Promise<string[]> {
   const warnings: string[] = [];
+  const fetcher = deps.fetch ?? globalThis.fetch;
+  let providerLabel = "AI đã cấu hình";
+  let patchStarted = false;
   try {
-    const settings = await getAppSettings({ deadlineAt: options.deadlineAt });
+    const settings = await (deps.readSettings ?? ((deadlineAt: number) => getAppSettings({ deadlineAt })))(options.deadlineAt);
     const ownedStations = settings.githubStations.filter(
       (station) => station.owner.toLowerCase() === options.login.toLowerCase(),
     );
@@ -70,12 +80,18 @@ export async function enrichNewGithubProfile(options: {
       .flatMap((station) => station.companionRepos.map((repo) => repo.language).filter(Boolean))
       .slice(-8);
 
-    const client = createOllamaChatClient({
+    // Use the SAME saved provider as repository naming and companion creation.
+    // Never silently fall back to Ollama when Reflection is selected but unavailable.
+    const reflection = settings.githubNurture.provider === "reflection";
+    providerLabel = reflection ? "Reflection" : "Ollama";
+    const createClient = reflection ? createReflectionChatClient : createOllamaChatClient;
+    const client = createClient({
       config: settings.githubNurture,
       deadlineAt: options.deadlineAt,
-      outputTokens: 320,
+      fetch: fetcher,
+      outputTokens: reflection ? 2048 : 320,
       maxResponseBytes: 12_000,
-      requestTimeoutMs: 25_000,
+      requestTimeoutMs: reflection ? 45_000 : 25_000,
     });
     const reply = await client.request([
       {
@@ -95,12 +111,15 @@ export async function enrichNewGithubProfile(options: {
           nonce: Math.floor(Math.random() * 1_000_000),
         }),
       },
-    ], { temperature: 0.9 });
+    ], { temperature: 0.9, format: providerLabel === "Reflection" ? "json" : undefined });
 
     const profile = profileSchema.parse(oneJsonObject(reply.content));
-    await githubPatchProfile(options.pat, profile, options.deadlineAt);
+    patchStarted = true;
+    await githubPatchProfile(options.pat, profile, options.deadlineAt, fetcher);
   } catch {
-    warnings.push("Kho đã tạo nhưng chưa cập nhật được bio/profile GitHub bằng Ollama; có thể chạy lại sau.");
+    warnings.push(patchStarted
+      ? "Đã đăng ký tài khoản nhưng GitHub chưa xác nhận cập nhật bio/profile; có thể thử lại sau."
+      : "Đã đăng ký tài khoản nhưng chưa cập nhật được bio/profile bằng " + providerLabel + "; có thể thử lại sau.");
   }
 
   warnings.push("Avatar GitHub chưa đổi tự động: API PAT chính thức không hỗ trợ upload avatar, nên hệ thống giữ avatar hiện tại/default.");

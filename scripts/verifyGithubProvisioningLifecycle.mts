@@ -135,7 +135,7 @@ for (const chosen of ["Prism", "notes_engine", "garden.v2"]) {
   f.deps.listKhoiloiNames = async () => { f.events.push("khoiloi-names"); return ["generated-project"]; };
   const result = await provisionGithubStation({ ...input, repo: "" }, f.deps);
   assert.equal(result.ok, false);
-  assert.match(result.message, /Ollama.*chưa tạo repo/);
+  assert.match(result.message, /AI đã cấu hình.*chưa tạo repo/);
   assert.ok(!f.events.includes("worker-id") && !f.events.includes("local-preflight"));
 }
 {
@@ -151,7 +151,7 @@ for (const failure of ["whoami", "scope", "llm-name"]) {
   assert.equal(result.ok, false);
   assert.ok(!f.events.includes("create") && !f.events.includes("delete") && !f.events.includes("local-preflight"));
   if (failure !== "llm-name") assert.ok(!f.events.includes("llm-name"));
-  else assert.match(result.message, /Ollama.*chưa tạo repo/);
+  else assert.match(result.message, /AI đã cấu hình.*chưa tạo repo/);
   assert.ok(!JSON.stringify(result).includes(input.pat));
 }
 for (const [failure, code, words] of [
@@ -200,7 +200,7 @@ for (const invalid of ["", ".", "..", "bad/name", "bad name", "a".repeat(101)]) 
   const f = fixture(); f.deps.generateRepoName = async () => invalid;
   const result = await provisionGithubStation({ ...input, repo: "" }, f.deps);
   assert.equal(result.ok, false);
-  assert.match(result.message, /Ollama/);
+  assert.match(result.message, /AI đã cấu hình/);
   assert.ok(!f.events.includes("create") && !f.events.includes("local-preflight"));
 }
 {
@@ -333,7 +333,7 @@ hungName.deps.generateRepoName = () => new Promise(() => {});
 const beforeHungName = Date.now();
 const timedOutName = await provisionGithubStation({ ...input, repo: "" }, hungName.deps);
 assert.equal(timedOutName.ok, false);
-assert.match(timedOutName.message, /Ollama/);
+assert.match(timedOutName.message, /AI đã cấu hình/);
 assert.ok(Date.now() - beforeHungName < 1_000);
 assert.ok(!hungName.events.includes("create") && !hungName.events.includes("local-preflight"));
 for (const finalStatus of [404, 200, "error"] as const) {

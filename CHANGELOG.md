@@ -9,6 +9,12 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.259 — Respect selected provider for GitHub profile enrichment (20/11/2026)
+
+- Fix githubProfileEnrichment calling Ollama unconditionally even when githubNurture.provider is Reflection. Select the configured client without fallback and request JSON mode with enough output tokens for Reflection.
+- Keep GitHub profile validation and the existing avatar notice; distinguish provider-generation errors from GitHub PATCH failures, and remove misleading Ollama labels in provisioning messages.
+- Add an offline regression with injected settings/HTTP fixtures to verify Reflection endpoint, JSON output, GitHub PATCH fields and no fallback when Reflection keys are unavailable.
+
 ## 1.3.258 — Fishing first-start dialog and retry (16/11/2026)
 
 - Revoke stale cast/entry markers before every early return so failed casts honor the five-second retry instead of clicking every tick.

@@ -126,6 +126,14 @@ export class CycleBlocked extends Error {
   }
 }
 
+class QuestScheduleDeferred extends Error {
+  constructor(state) {
+    super(state.message || "Ngoài khung giờ của Tông Môn.");
+    this.state = state;
+    this.dailyMarks = [];
+  }
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -272,6 +280,7 @@ const result = (quest, outcome, extra = {}) => ({
  * @param {{info:Function, debug:Function, warning:Function}} deps.log  nhận (scope, message)
  * @param {() => boolean} [deps.shouldStop]   true khi người dùng đã bấm dừng
  * @param {() => boolean} [deps.canFish]   current server-issued access, checked at every safe step
+ * @param {(questId: string) => {allowed: boolean, nowMs: number, closesAt: number | null, nextOpenAt: number | null, message: string} | undefined} [deps.questScheduleState]
  * @param {{resolve:Function, learn:Function}} [deps.quiz]  kho đáp án, nếu có
  * @param {(session: object) => Promise<{cleared: boolean, clicked: boolean}>} [deps.clickTurnstile]  cách GỠ một màn kiểm tra
  *   gặp giữa vòng — `cleared: true` CHỈ KHI trang đã hết màn kiểm tra; `clicked` để lời báo kể
@@ -292,8 +301,12 @@ export function createQuestEngine(deps) {
    */
   const clickTurnstile = deps.clickTurnstile ?? null;
 
-  const throwIfStopped = () => {
+  const questScheduleState = deps.questScheduleState;
+
+  const throwIfStopped = (quest) => {
     if (shouldStop()) throw new QuestAborted();
+    const schedule = questScheduleState?.(quest.id);
+    if (schedule?.allowed === false) throw new QuestScheduleDeferred(schedule);
   };
 
   const checkCondition = async (session, condition) => {
@@ -325,7 +338,7 @@ export function createQuestEngine(deps) {
    * mili giây nào. Chỉ khi selector không khớp gì cả ta mới nán lại chờ nó xuất hiện; nó hiện
    * ra thì lượt dừng bị huỷ và nhiệm vụ đi tiếp, còn hết ngân sách thì lượt dừng là thật.
    */
-  async function stopIsReal(session, condition, scope) {
+  async function stopIsReal(session, quest, condition, scope) {
     if (condition.kind !== "hidden" || !condition.selector?.trim()) return true;
 
     const present = await session.evaluate(selectorPresence, { selector: condition.selector });
@@ -341,7 +354,7 @@ export function createQuestEngine(deps) {
     // được gắn vào và vẽ ra. Cắt lát để lệnh Thu Đàn vẫn cầm quyền từ ngoài này.
     const deadline = Date.now() + STOP_CONFIRM_MS;
     for (;;) {
-      throwIfStopped();
+      throwIfStopped(quest);
 
       const remaining = deadline - Date.now();
       if (remaining <= 0) return true;
@@ -388,11 +401,20 @@ export function createQuestEngine(deps) {
       }
     }
     try {
+      throwIfStopped(quest);
       if (quest.kind === "labelMatch") return await runLabelMatch(session, profile, quest);
       if (quest.kind === "customSteps") return await runCustomSteps(session, quest);
       return result(quest, "skipped", { message: `Loại nhiệm vụ lạ: ${quest.kind}` });
     } catch (err) {
       if (err instanceof QuestAborted) throw err;
+      if (err instanceof QuestScheduleDeferred) {
+        return result(quest, "skipped", {
+          message: err.message,
+          scheduleDeferred: true,
+          nextOpenAt: err.state.nextOpenAt,
+          dailyMarks: err.dailyMarks,
+        });
+      }
       // CycleBlocked cũng phải XUYÊN QUA đây, cùng lẽ với QuestAborted: nó nói về CẢ VÒNG, không
       // phải về nhiệm vụ này. Nuốt nó thành một outcome failed là biến một lệnh dừng thành một
       // dòng nhật ký — rồi mười hai nhiệm vụ sau vẫn lần lượt đâm vào đúng bức tường ấy.
@@ -414,7 +436,9 @@ export function createQuestEngine(deps) {
     // Điều hướng LUÔN LUÔN, kể cả khi trình duyệt đã đậu sẵn ở URL này — xem ghi chú trong
     // session.navigate: "đang ở đúng trang rồi" chính là cách một lượt thừa kế một cái xác.
     await session.humanDelay();
+    throwIfStopped(quest);
     const nav = await session.navigate(url);
+    throwIfStopped(quest);
     if (!nav.ok) {
       return result(quest, "failed", { message: `Không mở được trang nhiệm vụ (${url}): ${nav.error}` });
     }
@@ -422,6 +446,7 @@ export function createQuestEngine(deps) {
     log.debug(scope, `Trang: ${url} (${via})`);
 
     const guide = await session.evaluate(guideProbe);
+    throwIfStopped(quest);
     if (guide && guide.trim()) log.info(scope, `Hướng dẫn trên trang: ${guide}`);
 
     await session.humanDelay();
@@ -432,14 +457,22 @@ export function createQuestEngine(deps) {
       maxClicks: 15,
     };
 
-    let res = await session.evaluate(labelMatchSweep, args);
+    const sweep = () => {
+      throwIfStopped(quest);
+      const schedule = questScheduleState?.(quest.id);
+      const closesAt = schedule?.closesAt == null ? null : Date.now() + schedule.closesAt - schedule.nowMs;
+      return session.evaluate(labelMatchSweep, { ...args, closesAt });
+    };
+    let res = await sweep();
+    throwIfStopped(quest);
 
     // Bảng nhiệm vụ nạp danh sách bằng client ("Đang tải danh sách nhiệm vụ..."). Nếu lượt
     // quét đầu không thấy gì thì cho việc render một nhịp rồi thử lại đúng một lần. An toàn:
     // lượt đầu chưa bấm gì cả.
     if (!res || (!res.found && res.clickedCount === 0)) {
       await sleep(2500);
-      res = (await session.evaluate(labelMatchSweep, args)) ?? res;
+      res = (await sweep()) ?? res;
+      throwIfStopped(quest);
     }
 
     if (!res) {
@@ -546,7 +579,13 @@ export function createQuestEngine(deps) {
         dailyCapReached: false,
         dailyMarks,
       };
-      error = await executeSteps(session, quest, quest.steps, state, 0);
+      try {
+        error = await executeSteps(session, quest, quest.steps, state, 0);
+        throwIfStopped(quest);
+      } catch (err) {
+        if (err instanceof QuestScheduleDeferred) err.dailyMarks = [...dailyMarks];
+        throw err;
+      }
 
       if (!error || !state.pageNotRendered) break;
 
@@ -558,6 +597,15 @@ export function createQuestEngine(deps) {
       // Probe hỏng/trả undefined thì coi như không có màn kiểm tra: một phép chẩn đoán không
       // bao giờ được tự nó giết một vòng chạy.
       const gate = await session.evaluate(readinessProbe);
+      const checkSchedule = () => {
+        try {
+          throwIfStopped(quest);
+        } catch (err) {
+          if (err instanceof QuestScheduleDeferred) err.dailyMarks = [...dailyMarks];
+          throw err;
+        }
+      };
+      checkSchedule();
       if (gate && gate.challenge === true) {
         // THỬ GỠ trước khi bỏ chạy. Đo 20/08/2026 trên sản xuất: màn kiểm tra tới GIỮA VÒNG chứ
         // không ở cổng đầu vòng — nên cú bấm Turnstile đặt ở cổng (1.3.18) chưa một lần được
@@ -568,6 +616,7 @@ export function createQuestEngine(deps) {
         let attempt2 = null;
         if (clickTurnstile && challengeClears < MAX_CHALLENGE_CLEARS) {
           attempt2 = await clickTurnstile(session);
+          checkSchedule();
           if (attempt2 && attempt2.cleared === true) {
             challengeClears += 1;
             log.info(scope, "Đã gỡ được màn kiểm tra — đi tiếp nhiệm vụ này.");
@@ -644,7 +693,7 @@ export function createQuestEngine(deps) {
     const scope = `Quest:${quest.name}`;
 
     for (const original of steps) {
-      throwIfStopped();
+      throwIfStopped(quest);
 
       // Giải Ở ĐÂY, không phải lúc script khởi động: đây chính là thứ khiến một thay đổi
       // option rơi vào giữa lượt đang chạy.
@@ -662,6 +711,7 @@ export function createQuestEngine(deps) {
         continue;
       }
 
+      throwIfStopped(quest);
       const error = await executeStep(session, quest, step, state, depth);
 
       if (state.stopReason) break;
@@ -716,6 +766,7 @@ export function createQuestEngine(deps) {
         // humanDelay silently misses it. Fishing already uses timed true inputs.
         if (quest.id !== "cau-ca" && quest.id !== "cau-ca-thuong")
           await session.humanDelay();
+        throwIfStopped(quest);
         const clicked = await session.click(step.selector ?? "", step.timeoutMs, step.forceClick === true, step.pressMs ?? 0);
         // Log a successful click, not an intent or an absent optional control.
         if (clicked && step.journalOnSuccess) {
@@ -732,13 +783,21 @@ export function createQuestEngine(deps) {
 
       case "clickByText":
         await session.humanDelay();
+        throwIfStopped(quest);
         return (await session.clickByText(step.text ?? "", step.timeoutMs))
           ? null
           : `Không bấm được chữ: ${step.text}`;
 
-      case "waitMilliseconds":
-        await sleep(clamp(step.timeoutMs, 0, 60_000));
+      case "waitMilliseconds": {
+        const until = performance.now() + clamp(step.timeoutMs, 0, 60_000);
+        do {
+          throwIfStopped(quest);
+          const schedule = questScheduleState?.(quest.id);
+          const untilClose = schedule?.closesAt == null ? Infinity : Math.max(1, schedule.closesAt - schedule.nowMs);
+          await sleep(Math.min(until - performance.now(), untilClose));
+        } while (performance.now() < until);
         return null;
+      }
 
       case "readText":
         state.lastRead = await session.getText(step.selector ?? "");
@@ -756,7 +815,9 @@ export function createQuestEngine(deps) {
       }
 
       case "evaluateJavaScript": {
-        state.lastRead = await session.evaluate(step.script ?? "");
+        // Game scripts can queue delayed actions (for example, Hỷ Sự navigation).
+        // Passive condition polling uses its own unrestricted timer to settle.
+        state.lastRead = await session.evaluate(step.script ?? "", undefined, true);
 
         // Giá trị trả về của một script là TIẾNG NÓI của nó, trên BA kênh. Dòng bắt đầu
         // bằng '!' là TƯỜNG THUẬT — thứ người theo dõi nên đọc ("X vừa vào phòng", "Trục
@@ -791,8 +852,8 @@ export function createQuestEngine(deps) {
       }
 
       case "fishingReel": {
-        await session.fishingReel?.(shouldStop);
-        throwIfStopped();
+        await session.fishingReel?.(() => shouldStop() || questScheduleState?.(quest.id)?.allowed === false);
+        throwIfStopped(quest);
         return null;
       }
 
@@ -806,7 +867,7 @@ export function createQuestEngine(deps) {
 
         if (
           (await checkCondition(session, step.condition)) &&
-          (await stopIsReal(session, step.condition, scope))
+          (await stopIsReal(session, quest, step.condition, scope))
         ) {
           state.stopReason = step.text?.trim() ? step.text : `không có gì để làm (${describeCondition(step.condition)})`;
           // Đánh dấu NGUỒN của lượt dừng ngay tại đây, chỗ duy nhất trang game tự phán. Không
@@ -838,7 +899,7 @@ export function createQuestEngine(deps) {
       }
 
       case "answerQuiz":
-        return await answerQuiz(session, step, state, scope);
+        return await answerQuiz(session, quest, step, state, scope);
 
       case "waitForCondition": {
         if (!step.condition) return "waitForCondition không có điều kiện.";
@@ -854,7 +915,7 @@ export function createQuestEngine(deps) {
         // bằng chúng. Cắt lát thay vì một evaluate dài, để lệnh dừng và ngân sách bước
         // vẫn cầm quyền từ ngoài này; trong một lát, phản ứng là tức thời.
         for (;;) {
-          throwIfStopped();
+          throwIfStopped(quest);
 
           const remaining = deadline - Date.now();
           if (remaining <= 0) {
@@ -903,7 +964,7 @@ export function createQuestEngine(deps) {
         let reason;
 
         for (;;) {
-          throwIfStopped();
+          throwIfStopped(quest);
 
           // Kiểm TRƯỚC thân vòng, nên một vòng lặp đã đạt mục tiêu sẵn thì không chạy lần
           // nào. Giải lại mỗi vòng: vòng ngoài của Mê Cung chạy tới 35 phút trên điều kiện
@@ -958,7 +1019,7 @@ export function createQuestEngine(deps) {
    * cũng không đoán bừa: trả lời sai tiêu một lượt trong ngày mà chẳng được gì, nên những
    * câu còn lại tốt hơn hết là để dành cho người dùng.
    */
-  async function answerQuiz(session, step, state, scope) {
+  async function answerQuiz(session, quest, step, state, scope) {
     const probe = await session.evaluate(quizProbe, {
       question: step.selector ?? null,
       options: step.optionsSelector ?? null,
@@ -992,6 +1053,7 @@ export function createQuestEngine(deps) {
     // Qua đường nhập liệu thật, không bao giờ bằng el.click() trong trang — xem ghi chú ở
     // session.clickOptionByText.
     await session.humanDelay();
+    throwIfStopped(quest);
     const clicked = await session.clickOptionByText(
       step.optionsSelector ?? "",
       answer.option,
@@ -1005,7 +1067,7 @@ export function createQuestEngine(deps) {
 
     // Bắt lấy lúc site đánh dấu đáp án đúng, rồi nhớ nó. Đây là cách DUY NHẤT kho lớn lên,
     // và nó đúng bất kể câu vừa rồi trả lời đúng hay sai.
-    const confirmed = await watchForCorrectOption(session, step.optionsSelector);
+    const confirmed = await watchForCorrectOption(session, quest, step.optionsSelector);
     if (confirmed?.trim()) await quiz.learn(probe.question, confirmed);
 
     return null;
@@ -1015,9 +1077,10 @@ export function createQuestEngine(deps) {
    * Rình dấu đáp-án-đúng và trả về ngay khi nó hiện, bỏ cuộc lặng lẽ sau ngân sách. Không
    * thấy KHÔNG phải lỗi — nó chỉ nghĩa là câu này chưa được học.
    */
-  async function watchForCorrectOption(session, optionsSelector) {
+  async function watchForCorrectOption(session, quest, optionsSelector) {
     const deadline = Date.now() + QUIZ_FEEDBACK_TIMEOUT_MS;
     while (Date.now() < deadline) {
+      throwIfStopped(quest);
       const text = await session.evaluate(quizCorrectAnswer, { options: optionsSelector ?? null });
       if (typeof text === "string" && text.trim()) return text;
       await sleep(QUIZ_FEEDBACK_POLL_MS);

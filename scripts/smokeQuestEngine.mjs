@@ -45,6 +45,7 @@ import {
   PEER_GATED_QUEST_IDS,
   peersDoneForQuota,
   reachedDailyQuota,
+  skipQuestForToday,
 } from "../src/lib/quest-engine/dailyQuota.mjs";
 import { computeNextDelaySeconds, parseCooldownSeconds } from "../src/lib/quest-engine/cooldown.mjs";
 import { profileForConfig } from "../src/lib/quest-engine/profile.mjs";
@@ -162,16 +163,16 @@ const PAGE = `<!doctype html>
   </script>
 </body></html>`;
 
-// Ba trang giả dưới đây giữ đúng các selector/state transition nhìn thấy trong recording
-// 02/08. Chúng không mock Playwright: profile schema 44 vẫn điều khiển Chromium thật.
+// Bản ghi 26/10: lịch vẫn giữ .ddg-day.is-today sau khi server nhận điểm danh.
+// Biên nhận nằm trên con dấu đã khóa, và profile điều khiển Chromium thật.
 const FREE_CHECKIN_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
-<div id="ddPage" data-mode="normal"><div id="ddGrid"><button id="ddDay8" class="dd-tile is-today">Ngày 8</button></div>
-<button id="ddStamp">Điểm Danh</button></div>
-<script>ddStamp.onclick=()=>setTimeout(()=>{ddDay8.classList.add('is-claimed');ddStamp.dataset.claimed='1';ddStamp.textContent='Đã Điểm Danh'},30)</script>`;
+<div id="ddPage" data-mode="normal"><div id="ddGrid"><button id="ddDay8" class="ddg-day is-today">Ngày 8</button></div>
+<button id="ddStamp" class="ddg-seal">Điểm Danh</button></div>
+<script>ddStamp.onclick=()=>setTimeout(()=>{ddStamp.classList.add('is-done');ddStamp.disabled=true;ddStamp.dataset.claimed='1';ddStamp.textContent='Đã Điểm Danh'},30)</script>`;
 
 const FREE_CHECKIN_DONE_PAGE = `<!doctype html><html lang="vi"><meta charset="utf-8">
-<div id="ddPage" data-mode="normal"><div id="ddGrid"><button id="ddDay8" class="dd-tile is-today is-claimed">Ngày 8</button></div>
-<button id="ddStamp">Đã Điểm Danh</button></div>`;
+<div id="ddPage" data-mode="normal"><div id="ddGrid"><button id="ddDay8" class="ddg-day is-today">Ngày 8</button></div>
+<button id="ddStamp" class="ddg-seal is-done" disabled>Đã Điểm Danh</button></div>`;
 
 // Chữ "Thí Luyện" hiện THÀNH VĂN BẢN chứ không chỉ nằm trong href: vipProbe đọc innerText và
 // trả null chừng nào chưa thấy tên một nhiệm vụ nào — null nghĩa là "hub chưa render xong",
@@ -2059,11 +2060,8 @@ async function main() {
 
 console.log("\nThứ tự hành sự trong MỘT vòng");
 
-  // Chế độ song song bị gỡ ngày 12/08/2026, và lý do là thứ tự: song song biến thứ tự hành
-  // sự thành thứ tự GIÀNH ĐƯỢC CỔNG, còn tông môn cần Mê Cung chạy CUỐI (tới 35 phút, giữ
-  // một phòng 5 người) và Luyện Đan Đường áp chót. Chạy tuần tự thì thứ tự ấy là hệ quả
-  // trực tiếp của `order` trong hồ sơ — nên chốt ngay trên hồ sơ, chứ không chốt trên một
-  // lượt chạy may rủi.
+  // Hồ sơ xếp các quest trước hai việc dài là Luyện Đan Đường và Mê Cung.
+  // Câu Cá ở sau Mê Cung, với hai biến thể cùng thứ tự trong hồ sơ.
   {
     const { loadProfile } = await import("../src/lib/quest-engine/profile.mjs");
     const { questsForAccount } = await import("../src/lib/quest-engine/engine.mjs");
@@ -2079,13 +2077,13 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       const names = questsForAccount(allOn, { isVip }).map((q) => q.name);
 
       check(
-        `đàn ${tier}: Mê Cung là nhiệm vụ CUỐI CÙNG của một vòng`,
-        names[names.length - 1] === "Mê Cung",
+        `đàn ${tier}: Câu Cá đứng ngay sau Mê Cung, cuối vòng`,
+        names.at(-2) === "Mê Cung" && names.at(-1) === "Câu Cá",
         names.slice(-3).join(" → "),
       );
       check(
-        `đàn ${tier}: Luyện Đan Đường là áp chót`,
-        names[names.length - 2] === "Luyện Đan Đường",
+        `đàn ${tier}: Luyện Đan Đường đứng ngay trước Mê Cung`,
+        names.at(-3) === "Luyện Đan Đường" && names.at(-2) === "Mê Cung",
         names.slice(-3).join(" → "),
       );
       check(
@@ -2467,8 +2465,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     // nhà cho cả ba chỗ vào mỏ, đoạt mỏ và mua phù. Cả hai twin VIP/thường cùng đổi.
     // 84 = Hoang Vực page 26/09: remaining-attacks became data-count + ra-count; at zero
     // attempts the site can show #battle-button again, so completion/witness logic must ignore it.
-    "profile schema is 86",
-    loadProfileForSchema().schemaVersion === 86,
+    "profile schema supports the schema 93 quest flows",
+    Number.isInteger(loadProfileForSchema().schemaVersion) && loadProfileForSchema().schemaVersion >= 93,
     String(loadProfileForSchema().schemaVersion),
   );
 
@@ -3139,10 +3137,10 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
   // --- kiểm trên trang thật ---------------------------------------------------------
   let teLeOffered = false;
 
-  // Bí Cảnh Tông Môn (bản thường) — trạng thái của trang boss và của hàng trên hub, đặt riêng
-  // từng ca. `btmHits` đếm số lượt trang boss được tải: nó là bằng chứng cho phép thử「dừng ở
-  // hub thì KHÔNG mở trang boss」, thứ không đọc được từ kết cục của lượt chạy.
+  // Bí Cảnh Tông Môn (bản thường): trang boss và hub có thể báo hai trạng thái khác nhau.
+  // Đếm số lượt mở trang boss và số thao tác thực tế cho từng ca.
   let btmState = "ready";
+  let btmAfterClaim = "ready";
   let btmBroken = false;
   let btmClaimBroken = false;
   const btmClaims = [];
@@ -3348,10 +3346,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       res.end(biCanhPage({ broken: btmBroken, claimBroken: btmClaimBroken, state: btmState, lastTurn: btmLastTurn }));
     }
     else if (path === "/btm-cooldown") res.end("ok");
-    // Cùng luật với /hv-claim: server ghi nhận VÀ đổi trạng thái, nên lượt tải lại kế tiếp là
-    // trang boss bình thường. Fixture giữ nguyên trạng thái「còn thưởng」sau một cú nhận thành
-    // công là fixture nói dối ở đúng chỗ quan trọng nhất.
-    else if (path === "/btm-claim") { btmClaims.push(new Date().toISOString()); btmState = "ready"; res.end("ok"); }
+    // Nhận thưởng mở lại trang boss. Số lượt đánh còn lại do server quyết định độc lập.
+    else if (path === "/btm-claim") { btmClaims.push(new Date().toISOString()); btmState = btmAfterClaim; res.end("ok"); }
     else if (path === "/btm-attack") { btmAttacks.push(new Date().toISOString()); res.end("ok"); }
     else if (path === "/pt-claim") { ptState.claims.push(url.searchParams.get("stage") ?? "?"); res.end("ok"); }
     else if (path === "/phuc-loi-duong") res.end(FREE_WELFARE_PAGE);
@@ -3514,8 +3510,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
 
     const checkinFree = exportedProfile.quests.find((q) => q.id === "diem-danh-thuong");
     const checkinResult = await run(checkinFree);
-    check("Điểm Danh dùng lịch dd và chờ ô hôm nay nhận .is-claimed", checkinResult.outcome === "completed", checkinResult.outcome);
-    check("Điểm Danh đã phát claim thật", await page.locator("#ddGrid .dd-tile.is-today").evaluate((el) => el.classList.contains("is-claimed")));
+    check("Điểm Danh dùng lịch dd và chờ con dấu khóa sau khi thành công", checkinResult.outcome === "completed", checkinResult.outcome);
+    check("Điểm Danh đã phát claim thật", (await page.locator("#ddStamp.is-done:disabled").getAttribute("data-claimed")) === "1");
 
     const welfareFree = exportedProfile.quests.find((q) => q.id === "phuc-loi-duong-thuong");
     const welfareResult = await run(welfareFree);
@@ -3576,6 +3572,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
     const biCanhFree = exportedProfile.quests.find((q) => q.id === "bi-canh-tong-mon-thuong");
     const resetBiCanh = async (over = {}) => {
       btmState = over.state ?? "ready";
+      btmAfterClaim = over.afterClaim ?? "ready";
       btmBroken = over.broken === true;
       btmClaimBroken = over.claimBroken === true;
       btmClaims.length = 0;
@@ -3586,16 +3583,13 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       await page.goto(`${baseUrl}/nhiem-vu-hang-ngay`, { waitUntil: "domcontentloaded" });
     };
 
-    // ---- Cổng hub: hết lượt thì thậm chí KHÔNG mở trang boss -------------------------------
-    // Không chỉ là chuyện tiết kiệm một lượt tải. Trang boss chỉ nói được "hết lượt" SAU khi
-    // /check-attack-cooldown trả lời, tức sau cả cửa sổ đệm; hàng trên hub thì server render
-    // sẵn. Đọc hub trước là đổi một cửa sổ chờ lấy một câu trả lời có ngay từ byte đầu.
+    // Hub còn báo "Xong" của boss cũ, nhưng trang boss mới đã có lượt.
     await resetBiCanh({ hubSpent: true });
-    const btmDone = await run(biCanhFree);
+    const btmFreshBoss = await run(biCanhFree);
     check(
-      "hàng hub đã \"Xong\" → dừng ở hub, KHÔNG mở trang boss lần nào",
-      btmDone.outcome === "alreadyDone" && btmHits === 0,
-      `${btmDone.outcome} · trang boss được tải ${btmHits} lần`,
+      "hub báo Xong, boss mới còn lượt → mở trang boss và đánh đúng một lượt",
+      btmFreshBoss.outcome === "completed" && btmHits === 1 && btmAttacks.length === 1,
+      `${btmFreshBoss.outcome} · hits=${btmHits} · attack=${btmAttacks.length}`,
     );
 
     // ---- Ca thường: đánh một đòn, đọc lại đồng hồ ------------------------------------------
@@ -3706,16 +3700,13 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       `${btmNoReward.outcome} · claim=${btmClaims.length} · attack=${btmAttacks.length} · hits=${btmHits}`,
     );
 
-    // ---- Ngày đã cạn mà thưởng còn treo: HOÃN có chủ ý ------------------------------------
-    // Khúc nhận nằm SAU cửa hub, nên ngày đã cạn thì trang boss không được mở lần nào — đúng
-    // bất biến mà ca "hàng hub đã Xong" ở trên canh. Cái thưởng ấy không mất: cửa chặn chỉ cắn
-    // khi tài khoản định vào boss mới, và chính lượt ghé ấy sẽ nhận trước khi khiêu chiến.
-    await resetBiCanh({ state: "claim", hubSpent: true });
+    // Thưởng boss cũ vẫn nhận được khi các lượt đánh trong ngày đã cạn.
+    await resetBiCanh({ state: "claim", afterClaim: "spent", hubSpent: true });
     const btmClaimSpent = await run(biCanhFree);
     check(
-      "ngày cạn + thưởng treo → dừng ở hub, hoãn khúc nhận, KHÔNG mở trang boss",
-      btmClaimSpent.outcome === "alreadyDone" && btmClaims.length === 0 && btmHits === 0,
-      `${btmClaimSpent.outcome} · claim=${btmClaims.length} · hits=${btmHits}`,
+      "ngày cạn + thưởng treo → nhận thưởng rồi dừng trước khi đánh",
+      btmClaimSpent.outcome === "alreadyDone" && btmClaims.length === 1 && btmAttacks.length === 0 && btmHits === 2,
+      `${btmClaimSpent.outcome} · claim=${btmClaims.length} · attack=${btmAttacks.length} · hits=${btmHits}`,
     );
 
     // ---- Cú bấm Nhận Thưởng rơi vào hư không: phải HỎNG, và hỏng NGAY ----------------------
@@ -3766,9 +3757,10 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       String(biCanhFree.fallbackCooldownSeconds),
     );
     check(
-      "cổng hub đứng TRƯỚC cú điều hướng sang trang boss",
-      biCanhFree.steps.findIndex((s) => s.action === "stopIf") <
-        biCanhFree.steps.findIndex((s) => s.action === "navigate" && s.text?.includes("bi-canh")),
+      "bước đầu mở trang boss trực tiếp và dùng luồng trang riêng",
+      biCanhFree.steps[0]?.action === "navigate" &&
+        biCanhFree.steps[0].text === biCanhFree.pagePath &&
+        isDedicatedPageQuest(exportedProfile, biCanhFree),
     );
     check(
       "nhân chứng hỏi CHỮ trên nút, không hỏi `disabled` (nút không được vẽ cũng là disabled)",
@@ -3777,8 +3769,9 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       JSON.stringify(biCanhFree.steps[witnessAt].condition),
     );
     check(
-      "bi-canh-tong-mon-thuong nằm trong sổ trần-ngày (5 lượt là trần NGÀY)",
-      DAILY_QUOTA_QUEST_IDS.has("bi-canh-tong-mon-thuong"),
+      "trần lượt đánh của boss không ngăn Bí Cảnh kiểm tra thưởng ở vòng sau",
+      !reachedDailyQuota(biCanhFree, btmLast) &&
+        !skipQuestForToday(biCanhFree, new Set([biCanhFree.id])),
     );
 
     // Nhật ký người dùng nói tiếng người (ảnh 05/08): lý do dừng hiện TRẦN, còn "stopIf",
@@ -5517,20 +5510,18 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
       _resetGate();
     }
 
-    // Phân loại phải đọc từ hồ sơ thật, không từ một danh sách tay: twin thường của Điểm
-    // Danh sống trên /diem-danh nên NÓ là trang riêng dù bản VIP là hub.
+    // Phân loại đọc đường dẫn trong hồ sơ: cả hai bản Điểm Danh có trang riêng,
+    // còn Phần Thưởng Hoạt Động dùng chung trang nhiệm vụ ngày.
     {
       const classified = loadProfileForSchema();
       const byId = (id) => classified.quests.find((q) => q.id === id);
+      const dedicatedIds = ["hoang-vuc", "diem-danh", "diem-danh-thuong", "khoang-mach"];
+      const hubQuest = byId("phan-thuong-hoat-dong");
       check(
-        // khoang-mach đổi phe từ schema 58: stub cũ không có pagePath (= hub), bản thật sống
-        // trên /khoang-mach/?nv_embed=1 — trang riêng, ăn ghế own-page của questGate.
-        "phân loại theo hồ sơ: hoang-vuc & diem-danh-thuong & khoang-mach = trang riêng; diem-danh = hub",
-        isDedicatedPageQuest(classified, byId("hoang-vuc")) &&
-          isDedicatedPageQuest(classified, byId("diem-danh-thuong")) &&
-          isDedicatedPageQuest(classified, byId("khoang-mach")) &&
-          !isDedicatedPageQuest(classified, byId("diem-danh")),
-        ["hoang-vuc", "diem-danh-thuong", "khoang-mach", "diem-danh"]
+        "phân loại theo hồ sơ: Hoang Vực, Điểm Danh và Khoáng Mạch có trang riêng; Phần Thưởng Hoạt Động ở hub",
+        dedicatedIds.every((id) => isDedicatedPageQuest(classified, byId(id))) &&
+          hubQuest != null && !isDedicatedPageQuest(classified, hubQuest),
+        [...dedicatedIds, "phan-thuong-hoat-dong"]
           .map((id) => `${id}=${isDedicatedPageQuest(classified, byId(id))}`)
           .join(" "),
       );
@@ -5818,8 +5809,8 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
           !DAILY_QUOTA_QUEST_IDS.has("vong-quay-phuc-van-thuong"),
       );
 
-      // Chiều ngược: chín cái tên được yêu cầu, quy về ID. Cặp twin VIP/thường trùng tên nhau
-      // và trần lượt là của TÀI KHOẢN, nên cả hai bản đều phải có mặt.
+      // Các quest dưới đây ghi trần theo tài khoản. Cặp VIP/thường dùng chung tên
+      // và cả hai bản phải có mặt, trừ ngoại lệ Vòng Quay bên dưới.
       const dailyNames = [
         "Điểm Danh",
         "Phúc Lợi Đường",
@@ -5829,7 +5820,6 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         "Phúc Lợi VIP — Khắc Trận Văn",
         "Vòng Quay Phúc Vận",
         "Vấn Đáp",
-        "Bí Cảnh Tông Môn",
       ];
       // MỘT ngoại lệ, và nó phải được gọi tên chứ không lặng lẽ lọt qua: bản THƯỜNG của Vòng
       // Quay đứng ngoài sổ từ 15/08/2026 (trang riêng của nó không phân biệt được「đủ 4」với
@@ -5841,7 +5831,7 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         .map((quest) => quest.id)
         .filter((id) => !OUTSIDE_BY_DESIGN.has(id));
       check(
-        "cả chín nhiệm vụ ngày đều có trong sổ, kể cả twin VIP/thường (trừ đúng một ngoại lệ đã khai)",
+        "cả tám nhiệm vụ ngày đều có trong sổ, kể cả twin VIP/thường (trừ Vòng Quay thường)",
         missing.length === 0,
         missing.join(", ") || "(đủ)",
       );
@@ -5849,6 +5839,12 @@ console.log("\nThứ tự hành sự trong MỘT vòng");
         "…và ngoại lệ ấy là THẬT: bản thường của Vòng Quay có trong hồ sơ nhưng ngoài sổ",
         profileNow.quests.some((q) => q.id === "vong-quay-phuc-van-thuong") &&
           !DAILY_QUOTA_QUEST_IDS.has("vong-quay-phuc-van-thuong"),
+      );
+
+      check(
+        "cả hai bản Bí Cảnh có trong hồ sơ và đứng ngoài sổ để còn nhận thưởng trong ngày",
+        ["bi-canh-tong-mon", "bi-canh-tong-mon-thuong"].every((id) =>
+          profileNow.quests.some((quest) => quest.id === id) && !DAILY_QUOTA_QUEST_IDS.has(id)),
       );
 
       // Và KHÔNG được lan sang những nhiệm vụ mà `alreadyDone` chỉ là một trạng thái thoáng

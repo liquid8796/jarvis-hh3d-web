@@ -11,7 +11,15 @@ import {
   type WorkerPref,
 } from "./configs";
 import { DEFAULT_MAX_JOBS, DISPATCH_CANDIDATES, pickDispatch, STALE_AFTER_MS } from "./dispatch";
-import { getAppSettings, saveAppSettings } from "./settings";
+import { getAppSettings, saveAppSettings, type AppSettings } from "./settings";
+import {
+  getQuestScheduleRules,
+  lockQuestScheduleRead,
+  questScheduleRevision,
+  questScheduleSnapshot,
+  QUEST_SCHEDULE_SNAPSHOT_VERSION_KEY,
+  QUEST_SCHEDULE_WAITING_KEY,
+} from "./questScheduleRollout";
 import { findById } from "./users";
 import { maintenanceAllowsAutomation } from "@/lib/auth/maintenance";
 import { ADMIN_ROLE_CODES } from "@/lib/auth/permissions";
@@ -646,7 +654,14 @@ async function mergeDailyQuota(jobId: string, day: string, questIds: string[]): 
  * nó thêm một lần nữa, tức là không bao giờ nếu loại ấy vừa tắt máy. Mà đó chính là ca người ta
  * đổi lựa chọn để thoát ra.
  */
-export async function claimNextJob(workerId: string, scope: WorkerScope): Promise<JobRow | null> {
+export async function claimNextJob(
+  workerId: string,
+  scope: WorkerScope,
+  { settings: suppliedSettings, supportsQuestSchedules = false }: {
+    settings?: AppSettings;
+    supportsQuestSchedules?: boolean;
+  } = {},
+): Promise<JobRow | null> {
   const scopeFilter = scope.kind === "user" ? sql` and job.user_id = ${scope.userId}` : sql``;
 
   /**
@@ -665,7 +680,8 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
    * bảng quyền. `user_roles` có khoá chính `(user_id, role_code)` nên phép `exists` này đi bằng
    * tiền tố khoá chính, không thêm chỉ mục nào.
    */
-  const settings = await getAppSettings();
+  const settings = suppliedSettings ?? await getAppSettings();
+  if (!supportsQuestSchedules && settings.questSchedules.some(rule => rule.enabled)) return null;
   // Second line of defense, in case another service calls claimNextJob
   // directly rather than through /api/worker.
   if (scope.kind === "operator"
@@ -769,7 +785,7 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
     return null;
   }
 
-  const claimed = await db().execute(sql`
+  const claim = (database: Pick<ReturnType<typeof db>, "execute">) => database.execute(sql`
     with candidate as (
       select id from automation_jobs
       where id = ${decision.jobId}
@@ -793,7 +809,7 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
       -- thay vì bắt người dùng chịu thêm một vòng với ngọc giản cũ. Snapshot = cấu hình
       -- nhiệm vụ chung GHÉP cookie/hạng của đúng tài khoản job phục vụ; job đời cũ không
       -- gắn tài khoản rơi về nhánh giữa (config trần), rồi mới tới snapshot đông lạnh.
-      config_snapshot = coalesce(
+      config_snapshot = ${questScheduleSnapshot(sql`coalesce(
         (select uc.config || jsonb_build_object(
             'gameCookie', acc.cookie_envelope,
             'accountTier', acc.account_tier)
@@ -803,7 +819,9 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
            and acc.id = automation_jobs.account_id),
         (select config from user_configs where user_id = automation_jobs.user_id),
         automation_jobs.config_snapshot
-      ),
+      )`, supportsQuestSchedules
+        ? sql`jsonb_build_object(${QUEST_SCHEDULE_SNAPSHOT_VERSION_KEY}::text, 1)`
+        : undefined)},
       started_at = coalesce(started_at, now()),
       -- Vòng mới bắt đầu từ tờ giấy trắng. Không dọn ở đây thì tiến độ của vòng TRƯỚC
       -- (thường là "8/8, đang chạy nhiệm vụ cuối") còn nguyên trên hàng đợi suốt quãng linh
@@ -818,7 +836,14 @@ export async function claimNextJob(workerId: string, scope: WorkerScope): Promis
     returning automation_jobs.*
   `);
 
-  const row = (claimed.rows?.[0] ?? null) as Record<string, unknown> | null;
+  const claimed = supportsQuestSchedules ? await claim(db()) : await db().transaction(async (tx) => {
+    // An admin save takes the exclusive lock and checks existing leases. Recheck
+    // under the shared lock so a concurrent save cannot pass between read and claim.
+    await lockQuestScheduleRead(tx);
+    if ((await getQuestScheduleRules(tx)).some(rule => rule.enabled)) return null;
+    return claim(tx);
+  });
+  const row = (claimed?.rows[0] ?? null) as Record<string, unknown> | null;
   if (!row) {
     return null;
   }
@@ -1046,12 +1071,12 @@ export async function completeWorkerCycle(
   message: string,
   proposedDelaySeconds?: number,
   dailyReport?: { day: string; questIds: string[] },
+  scheduleWake?: { atMs: number; policyRevision?: string },
 ): Promise<WorkerCycleTransition | null> {
   const now = new Date();
   const delaySeconds = normalizeNextDelay(outcome, proposedDelaySeconds);
   const normalNextRunAt = new Date(now.getTime() + delaySeconds * 1000);
   const timerNextRunAt = await nextTimerActivationForJob(jobId, now);
-  const nextRunAt = timerNextRunAt && timerNextRunAt < normalNextRunAt ? timerNextRunAt : normalNextRunAt;
   const stopFromWorker = outcome === "stopped";
 
   // Tài khoản đã tắt (hoặc job đời cũ mà tài khoản không còn) thì vòng này là vòng cuối:
@@ -1065,7 +1090,13 @@ export async function completeWorkerCycle(
     )
   )`;
 
-  const updated = await db().execute(sql`
+  const updateCycle = (
+    database: Pick<ReturnType<typeof db>, "execute">,
+    candidateNextRunAt: Date,
+    hasScheduleDeferral = false,
+  ) => {
+    const nextRunAt = timerNextRunAt && timerNextRunAt < candidateNextRunAt ? timerNextRunAt : candidateNextRunAt;
+    return database.execute(sql`
     update automation_jobs set
       status = case
         when ${accountRetired} then 'stopped'::job_status
@@ -1091,7 +1122,7 @@ export async function completeWorkerCycle(
       end,
       -- Đàn xếp lại thì phải nhận ảnh cấu hình MỚI, y như mọi vòng bình thường: vòng vừa bị cắt
       -- mang ảnh của ngày cũ, và giữ lại nó là chạy tiếp cho cái ngày vừa qua.
-      config_snapshot = case
+      config_snapshot = ${questScheduleSnapshot(sql`case
         when not restart_after_stop and (status = 'stopping' or ${stopFromWorker} or ${accountRetired}) then config_snapshot
         else coalesce(
           (select uc.config || jsonb_build_object(
@@ -1104,7 +1135,11 @@ export async function completeWorkerCycle(
           (select config from user_configs where user_id = automation_jobs.user_id),
           config_snapshot
         )
-      end,
+      end`, hasScheduleDeferral ? sql`case
+        when not restart_after_stop and status = 'running' and not ${accountRetired}
+          then jsonb_build_object(${QUEST_SCHEDULE_WAITING_KEY}::text, true)
+        else '{}'::jsonb
+      end` : undefined)},
       -- Vòng đã xong thì không còn nhiệm vụ nào "đang chạy". Job quay về hàng chờ mà còn đeo
       -- tiến độ cũ sẽ hiện trên Hàng Đợi là "đang nghỉ — Mê Cung" suốt cả cooldown.
       cycle_progress = null,
@@ -1130,6 +1165,25 @@ export async function completeWorkerCycle(
       and status in ('running', 'stopping')
     returning status, next_run_at, attempts
   `);
+  };
+
+  const updated = outcome === "done" && scheduleWake ? await db().transaction(async (tx) => {
+    // A save wakes marked queued jobs. Serialize this update so a delayed
+    // response cannot put a job back to sleep using rules that were just changed.
+    await lockQuestScheduleRead(tx);
+    const rules = await getQuestScheduleRules(tx);
+    const nowMs = Date.now();
+    const hasCurrentOpening = rules.some(rule => rule.enabled)
+      && scheduleWake.policyRevision === questScheduleRevision(rules)
+      && scheduleWake.atMs > nowMs && scheduleWake.atMs <= nowMs + 86_400_000;
+    const scheduleNextRunAtMs = hasCurrentOpening
+      ? Math.max(nowMs + 30_000, scheduleWake.atMs)
+      : nowMs + 30_000;
+    const nextRunAt = new Date(Math.min(normalNextRunAt.getTime(), scheduleNextRunAtMs));
+    // Preserve the deferral even when another cooldown or timer wakes sooner.
+    // A schedule edit could move the blocked quest ahead of either wake.
+    return updateCycle(tx, nextRunAt, hasCurrentOpening);
+  }) : await updateCycle(db(), normalNextRunAt);
 
   const row = (updated.rows?.[0] ?? null) as Record<string, unknown> | null;
   if (!row) return null;

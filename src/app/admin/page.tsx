@@ -29,6 +29,7 @@ import { MembershipSettingsForm } from "./MembershipSettingsForm";
 import { UserTable } from "./UserTable";
 import { BroadcastPanel } from "./BroadcastPanel";
 import { CreateUserPanel } from "./CreateUserPanel";
+import { QuestScheduleForm } from "./QuestScheduleForm";
 
 export const metadata = { title: "Tông Môn" };
 export const maxDuration = 300;
@@ -178,6 +179,11 @@ export default async function AdminPage({
                   />
                 </div>
               ),
+            },
+            {
+              key: "quest",
+              label: "Quest",
+              pane: <QuestScheduleForm initialRules={settings.questSchedules} />,
             },
             {
               key: "banTin",

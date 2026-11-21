@@ -3,7 +3,7 @@
  * legal in-habitat point for the current seat; screen/world coordinates are not
  * interchangeable and no within-habitat hotspot has been established.
  */
-export async function prepareFishingSpot(page) {
+export async function prepareFishingSpot(page, actionTimeout = (ms) => ms) {
   const inspect = (ownSpotSheet = false) => page.evaluate((ownSpotSheet) => {
     const visible = el => {
       if (!el || !el.getClientRects().length) return false;
@@ -46,7 +46,9 @@ export async function prepareFishingSpot(page) {
 
   let sheet;
   try {
-    await page.locator(".fish-room .fish-spot").click({ timeout: 1500 });
+    const openTimeout = actionTimeout(1500);
+    if (openTimeout === null) return { ready: false, reason: "Ngoài khung giờ của Tông Môn." };
+    await page.locator(".fish-room .fish-spot").click({ timeout: openTimeout });
     sheet = page.locator(".sheet").filter({ has: page.locator(".fish-spots") }).last();
     await sheet.waitFor({ state: "visible", timeout: 1500 });
     const target = sheet.locator("button.fish-hab").filter({
@@ -57,7 +59,9 @@ export async function prepareFishingSpot(page) {
     state = await inspect(true);
     if (!state.idle || state.spectator || state.blocked || state.hunt || await target.count() !== 1)
       return { ready: false, reason: `Chưa xác định được điểm ${label} an toàn.` };
-    await target.click({ timeout: 1500 }); // Ge(event) requires a trusted click.
+    const selectTimeout = actionTimeout(1500);
+    if (selectTimeout === null) return { ready: false, reason: "Ngoài khung giờ của Tông Môn." };
+    await target.click({ timeout: selectTimeout }); // Ge(event) requires a trusted click.
     await page.waitForFunction((label) => {
       const spot = document.querySelector(".fish-room .fish-spot b");
       const open = [...document.querySelectorAll(".fish-spots")].some(el => el.getClientRects().length);
@@ -74,7 +78,10 @@ export async function prepareFishingSpot(page) {
     // Close only the spot sheet opened by this call. Never dismiss another
     // dialog or let Space cast through a failed spot selection.
     if (sheet && await sheet.isVisible().catch(() => false)) {
-      await sheet.locator('.sheet-head button[aria-label="Đóng"]').click({ timeout: 750 }).catch(() => {});
+      const timeout = actionTimeout(750);
+      if (timeout !== null) {
+        await sheet.locator('.sheet-head button[aria-label="Đóng"]').click({ timeout }).catch(() => {});
+      }
     }
   }
 }

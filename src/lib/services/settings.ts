@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { questSchedulesSchema, storedQuestSchedulesSchema, type QuestScheduleRule } from "@/lib/validation/questSchedules";
 import { workerAutoscaleSchema } from "@/lib/validation/workerAutoscale";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -22,6 +23,7 @@ import { DEFAULT_GAME_BASE_URL, normalizeGameBaseUrl } from "@/lib/quest-engine/
 import type { TagFrame } from "@/lib/validation/tags";
 import { mergeGithubBranch } from "@/lib/validation/githubSettingsMerge";
 import { withDatabaseDeadline } from "../db/deadline";
+import { lockQuestScheduleUpdate, assertNoLegacyQuestScheduleJobs, getQuestScheduleRules, questScheduleRevision, wakeQuestScheduleJobs } from "./questScheduleRollout";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   DEFAULT_COMPANION_COUNT,
@@ -97,6 +99,7 @@ const githubPrimarySourceSchema = githubNurtureTraceSchema.extend({
 });
 
 export const appSettingsSchema = z.object({
+  questSchedules: storedQuestSchedulesSchema,
   chat: z
     .object({
       /**
@@ -638,6 +641,11 @@ export async function getAppSettings(options: { deadlineAt?: number } = {}): Pro
 
   const parsed = appSettingsSchema.safeParse(rows[0]?.value ?? {});
   const settings = parsed.success ? parsed.data : appSettingsSchema.parse({});
+  // A malformed unrelated branch must not discard an administrator's restrictions.
+  if (!parsed.success) {
+    const raw = rows[0]?.value;
+    settings.questSchedules = storedQuestSchedulesSchema.parse(raw && typeof raw === "object" ? (raw as Record<string, unknown>).questSchedules : undefined);
+  }
   githubReadBaselines.set(settings, structuredClone({ githubStations: settings.githubStations, githubNurture: settings.githubNurture, workerAutoscale: settings.workerAutoscale }));
   return settings;
 }
@@ -663,8 +671,10 @@ export async function saveAppSettings(value: AppSettings): Promise<void> {
   const clean = appSettingsSchema.parse(value);
   const baseline = githubReadBaselines.get(value);
   await db().transaction(async (tx) => {
-    await tx.insert(schema.appSettings).values({ id: GLOBAL_ID, value: clean, updatedAt: new Date() }).onConflictDoNothing();
+    await tx.insert(schema.appSettings).values({ id: GLOBAL_ID, value: { ...clean, questSchedules: [] }, updatedAt: new Date() }).onConflictDoNothing();
     const [row] = await tx.select().from(schema.appSettings).where(eq(schema.appSettings.id, GLOBAL_ID)).for("update");
+    // Only the guarded branch writer may change scheduling, even for callers without a read baseline.
+    clean.questSchedules = storedQuestSchedulesSchema.parse((row.value as Record<string, unknown>).questSchedules);
     if (baseline) {
       const current = appSettingsSchema.parse(row.value);
       clean.githubStations = mergeGithubBranch(baseline.githubStations, clean.githubStations, current.githubStations) as AppSettings["githubStations"];
@@ -675,4 +685,22 @@ export async function saveAppSettings(value: AppSettings): Promise<void> {
   });
   // Keep the baseline paired with the caller's object, which may be saved again later.
   githubReadBaselines.set(value, structuredClone({ githubStations: value.githubStations, githubNurture: value.githubNurture, workerAutoscale: value.workerAutoscale }));
+}
+
+/** Atomic branch update: other admin forms/background writers keep their settings. */
+export async function saveQuestSchedules(rules: QuestScheduleRule[]): Promise<void> {
+  const clean = questSchedulesSchema.parse(rules);
+  await db().transaction(async (tx) => {
+    // Serialize with legacy claims: a rule cannot activate while one is being leased.
+    await lockQuestScheduleUpdate(tx);
+    if (clean.some(rule => rule.enabled)) await assertNoLegacyQuestScheduleJobs(tx);
+    const changed = questScheduleRevision(await getQuestScheduleRules(tx)) !== questScheduleRevision(clean);
+    await tx.insert(schema.appSettings).values({
+      id: GLOBAL_ID, value: appSettingsSchema.parse({ questSchedules: clean }), updatedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: schema.appSettings.id,
+      set: { value: sql`jsonb_set(${schema.appSettings.value}, '{questSchedules}', ${JSON.stringify(clean)}::jsonb, true)`, updatedAt: sql`now()` },
+    });
+    if (changed) await wakeQuestScheduleJobs(tx);
+  });
 }

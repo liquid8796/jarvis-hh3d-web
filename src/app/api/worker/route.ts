@@ -38,6 +38,7 @@ import {
   storedConfigSchema,
 } from "@/lib/services/configs";
 import { getAppSettings } from "@/lib/services/settings";
+import { getQuestScheduleRules, questScheduleRevision } from "@/lib/services/questScheduleRollout";
 import { isDrainingWorkerId } from "@/lib/validation/workerAutoscale";
 import { findById } from "@/lib/services/users";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
@@ -90,6 +91,7 @@ const bodySchema = z.discriminatedUnion("op", [
     workerId: z.string().min(1).max(64),
     runner: z.string().optional(),
     version: workerVersionSchema.optional(),
+    questSchedulesVersion: z.number().int().positive().optional(),
     /**
      * Trần ghế (`WORKER_MAX_JOBS`) của chính tiến trình đang hỏi việc — thứ bộ cân tải cần để
      * biết khôi lỗi nào còn chỗ mà chia việc tới.
@@ -130,6 +132,7 @@ const bodySchema = z.discriminatedUnion("op", [
      * một trạng thái sống mà số bản không bao giờ được cập nhật.
      */
     version: workerVersionSchema.optional(),
+    questSchedulesVersion: z.number().int().positive().optional(),
   }),
   z.object({
     op: z.literal("accountTier"),
@@ -158,6 +161,8 @@ const bodySchema = z.discriminatedUnion("op", [
     // Worker mới đọc cooldown thật của cả vòng; worker cũ không gửi trường này và server
     // dùng nhịp an toàn mặc định, nên deploy web là đủ để bản đang cài cũng tự lặp.
     nextDelaySeconds: z.number().int().min(30).max(24 * 3600).optional(),
+    questScheduleWakeAtMs: z.number().int().positive().optional(),
+    questSchedulePolicyRevision: z.string().regex(/^[a-f0-9]{64}$/).optional(),
     /**
      * Nhiệm vụ ngày vừa chứng minh là hết lượt trong vòng này, và NGÀY mà lời khai ấy thuộc
      * về (nguyên văn cái server phát ở `claim`). Cả hai đều optional: khôi lỗi đời cũ không
@@ -173,6 +178,11 @@ const bodySchema = z.discriminatedUnion("op", [
     dailyDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   }),
 ]);
+
+async function readQuestSchedulePolicy() {
+  const rules = await getQuestScheduleRules();
+  return { questSchedulePolicy: { rules, serverTimeMs: Date.now(), revision: questScheduleRevision(rules) } };
+}
 
 export async function POST(request: Request) {
   const scope = await authorizeWorker(request);
@@ -215,11 +225,14 @@ export async function POST(request: Request) {
       // Scale In is cooperative: stop assigning new work before asking this
       // process to finish its in-flight cycles and exit. Personal workers are
       // never affected. Keep recording heartbeat until the process leaves.
-      if (scope.kind === "operator") {
-        const state = (await getAppSettings()).workerAutoscale;
-        if (isDrainingWorkerId(state.drainingWorkerIds, body.workerId)) {
-          return NextResponse.json({ job: null, drain: true, webVersion: WEB_VERSION });
-        }
+      const settings = await getAppSettings();
+      const supportsQuestSchedules = body.questSchedulesVersion === 1;
+      if (scope.kind === "operator"
+          && isDrainingWorkerId(settings.workerAutoscale.drainingWorkerIds, body.workerId)) {
+        return NextResponse.json({ job: null, drain: true, webVersion: WEB_VERSION });
+      }
+      if (!supportsQuestSchedules && settings.questSchedules.some(rule => rule.enabled)) {
+        return NextResponse.json({ job: null, webVersion: WEB_VERSION });
       }
 
       // Bế quan trùng tu: đóng ĐÚNG MỘT cánh cửa, và cánh cửa ấy nằm TRONG `claimNextJob`
@@ -235,14 +248,10 @@ export async function POST(request: Request) {
       // trị sự vẫn phải chạy trong lúc bế quan (họ cần một vòng THẬT để nghiệm bản vừa vá). Phép
       // phân biệt ấy phải nằm trong câu truy vấn phát việc, cạnh `DISPATCH_CANDIDATES` — xem khối
       // bình chú ở `claimNextJob`. Giữ lại một cú chặn ở đây nữa là dựng hai cửa cho một luật.
-      const job = await claimNextJob(body.workerId, scope);
+      const job = await claimNextJob(body.workerId, scope, { settings, supportsQuestSchedules });
       if (!job) {
         return NextResponse.json({ job: null, webVersion: WEB_VERSION });
       }
-
-      // Đọc SAU cú thoát sớm, không phải trước: chỉ hồi đáp CÓ job mới cần `game.baseUrl`, mà
-      // lượt không có job nào là lượt thường gặp nhất — mọi khôi lỗi nhàn rỗi đều gõ cửa đều đặn.
-      const settings = await getAppSettings();
 
       // ĐÂY là điểm duy nhất cookie rời khỏi phong bì. Nó xảy ra sau khi khôi lỗi đã chứng
       // minh danh tính (token tông môn hoặc linh phù của đúng chủ job), và đi tiếp trên
@@ -325,6 +334,7 @@ export async function POST(request: Request) {
       // không cài lại, không sửa env, không deploy.
       return NextResponse.json({
         webVersion: WEB_VERSION,
+        ...(supportsQuestSchedules ? await readQuestSchedulePolicy() : {}),
         job: {
           id: job.id,
           userId: job.userId,
@@ -360,7 +370,11 @@ export async function POST(request: Request) {
 
       // `stopping` là tín hiệu người dùng đã bấm Thu Đàn; worker tự kết thúc ở điểm an toàn.
       const owner = await findById(beat.userId);
-      return NextResponse.json({ status: beat.status, fishingAccess: fishingAccessForUser(owner) });
+      return NextResponse.json({
+        status: beat.status,
+        fishingAccess: fishingAccessForUser(owner),
+        ...(body.questSchedulesVersion === 1 ? await readQuestSchedulePolicy() : {}),
+      });
     }
 
     case "accountTier": {
@@ -406,6 +420,10 @@ export async function POST(request: Request) {
         body.dailyDay && body.dailyCapQuestIds?.length
           ? { day: body.dailyDay, questIds: body.dailyCapQuestIds }
           : undefined,
+        body.questScheduleWakeAtMs === undefined ? undefined : {
+          atMs: body.questScheduleWakeAtMs,
+          policyRevision: body.questSchedulePolicyRevision,
+        },
       );
       if (!transition) {
         return NextResponse.json({ error: "job is no longer active" }, { status: 409 });

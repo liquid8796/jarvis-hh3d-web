@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import ts from "typescript";
 import * as configs from "../src/lib/services/configs";
+import { questScheduleRevision } from "../src/lib/services/questScheduleRollout";
 import * as permissions from "../src/lib/auth/permissions";
 import * as fishingAccess from "../src/lib/quest-engine/fishingAccess.mjs";
 import * as cookies from "../src/lib/quest-engine/cookies.mjs";
@@ -55,8 +56,9 @@ const dependencies: Record<string, unknown> = {
     assert.equal(id, "fixture-owner", "claim checks the job owner"); return currentUser;
   } },
   "@/lib/services/settings": { getAppSettings: async () => ({
-    game: { baseUrl: "https://example.invalid" }, workerAutoscale: { drainingWorkerIds: [] },
+    game: { baseUrl: "https://example.invalid" }, workerAutoscale: { drainingWorkerIds: [] }, questSchedules: [],
   }) },
+  "@/lib/services/questScheduleRollout": { getQuestScheduleRules: async () => [], questScheduleRevision },
   "@/lib/validation/pillBagCaps": pillBagCaps,
   "@/lib/validation/workerAutoscale": workerAutoscale,
   "@/lib/validation/accountWorkerPref": {},
@@ -121,7 +123,7 @@ async function claimAs(user: User | null, kind: "user" | "operator", expected: b
   snapshot = { ...enabled, accountTier: "vip", isAdmin: true, tags: ["VIP"], canFish: true };
   const response = await route.POST(new Request("http://localhost/api/worker", {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ op: "claim", workerId: "fixture-worker", userId: "admin", isAdmin: true, tags: ["VIP"], canFish: true }),
+    body: JSON.stringify({ op: "claim", workerId: "fixture-worker", questSchedulesVersion: 1, userId: "admin", isAdmin: true, tags: ["VIP"], canFish: true }),
   }));
   assert.equal(response.status, 200);
   const body = await response.json();
@@ -150,7 +152,7 @@ for (const kind of ["user", "operator"] as const) {
     currentUser = { ...makeUser([], ["VIP"]), tagExpirations: { vip: expiry } };
     const response = await route.POST(new Request("http://localhost/api/worker", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ op: "heartbeat", jobId: "00000000-0000-4000-8000-000000000001" }),
+      body: JSON.stringify({ op: "heartbeat", jobId: "00000000-0000-4000-8000-000000000001", questSchedulesVersion: 1 }),
     }));
     assert.equal(response.status, 200);
     const body = await response.json();

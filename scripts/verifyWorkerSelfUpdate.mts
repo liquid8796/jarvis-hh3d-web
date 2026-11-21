@@ -10,6 +10,7 @@
  * phần chạy thật thì phải đo trên máy Windows, và đã đo (xem CHANGELOG 1.3.29).
  */
 import { readFileSync } from "node:fs";
+import ts from "typescript";
 import {
   UPDATE_EXIT_CODE,
   selfUpdateEnabled,
@@ -116,13 +117,34 @@ check(
 
 console.log("\nMối nối phía máy chủ: bản của trạm phải đi kèm CẢ HAI lối trả của claim");
 const route = read("src/app/api/worker/route.ts");
-check("lối KHÔNG có job mang webVersion", /job: null, webVersion: WEB_VERSION/.test(route));
-check("lối CÓ job mang webVersion", /webVersion: WEB_VERSION,\r?\n\s+job: \{/.test(route));
+const routeAst = ts.createSourceFile("route.ts", route, ts.ScriptTarget.Latest, true);
+const claimResponses: ts.ObjectLiteralExpression[] = [];
+function findClaimResponses(node: ts.Node, inClaim = false) {
+  const claim = inClaim || (ts.isCaseClause(node) && ts.isStringLiteral(node.expression) && node.expression.text === "claim");
+  if (claim && ts.isCallExpression(node) && node.expression.getText(routeAst) === "NextResponse.json") {
+    const [body] = node.arguments;
+    if (body && ts.isObjectLiteralExpression(body)) claimResponses.push(body);
+  }
+  ts.forEachChild(node, child => findClaimResponses(child, claim));
+}
+function responseField(body: ts.ObjectLiteralExpression, name: string) {
+  return body.properties.find((property): property is ts.PropertyAssignment =>
+    ts.isPropertyAssignment(property) && property.name.getText(routeAst) === name,
+  )?.initializer;
+}
+findClaimResponses(routeAst);
+const idleClaims = claimResponses.filter(body => responseField(body, "job")?.kind === ts.SyntaxKind.NullKeyword);
+const occupiedClaims = claimResponses.filter(body => responseField(body, "job")?.kind === ts.SyntaxKind.ObjectLiteralExpression);
+const sendsVersion = (responses: ts.ObjectLiteralExpression[]) => responses.length > 0
+  && responses.every(body => responseField(body, "webVersion")?.getText(routeAst) === "WEB_VERSION");
+check("lối KHÔNG có job mang webVersion", sendsVersion(idleClaims));
+check("lối CÓ job mang webVersion", sendsVersion(occupiedClaims));
 check("WEB_VERSION lấy từ package.json, không phải hằng gõ tay", /const WEB_VERSION = pkg\.version/.test(route));
 
 console.log("\nMối nối phía khôi lỗi");
 const worker = read("scripts/worker.mjs");
-check("đọc webVersion từ hồi đáp claim", /const \{ job, webVersion(?:, drain)? \} = await call\("claim"/.test(worker));
+check("đọc webVersion từ hồi đáp claim", /const\s*\{[^}]*\bwebVersion\b[^}]*\}\s*=\s*await call\("claim"/.test(worker)
+  && /shouldSelfUpdate\(\{[^}]*\bweb:\s*webVersion\b/.test(worker));
 check("hỏi luật rồi mới thu đàn", /shouldSelfUpdate\(\{/.test(worker) && /beginDrain\(xet\.reason\)/.test(worker));
 check("thoát bằng đúng mã ấy khi thu xong", /process\.exitCode = UPDATE_EXIT_CODE/.test(worker));
 check(

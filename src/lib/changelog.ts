@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.260",
+    date: "2026-11-21",
+    lines: [
+      "Thêm tab Quest trong Tông Môn để admin đặt các khung giờ chạy hằng ngày cho từng nhiệm vụ, kể cả khung qua nửa đêm.",
+      "Ngoài giờ cho phép, nhiệm vụ tạm dừng dù đạo hữu đã bật Auto; các nhiệm vụ khác vẫn tiếp tục và không mất lựa chọn đã lưu.",
+    ],
+  },
+  {
     version: "1.3.259",
     date: "2026-11-20",
     lines: [
@@ -490,15 +498,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Mê Cung nay cho chọn làm chủ phòng hoặc thành viên; áp dụng cho cả VIP và tài khoản thường.",
       "Có thể lọc độ khó, nhập mã phòng, chọn thời gian chờ và tự tìm phòng khác nếu bị trục xuất.",
       "Khôi lỗi tự bật các chế độ hỗ trợ khi vào phòng và kiểm tra Huyền Tinh đúng ngày.",
-    ],
-  },
-  {
-    version: "1.3.210",
-    date: "2026-10-24",
-    lines: [
-      "Ollama và Reflection được chờ tối đa 5 phút cho mỗi yêu cầu AI thay vì 1 phút.",
-      "Lượt nuôi kho GitHub và lịch chạy OCI được nới giới hạn tương ứng để không ngắt model quá sớm.",
-      "Các khóa đã nhập và cấu hình đang dùng được giữ nguyên; những lượt chạy ngắn vẫn được bảo vệ.",
     ],
   },
 ];

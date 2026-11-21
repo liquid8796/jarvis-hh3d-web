@@ -75,6 +75,51 @@ export function createSession(page, options) {
   const minDelay = Math.max(0, options.minActionDelayMs ?? 700);
   const maxDelay = Math.max(minDelay + 1, options.maxActionDelayMs ?? 1800);
   const pageTimeoutMs = options.pageTimeoutMs ?? 45_000;
+  const actionTimeout = (timeoutMs, durationMs = 0) => {
+    const state = options.questScheduleState?.();
+    if (state?.allowed === false) return null;
+    const cutoff = state?.closesAt ?? Infinity;
+    if (!Number.isFinite(cutoff)) return timeoutMs;
+    const remaining = Math.floor(cutoff - state.nowMs);
+    return remaining <= durationMs ? null : Math.min(remaining, timeoutMs > 0 ? timeoutMs : Infinity);
+  };
+  const guardedClick = async (click, timeoutMs, durationMs = 0) => {
+    const deadline = timeoutMs > 0 ? performance.now() + timeoutMs : Infinity;
+    let ready = false;
+    for (;;) {
+      const remaining = Math.ceil(deadline - performance.now());
+      if (remaining <= 0) return false;
+      const timeout = actionTimeout(remaining, durationMs);
+      if (timeout === null) return false;
+      if (ready || timeout >= remaining) {
+        await click({ timeout: Number.isFinite(timeout) ? timeout : timeoutMs });
+        return true;
+      }
+
+      // A policy refresh can extend the lease while the element finishes loading.
+      // Only retry actionability checks. An actual click can have sent input even if it throws.
+      try {
+        await click({ timeout, trial: true });
+        ready = true;
+      } catch (err) {
+        if (err?.name !== "TimeoutError") throw err;
+      }
+    }
+  };
+  const resetQuestPage = async () => {
+    try {
+      await page.goto("about:blank", { waitUntil: "commit", timeout: 1500 });
+      return true;
+    } catch {
+      await page.close().catch(() => {});
+      return false;
+    }
+  };
+  const releaseInput = async (release) => {
+    // Releasing over the game can trigger a cast. Disconnect first.
+    if (actionTimeout(1) === null && !await resetQuestPage()) return;
+    await release().catch(() => {});
+  };
   let fishTelemetryActive = false;
   let fishSocket = null;
   const fishingTelemetry = createFishingTelemetry();
@@ -221,7 +266,7 @@ export function createSession(page, options) {
         Number(style.opacity || "1") > 0.01;
     });
     if (gatePresent) return castFailed("Màn Vào Ngay chưa đóng; không ném câu vào game nằm sau lớp phủ.");
-    const spot = await prepareFishingSpot(page);
+    const spot = await prepareFishingSpot(page, actionTimeout);
     if (!spot.ready) {
       // A late bite/reel transition is not a failed cast. Keep the next tick
       // free to hook/reel instead of installing a five-second cast backoff.
@@ -239,6 +284,7 @@ export function createSession(page, options) {
     }
     const x = bounds.x + bounds.width / 2;
     const y = bounds.y + bounds.height / 2;
+    const pressDuration = Math.max(90, Math.min(350, pressMs || 150));
     let held = false;
     try {
       await page.mouse.move(x, y);
@@ -246,11 +292,12 @@ export function createSession(page, options) {
         if (await readFishCastState() === "accepted") return false;
         return castFailed("Trò chơi không còn sẵn sàng ném; không bấm qua lớp phủ.");
       }
+      if (actionTimeout(1, pressDuration) === null) return false;
       await page.mouse.down();
       held = true;
-      await delayFish(Math.max(90, Math.min(350, pressMs || 150)));
+      await delayFish(pressDuration);
     } finally {
-      if (held) await page.mouse.up().catch(() => {});
+      if (held) await releaseInput(() => page.mouse.up());
     }
     let observed = await watchFishCast(before);
     if (observed === "accepted") return castConfirmed();
@@ -259,18 +306,21 @@ export function createSession(page, options) {
     // The client's source registers keydown/keyup Space as the SAME trusted
     // fa/_i handlers. It bypasses pointer interception without forging packets.
     const beforeSpace = sentFishCasts;
-    await page.locator(".fish-room .fish-main").focus({ timeout: 1500 });
+    const focusTimeout = actionTimeout(1500, 110);
+    if (focusTimeout === null) return false;
+    await page.locator(".fish-room .fish-main").focus({ timeout: focusTimeout });
     if (!await readFishInputReadiness()) {
       if (await readFishCastState() === "accepted") return castConfirmed();
       return castFailed("Trò chơi không còn sẵn sàng ném; bỏ qua Space.");
     }
     let down = false;
     try {
+      if (actionTimeout(1, 110) === null) return false;
       await page.keyboard.down("Space");
       down = true;
       await delayFish(110);
     } finally {
-      if (down) await page.keyboard.up("Space").catch(() => {});
+      if (down) await releaseInput(() => page.keyboard.up("Space"));
     }
     observed = await watchFishCast(beforeSpace);
     if (observed === "accepted") return castConfirmed();
@@ -363,6 +413,7 @@ export function createSession(page, options) {
             lookaheadSeconds: gauge.lookaheadSeconds
           }) : false;
           if (desired !== holding) {
+            if (shouldStop() || actionTimeout(1) === null) break;
             if (desired) { await page.mouse.down(); holds++; }
             else await page.mouse.up();
             holding = desired;
@@ -374,9 +425,7 @@ export function createSession(page, options) {
         if (fishFight && fishFight.enteredAt === null) fishFight.skipped = "lỗi chuẩn bị thao tác kéo";
         log.debug("fish reel: " + squashCallLog(err instanceof Error ? err.message : String(err)));
       } finally {
-        if (holding) {
-          try { await page.mouse.up(); } catch { /* page closed during Thu Đàn */ }
-        }
+        if (holding) await releaseInput(() => page.mouse.up());
         const finalGauge = fishingTelemetry.current(Date.now());
         if (finalGauge) maxProgress = Math.max(maxProgress, finalGauge.p);
         log.debug(`Câu Cá: kết thúc kéo; ${gaugeSamples} mẫu hợp lệ, ${holds} lần giữ, tiến độ tối đa ${Math.round(maxProgress * 100)}%.`);
@@ -385,6 +434,7 @@ export function createSession(page, options) {
 
     page,
     page,
+    resetQuestPage,
 
     /**
      * Nghỉ bao lâu sau mỗi cú bấm trong lượt quét theo nhãn — lấy từ chính nhịp người dùng
@@ -409,6 +459,7 @@ export function createSession(page, options) {
      * "đang ở đúng trang rồi" chính xác là trường hợp KHÔNG được phép bỏ qua tải lại.
      */
     async navigate(url) {
+      if (actionTimeout(1) === null) return { ok: false, error: "Ngoài khung giờ của Tông Môn." };
       try {
         if (sameUrl(page.url(), url)) {
           await page.reload({ waitUntil: "domcontentloaded", timeout: pageTimeoutMs });
@@ -441,7 +492,10 @@ export function createSession(page, options) {
      * nào. Bọc rồi kiểm `typeof` phục hồi đúng ngữ nghĩa bản desktop, và vẫn để nguyên
      * những script viết dạng biểu thức thuần.
      */
-    async evaluate(fnOrSource, arg) {
+    async evaluate(fnOrSource, arg, guardDelayedActions = false) {
+      const dispatchedAt = Date.now();
+      const remaining = actionTimeout(Infinity);
+      if (remaining === null) return undefined;
       try {
         if (typeof fnOrSource === "string") {
           const queue = fishBagReceipts;
@@ -460,7 +514,15 @@ export function createSession(page, options) {
               }
               window.__jvzFishReceipts = (window.__jvzFishReceipts || []).concat(${JSON.stringify(receipts)}).slice(-32);`
             : "";
-          const source = `(() => { ${delivery} const v = (${fnOrSource}); return typeof v === "function" ? v() : v; })()`;
+          // Apply the deadline in the renderer as well, including delayed callbacks scheduled by a quest.
+          const cutoff = dispatchedAt + remaining;
+          const scheduled = Number.isFinite(cutoff) ? `if (Date.now() >= ${cutoff}) return;` : "";
+          const timers = guardDelayedActions && Number.isFinite(cutoff)
+            ? `const setTimeout = (fn, ms, ...args) => globalThis.setTimeout(() => {
+                 if (Date.now() < ${cutoff}) fn(...args);
+               }, ms);`
+            : "";
+          const source = `(() => { ${scheduled} ${timers} ${delivery} const v = (${fnOrSource}); return typeof v === "function" ? v() : v; })()`;
           const result = await page.evaluate(source);
           queue.splice(0, receipts.length);
           return result;
@@ -477,6 +539,7 @@ export function createSession(page, options) {
 
     async waitForSelector(selector, timeoutMs) {
       if (!selector || !selector.trim()) return false;
+      if (actionTimeout(1) === null) return false;
       try {
         await page.waitForSelector(selector, { timeout: timeoutMs, state: "visible" });
         return true;
@@ -495,16 +558,21 @@ export function createSession(page, options) {
      */
     async click(selector, timeoutMs, force = false, pressMs = 0) {
       if (!selector || !selector.trim()) return false;
+      const delay = Math.max(0, Math.min(1000, pressMs));
       try {
         if (selector.includes(".fish-main.st-idle.jvz-fish-press")) {
+          if (actionTimeout(1, delay) === null) return false;
           try { return await trustedFishCast(pressMs); }
           catch (err) {
             return castFailed("Lỗi gửi thao tác thật: " +
               squashCallLog(err instanceof Error ? err.message : String(err)));
           }
         }
-        await page.click(selector, { timeout: timeoutMs, force, delay: Math.max(0, Math.min(1000, pressMs)) });
-        return true;
+        return await guardedClick(
+          (options) => page.click(selector, { ...options, force, delay }),
+          timeoutMs,
+          delay,
+        );
       } catch (err) {
         if (selector.trim() === FISHING_HOOK_SELECTOR) {
           await diagnoseFishingHookFailure(page, err, log);
@@ -518,8 +586,10 @@ export function createSession(page, options) {
     async clickByText(text, timeoutMs) {
       if (!text || !text.trim()) return false;
       try {
-        await page.getByText(text, { exact: false }).first().click({ timeout: timeoutMs });
-        return true;
+        return await guardedClick(
+          (options) => page.getByText(text, { exact: false }).first().click(options),
+          timeoutMs,
+        );
       } catch {
         return false;
       }
@@ -565,8 +635,7 @@ export function createSession(page, options) {
 
         if (target < 0) return false;
 
-        await options.nth(target).click({ timeout: timeoutMs });
-        return true;
+        return await guardedClick((clickOptions) => options.nth(target).click(clickOptions), timeoutMs);
       } catch {
         return false;
       }

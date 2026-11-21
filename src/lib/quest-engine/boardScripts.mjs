@@ -25,6 +25,7 @@ export async function labelMatchSweep(args) {
   const matchTexts = cfg.matchTexts ?? [];
   const postClickWaitMs = cfg.postClickWaitMs ?? 1400;
   const maxClicks = cfg.maxClicks ?? 15;
+  const mayClick = () => cfg.closesAt == null || Date.now() < cfg.closesAt;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const nfc = (s) => (s && s.normalize ? s.normalize("NFC") : s || "");
   const norm = (s) => nfc(s).replace(/\s+/g, " ").trim().toLowerCase();
@@ -154,6 +155,7 @@ export async function labelMatchSweep(args) {
 
       const root = roots.find((r) => r.contains(target)) ?? roots[0];
       lastPopup = norm(root.innerText || root.textContent || "").slice(0, 160) || lastPopup;
+      if (!mayClick()) return;
       try {
         target.click();
         if (pos) confirmed++;
@@ -173,7 +175,7 @@ export async function labelMatchSweep(args) {
 
   await settlePopups(); // clear any leftover popup first
 
-  for (let pass = 0; pass < maxClicks; pass++) {
+  for (let pass = 0; pass < maxClicks && mayClick(); pass++) {
     const nodes = collect();
     let actedThisPass = false;
 
@@ -194,6 +196,7 @@ export async function labelMatchSweep(args) {
 
       try {
         el.scrollIntoView({ block: "center" });
+        if (!mayClick()) break;
         el.click();
         clicked++;
         clickedLabels.add(label);

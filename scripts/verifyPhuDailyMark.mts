@@ -220,7 +220,7 @@ for (const quest of twins) {
   check(
     "runCycle đưa sổ ngày xuống phép dịch cấu hình — bằng không dấu ghi rồi cũng không ai đọc",
     // Không dùng `[^)]*`: chính lời gọi ấy có một arrow function nên đã có `)` nằm giữa đường.
-    /profileForConfig\(.*dailyDone\?\.questIds\)/.test(runCycleSrc),
+    /profileForConfig\(.*dailyDone\?\.questIds\s*[,)]/.test(runCycleSrc),
   );
 }
 

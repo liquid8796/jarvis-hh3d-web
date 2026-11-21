@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /**
  * Khung tab của trang Tông Môn. Nội dung từng tab là server-render sẵn và truyền vào làm
@@ -22,6 +22,13 @@ export function AdminTabs({
     tabs.some((tab) => tab.key === initialKey) ? (initialKey ?? firstKey) : firstKey,
   );
   const activeKey = tabs.some((tab) => tab.key === active) ? active : firstKey;
+
+  const activeTab = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const options = { block: "nearest", inline: "nearest", container: "nearest" } as const;
+    activeTab.current?.scrollIntoView(options);
+  }, [activeKey]);
 
   function openTab(key: string) {
     setActive(key);
@@ -51,6 +58,7 @@ export function AdminTabs({
         {tabs.map((t) => (
           <button
             key={t.key}
+            ref={activeKey === t.key ? activeTab : undefined}
             type="button"
             onClick={() => openTab(t.key)}
             aria-pressed={activeKey === t.key}

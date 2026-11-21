@@ -245,7 +245,7 @@ export function turnstileCheckboxPoint(box, rand = Math.random) {
  * máy móc hơn một cú click tại chỗ. Click qua TOẠ ĐỘ trang nên xuyên được iframe khác gốc (sự
  * kiện chuột theo toạ độ không cần với vào trong frame).
  */
-export async function attemptTurnstileClick(page, { rand = Math.random } = {}) {
+export async function attemptTurnstileClick(page, { rand = Math.random, canClick = () => true } = {}) {
   let handle;
   try {
     handle = await page.$(TURNSTILE_IFRAME_SELECTOR);
@@ -264,7 +264,9 @@ export async function attemptTurnstileClick(page, { rand = Math.random } = {}) {
     await page.mouse.move(startX, startY);
     await page.mouse.move(point.x, point.y, { steps: 12 + Math.floor(rand() * 10) });
     await mouseSleep(120 + Math.floor(rand() * 240));
-    await page.mouse.click(point.x, point.y, { delay: 40 + Math.floor(rand() * 90) });
+    const delay = 40 + Math.floor(rand() * 90);
+    if (!canClick(delay)) return { clicked: false, note: "đã hết khung giờ chạy nhiệm vụ" };
+    await page.mouse.click(point.x, point.y, { delay });
     return { clicked: true, note: `đã bấm (${Math.round(point.x)}, ${Math.round(point.y)})` };
   } catch (err) {
     return { clicked: false, note: `bấm hỏng: ${errMsg(err)}` };
@@ -656,6 +658,7 @@ export async function runCycle(deps) {
     reportProgress = () => {},
     shouldStop = () => false,
     canFish = () => true,
+    questScheduleGate = null,
     // `baseUrl` truyền thẳng là nấc cao nhất (smoke/chẩn đoán). Khi không có nó, origin cấu
     // hình còn được wrapper cookie tự sửa sang TLD mới của CÙNG site ở ngay dưới đây.
     baseUrl: explicitBaseUrl,
@@ -762,6 +765,36 @@ export async function runCycle(deps) {
     return { keep, skipped };
   };
 
+  const scheduleStateFor = (questId) => questScheduleGate?.state(questId);
+  const nextScheduleWake = (plan) => {
+    let wake = null;
+    for (const quest of plan) {
+      const state = scheduleStateFor(quest.id);
+      if (state?.allowed === false && state.nextOpenAt !== null) {
+        if (wake === null || state.nextOpenAt < wake.questScheduleWakeAtMs) {
+          wake = {
+            nextDelaySeconds: Math.max(30, Math.ceil((state.nextOpenAt - state.nowMs) / 1000)),
+            questScheduleWakeAtMs: state.nextOpenAt,
+            questSchedulePolicyRevision: questScheduleGate.revision?.(),
+          };
+        }
+      }
+    }
+    return wake;
+  };
+  const withDailyResetWake = (delay, hasCappedQuests) =>
+    hasCappedQuests ? Math.min(delay, delayUntilDailyReset(dailyDone?.resetsInSeconds)) : delay;
+
+  const scheduleWaitResult = (plan, hasCappedQuests) => {
+    const wake = nextScheduleWake(plan);
+    return {
+      outcome: "done",
+      message: "Các quest đang bật chưa được phép chạy theo lịch của Tông Môn.",
+      ...wake,
+      nextDelaySeconds: withDailyResetWake(wake?.nextDelaySeconds ?? 30, hasCappedQuests),
+    };
+  };
+
   /**
    * Vòng hiện tại không còn gì để làm. Nếu một quest khác đang bị lịch hẹn gác tới LÁT NỮA
    * trong cùng ngày thì phải thức ở mốc ấy; chỉ khi không còn mốc nào sớm hơn mới ngủ tới reset.
@@ -795,10 +828,16 @@ export async function runCycle(deps) {
    */
   const provenTier =
     config.accountTier === "vip" ? true : config.accountTier === "free" ? false : null;
+  const presumed = provenTier === null ? enabled : questsForAccount(profile, { isVip: provenTier });
+  const { keep: eligibleBeforeBrowser, skipped } = splitPlanForToday(presumed);
+  if (shouldStop()) {
+    return { outcome: "stopped", message: "Đã thu đàn trước khi chạy nhiệm vụ." };
+  }
+  if (eligibleBeforeBrowser.length > 0 && eligibleBeforeBrowser.every((quest) => scheduleStateFor(quest.id)?.allowed === false)) {
+    return scheduleWaitResult(eligibleBeforeBrowser, skipped.length > 0);
+  }
   if (provenTier !== null) {
-    const presumed = questsForAccount(profile, { isVip: provenTier });
-    const { keep, skipped } = splitPlanForToday(presumed);
-    if (presumed.length > 0 && keep.length === 0) {
+    if (presumed.length > 0 && eligibleBeforeBrowser.length === 0) {
       await say(
         `Đã đủ lượt hôm nay cả ${skipped.length} nhiệm vụ (${skipped.map((q) => q.name).join(" · ")}) — ` +
           "vòng này không mở trình duyệt.",
@@ -832,6 +871,7 @@ export async function runCycle(deps) {
   let done = 0;
   let failed = 0;
   const results = [];
+  let activeQuestSchedule = null;
 
   try {
     // Chỉ tiêm cookie khi hồ sơ CHƯA có phiên đăng nhập — đúng luật của desktop
@@ -865,6 +905,7 @@ export async function runCycle(deps) {
 
     const session = createSession(page, {
       baseUrl,
+      questScheduleState: () => activeQuestSchedule?.(),
       log: {
         info: (m) => log.info("Trình duyệt", m),
         warning: (m) => log.warning("Trình duyệt", m),
@@ -976,6 +1017,9 @@ export async function runCycle(deps) {
     if (quests.length === 0) {
       return nothingLeftToday(skippedToday);
     }
+    if (quests.every((quest) => scheduleStateFor(quest.id)?.allowed === false)) {
+      return scheduleWaitResult(quests, skippedToday.length > 0);
+    }
 
     /**
      * Nhiệm vụ nào VỪA khai là đã đủ lượt hôm nay — server nhận ở cuối vòng rồi ghi vào sổ, để
@@ -984,7 +1028,8 @@ export async function runCycle(deps) {
      */
     const cappedToday = [];
 
-    await say(`Sẽ hành sự: ${quests.map((q) => q.name).join(" · ")}.`);
+    const currentlyPermitted = quests.filter((quest) => scheduleStateFor(quest.id)?.allowed !== false);
+    await say(`Sẽ hành sự: ${currentlyPermitted.map((q) => q.name).join(" · ")}.`);
 
     // Tiến độ vòng này, cho Hàng Đợi Công Việc. `runningNow` là SỐ NHIỀU vì nhánh song song
     // có thể cầm tới ba nhiệm vụ cùng lúc — báo cáo một cái là nói dối về hai cái kia.
@@ -1003,6 +1048,14 @@ export async function runCycle(deps) {
     let finished = 0;
     const publishProgress = () =>
       reportProgress({ running: [...runningNow.values()], done: finished, total: quests.length });
+
+    const scheduleDeferred = [];
+    const deferQuest = async (quest, state) => {
+      scheduleDeferred.push(quest);
+      finished++;
+      publishProgress();
+      await say(`${quest.name}: ${state?.message || "Ngoài khung giờ của Tông Môn."}`);
+    };
 
     // Phát ngay một lần: từ đây tới lúc nhiệm vụ đầu tiên vào tay còn cả quãng mở tab và
     // dựng trang, và trong quãng đó hàng đợi nên nói "0/8" thay vì không nói gì.
@@ -1036,7 +1089,13 @@ export async function runCycle(deps) {
       const clearChallenge = !solveTurnstile
         ? null
         : async (sess) => {
-            const res = await attemptTurnstileClick(sess.page);
+            if (activeQuestSchedule?.()?.allowed === false) return { cleared: false, clicked: false };
+            const res = await attemptTurnstileClick(sess.page, {
+              canClick: (durationMs) => {
+                const state = activeQuestSchedule?.();
+                return state?.allowed !== false && (state?.closesAt == null || state.closesAt - state.nowMs > durationMs);
+              },
+            });
             if (!res.clicked) {
               log.debug("Sẵn sàng", `Không bấm được ô kiểm tra giữa vòng: ${res.note}.`);
               return { cleared: false, clicked: false };
@@ -1045,7 +1104,7 @@ export async function runCycle(deps) {
             // Cloudflare cần vài giây để đổi trang sau một cú bấm hợp lệ; hỏi lại vài nhịp thay
             // vì kết luận ngay, nhưng có HẠN để một màn không bao giờ qua đừng giữ ghế mãi.
             const deadlineAt = Date.now() + TURNSTILE_CLEAR_WAIT_MS;
-            while (Date.now() < deadlineAt) {
+            while (Date.now() < deadlineAt && activeQuestSchedule?.()?.allowed !== false) {
               await new Promise((r) => setTimeout(r, TURNSTILE_CLEAR_POLL_MS));
               const again = await sess.evaluate(readinessProbe);
               if (again && again.challenge !== true) return { cleared: true, clicked: true };
@@ -1053,7 +1112,10 @@ export async function runCycle(deps) {
             return { cleared: false, clicked: true };
           };
 
-      const engine = createQuestEngine({ log, shouldStop, canFish, quiz, clickTurnstile: clearChallenge });
+      const engine = createQuestEngine({
+        log, shouldStop, canFish, quiz, clickTurnstile: clearChallenge,
+        questScheduleState: () => activeQuestSchedule?.(),
+      });
 
       for (const quest of quests) {
         if (shouldStop()) {
@@ -1072,6 +1134,18 @@ export async function runCycle(deps) {
           };
         }
 
+        let blocked;
+        const currentSchedule = () => {
+          if (blocked) return blocked;
+          const current = scheduleStateFor(quest.id);
+          if (current?.allowed === false) blocked = current;
+          return current;
+        };
+        if (currentSchedule()?.allowed === false) {
+          await deferQuest(quest, blocked);
+          continue;
+        }
+
         // Tuần tự trong đàn NÀY không có nghĩa là một mình trên máy: các đàn khác của cùng
         // khôi lỗi vẫn chạy cạnh bên, nên nhánh này cũng phải qua cổng toàn cục như ai.
         const slot = await acquireQuestSlot({
@@ -1079,7 +1153,7 @@ export async function runCycle(deps) {
           // Độc quyền theo TÊN, server chỉ định (Mê Cung trên ghế chung) — xem đầu questGate.mjs.
           exclusive: soloNames.has(quest.name),
           name: quest.name,
-          shouldStop,
+          shouldStop: () => shouldStop() || currentSchedule()?.allowed === false,
           onWait: ({ holder }) =>
             log.debug(
               `Quest:${quest.name}`,
@@ -1088,17 +1162,26 @@ export async function runCycle(deps) {
                 : "xếp hàng ở cổng điều phối — một nhiệm vụ trang riêng đang đợi phía trước.",
             ),
         });
-        if (slot.aborted) {
+        if (shouldStop()) {
+          slot.release?.();
           return { outcome: "stopped", message: `Đã thu đàn giữa chừng — xong ${done}/${quests.length}.` };
         }
+        if (slot.aborted || currentSchedule()?.allowed === false) {
+          slot.release?.();
+          await deferQuest(quest, blocked);
+          continue;
+        }
 
+        activeQuestSchedule = currentSchedule;
         runningNow.set(quest.id, quest.name);
         publishProgress();
 
         let outcome;
         try {
           outcome = await engine.run(session, profile, quest);
-          await observePillBagCapacity(session, quest.id, reportPillBagCaps);
+          if (currentSchedule()?.allowed !== false) {
+            await observePillBagCapacity(session, quest.id, reportPillBagCaps);
+          }
         } catch (err) {
           if (err instanceof QuestAborted) {
             return { outcome: "stopped", message: `Đã thu đàn giữa chừng — xong ${done}/${quests.length}.` };
@@ -1116,10 +1199,29 @@ export async function runCycle(deps) {
           }
           throw err;
         } finally {
+          activeQuestSchedule = null;
           slot.release();
           // Rời tay ở mọi ngả. Hai ngả bất thường (Thu Đàn, lỗi ném ra) đều kết thúc cả vòng
           // ngay sau đây, nên `finished` chỉ cộng trên đường đi bình thường bên dưới.
           runningNow.delete(quest.id);
+        }
+
+        // Preserve completed sub-actions when a schedule closes before the quest finishes.
+        for (const mark of outcome.dailyMarks ?? []) {
+          if (!cappedToday.includes(mark)) cappedToday.push(mark);
+        }
+        if (outcome.scheduleDeferred) {
+          const reset = await session.resetQuestPage();
+          await deferQuest(quest, { message: outcome.message });
+          if (!reset) {
+            return {
+              outcome: "done",
+              message: "Đã ngắt lượt sau khi hết khung giờ. Các quest còn lại sẽ được kiểm tra lại.",
+              nextDelaySeconds: 30,
+              dailyCapQuestIds: cappedToday,
+            };
+          }
+          continue;
         }
 
         finished++;
@@ -1143,10 +1245,6 @@ export async function runCycle(deps) {
          * `splitPlanForToday` lọc lại bằng `isDailyQuotaQuest` nên một dấu không bao giờ
          * cắt nhầm nhiệm vụ nào.
          */
-        for (const mark of outcome.dailyMarks ?? []) {
-          if (!cappedToday.includes(mark)) cappedToday.push(mark);
-        }
-
         const shape = OUTCOME_TEXT[outcome.outcome] ?? OUTCOME_TEXT.skipped;
         await say(`${quest.name}: ${shape.say(outcome)}`, shape.level);
 
@@ -1164,12 +1262,26 @@ export async function runCycle(deps) {
       );
     }
 
+    const reopenSoon = scheduleDeferred.some((quest) => {
+      const state = scheduleStateFor(quest.id);
+      return state?.allowed === true || state?.nextOpenAt === null;
+    });
+    const scheduledWake = nextScheduleWake(scheduleDeferred);
+    const scheduleDelay = reopenSoon ? 30 : scheduledWake?.nextDelaySeconds ?? Infinity;
+    const completedToday = new Set([...doneToday, ...cappedToday]);
+    const normalDelay = completedCycleDelaySeconds(quests, results, completedToday);
+    const nextDelaySeconds = withDailyResetWake(
+      results.length === 0 && Number.isFinite(scheduleDelay) ? scheduleDelay : Math.min(normalDelay, scheduleDelay),
+      scheduleDeferred.length > 0 && tierPlan.some((quest) => skipQuestForToday(quest, completedToday)),
+    );
     return {
       outcome: "done",
       message: failed > 0
         ? `Đi hết một vòng — ${done} thuận, ${failed} trắc trở.`
         : `Đi hết một vòng — ${done} nhiệm vụ thuận lợi.`,
-      nextDelaySeconds: completedCycleDelaySeconds(quests, results, [...doneToday, ...cappedToday]),
+      // An admin edit can move the deferred quest's opening ahead of the next normal cooldown.
+      ...scheduledWake,
+      nextDelaySeconds,
       dailyCapQuestIds: cappedToday,
     };
   } finally {

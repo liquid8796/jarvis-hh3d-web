@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.260 — Administrator quest availability windows (21/11/2026)
+
+- Add /admin?tab=quest with a validated editor for daily UTC+7 windows, multiple intervals and overnight ranges across all 15 logical quests. VIP/free variants share policy; user switches and personal timers remain independent.
+- Persist the global branch atomically. Serialize legacy claims against activation, preserve schedules during unrelated settings saves and refuse activation while unsupported jobs are still running instead of cancelling them.
+- Send authoritative policy on worker claim and heartbeat. Evaluate time with a monotonic server clock, conservative request latency and bounded snapshot freshness; recheck queued starts and browser actions, stop only the restricted quest, and retain daily side-effect marks.
+- Requeue at the next opening and revise schedule-specific waits after edits without bypassing daily quota. Add offline model, storage, API, worker/interpreter and Chromium admin regressions.
+
 ## 1.3.259 — Respect selected provider for GitHub profile enrichment (20/11/2026)
 
 - Fix githubProfileEnrichment calling Ollama unconditionally even when githubNurture.provider is Reflection. Select the configured client without fallback and request JSON mode with enough output tokens for Reflection.

@@ -31,6 +31,7 @@ import { mkdir } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { runCycle } from "../src/lib/quest-engine/runCycle.mjs";
 import { createFishingAccessGate } from "../src/lib/quest-engine/fishingAccess.mjs";
+import { createQuestScheduleGate } from "../src/lib/quest-engine/questSchedules.mjs";
 import { profileDirForJob, sweepStaleProfiles } from "../src/lib/quest-engine/browserProfile.mjs";
 import { createWorkerCall } from "../src/lib/worker/controlFollow.mjs";
 import { createOfficialDnsCachedFetch } from "../src/lib/worker/dnsCache.mjs";
@@ -70,7 +71,8 @@ const WORKER_ID = process.env.WORKER_ID ?? `linh-su-${process.pid}`;
 const POLL_MS = Number(process.env.WORKER_POLL_MS ?? 5000);
 // Năm giây là ranh giới người dùng còn cảm thấy nút Thu Đàn phản hồi tức thời. Cho phép chỉnh
 // để máy chủ riêng có thể tiết chế request, nhưng không nhận giá trị vô lý làm quay nóng CPU.
-const HEARTBEAT_MS = Math.max(1_000, Number(process.env.WORKER_HEARTBEAT_MS ?? 5_000) || 5_000);
+const HEARTBEAT_MS = Math.min(10_000, Math.max(1_000, Number(process.env.WORKER_HEARTBEAT_MS ?? 5_000) || 5_000));
+const QUEST_SCHEDULE_POLICY_MAX_STALE_MS = 20_000;
 // Số job (= số tài khoản) chạy CÙNG LÚC trong một tiến trình khôi lỗi. Mỗi job là một
 // Chromium riêng nên trần này là trần RAM. Kẹp 1–8 để một dấu phẩy gõ nhầm không mở tám mươi
 // trình duyệt.
@@ -168,6 +170,7 @@ async function runQuest({
   reportProgress,
   shouldStop,
   canFish,
+  questScheduleGate,
 }) {
   await say("Khôi lỗi đã nhận ngọc giản, đang khởi động tế đàn...");
 
@@ -201,16 +204,28 @@ async function runQuest({
     reportProgress,
     shouldStop,
     canFish,
+    questScheduleGate,
     profileDir,
   });
 }
 
+function isQuestSchedulePolicy(policy) {
+  return Array.isArray(policy?.rules) && Number.isFinite(policy.serverTimeMs) && /^[a-f0-9]{64}$/.test(policy.revision);
+}
+
 /** Một lượt trọn vẹn: nhịp tim chạy nền, engine chạy trước, kết thúc thì báo cáo. */
-async function handle(job) {
+async function handle(job, claimPolicy, claimUncertaintyMs) {
   console.log(`→ nhận job ${job.id}`);
 
   let stopping = false;
   const fishingGate = createFishingAccessGate(job.fishingAccess);
+  const initialPolicy = isQuestSchedulePolicy(claimPolicy) ? claimPolicy : null;
+  let scheduleRevision = initialPolicy?.revision;
+  const scheduleGate = createQuestScheduleGate(initialPolicy?.rules ?? null, {
+    serverTimeMs: initialPolicy?.serverTimeMs,
+    uncertaintyMs: claimUncertaintyMs,
+    maxStaleMs: QUEST_SCHEDULE_POLICY_MAX_STALE_MS,
+  });
 
   // Tiến độ vòng này, cưỡi nhịp tim sẵn có — không thêm một request nào. Engine cập nhật
   // biến này (đồng bộ, trong đường chạy nóng), nhịp tim kế tiếp mang nó đi; trễ tối đa đúng
@@ -221,14 +236,26 @@ async function handle(job) {
   // thành một lệnh xoá lặp lại mỗi 5 giây.
   let progress = null;
 
+  let heartbeatPending = false;
   const beat = setInterval(async () => {
+    // An older request must never restore policy after a newer heartbeat.
+    if (heartbeatPending) return;
+    heartbeatPending = true;
+    const sentAt = performance.now();
     try {
-      const { status, fishingAccess } = await call("heartbeat", {
+      const { status, fishingAccess, questSchedulePolicy } = await call("heartbeat", {
         jobId: job.id,
+        questSchedulesVersion: 1,
         ...(progress ? { progress } : {}),
         ...(VERSION ? { version: VERSION } : {}),
       });
       fishingGate.update(fishingAccess);
+      if (isQuestSchedulePolicy(questSchedulePolicy) && scheduleGate.update(questSchedulePolicy.rules, {
+        serverTimeMs: questSchedulePolicy.serverTimeMs,
+        uncertaintyMs: performance.now() - sentAt,
+      })) {
+        scheduleRevision = questSchedulePolicy.revision;
+      }
       // Bất kỳ trạng thái nào KHÔNG phải 'running' đều nghĩa là không còn ai chờ lượt này:
       // 'stopping/stopped' là Thu Đàn, còn 'failed/done' là reaper đã kết liễu job (mất
       // liên lạc dài rồi nối lại) — ôm browser chạy nốt một vòng không ai nhận chỉ tổ
@@ -244,6 +271,8 @@ async function handle(job) {
       if (/HTTP 40[34]\b/.test(err.message)) {
         stopping = true;
       }
+    } finally {
+      heartbeatPending = false;
     }
   }, HEARTBEAT_MS);
 
@@ -267,6 +296,7 @@ async function handle(job) {
       },
       shouldStop: () => stopping,
       canFish: fishingGate.canFish,
+      questScheduleGate: { state: scheduleGate.state, revision: () => scheduleRevision },
     });
     // TRẢ LẠI cái ngày server đã phát ở `claim`, không tự lấy ngày trên máy này. Một vòng bắt
     // đầu 23h50 và kết thúc 00h30 đã quan sát trạng thái của NGÀY HÔM QUA; khai theo đồng hồ
@@ -380,9 +410,11 @@ for (;;) {
 
   if (running.size < MAX_JOBS) {
     try {
-      const { job, webVersion, drain } = await call("claim", {
+      const sentAt = performance.now();
+      const { job, webVersion, drain, questSchedulePolicy } = await call("claim", {
         workerId: WORKER_ID,
         maxJobs: MAX_JOBS,
+        questSchedulesVersion: 1,
         ...(VERSION ? { version: VERSION } : {}),
       });
       if (drain === true) {
@@ -392,7 +424,7 @@ for (;;) {
         claimed = true;
         // handle() tự nuốt mọi lỗi của chính nó (kể cả lỗi báo cáo complete), nên promise
         // này không bao giờ reject — Set chỉ để đếm ghế.
-        const seat = handle(job).finally(() => running.delete(seat));
+        const seat = handle(job, questSchedulePolicy, performance.now() - sentAt).finally(() => running.delete(seat));
         running.add(seat);
       }
 

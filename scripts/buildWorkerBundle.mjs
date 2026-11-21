@@ -48,6 +48,10 @@ try {
       'import { createFishingAccessGate } from "./quest-engine/fishingAccess.mjs";',
     ],
     [
+      'import { createQuestScheduleGate } from "../src/lib/quest-engine/questSchedules.mjs";',
+      'import { createQuestScheduleGate } from "./quest-engine/questSchedules.mjs";',
+    ],
+    [
       'import { profileDirForJob, sweepStaleProfiles } from "../src/lib/quest-engine/browserProfile.mjs";',
       'import { profileDirForJob, sweepStaleProfiles } from "./quest-engine/browserProfile.mjs";',
     ],

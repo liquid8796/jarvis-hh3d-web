@@ -46,7 +46,11 @@ function parseDocument(value: unknown): SettingsDocument {
   return JSON.parse(value as string);
 }
 
-function database(initial?: SettingsDocument, { legacyLease = false } = {}) {
+function database(initial?: SettingsDocument, {
+  legacyLease = false,
+  legacyOwnerIsAdmin = false,
+  legacyWorkerKind,
+}: { legacyLease?: boolean; legacyOwnerIsAdmin?: boolean; legacyWorkerKind?: "operator" | "user" } = {}) {
   let value = structuredClone(initial);
   let transaction: { previous: SettingsDocument | undefined; locked: boolean } | undefined;
   const statements: Statement[] = [];
@@ -68,9 +72,13 @@ function database(initial?: SettingsDocument, { legacyLease = false } = {}) {
       transaction.locked = true;
     } else if (/^select 1 from "automation_jobs" /.test(sql)) {
       assert.ok(transaction?.locked, "Check legacy leases while holding the exclusive lock");
-      assert.match(sql, /where status in \('running', 'stopping'\) and \(config_snapshot->\$1::text\) is distinct from '1'::jsonb limit 1$/);
-      assert.deepEqual(params, ["$questSchedulesVersion"]);
-      return { rows: legacyLease ? [{ "?column?": 1 }] : [] };
+      assert.match(sql, /where job.status in \('running', 'stopping'\) and job.config_snapshot->\$1::text is distinct from '1'::jsonb/);
+      assert.match(sql, /job.config_snapshot->>\$2::text is distinct from 'user'/);
+      assert.match(sql, /and not exists \( select 1 from "user_roles" as owner_role where owner_role.user_id = job.user_id and owner_role.role_code = any\(\$3::text\[\]\) \) limit 1$/);
+      assert.deepEqual(params.slice(0, 2), ["$questSchedulesVersion", "$questScheduleWorkerKind"]);
+      assert.ok(Array.isArray(params[2]) && params[2].includes("gia-chu"));
+      const blocks = legacyLease && legacyWorkerKind !== "user" && !legacyOwnerIsAdmin;
+      return { rows: blocks ? [{ "?column?": 1 }] : [] };
     } else if (/^select value->'questSchedules' as rules,/.test(sql)) {
       assert.ok(transaction?.locked, "Read the previous policy while holding the exclusive lock");
       assert.match(sql, /from "app_settings" where id = 'global'$/);
@@ -203,4 +211,13 @@ test("a legacy worker lease blocks activation without writing but permits cleari
   assert.equal(cleared.statements.some(({ sql }) => sql.startsWith("select 1 ")), false);
   assert.ok(cleared.statements.some(({ sql }) => sql.startsWith('update "automation_jobs"')));
   assert.equal(cleared.statements.at(-1)?.sql, "commit");
+});
+
+test("legacy admin and authenticated personal leases do not block activation", async () => {
+  for (const exemption of [{ legacyOwnerIsAdmin: true }, { legacyWorkerKind: "user" as const }]) {
+    const db = database({ chat: { retentionDays: 20 } }, { legacyLease: true, ...exemption });
+    await saveQuestSchedules(rules);
+    assert.deepEqual(db.value()?.questSchedules, rules);
+    assert.equal(db.statements.at(-1)?.sql, "commit");
+  }
 });

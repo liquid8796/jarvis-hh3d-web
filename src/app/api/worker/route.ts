@@ -16,7 +16,7 @@ const WEB_VERSION = pkg.version.trim() || null;
 import { fishingAccessForUser, isAdminUser } from "@/lib/auth/permissions";
 import { enforceFishingAccessPolicy } from "@/lib/quest-engine/fishingAccess.mjs";
 import { z } from "zod";
-import { authorizeWorker } from "@/lib/auth/worker";
+import { authorizeWorker, type WorkerScope } from "@/lib/auth/worker";
 import {
   addEvent,
   claimNextJob,
@@ -38,7 +38,7 @@ import {
   storedConfigSchema,
 } from "@/lib/services/configs";
 import { getAppSettings } from "@/lib/services/settings";
-import { getQuestScheduleRules, questScheduleRevision } from "@/lib/services/questScheduleRollout";
+import { getQuestScheduleRules, questScheduleRevision, requestLegacyQuestScheduleRequeue } from "@/lib/services/questScheduleRollout";
 import { isDrainingWorkerId } from "@/lib/validation/workerAutoscale";
 import { findById } from "@/lib/services/users";
 import { decryptSecret, isEncrypted } from "@/lib/crypto/secretBox";
@@ -179,8 +179,8 @@ const bodySchema = z.discriminatedUnion("op", [
   }),
 ]);
 
-async function readQuestSchedulePolicy() {
-  const rules = await getQuestScheduleRules();
+async function readQuestSchedulePolicy(workerKind: WorkerScope["kind"], ownerIsAdmin: boolean) {
+  const rules = workerKind === "operator" && !ownerIsAdmin ? await getQuestScheduleRules() : [];
   return { questSchedulePolicy: { rules, serverTimeMs: Date.now(), revision: questScheduleRevision(rules) } };
 }
 
@@ -230,9 +230,6 @@ export async function POST(request: Request) {
       if (scope.kind === "operator"
           && isDrainingWorkerId(settings.workerAutoscale.drainingWorkerIds, body.workerId)) {
         return NextResponse.json({ job: null, drain: true, webVersion: WEB_VERSION });
-      }
-      if (!supportsQuestSchedules && settings.questSchedules.some(rule => rule.enabled)) {
-        return NextResponse.json({ job: null, webVersion: WEB_VERSION });
       }
 
       // Bế quan trùng tu: đóng ĐÚNG MỘT cánh cửa, và cánh cửa ấy nằm TRONG `claimNextJob`
@@ -305,11 +302,12 @@ export async function POST(request: Request) {
       //
       // Một phép đọc thêm cho mỗi lần PHÁT ĐƯỢC việc (không phải mỗi nhịp hỏi việc), tra
       // theo khoá chính. Không tìm thấy chủ thì coi như người thường — luật siết, không nới.
+      const owner = await findById(job.userId);
+      const ownerIsAdmin = owner !== null && isAdminUser(owner);
       let guarded = config;
       if (scope.kind === "operator") {
-        const owner = await findById(job.userId);
         guarded = enforceMazeCapPolicy(config, {
-          isAdmin: owner !== null && isAdminUser(owner),
+          isAdmin: ownerIsAdmin,
           // Luật theo MÁY đang nhận việc. Dù snapshot còn ghi `mine` từ một cấu hình cũ,
           // một operator đã claim được việc thì đây vẫn là ghế chung và phải giữ cap.
           workerPref: "sect",
@@ -323,8 +321,7 @@ export async function POST(request: Request) {
       guarded = enforceUnavailableQuestPolicy(guarded);
       // Both personal and sect workers enforce the owner's *current* role and VIP tag.
       // Never trust a saved config or a job snapshot claiming Câu Cá is enabled.
-      const fishingOwner = await findById(job.userId);
-      const fishingAccess = fishingAccessForUser(fishingOwner);
+      const fishingAccess = fishingAccessForUser(owner);
       guarded = enforceFishingAccessPolicy(guarded, fishingAccess.allowed);
 
       // Tên miền game ghép vào ĐÂY, cùng chỗ và cùng lý do với cookie: nó là sự thật của
@@ -334,7 +331,7 @@ export async function POST(request: Request) {
       // không cài lại, không sửa env, không deploy.
       return NextResponse.json({
         webVersion: WEB_VERSION,
-        ...(supportsQuestSchedules ? await readQuestSchedulePolicy() : {}),
+        ...(supportsQuestSchedules ? await readQuestSchedulePolicy(scope.kind, ownerIsAdmin) : {}),
         job: {
           id: job.id,
           userId: job.userId,
@@ -364,16 +361,23 @@ export async function POST(request: Request) {
 
       // Nhịp tim CŨNG là điểm danh: một khôi lỗi đang bận thì thôi không claim nữa, nên nếu
       // chỉ claim mới ghi sổ thì nó biến mất khỏi sổ đúng lúc làm việc chăm chỉ nhất.
-      if (beat.workerId) {
+      const workerKind = beat.questScheduleWorkerKind ?? scope.kind;
+      if (beat.workerId && workerKind === scope.kind) {
         await recordWorkerSeen(beat.workerId, scope, body.version ?? null);
       }
 
-      // `stopping` là tín hiệu người dùng đã bấm Thu Đàn; worker tự kết thúc ở điểm an toàn.
       const owner = await findById(beat.userId);
+      const ownerIsAdmin = owner !== null && isAdminUser(owner);
+      const supportsQuestSchedules = body.questSchedulesVersion === 1;
+      // Older operator workers can only stop a whole cycle. Requeue it at the
+      // next safe point if the owner's admin exemption ends during the lease.
+      const legacyRequeue = !supportsQuestSchedules && scope.kind === "operator" && workerKind === "operator"
+        && beat.status === "running" && (beat.questScheduleLegacyRequeue
+          || (!ownerIsAdmin && await requestLegacyQuestScheduleRequeue(body.jobId)));
       return NextResponse.json({
-        status: beat.status,
+        status: legacyRequeue ? "stopping" : beat.status,
         fishingAccess: fishingAccessForUser(owner),
-        ...(body.questSchedulesVersion === 1 ? await readQuestSchedulePolicy() : {}),
+        ...(supportsQuestSchedules ? await readQuestSchedulePolicy(workerKind, ownerIsAdmin) : {}),
       });
     }
 
@@ -424,6 +428,7 @@ export async function POST(request: Request) {
           atMs: body.questScheduleWakeAtMs,
           policyRevision: body.questSchedulePolicyRevision,
         },
+        scope,
       );
       if (!transition) {
         return NextResponse.json({ error: "job is no longer active" }, { status: 409 });

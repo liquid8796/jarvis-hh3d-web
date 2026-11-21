@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import { saveQuestSchedulesAction } from "@/app/actions/questSchedules";
+import { TimeOfDayInput } from "@/components/TimeOfDayInput";
 import {
   MAX_QUEST_SCHEDULE_WINDOWS,
   QUEST_SCHEDULE_OPTIONS,
@@ -32,11 +33,22 @@ export function QuestScheduleForm({ initialRules }: { initialRules: QuestSchedul
   }
 
   return (
-    <form action={action} onSubmit={() => setEditedSinceSubmit(false)} className="card card-hairline max-w-3xl p-4 sm:p-6">
+    <form
+      action={action}
+      onSubmit={(event) => {
+        // Dispatch manually so React's native form reset leaves the selected times intact.
+        event.preventDefault();
+        const values = new FormData(event.currentTarget);
+        setEditedSinceSubmit(false);
+        startTransition(() => action(values));
+      }}
+      className="card card-hairline max-w-3xl p-4 sm:p-6"
+    >
       <h2 className="h-display text-lg font-semibold text-gilded">Lịch Chạy Nhiệm Vụ</h2>
       <p className="mt-2 text-sm text-[var(--color-mist)]">
-        Lịch lặp lại hằng ngày theo giờ Việt Nam (UTC+7). Khi áp dụng lịch, Auto chỉ chạy nhiệm vụ
-        trong các khung giờ đã đặt và vẫn theo lựa chọn bật/tắt của đạo hữu.
+        Lịch lặp lại hằng ngày theo giờ Việt Nam (UTC+7) và chỉ áp dụng cho môn đồ thường chạy
+        Auto trên Khôi Lỗi tông môn. Tài khoản quản trị và các lượt chạy trên Khôi Lỗi cá nhân
+        (máy nhà) được miễn giới hạn này.
       </p>
       <p className="mt-1 text-sm text-[var(--color-mist)]">
         Cho phép từ giờ bắt đầu đến trước giờ kết thúc. Giờ kết thúc sớm hơn giờ bắt đầu
@@ -78,34 +90,22 @@ export function QuestScheduleForm({ initialRules }: { initialRules: QuestSchedul
               <div className="mt-2 space-y-2">
                 {rule.windows.map((window, index) => (
                   <div key={index} className="flex flex-wrap items-end gap-2">
-                    <label className="min-w-0 flex-1 text-xs text-[var(--color-mist)]">
-                      Bắt đầu
-                      <input
-                        type="time"
-                        aria-label={`Giờ bắt đầu ${index + 1}`}
-                        required
-                        value={window.start}
-                        onChange={(event) => updateRule(rule.questKey, {
-                          windows: rule.windows.map((item, itemIndex) => itemIndex === index ? { ...item, start: event.target.value } : item),
-                        })}
-                        className="input mt-1 min-h-11 w-full min-w-0"
-                        style={{ paddingInline: "0.375rem" }}
-                      />
-                    </label>
-                    <label className="min-w-0 flex-1 text-xs text-[var(--color-mist)]">
-                      Kết thúc
-                      <input
-                        type="time"
-                        aria-label={`Giờ kết thúc ${index + 1}`}
-                        required
-                        value={window.end}
-                        onChange={(event) => updateRule(rule.questKey, {
-                          windows: rule.windows.map((item, itemIndex) => itemIndex === index ? { ...item, end: event.target.value } : item),
-                        })}
-                        className="input mt-1 min-h-11 w-full min-w-0"
-                        style={{ paddingInline: "0.375rem" }}
-                      />
-                    </label>
+                    <TimeOfDayInput
+                      className="min-w-0 flex-1"
+                      label={`Bắt đầu ${index + 1}`}
+                      value={window.start}
+                      onChange={(start) => updateRule(rule.questKey, {
+                        windows: rule.windows.map((item, itemIndex) => itemIndex === index ? { ...item, start } : item),
+                      })}
+                    />
+                    <TimeOfDayInput
+                      className="min-w-0 flex-1"
+                      label={`Kết thúc ${index + 1}`}
+                      value={window.end}
+                      onChange={(end) => updateRule(rule.questKey, {
+                        windows: rule.windows.map((item, itemIndex) => itemIndex === index ? { ...item, end } : item),
+                      })}
+                    />
                     <button
                       type="button"
                       aria-label={`Xóa khung giờ ${index + 1}`}

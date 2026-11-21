@@ -66,6 +66,14 @@ export const MAX_LINE_LENGTH = 160;
  */
 export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: "1.3.261",
+    date: "2026-11-21",
+    lines: [
+      "Bộ hẹn giờ Quest và Auto Scaling nay hiển thị giờ 24h; lịch Auto cá nhân vẫn giữ thiết lập giây.",
+      "Giới hạn giờ Quest của Tông Môn chỉ áp dụng cho đạo hữu thường dùng khôi lỗi chung; tài khoản admin và khôi lỗi máy nhà được miễn.",
+    ],
+  },
+  {
     version: "1.3.260",
     date: "2026-11-21",
     lines: [
@@ -489,15 +497,6 @@ export const DEFAULT_RELEASE_NOTES: readonly ReleaseNote[] = [
       "Mê Cung chỉ hiện các tùy chọn phù hợp khi chọn Chủ phòng hoặc Thành viên.",
       "Độ khó và giới hạn Huyền Tinh dùng chung; chuyển vai trò không làm mất dữ liệu đang nhập.",
       "Cách hiển thị mới áp dụng cho cả VIP lẫn tài khoản thường.",
-    ],
-  },
-  {
-    version: "1.3.211",
-    date: "2026-10-24",
-    lines: [
-      "Mê Cung nay cho chọn làm chủ phòng hoặc thành viên; áp dụng cho cả VIP và tài khoản thường.",
-      "Có thể lọc độ khó, nhập mã phòng, chọn thời gian chờ và tự tìm phòng khác nếu bị trục xuất.",
-      "Khôi lỗi tự bật các chế độ hỗ trợ khi vào phòng và kiểm tra Huyền Tinh đúng ngày.",
     ],
   },
 ];

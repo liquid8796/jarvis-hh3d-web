@@ -8,6 +8,7 @@
  */
 import { sqlTag } from "./pgTag.mjs";
 import { claimNextJob, completeWorkerCycle, heartbeat, requestStop } from "../src/lib/services/jobs";
+import { TURN_GRACE_MS } from "../src/lib/services/dispatch";
 import { getQueueSnapshot } from "../src/lib/services/queue";
 import { recordWorkerSeen } from "../src/lib/services/workers";
 import { loadEnv } from "./loadEnv.mjs";
@@ -184,14 +185,14 @@ try {
     `hoàn thành vòng phải dọn tiến độ, còn lại ${JSON.stringify(afterComplete[0]?.cycle_progress)}`,
   );
 
-  // Vòng mới bắt đầu từ giấy trắng: claim phải dọn phần sót của vòng trước.
+  // Cho job quá thời gian ưu tiên worker cũ để worker mới kiểm tra việc dọn tiến độ.
   await sql`
     update automation_jobs
-    set next_run_at = now(), cycle_progress = ${JSON.stringify(beating)}::jsonb
+    set next_run_at = now() - (${TURN_GRACE_MS + 1000}::int * interval '1 millisecond'),
+        cycle_progress = ${JSON.stringify(beating)}::jsonb
     where id = ${jobId}
   `;
-  // Điểm danh ngay trước lượt claim: khôi lỗi này chưa từng gõ cửa, mà bộ cân tải chỉ chia
-  // việc cho tên có trong sổ VÀ đang trực — cửa sổ 30 giây đã trôi qua từ lâu ở đoạn này.
+  // Điểm danh worker mới ngay trước lượt claim để nó có mặt trong sổ trực.
   await recordWorkerSeen("verify-progress", { kind: "user", userId }, null, 2);
   const reclaimed = await claimNextJob("verify-progress", { kind: "user", userId });
   assert(reclaimed?.id === jobId, "job phải được claim lại để kiểm phép dọn lúc nhận việc");

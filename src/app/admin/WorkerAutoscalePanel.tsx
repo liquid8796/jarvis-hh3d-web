@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { reconcileWorkerAutoscaleAction, saveWorkerAutoscaleAction, type AutoscaleInput } from "@/app/actions/workerAutoscale";
+import { TimeOfDayInput } from "@/components/TimeOfDayInput";
 import type { WorkerAutoscaleSettings } from "@/lib/validation/workerAutoscale";
 import type { StationView } from "@/app/actions/githubStations";
 
@@ -123,10 +124,14 @@ export function WorkerAutoscalePanel({ initial, stations }: { initial: WorkerAut
             <button type="button" className="btn btn-ghost text-sm" disabled={busy || config.schedule.length >= 24} onClick={() => change("schedule", [...config.schedule, { time: "12:00", workers: config.minWorkers }])}>+ Thêm mốc</button>
           </div>
           <div className="mt-4 space-y-3">{config.schedule.map((item, i) =>
-            <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-3 rounded-xl border border-white/10 bg-black/15 p-3">
-              <label className="min-w-0 text-xs font-semibold text-[var(--color-mist)]">Thời gian
-                <input className={fieldClass} type="time" value={item.time} onChange={e => updateSchedule(i, { time: e.target.value })} disabled={busy} />
-              </label>
+            <div key={i} className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 rounded-xl border border-white/10 bg-black/15 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+              <TimeOfDayInput
+                className="col-span-2 min-w-0 sm:col-span-1"
+                label={`Thời gian ${i + 1}`}
+                value={item.time}
+                onChange={(time) => updateSchedule(i, { time })}
+                disabled={busy}
+              />
               <label className="min-w-0 text-xs font-semibold text-[var(--color-mist)]">Số Khôi Lỗi
                 <input className={fieldClass} type="number" min={config.minWorkers} max={100} value={item.workers} onChange={e => updateSchedule(i, { workers: limited(Number(e.target.value)) })} disabled={busy} />
               </label>

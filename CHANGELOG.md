@@ -9,6 +9,13 @@ kể cả chính mình sáu tháng nữa — phạm lại đúng lỗi đó.
 
 Xem [README.md](README.md) để biết hệ thống chạy thế nào.
 
+## 1.3.261 — 24-hour timers and scoped quest schedule exemptions (21/11/2026)
+
+- Use explicit zero-padded 24-hour controls in Admin Quest and Auto Scaling, with the same control for personal Auto timers while preserving seconds.
+- Exempt authenticated personal workers and current admin owners from administrator quest windows; keep personal timers and unrelated quest access policies intact.
+- Resolve exemptions from authenticated scope/current roles, preserve scoped legacy claims and activation safety, and reconsider obsolete schedule waits for exempt runs. A cooperative legacy role-revocation requeue preserves explicit user stops.
+- Extend actual Chromium form-save coverage and focused policy/API/storage/job-transition regressions; validate both TypeScript targets and production build.
+
 ## 1.3.260 — Administrator quest availability windows (21/11/2026)
 
 - Add /admin?tab=quest with a validated editor for daily UTC+7 windows, multiple intervals and overnight ranges across all 15 logical quests. VIP/free variants share policy; user switches and personal timers remain independent.

@@ -1,9 +1,11 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { startTransition, useActionState, useRef, useState } from "react";
 import { saveQuestTimersAction, type ActionResult } from "@/app/actions/automation";
+import { TimeOfDayInput } from "@/components/TimeOfDayInput";
 import {
   QUEST_TIMER_OPTIONS,
+  formatQuestTimer,
   type QuestTimer,
   type QuestTimerKey,
 } from "@/lib/questTimers";
@@ -91,7 +93,15 @@ export function QuestTimerPanel({
           </button>
         </div>
 
-        <form action={action} className="space-y-3">
+        <form
+          action={action}
+          onSubmit={(event) => {
+            event.preventDefault();
+            const values = new FormData(event.currentTarget);
+            startTransition(() => action(values));
+          }}
+          className="space-y-3"
+        >
         <input
           type="hidden"
           name="questTimersJson"
@@ -112,7 +122,7 @@ export function QuestTimerPanel({
                 key={row.rowId}
                 className="rounded-xl border border-[var(--color-ink-600)]/60 bg-[var(--color-ink-900)]/20 p-3 sm:p-4"
               >
-                <div className="grid grid-cols-3 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] sm:gap-3">
+                <div className="grid grid-cols-3 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:gap-3">
                   <div className="col-span-3 min-w-0 sm:col-span-1">
                     <label className="label" htmlFor={row.rowId + "-quest"}>Quest</label>
                     <select
@@ -135,30 +145,29 @@ export function QuestTimerPanel({
                     </select>
                   </div>
 
-                  {(
-                    [
-                      ["Giờ", "hour", row.hour, 23],
-                      ["Phút", "minute", row.minute, 59],
-                      ["Giây", "second", row.second, 59],
-                    ] as const
-                  ).map(([label, field, value, max]) => (
-                    <div key={field} className="min-w-0 sm:w-[5.2rem]">
-                      <label className="label" htmlFor={row.rowId + "-" + field}>{label}</label>
-                      <input
-                        id={row.rowId + "-" + field}
-                        className="input text-center tabular-nums"
-                        type="number"
-                        min={0}
-                        max={max}
-                        value={String(value).padStart(2, "0")}
-                        onChange={(event) =>
-                          update(row.rowId, {
-                            [field]: clamp(Number(event.target.value), 0, max),
-                          } as Partial<QuestTimer>)
-                        }
-                      />
-                    </div>
-                  ))}
+                  <TimeOfDayInput
+                    className="col-span-2 min-w-0 sm:col-span-1 sm:w-36"
+                    label="Giờ hẹn"
+                    value={formatQuestTimer(row).slice(0, 5)}
+                    onChange={(time) => {
+                      const [hour, minute] = time.split(":").map(Number);
+                      update(row.rowId, { hour, minute });
+                    }}
+                    disabled={pending}
+                  />
+                  <div className="min-w-0 sm:w-[5.2rem]">
+                    <label className="label" htmlFor={row.rowId + "-second"}>Giây</label>
+                    <input
+                      id={row.rowId + "-second"}
+                      className="input min-h-11 text-center tabular-nums"
+                      type="number"
+                      min={0}
+                      max={59}
+                      value={String(row.second).padStart(2, "0")}
+                      onChange={(event) => update(row.rowId, { second: clamp(Number(event.target.value), 0, 59) })}
+                      disabled={pending}
+                    />
+                  </div>
 
                   <button
                     type="button"

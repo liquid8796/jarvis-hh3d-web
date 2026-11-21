@@ -13,16 +13,19 @@ import {
 import { DEFAULT_MAX_JOBS, DISPATCH_CANDIDATES, pickDispatch, STALE_AFTER_MS } from "./dispatch";
 import { getAppSettings, saveAppSettings, type AppSettings } from "./settings";
 import {
+  decodeQuestScheduleWorkerKind,
   getQuestScheduleRules,
   lockQuestScheduleRead,
+  questScheduleOwnerIsAdmin,
   questScheduleRevision,
   questScheduleSnapshot,
+  QUEST_SCHEDULE_LEGACY_REQUEUE_KEY,
   QUEST_SCHEDULE_SNAPSHOT_VERSION_KEY,
   QUEST_SCHEDULE_WAITING_KEY,
+  QUEST_SCHEDULE_WORKER_KIND_KEY,
 } from "./questScheduleRollout";
 import { findById } from "./users";
 import { maintenanceAllowsAutomation } from "@/lib/auth/maintenance";
-import { ADMIN_ROLE_CODES } from "@/lib/auth/permissions";
 import { ONLINE_WINDOW_MS, workerOnlineFor } from "./workers";
 import { reviewDailyReset } from "@/lib/validation/dailyReset";
 import {
@@ -681,26 +684,26 @@ export async function claimNextJob(
    * tiền tố khoá chính, không thêm chỉ mục nào.
    */
   const settings = suppliedSettings ?? await getAppSettings();
-  if (!supportsQuestSchedules && settings.questSchedules.some(rule => rule.enabled)) return null;
+  const legacyOperator = scope.kind === "operator" && !supportsQuestSchedules;
+  const adminOnly = legacyOperator && settings.questSchedules.some(rule => rule.enabled);
   // Second line of defense, in case another service calls claimNextJob
   // directly rather than through /api/worker.
   if (scope.kind === "operator"
       && isDrainingWorkerId(settings.workerAutoscale.drainingWorkerIds, workerId)) return null;
-  const { maintenance } = settings;
-  const maintenanceFilter = maintenance.active
-    ? sql` and exists (
-        select 1 from ${schema.userRoles} as ur
-        where ur.user_id = job.user_id
-          and ur.role_code in (${sql.join(
-            ADMIN_ROLE_CODES.map((code) => sql`${code}`),
-            sql`, `,
-          )})
-      )`
-    : sql``;
+  const ownerIsAdmin = questScheduleOwnerIsAdmin(sql`job.user_id`);
+  const adminFilter = adminOnly || settings.maintenance.active ? sql` and ${ownerIsAdmin}` : sql``;
+  // Previous revisions deferred exempt work too. An exempt claimant can take a
+  // schedule-held job after the existing requeue grace, including after a promotion.
+  const scheduleExempt = scope.kind === "user" ? sql`true` : ownerIsAdmin;
+  const dueAt = sql`case
+    when job.config_snapshot->${QUEST_SCHEDULE_WAITING_KEY}::text = 'true'::jsonb and ${scheduleExempt}
+      then least(job.next_run_at, job.last_heartbeat + interval '30 seconds')
+    else job.next_run_at
+  end`;
 
   const dueResult = await db().execute(sql`
     select
-      job.id, job.user_id, job.next_run_at, job.last_worker_id,
+      job.id, job.user_id, ${dueAt} as next_run_at, job.last_worker_id,
       coalesce(
         (select acc.worker_pref_override from game_accounts as acc
          where acc.id = job.account_id and acc.user_id = job.user_id
@@ -710,7 +713,7 @@ export async function claimNextJob(
       ) as owner_pref
     from automation_jobs as job
     where job.status = 'queued'
-      and job.next_run_at <= now()${scopeFilter}${maintenanceFilter}
+      and ${dueAt} <= now()${scopeFilter}${adminFilter}
       -- Tài khoản đã tắt thì đàn của nó không được phát ra nữa — cửa chặn cho khe đua
       -- hiếm giữa "thu đàn của tài khoản" và "hạ cờ enabled" trong toggleAccountAction.
       and (
@@ -720,7 +723,7 @@ export async function claimNextJob(
           where acc.id = job.account_id and acc.enabled
         )
       )
-    order by job.next_run_at, job.created_at
+    order by next_run_at, job.created_at
     limit ${DISPATCH_CANDIDATES}
   `);
 
@@ -785,12 +788,16 @@ export async function claimNextJob(
     return null;
   }
 
-  const claim = (database: Pick<ReturnType<typeof db>, "execute">) => database.execute(sql`
+  const leaseMetadata = JSON.stringify({
+    [QUEST_SCHEDULE_WORKER_KIND_KEY]: scope.kind,
+    ...(supportsQuestSchedules ? { [QUEST_SCHEDULE_SNAPSHOT_VERSION_KEY]: 1 } : {}),
+  });
+  const claim = (database: Pick<ReturnType<typeof db>, "execute">, requireAdmin = false) => database.execute(sql`
     with candidate as (
-      select id from automation_jobs
+      select id from automation_jobs as job
       where id = ${decision.jobId}
         and status = 'queued'
-        and next_run_at <= now()
+        and ${dueAt} <= now()${scopeFilter}${requireAdmin ? sql` and ${ownerIsAdmin}` : sql``}
       for update skip locked
       limit 1
     )
@@ -819,9 +826,7 @@ export async function claimNextJob(
            and acc.id = automation_jobs.account_id),
         (select config from user_configs where user_id = automation_jobs.user_id),
         automation_jobs.config_snapshot
-      )`, supportsQuestSchedules
-        ? sql`jsonb_build_object(${QUEST_SCHEDULE_SNAPSHOT_VERSION_KEY}::text, 1)`
-        : undefined)},
+      )`, sql`${leaseMetadata}::jsonb`)},
       started_at = coalesce(started_at, now()),
       -- Vòng mới bắt đầu từ tờ giấy trắng. Không dọn ở đây thì tiến độ của vòng TRƯỚC
       -- (thường là "8/8, đang chạy nhiệm vụ cuối") còn nguyên trên hàng đợi suốt quãng linh
@@ -836,13 +841,12 @@ export async function claimNextJob(
     returning automation_jobs.*
   `);
 
-  const claimed = supportsQuestSchedules ? await claim(db()) : await db().transaction(async (tx) => {
-    // An admin save takes the exclusive lock and checks existing leases. Recheck
-    // under the shared lock so a concurrent save cannot pass between read and claim.
+  const claimed = legacyOperator ? await db().transaction(async (tx) => {
+    // Prevent a schedule save from racing past a legacy member lease.
     await lockQuestScheduleRead(tx);
-    if ((await getQuestScheduleRules(tx)).some(rule => rule.enabled)) return null;
-    return claim(tx);
-  });
+    const restricted = (await getQuestScheduleRules(tx)).some(rule => rule.enabled);
+    return claim(tx, restricted);
+  }) : await claim(db());
   const row = (claimed?.rows[0] ?? null) as Record<string, unknown> | null;
   if (!row) {
     return null;
@@ -927,7 +931,15 @@ export async function jobBelongsTo(jobId: string, scope: WorkerScope): Promise<b
 export async function heartbeat(
   jobId: string,
   progress?: CycleProgress,
-): Promise<{ status: JobRow["status"]; workerId: string | null; userId: string } | null> {
+): Promise<{
+  status: JobRow["status"];
+  workerId: string | null;
+  userId: string;
+  questScheduleWorkerKind: WorkerScope["kind"] | null;
+  questScheduleLegacyRequeue: boolean;
+} | null> {
+  const leaseKind = sql`${schema.automationJobs.configSnapshot}->>${QUEST_SCHEDULE_WORKER_KIND_KEY}::text`;
+  const legacyRequeue = sql`coalesce(${schema.automationJobs.configSnapshot}->${QUEST_SCHEDULE_LEGACY_REQUEUE_KEY}::text = 'true'::jsonb, false)`;
   if (progress === undefined) {
     const rows = await db()
       .update(schema.automationJobs)
@@ -937,8 +949,17 @@ export async function heartbeat(
         status: schema.automationJobs.status,
         workerId: schema.automationJobs.workerId,
         userId: schema.automationJobs.userId,
+        leaseKind: leaseKind.as("lease_kind"),
+        legacyRequeue: legacyRequeue.as("legacy_requeue"),
       });
-    return rows[0] ?? null;
+    const row = rows[0];
+    return row ? {
+      status: row.status,
+      workerId: row.workerId,
+      userId: row.userId,
+      questScheduleWorkerKind: decodeQuestScheduleWorkerKind(row.leaseKind),
+      questScheduleLegacyRequeue: row.legacyRequeue === true,
+    } : null;
   }
 
   /**
@@ -960,15 +981,19 @@ export async function heartbeat(
       end,
       cycle_progress = ${serialised}::jsonb
     where id = ${jobId}
-    returning status, worker_id, user_id
+    returning status, worker_id, user_id, ${leaseKind} as lease_kind, ${legacyRequeue} as legacy_requeue
   `);
 
-  const row = result.rows[0] as { status: string; worker_id: unknown; user_id: string } | undefined;
+  const row = result.rows[0] as {
+    status: string; worker_id: unknown; user_id: string; lease_kind: unknown; legacy_requeue: boolean;
+  } | undefined;
   if (!row) return null;
   return {
     status: row.status as JobRow["status"],
     workerId: row.worker_id == null ? null : String(row.worker_id),
     userId: row.user_id,
+    questScheduleWorkerKind: decodeQuestScheduleWorkerKind(row.lease_kind),
+    questScheduleLegacyRequeue: row.legacy_requeue === true,
   };
 }
 
@@ -1072,12 +1097,18 @@ export async function completeWorkerCycle(
   proposedDelaySeconds?: number,
   dailyReport?: { day: string; questIds: string[] },
   scheduleWake?: { atMs: number; policyRevision?: string },
+  scope: WorkerScope = { kind: "operator" },
 ): Promise<WorkerCycleTransition | null> {
   const now = new Date();
   const delaySeconds = normalizeNextDelay(outcome, proposedDelaySeconds);
   const normalNextRunAt = new Date(now.getTime() + delaySeconds * 1000);
   const timerNextRunAt = await nextTimerActivationForJob(jobId, now);
   const stopFromWorker = outcome === "stopped";
+  // A cooperative legacy-policy stop keeps the row running. An explicit stop
+  // changes its status and takes priority over the private policy marker.
+  const restartCycle = sql`(restart_after_stop or (
+    status = 'running' and coalesce(config_snapshot->${QUEST_SCHEDULE_LEGACY_REQUEUE_KEY}::text = 'true'::jsonb, false)
+  ))`;
 
   // Tài khoản đã tắt (hoặc job đời cũ mà tài khoản không còn) thì vòng này là vòng cuối:
   // re-queue một đàn mà claim sẽ không bao giờ phát ra chỉ tạo zombie "chờ khôi lỗi" vĩnh
@@ -1103,12 +1134,12 @@ export async function completeWorkerCycle(
         -- Đàn bị lượt reset sang ngày cắt ngang: nó ĐÃ dừng đúng như yêu cầu, và giờ phải vào
         -- vòng mới ngay. Nhánh này đứng TRƯỚC nhánh 'stopping' chung, vì nhìn từ đây hai đường
         -- giống hệt nhau — chỉ cột restart_after_stop phân biệt được (xem migration 0031).
-        when restart_after_stop then 'queued'::job_status
+        when ${restartCycle} then 'queued'::job_status
         when status = 'stopping' or ${stopFromWorker} then 'stopped'::job_status
         else 'queued'::job_status
       end,
       finished_at = case
-        when restart_after_stop and not ${accountRetired} then null
+        when ${restartCycle} and not ${accountRetired} then null
         when status = 'stopping' or ${stopFromWorker} or ${accountRetired} then now()
         else null
       end,
@@ -1116,14 +1147,14 @@ export async function completeWorkerCycle(
       -- vừa bị cắt ngang không nợ ai một quãng nghỉ nào — quãng nghỉ sinh ra để giãn nhịp giữa
       -- hai vòng ĐÃ XONG, còn vòng vừa rồi thì chưa xong.
       next_run_at = case
-        when restart_after_stop and not ${accountRetired} then now()
+        when ${restartCycle} and not ${accountRetired} then now()
         when status = 'stopping' or ${stopFromWorker} or ${accountRetired} then now()
         else ${nextRunAt}
       end,
       -- Đàn xếp lại thì phải nhận ảnh cấu hình MỚI, y như mọi vòng bình thường: vòng vừa bị cắt
       -- mang ảnh của ngày cũ, và giữ lại nó là chạy tiếp cho cái ngày vừa qua.
       config_snapshot = ${questScheduleSnapshot(sql`case
-        when not restart_after_stop and (status = 'stopping' or ${stopFromWorker} or ${accountRetired}) then config_snapshot
+        when not ${restartCycle} and (status = 'stopping' or ${stopFromWorker} or ${accountRetired}) then config_snapshot
         else coalesce(
           (select uc.config || jsonb_build_object(
               'gameCookie', acc.cookie_envelope,
@@ -1136,7 +1167,7 @@ export async function completeWorkerCycle(
           config_snapshot
         )
       end`, hasScheduleDeferral ? sql`case
-        when not restart_after_stop and status = 'running' and not ${accountRetired}
+        when not ${restartCycle} and status = 'running' and not ${accountRetired}
           then jsonb_build_object(${QUEST_SCHEDULE_WAITING_KEY}::text, true)
         else '{}'::jsonb
       end` : undefined)},
@@ -1154,7 +1185,7 @@ export async function completeWorkerCycle(
       -- Dòng ĐÃ TẮT (stopped) thì giữ nguyên tên: nó là lịch sử, không phải hàng chờ, và
       -- người vận hành cần đọc được vòng cuối cùng chạy trên máy nào.
       worker_id = case
-        when not restart_after_stop and (status = 'stopping' or ${stopFromWorker} or ${accountRetired}) then worker_id
+        when not ${restartCycle} and (status = 'stopping' or ${stopFromWorker} or ${accountRetired}) then worker_id
         else null
       end,
       -- Tắt ngay khi đã dùng: cờ này sống đúng một chặng (bật lúc reset → tắt lúc xếp lại). Để
@@ -1171,7 +1202,15 @@ export async function completeWorkerCycle(
     // A save wakes marked queued jobs. Serialize this update so a delayed
     // response cannot put a job back to sleep using rules that were just changed.
     await lockQuestScheduleRead(tx);
-    const rules = await getQuestScheduleRules(tx);
+    const { rows } = await tx.execute<{ applies: boolean }>(sql`
+      select (case job.config_snapshot->>${QUEST_SCHEDULE_WORKER_KIND_KEY}::text
+        when 'operator' then true
+        when 'user' then false
+        else ${scope.kind === "operator"}
+      end) and not ${questScheduleOwnerIsAdmin(sql`job.user_id`)} as applies
+      from ${schema.automationJobs} as job where job.id = ${jobId}
+    `);
+    const rules = rows[0]?.applies ? await getQuestScheduleRules(tx) : [];
     const nowMs = Date.now();
     const hasCurrentOpening = rules.some(rule => rule.enabled)
       && scheduleWake.policyRevision === questScheduleRevision(rules)
